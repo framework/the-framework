@@ -3,11 +3,8 @@ import assert from 'node:assert/strict'
 import { z } from 'zod'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { Agent } from './agent.js'
-import { AiFake } from './fake.js'
-import { AiRegistry } from './registry.js'
-import { toolDefinition } from './tool.js'
-import { mcpServerFromAgent } from './mcp/server-from-agent.js'
+import { Agent, AiFake, AiRegistry, toolDefinition } from '@gemstack/ai-sdk'
+import { mcpServerFromAgent } from './server-from-agent.js'
 
 // ─── Fixture agent ────────────────────────────────────────
 

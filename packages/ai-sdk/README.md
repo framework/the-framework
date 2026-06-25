@@ -1,6 +1,6 @@
 # @gemstack/ai-sdk
 
-AI engine: providers, agents, tools, streaming, middleware, structured output, conversation memory, evals, MCP, computer-use, and testing fakes.
+AI engine: providers, agents, tools, streaming, middleware, structured output, conversation memory, evals, computer-use, and testing fakes.
 
 The first [GemStack](https://github.com/gemstack-land/gemstack) package. Spun out of Rudder's `@rudderjs/ai` (carried forward from the 1.17.x line, renamed and re-versioned under the GemStack umbrella). The Rudder package now ships as a thin deprecated re-export of this one.
 
@@ -40,13 +40,14 @@ The neutral storage contracts (`UserMemory`, `ConversationStore`, `BudgetStorage
 | `.` | Core: `Agent`, `tool`, streaming, middleware, facade |
 | `./server` | The server provider entry |
 | `./node` | Node-only entry |
-| `./mcp` | Model Context Protocol server/client helpers |
 | `./computer-use` | Computer-use tool + executor |
 | `./eval` | Eval framework (`evalSuite`, metrics, reporters) |
 | `./gateway` | Gateway helpers |
 | `./conversation-orm`, `./memory-orm`, `./budget-orm` | ORM-backed stores (optional `@rudderjs/orm` peer; moving behind the neutral seam) |
 | `./memory-embedding` | Embedding-backed user memory |
 | `./react` | React bindings |
+
+> **Moved in `0.3.0`:** the MCP bridge (`mcpClientTools` / `mcpServerFromAgent`), previously the `./mcp` subpath, is now its own package, [`@gemstack/ai-mcp`](https://github.com/gemstack-land/gemstack/tree/main/packages/ai-mcp). Update `@gemstack/ai-sdk/mcp` imports to `@gemstack/ai-mcp` and move the `@modelcontextprotocol/sdk` peer there.
 
 ## License
 

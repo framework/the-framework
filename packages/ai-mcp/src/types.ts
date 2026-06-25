@@ -1,5 +1,5 @@
 /**
- * Public types for `@gemstack/ai-sdk/mcp`. Kept in a separate module so the
+ * Public types for `@gemstack/ai-mcp`. Kept in a separate module so the
  * client + server connectors can share them without circular imports.
  */
 

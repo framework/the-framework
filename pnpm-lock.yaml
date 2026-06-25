@@ -18,8 +18,11 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
 
-  packages/ai-sdk:
+  packages/ai-mcp:
     dependencies:
+      '@gemstack/ai-sdk':
+        specifier: workspace:^
+        version: link:../ai-sdk
       zod:
         specifier: ^4.0.0
         version: 4.4.3
@@ -27,6 +30,19 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  packages/ai-sdk:
+    dependencies:
+      zod:
+        specifier: ^4.0.0
+        version: 4.4.3
+    devDependencies:
       '@rudderjs/console':
         specifier: ^1.4.3
         version: 1.4.3

@@ -1,0 +1,66 @@
+{
+  "name": "@gemstack/ai-mcp",
+  "version": "0.0.0",
+  "description": "Bridge between @gemstack/ai-sdk Agents and Model Context Protocol servers: consume remote MCP tools as Agent tools, and expose an Agent as an MCP server.",
+  "keywords": [
+    "ai",
+    "agent",
+    "agents",
+    "mcp",
+    "model-context-protocol",
+    "tools",
+    "tool-calling",
+    "bridge",
+    "gemstack"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/gemstack-land/gemstack/tree/main/packages/ai-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/gemstack-land/gemstack/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gemstack-land/gemstack",
+    "directory": "packages/ai-mcp"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc -p tsconfig.test.json && cd dist-test && node --test",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@gemstack/ai-sdk": "workspace:^",
+    "zod": "^4.0.0"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  },
+  "author": "Suleiman Shahbari"
+}

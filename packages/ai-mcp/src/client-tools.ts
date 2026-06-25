@@ -1,11 +1,11 @@
 import { z } from 'zod'
-import { dynamicTool } from '../tool.js'
-import type { Tool, ToolCallContext } from '../types.js'
+import { dynamicTool } from '@gemstack/ai-sdk'
+import type { Tool, ToolCallContext } from '@gemstack/ai-sdk'
 import type {
   McpClientTransport, McpClientToolsOptions, StdioServerSpawn,
 } from './types.js'
 
-const CLIENT_INFO = { name: 'rudderjs-ai-mcp-bridge', version: '1.0.0' } as const
+const CLIENT_INFO = { name: 'gemstack-ai-mcp-bridge', version: '1.0.0' } as const
 
 /**
  * The result of `mcpClientTools()` — an array of `Tool`s that also carries a
@@ -21,7 +21,7 @@ export interface McpClientToolsHandle extends ReadonlyArray<Tool> {
 }
 
 /**
- * Connect to a remote MCP server and surface its tools as Rudder `Tool`s.
+ * Connect to a remote MCP server and surface its tools as `@gemstack/ai-sdk` `Tool`s.
  *
  * Three transport shapes are accepted:
  *

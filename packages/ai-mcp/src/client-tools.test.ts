@@ -4,8 +4,8 @@ import { z } from 'zod'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { mcpClientTools } from './mcp/client-tools.js'
-import { toolToSchema } from './tool.js'
+import { mcpClientTools } from './client-tools.js'
+import { toolToSchema } from '@gemstack/ai-sdk'
 
 // ─── Helpers ─────────────────────────────────────────────
 

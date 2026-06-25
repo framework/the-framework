@@ -3,13 +3,11 @@ import assert from 'node:assert/strict'
 import { z } from 'zod'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { Agent } from './agent.js'
-import { AiRegistry } from './registry.js'
-import { toolDefinition } from './tool.js'
-import { mcpServerFromAgent } from './mcp/server-from-agent.js'
+import { Agent, AiRegistry, toolDefinition } from '@gemstack/ai-sdk'
+import { mcpServerFromAgent } from './server-from-agent.js'
 import type {
   AiMessage, ProviderAdapter, ProviderRequestOptions, ProviderResponse, StreamChunk,
-} from './types.js'
+} from '@gemstack/ai-sdk'
 
 // ─── Scripted adapter (copy of handoff.test.ts pattern) ───
 

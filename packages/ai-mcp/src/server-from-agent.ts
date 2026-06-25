@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import type { Agent } from '../agent.js'
-import type { HasTools, Tool, ToolCallContext } from '../types.js'
+import type { Agent } from '@gemstack/ai-sdk'
+import type { HasTools, Tool, ToolCallContext } from '@gemstack/ai-sdk'
 import type { McpServerFromAgentOptions } from './types.js'
 
 /**
@@ -11,7 +11,7 @@ import type { McpServerFromAgentOptions } from './types.js'
  * SDK's stdio / HTTP transports:
  *
  * ```ts
- * import { mcpServerFromAgent } from '@gemstack/ai-sdk/mcp'
+ * import { mcpServerFromAgent } from '@gemstack/ai-mcp'
  * import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
  *
  * const server = await mcpServerFromAgent(MyAgent)

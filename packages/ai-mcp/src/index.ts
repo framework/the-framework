@@ -1,5 +1,5 @@
 /**
- * `@gemstack/ai-sdk/mcp` — bridge between `@gemstack/ai-sdk` Agents and Model Context
+ * `@gemstack/ai-mcp` — bridge between `@gemstack/ai-sdk` Agents and Model Context
  * Protocol servers. Two connectors:
  *
  * - {@link mcpClientTools} — consume a remote MCP server's tools as Agent tools

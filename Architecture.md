@@ -6,6 +6,28 @@ A shared reference for how GemStack packages are layered and named. This is the 
 
 The `ai-` prefix means **"depends on the agent runtime."** A package about AI that is agent-agnostic does not get the `ai-` prefix; it is a peer of the AI family, not a member.
 
+## What belongs in GemStack: engines, not bindings
+
+GemStack hosts **framework-agnostic engines** that work in any Node app. It does not host framework-specific bindings or extensions. This is the line that keeps the umbrella legible.
+
+- **Engines (belong here):** `@gemstack/ai-sdk` and its family. They have no hard dependency on any framework.
+- **Bindings (do not belong here):** framework extensions like the `vike-*` packages (in the `vike-data` repo). Their whole value is the framework integration, so they are the opposite of agnostic. They live with their framework and **consume** GemStack engines, e.g. `vike-ai` is a thin Vike binding over `@gemstack/ai-sdk`:
+
+```
+@gemstack/ai-sdk      (agnostic engine, here)
+       ^
+       | thin binding
+vike-ai               (Vike extension, in vike-data) -- consumes the engine
+```
+
+### Graduation, not bulk relocation
+
+Packages join GemStack by **graduating**, one at a time, when they prove framework-agnostic value, not by bulk-moving a framework's package set in.
+
+- `@gemstack/ai-sdk` is the template: it matured inside Rudder as `@rudderjs/ai`, proved it was agnostic and broadly useful, then graduated to `@gemstack/`.
+- A `vike-*` package moves here only if a genuinely agnostic *core* falls out of it that is useful beyond its framework. In that case the core graduates (e.g. `@gemstack/<core>`) while the framework binding stays `vike-*`.
+- Because both repos are co-governed and the `vike-*` set sits in the Vike orbit, any such move is decided with the Vike team, when there is brand traction, not unilaterally.
+
 ## The AI family
 
 ```

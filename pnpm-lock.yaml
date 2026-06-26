@@ -96,9 +96,6 @@ importers:
       '@rudderjs/core':
         specifier: ^1.13.3
         version: 1.13.3
-      '@rudderjs/orm':
-        specifier: ^1.22.0
-        version: 1.22.0(@rudderjs/console@1.4.3)(@rudderjs/core@1.13.3)
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.43
@@ -591,42 +588,6 @@ packages:
   '@rudderjs/core@1.13.3':
     resolution: {integrity: sha512-hBJJsucZnr8xFGMCpsz77UwgxpRPDYb/m5iVvkfk5ywBh3kcIiUufT9b1hwPabQn+erDdH3hNtoH4KUT4ckStg==}
     engines: {node: '>=22.12.0'}
-
-  '@rudderjs/database@1.5.5':
-    resolution: {integrity: sha512-MDz7tyhMwbKTGfVeGH2GSNxbVyTluwMnx1Ww7uHgTiBiDEgqIei02Ou3nT7CAlRmBcqz7FSp2LMkmGILeRgJ/A==}
-    engines: {node: '>=22.12.0'}
-    peerDependencies:
-      better-sqlite3: ^12.0.0
-      mysql2: ^3.0.0
-      postgres: ^3.0.0
-    peerDependenciesMeta:
-      better-sqlite3:
-        optional: true
-      mysql2:
-        optional: true
-      postgres:
-        optional: true
-
-  '@rudderjs/orm@1.22.0':
-    resolution: {integrity: sha512-c8E99UkKv7TaT3J748I8VwY+6Roztw/OfSKhbIQoqzk41kjaV6VdzoPpcpr6okrdkMNuO8zb+AGzIUAoZwASRQ==}
-    engines: {node: '>=22.12.0'}
-    peerDependencies:
-      '@rudderjs/console': ^1.4.3
-      '@rudderjs/core': ^1.13.3
-      better-sqlite3: ^12.0.0
-      mysql2: ^3.0.0
-      postgres: ^3.0.0
-    peerDependenciesMeta:
-      '@rudderjs/console':
-        optional: true
-      '@rudderjs/core':
-        optional: true
-      better-sqlite3:
-        optional: true
-      mysql2:
-        optional: true
-      postgres:
-        optional: true
 
   '@rudderjs/router@1.9.2':
     resolution: {integrity: sha512-h+DMjZhbglyyHu00FuKxE4BA2jiFFUjkb0s/ue1uM2LijeOd4Y8rhAs4e91fjPuVik6Tc86ElHkAc0ygqD6cCQ==}
@@ -2217,18 +2178,6 @@ snapshots:
       '@rudderjs/support': 1.6.3
       reflect-metadata: 0.2.2
       zod: 4.4.3
-
-  '@rudderjs/database@1.5.5':
-    dependencies:
-      '@rudderjs/contracts': 1.19.0
-
-  '@rudderjs/orm@1.22.0(@rudderjs/console@1.4.3)(@rudderjs/core@1.13.3)':
-    dependencies:
-      '@rudderjs/contracts': 1.19.0
-      '@rudderjs/database': 1.5.5
-    optionalDependencies:
-      '@rudderjs/console': 1.4.3
-      '@rudderjs/core': 1.13.3
 
   '@rudderjs/router@1.9.2':
     dependencies:

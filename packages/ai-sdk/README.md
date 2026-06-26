@@ -25,13 +25,12 @@ pnpm add @aws-sdk/client-bedrock-runtime # AWS Bedrock
 
 ## Status
 
-As of `0.2.0` the core stands alone: `@gemstack/ai-sdk`'s only required runtime dependency is `zod`. Every framework integration is an optional, opt-in subpath behind an optional peer dependency:
+The core stands alone: `@gemstack/ai-sdk`'s only required runtime dependency is `zod`. Persistence is via **neutral contracts** you implement against your own infrastructure:
 
-- the Rudder `/server` provider (optional peer `@rudderjs/core`)
-- the ORM-backed stores `/conversation-orm`, `/memory-orm`, `/budget-orm` (optional peer `@rudderjs/orm`)
-- the doctor check + `make:agent` scaffolder (optional peer `@rudderjs/console`)
+- `ConversationStore`, `UserMemory`, `BudgetStorage` ship in-memory defaults; bring your own backend by implementing the interface.
+- `CacheAdapter` (the suspendable run stores) and `StorageAdapter` (`ImageGenerator`/`AudioGenerator` `.store()`) are caller-supplied — no storage/cache package is bundled.
 
-The neutral storage contracts (`UserMemory`, `ConversationStore`, `BudgetStorage`) ship in-memory defaults, so a non-Rudder app uses the SDK with zero `@rudderjs/*` installed. The version line stays `0.x` while the API settles toward `1.0.0`.
+The ORM-backed implementations of those contracts (Prisma/Drizzle/native via `@rudderjs/orm`) are a Rudder binding and live in [`@rudderjs/ai`](https://www.npmjs.com/package/@rudderjs/ai) (`@rudderjs/ai/conversation-orm`, `/memory-orm`, `/budget-orm`, `/memory-embedding`), not here. A few remaining opt-in subpaths still carry optional Rudder peers (`/server` → `@rudderjs/core`; doctor + `make:agent` → `@rudderjs/console`). The version line stays `0.x` while the API settles toward `1.0.0`.
 
 ## Subpath exports
 
@@ -43,11 +42,11 @@ The neutral storage contracts (`UserMemory`, `ConversationStore`, `BudgetStorage
 | `./computer-use` | Computer-use tool + executor |
 | `./eval` | Eval framework (`evalSuite`, metrics, reporters) |
 | `./gateway` | Gateway helpers |
-| `./conversation-orm`, `./memory-orm`, `./budget-orm` | ORM-backed stores (optional `@rudderjs/orm` peer; moving behind the neutral seam) |
-| `./memory-embedding` | Embedding-backed user memory |
 | `./react` | React bindings |
 
 > **Moved in `0.3.0`:** the MCP bridge (`mcpClientTools` / `mcpServerFromAgent`), previously the `./mcp` subpath, is now its own package, [`@gemstack/ai-mcp`](https://github.com/gemstack-land/gemstack/tree/main/packages/ai-mcp). Update `@gemstack/ai-sdk/mcp` imports to `@gemstack/ai-mcp` and move the `@modelcontextprotocol/sdk` peer there.
+>
+> **Moved to `@rudderjs/ai`:** the ORM-backed stores (`./conversation-orm`, `./memory-orm`, `./budget-orm`, `./memory-embedding`) coupled the engine to `@rudderjs/orm`, so they now live in [`@rudderjs/ai`](https://www.npmjs.com/package/@rudderjs/ai) under the same subpath names. Update `@gemstack/ai-sdk/conversation-orm` imports to `@rudderjs/ai/conversation-orm` (etc.). They implement the same `ConversationStore` / `UserMemory` / `BudgetStorage` contracts, still exported from here.
 
 ## License
 

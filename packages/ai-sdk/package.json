@@ -75,25 +75,9 @@
       "import": "./dist/chat-mentions.js",
       "types": "./dist/chat-mentions.d.ts"
     },
-    "./conversation-orm": {
-      "import": "./dist/conversation-orm/index.js",
-      "types": "./dist/conversation-orm/index.d.ts"
-    },
     "./gateway": {
       "import": "./dist/gateway/index.js",
       "types": "./dist/gateway/index.d.ts"
-    },
-    "./memory-orm": {
-      "import": "./dist/memory-orm/index.js",
-      "types": "./dist/memory-orm/index.d.ts"
-    },
-    "./budget-orm": {
-      "import": "./dist/budget-orm/index.js",
-      "types": "./dist/budget-orm/index.d.ts"
-    },
-    "./memory-embedding": {
-      "import": "./dist/memory-embedding/index.js",
-      "types": "./dist/memory-embedding/index.d.ts"
     },
     "./eval": {
       "import": "./dist/eval/index.js",
@@ -113,7 +97,7 @@
     "dev": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc --noEmit",
     "test": "tsc -p tsconfig.test.json && cd dist-test && node --test",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist dist-test"
   },
   "dependencies": {
     "zod": "^4.0.0"
@@ -121,7 +105,6 @@
   "peerDependencies": {
     "@rudderjs/console": "^1.4.3",
     "@rudderjs/core": "^1.13.3",
-    "@rudderjs/orm": "^1.22.0",
     "react": ">=19.2.0"
   },
   "peerDependenciesMeta": {
@@ -129,9 +112,6 @@
       "optional": true
     },
     "@rudderjs/core": {
-      "optional": true
-    },
-    "@rudderjs/orm": {
       "optional": true
     },
     "react": {
@@ -148,7 +128,6 @@
   "devDependencies": {
     "@rudderjs/console": "^1.4.3",
     "@rudderjs/core": "^1.13.3",
-    "@rudderjs/orm": "^1.22.0",
     "@types/node": "^20.0.0",
     "@types/react": "^19.2.0",
     "react": "^19.2.0",

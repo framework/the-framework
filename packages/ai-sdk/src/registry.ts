@@ -47,7 +47,7 @@ export async function tryWithFailover<T>(
  * throw "Unknown AI provider".
  *
  * Defensive migration per the #499 static-state singleton audit. Same pattern
- * as PR #498 (`@rudderjs/orm` `ModelRegistry`), #500–#505 (pennant, cache,
+ * applied to other process-wide registries (model registry, pennant, cache,
  * queue, mail, storage, hash).
  */
 interface AiRegistryStore {
@@ -147,7 +147,7 @@ export class AiRegistry {
       throw new Error(
         `[ai-sdk] Provider "${providerName}" does not support hosted vector stores. ` +
         `Use a provider that implements createVectorStores() (e.g. openai). ` +
-        `For self-hosted RAG, use similaritySearch() against an @rudderjs/orm Model with a pgvector column.`,
+        `For self-hosted RAG, use similaritySearch() against an ORM Model with a pgvector column.`,
       )
     }
     return factory.createVectorStores()

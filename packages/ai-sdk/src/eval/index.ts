@@ -427,7 +427,7 @@ export function compose(...metrics: Metric[]): Metric {
   }
 }
 
-/** Local cosine — kept inline so `eval/` doesn't pull in `memory-embedding` (which depends on `@rudderjs/orm`). */
+/** Local cosine — kept inline so `eval/` doesn't pull in `memory-embedding` (which depends on an ORM). */
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0
   let dot  = 0

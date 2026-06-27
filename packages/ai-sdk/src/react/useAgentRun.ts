@@ -71,7 +71,7 @@ export interface UseAgentRunResult<TInput = unknown> {
  * approval requests with imperative `run` / `respond` / `approve` / `reject`.
  *
  * Lives behind the `@gemstack/ai-sdk/react` subpath so the main entry stays
- * runtime-agnostic (same split as `@rudderjs/sync/react`).
+ * runtime-agnostic.
  *
  * @example
  * const { status, outputs, run } = useAgentRun({

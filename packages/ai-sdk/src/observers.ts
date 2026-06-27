@@ -3,8 +3,8 @@
  * made through `@gemstack/ai-sdk`. Any package can subscribe to be notified
  * about completed or failed agent runs.
  *
- * Used today by `@rudderjs/telescope`'s AiCollector to record agent
- * executions into the dashboard. The registry is defined here (inside
+ * Used by an observability collector to record agent
+ * executions into a dashboard. The registry is defined here (inside
  * `@gemstack/ai-sdk`) so the observer contract lives with the package that
  * owns the AI abstraction.
  */
@@ -132,7 +132,7 @@ export class AiObserverRegistry {
   reset(): void { this.observers = [] }
 }
 
-// Process-wide singleton, like `httpObservers` in `@rudderjs/http`.
+// Process-wide singleton.
 const _g = globalThis as Record<string, unknown>
 if (!_g['__rudderjs_ai_observers__']) {
   _g['__rudderjs_ai_observers__'] = new AiObserverRegistry()

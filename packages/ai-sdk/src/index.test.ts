@@ -1897,112 +1897,6 @@ describe('AiFake', () => {
   })
 })
 
-// ─── AiProvider ───────────────────────────────────────────
-
-import { AiProvider } from './server/provider.js'
-import * as _core from '@rudderjs/core'
-
-describe('AiProvider', () => {
-  it('is a ServiceProvider class', () => {
-    assert.ok(typeof AiProvider === 'function')
-    assert.ok(AiProvider.prototype)
-  })
-})
-
-describe('AiProvider — empty apiKey skip-and-warn', () => {
-  // Fake `app` object — AiProvider only needs `.instance` and `.container.has`.
-  function makeFakeApp(): never {
-    return {
-      instance: () => undefined,
-      container: { has: () => false },
-      make:      () => undefined,
-    } as never
-  }
-
-  async function bootWith(aiConfig: Record<string, unknown>): Promise<string[]> {
-    AiRegistry.reset()
-    const previousRepo = _core.getConfigRepository?.()
-    _core.drainBootNotices() // clear any buffered notices before this boot
-
-    _core.setConfigRepository(new _core.ConfigRepository({ ai: aiConfig }))
-    try {
-      const provider = new AiProvider(makeFakeApp())
-      await provider.boot()
-    } finally {
-      if (previousRepo) _core.setConfigRepository(previousRepo)
-    }
-    // Skipped providers now register a grouped boot notice (scope 'ai') instead
-    // of console.warn-ing inline; the framework flushes them after the tree.
-    return _core.drainBootNotices().map(n => `${n.scope}: ${n.message}`)
-  }
-
-  it('boots cleanly when an apiKey-requiring provider has empty apiKey, warns once', async () => {
-    const warnings = await bootWith({
-      default:   'anthropic/claude-sonnet-4-5',
-      providers: {
-        anthropic: { driver: 'anthropic', apiKey: '' },
-      },
-    })
-
-    assert.equal(warnings.length, 1, 'one notice for the skipped anthropic provider')
-    assert.match(warnings[0]!, /anthropic skipped/)
-    assert.match(warnings[0]!, /no API key/)
-    assert.throws(
-      () => AiRegistry.getFactory('anthropic'),
-      /Unknown AI provider "anthropic"/,
-      'anthropic should not be registered',
-    )
-  })
-
-  it('registers providers that DO have a key while skipping ones that don\'t', async () => {
-    const warnings = await bootWith({
-      default:   'anthropic/claude-sonnet-4-5',
-      providers: {
-        anthropic: { driver: 'anthropic', apiKey: 'sk-real-key' },
-        openai:    { driver: 'openai',    apiKey: '' },
-        google:    { driver: 'google',    apiKey: '' },
-        ollama:    { driver: 'ollama',    baseUrl: 'http://localhost:11434' },
-      },
-    })
-
-    assert.equal(warnings.length, 2, 'two notices — openai + google')
-    assert.ok(warnings.some(w => /openai skipped/.test(w)), 'openai noticed')
-    assert.ok(warnings.some(w => /google skipped/.test(w)), 'google noticed')
-
-    assert.doesNotThrow(() => AiRegistry.getFactory('anthropic'), 'anthropic registered')
-    assert.doesNotThrow(() => AiRegistry.getFactory('ollama'),    'ollama registered (no apiKey needed)')
-    assert.throws(() => AiRegistry.getFactory('openai'), /Unknown AI provider "openai"/)
-    assert.throws(() => AiRegistry.getFactory('google'), /Unknown AI provider "google"/)
-  })
-
-  it('boots clean with zero providers configured', async () => {
-    const warnings = await bootWith({
-      default:   'anthropic/claude-sonnet-4-5',
-      providers: {},
-    })
-
-    assert.equal(warnings.length, 0, 'no warnings when no providers are configured')
-  })
-
-  it('boots clean when every apiKey-requiring provider is empty (matches fresh-scaffolded state)', async () => {
-    // Reproduces the scaffolder's default ai.ts: anthropic/openai/google all
-    // present, all reading from env vars that haven't been set yet, plus
-    // ollama (no apiKey needed). Pre-fix this would crash on the first one.
-    const warnings = await bootWith({
-      default:   'anthropic/claude-sonnet-4-5',
-      providers: {
-        anthropic: { driver: 'anthropic', apiKey: '' },
-        openai:    { driver: 'openai',    apiKey: '' },
-        google:    { driver: 'google',    apiKey: '' },
-        ollama:    { driver: 'ollama',    baseUrl: 'http://localhost:11434' },
-      },
-    })
-
-    assert.equal(warnings.length, 3, 'one warning per apiKey-requiring provider')
-    assert.doesNotThrow(() => AiRegistry.getFactory('ollama'), 'ollama still registers')
-  })
-})
-
 // ─── Client tools + tool approval ────────────────────────────
 //
 // A scriptable mock provider lets each test queue up provider responses
@@ -3450,9 +3344,8 @@ describe('parallel tool execution', () => {
 describe('AiRegistry store on globalThis', () => {
   it('state lives on globalThis so it survives a second copy of @gemstack/ai-sdk', () => {
     // Vite-bundled server apps inline `@gemstack/ai-sdk` (every agent path reads
-    // `AiRegistry.resolve(...)`) into entry.mjs, but `AiProvider.boot()`
-    // (loaded via `@gemstack/ai-sdk/server`) runs from a node_modules copy
-    // resolved via the provider auto-discovery manifest. Without a
+    // `AiRegistry.resolve(...)`) into entry.mjs, but provider registration can
+    // run from a separate node_modules copy resolved at boot. Without a
     // globalThis-routed store, factories registered from the externalized
     // copy would never be visible to agent resolution from inside the bundle
     // and every call would throw "Unknown AI provider".

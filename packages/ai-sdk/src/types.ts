@@ -198,9 +198,8 @@ export interface CacheableConfig {
    */
   messages?:     number
   /**
-   * How long the cache entry should live. Duration string accepted by
-   * `@rudderjs/support`'s parser — `'30m'`, `'2h'`, `'1d'`, etc. Default
-   * `'1h'` when omitted.
+   * How long the cache entry should live. A duration string (`'30m'`,
+   * `'2h'`, `'1d'`, etc.). Default `'1h'` when omitted.
    *
    * **Google-only for now.** Anthropic's ephemeral cache and OpenAI's
    * automatic prefix cache have no per-call TTL knob; their adapters ignore
@@ -624,8 +623,8 @@ export interface ServerTool<TInput = unknown, TOutput = unknown> extends Tool<TI
 
 /**
  * @deprecated Use {@link Tool}. A "client tool" is just a `Tool` whose
- * `execute` is omitted; the browser handles execution via the
- * `clientTools` registry in `@rudderjs/panels`.
+ * `execute` is omitted; the browser handles execution via a
+ * client-side tools registry.
  */
 export type ClientTool<TInput = unknown, TOutput = unknown> = Tool<TInput, TOutput>
 

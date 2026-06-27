@@ -1,8 +1,7 @@
 /**
  * Framework-free core of the `useAgentRun` React hook.
  *
- * The React hook (`useAgentRun.ts`) is a thin wrapper around the pieces here —
- * same posture as `@rudderjs/sync`'s `CollabRoomManager` vs `useCollabRoom`:
+ * The React hook (`useAgentRun.ts`) is a thin wrapper around the pieces here:
  * keeping the state machine and the stream-driving loop out of React lets us
  * exhaustively unit-test the client-tool round-trip and the approval resume
  * without a React testing harness (the framework intentionally ships none).

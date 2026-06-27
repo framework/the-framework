@@ -10,14 +10,14 @@ const distDir = join(__dirname, '..', 'dist')
 
 /**
  * Files that must have ZERO Node-only static imports — these compose the runtime-agnostic
- * main entry of @gemstack/ai-sdk. Anything in src/node/ or src/server/ is exempt.
+ * main entry of @gemstack/ai-sdk. Anything in src/node/ is exempt.
  */
 const NODE_IMPORT_RE = /from ['"](node:|fs|path|os|crypto|child_process|fs\/promises|stream|buffer)['"]/
 
 function listFiles(dir: string, prefix = ''): string[] {
   const out: string[] = []
   for (const name of readdirSync(dir, { withFileTypes: true })) {
-    if (name.name === 'node' || name.name === 'server') continue
+    if (name.name === 'node') continue
     if (name.name.endsWith('.d.ts') || name.name.endsWith('.map')) continue
     const full = join(dir, name.name)
     const rel  = prefix ? `${prefix}/${name.name}` : name.name
@@ -49,7 +49,6 @@ test('main entry has no Node-only imports', () => {
   )
 })
 
-test('/node and /server subpaths exist', () => {
-  assert.ok(existsSync(join(distDir, 'node', 'index.js')),   'dist/node/index.js missing')
-  assert.ok(existsSync(join(distDir, 'server', 'index.js')), 'dist/server/index.js missing')
+test('/node subpath exists', () => {
+  assert.ok(existsSync(join(distDir, 'node', 'index.js')), 'dist/node/index.js missing')
 })

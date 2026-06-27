@@ -90,12 +90,6 @@ importers:
         specifier: ^4.0.0
         version: 4.4.3
     devDependencies:
-      '@rudderjs/console':
-        specifier: ^1.4.3
-        version: 1.4.3
-      '@rudderjs/core':
-        specifier: ^1.13.3
-        version: 1.13.3
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.43
@@ -334,14 +328,6 @@ packages:
   '@changesets/write@0.4.0':
     resolution: {integrity: sha512-CdTLvIOPiCNuH71pyDu3rA+Q0n65cmAbXnwWH84rKGiFumFzkmHNT8KHTMEchcxN+Kl8I54xGUhJ7l3E7X396Q==}
 
-  '@clack/core@1.4.2':
-    resolution: {integrity: sha512-0Ty/1Gfm+Kb07sXcuESjyKfwEhSy4Ns1AgeEisHb/bDY5fWme0tTeTkU14T1Gmcs17YIjB/teiDe4uaCghbYqQ==}
-    engines: {node: '>= 20.12.0'}
-
-  '@clack/prompts@1.6.0':
-    resolution: {integrity: sha512-EYlRokl8szrP9Z25qT5aepMdBjzBvHF9ZEhzIiUBc9guz/T31EqRgvD0QSgZcpE93xiwrr+OkB4nz0BZyF6fSA==}
-    engines: {node: '>= 20.12.0'}
-
   '@esbuild/aix-ppc64@0.28.1':
     resolution: {integrity: sha512-Svl7tq8k/08+p6CXPpRjQ1fKX+1odH/BQbb48fV6fj3CWHhsoIOoY87w1oHXm0qEpkIK3ZfVgp0hed3XBXzXMQ==}
     engines: {node: '>=18'}
@@ -576,26 +562,6 @@ packages:
 
   '@protobufjs/utf8@1.1.1':
     resolution: {integrity: sha512-oOAWABowe8EAbMyWKM0tYDKi8Yaox52D+HWZhAIJqQXbqe0xI/GV7FhLWqlEKreMkfDjshR5FKgi3mnle0h6Eg==}
-
-  '@rudderjs/console@1.4.3':
-    resolution: {integrity: sha512-tCNCW6YlXr73MMWIeIEMc174MlZcpiSyez4X0SsBAO3vI04id11N2GouyT46mdlwuP2to4oOHNXZK8JQMcdJaQ==}
-    engines: {node: '>=22.12.0'}
-
-  '@rudderjs/contracts@1.19.0':
-    resolution: {integrity: sha512-I9djlPm7os3n4Bxv8BUY7tbrWmj1bN+GDVWzDznZUc/FFIZN4LcfspNKrwddlkh+gdvVJToChRYEKMWZ5IvDgQ==}
-    engines: {node: '>=22.12.0'}
-
-  '@rudderjs/core@1.13.3':
-    resolution: {integrity: sha512-hBJJsucZnr8xFGMCpsz77UwgxpRPDYb/m5iVvkfk5ywBh3kcIiUufT9b1hwPabQn+erDdH3hNtoH4KUT4ckStg==}
-    engines: {node: '>=22.12.0'}
-
-  '@rudderjs/router@1.9.2':
-    resolution: {integrity: sha512-h+DMjZhbglyyHu00FuKxE4BA2jiFFUjkb0s/ue1uM2LijeOd4Y8rhAs4e91fjPuVik6Tc86ElHkAc0ygqD6cCQ==}
-    engines: {node: '>=22.12.0'}
-
-  '@rudderjs/support@1.6.3':
-    resolution: {integrity: sha512-a1WjjyvA6FI7ZMWD4Grg1FXMKGqJOKl6ObM79SmpAMYl0NFp6KPP8ERhp8GMunhLe8AzIhucaXi4Drr5kS/YWQ==}
-    engines: {node: '>=22.12.0'}
 
   '@smithy/core@3.26.0':
     resolution: {integrity: sha512-mLUktFAn+Pa2agl1J7VgtYNFWCX8/b4GMJSK1hCu4YCvtBfM6F8Os3EP4ry+DFFlXOf3wyvlgXhuUdFoy52D3g==}
@@ -943,17 +909,8 @@ packages:
   fast-sha256@1.3.0:
     resolution: {integrity: sha512-n11RGP/lrWEFI/bWdygLxhI+pVeo1ZYIVwvvPkW7azl/rOy+F3HYRZ2K5zeE9mmkhQppyv9sQFx0JM9UabnpPQ==}
 
-  fast-string-truncated-width@3.0.3:
-    resolution: {integrity: sha512-0jjjIEL6+0jag3l2XWWizO64/aZVtpiGE3t0Zgqxv0DPuxiMjvB3M24fCyhZUO4KomJQPj3LTSUnDP3GpdwC0g==}
-
-  fast-string-width@3.0.2:
-    resolution: {integrity: sha512-gX8LrtNEI5hq8DVUfRQMbr5lpaS4nMIWV+7XEbXk2b8kiQIizgnlr12B4dA3ZEx3308ze0O4Q1R+cHts8kyUJg==}
-
   fast-uri@3.1.2:
     resolution: {integrity: sha512-rVjf7ArG3LTk+FS6Yw81V1DLuZl1bRbNrev6Tmd/9RaroeeRRJhAt7jg/6YFxbvAQXUCavSoZhPPj6oOx+5KjQ==}
-
-  fast-wrap-ansi@0.2.2:
-    resolution: {integrity: sha512-7F2Fl+TjRSenLqlU3UjSH0iyqopqoZIu7eZVpEirP2g1GtWa2G/ecEmBdgz31+Mxr+ELclgg6sokpSFIQiZ02Q==}
 
   fastq@1.20.1:
     resolution: {integrity: sha512-GGToxJ/w1x32s/D2EKND7kTil4n8OVk/9mycTc4VDza13lOvpUZTGX3mFSCtV9ksdGBVzvsyAVLM6mHFThxXxw==}
@@ -1443,9 +1400,6 @@ packages:
   signal-exit@4.1.0:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
-
-  sisteransi@1.0.5:
-    resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
 
   slash@3.0.0:
     resolution: {integrity: sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==}
@@ -1970,18 +1924,6 @@ snapshots:
       human-id: 4.2.0
       prettier: 2.8.8
 
-  '@clack/core@1.4.2':
-    dependencies:
-      fast-wrap-ansi: 0.2.2
-      sisteransi: 1.0.5
-
-  '@clack/prompts@1.6.0':
-    dependencies:
-      '@clack/core': 1.4.2
-      fast-string-width: 3.0.2
-      fast-wrap-ansi: 0.2.2
-      sisteransi: 1.0.5
-
   '@esbuild/aix-ppc64@0.28.1':
     optional: true
 
@@ -2163,30 +2105,6 @@ snapshots:
 
   '@protobufjs/utf8@1.1.1':
     optional: true
-
-  '@rudderjs/console@1.4.3':
-    dependencies:
-      '@clack/prompts': 1.6.0
-
-  '@rudderjs/contracts@1.19.0': {}
-
-  '@rudderjs/core@1.13.3':
-    dependencies:
-      '@rudderjs/console': 1.4.3
-      '@rudderjs/contracts': 1.19.0
-      '@rudderjs/router': 1.9.2
-      '@rudderjs/support': 1.6.3
-      reflect-metadata: 0.2.2
-      zod: 4.4.3
-
-  '@rudderjs/router@1.9.2':
-    dependencies:
-      '@rudderjs/contracts': 1.19.0
-      reflect-metadata: 0.2.2
-
-  '@rudderjs/support@1.6.3':
-    dependencies:
-      zod: 4.4.3
 
   '@smithy/core@3.26.0':
     dependencies:
@@ -2575,17 +2493,7 @@ snapshots:
   fast-sha256@1.3.0:
     optional: true
 
-  fast-string-truncated-width@3.0.3: {}
-
-  fast-string-width@3.0.2:
-    dependencies:
-      fast-string-truncated-width: 3.0.3
-
   fast-uri@3.1.2: {}
-
-  fast-wrap-ansi@0.2.2:
-    dependencies:
-      fast-string-width: 3.0.2
 
   fastq@1.20.1:
     dependencies:
@@ -3106,8 +3014,6 @@ snapshots:
       side-channel-weakmap: 1.0.2
 
   signal-exit@4.1.0: {}
-
-  sisteransi@1.0.5: {}
 
   slash@3.0.0: {}
 

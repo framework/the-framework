@@ -51,18 +51,6 @@
       "import": "./dist/node/index.js",
       "types": "./dist/node/index.d.ts"
     },
-    "./server": {
-      "import": "./dist/server/index.js",
-      "types": "./dist/server/index.d.ts"
-    },
-    "./commands/make-agent": {
-      "import": "./dist/commands/make-agent.js",
-      "types": "./dist/commands/make-agent.d.ts"
-    },
-    "./commands/ai-eval": {
-      "import": "./dist/commands/ai-eval.js",
-      "types": "./dist/commands/ai-eval.d.ts"
-    },
     "./observers": {
       "import": "./dist/observers.js",
       "types": "./dist/observers.d.ts"
@@ -99,17 +87,9 @@
     "zod": "^4.0.0"
   },
   "peerDependencies": {
-    "@rudderjs/console": "^1.4.3",
-    "@rudderjs/core": "^1.13.3",
     "react": ">=19.2.0"
   },
   "peerDependenciesMeta": {
-    "@rudderjs/console": {
-      "optional": true
-    },
-    "@rudderjs/core": {
-      "optional": true
-    },
     "react": {
       "optional": true
     }
@@ -122,8 +102,6 @@
     "openai": ">=4.70.0"
   },
   "devDependencies": {
-    "@rudderjs/console": "^1.4.3",
-    "@rudderjs/core": "^1.13.3",
     "@types/node": "^20.0.0",
     "@types/react": "^19.2.0",
     "react": "^19.2.0",

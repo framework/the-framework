@@ -1,6 +1,6 @@
 /**
  * `similaritySearch({ model, column, embedWith, ... })` — agent-tool
- * factory that wraps an `@rudderjs/orm` Model + a vector column into a
+ * factory that wraps an ORM Model + a vector column into a
  * drop-in `Tool` an agent can call to retrieve semantically similar
  * rows (#B7 Phase 2).
  *
@@ -49,9 +49,9 @@ import type { ServerToolBuilder } from './tool.js'
 /**
  * Structural type for the model class similaritySearch accepts.
  *
- * Declared locally instead of importing `Model` from `@rudderjs/orm`
- * so the main entry stays free of orm runtime — the tool calls
- * `model.query()` and never references the `@rudderjs/orm` package
+ * Declared locally instead of importing an ORM `Model` type
+ * so the main entry stays free of any ORM runtime — the tool calls
+ * `model.query()` and never references an ORM package
  * itself. The user's app brings its own Model class.
  */
 export interface SimilaritySearchModel<TInstance> {
@@ -61,8 +61,8 @@ export interface SimilaritySearchModel<TInstance> {
 
 /**
  * WhereOperator strings the `scope` callback may pass to `.where()`.
- * Mirrors `@rudderjs/contracts`'s `WhereOperator`. Duplicated here so the
- * main entry has no compile-time `@rudderjs/contracts` dep.
+ * Mirrors a query builder's where-operator set. Duplicated here so the
+ * main entry has no compile-time query-builder dep.
  */
 export type SimilaritySearchWhereOperator =
   | '=' | '!=' | '>' | '>=' | '<' | '<='
@@ -71,7 +71,7 @@ export type SimilaritySearchWhereOperator =
 
 /**
  * Structural type for the QueryBuilder methods similaritySearch needs.
- * Mirrors a subset of `@rudderjs/contracts`'s `QueryBuilder<T>` so apps
+ * Mirrors a subset of a query builder's `QueryBuilder<T>` so apps
  * writing a `scope` callback get autocomplete on the methods that actually
  * compose with `whereVectorSimilarTo` (#B7 Phase 2.5):
  *
@@ -240,7 +240,7 @@ export function similaritySearch<TInstance>(
       if (typeof whereVec !== 'function' || typeof selectDist !== 'function') {
         throw new Error(
           `[ai-sdk] similaritySearch: ${model.name}'s ORM adapter does not implement vector queries. ` +
-          'Use @rudderjs/orm-prisma against a Postgres + pgvector connection.',
+          'Use a Postgres + pgvector connection.',
         )
       }
 

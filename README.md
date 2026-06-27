@@ -1,4 +1,4 @@
-# GemStack
+# 💎 GemStack
 
 A collection of high-quality, framework-agnostic tools for building AI applications in Node.
 

@@ -44,7 +44,7 @@ Realized fully, GemStack is the unified home for agnostic engines: `@gemstack/ai
 
 These are not orphaned code needing a home: `@universal-orm` is already its own deliberate npm scope, and `universal-schema` sits under `@vike-data`. So there are **three agnostic-ish scopes in play** (`@gemstack`, `@universal-orm`, `@vike-data`). The decision is therefore not "where should this code live" but **"do we consolidate the agnostic engines under one umbrella (`@gemstack`), or keep `@universal-orm` as a parallel brand?"** Since `@universal-orm` is co-developed, this is a decide-with-the-Vike-team call, gated on brand traction.
 
-When a candidate does graduate, follow the `@gemstack/ai-sdk` playbook exactly: copy the source in, rename to the `@gemstack/*` name, leave a deprecated re-export shim at the old name, reset to a fresh `0.x` line, then repoint dependents.
+When a candidate does graduate, follow the `@gemstack/ai-sdk` playbook exactly: copy the source in, rename to the `@gemstack/*` name, leave a re-export at the old name, reset to a fresh `0.x` line, then repoint dependents. The old-name package takes one of two shapes: a **deprecated shim** (pure re-export, slated for eventual removal) or — when it has framework-coupled pieces that cannot graduate (provider wiring, ORM-backed stores, CLI) — a **living framework binding** that re-exports the agnostic core and owns those bindings. `@rudderjs/ai` is the latter: it re-exports `@gemstack/ai-sdk` and keeps the Rudder `AiProvider`, ORM stores, and `make:agent` / `ai:eval` CLI. Don't mislabel a binding as deprecated.
 
 ## The AI family
 

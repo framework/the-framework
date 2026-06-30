@@ -1,0 +1,58 @@
+{
+  "name": "@gemstack/connectors",
+  "version": "0.0.0",
+  "description": "The connector contract for GemStack AI orchestration: define a tool connector to an external service (GitHub, Google Drive, ...) once with `defineConnector`, compose any number into a single MCP server with `mountConnectors`. Built on @gemstack/mcp; framework-agnostic.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "connector",
+    "connectors",
+    "ai",
+    "agents",
+    "orchestration",
+    "tools",
+    "gemstack"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/gemstack-land/gemstack/tree/main/packages/connectors#readme",
+  "bugs": {
+    "url": "https://github.com/gemstack-land/gemstack/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gemstack-land/gemstack",
+    "directory": "packages/connectors"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "tsc -p tsconfig.test.json && cd dist-test && node --test",
+    "clean": "rm -rf dist dist-test"
+  },
+  "dependencies": {
+    "@gemstack/mcp": "workspace:^",
+    "reflect-metadata": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "zod": "^4.0.0"
+  },
+  "author": "Suleiman Shahbari"
+}

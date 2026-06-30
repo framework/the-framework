@@ -1,0 +1,24 @@
+{
+  "name": "@gemstack/example-connectors-quickstart",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runnable reference connector built with @gemstack/connectors: a read-only in-memory source, mounted into an MCP server and exercised with McpTestClient. Copy from this to write a real connector.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsc -p tsconfig.test.json && cd dist-test && node --test",
+    "clean": "rm -rf dist-test",
+    "start": "tsx src/demo.ts"
+  },
+  "dependencies": {
+    "@gemstack/connectors": "workspace:^",
+    "@gemstack/mcp": "workspace:^",
+    "reflect-metadata": "^0.2.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,5 +1,27 @@
 # @gemstack/ai-autopilot
 
+## 0.4.0
+
+### Minor Changes
+
+- 87e6804: Add `cloudflareTarget` — the first real `DeployTarget` adapter for bootstrap mode.
+
+  `cloudflareTarget({ session, ... })` ships the built app to Cloudflare via the `wrangler` CLI, run inside the build's runner session: install, build, then deploy to **Workers** (SSR) or **Pages** (SSG/SPA), reporting the live URL wrangler printed. Credentials come from `apiToken`/`accountId` (or `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID`) and are passed to `wrangler` through the command environment, so they work whether the session is local or a container. It never throws — a missing token, failed build, or failed deploy return `{ deployed: false, detail }` so the final phase narrates rather than crashing.
+
+  Wire it on the existing seam: `agentDeploy(deployer, { target: cloudflareTarget({ session, projectName }) })`.
+
+- 8d913dd: Add `dokployTarget` — a second real `DeployTarget`, for self-hosted Dokploy.
+
+  `dokployTarget({ serverUrl, applicationId })` triggers a deployment of a pre-configured Dokploy application over the Dokploy API (`POST /api/application.deploy`, `x-api-key` auth). Dokploy builds and serves the app server-side, so — unlike `cloudflareTarget`, which builds and uploads from the session — this target is a simple API trigger and takes no runner session. It never throws: a missing token, a bad response, or a network failure return `{ deployed: false, detail }`. Credentials come from `apiToken` or `DOKPLOY_AUTH_TOKEN` / `DOKPLOY_API_KEY`.
+
+  Also fixes the spelling of the deploy target in `DEFAULT_DEPLOY_TARGETS`: `dockploy` → `dokploy` (the real product name).
+
+### Patch Changes
+
+- fc21943: Export `DockerRunner`, `DockerRunnerSession`, `dockerAvailable`, and `DockerRunnerOptions` from the package entry.
+
+  The runner barrel exported these symbols, but the main entry point omitted them, so the shipped `DockerRunner` adapter could not actually be imported from `@gemstack/ai-autopilot`. They are now reachable alongside `FakeRunner`/`LocalRunner`.
+
 ## 0.3.0
 
 ### Minor Changes

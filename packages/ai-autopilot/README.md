@@ -70,6 +70,42 @@ Define your own with `definePersona({ name, role, systemPrompt, skills?, tools? 
 or materialize a single persona into an agent with `personaAgent(persona)`. Because
 a persona is data, it can be inspected and listed without building an agent first.
 
+## Runner — the pluggable execution seam
+
+Autopilot builds and runs an app somewhere. A **`Runner`** boots an isolated
+workspace (a virtual filesystem + a shell + an optional preview URL) and is
+shaped after Flue's `sandbox` contract, so real sandboxes drop in behind one
+interface: **WebContainer** (instant in-browser Vike preview), a **Docker**
+sandbox on our servers, or a **Flue** sandbox (in-memory / edge / container). We
+sit on those harnesses rather than competing with them.
+
+This package ships the interface plus a **`FakeRunner`** (the runner analog of
+`ai-sdk`'s `AiFake`) so autopilot can be driven and tested without any sandbox
+infra. Real adapters land as separate packages.
+
+```ts
+import { FakeRunner, runnerTools } from '@gemstack/ai-autopilot'
+import { personaAgent, vikePageBuilder } from '@gemstack/ai-autopilot'
+
+const runner = new FakeRunner()
+const session = await runner.boot({ files: { 'pages/+config.js': '…' } })
+
+// Give a persona hands inside the sandbox: read/write files, exec, preview.
+const agent = personaAgent(vikePageBuilder, { model: 'anthropic/claude-sonnet-4-5' })
+const withTools = agent // compose runnerTools(session) into its tools()
+
+await session.exec('pnpm build')
+const { url } = (await session.preview?.({ port: 5173 })) ?? {}
+```
+
+`runnerTools(session)` exposes the session to an agent as `ai-sdk` tools
+(`read_file`, `write_file`, `list_files`, `exec`, and — only when the session
+supports it — `preview`). Toggle `write` / `exec` for a read-only surface, or set
+a `prefix` to avoid name collisions.
+
+To implement a real runner, satisfy the `Runner` interface: `boot()` returns a
+`RunnerSession` with an `fs`, `exec()`, an optional `preview()`, and `dispose()`.
+
 ## Guardrails
 
 - **`concurrency`** (optional, default 4) — max workers in flight; positive integer.

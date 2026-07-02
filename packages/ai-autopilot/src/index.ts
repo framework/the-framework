@@ -19,6 +19,13 @@
  * - {@link personaAgent} / {@link personaWorkers} — materialize personas for a run
  * - {@link personaRoster} — describe personas to a planner
  * - {@link stackPersonas} — the built-in Vike + universal-orm personas
+ *
+ * The runner is the pluggable execution seam: a workspace (filesystem + shell +
+ * optional preview) where autopilot builds and runs an app. Shaped after Flue's
+ * `sandbox` so WebContainer / Docker / Flue drop in behind one interface.
+ *
+ * - {@link FakeRunner} — in-memory runner for tests
+ * - {@link runnerTools} — expose a booted session to an agent as sandbox tools
  */
 export { Supervisor } from './supervisor.js'
 export { agentPlanner, type AgentPlannerOptions } from './planner.js'
@@ -39,6 +46,25 @@ export {
   type PersonaSpec,
   type PersonaAgentOptions,
 } from './personas/index.js'
+export {
+  FakeRunner,
+  FakeRunnerSession,
+  RunnerError,
+  runnerTools,
+  type Runner,
+  type RunnerSession,
+  type RunnerFs,
+  type FileTree,
+  type BootOptions,
+  type ExecOptions,
+  type ExecResult,
+  type Preview,
+  type PreviewOptions,
+  type FakeRunnerOptions,
+  type FakeExec,
+  type RecordedExec,
+  type RunnerToolsOptions,
+} from './runner/index.js'
 export type {
   Subtask,
   PlannedSubtask,

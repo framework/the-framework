@@ -14,6 +14,7 @@ import {
   driverImprove,
   extendPrompt,
   isWorkspaceEmpty,
+  MISSING_VERDICT_BLOCKER,
   parseArchitectPlan,
 } from './steps.js'
 
@@ -107,10 +108,10 @@ test('driverChecklist parses the { blockers } verdict', async () => {
   assert.deepEqual(verdict.blockers, ['no auth'])
 })
 
-test('driverChecklist treats a verdict-less reply as passing', async () => {
+test('driverChecklist fails closed on a verdict-less reply (not passing)', async () => {
   const session = await new FakeDriver({ turns: [{ text: 'looks fine to me' }] }).start({ cwd: '/ws' })
   const verdict = await driverChecklist(session)({ pass: 1, plan: PLAN, intent: 'x', blockers: [] })
-  assert.deepEqual(verdict.blockers, [])
+  assert.deepEqual(verdict.blockers, [MISSING_VERDICT_BLOCKER])
 })
 
 test('deployWith runs the target against the decided plan and uses its name', async () => {

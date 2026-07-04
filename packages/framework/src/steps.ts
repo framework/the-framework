@@ -267,11 +267,16 @@ export function driverChecklist(
       ...(opts.system ? { system: opts.system } : {}),
       ...(ctx.signal ? { signal: ctx.signal } : {}),
     })
-    // A missing verdict is treated as "reported nothing concrete": passing, so a
-    // terse agent does not wedge the loop. parseVerdict returns undefined then.
-    return parseVerdict(turn.text) ?? { blockers: [] }
+    // Fail closed: a reply with no parseable { blockers } verdict is not a pass.
+    // Surface it as a blocker so the loop re-prompts (and, at maxPasses, stops with
+    // it) rather than declaring the app production-grade off an unverifiable reply.
+    return parseVerdict(turn.text) ?? { blockers: [MISSING_VERDICT_BLOCKER] }
   }
 }
+
+/** The blocker surfaced when a checklist reply omits the required `{ blockers }` verdict. */
+export const MISSING_VERDICT_BLOCKER =
+  'End your reply with the required fenced ```json { "blockers": [...] } verdict; it was missing.'
 
 /** The improve step: a fresh invocation that fixes the current blockers. */
 export function driverImprove(

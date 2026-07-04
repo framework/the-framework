@@ -10,6 +10,7 @@
  * - {@link FakeRunner} — in-memory runner for tests (the runner analog of `AiFake`)
  * - {@link LocalRunner} — real host workspace (fs + child processes); the first real adapter
  * - {@link DockerRunner} — sandboxed workspace in a container (via the `docker` CLI)
+ * - {@link WebContainerRunner} — sandboxed workspace in the browser (via `@webcontainer/api`)
  * - {@link runnerTools} — expose a session to an agent as sandbox tools
  */
 export type {
@@ -35,4 +36,10 @@ export {
 } from './fake.js'
 export { LocalRunner, LocalRunnerSession, type LocalRunnerOptions } from './local.js'
 export { DockerRunner, DockerRunnerSession, dockerAvailable, type DockerRunnerOptions } from './docker.js'
+export {
+  WebContainerRunner,
+  WebContainerRunnerSession,
+  webContainerAvailable,
+  type WebContainerRunnerOptions,
+} from './webcontainer.js'
 export { runnerTools, type RunnerToolsOptions } from './tools.js'

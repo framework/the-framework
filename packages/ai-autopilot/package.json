@@ -51,8 +51,18 @@
     "@gemstack/ai-skills": "workspace:^",
     "zod": "^4.0.0"
   },
+  "peerDependencies": {
+    "@webcontainer/api": "^1.6.0"
+  },
+  "peerDependenciesMeta": {
+    "@webcontainer/api": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@webcontainer/api": "^1.6.4",
+    "playwright-core": "^1.49.0",
     "typescript": "^5.4.0"
   },
   "author": "Suleiman Shahbari"

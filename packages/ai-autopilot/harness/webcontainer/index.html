@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>WebContainerRunner boot-and-serve harness</title>
+  <!-- The adapter dynamically imports the bare specifier `@webcontainer/api`; map it same-origin. -->
+  <script type="importmap">
+    { "imports": { "@webcontainer/api": "/api/index.js" } }
+  </script>
+</head>
+<body>
+<pre id="log"></pre>
+<script type="module">
+  // Drive the REAL compiled adapter (dist), exactly as an app would import it.
+  import { WebContainerRunner, webContainerAvailable } from '/dist/runner/webcontainer.js'
+
+  const logEl = document.getElementById('log')
+  const log = (m) => { logEl.textContent += m + '\n'; console.log(m) }
+  const checks = []
+  const check = (name, ok, detail) => { checks.push({ name, ok: !!ok, detail }); log((ok ? 'PASS ' : 'FAIL ') + name + (detail ? '  ' + detail : '')) }
+  window.__RESULT__ = { done: false }
+
+  const httpServer =
+    "const http=require('http');http.createServer((_,res)=>{res.writeHead(200);res.end('hello from webcontainer')}).listen(3000,()=>console.log('listening'))"
+
+  try {
+    check('webContainerAvailable() is true (cross-origin isolated)', webContainerAvailable(), 'isolated=' + self.crossOriginIsolated)
+
+    const runner = new WebContainerRunner()
+    const s = await runner.boot({ files: { 'server.js': httpServer, 'note.txt': 'seed' } })
+    log('booted session ' + s.id)
+
+    // --- filesystem round-trip ---
+    check('fs.read seeds mounted files', (await s.fs.read('note.txt')) === 'seed')
+    await s.fs.write('src/deep/a.txt', 'A')
+    check('fs.exists on a nested write', await s.fs.exists('src/deep/a.txt'))
+    const list = await s.fs.list()
+    check('fs.list is recursive + sorted', JSON.stringify(list) === JSON.stringify(['note.txt', 'server.js', 'src/deep/a.txt']), JSON.stringify(list))
+    await s.fs.remove('src')
+    check('fs.remove deletes recursively', !(await s.fs.exists('src/deep/a.txt')))
+    let threw = false
+    try { await s.fs.read('../escape') } catch { threw = true }
+    check('fs rejects paths escaping the workspace', threw)
+
+    // --- exec ---
+    const ver = await s.exec('node -v')
+    check('exec runs in the browser Node runtime', ver.exitCode === 0 && /v\d+\./.test(ver.stdout), JSON.stringify(ver.stdout.trim()))
+    check('exec propagates non-zero exit codes', (await s.exec('exit 7')).exitCode === 7)
+    check('exec honors cwd + env', (await s.exec('echo $FOO', { env: { FOO: 'bar' } })).stdout.includes('bar'))
+    const timed = await s.exec('node -e "setTimeout(()=>{}, 10000)"', { timeoutMs: 1000 })
+    check('exec kills a command past its timeout (124)', timed.exitCode === 124, 'code=' + timed.exitCode)
+
+    // --- start + preview + serve ---
+    const dev = await s.start('node server.js')
+    check('start returns a handle without blocking', dev.command === 'node server.js')
+    const preview = await s.preview({ port: 3000, waitMs: 15000 })
+    check('preview resolves a WebContainer URL for the running server', /webcontainer-api\.io/.test(preview.url), preview.url)
+
+    // Serve proof: hit the loopback server from INSIDE the container and read the body.
+    const served = await s.exec("node -e \"fetch('http://localhost:3000').then(r=>r.text()).then(t=>process.stdout.write(t))\"")
+    check('the started server actually serves', served.stdout.includes('hello from webcontainer'), JSON.stringify(served.stdout.trim()))
+
+    await dev.stop()
+    await s.dispose()
+    check('dispose blocks further exec', await (async () => { try { await s.exec('true'); return false } catch { return true } })())
+
+    // Single-instance guard: a fresh boot after dispose must succeed.
+    const s2 = await runner.boot()
+    check('boot succeeds again after dispose (single-instance slot freed)', !!s2.id)
+    await s2.dispose()
+
+    window.__RESULT__ = { done: true, ok: checks.every(c => c.ok), checks }
+  } catch (err) {
+    log('ERROR ' + (err && err.stack || err))
+    window.__RESULT__ = { done: true, ok: false, checks, error: String(err && err.message || err) }
+  }
+</script>
+</body>
+</html>

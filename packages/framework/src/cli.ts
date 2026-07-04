@@ -67,7 +67,8 @@ Options:
                          auto-activate either way (default: off, hand-rolled + Prisma).
   --max-passes <n>       Full-fledged loop pass budget (default: 5).
   --permission-mode <mode>   Claude Code permission mode: default | acceptEdits |
-                             bypassPermissions | plan (default: acceptEdits).
+                             bypassPermissions | plan (default: bypassPermissions,
+                             so the headless loop can run installs/builds/tests).
   --dangerously-skip-permissions   Bypass all agent permission checks (sandboxes only).
   --serve <cmd>          Gate the loop on the app actually running (e.g. "npm run dev"),
                          then keep it serving with a preview link on the dashboard.
@@ -262,6 +263,21 @@ export function parseArgs(argv: string[]): CliOptions {
 }
 
 /**
+ * Resolve the Claude Code driver options for a live CLI run. The CLI is a
+ * headless autonomous builder: every turn is `claude -p`, which cannot answer an
+ * interactive approval. The driver's library default (`acceptEdits`) silently
+ * denies installs/builds/tests, so the production-grade checklist can never
+ * verify the app actually builds/runs (#225). Default the CLI to
+ * `bypassPermissions` so the full loop runs unattended; `--permission-mode` and
+ * `--dangerously-skip-permissions` still override.
+ */
+export function claudeDriverOptions(opts: Pick<CliOptions, 'permissionMode' | 'skipPermissions'>): ClaudeCodeDriverOptions {
+  return opts.skipPermissions
+    ? { dangerouslySkipPermissions: true }
+    : { permissionMode: opts.permissionMode ?? 'bypassPermissions' }
+}
+
+/**
  * The `framework` command. Wires the parsed options into {@link runFramework}
  * over a live dashboard + terminal narration, and resolves with an exit code.
  * Returns 0 on success, 1 on a run error, 2 on a usage error.
@@ -310,10 +326,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     }
   }
 
-  const claudeOpts: ClaudeCodeDriverOptions = {
-    ...(opts.permissionMode ? { permissionMode: opts.permissionMode } : {}),
-    ...(opts.skipPermissions ? { dangerouslySkipPermissions: true } : {}),
-  }
+  const claudeOpts = claudeDriverOptions(opts)
   const driver: Driver = fake ? fakeDriver() : new ClaudeCodeDriver(claudeOpts)
   const cwd = opts.cwd ?? (fake ? join(tmpdir(), 'framework-fake-workspace') : process.cwd())
   // The fake demo defaults to a Cloudflare deploy decision so the flow ends with

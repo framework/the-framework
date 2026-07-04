@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import {
   buildDeployTarget,
   chooseSessionLink,
+  claudeDriverOptions,
   CLAUDE_CODE_SESSION_LIST,
   parseArgs,
   runCli,
@@ -33,6 +34,19 @@ test('parseArgs reads permission-mode and skip-permissions', () => {
   const opts = parseArgs(['--permission-mode', 'bypassPermissions', '--dangerously-skip-permissions', 'x'])
   assert.equal(opts.permissionMode, 'bypassPermissions')
   assert.equal(opts.skipPermissions, true)
+})
+
+test('claudeDriverOptions defaults the headless CLI to bypassPermissions (#225)', () => {
+  // Default run: acceptEdits would deny installs/builds/tests headlessly, so the CLI opts up.
+  assert.deepEqual(claudeDriverOptions({ skipPermissions: false }), { permissionMode: 'bypassPermissions' })
+  // An explicit --permission-mode still wins.
+  assert.deepEqual(claudeDriverOptions({ permissionMode: 'acceptEdits', skipPermissions: false }), {
+    permissionMode: 'acceptEdits',
+  })
+  // --dangerously-skip-permissions takes precedence over the mode.
+  assert.deepEqual(claudeDriverOptions({ permissionMode: 'plan', skipPermissions: true }), {
+    dangerouslySkipPermissions: true,
+  })
 })
 
 test('parseArgs persists by default and reads --resume / --no-persist (#211)', () => {

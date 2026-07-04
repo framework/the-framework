@@ -71,16 +71,32 @@ await runFramework({
 ```
 framework [intent...]          Build what you describe, from scratch.
 framework --fake               Offline demo (no CLI, no model, deterministic).
+framework doctor               Check prerequisites (Claude Code installed, etc.).
 
   --cwd <dir>            Workspace the agent builds in (default: cwd).
   --model <id>           Model to pass through to the wrapped agent.
   --scope <prototype|full>   How much app to build (default: full).
+  --max-passes <n>       Loop pass budget for a full build (default: 5).
   --compose-extensions   Opt the built-in capability extensions in (Vike-only; see below).
-  --deploy <target>      Narrate a deploy decision (e.g. cloudflare, dokploy).
+  --permission-mode <mode>   Claude Code permission mode: default | acceptEdits |
+                         bypassPermissions | plan (default: bypassPermissions, so the
+                         headless loop can run installs / builds / tests).
+  --dangerously-skip-permissions   Bypass all agent permission checks (sandboxes only).
+  --serve <cmd>          Gate the loop on the app actually running (e.g. "npm run dev"),
+                         then keep it serving with a preview link on the dashboard.
+  --serve-install <cmd>  Install command before serving (e.g. "npm install").
+  --serve-build <cmd>    Build command before serving (e.g. "npm run build").
+  --serve-port <n>       Port the app listens on (default: 3000).
+  --serve-path <path>    Path to health-check once it is up (default: /).
+  --deploy <target>      Deploy to this target (cloudflare, dokploy) or narrate any other.
+  --cf-project <name>    Cloudflare Pages project name (for a Pages deploy).
+  --dokploy-url <url>    Dokploy instance URL (required for --deploy dokploy).
+  --dokploy-app <id>     Dokploy application id (required for --deploy dokploy).
   --port <n>             Dashboard port (default: 4477).
   --no-dashboard         Run headless.
   --resume               Reopen the last run's dashboard from .framework/ (see below).
   --no-persist           Do not write the orchestration state to .framework/.
+  --skip-preflight       Skip the prerequisite checks before a live run.
   --session-link <url>   Link to the live agent session (shown on the dashboard).
 ```
 

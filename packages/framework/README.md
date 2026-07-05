@@ -77,6 +77,11 @@ framework doctor               Check prerequisites (Claude Code installed, etc.)
   --model <id>           Model to pass through to the wrapped agent.
   --scope <prototype|full>   How much app to build (default: full).
   --max-passes <n>       Loop pass budget for a full build (default: 5).
+  --preset <name>        Run under an Open Loop domain preset (see below).
+  --autopilot            Activate the preset's Autopilot mode variants.
+  --technical            Activate the preset's Technical mode variants.
+  --kind <name>          Build event kind the preset's review loop fires for
+                         (e.g. bug-fix or major-change; default: the preset's own).
   --compose-extensions   Opt the built-in capability extensions in (Vike-only; see below).
   --permission-mode <mode>   Claude Code permission mode: default | acceptEdits |
                          bypassPermissions | plan (default: bypassPermissions, so the
@@ -140,6 +145,53 @@ That is a separate process from an orchestration run, not the same agent. If you
 have a real per-session URL scheme, point the dashboard at it with
 `--session-link "https://.../{sessionId}"` (`{sessionId}` fills in with the real
 Claude session id once known), and the dashboard labels it a **live session**.
+
+## Open Loop domain presets (#204)
+
+A **domain preset** bundles the review loops, prompts, and skills a kind of work
+wants, so a run is framed for that domain instead of the generic web-app default.
+Three ship built in:
+
+- `software-development` — code-review + test-coverage + security-review on a
+  major change; root-cause + regression-test on a bug fix.
+- `web-development` — accessibility + performance-budget + web-security.
+- `data-science` — reproducibility + data-validation + methodology.
+
+Pick one with `--preset`. Its review loop drives the build's checklist, so the
+loop's prompts are what gate each pass:
+
+```bash
+framework --preset software-development "Add an orders page with sign-in"
+```
+
+**Modes** tune a preset without swapping it. `--autopilot` and `--technical`
+activate a preset's mode variants (e.g. a leaner review chain under `--technical`).
+A mode flag with no `--preset` is a no-op and says so.
+
+**Build event kind.** Each preset defines both a `major-change` and a `bug-fix`
+review loop; the run picks one. `--kind bug-fix` fires the bug-fix loop instead of
+the default. A build event with no preset is a no-op.
+
+### Per-repo config: `the-framework.yml`
+
+Instead of retyping flags every run, a project can commit its Open Loop defaults to
+`the-framework.yml` (or `.yaml`) at the workspace root:
+
+```yaml
+preset: software-development
+autopilot: true      # activate the preset's Autopilot mode variants
+technical: false
+event: bug-fix        # the build event kind its review loop fires for
+```
+
+Every field is optional. CLI flags override the file, so the precedence is:
+
+- **preset**: `--preset` > `the-framework.yml` `preset`
+- **modes**: a flag and the file OR together (a flag can only *enable* a mode)
+- **event**: `--kind` > `the-framework.yml` `event` > the preset's own default > `major-change`
+
+When the file contributes anything, the run narrates it (`◆ the-framework.yml: ...`).
+A malformed file is a warning, never a failed run.
 
 ## Extensions (#190)
 

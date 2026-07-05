@@ -21,6 +21,10 @@ async function writeFixture(root: string) {
     join(root, 'prompts', 'review.md'),
     `---\nname: review\ndescription: Review a change.\nmetadata:\n  loopId: review\n---\nReview the change for correctness.\n`,
   )
+  await writeFile(
+    join(root, 'prompts', 'review.technical.md'),
+    `---\nname: review-technical\ndescription: Review a change (technical mode).\nmetadata:\n  loopId: review\n  conditions: technical\n---\nDeep technical review: trace every path.\n`,
+  )
   await mkdir(join(root, 'skills'))
   await writeFile(
     join(root, 'skills', 'vike.md'),
@@ -56,6 +60,19 @@ describe('loadDomainPreset', () => {
     assert.equal(preset.skills[0]!.name, 'vike')
     assert.equal(preset.skills[0]!.url, 'https://vike.dev/llms.txt')
     assert.equal(preset.skills[0]!.title, 'Vike')
+  })
+
+  it('loads only base files when no mode is active', async () => {
+    const preset = await loadDomainPreset(dir)
+    assert.equal(preset.prompts.length, 1) // the technical variant is not active
+    assert.match(preset.prompts[0]!.instructions, /correctness/)
+  })
+
+  it('a conditions variant overrides its base under an active mode', async () => {
+    const preset = await loadDomainPreset(dir, { modes: ['technical'] })
+    assert.equal(preset.prompts.length, 1) // still one prompt for id "review" — the variant replaced the base
+    assert.equal(preset.prompts[0]!.id, 'review')
+    assert.match(preset.prompts[0]!.instructions, /trace every path/)
   })
 
   it('throws when preset.md is missing', async () => {

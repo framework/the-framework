@@ -104,6 +104,8 @@
  * - {@link composeDomainPresets} — merge presets into one (later wins on prompt/skill id)
  * - {@link selectPreset} — pick the user's chosen domain by name
  * - {@link softwareDevelopmentPreset} — the shipped, stack-agnostic built-in
+ * - {@link loadDomainPreset} `{ modes }` — activate Autopilot/Technical variants
+ *   ({@link selectWinners}): a `conditions` sibling `.md` overrides its base
  */
 export { Supervisor } from './supervisor.js'
 export { agentPlanner, type AgentPlannerOptions } from './planner.js'
@@ -339,6 +341,11 @@ export {
   loadSkillsFrom,
   builtinPresetsDir,
   softwareDevelopmentPreset,
+  selectWinners,
+  stemOf,
+  readConditions,
+  type LoadPresetOptions,
+  type Conditional,
   type DomainPreset,
   type DomainPresetSpec,
   type DomainPresetMeta,

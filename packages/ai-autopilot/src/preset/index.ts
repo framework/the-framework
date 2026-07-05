@@ -15,5 +15,7 @@ export {
   loadSkillsFrom,
   builtinPresetsDir,
   softwareDevelopmentPreset,
+  type LoadPresetOptions,
 } from './load.js'
+export { selectWinners, stemOf, readConditions, type Conditional } from './conditions.js'
 export type { DomainPreset, DomainPresetSpec, DomainPresetMeta } from './types.js'

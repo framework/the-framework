@@ -31,4 +31,17 @@ describe('softwareDevelopmentPreset (shipped built-in)', () => {
     const kinds = preset.loops.flatMap(l => [...l.on]).sort()
     assert.deepEqual(kinds, ['bug-fix', 'major-change'])
   })
+
+  it('Technical Control mode overrides the major-change loop with the leaner variant', async () => {
+    const base = await softwareDevelopmentPreset()
+    const technical = await softwareDevelopmentPreset({ modes: ['technical'] })
+
+    const majorOf = (p: Awaited<ReturnType<typeof softwareDevelopmentPreset>>) =>
+      p.loops.find(l => l.on.includes('major-change'))!
+
+    assert.deepEqual([...majorOf(base).run], ['code-review', 'test-coverage', 'security-review'])
+    assert.deepEqual([...majorOf(technical).run], ['code-review']) // the variant wins
+    // still exactly two loops (the variant replaces the base, not adds to it)
+    assert.equal(technical.loops.length, 2)
+  })
 })

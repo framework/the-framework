@@ -2,13 +2,22 @@ import { readFile, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { parseSkillManifest } from '@gemstack/ai-skills'
+import type { SkillManifest } from '@gemstack/ai-skills'
 import { defineLoop } from '../loop/define.js'
 import { defineSkill } from '../extensions/define.js'
-import { loadPromptsFrom } from '../prompts/library.js'
+import { parsePrompt } from '../prompts/parse.js'
 import type { Loop } from '../loop/types.js'
+import type { Prompt } from '../prompts/types.js'
 import type { Skill } from '../extensions/types.js'
+import { readConditions, selectWinners, stemOf } from './conditions.js'
 import { defineDomainPreset, DomainPresetError } from './define.js'
 import type { DomainPreset } from './types.js'
+
+/** Options for {@link loadDomainPreset} and the per-directory loaders. */
+export interface LoadPresetOptions {
+  /** Active modes (e.g. `['autopilot']`); a `conditions` variant wins over its base when its modes are active. */
+  modes?: readonly string[]
+}
 
 /**
  * Load a {@link DomainPreset} from a directory of `.md` files — the no-code,
@@ -23,9 +32,12 @@ import type { DomainPreset } from './types.js'
  * ```
  *
  * The three content subdirectories are all optional — a missing one yields an
- * empty list. The preset's identity comes from `preset.md`.
+ * empty list. The preset's identity comes from `preset.md`. Pass `modes` to
+ * activate `conditions` variants (see `conditions.ts`); with none, only base
+ * files load.
  */
-export async function loadDomainPreset(dir: string): Promise<DomainPreset> {
+export async function loadDomainPreset(dir: string, opts: LoadPresetOptions = {}): Promise<DomainPreset> {
+  const modes = opts.modes ?? []
   const manifestPath = join(dir, 'preset.md')
   let raw: string
   try {
@@ -37,9 +49,9 @@ export async function loadDomainPreset(dir: string): Promise<DomainPreset> {
   const title = str(manifest.metadata, 'title')
 
   const [loops, prompts, skills] = await Promise.all([
-    loadLoopsFrom(join(dir, 'loops')),
-    loadPromptsIn(join(dir, 'prompts')),
-    loadSkillsFrom(join(dir, 'skills')),
+    loadLoopsFrom(join(dir, 'loops'), { modes }),
+    loadPromptsIn(join(dir, 'prompts'), { modes }),
+    loadSkillsFrom(join(dir, 'skills'), { modes }),
   ])
 
   return defineDomainPreset({
@@ -59,62 +71,71 @@ export function builtinPresetsDir(): string {
 }
 
 /** The shipped, stack-agnostic "Software Development" domain preset (#243). */
-export function softwareDevelopmentPreset(): Promise<DomainPreset> {
-  return loadDomainPreset(join(builtinPresetsDir(), 'software-development'))
+export function softwareDevelopmentPreset(opts: LoadPresetOptions = {}): Promise<DomainPreset> {
+  return loadDomainPreset(join(builtinPresetsDir(), 'software-development'), opts)
 }
 
-/** Load every `*.md` loop file in a directory (a missing directory yields `[]`). */
-export async function loadLoopsFrom(dir: string): Promise<Loop[]> {
-  const files = await mdFiles(dir)
-  return Promise.all(
-    files.map(async f => {
-      const path = join(dir, f)
-      const { manifest } = parseSkillManifest(await readFile(path, 'utf8'), path)
-      const meta = manifest.metadata ?? {}
-      const on = meta.on
-      const run = meta.run
-      if (on === undefined) throw new DomainPresetError(`loop ${JSON.stringify(path)} is missing metadata.on`)
-      if (!Array.isArray(run)) throw new DomainPresetError(`loop ${JSON.stringify(path)} needs metadata.run to be a list`)
-      return defineLoop({ on: on as string | string[], run: run as string[] })
-    }),
-  )
+/** Load the loop files in a directory, applying mode overrides (a missing directory yields `[]`). */
+export async function loadLoopsFrom(dir: string, opts: LoadPresetOptions = {}): Promise<Loop[]> {
+  const winners = selectWinners(await manifestEntries(dir), opts.modes ?? [])
+  return winners.map(({ path, manifest }) => {
+    const meta = manifest.metadata ?? {}
+    const on = meta['on']
+    const run = meta['run']
+    if (on === undefined) throw new DomainPresetError(`loop ${JSON.stringify(path)} is missing metadata.on`)
+    if (!Array.isArray(run)) throw new DomainPresetError(`loop ${JSON.stringify(path)} needs metadata.run to be a list`)
+    return defineLoop({ on: on as string | string[], run: run as string[] })
+  })
 }
 
-/** Load every `*.md` skill pointer in a directory (a missing directory yields `[]`). */
-export async function loadSkillsFrom(dir: string): Promise<Skill[]> {
-  const files = await mdFiles(dir)
-  return Promise.all(
-    files.map(async f => {
-      const path = join(dir, f)
-      const { manifest } = parseSkillManifest(await readFile(path, 'utf8'), path)
-      const meta = manifest.metadata ?? {}
-      const url = str(meta, 'url')
-      if (!url) throw new DomainPresetError(`skill ${JSON.stringify(path)} is missing metadata.url (its llms.txt pointer)`)
-      return defineSkill({
-        name: manifest.name,
-        title: str(meta, 'title') ?? manifest.name,
-        description: manifest.description,
-        url,
-      })
-    }),
-  )
+/** Load the prompt bodies in a directory, applying mode overrides (a missing directory yields `[]`). Internal: the public prompt loader is `loadPromptsFrom` in `prompts/`. */
+async function loadPromptsIn(dir: string, opts: LoadPresetOptions = {}): Promise<Prompt[]> {
+  const winners = selectWinners(await manifestEntries(dir), opts.modes ?? [])
+  return winners.map(({ raw, path }) => parsePrompt(raw, path))
+}
+
+/** Load the skill pointers in a directory, applying mode overrides (a missing directory yields `[]`). */
+export async function loadSkillsFrom(dir: string, opts: LoadPresetOptions = {}): Promise<Skill[]> {
+  const winners = selectWinners(await manifestEntries(dir), opts.modes ?? [])
+  return winners.map(({ path, manifest }) => {
+    const meta = manifest.metadata ?? {}
+    const url = str(meta, 'url')
+    if (!url) throw new DomainPresetError(`skill ${JSON.stringify(path)} is missing metadata.url (its llms.txt pointer)`)
+    return defineSkill({
+      name: manifest.name,
+      title: str(meta, 'title') ?? manifest.name,
+      description: manifest.description,
+      url,
+    })
+  })
 }
 
 // ─── Internals ───────────────────────────────────────────────────
 
-/** `*.md` filenames in a directory, sorted; `[]` when the directory does not exist. */
-async function mdFiles(dir: string): Promise<string[]> {
+interface Entry {
+  readonly stem: string
+  readonly conditions: readonly string[]
+  readonly path: string
+  readonly raw: string
+  readonly manifest: SkillManifest
+}
+
+/** Parse every `*.md` file's frontmatter in a directory (a missing directory yields `[]`). */
+async function manifestEntries(dir: string): Promise<Entry[]> {
+  let files: string[]
   try {
-    return (await readdir(dir)).filter(f => f.endsWith('.md')).sort()
+    files = (await readdir(dir)).filter(f => f.endsWith('.md')).sort()
   } catch {
     return []
   }
-}
-
-/** Prompts subdir via the existing loader; a missing/empty dir yields `[]` while real parse errors still surface. */
-async function loadPromptsIn(dir: string) {
-  const files = await mdFiles(dir)
-  return files.length ? loadPromptsFrom(dir) : []
+  return Promise.all(
+    files.map(async f => {
+      const path = join(dir, f)
+      const raw = await readFile(path, 'utf8')
+      const { manifest } = parseSkillManifest(raw, path)
+      return { stem: stemOf(f), conditions: readConditions(manifest.metadata), path, raw, manifest }
+    }),
+  )
 }
 
 function str(meta: Record<string, unknown> | undefined, key: string): string | undefined {

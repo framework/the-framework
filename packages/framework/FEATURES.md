@@ -1,6 +1,6 @@
 # Features
 
-> [NOTE!]
+> [!NOTE]
 > **Potential features, for evaluating the USP potential** of The Framework. This **isn't a roadmap**, it's just brainstorming to shape a vision for The Framework.
 
 - Autopilot: minimum intervention, automatic code refactoring (for maintainability), automatic security audit, automatic new feature requests (related: product manager agent), automatic feature request implementation

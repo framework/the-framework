@@ -119,6 +119,13 @@ export {
   type LoadedMemory,
 } from './memory.js'
 export {
+  loadUserSystemPrompt,
+  systemPromptBlock,
+  ANTI_LAZY_PILL,
+  SYSTEM_PROMPT_FILE,
+  type SystemPromptOptions,
+} from './system-prompt.js'
+export {
   preflight,
   type PreflightResult,
   type PreflightCheck,

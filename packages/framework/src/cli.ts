@@ -35,6 +35,7 @@ import {
 import { isWorkspaceEmpty } from './steps.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from './config.js'
 import { loadRepoMemory } from './memory.js'
+import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt.js'
 import { preflight } from './preflight.js'
 import { RunStore } from './store/index.js'
 
@@ -686,6 +687,12 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   const memory = await loadRepoMemory(cwd)
   if (memory.some(m => m.content)) io.out(`◆ project memory: ${memory.filter(m => m.content).map(m => m.name).join(', ')}`)
 
+  // A user SYSTEM.md and the-framework.yml's anti-lazy-pill toggle shape the system
+  // prompt injected into every prompt (#301). The built-in pill is on unless removed.
+  const userSystemPrompt = await loadUserSystemPrompt(cwd)
+  if (userSystemPrompt) io.out(`◆ system prompt: ${SYSTEM_PROMPT_FILE}`)
+  if (fileConfig.antiLazyPill === false) io.out('◆ anti-lazy-pill: off (the-framework.yml)')
+
   const runOpts: RunFrameworkOptions = {
     intent,
     scope: opts.scope,
@@ -705,6 +712,8 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     ...(domainPreset ? { preset: domainPreset, ...(modeList.length ? { modes: modeList } : {}) } : {}),
     ...(buildEvent ? { buildEvent } : {}),
     ...(memory.length ? { memory } : {}),
+    ...(userSystemPrompt ? { systemPrompt: userSystemPrompt } : {}),
+    ...(fileConfig.antiLazyPill === false ? { antiLazyPill: false } : {}),
     ...((): { sessionLink?: string } => {
       const link = chooseSessionLink(opts, fake)
       return link ? { sessionLink: link } : {}

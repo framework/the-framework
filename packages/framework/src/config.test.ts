@@ -17,6 +17,11 @@ test('parseFrameworkConfig reads preset + mode booleans + event', () => {
   )
 })
 
+test('parseFrameworkConfig reads the antiLazyPill toggle', () => {
+  assert.deepEqual(parseFrameworkConfig('antiLazyPill: false\n'), { antiLazyPill: false })
+  assert.throws(() => parseFrameworkConfig('antiLazyPill: nope\n'), /"antiLazyPill" must be a boolean/)
+})
+
 test('parseFrameworkConfig treats an empty document as {}', () => {
   assert.deepEqual(parseFrameworkConfig(''), {})
   assert.deepEqual(parseFrameworkConfig('# just a comment\n'), {})

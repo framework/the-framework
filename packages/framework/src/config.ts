@@ -16,6 +16,8 @@ export interface FrameworkFileConfig {
   technical?: boolean
   /** Build event kind the preset's review loop fires for, e.g. `bug-fix` (#265). */
   event?: string
+  /** Inject the built-in anti-lazy-pill system prompt (#301). Default `true`; set false to remove it. */
+  antiLazyPill?: boolean
 }
 
 /** Config file names read from the workspace root, in precedence order. */
@@ -67,7 +69,7 @@ export function parseFrameworkConfig(raw: string, source = 'the-framework.yml'):
       config[key] = obj[key] as string
     }
   }
-  for (const key of ['autopilot', 'technical'] as const) {
+  for (const key of ['autopilot', 'technical', 'antiLazyPill'] as const) {
     if (obj[key] !== undefined) {
       if (typeof obj[key] !== 'boolean') throw new Error(`${source}: "${key}" must be a boolean`)
       config[key] = obj[key] as boolean

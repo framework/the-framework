@@ -33,6 +33,7 @@ import {
 import { snapshotWorkspace } from './sandbox.js'
 import type { Driver, DriverEvent, DriverSession } from './driver/index.js'
 import { memoryFraming, type LoadedMemory } from './memory.js'
+import { systemPromptBlock } from './system-prompt.js'
 import { decideDeploy, deployWith, domainLoopChecklist, driverArchitect, driverBuild, driverChecklist, driverImprove, driverLoopPrompts } from './steps.js'
 import { hasSessionIdPlaceholder, OPEN_LOOP_MODES, resolveSessionLink, type FrameworkEvent } from './events.js'
 
@@ -99,6 +100,17 @@ export interface RunFrameworkOptions {
    * `loadRepoMemory(cwd)`. Omit or pass `[]` to frame no memory.
    */
   memory?: readonly LoadedMemory[]
+  /**
+   * A user-authored system prompt (from `SYSTEM.md`) injected into every prompt
+   * (#301). Load with `loadUserSystemPrompt(cwd)`. Composed after the built-in
+   * anti-lazy-pill, so a repo can add its own instructions on top of the default.
+   */
+  systemPrompt?: string
+  /**
+   * Inject the built-in anti-lazy-pill (#297) into every prompt (#301). Default
+   * `true`; pass `false` (e.g. from `the-framework.yml`) to remove it.
+   */
+  antiLazyPill?: boolean
   /**
    * A user-picked Open Loop domain preset ({loops, prompts, skills}) to run the
    * build under (#251). Its skills (and their personas) frame every phase, and
@@ -281,7 +293,11 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
   // The repo's own memory files (#260) frame the agent alongside personas + skills:
   // their contents give context, and the agent is told to keep the ones it owns current.
   const memoryBlock = opts.memory && opts.memory.length ? memoryFraming(opts.memory) : ''
+  // The anti-lazy-pill + any user SYSTEM.md lead the system prompt so its working
+  // agreement frames every prompt before the role/skill/memory context (#301).
+  const promptBlock = systemPromptBlock({ antiLazyPill: opts.antiLazyPill, user: opts.systemPrompt })
   const system = [
+    ...(promptBlock ? [promptBlock] : []),
     ...personas.map(personaInstructions),
     ...skills.map(skillInstructions),
     ...(memoryBlock ? [memoryBlock] : []),

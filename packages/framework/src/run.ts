@@ -38,7 +38,7 @@ import { snapshotWorkspace } from './sandbox.js'
 import type { Driver, DriverEvent, DriverSession } from './driver/index.js'
 import { memoryFraming, type LoadedMemory } from './memory.js'
 import { systemPromptBlock } from './system-prompt.js'
-import { AWAIT_PROTOCOL, parseChoicesGate } from './turn-gate.js'
+import { AWAIT_PROTOCOL, parseAwaitGate } from './turn-gate.js'
 import { continueAfterChoice, decideDeploy, deployWith, domainLoopChecklist, driverArchitect, driverBuild, driverChecklist, driverImprove, driverLoopPrompts, reArchitect } from './steps.js'
 import { hasSessionIdPlaceholder, OPEN_LOOP_MODES, pickedIds, resolveSessionLink, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import { UsageMeter } from './usage.js'
@@ -479,7 +479,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
           emit,
           signal: runSignal,
         }),
-        build: agentChoiceGate(driverBuild(session, workspaceOpt), session, {
+        build: agentAwaitGate(driverBuild(session, workspaceOpt), session, {
           ...(opts.requestChoice ? { requestChoice: opts.requestChoice } : {}),
           emit,
           signal: runSignal,
@@ -593,48 +593,58 @@ const MAX_PLAN_ROUNDS = 5
 const MAX_AWAIT_ROUNDS = 5
 
 /**
- * The agent-authored choice gate (#337): the turn-boundary counterpart to the
+ * The agent-authored await gate (#337 / #339): the turn-boundary counterpart to the
  * framework-emitted plan-approval gate (#304). When a build turn ends by asking the
- * user — an `await-choices` block per {@link AWAIT_PROTOCOL}, e.g. the #326 unclear-scope
- * or alternatives flow — rather than finishing, show the choice, wait for the pick, and
- * re-prompt the driver to continue from that decision. A no-op unless a
- * {@link RunFrameworkOptions.requestChoice} handler is wired (headless byte-identical),
- * and unless the agent actually stopped to ask (the common case returns straight through).
- * Bounded so an agent that keeps asking can't loop forever.
+ * user — an `await-choices` (pick one) or `await-multiselect` (pick any) block per
+ * {@link AWAIT_PROTOCOL}, e.g. the #326 alternatives flow or the [Research] preset (#331)
+ * — rather than finishing, show it, wait for the answer, and re-prompt the driver to
+ * continue from that decision. A no-op unless a {@link RunFrameworkOptions.requestChoice}
+ * handler is wired (headless byte-identical), and unless the agent actually stopped to
+ * ask (the common case returns straight through). Bounded so an agent that keeps asking
+ * can't loop forever.
  */
-function agentChoiceGate(
+function agentAwaitGate(
   base: (ctx: BuildContext) => Promise<SupervisorRun>,
   session: DriverSession,
   deps: {
     requestChoice?: (req: ChoiceRequest) => Promise<ChoicePick>
     emit: (event: FrameworkEvent) => void
-    /** The run signal; a gate parked for a pick unblocks (proceed) if the run aborts. */
+    /** The run signal; a gate parked for an answer unblocks (default) if the run aborts. */
     signal?: AbortSignal
   },
 ): (ctx: BuildContext) => Promise<SupervisorRun> {
   return async ctx => {
     const { requestChoice, emit } = deps
+    const signalOpt = deps.signal ? { signal: deps.signal } : {}
     let run = await base(ctx)
     if (!requestChoice) return run
 
     for (let round = 0; round < MAX_AWAIT_ROUNDS; round++) {
-      const gate = parseChoicesGate(run.text)
+      const gate = parseAwaitGate(run.text)
       if (!gate) return run // the agent finished instead of asking — the common case
-      // Round 0 keeps the stable `await-choices` id; later rounds get a unique one so a
-      // dashboard never confuses a re-ask with the pick it just resolved.
-      const id = round === 0 ? 'await-choices' : `await-choices-${round}`
-      const picked = await requestChoices({
-        id,
-        title: gate.title,
-        options: gate.options,
-        ...(gate.recommended ? { recommended: gate.recommended } : {}),
-        requestChoice,
-        emit,
-        ...(deps.signal ? { signal: deps.signal } : {}),
-      })
-      const chosen = gate.options.find(o => o.id === picked)
-      emit({ kind: 'log', message: `Continuing with your choice: ${chosen?.label ?? picked}` })
-      run = await continueAfterChoice(session, ctx, gate.title, chosen?.label ?? picked)
+      // Round 0 keeps a stable id; later rounds get a unique one so a dashboard never
+      // confuses a re-ask with the answer it just resolved.
+      const base = gate.kind === 'multi' ? 'await-multiselect' : 'await-choices'
+      const id = round === 0 ? base : `${base}-${round}`
+      let answer: string
+      if (gate.kind === 'multi') {
+        const picked = await requestMultiSelect({ id, title: gate.title, options: gate.options, requestChoice, emit, ...signalOpt })
+        const labels = gate.options.filter(o => picked.includes(o.id)).map(o => o.label)
+        answer = labels.length ? labels.join(', ') : '(none)'
+      } else {
+        const pickedId = await requestChoices({
+          id,
+          title: gate.title,
+          options: gate.options,
+          ...(gate.recommended ? { recommended: gate.recommended } : {}),
+          requestChoice,
+          emit,
+          ...signalOpt,
+        })
+        answer = gate.options.find(o => o.id === pickedId)?.label ?? pickedId
+      }
+      emit({ kind: 'log', message: `Continuing with your choice: ${answer}` })
+      run = await continueAfterChoice(session, ctx, gate.title, answer)
     }
     // The agent kept asking past the limit: proceed with the latest turn rather than loop.
     emit({ kind: 'log', message: 'Proceeding with the build (await limit reached).' })

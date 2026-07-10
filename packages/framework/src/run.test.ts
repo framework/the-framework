@@ -762,6 +762,46 @@ test('a build turn that stops to ask fires a live gate and resumes on the pick (
   assert.equal(result.productionGrade, true)
 })
 
+test('a build turn that stops to showMultiSelect fires a checklist gate and resumes (#339)', async () => {
+  const plan = { stack: 'Vike', narration: 'p', decisions: [{ choice: 'x', why: 'y' }], alternatives: [] }
+  const awaitBlock =
+    'Rated the problems.\n```await-multiselect\n' +
+    '{ "title": "Which problems to deep-dive?", "options": [{ "id": "auth", "label": "auth", "default": true }, { "id": "routing", "label": "routing" }] }\n' +
+    '```'
+  const driver = new FakeDriver({
+    respond: (prompt: string): string => {
+      if (/You are the architect/.test(prompt)) return '```json\n' + JSON.stringify(plan) + '\n```'
+      if (/Build this app end to end/.test(prompt)) return awaitBlock
+      if (/You paused to ask/.test(prompt)) return 'Added the picks to TODO. Done.'
+      if (/production-grade checklist/.test(prompt)) return 'Reviewed.\n```json\n{ "blockers": [] }\n```'
+      return 'done'
+    },
+    sessionId: 'multi339',
+  })
+
+  const events: FrameworkEvent[] = []
+  const prompts: string[] = []
+  await runFramework({
+    intent: FAKE_INTENT,
+    driver,
+    cwd: '/tmp/ws',
+    signals: FAKE_SIGNALS,
+    onEvent: e => {
+      events.push(e)
+      if (e.kind === 'driver' && e.event.type === 'start') prompts.push(e.event.prompt)
+    },
+    // The user unchecks the default `auth` and keeps `routing`.
+    requestChoice: async req => (req.multi ? { picked: ['routing'], by: 'user' } : { picked: 'proceed', by: 'user' }),
+  })
+
+  const gate = events.find(e => e.kind === 'choice' && e.id === 'await-multiselect')
+  assert.ok(gate && gate.kind === 'choice' && gate.multi === true)
+  assert.ok(gate.options.some(o => o.id === 'auth' && o.default === true))
+  // Resumed with the user's selection (routing only), not the defaults.
+  assert.ok(events.some(e => e.kind === 'log' && /Continuing with your choice: routing/.test(e.message)))
+  assert.ok(prompts.some(p => /You paused to ask.*chose: routing/s.test(p)))
+})
+
 test('without a requestChoice handler a build that asks is not gated (#337 headless)', async () => {
   const plan = { stack: 'Vike', narration: 'p', decisions: [{ choice: 'x', why: 'y' }], alternatives: [] }
   const driver = new FakeDriver({

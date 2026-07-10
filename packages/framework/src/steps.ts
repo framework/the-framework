@@ -22,7 +22,7 @@ import type {
   Verdict,
 } from '@gemstack/ai-autopilot'
 import type { DriverSession } from './driver/index.js'
-import { parseChoicesGate } from './turn-gate.js'
+import { parseAwaitGate } from './turn-gate.js'
 
 /**
  * Driver-backed {@link https://github.com/gemstack-land/gemstack | Bootstrap} steps.
@@ -284,10 +284,10 @@ export function driverBuild(
     // #182: the build must actually produce an app. If nothing landed on disk,
     // the agent stalled (e.g. sanity-checking the stack) — re-prompt once with a
     // hard "create it from scratch" directive so an empty-dir run starts building.
-    // Exception (#337): an empty workspace plus an `await-choices` block means the
-    // agent stopped *on purpose* to ask; the choice gate handles it, so don't clobber
-    // the question with a scaffold directive.
-    if (opts.verifyWorkspace && isWorkspaceEmpty(session.cwd) && !parseChoicesGate(turn.text)) {
+    // Exception (#337 / #339): an empty workspace plus an await block means the agent
+    // stopped *on purpose* to ask; the await gate handles it, so don't clobber the
+    // question with a scaffold directive.
+    if (opts.verifyWorkspace && isWorkspaceEmpty(session.cwd) && !parseAwaitGate(turn.text)) {
       const retry: PlannedSubtask = { id: 'build-2', description: 'Scaffold the app from scratch (workspace was empty)' }
       ctx.onEvent({ type: 'dispatch-start', subtask: retry })
       turn = await session.prompt(scaffoldPrompt(ctx.plan, ctx.intent), { ...promptOpts, ...signalOpt })

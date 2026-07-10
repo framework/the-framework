@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { parseChoicesGate } from './turn-gate.js'
+import { parseAwaitGate, parseChoicesGate, parseMultiSelectGate } from './turn-gate.js'
 
 const block = (json: string): string => 'Here are the options.\n```await-choices\n' + json + '\n```'
+const multiBlock = (json: string): string => 'Pick some.\n```await-multiselect\n' + json + '\n```'
 
 test('parseChoicesGate returns undefined when the agent did not stop to ask (#337)', () => {
   assert.equal(parseChoicesGate('Built the whole app. Done.'), undefined)
@@ -48,4 +49,33 @@ test('parseChoicesGate ignores a malformed or empty block rather than throwing (
   assert.equal(parseChoicesGate(block('{ "options": [] }')), undefined)
   assert.equal(parseChoicesGate(block('{ "options": [{ "detail": "no label" }] }')), undefined)
   assert.equal(parseChoicesGate(block('{ "title": "x" }')), undefined) // no options array
+})
+
+test('parseMultiSelectGate parses a checklist and preserves default-checked entries (#339)', () => {
+  const gate = parseMultiSelectGate(
+    multiBlock('{ "title": "Which problems?", "options": [{ "label": "auth", "default": true }, { "label": "routing" }, { "label": "data", "detail": "rated 2/10", "default": true }] }'),
+  )
+  assert.ok(gate)
+  assert.equal(gate.title, 'Which problems?')
+  assert.deepEqual(gate.options, [
+    { id: 'opt:0', label: 'auth', default: true },
+    { id: 'opt:1', label: 'routing' },
+    { id: 'opt:2', label: 'data', detail: 'rated 2/10', default: true },
+  ])
+})
+
+test('parseMultiSelectGate returns undefined for no block / empty options (#339)', () => {
+  assert.equal(parseMultiSelectGate('no block here'), undefined)
+  assert.equal(parseMultiSelectGate(multiBlock('{ "options": [] }')), undefined)
+})
+
+test('parseAwaitGate discriminates choices vs multiselect, later block wins (#339)', () => {
+  const c = parseAwaitGate(block('{ "options": [{ "label": "one" }] }'))
+  assert.equal(c?.kind, 'choices')
+  const m = parseAwaitGate(multiBlock('{ "options": [{ "label": "a", "default": true }] }'))
+  assert.equal(m?.kind, 'multi')
+  assert.equal(parseAwaitGate('the agent just finished'), undefined)
+  // Both present: the one appearing later in the turn wins.
+  const both = parseAwaitGate(block('{ "options": [{ "label": "x" }] }') + '\n' + multiBlock('{ "options": [{ "label": "y" }] }'))
+  assert.equal(both?.kind, 'multi')
 })

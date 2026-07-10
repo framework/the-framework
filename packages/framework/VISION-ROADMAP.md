@@ -1,7 +1,11 @@
-# Roadmap 🚀
+# Vision: high-level roadmap 🚀
+
+AI flows.
 
 > [!NOTE]
-> - Also includes brainstorming ideas
+> Includes:
+> - Brainstorming ideas
+> - Prioritization => high-level roadmap
 
 ## TODO
 

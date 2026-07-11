@@ -132,6 +132,18 @@ export {
   type GitRunner,
 } from './project.js'
 export {
+  projectId,
+  registryPath,
+  nodeRegistryFs,
+  listProjects,
+  addProject,
+  removeProject,
+  REGISTRY_DIR,
+  REGISTRY_FILE,
+  type ProjectRecord,
+  type RegistryFs,
+} from './registry.js'
+export {
   PACKAGE_NAME,
   nodeVersionFetcher,
   compareVersions,

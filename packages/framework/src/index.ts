@@ -114,12 +114,14 @@ export {
 } from './store/index.js'
 export {
   logsPath,
+  gitignorePath,
   renderLogEntry,
   parseLogs,
   appendLog,
   readLogs,
   THE_FRAMEWORK_DIR,
   LOGS_FILE,
+  LOGS_GITIGNORE,
   type LogEntry,
 } from './logs.js'
 export {

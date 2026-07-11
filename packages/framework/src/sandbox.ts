@@ -18,7 +18,7 @@ export const SANDBOX_IGNORE: ReadonlySet<string> = new Set([
   '.vite',
   '.cache',
   'coverage',
-  '.framework',
+  '.the-framework',
 ])
 
 /** Options for {@link snapshotWorkspace}. */

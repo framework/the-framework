@@ -104,8 +104,8 @@ framework relay                Host a run relay so teammates can watch a run (se
   --port <n>             Dashboard port (default: 4200); with `relay`, the relay port (4488).
   --no-dashboard         Run headless.
   --share <relay-url>    Publish this run to a relay (see below) so teammates can watch it.
-  --resume               Reopen the last run's dashboard from .framework/ (see below).
-  --no-persist           Do not write the orchestration state to .framework/.
+  --resume               Reopen the last run's dashboard from .the-framework/ (see below).
+  --no-persist           Do not write the orchestration state to .the-framework/.
   --skip-preflight       Skip the prerequisite checks before a live run.
   --session-link <url>   Link to the live agent session (shown on the dashboard).
 ```
@@ -117,7 +117,7 @@ The live path needs the Claude Code CLI installed (`claude` on `PATH`). The
 
 The orchestration state (the stack rationale, loop status, and decisions ledger)
 is our part of the run, not the agent's chat transcript, so we persist it. Each
-run appends its event stream to `.framework/events.jsonl` in the workspace, with a
+run appends its event stream to `.the-framework/events.jsonl` in the workspace, with a
 small `run.json` snapshot beside it and a human-readable `DECISIONS.md` at the
 root. Because the dashboard is a pure projection of that stream, a restart can
 replay it: `framework --resume` reopens the last run's dashboard read-only, exactly
@@ -125,10 +125,15 @@ as it looked, without running the agent again. Add `--cwd <dir>` to resume a run
 from another workspace. Pass `--no-persist` to skip writing state. We do not
 persist the agent's transcript; Claude Code owns that.
 
+The `.the-framework/` directory holds both the transient run state (`events.jsonl`,
+`run.json`, `runs/`) and the committed project log `LOGS.md`. `install` seeds a
+`.the-framework/.gitignore` that keeps the run state out of git so only `LOGS.md`
+is tracked.
+
 ### Run history
 
-Each finished run is archived under `.framework/runs/<id>.jsonl` (its log) and
-`.framework/runs/<id>.json` (its snapshot). The dashboard's left sidebar lists a
+Each finished run is archived under `.the-framework/runs/<id>.jsonl` (its log) and
+`.the-framework/runs/<id>.json` (its snapshot). The dashboard's left sidebar lists a
 project's past runs (intent, status, session link); clicking one replays that
 run's projection in the main view, and **Back to live** returns to the current
 run. The list is served by `GET /api/runs`, a single run by `GET /api/runs/<id>`

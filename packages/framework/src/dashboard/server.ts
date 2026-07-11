@@ -33,7 +33,7 @@ export interface DashboardOptions {
    */
   onChoice?: (id: string, pick: string | string[], by: ChoiceBy) => void
   /**
-   * The workspace whose `.framework/runs/` archive backs the run-history sidebar
+   * The workspace whose `.the-framework/runs/` archive backs the run-history sidebar
    * (#303): `GET /api/runs` lists it, `GET /api/runs/<id>` replays one run. Omit
    * to disable history (the endpoints report an empty list).
    */

@@ -168,9 +168,9 @@ Options:
   --no-dashboard         Do not start the localhost dashboard.
   --share <relay-url>    Publish this run to a relay (from "framework relay") so
                          teammates can watch it live; prints the shareable URL.
-  --resume               Reopen the last run's dashboard from .framework/ in --cwd
+  --resume               Reopen the last run's dashboard from .the-framework/ in --cwd
                          (read-only replay; no new agent run). Survives a restart.
-  --no-persist           Do not write the orchestration state to .framework/.
+  --no-persist           Do not write the orchestration state to .the-framework/.
   --skip-preflight       Skip the prerequisite checks before a live run.
   --session-link <url>   A real per-session link to the live agent session, shown
                          on the dashboard. Our runs are headless (not Remote-
@@ -657,7 +657,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   if (opts.resume) return resumeRun(opts, io)
 
   // `--daemon` is the detached child's own entry: it *is* the persistent dashboard,
-  // tailing .framework/ until signalled. Never invoked by hand (#302).
+  // tailing .the-framework/ until signalled. Never invoked by hand (#302).
   if (opts.daemon) {
     await runDaemon(opts.cwd ?? process.cwd(), opts.port !== undefined ? { port: opts.port } : {})
     return 0
@@ -789,7 +789,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   }
 
   // Persist the orchestration state so a restart can --resume it (#211). The log
-  // is the dashboard's own event stream, appended to .framework/ in the workspace.
+  // is the dashboard's own event stream, appended to .the-framework/ in the workspace.
   // Best-effort: a store that fails to open just means no persistence, never a
   // failed run. --no-persist opts out entirely.
   let store: RunStore | undefined
@@ -801,7 +801,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     }
   }
 
-  // The persistent daemon dashboard steers this run through .framework/control.jsonl
+  // The persistent daemon dashboard steers this run through .the-framework/control.jsonl
   // (#344): its Stop button and choice picks append entries, we tail the file and
   // abort / resolve the parked gate. Reset first so a previous run's picks can never
   // fire into this one (gate ids repeat across runs). Only wired when a daemon is
@@ -1187,7 +1187,7 @@ async function runRelayServer(opts: CliOptions, io: CliIO): Promise<number> {
 }
 
 /**
- * Reopen the last run from its persisted `.framework/` log and replay it into a
+ * Reopen the last run from its persisted `.the-framework/` log and replay it into a
  * fresh dashboard (#211). No agent runs; the dashboard rehydrates from the saved
  * event stream and stays up read-only until Ctrl+C.
  */
@@ -1197,7 +1197,7 @@ async function resumeRun(opts: CliOptions, io: CliIO): Promise<number> {
   try {
     store = await RunStore.open(cwd, { fresh: false })
   } catch (err) {
-    io.err(`could not open .framework/ in ${cwd} (${err instanceof Error ? err.message : String(err)})`)
+    io.err(`could not open .the-framework/ in ${cwd} (${err instanceof Error ? err.message : String(err)})`)
     return 1
   }
   const events = await store.loadEvents()

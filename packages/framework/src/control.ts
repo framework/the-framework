@@ -7,14 +7,14 @@ import { JsonlTailer } from './jsonl-tail.js'
 
 /**
  * The dashboard-to-run control channel (#344): the reverse of the event log.
- * Events flow run -> `.framework/events.jsonl` -> daemon -> browser; steering
- * flows browser -> daemon -> `.framework/control.jsonl` -> run. The daemon
+ * Events flow run -> `.the-framework/events.jsonl` -> daemon -> browser; steering
+ * flows browser -> daemon -> `.the-framework/control.jsonl` -> run. The daemon
  * appends a {@link ControlEntry} per Stop click / choice pick, and the run tails
  * the file, aborting or resolving its parked gate. Same file-is-the-seam design
  * as the forward direction — no run<->daemon IPC.
  */
 
-/** The control log filename under `.framework/`. */
+/** The control log filename under `.the-framework/`. */
 export const CONTROL_FILE = 'control.jsonl'
 
 /** One steering instruction from the dashboard to the live run. */
@@ -51,7 +51,7 @@ export interface ControlWatcher {
 
 /**
  * Tail the workspace's control log, dispatching each well-formed entry as it is
- * appended. An `fs.watch` on `.framework/` plus a poll backstop, mirroring the
+ * appended. An `fs.watch` on `.the-framework/` plus a poll backstop, mirroring the
  * daemon's event tail (`fs.watch` is unreliable across platforms). Malformed or
  * unknown lines are skipped so a bad write can never crash a run.
  */

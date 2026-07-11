@@ -11,8 +11,13 @@ import type { FrameworkEvent } from '../events.js'
  * transcript (Claude Code owns that); only our own orchestration events.
  */
 
-/** The directory, under the workspace root, that holds the persisted run. */
-export const FRAMEWORK_DIR = '.framework'
+/**
+ * The directory, under the workspace root, that holds the persisted run. Same
+ * `.the-framework/` directory as the committed project log (#313): one dir holds
+ * both the transient run state (events.jsonl / run.json / runs/) and the DB
+ * (LOGS.md); a seeded `.the-framework/.gitignore` keeps the run state untracked.
+ */
+export const FRAMEWORK_DIR = '.the-framework'
 
 /** The append-only event log: one {@link FrameworkEvent} per line (JSONL). */
 export const EVENTS_FILE = 'events.jsonl'
@@ -184,7 +189,7 @@ export class RunStore {
   }
 
   /**
-   * Open (creating `.framework/` if needed) under the workspace `cwd`. `fresh`
+   * Open (creating `.the-framework/` if needed) under the workspace `cwd`. `fresh`
    * truncates any prior log for a new run; the default preserves it so a resume
    * can {@link loadEvents}.
    */
@@ -283,7 +288,7 @@ export class RunStore {
   }
 }
 
-/** Paths of a run's archived log + meta under `.framework/runs/`. */
+/** Paths of a run's archived log + meta under `.the-framework/runs/`. */
 function archivePaths(dir: string, id: string): { events: string; meta: string } {
   const runs = join(dir, RUNS_DIR)
   return { events: join(runs, `${id}.jsonl`), meta: join(runs, `${id}.json`) }

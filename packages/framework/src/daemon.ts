@@ -15,14 +15,14 @@ import { JsonlTailer } from './jsonl-tail.js'
  * The persistent background dashboard (#302). Today the dashboard dies with the
  * foreground `framework "<prompt>"` run; this makes it a long-lived local process
  * that outlives any single run. It is a pure projection of the store: the run
- * appends its events to `.framework/events.jsonl` (unchanged), and the daemon
+ * appends its events to `.the-framework/events.jsonl` (unchanged), and the daemon
  * *tails* that file, pushing each new event to connected browsers. No run<->daemon
  * IPC — the file is the seam, matching "the dashboard is a projection of the event
- * stream". Steering goes the other way through `.framework/control.jsonl` (#344).
+ * stream". Steering goes the other way through `.the-framework/control.jsonl` (#344).
  * MVP: one project = the workspace `cwd`; multi-project is deferred (#299).
  */
 
-/** The daemon's liveness record under `.framework/`. */
+/** The daemon's liveness record under `.the-framework/`. */
 export const DAEMON_STATE_FILE = 'daemon.json'
 
 /** The default dashboard port the daemon binds. Matches the per-run dashboard. */
@@ -40,7 +40,7 @@ export interface DaemonState {
   startedAt: string
 }
 
-/** The `.framework/` directory for a workspace. */
+/** The `.the-framework/` directory for a workspace. */
 export function daemonDir(cwd: string): string {
   return join(cwd, FRAMEWORK_DIR)
 }
@@ -191,7 +191,7 @@ export async function stopDaemon(cwd: string): Promise<boolean> {
 }
 
 /**
- * Tails the append-only `.framework/events.jsonl` run log. The generic tailing
+ * Tails the append-only `.the-framework/events.jsonl` run log. The generic tailing
  * lives in {@link JsonlTailer}; this keeps the event-typed name the daemon (and
  * public API) always had.
  */
@@ -211,7 +211,7 @@ export interface RunDaemonOptions {
 
 /**
  * The daemon body — run in the detached child. Starts the dashboard, seeds it
- * from the existing log, then tails `.framework/events.jsonl` (an `fs.watch` plus
+ * from the existing log, then tails `.the-framework/events.jsonl` (an `fs.watch` plus
  * a poll backstop, since `fs.watch` is unreliable across platforms), pushing each
  * new event to browsers. Resolves on SIGINT/SIGTERM after tearing the dashboard
  * down and removing its state file.
@@ -219,10 +219,10 @@ export interface RunDaemonOptions {
 export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promise<void> {
   const port = opts.port ?? DEFAULT_DAEMON_PORT
   // Steering (#344): the daemon owns no run, so its Stop button and choice picks
-  // append to `.framework/control.jsonl`; the live run tails that file. Appends
+  // append to `.the-framework/control.jsonl`; the live run tails that file. Appends
   // are best-effort — a full disk must not take the dashboard down with it.
   // The state file, the event/control logs, and the fs.watch all live under
-  // `.framework/` — create it up front so the daemon works as the very first
+  // `.the-framework/` — create it up front so the daemon works as the very first
   // command in a fresh workspace (before any run made the dir).
   await mkdir(daemonDir(cwd), { recursive: true })
 

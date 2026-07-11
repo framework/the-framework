@@ -14,6 +14,14 @@ export const THE_FRAMEWORK_DIR = '.the-framework'
 /** The markdown log file name. */
 export const LOGS_FILE = 'LOGS.md'
 
+/**
+ * The `.the-framework/.gitignore` that keeps run state transient (#313): the dir
+ * holds both the committed DB (LOGS.md) and the transient run logs, so this
+ * ignores everything except LOGS.md and itself.
+ */
+export const LOGS_GITIGNORE =
+  '# The Framework: only LOGS.md is the committed project DB; run state is transient.\n*\n!.gitignore\n!LOGS.md\n'
+
 /** One project-log entry: a loop, or a standalone prompt/build. */
 export interface LogEntry {
   /** ISO timestamp. */
@@ -42,6 +50,11 @@ export const LOGS_HEADER = '# The Framework logs\n'
 /** The log path under `cwd`. */
 export function logsPath(cwd: string): string {
   return join(cwd, THE_FRAMEWORK_DIR, LOGS_FILE)
+}
+
+/** The `.gitignore` path under `cwd`'s `.the-framework/`. */
+export function gitignorePath(cwd: string): string {
+  return join(cwd, THE_FRAMEWORK_DIR, '.gitignore')
 }
 
 /** Markdown for one entry, starting at `## ` (no file header, no blank lines around it). */

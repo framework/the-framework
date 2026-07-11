@@ -42,7 +42,7 @@ test('snapshotWorkspace skips binary files and oversized files', async () => {
 })
 
 test('SANDBOX_IGNORE lists the build/VCS/cache dirs', () => {
-  for (const name of ['node_modules', '.git', 'dist', '.framework']) {
+  for (const name of ['node_modules', '.git', 'dist', '.the-framework']) {
     assert.ok(SANDBOX_IGNORE.has(name), `${name} is ignored`)
   }
 })

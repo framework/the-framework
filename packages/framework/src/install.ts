@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from './project.js'
-import { logsPath, LOGS_HEADER, THE_FRAMEWORK_DIR } from './logs.js'
+import { logsPath, LOGS_HEADER, THE_FRAMEWORK_DIR, gitignorePath, LOGS_GITIGNORE } from './logs.js'
 import { nodeStoreFs, type StoreFs } from './store/index.js'
 
 /**
@@ -45,6 +45,10 @@ export async function installProject(cwd: string, deps: InstallDeps = {}): Promi
     await fs.mkdir(join(cwd, THE_FRAMEWORK_DIR))
     const path = logsPath(cwd)
     if (!(await fs.exists(path))) await fs.write(path, LOGS_HEADER)
+    // Keep the transient run state (events.jsonl / run.json / runs/) out of git;
+    // only LOGS.md is the committed DB (#313).
+    const ignore = gitignorePath(cwd)
+    if (!(await fs.exists(ignore))) await fs.write(ignore, LOGS_GITIGNORE)
 
     await git(['add', '-A'], cwd)
     await git(['commit', '-m', '[The Framework] install The Framework'], cwd)

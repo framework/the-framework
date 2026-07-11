@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
 import { enumerateGitRepos, installProject, type DirLister } from './install.js'
-import { logsPath, readLogs, LOGS_HEADER } from './logs.js'
+import { logsPath, readLogs, LOGS_HEADER, gitignorePath, LOGS_GITIGNORE } from './logs.js'
 import type { GitRunner } from './project.js'
 import type { StoreFs } from './store/index.js'
 
@@ -62,6 +62,17 @@ test('installProject on a clean repo seeds the log and makes exactly one install
 
   const commits = calls.filter(args => args[0] === 'commit')
   assert.deepEqual(commits, [['commit', '-m', '[The Framework] install The Framework']])
+})
+
+test('installProject seeds .the-framework/.gitignore so only LOGS.md is committed (#313)', async () => {
+  const fs = memFs()
+  const { git } = fakeGit(() => '')
+
+  await installProject(CWD, { git, fs })
+  assert.equal(fs.files.get(gitignorePath(CWD)), LOGS_GITIGNORE)
+  // The ignore keeps run state (events.jsonl / run.json / runs/) untracked while committing LOGS.md.
+  assert.match(LOGS_GITIGNORE, /^\*$/m)
+  assert.match(LOGS_GITIGNORE, /^!LOGS\.md$/m)
 })
 
 test('installProject on a dirty repo commits the pre-existing changes first', async () => {

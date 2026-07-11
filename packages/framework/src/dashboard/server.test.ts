@@ -296,7 +296,7 @@ test('POST /stop invokes onStop and the page renders the Stop button (#218)', as
 
 test('/api/runs lists the workspace archive and /api/runs/<id> replays a run (#303)', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'fw-hist-'))
-  const runs = join(cwd, '.framework', 'runs')
+  const runs = join(cwd, '.the-framework', 'runs')
   await mkdir(runs, { recursive: true })
   const events: FrameworkEvent[] = [
     { kind: 'session', driver: 'fake', workspace: cwd, fake: true },

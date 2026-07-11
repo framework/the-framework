@@ -171,7 +171,7 @@ test('runDaemon serves the dashboard, records its state, and cleans up on shutdo
   }
 })
 
-test('runDaemon comes up on a fresh workspace with no .framework yet', async () => {
+test('runDaemon comes up on a fresh workspace with no .the-framework yet', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-daemon-')) // deliberately no mkdir
   const ac = new AbortController()
   try {
@@ -181,7 +181,7 @@ test('runDaemon comes up on a fresh workspace with no .framework yet', async () 
       await new Promise(r => setTimeout(r, 20))
       state = await readDaemonState(cwd)
     }
-    assert.ok(state, 'the daemon created .framework/ itself and wrote its state file')
+    assert.ok(state, 'the daemon created .the-framework/ itself and wrote its state file')
     assert.equal((await fetch(state!.url)).status, 200)
     ac.abort()
     await done

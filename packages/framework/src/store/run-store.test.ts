@@ -51,8 +51,8 @@ function memFs(seed: Record<string, string> = {}): StoreFs & { files: Map<string
 
 const AT = '2026-07-04T00:00:00.000Z'
 const CWD = '/ws'
-const EVENTS = join(CWD, '.framework', 'events.jsonl')
-const META = join(CWD, '.framework', 'run.json')
+const EVENTS = join(CWD, '.the-framework', 'events.jsonl')
+const META = join(CWD, '.the-framework', 'run.json')
 
 const RUN: FrameworkEvent[] = [
   { kind: 'session', driver: 'fake', workspace: CWD, fake: true, sessionLink: 'https://claude.ai/code' },
@@ -150,8 +150,8 @@ test('close archives the run into runs/<id>.json + .jsonl for history (#303)', a
   await store.close()
 
   const id = store.snapshot().id
-  const archivedMeta = fs.files.get(join(CWD, '.framework', 'runs', `${id}.json`))
-  const archivedLog = fs.files.get(join(CWD, '.framework', 'runs', `${id}.jsonl`))
+  const archivedMeta = fs.files.get(join(CWD, '.the-framework', 'runs', `${id}.json`))
+  const archivedLog = fs.files.get(join(CWD, '.the-framework', 'runs', `${id}.jsonl`))
   assert.ok(archivedMeta, 'meta archived')
   assert.ok(archivedLog, 'log archived')
   assert.equal((JSON.parse(archivedMeta!) as RunMeta).intent, 'a blog with comments')

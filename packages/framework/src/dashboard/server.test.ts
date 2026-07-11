@@ -362,6 +362,54 @@ test('/stop is 405 for a non-POST and 404 when stopping is not wired (#218)', as
   }
 })
 
+test('POST /api/projects installs + registers via onAddProject (#396)', async () => {
+  const calls: Array<{ path: string; directory: boolean }> = []
+  const dash = await startDashboard({
+    port: 0,
+    onAddProject: (path, directory) => {
+      calls.push({ path, directory })
+      return { ok: true, added: directory ? 2 : 1, alreadyActivated: 0 }
+    },
+  })
+  try {
+    // A single repo.
+    const one = await postJson(dash.url + '/api/projects', { path: '/repos/app-a' })
+    assert.equal(one.status, 202)
+    assert.deepEqual(JSON.parse(one.body), { ok: true, added: 1, alreadyActivated: 0 })
+    // A folder of repos.
+    const many = await postJson(dash.url + '/api/projects', { path: '/repos', directory: true })
+    assert.equal(JSON.parse(many.body).added, 2)
+    assert.deepEqual(calls, [
+      { path: '/repos/app-a', directory: false },
+      { path: '/repos', directory: true },
+    ])
+    // A missing path is a 400 and never reaches the handler.
+    assert.equal((await postJson(dash.url + '/api/projects', {})).status, 400)
+    assert.equal(calls.length, 2)
+  } finally {
+    await dash.close()
+  }
+})
+
+test('POST /api/projects surfaces a failed install as 400, and is 404 when adding is disabled (#396)', async () => {
+  const failing = await startDashboard({ port: 0, onAddProject: () => ({ ok: false, error: 'not a git repo' }) })
+  try {
+    const res = await postJson(failing.url + '/api/projects', { path: '/nope' })
+    assert.equal(res.status, 400)
+    assert.deepEqual(JSON.parse(res.body), { ok: false, error: 'not a git repo' })
+  } finally {
+    await failing.close()
+  }
+  // No handler wired -> 404 (adding disabled), and a cross-origin POST is refused.
+  const noAdd = await startDashboard({ port: 0 })
+  try {
+    assert.equal((await postJson(noAdd.url + '/api/projects', { path: '/x' })).status, 404)
+    assert.equal((await postJson(noAdd.url + '/api/projects', { path: '/x' }, { origin: 'https://evil.example' })).status, 403)
+  } finally {
+    await noAdd.close()
+  }
+})
+
 function postJson(
   url: string,
   body: unknown,

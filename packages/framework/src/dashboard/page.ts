@@ -11,7 +11,7 @@ import { renderMaintainabilityMinimalPrompt } from '../maintainability-minimal-p
  * that foreground the orchestration (stack rationale, loop status, decisions)
  * beside a tail of the wrapped agent's own activity.
  */
-export function dashboardHtml(title: string, stoppable = false, choiceable = false, startable = false): string {
+export function dashboardHtml(title: string, stoppable = false, choiceable = false, startable = false, addable = false): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -90,6 +90,25 @@ export function dashboardHtml(title: string, stoppable = false, choiceable = fal
   #queue .q-proj { color: #7b8496; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
   #projects .empty, #overview .empty, #queue .empty { color: #5c657a; font-size: 12px; padding: 6px; cursor: default; }
   #projects .empty:hover, #overview .empty:hover, #queue .empty:hover { background: none; }
+  /* Add project(s) (#396): a small install form under the Projects heading. */
+  #projects-head { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 8px; }
+  #projects-head h2 { margin: 0; }
+  #add-project { font: inherit; font-size: 12px; cursor: pointer; color: #9db4d6; background: #131a2a;
+    border: 1px solid #24344a; border-radius: 6px; padding: 2px 8px; }
+  #add-project:hover { background: #17212f; }
+  #add-project[hidden] { display: none; }
+  #add-project-form { padding: 8px 6px 10px; display: flex; flex-direction: column; gap: 6px; }
+  #add-project-form[hidden] { display: none; }
+  #add-project-form input[type=text] { font: inherit; font-size: 12px; color: #d7dce5; background: #0d1119;
+    border: 1px solid #24344a; border-radius: 6px; padding: 6px 8px; width: 100%; box-sizing: border-box; }
+  #add-project-form label { color: #8b93a3; font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  #add-project-actions { display: flex; gap: 6px; }
+  #add-project-actions button { font: inherit; font-size: 12px; cursor: pointer; border-radius: 6px; padding: 4px 10px; }
+  #add-project-submit { color: #cfe6d6; background: #12241a; border: 1px solid #2f6f4a; }
+  #add-project-cancel { color: #b7c0d0; background: #141a24; border: 1px solid #24344a; }
+  #add-project-note { font-size: 11px; color: #7b8496; }
+  #add-project-note.err { color: #e2686a; }
+  #add-project-note.ok { color: #67d98f; }
   #viewing { display: none; align-items: center; gap: 8px; padding: 8px 20px; font-size: 12px;
     background: #16202e; border-bottom: 1px solid #24344a; color: #9db4d6; }
   #viewing.on { display: flex; }
@@ -269,7 +288,19 @@ export function dashboardHtml(title: string, stoppable = false, choiceable = fal
 <aside id="projects-sidebar">
   <h2>Overview</h2>
   <div id="overview"><div class="empty">loading…</div></div>
-  <h2>Projects</h2>
+  <div id="projects-head">
+    <h2>Projects</h2>
+    <button id="add-project"${addable ? '' : ' hidden'} title="Install The Framework into a repo (or every repo in a folder)">+ Add</button>
+  </div>
+  <form id="add-project-form" hidden>
+    <input id="add-project-path" type="text" placeholder="/absolute/path/to/repo" autocomplete="off" />
+    <label><input type="checkbox" id="add-project-dir" /> It&#39;s a folder of repos</label>
+    <div id="add-project-actions">
+      <button type="submit" id="add-project-submit">Add</button>
+      <button type="button" id="add-project-cancel">Cancel</button>
+    </div>
+    <span id="add-project-note"></span>
+  </form>
   <ul id="projects"><li class="empty">loading…</li></ul>
   <h2>Queue</h2>
   <ul id="queue"><li class="empty">loading…</li></ul>
@@ -371,18 +402,19 @@ export function dashboardHtml(title: string, stoppable = false, choiceable = fal
 </aside>
 </div>
 <script>
-${clientScript(stoppable, choiceable, startable)}
+${clientScript(stoppable, choiceable, startable, addable)}
 </script>
 </body>
 </html>`
 }
 
-function clientScript(stoppable: boolean, choiceable: boolean, startable: boolean): string {
+function clientScript(stoppable: boolean, choiceable: boolean, startable: boolean, addable: boolean): string {
   // Runs in the browser. Keep it dependency-free.
   return `
 const STOPPABLE = ${stoppable ? 'true' : 'false'};
 const CHOICEABLE = ${choiceable ? 'true' : 'false'};
 const STARTABLE = ${startable ? 'true' : 'false'};
+const ADDABLE = ${addable ? 'true' : 'false'};
 const RESEARCH_PROMPT = ${JSON.stringify(renderResearchPrompt())};
 const READABILITY_PROMPT = ${JSON.stringify(renderReadabilityPrompt())};
 const MAINTAINABILITY_PROMPT = ${JSON.stringify(renderMaintainabilityPrompt())};
@@ -938,6 +970,53 @@ function loadQueue() {
         .flatMap(doc => todoItems(doc.content).map(text => ({ projectId: p.id, projectName: p.name || 'project', text }))))
       .catch(() => [])
   )).then(perProject => renderQueue(perProject.flat())).catch(() => {});
+}
+
+// Add project(s) (#396): install The Framework into a repo (or every git repo in a
+// folder) and register it. The install + commit happen server-side; on success we
+// just reload the Projects list.
+function toggleAddProject(show) {
+  const form = $('add-project-form');
+  form.hidden = !show;
+  $('add-project-note').textContent = '';
+  if (show) $('add-project-path').focus();
+}
+
+function submitAddProject(ev) {
+  ev.preventDefault();
+  if (!ADDABLE) return;
+  const note = $('add-project-note');
+  note.className = '';
+  const path = $('add-project-path').value.trim();
+  if (!path) { note.className = 'err'; note.textContent = 'enter a path first'; return; }
+  const directory = $('add-project-dir').checked;
+  $('add-project-submit').disabled = true;
+  note.textContent = 'installing\\u2026';
+  fetch('api/projects', { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ path: path, directory: directory }) })
+    .then(async r => {
+      $('add-project-submit').disabled = false;
+      let body = {}; try { body = await r.json(); } catch {}
+      if (r.ok && body.ok) {
+        const n = (body.added || 0) + (body.alreadyActivated || 0);
+        note.className = 'ok';
+        note.textContent = 'added ' + n + ' project' + (n === 1 ? '' : 's');
+        $('add-project-path').value = '';
+        $('add-project-dir').checked = false;
+        loadProjects();
+        return;
+      }
+      note.className = 'err';
+      note.textContent = (body && body.error) ? body.error : 'could not add (' + r.status + ')';
+    })
+    .catch(() => { $('add-project-submit').disabled = false; note.className = 'err';
+      note.textContent = 'could not reach the dashboard server'; });
+}
+
+if (ADDABLE) {
+  $('add-project').addEventListener('click', () => toggleAddProject($('add-project-form').hidden));
+  $('add-project-cancel').addEventListener('click', () => toggleAddProject(false));
+  $('add-project-form').addEventListener('submit', submitAddProject);
 }
 
 // Document sidebar (#319): render the PLAN.md / TODO.md the agent writes at the

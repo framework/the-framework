@@ -105,10 +105,12 @@ test('enumerateGitRepos keeps only children that are their own repo roots, sorte
   const dir = '/repos'
   const children = [join(dir, 'b'), join(dir, 'a'), join(dir, 'nested'), join(dir, 'plain')]
   const dirs: DirLister = { childDirs: async () => children }
+  // `git rev-parse --show-prefix`: '' at a repo root, a path inside an outer repo,
+  // and an error when the dir is not a repo at all.
   const { git } = fakeGit((_args, cwd) => {
-    if (cwd === join(dir, 'nested')) return dir + '\n' // subdir of an outer repo
+    if (cwd === join(dir, 'nested')) return 'nested/\n' // subdir of an outer repo
     if (cwd === join(dir, 'plain')) throw new Error('not a git repository')
-    return cwd + '\n'
+    return '\n'
   })
 
   assert.deepEqual(await enumerateGitRepos(dir, { git, dirs }), [join(dir, 'a'), join(dir, 'b')])

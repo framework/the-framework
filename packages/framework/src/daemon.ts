@@ -4,10 +4,11 @@ import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { FrameworkEvent } from './events.js'
 import { EVENTS_FILE, FRAMEWORK_DIR } from './store/index.js'
-import { startDashboard, type Dashboard, type StartRunKind, type StartRunOptions, type StartRunResult } from './dashboard/index.js'
+import { startDashboard, type Dashboard, type StartRunKind, type StartRunOptions, type StartRunResult, type AddProjectResult } from './dashboard/index.js'
 import { appendControl } from './control.js'
 import { isActivated } from './project.js'
 import { addProject } from './registry.js'
+import { installProject, enumerateGitRepos } from './install.js'
 import { JsonlTailer } from './jsonl-tail.js'
 
 /**
@@ -290,12 +291,32 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     return { ok: true }
   }
 
+  // Add project(s) (#396): install a single repo, or every git repo directly under
+  // a directory, then register each so it appears in the Projects list. installProject
+  // is idempotent (an already-activated repo is a no-op success); a git failure on any
+  // target aborts and surfaces as an error the dialog shows.
+  const addProjects = async (path: string, directory: boolean): Promise<AddProjectResult> => {
+    const targets = directory ? await enumerateGitRepos(path) : [path]
+    if (!targets.length) return { ok: false, error: `no git repositories found under ${path}` }
+    let added = 0
+    let alreadyActivated = 0
+    for (const repo of targets) {
+      const result = await installProject(repo)
+      if (!result.ok) return { ok: false, error: result.error }
+      if (result.alreadyActivated) alreadyActivated++
+      else added++
+      await addProject(repo, new Date().toISOString()).catch(() => {})
+    }
+    return { ok: true, added, alreadyActivated }
+  }
+
   const dashboard: Dashboard = await startDashboard({
     port,
     cwd,
     onStop: () => void appendControl(cwd, { kind: 'stop' }).catch(() => {}),
     onChoice: (id, pick, by) => void appendControl(cwd, { kind: 'choice', id, pick, by }).catch(() => {}),
     onStart: startRun,
+    onAddProject: addProjects,
   })
   const eventsPath = join(daemonDir(cwd), EVENTS_FILE)
   const tailer = new EventTailer(eventsPath, event => dashboard.push(event))

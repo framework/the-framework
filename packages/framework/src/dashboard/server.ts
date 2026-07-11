@@ -54,7 +54,19 @@ export interface DashboardOptions {
    * back-compat) and the target the live stream + run start/stop still follow (#393).
    */
   projects?: ProjectsProvider
+  /**
+   * Install + register projects (#396): `POST /api/projects` with a JSON
+   * `{ path, directory? }` body. Wire this to install the repo (or every git repo
+   * under a directory) and add it to the registry (the daemon does). Omit to
+   * disable adding; the page hides the "Add project(s)" control.
+   */
+  onAddProject?: (path: string, directory: boolean) => Promise<AddProjectResult> | AddProjectResult
 }
+
+/** The outcome of an {@link DashboardOptions.onAddProject} attempt (#396). */
+export type AddProjectResult =
+  | { ok: true; added: number; alreadyActivated: number }
+  | { ok: false; error: string }
 
 /**
  * The dashboard's Global options (#314), posted alongside a Start. Each maps to a
@@ -118,10 +130,11 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
   const onStart = opts.onStart
   const cwd = opts.cwd
   const projects = opts.projects ?? defaultProjectsProvider()
+  const onAddProject = opts.onAddProject
   const stream = new EventStream<FrameworkEvent>()
   const clients = new Set<ServerResponse>()
 
-  const server = createServer((req, res) => handle(req, res, stream, clients, title, onStop, onChoice, onStart, cwd, projects))
+  const server = createServer((req, res) => handle(req, res, stream, clients, title, onStop, onChoice, onStart, cwd, projects, onAddProject))
 
   return new Promise<Dashboard>((resolvePromise, rejectPromise) => {
     server.once('error', rejectPromise)
@@ -150,6 +163,7 @@ function handle(
   onStart: ((prompt: string, kind: StartRunKind, options: StartRunOptions) => StartRunResult) | undefined,
   cwd: string | undefined,
   projects: ProjectsProvider,
+  onAddProject: ((path: string, directory: boolean) => Promise<AddProjectResult> | AddProjectResult) | undefined,
 ): void {
   const url = req.url ?? '/'
   // Parse once so a `?project=<id>` query never bleeds into the pathname match
@@ -158,16 +172,48 @@ function handle(
   const projectId = searchParams.get('project')
   if (pathname === '/') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-    res.end(dashboardHtml(title, Boolean(onStop), Boolean(onChoice), Boolean(onStart)))
+    res.end(dashboardHtml(title, Boolean(onStop), Boolean(onChoice), Boolean(onStart), Boolean(onAddProject)))
     return
   }
   if (pathname === '/events') {
     serveSSE(req, res, stream, clients)
     return
   }
-  // The registered projects (#392): the Projects sidebar lists these, then reads
-  // one via `?project=<id>` on the endpoints below.
+  // The registered projects (#392): the Projects sidebar lists these (GET), then
+  // reads one via `?project=<id>` on the endpoints below. A POST installs + adds a
+  // project (#396) through the wired handler, guarded like the other POST routes.
   if (pathname === '/api/projects') {
+    if (req.method === 'POST') {
+      if (!isSameOriginRequest(req)) {
+        res.writeHead(403, { 'content-type': 'text/plain' })
+        res.end('cross-origin request forbidden')
+        return
+      }
+      if (!onAddProject) {
+        res.writeHead(404, { 'content-type': 'text/plain' })
+        res.end('adding projects not enabled')
+        return
+      }
+      readJsonBody(req, body => {
+        const path = typeof body['path'] === 'string' ? body['path'].trim() : ''
+        const directory = body['directory'] === true
+        if (!path) {
+          res.writeHead(400, { 'content-type': 'application/json' })
+          res.end('{"error":"a project path is required"}')
+          return
+        }
+        void Promise.resolve(onAddProject(path, directory))
+          .then(result => {
+            res.writeHead(result.ok ? 202 : 400, { 'content-type': 'application/json' })
+            res.end(JSON.stringify(result))
+          })
+          .catch(err => {
+            res.writeHead(500, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ ok: false, error: err instanceof Error ? err.message : String(err) }))
+          })
+      })
+      return
+    }
     void serveProjects(res, projects)
     return
   }

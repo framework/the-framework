@@ -1,4 +1,4 @@
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from './project.js'
 import { logsPath, LOGS_HEADER, THE_FRAMEWORK_DIR } from './logs.js'
 import { nodeStoreFs, type StoreFs } from './store/index.js'
@@ -86,10 +86,12 @@ export interface EnumerateDeps {
 }
 
 /**
- * The immediate child directories of `dir` that are their own git repo roots
- * (`git rev-parse --show-toplevel` resolves to the child itself). A child that
- * is not a repo, or merely a subdir of an outer repo, is skipped. Returns the
- * surviving paths, deduped and sorted. Forgiving: never throws.
+ * The immediate child directories of `dir` that are their own git repo roots. A
+ * child is a root when `git rev-parse --show-prefix` (the path from the repo root
+ * down to the cwd) is empty; a subdir of an outer repo yields a non-empty prefix,
+ * and a non-repo makes git error. This beats comparing `--show-toplevel` to the
+ * child path, which breaks where the path crosses a symlink (e.g. macOS `/var` ->
+ * `/private/var`). Returns the surviving paths, deduped and sorted; never throws.
  */
 export async function enumerateGitRepos(dir: string, deps: EnumerateDeps = {}): Promise<string[]> {
   const git = deps.git ?? nodeGitRunner()
@@ -98,8 +100,8 @@ export async function enumerateGitRepos(dir: string, deps: EnumerateDeps = {}): 
   const repos = new Set<string>()
   for (const child of await dirs.childDirs(dir)) {
     try {
-      const toplevel = await git(['rev-parse', '--show-toplevel'], child)
-      if (resolve(toplevel.trim()) === resolve(child)) repos.add(child)
+      const prefix = await git(['rev-parse', '--show-prefix'], child)
+      if (prefix.trim() === '') repos.add(child)
     } catch {
       // Not a repo (or git failed): skip.
     }

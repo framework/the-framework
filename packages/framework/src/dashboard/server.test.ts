@@ -68,6 +68,8 @@ test('dashboard serves the HTML page with the title', async () => {
     // The Modes panel + its renderer ship in the page (#272), hidden until a modes event.
     assert.match(body, /id="modes-panel" hidden/)
     assert.match(body, /function renderModes/)
+    // The main grid is capped and centered in the content column, not left-hugging.
+    assert.match(body, /main \{[^}]*max-width: 1100px; margin: 0 auto;/)
   } finally {
     await dash.close()
   }

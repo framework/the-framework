@@ -72,7 +72,7 @@ export function dashboardHtml(title: string, stoppable = false, choiceable = fal
   #viewing button { font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: #6ea8fe;
     background: #0f1722; border: 1px solid #24344a; border-radius: 6px; padding: 3px 10px; }
   #content { flex: 1; min-width: 0; }
-  main { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px 20px; max-width: 1100px; }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px 20px; max-width: 1100px; margin: 0 auto; }
   section { background: #10141d; border: 1px solid #1c2230; border-radius: 10px; padding: 14px 16px; }
   section h2 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase;
     letter-spacing: .8px; color: #7b8496; font-weight: 600; }

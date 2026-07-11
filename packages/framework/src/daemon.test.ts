@@ -243,6 +243,65 @@ setTimeout(() => {}, 600)
   }
 })
 
+test('POST /api/start kind=research spawns the research subcommand, defaulting the what (#331)', async () => {
+  const cwd = await tmpWorkspace()
+  const stub = join(cwd, 'stub-cli.cjs')
+  await writeFile(
+    stub,
+    `const fs = require('node:fs'), path = require('node:path')
+const args = process.argv.slice(2)
+fs.appendFileSync(path.join(args[args.indexOf('--cwd') + 1], 'started.log'), JSON.stringify(args) + '\\n')
+`,
+  )
+  const ac = new AbortController()
+  try {
+    const done = runDaemon(cwd, { port: 0, pollMs: 50, signal: ac.signal, binPath: stub })
+    let state = await readDaemonState(cwd)
+    for (let i = 0; i < 100 && !state; i++) {
+      await new Promise(r => setTimeout(r, 20))
+      state = await readDaemonState(cwd)
+    }
+    assert.ok(state, 'daemon wrote its state file')
+
+    const post = (body: object) =>
+      fetch(`${state!.url}/api/start`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+    // With a what -> it is passed through; without -> omitted so the CLI defaults it.
+    assert.equal((await post({ prompt: 'the auth flow', kind: 'research' })).status, 202)
+    let lines: string[] = []
+    for (let i = 0; i < 100 && lines.length < 1; i++) {
+      await new Promise(r => setTimeout(r, 20))
+      lines = await readFile(join(cwd, 'started.log'), 'utf8').then(
+        s => s.split('\n').filter(Boolean),
+        () => [],
+      )
+    }
+    assert.deepEqual(JSON.parse(lines[0]!), ['research', 'the auth flow', '--no-dashboard', '--cwd', cwd])
+
+    let second = await post({ kind: 'research' })
+    for (let i = 0; i < 100 && second.status !== 202; i++) {
+      await new Promise(r => setTimeout(r, 50))
+      second = await post({ kind: 'research' })
+    }
+    assert.equal(second.status, 202)
+    for (let i = 0; i < 100 && lines.length < 2; i++) {
+      await new Promise(r => setTimeout(r, 20))
+      lines = (await readFile(join(cwd, 'started.log'), 'utf8')).split('\n').filter(Boolean)
+    }
+    assert.deepEqual(JSON.parse(lines[1]!), ['research', '--no-dashboard', '--cwd', cwd])
+
+    ac.abort()
+    await done
+  } finally {
+    ac.abort()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
 test('/api/start refuses to re-exec a test entry as the run (#345)', async () => {
   const cwd = await tmpWorkspace()
   const ac = new AbortController()

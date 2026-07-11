@@ -91,7 +91,7 @@ export {
   SESSION_ID_PLACEHOLDER,
   OPEN_LOOP_MODES,
 } from './events.js'
-export { startDashboard, dashboardHtml, type Dashboard, type DashboardOptions, type StartRunResult } from './dashboard/index.js'
+export { startDashboard, dashboardHtml, type Dashboard, type DashboardOptions, type StartRunKind, type StartRunResult } from './dashboard/index.js'
 export {
   RunStore,
   nodeStoreFs,
@@ -182,6 +182,13 @@ export {
   type ControlEntry,
   type ControlWatcher,
 } from './control.js'
+export { runPrompt, type RunPromptOptions, type RunPromptResult } from './prompt-run.js'
+export {
+  renderResearchPrompt,
+  RESEARCH_PRESET_NAME,
+  RESEARCH_PROMPT_TEMPLATE,
+  RESEARCH_PARAMS,
+} from './research-preset.js'
 export {
   fakeDriver,
   FAKE_INTENT,

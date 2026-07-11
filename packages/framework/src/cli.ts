@@ -40,6 +40,8 @@ import { preflight } from './preflight.js'
 import { RunStore } from './store/index.js'
 import { daemonStatus, ensureDaemon, runDaemon, stopDaemon, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { resetControl, watchControl, type ControlWatcher } from './control.js'
+import { runPrompt } from './prompt-run.js'
+import { renderResearchPrompt } from './research-preset.js'
 
 /**
  * The default link shown for a live run: the generic Claude Code entry point,
@@ -79,6 +81,9 @@ Usage:
   framework                       Ensure the background dashboard is running; print commands.
   framework [intent...]           Build what you describe, from scratch.
   framework stop                  Stop the background dashboard for this workspace.
+  framework research [what]      Rate the "problem variability" of <what> (default:
+                                 this PR), then pick which problems to deep-dive.
+                                 A direct review prompt on existing code — no build.
   framework --fake                Run the offline demo (no CLI, no model, deterministic).
   framework doctor                Check prerequisites (Claude Code installed, etc.).
   framework relay                 Host a run relay so teammates can watch a run (#230).
@@ -188,6 +193,8 @@ export interface CliOptions {
   daemon: boolean
   /** `framework stop`: stop the background daemon for this workspace. */
   stop: boolean
+  /** `framework research [what]`: run the Research preset as a direct prompt (#331). */
+  research: boolean
   error?: string
 }
 
@@ -212,6 +219,7 @@ export function parseArgs(argv: string[]): CliOptions {
     persist: true,
     daemon: false,
     stop: false,
+    research: false,
   }
   const PERMISSION_MODES: PermissionMode[] = ['default', 'acceptEdits', 'bypassPermissions', 'plan']
   const words: string[] = []
@@ -361,6 +369,9 @@ export function parseArgs(argv: string[]): CliOptions {
   } else if (words[0] === 'stop') {
     opts.stop = true
     words.shift()
+  } else if (words[0] === 'research') {
+    opts.research = true
+    words.shift() // the remaining words are the "what" param (may be empty -> default)
   }
   opts.intent = words.join(' ').trim()
   return opts
@@ -544,7 +555,8 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   const intent = opts.intent || (fake ? FAKE_INTENT : '')
   // Bare `framework` (no prompt): ensure the persistent dashboard is running and
   // print the convenience commands + version (#299/#302). A prompt still builds.
-  if (!intent && !fake) return ensureDaemonCmd(opts, io)
+  // A bare `framework research` is a real run — its "what" defaults to `this PR`.
+  if (!intent && !fake && !opts.research) return ensureDaemonCmd(opts, io)
 
   const cwd = opts.cwd ?? (fake ? join(tmpdir(), 'framework-fake-workspace') : process.cwd())
 
@@ -718,7 +730,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   // AI meta-select: with no preset chosen explicitly, infer the best fit (+ modes +
   // build event) from the intent + workspace, then resolve it with the active modes.
   // Narrates through onEvent so the routing turn is visible on the dashboard (#310).
-  if (!fake && opts.autoPreset && !presetName) {
+  if (!fake && opts.autoPreset && !presetName && !opts.research) {
     const selection = await autoSelectPreset({ intent, cwd, signals, claudeOpts, signal: controller.signal, io, onEvent })
     if (selection?.preset) {
       presetName = selection.preset
@@ -746,6 +758,68 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   }
 
   const driver: Driver = fake ? fakeDriver() : new ClaudeCodeDriver(claudeOpts)
+
+  // `framework research [what]` (#331): the direct prompt path — render the
+  // Research preset prompt and run it through runPrompt, which honors its gates
+  // (#337/#339) but skips the scope -> architect -> build scaffolding entirely.
+  // Shares all the wiring above (dashboard, store, control channel, budget).
+  if (opts.research) {
+    const userSystemPrompt = await loadUserSystemPrompt(cwd)
+    if (userSystemPrompt) io.out(`◆ system prompt: ${SYSTEM_PROMPT_FILE}`)
+    if (fileConfig.antiLazyPill === false) io.out('◆ anti-lazy-pill: off (the-framework.yml)')
+    try {
+      await runPrompt({
+        prompt: renderResearchPrompt(intent),
+        driver,
+        cwd,
+        onEvent,
+        signal: controller.signal,
+        ...(dashboard || control
+          ? {
+              requestChoice: (req: ChoiceRequest) =>
+                new Promise<ChoicePick>(resolve => pendingChoices.set(req.id, resolve)),
+            }
+          : {}),
+        ...(opts.model ? { model: opts.model } : {}),
+        ...(opts.maxCost ? { budgetUsd: opts.maxCost } : {}),
+        ...(userSystemPrompt ? { systemPrompt: userSystemPrompt } : {}),
+        ...(fileConfig.antiLazyPill === false ? { antiLazyPill: false } : {}),
+        ...((): { sessionLink?: string } => {
+          const link = chooseSessionLink(opts, fake)
+          return link ? { sessionLink: link } : {}
+        })(),
+      })
+      clearInterrupt()
+      io.out('\n✓ research done: see the REVIEW-PROBLEMS / TODO files it wrote.')
+      await store?.close()
+      if (dashboard) {
+        io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
+        await waitForInterrupt()
+        await dashboard.close()
+      }
+      return 0
+    } catch (err) {
+      clearInterrupt()
+      await store?.close()
+      if (controller.signal.aborted || stoppedCleanly) {
+        io.out('\n■ Stopped.')
+        if (dashboard) {
+          io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
+          await waitForInterrupt()
+          await dashboard.close()
+        }
+        return 0
+      }
+      io.err(`\n✗ research failed: ${err instanceof Error ? err.message : String(err)}`)
+      await dashboard?.close()
+      return 1
+    } finally {
+      clearInterrupt()
+      control?.close()
+      if (publisher) await publisher.flush()
+    }
+  }
+
   // The fake demo defaults to a Cloudflare deploy decision so the flow ends with
   // a deploy phase; a live run only narrates deploy when asked.
   const deploy: DeployDecision | undefined = opts.deploy

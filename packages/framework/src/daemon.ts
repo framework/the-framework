@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { FrameworkEvent } from './events.js'
 import { EVENTS_FILE, FRAMEWORK_DIR } from './store/index.js'
-import { startDashboard, type Dashboard, type StartRunResult } from './dashboard/index.js'
+import { startDashboard, type Dashboard, type StartRunKind, type StartRunResult } from './dashboard/index.js'
 import { appendControl } from './control.js'
 import { JsonlTailer } from './jsonl-tail.js'
 
@@ -214,7 +214,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // which the run wires whenever a daemon is live. One run at a time: while the
   // last child is alive, Start is refused (the #322 runaway concern).
   let activeRunPid: number | undefined
-  const startRun = (prompt: string): StartRunResult => {
+  const startRun = (prompt: string, kind: StartRunKind): StartRunResult => {
     if (activeRunPid !== undefined && isProcessAlive(activeRunPid)) {
       return { ok: false, busy: true, error: 'a run is already active; stop it or wait for it to finish' }
     }
@@ -225,7 +225,10 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     if (!opts.binPath && (process.env.NODE_TEST_CONTEXT || /\.test\.[cm]?[jt]s$/.test(binPath))) {
       return { ok: false, error: 'refusing to spawn a run from a test entry; pass an explicit binPath' }
     }
-    const child = spawn(process.execPath, [binPath, prompt, '--no-dashboard', '--cwd', cwd], {
+    // [Research] (#331) runs the research subcommand; its empty prompt is fine
+    // (the "what" defaults to `this PR` in the CLI).
+    const runArgs = kind === 'research' ? ['research', ...(prompt ? [prompt] : [])] : [prompt]
+    const child = spawn(process.execPath, [binPath, ...runArgs, '--no-dashboard', '--cwd', cwd], {
       detached: true,
       stdio: 'ignore',
     })
@@ -241,7 +244,10 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
       if (code) dashboard.push({ kind: 'log', message: `✗ run exited with code ${code}` })
     })
     activeRunPid = child.pid
-    dashboard.push({ kind: 'log', message: `▶ run started: ${prompt}` })
+    dashboard.push({
+      kind: 'log',
+      message: kind === 'research' ? `▶ research started: ${prompt || 'this PR'}` : `▶ run started: ${prompt}`,
+    })
     return { ok: true }
   }
 

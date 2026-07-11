@@ -37,12 +37,19 @@ export interface DashboardOptions {
   cwd?: string
   /**
    * Called when the browser posts a new-run prompt (#345): `POST /api/start`
-   * with a JSON `{ prompt }` body. Wire this to spawn the run (the daemon
-   * does); return `busy: true` to refuse because a run is already active (409).
-   * Omit to disable starting; the page hides the prompt panel.
+   * with a JSON `{ prompt, kind? }` body. Wire this to spawn the run (the
+   * daemon does); return `busy: true` to refuse because a run is already active
+   * (409). Omit to disable starting; the page hides the prompt panel.
    */
-  onStart?: (prompt: string) => StartRunResult
+  onStart?: (prompt: string, kind: StartRunKind) => StartRunResult
 }
+
+/**
+ * What a dashboard Start spawns (#345/#331): `build` is the normal framework
+ * run; `research` is the [Research] preset as a direct prompt, whose empty
+ * prompt is allowed (its "what" defaults to `this PR`).
+ */
+export type StartRunKind = 'build' | 'research'
 
 /** The outcome of an {@link DashboardOptions.onStart} attempt (#345). */
 export type StartRunResult =
@@ -108,7 +115,7 @@ function handle(
   title: string,
   onStop: (() => void) | undefined,
   onChoice: ((id: string, pick: string | string[], by: ChoiceBy) => void) | undefined,
-  onStart: ((prompt: string) => StartRunResult) | undefined,
+  onStart: ((prompt: string, kind: StartRunKind) => StartRunResult) | undefined,
   cwd: string | undefined,
 ): void {
   const url = req.url ?? '/'
@@ -202,12 +209,15 @@ function handle(
     }
     readJsonBody(req, body => {
       const prompt = typeof body['prompt'] === 'string' ? body['prompt'].trim() : ''
-      if (!prompt) {
+      const kind: StartRunKind = body['kind'] === 'research' ? 'research' : 'build'
+      // A research run's "what" defaults server-side (`this PR`), so only a
+      // build needs a prompt.
+      if (!prompt && kind !== 'research') {
         res.writeHead(400, { 'content-type': 'application/json' })
         res.end('{"error":"a non-empty prompt is required"}')
         return
       }
-      const result = onStart(prompt)
+      const result = onStart(prompt, kind)
       if (!result.ok) {
         res.writeHead(result.busy ? 409 : 500, { 'content-type': 'application/json' })
         res.end(JSON.stringify({ error: result.error }))

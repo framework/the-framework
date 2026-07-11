@@ -36,6 +36,16 @@ test('parseArgs reads flags and the intent words', () => {
   assert.equal(opts.intent, 'a blog app')
 })
 
+test('parseArgs reads the research subcommand with its optional what (#331)', () => {
+  const bare = parseArgs(['research'])
+  assert.equal(bare.research, true)
+  assert.equal(bare.intent, '') // the "what" defaults downstream (this PR)
+  const withWhat = parseArgs(['research', 'the', 'auth', 'flow'])
+  assert.equal(withWhat.research, true)
+  assert.equal(withWhat.intent, 'the auth flow')
+  assert.equal(parseArgs(['build', 'a', 'blog']).research, false)
+})
+
 test('parseArgs reads the stop subcommand and the internal --daemon flag', () => {
   const stop = parseArgs(['stop'])
   assert.equal(stop.stop, true)

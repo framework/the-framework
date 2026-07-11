@@ -109,6 +109,10 @@ export function dashboardHtml(title: string, stoppable = false, choiceable = fal
     background: #6ea8fe; border: 0; border-radius: 6px; padding: 6px 16px; }
   #start-run:hover { background: #8bbaff; }
   #start-run:disabled { opacity: .5; cursor: default; }
+  #start-research { font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; color: #b7c0d0;
+    background: #141a24; border: 1px solid #24344a; border-radius: 6px; padding: 6px 14px; }
+  #start-research:hover { background: #17212f; }
+  #start-research:disabled { opacity: .5; cursor: default; }
   #start-note { color: #f0a35e; font-size: 12px; }
   /* Interactive plan-approval / choice panel (#304): full-width, accented so it
      reads as the one thing awaiting the human. */
@@ -194,6 +198,7 @@ export function dashboardHtml(title: string, stoppable = false, choiceable = fal
     <textarea id="start-prompt" rows="3" placeholder="What should the agent build?"></textarea>
     <div id="start-actions">
       <button id="start-run">&#9654; Start<span class="kbd">Ctrl+Enter</span></button>
+      <button id="start-research" title="Rate the problem variability of the prompt above (default: this PR), then pick which problems to deep-dive">&#128269; Research</button>
       <span id="start-note"></span>
     </div>
   </section>
@@ -693,29 +698,32 @@ syncNotifyBtn();
 
 // Start a run (#345): POST the prompt to /api/start; the daemon spawns the run
 // and its events stream in over the same SSE feed. A 409 means one is active.
-function startNewRun() {
+// kind 'research' (#331) runs the Research preset on the prompt instead of
+// building it; its empty prompt is fine (the "what" defaults to "this PR").
+function startNewRun(kind) {
   if (!STARTABLE) return;
   const note = $('start-note');
   const prompt = $('start-prompt').value.trim();
-  if (!prompt) { note.textContent = 'type what to build first'; return; }
-  const btn = $('start-run');
-  btn.disabled = true;
+  if (!prompt && kind !== 'research') { note.textContent = 'type what to build first'; return; }
+  const buttons = [$('start-run'), $('start-research')];
+  for (const b of buttons) b.disabled = true;
   note.textContent = 'starting\\u2026';
   fetch('api/start', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ prompt: prompt }) })
+    body: JSON.stringify({ prompt: prompt, kind: kind }) })
     .then(async r => {
-      btn.disabled = false;
+      for (const b of buttons) b.disabled = false;
       if (r.ok) { note.textContent = ''; $('start-prompt').value = ''; showLive(); return; }
       let msg = 'could not start (' + r.status + ')';
       try { const b = await r.json(); if (b && b.error) msg = b.error; } catch {}
       note.textContent = msg;
     })
-    .catch(() => { btn.disabled = false; note.textContent = 'could not reach the dashboard server'; });
+    .catch(() => { for (const b of buttons) b.disabled = false; note.textContent = 'could not reach the dashboard server'; });
 }
-$('start-run').addEventListener('click', startNewRun);
+$('start-run').addEventListener('click', () => startNewRun('build'));
+$('start-research').addEventListener('click', () => startNewRun('research'));
 $('start-prompt').addEventListener('keydown', ev => {
   // stopPropagation so the document-level Ctrl+Enter never accepts a choice too.
-  if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); startNewRun(); }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); startNewRun('build'); }
 });
 
 $('stop').addEventListener('click', stopRun);

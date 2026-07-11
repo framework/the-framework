@@ -354,6 +354,32 @@ test('/api/start guards: 400 empty prompt, 409 busy, 500 spawn failure (#345)', 
   }
 })
 
+test('/api/start passes the run kind through; a research start may omit the prompt (#331)', async () => {
+  const calls: Array<{ prompt: string; kind: string }> = []
+  const dash = await startDashboard({ port: 0, onStart: (prompt, kind) => { calls.push({ prompt, kind }); return { ok: true } } })
+  try {
+    // No kind -> build; unknown kind -> build.
+    await postJson(dash.url + '/api/start', { prompt: 'a blog' })
+    await postJson(dash.url + '/api/start', { prompt: 'a blog', kind: 'nonsense' })
+    // Research: kind passes through, and an empty prompt is allowed (defaults to
+    // "this PR" downstream) where a build's would 400.
+    assert.equal((await postJson(dash.url + '/api/start', { prompt: 'the auth flow', kind: 'research' })).status, 202)
+    assert.equal((await postJson(dash.url + '/api/start', { kind: 'research' })).status, 202)
+    assert.deepEqual(calls, [
+      { prompt: 'a blog', kind: 'build' },
+      { prompt: 'a blog', kind: 'build' },
+      { prompt: 'the auth flow', kind: 'research' },
+      { prompt: '', kind: 'research' },
+    ])
+    // The page ships the [Research] button beside Start.
+    const page = await fetchText(dash.url + '/')
+    assert.match(page.body, /id="start-research"/)
+    assert.match(page.body, /startNewRun\('research'\)/)
+  } finally {
+    await dash.close()
+  }
+})
+
 test('/api/start is 405 for a non-POST and 404 when starting is not wired (#345)', async () => {
   const withStart = await startDashboard({ port: 0, onStart: () => ({ ok: true }) })
   try {

@@ -127,6 +127,17 @@ export function dashboardHtml(title: string, stoppable = false, choiceable = fal
   .start-preset:hover { background: #17212f; }
   .start-preset:disabled { opacity: .5; cursor: default; }
   #start-note { color: #f0a35e; font-size: 12px; }
+  /* Global options (#314): persistent run toggles beside the Start box. */
+  #global-options { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-top: 12px;
+    padding-top: 10px; border-top: 1px solid #1c2230; }
+  #global-options .go-title { color: #7b8496; font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
+    font-weight: 600; margin-right: 4px; }
+  #global-options label { display: flex; align-items: center; gap: 5px; color: #b7c0d0; font-size: 13px; cursor: pointer; }
+  #global-options label.disabled { color: #4a5266; cursor: default; }
+  #eco-subs { display: flex; flex-wrap: wrap; gap: 6px 14px; width: 100%; margin: 2px 0 0 4px;
+    padding-left: 12px; border-left: 2px solid #1c2230; }
+  #eco-subs[hidden] { display: none; }
+  #eco-subs label { font-size: 12px; color: #96a0b3; }
   /* Interactive plan-approval / choice panel (#304): full-width, accented so it
      reads as the one thing awaiting the human. */
   #choice-panel { grid-column: 1 / -1; background: #131a2a; border: 1px solid #2b3b5c;
@@ -226,6 +237,18 @@ export function dashboardHtml(title: string, stoppable = false, choiceable = fal
       <button id="start-maintainability" class="start-preset" title="Prefill the Maintainability preset prompt (refactor code to make it easier to adapt for future changes); review or edit it, then Start">&#128200; Maintainability</button>
       <button id="start-maintainability-minimal" class="start-preset" title="Prefill the minimal Maintainability preset prompt (#362: the bare red-flags line, no target scope); review or edit it, then Start">&#128200; Maintainability (minimal)</button>
       <span id="start-note"></span>
+    </div>
+    <div id="global-options">
+      <span class="go-title">Global options</span>
+      <label id="opt-autopilot-label" title="Auto-accept the recommended choice after a countdown; also relaxes the maintenance stance"><input type="checkbox" id="opt-autopilot"> Autopilot</label>
+      <label title="Expose technical detail (e.g. tech-stack choices) — the 'technical' mode"><input type="checkbox" id="opt-technical"> Technical control</label>
+      <label title="Remove all system prompts: fully transparent, same as raw Claude Code"><input type="checkbox" id="opt-vanilla"> Vanilla</label>
+      <label id="opt-eco-label" title="Trim the built-in system prompt to save tokens"><input type="checkbox" id="opt-eco"> Eco</label>
+      <div id="eco-subs" hidden>
+        <label title="Drop the planning section, letting the agent plan on its own"><input type="checkbox" id="opt-eco-planning"> Auto planning</label>
+        <label title="Drop the alternatives/variability section"><input type="checkbox" id="opt-eco-research"> Auto research</label>
+        <label title="Drop the maintenance section"><input type="checkbox" id="opt-eco-maintenance"> Auto maintenance</label>
+      </div>
     </div>
   </section>
   <section id="choice-panel" hidden>
@@ -779,7 +802,7 @@ function startNewRun() {
   for (const b of buttons) b.disabled = true;
   note.textContent = 'starting\\u2026';
   fetch('api/start', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ prompt: prompt, kind: startKind }) })
+    body: JSON.stringify({ prompt: prompt, kind: startKind, options: collectStartOptions() }) })
     .then(async r => {
       for (const b of buttons) b.disabled = false;
       if (r.ok) { note.textContent = ''; $('start-prompt').value = ''; startKind = 'build'; showLive(); return; }
@@ -812,13 +835,59 @@ $('start-prompt').addEventListener('keydown', ev => {
   if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); startNewRun(); }
 });
 
+// Global options (#314): persistent run toggles saved in localStorage and sent
+// with every Start. Autopilot keeps its historical key, shared with the choice
+// panel toggle so the two stay in lockstep; the rest map to run flags the daemon
+// forwards. Absent options default off, i.e. today's behavior.
+function optKey(name) { return 'framework:opt:' + name; }
+function optOn(name) { return localStorage.getItem(optKey(name)) === '1'; }
+function setOpt(name, on) { localStorage.setItem(optKey(name), on ? '1' : '0'); }
+function setAutopilot(on) {
+  localStorage.setItem('framework:autopilot', on ? '1' : '0');
+  const choiceToggle = $('autopilot-toggle'); if (choiceToggle) choiceToggle.checked = on;
+  const globalToggle = $('opt-autopilot'); if (globalToggle) globalToggle.checked = on;
+}
+const ECO_SUBS = ['eco-planning', 'eco-research', 'eco-maintenance'];
+function collectStartOptions() {
+  const options = {};
+  if (autopilotOn()) options.autopilot = true;
+  if (optOn('technical')) options.technical = true;
+  if (optOn('vanilla')) options.vanilla = true;
+  if (optOn('eco')) {
+    const eco = {};
+    if (optOn('eco-planning')) eco.autoPlanning = true;
+    if (optOn('eco-research')) eco.autoResearch = true;
+    if (optOn('eco-maintenance')) eco.autoMaintenance = true;
+    if (Object.keys(eco).length) options.eco = eco;
+  }
+  return options;
+}
+// Vanilla removes the whole built-in prompt, so Eco has nothing left to trim.
+function syncEcoUi() {
+  const vanilla = optOn('vanilla');
+  $('opt-eco').disabled = vanilla;
+  $('opt-eco-label').classList.toggle('disabled', vanilla);
+  $('eco-subs').hidden = !optOn('eco') || vanilla;
+}
+function initGlobalOptions() {
+  if (!STARTABLE) return;
+  $('opt-autopilot').checked = autopilotOn();
+  for (const name of ['technical', 'vanilla', 'eco', ...ECO_SUBS]) $('opt-' + name).checked = optOn(name);
+  syncEcoUi();
+  $('opt-autopilot').addEventListener('change', ev => setAutopilot(ev.target.checked));
+  for (const name of ['technical', 'vanilla', 'eco', ...ECO_SUBS]) {
+    $('opt-' + name).addEventListener('change', ev => { setOpt(name, ev.target.checked); syncEcoUi(); });
+  }
+}
+initGlobalOptions();
+
 $('stop').addEventListener('click', stopRun);
 $('back-live').addEventListener('click', showLive);
 $('choice-accept').addEventListener('click', () => acceptChoice('user'));
 $('choice-approve').addEventListener('click', () => acceptChoice('user', 'approve'));
 $('choice-decline').addEventListener('click', () => acceptChoice('user', 'decline'));
 $('autopilot-toggle').addEventListener('change', ev => {
-  localStorage.setItem('framework:autopilot', ev.target.checked ? '1' : '0');
+  setAutopilot(ev.target.checked);
   if (ev.target.checked) startCountdown(); else { stopCountdown(); $('choice-count').textContent = 'Auto accept off'; }
 });
 // Any mouse movement cancels the running autopilot countdown (cheap no-op once cleared).

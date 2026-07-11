@@ -15,6 +15,7 @@ import { renderMaintainabilityMinimalPrompt } from '../maintainability-minimal-p
 interface StartPost {
   prompt: string
   kind: string
+  options?: Record<string, unknown>
 }
 
 function boot() {
@@ -110,5 +111,6 @@ test('clearing a prefilled preset reverts Start to a normal build run (#353)', a
   h.type('a plain blog')
   h.click('start-run')
   await new Promise(resolve => setImmediate(resolve))
-  assert.deepEqual(h.posts, [{ prompt: 'a plain blog', kind: 'build' }])
+  // The Global options (#314) ride along; autopilot defaults on, nothing else set.
+  assert.deepEqual(h.posts, [{ prompt: 'a plain blog', kind: 'build', options: { autopilot: true } }])
 })

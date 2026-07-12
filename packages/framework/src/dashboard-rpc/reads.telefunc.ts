@@ -1,7 +1,7 @@
 import { listRuns, loadRunEvents, type RunMeta } from '../store/index.js'
 import { readLogs, type LogEntry } from '../logs.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
-import { defaultProjectsProvider } from '../dashboard/projects.js'
+import { contextProjects } from './context.js'
 import type { FrameworkEvent } from '../events.js'
 
 // The read model behind the new dashboard (#405): the run history, a run's replay, the
@@ -12,9 +12,9 @@ import type { FrameworkEvent } from '../events.js'
 // in framework-dashboard, keeping the baked RPC keys `/server/reads.telefunc.ts`). The
 // live run stream is its own Telefunc Channel (events.telefunc.ts).
 
-/** The registry path for a project id, or undefined when unknown (readers then yield empty). */
+/** The path for a project id (registry, or single-project #427), else undefined -> empty. */
 async function projectPath(projectId: string): Promise<string | undefined> {
-  return defaultProjectsProvider().resolvePath(projectId)
+  return contextProjects().resolvePath(projectId)
 }
 
 /** The project's archived runs, most-recent first (or `[]`). */

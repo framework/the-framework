@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { config } from 'telefunc'
 import { Telefunc } from 'telefunc/node'
 import { registerDashboardTelefunctions } from '../dashboard-rpc/register.js'
+import type { ProjectsProvider } from './projects.js'
 import { isSameOriginRequest, type StartRunKind, type StartRunOptions, type StartRunResult } from './server.js'
 
 /** Wired by the daemon so `sendStart` can reach the daemon's own `startRun` closure. */
@@ -12,9 +13,14 @@ export type StartRunHandler = (
   projectId?: string,
 ) => StartRunResult | Promise<StartRunResult>
 
-/** The Telefunc request context the mount provides; `sendStart` reads `startRun` from it. */
+/**
+ * The Telefunc request context the mount provides. `sendStart` reads `startRun` from it;
+ * every project-keyed RPC reads `projects` (#427) — the daemon leaves it unset to use the
+ * global registry, the per-run foreground dashboard passes a single-project provider.
+ */
 export interface DashboardContext {
   startRun?: StartRunHandler
+  projects?: ProjectsProvider
 }
 
 let instance: Telefunc | undefined
@@ -41,6 +47,7 @@ function setup(): Telefunc {
  */
 export function makeTelefuncMount(
   startRun?: StartRunHandler,
+  projects?: ProjectsProvider,
 ): (req: IncomingMessage, res: ServerResponse) => Promise<boolean> {
   return async (req, res) => {
     if (!isSameOriginRequest(req)) {
@@ -49,7 +56,10 @@ export function makeTelefuncMount(
       return true
     }
     const tf = setup()
-    const context: DashboardContext = startRun ? { startRun } : {}
+    const context: DashboardContext = {
+      ...(startRun ? { startRun } : {}),
+      ...(projects ? { projects } : {}),
+    }
     return tf.serve({ req, res, context: context as never })
   }
 }

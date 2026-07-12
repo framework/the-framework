@@ -164,7 +164,11 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
   // byte-identical to before (legacy page.ts only). When set, `/_telefunc` (RPCs +
   // Channel) is always mounted, and in `next` mode the SPA takes `/` while page.ts
   // moves to `/legacy` (whose SSE + steer routes still fall through to the legacy handler).
-  const telefuncMount = clientBundleDir ? makeTelefuncMount(onStart) : undefined
+  // The mount resolves project ids against `opts.projects` when set (the per-run
+  // foreground dashboard passes a single-project provider, #427); unset -> the global
+  // registry, as the daemon uses. `projects` above already defaulted, so pass the raw
+  // option so an unset one stays undefined on the context (the RPC falls back).
+  const telefuncMount = clientBundleDir ? makeTelefuncMount(onStart, opts.projects) : undefined
 
   const server = createServer((req, res) => {
     if (clientBundleDir) {

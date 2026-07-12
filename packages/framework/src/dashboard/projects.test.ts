@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { summarizeProject, type SummarizeDeps } from './projects.js'
+import { summarizeProject, singleProjectProvider, type SummarizeDeps } from './projects.js'
 import type { ProjectRecord } from '../registry.js'
 import type { LogEntry } from '../logs.js'
 
@@ -50,4 +50,26 @@ test('a throwing reader is forgiving: inactive, no activity, never throws', asyn
   )
   assert.equal(summary.activated, false)
   assert.equal('lastActivityAt' in summary, false)
+})
+
+test('singleProjectProvider (#427) lists exactly the one cwd under the fixed id', async () => {
+  const provider = singleProjectProvider('/repos/scratch')
+  const list = await provider.list()
+  assert.equal(list.length, 1)
+  assert.equal(list[0]?.id, 'home')
+  assert.equal(list[0]?.path, '/repos/scratch')
+  assert.equal(list[0]?.name, 'scratch')
+})
+
+test('singleProjectProvider resolves the fixed id to cwd and everything else to nothing', async () => {
+  const provider = singleProjectProvider('/repos/scratch')
+  assert.equal(await provider.resolvePath('home'), '/repos/scratch')
+  assert.equal(await provider.resolvePath('anything-else'), undefined)
+})
+
+test('singleProjectProvider honors a custom id', async () => {
+  const provider = singleProjectProvider('/repos/scratch', 'run-1')
+  assert.equal((await provider.list())[0]?.id, 'run-1')
+  assert.equal(await provider.resolvePath('run-1'), '/repos/scratch')
+  assert.equal(await provider.resolvePath('home'), undefined)
 })

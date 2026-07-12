@@ -1,6 +1,6 @@
 import { getContext } from 'telefunc'
 import { appendControl } from '../control.js'
-import { defaultProjectsProvider } from '../dashboard/projects.js'
+import { contextProjects } from './context.js'
 import type { ChoiceBy } from '../events.js'
 import type { StartRunKind, StartRunOptions, StartRunResult } from '../dashboard/server.js'
 import type { DashboardContext } from '../dashboard/telefunc-serve.js'
@@ -13,9 +13,9 @@ import type { DashboardContext } from '../dashboard/telefunc-serve.js'
 // steerable. (Starting a run needs a spawn + the daemon's busy guard, so `sendStart`
 // lands with the daemon-serves-the-bundle wiring, not here.)
 
-/** The registry path for a project id, or undefined when unknown (a no-op steer). */
+/** The path for a project id (registry, or single-project #427), else undefined (no-op steer). */
 async function projectPath(projectId: string): Promise<string | undefined> {
-  return defaultProjectsProvider().resolvePath(projectId)
+  return contextProjects().resolvePath(projectId)
 }
 
 /** Stop the project's live run (the Stop button): append a stop entry to its control log. */

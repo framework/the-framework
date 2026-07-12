@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { Channel, type ClientChannel } from 'telefunc'
 import { FRAMEWORK_DIR, EVENTS_FILE } from '../store/index.js'
-import { defaultProjectsProvider } from '../dashboard/projects.js'
+import { contextProjects } from './context.js'
 import type { FrameworkEvent } from '../events.js'
 import { tailEvents } from './events-tail.js'
 
@@ -13,7 +13,7 @@ import { tailEvents } from './events-tail.js'
 
 /** The events file for a project id, or undefined when the project is unknown. */
 async function resolveEventsPath(projectId: string): Promise<string | undefined> {
-  const path = await defaultProjectsProvider().resolvePath(projectId)
+  const path = await contextProjects().resolvePath(projectId)
   return path ? join(path, FRAMEWORK_DIR, EVENTS_FILE) : undefined
 }
 

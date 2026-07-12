@@ -16,7 +16,7 @@ import {
 } from '@gemstack/ai-autopilot'
 import { ClaudeCodeDriver, type ClaudeCodeDriverOptions, type Driver, type DriverSession, type PermissionMode } from './driver/index.js'
 import { hostExecutor } from './host-exec.js'
-import { startDashboard, type Dashboard } from './dashboard/index.js'
+import { startDashboard, singleProjectProvider, resolveDashboardBundle, type Dashboard } from './dashboard/index.js'
 import { startRelay, relayPublisher, type RelayPublisher } from './relay.js'
 import { randomUUID } from 'node:crypto'
 import { formatFrameworkEvent, CLAUDE_CODE_SESSION_LINK, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
@@ -805,8 +805,16 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     for (const resolve of pendingChoices.values()) resolve({ picked: 'proceed', by: 'auto' })
     pendingChoices.clear()
   })
+  // Serve the new Vike + Telefunc dashboard (#405/#427) for this run, in single-project
+  // mode: the SPA reads this one `cwd` (its own `.the-framework/events.jsonl` +
+  // control.jsonl) without touching the global registry, so a one-shot run never
+  // pollutes the Projects list. The bundle rides in `.the-framework/events.jsonl`, so it
+  // needs the store: without --persist there is nothing to stream, and we fall back to
+  // page.ts. An old install missing the built bundle also falls back (resolve -> undefined).
   let dashboard: Dashboard | undefined
+  let clientBundleDir: string | undefined
   if (opts.dashboard) {
+    if (opts.persist) clientBundleDir = await resolveDashboardBundle()
     try {
       dashboard = await startDashboard({
         ...(opts.port !== undefined ? { port: opts.port } : {}),
@@ -819,12 +827,20 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
           }
         },
         cwd,
+        ...(clientBundleDir
+          ? { clientBundleDir, dashboardMode: 'next' as const, projects: singleProjectProvider(cwd) }
+          : {}),
       })
       io.out(`◆ dashboard: ${dashboard.url}`)
     } catch (err) {
+      clientBundleDir = undefined
       io.err(`could not start dashboard (${err instanceof Error ? err.message : String(err)}); continuing headless`)
     }
   }
+  // The new dashboard steers this live run purely through control.jsonl (its Stop /
+  // choice picks are Telefunc writes to that file, #427), so tail it whenever the new
+  // dashboard is up — not only when a daemon is (the condition just below).
+  const newDashboard = dashboard !== undefined && clientBundleDir !== undefined
 
   // Persist the orchestration state so a restart can --resume it (#211). The log
   // is the dashboard's own event stream, appended to .the-framework/ in the workspace.
@@ -839,14 +855,14 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     }
   }
 
-  // The persistent daemon dashboard steers this run through .the-framework/control.jsonl
-  // (#344): its Stop button and choice picks append entries, we tail the file and
-  // abort / resolve the parked gate. Reset first so a previous run's picks can never
-  // fire into this one (gate ids repeat across runs). Only wired when the machine's
-  // daemon is live (#393): the one daemon steers runs in any project, and it writes
-  // to this run's own control.jsonl. Without a daemon, headless behavior is identical.
+  // Steer this run through .the-framework/control.jsonl (#344): a Stop button or choice
+  // pick appends an entry, we tail the file and abort / resolve the parked gate. Reset
+  // first so a previous run's picks can never fire into this one (gate ids repeat across
+  // runs). Wired when the machine's daemon is live (#393, it steers any project's run) or
+  // when this run's own new dashboard is up (#427, it too steers over control.jsonl).
+  // Otherwise headless behavior is identical.
   let control: ControlWatcher | undefined
-  if (opts.persist && (await daemonStatus())) {
+  if (opts.persist && (newDashboard || (await daemonStatus()))) {
     try {
       await resetControl(cwd)
       control = watchControl(cwd, entry => {
@@ -1335,10 +1351,21 @@ async function resumeRun(opts: CliOptions, io: CliIO): Promise<number> {
   }
   const meta = (await store.readMeta()) ?? store.snapshot()
 
+  // Resume serves the new dashboard too (#427), single-project on this `cwd`: the saved
+  // `.the-framework/events.jsonl` is exactly what the SPA's event Channel tails, so the
+  // past run replays with no extra wiring (it is finished, so there is nothing to steer).
+  // No bundle (old install) falls back to page.ts, byte-identical to before.
   let dashboard: Dashboard | undefined
   if (opts.dashboard) {
+    const clientBundleDir = await resolveDashboardBundle()
     try {
-      dashboard = await startDashboard({ ...(opts.port !== undefined ? { port: opts.port } : {}), cwd })
+      dashboard = await startDashboard({
+        ...(opts.port !== undefined ? { port: opts.port } : {}),
+        cwd,
+        ...(clientBundleDir
+          ? { clientBundleDir, dashboardMode: 'next' as const, projects: singleProjectProvider(cwd) }
+          : {}),
+      })
       io.out(`◆ dashboard (resumed): ${dashboard.url}`)
     } catch (err) {
       io.err(`could not start dashboard (${err instanceof Error ? err.message : String(err)}); replaying to terminal only`)

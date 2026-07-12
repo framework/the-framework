@@ -2,10 +2,10 @@ import { spawn } from 'node:child_process'
 import { watch, type FSWatcher } from 'node:fs'
 import { mkdir, readFile, writeFile, rm, stat } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import type { FrameworkEvent } from './events.js'
 import { EVENTS_FILE, FRAMEWORK_DIR } from './store/index.js'
 import { startDashboard, type Dashboard, type StartRunKind, type StartRunOptions, type StartRunResult, type AddProjectResult } from './dashboard/index.js'
+import { resolveDashboardBundle } from './dashboard/bundle.js'
 import { appendControl } from './control.js'
 import { isActivated } from './project.js'
 import { addProject, listProjects, projectId } from './registry.js'
@@ -53,21 +53,6 @@ export interface DaemonState {
 /** The `.the-framework/` directory for a workspace. */
 export function daemonDir(cwd: string): string {
   return join(cwd, FRAMEWORK_DIR)
-}
-
-/**
- * Locate the prerendered dashboard bundle (#405). A published install copies it into
- * `dist/dashboard-client` (see scripts/bundle-dashboard.mjs); the workspace falls back
- * to `packages/framework-dashboard/dist/client`. Returns the directory only when its
- * `index.html` exists, else undefined (the daemon then serves the legacy page.ts).
- */
-async function resolveDashboardBundle(): Promise<string | undefined> {
-  const here = dirname(fileURLToPath(import.meta.url)) // dist/ (or dist-test/) at runtime
-  const candidates = [join(here, 'dashboard-client'), join(here, '..', '..', 'framework-dashboard', 'dist', 'client')]
-  for (const dir of candidates) {
-    if (await stat(join(dir, 'index.html')).then(s => s.isFile()).catch(() => false)) return dir
-  }
-  return undefined
 }
 
 /**

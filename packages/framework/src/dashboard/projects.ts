@@ -78,3 +78,23 @@ export function defaultProjectsProvider(): ProjectsProvider {
     },
   }
 }
+
+/**
+ * A {@link ProjectsProvider} scoped to one workspace (#427): the per-run foreground
+ * dashboard and `--resume` serve the new SPA for a single `cwd` without touching the
+ * global registry, so a one-shot run never pollutes the Projects list. `list()` yields
+ * exactly that project (the SPA auto-selects the sole entry), and `resolvePath` returns
+ * its `cwd` for the fixed `id` — every read RPC + the event Channel then read the run's
+ * own `.the-framework/` files. An unknown id resolves to nothing, as with the registry.
+ */
+export function singleProjectProvider(cwd: string, id = 'home'): ProjectsProvider {
+  return {
+    async list() {
+      // addedAt is unused by summarizeProject (last activity comes from LOGS.md).
+      return [await summarizeProject({ id, path: cwd, addedAt: '' })]
+    },
+    async resolvePath(reqId) {
+      return reqId === id ? cwd : undefined
+    },
+  }
+}

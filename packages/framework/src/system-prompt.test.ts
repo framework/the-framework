@@ -81,6 +81,13 @@ test('systemPromptBlock removes the built-in prompt when antiLazyPill is false',
   assert.equal(systemPromptBlock({ antiLazyPill: false, user: 'Only mine.' }), 'Only mine.')
 })
 
+test('systemPromptBlock prepends a Context line for the selected directories (#439)', () => {
+  const block = systemPromptBlock({ antiLazyPill: false, user: 'Only mine.', context: ['/work/api', ' /work/ui '] })
+  assert.equal(block, 'Context: /work/api, /work/ui\n\nOnly mine.') // trimmed + comma-joined, first
+  assert.equal(systemPromptBlock({ antiLazyPill: false, user: 'x', context: [] }), 'x') // empty adds nothing
+  assert.equal(systemPromptBlock({ antiLazyPill: false, user: 'x', context: ['  '] }), 'x') // blank entries dropped
+})
+
 test('systemPromptBlock ignores a whitespace-only user prompt', () => {
   assert.equal(systemPromptBlock({ user: '   ' }), renderSystemPrompt().system)
   assert.equal(systemPromptBlock({ antiLazyPill: false, user: '  \n ' }), '')

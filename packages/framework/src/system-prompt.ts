@@ -180,6 +180,12 @@ export interface SystemPromptOptions {
   user?: string | undefined
   /** Context for the template's `${{...}}` fragments. Default: {@link DEFAULT_TF}. */
   tf?: TfContext | undefined
+  /**
+   * Directories the user picked as in-context (#439/#314). The agent can reach every
+   * registered repo, so this narrows its focus: it prepends one `Context: <dirs>` line to
+   * the block. Empty/absent adds nothing.
+   */
+  context?: readonly string[] | undefined
 }
 
 /**
@@ -192,6 +198,10 @@ export interface SystemPromptOptions {
  */
 export function systemPromptBlock(opts: SystemPromptOptions = {}): string {
   const parts: string[] = []
+  // The #439 context line goes first, so it frames whatever prompt follows (or stands
+  // alone under `--vanilla`, where there is no built-in prompt to frame).
+  const context = opts.context?.map(d => d.trim()).filter(Boolean)
+  if (context && context.length) parts.push(`Context: ${context.join(', ')}`)
   if (opts.antiLazyPill !== false) parts.push(renderSystemPrompt(opts.tf).system)
   const user = opts.user?.trim()
   if (user) parts.push(user)

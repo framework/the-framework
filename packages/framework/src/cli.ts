@@ -148,6 +148,9 @@ Options:
   --eco-auto-research    Drop the built-in prompt's "Alternatives" (research) section.
   --eco-auto-maintenance Drop the built-in prompt's "Maintenance" section.
                          (The --eco-* flags trim the #326 prompt to save tokens.)
+  --context <dir>        Focus the agent on this directory (repeatable). Adds one
+                         "Context: <dirs>" line to the system prompt; the agent can
+                         still reach every repo, this just narrows where it looks.
   --kind <name>          Build event kind the preset's review loop fires for, e.g.
                          bug-fix or major-change (default: the-framework.yml's event,
                          else the preset's own, else major-change). Selects which
@@ -219,6 +222,8 @@ export interface CliOptions {
   vanilla: boolean
   /** `--eco-*`: fine-grained #326 section drops to save tokens (#314). */
   eco: Required<EcoOptions>
+  /** `--context <dir>` (repeatable): in-context directories added as one `Context:` line (#439). */
+  context: string[]
   buildEvent?: string | undefined
   maxPasses?: number
   maxCost?: number
@@ -276,6 +281,7 @@ export function parseArgs(argv: string[]): CliOptions {
     technical: false,
     vanilla: false,
     eco: { autoPlanning: false, autoResearch: false, autoMaintenance: false },
+    context: [],
     dashboard: true,
     relayServe: false,
     composeExtensions: false,
@@ -336,6 +342,12 @@ export function parseArgs(argv: string[]): CliOptions {
       case '--eco-auto-maintenance':
         opts.eco.autoMaintenance = true
         break
+      case '--context': {
+        // Repeatable: `--context a --context b` -> the in-context directories (#439).
+        const dir = argv[++i]
+        if (dir) opts.context.push(dir)
+        break
+      }
       case '--kind':
         opts.buildEvent = argv[++i]
         break
@@ -965,6 +977,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     if (userSystemPrompt) io.out(`◆ system prompt: ${SYSTEM_PROMPT_FILE}`)
     if (noBuiltinPrompt) io.out(`◆ built-in system prompt: off (${opts.vanilla ? 'vanilla' : 'the-framework.yml'})`)
     else if (eco) io.out(`◆ eco: dropping ${Object.keys(eco).filter(k => eco[k as keyof EcoOptions]).join(', ')}`)
+    if (opts.context.length) io.out(`◆ context: ${opts.context.join(', ')}`)
     try {
       await runPrompt({
         prompt: opts.directPrompt ? intent : renderResearchPrompt(intent),
@@ -983,6 +996,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
         ...(userSystemPrompt ? { systemPrompt: userSystemPrompt } : {}),
         ...(noBuiltinPrompt ? { antiLazyPill: false } : {}),
         ...(eco ? { eco } : {}),
+        ...(opts.context.length ? { context: opts.context } : {}),
         ...(modeList.includes('autopilot') ? { autopilot: true } : {}),
         ...((): { sessionLink?: string } => {
           const link = chooseSessionLink(opts, fake)
@@ -1083,6 +1097,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   if (userSystemPrompt) io.out(`◆ system prompt: ${SYSTEM_PROMPT_FILE}`)
   if (noBuiltinPrompt) io.out(`◆ built-in system prompt: off (${opts.vanilla ? 'vanilla' : 'the-framework.yml'})`)
   else if (eco) io.out(`◆ eco: dropping ${Object.keys(eco).filter(k => eco[k as keyof EcoOptions]).join(', ')}`)
+  if (opts.context.length) io.out(`◆ context: ${opts.context.join(', ')}`)
 
   const runOpts: RunFrameworkOptions = {
     intent,
@@ -1121,6 +1136,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     ...(userSystemPrompt ? { systemPrompt: userSystemPrompt } : {}),
     ...(noBuiltinPrompt ? { antiLazyPill: false } : {}),
     ...(eco ? { eco } : {}),
+    ...(opts.context.length ? { context: opts.context } : {}),
     ...((): { sessionLink?: string } => {
       const link = chooseSessionLink(opts, fake)
       return link ? { sessionLink: link } : {}

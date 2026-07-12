@@ -76,6 +76,19 @@ export function makeTelefuncMount(
       ...(projects ? { projects } : {}),
       ...(eventsSource ? { eventsSource } : {}),
     }
-    return tf.serve({ req, res, context: context as never })
+    // Never let a telefunc failure become an unhandled rejection that kills the daemon:
+    // telefunc 0.2.22 throws on a bare `GET /_telefunc` (it passes the request as a body,
+    // which `new Request()` rejects for GET), and a browser tab hits that on reconnect.
+    try {
+      return await tf.serve({ req, res, context: context as never })
+    } catch {
+      if (!res.headersSent) {
+        res.writeHead(400, { 'content-type': 'text/plain' })
+        res.end('bad telefunc request')
+      } else {
+        res.end()
+      }
+      return true
+    }
   }
 }

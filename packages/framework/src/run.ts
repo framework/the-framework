@@ -123,6 +123,8 @@ export interface RunFrameworkOptions {
   antiLazyPill?: boolean
   /** Eco fine-grained control (#314): drop the enabled #326 sections to save tokens. */
   eco?: EcoOptions
+  /** In-context directories (#439): added as one `Context:` line to the system prompt. */
+  context?: readonly string[]
   /**
    * A user-picked Open Loop domain preset ({loops, prompts, skills}) to run the
    * build under (#251). Its skills (and their personas) frame every phase, and
@@ -343,7 +345,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     prompt: opts.intent,
     params: { autopilot: opts.modes?.includes('autopilot') ?? false, ...(opts.eco ? { eco: opts.eco } : {}) },
   }
-  const promptBlock = systemPromptBlock({ antiLazyPill: opts.antiLazyPill, user: opts.systemPrompt, tf })
+  const promptBlock = systemPromptBlock({ antiLazyPill: opts.antiLazyPill, user: opts.systemPrompt, tf, context: opts.context })
   // The await protocol (#337) concretizes the pill's showChoices()/AWAIT macros into a
   // signal the turn-boundary gate can detect, so it rides along with the pill.
   const system = [

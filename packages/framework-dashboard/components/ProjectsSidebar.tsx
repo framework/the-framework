@@ -79,25 +79,38 @@ function AddProject({ onAdded }: { onAdded: () => void }) {
   const [directory, setDirectory] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Trust gate (#439/#314): adding a repo lets the agent read its files, so an untrusted
+  // repo is a prompt-injection risk. Confirm trust before actually installing.
+  const [confirming, setConfirming] = useState(false)
 
-  const submit = async (e: FormEvent) => {
+  // Step 1: the user submits the path -> show the trust confirmation, don't add yet.
+  const review = (e: FormEvent) => {
     e.preventDefault()
-    const trimmed = path.trim()
-    if (!trimmed || busy) return
+    if (!path.trim() || busy) return
+    setError(null)
+    setConfirming(true)
+  }
+
+  // Step 2: trust confirmed -> install + register.
+  const confirmAdd = async () => {
+    if (busy) return
     setBusy(true)
     setError(null)
     try {
-      const result = await sendAddProject(trimmed, directory)
+      const result = await sendAddProject(path.trim(), directory)
       if (result.ok) {
         setPath('')
         setDirectory(false)
+        setConfirming(false)
         setOpen(false)
         onAdded()
       } else {
         setError(result.error)
+        setConfirming(false)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add the project.')
+      setConfirming(false)
     } finally {
       setBusy(false)
     }
@@ -113,8 +126,33 @@ function AddProject({ onAdded }: { onAdded: () => void }) {
     )
   }
 
+  // The trust confirmation (#439): a plain-language prompt-injection warning before adding.
+  if (confirming) {
+    return (
+      <div className="border-t border-border p-3">
+        <p className="mb-2 text-xs font-medium">Do you trust this repository?</p>
+        <p className="mb-2 break-all text-xs text-muted-foreground">
+          <code className="rounded bg-muted px-1">{path.trim()}</code>
+        </p>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Adding it lets the agent read its files. Hidden instructions in an untrusted repo can hijack the agent
+          (prompt injection) — only add repos you trust.
+        </p>
+        {error && <p className="mb-2 text-xs text-red-500">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => setConfirming(false)}>
+            Back
+          </Button>
+          <Button type="button" size="sm" disabled={busy} onClick={() => void confirmAdd()}>
+            {busy ? 'Adding…' : 'I trust it — add'}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <form onSubmit={submit} className="border-t border-border p-3">
+    <form onSubmit={review} className="border-t border-border p-3">
       <input
         value={path}
         onChange={e => setPath(e.target.value)}
@@ -132,7 +170,7 @@ function AddProject({ onAdded }: { onAdded: () => void }) {
           Cancel
         </Button>
         <Button type="submit" size="sm" disabled={busy || !path.trim()}>
-          {busy ? 'Adding…' : 'Add'}
+          Add
         </Button>
       </div>
     </form>

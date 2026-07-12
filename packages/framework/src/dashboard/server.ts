@@ -65,6 +65,8 @@ export interface StartRunOptions {
   vanilla?: boolean
   /** Fine-grained #326 section drops to save tokens. */
   eco?: EcoOptions
+  /** In-context directories (#439): each becomes a `--context <dir>` flag on the spawned run. */
+  context?: string[]
 }
 
 /**

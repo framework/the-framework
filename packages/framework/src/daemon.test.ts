@@ -48,6 +48,13 @@ test('startOptionFlags maps only enabled Global options to CLI flags (#314)', ()
     '--eco-auto-planning',
     '--eco-auto-maintenance',
   ])
+  // Context (#439): one repeatable --context flag per selected dir; blanks dropped.
+  assert.deepEqual(startOptionFlags({ context: ['/work/api', '  ', '/work/ui'] }), [
+    '--context',
+    '/work/api',
+    '--context',
+    '/work/ui',
+  ])
 })
 
 const logEvent = (message: string): FrameworkEvent => ({ kind: 'log', message })

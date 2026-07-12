@@ -66,6 +66,7 @@ export function startOptionFlags(options: StartRunOptions): string[] {
   if (options.eco?.autoPlanning) flags.push('--eco-auto-planning')
   if (options.eco?.autoResearch) flags.push('--eco-auto-research')
   if (options.eco?.autoMaintenance) flags.push('--eco-auto-maintenance')
+  for (const dir of options.context ?? []) if (typeof dir === 'string' && dir.trim()) flags.push('--context', dir)
   return flags
 }
 

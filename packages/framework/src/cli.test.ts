@@ -51,6 +51,11 @@ test('parseArgs reads the backlog-loop flags (#323)', () => {
   assert.match(parseArgs(['--max-todo-items', '0', 'x']).error!, /max-todo-items/)
 })
 
+test('parseArgs collects repeatable --context directories (#439)', () => {
+  assert.deepEqual(parseArgs(['x']).context, [])
+  assert.deepEqual(parseArgs(['--context', '/work/api', '--context', '/work/ui', 'x']).context, ['/work/api', '/work/ui'])
+})
+
 test('parseArgs reads the maintain subcommand + its bounds (#298)', () => {
   const dflt = parseArgs(['x'])
   assert.equal(dflt.maintain, false)

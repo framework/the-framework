@@ -42,6 +42,8 @@ export interface RunPromptOptions {
   autopilot?: boolean
   /** Eco fine-grained control (#314): drop the enabled #326 sections to save tokens. */
   eco?: EcoOptions
+  /** In-context directories (#439): added as one `Context:` line to the system prompt. */
+  context?: readonly string[]
   /** Stop the run once the agent has spent this much, in USD (#322). */
   budgetUsd?: number
   /** Session link template for the dashboard, `{sessionId}` resolved when known. */
@@ -80,7 +82,7 @@ export async function runPrompt(opts: RunPromptOptions): Promise<RunPromptResult
     prompt: opts.prompt,
     params: { autopilot: opts.autopilot === true, ...(opts.eco ? { eco: opts.eco } : {}) },
   }
-  const promptBlock = systemPromptBlock({ antiLazyPill: opts.antiLazyPill, user: opts.systemPrompt, tf })
+  const promptBlock = systemPromptBlock({ antiLazyPill: opts.antiLazyPill, user: opts.systemPrompt, tf, context: opts.context })
   const system = [...(promptBlock ? [promptBlock] : []), AWAIT_PROTOCOL].join('\n\n')
   // The template's `# User prompt` half carries the prompt (today it renders to
   // exactly `opts.prompt`; any framing Rom adds around the slot rides along). With

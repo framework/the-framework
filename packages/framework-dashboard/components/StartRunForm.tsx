@@ -1,4 +1,5 @@
-import { useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
+import type { ProjectSummary } from '@gemstack/framework'
 import {
   renderResearchPrompt,
   renderReadabilityPrompt,
@@ -6,6 +7,7 @@ import {
   renderMaintainabilityMinimalPrompt,
 } from '@gemstack/framework/client'
 import { sendStart } from '../server/control.telefunc.js'
+import { onProjects } from '../server/projects.telefunc.js'
 import { autopilotOn, setAutopilot } from '../lib/autopilot.js'
 import { Button } from './ui/button.js'
 import { cn } from '../lib/utils.js'
@@ -39,6 +41,28 @@ export function StartRunForm({ projectId }: { projectId: string }) {
   const [ecoResearch, setEcoResearch] = useState(false)
   const [ecoMaintenance, setEcoMaintenance] = useState(false)
 
+  // Context selector (#439/#314): the agent can reach every registered repo, so ticking a
+  // subset narrows its focus — the picked paths become one `Context:` line in the system
+  // prompt. Loaded from the same registry the Projects sidebar shows.
+  const [projects, setProjects] = useState<ProjectSummary[]>([])
+  const [context, setContext] = useState<Set<string>>(new Set())
+  const [showContext, setShowContext] = useState(false)
+
+  useEffect(() => {
+    let live = true
+    void onProjects().then(list => live && setProjects(list))
+    return () => {
+      live = false
+    }
+  }, [])
+
+  const toggleContext = (path: string) =>
+    setContext(prev => {
+      const next = new Set(prev)
+      next.has(path) ? next.delete(path) : next.add(path)
+      return next
+    })
+
   // Vanilla removes the system prompt entirely, so Eco (which only trims it) has nothing
   // left to act on.
   const ecoDisabled = vanilla
@@ -54,6 +78,7 @@ export function StartRunForm({ projectId }: { projectId: string }) {
       ...(technical ? { technical: true } : {}),
       ...(vanilla ? { vanilla: true } : {}),
       ...(eco && !vanilla && Object.keys(ecoOpts).length ? { eco: ecoOpts } : {}),
+      ...(context.size ? { context: [...context] } : {}),
     }
   }
 
@@ -154,6 +179,32 @@ export function StartRunForm({ projectId }: { projectId: string }) {
           <label className="flex cursor-pointer items-center gap-1.5" title="Drop the maintenance section">
             <input type="checkbox" checked={ecoMaintenance} onChange={e => setEcoMaintenance(e.target.checked)} disabled={busy} /> Auto maintenance
           </label>
+        </div>
+      )}
+
+      {projects.length > 0 && (
+        <div className="mt-3 text-xs text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => setShowContext(s => !s)}
+            className="flex items-center gap-1 font-medium hover:text-foreground"
+          >
+            <span className="inline-block w-3">{showContext ? '▾' : '▸'}</span>
+            Context{context.size > 0 && <span className="text-primary"> · {context.size} selected</span>}
+          </button>
+          {showContext && (
+            <div className="mt-1.5 pl-4">
+              <p className="mb-1.5 text-muted-foreground/80">Focus the agent on these repos (it can still reach the rest):</p>
+              <div className="flex flex-col gap-1">
+                {projects.map(p => (
+                  <label key={p.id} className="flex cursor-pointer items-center gap-1.5" title={p.path}>
+                    <input type="checkbox" checked={context.has(p.path)} onChange={() => toggleContext(p.path)} disabled={busy} />
+                    <span className="truncate">{p.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

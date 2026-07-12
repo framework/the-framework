@@ -51,6 +51,20 @@ test('parseArgs reads the backlog-loop flags (#323)', () => {
   assert.match(parseArgs(['--max-todo-items', '0', 'x']).error!, /max-todo-items/)
 })
 
+test('parseArgs reads the maintain subcommand + its bounds (#298)', () => {
+  const dflt = parseArgs(['x'])
+  assert.equal(dflt.maintain, false)
+  assert.equal(dflt.dryRun, false)
+
+  const m = parseArgs(['maintain', '--dry-run'])
+  assert.equal(m.maintain, true)
+  assert.equal(m.dryRun, true)
+  assert.equal(m.intent, '') // maintain takes no positional args
+
+  assert.equal(parseArgs(['maintain', '--max-repos', '3']).maxRepos, 3)
+  assert.match(parseArgs(['maintain', '--max-repos', '0']).error!, /max-repos/)
+})
+
 test('parseArgs reads the Global options flags: vanilla + eco (#314)', () => {
   const dflt = parseArgs(['x'])
   assert.equal(dflt.vanilla, false)

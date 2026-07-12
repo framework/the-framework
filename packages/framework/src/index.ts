@@ -92,6 +92,21 @@ export {
   SESSION_ID_PLACEHOLDER,
   OPEN_LOOP_MODES,
 } from './events.js'
+export {
+  assessRepo,
+  planMaintenanceSweep,
+  maintainSweep,
+  readMaintenanceState,
+  writeMaintenanceState,
+  maintenanceStatePath,
+  MAINTENANCE_FILE,
+  type MaintenanceState,
+  type RepoReview,
+  type MaintenanceAction,
+  type SweepSummary,
+  type SweepDeps,
+  type MaintenanceFs,
+} from './maintenance.js'
 export { startDashboard, dashboardHtml, summarizeProject, defaultProjectsProvider, readDocs, type Dashboard, type DashboardOptions, type StartRunKind, type StartRunResult, type AddProjectResult, type ProjectSummary, type ProjectsProvider, type SummarizeDeps, type WorkspaceDoc } from './dashboard/index.js'
 export {
   RunStore,

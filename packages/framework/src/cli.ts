@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   builtinDomainPresets,
@@ -44,8 +45,16 @@ import { preflight } from './preflight.js'
 import { RunStore } from './store/index.js'
 import { daemonStatus, ensureDaemon, runDaemon, stopDaemon, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { resetControl, watchControl, type ControlWatcher } from './control.js'
-import { isActivated } from './project.js'
-import { addProject } from './registry.js'
+import { isActivated, nodeGitRunner } from './project.js'
+import { addProject, listProjects } from './registry.js'
+import {
+  planMaintenanceSweep,
+  maintainSweep,
+  writeMaintenanceState,
+  short,
+  type RepoReview,
+} from './maintenance.js'
+import { renderMaintainabilityPrompt } from './maintainability-preset.js'
 import { runPrompt } from './prompt-run.js'
 import { renderResearchPrompt } from './research-preset.js'
 
@@ -110,6 +119,9 @@ Usage:
   framework prompt <text>         Run one prompt verbatim through the agent, honoring
                                  its await gates — no scaffold/build pipeline. This is
                                  what a dashboard preset sends after you edit it.
+  framework maintain              Sweep the registered repos: run the maintainability
+                                 loop on any that grew un-reviewed commits (#298).
+                                 --dry-run to preview; --max-repos / --max-cost to bound.
   framework --fake                Run the offline demo (no CLI, no model, deterministic).
   framework doctor                Check prerequisites (Claude Code installed, etc.).
   framework relay                 Host a run relay so teammates can watch a run (#230).
@@ -240,6 +252,12 @@ export interface CliOptions {
   research: boolean
   /** `framework prompt <text>`: run one prompt verbatim through the direct path (#353). */
   directPrompt: boolean
+  /** `framework maintain`: sweep the registered repos, running the maintenance loop on un-reviewed commits (#298). */
+  maintain: boolean
+  /** `--dry-run`: for `maintain`, list what would be reviewed without running anything. */
+  dryRun: boolean
+  /** `--max-repos <n>`: cap how many repos one maintenance sweep reviews. */
+  maxRepos?: number
   error?: string
 }
 
@@ -268,6 +286,8 @@ export function parseArgs(argv: string[]): CliOptions {
     stop: false,
     research: false,
     directPrompt: false,
+    maintain: false,
+    dryRun: false,
     todoLoop: true,
   }
   const PERMISSION_MODES: PermissionMode[] = ['default', 'acceptEdits', 'bypassPermissions', 'plan']
@@ -412,6 +432,15 @@ export function parseArgs(argv: string[]): CliOptions {
       case '--no-todo-loop':
         opts.todoLoop = false
         break
+      case '--dry-run':
+        opts.dryRun = true
+        break
+      case '--max-repos': {
+        const n = Number(argv[++i])
+        if (!Number.isInteger(n) || n < 1) opts.error = `invalid --max-repos: must be a positive integer`
+        else opts.maxRepos = n
+        break
+      }
       case '--max-todo-items': {
         const n = Number(argv[++i])
         if (!Number.isInteger(n) || n < 1) opts.error = `invalid --max-todo-items: must be a positive integer`
@@ -445,6 +474,9 @@ export function parseArgs(argv: string[]): CliOptions {
   } else if (words[0] === 'prompt') {
     opts.directPrompt = true
     words.shift() // the remaining words are the prompt text, run verbatim (#353)
+  } else if (words[0] === 'maintain') {
+    opts.maintain = true
+    words.shift() // maintain takes no positional args; the target is the registry
   }
   opts.intent = words.join(' ').trim()
   return opts
@@ -667,6 +699,10 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
 
   // `framework stop` stops this workspace's background dashboard.
   if (opts.stop) return stopDaemonCmd(opts, io)
+
+  // `framework maintain` sweeps the registered repos, running the maintenance loop on
+  // any that grew un-reviewed commits (#298). No dashboard, no intent.
+  if (opts.maintain) return maintainCmd(opts, io)
 
   const fake = opts.fake
   const intent = opts.intent || (fake ? FAKE_INTENT : '')
@@ -1184,6 +1220,88 @@ async function stopDaemonCmd(_opts: CliOptions, io: CliIO): Promise<number> {
   const stopped = await stopDaemon()
   io.out(stopped ? '◆ dashboard stopped.' : 'No background dashboard was running.')
   return 0
+}
+
+/**
+ * `framework maintain`: the background maintenance sweep (#298). Walks the registered
+ * repos, and for each with new commits since its last review runs the maintainability
+ * loop (`framework prompt "<maintainability prompt>"`), budget-capped by `--max-cost`
+ * and bounded by `--max-repos`. A first-seen repo is baselined (recorded, not reviewed
+ * retroactively). `--dry-run` prints the plan without running anything.
+ */
+async function maintainCmd(opts: CliOptions, io: CliIO): Promise<number> {
+  const projects = await listProjects()
+  if (projects.length === 0) {
+    io.out('No registered projects. Run `framework` in a repo to add one.')
+    return 0
+  }
+
+  const reviews = await planMaintenanceSweep(
+    projects.map(p => ({ id: p.id, path: p.path })),
+    nodeGitRunner(),
+  )
+
+  if (opts.dryRun) {
+    io.out(`Maintenance sweep (dry run) — ${reviews.length} registered repo${reviews.length === 1 ? '' : 's'}:`)
+    for (const r of reviews) io.out(`  ${describeReview(r)}`)
+    return 0
+  }
+
+  const binPath = process.argv[1]
+  if (!binPath) {
+    io.err('cannot locate the framework CLI entry to run the maintenance loop.')
+    return 1
+  }
+
+  const summary = await maintainSweep(reviews, {
+    run: review => spawnMaintenanceRun(review, binPath, opts.maxCost),
+    record: (path, state) => writeMaintenanceState(path, state),
+    log: message => io.out(message),
+    now: () => new Date().toISOString(),
+    ...(opts.maxRepos !== undefined ? { maxRepos: opts.maxRepos } : {}),
+  })
+
+  io.out(
+    `Sweep done: ${summary.reviewed} reviewed, ${summary.baselined} baselined, ${summary.skipped} up-to-date, ` +
+      `${summary.failed} failed${summary.pending ? `, ${summary.pending} pending (--max-repos)` : ''}.`,
+  )
+  return summary.failed ? 1 : 0
+}
+
+/** One line describing a repo's assessed maintenance status, for the dry-run plan. */
+function describeReview(r: RepoReview): string {
+  const name = basename(r.path)
+  switch (r.action) {
+    case 'baseline':
+      return `${name} — baseline at ${short(r.headSha)} (first seen; nothing reviewed retroactively)`
+    case 'review':
+      return `${name} — review ${r.newCommits} new commit${r.newCommits === 1 ? '' : 's'} (${short(r.reviewedSha)}..${short(r.headSha)})${r.note ? ` [${r.note}]` : ''}`
+    case 'skip':
+      return `${name} — up to date`
+    case 'error':
+      return `${name} — skipped (${r.note ?? 'could not assess'})`
+  }
+}
+
+/**
+ * Run the maintainability loop on one repo by spawning `framework prompt "<prompt>"
+ * --cwd <repo> --no-dashboard`, reusing the whole run path (preflight, driver, budget
+ * cap, LOGS.md). The child inherits stdio so its run streams to the terminal.
+ * Resolves true on a clean exit (0). Never re-execs a test entry (fork-bomb guard).
+ */
+function spawnMaintenanceRun(review: RepoReview, binPath: string, maxCost?: number): Promise<boolean> {
+  if (process.env.NODE_TEST_CONTEXT || /\.test\.[cm]?[jt]s$/.test(binPath)) {
+    return Promise.resolve(false) // refuse to spawn from a test entry
+  }
+  // Scope the maintainability pass to the un-reviewed range so the agent knows what to look at.
+  const what = review.reviewedSha ? `the changes in ${short(review.reviewedSha)}..${short(review.headSha)}` : 'the recent changes'
+  const args = [binPath, 'prompt', renderMaintainabilityPrompt(what), '--no-dashboard', '--cwd', review.path]
+  if (maxCost !== undefined) args.push('--max-cost', String(maxCost))
+  return new Promise<boolean>(resolvePromise => {
+    const child = spawn(process.execPath, args, { stdio: 'inherit' })
+    child.once('error', () => resolvePromise(false))
+    child.once('exit', code => resolvePromise(code === 0))
+  })
 }
 
 async function runRelayServer(opts: CliOptions, io: CliIO): Promise<number> {

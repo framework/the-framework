@@ -20,7 +20,7 @@ export function EventList({ events, stick = true }: { events: FrameworkEvent[]; 
         {events.map((e, i) => (
           <li key={i} className="flex items-start gap-2">
             <Badge className="mt-0.5 shrink-0 text-[10px] uppercase text-muted-foreground">{e.kind}</Badge>
-            <span className="whitespace-pre-wrap break-words text-foreground">{formatFrameworkEvent(e).trim()}</span>
+            <span className="whitespace-pre-wrap break-words text-foreground">{(formatFrameworkEvent(e) ?? '').trim()}</span>
           </li>
         ))}
       </ol>

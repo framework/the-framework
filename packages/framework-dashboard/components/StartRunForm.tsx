@@ -9,7 +9,6 @@ import {
 } from '@gemstack/framework/client'
 import { sendStart } from '../server/control.telefunc.js'
 import { onProjects } from '../server/projects.telefunc.js'
-import { onProjectFiles } from '../server/reads.telefunc.js'
 import { usePreferences, updatePreferences, autopilotEnabled } from '../lib/preferences.js'
 import { PromptEditor, type PromptEditorHandle } from './PromptEditor.js'
 import { Button } from './ui/button.js'
@@ -33,9 +32,21 @@ const PRESETS: { id: string; label: string; render: () => string }[] = [
 export function StartRunForm({
   projectId,
   onRunStarted,
+  files,
+  context,
+  addContext,
+  toggleContext,
 }: {
   projectId: string
   onRunStarted?: ((intent: string) => void) | undefined
+  /** The project's files for the `#` picker (#504), owned by the shell. */
+  files: string[]
+  /** The run Context set, shared with the right-rail file tree (#492) — owned by the shell. */
+  context: Set<string>
+  /** Add a path to the Context (from an `@`/`#` mention). */
+  addContext: (path: string) => void
+  /** Toggle a path in the Context (from a repo checkbox). */
+  toggleContext: (path: string) => void
 }) {
   const [prompt, setPrompt] = useState('')
   const [kind, setKind] = useState<'build' | 'prompt'>('build')
@@ -60,7 +71,6 @@ export function StartRunForm({
   // subset narrows its focus — the picked paths become one `Context:` line in the system
   // prompt. Loaded from the same registry the Projects sidebar shows.
   const [projects, setProjects] = useState<ProjectSummary[]>([])
-  const [context, setContext] = useState<Set<string>>(new Set())
   const [showContext, setShowContext] = useState(false)
 
   useEffect(() => {
@@ -70,25 +80,6 @@ export function StartRunForm({
       live = false
     }
   }, [])
-
-  // The current project's files for the `#` picker (#504): repo-relative paths from
-  // `git ls-files`, reloaded when the selected project changes. Empty on the relay.
-  const [files, setFiles] = useState<string[]>([])
-  useEffect(() => {
-    let live = true
-    setFiles([])
-    void onProjectFiles(projectId).then(list => live && setFiles(list))
-    return () => {
-      live = false
-    }
-  }, [projectId])
-
-  const toggleContext = (path: string) =>
-    setContext(prev => {
-      const next = new Set(prev)
-      next.has(path) ? next.delete(path) : next.add(path)
-      return next
-    })
 
   // Vanilla removes the system prompt entirely, so Eco (which only trims it) has nothing
   // left to act on.
@@ -157,13 +148,6 @@ export function StartRunForm({
       setNote(null)
     }
   }
-
-  const addContext = (path: string) =>
-    setContext(prev => {
-      const next = new Set(prev)
-      next.add(path)
-      return next
-    })
 
   return (
     <form onSubmit={submit} className="border-b border-border p-4">

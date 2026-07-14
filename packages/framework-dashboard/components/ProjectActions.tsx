@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { Github, FolderOpen, Code } from 'lucide-react'
 import { onGithubUrl } from '../server/reads.telefunc.js'
 import { sendOpenInApp } from '../server/control.telefunc.js'
-import { Button } from './ui/button.js'
+import { PreviewBar } from './PreviewBar.js'
+import { GitStatusBar } from './GitStatusBar.js'
+import { Button, buttonVariants } from './ui/button.js'
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './ui/tooltip.js'
 
 // Project-panel quick actions (#488). "Open on GitHub" (#489) when the repo has a github.com
 // remote, plus localhost-only "Open folder" / "Open in editor" (#490) that ask the daemon to
@@ -38,33 +41,48 @@ export function ProjectActions({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
-      {githubUrl && (
-        <a href={githubUrl} target="_blank" rel="noreferrer" title={githubUrl}>
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Github className="h-4 w-4" /> Open on GitHub
-          </Button>
-        </a>
-      )}
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-1.5"
-        disabled={busy}
-        title="Reveal the repo in your file manager (Finder / Explorer)"
-        onClick={() => void open('files')}
-      >
-        <FolderOpen className="h-4 w-4" /> Open folder
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-1.5"
-        disabled={busy}
-        title="Open the repo in your editor (code, or $FRAMEWORK_EDITOR)"
-        onClick={() => void open('editor')}
-      >
-        <Code className="h-4 w-4" /> Open in editor
-      </Button>
+      {/* Git status (#491) reads on the left; the project actions group on the right. Nav
+          actions are icon-only with tooltips; Serve keeps its label + running state. */}
+      <GitStatusBar projectId={projectId} inline />
+      <TooltipProvider delay={300} closeDelay={0}>
+        <span className="ml-auto flex flex-wrap items-center gap-2">
+          {githubUrl && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <a
+                    href={githubUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
+                  />
+                }
+              >
+                <Github className="h-3.5 w-3.5" />
+              </TooltipTrigger>
+              <TooltipContent>Open on GitHub</TooltipContent>
+            </Tooltip>
+          )}
+          <Tooltip>
+            <TooltipTrigger
+              render={<Button variant="outline" size="icon-sm" disabled={busy} onClick={() => void open('files')} />}
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>Open folder (Finder / Explorer)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={<Button variant="outline" size="icon-sm" disabled={busy} onClick={() => void open('editor')} />}
+            >
+              <Code className="h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>Open in editor (code, or $FRAMEWORK_EDITOR)</TooltipContent>
+          </Tooltip>
+          {/* Serve (#475): one click to serve the built result, alongside the other actions. */}
+          <PreviewBar projectId={projectId} inline />
+        </span>
+      </TooltipProvider>
       {error && <p className="w-full text-xs text-red-500">{error}</p>}
     </div>
   )

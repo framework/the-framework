@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { onProjectFiles } from './reads.telefunc.js'
+import { onProjectFiles, onProjectFileStatus } from './reads.telefunc.js'
 
 // Outside a Telefunc `serve({ context })` the RPC resolves against the global registry, so an
 // unknown project id has no local path — the same situation as the relay, which has no
@@ -8,4 +8,8 @@ import { onProjectFiles } from './reads.telefunc.js'
 
 test('onProjectFiles for an unknown project returns an empty list', async () => {
   assert.deepEqual(await onProjectFiles('project-that-does-not-exist'), [])
+})
+
+test('onProjectFileStatus for an unknown project returns an empty map', async () => {
+  assert.deepEqual(await onProjectFileStatus('project-that-does-not-exist'), {})
 })

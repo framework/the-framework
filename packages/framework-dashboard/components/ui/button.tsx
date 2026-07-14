@@ -17,6 +17,7 @@ const buttonVariants = cva(
         default: 'h-9 px-4 py-2',
         sm: 'h-8 px-3',
         icon: 'h-9 w-9',
+        'icon-sm': 'h-7 w-7',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },
@@ -30,3 +31,5 @@ export interface ButtonProps
 export function Button({ className, variant, size, ...props }: ButtonProps) {
   return <button className={cn(buttonVariants({ variant, size }), className)} {...props} />
 }
+
+export { buttonVariants }

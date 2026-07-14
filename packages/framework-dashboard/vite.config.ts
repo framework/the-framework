@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import vike from 'vike/plugin'
 import { telefunc } from 'telefunc/vite'
@@ -11,6 +12,10 @@ import { defineConfig } from 'vite'
 // there is touched. Production serving (daemon serves the built bundle) is next (#405).
 export default defineConfig({
   plugins: [react(), vike(), telefunc(), tailwindcss()],
+  // `@/*` -> package root, matching tsconfig `paths` (used by the copied-in animate-ui components).
+  resolve: {
+    alias: { '@': fileURLToPath(new URL('.', import.meta.url)) },
+  },
   server: {
     port: 4300,
   },

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { onProjectFiles } from '../../server/reads.telefunc.js'
 import { ProjectsSidebar } from '../../components/ProjectsSidebar.js'
 import { RunHistory } from '../../components/RunHistory.js'
 import { ProjectHome } from '../../components/ProjectHome.js'
@@ -35,6 +36,36 @@ export default function Page() {
 
   const { runs, reload } = useRuns(projectId)
 
+  // The run Context set lives in the shell (#492/#504) so the two surfaces that feed it share
+  // one source of truth: the `#` file chips + whole-repo Context selector in the Start form
+  // (main pane), and the file tree in the right rail. Reset when the project changes — the
+  // picked file paths are that project's.
+  const [context, setContext] = useState<Set<string>>(new Set())
+  const addContext = (path: string) =>
+    setContext(prev => (prev.has(path) ? prev : new Set(prev).add(path)))
+  const toggleContext = (path: string) =>
+    setContext(prev => {
+      const next = new Set(prev)
+      next.has(path) ? next.delete(path) : next.add(path)
+      return next
+    })
+
+  // The selected project's files (git ls-files), fetched once here and handed to both the
+  // `#` picker and the tree. Empty when no project / on the relay (no checkout).
+  const [files, setFiles] = useState<string[]>([])
+  useEffect(() => {
+    if (!projectId) {
+      setFiles([])
+      return
+    }
+    let live = true
+    setFiles([])
+    void onProjectFiles(projectId).then(list => live && setFiles(list))
+    return () => {
+      live = false
+    }
+  }, [projectId])
+
   const onRunStarted = (intent: string) => {
     // Stay on the home launcher (it must stay visible so you can launch again); the new run
     // just appends to the rail. Reload so its real row replaces the optimistic one quickly.
@@ -45,6 +76,7 @@ export default function Page() {
   const selectProject = (id: string) => {
     setProjectId(id)
     setRunId(null) // switching projects always returns to the home launcher
+    setContext(new Set()) // the picked context is the old project's — start fresh
     if (typeof window !== 'undefined') window.localStorage.setItem(SELECTED_PROJECT_KEY, id)
   }
 
@@ -75,7 +107,18 @@ export default function Page() {
   const selectedRun = runId ? runs.find(run => run.id === runId) : undefined
   const renderMain = () => {
     if (!projectId) return <DashboardPage onSelectProject={selectProject} />
-    if (runId === null) return <ProjectHome projectId={projectId} events={events} onRunStarted={onRunStarted} />
+    if (runId === null)
+      return (
+        <ProjectHome
+          projectId={projectId}
+          events={events}
+          onRunStarted={onRunStarted}
+          files={files}
+          context={context}
+          addContext={addContext}
+          toggleContext={toggleContext}
+        />
+      )
     if (selectedRun?.status === 'running') return <RunLive projectId={projectId} events={events} />
     return <RunReplay projectId={projectId} runId={runId} />
   }
@@ -98,7 +141,14 @@ export default function Page() {
           startIntent={runStart.intent}
         />
         <main className="flex min-w-0 flex-1 flex-col">{renderMain()}</main>
-        <RightRail projectId={projectId} choices={choices} views={views} />
+        <RightRail
+          projectId={projectId}
+          choices={choices}
+          views={views}
+          files={files}
+          context={context}
+          toggleContext={toggleContext}
+        />
       </div>
     </div>
   )

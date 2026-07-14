@@ -7,7 +7,8 @@ import { cn } from '../lib/utils.js'
 // The project panel's git status (#491, part of #488): active branch, a clean/dirty dot, and
 // the linked PR. Reads `onGitStatus`, polled so it tracks a run committing/branching. Hidden
 // when the project is not a git repo (or on the relay, which has no local checkout).
-export function GitStatusBar({ projectId }: { projectId: string }) {
+// `inline` renders just the status (for the project action bar); otherwise a full-width row.
+export function GitStatusBar({ projectId, inline = false }: { projectId: string; inline?: boolean }) {
   const [status, setStatus] = useState<GitStatus | null>(null)
 
   useEffect(() => {
@@ -24,11 +25,11 @@ export function GitStatusBar({ projectId }: { projectId: string }) {
 
   if (!status) return null
 
-  return (
-    <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs">
+  const content = (
+    <>
       <span className="flex items-center gap-1.5 text-muted-foreground">
         <GitBranch className="h-3.5 w-3.5" />
-        <span className="font-medium text-foreground" title={`branch ${status.branch}`}>
+        <span className="max-w-[14rem] truncate font-medium text-foreground" title={`branch ${status.branch}`}>
           {status.branch}
         </span>
       </span>
@@ -44,7 +45,7 @@ export function GitStatusBar({ projectId }: { projectId: string }) {
           href={status.pr.url}
           target="_blank"
           rel="noreferrer"
-          className="ml-auto flex items-center gap-1.5 text-primary hover:underline"
+          className={cn('flex items-center gap-1.5 text-primary hover:underline', !inline && 'ml-auto')}
           title={status.pr.title}
         >
           <span>PR #{status.pr.number}</span>
@@ -53,6 +54,10 @@ export function GitStatusBar({ projectId }: { projectId: string }) {
           </span>
         </a>
       )}
-    </div>
+    </>
   )
+
+  if (inline) return <span className="flex items-center gap-2 text-xs">{content}</span>
+
+  return <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-xs">{content}</div>
 }

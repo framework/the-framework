@@ -7,6 +7,7 @@ import { buildDashboard, type DashboardData } from '../dashboard/dashboard.js'
 import { githubUrlFor } from '../dashboard/github.js'
 import { readGitStatus, type GitStatus } from '../dashboard/git-status.js'
 import { crawlRepoFiles } from '../project.js'
+import { readFileStatuses, type FileGitStatus } from '../dashboard/file-status.js'
 import { contextProjects } from './context.js'
 import type { FrameworkEvent } from '../events.js'
 
@@ -86,6 +87,15 @@ export async function onDashboard(): Promise<DashboardData> {
 export async function onProjectFiles(projectId: string): Promise<string[]> {
   const cwd = await projectPath(projectId)
   return cwd ? crawlRepoFiles(cwd).catch(() => []) : []
+}
+
+/**
+ * Per-file git status for the tree's dots (#492): repo-relative path -> untracked/modified/
+ * deleted, from `git status --porcelain`. `{}` when not a repo / on the relay (no checkout).
+ */
+export async function onProjectFileStatus(projectId: string): Promise<Record<string, FileGitStatus>> {
+  const cwd = await projectPath(projectId)
+  return cwd ? readFileStatuses(cwd).catch(() => ({})) : {}
 }
 
 /** The project's GitHub URL from its `origin` remote (#489), or null (no remote / not GitHub / relay). */

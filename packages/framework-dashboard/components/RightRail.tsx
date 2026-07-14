@@ -4,12 +4,13 @@ import { DocsPanel } from './DocsPanel.js'
 import { ProjectLogPanel } from './ProjectLogPanel.js'
 import { ChoicesRail } from './ChoicesRail.js'
 import { ViewsRail } from './ViewsRail.js'
+import { FileTree } from './FileTree.js'
 import type { AgentView } from '../lib/live-state.js'
 import { Badge } from './ui/badge.js'
 import { Button } from './ui/button.js'
 import { cn } from '../lib/utils.js'
 
-type Tab = 'choices' | 'views' | 'docs' | 'log'
+type Tab = 'files' | 'choices' | 'views' | 'docs' | 'log'
 
 // The right sidebar (#314 third rail): the interactive choice gates the run parks on
 // (#440), the ad-hoc markdown views the agent pushes (#441), the surfaced docs (PLAN/TODO),
@@ -20,25 +21,44 @@ export function RightRail({
   projectId,
   choices,
   views,
+  files,
+  context,
+  toggleContext,
 }: {
   projectId: string | null
   choices: ChoiceRequest[]
   views: AgentView[]
+  /** The project's files for the Files tab tree (#492); empty on the relay. */
+  files: string[]
+  /** The run Context set, shared with the Start form (#504). */
+  context: Set<string>
+  /** Toggle a file path in the Context. */
+  toggleContext: (path: string) => void
 }) {
   const [tab, setTab] = useState<Tab>('docs')
   const hasChoices = choices.length > 0
   const hasViews = views.length > 0
+  const hasFiles = files.length > 0
 
-  // Pull the rail to the most urgent surface: a choice gate over a view over the docs.
+  // Pull the rail to the most urgent surface: a choice gate over a view, else the file tree
+  // when just browsing a project (#492), else the docs.
   useEffect(() => {
-    setTab(hasChoices ? 'choices' : hasViews ? 'views' : 'docs')
-  }, [hasChoices, hasViews])
+    setTab(hasChoices ? 'choices' : hasViews ? 'views' : hasFiles ? 'files' : 'docs')
+  }, [hasChoices, hasViews, hasFiles])
 
   if (!projectId) return null
 
-  const tabs: Tab[] = [...(hasChoices ? ['choices' as const] : []), ...(hasViews ? ['views' as const] : []), 'docs', 'log']
-  const label = (t: Tab) => (t === 'choices' ? 'Choices' : t === 'views' ? 'Views' : t === 'docs' ? 'Docs' : 'Log')
-  const count = (t: Tab) => (t === 'choices' ? choices.length : t === 'views' ? views.length : 0)
+  // Files first (#492): the project peek surface, before the run's own choices/views/docs/log.
+  const tabs: Tab[] = [
+    ...(hasFiles ? ['files' as const] : []),
+    ...(hasChoices ? ['choices' as const] : []),
+    ...(hasViews ? ['views' as const] : []),
+    'docs',
+    'log',
+  ]
+  const label = (t: Tab) =>
+    t === 'files' ? 'Files' : t === 'choices' ? 'Choices' : t === 'views' ? 'Views' : t === 'docs' ? 'Docs' : 'Log'
+  const count = (t: Tab) => (t === 'choices' ? choices.length : t === 'views' ? views.length : t === 'files' ? context.size : 0)
 
   return (
     <aside className="flex w-80 shrink-0 flex-col border-l border-border">
@@ -57,7 +77,9 @@ export function RightRail({
         ))}
       </div>
       <div className="flex min-h-0 flex-1 flex-col">
-        {tab === 'choices' && hasChoices ? (
+        {tab === 'files' && hasFiles ? (
+          <FileTree projectId={projectId} files={files} selected={context} onToggle={toggleContext} />
+        ) : tab === 'choices' && hasChoices ? (
           <ChoicesRail projectId={projectId} choices={choices} />
         ) : tab === 'views' && hasViews ? (
           <ViewsRail views={views} />

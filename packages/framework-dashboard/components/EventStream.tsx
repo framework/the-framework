@@ -7,6 +7,10 @@ import { PreviewBar } from './PreviewBar.js'
 import { RunOverview } from './RunOverview.js'
 import { Button } from './ui/button.js'
 
+const NO_FILES: string[] = []
+const NO_CONTEXT = new Set<string>()
+const NOOP = () => {}
+
 // The live event view (#405/#314): a projection of the selected project's
 // `.the-framework/events.jsonl`, streamed over a Telefunc Channel by the shell's
 // `useLiveEvents` hook and passed in as `events`. The main column shows the run overview,
@@ -52,7 +56,16 @@ export function EventStream({
           </Button>
         </div>
       ) : (
-        <StartRunForm projectId={projectId} onRunStarted={onRunStarted} />
+        // Non-relay steering path (unreached today — the relay always mounts readOnly). The
+        // file Context lives in the shell there; this fallback wires inert handlers.
+        <StartRunForm
+          projectId={projectId}
+          onRunStarted={onRunStarted}
+          files={NO_FILES}
+          context={NO_CONTEXT}
+          addContext={NOOP}
+          toggleContext={NOOP}
+        />
       )}
       {events.length > 0 ? (
         <>

@@ -1,8 +1,6 @@
 import type { FrameworkEvent } from '@gemstack/framework'
 import { StartRunForm } from './StartRunForm.js'
 import { ProjectActions } from './ProjectActions.js'
-import { GitStatusBar } from './GitStatusBar.js'
-import { PreviewBar } from './PreviewBar.js'
 import { RunOverview } from './RunOverview.js'
 
 // The project home / launcher — what "Live" selects. Always the Start form + preset cards +
@@ -13,17 +11,30 @@ export function ProjectHome({
   projectId,
   events,
   onRunStarted,
+  files,
+  context,
+  addContext,
+  toggleContext,
 }: {
   projectId: string
   events: FrameworkEvent[]
   onRunStarted?: ((intent: string) => void) | undefined
+  files: string[]
+  context: Set<string>
+  addContext: (path: string) => void
+  toggleContext: (path: string) => void
 }) {
   return (
     <>
       <ProjectActions projectId={projectId} />
-      <GitStatusBar projectId={projectId} />
-      <PreviewBar projectId={projectId} />
-      <StartRunForm projectId={projectId} onRunStarted={onRunStarted} />
+      <StartRunForm
+        projectId={projectId}
+        onRunStarted={onRunStarted}
+        files={files}
+        context={context}
+        addContext={addContext}
+        toggleContext={toggleContext}
+      />
       {events.length > 0 && <RunOverview events={events} />}
     </>
   )

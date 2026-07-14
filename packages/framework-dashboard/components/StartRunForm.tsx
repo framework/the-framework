@@ -5,6 +5,7 @@ import {
   renderReadabilityPrompt,
   renderMaintainabilityPrompt,
   renderMaintainabilityMinimalPrompt,
+  renderSecurityAuditPrompt,
 } from '@gemstack/framework/client'
 import { sendStart } from '../server/control.telefunc.js'
 import { onProjects } from '../server/projects.telefunc.js'
@@ -20,6 +21,7 @@ const PRESETS: { id: string; label: string; render: () => string }[] = [
   { id: 'readability', label: 'Readability', render: renderReadabilityPrompt },
   { id: 'maintainability', label: 'Maintainability', render: renderMaintainabilityPrompt },
   { id: 'maintainability-minimal', label: 'Maintainability (minimal)', render: renderMaintainabilityMinimalPrompt },
+  { id: 'security-audit', label: 'Security audit', render: renderSecurityAuditPrompt },
 ]
 
 // Start a run in the selected project (#405): the one write that goes through the daemon's

@@ -308,6 +308,12 @@ export {
   MAINTAINABILITY_MINIMAL_PARAMS,
 } from './maintainability-minimal-preset.js'
 export {
+  renderSecurityAuditPrompt,
+  SECURITY_AUDIT_PRESET_NAME,
+  SECURITY_AUDIT_PROMPT_TEMPLATE,
+  SECURITY_AUDIT_PARAMS,
+} from './security-audit-preset.js'
+export {
   fakeDriver,
   FAKE_INTENT,
   FAKE_SIGNALS,

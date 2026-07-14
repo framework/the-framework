@@ -1,5 +1,6 @@
 import { getContext } from 'telefunc'
 import { appendControl } from '../control.js'
+import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
 import { contextProjects } from './context.js'
 import type { ChoiceBy } from '../events.js'
 import type { PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from '../dashboard/server.js'
@@ -83,4 +84,15 @@ export async function onPreviewStatus(projectId: string): Promise<PreviewStatus>
   const { preview } = getContext<DashboardContext>()
   if (!preview) return { running: false }
   return preview.status(projectId)
+}
+
+/**
+ * Open a project in the OS file manager or an editor (#490). Localhost-only: the daemon
+ * spawns a local command against the project's own registered path. A public host has no
+ * local path to resolve, so it returns an error rather than spawning anything.
+ */
+export async function sendOpenInApp(projectId: string, target: OpenTarget): Promise<OpenResult> {
+  const cwd = await projectPath(projectId)
+  if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
+  return openInApp(cwd, target)
 }

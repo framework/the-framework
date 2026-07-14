@@ -143,6 +143,17 @@ test('applyEventToMeta marks a user-stopped run as stopped, not failed (#218)', 
   assert.equal(stopped.status, 'stopped')
 })
 
+test('applyEventToMeta records the session name + ready-for-merge lifecycle signals (#326)', () => {
+  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  assert.equal(base.sessionName, undefined)
+  assert.equal(base.readyForMerge, undefined)
+  const named = applyEventToMeta(base, { kind: 'session-name', name: 'add-comments' }, AT)
+  assert.equal(named.sessionName, 'add-comments')
+  const ready = applyEventToMeta(named, { kind: 'ready-for-merge' }, AT)
+  assert.equal(ready.readyForMerge, true)
+  assert.equal(ready.sessionName, 'add-comments') // ready doesn't clobber the name
+})
+
 test('close archives the run into runs/<id>.json + .jsonl for history (#303)', async () => {
   const fs = memFs()
   const store = await RunStore.open(CWD, { fs, fresh: true, now: AT })

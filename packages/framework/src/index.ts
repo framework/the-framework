@@ -97,10 +97,12 @@ export {
   decisionLedger,
   loopStatus,
   sessionInfo,
+  runProgress,
   type ArchitectPlan,
   type Decision,
   type LoopStatus,
   type SessionInfo,
+  type RunProgress,
 } from './run-view.js'
 export {
   assessRepo,

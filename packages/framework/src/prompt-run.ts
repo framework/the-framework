@@ -2,7 +2,7 @@ import type { Driver, DriverEvent, DriverSession } from './driver/index.js'
 import { hasSessionIdPlaceholder, resolveSessionLink, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import { resolveAwaitGate } from './run.js'
 import { renderSystemPrompt, systemPromptBlock, type EcoOptions, type TfContext } from './system-prompt.js'
-import { AWAIT_PROTOCOL, PLAN_DECLINED_MESSAGE, isDeclinedConfirmation, parseAwaitGate, parseMarkdownViews } from './turn-gate.js'
+import { AWAIT_PROTOCOL, SIGNAL_PROTOCOL, PLAN_DECLINED_MESSAGE, isDeclinedConfirmation, parseAwaitGate, parseMarkdownViews, parseSessionName, parseReadyForMerge } from './turn-gate.js'
 import { UsageMeter } from './usage.js'
 
 /**
@@ -85,7 +85,7 @@ export async function runPrompt(opts: RunPromptOptions): Promise<RunPromptResult
     params: { autopilot: opts.autopilot === true, ...(opts.eco ? { eco: opts.eco } : {}) },
   }
   const promptBlock = systemPromptBlock({ antiLazyPill: opts.antiLazyPill, user: opts.systemPrompt, tf, context: opts.context, bootstrap: opts.bootstrap })
-  const system = [...(promptBlock ? [promptBlock] : []), AWAIT_PROTOCOL].join('\n\n')
+  const system = [...(promptBlock ? [promptBlock] : []), AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n')
   // The template's `# User prompt` half carries the prompt (today it renders to
   // exactly `opts.prompt`; any framing Rom adds around the slot rides along). With
   // the built-in prompt off, the raw prompt is sent as-is.
@@ -136,14 +136,26 @@ export async function runPrompt(opts: RunPromptOptions): Promise<RunPromptResult
     onEvent: onDriverEvent,
   })
 
-  // Non-blocking markdown views the agent showed this turn (#441), pushed to the rail.
-  const showViews = (text: string): void => {
+  // Non-blocking signals the agent emitted this turn: markdown views (#441) and the #326
+  // lifecycle signals (session name, ready-for-merge). None stop the turn.
+  let named: string | undefined
+  let ready = false
+  const emitTurnSignals = (text: string): void => {
     for (const view of parseMarkdownViews(text)) emit({ kind: 'view', ...view })
+    const name = parseSessionName(text)
+    if (name && name !== named) {
+      named = name
+      emit({ kind: 'session-name', name })
+    }
+    if (!ready && parseReadyForMerge(text)) {
+      ready = true
+      emit({ kind: 'ready-for-merge' })
+    }
   }
 
   try {
     let turn = await session.prompt(firstPrompt, { signal: runSignal })
-    showViews(turn.text)
+    emitTurnSignals(turn.text)
     let gate = parseAwaitGate(turn.text)
     for (let round = 0; round < MAX_AWAIT_ROUNDS && gate; round++) {
       const answer = await resolveAwaitGate(gate, round, { requestChoice: opts.requestChoice, emit, signal: runSignal })
@@ -158,7 +170,7 @@ export async function runPrompt(opts: RunPromptOptions): Promise<RunPromptResult
         `You paused to ask: "${gate.title}". The user chose: ${answer}. Continue with that decision, and do not ask again unless a genuinely new choice comes up.`,
         { signal: runSignal },
       )
-      showViews(turn.text)
+      emitTurnSignals(turn.text)
       gate = parseAwaitGate(turn.text)
     }
     // The agent kept asking past the limit: finish with the latest turn rather than loop.

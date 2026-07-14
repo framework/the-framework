@@ -68,8 +68,19 @@ export function OverviewSection({
                       )}
                     >
                       <span className="flex w-full items-center gap-1.5">
-                        <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-primary" />
+                        <span
+                          className={cn(
+                            'h-2 w-2 shrink-0 rounded-full',
+                            run.readyForMerge ? 'bg-green-500' : 'animate-pulse bg-amber-500',
+                          )}
+                          title={run.readyForMerge ? 'Ready for merge' : 'Building'}
+                        />
                         <span className="truncate font-medium">{run.projectName}</span>
+                        {run.sessionName && (
+                          <span className="truncate text-xs text-muted-foreground" title={`branch the-framework/${run.sessionName}`}>
+                            {run.sessionName}
+                          </span>
+                        )}
                       </span>
                       {(run.intent || run.scope) && (
                         <span className="truncate pl-3.5 text-xs text-muted-foreground" title={run.intent || run.scope}>

@@ -20,6 +20,10 @@ export interface ActiveRun {
   scope?: string
   /** ISO timestamp of the run's last event. */
   updatedAt?: string
+  /** The session name the agent chose (#326), when it set one. */
+  sessionName?: string
+  /** Whether the agent signalled `setReadyForMerge()` (#326): drives the building/ready dot. */
+  readyForMerge?: boolean
 }
 
 /** One recently active project, most-recent first. */
@@ -78,6 +82,8 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
         ...(meta.intent ? { intent: meta.intent } : {}),
         ...(meta.scope ? { scope: meta.scope } : {}),
         ...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {}),
+        ...(meta.sessionName ? { sessionName: meta.sessionName } : {}),
+        ...(meta.readyForMerge ? { readyForMerge: true } : {}),
       })
     }
   }

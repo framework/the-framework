@@ -38,6 +38,28 @@ export const AWAIT_PROTOCOL = [
   'This just shows it; you do not stop. Re-emit the same title to update that view in place.',
 ].join('\n')
 
+/**
+ * The session-lifecycle protocol (#326): the code side of the `setSessionName()` and
+ * `setReadyForMerge()` actions Rom's system prompt calls out. Like {@link AWAIT_PROTOCOL},
+ * it does not restate *when* to act — the system prompt owns that — it only pins *how* to
+ * emit the signal so the turn-boundary can detect it. Both are non-blocking: the agent
+ * emits the block and keeps going (the framework records it and reflects it in the
+ * dashboard). Injected alongside AWAIT_PROTOCOL.
+ */
+export const SIGNAL_PROTOCOL = [
+  '## Session name',
+  'When you call setSessionName(<name>) (after creating and checking out the `the-framework/<name>` branch), also emit a `set-session-name` block naming it, so the dashboard shows which session this is. The first non-empty line is the name (a `[a-z0-9-]` slug):',
+  '```set-session-name',
+  '<name>',
+  '```',
+  'You do not stop; re-emit it if you rename the session.',
+  '',
+  '## Ready for merge',
+  'When you call setReadyForMerge() — you believe the work is complete and ready for human review — emit an empty `ready-for-merge` block. This flips the dashboard status from building to ready; it does not stop your turn.',
+  '```ready-for-merge',
+  '```',
+].join('\n')
+
 /** A single-select choice an agent stopped to ask, parsed from an `await-choices` block (#337). */
 export interface ParsedChoicesGate {
   /** The question shown above the options. */
@@ -123,6 +145,32 @@ export function parseMarkdownViews(text: string): ParsedMarkdownView[] {
     byId.set(id, { id, title, markdown })
   }
   return [...byId.values()]
+}
+
+/**
+ * Parse the session name the agent set this turn (#326), from the last `set-session-name`
+ * block (per {@link SIGNAL_PROTOCOL}) — its first non-empty line, slugified to `[a-z0-9-]`
+ * so it matches the branch-name shape. Returns `undefined` when the agent did not set one
+ * (the common case) or the block is blank. A later block in the same turn wins (a rename).
+ */
+export function parseSessionName(text: string): string | undefined {
+  const re = /```set-session-name\s+([\s\S]*?)```/g
+  let name: string | undefined
+  for (const m of text.matchAll(re)) {
+    const line = (m[1] ?? '').split('\n').map(l => l.trim()).find(Boolean)
+    const slug = line ? slugify(line) : ''
+    if (slug && slug !== 'view') name = slug
+  }
+  return name
+}
+
+/**
+ * Whether the agent signalled `setReadyForMerge()` this turn (#326): the presence of a
+ * `ready-for-merge` block (per {@link SIGNAL_PROTOCOL}) anywhere in the text. Non-blocking
+ * and body-less — it just flips the run from building to ready-for-review.
+ */
+export function parseReadyForMerge(text: string): boolean {
+  return /```ready-for-merge\s*```/.test(text) || /```ready-for-merge\s+[\s\S]*?```/.test(text)
 }
 
 /** Find the body + start index of the last fenced block with `tag` in `text`. */

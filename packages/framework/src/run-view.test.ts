@@ -1,7 +1,23 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { architectPlan, decisionLedger, loopStatus, sessionInfo, deployPlan } from './run-view.js'
+import { architectPlan, decisionLedger, loopStatus, sessionInfo, deployPlan, runProgress } from './run-view.js'
 import type { FrameworkEvent } from './events.js'
+
+test('runProgress starts building with no name and flips to ready on setReadyForMerge (#326)', () => {
+  assert.deepEqual(runProgress([]), { readyForMerge: false })
+  const building: FrameworkEvent[] = [{ kind: 'session-name', name: 'add-comments' }]
+  assert.deepEqual(runProgress(building), { sessionName: 'add-comments', readyForMerge: false })
+  const ready: FrameworkEvent[] = [...building, { kind: 'ready-for-merge' }]
+  assert.deepEqual(runProgress(ready), { sessionName: 'add-comments', readyForMerge: true })
+})
+
+test('runProgress takes the latest session name when the agent renames it (#326)', () => {
+  const events: FrameworkEvent[] = [
+    { kind: 'session-name', name: 'first-guess' },
+    { kind: 'session-name', name: 'better-name' },
+  ]
+  assert.equal(runProgress(events).sessionName, 'better-name')
+})
 
 const architect = (stack: string, extra: Record<string, unknown> = {}): FrameworkEvent => ({
   kind: 'bootstrap',

@@ -1,6 +1,7 @@
 import type { FrameworkEvent } from '@gemstack/framework'
-import { architectPlan, decisionLedger, loopStatus, sessionInfo, deployPlan } from '@gemstack/framework/client'
+import { architectPlan, decisionLedger, loopStatus, sessionInfo, deployPlan, runProgress } from '@gemstack/framework/client'
 import { Badge } from './ui/badge.js'
+import { cn } from '../lib/utils.js'
 
 // The run overview (#431): the "moat" the wrapped agent's own chat cannot show, rebuilt
 // on the new dashboard. Each card is a pure projection of the event stream (run-view.ts
@@ -13,11 +14,22 @@ export function RunOverview({ events }: { events: FrameworkEvent[] }) {
   const loop = loopStatus(events)
   const session = sessionInfo(events)
   const deploy = deployPlan(events)
+  const progress = runProgress(events)
+  const hasProgress = Boolean(progress.sessionName) || progress.readyForMerge
 
-  if (!plan && !loop && !deploy && !session?.sessionLink) return null
+  if (!plan && !loop && !deploy && !session?.sessionLink && !hasProgress) return null
 
   return (
     <div className="grid gap-3 border-b border-border p-4 md:grid-cols-2">
+      {hasProgress && (
+        <div className="flex items-center gap-2 text-sm md:col-span-2">
+          <span
+            className={cn('h-2.5 w-2.5 shrink-0 rounded-full', progress.readyForMerge ? 'bg-green-500' : 'animate-pulse bg-amber-500')}
+          />
+          {progress.sessionName && <span className="font-medium">{progress.sessionName}</span>}
+          <span className="text-xs text-muted-foreground">{progress.readyForMerge ? 'ready for merge' : 'building…'}</span>
+        </div>
+      )}
       {plan && (
         <section className="rounded-lg border border-border p-3">
           <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stack &amp; rationale</h3>

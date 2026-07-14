@@ -111,6 +111,18 @@ export type FrameworkEvent =
    */
   | { kind: 'view'; id: string; title: string; markdown: string }
   /**
+   * The agent named the session (#326): the `[a-z0-9-]` slug it chose (also its
+   * `the-framework/<name>` branch), from a `setSessionName()` signal. Non-blocking;
+   * the dashboard shows it as the run's label. Re-emitted on a rename.
+   */
+  | { kind: 'session-name'; name: string }
+  /**
+   * The agent signalled `setReadyForMerge()` (#326): it believes the work is complete
+   * and ready for human review. Non-blocking — it flips the run's dashboard status from
+   * building (orange) to ready (green); the post-merge quality prompts hang off it.
+   */
+  | { kind: 'ready-for-merge' }
+  /**
    * Cumulative token + cost usage for the run so far (#322). Emitted after each
    * agent turn that reports usage; the dashboard renders a live spend readout and
    * the run stops itself once `costUsd` reaches the budget cap, if one is set.
@@ -165,6 +177,10 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `  ${event.message}`
     case 'view':
       return `▶ view: ${event.title}`
+    case 'session-name':
+      return `  session: ${event.name}`
+    case 'ready-for-merge':
+      return `✓ ready for merge`
     case 'usage':
       return `  spend: $${event.costUsd.toFixed(4)}${
         event.budgetUsd ? ` / $${event.budgetUsd}` : ''

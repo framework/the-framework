@@ -9,11 +9,13 @@ export {
   loopStatus,
   sessionInfo,
   deployPlan,
+  runProgress,
   type ArchitectPlan,
   type Decision,
   type LoopStatus,
   type SessionInfo,
   type DeployPlan,
+  type RunProgress,
 } from './run-view.js'
 // The Start-a-run presets (#433): pure prompt builders (no Node imports) the dashboard
 // prefills into the textarea, then runs verbatim as a `prompt` kind.

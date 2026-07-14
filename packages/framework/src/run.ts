@@ -38,7 +38,7 @@ import { snapshotWorkspace } from './sandbox.js'
 import type { Driver, DriverEvent, DriverSession } from './driver/index.js'
 import { memoryFraming, type LoadedMemory } from './memory.js'
 import { systemPromptBlock, type EcoOptions, type TfContext } from './system-prompt.js'
-import { AWAIT_PROTOCOL, CONFIRM_APPROVED, CONFIRM_DECLINED, PLAN_DECLINED_MESSAGE, isDeclinedConfirmation, parseAwaitGate, parseMarkdownViews, type ParsedAwaitGate } from './turn-gate.js'
+import { AWAIT_PROTOCOL, SIGNAL_PROTOCOL, CONFIRM_APPROVED, CONFIRM_DECLINED, PLAN_DECLINED_MESSAGE, isDeclinedConfirmation, parseAwaitGate, parseMarkdownViews, parseSessionName, parseReadyForMerge, type ParsedAwaitGate } from './turn-gate.js'
 // Value import from todo-loop.js is a benign cycle: todo-loop.js only calls
 // run.js's hoisted function declarations (requestChoices / resolveAwaitGate).
 import { runTodoLoop, type TodoLoopResult } from './todo-loop.js'
@@ -352,9 +352,10 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
   }
   const promptBlock = systemPromptBlock({ antiLazyPill: opts.antiLazyPill, user: opts.systemPrompt, tf, context: opts.context, bootstrap: opts.bootstrap })
   // The await protocol (#337) concretizes the pill's showChoices()/AWAIT macros into a
-  // signal the turn-boundary gate can detect, so it rides along with the pill.
+  // signal the turn-boundary gate can detect, so it rides along with the pill. The signal
+  // protocol (#326) does the same for the setSessionName()/setReadyForMerge() lifecycle actions.
   const system = [
-    ...(promptBlock ? [promptBlock, AWAIT_PROTOCOL] : []),
+    ...(promptBlock ? [promptBlock, AWAIT_PROTOCOL, SIGNAL_PROTOCOL] : []),
     ...personas.map(personaInstructions),
     ...skills.map(skillInstructions),
     ...(memoryBlock ? [memoryBlock] : []),
@@ -708,12 +709,25 @@ function agentAwaitGate(
 ): (ctx: BuildContext) => Promise<SupervisorRun> {
   return async ctx => {
     const { requestChoice, emit } = deps
-    // Non-blocking markdown views the agent showed this turn (#441), pushed to the rail.
-    const showViews = (text: string): void => {
+    // Non-blocking signals the agent emitted this turn: markdown views (#441) pushed to the
+    // rail, and the #326 lifecycle signals (session name, ready-for-merge) that flip the run's
+    // dashboard status. None stop the turn.
+    let named: string | undefined
+    let ready = false
+    const emitTurnSignals = (text: string): void => {
       for (const view of parseMarkdownViews(text)) emit({ kind: 'view', ...view })
+      const name = parseSessionName(text)
+      if (name && name !== named) {
+        named = name
+        emit({ kind: 'session-name', name })
+      }
+      if (!ready && parseReadyForMerge(text)) {
+        ready = true
+        emit({ kind: 'ready-for-merge' })
+      }
     }
     let run = await base(ctx)
-    showViews(run.text)
+    emitTurnSignals(run.text)
     if (!requestChoice) return run
 
     for (let round = 0; round < MAX_AWAIT_ROUNDS; round++) {
@@ -729,7 +743,7 @@ function agentAwaitGate(
       }
       emit({ kind: 'log', message: `Continuing with your choice: ${answer}` })
       run = await continueAfterChoice(session, ctx, gate.title, answer)
-      showViews(run.text)
+      emitTurnSignals(run.text)
     }
     // The agent kept asking past the limit: proceed with the latest turn rather than loop.
     emit({ kind: 'log', message: 'Proceeding with the build (await limit reached).' })

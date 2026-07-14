@@ -34,6 +34,28 @@ test('runPrompt runs a gateless prompt straight through and emits session + end'
   assert.equal(events.some(e => e.kind === 'choice'), false)
 })
 
+test('runPrompt emits the #326 lifecycle signals a turn declares (session name, ready-for-merge)', async () => {
+  const events: FrameworkEvent[] = []
+  const turn = [
+    'Set up the branch and finished the work.',
+    '```set-session-name',
+    'Add Comments!',
+    '```',
+    '```ready-for-merge',
+    '```',
+  ].join('\n')
+  const driver = new FakeDriver({ turns: [{ text: turn }] })
+  await runPrompt({ prompt: 'add comments', driver, cwd: '/ws', onEvent: e => events.push(e) })
+  assert.deepEqual(
+    events.find(e => e.kind === 'session-name'),
+    { kind: 'session-name', name: 'add-comments' }, // slugified to the branch shape
+  )
+  assert.ok(
+    events.some(e => e.kind === 'ready-for-merge'),
+    'a ready-for-merge event is emitted',
+  )
+})
+
 test('runPrompt surfaces the system prompt (#343); the user prompt rides a driver start event', async () => {
   const events: FrameworkEvent[] = []
   const driver = new FakeDriver({ turns: [{ text: 'done' }] })

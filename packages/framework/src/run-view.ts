@@ -117,6 +117,28 @@ export function deployPlan(events: readonly FrameworkEvent[]): DeployPlan | null
   return null
 }
 
+/** The run's lifecycle progress (#326): the session name it chose and whether it is ready for merge. */
+export interface RunProgress {
+  /** The `[a-z0-9-]` session name (also the branch), once the agent set one via `setSessionName()`. */
+  sessionName?: string
+  /** True once the agent signalled `setReadyForMerge()`: building (false) -> ready (true). */
+  readyForMerge: boolean
+}
+
+/**
+ * The run's lifecycle progress (#326): the latest `session-name` the agent set and whether
+ * a `ready-for-merge` has fired. Drives the dashboard status label + dot (orange building,
+ * green ready). Always returns a value — an untouched run is `{ readyForMerge: false }`.
+ */
+export function runProgress(events: readonly FrameworkEvent[]): RunProgress {
+  const progress: RunProgress = { readyForMerge: false }
+  for (const event of events) {
+    if (event.kind === 'session-name') progress.sessionName = event.name
+    else if (event.kind === 'ready-for-merge') progress.readyForMerge = true
+  }
+  return progress
+}
+
 /** The wrapped agent session (#431): its id and a deep link, when one is known. */
 export interface SessionInfo {
   driver?: string

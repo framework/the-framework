@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { isDeclinedConfirmation, parseAwaitGate, parseChoicesGate, parseConfirmationGate, parseMarkdownViews, parseMultiSelectGate } from './turn-gate.js'
+import { isDeclinedConfirmation, parseAwaitGate, parseChoicesGate, parseConfirmationGate, parseMarkdownViews, parseMultiSelectGate, parseSessionName, parseReadyForMerge } from './turn-gate.js'
 
 const block = (json: string): string => 'Here are the options.\n```await-choices\n' + json + '\n```'
 const multiBlock = (json: string): string => 'Pick some.\n```await-multiselect\n' + json + '\n```'
@@ -147,4 +147,26 @@ test('parseMarkdownViews collects several blocks and keeps the later of a repeat
 
 test('parseMarkdownViews skips a blank block (#441)', () => {
   assert.deepEqual(parseMarkdownViews('```show-markdown\n# Empty\n```'), [])
+})
+
+test('parseSessionName returns undefined when the turn set no session name (#326)', () => {
+  assert.equal(parseSessionName('Working on the branch, no signal here.'), undefined)
+})
+
+test('parseSessionName reads + slugifies the name from a set-session-name block (#326)', () => {
+  assert.equal(parseSessionName('```set-session-name\nadd-comments\n```'), 'add-comments')
+  // Free-form text is slugified to the [a-z0-9-] branch shape.
+  assert.equal(parseSessionName('done.\n```set-session-name\nAdd Comments Feature!\n```'), 'add-comments-feature')
+  // The first non-empty line is the name.
+  assert.equal(parseSessionName('```set-session-name\n\n  my-slug  \nignored\n```'), 'my-slug')
+})
+
+test('parseSessionName keeps the later block when the agent renames mid-turn (#326)', () => {
+  assert.equal(parseSessionName('```set-session-name\nfirst\n```\nthen\n```set-session-name\nsecond\n```'), 'second')
+})
+
+test('parseReadyForMerge is true only when a ready-for-merge block is present (#326)', () => {
+  assert.equal(parseReadyForMerge('Still building the feature.'), false)
+  assert.equal(parseReadyForMerge('All done.\n```ready-for-merge\n```'), true)
+  assert.equal(parseReadyForMerge('```ready-for-merge```'), true) // empty, no inner newline
 })

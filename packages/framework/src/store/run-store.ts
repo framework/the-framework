@@ -77,6 +77,10 @@ export interface RunMeta {
   sessionId?: string
   /** The link shown to jump into the live agent session. */
   sessionLink?: string
+  /** The session name the agent chose (#326), also its `the-framework/<name>` branch. */
+  sessionName?: string
+  /** Whether the agent signalled `setReadyForMerge()` (#326): building (false/absent) vs ready (true). */
+  readyForMerge?: boolean
 }
 
 /**
@@ -123,6 +127,12 @@ export function applyEventToMeta(meta: RunMeta, event: FrameworkEvent, at: strin
     case 'session-update':
       next.sessionId = event.sessionId
       if (event.sessionLink) next.sessionLink = event.sessionLink
+      break
+    case 'session-name':
+      next.sessionName = event.name
+      break
+    case 'ready-for-merge':
+      next.readyForMerge = true
       break
     case 'bootstrap': {
       const b = event.event

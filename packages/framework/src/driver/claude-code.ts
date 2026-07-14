@@ -1,7 +1,9 @@
 import { spawn as nodeSpawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import { killTree, registerChild, unregisterChild } from './child-registry.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
 
@@ -10,6 +12,13 @@ const TERMINATE_GRACE_MS = 5000
 
 /** Claude Code permission modes we pass through to the CLI. */
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
+
+/** A stdio MCP server spec, as written into the `--mcp-config` file (#452). */
+export interface McpServerSpec {
+  command: string
+  args?: string[]
+  env?: Record<string, string>
+}
 
 /** The slice of `child_process.spawn` this driver needs. Injectable for tests. */
 export type SpawnLike = (
@@ -44,6 +53,13 @@ export interface ClaudeCodeDriverOptions {
   dangerouslySkipPermissions?: boolean
   /** Extra CLI args appended verbatim (escape hatch). */
   extraArgs?: string[]
+  /**
+   * MCP servers to expose to the agent for this session (#452). Written to a
+   * temp config file passed via `--mcp-config`, so they merge with the user's
+   * own configured MCP servers rather than replacing them. Used by `--browser`
+   * to wire chrome-devtools-mcp (a real browser + DevTools tools) into the run.
+   */
+  mcpServers?: Record<string, McpServerSpec>
   /** Environment for the child process. Default `process.env`. */
   env?: NodeJS.ProcessEnv
   /** `spawn` override for tests. Default `node:child_process.spawn`. */
@@ -76,6 +92,8 @@ let sessionCounter = 0
 export class ClaudeCodeSession implements DriverSession {
   readonly id: string
   readonly cwd: string
+  /** Path to the written `--mcp-config` file, lazily created on first use. */
+  private mcpConfigPath: string | undefined
 
   constructor(
     private readonly config: ClaudeCodeDriverOptions,
@@ -115,8 +133,17 @@ export class ClaudeCodeSession implements DriverSession {
   }
 
   dispose(): Promise<void> {
-    // Each prompt spawns and reaps its own process, so there is nothing durable
-    // to tear down. The session id reaches the UI via the emitted result event.
+    // Each prompt spawns and reaps its own process, so the only durable thing is
+    // the temp MCP config file; drop it. The session id reaches the UI via the
+    // emitted result event.
+    if (this.mcpConfigPath) {
+      try {
+        rmSync(dirname(this.mcpConfigPath), { recursive: true, force: true })
+      } catch {
+        // Best effort: the temp dir lands under the OS tmp and is reaped anyway.
+      }
+      this.mcpConfigPath = undefined
+    }
     return Promise.resolve()
   }
 
@@ -126,8 +153,27 @@ export class ClaudeCodeSession implements DriverSession {
     else args.push('--permission-mode', this.config.permissionMode ?? 'acceptEdits')
     if (system) args.push('--append-system-prompt', system)
     if (this.startOpts.model) args.push('--model', this.startOpts.model)
+    const mcpConfig = this.mcpConfigFile()
+    if (mcpConfig) args.push('--mcp-config', mcpConfig)
     if (this.config.extraArgs) args.push(...this.config.extraArgs)
     return args
+  }
+
+  /**
+   * Lazily materialize the `--mcp-config` file for {@link ClaudeCodeDriverOptions.mcpServers}.
+   * Written once and reused across the session's prompts; `undefined` when no
+   * servers are configured. Not `--strict-mcp-config`, so these merge with the
+   * user's own MCP servers rather than replacing them.
+   */
+  private mcpConfigFile(): string | undefined {
+    const servers = this.config.mcpServers
+    if (!servers || Object.keys(servers).length === 0) return undefined
+    if (!this.mcpConfigPath) {
+      const dir = mkdtempSync(join(tmpdir(), 'framework-mcp-'))
+      this.mcpConfigPath = join(dir, 'mcp.json')
+      writeFileSync(this.mcpConfigPath, JSON.stringify({ mcpServers: servers }))
+    }
+    return this.mcpConfigPath
   }
 }
 

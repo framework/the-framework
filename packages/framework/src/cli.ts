@@ -14,7 +14,7 @@ import {
   type DomainPreset,
   type FrameworkSignals,
 } from '@gemstack/ai-autopilot'
-import { ClaudeCodeDriver, type ClaudeCodeDriverOptions, type Driver, type DriverSession, type PermissionMode } from './driver/index.js'
+import { ClaudeCodeDriver, type ClaudeCodeDriverOptions, type Driver, type DriverSession, type McpServerSpec, type PermissionMode } from './driver/index.js'
 import { hostExecutor } from './host-exec.js'
 import { startDashboard, singleProjectProvider, resolveDashboardBundle, type Dashboard } from './dashboard/index.js'
 import { startRelay, relayPublisher, type RelayPublisher } from './relay.js'
@@ -160,6 +160,9 @@ Options:
   --post-merge           When the run signals setReadyForMerge(), fire the post-merge
                          quality suite: maintainability, readability, and security-audit
                          prompts, one after another (#326).
+  --browser              Give the agent a real browser during the run via
+                         chrome-devtools-mcp: navigate pages, read console + network,
+                         inspect the DOM, and screenshot. Off by default (#452).
   --kind <name>          Build event kind the preset's review loop fires for, e.g.
                          bug-fix or major-change (default: the-framework.yml's event,
                          else the preset's own, else major-change). Selects which
@@ -237,6 +240,8 @@ export interface CliOptions {
   bootstrap: boolean
   /** `--post-merge`: fire the #326 post-merge quality suite (maintainability/readability/security-audit) when the run signals setReadyForMerge(). */
   postMerge: boolean
+  /** `--browser`: give the agent a real browser via chrome-devtools-mcp (navigate, console, network, DOM, screenshot) during the run (#452). */
+  browser: boolean
   buildEvent?: string | undefined
   maxPasses?: number
   maxCost?: number
@@ -299,6 +304,7 @@ export function parseArgs(argv: string[]): CliOptions {
     context: [],
     bootstrap: false,
     postMerge: false,
+    browser: false,
     dashboard: true,
     relayServe: false,
     composeExtensions: false,
@@ -356,6 +362,9 @@ export function parseArgs(argv: string[]): CliOptions {
         break
       case '--post-merge':
         opts.postMerge = true
+        break
+      case '--browser':
+        opts.browser = true
         break
       case '--eco-auto-planning':
         opts.eco.autoPlanning = true
@@ -534,6 +543,23 @@ export function claudeDriverOptions(opts: Pick<CliOptions, 'permissionMode' | 's
   return opts.skipPermissions
     ? { dangerouslySkipPermissions: true }
     : { permissionMode: opts.permissionMode ?? 'bypassPermissions' }
+}
+
+/**
+ * The `--browser` MCP wiring (#452): chrome-devtools-mcp is a maintained stdio
+ * server that launches its own Chromium and exposes DevTools tools (navigate,
+ * console, network, DOM, screenshot). `npx -y` resolves it on demand so there is
+ * nothing to pre-install. Merged into the build driver only, not the short
+ * preset-router turn.
+ */
+export const BROWSER_MCP_SERVERS: Record<string, McpServerSpec> = {
+  'chrome-devtools': { command: 'npx', args: ['-y', 'chrome-devtools-mcp@latest'] },
+}
+
+/** Fold the `--browser` MCP server into driver options when the flag is set. */
+export function withBrowser(base: ClaudeCodeDriverOptions, browser: boolean): ClaudeCodeDriverOptions {
+  if (!browser) return base
+  return { ...base, mcpServers: { ...base.mcpServers, ...BROWSER_MCP_SERVERS } }
 }
 
 /** The active Open Loop modes from the mode flags, in a stable order. */
@@ -1005,7 +1031,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     io.err(`note: --sandbox docker has no effect without --serve.`)
   }
 
-  const driver: Driver = fake ? fakeDriver() : new ClaudeCodeDriver(claudeOpts)
+  const driver: Driver = fake ? fakeDriver() : new ClaudeCodeDriver(withBrowser(claudeOpts, opts.browser))
 
   // `framework research [what]` (#331) and `framework prompt <text>` (#353): the
   // direct prompt path — run one prompt through runPrompt, which honors its gates

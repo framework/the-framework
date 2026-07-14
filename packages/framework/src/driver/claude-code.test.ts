@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { Readable, Writable } from 'node:stream'
+import { existsSync, readFileSync } from 'node:fs'
 import { ClaudeCodeDriver, StreamJsonParser, runClaude, type SpawnLike, type SpawnedProcess } from './claude-code.js'
 import type { DriverEvent } from './types.js'
 
@@ -151,4 +152,36 @@ test('ClaudeCodeDriver builds correct CLI args (permission mode, system, model)'
   assert.ok(captured.includes('You are a Vike expert'))
   assert.ok(captured.includes('--model'))
   assert.ok(captured.includes('claude-haiku-4-5-20251001'))
+})
+
+test('ClaudeCodeDriver omits --mcp-config when no mcpServers are configured', async () => {
+  let captured: string[] = []
+  const spawn: SpawnLike = (_cmd, args) => {
+    captured = [...args]
+    return fakeSpawn([JSON.stringify({ type: 'result', result: 'ok' })])(_cmd, args, { cwd: '/ws', env: {} })
+  }
+  const session = await new ClaudeCodeDriver({ spawn }).start({ cwd: '/ws' })
+  await session.prompt('go')
+  assert.ok(!captured.includes('--mcp-config'))
+})
+
+test('ClaudeCodeDriver writes an --mcp-config file for mcpServers and cleans it up on dispose', async () => {
+  let captured: string[] = []
+  const spawn: SpawnLike = (_cmd, args) => {
+    captured = [...args]
+    return fakeSpawn([JSON.stringify({ type: 'result', result: 'ok' })])(_cmd, args, { cwd: '/ws', env: {} })
+  }
+  const mcpServers = { 'chrome-devtools': { command: 'npx', args: ['-y', 'chrome-devtools-mcp@latest'] } }
+  const session = await new ClaudeCodeDriver({ spawn, mcpServers }).start({ cwd: '/ws' })
+  await session.prompt('go')
+  const idx = captured.indexOf('--mcp-config')
+  assert.ok(idx >= 0)
+  const configPath = captured[idx + 1]!
+  assert.deepEqual(JSON.parse(readFileSync(configPath, 'utf8')), { mcpServers })
+  // The path is stable across prompts in the same session (written once).
+  const first = [...captured]
+  await session.prompt('again')
+  assert.equal(captured[captured.indexOf('--mcp-config') + 1], first[first.indexOf('--mcp-config') + 1])
+  await session.dispose()
+  assert.ok(!existsSync(configPath))
 })

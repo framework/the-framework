@@ -14,6 +14,7 @@ export {
   StreamJsonParser,
   runClaude,
   type ClaudeCodeDriverOptions,
+  type McpServerSpec,
   type PermissionMode,
   type SpawnLike,
   type SpawnedProcess,

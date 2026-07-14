@@ -25,6 +25,8 @@ import {
   runLogKind,
   runPostMergeSuite,
   POST_MERGE_PASSES,
+  withBrowser,
+  BROWSER_MCP_SERVERS,
   workspaceSummary,
   type CliIO,
 } from './cli.js'
@@ -67,6 +69,20 @@ test('parseArgs reads --bootstrap (#297/#448)', () => {
 test('parseArgs reads --post-merge (#326)', () => {
   assert.equal(parseArgs(['x']).postMerge, false)
   assert.equal(parseArgs(['--post-merge', 'x']).postMerge, true)
+})
+
+test('parseArgs reads --browser (#452)', () => {
+  assert.equal(parseArgs(['x']).browser, false)
+  assert.equal(parseArgs(['--browser', 'x']).browser, true)
+})
+
+test('withBrowser folds chrome-devtools-mcp into driver options only when enabled (#452)', () => {
+  const base = claudeDriverOptions({ skipPermissions: false })
+  assert.equal(withBrowser(base, false).mcpServers, undefined)
+  const withIt = withBrowser(base, true)
+  assert.deepEqual(withIt.mcpServers, BROWSER_MCP_SERVERS)
+  // Non-mutating: the base options are untouched.
+  assert.equal(base.mcpServers, undefined)
 })
 
 test('promptRunArgs runs a headless prompt and carries NO --post-merge (recursion guard, #326)', () => {

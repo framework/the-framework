@@ -34,29 +34,43 @@ test('loadUserSystemPrompt is undefined when the file is absent or empty', async
 })
 
 test('SYSTEM_PROMPT_TEMPLATE carries the #326 sections verbatim', () => {
-  for (const section of ['## Unclear scope', '## Large scope', '## Alternatives', '## Maintenance', '# User prompt']) {
+  for (const section of [
+    '## Analyze the user prompt',
+    '### Ambiguous prompt',
+    '### Scope',
+    '## Before starting changes',
+    '### Session name',
+    '## Before applying changes',
+    '### Alternatives',
+    '## After applying changes',
+    '# User prompt',
+  ]) {
     assert.ok(SYSTEM_PROMPT_TEMPLATE.includes(section), `missing ${section}`)
   }
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('TODO_FILE: `TODO_<SESSION_NAME>.agent.md`'))
+  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('ADD_ANALYSIS_ENTRY: Add entry to the ANLYSIS_RESULT.md list'))
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('${{tf.prompt}}'))
-  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('${{ tf.params.autopilot ?'))
+  // The whole block is the branch-free doc now: #326 moved the one `tf.params.autopilot`
+  // ternary out with the maintenance section, so `tf.prompt` is the only fragment left.
+  assert.equal(SYSTEM_PROMPT_TEMPLATE.match(/\$\{\{/g)?.length, 1)
+})
+
+test('SYSTEM_PROMPT_TEMPLATE no longer carries the pre-#326-rewrite headings (#555)', () => {
+  // The 11-Jul draft's headings. They are what ECO_SECTION_HEADINGS used to match on, so
+  // if one comes back the eco mapping below is the thing to re-check.
+  for (const gone of ['## Unclear scope', '## Large scope', '## Maintenance']) {
+    assert.ok(!SYSTEM_PROMPT_TEMPLATE.includes(gone), `${gone} should be gone`)
+  }
 })
 
 test('renderSystemPrompt splits the system and user halves', () => {
   const { system, user } = renderSystemPrompt({ prompt: 'build a todo app', params: {} })
   assert.ok(system.startsWith('# System prompt'))
-  assert.ok(system.includes('## Maintenance'))
+  assert.ok(system.includes('## Analyze the user prompt'))
+  assert.ok(system.includes('## After applying changes'))
   assert.ok(!system.includes('# User prompt'))
   assert.ok(!system.includes('${{'), 'system half fully rendered')
   assert.equal(user, 'build a todo app')
-})
-
-test('renderSystemPrompt branches the maintenance line on tf.params.autopilot', () => {
-  const attended = renderSystemPrompt({ prompt: 'x', params: { autopilot: false } }).system
-  const autopilot = renderSystemPrompt({ prompt: 'x', params: { autopilot: true } }).system
-  assert.ok(attended.includes('prefer minimal changes to make it easier for humans to read the changes'))
-  assert.ok(autopilot.includes('you can prefer minimal changes (e.g. to postpone a deep refactor)'))
-  assert.ok(!autopilot.includes('easier for humans'))
 })
 
 test('renderSystemPrompt is not confused by a user prompt containing the heading', () => {
@@ -103,56 +117,78 @@ test('systemPromptBlock ignores a whitespace-only user prompt', () => {
 })
 
 test('systemPromptBlock threads tf through to the template', () => {
-  const block = systemPromptBlock({ tf: { prompt: 'x', params: { autopilot: true } } })
-  assert.ok(block.includes('postpone a deep refactor'))
+  // `tf.prompt` lands in the user half, so eco is what observably reaches the system half.
+  const block = systemPromptBlock({ tf: { prompt: 'x', params: { eco: { autoResearch: true } } } })
+  assert.ok(!block.includes('### Alternatives'))
 })
 
-test('eco.autoPlanning drops only the Large scope section (#314)', () => {
+test('every eco flag with a section still drops it (#314/#555)', () => {
+  // The regression this exists for: the mapping matches by exact heading string and
+  // dropSection() no-ops on a miss, so renaming a heading in the #326 doc silently stops a
+  // flag from trimming anything. A `!system.includes('## Large scope')` assertion cannot
+  // catch that, because it passes for free once the heading is gone. Assert the drop really
+  // shortens the prompt instead.
+  const full = renderSystemPrompt({ prompt: 'x', params: {} }).system
+  for (const flag of ['autoPlanning', 'autoResearch'] as const) {
+    const trimmed = renderSystemPrompt({ prompt: 'x', params: { eco: { [flag]: true } } }).system
+    assert.ok(trimmed.length < full.length, `eco.${flag} dropped nothing`)
+  }
+})
+
+test('eco.autoPlanning drops only the Scope section (#314)', () => {
   const { system } = renderSystemPrompt({ prompt: 'x', params: { eco: { autoPlanning: true } } })
-  assert.ok(!system.includes('## Large scope'))
+  assert.ok(!system.includes('### Scope'))
   assert.ok(!system.includes('PLAN_<SESSION_NAME>'))
-  // The neighbours survive, and the block spacing is intact.
-  assert.ok(system.includes('## Unclear scope'))
-  assert.ok(system.includes('## Alternatives'))
-  assert.ok(system.includes('## Maintenance'))
-  assert.ok(!system.includes('\n\n\n'))
+  assert.ok(!system.includes('whether the scope is small, large, or very large'))
+  // The `##` parent, the `###` sibling above it, and the section after it all survive: the
+  // drop stops at the next same-or-higher heading rather than running past it.
+  assert.ok(system.includes('## Analyze the user prompt'))
+  assert.ok(system.includes('### Ambiguous prompt'))
+  assert.ok(system.includes('whether YES/NO the prompt is ambiguous'))
+  assert.ok(system.includes('## Before starting changes'))
+  assert.ok(system.includes('### Alternatives'))
 })
 
 test('eco.autoResearch drops only the Alternatives section (#314)', () => {
   const { system } = renderSystemPrompt({ prompt: 'x', params: { eco: { autoResearch: true } } })
-  assert.ok(!system.includes('## Alternatives'))
-  assert.ok(!system.includes('measure "variability"'))
-  assert.ok(system.includes('## Large scope'))
-  assert.ok(system.includes('## Maintenance'))
+  assert.ok(!system.includes('### Alternatives'))
+  assert.ok(!system.includes('Measure "variability"'))
+  // Its `##` parent stays, and so does the section after it.
+  assert.ok(system.includes('## Before applying changes'))
+  assert.ok(system.includes('## After applying changes'))
+  assert.ok(system.includes('### Scope'))
 })
 
-test('eco.autoMaintenance drops the trailing Maintenance section cleanly (#314)', () => {
+test('eco.autoMaintenance drops nothing: #326 moved the section to the post-merge prompt (#555/#556)', () => {
+  // Not a silent breakage but a deliberate no-op: the maintenance text left the system
+  // prompt, so there is nothing here to trim and the tokens are already saved for everyone.
+  // The flag stays parsed and persisted, and re-points at the post-merge prompt in #556.
   const { system, user } = renderSystemPrompt({ prompt: 'ship it', params: { eco: { autoMaintenance: true } } })
-  assert.ok(!system.includes('## Maintenance'))
-  assert.ok(system.includes('## Alternatives'))
-  // The user half is untouched by eco, and no stray fragment survives the drop.
-  assert.equal(user, 'ship it')
+  assert.equal(system, renderSystemPrompt({ prompt: 'ship it', params: {} }).system)
+  assert.equal(user, 'ship it') // the user half is untouched by eco
   assert.ok(!system.includes('${{'))
 })
 
-test('all three eco drops leave just the Unclear scope section (#314)', () => {
+test('both eco drops leave the rest of the prompt standing (#314)', () => {
   const { system } = renderSystemPrompt({
     prompt: 'x',
     params: { eco: { autoPlanning: true, autoResearch: true, autoMaintenance: true } },
   })
-  assert.ok(system.includes('## Unclear scope'))
-  for (const gone of ['## Large scope', '## Alternatives', '## Maintenance']) {
+  for (const kept of ['## Analyze the user prompt', '### Ambiguous prompt', '### Session name', '## After applying changes']) {
+    assert.ok(system.includes(kept), `missing ${kept}`)
+  }
+  for (const gone of ['### Scope', '### Alternatives']) {
     assert.ok(!system.includes(gone), `${gone} should be dropped`)
   }
 })
 
 test('no eco flags renders every section, and eco never touches the template', () => {
   const { system } = renderSystemPrompt({ prompt: 'x', params: { eco: {} } })
-  for (const section of ['## Unclear scope', '## Large scope', '## Alternatives', '## Maintenance']) {
+  for (const section of ['## Analyze the user prompt', '### Scope', '### Alternatives', '## After applying changes']) {
     assert.ok(system.includes(section), `missing ${section}`)
   }
   // The living #326 doc stays byte-identical regardless of eco.
-  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('## Large scope'))
+  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('### Scope'))
 })
 
 test('vanilla (antiLazyPill false) wins over eco: no built-in prompt at all (#314)', () => {

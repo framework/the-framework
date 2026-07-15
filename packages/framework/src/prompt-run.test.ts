@@ -93,10 +93,10 @@ test('runPrompt honors eco flags in the emitted system prompt (#314)', async () 
   })
   const sys = events.find(e => e.kind === 'system-prompt') as { text: string } | undefined
   assert.ok(sys)
-  // The dropped sections are gone; the surviving one stays.
-  assert.ok(!sys.text.includes('## Alternatives'))
-  assert.ok(!sys.text.includes('## Maintenance'))
-  assert.ok(sys.text.includes('## Large scope'))
+  // The dropped section is gone; the surviving one stays. autoMaintenance drops nothing
+  // since #326 moved that section to the post-merge prompt (#556).
+  assert.ok(!sys.text.includes('### Alternatives'))
+  assert.ok(sys.text.includes('### Scope'))
 })
 
 test('runPrompt with antiLazyPill false emits no built-in prompt even with eco set (#314)', async () => {
@@ -114,7 +114,7 @@ test('runPrompt with antiLazyPill false emits no built-in prompt even with eco s
   assert.ok(sys)
   // Vanilla: no #326 block at all, only the always-on await protocol.
   assert.ok(!sys.text.includes('# System prompt'))
-  assert.ok(!sys.text.includes('## Unclear scope'))
+  assert.ok(!sys.text.includes('## Analyze the user prompt'))
 })
 
 test('runPrompt pauses on a multi-select gate and continues with the pick (#331)', async () => {

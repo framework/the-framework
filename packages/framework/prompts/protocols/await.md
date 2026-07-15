@@ -22,3 +22,4 @@ To display markdown in the side panel without blocking (a plan, a summary, a wri
 <the markdown body>
 ```
 This just shows it; you do not stop. Re-emit the same title to update that view in place.
+showMarkdown() and showMarkdownSecondary() are both this block: emit the same `show-markdown` block for either.

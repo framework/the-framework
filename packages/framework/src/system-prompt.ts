@@ -8,12 +8,13 @@ import { AWAIT_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 // import here puts `node:fs` in the browser bundle.
 
 /**
- * Rom's system prompt (#326), verbatim, as a template. It supersedes the
- * anti-lazy-pill (#297/#301) it grew out of: unclear scope becomes a ranked
- * `showChoices()` list, a large scope becomes a PLAN file to approve, a very
- * large one also spins off a TODO backlog (consumed by the backlog loop, #323),
- * the alternatives flow rates problem "variability" before code is written, and
- * the maintenance section keeps edits minimal.
+ * The system prompt (#326), verbatim, as a template. It supersedes the
+ * anti-lazy-pill (#297/#301) it grew out of: the prompt is analyzed first into an
+ * ANLYSIS_RESULT.md, an ambiguous prompt becomes a ranked `showChoices()` list, a
+ * large scope becomes a PLAN file to approve, a very large one also spins off a TODO
+ * backlog (consumed by the backlog loop, #323), the work moves onto its own
+ * `the-framework/<session>` branch before the first change, and the alternatives flow
+ * rates problem "variability" before code is written.
  *
  * Two layers make it executable:
  * - `${{ ... }}` fragments are JS evaluated against a {@link TfContext} (#350).
@@ -30,25 +31,38 @@ import { AWAIT_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 export const SYSTEM_PROMPT_TEMPLATE = SYSTEM_PROMPT
 
 /**
- * Eco fine-grained control (#314): each flag drops one whole `##` section from the
+ * Eco fine-grained control (#314): each flag drops one whole section from the
  * built-in #326 prompt to save tokens, letting the agent auto-handle that concern.
- * The template itself stays byte-identical to Rom's #326 doc; the sections are
+ * The template itself stays byte-identical to the #326 doc; the sections are
  * removed after the split, so a dropped section never leaves a fragment behind.
  */
 export interface EcoOptions {
-  /** Drop `## Large scope` (the PLAN-file planning section). */
+  /** Drop `### Scope` (the PLAN-file planning section). */
   autoPlanning?: boolean | undefined
-  /** Drop `## Alternatives` (the variability-rating research section). */
+  /** Drop `### Alternatives` (the variability-rating research section). */
   autoResearch?: boolean | undefined
-  /** Drop `## Maintenance` (the minimal-changes maintenance section). */
+  /**
+   * Drop the maintenance section. #326 moved it out of the system prompt and into the
+   * post-merge prompt, so there is nothing left here to trim and this flag currently
+   * drops nothing. It re-points at that prompt when it lands (#556); until then it stays
+   * parsed and persisted so the CLI flag and the dashboard toggle keep working.
+   */
   autoMaintenance?: boolean | undefined
 }
 
-/** Maps an {@link EcoOptions} flag to the `## ` heading it drops from the template. */
-const ECO_SECTION_HEADINGS: Record<keyof EcoOptions, string> = {
-  autoPlanning: '## Large scope',
-  autoResearch: '## Alternatives',
-  autoMaintenance: '## Maintenance',
+/**
+ * Maps an {@link EcoOptions} flag to the heading it drops from the template. Partial: a
+ * flag whose section no longer lives in this prompt has no entry.
+ *
+ * Every entry must match a heading that really exists. {@link dropSection} no-ops on a
+ * miss, so a heading rename in the #326 doc would silently stop the flag from trimming
+ * anything, with no test failure to catch it (a `!includes('## Large scope')` assertion
+ * passes for free once that heading is gone). `system-prompt.test.ts` pins each entry
+ * against the template and asserts the drop actually shortens the prompt.
+ */
+const ECO_SECTION_HEADINGS: Partial<Record<keyof EcoOptions, string>> = {
+  autoPlanning: '### Scope',
+  autoResearch: '### Alternatives',
 }
 
 /** The `tf` context the template's `${{...}}` fragments read (#326/#350). */
@@ -73,16 +87,22 @@ export interface RenderedSystemPrompt {
 const USER_PROMPT_HEADING = '\n# User prompt\n'
 
 /**
- * Drop a whole `## <heading>` section from a markdown block: everything from the
- * heading up to (but not including) the next `## ` heading, or the end. The `\n\n`
- * separator ahead of the section goes with it, so the surrounding blocks stay
+ * Drop a whole `<heading>` section from a markdown block: everything from the heading
+ * up to (but not including) the next heading of the same or a higher level, or the end.
+ * The `\n\n` separator ahead of the section goes with it, so the surrounding blocks stay
  * spaced exactly as before. A heading that isn't present is a no-op.
+ *
+ * Level-aware because #326 nests the eco-droppable sections under `##` parents: dropping
+ * `### Scope` has to stop at the next `###` sibling rather than run on to the next `##`
+ * and swallow it.
  */
 function dropSection(md: string, heading: string): string {
   const at = md.indexOf(`\n${heading}`)
   if (at === -1) return md
-  const nextHeading = md.indexOf('\n## ', at + heading.length + 1)
-  const end = nextHeading === -1 ? md.length : nextHeading
+  const level = /^#+/.exec(heading)?.[0].length ?? 2
+  const after = at + heading.length + 1
+  const next = new RegExp(`\\n#{1,${level}} `).exec(md.slice(after))
+  const end = next ? after + next.index : md.length
   return md.slice(0, at) + md.slice(end)
 }
 
@@ -90,8 +110,8 @@ function dropSection(md: string, heading: string): string {
 function applyEco(systemHalf: string, eco: EcoOptions | undefined): string {
   if (!eco) return systemHalf
   let out = systemHalf
-  for (const key of Object.keys(ECO_SECTION_HEADINGS) as (keyof EcoOptions)[]) {
-    if (eco[key]) out = dropSection(out, ECO_SECTION_HEADINGS[key])
+  for (const [key, heading] of Object.entries(ECO_SECTION_HEADINGS) as [keyof EcoOptions, string][]) {
+    if (eco[key]) out = dropSection(out, heading)
   }
   return out
 }

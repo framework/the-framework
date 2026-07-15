@@ -3,8 +3,7 @@ import { renderPresetPrompt, type PresetParam } from './preset-params.js'
 /**
  * The [UX] preset (#472): Rom's usability review, shipped like [Research] (#331)
  * as a direct interactive prompt rather than a build run — it reviews existing UI
- * from a user's perspective, so it skips the scope -> architect -> build
- * scaffolding. It enumerates every finding as a `showChoices()` list, stops at
+ * from a user's perspective, so it skips the scope -> build scaffolding. It enumerates every finding as a `showChoices()` list, stops at
  * `<AWAIT>` for the user to accept proposals, then works on the accepted ones.
  * `<PARAM:what>` is the user-facing blank (defaults to `this PR`); `<AWAIT>` is the
  * agent-facing turn-gate macro (#339/#340) the dashboard resolves. Keep it in sync

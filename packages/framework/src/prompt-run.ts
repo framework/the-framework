@@ -9,7 +9,7 @@ import { leaveResumeNote } from './todo-loop.js'
 
 /**
  * The direct prompt path (#331): run *one prompt* through the driver and honor
- * its await gates — no scope/architect/build scaffolding, no review loop. This
+ * its await gates — no scope/build scaffolding, no review loop. This
  * is what a review-shaped preset like [Research] needs: the prompt operates on
  * existing code, stops at `showChoices()` / `showMultiSelect()` + AWAIT, and
  * continues from the user's answer. Plumbing, not babysitting — the framework

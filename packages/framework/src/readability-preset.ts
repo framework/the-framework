@@ -3,7 +3,7 @@ import { renderPresetPrompt, type PresetParam } from './preset-params.js'
 /**
  * The [Readability] preset (#360): Rom's refactor-for-human-readers pass, shipped
  * as a direct prompt like [Research] (#331) — it reworks existing code, so it
- * skips the scope -> architect -> build scaffolding. `<PARAM:what>` is the
+ * skips the scope -> build scaffolding. `<PARAM:what>` is the
  * user-facing blank (#330); `<FUNCTION>` is an agent-facing macro defined at the
  * bottom of the prompt itself, like the Research preset's CAPS tokens.
  */

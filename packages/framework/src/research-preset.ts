@@ -3,7 +3,7 @@ import { renderPresetPrompt, type PresetParam } from './preset-params.js'
 /**
  * The [Research] preset (#331): Rom's problem-variability review, shipped as a
  * direct prompt (see `runPrompt`) rather than a build run — research reviews
- * existing code, so it skips the scope -> architect -> build scaffolding. The
+ * existing code, so it skips the scope -> build scaffolding. The
  * `<PARAM:what>` placeholder is the user-facing blank (#330); the CAPS tokens
  * (`<AWAIT>`, `<REVIEW_FILE>`, …) are agent-facing macros defined at the bottom
  * of the prompt itself, and `showMultiSelect()` + `<AWAIT>` becomes a live

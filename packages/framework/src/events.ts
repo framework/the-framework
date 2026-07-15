@@ -68,7 +68,7 @@ export function pickedIds(picked: string | readonly string[]): string[] {
 /**
  * The single event type the whole run streams over. It unifies three sources so
  * the dashboard (and terminal) render one timeline: bootstrap-phase narration
- * (the moat: architect rationale, checklist verdicts, deploy), the wrapped
+ * (the moat: checklist verdicts, deploy), the wrapped
  * agent's own black-box progress, and framework-level status. We own this stream
  * (guardrail #2, #165) rather than surfacing the agent's transport directly.
  */
@@ -91,7 +91,7 @@ export type FrameworkEvent =
    * gated on.
    */
   | { kind: 'system-prompt'; text: string }
-  /** A bootstrap-phase narration event (scope / architect / checklist / deploy / ...). */
+  /** A bootstrap-phase narration event (scope / checklist / deploy / ...). */
   | { kind: 'bootstrap'; event: BootstrapEvent }
   /** The wrapped agent's own progress, forwarded verbatim (never gated on). */
   | { kind: 'driver'; event: DriverEvent }
@@ -244,8 +244,6 @@ function formatBootstrapEvent(event: BootstrapEvent): string {
   switch (event.type) {
     case 'scope':
       return `▶ scope: ${event.scope} — "${event.intent}"`
-    case 'architect':
-      return `▶ architect: ${event.stack}\n${event.decisions.map(d => `    · ${d.choice} — ${d.why}`).join('\n')}`
     case 'narrate':
       return `  ${event.message}`
     case 'build':

@@ -3,8 +3,7 @@ import { renderPresetPrompt, type PresetParam } from './preset-params.js'
 /**
  * The [Security audit] preset (#461): Rom's exhaustive security pass, shipped as
  * a direct prompt like [Readability] (#360) and [Maintainability] (#361) — it
- * scrutinizes existing code, so it skips the scope -> architect -> build
- * scaffolding. `<PARAM:what>` is the user-facing blank (defaults to `this PR`).
+ * scrutinizes existing code, so it skips the scope -> build scaffolding. `<PARAM:what>` is the user-facing blank (defaults to `this PR`).
  * It is also one of the post-merge quality prompts #326 fires on
  * `setReadyForMerge()`. Keep it in sync with the issue rather than growing it here.
  */

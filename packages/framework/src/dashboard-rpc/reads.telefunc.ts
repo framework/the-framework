@@ -8,7 +8,7 @@ import { githubUrlFor } from '../dashboard/github.js'
 import { readGitStatus, type GitStatus } from '../dashboard/git-status.js'
 import { crawlRepoFiles } from '../project.js'
 import { readFileStatuses, type FileGitStatus } from '../dashboard/file-status.js'
-import { contextProjects } from './context.js'
+import { contextProjects, resolveProjectPath } from './context.js'
 import type { FrameworkEvent } from '../events.js'
 
 // The read model behind the new dashboard (#405): the run history, a run's replay, the
@@ -19,9 +19,15 @@ import type { FrameworkEvent } from '../events.js'
 // in framework-dashboard, keeping the baked RPC keys `/server/reads.telefunc.ts`). The
 // live run stream is its own Telefunc Channel (events.telefunc.ts).
 
-/** The path for a project id (registry, or single-project #427), else undefined -> empty. */
-async function projectPath(projectId: string): Promise<string | undefined> {
-  return contextProjects().resolvePath(projectId)
+/**
+ * Resolve a project id and run a forgiving read against its workspace: an unknown project
+ * or a failing read both fall back to `empty`. The uniform readers below are one call each
+ * over this; the run history and null-returning git readers stay bespoke (extra logic or a
+ * distinct empty).
+ */
+async function withProject<T>(projectId: string, read: (cwd: string) => Promise<T>, empty: T): Promise<T> {
+  const cwd = await resolveProjectPath(projectId)
+  return cwd ? read(cwd).catch(() => empty) : empty
 }
 
 /**
@@ -32,7 +38,7 @@ async function projectPath(projectId: string): Promise<string | undefined> {
  * the same id (it then appears from `listRuns` instead), so there is no double.
  */
 export async function onRuns(projectId: string): Promise<RunMeta[]> {
-  const cwd = await projectPath(projectId)
+  const cwd = await resolveProjectPath(projectId)
   if (!cwd) return []
   const archived = await listRuns(cwd).catch(() => [])
   const live = await readLiveMeta(cwd).catch(() => undefined)
@@ -44,21 +50,19 @@ export async function onRuns(projectId: string): Promise<RunMeta[]> {
 
 /** One archived run's event log for replay (or `[]` when the run or project is gone). */
 export async function onRun(projectId: string, runId: string): Promise<FrameworkEvent[]> {
-  const cwd = await projectPath(projectId)
+  const cwd = await resolveProjectPath(projectId)
   if (!cwd) return []
   return (await loadRunEvents(cwd, runId).catch(() => undefined)) ?? []
 }
 
 /** The surfaced PLAN/TODO docs at the workspace root, in sidebar order (or `[]`). */
 export async function onDocs(projectId: string): Promise<WorkspaceDoc[]> {
-  const cwd = await projectPath(projectId)
-  return cwd ? readDocs(cwd).catch(() => []) : []
+  return withProject(projectId, readDocs, [])
 }
 
 /** The committed `.the-framework/LOGS.md` entries, newest-first (or `[]`). */
 export async function onProjectLog(projectId: string): Promise<LogEntry[]> {
-  const cwd = await projectPath(projectId)
-  return cwd ? readLogs(cwd).catch(() => []) : []
+  return withProject(projectId, readLogs, [])
 }
 
 /** The aggregated open TODO queue across every registered project (#438), most-open first. */
@@ -85,8 +89,7 @@ export async function onDashboard(): Promise<DashboardData> {
  * `git ls-files`. Localhost-only by nature — the relay has no checkout, so it resolves `[]`.
  */
 export async function onProjectFiles(projectId: string): Promise<string[]> {
-  const cwd = await projectPath(projectId)
-  return cwd ? crawlRepoFiles(cwd).catch(() => []) : []
+  return withProject(projectId, crawlRepoFiles, [])
 }
 
 /**
@@ -94,20 +97,19 @@ export async function onProjectFiles(projectId: string): Promise<string[]> {
  * deleted, from `git status --porcelain`. `{}` when not a repo / on the relay (no checkout).
  */
 export async function onProjectFileStatus(projectId: string): Promise<Record<string, FileGitStatus>> {
-  const cwd = await projectPath(projectId)
-  return cwd ? readFileStatuses(cwd).catch(() => ({})) : {}
+  return withProject(projectId, readFileStatuses, {})
 }
 
 /** The project's GitHub URL from its `origin` remote (#489), or null (no remote / not GitHub / relay). */
 export async function onGithubUrl(projectId: string): Promise<string | null> {
-  const cwd = await projectPath(projectId)
+  const cwd = await resolveProjectPath(projectId)
   if (!cwd) return null
   return (await githubUrlFor(cwd)) ?? null
 }
 
 /** The project's git status (#491): active branch, dirty flag, linked PR. Null when not a repo / relay. */
 export async function onGitStatus(projectId: string): Promise<GitStatus | null> {
-  const cwd = await projectPath(projectId)
+  const cwd = await resolveProjectPath(projectId)
   if (!cwd) return null
   return (await readGitStatus(cwd)) ?? null
 }

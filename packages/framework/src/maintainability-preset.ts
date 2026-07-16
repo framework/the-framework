@@ -1,4 +1,4 @@
-import { renderTemplate } from './prompt-template.js'
+import { definePreset } from './preset-prompt.js'
 import { PRESETS_MAINTAINABILITY } from './prompts.generated.js'
 
 /**
@@ -7,23 +7,13 @@ import { PRESETS_MAINTAINABILITY } from './prompts.generated.js'
  * deliberately minimal — Rom wants to see how it performs before developing a
  * more explicit one, so keep it in sync with the issue rather than growing it here.
  */
+const maintainability = definePreset('maintainability', PRESETS_MAINTAINABILITY, 'What to refactor for maintainability')
 
 /** The preset's name, as the dashboard button uses it. */
-export const MAINTAINABILITY_PRESET_NAME = 'maintainability'
-
+export const MAINTAINABILITY_PRESET_NAME = maintainability.name
 /** The one user param: what to refactor. Defaults to `this PR`, like the others. */
-export const MAINTAINABILITY_PARAMS = [
-  { name: 'what', default: 'this PR', description: 'What to refactor for maintainability' },
-] as const
-
+export const MAINTAINABILITY_PARAMS = maintainability.params
 /** The prompt template, verbatim from #361, in `prompts/presets/maintainability.md` (#551). */
-export const MAINTAINABILITY_PROMPT_TEMPLATE = PRESETS_MAINTAINABILITY
-
-/**
- * Render the Maintainability prompt for a target, filling its `${{ tf.params.what }}`
- * blank (#326). A blank / omitted `what` falls back to the declared default (`this PR`).
- */
-export function renderMaintainabilityPrompt(what?: string): string {
-  const value = what?.trim() || MAINTAINABILITY_PARAMS[0].default
-  return renderTemplate(MAINTAINABILITY_PROMPT_TEMPLATE, { tf: { params: { what: value } } })
-}
+export const MAINTAINABILITY_PROMPT_TEMPLATE = maintainability.template
+/** Render the Maintainability prompt, filling its `${{ tf.params.what }}` blank (defaults to `this PR`). */
+export const renderMaintainabilityPrompt = maintainability.render

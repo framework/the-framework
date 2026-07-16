@@ -2,9 +2,10 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { createServer } from 'node:http'
 import { createReadStream } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
-import { extname, join, normalize, sep } from 'node:path'
+import { join, normalize, sep } from 'node:path'
 import type { ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { contentTypeFor } from './dashboard/content-type.js'
 
 /**
  * On-demand app preview (#475): serve a project's built result from the dashboard
@@ -174,22 +175,6 @@ async function startStaticServer(cwd: string): Promise<PreviewHandle> {
   }
 }
 
-const CONTENT_TYPES: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.ico': 'image/x-icon',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-}
-
 /** Serve one file from `root`, defaulting `/` to `index.html`, refusing path traversal. */
 async function serveStaticFile(root: string, urlPath: string, res: ServerResponse): Promise<void> {
   const rel = normalize(decodeURIComponent(urlPath.split('?')[0]!)).replace(/^(\.\.[/\\])+/, '')
@@ -206,6 +191,6 @@ async function serveStaticFile(root: string, urlPath: string, res: ServerRespons
     res.writeHead(404, { 'content-type': 'text/plain' }).end('not found')
     return
   }
-  res.writeHead(200, { 'content-type': CONTENT_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream' })
+  res.writeHead(200, { 'content-type': contentTypeFor(file) })
   createReadStream(file).pipe(res)
 }

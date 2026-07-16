@@ -1,29 +1,13 @@
 import { readFile, stat } from 'node:fs/promises'
-import { extname, join, normalize, sep } from 'node:path'
+import { join, normalize, sep } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { contentTypeFor } from './content-type.js'
 
 // Serve the prerendered dashboard bundle (#405). The new dashboard is a Vike `ssr:false`
 // SPA prerendered to a static `index.html` + `assets/**`, so the daemon serves it as
 // plain files with an SPA fallback (any non-asset path yields `index.html`, which boots
 // the client router) — no Vike runtime in the daemon. Assets are copied into the
 // framework package at build time (see scripts/bundle-dashboard.mjs).
-
-const CONTENT_TYPES: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.map': 'application/json; charset=utf-8',
-  '.webmanifest': 'application/manifest+json',
-}
 
 /** Whether a real, readable file exists at `path`. */
 async function isFile(path: string): Promise<boolean> {
@@ -50,7 +34,7 @@ export async function serveClientBundle(req: IncomingMessage, res: ServerRespons
     res.end('dashboard bundle not built')
     return
   }
-  const type = CONTENT_TYPES[extname(target)] ?? 'application/octet-stream'
+  const type = contentTypeFor(target)
   // Fingerprinted assets are immutable; index.html must always revalidate.
   const cacheControl = target.endsWith('index.html') ? 'no-cache' : 'public, max-age=31536000, immutable'
   res.writeHead(200, { 'content-type': type, 'cache-control': cacheControl })

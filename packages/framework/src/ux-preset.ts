@@ -1,4 +1,4 @@
-import { renderTemplate } from './prompt-template.js'
+import { definePreset } from './preset-prompt.js'
 import { PRESETS_UX } from './prompts.generated.js'
 
 /**
@@ -10,24 +10,13 @@ import { PRESETS_UX } from './prompts.generated.js'
  * agent-facing turn-gate macro (#339/#340) the dashboard resolves. Keep it in sync
  * with the issue rather than growing it here.
  */
+const ux = definePreset('ux', PRESETS_UX, 'What to review the UX of')
 
 /** The preset's name, as the dashboard button uses it. */
-export const UX_PRESET_NAME = 'ux'
-
+export const UX_PRESET_NAME = ux.name
 /** The one user param: what to review. Defaults to `this PR`, like the others. */
-export const UX_PARAMS = [
-  { name: 'what', default: 'this PR', description: 'What to review the UX of' },
-] as const
-
+export const UX_PARAMS = ux.params
 /** The prompt template, from #472 (with `${{ tf.params.what }}` as the blank, `<AWAIT>` as the gate). */
-export const UX_PROMPT_TEMPLATE = PRESETS_UX
-
-/**
- * Render the UX prompt for a target, filling its `${{ tf.params.what }}` blank
- * (#326). A blank / omitted `what` falls back to the declared default (`this PR`),
- * so the dashboard button runs with zero input.
- */
-export function renderUxPrompt(what?: string): string {
-  const value = what?.trim() || UX_PARAMS[0].default
-  return renderTemplate(UX_PROMPT_TEMPLATE, { tf: { params: { what: value } } })
-}
+export const UX_PROMPT_TEMPLATE = ux.template
+/** Render the UX prompt, filling its `${{ tf.params.what }}` blank (defaults to `this PR`). */
+export const renderUxPrompt = ux.render

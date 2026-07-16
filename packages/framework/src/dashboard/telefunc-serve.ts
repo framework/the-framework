@@ -6,7 +6,7 @@ import type { ProjectsProvider } from './projects.js'
 import type { FrameworkEvent } from '../events.js'
 import type { PreferencesStore } from '../registry.js'
 import type { QuotaSource } from './quota.js'
-import { isSameOriginRequest, type AddProjectResult, type PreviewResult, type PreviewStatus, type StartRunKind, type StartRunOptions, type StartRunResult } from './server.js'
+import type { AddProjectResult, PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from './types.js'
 
 /** Wired by the daemon so `sendStart` can reach the daemon's own `startRun` closure. */
 export type StartRunHandler = (
@@ -68,20 +68,39 @@ function setup(): Telefunc {
 }
 
 /**
+ * CSRF guard for the state-changing Telefunc calls. A browser attaches an `Origin`
+ * header to every cross-site request, so we reject any POST whose Origin is not this
+ * same server (or a loopback host) — otherwise a page on `evil.com` could `fetch()` the
+ * localhost dashboard and spawn/steer a run. An absent Origin means a non-browser caller
+ * (curl, the test suite) with no ambient session to abuse, so it passes. Lives here beside
+ * the mount, its only caller.
+ */
+export function isSameOriginRequest(req: IncomingMessage): boolean {
+  const origin = req.headers.origin
+  if (!origin) return true
+  const host = req.headers.host
+  if (host && (origin === `http://${host}` || origin === `https://${host}`)) return true
+  let hostname: string
+  try {
+    hostname = new URL(origin).hostname
+  } catch {
+    return false // malformed Origin: treat as cross-origin
+  }
+  return hostname === 'localhost' || hostname === '::1' || hostname === '[::1]' || hostname.startsWith('127.')
+}
+
+/**
  * Mount the dashboard's Telefunc surface (#405) on the daemon's `node:http` server: one
  * `serve()` handles both the RPCs and the Channel SSE stream at `/_telefunc`. Telefunc
  * runs in the daemon process, so a `sendStart` telefunction can call the daemon's own
- * `startRun` via the request context. Cross-origin POSTs are rejected (CSRF: a page on
- * evil.com must not steer or start a run). Returns whether the request was Telefunc's.
+ * `startRun` via the request context. The `context` is exactly what each telefunction
+ * reaches through {@link getContext} (see {@link DashboardContext}): the daemon wires the
+ * full set, the relay passes only an events source plus an empty projects provider. Cross-
+ * origin POSTs are rejected (CSRF: a page on evil.com must not steer or start a run).
+ * Returns whether the request was Telefunc's.
  */
 export function makeTelefuncMount(
-  startRun?: StartRunHandler,
-  projects?: ProjectsProvider,
-  eventsSource?: EventsSource,
-  addProject?: AddProjectHandler,
-  preferences?: PreferencesStore,
-  preview?: PreviewHandlers,
-  quota?: QuotaSource,
+  context: DashboardContext = {},
 ): (req: IncomingMessage, res: ServerResponse) => Promise<boolean> {
   return async (req, res) => {
     if (!isSameOriginRequest(req)) {
@@ -90,15 +109,6 @@ export function makeTelefuncMount(
       return true
     }
     const tf = setup()
-    const context: DashboardContext = {
-      ...(startRun ? { startRun } : {}),
-      ...(addProject ? { addProject } : {}),
-      ...(preview ? { preview } : {}),
-      ...(projects ? { projects } : {}),
-      ...(eventsSource ? { eventsSource } : {}),
-      ...(preferences ? { preferences } : {}),
-      ...(quota ? { quota } : {}),
-    }
     // Never let a telefunc failure become an unhandled rejection that kills the daemon:
     // telefunc 0.2.22 throws on a bare `GET /_telefunc` (it passes the request as a body,
     // which `new Request()` rejects for GET), and a browser tab hits that on reconnect.

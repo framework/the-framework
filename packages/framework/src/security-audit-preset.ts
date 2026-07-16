@@ -1,4 +1,4 @@
-import { renderTemplate } from './prompt-template.js'
+import { definePreset } from './preset-prompt.js'
 import { PRESETS_SECURITY_AUDIT } from './prompts.generated.js'
 
 /**
@@ -8,24 +8,13 @@ import { PRESETS_SECURITY_AUDIT } from './prompts.generated.js'
  * It is also one of the on-before-mergeable quality prompts #326 fires on
  * `setReadyForMerge()`. Keep it in sync with the issue rather than growing it here.
  */
+const securityAudit = definePreset('security-audit', PRESETS_SECURITY_AUDIT, 'What to security-audit')
 
 /** The preset's name, as the dashboard button uses it. */
-export const SECURITY_AUDIT_PRESET_NAME = 'security-audit'
-
+export const SECURITY_AUDIT_PRESET_NAME = securityAudit.name
 /** The one user param: what to audit. Defaults to `this PR`, like the others. */
-export const SECURITY_AUDIT_PARAMS = [
-  { name: 'what', default: 'this PR', description: 'What to security-audit' },
-] as const
-
+export const SECURITY_AUDIT_PARAMS = securityAudit.params
 /** The prompt template, verbatim from #461 (with `${{ tf.params.what }}` as the blank). */
-export const SECURITY_AUDIT_PROMPT_TEMPLATE = PRESETS_SECURITY_AUDIT
-
-/**
- * Render the Security audit prompt for a target, filling its `${{ tf.params.what }}`
- * blank (#326). A blank / omitted `what` falls back to the declared default
- * (`this PR`), so the dashboard button runs with zero input.
- */
-export function renderSecurityAuditPrompt(what?: string): string {
-  const value = what?.trim() || SECURITY_AUDIT_PARAMS[0].default
-  return renderTemplate(SECURITY_AUDIT_PROMPT_TEMPLATE, { tf: { params: { what: value } } })
-}
+export const SECURITY_AUDIT_PROMPT_TEMPLATE = securityAudit.template
+/** Render the Security audit prompt, filling its `${{ tf.params.what }}` blank (defaults to `this PR`). */
+export const renderSecurityAuditPrompt = securityAudit.render

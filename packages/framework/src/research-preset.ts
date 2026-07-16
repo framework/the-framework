@@ -1,4 +1,4 @@
-import { renderTemplate } from './prompt-template.js'
+import { definePreset } from './preset-prompt.js'
 import { PRESETS_RESEARCH } from './prompts.generated.js'
 
 /**
@@ -10,25 +10,13 @@ import { PRESETS_RESEARCH } from './prompts.generated.js'
  * of the prompt itself, and `showMultiSelect()` + `<AWAIT>` becomes a live
  * turn-boundary gate (#339/#340) the dashboard resolves.
  */
+const research = definePreset('research', PRESETS_RESEARCH, 'What to measure problem variability of')
 
 /** The preset's name, as the CLI subcommand and the dashboard button use it. */
-export const RESEARCH_PRESET_NAME = 'research'
-
+export const RESEARCH_PRESET_NAME = research.name
 /** The one user param: what to measure. Defaults to `this PR`, per the issue. */
-export const RESEARCH_PARAMS = [
-  { name: 'what', default: 'this PR', description: 'What to measure problem variability of' },
-] as const
-
+export const RESEARCH_PARAMS = research.params
 /** The prompt template, verbatim from #331 (with `${{ tf.params.what }}` as the blank). */
-export const RESEARCH_PROMPT_TEMPLATE = PRESETS_RESEARCH
-
-/**
- * Render the Research prompt for a target, filling its `${{ tf.params.what }}`
- * blank (#326). A blank / omitted `what` falls back to the declared default
- * (`this PR`), so the dashboard button and a bare `framework research` both run
- * with zero input.
- */
-export function renderResearchPrompt(what?: string): string {
-  const value = what?.trim() || RESEARCH_PARAMS[0].default
-  return renderTemplate(RESEARCH_PROMPT_TEMPLATE, { tf: { params: { what: value } } })
-}
+export const RESEARCH_PROMPT_TEMPLATE = research.template
+/** Render the Research prompt, filling its `${{ tf.params.what }}` blank (defaults to `this PR`). */
+export const renderResearchPrompt = research.render

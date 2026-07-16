@@ -213,13 +213,17 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
   let stalls = 0
   let file: string | undefined
 
+  // The backlog emptied: announce it if we did any work, and report a clean finish.
+  // Both the mid-loop find and the post-loop re-check funnel through here.
+  const finishEmpty = (): TodoLoopResult => {
+    if (completed > 0) emit({ kind: 'log', message: `Backlog done: ${file ?? 'TODO'} is empty after ${completed} item(s).` })
+    return { completed, reason: 'empty', ...(file ? { file } : {}) }
+  }
+
   for (let item = 0; item < maxItems; item++) {
     if (opts.signal?.aborted) break
     const backlog = await findTodoBacklog(cwd)
-    if (!backlog) {
-      if (completed > 0) emit({ kind: 'log', message: `Backlog done: ${file ?? 'TODO'} is empty after ${completed} item(s).` })
-      return { completed, reason: 'empty', ...(file ? { file } : {}) }
-    }
+    if (!backlog) return finishEmpty()
     file = backlog.name
     const next = backlog.entries[0]!
     const preview = next.length > 100 ? `${next.slice(0, 100)}…` : next
@@ -249,7 +253,10 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
     }
 
     emit({ kind: 'log', message: `Backlog item ${completed + 1}: ${preview}` })
-    await promptItem(session, backlog.name, gateDeps)
+    // Complete exactly the first open entry and check it off, honoring await gates.
+    // A declined plan (#358) ends the item turn; the loop's stall check takes it from there.
+    const prompt = `Open \`${backlog.name}\` at the workspace root and work on the FIRST open entry only. Complete it fully and verify your work. Then update \`${backlog.name}\`: check the entry off (or remove it). Do not start any other entry.`
+    await runAwaitRounds({ session, prompt, ...gateDeps })
     completed++
 
     // Progress check: the item turn must have retired the entry it was given
@@ -273,10 +280,7 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
   if (opts.signal?.aborted) return { completed, reason: 'stopped', ...(file ? { file } : {}) }
 
   const remaining = await findTodoBacklog(cwd)
-  if (!remaining) {
-    if (completed > 0) emit({ kind: 'log', message: `Backlog done: ${file ?? 'TODO'} is empty after ${completed} item(s).` })
-    return { completed, reason: 'empty', ...(file ? { file } : {}) }
-  }
+  if (!remaining) return finishEmpty()
   emit({
     kind: 'log',
     message: `Backlog loop stopped at the ${maxItems}-item cap; ${remaining.entries.length} item(s) left in ${remaining.name}.`,
@@ -284,25 +288,3 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
   return { completed, reason: 'max-items', ...(file ? { file } : {}) }
 }
 
-/** One backlog item's turn: complete the first open entry, honoring await gates. */
-async function promptItem(
-  session: DriverSession,
-  fileName: string,
-  deps: {
-    requestChoice?: ((req: ChoiceRequest) => Promise<ChoicePick>) | undefined
-    emit: (event: FrameworkEvent) => void
-    signal?: AbortSignal | undefined
-    emitTurnSignals: (text: string) => void
-  },
-): Promise<void> {
-  const prompt = `Open \`${fileName}\` at the workspace root and work on the FIRST open entry only. Complete it fully and verify your work. Then update \`${fileName}\`: check the entry off (or remove it). Do not start any other entry.`
-  // A declined plan (#358) ends the item turn; the loop's stall check takes it from there.
-  await runAwaitRounds({
-    session,
-    prompt,
-    emitTurnSignals: deps.emitTurnSignals,
-    requestChoice: deps.requestChoice,
-    emit: deps.emit,
-    signal: deps.signal,
-  })
-}

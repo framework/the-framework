@@ -1,9 +1,9 @@
 import { getContext } from 'telefunc'
 import { appendControl } from '../control.js'
 import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
-import { contextProjects } from './context.js'
+import { resolveProjectPath } from './context.js'
 import type { ChoiceBy } from '../events.js'
-import type { PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from '../dashboard/server.js'
+import type { PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from '../dashboard/types.js'
 import type { DashboardContext } from '../dashboard/telefunc-serve.js'
 
 // The write side behind the new dashboard (#405): steering a live run. The reverse of
@@ -14,14 +14,9 @@ import type { DashboardContext } from '../dashboard/telefunc-serve.js'
 // steerable. (Starting a run needs a spawn + the daemon's busy guard, so `sendStart`
 // lands with the daemon-serves-the-bundle wiring, not here.)
 
-/** The path for a project id (registry, or single-project #427), else undefined (no-op steer). */
-async function projectPath(projectId: string): Promise<string | undefined> {
-  return contextProjects().resolvePath(projectId)
-}
-
 /** Stop the project's live run (the Stop button): append a stop entry to its control log. */
 export async function sendStop(projectId: string): Promise<void> {
-  const cwd = await projectPath(projectId)
+  const cwd = await resolveProjectPath(projectId)
   if (cwd) await appendControl(cwd, { kind: 'stop' })
 }
 
@@ -36,7 +31,7 @@ export async function sendChoice(
   pick: string | string[],
   by: ChoiceBy = 'user',
 ): Promise<void> {
-  const cwd = await projectPath(projectId)
+  const cwd = await resolveProjectPath(projectId)
   if (cwd) await appendControl(cwd, { kind: 'choice', id, pick, by })
 }
 
@@ -92,7 +87,7 @@ export async function onPreviewStatus(projectId: string): Promise<PreviewStatus>
  * local path to resolve, so it returns an error rather than spawning anything.
  */
 export async function sendOpenInApp(projectId: string, target: OpenTarget): Promise<OpenResult> {
-  const cwd = await projectPath(projectId)
+  const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
   return openInApp(cwd, target)
 }

@@ -2,9 +2,9 @@ import type { Driver, DriverSession } from './driver/index.js'
 import { type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import { runAwaitRounds } from './run.js'
 import { composeRunSystem, renderSystemPrompt, type EcoOptions, type TfContext } from './system-prompt.js'
-import { createDriverEventHandler, emitSessionStart } from './run-telemetry.js'
+import { createRunControls, emitSessionStart, endStopDetail } from './run-telemetry.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
-import { CONSUMPTION_LIMIT_LABEL, type ConsumptionWindow } from './consumption.js'
+import { type ConsumptionWindow } from './consumption.js'
 import { leaveResumeNote } from './todo-loop.js'
 
 /**
@@ -98,25 +98,17 @@ export async function runPrompt(opts: RunPromptOptions): Promise<RunPromptResult
   // ride along as `driver` `start` events, so the dashboard can show them all.
   emit({ kind: 'system-prompt', text: system })
 
-  // Usage accounting + the self-stopping budget cap, the same wiring as a build
-  // run (#322): the run signal composes the caller's abort with the budget abort.
-  const budgetController = new AbortController()
-  // A consumption limit (#531) is the other self-stop: the account's quota ran
-  // out rather than this run's spend.
-  const consumptionController = new AbortController()
-  const runSignal = AbortSignal.any([
-    ...(opts.signal ? [opts.signal] : []),
-    budgetController.signal,
-    consumptionController.signal,
-  ])
-  const { onDriverEvent, consumptionTrip } = createDriverEventHandler({
-    emit,
-    sessionLink: opts.sessionLink,
-    budgetUsd: opts.budgetUsd,
-    consumptionGate: opts.consumptionGate,
-    budgetController,
-    consumptionController,
-  })
+  // Usage accounting + the self-stops, the same wiring as a build run (#322/#529):
+  // the run signal composes the caller's abort with the budget/consumption aborts.
+  // (The decline controller is inert here — this path finishes a declined plan cleanly.)
+  const { runSignal, onDriverEvent, consumptionTrip, budgetController, consumptionController, declineController } =
+    createRunControls({
+      emit,
+      ...(opts.signal ? { signal: opts.signal } : {}),
+      ...(opts.sessionLink ? { sessionLink: opts.sessionLink } : {}),
+      ...(opts.budgetUsd != null ? { budgetUsd: opts.budgetUsd } : {}),
+      ...(opts.consumptionGate ? { consumptionGate: opts.consumptionGate } : {}),
+    })
 
   const session: DriverSession = await opts.driver.start({
     cwd: opts.cwd,
@@ -145,21 +137,16 @@ export async function runPrompt(opts: RunPromptOptions): Promise<RunPromptResult
     emit({ kind: 'end', ok: true })
     return { text: rounds.text, events }
   } catch (err) {
-    // A user interrupt or the budget cap is a clean stop, not a failure (#322).
-    const budgetStopped = budgetController.signal.aborted && opts.signal?.aborted !== true
-    const paused = consumptionController.signal.aborted && opts.signal?.aborted !== true
-    const stopped = opts.signal?.aborted === true || budgetController.signal.aborted || consumptionController.signal.aborted
-    // Written here, not at the trip: the note is file I/O and the trip is a sync
-    // event handler, so a fire-and-forget write could lose the race with the run
-    // unwinding.
-    const resumeNote = paused ? await leaveResumeNote(opts.cwd, events, emit) : undefined
-    const detail = budgetStopped
-      ? `budget reached ($${opts.budgetUsd})`
-      : paused
-        ? `${CONSUMPTION_LIMIT_LABEL[consumptionTrip() ?? 'session']} consumption limit reached${resumeNote ? `; will resume from ${resumeNote}` : ''}`
-        : err instanceof Error
-          ? err.message
-          : String(err)
+    const { stopped, detail } = await endStopDetail({
+      err,
+      ...(opts.signal ? { signal: opts.signal } : {}),
+      budgetController,
+      consumptionController,
+      declineController,
+      consumptionTrip,
+      ...(opts.budgetUsd != null ? { budgetUsd: opts.budgetUsd } : {}),
+      leaveResumeNote: () => leaveResumeNote(opts.cwd, events, emit),
+    })
     emit({ kind: 'end', ok: false, ...(stopped ? { stopped: true } : {}), detail })
     throw err
   } finally {

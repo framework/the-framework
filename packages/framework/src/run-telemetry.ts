@@ -111,3 +111,99 @@ export function createDriverEventHandler(opts: DriverEventHandlerOptions): Drive
 
   return { onDriverEvent, consumptionTrip: () => consumptionTrip }
 }
+
+/** Inputs to {@link createRunControls}. */
+export interface RunControlsOptions {
+  emit: (event: FrameworkEvent) => void
+  /** The caller's abort signal (Stop button / Ctrl+C / control channel), if any. */
+  signal?: AbortSignal | undefined
+  sessionLink?: string | undefined
+  budgetUsd?: number | undefined
+  consumptionGate?: (() => ConsumptionWindow | null) | undefined
+}
+
+/** The run's abort plumbing plus its driver-event sink. */
+export interface RunControls extends DriverEventHandler {
+  /** The composed signal every driver turn runs under. */
+  runSignal: AbortSignal
+  /** Trips a clean stop once this run has spent its budget cap (#322). */
+  budgetController: AbortController
+  /** Trips a clean pause once the account's quota window is spent (#529). */
+  consumptionController: AbortController
+  /** Trips a clean stop when the user declines a plan (#358); inert on the direct path. */
+  declineController: AbortController
+}
+
+/**
+ * Compose the run's signal and wire its driver-event handler in one place. The caller's
+ * signal is OR'd (via {@link AbortSignal.any}) with three self-stops — the budget cap
+ * (#322), a spent consumption window (#529), and a declined plan (#358) — so anything
+ * downstream that watches `runSignal` stops the same way regardless of which fired.
+ * Shared by the build (`run.ts`) and direct-prompt (`prompt-run.ts`) paths.
+ */
+export function createRunControls(opts: RunControlsOptions): RunControls {
+  const budgetController = new AbortController()
+  const declineController = new AbortController()
+  const consumptionController = new AbortController()
+  const runSignal = AbortSignal.any([
+    ...(opts.signal ? [opts.signal] : []),
+    budgetController.signal,
+    declineController.signal,
+    consumptionController.signal,
+  ])
+  const handler = createDriverEventHandler({
+    emit: opts.emit,
+    sessionLink: opts.sessionLink,
+    budgetUsd: opts.budgetUsd,
+    consumptionGate: opts.consumptionGate,
+    budgetController,
+    consumptionController,
+  })
+  return { ...handler, runSignal, budgetController, consumptionController, declineController }
+}
+
+/** Inputs to {@link endStopDetail}. */
+export interface StopDetailOptions {
+  /** The error the run's turn loop threw. */
+  err: unknown
+  /** The caller's own signal, to tell a caller stop from a self-stop. */
+  signal?: AbortSignal | undefined
+  budgetController: AbortController
+  consumptionController: AbortController
+  declineController: AbortController
+  consumptionTrip: () => ConsumptionWindow | undefined
+  budgetUsd?: number | undefined
+  /**
+   * Leave a resume note when the run paused on a consumption limit, returning where
+   * it will resume from. Injected (not imported) so this module stays free of the
+   * todo loop it would otherwise import in a cycle.
+   */
+  leaveResumeNote: () => Promise<string | undefined>
+}
+
+/**
+ * Classify why a run's turn loop threw and render the `end` event's `detail`. A caller
+ * interrupt, a budget cap (#322), a declined plan (#358), or a spent consumption window
+ * (#529) are all clean stops; anything else is a real failure. The resume note is written
+ * here (once `paused` is known) rather than at the trip, because it is file I/O racing the
+ * run unwinding. Shared so the two run paths can never disagree on what "stopped" means.
+ */
+export async function endStopDetail(opts: StopDetailOptions): Promise<{ stopped: boolean; detail: string }> {
+  const callerAborted = opts.signal?.aborted === true
+  const budgetStopped = opts.budgetController.signal.aborted && !callerAborted
+  const declined = opts.declineController.signal.aborted
+  const paused = opts.consumptionController.signal.aborted && !callerAborted
+  const stopped =
+    callerAborted || opts.budgetController.signal.aborted || declined || opts.consumptionController.signal.aborted
+  const resumeNote = paused ? await opts.leaveResumeNote() : undefined
+  const detail = declined
+    ? 'plan declined'
+    : budgetStopped
+      ? `budget reached ($${opts.budgetUsd})`
+      : paused
+        ? `${CONSUMPTION_LIMIT_LABEL[opts.consumptionTrip() ?? 'session']} consumption limit reached${resumeNote ? `; will resume from ${resumeNote}` : ''}`
+        : opts.err instanceof Error
+          ? opts.err.message
+          : String(opts.err)
+  return { stopped, detail }
+}

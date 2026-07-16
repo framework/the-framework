@@ -21,6 +21,7 @@ import { randomUUID } from 'node:crypto'
 import { formatFrameworkEvent, CLAUDE_CODE_SESSION_LINK, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import {
   runFramework,
+  type AppPreview,
   type DeployDecision,
   type RunFrameworkOptions,
   type RunFrameworkResult,
@@ -36,10 +37,10 @@ import { appendLog, type LogEntry } from './logs.js'
 import { preflight } from './preflight.js'
 import { RunStore, nodeStoreFs, type StoreFs } from './store/index.js'
 import { materializePresets } from './presets.js'
-import { daemonStatus, ensureDaemon, runDaemon, stopDaemon, DEFAULT_DAEMON_PORT } from './daemon.js'
+import { daemonStatus, ensureDaemon, registerHomeProject, runDaemon, stopDaemon, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { resetControl, watchControl, type ControlWatcher } from './control.js'
-import { isActivated, nodeGitRunner } from './project.js'
-import { addProject, listProjects, readPreferences, resolveConsumptionLimits } from './registry.js'
+import { nodeGitRunner } from './project.js'
+import { listProjects, readPreferences, resolveConsumptionLimits } from './registry.js'
 import { startConsumptionGuard } from './consumption-guard.js'
 import {
   planMaintenanceSweep,
@@ -309,6 +310,14 @@ export function parseArgs(argv: string[]): CliOptions {
   }
   const PERMISSION_MODES: PermissionMode[] = ['default', 'acceptEdits', 'bypassPermissions', 'plan']
   const words: string[] = []
+  // Parse an integer flag's value, recording opts.error (naming the flag) on a bad one. The
+  // integer flags all share this shape; only the lower bound (0 for --port, else 1) varies.
+  const intFlag = (value: string | undefined, label: string, min: number): number | undefined => {
+    const n = Number(value)
+    if (Number.isInteger(n) && n >= min) return n
+    opts.error = `invalid ${label}: must be a ${min > 0 ? 'positive' : 'non-negative'} integer`
+    return undefined
+  }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!
     switch (arg) {
@@ -426,9 +435,8 @@ export function parseArgs(argv: string[]): CliOptions {
         opts.servePath = argv[++i]
         break
       case '--serve-port': {
-        const n = Number(argv[++i])
-        if (!Number.isInteger(n) || n < 1) opts.error = `invalid --serve-port: must be a positive integer`
-        else opts.servePort = n
+        const n = intFlag(argv[++i], '--serve-port', 1)
+        if (n !== undefined) opts.servePort = n
         break
       }
       case '--sandbox': {
@@ -450,9 +458,8 @@ export function parseArgs(argv: string[]): CliOptions {
         break
       }
       case '--max-passes': {
-        const n = Number(argv[++i])
-        if (!Number.isInteger(n) || n < 1) opts.error = `invalid --max-passes: must be a positive integer`
-        else opts.maxPasses = n
+        const n = intFlag(argv[++i], '--max-passes', 1)
+        if (n !== undefined) opts.maxPasses = n
         break
       }
       case '--max-cost': {
@@ -468,21 +475,18 @@ export function parseArgs(argv: string[]): CliOptions {
         opts.dryRun = true
         break
       case '--max-repos': {
-        const n = Number(argv[++i])
-        if (!Number.isInteger(n) || n < 1) opts.error = `invalid --max-repos: must be a positive integer`
-        else opts.maxRepos = n
+        const n = intFlag(argv[++i], '--max-repos', 1)
+        if (n !== undefined) opts.maxRepos = n
         break
       }
       case '--max-todo-items': {
-        const n = Number(argv[++i])
-        if (!Number.isInteger(n) || n < 1) opts.error = `invalid --max-todo-items: must be a positive integer`
-        else opts.todoMaxItems = n
+        const n = intFlag(argv[++i], '--max-todo-items', 1)
+        if (n !== undefined) opts.todoMaxItems = n
         break
       }
       case '--port': {
-        const n = Number(argv[++i])
-        if (!Number.isInteger(n) || n < 0) opts.error = `invalid --port: must be a non-negative integer`
-        else opts.port = n
+        const n = intFlag(argv[++i], '--port', 0)
+        if (n !== undefined) opts.port = n
         break
       }
       default:
@@ -675,6 +679,125 @@ export async function resolveDomainPreset(
   return { preset }
 }
 
+/** The run-scoped state {@link settleRun} needs to close out either run path. */
+interface RunEpilogue {
+  io: CliIO
+  dashboard: Dashboard | undefined
+  store: RunStore | undefined
+  control: ControlWatcher | undefined
+  guard: { stop: () => void } | undefined
+  publisher: RelayPublisher | undefined
+  clearInterrupt: () => void
+  maybeFireOnBeforeMergeable: () => Promise<void>
+  /** True once the run stopped cleanly (interrupt / budget cap) rather than failed. */
+  isStopped: () => boolean
+  /** How a real failure is labelled: "run", "research", or "prompt run". */
+  failLabel: string
+}
+
+/**
+ * Run one engine (a build or a direct prompt) and settle it identically: on success print its
+ * line and keep the dashboard (and any app preview) up until Ctrl+C; on a clean stop (interrupt
+ * / budget cap #322) report it and stay up; on a real failure report it and close. The teardown
+ * — flush the store, close the control channel + consumption guard, flush the relay — runs
+ * either way. Returns the exit code (0 on success or a clean stop, 1 on a failure). Shared by
+ * both run paths so their epilogues cannot drift.
+ */
+async function settleRun(
+  ctx: RunEpilogue,
+  run: () => Promise<{ successLine: string; preview?: AppPreview }>,
+): Promise<number> {
+  const { io, dashboard } = ctx
+  try {
+    const { successLine, preview } = await run()
+    // Run settled: hand Ctrl+C back to the post-run dashboard/app wait below.
+    ctx.clearInterrupt()
+    io.out(successLine)
+    if (preview) io.out(`\n▶ Your app is running at ${preview.url} — open it in a browser.`)
+    await ctx.store?.close() // flush the event log; best-effort
+    await ctx.maybeFireOnBeforeMergeable()
+    // Stay up while the dashboard and/or the app are live, then tear both down.
+    if (dashboard || preview) {
+      if (dashboard) io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
+      else io.out(`\nPress Ctrl+C to stop the app.`)
+      await waitForInterrupt()
+      if (preview) await preview.stop()
+      await dashboard?.close()
+    }
+    return 0
+  } catch (err) {
+    ctx.clearInterrupt()
+    await ctx.store?.close()
+    // A clean stop (Stop button, Ctrl+C, or a budget cap #322) is not a failure: report it,
+    // keep the dashboard up so the stopped state stays visible, and exit 0.
+    if (ctx.isStopped()) {
+      io.out('\n■ Stopped.')
+      if (dashboard) await keepDashboardUp(dashboard, io)
+      return 0
+    }
+    io.err(`\n✗ ${ctx.failLabel} failed: ${err instanceof Error ? err.message : String(err)}`)
+    await dashboard?.close()
+    return 1
+  } finally {
+    ctx.clearInterrupt()
+    ctx.control?.close()
+    ctx.guard?.stop()
+    // Make sure every event (including the final `end`) reached the relay before exit.
+    if (ctx.publisher) await ctx.publisher.flush()
+  }
+}
+
+/**
+ * Start this run's single-project dashboard on `cwd` (#427), or return undefined to run
+ * headless. `enabled` gates it (a --no-persist run has no event log to stream); a missing
+ * bundle (an old install) or a startup error also fall back to headless. `resumed` tags the
+ * URL line, and `headlessNote` is the fallback message's tail.
+ */
+async function startRunDashboard(
+  enabled: boolean,
+  cwd: string,
+  port: number | undefined,
+  io: CliIO,
+  labels: { resumed?: boolean; headlessNote: string },
+): Promise<Dashboard | undefined> {
+  if (!enabled) return undefined
+  const clientBundleDir = await resolveDashboardBundle()
+  if (!clientBundleDir) return undefined
+  try {
+    const dashboard = await startDashboard({
+      ...(port !== undefined ? { port } : {}),
+      clientBundleDir,
+      projects: singleProjectProvider(cwd),
+    })
+    io.out(`◆ dashboard${labels.resumed ? ' (resumed)' : ''}: ${dashboard.url}`)
+    return dashboard
+  } catch (err) {
+    io.err(`could not start dashboard (${err instanceof Error ? err.message : String(err)}); ${labels.headlessNote}`)
+    return undefined
+  }
+}
+
+/**
+ * Resolve the system-prompt configuration both run paths share (#301/#314), echoing what
+ * is in effect: a user SYSTEM.md, the built-in prompt toggle, the eco section drops, and the
+ * in-context dirs. Reads SYSTEM.md once, so call it on the shared path before either run.
+ */
+async function resolvePromptConfig(
+  opts: CliOptions,
+  fileConfig: FrameworkFileConfig,
+  cwd: string,
+  io: CliIO,
+): Promise<{ userSystemPrompt?: string; noBuiltinPrompt: boolean; eco?: EcoOptions }> {
+  const userSystemPrompt = await loadUserSystemPrompt(cwd)
+  const noBuiltinPrompt = antiLazyPillOff(opts, fileConfig)
+  const eco = ecoOptions(opts)
+  if (userSystemPrompt) io.out(`◆ system prompt: ${SYSTEM_PROMPT_FILE}`)
+  if (noBuiltinPrompt) io.out(`◆ built-in system prompt: off (${opts.vanilla ? 'vanilla' : 'the-framework.yml'})`)
+  else if (eco) io.out(`◆ eco: dropping ${Object.keys(eco).filter(k => eco[k as keyof EcoOptions]).join(', ')}`)
+  if (opts.context.length) io.out(`◆ context: ${opts.context.join(', ')}`)
+  return { ...(userSystemPrompt ? { userSystemPrompt } : {}), noBuiltinPrompt, ...(eco ? { eco } : {}) }
+}
+
 /**
  * The `framework` command. Wires the parsed options into {@link runFramework}
  * over a live dashboard + terminal narration, and resolves with an exit code.
@@ -834,28 +957,13 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     for (const resolve of pendingChoices.values()) resolve({ picked: 'proceed', by: 'auto' })
     pendingChoices.clear()
   })
-  // Serve the new Vike + Telefunc dashboard (#405/#427) for this run, in single-project
-  // mode: the SPA reads this one `cwd` (its own `.the-framework/events.jsonl` +
-  // control.jsonl) without touching the global registry, so a one-shot run never pollutes
-  // the Projects list. It streams the persisted event log, so a --no-persist run (or an
-  // old install missing the built bundle) runs headless.
-  let dashboard: Dashboard | undefined
-  let clientBundleDir: string | undefined
-  if (opts.dashboard && opts.persist) clientBundleDir = await resolveDashboardBundle()
-  if (clientBundleDir) {
-    try {
-      dashboard = await startDashboard({
-        ...(opts.port !== undefined ? { port: opts.port } : {}),
-        clientBundleDir,
-        projects: singleProjectProvider(cwd),
-      })
-      io.out(`◆ dashboard: ${dashboard.url}`)
-    } catch (err) {
-      dashboard = undefined
-      clientBundleDir = undefined
-      io.err(`could not start dashboard (${err instanceof Error ? err.message : String(err)}); continuing headless`)
-    }
-  }
+  // Serve the new Vike + Telefunc dashboard (#405/#427) for this run, in single-project mode:
+  // the SPA reads this one `cwd`'s event/control logs without touching the global registry, so
+  // a one-shot run never pollutes the Projects list. It streams the persisted event log, so a
+  // --no-persist run (or an old install missing the built bundle) runs headless.
+  const dashboard = await startRunDashboard(opts.dashboard && opts.persist, cwd, opts.port, io, {
+    headlessNote: 'continuing headless',
+  })
   // The new dashboard steers this live run purely through control.jsonl (its Stop / choice
   // picks are Telefunc writes to that file, #427), which the watcher below tails whenever
   // the dashboard is up — not only when a daemon is.
@@ -909,6 +1017,18 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     )
     io.out(`◆ shared run: ${publisher.url}`)
   }
+
+  // Pause the choice gates when someone can answer: this run's own dashboard, or the
+  // workspace daemon's via the control channel (#344). With neither, the gates auto-accept
+  // the recommended option (#304). The run's requestChoice parks a resolver in pendingChoices
+  // keyed by the choice id; a dashboard/daemon pick (or an abort) resolves it.
+  const requestChoice =
+    dashboard || control
+      ? (req: ChoiceRequest): Promise<ChoicePick> => new Promise(resolve => pendingChoices.set(req.id, resolve))
+      : undefined
+  // The session link shown on the dashboard: --session-link, else Claude Code's own entry for
+  // a live Claude run, else nothing (#212/#542). Same for both run paths.
+  const sessionLink = chooseSessionLink(opts, fake)
 
   // The framework's own verdict that the run stopped cleanly rather than failed —
   // set by a user interrupt or a budget cap (#322). Trusted over which signal
@@ -1007,6 +1127,25 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     io.out(`◆ consumption limits: off — ${AGENT_SPECS[opts.agent].label} reports no quota, so nothing gates your subscription spend.`)
   }
 
+  // A user SYSTEM.md + the anti-lazy-pill toggle shape the system prompt (#301), and the eco
+  // flags trim the built-in one (#314). Resolve and echo once, shared by both run paths.
+  const promptConfig = await resolvePromptConfig(opts, fileConfig, cwd, io)
+
+  // The run-scoped state both run paths hand to settleRun to close out. stoppedCleanly is a
+  // getter because the onEvent sink sets it as the `end` event arrives.
+  const epilogue = (failLabel: string): RunEpilogue => ({
+    io,
+    dashboard,
+    store,
+    control,
+    guard,
+    publisher,
+    clearInterrupt,
+    maybeFireOnBeforeMergeable,
+    isStopped: () => controller.signal.aborted || stoppedCleanly,
+    failLabel,
+  })
+
   // `framework research [what]` (#331) and `framework prompt <text>` (#353): the
   // direct prompt path — run one prompt through runPrompt, which honors its gates
   // (#337/#339) but skips the scope -> build scaffolding entirely.
@@ -1014,27 +1153,15 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   // verbatim (it may already BE an edited preset, so it must not be re-rendered).
   // Shares all the wiring above (dashboard, store, control channel, budget).
   if (opts.research || opts.directPrompt) {
-    const kindLabel = opts.directPrompt ? 'prompt run' : 'research'
-    const userSystemPrompt = await loadUserSystemPrompt(cwd)
-    const noBuiltinPrompt = antiLazyPillOff(opts, fileConfig)
-    const eco = ecoOptions(opts)
-    if (userSystemPrompt) io.out(`◆ system prompt: ${SYSTEM_PROMPT_FILE}`)
-    if (noBuiltinPrompt) io.out(`◆ built-in system prompt: off (${opts.vanilla ? 'vanilla' : 'the-framework.yml'})`)
-    else if (eco) io.out(`◆ eco: dropping ${Object.keys(eco).filter(k => eco[k as keyof EcoOptions]).join(', ')}`)
-    if (opts.context.length) io.out(`◆ context: ${opts.context.join(', ')}`)
-    try {
+    const { userSystemPrompt, noBuiltinPrompt, eco } = promptConfig
+    return settleRun(epilogue(opts.directPrompt ? 'prompt run' : 'research'), async () => {
       await runPrompt({
         prompt: opts.directPrompt ? intent : renderResearchPrompt(intent),
         driver,
         cwd,
         onEvent,
         signal: controller.signal,
-        ...(dashboard || control
-          ? {
-              requestChoice: (req: ChoiceRequest) =>
-                new Promise<ChoicePick>(resolve => pendingChoices.set(req.id, resolve)),
-            }
-          : {}),
+        ...(requestChoice ? { requestChoice } : {}),
         ...(opts.model ? { model: opts.model } : {}),
         ...(opts.maxCost ? { budgetUsd: opts.maxCost } : {}),
         ...(guard ? { consumptionGate: guard.gate } : {}),
@@ -1043,46 +1170,14 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
         ...(eco ? { eco } : {}),
         ...(opts.context.length ? { context: opts.context } : {}),
         ...(modeList.includes('autopilot') ? { autopilot: true } : {}),
-        ...((): { sessionLink?: string } => {
-          const link = chooseSessionLink(opts, fake)
-          return link ? { sessionLink: link } : {}
-        })(),
+        ...(sessionLink ? { sessionLink } : {}),
       })
-      clearInterrupt()
-      io.out(
-        opts.directPrompt
+      return {
+        successLine: opts.directPrompt
           ? '\n✓ prompt run done.'
           : '\n✓ research done: see the REVIEW-PROBLEMS / TODO files it wrote.',
-      )
-      await store?.close()
-      await maybeFireOnBeforeMergeable()
-      if (dashboard) {
-        io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
-        await waitForInterrupt()
-        await dashboard.close()
       }
-      return 0
-    } catch (err) {
-      clearInterrupt()
-      await store?.close()
-      if (controller.signal.aborted || stoppedCleanly) {
-        io.out('\n■ Stopped.')
-        if (dashboard) {
-          io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
-          await waitForInterrupt()
-          await dashboard.close()
-        }
-        return 0
-      }
-      io.err(`\n✗ ${kindLabel} failed: ${err instanceof Error ? err.message : String(err)}`)
-      await dashboard?.close()
-      return 1
-    } finally {
-      clearInterrupt()
-      control?.close()
-      guard?.stop()
-      if (publisher) await publisher.flush()
-    }
+    })
   }
 
   // The fake demo defaults to a Cloudflare deploy decision so the flow ends with
@@ -1120,15 +1215,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
       }
     : undefined
 
-  // A user SYSTEM.md and the-framework.yml's anti-lazy-pill toggle shape the system
-  // prompt injected into every prompt (#301). The built-in pill is on unless removed.
-  const userSystemPrompt = await loadUserSystemPrompt(cwd)
-  const noBuiltinPrompt = antiLazyPillOff(opts, fileConfig)
-  const eco = ecoOptions(opts)
-  if (userSystemPrompt) io.out(`◆ system prompt: ${SYSTEM_PROMPT_FILE}`)
-  if (noBuiltinPrompt) io.out(`◆ built-in system prompt: off (${opts.vanilla ? 'vanilla' : 'the-framework.yml'})`)
-  else if (eco) io.out(`◆ eco: dropping ${Object.keys(eco).filter(k => eco[k as keyof EcoOptions]).join(', ')}`)
-  if (opts.context.length) io.out(`◆ context: ${opts.context.join(', ')}`)
+  const { userSystemPrompt, noBuiltinPrompt, eco } = promptConfig
 
   const runOpts: RunFrameworkOptions = {
     intent,
@@ -1138,15 +1225,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     onEvent,
     signals,
     signal: controller.signal,
-    // Pause the choice gates when someone can answer: this run's own dashboard, or
-    // the workspace daemon's via the control channel (#344). With neither, the gates
-    // auto-accept the recommended option as before (#304).
-    ...(dashboard || control
-      ? {
-          requestChoice: (req: ChoiceRequest) =>
-            new Promise<ChoicePick>(resolve => pendingChoices.set(req.id, resolve)),
-        }
-      : {}),
+    ...(requestChoice ? { requestChoice } : {}),
     ...(opts.model ? { model: opts.model } : {}),
     ...(opts.maxPasses ? { maxPasses: opts.maxPasses } : {}),
     ...(opts.maxCost ? { budgetUsd: opts.maxCost } : {}),
@@ -1166,67 +1245,18 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     ...(noBuiltinPrompt ? { antiLazyPill: false } : {}),
     ...(eco ? { eco } : {}),
     ...(opts.context.length ? { context: opts.context } : {}),
-    ...((): { sessionLink?: string } => {
-      const link = chooseSessionLink(opts, fake)
-      return link ? { sessionLink: link } : {}
-    })(),
+    ...(sessionLink ? { sessionLink } : {}),
   }
 
-  try {
+  return settleRun(epilogue('run'), async () => {
     const { result, preview } = await runFramework(runOpts)
-    // Run settled: hand Ctrl+C back to the post-run dashboard/app wait below.
-    clearInterrupt()
-    io.out(
-      result.productionGrade
-        ? `\n✓ production-grade in ${result.passes} pass(es).`
-        : `\n• prototype ready${result.stoppedEarly ? ` (stopped with ${result.blockers.length} blocker(s))` : ''}.`,
-    )
-    if (preview) io.out(`\n▶ Your app is running at ${preview.url} — open it in a browser.`)
-    // Flush the event log. Best-effort.
-    await store?.close()
-    await maybeFireOnBeforeMergeable()
-    // Stay up while the dashboard and/or the app are live, then tear both down.
-    if (dashboard || preview) {
-      if (dashboard) io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
-      else io.out(`\nPress Ctrl+C to stop the app.`)
-      await waitForInterrupt()
-      if (preview) await preview.stop()
-      await dashboard?.close()
-    }
-    return 0
-  } catch (err) {
-    clearInterrupt()
-    await store?.close()
-    // A clean stop (dashboard Stop button, Ctrl+C, or a budget cap #322) is not a
-    // failure: report it cleanly, keep the dashboard up so the stopped state is
-    // visible, and exit 0.
-    if (controller.signal.aborted || stoppedCleanly) {
-      io.out('\n■ Stopped.')
-      if (dashboard) {
-        io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
-        await waitForInterrupt()
-        await dashboard.close()
-      }
-      return 0
-    }
-    io.err(`\n✗ run failed: ${err instanceof Error ? err.message : String(err)}`)
-    await dashboard?.close()
-    return 1
-  } finally {
-    clearInterrupt()
-    control?.close()
-    guard?.stop()
-    // Make sure every event (including the final `end`) reached the relay before exit.
-    if (publisher) await publisher.flush()
-  }
+    const successLine = result.productionGrade
+      ? `\n✓ production-grade in ${result.passes} pass(es).`
+      : `\n• prototype ready${result.stoppedEarly ? ` (stopped with ${result.blockers.length} blocker(s))` : ''}.`
+    return { successLine, ...(preview ? { preview } : {}) }
+  })
 }
 
-/**
- * `framework relay`: host the run relay (#230). Teammates open a run's URL
- * (printed when a run uses `--share <this-url>`) and watch it live with full
- * history replay. Runs until interrupted. Unauthenticated by design — anyone with
- * a run URL can watch; accounts/teams/steering come later.
- */
 /**
  * Bare `framework` (no prompt): run the dashboard server in the foreground (#456), so its
  * logs and any server-thrown errors are visible and Ctrl+C stops it. If a background daemon
@@ -1273,13 +1303,10 @@ async function ensureDaemonCmd(opts: CliOptions, io: CliIO): Promise<number> {
     io.err(`could not start the dashboard daemon (${err instanceof Error ? err.message : String(err)}).`)
     return 1
   }
-  // One daemon per machine (#393): when it is already running, `framework` in a new
-  // repo would not otherwise register that repo (only the daemon's own cwd is added
-  // on startup). Register it here too, best-effort, so it shows up in the Projects
-  // list either way. Idempotent (addProject dedupes by path).
-  if (await isActivated(cwd).catch(() => false)) {
-    await addProject(cwd, new Date().toISOString()).catch(() => {})
-  }
+  // One daemon per machine (#393): when it is already running, `framework` in a new repo
+  // would not otherwise register that repo (only the daemon's own cwd is added on startup).
+  // Register it here too, best-effort, so it shows up in the Projects list either way.
+  await registerHomeProject(cwd)
 
   const { state, alreadyRunning } = result
   io.out(`◆ dashboard ${alreadyRunning ? 'already running' : 'started'}: ${state.url}`)
@@ -1377,13 +1404,6 @@ function spawnMaintenanceRun(review: RepoReview, binPath: string, maxCost?: numb
 }
 
 /**
- * Run one direct prompt by spawning `framework prompt "<prompt>" --cwd <dir> --no-dashboard`,
- * reusing the whole run path (preflight, driver, budget cap, LOGS.md). The child inherits
- * stdio so its run streams to the terminal. Note it carries no `--on-before-mergeable`, so a quality
- * pass never triggers its own on-before-mergeable prompt (the recursion guard). Resolves true on a
- * clean exit (0). Never re-execs a test entry (fork-bomb guard).
- */
-/**
  * The argv a spawned `framework prompt` child runs with. Pure so a test can assert it:
  * note it carries **no** `--on-before-mergeable`, which is the on-before-mergeable recursion guard (a quality
  * pass must not trigger its own suite).
@@ -1401,6 +1421,13 @@ export function promptRunArgs(prompt: string, cwd: string, binPath: string, maxC
   return args
 }
 
+/**
+ * Run one direct prompt by spawning `framework prompt "<prompt>" --cwd <dir> --no-dashboard`,
+ * reusing the whole run path (preflight, driver, budget cap, LOGS.md). The child inherits
+ * stdio so its run streams to the terminal. Note it carries no `--on-before-mergeable`, so a quality
+ * pass never triggers its own on-before-mergeable prompt (the recursion guard). Resolves true on a
+ * clean exit (0). Never re-execs a test entry (fork-bomb guard).
+ */
 function spawnPromptRun(prompt: string, cwd: string, binPath: string, maxCost?: number, vanilla = false): Promise<boolean> {
   if (process.env.NODE_TEST_CONTEXT || /\.test\.[cm]?[jt]s$/.test(binPath)) {
     return Promise.resolve(false) // refuse to spawn from a test entry
@@ -1450,6 +1477,12 @@ export async function runOnBeforeMergeable(
   if (!ok) io.out(`  ! on-before-mergeable queueing did not complete cleanly.`)
 }
 
+/**
+ * `framework relay`: host the run relay (#230). Teammates open a run's URL
+ * (printed when a run uses `--share <this-url>`) and watch it live with full
+ * history replay. Runs until interrupted. Unauthenticated by design — anyone with
+ * a run URL can watch; accounts/teams/steering come later.
+ */
 async function runRelayServer(opts: CliOptions, io: CliIO): Promise<number> {
   const relay = await startRelay(opts.port !== undefined ? { port: opts.port } : {})
   io.out(`◆ relay listening at ${relay.url}`)
@@ -1485,22 +1518,10 @@ async function resumeRun(opts: CliOptions, io: CliIO): Promise<number> {
   // `.the-framework/events.jsonl` is exactly what the SPA's event Channel tails, so the
   // past run replays with no extra wiring (it is finished, so there is nothing to steer).
   // A missing bundle (an old install) replays to the terminal only.
-  let dashboard: Dashboard | undefined
-  if (opts.dashboard) {
-    const clientBundleDir = await resolveDashboardBundle()
-    if (clientBundleDir) {
-      try {
-        dashboard = await startDashboard({
-          ...(opts.port !== undefined ? { port: opts.port } : {}),
-          clientBundleDir,
-          projects: singleProjectProvider(cwd),
-        })
-        io.out(`◆ dashboard (resumed): ${dashboard.url}`)
-      } catch (err) {
-        io.err(`could not start dashboard (${err instanceof Error ? err.message : String(err)}); replaying to terminal only`)
-      }
-    }
-  }
+  const dashboard = await startRunDashboard(opts.dashboard, cwd, opts.port, io, {
+    resumed: true,
+    headlessNote: 'replaying to terminal only',
+  })
 
   for (const event of events) {
     io.out(formatFrameworkEvent(event))
@@ -1541,6 +1562,13 @@ export function buildDeployTarget(
     return { target: dokployTarget({ serverUrl: opts.dokployUrl, applicationId: opts.dokployApp }) }
   }
   return {} // Unknown target: narrate the decision only.
+}
+
+/** The post-run wait: keep the dashboard up until Ctrl+C, then close it. */
+async function keepDashboardUp(dashboard: Dashboard, io: CliIO): Promise<void> {
+  io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
+  await waitForInterrupt()
+  await dashboard.close()
 }
 
 /** Resolve when the process is interrupted (Ctrl+C), so the dashboard stays up. */

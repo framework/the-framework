@@ -249,3 +249,63 @@ test('an aborted signal ends the loop before starting another entry', async () =
     await rm(cwd, { recursive: true, force: true })
   }
 })
+
+test('a backlog turn emits its signals: views, session name, ready-for-merge', async () => {
+  const cwd = await tmpWorkspace()
+  const file = join(cwd, 'TODO_feat-x.agent.md')
+  await writeFile(file, '- [ ] tidy the login redirect\n')
+  try {
+    const events: FrameworkEvent[] = []
+    // The protocols are unconditional, so the agent is told it can signal on ANY turn,
+    // a backlog turn included. Everything it emits has to reach the run stream.
+    const driver = new FakeDriver({
+      respond: () => {
+        writeFileSync(file, '- [x] tidy the login redirect\n')
+        return [
+          'Done.',
+          '```show-markdown',
+          '# What I changed',
+          'Rewrote the redirect guard.',
+          '```',
+          '```set-session-name',
+          'login-redirect-fix',
+          '```',
+          '```ready-for-merge',
+          '```',
+        ].join('\n')
+      },
+    })
+    const session = await driver.start({ cwd })
+    await runTodoLoop({ session, cwd, emit: e => events.push(e) })
+
+    const view = events.find(e => e.kind === 'view')
+    assert.equal(view?.title, 'What I changed')
+    assert.equal(events.find(e => e.kind === 'session-name')?.name, 'login-redirect-fix')
+    assert.equal(events.filter(e => e.kind === 'ready-for-merge').length, 1)
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('ready-for-merge is emitted once across a multi-item backlog', async () => {
+  const cwd = await tmpWorkspace()
+  const file = join(cwd, 'TODO_feat-x.agent.md')
+  await writeFile(file, '- [ ] first task\n- [ ] second task\n')
+  try {
+    const events: FrameworkEvent[] = []
+    // Both items signal ready-for-merge; the loop's one emitter dedupes them.
+    const driver = new FakeDriver({
+      respond: (_prompt, i) => {
+        writeFileSync(file, i === 0 ? '- [x] first task\n- [ ] second task\n' : '- [x] first task\n- [x] second task\n')
+        return 'Done.\n```ready-for-merge\n```'
+      },
+    })
+    const session = await driver.start({ cwd })
+    const result = await runTodoLoop({ session, cwd, emit: e => events.push(e) })
+
+    assert.equal(result.completed, 2)
+    assert.equal(events.filter(e => e.kind === 'ready-for-merge').length, 1)
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})

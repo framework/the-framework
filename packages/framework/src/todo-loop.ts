@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { DriverSession } from './driver/index.js'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
 import { requestChoices, resolveAwaitGate } from './run.js'
-import { PLAN_DECLINED_MESSAGE, isDeclinedConfirmation, parseAwaitGate } from './turn-gate.js'
+import { PLAN_DECLINED_MESSAGE, createTurnSignalEmitter, isDeclinedConfirmation, parseAwaitGate } from './turn-gate.js'
 
 /**
  * The backlog loop (#323): once the main work settles, consume the agent's own
@@ -193,13 +193,21 @@ const MAX_STALLS = 2
  * to complete exactly that entry and check it off, and repeat. Caps make it safe
  * to leave unattended (#322's concern): the run's budget/abort signal ends any
  * turn, a hard item cap bounds the run, and two consecutive items that leave the
- * next entry untouched stop the loop instead of spinning. Await gates inside an
- * item turn (`showChoices()` / `showMultiSelect()`) are honored like anywhere else.
+ * next entry untouched stop the loop instead of spinning. A backlog turn is a turn
+ * like any other: await gates (`showChoices()` / `showMultiSelect()`) and the signals
+ * (`showMarkdown()`, `setSessionName()`, `setReadyForMerge()`) are honored here too.
  */
 export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult> {
   const { session, cwd, emit } = opts
   const maxItems = opts.maxItems ?? DEFAULT_MAX_TODO_ITEMS
-  const gateDeps = { requestChoice: opts.requestChoice, emit, signal: opts.signal }
+  // One emitter for the whole backlog, so ready-for-merge fires once across every item
+  // and a session name only re-emits on an actual rename.
+  const gateDeps = {
+    requestChoice: opts.requestChoice,
+    emit,
+    signal: opts.signal,
+    emitTurnSignals: createTurnSignalEmitter(emit),
+  }
 
   let completed = 0
   let stalls = 0
@@ -287,11 +295,13 @@ async function promptItem(
     requestChoice?: ((req: ChoiceRequest) => Promise<ChoicePick>) | undefined
     emit: (event: FrameworkEvent) => void
     signal?: AbortSignal | undefined
+    emitTurnSignals: (text: string) => void
   },
 ): Promise<void> {
   const signalOpt = deps.signal ? { signal: deps.signal } : {}
   const prompt = `Open \`${fileName}\` at the workspace root and work on the FIRST open entry only. Complete it fully and verify your work. Then update \`${fileName}\`: check the entry off (or remove it). Do not start any other entry.`
   let turn = await session.prompt(prompt, signalOpt)
+  deps.emitTurnSignals(turn.text)
   let gate = parseAwaitGate(turn.text)
   for (let round = 0; round < MAX_AWAIT_ROUNDS && gate; round++) {
     const answer = await resolveAwaitGate(gate, round, deps)
@@ -305,6 +315,7 @@ async function promptItem(
       `You paused to ask: "${gate.title}". The user chose: ${answer}. Continue the backlog entry with that decision, and do not ask again unless a genuinely new choice comes up.`,
       signalOpt,
     )
+    deps.emitTurnSignals(turn.text)
     gate = parseAwaitGate(turn.text)
   }
 }

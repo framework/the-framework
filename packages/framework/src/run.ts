@@ -25,7 +25,7 @@ import { snapshotWorkspace } from './sandbox.js'
 import { CONSUMPTION_LIMIT_LABEL, type ConsumptionWindow } from './consumption.js'
 import type { Driver, DriverEvent, DriverSession } from './driver/index.js'
 import { composeRunSystem, type EcoOptions, type TfContext } from './system-prompt.js'
-import { AWAIT_PROTOCOL, CONFIRM_APPROVED, CONFIRM_DECLINED, PLAN_DECLINED_MESSAGE, isDeclinedConfirmation, parseAwaitGate, parseMarkdownViews, parseSessionName, parseReadyForMerge, type ParsedAwaitGate } from './turn-gate.js'
+import { AWAIT_PROTOCOL, CONFIRM_APPROVED, CONFIRM_DECLINED, PLAN_DECLINED_MESSAGE, createTurnSignalEmitter, isDeclinedConfirmation, parseAwaitGate, type ParsedAwaitGate } from './turn-gate.js'
 // Value import from todo-loop.js is a benign cycle: todo-loop.js only calls
 // run.js's hoisted function declarations (requestChoices / resolveAwaitGate).
 import { leaveResumeNote, runTodoLoop, type TodoLoopResult } from './todo-loop.js'
@@ -572,20 +572,7 @@ function agentAwaitGate(
     // Non-blocking signals the agent emitted this turn: markdown views (#441) pushed to the
     // rail, and the #326 lifecycle signals (session name, ready-for-merge) that flip the run's
     // dashboard status. None stop the turn.
-    let named: string | undefined
-    let ready = false
-    const emitTurnSignals = (text: string): void => {
-      for (const view of parseMarkdownViews(text)) emit({ kind: 'view', ...view })
-      const name = parseSessionName(text)
-      if (name && name !== named) {
-        named = name
-        emit({ kind: 'session-name', name })
-      }
-      if (!ready && parseReadyForMerge(text)) {
-        ready = true
-        emit({ kind: 'ready-for-merge' })
-      }
-    }
+    const emitTurnSignals = createTurnSignalEmitter(emit)
     let run = await base(ctx)
     emitTurnSignals(run.text)
     if (!requestChoice) return run

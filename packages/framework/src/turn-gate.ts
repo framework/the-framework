@@ -1,3 +1,4 @@
+import type { FrameworkEvent } from './events.js'
 import { PROTOCOLS_AWAIT, PROTOCOLS_SIGNAL } from './prompts.generated.js'
 import type { ChoicesOption } from './run.js'
 import type { MultiSelectOption } from './run.js'
@@ -271,4 +272,32 @@ export function parseAwaitGate(text: string): ParsedAwaitGate | undefined {
     if (gate) return gate
   }
   return undefined
+}
+
+/**
+ * Emit the {@link PROTOCOLS_SIGNAL} signals an agent turn carries: markdown views, the
+ * session name, and `setReadyForMerge()`. Every turn the framework prompts goes through
+ * one of these, because the protocols are unconditional (see `composeRunSystem`) — the
+ * agent is told it can signal on any turn, so any turn we don't parse drops the signal.
+ *
+ * The returned function holds the dedupe state for the turns it covers: `ready-for-merge`
+ * fires once, and a session name only re-emits on an actual rename. Each caller makes one
+ * for its own span of turns (a build's await rounds, the whole backlog), so keep it for as
+ * many turns as should share that dedupe rather than making one per turn.
+ */
+export function createTurnSignalEmitter(emit: (event: FrameworkEvent) => void): (text: string) => void {
+  let named: string | undefined
+  let ready = false
+  return (text: string): void => {
+    for (const view of parseMarkdownViews(text)) emit({ kind: 'view', ...view })
+    const name = parseSessionName(text)
+    if (name && name !== named) {
+      named = name
+      emit({ kind: 'session-name', name })
+    }
+    if (!ready && parseReadyForMerge(text)) {
+      ready = true
+      emit({ kind: 'ready-for-merge' })
+    }
+  }
 }

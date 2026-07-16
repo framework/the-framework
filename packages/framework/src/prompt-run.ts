@@ -2,7 +2,7 @@ import type { Driver, DriverEvent, DriverSession } from './driver/index.js'
 import { hasSessionIdPlaceholder, resolveSessionLink, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import { resolveAwaitGate } from './run.js'
 import { composeRunSystem, renderSystemPrompt, type EcoOptions, type TfContext } from './system-prompt.js'
-import { PLAN_DECLINED_MESSAGE, isDeclinedConfirmation, parseAwaitGate, parseMarkdownViews, parseSessionName, parseReadyForMerge } from './turn-gate.js'
+import { PLAN_DECLINED_MESSAGE, createTurnSignalEmitter, isDeclinedConfirmation, parseAwaitGate } from './turn-gate.js'
 import { UsageMeter } from './usage.js'
 import { CONSUMPTION_LIMIT_LABEL, type ConsumptionWindow } from './consumption.js'
 import { leaveResumeNote } from './todo-loop.js'
@@ -166,20 +166,7 @@ export async function runPrompt(opts: RunPromptOptions): Promise<RunPromptResult
 
   // Non-blocking signals the agent emitted this turn: markdown views (#441) and the #326
   // lifecycle signals (session name, ready-for-merge). None stop the turn.
-  let named: string | undefined
-  let ready = false
-  const emitTurnSignals = (text: string): void => {
-    for (const view of parseMarkdownViews(text)) emit({ kind: 'view', ...view })
-    const name = parseSessionName(text)
-    if (name && name !== named) {
-      named = name
-      emit({ kind: 'session-name', name })
-    }
-    if (!ready && parseReadyForMerge(text)) {
-      ready = true
-      emit({ kind: 'ready-for-merge' })
-    }
-  }
+  const emitTurnSignals = createTurnSignalEmitter(emit)
 
   try {
     let turn = await session.prompt(firstPrompt, { signal: runSignal })

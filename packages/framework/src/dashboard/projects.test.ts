@@ -3,12 +3,22 @@ import { test } from 'node:test'
 import { summarizeProject, singleProjectProvider, type SummarizeDeps } from './projects.js'
 import type { ProjectRecord } from '../registry.js'
 import type { LogEntry } from '../logs.js'
+import { RUN_META_VERSION, type RunMeta } from '../store/index.js'
 
 const RECORD: ProjectRecord = { id: 'app-a-1', path: '/repos/app-a', addedAt: '2026-07-11T00:00:00.000Z' }
 
 function deps(over: SummarizeDeps): SummarizeDeps {
-  return { isActivated: async () => true, readLogs: async () => [], ...over }
+  return { isActivated: async () => true, readLogs: async () => [], readRuns: async () => [], ...over }
 }
+
+const run = (id: string, updatedAt: string): RunMeta => ({
+  version: RUN_META_VERSION,
+  status: 'stopped',
+  id,
+  startedAt: updatedAt,
+  updatedAt,
+  passes: 0,
+})
 
 test('summarizeProject derives name from the path basename', async () => {
   const summary = await summarizeProject(RECORD, deps({}))
@@ -29,6 +39,28 @@ test('lastActivityAt is the newest LOGS.md entry (readLogs is newest-first)', as
 test('no log entries means no lastActivityAt key at all', async () => {
   const summary = await summarizeProject(RECORD, deps({ readLogs: async () => [] }))
   assert.equal('lastActivityAt' in summary, false)
+})
+
+test('lastActivityAt falls back to the newest run when there are no LOGS.md entries (#645)', async () => {
+  const summary = await summarizeProject(
+    RECORD,
+    deps({ readRuns: async () => [run('b', '2026-07-12T00:00:00.000Z'), run('a', '2026-07-10T00:00:00.000Z')] }),
+  )
+  assert.equal(summary.lastActivityAt, '2026-07-12T00:00:00.000Z')
+})
+
+test('lastActivityAt is the newest of LOGS.md and runs, either way (#645)', async () => {
+  const newerRun = deps({
+    readLogs: async () => [{ at: '2026-07-11T00:00:00.000Z', kind: 'build', title: 'log', status: 'done' }],
+    readRuns: async () => [run('x', '2026-07-14T00:00:00.000Z')],
+  })
+  assert.equal((await summarizeProject(RECORD, newerRun)).lastActivityAt, '2026-07-14T00:00:00.000Z')
+
+  const newerLog = deps({
+    readLogs: async () => [{ at: '2026-07-20T00:00:00.000Z', kind: 'build', title: 'log', status: 'done' }],
+    readRuns: async () => [run('x', '2026-07-14T00:00:00.000Z')],
+  })
+  assert.equal((await summarizeProject(RECORD, newerLog)).lastActivityAt, '2026-07-20T00:00:00.000Z')
 })
 
 test('activation reflects the injected check', async () => {

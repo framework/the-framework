@@ -2,6 +2,7 @@ import { basename } from 'node:path'
 import { listProjects, type ProjectRecord } from '../registry.js'
 import { isActivated } from '../project.js'
 import { readLogs, type LogEntry } from '../logs.js'
+import { listRuns, readLiveMeta, type RunMeta } from '../store/index.js'
 
 /**
  * The multi-project read side (#392): projects the daemon serves come from the
@@ -21,7 +22,7 @@ export interface ProjectSummary {
   name: string
   /** True when the repo still has its `.the-framework/` marker. */
   activated: boolean
-  /** ISO timestamp of the newest `LOGS.md` entry, when any. */
+  /** ISO timestamp of the project's newest activity: the latest `LOGS.md` entry or run, whichever is newer. */
   lastActivityAt?: string
 }
 
@@ -29,6 +30,17 @@ export interface ProjectSummary {
 export interface SummarizeDeps {
   isActivated?: (path: string) => Promise<boolean>
   readLogs?: (path: string) => Promise<LogEntry[]>
+  /** The project's runs (live + archived), newest-first. Defaults to {@link readAllRuns}. */
+  readRuns?: (path: string) => Promise<RunMeta[]>
+}
+
+/** A project's runs, live prepended to the archived history. Forgiving: a failed read is `[]`. */
+async function readAllRuns(path: string): Promise<RunMeta[]> {
+  const [archived, live] = await Promise.all([
+    listRuns(path).catch(() => [] as RunMeta[]),
+    readLiveMeta(path).catch(() => undefined),
+  ])
+  return live ? [live, ...archived] : archived
 }
 
 /**
@@ -40,9 +52,16 @@ export interface SummarizeDeps {
 export async function summarizeProject(record: ProjectRecord, deps: SummarizeDeps = {}): Promise<ProjectSummary> {
   const checkActivated = deps.isActivated ?? isActivated
   const loadLogs = deps.readLogs ?? readLogs
+  const loadRuns = deps.readRuns ?? readAllRuns
   const activated = await checkActivated(record.path).catch(() => false)
-  const logs = await loadLogs(record.path).catch(() => [] as LogEntry[])
-  const lastActivityAt = logs[0]?.at
+  const [logs, runs] = await Promise.all([
+    loadLogs(record.path).catch(() => [] as LogEntry[]),
+    loadRuns(record.path).catch(() => [] as RunMeta[]),
+  ])
+  // Newest of the latest LOGS.md entry and the latest run: a run is activity even
+  // when it stopped before writing to LOGS.md. ISO timestamps sort chronologically.
+  const runActivity = runs.map(r => r.updatedAt || r.startedAt).filter(Boolean)
+  const lastActivityAt = [logs[0]?.at, ...runActivity].filter((a): a is string => !!a).sort().at(-1)
   const summary: ProjectSummary = {
     id: record.id,
     path: record.path,

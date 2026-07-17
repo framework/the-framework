@@ -15,6 +15,7 @@ import { PromptEditor, type PromptEditorHandle } from './PromptEditor.js'
 import { PresetMenu } from './PresetMenu.js'
 import { PresetCreatePanel } from './PresetCreatePanel.js'
 import { AgentModelMenu, type AgentOption } from './AgentModelMenu.js'
+import { ContextFiles } from './ContextFiles.js'
 import { ClaudeLogo, CodexLogo } from './agent-logos.js'
 import { DisclosureToggle } from './DisclosureToggle.js'
 import { SystemPromptDisclosure } from './SystemPromptDisclosure.js'
@@ -114,6 +115,19 @@ export function StartRunForm({
   const projects = useLoaded<ProjectSummary[]>(onProjects, [], [])
   const [showContext, setShowContext] = useState(false)
 
+  // The Context set mixes whole repos (registered project paths) and individual files (relative
+  // paths from a `#` mention or the file tree). Split out the files so they can be shown + removed,
+  // and count each kind separately for the section header.
+  const projectPaths = new Set(projects.map(p => p.path))
+  const contextFiles = [...context].filter(path => !projectPaths.has(path))
+  const selectedRepos = projects.filter(p => context.has(p.path)).length
+  const contextSummary = [
+    selectedRepos > 0 ? `${selectedRepos} project${selectedRepos > 1 ? 's' : ''}` : null,
+    contextFiles.length > 0 ? `${contextFiles.length} file${contextFiles.length > 1 ? 's' : ''}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   // Vanilla removes the system prompt entirely, so Eco (which only trims it) has nothing
   // left to act on.
   const ecoDisabled = vanilla
@@ -193,7 +207,7 @@ export function StartRunForm({
   const mainOptions: OptionRow[] = [
     { key: 'autopilot', label: 'Autopilot', description: 'Auto-accepts the recommended choice after a countdown.', title: 'Auto-accept the recommended choice after a countdown; also relaxes the maintenance stance', checked: autopilot },
     { key: 'technical', label: 'Technical control', description: 'Surfaces technical detail like tech-stack choices.', title: 'Expose technical detail (e.g. tech-stack choices)', checked: technical },
-    { key: 'vanilla', label: 'Disable system prompt', description: 'Raw Claude Code, with no added system prompt.', title: "Remove all system prompts: the same as raw Claude Code. Expand 'See actual prompt sent' to read what it removes.", checked: vanilla },
+    { key: 'vanilla', label: 'Disable system prompt', description: 'Raw Claude Code, with no added system prompt.', title: "Remove all system prompts: the same as raw Claude Code. Expand 'Actual prompt' to read what it removes.", checked: vanilla },
     { key: 'eco', label: 'Eco', description: 'Trims the system prompt to save tokens.', title: 'Trim the built-in system prompt to save tokens', checked: eco && !ecoDisabled, disabled: ecoDisabled },
     { key: 'onBeforeMergeableQuality', label: 'Post-merge cleanup', description: 'Runs quality passes once it is ready to merge.', title: "When the run signals it's ready for merge, run maintainability, readability, and security-audit passes", checked: onBeforeMergeableQuality },
     { key: 'browser', label: 'Browser', description: 'Gives the agent a real browser to inspect pages.', title: 'Give the agent a real browser via chrome-devtools-mcp: navigate pages, read console + network, inspect the DOM, and screenshot', checked: browser },
@@ -274,22 +288,33 @@ export function StartRunForm({
         busy={busy}
       />
 
-      {projects.length > 0 && (
+      {(projects.length > 0 || contextFiles.length > 0) && (
         <div className="mt-3 text-xs text-muted-foreground">
           <DisclosureToggle open={showContext} onToggle={() => setShowContext(s => !s)}>
-            Context{context.size > 0 && <span className="text-primary"> · {context.size} selected</span>}
+            Context{contextSummary && <span className="text-primary"> · {contextSummary}</span>}
           </DisclosureToggle>
           {showContext && (
-            <div className="mt-1.5 pl-4">
-              <p className="mb-1.5 text-muted-foreground/80">Focus the agent on these repos (it can still reach the rest):</p>
-              <div className="flex flex-col gap-1">
-                {projects.map(p => (
-                  <label key={p.id} className="flex cursor-pointer items-center gap-1.5" title={p.path}>
-                    <input type="checkbox" checked={context.has(p.path)} onChange={() => toggleContext(p.path)} disabled={busy} />
-                    <span className="truncate">{p.name}</span>
-                  </label>
-                ))}
-              </div>
+            <div className="mt-2 space-y-2 rounded border border-border p-3">
+              {/* Files picked via a `#` mention or the file tree (#661): removable with an X. */}
+              {contextFiles.length > 0 && (
+                <div>
+                  <p className="mb-1 text-muted-foreground/80">Files</p>
+                  <ContextFiles files={contextFiles} onRemove={toggleContext} busy={busy} />
+                </div>
+              )}
+              {projects.length > 0 && (
+                <div>
+                  <p className="mb-1.5 text-muted-foreground/80">Focus the agent on these repos (it can still reach the rest):</p>
+                  <div className="flex flex-col gap-1">
+                    {projects.map(p => (
+                      <label key={p.id} className="flex cursor-pointer items-center gap-1.5" title={p.path}>
+                        <input type="checkbox" checked={context.has(p.path)} onChange={() => toggleContext(p.path)} disabled={busy} />
+                        <span className="truncate">{p.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

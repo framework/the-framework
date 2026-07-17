@@ -78,3 +78,10 @@ export function notificationsEnabled(preferences: Preferences): boolean {
 export function discordEnabled(preferences: Preferences): boolean {
   return preferences.notifyDiscord ?? false
 }
+
+/** "New activity" notifications default off (#627): the category that pings on a run starting or
+ * finishing, not just on things that need you. Composes with the method toggles above — activity
+ * reaches the browser when {@link notificationsEnabled}, Discord when {@link discordEnabled}. */
+export function newActivityEnabled(preferences: Preferences): boolean {
+  return preferences.notifyNewActivity ?? false
+}

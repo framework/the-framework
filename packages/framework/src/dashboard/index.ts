@@ -25,3 +25,4 @@ export {
   type PrLister,
   type InterventionsDeps,
 } from './interventions.js'
+export { buildActivity, activityKey, pickNewActivity, type Activity, type ActivityDeps } from './activity.js'

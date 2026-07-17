@@ -185,6 +185,12 @@ test('writePreferences round-trips the notifyDiscord toggle (#627)', async () =>
   assert.deepEqual(await readPreferences(fs, ENV), { notifyDiscord: true })
 })
 
+test('writePreferences round-trips the notifyNewActivity toggle (#627)', async () => {
+  const fs = memFs({ [FILE]: JSON.stringify([APP_A]) })
+  await writePreferences({ notifyNewActivity: true }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { notifyNewActivity: true })
+})
+
 test('writePreferences keeps the model string but drops a blank one (#628)', async () => {
   const fs = memFs({ [FILE]: JSON.stringify([APP_A]) })
   await writePreferences({ model: '  opus  ' }, fs, ENV)

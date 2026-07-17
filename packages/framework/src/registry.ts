@@ -57,6 +57,13 @@ export interface Preferences {
   browser?: boolean
   /** Fire a browser notification when a new item lands on the "needs you" queue (#627). Absent = on. */
   notifyBrowser?: boolean
+  /**
+   * Also notify on plain run activity — a run started, a run finished (#627). The default-off
+   * counterpart to the always-on "needs you" notifications: it keeps you loosely informed of the
+   * pipeline moving even when nothing needs you. A *category* toggle: it composes with the method
+   * toggles ({@link notifyBrowser} / {@link notifyDiscord}), so activity reaches whichever are on.
+   */
+  notifyNewActivity?: boolean
   /** The model to run on (#628), e.g. `opus` / `sonnet`; maps to a run's `--model`. Absent = the driver's default. */
   model?: string
   /** Which coding agent drives the run (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
@@ -177,6 +184,7 @@ const PREFERENCE_KEYS = [
   'browser',
   'notifyBrowser',
   'notifyDiscord',
+  'notifyNewActivity',
 ] as const
 
 /** Keep only the known preference fields, so a hand-edited or browser-supplied

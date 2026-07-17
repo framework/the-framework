@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import type { Intervention } from '@gemstack/framework'
-import { onProjectFiles, onInterventions } from '../../server/reads.telefunc.js'
+import type { Intervention, Activity } from '@gemstack/framework'
+import { onProjectFiles, onInterventions, onActivity } from '../../server/reads.telefunc.js'
 import { ProjectsSidebar } from '../../components/ProjectsSidebar.js'
 import { NotificationBell } from '../../components/NotificationBell.js'
 import { DiscordToggle } from '../../components/DiscordToggle.js'
+import { ActivityToggle } from '../../components/ActivityToggle.js'
 import { RunHistory } from '../../components/RunHistory.js'
 import { ProjectHome } from '../../components/ProjectHome.js'
 import { DashboardPage } from '../../components/DashboardPage.js'
@@ -18,7 +19,8 @@ import { useLoaded, usePolled } from '../../lib/use-async.js'
 import { usePersistentState } from '../../lib/use-persistent-state.js'
 import { useContextSet } from '../../lib/use-context-set.js'
 import { useInterventionNotifications } from '../../lib/use-intervention-notifications.js'
-import { usePreferences, notificationsEnabled } from '../../lib/preferences.js'
+import { useActivityNotifications } from '../../lib/use-activity-notifications.js'
+import { usePreferences, notificationsEnabled, newActivityEnabled } from '../../lib/preferences.js'
 import { pendingChoices, agentViews } from '../../lib/live-state.js'
 
 /** Stable, so `files` keeps one identity while no project is selected. */
@@ -26,6 +28,9 @@ const EMPTY_FILES: string[] = []
 
 /** Stable initial for the interventions poll, so it does not churn on every render. */
 const EMPTY_INTERVENTIONS: Intervention[] = []
+
+/** Stable initial for the activity poll (#627), so it does not churn on every render. */
+const EMPTY_ACTIVITY: Activity[] = []
 
 // The dashboard shell (#405 phase 2): Projects | Runs | main | Docs/Log rail. The main pane
 // is one of three views chosen by the Runs-rail selection: the project home/launcher (Live,
@@ -66,6 +71,14 @@ export default function Page() {
   // one interventions poll above; the browser permission is the real gate (see the header bell).
   const preferences = usePreferences()
   useInterventionNotifications(interventions, notificationsEnabled(preferences))
+
+  // The "New activity" category (#627): the default-off feed of runs starting/finishing. Its only
+  // client consumer is the browser notification below, so it is polled exactly when that will fire —
+  // both the category (`notifyNewActivity`) and the browser method (`notifyBrowser`) on. (Discord
+  // delivery, if enabled, is the daemon's own watcher, independent of this poll.)
+  const browserActivity = newActivityEnabled(preferences) && notificationsEnabled(preferences)
+  const { value: activity } = usePolled<Activity[]>(browserActivity ? onActivity : null, EMPTY_ACTIVITY, 15000, [browserActivity])
+  useActivityNotifications(activity, browserActivity)
 
   const onRunStarted = (intent: string) => {
     // Stay on the home launcher (it must stay visible so you can launch again); the new run
@@ -130,6 +143,7 @@ export default function Page() {
         <div className="ml-auto flex items-center gap-1">
           <NotificationBell />
           <DiscordToggle />
+          <ActivityToggle />
         </div>
       </header>
       <div className="flex min-h-0 flex-1">

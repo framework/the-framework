@@ -4,6 +4,7 @@ import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
 import { buildOverview, type Overview } from '../dashboard/overview.js'
 import { buildInterventions, type Intervention } from '../dashboard/interventions.js'
+import { buildActivity, type Activity } from '../dashboard/activity.js'
 import { buildDashboard, type DashboardData } from '../dashboard/dashboard.js'
 import { githubUrlFor } from '../dashboard/github.js'
 import { readGitStatus, type GitStatus } from '../dashboard/git-status.js'
@@ -82,6 +83,12 @@ export async function onOverview(): Promise<Overview> {
 export async function onInterventions(): Promise<Intervention[]> {
   const projects = await contextProjects().list().catch(() => [])
   return buildInterventions(projects)
+}
+
+/** The cross-project "New activity" feed (#627): recent run started/finished transitions, newest first. */
+export async function onActivity(): Promise<Activity[]> {
+  const projects = await contextProjects().list().catch(() => [])
+  return buildActivity(projects)
 }
 
 /** The Overview dashboard page (#471): the {@link onOverview} rollup plus run counts, run-status totals, and activity. */

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   FLAT_TODO_FILE,
+  LEGACY_HYPHEN_TODO_FILE,
   LEGACY_TICKETS_TODO_FILE,
   LEGACY_TODO_FILE,
   TICKETS_DIR,
@@ -14,9 +15,10 @@ import {
 } from './tickets.js'
 import { TICKETING_FORMAT } from './prompts.generated.js'
 
-test('the flat backlog lives at the root TODO-AGENTS.md, with the legacy locations named (#682)', () => {
+test('the flat backlog lives at the root TODO_AGENTS.md, with the legacy locations named (#674/#682)', () => {
   assert.equal(TICKETS_DIR, 'tickets')
-  assert.equal(FLAT_TODO_FILE, 'TODO-AGENTS.md')
+  assert.equal(FLAT_TODO_FILE, 'TODO_AGENTS.md')
+  assert.equal(LEGACY_HYPHEN_TODO_FILE, 'TODO-AGENTS.md')
   assert.equal(LEGACY_TICKETS_TODO_FILE, 'tickets/TODO.md')
   assert.equal(LEGACY_TODO_FILE, 'TODO.md')
 })
@@ -38,7 +40,7 @@ test('the ticket-format spec materializes under .the-framework, not tickets/ (#6
   }
 })
 
-test('findFlatTodo prefers TODO-AGENTS.md, then legacy tickets/TODO.md, then root TODO.md, else undefined (#682)', async () => {
+test('findFlatTodo prefers TODO_AGENTS.md, then legacy tickets/TODO.md, then root TODO.md, else undefined (#682)', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-tickets-'))
   try {
     assert.equal(await findFlatTodo(cwd), undefined)
@@ -52,9 +54,13 @@ test('findFlatTodo prefers TODO-AGENTS.md, then legacy tickets/TODO.md, then roo
     await writeFile(join(cwd, LEGACY_TICKETS_TODO_FILE), '- [ ] newer\n')
     assert.equal(await findFlatTodo(cwd), 'tickets/TODO.md')
 
-    // The #682 root TODO-AGENTS.md wins over both legacy locations.
-    await writeFile(join(cwd, FLAT_TODO_FILE), '- [ ] current\n')
+    // The brief #682 hyphen spelling wins over the older locations.
+    await writeFile(join(cwd, LEGACY_HYPHEN_TODO_FILE), '- [ ] hyphen\n')
     assert.equal(await findFlatTodo(cwd), 'TODO-AGENTS.md')
+
+    // The #674 root TODO_AGENTS.md (underscore) wins over every legacy location.
+    await writeFile(join(cwd, FLAT_TODO_FILE), '- [ ] current\n')
+    assert.equal(await findFlatTodo(cwd), 'TODO_AGENTS.md')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

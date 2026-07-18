@@ -61,11 +61,11 @@ test('findTodoBacklog prefers the newest session-scoped file, falls back to flat
   }
 })
 
-test('findTodoBacklog reads the flat backlog from the root TODO-AGENTS.md (#682)', async () => {
+test('findTodoBacklog reads the flat backlog from the root TODO_AGENTS.md (#682)', async () => {
   const cwd = await tmpWorkspace()
   try {
-    await writeFile(join(cwd, 'TODO-AGENTS.md'), '- [ ] roadmap entry\n')
-    assert.deepEqual(await findTodoBacklog(cwd), { name: 'TODO-AGENTS.md', entries: ['roadmap entry'] })
+    await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] roadmap entry\n')
+    assert.deepEqual(await findTodoBacklog(cwd), { name: 'TODO_AGENTS.md', entries: ['roadmap entry'] })
 
     // A session-scoped backlog still wins over the flat one, wherever the flat one lives.
     await writeFile(join(cwd, 'TODO_feat-x.agent.md'), '- [ ] scoped entry\n')
@@ -86,16 +86,16 @@ test('findTodoBacklog still reads a legacy tickets/TODO.md backlog (#682 fallbac
   }
 })
 
-test('appendTodoEntry creates the root TODO-AGENTS.md when the workspace has no backlog (#682)', async () => {
+test('appendTodoEntry creates the root TODO_AGENTS.md when the workspace has no backlog (#682)', async () => {
   const cwd = await tmpWorkspace()
   try {
     const file = await appendTodoEntry(cwd, 'Resume the paused run')
-    assert.equal(file, 'TODO-AGENTS.md')
-    assert.equal(await readFile(join(cwd, 'TODO-AGENTS.md'), 'utf8'), '- [ ] Resume the paused run\n')
+    assert.equal(file, 'TODO_AGENTS.md')
+    assert.equal(await readFile(join(cwd, 'TODO_AGENTS.md'), 'utf8'), '- [ ] Resume the paused run\n')
 
     // A second entry appends to the same file, not a new one.
     await appendTodoEntry(cwd, 'And another')
-    assert.equal(await readFile(join(cwd, 'TODO-AGENTS.md'), 'utf8'), '- [ ] Resume the paused run\n- [ ] And another\n')
+    assert.equal(await readFile(join(cwd, 'TODO_AGENTS.md'), 'utf8'), '- [ ] Resume the paused run\n- [ ] And another\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

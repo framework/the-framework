@@ -8,7 +8,7 @@ import { nodeStoreFs, type StoreFs } from './store/index.js'
  * The root `tickets/` directory (#629): a plain repo convention where The Framework
  * keeps its human-facing roadmap files, rather than hiding them in a proprietary
  * `.the-framework/` dir. It sits beside conventions like a root `DECISIONS.md`. Since
- * #682 moved the backlog out to a root `TODO-AGENTS.md`, this directory holds only
+ * #682 moved the backlog out to a root `TODO_AGENTS.md`, this directory holds only
  * ticket files (`<DATE>_<SLUG>.md`).
  */
 export const TICKETS_DIR = 'tickets'
@@ -35,12 +35,15 @@ export async function materializeTicketingFormat(cwd: string, fs: StoreFs = node
 
 /**
  * The flat, durable backlog/roadmap file — the confirmed-task queue (the "AI task queue"
- * the #683 context fragment names). Lives at the repo root as `TODO-AGENTS.md` (#682):
+ * the #683 context fragment names). Lives at the repo root as `TODO_AGENTS.md` (#682):
  * moved out of `tickets/` so that directory holds only tickets. This is the file a run
  * drains and the dashboard surfaces; the session-scoped `TODO_<slug>.agent.md` files the
  * system prompt writes are separate and also live at the root.
  */
-export const FLAT_TODO_FILE = 'TODO-AGENTS.md'
+export const FLAT_TODO_FILE = 'TODO_AGENTS.md'
+
+/** The brief hyphen spelling from #682, read as a fallback after #674 settled on the underscore. */
+export const LEGACY_HYPHEN_TODO_FILE = 'TODO-AGENTS.md'
 
 /** The #629 backlog location (under `tickets/`), read as a fallback after #682 moved it to the root. */
 export const LEGACY_TICKETS_TODO_FILE = `${TICKETS_DIR}/TODO.md`
@@ -56,13 +59,13 @@ async function isFile(cwd: string, rel: string): Promise<boolean> {
 }
 
 /**
- * The workspace's flat backlog file, newest convention first: the #682 root
- * `TODO-AGENTS.md`, else the #629 `tickets/TODO.md`, else the pre-#629 root `TODO.md`.
- * Returns the workspace-relative path, or `undefined` when none exists. New backlogs are
- * created at {@link FLAT_TODO_FILE}.
+ * The workspace's flat backlog file, newest convention first: the root `TODO_AGENTS.md`,
+ * else the brief hyphen spelling, else the #629 `tickets/TODO.md`, else the pre-#629 root
+ * `TODO.md`. Returns the workspace-relative path, or `undefined` when none exists. New
+ * backlogs are created at {@link FLAT_TODO_FILE}.
  */
 export async function findFlatTodo(cwd: string): Promise<string | undefined> {
-  for (const rel of [FLAT_TODO_FILE, LEGACY_TICKETS_TODO_FILE, LEGACY_TODO_FILE]) {
+  for (const rel of [FLAT_TODO_FILE, LEGACY_HYPHEN_TODO_FILE, LEGACY_TICKETS_TODO_FILE, LEGACY_TODO_FILE]) {
     if (await isFile(cwd, rel)) return rel
   }
   return undefined

@@ -35,13 +35,13 @@ test('readDocs surfaces session-scoped PLAN_/TODO_ .agent.md files (#323/#326)',
   }
 })
 
-test('readDocs surfaces the flat backlog from the root TODO-AGENTS.md, after PLAN (#682)', async () => {
+test('readDocs surfaces the flat backlog from the root TODO_AGENTS.md, after PLAN (#682)', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-docs-'))
   try {
-    await writeFile(join(cwd, 'TODO-AGENTS.md'), '- [ ] roadmap\n')
+    await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] roadmap\n')
     await writeFile(join(cwd, 'PLAN.md'), '# Plan\n')
     const docs = await readDocs(cwd)
-    assert.deepEqual(docs.map(d => d.name), ['PLAN.md', 'TODO-AGENTS.md'])
+    assert.deepEqual(docs.map(d => d.name), ['PLAN.md', 'TODO_AGENTS.md'])
     assert.equal(docs[1]!.content, '- [ ] roadmap\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })

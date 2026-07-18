@@ -10,13 +10,13 @@ import { findFlatTodo } from '../tickets.js'
  * `PLAN_<SESSION>.agent.md` (the plan for now) and `TODO_<SESSION>.agent.md` (the
  * backlog), where SESSION is a git-branch slug. The flat fallbacks are `PLAN.md`
  * (root) and the flat backlog (`backlog: true` defers to {@link findFlatTodo}, which
- * resolves the #682 root `TODO-AGENTS.md` or a legacy `tickets/TODO.md` / `TODO.md`).
+ * resolves the #682 root `TODO_AGENTS.md` or a legacy `tickets/TODO.md` / `TODO.md`).
  * Scoped and flat-root names are matched against a flat readdir of the root, never
  * taken from user input, so there is no path traversal to guard against.
  */
 export const DOC_CATEGORIES = [
   { flat: 'PLAN.md', scoped: /^PLAN_[a-z0-9-]+\.agent\.md$/ },
-  { flat: 'TODO-AGENTS.md', backlog: true, scoped: /^TODO_[a-z0-9-]+\.agent\.md$/ },
+  { flat: 'TODO_AGENTS.md', backlog: true, scoped: /^TODO_[a-z0-9-]+\.agent\.md$/ },
 ] as const
 
 /** One surfaced document: its filename and current contents. */
@@ -45,7 +45,7 @@ async function surfacedFilenames(cwd: string): Promise<string[]> {
   const names: string[] = []
   for (const cat of DOC_CATEGORIES) {
     if ('backlog' in cat) {
-      // The flat backlog is `TODO-AGENTS.md` at the root (#682), with legacy fallbacks.
+      // The flat backlog is `TODO_AGENTS.md` at the root (#682), with legacy fallbacks.
       const flat = await findFlatTodo(cwd)
       if (flat) names.push(flat)
     } else if (present.has(cat.flat)) {

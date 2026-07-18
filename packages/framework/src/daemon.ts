@@ -390,7 +390,10 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
       build: projects => buildInterventions(projects, { dashboardUrl: dashboard.url }),
       onNew: async items => {
         const prefs = await readPrefs()
-        if (!prefs.notifyDiscord) return // opted out (default): keep quiet, baseline already advanced
+        // Double-gated like activity below: the method (`notifyDiscord`) AND the category
+        // (`notifyHumanIntervention`) must both be on. The category defaults on, so `?? true` —
+        // do NOT copy activity's plain `!prefs.x`, which would silence the baseline by default.
+        if (!prefs.notifyDiscord || (prefs.notifyHumanIntervention ?? true) === false) return
         await postDiscord(webhook, items).catch(() => {})
       },
     })

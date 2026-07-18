@@ -18,7 +18,7 @@ import { usePersistentState } from '../../lib/use-persistent-state.js'
 import { useContextSet } from '../../lib/use-context-set.js'
 import { useInterventionNotifications } from '../../lib/use-intervention-notifications.js'
 import { useActivityNotifications } from '../../lib/use-activity-notifications.js'
-import { usePreferences, notificationsEnabled, newActivityEnabled } from '../../lib/preferences.js'
+import { usePreferences, notificationsEnabled, newActivityEnabled, humanInterventionEnabled } from '../../lib/preferences.js'
 import { pendingChoices, agentViews } from '../../lib/live-state.js'
 
 /** Stable, so `files` keeps one identity while no project is selected. */
@@ -66,9 +66,11 @@ export default function Page() {
   const { value: interventions } = usePolled<Intervention[]>(onInterventions, EMPTY_INTERVENTIONS, 15000, [])
 
   // Fire a browser notification when a new item lands on the "needs you" queue (#627). Rides the
-  // one interventions poll above; the browser permission is the real gate (see the header bell).
+  // one interventions poll above (the poll stays unconditional — it also feeds the sidebar badge
+  // and Overview card); only the notification is gated, on both the category (`notifyHumanIntervention`,
+  // default on) and the browser method (`notifyBrowser`).
   const preferences = usePreferences()
-  useInterventionNotifications(interventions, notificationsEnabled(preferences))
+  useInterventionNotifications(interventions, humanInterventionEnabled(preferences) && notificationsEnabled(preferences))
 
   // The "New activity" category (#627): the default-off feed of runs starting/finishing. Its only
   // client consumer is the browser notification below, so it is polled exactly when that will fire —

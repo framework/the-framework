@@ -2,6 +2,7 @@ import type { FrameworkEvent } from '@gemstack/framework'
 import { loopStatus, sessionInfo, deployPlan, runProgress } from '@gemstack/framework/client'
 import { Badge } from './ui/badge.js'
 import { isRunActive } from '../lib/live-state.js'
+import { describeSessionLink } from '../lib/session-link.js'
 import { cn } from '../lib/utils.js'
 
 // The run overview (#431): the "moat" the wrapped agent's own chat cannot show, rebuilt
@@ -18,6 +19,11 @@ export function RunOverview({ events }: { events: FrameworkEvent[] }) {
   // A run only pulses "building…" while it's live (#695/U20): once the `end` event lands the
   // pill must settle to the final state ("ready for merge" or "finished") instead of pulsing on.
   const active = isRunActive(events)
+
+  // The "Open session" link, labeled honestly: a headless Claude Code run has no per-session
+  // URL, so the generic app entry (claude.ai/code) is shown as "Open Claude Code" with the id
+  // surfaced separately, not as a deep link to that id. See {@link describeSessionLink}.
+  const sessionLink = describeSessionLink(session)
 
   if (!loop && !deploy && !session?.sessionLink && !hasProgress) return null
 
@@ -72,15 +78,17 @@ export function RunOverview({ events }: { events: FrameworkEvent[] }) {
         </section>
       )}
 
-      {session?.sessionLink && (
-        <a
-          href={session.sessionLink}
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs text-primary underline underline-offset-2 md:col-span-2"
-        >
-          Open session{session.sessionId ? ` (${session.sessionId})` : ''} ↗
-        </a>
+      {sessionLink && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs md:col-span-2">
+          <a href={sessionLink.href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
+            {sessionLink.label}
+          </a>
+          {sessionLink.id && (
+            <span className="text-muted-foreground" title="Claude Code session id">
+              session <code className="font-mono text-[11px]">{sessionLink.id}</code>
+            </span>
+          )}
+        </div>
       )}
     </div>
   )

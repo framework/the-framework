@@ -212,12 +212,12 @@ export function StartRunForm({
   // while Eco is on.
   const mainOptions: OptionRow[] = [
     { key: 'transparent', label: 'Transparent', description: 'Raw Claude Code — turns the whole framework off.', title: 'Fully transparent (#625): run the agent exactly like plain Claude Code, with no framework system prompt, controls, dashboard, guard, or TODO loop. Overrides the options below.', checked: transparent },
-    { key: 'autopilot', label: 'Autopilot', description: 'Auto-accepts the recommended choice after a countdown.', title: 'Auto-accept the recommended choice after a countdown; also relaxes the maintenance stance', checked: autopilot && !transparent, disabled: transparent },
-    { key: 'technical', label: 'Technical control', description: 'Surfaces technical detail like tech-stack choices.', title: 'Expose technical detail (e.g. tech-stack choices)', checked: technical && !transparent, disabled: transparent },
-    { key: 'vanilla', label: 'Disable system prompt', description: 'Drops the added system prompt; keeps the run controls.', title: "Remove the built-in system prompt but keep the framework's run controls. For a fully raw run, use Transparent. Expand 'Actual prompt' to read what it removes.", checked: vanilla && !transparent, disabled: transparent },
-    { key: 'eco', label: 'Eco', description: 'Trims the system prompt to save tokens.', title: 'Trim the built-in system prompt to save tokens', checked: eco && !ecoDisabled, disabled: ecoDisabled },
-    { key: 'onBeforeMergeableQuality', label: 'Post-merge cleanup', description: 'Runs quality passes once it is ready to merge.', title: "When the run signals it's ready for merge, run maintainability, readability, and security-audit passes", checked: onBeforeMergeableQuality && !transparent, disabled: transparent },
-    { key: 'browser', label: 'Browser', description: 'Gives the agent a real browser to inspect pages.', title: 'Give the agent a real browser via chrome-devtools-mcp: navigate pages, read console + network, inspect the DOM, and screenshot', checked: browser && !transparent, disabled: transparent },
+    { key: 'autopilot', label: 'Autopilot', description: 'Auto-accepts the recommended choice after a countdown.', title: 'Auto-accept the recommended choice after a countdown; also relaxes the maintenance stance', checked: autopilot && !transparent, disabled: transparent, disabledReason: 'off while Transparent is on' },
+    { key: 'technical', label: 'Technical control', description: 'Surfaces technical detail like tech-stack choices.', title: 'Expose technical detail (e.g. tech-stack choices)', checked: technical && !transparent, disabled: transparent, disabledReason: 'off while Transparent is on' },
+    { key: 'vanilla', label: 'Disable system prompt', description: 'Drops the added system prompt; keeps the run controls.', title: "Remove the built-in system prompt but keep the framework's run controls. For a fully raw run, use Transparent. Expand 'Actual prompt' to read what it removes.", checked: vanilla && !transparent, disabled: transparent, disabledReason: 'off while Transparent is on' },
+    { key: 'eco', label: 'Eco', description: 'Trims the system prompt to save tokens.', title: 'Trim the built-in system prompt to save tokens', checked: eco && !ecoDisabled, disabled: ecoDisabled, disabledReason: 'nothing to trim while the system prompt is off' },
+    { key: 'onBeforeMergeableQuality', label: 'Post-merge cleanup', description: 'Runs quality passes once it is ready to merge.', title: "When the run signals it's ready for merge, run maintainability, readability, and security-audit passes", checked: onBeforeMergeableQuality && !transparent, disabled: transparent, disabledReason: 'off while Transparent is on' },
+    { key: 'browser', label: 'Browser', description: 'Gives the agent a real browser to inspect pages.', title: 'Give the agent a real browser via chrome-devtools-mcp: navigate pages, read console + network, inspect the DOM, and screenshot', checked: browser && !transparent, disabled: transparent, disabledReason: 'off while Transparent is on' },
   ]
   const ecoOptions: OptionRow[] = [
     { key: 'ecoPlanning', label: 'Auto planning', description: 'Drops the planning section; the agent plans itself.', title: 'Drop the planning section, letting the agent plan on its own', checked: ecoPlanning },
@@ -270,7 +270,12 @@ export function StartRunForm({
         {/* Global options (#314) as a gear-icon checkbox dropdown (#654/#668). */}
         <OptionsMenu options={mainOptions} ecoOptions={ecoOptions} showEco={eco && !ecoDisabled} busy={busy} />
         {/* Start run at the end of the row (#668). */}
-        <Button type="submit" className="ml-auto" disabled={busy || !prompt.trim()}>
+        <Button
+          type="submit"
+          className="ml-auto"
+          disabled={busy || !prompt.trim()}
+          title={!prompt.trim() ? 'Type a prompt to start a run' : undefined}
+        >
           {busy ? 'Starting…' : 'Start run'}
         </Button>
       </div>

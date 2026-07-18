@@ -55,7 +55,7 @@ export function ProjectsSidebar({
           {interventionCount > 0 && (
             <span
               className="ml-auto min-w-5 rounded-full bg-primary px-1.5 text-center text-xs font-semibold text-primary-foreground tabular-nums"
-              title={`${interventionCount} item(s) need you`}
+              title={`${interventionCount} item${interventionCount === 1 ? '' : 's'} need${interventionCount === 1 ? 's' : ''} you`}
             >
               {interventionCount}
             </span>

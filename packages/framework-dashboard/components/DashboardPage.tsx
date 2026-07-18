@@ -275,8 +275,16 @@ function ProjectsTable({ projects, onSelectProject }: { projects: ProjectStat[];
           {projects.map(p => (
             <tr
               key={p.projectId}
+              role="button"
+              tabIndex={0}
               onClick={() => onSelectProject(p.projectId)}
-              className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-accent"
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onSelectProject(p.projectId)
+                }
+              }}
+              className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
             >
               <td className="py-2 pr-4">
                 <span className="flex items-center gap-2">

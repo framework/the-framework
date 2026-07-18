@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { Intervention, Activity } from '@gemstack/framework'
+import type { Intervention, Activity, ProjectSummary } from '@gemstack/framework'
 import { onProjectFiles, onInterventions, onActivity } from '../../server/reads.telefunc.js'
+import { onProjects } from '../../server/projects.telefunc.js'
 import { ProjectsSidebar } from '../../components/ProjectsSidebar.js'
 import { NotificationsMenu } from '../../components/NotificationsMenu.js'
 import { RunHistory } from '../../components/RunHistory.js'
@@ -20,9 +21,13 @@ import { useInterventionNotifications } from '../../lib/use-intervention-notific
 import { useActivityNotifications } from '../../lib/use-activity-notifications.js'
 import { usePreferences, notificationsEnabled, newActivityEnabled, humanInterventionEnabled } from '../../lib/preferences.js'
 import { pendingChoices, agentViews } from '../../lib/live-state.js'
+import { useDocumentTitle } from '../../lib/document-title.js'
 
 /** Stable, so `files` keeps one identity while no project is selected. */
 const EMPTY_FILES: string[] = []
+
+/** Stable initial for the projects load, so it does not churn on every render. */
+const EMPTY_PROJECTS: ProjectSummary[] = []
 
 /** Stable initial for the interventions poll, so it does not churn on every render. */
 const EMPTY_INTERVENTIONS: Intervention[] = []
@@ -64,6 +69,13 @@ export default function Page() {
   // the sidebar badge and the Overview card share one poll. Slow cadence — PRs change rarely and
   // each poll spawns `gh` per project.
   const { value: interventions } = usePolled<Intervention[]>(onInterventions, EMPTY_INTERVENTIONS, 15000, [])
+
+  // The registered projects, loaded once for the browser-tab title (#695/U3): the selected
+  // project's name plus the needs-you count drive `document.title` so a backgrounded tab tells
+  // you which project needs attention. The sidebar keeps its own poll; this is a cheap one-shot.
+  const projects = useLoaded<ProjectSummary[]>(onProjects, EMPTY_PROJECTS, [])
+  const projectName = projectId ? projects.find(p => p.id === projectId)?.name : null
+  useDocumentTitle(interventions.length, projectName)
 
   // Fire a browser notification when a new item lands on the "needs you" queue (#627). Rides the
   // one interventions poll above (the poll stays unconditional — it also feeds the sidebar badge

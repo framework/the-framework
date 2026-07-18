@@ -82,10 +82,14 @@ export function ProjectsSidebar({
             onClick={() => onSelect(p.id)}
           >
             <span className="flex w-full items-center gap-2">
+              {/* Status by color alone reads as nothing to a screen reader (#695/U33): hide the
+                  decorative dot and give it an sr-only text alternative. */}
               <span
+                aria-hidden
                 className={cn('h-2 w-2 shrink-0 rounded-full', p.activated ? 'bg-primary' : 'bg-muted-foreground')}
                 title={p.activated ? 'activated' : 'not activated'}
               />
+              <span className="sr-only">{p.activated ? 'Activated' : 'Not activated'}: </span>
               <span className="truncate font-medium">{p.name}</span>
             </span>
             <span className="truncate pl-4 text-xs font-normal text-muted-foreground">

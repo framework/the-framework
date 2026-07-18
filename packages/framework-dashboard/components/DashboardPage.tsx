@@ -204,10 +204,13 @@ function WorkingNow({ active, onSelectProject }: { active: ActiveRun[]; onSelect
             className="flex w-full flex-col items-start gap-0.5 py-2 text-left hover:opacity-80"
           >
             <span className="flex w-full items-center gap-1.5">
+              {/* Decorative dot + sr-only status (#695/U33): color alone reaches no screen reader. */}
               <span
+                aria-hidden
                 className={cn('h-2 w-2 shrink-0 rounded-full', run.readyForMerge ? 'bg-emerald-500' : 'animate-pulse bg-amber-500')}
                 title={run.readyForMerge ? 'Ready for merge' : 'Building'}
               />
+              <span className="sr-only">{run.readyForMerge ? 'Ready for merge' : 'Building'}: </span>
               <span className="truncate font-medium">{run.projectName}</span>
               {run.sessionName && <span className="truncate text-xs text-muted-foreground">{run.sessionName}</span>}
             </span>
@@ -288,13 +291,16 @@ function ProjectsTable({ projects, onSelectProject }: { projects: ProjectStat[];
             >
               <td className="py-2 pr-4">
                 <span className="flex items-center gap-2">
+                  {/* Decorative dot + sr-only status (#695/U33): color alone reaches no screen reader. */}
                   <span
+                    aria-hidden
                     className={cn(
                       'h-2 w-2 shrink-0 rounded-full',
                       p.running ? 'animate-pulse bg-primary' : p.activated ? 'bg-emerald-500' : 'bg-muted-foreground',
                     )}
                     title={p.running ? 'Running' : p.activated ? 'Activated' : 'Not activated'}
                   />
+                  <span className="sr-only">{p.running ? 'Running' : p.activated ? 'Activated' : 'Not activated'}: </span>
                   <span className="truncate font-medium">{p.projectName}</span>
                 </span>
               </td>

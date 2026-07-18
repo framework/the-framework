@@ -1,6 +1,7 @@
 import type { FrameworkEvent } from '@gemstack/framework'
 import { loopStatus, sessionInfo, deployPlan, runProgress } from '@gemstack/framework/client'
 import { Badge } from './ui/badge.js'
+import { isRunActive } from '../lib/live-state.js'
 import { cn } from '../lib/utils.js'
 
 // The run overview (#431): the "moat" the wrapped agent's own chat cannot show, rebuilt
@@ -14,6 +15,9 @@ export function RunOverview({ events }: { events: FrameworkEvent[] }) {
   const deploy = deployPlan(events)
   const progress = runProgress(events)
   const hasProgress = Boolean(progress.sessionName) || progress.readyForMerge
+  // A run only pulses "building…" while it's live (#695/U20): once the `end` event lands the
+  // pill must settle to the final state ("ready for merge" or "finished") instead of pulsing on.
+  const active = isRunActive(events)
 
   if (!loop && !deploy && !session?.sessionLink && !hasProgress) return null
 
@@ -22,10 +26,16 @@ export function RunOverview({ events }: { events: FrameworkEvent[] }) {
       {hasProgress && (
         <div className="flex items-center gap-2 text-sm md:col-span-2">
           <span
-            className={cn('h-2.5 w-2.5 shrink-0 rounded-full', progress.readyForMerge ? 'bg-green-500' : 'animate-pulse bg-amber-500')}
+            className={cn(
+              'h-2.5 w-2.5 shrink-0 rounded-full',
+              progress.readyForMerge ? 'bg-green-500' : active ? 'animate-pulse bg-amber-500' : 'bg-muted-foreground',
+            )}
+            aria-hidden
           />
           {progress.sessionName && <span className="font-medium">{progress.sessionName}</span>}
-          <span className="text-xs text-muted-foreground">{progress.readyForMerge ? 'ready for merge' : 'building…'}</span>
+          <span className="text-xs text-muted-foreground">
+            {progress.readyForMerge ? 'ready for merge' : active ? 'building…' : 'finished'}
+          </span>
         </div>
       )}
       {loop && (

@@ -92,6 +92,9 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   // markdown out). Takes the editor as an argument so the `/` menu — whose closures are built
   // once, before useEditor resolves — can call it too, not only the imperative handle.
   const loadTemplateInto = (ed: Editor, text: string): void => {
+    // Loading a preset replaces the whole editor, so guard typed work (#695/U11): a non-empty
+    // editor gets one confirm before its content is discarded. An empty editor loads silently.
+    if (!ed.isEmpty && typeof window !== 'undefined' && !window.confirm('Replace your current prompt with this preset?')) return
     applyTemplate(ed, text)
     setIsEmpty(ed.isEmpty)
     onChangeRef.current(ed.storage.markdown.getMarkdown())

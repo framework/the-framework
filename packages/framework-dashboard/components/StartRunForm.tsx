@@ -274,9 +274,19 @@ export function StartRunForm({
           type="submit"
           className="ml-auto"
           disabled={busy || !prompt.trim()}
-          title={!prompt.trim() ? 'Type a prompt to start a run' : undefined}
+          title={!prompt.trim() ? 'Type a prompt to start a run' : 'Start run  (⌘↵ / Ctrl+Enter)'}
         >
-          {busy ? 'Starting…' : 'Start run'}
+          {busy ? (
+            'Starting…'
+          ) : (
+            <>
+              Start run
+              {/* The editor submits on ⌘/Ctrl+Enter (#695/U13): surface the otherwise-hidden shortcut. */}
+              <kbd className="ml-1.5 hidden rounded border border-primary-foreground/30 px-1 text-[10px] font-medium text-primary-foreground/70 sm:inline">
+                ⌘↵
+              </kbd>
+            </>
+          )}
         </Button>
       </div>
 

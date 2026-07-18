@@ -10,7 +10,7 @@ import { cn } from '../lib/utils.js'
 // in @gemstack/framework) — the production-grade loop status, the deploy plan, and a link
 // to the live session. Cards render only when their data has arrived, so an early run
 // shows nothing extra.
-export function RunOverview({ events }: { events: FrameworkEvent[] }) {
+export function RunOverview({ events, showSessionLink = true }: { events: FrameworkEvent[]; showSessionLink?: boolean }) {
   const loop = loopStatus(events)
   const session = sessionInfo(events)
   const deploy = deployPlan(events)
@@ -22,10 +22,11 @@ export function RunOverview({ events }: { events: FrameworkEvent[] }) {
 
   // The "Open session" link, labeled honestly: a headless Claude Code run has no per-session
   // URL, so the generic app entry (claude.ai/code) is shown as "Open Claude Code" with the id
-  // surfaced separately, not as a deep link to that id. See {@link describeSessionLink}.
-  const sessionLink = describeSessionLink(session)
+  // surfaced separately, not as a deep link to that id. See {@link describeSessionLink}. The
+  // run's own view moves this into its action bar, so it opts out via `showSessionLink={false}`.
+  const sessionLink = showSessionLink ? describeSessionLink(session) : null
 
-  if (!loop && !deploy && !session?.sessionLink && !hasProgress) return null
+  if (!loop && !deploy && !sessionLink && !hasProgress) return null
 
   return (
     <div className="grid gap-3 border-b border-border p-4 md:grid-cols-2">
@@ -79,16 +80,14 @@ export function RunOverview({ events }: { events: FrameworkEvent[] }) {
       )}
 
       {sessionLink && (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs md:col-span-2">
-          <a href={sessionLink.href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
-            {sessionLink.label}
-          </a>
-          {sessionLink.id && (
-            <span className="text-muted-foreground" title="Claude Code session id">
-              session <code className="font-mono text-[11px]">{sessionLink.id}</code>
-            </span>
-          )}
-        </div>
+        <a
+          href={sessionLink.href}
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs text-primary underline underline-offset-2 md:col-span-2"
+        >
+          {sessionLink.label}
+        </a>
       )}
     </div>
   )

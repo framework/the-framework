@@ -217,6 +217,8 @@ test('runLogKind maps the run path to a project-log kind (#379)', () => {
   assert.equal(runLogKind({ directPrompt: false, research: false }), 'build')
   assert.equal(runLogKind({ directPrompt: true, research: false }), 'prompt')
   assert.equal(runLogKind({ directPrompt: false, research: true }), 'prompt')
+  // Transparent (#625) routes a build-kind run through the raw prompt path, so it logs as a prompt.
+  assert.equal(runLogKind({ directPrompt: false, research: false }, true), 'prompt')
 })
 
 test('runLogEntry maps the end event to a status and carries the session (#379)', () => {
@@ -630,6 +632,26 @@ test('runCli --fake --no-dashboard runs the whole flow offline to production-gra
   assert.match(text, /checklist pass 1/)
   assert.match(text, /production-grade/)
   assert.match(text, /deploy: SSR/)
+})
+
+test('runCli --transparent runs a bare prompt raw, skipping the build flow + wrapping (#625/#678)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'framework-transparent-'))
+  try {
+    const { io, out } = capture()
+    const code = await runCli(['make it blue', '--transparent', '--fake', '--no-dashboard', '--cwd', dir], io)
+    assert.equal(code, 0)
+    const text = out.join('\n')
+    // Transparent = raw Claude Code: the build path's markers must NOT appear (contrast the test above).
+    assert.doesNotMatch(text, /scope: full/) // no scope phase
+    assert.doesNotMatch(text, /Build this app end to end/) // no buildPrompt wrapping
+    assert.doesNotMatch(text, /Work within the existing codebase/) // no extendPrompt wrapping
+    assert.doesNotMatch(text, /production-grade/) // no synthesize / production-grade pass
+    // And it records as a prompt run, not a build.
+    const logs = await readLogs(dir)
+    assert.equal(logs[0]!.kind, 'prompt')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
 
 test('a live daemon steers a dashboard-less run through its gates via control.jsonl (#344)', async () => {

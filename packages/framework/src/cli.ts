@@ -616,9 +616,11 @@ export function ecoOptions(opts: Pick<CliOptions, 'eco'>): EcoOptions | undefine
   return { autoPlanning, autoResearch, autoMaintenance }
 }
 
-/** The log kind a run records in `.the-framework/LOGS.md` (#379): the direct paths are prompts, a build run is a build. */
-export function runLogKind(opts: Pick<CliOptions, 'directPrompt' | 'research'>): LogEntry['kind'] {
-  return opts.directPrompt || opts.research ? 'prompt' : 'build'
+/** The log kind a run records in `.the-framework/LOGS.md` (#379): the direct paths are prompts, a
+ * build run is a build. Transparent (#625) routes a build-kind run through the raw prompt path too,
+ * so it logs as a prompt. */
+export function runLogKind(opts: Pick<CliOptions, 'directPrompt' | 'research'>, transparent = false): LogEntry['kind'] {
+  return opts.directPrompt || opts.research || transparent ? 'prompt' : 'build'
 }
 
 /**
@@ -1069,7 +1071,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   // kind + title are known up front; the session id/link arrive mid-run, and the
   // `end` event (fired once by both run paths) closes the entry. Best-effort: the
   // project DB is committed history, so it must never break a run.
-  const logKind = runLogKind(opts)
+  const logKind = runLogKind(opts, transparent)
   const logTitle = intent || (opts.research ? 'this PR' : '')
   let logSessionId: string | undefined
   let logSessionLink: string | undefined
@@ -1176,14 +1178,19 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   // `framework research [what]` (#331) and `framework prompt <text>` (#353): the
   // direct prompt path — run one prompt through runPrompt, which honors its gates
   // (#337/#339) but skips the scope -> build scaffolding entirely.
-  // Research renders its preset template around the "what"; prompt runs the text
+  // Transparent (#625) joins them: "raw Claude Code" must bypass the build orchestration
+  // AND the prompt wrapping too, not just zero the system prompt — so a transparent run
+  // (any kind) runs its prompt verbatim here rather than through runFramework's
+  // scope -> build -> synthesize + extendPrompt. Research renders its preset template
+  // around the "what" (only when it isn't transparent); prompt/transparent run the text
   // verbatim (it may already BE an edited preset, so it must not be re-rendered).
   // Shares all the wiring above (dashboard, store, control channel, budget).
-  if (opts.research || opts.directPrompt) {
+  const isResearch = opts.research && !transparent
+  if (opts.research || opts.directPrompt || transparent) {
     const { userSystemPrompt, noBuiltinPrompt, eco } = promptConfig
-    return settleRun(epilogue(opts.directPrompt ? 'prompt run' : 'research'), async () => {
+    return settleRun(epilogue(isResearch ? 'research' : 'prompt run'), async () => {
       await runPrompt({
-        prompt: opts.directPrompt ? intent : renderResearchPrompt(intent),
+        prompt: isResearch ? renderResearchPrompt(intent) : intent,
         driver,
         cwd,
         onEvent,
@@ -1201,9 +1208,9 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
         ...(sessionLink ? { sessionLink } : {}),
       })
       return {
-        successLine: opts.directPrompt
-          ? '\n✓ prompt run done.'
-          : '\n✓ research done: see the REVIEW-PROBLEMS / TODO files it wrote.',
+        successLine: isResearch
+          ? '\n✓ research done: see the REVIEW-PROBLEMS / TODO files it wrote.'
+          : '\n✓ prompt run done.',
       }
     })
   }

@@ -1,6 +1,7 @@
 import type { FrameworkEvent } from '@gemstack/framework'
 import { sessionInfo } from '@gemstack/framework/client'
-import { onRun } from '../server/reads.telefunc.js'
+import { useCallback, useState } from 'react'
+import { onRun, onRetainedWorktrees } from '../server/reads.telefunc.js'
 import { EventList } from './EventList.js'
 import { RunActionBar } from './RunActionBar.js'
 import { RunResumeChat } from './RunResumeChat.js'
@@ -26,6 +27,12 @@ export function RunReplay({
 }) {
   // null until the first answer: "Loading run…" and "no events" are different things.
   const events = useLoaded<FrameworkEvent[] | null>(() => onRun(projectId, runId), null, [projectId, runId])
+  // Whether this run kept its worktree (#737): a failed/stopped run does, a clean one had it
+  // removed when it finished. Drives the Remove button, and is cleared locally once removed so
+  // the button goes without waiting for a refetch.
+  const retained = useLoaded<string[]>(() => onRetainedWorktrees(projectId), [], [projectId, runId])
+  const [removed, setRemoved] = useState(false)
+  const onWorktreeRemoved = useCallback(() => setRemoved(true), [])
 
   if (events === null) return <div className="grid flex-1 place-items-center text-sm text-muted-foreground">Loading run…</div>
   // The agent session this run ran under (from its `session-update` events): present once the
@@ -33,7 +40,13 @@ export function RunReplay({
   const sessionId = sessionInfo(events)?.sessionId
   return (
     <>
-      <RunActionBar projectId={projectId} events={events} />
+      <RunActionBar
+        projectId={projectId}
+        runId={runId}
+        events={events}
+        retainedWorktree={!removed && retained.includes(runId)}
+        onWorktreeRemoved={onWorktreeRemoved}
+      />
       {events.length === 0 ? (
         <div className="grid flex-1 place-items-center text-sm text-muted-foreground">This run has no events.</div>
       ) : (

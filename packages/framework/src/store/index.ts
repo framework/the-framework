@@ -8,6 +8,8 @@ export {
   reconcileOrphanedRuns,
   loadRunEvents,
   readLiveMetas,
+  archiveWorktreeRun,
+  listWorktreeDirs,
   runIdFromStartedAt,
   isSafeRunId,
   FRAMEWORK_DIR,

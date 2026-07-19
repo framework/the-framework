@@ -400,6 +400,45 @@ async function archivePriorRun(fs: StoreFs, dir: string): Promise<void> {
 }
 
 /**
+ * The run ids that have a worktree directory under `.the-framework/worktrees/` (#737). Names
+ * only, from the filesystem: a directory here IS a run's checkout, and its name is the run id.
+ * Forgiving — a project that never ran concurrently has no such dir and yields `[]`.
+ */
+export async function listWorktreeDirs(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<string[]> {
+  const names = await fs.readdir(join(cwd, FRAMEWORK_DIR, WORKTREES_DIR)).catch(() => [])
+  return names.filter(isSafeRunId)
+}
+
+/**
+ * Archive a worktree run's history into the *main repo* (#737), returning the meta it archived.
+ *
+ * A run writes its `run.json` / `events.jsonl` inside its own worktree (#736), so deleting that
+ * worktree would delete the run's history with it. This copies it to the repo's `runs/`, which is
+ * the one place the dashboard's history reads from, so teardown becomes safe.
+ *
+ * A meta still marked `running` is flipped to `stopped` first: this runs when the process is
+ * already gone, so `running` means it died without closing (crash, kill -9), exactly the case
+ * {@link reconcileOrphanedRuns} handles for the project path. Idempotent per id, and forgiving:
+ * a worktree with no run, or an unreadable one, yields `undefined` rather than throwing.
+ */
+export async function archiveWorktreeRun(
+  worktree: string,
+  repo: string,
+  fs: StoreFs = nodeStoreFs(),
+): Promise<RunMeta | undefined> {
+  try {
+    const worktreeDir = join(worktree, FRAMEWORK_DIR)
+    const live = await readMetaFile(fs, join(worktreeDir, META_FILE))
+    if (!live?.id || !isSafeRunId(live.id)) return undefined
+    const meta: RunMeta = live.status === 'running' ? { ...live, status: 'stopped' } : live
+    await archiveRun(fs, join(repo, FRAMEWORK_DIR), meta, join(worktreeDir, EVENTS_FILE))
+    return meta
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * List a project's archived runs, most-recent first. Reads every `runs/*.json`
  * meta; the id sorts chronologically so no timestamp parse is needed. Missing or
  * unreadable dir/entries are skipped, never thrown.
@@ -453,6 +492,21 @@ export async function reconcileOrphanedRuns(cwd: string, fs: StoreFs = nodeStore
     const stopped: RunMeta = { ...live, status: 'stopped' }
     await fs.write(join(dir, META_FILE), JSON.stringify(stopped, null, 2) + '\n').catch(() => {})
     await archivePriorRun(fs, dir).catch(() => {})
+    fixed++
+  }
+
+  // Runs living in worktrees (#736/#737). A daemon that died mid-run never ran its teardown, so
+  // each of those runs is orphaned the same way — except its history sits inside the worktree,
+  // where nothing reads it. Flip it in place (so the dashboard stops showing it as live) and copy
+  // it into the repo's history. The worktree itself is left on disk: a run that ended this way did
+  // not end cleanly, and those are kept for inspection. Removing one is an explicit action.
+  for (const name of await fs.readdir(join(dir, WORKTREES_DIR))) {
+    if (!isSafeRunId(name)) continue
+    const worktreeDir = join(dir, WORKTREES_DIR, name, FRAMEWORK_DIR)
+    const meta = await readMetaFile(fs, join(worktreeDir, META_FILE))
+    if (meta?.status !== 'running') continue
+    await fs.write(join(worktreeDir, META_FILE), JSON.stringify({ ...meta, status: 'stopped' }, null, 2) + '\n').catch(() => {})
+    await archiveWorktreeRun(join(dir, WORKTREES_DIR, name), cwd, fs).catch(() => undefined)
     fixed++
   }
   return fixed

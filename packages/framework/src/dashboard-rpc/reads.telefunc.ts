@@ -1,4 +1,4 @@
-import { listRuns, readLiveMetas, loadRunEvents, type RunMeta } from '../store/index.js'
+import { listRuns, readLiveMetas, loadRunEvents, listWorktreeDirs, type RunMeta } from '../store/index.js'
 import { readLogs, type LogEntry } from '../logs.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
@@ -52,6 +52,22 @@ export async function onRuns(projectId: string): Promise<RunMeta[]> {
   const archived = await listRuns(cwd).catch(() => [])
   const live = await readLiveMetas(cwd).catch(() => [])
   return [...live.filter(run => !archived.some(r => r.id === run.id)), ...archived]
+}
+
+/**
+ * The run ids that still have a worktree on disk (#737). A run that failed or was stopped keeps
+ * its checkout so you can go look at what it was holding; this is how the dashboard knows which
+ * finished run has one to offer removing. Live runs are excluded — their worktree is in use.
+ */
+export async function onRetainedWorktrees(projectId: string): Promise<string[]> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return []
+  const [names, live] = await Promise.all([
+    listWorktreeDirs(cwd).catch(() => []),
+    readLiveMetas(cwd).catch(() => []),
+  ])
+  const running = new Set(live.filter(run => run.status === 'running').map(run => run.id))
+  return names.filter(id => !running.has(id)).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
 }
 
 /** One archived run's event log for replay (or `[]` when the run or project is gone). */

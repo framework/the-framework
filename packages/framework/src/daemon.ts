@@ -10,6 +10,9 @@ import {
   runBranchName,
   linkDependencies,
   excludeDependencyLinks,
+  archiveWorktreeRun,
+  removeWorktree,
+  pruneWorktrees,
 } from './store/index.js'
 import { startDashboard, type Dashboard, type StartRunKind, type StartRunOptions, type StartRunResult, type AddProjectResult, type PreviewResult, type PreviewStatus } from './dashboard/index.js'
 import { startInterventionWatcher, postDiscord, type InterventionWatcher } from './dashboard/intervention-watcher.js'
@@ -500,6 +503,30 @@ function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOptions): Pro
     }
   }
 
+  /**
+   * Retire a finished run's worktree (#737). Its history lives inside the worktree, so it is
+   * copied into the repo first — otherwise removing the checkout would delete the run from the
+   * dashboard's history.
+   *
+   * Then the retention rule: a run that finished cleanly has nothing left to look at, so its
+   * worktree goes. A run that failed or was stopped keeps its checkout, because that is exactly
+   * when you want to see the half-finished working tree and the diff it died holding. Those are
+   * removed explicitly (the dashboard's Remove), never silently on a timer.
+   *
+   * Best-effort from end to end: this runs off a process-exit event with nothing to return to,
+   * so a failure here must not take the daemon down.
+   */
+  const tearDownWorktree = async (projectCwd: string, worktree: string): Promise<void> => {
+    try {
+      const meta = await archiveWorktreeRun(worktree, projectCwd)
+      if (meta?.status !== 'done') return // failed / stopped / unreadable: keep it for inspection
+      await removeWorktree(projectCwd, worktree)
+      await pruneWorktrees(projectCwd)
+    } catch {
+      // A worktree we could not retire is a worktree left on disk, which is the safe direction.
+    }
+  }
+
   // Start-from-dashboard (#345): spawn `framework "<prompt>" --no-dashboard --cwd <checkout>`
   // as a detached child — the same spawn ensureDaemon uses for the daemon itself. The run
   // streams into the page via its tailed event log, and its gates + Stop steer through the
@@ -557,10 +584,13 @@ function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOptions): Pro
         ...(workspace.runId ? ['--run-id', workspace.runId] : []),
       ])
       // The run narrates itself through its own `.the-framework/events.jsonl`, which the
-      // dashboard streams over a Telefunc Channel; the daemon just tracks liveness. The
-      // worktree is left in place on exit — archiving its history and tearing it down is #737.
-      child.once('error', () => activeRuns.delete(key))
-      child.once('exit', () => activeRuns.delete(key))
+      // dashboard streams over a Telefunc Channel; the daemon just tracks liveness.
+      const settle = (): void => {
+        activeRuns.delete(key)
+        if (workspace.runId) void tearDownWorktree(projectCwd, workspace.cwd)
+      }
+      child.once('error', settle)
+      child.once('exit', settle)
       if (child.pid !== undefined) activeRuns.set(key, child.pid)
       return { ok: true }
     } finally {

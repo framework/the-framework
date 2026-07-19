@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { mkdtemp, rm, mkdir, writeFile, readFile, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { sendStop, sendMessage, sendChoice } from './control.telefunc.js'
+import { sendStop, sendMessage, sendChoice, sendRemoveWorktree } from './control.telefunc.js'
+import { onRetainedWorktrees } from './reads.telefunc.js'
 import { addProject, projectId as idFor } from '../registry.js'
 import { FRAMEWORK_DIR, WORKTREES_DIR } from '../store/index.js'
 import { CONTROL_FILE } from '../control.js'
@@ -95,6 +96,50 @@ test('an unknown or absent run id falls back to the project root, as before #736
     await sendStop(ctx.projectId, 'a-run-that-is-gone')
     assert.deepEqual(await entries(ctx.rootControl), [{ kind: 'stop' }, { kind: 'stop' }])
     assert.deepEqual(await entries(ctx.runControl), [], 'the live run is left alone')
+  } finally {
+    ctx.restore()
+    await rm(ctx.dir, { recursive: true, force: true })
+  }
+})
+
+// #737: a failed run keeps its worktree for inspection, so removing one is an explicit action —
+// and must never yank the checkout out from under a run that is still going.
+
+test('sendRemoveWorktree refuses while that run is still live (#737)', async () => {
+  const ctx = await projectWithWorktreeRun() // its run.json says `running`
+  try {
+    const result = await sendRemoveWorktree(ctx.projectId, ctx.runId)
+    assert.equal(result.ok, false)
+    assert.match(result.ok === false ? result.error : '', /still going/)
+    assert.equal(await entries(ctx.runControl).then(() => true), true, 'the worktree is untouched')
+  } finally {
+    ctx.restore()
+    await rm(ctx.dir, { recursive: true, force: true })
+  }
+})
+
+test('sendRemoveWorktree rejects an unsafe run id before touching anything (#737)', async () => {
+  const ctx = await projectWithWorktreeRun()
+  try {
+    const result = await sendRemoveWorktree(ctx.projectId, '../../etc')
+    assert.equal(result.ok, false)
+    assert.match(result.ok === false ? result.error : '', /invalid run id/)
+  } finally {
+    ctx.restore()
+    await rm(ctx.dir, { recursive: true, force: true })
+  }
+})
+
+test('onRetainedWorktrees hides a live run, and lists one that has finished (#737)', async () => {
+  const ctx = await projectWithWorktreeRun()
+  try {
+    assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [], 'a running run has nothing to offer removing')
+    // Once it is no longer running, its retained checkout is listed.
+    await writeFile(
+      join(ctx.dir, FRAMEWORK_DIR, WORKTREES_DIR, ctx.runId, FRAMEWORK_DIR, 'run.json'),
+      JSON.stringify({ version: 1, status: 'failed', id: ctx.runId, startedAt: ctx.runId, updatedAt: ctx.runId, passes: 0 }),
+    )
+    assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [ctx.runId])
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })

@@ -404,6 +404,94 @@ setTimeout(() => {}, 800)
   }
 })
 
+test('a finished run loses its worktree; a failed one keeps it, history saved either way (#737)', async () => {
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-daemon-teardown-')))
+  const git = nodeGitRunner()
+  const ac = new AbortController()
+  try {
+    await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true })
+    await git(['init'], cwd)
+    await git(['config', 'user.email', 't@t'], cwd)
+    await git(['config', 'user.name', 't'], cwd)
+    await writeFile(join(cwd, 'README.md'), '# t\n')
+    await git(['add', '-A'], cwd)
+    await git(['commit', '-m', 'init'], cwd)
+
+    // The stub plays a run: it writes the meta a real run would leave behind, with the status
+    // read from a file the test controls, then exits so the daemon's teardown fires.
+    const stub = join(cwd, 'stub-cli.cjs')
+    await writeFile(
+      stub,
+      `const fs = require('node:fs'), path = require('node:path')
+const args = process.argv.slice(2)
+const runCwd = args[args.indexOf('--cwd') + 1]
+const runId = args[args.indexOf('--run-id') + 1]
+const status = fs.readFileSync(${JSON.stringify(join(cwd, 'status.txt'))}, 'utf8').trim()
+const dir = path.join(runCwd, '.the-framework')
+fs.mkdirSync(dir, { recursive: true })
+fs.writeFileSync(path.join(dir, 'events.jsonl'), JSON.stringify({ kind: 'log', message: 'worked' }) + '\\n')
+fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify({ version: 1, status, id: runId, startedAt: runId, updatedAt: runId, passes: 1 }))
+fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
+`,
+    )
+    const env = await configEnv(cwd)
+    const done = runDaemon(cwd, { port: 0, signal: ac.signal, binPath: stub, env })
+    let state = await readDaemonState(env)
+    for (let i = 0; i < 100 && !state; i++) {
+      await new Promise(r => setTimeout(r, 20))
+      state = await readDaemonState(env)
+    }
+    assert.ok(state, 'daemon wrote its state file')
+
+    /** Start a run whose stub reports `status`, and resolve once its worktree has settled. */
+    const runWith = async (status: string, nth: number): Promise<string> => {
+      await writeFile(join(cwd, 'status.txt'), status)
+      assert.equal((await sendStart(state!.url, cwd, `run ${status}`)).ok, true)
+      let ids: string[] = []
+      for (let i = 0; i < 150 && ids.length < nth; i++) {
+        await new Promise(r => setTimeout(r, 20))
+        ids = await readFile(join(cwd, 'started.log'), 'utf8').then(s => s.split('\n').filter(Boolean), () => [])
+      }
+      assert.equal(ids.length, nth, `run ${nth} started`)
+      return ids[nth - 1]!
+    }
+
+    /** Poll for the archived history to appear, which is the teardown having run. */
+    const archived = async (runId: string): Promise<boolean> => {
+      for (let i = 0; i < 150; i++) {
+        if (await stat(join(cwd, FRAMEWORK_DIR, 'runs', `${runId}.json`)).then(() => true, () => false)) return true
+        await new Promise(r => setTimeout(r, 20))
+      }
+      return false
+    }
+
+    // A clean finish: history archived into the repo, worktree gone.
+    const doneId = await runWith('done', 1)
+    assert.equal(await archived(doneId), true, "a finished run's history is copied into the project")
+    let gone = false
+    for (let i = 0; i < 150 && !gone; i++) {
+      gone = await stat(join(cwd, FRAMEWORK_DIR, 'worktrees', doneId)).then(() => false, () => true)
+      if (!gone) await new Promise(r => setTimeout(r, 20))
+    }
+    assert.equal(gone, true, 'and its worktree is removed')
+
+    // A failure: history archived too, but the checkout is kept so it can be inspected.
+    const failedId = await runWith('failed', 2)
+    assert.equal(await archived(failedId), true, "a failed run's history is copied too")
+    assert.equal(
+      (await stat(join(cwd, FRAMEWORK_DIR, 'worktrees', failedId, 'README.md'))).isFile(),
+      true,
+      'and its worktree is retained, content and all, for inspection',
+    )
+
+    ac.abort()
+    await done
+  } finally {
+    ac.abort()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
 test('sendStart spawns the run child (prompt, --no-dashboard, --cwd) one at a time when the project has no worktree (#345)', async () => {
   // A non-git workspace cannot be given a worktree, so runs share the one checkout and the
   // pre-#736 one-at-a-time guard still applies. tmpWorkspace() is deliberately not a repo.

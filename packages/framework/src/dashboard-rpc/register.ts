@@ -1,6 +1,6 @@
 import { __decorateTelefunction } from 'telefunc'
-import { onRuns, onRun, onDocs, onProjectLog, onQueue, onOverview, onInterventions, onActivity, onDashboard, onGithubUrl, onGitStatus, onProjectFiles, onProjectFileStatus } from './reads.telefunc.js'
-import { sendStop, sendChoice, sendMessage, sendStart, sendPreview, onServeTargets, sendStopPreview, onPreviewStatus, sendOpenInApp } from './control.telefunc.js'
+import { onRuns, onRun, onDocs, onProjectLog, onQueue, onOverview, onInterventions, onActivity, onDashboard, onGithubUrl, onGitStatus, onProjectFiles, onProjectFileStatus, onRetainedWorktrees } from './reads.telefunc.js'
+import { sendStop, sendChoice, sendMessage, sendStart, sendPreview, onServeTargets, sendStopPreview, onPreviewStatus, sendOpenInApp, sendRemoveWorktree } from './control.telefunc.js'
 import { onEvents } from './events.telefunc.js'
 import { onProjects, sendAddProject } from './projects.telefunc.js'
 import { onPreferences, savePreferences, onEditors } from './preferences.telefunc.js'
@@ -44,6 +44,7 @@ export function registerDashboardTelefunctions(appRootDir: string = process.cwd(
   reg(onDashboard, 'onDashboard', reads)
   reg(onGithubUrl, 'onGithubUrl', reads)
   reg(onGitStatus, 'onGitStatus', reads)
+  reg(onRetainedWorktrees, 'onRetainedWorktrees', reads)
   reg(onProjectFiles, 'onProjectFiles', reads)
   reg(onProjectFileStatus, 'onProjectFileStatus', reads)
   reg(sendStop, 'sendStop', control)
@@ -55,6 +56,7 @@ export function registerDashboardTelefunctions(appRootDir: string = process.cwd(
   reg(sendStopPreview, 'sendStopPreview', control)
   reg(onPreviewStatus, 'onPreviewStatus', control)
   reg(sendOpenInApp, 'sendOpenInApp', control)
+  reg(sendRemoveWorktree, 'sendRemoveWorktree', control)
   reg(onEvents, 'onEvents', events)
   reg(onProjects, 'onProjects', projects)
   reg(sendAddProject, 'sendAddProject', projects)

@@ -9,6 +9,8 @@ import {
   listRuns,
   readLiveMeta,
   readLiveMetas,
+  archiveWorktreeRun,
+  listWorktreeDirs,
   reconcileOrphanedRuns,
   loadRunEvents,
   runIdFromStartedAt,
@@ -399,4 +401,58 @@ test('readLiveMetas self-heals a dead run in a worktree, same as the single read
   const runs = await readLiveMetas(CWD, fs, () => false)
   assert.equal(runs[0]?.status, 'stopped', 'a running meta whose process is gone reads as stopped')
   assert.equal((JSON.parse(fs.files.get(path)!) as RunMeta).status, 'stopped', 'and is healed on disk')
+})
+
+// #737: a run's history lives inside its worktree, so removing that worktree would delete the run
+// from the dashboard's history. It is copied into the repo first, which is what makes teardown safe.
+const worktreeAt = (runId: string) => join(CWD, '.the-framework', 'worktrees', runId)
+const worktreeFiles = (runId: string, meta: Record<string, unknown>, events = '') => ({
+  [join(worktreeAt(runId), '.the-framework', 'run.json')]: JSON.stringify(meta),
+  [join(worktreeAt(runId), '.the-framework', 'events.jsonl')]: events,
+})
+
+test('archiveWorktreeRun copies a finished run into the repo history (#737)', async () => {
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, passes: 2 }, '{"kind":"log","message":"hi"}\n'))
+  const meta = await archiveWorktreeRun(worktreeAt('r1'), CWD, fs)
+  assert.equal(meta?.status, 'done')
+  assert.equal(fs.files.get(join(CWD, '.the-framework', 'runs', 'r1.jsonl')), '{"kind":"log","message":"hi"}\n', 'the log lands in the repo')
+  assert.equal((JSON.parse(fs.files.get(join(CWD, '.the-framework', 'runs', 'r1.json'))!) as RunMeta).passes, 2)
+  // And the archived copy is what listRuns reads, so the run survives losing its worktree.
+  assert.deepEqual((await listRuns(CWD, fs)).map(r => r.id), ['r1'])
+})
+
+test('archiveWorktreeRun records a run that died mid-flight as stopped, not running (#737)', async () => {
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT, passes: 0 }))
+  // The process is gone by the time we archive, so `running` here means it never closed.
+  assert.equal((await archiveWorktreeRun(worktreeAt('r1'), CWD, fs))?.status, 'stopped')
+  assert.equal((JSON.parse(fs.files.get(join(CWD, '.the-framework', 'runs', 'r1.json'))!) as RunMeta).status, 'stopped')
+})
+
+test('archiveWorktreeRun is forgiving of a worktree with no run', async () => {
+  assert.equal(await archiveWorktreeRun(worktreeAt('nope'), CWD, memFs()), undefined)
+})
+
+test('reconcileOrphanedRuns rescues a run a crashed daemon left in a worktree (#737)', async () => {
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT, passes: 0 }))
+  assert.equal(await reconcileOrphanedRuns(CWD, fs), 1)
+  assert.equal(
+    (JSON.parse(fs.files.get(join(worktreeAt('r1'), '.the-framework', 'run.json'))!) as RunMeta).status,
+    'stopped',
+    'the live meta stops claiming to be running',
+  )
+  assert.equal(
+    (JSON.parse(fs.files.get(join(CWD, '.the-framework', 'runs', 'r1.json'))!) as RunMeta).status,
+    'stopped',
+    'and its history is rescued into the repo',
+  )
+})
+
+test('listWorktreeDirs names the run of each worktree, ignoring anything else in there', async () => {
+  const fs = memFs({
+    ...worktreeFiles('r1', { id: 'r1' }),
+    ...worktreeFiles('r2', { id: 'r2' }),
+    [join(CWD, '.the-framework', 'worktrees', '.tmp', 'x')]: '',
+  })
+  assert.deepEqual((await listWorktreeDirs(CWD, fs)).sort(), ['r1', 'r2'])
+  assert.deepEqual(await listWorktreeDirs(join(CWD, 'never-ran'), fs), [])
 })

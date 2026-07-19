@@ -6,6 +6,7 @@ import { useAction } from '../lib/use-action.js'
 import { isRunActive } from '../lib/live-state.js'
 import { describeSessionLink } from '../lib/session-link.js'
 import { PreviewBar } from './PreviewBar.js'
+import { RemoveWorktreeButton } from './RemoveWorktreeButton.js'
 import { Button, buttonVariants } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './ui/tooltip.js'
 
@@ -13,16 +14,23 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './ui/t
 // tooltips, instead of three stacked labeled rows. Shared by the live view (RunLive) and the
 // finished replay (RunReplay), so the controls stay put when a run reaches Done. Serve is a
 // project-level action (always available); Stop shows only while the run is active; Open session
-// appears once the run has reported one (honestly labeled — see describeSessionLink).
+// appears once the run has reported one (honestly labeled — see describeSessionLink). A finished
+// run that kept its worktree (#737) also gets a Remove.
 export function RunActionBar({
   projectId,
   runId,
   events,
+  retainedWorktree = false,
+  onWorktreeRemoved,
 }: {
   projectId: string
   /** Which run Stop addresses (#749); absent falls back to the project's own control log. */
   runId?: string | null | undefined
   events: FrameworkEvent[]
+  /** True when this finished run still has a worktree on disk, so it can be removed (#737). */
+  retainedWorktree?: boolean
+  /** Told after that worktree is removed, so the button goes. */
+  onWorktreeRemoved?: () => void
 }) {
   // Stop routes through useAction like every other mutation: a click disables + shows "Stopping…"
   // and a failed stop surfaces instead of silently doing nothing.
@@ -53,6 +61,10 @@ export function RunActionBar({
             </TooltipTrigger>
             <TooltipContent>{busy ? 'Stopping…' : 'Stop run'}</TooltipContent>
           </Tooltip>
+        )}
+        {/* A retained worktree only exists for a finished run, so this never sits beside Stop. */}
+        {retainedWorktree && !active && runId && (
+          <RemoveWorktreeButton projectId={projectId} runId={runId} onRemoved={() => onWorktreeRemoved?.()} />
         )}
         {session && (
           <Tooltip>

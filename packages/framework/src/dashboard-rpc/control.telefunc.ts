@@ -2,8 +2,16 @@ import { getContext } from 'telefunc'
 import { appendControl, type ControlEntry } from '../control.js'
 import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
 import { resolveProjectPath, resolveRunPath, contextPreferences } from './context.js'
+import { isSafeRunId, readLiveMetas, removeWorktree, pruneWorktrees, worktreePath } from '../store/index.js'
 import type { ChoiceBy } from '../events.js'
-import type { PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from '../dashboard/types.js'
+import type {
+  PreviewResult,
+  PreviewStatus,
+  RemoveWorktreeResult,
+  StartRunKind,
+  StartRunOptions,
+  StartRunResult,
+} from '../dashboard/types.js'
 import type { ServeTarget } from '../preview.js'
 import type { DashboardContext } from '../dashboard/telefunc-serve.js'
 import type { Preferences } from '../registry.js'
@@ -59,6 +67,31 @@ export async function sendMessage(projectId: string, text: string, runId?: strin
   const message = text.trim()
   if (!message) return
   await appendControlFor(projectId, { kind: 'message', text: message }, runId)
+}
+
+/**
+ * Remove a retained worktree (#737). A run that failed or was stopped keeps its checkout so you
+ * can inspect it; this is the explicit cleanup for one, since nothing removes them on a timer.
+ *
+ * Refuses while that run is still live: its worktree is the checkout the agent is working in, and
+ * Stop is the way to end a run, not pulling the floor out from under it. The run's history was
+ * archived into the repo when it finished, so removal costs no history.
+ */
+export async function sendRemoveWorktree(projectId: string, runId: string): Promise<RemoveWorktreeResult> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
+  if (!isSafeRunId(runId)) return { ok: false, error: `invalid run id: ${runId}` }
+  const live = await readLiveMetas(cwd).catch(() => [])
+  if (live.some(run => run.id === runId && run.status === 'running')) {
+    return { ok: false, error: 'that run is still going; stop it before removing its worktree' }
+  }
+  try {
+    await removeWorktree(cwd, worktreePath(cwd, runId))
+    await pruneWorktrees(cwd)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 /**

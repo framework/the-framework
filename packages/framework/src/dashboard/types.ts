@@ -4,6 +4,9 @@ import type { EcoOptions } from '../system-prompt.js'
 // Preview RPCs speak. They live here, on neither the HTTP server nor the Telefunc mount, so
 // both — plus the telefunctions themselves — depend on this leaf rather than on each other.
 
+/** The outcome of removing a retained worktree (#737). */
+export type RemoveWorktreeResult = { ok: true } | { ok: false; error: string }
+
 /** The outcome of an add-project attempt (#396). */
 export type AddProjectResult =
   | { ok: true; added: number; alreadyActivated: number }

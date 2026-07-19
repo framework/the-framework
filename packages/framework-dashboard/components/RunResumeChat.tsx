@@ -1,18 +1,22 @@
 import { useRef, useState } from 'react'
 import { Composer, type ComposerHandle } from './Composer.js'
 import { sendStart } from '../server/control.telefunc.js'
-import { usePreferences } from '../lib/preferences.js'
+
+// The run's driver reports itself by driver name; `--agent` takes the agent name (#831).
+const AGENT_OF_DRIVER: Record<string, string> = { 'claude-code': 'claude', codex: 'codex' }
 
 // The finished-run composer (#720): keep talking to a run that has ended. A live run drains
 // messages in-process (RunChat + sendMessage), but a finished run has no process — so sending here
 // spins a FRESH run whose opening prompt `--resume`s the captured session id, continuing the same
 // conversation with full prior context. Reuses the shared Composer, then jumps to the new run's live
-// output (onRunStarted). Options come from the shared prefs, same as the launcher; the agent should
-// match the one the run used (resume is per-agent). Only rendered when the run has a session id.
+// output (onRunStarted). The agent is the one the run actually ran under, never the global pref
+// (#831): resume is per-agent, so a session id means nothing to a different agent's CLI. Only
+// rendered when the run has a session id.
 export function RunResumeChat({
   projectId,
   runId,
   sessionId,
+  driver,
   files,
   addContext,
   onRunStarted,
@@ -22,6 +26,8 @@ export function RunResumeChat({
   runId: string
   /** The finished run's agent session id, to resume. */
   sessionId: string
+  /** The driver that ran it, so the continuation resumes on the same agent (#831). */
+  driver?: string | undefined
   files: string[]
   addContext: (path: string) => void
   onRunStarted: (intent: string, runId?: string) => void
@@ -29,24 +35,21 @@ export function RunResumeChat({
   const composerRef = useRef<ComposerHandle>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const preferences = usePreferences()
 
   const send = async (text: string): Promise<void> => {
     if (busy) return
     setBusy(true)
     setError(null)
     try {
-      // A continuation is a `prompt` run seeded with the finished run's session id (#720). Carry the
-      // model/agent from the shared prefs (resume is per-agent, so keep the same one the run used);
-      // the system-prompt options are moot here — the resumed transcript keeps its own framing.
-      const model = preferences.model ?? ''
-      const agent = preferences.agent ?? 'claude'
+      // A continuation is a `prompt` run seeded with the finished run's session id (#720). It
+      // resumes on the run's own agent; the model and the system-prompt options are moot here, since
+      // the resumed transcript keeps the framing and model it already had.
+      const agent = driver ? AGENT_OF_DRIVER[driver] : undefined
       const result = await sendStart(projectId, text, 'prompt', {
         resumeSession: sessionId,
         // Continue this run rather than opening a new row (#762): the follow-up writes into the
         // same run, on the same branch, so one thing you asked for stays one entry.
         continueRunId: runId,
-        ...(model ? { model } : {}),
         ...(agent && agent !== 'claude' ? { agent } : {}),
       })
       if (result.ok) {
@@ -73,6 +76,7 @@ export function RunResumeChat({
         busy={busy}
         submitLabel="Send"
         submitBusyLabel="Resuming…"
+        showAgentModel={false}
         placeholder="Message the session to continue it…  ( / commands · < tags · @ projects · # files )"
       />
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}

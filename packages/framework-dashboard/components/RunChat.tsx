@@ -3,10 +3,10 @@ import { Composer, type ComposerHandle } from './Composer.js'
 import { sendMessage } from '../server/control.telefunc.js'
 
 // The live-chat composer (#714/#721): send more messages to a running run. Reuses the same shared
-// Composer the launcher uses, so `/` presets, `<` tags, and `@`/`#` mentions work here too, plus the
-// agent/model + options controls. On submit it writes a `message` control entry that the run drains
-// between turns (continuing the same session via --resume); the agent/model + options edit the
-// Global preferences (the defaults for the next run) — a mid-run message itself carries no options.
+// Composer the launcher uses, so `/` presets, `<` tags, and `@`/`#` mentions work here too. On
+// submit it writes a `message` control entry that the run drains between turns, continuing the same
+// session via --resume. No agent/model select (#831): the run's driver is created once at spawn and
+// a message carries only text, so the select could not change this session, only the next one.
 // Only rendered inside RunLive, i.e. while the run is running — a finished run replays without it.
 export function RunChat({
   projectId,
@@ -49,6 +49,7 @@ export function RunChat({
         busy={sending}
         submitLabel="Send"
         submitBusyLabel="Sending…"
+        showAgentModel={false}
         placeholder="Message the session…  ( / commands · < tags · @ projects · # files )"
       />
     </div>

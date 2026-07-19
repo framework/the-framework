@@ -71,6 +71,36 @@ describe('RunResumeChat (#720)', () => {
     await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('and now dark mode', undefined))
   })
 
+  test('resumes on the run\'s own agent, not the global pref (#831)', async () => {
+    sendStart.mockResolvedValue({ ok: true })
+    // The pref says Codex, but this run ran under Claude. Handing its session id to `codex --resume`
+    // would be meaningless, so the run's driver wins.
+    prefs = { agent: 'codex', model: 'gpt-5' }
+    renderChat({ driver: 'claude-code' })
+    fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'carry on' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(1))
+    const options = sendStart.mock.calls[0]![3]
+    expect(options.agent).toBeUndefined() // claude is the default, so no --agent flag
+    expect(options.model).toBeUndefined() // the resumed transcript keeps the model it had
+  })
+
+  test('a codex run resumes on codex (#831)', async () => {
+    sendStart.mockResolvedValue({ ok: true })
+    prefs = { agent: 'claude' }
+    renderChat({ driver: 'codex' })
+    fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'carry on' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(1))
+    expect(sendStart.mock.calls[0]![3].agent).toBe('codex')
+  })
+
+  test('offers no agent/model select, since a session cannot change agent (#831)', () => {
+    prefs = { agent: 'claude' }
+    renderChat({ driver: 'claude-code' })
+    expect(screen.queryByTitle(/Agent:/)).toBeNull()
+  })
+
   test('surfaces the busy guard instead of jumping', async () => {
     sendStart.mockResolvedValue({ ok: false, busy: true })
     const { onRunStarted } = renderChat()

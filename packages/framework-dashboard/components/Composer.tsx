@@ -92,8 +92,11 @@ export const Composer = forwardRef<ComposerHandle, {
    *  or preset panel. The `/` `<` `@` `#` triggers still work; agent/model + options come from the
    *  shared prefs the launcher sets. */
   compact?: boolean | undefined
+  /** Off inside a session (#831): a session is bound to the agent it started with, so the select
+   *  would only ever rewrite the *next* session's default. Chosen at the launcher instead. */
+  showAgentModel?: boolean | undefined
 }>(function Composer(
-  { files, addContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, showShortcutHint = false, compact = false },
+  { files, addContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, showShortcutHint = false, compact = false, showAgentModel = true },
   ref,
 ) {
   const [prompt, setPrompt] = useState('')
@@ -200,13 +203,15 @@ export const Composer = forwardRef<ComposerHandle, {
   // controls in either place read and write the same state.
   const controls = (
     <>
-      <AgentModelMenu
-        agents={AGENTS}
-        agent={agent}
-        model={model}
-        onChange={(a, m) => updatePreferences({ agent: a, model: m })}
-        busy={busy}
-      />
+      {showAgentModel && (
+        <AgentModelMenu
+          agents={AGENTS}
+          agent={agent}
+          model={model}
+          onChange={(a, m) => updatePreferences({ agent: a, model: m })}
+          busy={busy}
+        />
+      )}
       <OptionsMenu
         options={mainOptions}
         ecoOptions={ecoOptions}

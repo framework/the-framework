@@ -80,6 +80,17 @@ describe('Composer (#721)', () => {
     expect(onSubmit).toHaveBeenCalledWith('quick run', 'build')
   })
 
+  test('showAgentModel={false} (#831) drops the agent/model select, keeping the rest of the row', () => {
+    const { onSubmit } = renderComposer({ showAgentModel: false })
+    // An in-session composer: the session is bound to the agent it started with, so offering the
+    // select there would only ever rewrite the next session's default.
+    expect(screen.queryByTitle(/Agent:/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Session options' })).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'follow-up' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(onSubmit).toHaveBeenCalledWith('follow-up', 'build')
+  })
+
   test('the submit button is disabled until the editor has text, then fires onSubmit', () => {
     const { onSubmit } = renderComposer()
     const submit = screen.getByRole('button', { name: 'Send' })

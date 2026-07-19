@@ -39,7 +39,8 @@ export function RunReplay({
   if (events === null) return <div className="grid flex-1 place-items-center text-sm text-muted-foreground">Loading session…</div>
   // The agent session this run ran under (from its `session-update` events): present once the
   // agent reported it, so a run that never got that far simply can't be resumed.
-  const sessionId = sessionInfo(events)?.sessionId
+  const session = sessionInfo(events)
+  const sessionId = session?.sessionId
   return (
     <>
       <RunActionBar
@@ -59,7 +60,7 @@ export function RunReplay({
         <EventList events={events} stick={false} />
       )}
       {sessionId && (
-        <RunResumeChat projectId={projectId} runId={runId} sessionId={sessionId} files={files} addContext={addContext} onRunStarted={onRunStarted} />
+        <RunResumeChat projectId={projectId} runId={runId} sessionId={sessionId} driver={session?.driver} files={files} addContext={addContext} onRunStarted={onRunStarted} />
       )}
     </>
   )

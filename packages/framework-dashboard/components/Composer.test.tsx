@@ -13,6 +13,8 @@ vi.mock('../lib/preferences.js', () => ({
 }))
 // The editor picker (#727) detects installed editors over Telefunc; stub it to none in the test.
 vi.mock('../lib/editors.js', () => ({ useDetectedEditors: () => [] }))
+// Composer loads its own projects for the `@` picker (#743); stub the read to none.
+vi.mock('../server/projects.telefunc.js', () => ({ onProjects: () => Promise.resolve([]) }))
 
 // Stub the Tiptap editor (it needs a real DOM/ProseMirror): a plain input driving onChange, a
 // "type-submit" button firing onSubmit, and a ref exposing the same handle the composer calls.
@@ -38,7 +40,6 @@ function renderComposer(over: Partial<Parameters<typeof Composer>[0]> = {}) {
   const onSubmit = vi.fn()
   render(
     <Composer
-      projects={[]}
       files={[]}
       addContext={vi.fn()}
       onSubmit={onSubmit}

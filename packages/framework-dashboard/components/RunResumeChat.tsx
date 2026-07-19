@@ -1,10 +1,7 @@
 import { useRef, useState } from 'react'
-import type { ProjectSummary } from '@gemstack/framework'
 import { Composer, type ComposerHandle } from './Composer.js'
 import { sendStart } from '../server/control.telefunc.js'
-import { onProjects } from '../server/projects.telefunc.js'
 import { usePreferences } from '../lib/preferences.js'
-import { useLoaded } from '../lib/use-async.js'
 
 // The finished-run composer (#720): keep talking to a run that has ended. A live run drains
 // messages in-process (RunChat + sendMessage), but a finished run has no process — so sending here
@@ -30,8 +27,6 @@ export function RunResumeChat({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const preferences = usePreferences()
-  // The registered projects for the `@` picker — the same list the launcher reads.
-  const projects = useLoaded<ProjectSummary[]>(onProjects, [], [])
 
   const send = async (text: string): Promise<void> => {
     if (busy) return
@@ -66,7 +61,6 @@ export function RunResumeChat({
       <p className="mb-2 text-xs text-muted-foreground">Run ended — your next message continues it.</p>
       <Composer
         ref={composerRef}
-        projects={projects}
         files={files}
         addContext={addContext}
         onSubmit={send}

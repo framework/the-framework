@@ -14,6 +14,8 @@ const sendStart = vi.hoisted(() => vi.fn())
 vi.mock('../server/control.telefunc.js', () => ({ sendStart }))
 // The Composer's editor picker (#727) detects editors over Telefunc; stub it to none.
 vi.mock('../lib/editors.js', () => ({ useDetectedEditors: () => [] }))
+// The Composer loads its own projects for the `@` picker (#743); stub the read to none.
+vi.mock('../server/projects.telefunc.js', () => ({ onProjects: () => Promise.resolve([]) }))
 
 // Stub the Tiptap editor: an input driving onChange, a ref exposing clear/focus. (Same stub as
 // Composer.test — the quick-launch renders the real Composer, whose editor needs a real DOM.)
@@ -34,7 +36,6 @@ function renderQL(over: Partial<Parameters<typeof NavbarQuickLaunch>[0]> = {}) {
     <NavbarQuickLaunch
       projectId="p1"
       projectName="demo"
-      projects={[]}
       files={[]}
       context={new Set()}
       addContext={vi.fn()}

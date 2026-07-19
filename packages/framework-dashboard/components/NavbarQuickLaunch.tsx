@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react'
-import type { ProjectSummary } from '@gemstack/framework'
 import { sendStart } from '../server/control.telefunc.js'
 import { usePreferences } from '../lib/preferences.js'
 import { collectRunOptions } from '../lib/run-options.js'
@@ -14,7 +13,6 @@ import { Composer, type ComposerHandle } from './Composer.js'
 export function NavbarQuickLaunch({
   projectId,
   projectName,
-  projects,
   files,
   context,
   addContext,
@@ -23,7 +21,6 @@ export function NavbarQuickLaunch({
 }: {
   projectId: string | null
   projectName?: string | null | undefined
-  projects: ProjectSummary[]
   files: string[]
   context: Set<string>
   addContext: (path: string) => void
@@ -70,7 +67,6 @@ export function NavbarQuickLaunch({
       <Composer
         ref={composerRef}
         compact
-        projects={projects}
         files={files}
         addContext={addContext}
         onSubmit={submit}

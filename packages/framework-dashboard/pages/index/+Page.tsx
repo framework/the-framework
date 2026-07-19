@@ -191,7 +191,6 @@ export default function Page() {
           className="mx-2 min-w-0 flex-1"
           projectId={projectId}
           projectName={projectName}
-          projects={projects}
           files={files}
           context={context}
           addContext={addContext}

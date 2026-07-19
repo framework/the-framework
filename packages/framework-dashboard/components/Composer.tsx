@@ -10,6 +10,8 @@ import {
 } from '@gemstack/framework/client'
 import { usePreferences, updatePreferences, autopilotEnabled, themePreference } from '../lib/preferences.js'
 import { useDetectedEditors } from '../lib/editors.js'
+import { useLoaded } from '../lib/use-async.js'
+import { onProjects } from '../server/projects.telefunc.js'
 import { PromptEditor, type PromptEditorHandle } from './PromptEditor.js'
 import { PresetCreatePanel } from './PresetCreatePanel.js'
 import { AgentModelMenu, type AgentOption } from './AgentModelMenu.js'
@@ -65,11 +67,11 @@ export interface ComposerHandle {
 // The shared run composer (#721): the Tiptap editor (`/` `<` `@` `#` triggers, presets, mentions)
 // plus the control row — agent/model select, presets menu, Global-options gear, and the submit
 // button. Factored out of the launcher (StartRunForm) so the run-view chat (RunChat) gets the exact
-// same surface, wired to the same data (projects, files, presets, prefs). The caller owns what
-// happens on submit: the launcher starts a run (with collected options), the chat sends a message.
+// same surface, wired to the same data (files, presets, prefs). The caller owns what happens on
+// submit: the launcher starts a run (with collected options), the chat sends a message. The `@`
+// picker's project list is Composer's own concern, so it loads it here (#743) rather than making
+// every host pass the same list down.
 export const Composer = forwardRef<ComposerHandle, {
-  /** Registered projects for the `@` picker. */
-  projects: ProjectSummary[]
   /** The current project's files for the `#` picker (#504). */
   files: string[]
   /** Add a path to the run Context (from an `@`/`#` mention). */
@@ -91,13 +93,15 @@ export const Composer = forwardRef<ComposerHandle, {
    *  shared prefs the launcher sets. */
   compact?: boolean | undefined
 }>(function Composer(
-  { projects, files, addContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, showShortcutHint = false, compact = false },
+  { files, addContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, showShortcutHint = false, compact = false },
   ref,
 ) {
   const [prompt, setPrompt] = useState('')
   const [kind, setKind] = useState<'build' | 'prompt'>('build')
   const [addingPreset, setAddingPreset] = useState(false)
   const editorRef = useRef<PromptEditorHandle>(null)
+  // The registered projects for the `@` picker — the same list the launcher reads.
+  const projects = useLoaded<ProjectSummary[]>(onProjects, [], [])
 
   const preferences = usePreferences()
   const autopilot = autopilotEnabled(preferences)

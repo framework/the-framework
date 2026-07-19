@@ -109,7 +109,6 @@ export function StartRunForm({
       <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Start a run</div>
       <Composer
         ref={composerRef}
-        projects={projects}
         files={files}
         addContext={addContext}
         onSubmit={submit}

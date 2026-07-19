@@ -1,9 +1,6 @@
 import { useRef, useState } from 'react'
-import type { ProjectSummary } from '@gemstack/framework'
 import { Composer, type ComposerHandle } from './Composer.js'
 import { sendMessage } from '../server/control.telefunc.js'
-import { onProjects } from '../server/projects.telefunc.js'
-import { useLoaded } from '../lib/use-async.js'
 
 // The live-chat composer (#714/#721): send more messages to a running run. Reuses the same shared
 // Composer the launcher uses, so `/` presets, `<` tags, and `@`/`#` mentions work here too, plus the
@@ -24,8 +21,6 @@ export function RunChat({
 }) {
   const composerRef = useRef<ComposerHandle>(null)
   const [sending, setSending] = useState(false)
-  // The registered projects for the `@` picker — the same list the launcher reads.
-  const projects = useLoaded<ProjectSummary[]>(onProjects, [], [])
 
   const send = async (text: string): Promise<void> => {
     if (sending) return
@@ -45,7 +40,6 @@ export function RunChat({
     <div className="border-t border-border p-3">
       <Composer
         ref={composerRef}
-        projects={projects}
         files={files}
         addContext={addContext}
         onSubmit={send}

@@ -14,6 +14,7 @@ import {
 } from '@gemstack/ai-autopilot'
 import { type ClaudeCodeDriverOptions, type Driver, type DriverSession, type McpServerSpec, type PermissionMode } from './driver/index.js'
 import { AGENTS, AGENT_SPECS, createDriver, isAgentName, type AgentName } from './agent.js'
+import { launchSharedBrowser, type SharedBrowser } from './browser.js'
 import { hostExecutor } from './host-exec.js'
 import { startDashboard, singleProjectProvider, resolveDashboardBundle, type Dashboard } from './dashboard/index.js'
 import { startRelay, relayPublisher, type RelayPublisher } from './relay.js'
@@ -584,10 +585,24 @@ export const BROWSER_MCP_SERVERS: Record<string, McpServerSpec> = {
   'chrome-devtools': { command: 'npx', args: ['-y', 'chrome-devtools-mcp@latest'] },
 }
 
+/**
+ * The same server, pointed at a Chrome the run already launched (#793). `--browserUrl` makes
+ * it attach instead of launching, which is what lets a second client (the #609 screencast)
+ * watch the very page the agent is on. Without a URL this is the old spec unchanged.
+ */
+export function browserMcpServers(browserUrl?: string | undefined): Record<string, McpServerSpec> {
+  if (!browserUrl) return BROWSER_MCP_SERVERS
+  return { 'chrome-devtools': { command: 'npx', args: ['-y', 'chrome-devtools-mcp@latest', '--browserUrl', browserUrl] } }
+}
+
 /** Fold the `--browser` MCP server into driver options when the flag is set. */
-export function withBrowser(base: ClaudeCodeDriverOptions, browser: boolean): ClaudeCodeDriverOptions {
+export function withBrowser(
+  base: ClaudeCodeDriverOptions,
+  browser: boolean,
+  browserUrl?: string | undefined,
+): ClaudeCodeDriverOptions {
   if (!browser) return base
-  return { ...base, mcpServers: { ...base.mcpServers, ...BROWSER_MCP_SERVERS } }
+  return { ...base, mcpServers: { ...base.mcpServers, ...browserMcpServers(browserUrl) } }
 }
 
 /**
@@ -729,6 +744,8 @@ interface RunEpilogue {
   control: ControlWatcher | undefined
   guard: { stop: () => void } | undefined
   publisher: RelayPublisher | undefined
+  /** The run's Chrome (#793), stopped with the run so no headless browser outlives it. */
+  sharedBrowser: SharedBrowser | undefined
   clearInterrupt: () => void
   maybeFireOnBeforeMergeable: () => Promise<void>
   /** True once the run stopped cleanly (interrupt / budget cap) rather than failed. */
@@ -784,6 +801,7 @@ async function settleRun(
     ctx.clearInterrupt()
     ctx.control?.close()
     ctx.guard?.stop()
+    await ctx.sharedBrowser?.close()
     // Make sure every event (including the final `end`) reached the relay before exit.
     if (ctx.publisher) await ctx.publisher.flush()
   }
@@ -1199,7 +1217,17 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     io.err(`note: --sandbox docker has no effect without --serve.`)
   }
 
-  const driver: Driver = fake ? fakeDriver() : createDriver({ agent: opts.agent, claudeOpts: withBrowser(claudeOpts, opts.browser) })
+  // The run owns the browser (#793): launching it here, rather than letting chrome-devtools-mcp
+  // launch its own, is what lets the #609 preview attach to the same page. Undefined when the
+  // machine has no Chrome, which leaves `--browser` on its old path rather than failing the run.
+  const sharedBrowser = opts.browser && !fake ? await launchSharedBrowser() : undefined
+  if (opts.browser && !fake && !sharedBrowser) {
+    io.err('note: no Chrome found, so --browser falls back to its own browser (no preview).')
+  }
+
+  const driver: Driver = fake
+    ? fakeDriver()
+    : createDriver({ agent: opts.agent, claudeOpts: withBrowser(claudeOpts, opts.browser, sharedBrowser?.browserUrl) })
 
   // The consumption limits (#519/#531). Read from the user's own file rather than
   // taken as a flag: unlike autopilot or eco, a limit is not a per-run choice, so
@@ -1228,6 +1256,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     control,
     guard,
     publisher,
+    sharedBrowser,
     clearInterrupt,
     maybeFireOnBeforeMergeable,
     isStopped: () => controller.signal.aborted || stoppedCleanly,

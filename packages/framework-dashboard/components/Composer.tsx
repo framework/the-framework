@@ -6,6 +6,7 @@ import {
   renderMaintainabilityPrompt,
   renderSecurityAuditPrompt,
   renderUxPrompt,
+  renderSuggestNewTicketsPrompt,
 } from '@gemstack/framework/client'
 import { usePreferences, updatePreferences, autopilotEnabled } from '../lib/preferences.js'
 import { PromptEditor, type PromptEditorHandle } from './PromptEditor.js'
@@ -24,6 +25,7 @@ const PRESETS: { id: string; label: string; render: () => string }[] = [
   { id: 'maintainability', label: 'Maintainability', render: renderMaintainabilityPrompt },
   { id: 'security-audit', label: 'Security audit', render: renderSecurityAuditPrompt },
   { id: 'ux', label: 'UX', render: renderUxPrompt },
+  { id: 'suggest-new-tickets', label: 'Suggest new tickets', render: renderSuggestNewTicketsPrompt },
 ]
 
 // The agent + model tree (#650/#656/#658): each agent lists ONLY its own models, since `--model`

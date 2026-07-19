@@ -7,6 +7,7 @@ import { defineDomainPreset, defineLoop } from '@gemstack/ai-autopilot'
 import type { Prompt } from '@gemstack/ai-autopilot'
 import { DEFAULT_MAX_PASSES, requestChoices, requestMultiSelect, runAwaitRounds, runFramework, type ChoicesOption, type MultiSelectOption } from './run.js'
 import { FAKE_DEPLOY, FAKE_INTENT, FAKE_SIGNALS, fakeDriver } from './fake-script.js'
+import { RunMessageQueue } from './run-messages.js'
 import { FakeDriver, type Driver, type DriverSession } from './driver/index.js'
 import { composeRunSystem } from './system-prompt.js'
 import type { ChoiceRequest, FrameworkEvent } from './events.js'
@@ -886,4 +887,25 @@ test('runAwaitRounds gives up after MAX_AWAIT_ROUNDS and reports it exhausted', 
   assert.equal(result.exhausted, true)
   assert.equal(result.declined, false)
   assert.equal(prompts.length, MAX_AWAIT_ROUNDS + 1) // the opener, then one per round
+})
+
+test('runAwaitRounds does not report exhausted when a chat phase follows the opening cap (#742)', async () => {
+  // The opening prompt asks forever and hits the cap, but live chat is wired: the run stays open
+  // and ends because chat closes (Stop), not "at the await limit". So exhausted must be false —
+  // before #742 the opening drain's `exhausted: true` leaked through into a spurious end log.
+  const driver = new FakeDriver({ respond: () => choicesGate('Again?') })
+  const session = await driver.start({ cwd: '/tmp/ws' })
+  const messages = new RunMessageQueue()
+  messages.close() // no messages: the stay-open phase ends immediately.
+  const result = await runAwaitRounds({
+    session,
+    prompt: 'open',
+    emitTurnSignals: () => {},
+    requestChoice: async () => ({ picked: 'a' }),
+    emit: () => {},
+    messages,
+  })
+
+  assert.equal(result.exhausted, false)
+  assert.equal(result.declined, false)
 })

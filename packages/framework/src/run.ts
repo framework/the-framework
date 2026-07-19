@@ -693,19 +693,25 @@ async function drainGates(session: DriverSession, turn: DriverTurn, deps: AwaitT
  * repeat until the source resolves `undefined` (Stop / budget cap). This is the "stay-open"
  * lifecycle: a run keeps running as a conversation until the user ends it. Shared by the
  * direct prompt path and the build path, which both reach it once their work has settled.
+ *
+ * Reports the settled `exhausted` of the *last* chat turn (#742): entering chat means the
+ * opening prompt's await-round cap is no longer the run's end reason, and a phase that ends
+ * on Stop / close is not exhausted at all.
  */
-export async function runChatPhase(session: DriverSession, messages: RunMessages, seed: DriverTurn, deps: AwaitTurnDeps): Promise<DriverTurn> {
+export async function runChatPhase(session: DriverSession, messages: RunMessages, seed: DriverTurn, deps: AwaitTurnDeps): Promise<{ turn: DriverTurn; exhausted: boolean }> {
   const signalOpt = deps.signal ? { signal: deps.signal } : {}
   let turn = seed
+  let exhausted = false
   for (;;) {
     const message = await messages.next(deps.signal)
-    if (message === undefined) return turn // Stop / budget cap: end the conversation.
+    if (message === undefined) return { turn, exhausted } // Stop / budget cap: end the conversation.
     deps.emit({ kind: 'log', message: `You: ${message}` })
     turn = await session.prompt(message, { ...signalOpt, resume: true })
     deps.emitTurnSignals(turn.text)
     const drained = await drainGates(session, turn, deps)
     turn = drained.turn
-    if (drained.declined) return turn
+    exhausted = drained.exhausted
+    if (drained.declined) return { turn, exhausted }
   }
 }
 
@@ -736,9 +742,14 @@ export async function runAwaitRounds(opts: AwaitRoundsOptions): Promise<AwaitRou
   if (drained.declined) return { text: drained.turn.text, declined: true, exhausted: false }
 
   // Live chat (#714): stay open for the user's messages until Stop. Headless leaves it unset,
-  // so the run ends here exactly as before.
-  const finalTurn = messages ? await runChatPhase(session, messages, drained.turn, deps) : drained.turn
-  return { text: finalTurn.text, declined: false, exhausted: drained.exhausted }
+  // so the run ends here exactly as before. Once chat runs, its settled state is the run's end
+  // reason, not the opening drain's (#742) — otherwise a chat closed by Stop would still be
+  // reported "exhausted" and log a spurious await-limit notice.
+  if (messages) {
+    const chat = await runChatPhase(session, messages, drained.turn, deps)
+    return { text: chat.turn.text, declined: false, exhausted: chat.exhausted }
+  }
+  return { text: drained.turn.text, declined: false, exhausted: drained.exhausted }
 }
 
 

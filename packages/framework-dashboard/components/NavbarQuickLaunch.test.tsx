@@ -8,9 +8,12 @@ vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => prefs,
   updatePreferences: vi.fn(),
   autopilotEnabled: (p: Preferences) => p.autopilot ?? true,
+  themePreference: (p: Preferences) => p.theme ?? 'system',
 }))
 const sendStart = vi.hoisted(() => vi.fn())
 vi.mock('../server/control.telefunc.js', () => ({ sendStart }))
+// The Composer's editor picker (#727) detects editors over Telefunc; stub it to none.
+vi.mock('../lib/editors.js', () => ({ useDetectedEditors: () => [] }))
 
 // Stub the Tiptap editor: an input driving onChange, a ref exposing clear/focus. (Same stub as
 // Composer.test — the quick-launch renders the real Composer, whose editor needs a real DOM.)

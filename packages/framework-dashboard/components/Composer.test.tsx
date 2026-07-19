@@ -11,6 +11,8 @@ vi.mock('../lib/preferences.js', () => ({
   autopilotEnabled: (p: Preferences) => p.autopilot ?? true,
   themePreference: (p: Preferences) => p.theme ?? 'system',
 }))
+// The editor picker (#727) detects installed editors over Telefunc; stub it to none in the test.
+vi.mock('../lib/editors.js', () => ({ useDetectedEditors: () => [] }))
 
 // Stub the Tiptap editor (it needs a real DOM/ProseMirror): a plain input driving onChange, a
 // "type-submit" button firing onSubmit, and a ref exposing the same handle the composer calls.

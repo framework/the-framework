@@ -9,6 +9,7 @@ import {
   renderSuggestNewTicketsPrompt,
 } from '@gemstack/framework/client'
 import { usePreferences, updatePreferences, autopilotEnabled, themePreference } from '../lib/preferences.js'
+import { useDetectedEditors } from '../lib/editors.js'
 import { PromptEditor, type PromptEditorHandle } from './PromptEditor.js'
 import { PresetCreatePanel } from './PresetCreatePanel.js'
 import { PresetMenu } from './PresetMenu.js'
@@ -113,6 +114,8 @@ export const Composer = forwardRef<ComposerHandle, {
   const model = preferences.model ?? '' // #628: empty = the driver's default model
   const agent = preferences.agent ?? 'claude' // #650: which coding agent drives the run
   const customPresets = preferences.customPresets ?? [] // #626: the user's own saved prompts
+  const editor = preferences.editor // #727: preferred editor; undefined = $FRAMEWORK_EDITOR / code
+  const detectedEditors = useDetectedEditors() // #727: editors installed on the daemon's machine
   const theme = themePreference(preferences) // #725: system (default) / light / dark
 
   // Vanilla removes the system prompt (nothing left for Eco to trim); Transparent turns off the
@@ -237,6 +240,9 @@ export const Composer = forwardRef<ComposerHandle, {
           ecoOptions={ecoOptions}
           showEco={eco && !ecoDisabled}
           busy={busy}
+          editor={editor}
+          editors={detectedEditors}
+          onEditorChange={e => updatePreferences({ editor: e ?? '' })}
           theme={theme}
           onThemeChange={t => updatePreferences({ theme: t })}
         />

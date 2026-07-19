@@ -1,6 +1,7 @@
 import type { Preferences } from '@gemstack/framework'
 import { Settings, Check, Monitor, Sun, Moon, type LucideIcon } from 'lucide-react'
 import { updatePreferences, type ThemePreference } from '../lib/preferences.js'
+import type { EditorInfo } from '../server/preferences.telefunc.js'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'
 import {
@@ -59,6 +60,9 @@ export function OptionsMenu({
   ecoOptions,
   showEco,
   busy,
+  editor,
+  editors,
+  onEditorChange,
   theme,
   onThemeChange,
 }: {
@@ -67,12 +71,22 @@ export function OptionsMenu({
   /** Whether Eco's sub-drops apply right now (Eco on and not disabled by Vanilla). */
   showEco: boolean
   busy: boolean
+  /** The current preferred-editor CLI (#727), or undefined for the default. */
+  editor: string | undefined
+  /** The editors detected on the daemon's machine; empty on a public host. */
+  editors: EditorInfo[]
+  /** Pick an editor CLI, or `undefined` to fall back to `$FRAMEWORK_EDITOR` / `code`. */
+  onEditorChange: (editor: string | undefined) => void
   /** The current dashboard theme (#725). */
   theme: ThemePreference
   /** Pick a new theme; persisted by the caller. */
   onThemeChange: (theme: ThemePreference) => void
 }) {
   const activeCount = options.filter(o => o.checked && !o.disabled).length
+  // Detected editors, plus the stored one as a "custom" row when it isn't auto-detected (e.g. a
+  // hand-set $FRAMEWORK_EDITOR), so the current choice always shows even if we couldn't find it.
+  const editorRows: EditorInfo[] =
+    editor && !editors.some(e => e.bin === editor) ? [...editors, { bin: editor, label: editor }] : editors
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -127,6 +141,31 @@ export function OptionsMenu({
         )}
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
+          <DropdownMenuLabel>Open in editor</DropdownMenuLabel>
+          <DropdownMenuItem
+            disabled={busy}
+            closeOnClick={false}
+            onClick={() => onEditorChange(undefined)}
+            title="Use $FRAMEWORK_EDITOR, or VS Code"
+            className="items-start"
+          >
+            <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', editor ? 'opacity-0' : 'opacity-100')} />
+            <OptionLabel label="Default" description="$FRAMEWORK_EDITOR, or code" />
+          </DropdownMenuItem>
+          {editorRows.map(e => (
+            <DropdownMenuItem
+              key={e.bin}
+              disabled={busy}
+              closeOnClick={false}
+              onClick={() => onEditorChange(e.bin)}
+              title={`Open projects in ${e.label} (${e.bin})`}
+              className="items-start"
+            >
+              <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', editor === e.bin ? 'opacity-100' : 'opacity-0')} />
+              <OptionLabel label={e.label} description={e.bin} />
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
           <DropdownMenuLabel>Theme</DropdownMenuLabel>
           {THEME_OPTIONS.map(t => {
             const Icon = t.icon

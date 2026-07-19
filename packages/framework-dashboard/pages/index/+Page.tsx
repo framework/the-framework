@@ -99,9 +99,10 @@ export default function Page() {
 
   const onRunStarted = (intent: string) => {
     // Jump to the new run's live output. Reset to the home/Live row first (a no-op from the launcher,
-    // where it already is) so a navbar quick-launch (#723) jumps to live even from a finished run's
-    // replay; `followLive` streams the shared feed until the poll adopts the new run's real id below.
-    // The new run just appends to the rail; reload so its real row shows up quickly.
+    // where it already is) so a navbar quick-launch (#723) or resuming a finished run (#720) jumps to
+    // live even from a finished run's replay; `followLive` streams the shared feed until the poll
+    // adopts the new run's real id below. The new run just appends to the rail; reload so its real
+    // row shows up quickly.
     setRunId(null)
     setRunStart(prev => ({ tick: prev.tick + 1, intent }))
     setFollowLive(true)
@@ -177,7 +178,7 @@ export default function Page() {
       )
     }
     if (selectedRun?.status === 'running') return <RunLive projectId={projectId} events={events} files={files} addContext={addContext} />
-    return <RunReplay projectId={projectId} runId={runId} />
+    return <RunReplay projectId={projectId} runId={runId} files={files} addContext={addContext} onRunStarted={onRunStarted} />
   }
 
   return (

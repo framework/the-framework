@@ -68,11 +68,12 @@ describe('Composer (#721)', () => {
     expect(screen.getByRole('button', { name: /Start run/ })).toBeTruthy()
   })
 
-  test('compact (#723) drops the control row, keeping only the editor + submit', () => {
+  test('compact (#723) keeps the agent/model + options controls (#755)', () => {
     const { onSubmit } = renderComposer({ compact: true, submitLabel: 'Start' })
-    // The redundant control row is gone in compact form.
-    expect(screen.queryByRole('button', { name: 'Run options' })).toBeNull()
-    expect(screen.queryByTitle(/Agent: Claude Code/)).toBeNull()
+    // They used to be dropped here, which meant a navbar run silently used the stored agent,
+    // model and options with nothing on screen saying which.
+    expect(screen.queryByRole('button', { name: 'Run options' })).not.toBeNull()
+    expect(screen.queryByTitle(/Agent: Claude Code/)).not.toBeNull()
     // The editor + submit still work (so `/` `<` `@` `#` triggers remain live in the editor).
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'quick run' } })
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))

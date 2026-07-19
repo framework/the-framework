@@ -194,12 +194,42 @@ export const Composer = forwardRef<ComposerHandle, {
     />
   )
 
-  // Compact (#723): one row of editor + submit for the navbar. The `/` `<` `@` `#` triggers still
-  // work in the editor; the agent/model + options controls are dropped (they come from prefs).
+  // The agent/model select and the options gear, shared by both forms (#755). They were compact's
+  // one real omission: a run started from the navbar used the stored agent, model and options with
+  // nothing on screen saying which. Every value is preferences-backed and global, so the same
+  // controls in either place read and write the same state.
+  const controls = (
+    <>
+      <AgentModelMenu
+        agents={AGENTS}
+        agent={agent}
+        model={model}
+        onChange={(a, m) => updatePreferences({ agent: a, model: m })}
+        busy={busy}
+      />
+      <OptionsMenu
+        options={mainOptions}
+        ecoOptions={ecoOptions}
+        showEco={eco && !ecoDisabled}
+        busy={busy}
+        editor={editor}
+        editors={detectedEditors}
+        onEditorChange={e => updatePreferences({ editor: e ?? '' })}
+        // Preset loading + "New preset…" moved to the `/` menu (#722); the gear keeps the manage
+        // side, deleting a saved preset.
+        customPresets={customPresets}
+        onDeleteCustomPreset={id => updatePreferences({ customPresets: customPresets.filter(p => p.id !== id) })}
+      />
+    </>
+  )
+
+  // Compact (#723): a single row for the navbar — editor, then the same controls and submit. It
+  // stays one row on purpose (#755): the header must not grow taller to gain them.
   if (compact) {
     return (
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-1.5">
         <div className="min-w-0 flex-1">{editorEl}</div>
+        {controls}
         <Button
           type="submit"
           size="sm"
@@ -220,28 +250,7 @@ export const Composer = forwardRef<ComposerHandle, {
       {/* Run controls, directly under the editor (#649/#650/#654/#668): agent+model at the start,
           then presets and the options gear, then submit at the end. */}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <AgentModelMenu
-          agents={AGENTS}
-          agent={agent}
-          model={model}
-          onChange={(a, m) => updatePreferences({ agent: a, model: m })}
-          busy={busy}
-        />
-        <OptionsMenu
-          options={mainOptions}
-          ecoOptions={ecoOptions}
-          showEco={eco && !ecoDisabled}
-          busy={busy}
-          editor={editor}
-          editors={detectedEditors}
-          onEditorChange={e => updatePreferences({ editor: e ?? '' })}
-          theme={theme}
-          onThemeChange={t => updatePreferences({ theme: t })}
-          // Preset loading + "New preset…" moved to the `/` menu (#722); the gear keeps the manage
-          // side, deleting a saved preset.
-          customPresets={customPresets}
-          onDeleteCustomPreset={id => updatePreferences({ customPresets: customPresets.filter(p => p.id !== id) })}
-        />
+        {controls}
         <Button
           type="submit"
           onClick={submit}

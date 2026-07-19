@@ -1,6 +1,6 @@
 import type { Preferences, CustomPreset } from '@gemstack/framework'
-import { Settings, Check, Monitor, Sun, Moon, X, type LucideIcon } from 'lucide-react'
-import { updatePreferences, type ThemePreference } from '../lib/preferences.js'
+import { Settings, Check, X } from 'lucide-react'
+import { updatePreferences } from '../lib/preferences.js'
 import type { EditorInfo } from '../server/preferences.telefunc.js'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'
@@ -38,13 +38,6 @@ function setOption(key: keyof Preferences, checked: boolean) {
   updatePreferences({ [key]: checked } as Partial<Preferences>)
 }
 
-/** The theme choices (#725), in trigger order; `system` is the default. */
-const THEME_OPTIONS: { value: ThemePreference; label: string; description: string; icon: LucideIcon }[] = [
-  { value: 'system', label: 'System', description: 'Follow your OS setting', icon: Monitor },
-  { value: 'light', label: 'Light', description: '', icon: Sun },
-  { value: 'dark', label: 'Dark', description: '', icon: Moon },
-]
-
 /** An option's label with a short one-line description under it (#654). */
 function OptionLabel({ label, description }: { label: string; description?: string | undefined }) {
   return (
@@ -63,8 +56,6 @@ export function OptionsMenu({
   editor,
   editors,
   onEditorChange,
-  theme,
-  onThemeChange,
   customPresets = [],
   onDeleteCustomPreset = () => {},
 }: {
@@ -79,10 +70,6 @@ export function OptionsMenu({
   editors: EditorInfo[]
   /** Pick an editor CLI, or `undefined` to fall back to `$FRAMEWORK_EDITOR` / `code`. */
   onEditorChange: (editor: string | undefined) => void
-  /** The current dashboard theme (#725). */
-  theme: ThemePreference
-  /** Pick a new theme; persisted by the caller. */
-  onThemeChange: (theme: ThemePreference) => void
   /** The user's saved presets (#626); managed here now the Presets dropdown is gone (#722). */
   customPresets?: CustomPreset[]
   /** Delete a saved preset by id. */
@@ -171,26 +158,6 @@ export function OptionsMenu({
               <OptionLabel label={e.label} description={e.bin} />
             </DropdownMenuItem>
           ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>Theme</DropdownMenuLabel>
-          {THEME_OPTIONS.map(t => {
-            const Icon = t.icon
-            return (
-              <DropdownMenuItem
-                key={t.value}
-                disabled={busy}
-                // Keep the menu open so the theme visibly changes underneath the pick.
-                closeOnClick={false}
-                onClick={() => onThemeChange(t.value)}
-                title={`${t.label} theme`}
-                className="items-start"
-              >
-                <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', t.value === theme ? 'opacity-100' : 'opacity-0')} />
-                <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" />
-                <OptionLabel label={t.label} description={t.description || undefined} />
-              </DropdownMenuItem>
-            )
-          })}
         </DropdownMenuGroup>
         {customPresets.length > 0 && (
           <DropdownMenuGroup>

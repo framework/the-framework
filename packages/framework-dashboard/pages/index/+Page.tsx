@@ -3,6 +3,7 @@ import type { Intervention, Activity, ProjectSummary } from '@gemstack/framework
 import { onProjectFiles, onInterventions, onActivity } from '../../server/reads.telefunc.js'
 import { onProjects } from '../../server/projects.telefunc.js'
 import { ProjectsSidebar } from '../../components/ProjectsSidebar.js'
+import { ThemeToggle } from '../../components/ThemeToggle.js'
 import { NotificationsMenu } from '../../components/NotificationsMenu.js'
 import { NavbarQuickLaunch } from '../../components/NavbarQuickLaunch.js'
 import { RunHistory } from '../../components/RunHistory.js'
@@ -12,7 +13,6 @@ import { RunLive } from '../../components/RunLive.js'
 import { RunReplay } from '../../components/RunReplay.js'
 import { RightRail } from '../../components/RightRail.js'
 import { RelayView } from '../../components/RelayView.js'
-import { Badge } from '../../components/ui/badge.js'
 import { useLiveEvents } from '../../lib/use-live-events.js'
 import { useRuns } from '../../lib/use-runs.js'
 import { useLoaded, usePolled } from '../../lib/use-async.js'
@@ -186,7 +186,6 @@ export default function Page() {
     <div className="flex h-screen flex-col">
       <header className="flex items-center gap-3 border-b border-border px-4 py-3">
         <span className="shrink-0 font-semibold">The Framework</span>
-        <Badge className="shrink-0 text-muted-foreground">dashboard</Badge>
         {/* Global quick-launch (#723): start a run in the selected project from anywhere. */}
         <NavbarQuickLaunch
           className="mx-2 min-w-0 flex-1"
@@ -198,6 +197,7 @@ export default function Page() {
           onRunStarted={onRunStarted}
         />
         <div className="flex shrink-0 items-center gap-1">
+          <ThemeToggle />
           <NotificationsMenu />
         </div>
       </header>

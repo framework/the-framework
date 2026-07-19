@@ -27,47 +27,30 @@ function open() {
 
 describe('OptionsMenu (#654)', () => {
   test('the trigger badges how many options are on', () => {
-    render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={false} busy={false} {...editorProps} theme="system" onThemeChange={() => {}} />)
+    render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={false} busy={false} {...editorProps} />)
     // Only Eco is checked -> the gear trigger shows a corner badge "1".
     expect(screen.getByRole('button', { name: /run options/i }).textContent).toContain('1')
   })
 
   test('toggling an item writes the new value through', () => {
-    render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={false} busy={false} {...editorProps} theme="system" onThemeChange={() => {}} />)
+    render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={false} busy={false} {...editorProps} />)
     open()
     fireEvent.click(screen.getByText('Autopilot'))
     expect(updatePreferences).toHaveBeenCalledWith({ autopilot: true })
   })
 
   test('hides the Eco sub-drops when Eco does not apply', () => {
-    render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={false} busy={false} {...editorProps} theme="system" onThemeChange={() => {}} />)
+    render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={false} busy={false} {...editorProps} />)
     open()
     expect(screen.queryByText('Auto planning')).toBeNull()
   })
 
   test('shows the Eco sub-drops when Eco applies', () => {
-    render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={true} busy={false} {...editorProps} theme="system" onThemeChange={() => {}} />)
+    render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={true} busy={false} {...editorProps} />)
     open()
     expect(screen.getByText('Auto planning')).toBeTruthy()
   })
 
-  test('picking a theme calls onThemeChange with the chosen value (#725)', () => {
-    const onThemeChange = vi.fn()
-    render(
-      <OptionsMenu
-        options={mainOptions()}
-        ecoOptions={ecoOptions()}
-        showEco={false}
-        busy={false}
-        {...editorProps}
-        theme="system"
-        onThemeChange={onThemeChange}
-      />,
-    )
-    open()
-    fireEvent.click(screen.getByText('Dark'))
-    expect(onThemeChange).toHaveBeenCalledWith('dark')
-  })
 })
 
 describe('OptionsMenu editor picker (#727)', () => {
@@ -87,8 +70,6 @@ describe('OptionsMenu editor picker (#727)', () => {
         editor={undefined}
         editors={editors}
         onEditorChange={onEditorChange}
-        theme="system"
-        onThemeChange={() => {}}
       />,
     )
     open()
@@ -107,8 +88,6 @@ describe('OptionsMenu editor picker (#727)', () => {
         editor="cursor"
         editors={editors}
         onEditorChange={onEditorChange}
-        theme="system"
-        onThemeChange={() => {}}
       />,
     )
     open()
@@ -126,8 +105,6 @@ describe('OptionsMenu editor picker (#727)', () => {
         editor="mate"
         editors={editors}
         onEditorChange={() => {}}
-        theme="system"
-        onThemeChange={() => {}}
       />,
     )
     open()
@@ -137,7 +114,7 @@ describe('OptionsMenu editor picker (#727)', () => {
 })
 
 describe('OptionsMenu saved presets (#722)', () => {
-  const base = () => ({ options: mainOptions(), ecoOptions: ecoOptions(), showEco: false, busy: false, ...editorProps, theme: 'system' as const, onThemeChange: () => {} })
+  const base = () => ({ options: mainOptions(), ecoOptions: ecoOptions(), showEco: false, busy: false, ...editorProps })
 
   test('deletes a saved preset by id', () => {
     const onDeleteCustomPreset = vi.fn()

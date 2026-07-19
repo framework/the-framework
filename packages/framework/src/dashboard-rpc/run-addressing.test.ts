@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { mkdtemp, rm, mkdir, writeFile, readFile, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { sendStop, sendMessage, sendChoice, sendRemoveWorktree } from './control.telefunc.js'
-import { onRetainedWorktrees } from './reads.telefunc.js'
+import { onRetainedWorktrees, onRuns } from './reads.telefunc.js'
 import { addProject, projectId as idFor } from '../registry.js'
 import { FRAMEWORK_DIR, WORKTREES_DIR } from '../store/index.js'
 import { CONTROL_FILE } from '../control.js'
@@ -175,6 +175,28 @@ test('a run id with no worktree at all still falls back to the project root (#76
     // The non-git fallback path, and any run whose worktree has since been removed.
     await sendStop(ctx.projectId, '2026-07-19T11-45-00-000Z')
     assert.deepEqual(await entries(ctx.rootControl), [{ kind: 'stop' }])
+  } finally {
+    ctx.restore()
+    await rm(ctx.dir, { recursive: true, force: true })
+  }
+})
+
+// #768: a continued run (#762) has an archived copy from its first leg AND is live again. The
+// dedup used to keep the archive and drop the live copy, so the dashboard showed a running run as
+// finished — the run really was going, the UI just rendered its stale replay and looked dead.
+test('a continued run reads as running, not as its archived first leg (#768)', async () => {
+  const ctx = await projectWithWorktreeRun() // its worktree meta says `running`
+  try {
+    // Its first leg was archived when it finished, exactly as teardown (#737) leaves things.
+    await mkdir(join(ctx.dir, FRAMEWORK_DIR, 'runs'), { recursive: true })
+    await writeFile(
+      join(ctx.dir, FRAMEWORK_DIR, 'runs', `${ctx.runId}.json`),
+      JSON.stringify({ version: 1, status: 'done', id: ctx.runId, startedAt: ctx.runId, updatedAt: ctx.runId, passes: 1 }),
+    )
+    const runs = (await onRuns(ctx.projectId)) as { id: string; status: string }[]
+    const mine = runs.filter(run => run.id === ctx.runId)
+    assert.equal(mine.length, 1, 'still one row, not two')
+    assert.equal(mine[0]?.status, 'running', 'and it reads as live, not as the archived first leg')
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })

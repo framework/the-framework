@@ -41,17 +41,22 @@ async function withProject<T>(projectId: string, read: (cwd: string) => Promise<
  * them all (#738) instead of the single one that used to sit at the project path. They come
  * back as {@link LiveRun}s, carrying the `cwd` of the checkout that run is editing.
  *
- * A live run is skipped once it has been archived under the same id (it then appears from
- * `listRuns` instead), so there is no double. The status is not filtered on: `readLiveMeta`
+ * One row per id, and where both a live and an archived copy exist the live one wins (#768): a
+ * continued run (#762) has an archive from its first leg while being live again, and the archive
+ * would otherwise show a running run as finished. The status is not filtered on: `readLiveMeta`
  * may have just self-healed a dead run to `stopped` (#716), and that freshly-archived row can
- * lag `listRuns` by a poll — prepending it regardless keeps the row visible with no flicker.
+ * lag `listRuns` by a poll — keeping it regardless leaves the row visible with no flicker.
  */
 export async function onRuns(projectId: string): Promise<RunMeta[]> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return []
   const archived = await listRuns(cwd).catch(() => [])
   const live = await readLiveMetas(cwd).catch(() => [])
-  return [...live.filter(run => !archived.some(r => r.id === run.id)), ...archived]
+  // Live wins over archived (#768). The dedup used to drop the live copy, which was right while
+  // "archived" meant "finished for good": a run was only ever copied into `runs/` on its way out.
+  // Continuing a run (#762) breaks that — the run has an archived copy from its first leg AND is
+  // live again — and keeping the archive showed a running run as finished.
+  return [...live, ...archived.filter(run => !live.some(l => l.id === run.id))]
 }
 
 /**

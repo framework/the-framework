@@ -46,7 +46,11 @@ async function readAllRuns(cwd: string): Promise<RunMeta[]> {
     readLiveMetas(cwd).catch(() => [] as LiveRun[]),
   ])
   // Skip a live run already archived under the same id, so it is not counted twice.
-  return [...live.filter(run => !archived.some(r => r.id === run.id)), ...archived]
+  // Live wins over archived (#768). The dedup used to drop the live copy, which was right while
+  // "archived" meant "finished for good": a run was only ever copied into `runs/` on its way out.
+  // Continuing a run (#762) breaks that — the run has an archived copy from its first leg AND is
+  // live again — and keeping the archive showed a running run as finished.
+  return [...live, ...archived.filter(run => !live.some(l => l.id === run.id))]
 }
 
 /** Map one run to its current activity item: `started` while running, else `finished`. */

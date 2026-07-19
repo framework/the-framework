@@ -2,7 +2,7 @@ import { basename } from 'node:path'
 import { listProjects, type ProjectRecord } from '../registry.js'
 import { isActivated } from '../project.js'
 import { readLogs, type LogEntry } from '../logs.js'
-import { listRuns, readLiveMeta, type RunMeta } from '../store/index.js'
+import { listRuns, readLiveMetas, type LiveRun, type RunMeta } from '../store/index.js'
 
 /**
  * The multi-project read side (#392): projects the daemon serves come from the
@@ -38,9 +38,10 @@ export interface SummarizeDeps {
 async function readAllRuns(path: string): Promise<RunMeta[]> {
   const [archived, live] = await Promise.all([
     listRuns(path).catch(() => [] as RunMeta[]),
-    readLiveMeta(path).catch(() => undefined),
+    readLiveMetas(path).catch(() => [] as LiveRun[]),
   ])
-  return live ? [live, ...archived] : archived
+  // Dedup by id like every other reader: a live run that has since been archived is one run.
+  return [...live.filter(run => !archived.some(r => r.id === run.id)), ...archived]
 }
 
 /**

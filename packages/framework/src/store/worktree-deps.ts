@@ -1,4 +1,6 @@
-import { join, relative } from 'node:path'
+import { join, relative, isAbsolute } from 'node:path'
+import { nodeFs, type NodeFs } from '../node-fs.js'
+import { nodeGitRunner, type GitRunner } from '../project.js'
 import { FRAMEWORK_DIR } from './run-store.js'
 
 /**
@@ -109,4 +111,42 @@ export async function linkDependencies(repo: string, worktree: string, fs: LinkF
     }
   }
   return linked
+}
+
+/** The exclude rule that covers a linked tree. Deliberately slash-free: see below. */
+const EXCLUDE_RULE = NODE_MODULES
+
+/**
+ * Make git ignore the dependency links (#738). A repo's `.gitignore` says `node_modules/`, and
+ * a trailing slash matches a *directory* only — the links {@link linkDependencies} makes are
+ * symlinks, so they are not covered, and they show up as untracked in every run's worktree.
+ * That is not cosmetic: the agent runs `git add -A`, so the run would commit dangling absolute
+ * symlinks into its branch and onto the PR.
+ *
+ * The rule goes in the repository's `info/exclude` rather than a worktree-local file because
+ * git resolves excludes from the *common* git dir, so a per-worktree copy is never read (a
+ * detail worth pinning: the per-worktree path looks right and silently does nothing). Writing
+ * a slash-free `node_modules` there covers the symlink form in every worktree. Idempotent, and
+ * the main checkout is unaffected in practice: its `node_modules` is a real directory, already
+ * ignored by the same name.
+ *
+ * Best-effort: a run whose links are merely untracked is still a run.
+ */
+export async function excludeDependencyLinks(
+  repo: string,
+  fs: NodeFs = nodeFs(),
+  run: GitRunner = nodeGitRunner(),
+): Promise<void> {
+  try {
+    const common = (await run(['rev-parse', '--git-common-dir'], repo)).trim()
+    if (!common) return
+    const infoDir = join(isAbsolute(common) ? common : join(repo, common), 'info')
+    const path = join(infoDir, 'exclude')
+    const current = await fs.read(path).catch(() => '')
+    if (current.split('\n').some(line => line.trim() === EXCLUDE_RULE)) return
+    await fs.mkdir(infoDir)
+    await fs.append(path, (current && !current.endsWith('\n') ? '\n' : '') + EXCLUDE_RULE + '\n')
+  } catch {
+    // Not a repo, or an unwritable git dir: the links just stay visible to git status.
+  }
 }

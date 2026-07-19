@@ -197,7 +197,8 @@ function WorkingNow({ active, onSelectProject }: { active: ActiveRun[]; onSelect
   return (
     <ul className="divide-y divide-border">
       {active.map(run => (
-        <li key={run.projectId}>
+        // Keyed by project + run (#738): one project can have several runs in flight.
+        <li key={`${run.projectId}:${run.runId}`}>
           <button
             type="button"
             onClick={() => onSelectProject(run.projectId)}

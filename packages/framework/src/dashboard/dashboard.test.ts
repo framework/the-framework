@@ -30,7 +30,7 @@ test('buildDashboard rolls up totals, run-status, and per-project counts', async
     { projectId: 'b', projectName: 'b', open: 0, total: 1, items: [] },
   ]
   const data = await buildDashboard(projects, {
-    liveMeta: async cwd => (cwd === '/a' ? run('running', '2026-07-14T11:00:00Z') : undefined),
+    liveRuns: async cwd => (cwd === '/a' ? [{ ...run('running', '2026-07-14T11:00:00Z'), cwd }] : []),
     runs: async cwd => runsByPath[cwd] ?? [],
     queue: async () => queues,
     now: NOW,
@@ -54,7 +54,7 @@ test('buildDashboard buckets run activity across a 14-day window, oldest-first',
     run('done', '2026-06-01T09:00:00Z'), // older than 14 days -> dropped
   ]
   const data = await buildDashboard([project('a', '/a')], {
-    liveMeta: async () => undefined,
+    liveRuns: async () => [],
     runs: async () => runs,
     queue: async () => [],
     now: NOW,

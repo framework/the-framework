@@ -8,6 +8,7 @@ import {
   metaFromEvents,
   listRuns,
   readLiveMeta,
+  readLiveMetas,
   reconcileOrphanedRuns,
   loadRunEvents,
   runIdFromStartedAt,
@@ -40,13 +41,16 @@ function memFs(seed: Record<string, string> = {}): StoreFs & { files: Map<string
       // no-op: the memory fs has no directories
     },
     async readdir(dir) {
-      // Derive children from the flat path map: basenames whose dirname is `dir`.
+      // Derive children from the flat path map: file basenames whose dirname is `dir`, plus
+      // the first segment of anything deeper (the real fs lists subdirectories too, which is
+      // how `readLiveMetas` finds the per-run worktrees).
       const prefix = dir.endsWith('/') ? dir : dir + '/'
       const names = new Set<string>()
       for (const p of files.keys()) {
         if (!p.startsWith(prefix)) continue
         const rest = p.slice(prefix.length)
-        if (!rest.includes('/')) names.add(rest)
+        const head = rest.split('/')[0]
+        if (head) names.add(head)
       }
       return [...names]
     },
@@ -347,4 +351,52 @@ test('fresh open adopts the id the daemon allocated, ignoring an unsafe one (#73
   // A traversal-shaped id is dropped for the derived one: the id names a directory.
   const unsafe = await RunStore.open(CWD, { fs: memFs(), fresh: true, now: AT, id: '../evil' })
   assert.equal((await unsafe.readMeta())?.id, runIdFromStartedAt(AT))
+})
+
+// #738: since #736 a run lives in its own worktree, so a project's live runs are spread across
+// `.the-framework/worktrees/*` rather than sitting at the project path.
+const worktreeMeta = (runId: string, over: Partial<RunMeta> = {}): string =>
+  JSON.stringify({ version: 1, status: 'running', id: runId, startedAt: AT, updatedAt: AT, passes: 0, ...over })
+
+test('readLiveMetas finds a run living in each worktree, newest first (#738)', async () => {
+  const fs = memFs({
+    [join(CWD, '.the-framework', 'worktrees', 'r1', '.the-framework', 'run.json')]: worktreeMeta('r1'),
+    [join(CWD, '.the-framework', 'worktrees', 'r2', '.the-framework', 'run.json')]: worktreeMeta('r2'),
+  })
+  const runs = await readLiveMetas(CWD, fs)
+  assert.deepEqual(
+    runs.map(r => ({ id: r.id, cwd: r.cwd })),
+    [
+      { id: 'r2', cwd: join(CWD, '.the-framework', 'worktrees', 'r2') },
+      { id: 'r1', cwd: join(CWD, '.the-framework', 'worktrees', 'r1') },
+    ],
+    'both runs, newest id first, each carrying its own checkout',
+  )
+})
+
+test('readLiveMetas also returns a run at the project root (the non-git fallback, and pre-#736 runs)', async () => {
+  const fs = memFs({
+    [META]: worktreeMeta('root-run'),
+    [join(CWD, '.the-framework', 'worktrees', 'r1', '.the-framework', 'run.json')]: worktreeMeta('r1'),
+  })
+  const runs = await readLiveMetas(CWD, fs)
+  assert.deepEqual(runs.map(r => r.id).sort(), ['r1', 'root-run'])
+  assert.equal(runs.find(r => r.id === 'root-run')?.cwd, CWD, 'the root run reports the repo itself')
+})
+
+test('readLiveMetas is empty on a project that never ran, and skips a junk worktree name', async () => {
+  assert.deepEqual(await readLiveMetas(CWD, memFs()), [])
+  // Only our own `<runId>` directories are read; anything else in there is not a run of ours.
+  const fs = memFs({
+    [join(CWD, '.the-framework', 'worktrees', '.tmp-scratch', '.the-framework', 'run.json')]: worktreeMeta('x'),
+  })
+  assert.deepEqual(await readLiveMetas(CWD, fs), [])
+})
+
+test('readLiveMetas self-heals a dead run in a worktree, same as the single reader (#716)', async () => {
+  const path = join(CWD, '.the-framework', 'worktrees', 'r1', '.the-framework', 'run.json')
+  const fs = memFs({ [path]: worktreeMeta('r1', { pid: 999999, host: hostname() }) })
+  const runs = await readLiveMetas(CWD, fs, () => false)
+  assert.equal(runs[0]?.status, 'stopped', 'a running meta whose process is gone reads as stopped')
+  assert.equal((JSON.parse(fs.files.get(path)!) as RunMeta).status, 'stopped', 'and is healed on disk')
 })

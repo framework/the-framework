@@ -9,6 +9,7 @@ import {
   addWorktree,
   runBranchName,
   linkDependencies,
+  excludeDependencyLinks,
 } from './store/index.js'
 import { startDashboard, type Dashboard, type StartRunKind, type StartRunOptions, type StartRunResult, type AddProjectResult, type PreviewResult, type PreviewStatus } from './dashboard/index.js'
 import { startInterventionWatcher, postDiscord, type InterventionWatcher } from './dashboard/intervention-watcher.js'
@@ -488,8 +489,10 @@ function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOptions): Pro
   const allocateWorkspace = async (projectCwd: string, runId: string): Promise<{ cwd: string; runId?: string }> => {
     try {
       const worktree = await addWorktree(projectCwd, { runId, branch: runBranchName(runId) })
-      // `node_modules` is gitignored, so a fresh worktree has none: link the parent's in.
+      // `node_modules` is gitignored, so a fresh worktree has none: link the parent's in, and
+      // make git ignore the links (a `node_modules/` rule does not match a symlink, #738).
       await linkDependencies(projectCwd, worktree.path).catch(() => [])
+      await excludeDependencyLinks(projectCwd).catch(() => {})
       return { cwd: worktree.path, runId }
     } catch (err) {
       console.log(`[framework] no worktree for ${basename(projectCwd)} (${err instanceof Error ? err.message : String(err)}); running in the main checkout`)

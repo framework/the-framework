@@ -21,6 +21,15 @@ import { nodeFs } from '../node-fs.js'
  */
 export const FRAMEWORK_DIR = '.the-framework'
 
+/**
+ * Per-run worktrees live under `<repo>/.the-framework/worktrees/` (#736). Kept out of git by
+ * the install-time `.the-framework/.gitignore` (`*` rule, #313), so a worktree's checkout never
+ * shows up as dirty in the parent. Declared here beside {@link FRAMEWORK_DIR} rather than in
+ * `worktree.ts`, which imports from this module: {@link readLiveMetas} needs it to find the
+ * runs living in those worktrees, and the other direction would be an import cycle.
+ */
+export const WORKTREES_DIR = 'worktrees'
+
 /** The append-only event log: one {@link FrameworkEvent} per line (JSONL). */
 export const EVENTS_FILE = 'events.jsonl'
 
@@ -499,6 +508,45 @@ export async function readLiveMeta(
     return stopped
   }
   return meta
+}
+
+/**
+ * A live run plus the checkout it is running in (#738). Since #736 a run lives in its own
+ * worktree, so a project's live run is no longer a single thing and no longer sits at the
+ * project path: `cwd` says which checkout to read that run's git/file status from.
+ */
+export interface LiveRun extends RunMeta {
+  /** The run's own checkout: a worktree under `.the-framework/worktrees/`, or the repo root. */
+  cwd: string
+}
+
+/**
+ * Every live run of a project (#738): the list variant of {@link readLiveMeta}.
+ *
+ * A run started from the dashboard gets its own worktree (#736) and writes its `run.json`
+ * inside it, so the project path alone no longer sees any of them. This looks in both places:
+ * each `.the-framework/worktrees/*` checkout, and the repo root itself, which is where a
+ * project that cannot be given a worktree (not a git repo) still runs and where every run
+ * from before #736 lives.
+ *
+ * Each candidate goes through {@link readLiveMeta}, so a stale run self-heals exactly as it
+ * did. Newest first, by id. Never throws: an unreadable worktree is skipped.
+ */
+export async function readLiveMetas(
+  cwd: string,
+  fs: StoreFs = nodeStoreFs(),
+  isAlive: (pid: number) => boolean = isPidAlive,
+): Promise<LiveRun[]> {
+  const worktreesDir = join(cwd, FRAMEWORK_DIR, WORKTREES_DIR)
+  const names = await fs.readdir(worktreesDir).catch(() => [])
+  // isSafeRunId: the directory name is the run id, and anything else in there is not ours.
+  const candidates = [cwd, ...names.filter(isSafeRunId).map(name => join(worktreesDir, name))]
+  const runs: LiveRun[] = []
+  for (const candidate of candidates) {
+    const meta = await readLiveMeta(candidate, fs, isAlive).catch(() => undefined)
+    if (meta) runs.push({ ...meta, cwd: candidate })
+  }
+  return runs.sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
 }
 
 /**

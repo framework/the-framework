@@ -1,4 +1,4 @@
-import { readLiveMeta, type RunMeta } from '../store/index.js'
+import { readLiveMetas, type LiveRun } from '../store/index.js'
 import type { ProjectSummary } from './projects.js'
 
 // The interventions queue (#632, part of the Queue #624): the cross-project "needs you" list.
@@ -25,6 +25,8 @@ export interface Intervention {
   number?: number
   /** The parked gate's id (`awaiting` only) — its stable identity, so it notifies exactly once. */
   awaitId?: string
+  /** Which run is asking (`awaiting` only, #738): a project can have several parked at once. */
+  runId?: string
   /** When the PR was opened (`pr`) or the run last updated (`awaiting`), ISO, for ordering. */
   createdAt?: string
 }
@@ -63,8 +65,8 @@ export function nodeGhPrLister(): PrLister {
 /** Injectable seam so {@link buildInterventions} is unit-testable off disk. */
 export interface InterventionsDeps {
   prs?: PrLister
-  /** The live-run meta reader (default {@link readLiveMeta}); drives the `awaiting` source (#636). */
-  liveMeta?: (cwd: string) => Promise<RunMeta | undefined>
+  /** The live-run reader (default {@link readLiveMetas}); drives the `awaiting` source (#636). */
+  liveRuns?: (cwd: string) => Promise<LiveRun[]>
   /**
    * The dashboard's own URL, so an `awaiting` item can link back to it. Only the daemon knows
    * it (the card path resolves the project client-side and needs no URL), so it is optional; an
@@ -84,7 +86,7 @@ export async function buildInterventions(
   deps: InterventionsDeps = {},
 ): Promise<Intervention[]> {
   const prs = deps.prs ?? nodeGhPrLister()
-  const liveMeta = deps.liveMeta ?? readLiveMeta
+  const liveRuns = deps.liveRuns ?? readLiveMetas
   const items: Intervention[] = []
   for (const project of projects) {
     const open = await prs(project.path).catch(() => [])
@@ -101,10 +103,11 @@ export async function buildInterventions(
       })
     }
     // A run paused mid-flight to ask the user is a "needs you" too (#636): a live run that is
-    // still `running` and has an unresolved choice gate. One per project (a run parks on one
-    // gate at a time), keyed on the gate id so it notifies once.
-    const meta = await liveMeta(project.path).catch(() => undefined)
-    if (meta?.status === 'running' && meta.pendingChoice) {
+    // still `running` and has an unresolved choice gate. A run parks on one gate at a time, but
+    // a project now has several concurrent runs (#736), so each parked run contributes its own
+    // item — keyed on the gate id, plus the run id so two runs are told apart.
+    for (const meta of await liveRuns(project.path).catch(() => [])) {
+      if (meta.status !== 'running' || !meta.pendingChoice) continue
       items.push({
         projectId: project.id,
         projectName: project.name,
@@ -112,6 +115,7 @@ export async function buildInterventions(
         title: meta.pendingChoice.title,
         url: deps.dashboardUrl ?? '',
         awaitId: meta.pendingChoice.id,
+        runId: meta.id,
         ...(meta.updatedAt ? { createdAt: meta.updatedAt } : {}),
       })
     }

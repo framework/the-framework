@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from '../project.js'
-import { FRAMEWORK_DIR, isSafeRunId } from './run-store.js'
+import { FRAMEWORK_DIR, WORKTREES_DIR, isSafeRunId } from './run-store.js'
 
 /**
  * Git-worktree lifecycle for concurrent runs (#453/#735): give each run its own
@@ -9,11 +9,6 @@ import { FRAMEWORK_DIR, isSafeRunId } from './run-store.js'
  * dashboard changes (those are the sibling #453 slices). This module only knows
  * how to add, list, remove, and prune worktrees.
  */
-
-/** Per-run worktrees live under `<repo>/.the-framework/worktrees/`. Already kept
- *  out of git by the install-time `.the-framework/.gitignore` (`*` rule, #313), so
- *  a worktree's checkout never shows up as dirty in the parent. */
-export const WORKTREES_DIR = 'worktrees'
 
 /** The path a run's worktree gets: `<repo>/.the-framework/worktrees/<runId>`. */
 export function worktreePath(repo: string, runId: string): string {

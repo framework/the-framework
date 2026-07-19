@@ -1,4 +1,4 @@
-import { listRuns, readLiveMeta, type RunMeta, type RunStatus } from '../store/index.js'
+import { listRuns, readLiveMetas, type LiveRun, type RunMeta, type RunStatus } from '../store/index.js'
 import type { ProjectSummary } from './projects.js'
 
 // The "New activity" feed (#627): the cross-project stream of run lifecycle transitions that
@@ -43,11 +43,10 @@ export interface ActivityDeps {
 async function readAllRuns(cwd: string): Promise<RunMeta[]> {
   const [archived, live] = await Promise.all([
     listRuns(cwd).catch(() => [] as RunMeta[]),
-    readLiveMeta(cwd).catch(() => undefined),
+    readLiveMetas(cwd).catch(() => [] as LiveRun[]),
   ])
-  // Skip the live run when it is already archived under the same id, so it is not counted twice.
-  if (live && !archived.some(r => r.id === live.id)) return [live, ...archived]
-  return archived
+  // Skip a live run already archived under the same id, so it is not counted twice.
+  return [...live.filter(run => !archived.some(r => r.id === run.id)), ...archived]
 }
 
 /** Map one run to its current activity item: `started` while running, else `finished`. */

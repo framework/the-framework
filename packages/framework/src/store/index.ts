@@ -7,15 +7,18 @@ export {
   readLiveMeta,
   reconcileOrphanedRuns,
   loadRunEvents,
+  readLiveMetas,
   runIdFromStartedAt,
   isSafeRunId,
   FRAMEWORK_DIR,
+  WORKTREES_DIR,
   EVENTS_FILE,
   META_FILE,
   RUNS_DIR,
   RUN_META_VERSION,
   type StoreFs,
   type RunMeta,
+  type LiveRun,
   type RunStatus,
   type OpenStoreOptions,
 } from './run-store.js'
@@ -29,9 +32,14 @@ export {
   runBranchName,
   currentBranch,
   renameRunBranch,
-  WORKTREES_DIR,
   type WorktreeInfo,
   type AddWorktreeOptions,
   type AddedWorktree,
 } from './worktree.js'
-export { linkDependencies, findDependencyDirs, nodeLinkFs, type LinkFs } from './worktree-deps.js'
+export {
+  linkDependencies,
+  excludeDependencyLinks,
+  findDependencyDirs,
+  nodeLinkFs,
+  type LinkFs,
+} from './worktree-deps.js'

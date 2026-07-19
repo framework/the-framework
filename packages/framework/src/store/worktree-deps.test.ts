@@ -3,7 +3,9 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { mkdtemp, rm, mkdir, writeFile, readFile, lstat, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { findDependencyDirs, linkDependencies, nodeLinkFs, type LinkFs } from './index.js'
+import { findDependencyDirs, linkDependencies, excludeDependencyLinks, nodeLinkFs, type LinkFs } from './index.js'
+import { nodeFs } from '../node-fs.js'
+import { nodeGitRunner } from '../project.js'
 
 /** A {@link LinkFs} over an in-memory set of directory paths, recording the links made. */
 function fakeFs(dirs: string[]): LinkFs & { links: { target: string; path: string }[] } {
@@ -114,6 +116,45 @@ test('linkDependencies gives a real worktree a working dependency tree', async (
 
     // Idempotent: a second call over the same worktree links nothing new.
     assert.deepEqual(await linkDependencies(repo, wt, nodeLinkFs()), [])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+// The regression this guards: `.gitignore` says `node_modules/`, which matches a directory and
+// NOT the symlink we create, so without an exclude the run's `git add -A` commits dangling
+// absolute symlinks onto its branch. Exercised against real git, since the whole claim is about
+// what git actually ignores.
+test('excludeDependencyLinks makes git ignore the linked trees in a worktree (#738)', async () => {
+  const git = nodeGitRunner()
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-deps-git-')))
+  const repo = join(root, 'repo')
+  try {
+    await mkdir(join(repo, 'node_modules', 'dep'), { recursive: true })
+    await git(['init'], repo)
+    await git(['config', 'user.email', 't@t'], repo)
+    await git(['config', 'user.name', 't'], repo)
+    await writeFile(join(repo, '.gitignore'), 'node_modules/\n')
+    await writeFile(join(repo, 'README.md'), '# t\n')
+    await git(['add', '-A'], repo)
+    await git(['commit', '-m', 'init'], repo)
+
+    const wt = join(root, 'wt')
+    await git(['worktree', 'add', wt, '-b', 'the-framework/run-1'], repo)
+    await linkDependencies(repo, wt, nodeLinkFs())
+    assert.equal(
+      (await git(['status', '--porcelain'], wt)).includes('node_modules'),
+      true,
+      'the plain .gitignore rule does not cover the symlink',
+    )
+
+    await excludeDependencyLinks(repo, nodeFs(), git)
+    assert.equal((await git(['status', '--porcelain'], wt)).trim(), '', 'the worktree is clean once excluded')
+
+    // Idempotent: a second run over the same repo must not append the rule again.
+    await excludeDependencyLinks(repo, nodeFs(), git)
+    const exclude = await readFile(join(repo, '.git', 'info', 'exclude'), 'utf8')
+    assert.equal(exclude.split('\n').filter(l => l.trim() === 'node_modules').length, 1)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

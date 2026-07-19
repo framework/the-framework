@@ -1,4 +1,4 @@
-import { readLiveMeta, type RunMeta, type RunStatus } from '../store/index.js'
+import { readLiveMetas, type LiveRun, type RunStatus } from '../store/index.js'
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
 
@@ -12,6 +12,10 @@ import { collectQueue, type ProjectQueue } from './queue.js'
 export interface ActiveRun {
   projectId: string
   projectName: string
+  /** Which run this is (#738): a project can have several in flight, one per worktree. */
+  runId: string
+  /** The run's own checkout, so its git/file status is read from the worktree it edits (#738). */
+  cwd: string
   status: RunStatus
   /** What the user asked to build (the run's `scope` event). */
   intent?: string
@@ -46,27 +50,30 @@ const RECENT_LIMIT = 5
 
 /** Injectable readers so {@link buildOverview} is unit-testable off disk. */
 export interface OverviewDeps {
-  liveMeta?: (cwd: string) => Promise<RunMeta | undefined>
+  liveRuns?: (cwd: string) => Promise<LiveRun[]>
   queue?: (projects: ProjectSummary[]) => Promise<ProjectQueue[]>
 }
 
 /**
- * Build the cross-project Overview: the running runs (from each project's live meta), the
- * total open TODO count (from {@link collectQueue}), and the most recently active projects
- * (by {@link ProjectSummary.lastActivityAt}). Forgiving — a project whose meta is missing
- * or not running simply contributes nothing to `active`.
+ * Build the cross-project Overview: the running runs (every live run of each project, one per
+ * worktree since #736), the total open TODO count (from {@link collectQueue}), and the most
+ * recently active projects (by {@link ProjectSummary.lastActivityAt}). Forgiving — a project
+ * with no live run, or none running, simply contributes nothing to `active`.
  */
 export async function buildOverview(projects: ProjectSummary[], deps: OverviewDeps = {}): Promise<Overview> {
-  const liveMeta = deps.liveMeta ?? readLiveMeta
+  const liveRuns = deps.liveRuns ?? readLiveMetas
   const queue = deps.queue ?? (p => collectQueue(p))
 
   const active: ActiveRun[] = []
   for (const project of projects) {
-    const meta = await liveMeta(project.path)
-    if (meta?.status === 'running') {
+    // Every live run of the project (#738), not just the one that used to sit at its path.
+    for (const meta of await liveRuns(project.path).catch(() => [])) {
+      if (meta.status !== 'running') continue
       active.push({
         projectId: project.id,
         projectName: project.name,
+        runId: meta.id,
+        cwd: meta.cwd,
         status: meta.status,
         ...(meta.intent ? { intent: meta.intent } : {}),
         ...(meta.scope ? { scope: meta.scope } : {}),

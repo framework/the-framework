@@ -2,12 +2,15 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { buildInterventions, interventionKey, type OpenPr } from './interventions.js'
 import type { ProjectSummary } from './projects.js'
-import type { RunMeta } from '../store/index.js'
+import type { LiveRun, RunMeta } from '../store/index.js'
 
 const project = (id: string, path: string): ProjectSummary => ({ id, path, name: id, activated: true })
 
 /** No paused run anywhere — keeps the PR-only tests hermetic (no disk read). */
-const noRuns = async (): Promise<RunMeta | undefined> => undefined
+const noRuns = async (): Promise<LiveRun[]> => []
+
+/** A live run in its own worktree (#738), which is what the reader now returns. */
+const live = (meta: RunMeta, cwd = '/a/.the-framework/worktrees/r1'): LiveRun => ({ ...meta, cwd })
 
 const runningMeta = (over: Partial<RunMeta> = {}): RunMeta => ({
   version: 1,
@@ -29,7 +32,7 @@ test('buildInterventions rolls up open non-draft PRs across projects, newest fir
     '/c': [], // no open PRs -> contributes nothing
   }
   const prs = async (cwd: string): Promise<OpenPr[]> => prsByPath[cwd] ?? []
-  const items = await buildInterventions([project('a', '/a'), project('b', '/b'), project('c', '/c')], { prs, liveMeta: noRuns })
+  const items = await buildInterventions([project('a', '/a'), project('b', '/b'), project('c', '/c')], { prs, liveRuns: noRuns })
 
   // Newest PR first; the draft is gone.
   assert.deepEqual(
@@ -47,28 +50,28 @@ test('buildInterventions skips a project whose PR lookup throws', async () => {
     if (cwd === '/boom') throw new Error('gh exploded')
     return [{ number: 1, title: 'ok', url: 'u1', isDraft: false }]
   }
-  const items = await buildInterventions([project('boom', '/boom'), project('ok', '/ok')], { prs, liveMeta: noRuns })
+  const items = await buildInterventions([project('boom', '/boom'), project('ok', '/ok')], { prs, liveRuns: noRuns })
   assert.deepEqual(items.map(i => i.projectId), ['ok'])
 })
 
 test('buildInterventions returns [] when nothing is open anywhere', async () => {
   const prs = async (): Promise<OpenPr[]> => []
-  assert.deepEqual(await buildInterventions([project('a', '/a')], { prs, liveMeta: noRuns }), [])
+  assert.deepEqual(await buildInterventions([project('a', '/a')], { prs, liveRuns: noRuns }), [])
 })
 
 test('buildInterventions dedupes a PR shared by two registered projects (same repo), keeping one', async () => {
   const shared: OpenPr = { number: 285, title: 'release', url: 'https://gh/pr/285', isDraft: false, createdAt: '2026-07-05T00:00:00Z' }
   const prs = async (): Promise<OpenPr[]> => [shared] // both projects resolve to the same repo
-  const items = await buildInterventions([project('root', '/repo'), project('sub', '/repo/packages/x')], { prs, liveMeta: noRuns })
+  const items = await buildInterventions([project('root', '/repo'), project('sub', '/repo/packages/x')], { prs, liveRuns: noRuns })
   assert.deepEqual(items.map(i => i.number), [285])
 })
 
 const noPrs = async (): Promise<OpenPr[]> => []
 
 test('buildInterventions adds an awaiting item for a running run parked on a choice (#636)', async () => {
-  const liveMeta = async (cwd: string): Promise<RunMeta | undefined> =>
-    cwd === '/a' ? runningMeta({ pendingChoice: { id: 'gate-1', title: 'Cache the auth store?' } }) : undefined
-  const items = await buildInterventions([project('a', '/a'), project('b', '/b')], { prs: noPrs, liveMeta })
+  const liveRuns = async (cwd: string): Promise<LiveRun[]> =>
+    cwd === '/a' ? [live(runningMeta({ pendingChoice: { id: 'gate-1', title: 'Cache the auth store?' } }))] : []
+  const items = await buildInterventions([project('a', '/a'), project('b', '/b')], { prs: noPrs, liveRuns })
 
   assert.equal(items.length, 1)
   assert.deepEqual(
@@ -78,25 +81,25 @@ test('buildInterventions adds an awaiting item for a running run parked on a cho
 })
 
 test('buildInterventions ignores a pendingChoice on a run that is no longer running', async () => {
-  const liveMeta = async (): Promise<RunMeta | undefined> =>
-    runningMeta({ status: 'done', pendingChoice: { id: 'gate-1', title: 'stale' } })
-  assert.deepEqual(await buildInterventions([project('a', '/a')], { prs: noPrs, liveMeta }), [])
+  const liveRuns = async (): Promise<LiveRun[]> =>
+    [live(runningMeta({ status: 'done', pendingChoice: { id: 'gate-1', title: 'stale' } }))]
+  assert.deepEqual(await buildInterventions([project('a', '/a')], { prs: noPrs, liveRuns }), [])
 })
 
 test('buildInterventions links an awaiting item to the dashboard URL when given, else empty', async () => {
-  const liveMeta = async (): Promise<RunMeta | undefined> => runningMeta({ pendingChoice: { id: 'g', title: 'q?' } })
-  const withUrl = await buildInterventions([project('a', '/a')], { prs: noPrs, liveMeta, dashboardUrl: 'http://localhost:4200' })
+  const liveRuns = async (): Promise<LiveRun[]> => [live(runningMeta({ pendingChoice: { id: 'g', title: 'q?' } }))]
+  const withUrl = await buildInterventions([project('a', '/a')], { prs: noPrs, liveRuns, dashboardUrl: 'http://localhost:4200' })
   assert.equal(withUrl[0]!.url, 'http://localhost:4200')
-  const withoutUrl = await buildInterventions([project('a', '/a')], { prs: noPrs, liveMeta })
+  const withoutUrl = await buildInterventions([project('a', '/a')], { prs: noPrs, liveRuns })
   assert.equal(withoutUrl[0]!.url, '')
 })
 
 test('buildInterventions surfaces PRs and awaiting runs together, newest first', async () => {
   const prs = async (cwd: string): Promise<OpenPr[]> =>
     cwd === '/a' ? [{ number: 5, title: 'pr', url: 'u5', isDraft: false, createdAt: '2026-07-10T00:00:00Z' }] : []
-  const liveMeta = async (cwd: string): Promise<RunMeta | undefined> =>
-    cwd === '/b' ? runningMeta({ updatedAt: '2026-07-16T00:00:00Z', pendingChoice: { id: 'g', title: 'q?' } }) : undefined
-  const items = await buildInterventions([project('a', '/a'), project('b', '/b')], { prs, liveMeta })
+  const liveRuns = async (cwd: string): Promise<LiveRun[]> =>
+    cwd === '/b' ? [live(runningMeta({ updatedAt: '2026-07-16T00:00:00Z', pendingChoice: { id: 'g', title: 'q?' } }))] : []
+  const items = await buildInterventions([project('a', '/a'), project('b', '/b')], { prs, liveRuns })
   assert.deepEqual(items.map(i => i.kind), ['awaiting', 'pr']) // awaiting is newer
 })
 

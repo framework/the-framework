@@ -43,6 +43,7 @@ export function RunHistory({
   }, [startTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasRunning = runs.some(run => run.status === 'running')
+  const newestRunningId = runs.find(run => run.status === 'running')?.id
   useEffect(() => {
     if (hasRunning) setOptimistic(null)
   }, [hasRunning])
@@ -83,7 +84,9 @@ export function RunHistory({
             status={run.status}
             intent={run.intent}
             subtitle={new Date(run.startedAt).toLocaleString()}
-            active={run.id === selectedRunId || (followLive && run.status === 'running')}
+            // Following live highlights the newest running run, not every one of them (#738):
+            // `runs` is newest-first, so that is the first with a running status.
+            active={run.id === selectedRunId || (followLive && run.id === newestRunningId)}
             onClick={() => onSelect(run.id)}
           />
         ))}

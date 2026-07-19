@@ -1,4 +1,4 @@
-import { listRuns, readLiveMeta, loadRunEvents, type RunMeta } from '../store/index.js'
+import { listRuns, readLiveMetas, loadRunEvents, type RunMeta } from '../store/index.js'
 import { readLogs, type LogEntry } from '../logs.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
@@ -33,24 +33,41 @@ async function withProject<T>(projectId: string, read: (cwd: string) => Promise<
 }
 
 /**
+ * The checkout a read should target: a live run's own worktree when `runId` names one (#738),
+ * else the project root. Since #736 a run edits its worktree, not the user's checkout, so the
+ * branch / dirty flag / file dots shown beside a run have to come from there — asking the
+ * project root would report the user's own working tree instead of the run's.
+ *
+ * An unknown or finished `runId` falls back to the project root rather than failing: the run's
+ * worktree may already be gone, and the project's own status is still the sane thing to show.
+ */
+async function resolveRunPath(projectId: string, runId?: string): Promise<string | undefined> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd || !runId) return cwd
+  const live = await readLiveMetas(cwd).catch(() => [])
+  return live.find(run => run.id === runId)?.cwd ?? cwd
+}
+
+/**
  * The project's runs, most-recent first (or `[]`). The archived (finished) runs
- * from `runs/`, plus the live run prepended when one is present — so the sidebar
- * shows the in-progress run with a `running` status the moment it starts, not
- * only after it closes. The live run is skipped once it has been archived under
- * the same id (it then appears from `listRuns` instead), so there is no double.
- * The status is not filtered on: `readLiveMeta` may have just self-healed a dead
- * run to `stopped` (#716), and that freshly-archived row can lag `listRuns` by a
- * poll — prepending it regardless keeps the row visible (as stopped) with no flicker.
+ * from `runs/`, plus every live run prepended — so the sidebar shows an in-progress
+ * run with a `running` status the moment it starts, not only after it closes.
+ *
+ * Since #736 a project has any number of live runs, each in its own worktree, so this reads
+ * them all (#738) instead of the single one that used to sit at the project path. They come
+ * back as {@link LiveRun}s, carrying the `cwd` of the checkout that run is editing.
+ *
+ * A live run is skipped once it has been archived under the same id (it then appears from
+ * `listRuns` instead), so there is no double. The status is not filtered on: `readLiveMeta`
+ * may have just self-healed a dead run to `stopped` (#716), and that freshly-archived row can
+ * lag `listRuns` by a poll — prepending it regardless keeps the row visible with no flicker.
  */
 export async function onRuns(projectId: string): Promise<RunMeta[]> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return []
   const archived = await listRuns(cwd).catch(() => [])
-  const live = await readLiveMeta(cwd).catch(() => undefined)
-  if (live && !archived.some(r => r.id === live.id)) {
-    return [live, ...archived]
-  }
-  return archived
+  const live = await readLiveMetas(cwd).catch(() => [])
+  return [...live.filter(run => !archived.some(r => r.id === run.id)), ...archived]
 }
 
 /** One archived run's event log for replay (or `[]` when the run or project is gone). */
@@ -104,17 +121,21 @@ export async function onDashboard(): Promise<DashboardData> {
  * The project's files for the `#` context picker (#504) and the panel tree (#492): every
  * file git sees (tracked + untracked, honoring .gitignore), repo-relative and sorted, via
  * `git ls-files`. Localhost-only by nature — the relay has no checkout, so it resolves `[]`.
+ * Pass a live `runId` to list that run's worktree instead of the project root (#738).
  */
-export async function onProjectFiles(projectId: string): Promise<string[]> {
-  return withProject(projectId, crawlRepoFiles, [])
+export async function onProjectFiles(projectId: string, runId?: string): Promise<string[]> {
+  const cwd = await resolveRunPath(projectId, runId)
+  return cwd ? crawlRepoFiles(cwd).catch(() => []) : []
 }
 
 /**
  * Per-file git status for the tree's dots (#492): repo-relative path -> untracked/modified/
  * deleted, from `git status --porcelain`. `{}` when not a repo / on the relay (no checkout).
+ * Pass a live `runId` to see that run's own worktree rather than the project root (#738).
  */
-export async function onProjectFileStatus(projectId: string): Promise<Record<string, FileGitStatus>> {
-  return withProject(projectId, readFileStatuses, {})
+export async function onProjectFileStatus(projectId: string, runId?: string): Promise<Record<string, FileGitStatus>> {
+  const cwd = await resolveRunPath(projectId, runId)
+  return cwd ? readFileStatuses(cwd).catch(() => ({})) : {}
 }
 
 /** The project's GitHub URL from its `origin` remote (#489), or null (no remote / not GitHub / relay). */
@@ -124,9 +145,13 @@ export async function onGithubUrl(projectId: string): Promise<string | null> {
   return (await githubUrlFor(cwd)) ?? null
 }
 
-/** The project's git status (#491): active branch, dirty flag, linked PR. Null when not a repo / relay. */
-export async function onGitStatus(projectId: string): Promise<GitStatus | null> {
-  const cwd = await resolveProjectPath(projectId)
+/**
+ * The project's git status (#491): active branch, dirty flag, linked PR. Null when not a repo /
+ * relay. Pass a live `runId` to read that run's worktree, which is the branch and the dirty
+ * state that actually belong to it (#738).
+ */
+export async function onGitStatus(projectId: string, runId?: string): Promise<GitStatus | null> {
+  const cwd = await resolveRunPath(projectId, runId)
   if (!cwd) return null
   return (await readGitStatus(cwd)) ?? null
 }

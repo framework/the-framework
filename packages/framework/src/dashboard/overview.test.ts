@@ -23,7 +23,7 @@ test('buildOverview surfaces only running runs, most-recently-updated first', as
     '/c': meta('running', 'build the UI', '2026-07-13T12:00:00Z'),
   }
   const overview = await buildOverview([project('a', '/a'), project('b', '/b'), project('c', '/c')], {
-    liveMeta: async cwd => metas[cwd],
+    liveRuns: async cwd => (metas[cwd] ? [{ ...metas[cwd]!, cwd }] : []),
     queue: async () => [],
   })
   assert.deepEqual(
@@ -43,7 +43,7 @@ test('buildOverview sums the open queue and lists recent projects newest-first (
     { projectId: 'p0', projectName: 'p0', open: 3, total: 4, items: [] },
     { projectId: 'p1', projectName: 'p1', open: 2, total: 2, items: [] },
   ]
-  const overview = await buildOverview(projects, { liveMeta: async () => undefined, queue: async () => queues })
+  const overview = await buildOverview(projects, { liveRuns: async () => [], queue: async () => queues })
   assert.equal(overview.active.length, 0)
   assert.equal(overview.queueOpen, 5)
   assert.equal(overview.recent.length, 5)
@@ -55,7 +55,7 @@ test('buildOverview sums the open queue and lists recent projects newest-first (
 
 test('buildOverview omits projects with no activity from recent', async () => {
   const overview = await buildOverview([project('a', '/a'), project('b', '/b', '2026-07-13T00:00:00Z')], {
-    liveMeta: async () => undefined,
+    liveRuns: async () => [],
     queue: async () => [],
   })
   assert.deepEqual(overview.recent.map(r => r.projectId), ['b'])

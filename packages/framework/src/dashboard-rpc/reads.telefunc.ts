@@ -1,6 +1,7 @@
 import { listRuns, readLiveMetas, loadRunEvents, listWorktreeDirs, worktreeSize, isSafeRunId, type RunMeta } from '../store/index.js'
 import { readLogs, type LogEntry } from '../logs.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
+import { readTickets, type WorkspaceTicket } from '../dashboard/tickets.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
 import { buildOverview, type Overview } from '../dashboard/overview.js'
 import { buildInterventions, type Intervention } from '../dashboard/interventions.js'
@@ -127,6 +128,11 @@ export async function onRun(projectId: string, runId: string): Promise<Framework
 /** The surfaced PLAN/TODO docs at the workspace root, in sidebar order (or `[]`). */
 export async function onDocs(projectId: string): Promise<WorkspaceDoc[]> {
   return withProject(projectId, readDocs, [])
+}
+
+/** The project's `tickets/*.md`, by filename (#697). `[]` when the repo has no `tickets/` yet. */
+export async function onTickets(projectId: string): Promise<WorkspaceTicket[]> {
+  return withProject(projectId, readTickets, [])
 }
 
 /** The committed `.the-framework/LOGS.md` entries, newest-first (or `[]`). */

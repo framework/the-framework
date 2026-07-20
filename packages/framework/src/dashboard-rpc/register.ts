@@ -1,6 +1,6 @@
 import { __decorateTelefunction } from 'telefunc'
-import { onRuns, onRun, onDocs, onProjectLog, onQueue, onOverview, onInterventions, onActivity, onDashboard, onGithubUrl, onGitStatus, onProjectFiles, onProjectFileStatus, onFileDiff, onRunChanges, onFileContent, onRetainedWorktrees, onRunWorktree, onRunHandoff } from './reads.telefunc.js'
-import { sendStop, sendChoice, sendMessage, sendStart, sendPreview, onServeTargets, sendStopPreview, onPreviewStatus, sendOpenInApp, sendRemoveWorktree, sendPushBranch, sendOpenPullRequest } from './control.telefunc.js'
+import { onRuns, onRun, onDocs, onProjectLog, onQueue, onOverview, onInterventions, onActivity, onDashboard, onGithubUrl, onGitStatus, onProjectFiles, onProjectFileStatus, onFileDiff, onRunChanges, onFileContent, onTickets, onRetainedWorktrees, onRunWorktree, onRunHandoff } from './reads.telefunc.js'
+import { sendStop, sendChoice, sendMessage, sendStart, sendPreview, onServeTargets, sendStopPreview, onPreviewStatus, sendOpenInApp, sendRemoveWorktree, sendPushBranch, sendOpenPullRequest, sendQueueTicket } from './control.telefunc.js'
 import { onEvents } from './events.telefunc.js'
 import { onProjects, sendAddProject } from './projects.telefunc.js'
 import { onPreferences, savePreferences, onProjectPreferences, saveProjectPreferences, onEditors } from './preferences.telefunc.js'
@@ -67,6 +67,7 @@ export function registerDashboardTelefunctions(appRootDir: string = process.cwd(
   reg(onFileDiff, 'onFileDiff', reads)
   reg(onRunChanges, 'onRunChanges', reads)
   reg(onFileContent, 'onFileContent', reads)
+  reg(onTickets, 'onTickets', reads)
   reg(sendStop, 'sendStop', control)
   reg(sendChoice, 'sendChoice', control)
   reg(sendMessage, 'sendMessage', control)
@@ -79,6 +80,7 @@ export function registerDashboardTelefunctions(appRootDir: string = process.cwd(
   reg(sendRemoveWorktree, 'sendRemoveWorktree', control)
   reg(sendPushBranch, 'sendPushBranch', control)
   reg(sendOpenPullRequest, 'sendOpenPullRequest', control)
+  reg(sendQueueTicket, 'sendQueueTicket', control)
   reg(onEvents, 'onEvents', events)
   reg(onProjects, 'onProjects', projects)
   reg(sendAddProject, 'sendAddProject', projects)

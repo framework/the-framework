@@ -2,6 +2,7 @@ import { getContext } from 'telefunc'
 import { appendControl, type ControlEntry } from '../control.js'
 import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
 import { resolveProjectPath, resolveRunPath, contextPreferences, contextPreview } from './context.js'
+import { appendFlatTodoEntry } from '../todo-loop.js'
 import { isSafeRunId, listRuns, readLiveMetas, removeWorktree, pruneWorktrees, worktreePath, type RunMeta } from '../store/index.js'
 import {
   openRunPullRequest,
@@ -237,4 +238,29 @@ function prBodyFor(run: RunMeta): string {
   if (run.intent) lines.push(run.intent.trim(), '')
   lines.push(`Opened from The Framework session \`${run.sessionName ?? run.id}\`.`)
   return lines.join('\n')
+}
+
+/** What {@link sendQueueTicket} did: the backlog file written, or why it could not be. */
+export interface QueueTicketResult {
+  ok: boolean
+  /** The workspace-relative backlog the entry landed in, when it landed. */
+  file?: string
+  error?: string
+}
+
+/**
+ * Put a ticket on the project's agent queue (#697), so the next drain run works it.
+ *
+ * A direct write rather than a run: the queue is a plain file the dashboard already reads,
+ * and asking an agent to append one line would cost a turn and could do anything else besides.
+ * It writes the project checkout's flat backlog specifically, which is the durable queue #624
+ * settled on and the one a worktree run's queue is promoted into (#852).
+ */
+export async function sendQueueTicket(projectId: string, entry: string): Promise<QueueTicketResult> {
+  const trimmed = entry.trim()
+  if (!trimmed) return { ok: false, error: 'a ticket is required' }
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return { ok: false, error: 'no such project' }
+  const file = await appendFlatTodoEntry(cwd, trimmed)
+  return file ? { ok: true, file } : { ok: false, error: 'the queue could not be written' }
 }

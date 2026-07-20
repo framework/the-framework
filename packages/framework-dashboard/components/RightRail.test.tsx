@@ -8,6 +8,7 @@ vi.mock('./ProjectLogPanel.js', () => ({ ProjectLogPanel: () => <div>log</div> }
 vi.mock('./FileTree.js', () => ({ FileTree: () => <div>files</div> }))
 vi.mock('./BrowserPanel.js', () => ({ BrowserPanel: () => <div>browser</div> }))
 vi.mock('./ChoicesRail.js', () => ({ ChoicesRail: () => <div>choices</div> }))
+vi.mock('./TicketsPanel.js', () => ({ TicketsPanel: () => <div>tickets</div> }))
 
 const { RightRail } = await import('./RightRail.js')
 

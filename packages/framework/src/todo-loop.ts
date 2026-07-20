@@ -94,7 +94,25 @@ async function backlogCandidates(cwd: string): Promise<string[]> {
  * unwinding, and must not mask the reason it stopped.
  */
 export async function appendTodoEntry(cwd: string, entry: string): Promise<string | undefined> {
-  const name = (await backlogCandidates(cwd))[0] ?? FLAT_TODO_FILE
+  return writeTodoEntry(cwd, (await backlogCandidates(cwd))[0] ?? FLAT_TODO_FILE, entry)
+}
+
+/**
+ * Append an open entry to the workspace's *flat* backlog specifically, creating
+ * {@link FLAT_TODO_FILE} when there is none.
+ *
+ * The difference from {@link appendTodoEntry} is which file wins while a session-scoped
+ * `TODO_<slug>.agent.md` is lying around: that one belongs to a run, and something a human
+ * queued from the dashboard (#697) belongs to the project. The flat file is the durable global
+ * queue #624 settled on, and the only one `promoteQueue` carries between branches (#852), so a
+ * pick that landed in some run's own backlog could quietly never be seen again.
+ */
+export async function appendFlatTodoEntry(cwd: string, entry: string): Promise<string | undefined> {
+  return writeTodoEntry(cwd, (await findFlatTodo(cwd)) ?? FLAT_TODO_FILE, entry)
+}
+
+/** Append one open entry to a named backlog file. Never throws; resolves with the file written. */
+async function writeTodoEntry(cwd: string, name: string, entry: string): Promise<string | undefined> {
   const path = join(cwd, name)
   try {
     const existing = await readFile(path, 'utf8').catch(() => '')

@@ -6,12 +6,13 @@ import { ChoicesRail } from './ChoicesRail.js'
 import { ViewsRail } from './ViewsRail.js'
 import { FileTree } from './FileTree.js'
 import { BrowserPanel } from './BrowserPanel.js'
+import { TicketsPanel } from './TicketsPanel.js'
 import type { AgentView } from '../lib/live-state.js'
 import { Badge } from './ui/badge.js'
 import { Button } from './ui/button.js'
 import { cn } from '../lib/utils.js'
 
-type Tab = 'files' | 'choices' | 'views' | 'browser' | 'docs' | 'log'
+type Tab = 'files' | 'choices' | 'views' | 'browser' | 'tickets' | 'docs' | 'log'
 
 // The right sidebar (#314 third rail): the interactive choice gates the run parks on
 // (#440), the ad-hoc markdown views the agent pushes (#441), the surfaced docs (PLAN/TODO),
@@ -92,6 +93,7 @@ export function RightRail({
     ...(hasViews ? ['views' as const] : []),
     // Only when the run actually has one (#813) — a dead tab teaches people the preview is broken.
     ...(hasBrowser && runId ? ['browser' as const] : []),
+    'tickets',
     'docs',
     'log',
   ]
@@ -104,9 +106,11 @@ export function RightRail({
           ? 'Views'
           : t === 'browser'
             ? 'Browser'
-            : t === 'docs'
-              ? 'Docs'
-              : 'Log'
+            : t === 'tickets'
+              ? 'Tickets'
+              : t === 'docs'
+                ? 'Docs'
+                : 'Log'
   // The Files badge counts only selected files, not whole-repo entries (#661): the shared context
   // set also holds project paths (from the Start form's repo checkboxes), which aren't in `files`.
   const selectedFiles = files.filter(f => context.has(f)).length
@@ -142,6 +146,8 @@ export function RightRail({
           <ViewsRail views={views} />
         ) : tab === 'browser' && hasBrowser && runId ? (
           <BrowserPanel projectId={projectId} runId={runId} />
+        ) : tab === 'tickets' ? (
+          <TicketsPanel projectId={projectId} />
         ) : tab === 'log' ? (
           <ProjectLogPanel projectId={projectId} />
         ) : (

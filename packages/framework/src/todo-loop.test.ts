@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { FakeDriver } from './driver/fake.js'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
-import { appendTodoEntry, findTodoBacklog, parseTodoEntries, runTodoLoop } from './todo-loop.js'
+import { appendTodoEntry, appendFlatTodoEntry, findTodoBacklog, parseTodoEntries, runTodoLoop } from './todo-loop.js'
 
 async function tmpWorkspace(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'framework-todo-'))
@@ -345,6 +345,26 @@ test('ready-for-merge is emitted once across a multi-item backlog', async () => 
 
     assert.equal(result.completed, 2)
     assert.equal(events.filter(e => e.kind === 'ready-for-merge').length, 1)
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+// #697: a human queueing a ticket from the dashboard means the project's queue, not whichever
+// run's session-scoped backlog happens to be lying in the checkout. Only the flat file is
+// carried between branches by promoteQueue (#852), so the other one can vanish unseen.
+test('appendFlatTodoEntry writes the flat queue even when a session backlog exists (#697)', async () => {
+  const cwd = await tmpWorkspace()
+  try {
+    await writeFile(join(cwd, 'TODO_a-session.agent.md'), '- [ ] a run\n', 'utf8')
+
+    // The run-facing helper prefers the session file, which is what it is for.
+    assert.equal(await appendTodoEntry(cwd, 'from the run'), 'TODO_a-session.agent.md')
+
+    // The dashboard-facing one does not.
+    assert.equal(await appendFlatTodoEntry(cwd, 'Do ticket 42'), 'TODO_AGENTS.md')
+    assert.equal(await readFile(join(cwd, 'TODO_AGENTS.md'), 'utf8'), '- [ ] Do ticket 42\n')
+    assert.equal(await readFile(join(cwd, 'TODO_a-session.agent.md'), 'utf8'), '- [ ] a run\n- [ ] from the run\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

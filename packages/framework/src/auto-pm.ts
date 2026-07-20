@@ -1,19 +1,19 @@
-import type { ConsumptionStatus } from './consumption.js'
+import type { QuotaBoundaryStatus } from './quota-boundary.js'
 import { renderSpikeAndPlanPrompt, SPIKE_AND_PLAN_PRESET_NAME } from './spike-and-plan-preset.js'
 import { renderQuickWinsPrompt, QUICK_WINS_PRESET_NAME } from './quick-wins-preset.js'
 import { renderDrainQueuePrompt, DRAIN_QUEUE_PRESET_NAME } from './drain-queue-preset.js'
 
 /**
  * Auto PM (#685): spend leftover subscription quota on product management instead of
- * letting it expire. While the configured usage limits are not met and nobody is at the
- * keyboard, the daemon runs the cycle by itself: it works the agent queue down entry by entry (#855),
+ * letting it expire. While the account is still under its quota boundary (#879) and nobody
+ * is at the keyboard, the daemon runs the cycle by itself: it works the agent queue down entry by entry (#855),
  * and once that is empty it refills it — harvesting quick-wins, then spiking and planning
  * the tickets that have neither yet.
  *
  * The whole feature is one policy question ("is now a good time to spend tokens on our
  * own roadmap?"), so that question lives here as a pure function and the daemon only
  * supplies the readings. #298 is the parent idea (background jobs / "max out the usage"),
- * and #519 already built the meter this reads.
+ * and #879 defines the boundary this reads.
  */
 
 /** How often the daemon re-asks {@link autoPmDecision}. */
@@ -38,8 +38,8 @@ export interface AutoPmInputs {
   backlogEmpty: boolean | undefined
   /** Live runs on this project. Any run at all means the user's quota is already being spent. */
   activeRuns: number
-  /** The budget readings, or `undefined` when the quota could not be read. */
-  quota: AutoPmQuota | undefined
+  /** Where the account stands against its quota boundary, or `undefined` when it could not be read. */
+  quota: QuotaBoundaryStatus | undefined
   /** Milliseconds since this project was last auto-started, or `undefined` if it never was. */
   sinceLastStartMs?: number
   /** Override {@link DEFAULT_AUTO_PM_COOLDOWN_MS}. */
@@ -62,43 +62,31 @@ export type QuotaDecision = { start: true } | AutoPmRefusal
 export type AutoPmDecision = { start: true; mode: AutoPmMode } | AutoPmRefusal
 
 /**
- * What one tick knows about the budget: where the user's configured limits stand.
- *
- * It used to carry the account's own absolute weekly figure as well (#848), to cover the
- * rolling meter reading zero after a restart. That was only meaningful next to a percentage
- * threshold, and #870 removed the threshold, so it went with it rather than sitting here unread.
- */
-export interface AutoPmQuota {
-  /** Where the user's configured limits stand, from the rolling meter. */
-  status: ConsumptionStatus
-}
-
-/**
  * Whether the budget allows spending unasked.
  *
- * The gate is the user's own configured limits (#870): auto PM starts while they are not met
- * and stands down once one is. It used to require half of every budget still free, which was a
- * second budget notion nobody had asked for — and two sets of limits to reason about is worse
- * than one, even when the extra one is stricter.
+ * The gate is the quota boundary (#879): by the nth day of the quota week, at most n/7 of the
+ * week's allowance should be gone, so auto PM spends up to that line and stands down at it.
+ * Work the user asks for is free to cross it and borrow against the days still to come; work
+ * nobody asked for is exactly what the line is there to stop.
  *
- * `status.reached` is that question already answered: "the limit to pause for, or null",
- * widest-first, so the window it names is the one that takes longest to recover.
+ * **It fails closed on a quota it cannot read, and that is the opposite of the per-run guard.**
+ * #519 settled that an unreadable quota must never *stop* the user's own work, so
+ * `startConsumptionGuard` fails open. Quietly burning a subscription on work nobody asked for
+ * is a far worse failure than skipping a tick.
  *
- * **It still fails closed on a quota it cannot read at all, and that is the opposite of the
- * per-run guard.** #519 settled that an unreadable quota must never *stop* the user's own work,
- * so `startConsumptionGuard` fails open. Work nobody asked for is the other way round: quietly
- * burning a subscription is a far worse failure than skipping a tick. That is a separate
- * property from the threshold, so dropping the threshold left it alone.
- *
- * Note what this no longer covers. `reached` reads the rolling meter, which is delta-based: a
- * restarted daemon has nothing to diff and honestly reports zero consumed however much the
- * account has spent (#848). With no configured limit to trip, nothing then stands between a
- * fresh daemon and work nobody asked for. Raised on #870 as a decision rather than fixed here,
- * since the answer is a limit that stops unattended work specifically.
+ * Reading the account's own week also means a restarted daemon is not blind: the figure is
+ * absolute and complete, unlike the delta meter this replaced, which reported zero consumed
+ * after a restart however much the account had spent (#848).
  */
-export function quotaHeadroom(quota: AutoPmQuota | undefined): QuotaDecision {
+export function quotaHeadroom(quota: QuotaBoundaryStatus | undefined): QuotaDecision {
   if (!quota) return { start: false, reason: 'the quota could not be read, so there is no way to tell what is spare' }
-  if (quota.status.reached) return { start: false, reason: `the ${quota.status.reached} limit is reached` }
+  const reached = quota.reached
+  if (reached) {
+    return {
+      start: false,
+      reason: `${reached.label} is ${Math.round(reached.percentUsed)}% used, at or past day ${quota.boundary.day} of the week's ${Math.round(quota.boundary.percent)}%`,
+    }
+  }
   return { start: true }
 }
 
@@ -195,8 +183,8 @@ export interface AutoPmDeps {
   backlogEmpty(project: AutoPmProject): Promise<boolean>
   /** How many runs are live on a project. */
   activeRuns(project: AutoPmProject): number
-  /** The current budget readings, or `undefined` when there are none. */
-  quota(): Promise<AutoPmQuota | undefined>
+  /** Where the account stands against its boundary, or `undefined` when there is no reading. */
+  quota(): Promise<QuotaBoundaryStatus | undefined>
   /** The jobs to rotate through, in cycle order. Used only while the queue is empty. */
   jobs: readonly AutoPmJob[]
   /** The job for a queue with open entries (#855); {@link AUTO_PM_DRAIN_JOB} by default. */

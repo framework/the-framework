@@ -347,20 +347,20 @@ test('runPrompt cannot cap an agent that reports no price, and says so in tokens
   assert.equal(last.kind === 'usage' && last.turns, 2)
 })
 
-test('runPrompt pauses at a consumption limit and reports a clean stop (#531)', async () => {
+test('runPrompt pauses at the quota boundary and reports a clean stop (#531/#879)', async () => {
   const events: FrameworkEvent[] = []
   const usage = { inputTokens: 10, outputTokens: 10, cacheReadTokens: 0, cacheCreationTokens: 0, costUsd: 0.01 }
   // Turn 1 ends on a gate, so the run would otherwise take a turn 2.
   const driver = new FakeDriver({ turns: [{ text: multiGateTurn, usage }, { text: 'never', usage }] })
   await assert.rejects(() =>
-    runPrompt({ prompt: 'go', driver, cwd: '/ws', consumptionGate: () => 'daily', onEvent: e => events.push(e) }),
+    runPrompt({ prompt: 'go', driver, cwd: '/ws', consumptionGate: () => 'Current week (all models)', onEvent: e => events.push(e) }),
   )
   // The direct prompt path is its own loop, so it needs the gate in its own right.
   const end = events.at(-1) as { kind: string; ok: boolean; stopped?: boolean; detail?: string }
   assert.equal(end.kind, 'end')
   assert.equal(end.stopped, true)
-  assert.match(end.detail ?? '', /Daily consumption limit reached/)
-  assert.ok(events.some(e => e.kind === 'log' && e.message === 'Daily consumption limit reached — pausing the session.'))
+  assert.match(end.detail ?? '', /quota boundary reached \(Current week \(all models\)\)/)
+  assert.ok(events.some(e => e.kind === 'log' && e.message === 'Quota boundary reached (Current week (all models)) — pausing the session.'))
 })
 
 test('runPrompt carries on when the consumption gate fails (#531)', async () => {

@@ -22,7 +22,6 @@ import {
   type Verdict,
 } from '@gemstack/ai-autopilot'
 import { snapshotWorkspace } from './sandbox.js'
-import { type ConsumptionWindow } from './consumption.js'
 import type { Driver, DriverSession, DriverTurn } from './driver/index.js'
 import { composeRunSystem, type EcoOptions, type TfContext } from './system-prompt.js'
 import { createRunControls, emitSessionStart, endStopDetail } from './run-telemetry.js'
@@ -199,7 +198,7 @@ export interface RunFrameworkOptions {
    * leave the run ungated, which is also what a gate that throws resolves to:
    * an unreadable quota must never stop the user's work (Rom's call on #519).
    */
-  consumptionGate?: () => ConsumptionWindow | null
+  consumptionGate?: () => string | null
   /**
    * Run the backlog loop (#323) after the build settles: consume the agent's own
    * `TODO_<slug>.agent.md` / `TODO_AGENTS.md` one entry per turn until empty, gating

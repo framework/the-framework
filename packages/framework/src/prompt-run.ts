@@ -4,7 +4,6 @@ import { runAwaitRounds } from './run.js'
 import { composeRunSystem, renderSystemPrompt, type EcoOptions, type TfContext } from './system-prompt.js'
 import { createRunControls, emitSessionStart, endStopDetail } from './run-telemetry.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
-import { type ConsumptionWindow } from './consumption.js'
 import { leaveResumeNote } from './todo-loop.js'
 import type { RunMessages } from './run-messages.js'
 
@@ -58,7 +57,7 @@ export interface RunPromptOptions {
    * has been reached to pause the run, or `null` to carry on. Same seam and same
    * fail-open as a build run — see `RunFrameworkOptions.consumptionGate`.
    */
-  consumptionGate?: () => ConsumptionWindow | null
+  consumptionGate?: () => string | null
   /** Session link template for the dashboard, `{sessionId}` resolved when known. */
   sessionLink?: string
   /**

@@ -9,23 +9,20 @@ import {
   type AutoPmDeps,
   type AutoPmJob,
   type AutoPmProject,
-  type AutoPmQuota,
 } from './auto-pm.js'
-import { ConsumptionMeter, consumptionStatus, DEFAULT_CONSUMPTION_LIMITS } from './consumption.js'
+import { quotaBoundaryStatus, type QuotaBoundaryStatus } from './quota-boundary.js'
 
-const T0 = 1_800_000_000_000
+/** 2026-07-20T12:00:00Z. The week below resets in 5 days, so this is day 3 of 7 (42.8% allowed). */
+const T0 = Date.UTC(2026, 6, 20, 12, 0, 0)
 
-/**
- * A reading where the rolling meter has seen `weekPercent` points burned.
- */
-function status(weekPercent: number | undefined): AutoPmQuota {
-  const meter = new ConsumptionMeter()
-  if (weekPercent !== undefined) {
-    // Two samples, because the meter measures the delta between readings, not an absolute.
-    meter.record({ at: T0 - 1000, weeklyPercent: 0 })
-    meter.record({ at: T0, weeklyPercent: weekPercent })
-  }
-  return { status: consumptionStatus({ meter, limits: DEFAULT_CONSUMPTION_LIMITS, now: T0 }) }
+/** A reading where the account's week is `weekPercent` used. */
+function status(weekPercent: number): QuotaBoundaryStatus {
+  const boundary = quotaBoundaryStatus({
+    windows: [{ label: 'Current week (all models)', kind: 'week', percentUsed: weekPercent, resetsAtText: 'Jul 25 at 7am (UTC)' }],
+    now: T0,
+  })
+  if (!boundary) throw new Error('the fixture week should be placeable')
+  return boundary
 }
 
 /** The happy inputs, so each test names only the condition it is about. */
@@ -76,47 +73,29 @@ test('quotaHeadroom refuses to start when the quota cannot be read (#685)', () =
   assert.match(decision.start === false ? decision.reason : '', /could not be read/)
 })
 
-test('quotaHeadroom starts while no configured limit is met (#870)', () => {
+test('quotaHeadroom starts while the account is under the boundary (#879)', () => {
   assert.deepEqual(quotaHeadroom(status(1)), { start: true })
 })
 
-test('quotaHeadroom stands down once a configured limit is reached, and names it (#870)', () => {
-  // The user's own limits are the gate now: auto PM has no threshold of its own to trip first.
+test('quotaHeadroom stands down at the boundary, and says where it sits (#879)', () => {
+  // Day 3 of 7 allows 42.8%, so a week at 99% is well past it.
   const decision = quotaHeadroom(status(99))
   assert.equal(decision.start, false)
-  assert.match(decision.start === false ? decision.reason : '', /limit is reached/)
+  assert.match(decision.start === false ? decision.reason : '', /99% used, at or past day 3 of the week's 43%/)
 })
 
-test('quotaHeadroom starts with every rolling limit switched off (#870)', () => {
-  // Switching the limits off is the user saying "do not pace me". Auto PM used to keep its own
-  // 50%-free rule here and refuse anyway, which is the second budget notion #870 removed.
-  const off = { enabled: false, percent: 20 }
-  const meter = new ConsumptionMeter()
-  meter.record({ at: T0 - 1000, weeklyPercent: 0 })
-  meter.record({ at: T0, weeklyPercent: 95 })
-  const quota: AutoPmQuota = {
-    status: consumptionStatus({ meter, limits: { daily: off, fiveHour: off, session: off }, now: T0 }),
-  }
-  assert.deepEqual(quotaHeadroom(quota), { start: true })
+test('quotaHeadroom stands down the moment the boundary is met, not only when it is passed (#879)', () => {
+  const decision = quotaHeadroom(status((3 / 7) * 100))
+  assert.equal(decision.start, false)
 })
 
-test('a restarted daemon reads as untouched, which the configured limits are what guard (#870)', () => {
-  // Pinning a known blind spot rather than leaving it to be rediscovered. The meter is delta
-  // based, so a daemon that just restarted has one sample, nothing to diff it against, and
-  // honestly reports 0 consumed -- while the account may sit at 95% of its week.
-  //
-  // #848 covered this with the account's own absolute weekly figure, measured against auto PM's
-  // 50%-free rule. #870 removed that rule as a second set of limits, and the absolute check went
-  // with it, so what stands here now is whatever the user configured. With the defaults that is
-  // enough; with the limits off, nothing stops a fresh daemon. Raised on #870.
-  const fresh = new ConsumptionMeter()
-  fresh.record({ at: T0, weeklyPercent: 95 })
-  const rolling = consumptionStatus({ meter: fresh, limits: DEFAULT_CONSUMPTION_LIMITS, now: T0 })
-  assert.equal(rolling.daily.usedPercent, 0) // the trap: not undefined
-  assert.equal(rolling.daily.complete, false) // the honest signal underneath it
-
-  const decision = autoPmDecision({ enabled: true, backlogEmpty: true, activeRuns: 0, quota: { status: rolling } })
-  assert.equal(decision.start, true)
+test('a restarted daemon is no longer blind (#848/#879)', () => {
+  // The old rolling meter was delta-based, so a daemon that had just restarted had one sample,
+  // nothing to diff it against, and honestly reported 0 consumed while the account sat at 95%
+  // of its week. The boundary reads the account's own absolute figure, which owes nothing to
+  // how long this process has been up, so the restart is simply not a case any more.
+  const decision = autoPmDecision({ enabled: true, backlogEmpty: true, activeRuns: 0, quota: status(95) })
+  assert.equal(decision.start, false)
 })
 
 const JOBS: readonly AutoPmJob[] = [

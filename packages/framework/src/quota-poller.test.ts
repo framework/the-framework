@@ -1,7 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { DEFAULT_POLL_MS, MAX_POLL_MS, QuotaPoller } from './quota-poller.js'
-import { ONE_DAY_MS } from './consumption.js'
 import type { DriverQuota } from './driver/index.js'
 
 const T0 = 1_800_000_000_000
@@ -27,16 +26,6 @@ function pollerOf(script: DriverQuota[], startAt = T0) {
   })
   return { poller, advance: (ms: number) => (at += ms) }
 }
-
-test('QuotaPoller feeds the meter from the weekly window (#525)', async () => {
-  const { poller, advance } = pollerOf([goodAt(10), goodAt(14)])
-  await poller.poll()
-  advance(60_000)
-  await poller.poll()
-  // The session and per-model windows must not be mistaken for the weekly meter.
-  assert.equal(poller.meter.size, 2)
-  assert.equal(poller.meter.rolling(ONE_DAY_MS, T0 + 60_000)?.points, 4)
-})
 
 test('QuotaPoller keeps the last good reading through a transient failure (#525)', async () => {
   const { poller, advance } = pollerOf([goodAt(10), { available: false, reason: 'fetch-failed' }])
@@ -109,27 +98,6 @@ test('QuotaPoller survives a driver that throws (#525)', async () => {
   // A throw is the same story as a failed fetch: this attempt told us nothing.
   assert.deepEqual(quota, { available: false, reason: 'fetch-failed' })
   assert.equal(poller.isStopped, false)
-})
-
-test('QuotaPoller ignores a reading with no weekly window (#525)', async () => {
-  const { poller } = pollerOf([{ available: true, windows: [{ label: 'Current session', kind: 'session', percentUsed: 5 }] }])
-  await poller.poll()
-  // Nothing to anchor the limits to, but it's still a successful read.
-  assert.equal(poller.meter.size, 0)
-  assert.ok(poller.current().lastGood?.available)
-})
-
-test('QuotaPoller prunes samples it no longer needs (#525)', async () => {
-  let at = T0
-  let weekly = 1
-  const poller = new QuotaPoller({ read: () => Promise.resolve(goodAt(weekly)), now: () => at })
-  for (let i = 0; i < 5; i++) {
-    await poller.poll()
-    at += 12 * 60 * 60 * 1000
-    weekly += 1
-  }
-  // Five readings 12h apart, but only a day's worth is ever needed.
-  assert.ok(poller.meter.size <= 3, `kept ${poller.meter.size} samples`)
 })
 
 test('QuotaPoller.stop is idempotent and start does not revive it (#525)', () => {

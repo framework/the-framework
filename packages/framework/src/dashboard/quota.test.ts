@@ -2,10 +2,10 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { pollerQuotaSource } from './quota.js'
 import { QuotaPoller } from '../quota-poller.js'
-import { DEFAULT_CONSUMPTION_LIMITS, type ConsumptionLimits } from '../consumption.js'
 import type { DriverQuota } from '../driver/index.js'
 
-const T0 = 1_800_000_000_000
+/** 2026-07-20T12:00:00Z. The week below resets in 5 days, so this is day 3 of 7. */
+const T0 = Date.UTC(2026, 6, 20, 12, 0, 0)
 const HOUR = 60 * 60 * 1000
 
 function week(percentUsed: number): DriverQuota {
@@ -13,19 +13,19 @@ function week(percentUsed: number): DriverQuota {
     available: true,
     windows: [
       { label: 'Current session', kind: 'session', percentUsed: 2, resetsAtText: 'in 2h 53m' },
-      { label: 'Current week (all models)', kind: 'week', percentUsed },
+      { label: 'Current week (all models)', kind: 'week', percentUsed, resetsAtText: 'Jul 25 at 7am (UTC)' },
     ],
   }
 }
 
-function sourceOf(script: DriverQuota[], limits: ConsumptionLimits = DEFAULT_CONSUMPTION_LIMITS) {
+function sourceOf(script: DriverQuota[]) {
   let at = T0
   let i = 0
   const poller = new QuotaPoller({ read: () => Promise.resolve(script[Math.min(i++, script.length - 1)] as DriverQuota), now: () => at })
-  return { source: pollerQuotaSource(poller, () => Promise.resolve(limits)), poller, advance: (ms: number) => (at += ms) }
+  return { source: pollerQuotaSource(poller, () => at), poller, advance: (ms: number) => (at += ms) }
 }
 
-test('the usage panel gets the account windows and where the limits stand (#533)', async () => {
+test('the usage panel gets the account windows and where the boundary stands (#533/#879)', async () => {
   const { source, poller, advance } = sourceOf([week(10), week(16)])
   await poller.poll()
   advance(HOUR)
@@ -36,10 +36,20 @@ test('the usage panel gets the account windows and where the limits stand (#533)
   assert.equal(view.windows.find(w => w.kind === 'week')?.percentUsed, 16)
   assert.equal(view.readAt, T0 + HOUR)
   assert.equal(view.unavailable, undefined)
-  // And the limits: 6 points of the day's 20.
-  assert.equal(view.limits.daily.consumed, 6)
-  assert.equal(view.limits.daily.usedPercent, 30)
-  assert.equal(view.limits.reached, null)
+  // And the boundary: day 3 of the week allows three sevenths of it, and 16% is under that.
+  assert.equal(view.boundary?.boundary.day, 3)
+  assert.equal(view.boundary?.reached, null)
+})
+
+test('the boundary moves with the clock rather than with the reading (#879)', async () => {
+  const { source, poller, advance } = sourceOf([week(50)])
+  await poller.poll()
+  assert.equal((await source.read()).boundary?.reached?.label, 'Current week (all models)')
+  // Two days later the same 50% is under the line, with no new reading.
+  advance(2 * 24 * HOUR)
+  const later = await source.read()
+  assert.equal(later.boundary?.boundary.day, 5)
+  assert.equal(later.boundary?.reached, null)
 })
 
 test('the usage panel keeps the last reading and marks it stale on a blip (#533)', async () => {
@@ -58,44 +68,18 @@ test('the usage panel reports no reading rather than an empty one (#533)', async
   const { source } = sourceOf([{ available: false, reason: 'no-subscription' }])
   const view = await source.read()
   assert.deepEqual(view.windows, [])
-  // Undefined, not 0: an empty bar would say "nothing used" on an account we
-  // cannot read at all.
-  assert.equal(view.limits.daily.consumed, undefined)
-  assert.equal(view.limits.daily.usedPercent, undefined)
-  assert.equal(view.limits.reached, null)
+  // Absent, not a boundary of zero: we cannot read the account at all.
+  assert.equal(view.boundary, undefined)
 })
 
-test('the usage panel leaves the session bar unmeasured when nothing is running (#533)', async () => {
-  const { source, poller } = sourceOf([week(10)])
+test('an unplaceable week leaves the boundary absent rather than guessed (#879)', async () => {
+  const { source, poller } = sourceOf([
+    { available: true, windows: [{ label: 'Current week (all models)', kind: 'week', percentUsed: 10 }] },
+  ])
   await poller.poll()
   const view = await source.read()
-  // The panel is account-wide; a session bar belongs to a run's own guard.
-  assert.equal(view.limits.session.consumed, undefined)
-})
-
-test('the usage panel re-reads the limits, so a settings change re-scales the bars (#533)', async () => {
-  let limits: ConsumptionLimits = DEFAULT_CONSUMPTION_LIMITS
-  let at = T0
-  let i = 0
-  const script = [week(10), week(15)]
-  const poller = new QuotaPoller({ read: () => Promise.resolve(script[Math.min(i++, 1)] as DriverQuota), now: () => at })
-  const source = pollerQuotaSource(poller, () => Promise.resolve(limits))
-  await poller.poll()
-  at += HOUR
-  await poller.poll()
-  assert.equal((await source.read()).limits.daily.usedPercent, 25) // 5 of 20
-
-  limits = { ...DEFAULT_CONSUMPTION_LIMITS, daily: { enabled: true, percent: 10 } }
-  // No restart: the same 5 points are now half the day's budget.
-  assert.equal((await source.read()).limits.daily.usedPercent, 50)
-})
-
-test('the usage panel falls back to the defaults when the limits cannot be read (#533)', async () => {
-  const { poller } = sourceOf([week(10)])
-  // An unreadable preferences file must not take the guard rails off.
-  const source = pollerQuotaSource(poller, () => Promise.reject(new Error('registry unreadable')))
-  await poller.poll()
-  assert.equal((await source.read()).limits.daily.budget, 20)
+  assert.equal(view.windows.length, 1)
+  assert.equal(view.boundary, undefined)
 })
 
 test('stopping the source ends the polling (#533)', () => {

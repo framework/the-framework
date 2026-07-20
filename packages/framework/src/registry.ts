@@ -1,5 +1,4 @@
 import { basename, dirname, join, resolve } from 'node:path'
-import { DEFAULT_CONSUMPTION_LIMITS, sanitizeConsumptionLimits, type ConsumptionLimits } from './consumption.js'
 import { nodeFs } from './node-fs.js'
 
 /**
@@ -103,22 +102,12 @@ export interface Preferences {
   autoPm?: boolean
   /** User-defined presets (#626): the user's own saved prompts, shown beside the built-in presets. */
   customPresets?: CustomPreset[]
-  /**
-   * How much of the subscription The Framework may burn before it pauses itself
-   * (#527, the settings behind #519).
-   *
-   * The only preference where **absent does not mean off**: the rest are flat
-   * booleans a user opts into, but an unset limit should protect the account
-   * rather than leave it unguarded, so absent means {@link DEFAULT_CONSUMPTION_LIMITS}.
-   * Read it through {@link resolveConsumptionLimits} rather than directly.
-   */
-  consumptionLimits?: ConsumptionLimits
 }
 
 /**
  * The run options a project may override (#840). The rest of {@link Preferences} stays global
  * on purpose: `theme`, `editor`, the notification toggles and `customPresets` are about the
- * user, not the repo, and `consumptionLimits` is deliberately not a per-run choice (#800).
+ * user, not the repo.
  *
  * These are the *user's* per-project choices, not the repo's: they live in the user's home
  * file rather than the committed `the-framework.yml` because `model` and `agent` name what
@@ -279,8 +268,6 @@ function sanitizePreferences(value: unknown): Preferences {
     preferences.theme = input['theme'] as (typeof KNOWN_THEMES)[number]
   const customPresets = sanitizeCustomPresets(input['customPresets'])
   if (customPresets.length) preferences.customPresets = customPresets
-  const consumptionLimits = sanitizeConsumptionLimits(input['consumptionLimits'])
-  if (consumptionLimits) preferences.consumptionLimits = consumptionLimits
   return preferences
 }
 
@@ -342,18 +329,6 @@ function sanitizeCustomPresets(value: unknown): CustomPreset[] {
   return out
 }
 
-/**
- * The limits in force: what the user set, with {@link DEFAULT_CONSUMPTION_LIMITS}
- * filling any gap.
- *
- * Absent means the defaults rather than "off", so a user who has never opened
- * the settings is still guarded (#519).
- */
-export function resolveConsumptionLimits(preferences: Preferences | undefined): ConsumptionLimits {
-  // sanitizeConsumptionLimits already fills every window, so a stored value is
-  // whole: the only gap left to default is an absent one.
-  return preferences?.consumptionLimits ?? DEFAULT_CONSUMPTION_LIMITS
-}
 
 /**
  * Read the whole registry. Forgiving: a missing / unreadable / malformed file yields an

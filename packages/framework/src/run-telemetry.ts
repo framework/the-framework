@@ -1,4 +1,3 @@
-import { CONSUMPTION_LIMIT_LABEL, type ConsumptionWindow } from './consumption.js'
 import type { Driver, DriverEvent } from './driver/index.js'
 import { hasSessionIdPlaceholder, resolveSessionLink } from './session-link.js'
 import { type FrameworkEvent } from './events.js'
@@ -44,8 +43,11 @@ export interface DriverEventHandlerOptions {
   sessionLink?: string | undefined
   /** The run's spend cap (#322). Omitted = uncapped. */
   budgetUsd?: number | undefined
-  /** Answers "has the account's quota run out?" between turns (#529). */
-  consumptionGate?: (() => ConsumptionWindow | null) | undefined
+  /**
+   * Answers "has the account reached its quota boundary?" between turns (#879).
+   * Returns the label of the window that reached it, or null while there is room.
+   */
+  consumptionGate?: (() => string | null) | undefined
   /** Tripped when the budget cap is crossed. */
   budgetController: AbortController
   /** Tripped when the consumption gate reports a window is spent. */
@@ -56,8 +58,8 @@ export interface DriverEventHandlerOptions {
 export interface DriverEventHandler {
   /** Wire this as the driver session's `onEvent`. */
   onDriverEvent: (event: DriverEvent) => void
-  /** The window whose limit tripped, once the consumption gate has fired. */
-  consumptionTrip: () => ConsumptionWindow | undefined
+  /** The window that reached the boundary, once the consumption gate has fired. */
+  consumptionTrip: () => string | undefined
 }
 
 /**
@@ -76,7 +78,7 @@ export interface DriverEventHandler {
 export function createDriverEventHandler(opts: DriverEventHandlerOptions): DriverEventHandler {
   const { emit, budgetController, consumptionController } = opts
   let lastSessionId: string | undefined
-  let consumptionTrip: ConsumptionWindow | undefined
+  let consumptionTrip: string | undefined
   const usage = new UsageMeter()
 
   const onDriverEvent = (event: DriverEvent): void => {
@@ -96,7 +98,7 @@ export function createDriverEventHandler(opts: DriverEventHandlerOptions): Drive
       budgetController.abort(new Error('[framework] budget reached'))
     }
     if (opts.consumptionGate && !consumptionController.signal.aborted) {
-      let reached: ConsumptionWindow | null = null
+      let reached: string | null = null
       try {
         reached = opts.consumptionGate()
       } catch (err) {
@@ -104,8 +106,8 @@ export function createDriverEventHandler(opts: DriverEventHandlerOptions): Drive
       }
       if (reached) {
         consumptionTrip = reached
-        emit({ kind: 'log', message: `${CONSUMPTION_LIMIT_LABEL[reached]} consumption limit reached — pausing the session.` })
-        consumptionController.abort(new Error('[framework] consumption limit reached'))
+        emit({ kind: 'log', message: `Quota boundary reached (${reached}) — pausing the session.` })
+        consumptionController.abort(new Error('[framework] quota boundary reached'))
       }
     }
   }
@@ -120,7 +122,7 @@ export interface RunControlsOptions {
   signal?: AbortSignal | undefined
   sessionLink?: string | undefined
   budgetUsd?: number | undefined
-  consumptionGate?: (() => ConsumptionWindow | null) | undefined
+  consumptionGate?: (() => string | null) | undefined
 }
 
 /** The run's abort plumbing plus its driver-event sink. */
@@ -172,7 +174,7 @@ export interface StopDetailOptions {
   budgetController: AbortController
   consumptionController: AbortController
   declineController: AbortController
-  consumptionTrip: () => ConsumptionWindow | undefined
+  consumptionTrip: () => string | undefined
   budgetUsd?: number | undefined
   /**
    * Leave a resume note when the run paused on a consumption limit, returning where
@@ -202,7 +204,7 @@ export async function endStopDetail(opts: StopDetailOptions): Promise<{ stopped:
     : budgetStopped
       ? `budget reached ($${opts.budgetUsd})`
       : paused
-        ? `${CONSUMPTION_LIMIT_LABEL[opts.consumptionTrip() ?? 'session']} consumption limit reached${resumeNote ? `; will resume from ${resumeNote}` : ''}`
+        ? `quota boundary reached${opts.consumptionTrip() ? ` (${opts.consumptionTrip()})` : ''}${resumeNote ? `; will resume from ${resumeNote}` : ''}`
         : opts.err instanceof Error
           ? opts.err.message
           : String(opts.err)

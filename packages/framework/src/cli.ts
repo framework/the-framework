@@ -45,7 +45,7 @@ import { daemonStatus, ensureDaemon, registerHomeProject, runDaemon, stopDaemon,
 import { resetControl, watchControl, type ControlWatcher } from './control.js'
 import { RunMessageQueue } from './run-messages.js'
 import { nodeGitRunner } from './project.js'
-import { listProjects, readPreferences, resolveConsumptionLimits } from './registry.js'
+import { listProjects, readPreferences } from './registry.js'
 import { startConsumptionGuard } from './consumption-guard.js'
 import {
   planMaintenanceSweep,
@@ -1278,18 +1278,18 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   // discarded, so a printed URL reaches nobody (#813).
   if (browserStream) pendingBrowserPort = browserStream.port
 
-  // The consumption limits (#519/#531). Read from the user's own file rather than
-  // taken as a flag: unlike autopilot or eco, a limit is not a per-run choice, so
-  // a run started from a terminal is guarded exactly like one started from the
-  // dashboard. `undefined` when the agent can't report a quota (the fake driver,
-  // or Codex), which leaves the run ungated — the fail-open Rom confirmed.
+  // The quota boundary (#879). Nothing to configure and nothing to pass: the
+  // boundary is derived from the account's own week, so a run started from a
+  // terminal is gated exactly like one started from the dashboard. `undefined`
+  // when the agent can't report a quota (the fake driver, or Codex), which
+  // leaves the run ungated — the fail-open Rom confirmed.
   // Transparent mode (#625) leaves the run fully raw, so the guard is off with it — the run is
   // `claude -p` with no framework behavior, spend included.
-  const guard = transparent ? undefined : startConsumptionGuard({ driver, limits: resolveConsumptionLimits(await readPreferences()) })
+  const guard = transparent ? undefined : startConsumptionGuard({ driver, ...(opts.model ? { model: opts.model } : {}) })
   if (transparent) io.out(`◆ transparent: on — raw ${AGENT_SPECS[opts.agent].label}, no framework prompt, guard, dashboard, or TODO loop`)
-  else if (guard) io.out('◆ consumption limits: on')
+  else if (guard) io.out('◆ quota boundary: on')
   else if (!fake) {
-    io.out(`◆ consumption limits: off — ${AGENT_SPECS[opts.agent].label} reports no quota, so nothing gates your subscription spend.`)
+    io.out(`◆ quota boundary: off — ${AGENT_SPECS[opts.agent].label} reports no quota, so nothing gates your subscription spend.`)
   }
 
   // A user SYSTEM.md + the anti-lazy-pill toggle shape the system prompt (#301), and the eco

@@ -715,7 +715,7 @@ test('runFramework runs the backlog loop after the build when opted in (#323)', 
   }
 })
 
-test('runFramework pauses the run once a consumption limit is reached (#529)', async () => {
+test('runFramework pauses the run once the quota boundary is reached (#529/#879)', async () => {
   const events: FrameworkEvent[] = []
   await assert.rejects(
     runFramework({
@@ -723,16 +723,16 @@ test('runFramework pauses the run once a consumption limit is reached (#529)', a
       driver: fakeDriver(),
       cwd: '/tmp/ws',
       signals: FAKE_SIGNALS,
-      consumptionGate: () => 'daily',
+      consumptionGate: () => 'Current week (all models)',
       onEvent: e => events.push(e),
     }),
   )
-  assert.ok(events.some(e => e.kind === 'log' && e.message === 'Daily consumption limit reached — pausing the session.'))
+  assert.ok(events.some(e => e.kind === 'log' && e.message === 'Quota boundary reached (Current week (all models)) — pausing the session.'))
   const end = events.at(-1)!
   assert.equal(end.kind, 'end')
   // A limit is a clean stop, like the budget cap — not a failure.
   assert.equal(end.kind === 'end' && end.stopped, true)
-  assert.ok(end.kind === 'end' && end.detail?.startsWith('Daily consumption limit reached'))
+  assert.ok(end.kind === 'end' && end.detail?.startsWith('quota boundary reached (Current week (all models))'))
 })
 
 test('runFramework leaves a resume note on the backlog when it pauses (#529)', async () => {
@@ -745,7 +745,7 @@ test('runFramework leaves a resume note on the backlog when it pauses (#529)', a
         driver: fakeDriver(),
         cwd,
         signals: FAKE_SIGNALS,
-        consumptionGate: () => 'five-hour',
+        consumptionGate: () => 'Current week (all models)',
         onEvent: e => events.push(e),
       }),
     )
@@ -764,7 +764,7 @@ test('runFramework appends the resume note to an existing backlog (#529)', async
   try {
     await writeFile(join(cwd, 'TODO.md'), '- [ ] Something already open') // no trailing newline
     await assert.rejects(
-      runFramework({ intent: FAKE_INTENT, driver: fakeDriver(), cwd, signals: FAKE_SIGNALS, consumptionGate: () => 'session' }),
+      runFramework({ intent: FAKE_INTENT, driver: fakeDriver(), cwd, signals: FAKE_SIGNALS, consumptionGate: () => 'Current session' }),
     )
     const todo = await readFile(join(cwd, 'TODO.md'), 'utf8')
     // The existing entry survives and the note lands on its own line.

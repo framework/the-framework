@@ -63,22 +63,14 @@ export {
 } from './run.js'
 export { snapshotWorkspace, SANDBOX_IGNORE, type SnapshotOptions } from './sandbox.js'
 export {
-  ConsumptionMeter,
-  consumptionStatus,
-  budgetsFrom,
-  DEFAULT_CONSUMPTION_LIMITS,
-  FIVE_HOURS_MS,
-  ONE_DAY_MS,
-  type QuotaSample,
-  type RollingConsumption,
-  type ConsumptionLimit,
-  type ConsumptionLimits,
-  type ConsumptionBudgets,
-  type ConsumptionWindow,
-  type ConsumptionStatus,
-  type LimitStatus,
-  CONSUMPTION_LIMIT_LABEL,
-} from './consumption.js'
+  parseResetsAt,
+  boundaryFromResetsAt,
+  quotaBoundaryStatus,
+  QUOTA_WEEK_MS,
+  type QuotaBoundary,
+  type BoundaryWindow,
+  type QuotaBoundaryStatus,
+} from './quota-boundary.js'
 export { startConsumptionGuard, type ConsumptionGuard, type StartConsumptionGuardOptions } from './consumption-guard.js'
 export { pollerQuotaSource, defaultQuotaSource, type QuotaView, type QuotaSource } from './dashboard/quota.js'
 export {
@@ -191,7 +183,6 @@ export {
   PROJECT_PREFERENCE_KEYS,
   type ProjectRecord,
   type Registry,
-  resolveConsumptionLimits,
   type Preferences,
   type ProjectPreferences,
   type PreferencesStore,

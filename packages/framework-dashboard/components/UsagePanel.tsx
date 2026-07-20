@@ -1,25 +1,13 @@
-import type { ConsumptionLimits, DriverQuotaWindow, LimitStatus, Preferences, QuotaView } from '@gemstack/framework'
-import { DEFAULT_CONSUMPTION_LIMITS } from '@gemstack/framework/client'
+import type { DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '@gemstack/framework'
 import { useQuota } from '../lib/quota.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { cn } from '../lib/utils.js'
 
-// The usage panel (#519): what the account has left, and how much of it The Framework may
-// spend before it pauses itself. Two halves, because they answer different questions —
-// "am I about to run out?" (the account's own windows) and "will my agents stop?" (the limits).
-
-/** The three limits, in the order they bite: widest first. */
-const LIMITS: { key: keyof ConsumptionLimits; label: string; hint: string }[] = [
-  { key: 'daily', label: 'Daily', hint: 'How much of your week a single day may consume' },
-  { key: 'fiveHour', label: 'Last 5h', hint: "How much of the day's budget a rolling 5 hours may consume" },
-  { key: 'session', label: 'This session', hint: "How much of the day's budget one session may consume" },
-]
-
-function limitsOf(preferences: Preferences): ConsumptionLimits {
-  // Absent means the defaults, not off: a user who never opened this is still guarded.
-  return preferences.consumptionLimits ?? DEFAULT_CONSUMPTION_LIMITS
-}
+// The usage panel (#519/#879): what the account has left, and how much of it The Framework
+// may spend before it pauses itself. Two halves, because they answer different questions —
+// "am I about to run out?" (the account's own windows) and "will my agents stop?" (the
+// boundary). There is nothing to configure: the boundary is derived from the account's week.
 
 /** A bar, or an explicit "we don't know" — never an empty bar, which would read as "nothing used". */
 function Meter({ percent, muted }: { percent: number | undefined; muted?: boolean }) {
@@ -48,38 +36,23 @@ function AccountWindow({ window }: { window: DriverQuotaWindow }) {
   )
 }
 
-function LimitRow({
-  label,
-  hint,
-  status,
-  percent,
-  onToggle,
-}: {
-  label: string
-  hint: string
-  status: LimitStatus
-  percent: number
-  onToggle: (enabled: boolean) => void
-}) {
+/** Where the boundary sits today, and whether the agents have reached it. */
+function Boundary({ status }: { status: QuotaBoundaryStatus }) {
+  const { boundary, reached } = status
   return (
-    <div className={cn('space-y-1', !status.enabled && 'opacity-50')}>
+    <div className="space-y-1">
       <div className="flex items-baseline justify-between gap-2 text-sm">
-        <label className="flex cursor-pointer items-center gap-1.5" title={hint}>
-          <input type="checkbox" checked={status.enabled} onChange={e => onToggle(e.target.checked)} />
-          <span className="font-medium text-foreground">{label}</span>
-          <span className="text-xs text-muted-foreground">{percent}%</span>
-        </label>
+        <span className="font-medium text-foreground">Today's boundary</span>
         <span className="text-xs text-muted-foreground">
-          {status.usedPercent === undefined
-            ? 'not measured yet'
-            : `${Math.round(status.usedPercent)}% of its budget${status.reached ? ' · paused' : ''}`}
+          day {boundary.day} of 7 · up to {Math.round(boundary.percent)}% of the week
         </span>
       </div>
-      <Meter percent={status.usedPercent} muted={!status.enabled} />
-      {status.consumed !== undefined && !status.complete && status.enabled ? (
-        // Say so rather than let a short window read as low usage.
-        <p className="text-xs text-muted-foreground">Counting from when the dashboard started, so this covers less than the full window.</p>
-      ) : null}
+      <Meter percent={boundary.percent} muted />
+      <p className="text-xs text-muted-foreground">
+        {reached
+          ? `${reached.label} is ${Math.round(reached.percentUsed)}% used, so unattended work is paused until the boundary moves on.`
+          : 'Your agents spend up to this line, so nothing is left on the floor and the last day of the week is all-out.'}
+      </p>
     </div>
   )
 }
@@ -90,11 +63,11 @@ function unavailableNote(view: QuotaView): string | undefined {
     case undefined:
       return undefined
     case 'no-subscription':
-      return "This account has no subscription usage to report, so the limits don't apply."
+      return "This account has no subscription usage to report, so there is no boundary to measure against."
     case 'agent-not-found':
       return 'Claude Code was not found, so usage cannot be read.'
     case 'unrecognized':
-      return 'Claude Code reported its usage in a way this version does not recognize, so the limits are off.'
+      return 'Claude Code reported its usage in a way this version does not recognize, so the boundary is off.'
     default:
       return view.windows.length
         ? "Couldn't refresh just now, so these numbers may be a little behind."
@@ -105,12 +78,6 @@ function unavailableNote(view: QuotaView): string | undefined {
 export function UsagePanel() {
   const view = useQuota()
   const preferences = usePreferences()
-  const limits = limitsOf(preferences)
-
-  const setLimit = (key: keyof ConsumptionLimits, enabled: boolean): void => {
-    updatePreferences({ consumptionLimits: { ...limits, [key]: { ...limits[key], enabled } } })
-  }
-
   const note = view ? unavailableNote(view) : undefined
 
   return (
@@ -127,19 +94,9 @@ export function UsagePanel() {
 
         {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
 
-        {view ? (
-          <div className="space-y-3 border-t pt-4">
-            <p className="text-xs text-muted-foreground">Pause my agents once they have used this much:</p>
-            {LIMITS.map(({ key, label, hint }) => (
-              <LimitRow
-                key={key}
-                label={label}
-                hint={hint}
-                status={view.limits[key]}
-                percent={limits[key].percent}
-                onToggle={enabled => setLimit(key, enabled)}
-              />
-            ))}
+        {view?.boundary ? (
+          <div className="border-t pt-4">
+            <Boundary status={view.boundary} />
           </div>
         ) : null}
 
@@ -154,8 +111,8 @@ export function UsagePanel() {
               <span className="font-medium text-foreground">Spend what's left on the roadmap</span>
             </label>
             <p className="text-xs text-muted-foreground">
-              When nothing is running and the queue is empty, spike &amp; plan tickets rather than let the
-              budget expire. Only while the limits above are not reached.
+              When nothing is running, work the queue down and refill it rather than let the week's
+              allowance expire. Only while the account is still under today's boundary.
             </p>
           </div>
         ) : null}

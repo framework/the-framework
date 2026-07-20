@@ -16,7 +16,6 @@ export {
 } from './run-view.js'
 // The Start-a-run presets (#433): pure prompt builders (no Node imports) the dashboard
 // prefills into the textarea, then runs verbatim as a `prompt` kind.
-export { DEFAULT_CONSUMPTION_LIMITS } from './consumption.js'
 // The prompt-wrapping logic itself (#520), so the dashboard can show the user the
 // built-in prompt *before* a run rather than describing it. These are pure string
 // work — `loadUserSystemPrompt` is the module's only Node-bound export and stays

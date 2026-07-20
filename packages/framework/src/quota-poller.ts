@@ -1,11 +1,10 @@
-import { ConsumptionMeter } from './consumption.js'
 import { isTransientQuotaReason, type DriverQuota, type DriverQuotaUnavailableReason } from './driver/index.js'
 
 /**
  * How often to read the quota when everything is healthy. A read spawns the
  * whole agent CLI (~5s), and the agent's own usage fetch is refused upstream if
- * asked too often, so this is deliberately slow: the limits work on rolling 5h
- * and 24h windows, which a 5-minute sample rate resolves comfortably.
+ * asked too often, so this is deliberately slow: the boundary moves over days,
+ * which a 5-minute sample rate resolves comfortably.
  */
 export const DEFAULT_POLL_MS = 5 * 60 * 1000
 
@@ -39,14 +38,12 @@ export interface QuotaPollerOptions {
   intervalMs?: number
   /** Ceiling for the backed-off interval. Default {@link MAX_POLL_MS}. */
   maxIntervalMs?: number
-  /** The meter to feed. A fresh one by default. */
-  meter?: ConsumptionMeter
   /** Clock, injectable for tests. */
   now?: () => number
 }
 
 /**
- * Keeps a {@link ConsumptionMeter} fed with quota readings (#525).
+ * Keeps a recent quota reading on hand (#525).
  *
  * Polling is slow by design and backs *off* on failure rather than retrying
  * into it: the agent's usage fetch is refused upstream when asked too often,
@@ -54,7 +51,6 @@ export interface QuotaPollerOptions {
  * number permanently unavailable — the opposite of the goal.
  */
 export class QuotaPoller {
-  readonly meter: ConsumptionMeter
   private envelope: QuotaEnvelope = { latest: undefined, lastGood: undefined, lastGoodAt: undefined, lastFailureAt: undefined }
   private timer: ReturnType<typeof setTimeout> | undefined
   private running = false
@@ -63,7 +59,6 @@ export class QuotaPoller {
   private readonly now: () => number
 
   constructor(private readonly opts: QuotaPollerOptions) {
-    this.meter = opts.meter ?? new ConsumptionMeter()
     this.currentIntervalMs = opts.intervalMs ?? DEFAULT_POLL_MS
     this.now = opts.now ?? (() => Date.now())
   }
@@ -126,13 +121,9 @@ export class QuotaPoller {
   }
 
   private onGood(quota: DriverQuota & { available: true }): void {
-    const at = this.now()
-    this.envelope = { ...this.envelope, lastGood: quota, lastGoodAt: at }
+    this.envelope = { ...this.envelope, lastGood: quota, lastGoodAt: this.now() }
     // Reset the backoff: the fetch is working again.
     this.currentIntervalMs = this.opts.intervalMs ?? DEFAULT_POLL_MS
-    const week = quota.windows.find(w => w.kind === 'week')
-    if (week) this.meter.record({ at, weeklyPercent: week.percentUsed })
-    this.meter.prune(at)
   }
 
   private onBad(reason: DriverQuotaUnavailableReason): void {

@@ -1,7 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { ConsumptionMeter, DEFAULT_CONSUMPTION_LIMITS, consumptionStatus } from './consumption.js'
 import {
   addProject,
   listProjects,
@@ -9,7 +8,6 @@ import {
   readPreferences,
   readProjectPreferences,
   readRegistry,
-  resolveConsumptionLimits,
   resolvePreferences,
   registryPreferencesStore,
   registryPath,
@@ -214,14 +212,6 @@ test('a project storing nothing drops its entry rather than leaving an empty obj
   assert.deepEqual(await readProjectPreferences(APP_A.id, fs, ENV), {})
 })
 
-test('a project cannot store a global-only key', async () => {
-  const fs = memFs()
-  // theme/editor/consumptionLimits are about the user, not the repo (#800), so they never
-  // reach the per-project block even when handed straight to the writer.
-  await writeProjectPreferences(APP_A.id, { technical: true, theme: 'dark', consumptionLimits: {} } as never, fs, ENV)
-  assert.deepEqual(await readProjectPreferences(APP_A.id, fs, ENV), { technical: true })
-})
-
 test('a hand-edited projectPreferences block is read forgivingly', async () => {
   const raw = JSON.stringify({
     projects: [APP_A],
@@ -368,73 +358,3 @@ test('registryPreferencesStore round-trips through the same file', async () => {
   assert.deepEqual(await store.read(), { vanilla: true })
 })
 
-const LIMITS = {
-  daily: { enabled: true, percent: 25 },
-  fiveHour: { enabled: false, percent: 50 },
-  session: { enabled: true, percent: 30 },
-}
-
-test('preferences round-trip the consumption limits (#527)', async () => {
-  const fs = memFs({ [FILE]: JSON.stringify([APP_A]) })
-  await writePreferences({ autopilot: true, consumptionLimits: LIMITS }, fs, ENV)
-  // Every other preference is a boolean; a percentage used to be dropped silently.
-  assert.deepEqual(await readPreferences(fs, ENV), { autopilot: true, consumptionLimits: LIMITS })
-})
-
-test('a hand-edited limit falls back to the default rather than unguarding the account (#527)', async () => {
-  const raw = JSON.stringify({
-    projects: [APP_A],
-    preferences: {
-      consumptionLimits: {
-        daily: { enabled: true, percent: 25 },
-        fiveHour: { enabled: 'yes', percent: 50 }, // enabled isn't a boolean
-        session: { enabled: true, percent: 'lots' }, // percent isn't a number
-      },
-    },
-  })
-  const prefs = await readPreferences(memFs({ [FILE]: raw }), ENV)
-  assert.deepEqual(prefs.consumptionLimits, {
-    daily: { enabled: true, percent: 25 }, // the good one survives
-    fiveHour: DEFAULT_CONSUMPTION_LIMITS.fiveHour,
-    session: DEFAULT_CONSUMPTION_LIMITS.session,
-  })
-})
-
-test('an out-of-range percentage is clamped, not thrown away (#527)', async () => {
-  const raw = JSON.stringify({
-    projects: [APP_A],
-    preferences: { consumptionLimits: { daily: { enabled: true, percent: 150 }, session: { enabled: true, percent: -5 } } },
-  })
-  const prefs = await readPreferences(memFs({ [FILE]: raw }), ENV)
-  assert.equal(prefs.consumptionLimits?.daily.percent, 100)
-  assert.equal(prefs.consumptionLimits?.session.percent, 0)
-})
-
-test('a junk limits object is ignored entirely (#527)', async () => {
-  const raw = JSON.stringify({ projects: [APP_A], preferences: { consumptionLimits: 'all of them' } })
-  assert.deepEqual(await readPreferences(memFs({ [FILE]: raw }), ENV), {})
-})
-
-test('resolveConsumptionLimits guards a user who never opened the settings (#527)', () => {
-  // Unlike every other preference, absent must not mean off.
-  assert.deepEqual(resolveConsumptionLimits(undefined), DEFAULT_CONSUMPTION_LIMITS)
-  assert.deepEqual(resolveConsumptionLimits({}), DEFAULT_CONSUMPTION_LIMITS)
-  assert.deepEqual(resolveConsumptionLimits({ autopilot: true }), DEFAULT_CONSUMPTION_LIMITS)
-})
-
-test('resolveConsumptionLimits keeps what the user set (#527)', () => {
-  assert.deepEqual(resolveConsumptionLimits({ consumptionLimits: LIMITS }), LIMITS)
-})
-
-test('a zero budget stops the work rather than quietly doing nothing (#527)', () => {
-  const meter = new ConsumptionMeter()
-  meter.record({ at: 1_000, weeklyPercent: 5 })
-  meter.record({ at: 2_000, weeklyPercent: 5 })
-  const limits = resolveConsumptionLimits({
-    consumptionLimits: { ...DEFAULT_CONSUMPTION_LIMITS, daily: { enabled: true, percent: 0 } },
-  })
-  const status = consumptionStatus({ meter, limits, now: 2_000 })
-  assert.equal(status.daily.reached, true)
-  assert.equal(status.daily.usedPercent, 100)
-  assert.equal(status.reached, 'daily')
-})

@@ -1,11 +1,10 @@
-import { consumptionStatus, DEFAULT_CONSUMPTION_LIMITS, type ConsumptionLimits, type ConsumptionStatus } from '../consumption.js'
 import { QuotaPoller } from '../quota-poller.js'
+import { quotaBoundaryStatus, type QuotaBoundaryStatus } from '../quota-boundary.js'
 import { ClaudeCodeDriver, type DriverQuotaUnavailableReason, type DriverQuotaWindow } from '../driver/index.js'
-import { readPreferences, resolveConsumptionLimits } from '../registry.js'
 
 /**
  * Everything the dashboard needs to draw the usage panel (#533): the account's
- * own windows, and where the user's limits stand against them.
+ * own windows, and where they stand against the quota boundary (#879).
  */
 export interface QuotaView {
   /**
@@ -22,8 +21,12 @@ export interface QuotaView {
    * the newest attempt failed, so the UI can mark it stale rather than blank it.
    */
   unavailable?: DriverQuotaUnavailableReason
-  /** Where the three limits stand, for their checkboxes and bars. */
-  limits: ConsumptionStatus
+  /**
+   * Where the account stands against its boundary (#879). Absent when there is no
+   * reading, or when the week's reset could not be placed — which is "we don't
+   * know", not "nothing is allowed".
+   */
+  boundary?: QuotaBoundaryStatus
 }
 
 /** Where a dashboard reads the quota from. */
@@ -36,17 +39,21 @@ export interface QuotaSource {
 /**
  * A {@link QuotaSource} backed by a live poller.
  *
- * The limits are re-read per call rather than captured, so a user who changes
- * them in the settings sees the bars re-scale without a restart.
+ * The boundary is computed per call rather than captured: it moves with the
+ * clock, so a cached one would be stale the moment the week's day rolls over.
+ * No model is passed — the panel is about the account, and a model's own week
+ * only narrows the gate for a run that has chosen one (#879).
  */
-export function pollerQuotaSource(poller: QuotaPoller, limits: () => Promise<ConsumptionLimits>): QuotaSource {
+export function pollerQuotaSource(poller: QuotaPoller, now: () => number = () => Date.now()): QuotaSource {
   return {
     stop: () => poller.stop(),
     read: async () => {
       const envelope = poller.current()
+      const windows = envelope.lastGood?.windows ?? []
+      const boundary = quotaBoundaryStatus({ windows, now: now() })
       const view: QuotaView = {
-        windows: envelope.lastGood?.windows ?? [],
-        limits: consumptionStatus({ meter: poller.meter, limits: await limits().catch(() => DEFAULT_CONSUMPTION_LIMITS) }),
+        windows,
+        ...(boundary ? { boundary } : {}),
         ...(envelope.lastGoodAt !== undefined ? { readAt: envelope.lastGoodAt } : {}),
         ...(envelope.latest && !envelope.latest.available ? { unavailable: envelope.latest.reason } : {}),
       }
@@ -67,5 +74,5 @@ export function defaultQuotaSource(): QuotaSource {
   const driver = new ClaudeCodeDriver()
   const poller = new QuotaPoller({ read: () => driver.readQuota() })
   poller.start()
-  return pollerQuotaSource(poller, async () => resolveConsumptionLimits(await readPreferences()))
+  return pollerQuotaSource(poller)
 }

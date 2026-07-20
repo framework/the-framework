@@ -146,6 +146,9 @@ export function startOptionFlags(options: StartRunOptions): string[] {
   if (typeof options.agent === 'string' && options.agent.trim() && options.agent !== 'claude') {
     flags.push('--agent', options.agent.trim())
   }
+  // Unattended (#846): nobody is at the keyboard, so gates take the recommended option
+  // rather than park for an answer that is not coming.
+  if (options.unattended) flags.push('--unattended')
   // Resume a finished run's session (#720): the spawned run continues that conversation.
   if (typeof options.resumeSession === 'string' && options.resumeSession.trim()) {
     flags.push('--resume-session', options.resumeSession.trim())
@@ -451,7 +454,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     backlogEmpty: async project => (await findTodoBacklog(project.path)) === undefined,
     activeRuns: project => runtime.activeRunCount(project.id),
     quota: async () => (await quota.read()).limits,
-    start: async (project, job) => (await runtime.onStart(job.prompt, 'prompt', {}, project.id)).ok,
+    start: async (project, job) => (await runtime.onStart(job.prompt, 'prompt', { unattended: true }, project.id)).ok,
     log: message => console.log(message),
   })
 

@@ -40,6 +40,13 @@ export interface StartRunOptions {
   model?: string
   /** Which coding agent drives the run (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
   agent?: string
+  /**
+   * Nobody is watching this run (#846): its choice gates take the recommended option instead of
+   * parking for an answer, which is the fallback a fully headless run already uses and the one
+   * autopilot would have clicked. Set by the work the daemon starts on its own (auto PM, #685).
+   * Stop still works — that aborts the run controller, not a gate.
+   */
+  unattended?: boolean
   /** Resume a finished run's conversation (#720): its captured agent session id; maps to `--resume-session`. The run's prompt continues that session (full prior context) instead of starting fresh. Sent with `kind: 'prompt'` when you message a run that has ended. */
   resumeSession?: string
   /**

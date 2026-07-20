@@ -65,6 +65,9 @@ test('parseArgs reads the backlog-loop flags (#323)', () => {
   assert.equal(dflt.todoLoop, true)
   assert.equal(dflt.todoMaxItems, undefined)
   assert.equal(parseArgs(['--no-todo-loop', 'x']).todoLoop, false)
+  // Unattended (#846): off unless asked, so an ordinary run still parks its gates for the human.
+  assert.equal(parseArgs(['x']).unattended, undefined)
+  assert.equal(parseArgs(['--unattended', 'x']).unattended, true)
   assert.equal(parseArgs(['--max-todo-items', '5', 'x']).todoMaxItems, 5)
   assert.match(parseArgs(['--max-todo-items', '0', 'x']).error!, /max-todo-items/)
 })

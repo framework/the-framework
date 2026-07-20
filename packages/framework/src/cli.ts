@@ -173,6 +173,8 @@ Options:
   --browser              Give the agent a real browser during the run via
                          chrome-devtools-mcp: navigate pages, read console + network,
                          inspect the DOM, and screenshot. Off by default (#452).
+  --unattended           Nobody is watching: choice gates take the recommended option
+                         instead of waiting for an answer. Stop still works (#846).
   --kind <name>          Build event kind the preset's review loop fires for, e.g.
                          bug-fix or major-change (default: the-framework.yml's event,
                          else the preset's own, else major-change). Selects which
@@ -247,6 +249,8 @@ export interface CliOptions {
   model?: string | undefined
   /** `--resume-session <id>` (#720): continue a finished run's agent session — the prompt resumes that conversation (full prior context). Set by the dashboard when you message a run that has ended. */
   resumeSession?: string | undefined
+  /** `--unattended`: no human is watching, so choice gates take the recommended option (#846). */
+  unattended?: boolean
   scope: 'prototype' | 'full'
   preset?: string | undefined
   autopilot: boolean
@@ -453,6 +457,9 @@ export function parseArgs(argv: string[]): CliOptions {
         break
       case '--resume-session':
         opts.resumeSession = argv[++i]
+        break
+      case '--unattended':
+        opts.unattended = true
         break
       case '--deploy':
         opts.deploy = argv[++i]
@@ -1126,8 +1133,11 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   // workspace daemon's via the control channel (#344). With neither, the gates auto-accept
   // the recommended option (#304). The run's requestChoice parks a resolver in pendingChoices
   // keyed by the choice id; a dashboard/daemon pick (or an abort) resolves it.
+  // An unattended run (#846) is steerable but unwatched: keep the control channel for Stop and
+  // live messages, and leave requestChoice unset so each gate takes its recommended option. Auto
+  // PM (#685) fires when nobody is there, and a parked gate would hang it until someone looked.
   const requestChoice =
-    dashboard || control
+    (dashboard || control) && !opts.unattended
       ? (req: ChoiceRequest): Promise<ChoicePick> => new Promise(resolve => pendingChoices.set(req.id, resolve))
       : undefined
   // The session link shown on the dashboard: --session-link, else Claude Code's own entry for

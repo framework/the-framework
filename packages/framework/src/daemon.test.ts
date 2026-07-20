@@ -73,6 +73,9 @@ test('startOptionFlags maps only enabled Global options to CLI flags (#314)', ()
   assert.deepEqual(startOptionFlags({ agent: 'codex' }), ['--agent', 'codex'])
   assert.deepEqual(startOptionFlags({ agent: 'claude' }), [])
   assert.deepEqual(startOptionFlags({ agent: '   ' }), [])
+  // Unattended (#846): auto PM's own runs, whose gates must not park for an absent human.
+  assert.deepEqual(startOptionFlags({ unattended: true }), ['--unattended'])
+  assert.deepEqual(startOptionFlags({ unattended: false }), [])
   // Resume a finished run's session (#720): maps to --resume-session, trimmed; blank -> no flag.
   assert.deepEqual(startOptionFlags({ resumeSession: 'sess-42' }), ['--resume-session', 'sess-42'])
   assert.deepEqual(startOptionFlags({ resumeSession: '  sess-7  ' }), ['--resume-session', 'sess-7'])

@@ -74,6 +74,9 @@ export interface FollowFileOptions {
  * pull already in flight swallows the next trigger) and stop for good once the returned
  * function is called. Shared by the run's control tail and the dashboard's event tail, which
  * hand-rolled this separately and drifted apart.
+ *
+ * Nothing here may throw at the process: a failed pull and a watcher error are both survivable,
+ * and the poll alone is a complete tail (#996).
  */
 export function followFile(dir: string, pull: () => Promise<void>, opts: FollowFileOptions): () => void {
   let pulling = false
@@ -83,6 +86,11 @@ export function followFile(dir: string, pull: () => Promise<void>, opts: FollowF
     pulling = true
     try {
       await pull()
+    } catch {
+      // #996: every caller discards this promise, so a rejected read (EIO on a network mount,
+      // EISDIR, a log grown past kMaxLength) would be an unhandled rejection and kill the
+      // process. Swallowed rather than logged: the next tick retries, and a fault that persists
+      // would otherwise print once per poll forever.
     } finally {
       pulling = false
     }
@@ -91,6 +99,13 @@ export function followFile(dir: string, pull: () => Promise<void>, opts: FollowF
   let watcher: FSWatcher | undefined
   try {
     watcher = watch(dir, () => void pump())
+    // #996: an 'error' with no listener throws out of the emitter, which is the same process
+    // death. The watcher is spent once it errors (node closes the handle first), so drop it and
+    // let the poll below carry the tail on its own.
+    watcher.on('error', () => {
+      watcher?.close()
+      watcher = undefined
+    })
   } catch {
     // dir may not be watchable everywhere; the poll backstop still covers it
   }

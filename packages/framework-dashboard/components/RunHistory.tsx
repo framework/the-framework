@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { RunMeta, RunStatus } from '@gemstack/framework'
+import { AGENT_LABELS, agentForDriver } from '@gemstack/framework/client'
 import { Button } from './ui/button.js'
 import { Badge } from './ui/badge.js'
 import { cn } from '../lib/utils.js'
-import { formatDateTime } from '../lib/format-date.js'
+import { formatRelative } from '../lib/format-date.js'
 import { STATUS_TONE } from '../lib/status-tone.js'
+import { runLabel } from '../lib/run-label.js'
+import { AgentLogo } from './agent-logos.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
 /** A label hidden in the collapsed strip, revealed by hover/focus on the rail (#862). */
@@ -123,8 +126,9 @@ export function RunHistory({
           <RunRow
             key={run.id}
             status={run.status}
-            intent={run.intent}
-            subtitle={formatDateTime(run.startedAt)}
+            intent={runLabel(run)}
+            driver={run.driver}
+            subtitle={formatRelative(run.startedAt)}
             // Following live highlights the newest running run, not every one of them (#738):
             // `runs` is newest-first, so that is the first with a running status.
             active={run.id === selectedRunId || (followLive && run.id === newestRunningId)}
@@ -148,6 +152,7 @@ function RunRow({
   subtitle,
   active,
   onClick,
+  driver,
   dim = false,
   waiting = false,
   collapsed = false,
@@ -155,6 +160,8 @@ function RunRow({
   status: RunStatus
   intent: string | undefined
   subtitle: string
+  /** The agent that ran it, so the row can show whose session it was. */
+  driver?: string | undefined
   active: boolean
   onClick: () => void
   dim?: boolean
@@ -166,6 +173,7 @@ function RunRow({
   // Only a live run can be waiting on you; a finished one is just finished.
   const parked = waiting && status === 'running'
   const label = collapsed ? FADED_LABEL : ''
+  const agent = agentForDriver(driver)
   return (
     <Button
       variant="ghost"
@@ -178,7 +186,7 @@ function RunRow({
       onClick={onClick}
       // Collapsed, the visible labels fade and the row is carried by a colour dot; keep the
       // whole story reachable by hover and assistive tech (#948).
-      {...(collapsed ? { title: `${parked ? 'waiting' : status}: ${intent || '(no prompt)'}`, 'aria-label': `${parked ? 'waiting' : status}: ${intent || '(no prompt)'}` } : {})}
+      {...(collapsed ? { title: `${parked ? 'waiting' : status}: ${intent || 'New session'}`, 'aria-label': `${parked ? 'waiting' : status}: ${intent || 'New session'}` } : {})}
     >
       <span className="flex w-full items-center gap-2">
         {/* The dot means "the agent is working", so a run parked on you gets a still one (#785):
@@ -196,8 +204,17 @@ function RunRow({
           {parked ? 'waiting' : status}
         </Badge>
         <span className={cn('truncate text-xs font-normal text-muted-foreground', label)}>{subtitle}</span>
+        {/* Which agent ran it. The logo is the only thing naming the agent on this row, so it
+            carries a title rather than being decorative. */}
+        {agent && (
+          <AgentLogo
+            agent={agent}
+            title={AGENT_LABELS[agent]}
+            className={cn('ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground', label)}
+          />
+        )}
       </span>
-      <span className={cn('w-full truncate text-sm font-medium', label)}>{intent || '(no prompt)'}</span>
+      <span className={cn('w-full truncate text-sm font-medium', label)}>{intent || 'New session'}</span>
     </Button>
   )
 }

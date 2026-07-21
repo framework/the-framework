@@ -17,3 +17,14 @@ tab; its width is now constant.
 
 The ✅/❌/⚠️ glyphs in the Enhanced System Prompt disclosure are replaced by a status dot and plain
 text, matching how every other state in the app is drawn.
+
+Sessions rail rows now show which agent ran them, and lead with something that identifies the
+session: the agent's own session name or its branch when there is no typed prompt, and the start
+time when there is neither. They used to print a bold "(no prompt)" while the timestamp that
+actually told them apart sat beside it in small muted text.
+
+A clean git tree's dot is neutral rather than green. Green means "added / new / done" everywhere
+else, so a green dot for "nothing changed" sat one pane from the file tree's green dot for "this
+folder has changes".
+
+Claude's logo is its own starburst rather than the Anthropic wordmark.

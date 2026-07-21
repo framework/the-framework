@@ -55,8 +55,12 @@ export function GitStatusBar({
         </span>
       </span>
       <span className="flex items-center gap-1.5">
+        {/* Clean is neutral, not green. Green means "added / new / done" everywhere else, so a
+            green dot for "nothing changed" sat one pane away from the file tree's green dot for
+            "this folder HAS changes": the same colour for opposite facts. A clean tree is the
+            unremarkable default and has nothing to announce. */}
         <span
-          className={cn('h-2 w-2 rounded-full', status.dirty ? 'bg-warning' : 'bg-success')}
+          className={cn('h-2 w-2 rounded-full', status.dirty ? 'bg-warning' : 'bg-muted-foreground')}
           title={status.dirty ? dirtyLabel : 'Clean'}
         />
         <span className="text-muted-foreground">{status.dirty ? 'dirty' : 'clean'}</span>

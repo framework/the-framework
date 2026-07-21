@@ -17,6 +17,18 @@ export function formatDateTime(value: string | undefined, fallback = '—'): str
   return date ? date.toLocaleString() : fallback
 }
 
+/**
+ * A short local date + time, e.g. "Jul 18, 10:35 PM". For places where the timestamp is standing
+ * in as a name (an unnamed session in the rail), where seconds are noise on the line that has to
+ * identify the row.
+ */
+export function formatDateTimeShort(value: string | undefined, fallback = '—'): string {
+  const date = parse(value)
+  return date
+    ? date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : fallback
+}
+
 /** A timestamp as a local date alone, for the denser table columns. */
 export function formatDate(value: string | undefined, fallback = '—'): string {
   const date = parse(value)

@@ -221,6 +221,29 @@ describe('Auto-persist on Agent.stream()', () => {
     setConversationStore(undefined as unknown as never)
   })
 
+  it('invokes conversational() exactly once per stream() call', async () => {
+    const store = new MemoryConversationStore()
+    setConversationStore(store)
+    fake.respondWith('once')
+
+    let calls = 0
+    class CountingAgent extends Agent {
+      instructions() { return 'count me' }
+      // Async, so stream() cannot take its synchronous fast path.
+      async conversational(): Promise<ConversationalSpec> {
+        calls++
+        return { user: 'u-count' }
+      }
+    }
+
+    const { stream, response } = new CountingAgent().stream('hi')
+    for await (const _c of stream) { /* drain */ }
+    await response
+    // Calling it twice repeats the override's side effects (a DI or DB lookup)
+    // and leaves the first promise unhandled if it rejects.
+    assert.equal(calls, 1)
+  })
+
   it('streams through and persists at the end', async () => {
     const store = new MemoryConversationStore()
     setConversationStore(store)

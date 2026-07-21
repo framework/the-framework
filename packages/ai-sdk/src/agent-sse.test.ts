@@ -157,6 +157,17 @@ describe('readAgentStream round-trips toAgentSseStream', () => {
     assert.equal(turn.awaiting, 'approval')
   })
 
+  it('propagates an error thrown by a consumer callback instead of swallowing it', async () => {
+    const server = toAgentSseStream(streamOf([{ type: 'text-delta', text: 'hi' }]))
+    // The malformed-JSON guard must not also eat the consumer's own bugs.
+    await assert.rejects(
+      () => readAgentStream(new Response(server), {
+        onText: () => { throw new Error('consumer bug') },
+      }),
+      /consumer bug/,
+    )
+  })
+
   it('fires onError for an error event', async () => {
     const failing: AgentStreamResponse = {
       stream: (async function* () {})(),

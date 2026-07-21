@@ -14,6 +14,7 @@ import type { McpTool } from '../McpTool.js'
 import type { McpResource } from '../McpResource.js'
 import type { McpPrompt } from '../McpPrompt.js'
 import { zodToJsonSchema } from '../zod-to-json-schema.js'
+import { validateInput } from '../validate-input.js'
 import { getToolAnnotations, getResourceAnnotations } from '../decorators.js'
 import { matchUriTemplate } from '../uri-template.js'
 import { getMcpObservers } from './observers-accessor.js'
@@ -56,7 +57,15 @@ export function createSdkServer(server: McpServer): Server {
     if (!tool || !(await isRegistered(tool))) {
       return { content: [{ type: 'text' as const, text: `Unknown tool: ${request.params.name}` }], isError: true }
     }
-    const input = (request.params.arguments ?? {}) as Record<string, unknown>
+    const raw = (request.params.arguments ?? {}) as Record<string, unknown>
+    const checked = validateInput(tool.schema(), raw)
+    if (!checked.ok) {
+      return {
+        content: [{ type: 'text' as const, text: `Invalid arguments for ${tool.name()}: ${checked.message}` }],
+        isError: true,
+      }
+    }
+    const input = checked.data
     const start = performance.now()
     try {
       const extras = resolveHandleDeps(tool, 'handle', resolver)
@@ -174,7 +183,12 @@ export function createSdkServer(server: McpServer): Server {
     if (!prompt || !(await isRegistered(prompt))) {
       throw new Error(`Unknown prompt: ${request.params.name}`)
     }
-    const args = (request.params.arguments ?? {}) as Record<string, unknown>
+    const rawArgs = (request.params.arguments ?? {}) as Record<string, unknown>
+    const checkedArgs = prompt.arguments ? validateInput(prompt.arguments(), rawArgs) : { ok: true as const, data: rawArgs }
+    if (!checkedArgs.ok) {
+      throw new Error(`Invalid arguments for ${prompt.name()}: ${checkedArgs.message}`)
+    }
+    const args = checkedArgs.data
     const start = performance.now()
     try {
       const extras = resolveHandleDeps(prompt, 'handle', resolver)

@@ -8,6 +8,7 @@ import { resolveOrConstruct, resolveHandleDeps, isRegistered, filterRegistered }
 import { consumeToolReturn } from './runtime/consume-tool-return.js'
 import { getToolAnnotations, getResourceAnnotations, type ToolAnnotations, type ResourceAnnotations } from './decorators.js'
 import type { McpResolver } from './resolver.js'
+import { validateInput } from './validate-input.js'
 
 export interface McpTestClientOptions {
   /** DI resolver for `@Handle()` dependencies + primitive construction. */
@@ -40,8 +41,12 @@ export class McpTestClient {
   ): Promise<McpToolResult> {
     const tool = this.tools.find((t) => t.name() === name)
     if (!tool || !(await isRegistered(tool))) throw new Error(`Tool "${name}" not found`)
+    // Validate exactly as the runtime does, so a test cannot pass arguments a
+    // real client would be rejected for.
+    const checked = validateInput(tool.schema(), input)
+    if (!checked.ok) throw new Error(`Invalid arguments for ${name}: ${checked.message}`)
     const extras = resolveHandleDeps(tool, 'handle', this.resolver)
-    const ret = tool.handle(input, ...extras as [])
+    const ret = tool.handle(checked.data, ...extras as [])
     const extra = onProgress
       ? {
           sendNotification: async (n: { method: string; params: Record<string, unknown> }) => {

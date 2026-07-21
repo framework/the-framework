@@ -320,9 +320,17 @@ export async function readAgentStream(
       if (line.startsWith('event: ')) {
         currentEvent = line.slice(7)
       } else if (line.startsWith('data: ') && currentEvent) {
+        // Parse inside the guard, apply outside it: `applyAgentSseEvent` invokes
+        // the consumer's callbacks, and swallowing their errors here would lose
+        // the diagnostic and leave `turn` half-mutated.
+        let data: unknown
         try {
-          applyAgentSseEvent(currentEvent, JSON.parse(line.slice(6)), turn, callbacks)
-        } catch { /* skip malformed JSON */ }
+          data = JSON.parse(line.slice(6))
+        } catch {
+          currentEvent = ''
+          continue // skip malformed JSON
+        }
+        applyAgentSseEvent(currentEvent, data, turn, callbacks)
         currentEvent = ''
       }
     }

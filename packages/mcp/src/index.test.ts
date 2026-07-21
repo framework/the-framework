@@ -514,6 +514,40 @@ describe('McpTestClient', () => {
     )
   })
 
+  it('rejects arguments that do not match the declared schema', async () => {
+    class GetIssueTool extends McpTool {
+      schema() { return z.object({ number: z.number().int().positive() }) }
+      async handle(input: Record<string, unknown>) {
+        // Handlers are written against the declared types and interpolate them
+        // into request paths, so an unchecked value here is an injection.
+        return McpResponse.text(`/issues/${String(input['number'])}`)
+      }
+    }
+    class Srv extends McpServer { protected tools = [GetIssueTool] }
+
+    const client = new McpTestClient(Srv)
+    await assert.rejects(
+      () => client.callTool('get-issue', { number: '../../../user/repos' }),
+      /Invalid arguments/,
+    )
+    const ok = await client.callTool('get-issue', { number: 7 })
+    assert.equal((ok.content[0] as { text: string }).text, '/issues/7')
+  })
+
+  it('strips undeclared keys instead of forwarding them to the handler', async () => {
+    class StrictTool extends McpTool {
+      schema() { return z.object({ a: z.string() }) }
+      async handle(input: Record<string, unknown>) {
+        return McpResponse.text(Object.keys(input).sort().join(','))
+      }
+    }
+    class Srv extends McpServer { protected tools = [StrictTool] }
+
+    const client = new McpTestClient(Srv)
+    const r = await client.callTool('strict', { a: 'x', injected: 'y' })
+    assert.equal((r.content[0] as { text: string }).text, 'a')
+  })
+
   it('lists and reads resources', async () => {
     const client = new McpTestClient(TestServer)
     const resources = await client.listResources()

@@ -1115,6 +1115,10 @@ function runStreamWithMaybeAutoPersist(
   // Synchronous fast path — most agents override neither `conversational()`
   // nor `remembers()`. Skip the async outer entirely when we can prove
   // both are no-ops, sparing a microtask boundary per streaming call.
+  //
+  // Both are invoked exactly once and the values threaded into the async path
+  // below: calling them again there would repeat the override's side effects
+  // (a DI or DB lookup) and leave this first promise unhandled if it rejects.
   const declaredConv = a.conversational()
   const declaredMem  = a.remembers()
   const isFast = (
@@ -1139,8 +1143,8 @@ function runStreamWithMaybeAutoPersist(
     try {
       // Memory auto-cascade BEFORE conversation persistence — same
       // ordering as the non-streaming `Agent.prompt` path.
-      effOptions = await prepareOptionsWithMemoryAutoCascade(a, options)
-      spec = await resolveAutoPersistSpec(() => a.conversational(), effOptions?.conversation)
+      effOptions = await prepareOptionsWithMemoryAutoCascade(a, options, () => declaredMem)
+      spec = await resolveAutoPersistSpec(() => declaredConv, effOptions?.conversation)
     } catch (err) {
       rejectResp!(err)
       throw err
@@ -1241,10 +1245,12 @@ function getMiddleware(a: Agent, options?: AgentPromptOptions): AiMiddleware[] {
 async function prepareOptionsWithMemoryAutoCascade(
   a:        Agent,
   options?: AgentPromptOptions,
+  /** Reuse an already-obtained `remembers()` result instead of calling it again. */
+  declared?: () => ReturnType<Agent['remembers']>,
 ): Promise<AgentPromptOptions | undefined> {
   if (options?.messages) return options
 
-  const spec = await resolveRemembersSpec(() => a.remembers(), options?.memory)
+  const spec = await resolveRemembersSpec(declared ?? (() => a.remembers()), options?.memory)
   if (!spec) return options
 
   const installed: AiMiddleware[] = []

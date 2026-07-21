@@ -65,7 +65,10 @@ export async function* parseSseStream(
     }
   } finally {
     signal?.removeEventListener('abort', onAbort)
-    reader.releaseLock()
+    // Cancel, don't just release: an early return (a `stopWhen`, an approval
+    // pause, a consumer `break`) would otherwise leave the response body open
+    // and pin the upstream socket until the server times it out.
+    void reader.cancel().catch(() => {})
   }
 }
 

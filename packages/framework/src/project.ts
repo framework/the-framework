@@ -141,6 +141,20 @@ export function nodeGitRunner(): GitRunner {
 }
 
 /**
+ * Whether `cwd` sits inside a git working tree (#997). Lets a caller tell "this project cannot
+ * host a worktree at all" from "git was there and the operation failed", which are the same
+ * rejection out of `git worktree add` but call for opposite handling.
+ *
+ * Forgiving in one direction only: an unreadable / missing git reads as "no repo", which is the
+ * conservative answer for the caller that treats a repo's failure as fatal.
+ */
+export async function isGitRepo(cwd: string, run: GitRunner = nodeGitRunner()): Promise<boolean> {
+  return run(['rev-parse', '--is-inside-work-tree'], cwd)
+    .then(out => out.trim() === 'true')
+    .catch(() => false)
+}
+
+/**
  * List every file git sees in the repo at `cwd`: tracked + untracked, honoring
  * .gitignore. Uses `git ls-files -z --cached --others --exclude-standard` (the
  * same approach Vike uses). Returns repo-relative paths, deduped and sorted.

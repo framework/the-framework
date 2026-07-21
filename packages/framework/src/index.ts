@@ -193,6 +193,7 @@ export {
   isActivated,
   nodeProjectFs,
   crawlRepoFiles,
+  isGitRepo,
   nodeGitRunner,
   gitTimeoutMs,
   GIT_READ_TIMEOUT_MS,

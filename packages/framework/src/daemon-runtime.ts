@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { basename, resolve } from 'node:path'
-import { stat } from 'node:fs/promises'
+import { rm, stat } from 'node:fs/promises'
 import {
   runIdFromStartedAt,
   addWorktree,
@@ -28,6 +28,8 @@ import { isSafeVia } from './conversations.js'
 import { startPreview, detectServeTargets, type PreviewHandle, type ServeTarget } from './preview.js'
 import { addProject, listProjects, projectId } from './registry.js'
 import { installProject, enumerateGitRepos } from './install.js'
+import { isGitRepo } from './project.js'
+import { isCliTimeout } from './cli-exec.js'
 import { errorMessage } from './error-message.js'
 
 /**
@@ -69,6 +71,19 @@ export function resolveSpawnBin(explicitBinPath: string | undefined): string {
     throw new Error('refusing to spawn a framework process from a test entry; pass an explicit binPath')
   }
   return binPath
+}
+
+/**
+ * Clean up after a `git worktree add` that was SIGTERMed mid-write (#997). Observed behavior: git
+ * removes its own administrative entry on the way out but leaves the partial checkout it had
+ * already written, so `git worktree prune` finds nothing to do and the directory stays.
+ *
+ * Only a timeout kill is cleaned up. Any other rejection may be git refusing a path that was
+ * already on disk before this run asked for it, and that is not ours to delete.
+ */
+export async function cleanupTimedOutWorktree(repo: string, runId: string, err: unknown): Promise<void> {
+  if (!isCliTimeout(err)) return
+  await rm(worktreePath(repo, runId), { recursive: true, force: true }).catch(() => {})
 }
 
 /** Spawn a detached, unref'd framework child (`node <binPath> <args...>`) that outlives us. */
@@ -242,21 +257,35 @@ export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOption
    * repo never fight over the working tree — and the user's own checkout, uncommitted work
    * included, is left untouched.
    *
-   * A project that cannot provide one (not a git repo, or any git failure) falls back to the main
-   * checkout, which is exactly the pre-#736 behavior — and keeps its pre-#736 limit of one run at a
-   * time, since those runs *would* collide. Signalled by the absent `runId`.
+   * A project that *structurally* cannot provide one — it is not a git repo — falls back to the
+   * main checkout, which is exactly the pre-#736 behavior, and keeps its pre-#736 limit of one run
+   * at a time, since those runs *would* collide. Signalled by the absent `runId`.
+   *
+   * A project that *is* a repo and whose `worktree add` failed does not fall back (#997): that
+   * downgrade silently pointed the agent at the user's own working tree, uncommitted work
+   * included, which is the one thing #736 exists to prevent. A `worktree add` on a large repo can
+   * outrun its budget and be SIGTERMed, so this is reachable in normal use, not just on a broken
+   * repo. The run fails instead, because a failed run is recoverable by starting it again and a
+   * checkout with agent edits mixed into it is not.
    */
-  const allocateWorkspace = async (projectCwd: string, runId: string): Promise<{ cwd: string; runId?: string }> => {
+  const allocateWorkspace = async (
+    projectCwd: string,
+    runId: string,
+  ): Promise<{ ok: true; workspace: { cwd: string; runId?: string } } | { ok: false; error: string }> => {
     try {
       const worktree = await addWorktree(projectCwd, { runId, branch: runBranchName(runId) })
       // `node_modules` is gitignored, so a fresh worktree has none: link the parent's in, and
       // make git ignore the links (a `node_modules/` rule does not match a symlink, #738).
       await linkDependencies(projectCwd, worktree.path).catch(() => [])
       await excludeDependencyLinks(projectCwd).catch(() => {})
-      return { cwd: worktree.path, runId }
+      return { ok: true, workspace: { cwd: worktree.path, runId } }
     } catch (err) {
-      console.log(`[framework] no worktree for ${basename(projectCwd)} (${errorMessage(err)}); running in the main checkout`)
-      return { cwd: projectCwd }
+      if (await isGitRepo(projectCwd)) {
+        await cleanupTimedOutWorktree(projectCwd, runId, err)
+        return { ok: false, error: `could not create a worktree for this run: ${errorMessage(err)}` }
+      }
+      console.log(`[framework] ${basename(projectCwd)} is not a git repository, so it gets no worktree; running in the main checkout`)
+      return { ok: true, workspace: { cwd: projectCwd } }
     }
   }
 
@@ -326,7 +355,13 @@ export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOption
 
     // Continuing an existing run (#762) reuses its id, checkout and log; anything else is new.
     const continued = options.continueRunId ? await continueWorkspace(projectCwd, options.continueRunId) : undefined
-    const workspace = continued ?? (await allocateWorkspace(projectCwd, runIdFromStartedAt(new Date().toISOString())))
+    // A repo that could not be given a worktree fails the Start rather than borrowing the user's
+    // own checkout (#997); the dashboard shows the reason, and starting again is the retry.
+    const allocated = continued
+      ? ({ ok: true, workspace: continued } as const)
+      : await allocateWorkspace(projectCwd, runIdFromStartedAt(new Date().toISOString()))
+    if (!allocated.ok) return { ok: false, error: allocated.error }
+    const workspace = allocated.workspace
     // A run in its own worktree is keyed by that worktree, so it never collides with a
     // sibling; a fallback run is keyed by the project, restoring the one-at-a-time guard.
     const key = scopedKey(projectKey, workspace.runId)

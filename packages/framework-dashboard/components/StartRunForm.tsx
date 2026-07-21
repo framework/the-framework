@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { ProjectSummary } from '@gemstack/framework'
 import { runOptionsFromPreferences } from '@gemstack/framework/client'
 import { onProjects } from '../server/projects.telefunc.js'
+import { onSystemPromptUser } from '../server/reads.telefunc.js'
 import { usePreferences, updatePreferences, autopilotEnabled } from '../lib/preferences.js'
 import { useStartRun } from '../lib/use-start-run.js'
 import { useLoaded } from '../lib/use-async.js'
@@ -21,6 +22,7 @@ export function StartRunForm({
   files,
   context,
   addContext,
+  removeContext,
   toggleContext,
 }: {
   projectId: string
@@ -31,6 +33,8 @@ export function StartRunForm({
   context: Set<string>
   /** Add a path to the Context (from an `@`/`#` mention). */
   addContext: (path: string) => void
+  /** Drop a path from the Context when its `@`/`#` chip leaves the editor (#948). */
+  removeContext: (path: string) => void
   /** Toggle a path in the Context (from a repo checkbox). */
   toggleContext: (path: string) => void
 }) {
@@ -49,6 +53,9 @@ export function StartRunForm({
   // narrows its focus — the picked paths become one `Context:` line in the system prompt.
   const projects = useLoaded<ProjectSummary[]>(onProjects, [], [])
   const [showContext, setShowContext] = useState(false)
+  // The repo's own SYSTEM.md (#872): composition takes it as `user`, but reading it is
+  // Node-bound, so without this read the "entire system prompt" preview under-reported.
+  const userSystemPrompt = useLoaded<string | null>(() => onSystemPromptUser(projectId), null, [projectId])
 
   // The Context set mixes whole repos (registered project paths) and individual files (relative
   // paths). Split out the files so they can be shown + removed, and count each kind separately.
@@ -90,20 +97,32 @@ export function StartRunForm({
         ref={composerRef}
         files={files}
         addContext={addContext}
+        removeContext={removeContext}
         onSubmit={submit}
         onPromptChange={value => {
           setPrompt(value)
           if (!value.trim() && note) setNote(null)
+          // Editing after a failed start: the red error described the old attempt, drop it (#948).
+          if (error) reset()
         }}
-        onPreset={label => {
+        onPreset={(label, replaced) => {
           reset()
-          setNote(`${label} preset loaded — review or edit, then Start`)
+          setNote(
+            replaced
+              ? `${label} preset loaded over your draft — undo (⌘Z) brings the draft back`
+              : `${label} preset loaded — review or edit, then Start`,
+          )
         }}
         busy={busy}
         submitLabel="Start session"
         submitBusyLabel="Starting…"
         showShortcutHint
       />
+
+      {/* Feedback right where the action is (#948): the error used to render below the (possibly
+          expanded, tall) Context disclosure, past the fold from the Start button that caused it. */}
+      {error && <p role="alert" className="mt-2 text-xs text-red-500">{error}</p>}
+      {note && !error && <p role="status" className="mt-2 text-xs text-muted-foreground">{note}</p>}
 
       <SystemPromptDisclosure
         prompt={prompt}
@@ -118,11 +137,13 @@ export function StartRunForm({
         autopilot={autopilot}
         eco={options.eco}
         context={[...context]}
+        user={userSystemPrompt}
         busy={busy}
       />
 
-      {(otherProjects.length > 0 || contextFiles.length > 0) && (
-        <div className="mt-3 text-xs text-muted-foreground">
+      {/* Always rendered (#948): hiding the whole section for a single-project setup also hid
+          the only place that teaches the `#` / Files-tab focus flow. */}
+      <div className="mt-3 text-xs text-muted-foreground">
           <DisclosureToggle open={showContext} onToggle={() => setShowContext(s => !s)}>
             Context{contextSummary && <span className="text-primary"> · {contextSummary}</span>}
           </DisclosureToggle>
@@ -158,11 +179,7 @@ export function StartRunForm({
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
-      {note && !error && <p className="mt-2 text-xs text-muted-foreground">{note}</p>}
+      </div>
     </form>
   )
 }

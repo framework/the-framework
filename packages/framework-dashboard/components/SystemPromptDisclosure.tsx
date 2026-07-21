@@ -31,6 +31,7 @@ export function SystemPromptDisclosure({
   autopilot,
   eco,
   context,
+  user,
   busy,
 }: {
   /** What the user has typed. It rides inside the prompt, so it shapes the preview. */
@@ -47,6 +48,8 @@ export function SystemPromptDisclosure({
   autopilot: boolean
   eco: EcoOptions | undefined
   context: string[]
+  /** The repo's own SYSTEM.md text (#872), so the preview shows the prompt the run sends. */
+  user?: string | null | undefined
   busy: boolean
 }) {
   const [open, setOpen] = useState(false)
@@ -57,6 +60,7 @@ export function SystemPromptDisclosure({
     ...(browser ? { browser: true } : {}),
     tf: { prompt, params: { autopilot, ...(eco ? { eco } : {}) } },
     ...(context.length ? { context } : {}),
+    ...(user ? { user } : {}),
   })
 
   // Transparent is the master off-switch, so it turns the built-in block off whatever

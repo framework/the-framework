@@ -1,7 +1,7 @@
 import type { FrameworkEvent } from '@gemstack/framework'
 import { loopStatus, sessionInfo, deployPlan, runProgress } from '@gemstack/framework/client'
 import { Badge } from './ui/badge.js'
-import { isRunActive } from '../lib/live-state.js'
+import { isRunActive, runOutcome } from '../lib/live-state.js'
 import { describeSessionLink } from '../lib/session-link.js'
 import { cn } from '../lib/utils.js'
 
@@ -15,10 +15,24 @@ export function RunOverview({ events, showSessionLink = true }: { events: Framew
   const session = sessionInfo(events)
   const deploy = deployPlan(events)
   const progress = runProgress(events)
-  const hasProgress = Boolean(progress.sessionName) || progress.readyForMerge
   // A run only pulses "building…" while it's live (#695/U20): once the `end` event lands the
-  // pill must settle to the final state ("ready for merge" or "finished") instead of pulsing on.
+  // pill must settle to the final state instead of pulsing on. How it ended matters (#948):
+  // a crash or a user stop must not read as a plain "finished", and it outranks an earlier
+  // ready-for-merge — the green would be a lie about a run that then failed.
   const active = isRunActive(events)
+  const outcome = runOutcome(events)
+  const failed = outcome !== undefined && !outcome.ok && !outcome.stopped
+  const stopped = outcome?.stopped === true
+  const hasProgress = Boolean(progress.sessionName) || progress.readyForMerge || failed || stopped
+  const status = failed
+    ? { dot: 'bg-red-500', label: outcome?.detail ? `failed — ${outcome.detail}` : 'failed', tone: 'text-red-500' }
+    : stopped
+      ? { dot: 'bg-amber-500', label: 'stopped', tone: 'text-amber-600 dark:text-amber-400' }
+      : progress.readyForMerge
+        ? { dot: 'bg-green-500', label: 'ready for merge', tone: 'text-muted-foreground' }
+        : active
+          ? { dot: 'animate-pulse bg-amber-500', label: 'building…', tone: 'text-muted-foreground' }
+          : { dot: 'bg-muted-foreground', label: 'finished', tone: 'text-muted-foreground' }
 
   // The "Open session" link, labeled honestly: a headless Claude Code run has no per-session
   // URL, so the generic app entry (claude.ai/code) is shown as "Open Claude Code" with the id
@@ -32,25 +46,19 @@ export function RunOverview({ events, showSessionLink = true }: { events: Framew
     <div className="grid gap-3 border-b border-border p-4 md:grid-cols-2">
       {hasProgress && (
         <div className="flex items-center gap-2 text-sm md:col-span-2">
-          <span
-            className={cn(
-              'h-2.5 w-2.5 shrink-0 rounded-full',
-              progress.readyForMerge ? 'bg-green-500' : active ? 'animate-pulse bg-amber-500' : 'bg-muted-foreground',
-            )}
-            aria-hidden
-          />
+          <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', status.dot)} aria-hidden />
           {progress.sessionName && <span className="font-medium">{progress.sessionName}</span>}
-          <span className="text-xs text-muted-foreground">
-            {progress.readyForMerge ? 'ready for merge' : active ? 'building…' : 'finished'}
-          </span>
+          <span className={cn('text-xs', status.tone)}>{status.label}</span>
         </div>
       )}
       {loop && (
         <section className="rounded-lg border border-border p-3">
           <h3 className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Loop status
+            {/* "ended early", not "stopped": the loop finishing without passing is not the user
+                stopping the session, and the status pill above may say "stopped" for that. */}
             <Badge className={loop.productionGrade ? 'text-primary' : loop.finished ? 'text-muted-foreground' : ''}>
-              {loop.productionGrade ? 'production-grade' : loop.finished ? 'stopped' : `pass ${loop.pass}`}
+              {loop.productionGrade ? 'production-grade' : loop.finished ? 'ended early' : `pass ${loop.pass}`}
             </Badge>
           </h3>
           {loop.blockers.length > 0 ? (

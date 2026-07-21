@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { FrameworkEvent } from '@gemstack/framework'
-import { agentViews, pendingChoices, isRunActive, currentRunEvents } from './live-state.js'
+import { agentViews, pendingChoices, isRunActive, currentRunEvents, runOutcome } from './live-state.js'
 
 const view = (id: string, title: string, markdown: string): FrameworkEvent => ({ kind: 'view', id, title, markdown })
 const choice = (id: string, title: string): FrameworkEvent => ({
@@ -102,5 +102,28 @@ describe('currentRunEvents', () => {
       { kind: 'log', message: 'run 2' },
       { kind: 'end', ok: false, stopped: true },
     ])
+  })
+})
+
+// #948: the overview pill must tell a crash, a user stop, and a clean finish apart.
+describe('runOutcome', () => {
+  test('undefined while the run is still going', () => {
+    expect(runOutcome([{ kind: 'log', message: 'hi' }])).toBeUndefined()
+  })
+
+  test('a clean end', () => {
+    expect(runOutcome([{ kind: 'end', ok: true }])).toEqual({ ok: true, stopped: false })
+  })
+
+  test('a failure carries its detail', () => {
+    expect(runOutcome([{ kind: 'end', ok: false, detail: 'driver exited 1' }])).toEqual({
+      ok: false,
+      stopped: false,
+      detail: 'driver exited 1',
+    })
+  })
+
+  test('a user stop is a stop, not a failure', () => {
+    expect(runOutcome([{ kind: 'end', ok: false, stopped: true }])).toEqual({ ok: false, stopped: true })
   })
 })

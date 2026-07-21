@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Composer, type ComposerHandle } from './Composer.js'
 import { agentForDriver } from '@gemstack/framework/client'
 import { useStartRun } from '../lib/use-start-run.js'
+import type { RunOutcome } from '../lib/live-state.js'
 
 // The finished-run composer (#720): keep talking to a run that has ended. A live run drains
 // messages in-process (RunChat + sendMessage), but a finished run has no process — so sending here
@@ -17,8 +18,10 @@ export function RunResumeChat({
   driver,
   files,
   addContext,
+  removeContext,
   onRunStarted,
   sessionName,
+  outcome,
 }: {
   projectId: string
   /** The run being continued (#762), so the follow-up reopens it instead of starting a new one. */
@@ -29,9 +32,13 @@ export function RunResumeChat({
   driver?: string | undefined
   files: string[]
   addContext: (path: string) => void
+  /** Drop a path from the run Context when its chip leaves the editor (#948). */
+  removeContext?: ((path: string) => void) | undefined
   onRunStarted: (intent: string, runId?: string) => void
   /** This session's name (#874), so a preset launched here targets it by default. */
   sessionName?: string | undefined
+  /** How the run ended (#948), so the note does not call a crash "ended". */
+  outcome?: RunOutcome | undefined
 }) {
   const composerRef = useRef<ComposerHandle>(null)
   const { busy, error, start } = useStartRun()
@@ -64,16 +71,24 @@ export function RunResumeChat({
 
   return (
     <div className="border-t border-border p-2">
-      <p className="mb-2 text-xs text-muted-foreground">Session ended — your next message continues it.</p>
+      <p className="mb-2 text-xs text-muted-foreground">
+        {outcome && !outcome.ok && !outcome.stopped
+          ? 'Session failed — your next message resumes it where it stopped.'
+          : outcome?.stopped
+            ? 'Session stopped — your next message resumes it.'
+            : 'Session ended — your next message continues it.'}
+      </p>
       <Composer
         ref={composerRef}
         files={files}
         addContext={addContext}
+        removeContext={removeContext}
         onSubmit={send}
         busy={busy}
         submitLabel="Send"
         submitBusyLabel="Resuming…"
         showAgentModel={false}
+        inSession
         sessionName={sessionName}
         placeholder="Message the session to continue it…  ( / commands · < tags · @ projects · # files )"
       />

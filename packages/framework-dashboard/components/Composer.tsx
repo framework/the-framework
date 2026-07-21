@@ -14,6 +14,7 @@ import { useLoaded } from '../lib/use-async.js'
 import { onProjects } from '../server/projects.telefunc.js'
 import { PromptEditor, type PromptEditorHandle } from './PromptEditor.js'
 import { PresetCreatePanel } from './PresetCreatePanel.js'
+import { PresetsMenu } from './PresetsMenu.js'
 import { AgentModelMenu, type AgentOption } from './AgentModelMenu.js'
 import { OptionsMenu, type OptionRow } from './OptionsMenu.js'
 import { ResolvedOptions } from './ResolvedOptions.js'
@@ -69,12 +70,15 @@ export const Composer = forwardRef<ComposerHandle, {
   files: string[]
   /** Add a path to the run Context (from an `@`/`#` mention). */
   addContext: (path: string) => void
+  /** Drop a path from the run Context when its `@`/`#` chip leaves the editor (#948). */
+  removeContext?: ((path: string) => void) | undefined
   /** Run the composed text. `kind` is `prompt` once a preset was loaded, else `build`. */
   onSubmit: (text: string, kind: 'build' | 'prompt') => void | Promise<void>
   /** Mirror the live prompt + kind out, so the launcher can drive its disclosure/context UI. */
   onPromptChange?: ((prompt: string, kind: 'build' | 'prompt') => void) | undefined
-  /** A preset was loaded (so the launcher can flag it in its note). */
-  onPreset?: ((label: string) => void) | undefined
+  /** A preset was loaded (so the launcher can flag it in its note); `replaced` says a typed
+   *  draft was overwritten (undo brings it back). */
+  onPreset?: ((label: string, replaced: boolean) => void) | undefined
   busy: boolean
   submitLabel: string
   submitBusyLabel: string
@@ -88,12 +92,16 @@ export const Composer = forwardRef<ComposerHandle, {
   /** Off inside a session (#831): a session is bound to the agent it started with, so the select
    *  would only ever rewrite the *next* session's default. Chosen at the launcher instead. */
   showAgentModel?: boolean | undefined
+  /** Inside a running/finished session (#833): every run option is baked in at spawn, so the
+   *  gear drops them (keeping the genuinely global editor pick) and the "In play" strip goes —
+   *  both would otherwise read as controls over *this* session that only rewrite the next one. */
+  inSession?: boolean | undefined
   /** The session this composer sits in, if any (#874): a preset launched from a run page targets
    *  that session by default, instead of the whole codebase. Absent at the launcher, where no
    *  session exists yet. */
   sessionName?: string | undefined
 }>(function Composer(
-  { files, addContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, showShortcutHint = false, compact = false, showAgentModel = true, sessionName },
+  { files, addContext, removeContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, showShortcutHint = false, compact = false, showAgentModel = true, inSession = false, sessionName },
   ref,
 ) {
   const [prompt, setPrompt] = useState('')
@@ -132,6 +140,8 @@ export const Composer = forwardRef<ComposerHandle, {
   const browser = preferences.browser ?? false
   const model = preferences.model ?? '' // #628: empty = the driver's default model
   const agent = preferences.agent ?? 'claude' // #650: which coding agent drives the run
+  // The stored agent as a display name; an unknown stored value falls back to Claude Code.
+  const agentLabel = AGENT_LABELS[AGENTS.includes(agent as AgentName) ? (agent as AgentName) : 'claude']
   const customPresets = preferences.customPresets ?? [] // #626: the user's own saved prompts
   const editor = preferences.editor // #727: preferred editor; undefined = $FRAMEWORK_EDITOR / code
   const detectedEditors = useDetectedEditors() // #727: editors installed on the daemon's machine
@@ -150,18 +160,32 @@ export const Composer = forwardRef<ComposerHandle, {
     focus: () => editorRef.current?.focus(),
   }))
 
+  // A synchronous latch alongside the async `busy` prop (#948): two fast ⌘↵ presses both read
+  // `busy === false` (React state lags), fired two starts, and the second surfaced a spurious
+  // "already active" error. The ref flips before any await.
+  const submittingRef = useRef(false)
   const submit = (e?: FormEvent) => {
     e?.preventDefault()
     const text = prompt.trim()
-    if (!text || busy) return
-    void onSubmit(text, kind)
+    if (!text || busy || submittingRef.current) return
+    submittingRef.current = true
+    void Promise.resolve(onSubmit(text, kind)).finally(() => {
+      submittingRef.current = false
+    })
   }
 
-  // A preset button (or the `/` menu) loads the rendered template into the editor, which chip-ifies
-  // its tags; the run then goes verbatim as a `prompt` kind.
-  const loadPreset = (label: string) => {
+  // A preset (from the `/` menu or the Presets button) loads the rendered template into the
+  // editor, which chip-ifies its tags; the run then goes verbatim as a `prompt` kind.
+  const loadPreset = (label: string, replaced: boolean) => {
     setKind('prompt')
-    onPreset?.(label)
+    onPreset?.(label, replaced)
+  }
+
+  // The Presets button's load path (#948): through the imperative handle rather than the
+  // suggestion plugin, then the same bookkeeping as the `/` menu.
+  const loadPresetFromMenu = (text: string, label: string) => {
+    const replaced = editorRef.current?.loadTemplate(text) ?? false
+    loadPreset(label, replaced)
   }
 
   const onPromptEdit = (value: string) => {
@@ -175,7 +199,8 @@ export const Composer = forwardRef<ComposerHandle, {
   // The Global options as one table (#314). Autopilot's default-on lives in `autopilotEnabled`; Eco
   // is disabled + dimmed under Vanilla; the Eco sub-drops show only while Eco is on.
   const mainOptions: OptionRow[] = [
-    { key: 'transparent', label: 'Transparent', description: 'Raw Claude Code — turns the whole framework off.', title: 'Fully transparent (#625): run the agent exactly like plain Claude Code, with no framework system prompt, controls, dashboard, guard, or TODO loop. Overrides the options below.', checked: transparent },
+    // Named for the agent actually selected (#948): under Codex, "Raw Claude Code" was a lie.
+    { key: 'transparent', label: 'Transparent', description: `Raw ${agentLabel} — turns the whole framework off.`, title: `Fully transparent (#625): run the agent exactly like plain ${agentLabel}, with no framework system prompt, controls, dashboard, guard, or TODO loop. Overrides the options below.`, checked: transparent },
     // Says only what it does (#801): the maintenance stance it used to relax left the system prompt
     // with that section (#556), so the countdown is the whole feature.
     { key: 'autopilot', label: 'Autopilot', description: 'Auto-accepts the recommended choice after a countdown.', title: 'Auto-accept the recommended choice after a countdown, instead of waiting for you to pick', checked: autopilot && !transparent, disabled: transparent, disabledReason: 'off while Transparent is on' },
@@ -205,6 +230,7 @@ export const Composer = forwardRef<ComposerHandle, {
       onPreset={loadPreset}
       onMentionProject={addContext}
       onMentionFile={addContext}
+      {...(removeContext ? { onMentionRemoved: removeContext } : {})}
       projects={projects}
       files={files}
       presets={presets}
@@ -232,18 +258,30 @@ export const Composer = forwardRef<ComposerHandle, {
           busy={busy}
         />
       )}
+      {/* Presets get a visible surface (#948): load, create and delete in one menu, instead of
+          loading only behind typing `/` and deleting off in the options gear. Not in the compact
+          row, which has no room and no create panel. */}
+      {!compact && (
+        <PresetsMenu
+          presets={presets}
+          customPresets={customPresets}
+          busy={busy}
+          onLoad={loadPresetFromMenu}
+          onNew={() => setAddingPreset(true)}
+          onDelete={id => updatePreferences({ customPresets: customPresets.filter(p => p.id !== id) })}
+        />
+      )}
       <OptionsMenu
-        options={mainOptions}
-        ecoOptions={ecoOptions}
-        showEco={eco && !ecoDisabled}
+        // In-session (#833): the run options were baked into the session at spawn, so offering
+        // them here only rewrote the next session's defaults while reading as session state.
+        options={inSession ? [] : mainOptions}
+        ecoOptions={inSession ? [] : ecoOptions}
+        showEco={!inSession && eco && !ecoDisabled}
         busy={busy}
         editor={editor}
         editors={detectedEditors}
         onEditorChange={e => updatePreferences({ editor: e ?? '' })}
-        // Preset loading + "New preset…" moved to the `/` menu (#722); the gear keeps the manage
-        // side, deleting a saved preset.
-        customPresets={customPresets}
-        onDeleteCustomPreset={id => updatePreferences({ customPresets: customPresets.filter(p => p.id !== id) })}
+        {...(inSession ? { label: 'Preferences' } : {})}
       />
     </>
   )
@@ -301,17 +339,22 @@ export const Composer = forwardRef<ComposerHandle, {
       </div>
 
       {/* What the session resolves to, without opening the gear (#842). Off in the compact row
-          above, which is one line on purpose. */}
-      <ResolvedOptions options={mainOptions} sources={sources} fileConfig={fileConfig} />
+          above, which is one line on purpose, and in-session (#833), where it described the
+          *global* options rather than the ones this session actually runs with. */}
+      {!inSession && <ResolvedOptions options={mainOptions} sources={sources} fileConfig={fileConfig} />}
 
       {addingPreset && (
         <PresetCreatePanel
           currentPrompt={prompt}
           busy={busy}
-          onCancel={() => setAddingPreset(false)}
+          onCancel={() => {
+            setAddingPreset(false)
+            editorRef.current?.focus()
+          }}
           onSave={preset => {
             updatePreferences({ customPresets: [...customPresets, preset] })
             setAddingPreset(false)
+            editorRef.current?.focus()
           }}
         />
       )}

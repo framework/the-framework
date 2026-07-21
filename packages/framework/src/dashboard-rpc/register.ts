@@ -1,9 +1,9 @@
 import { __decorateTelefunction } from 'telefunc'
-import { onRuns, onRun, onDocs, onProjectLog, onQueue, onOverview, onInterventions, onActivity, onDashboard, onGithubUrl, onGitStatus, onProjectFiles, onProjectFileStatus, onFileDiff, onRunChanges, onFileContent, onTickets, onRetainedWorktrees, onRunWorktree, onRunHandoff } from './reads.telefunc.js'
+import { onRuns, onRun, onDocs, onProjectLog, onQueue, onOverview, onInterventions, onActivity, onDashboard, onGithubUrl, onGitStatus, onProjectFiles, onProjectFileStatus, onFileDiff, onRunChanges, onFileContent, onTickets, onRetainedWorktrees, onRunWorktree, onRunHandoff, onSystemPromptUser } from './reads.telefunc.js'
 import { sendStop, sendChoice, sendMessage, sendStart, sendPreview, onServeTargets, sendStopPreview, onPreviewStatus, sendOpenInApp, sendRemoveWorktree, sendPushBranch, sendOpenPullRequest, sendQueueTicket } from './control.telefunc.js'
 import { onEvents } from './events.telefunc.js'
 import { onProjects, sendAddProject } from './projects.telefunc.js'
-import { onPreferences, savePreferences, onProjectPreferences, saveProjectPreferences, onEditors } from './preferences.telefunc.js'
+import { onPreferences, savePreferences, onProjectPreferences, saveProjectPreferences, onEditors, onNotifyChannels } from './preferences.telefunc.js'
 import { onQuota } from './quota.telefunc.js'
 
 // The client bakes each RPC key from the dashboard's source path (relative to its Vite
@@ -62,6 +62,7 @@ export function registerDashboardTelefunctions(appRootDir: string = process.cwd(
   reg(onRetainedWorktrees, 'onRetainedWorktrees', reads)
   reg(onRunWorktree, 'onRunWorktree', reads)
   reg(onRunHandoff, 'onRunHandoff', reads)
+  reg(onSystemPromptUser, 'onSystemPromptUser', reads)
   reg(onProjectFiles, 'onProjectFiles', reads)
   reg(onProjectFileStatus, 'onProjectFileStatus', reads)
   reg(onFileDiff, 'onFileDiff', reads)
@@ -89,5 +90,6 @@ export function registerDashboardTelefunctions(appRootDir: string = process.cwd(
   reg(onProjectPreferences, 'onProjectPreferences', preferences)
   reg(saveProjectPreferences, 'saveProjectPreferences', preferences)
   reg(onEditors, 'onEditors', preferences)
+  reg(onNotifyChannels, 'onNotifyChannels', preferences)
   reg(onQuota, 'onQuota', quota)
 }

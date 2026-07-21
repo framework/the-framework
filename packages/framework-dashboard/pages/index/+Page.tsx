@@ -26,6 +26,8 @@ import { pendingChoices, agentViews } from '../../lib/live-state.js'
 import { useDocumentTitle } from '../../lib/document-title.js'
 import { useWorking } from '../../lib/use-working.js'
 import { useFavicon } from '../../lib/favicon.js'
+import { useDaemonHealth } from '../../lib/use-daemon-health.js'
+import { TriangleAlert } from 'lucide-react'
 
 /** Stable, so `files` keeps one identity while no project is selected. */
 const EMPTY_FILES: string[] = []
@@ -78,7 +80,7 @@ export default function Page() {
   // The run Context set lives in the shell (#492/#504) so the two surfaces that feed it share
   // one source of truth: the `#` file chips + whole-repo Context selector in the Start form
   // (main pane), and the file tree in the right rail.
-  const { context, add: addContext, toggle: toggleContext, reset: resetContext } = useContextSet()
+  const { context, add: addContext, remove: removeContext, toggle: toggleContext, reset: resetContext } = useContextSet()
 
   // The picked context is one project's, so changing projects starts fresh. Keyed off the route
   // rather than the click, because Back/Forward change projects too.
@@ -132,6 +134,8 @@ export default function Page() {
   const onRunStarted = (intent: string, startedId?: string) => {
     setRunStart(prev => ({ tick: prev.tick + 1, intent, id: startedId ?? null }))
     setAdopting(startedId === undefined)
+    // The picked context went with that run; the next launch starts from a clean focus (#948).
+    resetContext()
     // Go to the run we just started — a real history entry, so Back returns to where you launched
     // from. Its row does not exist yet; the main pane shows it live on the strength of the id.
     if (startedId !== undefined) go({ projectId, runId: startedId })
@@ -181,7 +185,7 @@ export default function Page() {
   // (#440) read one shared Telefunc Channel. Hooks run before the relay early return below.
   // The run whose feed and controls are in play is simply the one in the URL; in the no-id
   // fallback there is none yet, and a null id resolves to the project root, as before.
-  const events = useLiveEvents(projectId, runId, runStart.tick)
+  const { events, lost } = useLiveEvents(projectId, runId, runStart.tick)
   const choices = projectId ? pendingChoices(events) : []
   const views = projectId ? agentViews(events) : []
 
@@ -196,6 +200,11 @@ export default function Page() {
   const local = relayRun === null
   const working = useWorking(local)
   useFavicon(working, local)
+
+  // Whether the daemon answers at all (#948). Without this, a dead daemon froze every surface
+  // silently: the channels retry their transport without a verdict and the polls keep their
+  // last value, so "the agent went quiet" and "nothing on this page is live" looked identical.
+  const healthy = useDaemonHealth(local)
 
   // Hooks above run unconditionally (rules of hooks); this early return is safe after them.
   if (relayRun) return <RelayView runId={relayRun} />
@@ -218,7 +227,7 @@ export default function Page() {
     if (runId === null) {
       // Just pressed Start on a project with no worktree: follow the live output until the poll
       // surfaces the run and the effect above adopts its id.
-      if (adopting) return <RunLive projectId={projectId} runId={null} events={events} files={files} addContext={addContext} />
+      if (adopting) return <RunLive projectId={projectId} runId={null} events={events} files={files} addContext={addContext} removeContext={removeContext} lost={lost} />
       return (
         <ProjectHome
           projectId={projectId}
@@ -227,6 +236,7 @@ export default function Page() {
           files={files}
           context={context}
           addContext={addContext}
+          removeContext={removeContext}
           toggleContext={toggleContext}
         />
       )
@@ -236,7 +246,7 @@ export default function Page() {
       // list we have not read yet. Both are live views; only a session that is genuinely absent
       // from a list we did read is gone.
       if (runId === runStart.id || !runsLoaded)
-        return <RunLive projectId={projectId} runId={runId} events={events} files={files} addContext={addContext} />
+        return <RunLive projectId={projectId} runId={runId} events={events} files={files} addContext={addContext} removeContext={removeContext} lost={lost} />
       return (
         <NotFound
           title="This session is gone"
@@ -247,8 +257,8 @@ export default function Page() {
       )
     }
     if (selectedRun.status === 'running')
-      return <RunLive projectId={projectId} runId={runId} events={events} files={files} addContext={addContext} />
-    return <RunReplay projectId={projectId} runId={runId} files={files} addContext={addContext} onRunStarted={onRunStarted} />
+      return <RunLive projectId={projectId} runId={runId} events={events} files={files} addContext={addContext} removeContext={removeContext} lost={lost} />
+    return <RunReplay projectId={projectId} runId={runId} files={files} addContext={addContext} removeContext={removeContext} onRunStarted={onRunStarted} />
   }
 
   return (
@@ -278,6 +288,12 @@ export default function Page() {
           <NotificationsMenu />
         </div>
       </header>
+      {!healthy && (
+        <div role="alert" className="flex items-center gap-2 border-b border-border bg-amber-500/10 px-4 py-2 text-xs text-amber-600 dark:text-amber-400">
+          <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          The daemon is not answering — retrying. Everything on this page is frozen until it returns.
+        </div>
+      )}
       {/* The workspace row is fixed-height: each column scrolls internally, so the row itself
           must never scroll. overflow-hidden clips any stray horizontal bleed (no page X-scroll).
           `relative` is load-bearing (#904): overflow only clips a descendant this box is the
@@ -307,6 +323,7 @@ export default function Page() {
           toggleContext={toggleContext}
           hasBrowser={selectedRun?.status === 'running' && selectedRun.browserStreamPort !== undefined}
           onWideChange={setWideRail}
+          onRunStarted={onRunStarted}
         />
       </div>
     </div>

@@ -10,7 +10,8 @@ import { Logo } from './Logo.js'
 // feed over the same Telefunc `onEvents` Channel the daemon uses. No Projects/Runs/Docs
 // rails and no steering — a teammate with the link watches, they do not drive.
 export function RelayView({ runId }: { runId: string }) {
-  const events = useLiveEvents(runId)
+  // The run id rides in the projectId slot: the relay keys `onEvents` by it (no registry).
+  const { events, lost, done } = useLiveEvents(runId)
   // The mark and the tab icon (#875) follow the one run being watched, since that is all the
   // relay knows about — it has no project registry to ask.
   const working = isRunActive(events)
@@ -24,7 +25,15 @@ export function RelayView({ runId }: { runId: string }) {
         <span className="ml-auto text-xs text-muted-foreground">read-only shared session</span>
       </header>
       <main className="flex min-w-0 flex-1 flex-col">
-        <RunFeed events={events} />
+        {/* An unknown or ended run closes the channel cleanly with nothing streamed; saying so
+            beats "Waiting for the session to start…" forever (#948). */}
+        {events.length === 0 && done ? (
+          <div className="grid flex-1 place-items-center px-6 text-center text-sm text-muted-foreground">
+            This shared session isn&rsquo;t available — it may have ended, or the link may be wrong.
+          </div>
+        ) : (
+          <RunFeed events={events} lost={lost} />
+        )}
       </main>
     </div>
   )

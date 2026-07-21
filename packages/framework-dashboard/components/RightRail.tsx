@@ -29,6 +29,7 @@ export function RightRail({
   toggleContext,
   hasBrowser = false,
   onWideChange,
+  onRunStarted,
 }: {
   projectId: string | null
   /** The selected run: resolves a choice pick's gate (#749) and scopes the tree to its worktree (#815). */
@@ -45,6 +46,8 @@ export function RightRail({
   hasBrowser?: boolean
   /** Told when the rail takes its wide form (#862), so the shell can free the room for it. */
   onWideChange?: (wide: boolean) => void
+  /** Told when a panel starts a session (the tickets import, #948), so the shell shows it. */
+  onRunStarted?: ((intent: string, runId?: string) => void) | undefined
 }) {
   const [tab, setTab] = useState<Tab>('docs')
   // Once the user picks a tab, stop auto-defaulting (#695/U22) — only a genuinely new choice
@@ -123,10 +126,14 @@ export function RightRail({
         wide ? 'w-[32rem]' : 'w-80',
       )}
     >
-      <div className="flex gap-1 border-b border-border p-2">
+      {/* flex-wrap: up to 7 tabs share a w-80 rail, and without it the tail clipped (#948).
+          Announced as the tabset it visually is. */}
+      <div role="tablist" aria-label="Rail panels" className="flex flex-wrap gap-1 border-b border-border p-2">
         {tabs.map(t => (
           <Button
             key={t}
+            role="tab"
+            aria-selected={tab === t}
             variant="ghost"
             size="sm"
             className={cn('h-7 gap-1.5 text-xs', tab === t && 'bg-accent text-accent-foreground')}
@@ -147,7 +154,7 @@ export function RightRail({
         ) : tab === 'browser' && hasBrowser && runId ? (
           <BrowserPanel projectId={projectId} runId={runId} />
         ) : tab === 'tickets' ? (
-          <TicketsPanel projectId={projectId} />
+          <TicketsPanel projectId={projectId} onRunStarted={onRunStarted} />
         ) : tab === 'log' ? (
           <ProjectLogPanel projectId={projectId} />
         ) : (

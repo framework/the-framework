@@ -4,13 +4,13 @@ import { BrowserPanel } from './BrowserPanel.js'
 
 afterEach(cleanup)
 
-const frame = () => screen.getByAltText("The run's browser")
+const frame = () => screen.getByAltText("The session's browser")
 
 describe('BrowserPanel failure recovery (#946)', () => {
   test('an img error shows the message with a Retry, and Retry restores the stream', () => {
     render(<BrowserPanel projectId="p" runId="r1" />)
     fireEvent.error(frame())
-    expect(screen.queryByAltText("The run's browser")).toBeNull()
+    expect(screen.queryByAltText("The session's browser")).toBeNull()
     expect(screen.getByText(/not reachable/)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /Retry/ }))

@@ -1,4 +1,5 @@
 import { findRun, readLiveMetas, readAllRuns, loadRunEvents, worktreeSize, isSafeRunId, type RunMeta } from '../store/index.js'
+import { loadUserSystemPrompt } from '../system-prompt-file.js'
 import { listProjectWorktrees } from '../worktrees.js'
 import { readLogs, type LogEntry } from '../logs.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
@@ -264,4 +265,15 @@ export async function onRunHandoff(projectId: string, runId: string): Promise<Ru
   const run = await findRun(cwd, runId).catch(() => undefined)
   if (!run) return null
   return (await readRunHandoff(cwd, runBranchFor(run)).catch(() => undefined)) ?? null
+}
+
+/**
+ * The project's own `SYSTEM.md` text, or null when it has none (#872). The prompt preview
+ * claims to show the entire system prompt; composition takes this text as `opts.user`, but
+ * reading it is Node-bound, so the browser needs this read to keep that claim true.
+ */
+export async function onSystemPromptUser(projectId: string): Promise<string | null> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return null
+  return (await loadUserSystemPrompt(cwd)) ?? null
 }

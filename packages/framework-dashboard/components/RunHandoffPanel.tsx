@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { RunHandoff } from '@gemstack/framework'
 import { GitBranch, GitPullRequest, Upload } from 'lucide-react'
 import { onRunHandoff } from '../server/reads.telefunc.js'
@@ -6,6 +7,7 @@ import { usePolled } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
 import { DiffStat } from './DiffView.js'
 import { Button } from './ui/button.js'
+import { CopyButton } from './ui/copy-button.js'
 
 // The end-of-session handoff (#799): what this session produced, and the next step offered rather
 // than described. Before this, a finished session showed no branch, no commits and no diff, so
@@ -27,13 +29,19 @@ export function RunHandoffPanel({ projectId, runId }: { projectId: string; runId
     [projectId, runId],
   )
   const { busy, error, run } = useAction()
+  // Which button is in flight, so it can say "Pushing…" rather than silently greying (#948).
+  const [pending, setPending] = useState<'push' | 'pr' | null>(null)
 
   // Nothing read yet, or nothing to report (no git repo, unknown session): say nothing rather
   // than flash a wrong empty state.
   if (!loaded || !handoff) return null
 
-  const act = (fn: () => Promise<unknown>, fallback: string): void => {
-    void run(fn, fallback).then(result => result !== undefined && reload())
+  const act = (which: 'push' | 'pr', fn: () => Promise<unknown>, fallback: string): void => {
+    setPending(which)
+    void run(fn, fallback).then(result => {
+      setPending(null)
+      if (result !== undefined) reload()
+    })
   }
 
   return (
@@ -44,11 +52,12 @@ export function RunHandoffPanel({ projectId, runId }: { projectId: string; runId
           <span className="truncate font-medium text-foreground" title={handoff.branch}>
             {handoff.branch}
           </span>
+          <CopyButton text={handoff.branch} label="Copy branch name" />
         </span>
         <Summary handoff={handoff} />
         <div className="min-w-0 flex-1" />
         {error && <span className="text-red-500">{error}</span>}
-        <Actions handoff={handoff} busy={busy} act={act} projectId={projectId} runId={runId} />
+        <Actions handoff={handoff} busy={busy} pending={pending} act={act} projectId={projectId} runId={runId} />
       </div>
       {!handoff.empty && handoff.exists && (
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -78,6 +87,8 @@ function Summary({ handoff }: { handoff: RunHandoff }) {
       <span>·</span>
       <span>{files}</span>
       <DiffStat added={handoff.insertions} removed={handoff.deletions} className="text-xs" />
+      {/* Whether the work is on the remote yet is the first handoff question — say it. */}
+      {handoff.pushed && !handoff.pr && <span className="text-muted-foreground">· pushed</span>}
       {handoff.merged && <span className="text-muted-foreground">· merged</span>}
     </span>
   )
@@ -93,13 +104,15 @@ function Summary({ handoff }: { handoff: RunHandoff }) {
 function Actions({
   handoff,
   busy,
+  pending,
   act,
   projectId,
   runId,
 }: {
   handoff: RunHandoff
   busy: boolean
-  act: (fn: () => Promise<unknown>, fallback: string) => void
+  pending: 'push' | 'pr' | null
+  act: (which: 'push' | 'pr', fn: () => Promise<unknown>, fallback: string) => void
   projectId: string
   runId: string
 }) {
@@ -131,19 +144,19 @@ function Actions({
           variant="outline"
           size="xs"
           disabled={busy}
-          onClick={() => act(() => sendPushBranch(projectId, runId), 'Could not push the branch.')}
+          onClick={() => act('push', () => sendPushBranch(projectId, runId), 'Could not push the branch.')}
         >
           <Upload className="h-3.5 w-3.5" />
-          Push branch
+          {pending === 'push' ? 'Pushing…' : 'Push branch'}
         </Button>
       )}
       <Button
         size="xs"
         disabled={busy}
-        onClick={() => act(() => sendOpenPullRequest(projectId, runId), 'Could not open the pull request.')}
+        onClick={() => act('pr', () => sendOpenPullRequest(projectId, runId), 'Could not open the pull request.')}
       >
         <GitPullRequest className="h-3.5 w-3.5" />
-        Open PR
+        {pending === 'pr' ? 'Opening PR…' : 'Open PR'}
       </Button>
     </div>
   )

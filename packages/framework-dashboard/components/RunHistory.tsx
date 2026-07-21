@@ -53,6 +53,14 @@ export function RunHistory({
   useEffect(() => {
     setOptimistic(null)
   }, [projectId])
+  // A failed start has no running run to hand over to, so without a deadline the row said
+  // "starting…" forever (#948). The Start form surfaces the actual error; this just stops
+  // the rail pretending.
+  useEffect(() => {
+    if (optimistic === null || hasRunning) return
+    const timer = setTimeout(() => setOptimistic(null), 20_000)
+    return () => clearTimeout(timer)
+  }, [optimistic, hasRunning])
 
   if (!projectId) return null
 
@@ -168,6 +176,9 @@ function RunRow({
         dim && 'opacity-70',
       )}
       onClick={onClick}
+      // Collapsed, the visible labels fade and the row is carried by a colour dot; keep the
+      // whole story reachable by hover and assistive tech (#948).
+      {...(collapsed ? { title: `${parked ? 'waiting' : status}: ${intent || '(no prompt)'}`, 'aria-label': `${parked ? 'waiting' : status}: ${intent || '(no prompt)'}` } : {})}
     >
       <span className="flex w-full items-center gap-2">
         {/* The dot means "the agent is working", so a run parked on you gets a still one (#785):

@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react'
+import { Button } from './ui/button.js'
 
 /**
- * The run's browser, live in the right rail (#813).
+ * The session's browser, live in the right rail (#813).
  *
- * The run serves its headless Chrome as MJPEG (#802) and takes clicks and keys back over POST;
- * the daemon proxies both so this stays same-origin. An `<img>` renders
+ * The session serves its headless Chrome as MJPEG (#802) and takes clicks and keys back over
+ * POST; the daemon proxies both so this stays same-origin. An `<img>` renders
  * `multipart/x-mixed-replace` natively, so there is no player here — the browser is the player.
  *
- * This is the half that makes the `await-browser` gate (#796) actionable: the run parks asking a
- * human to get past a login wall, and until now that human had no way to reach the page.
+ * This is the half that makes the `await-browser` gate (#796) actionable: the session parks
+ * asking a human to get past a login wall, and until now that human had no way to reach the page.
  */
 export function BrowserPanel({ projectId, runId }: { projectId: string; runId: string }) {
   const img = useRef<HTMLImageElement>(null)
@@ -55,18 +56,13 @@ export function BrowserPanel({ projectId, runId }: { projectId: string; runId: s
   if (failed) {
     return (
       <div className="p-3 text-xs text-muted-foreground">
-        <p>
-          The preview is not reachable. It ends with the run, and a run only has one when it was started with Browser
-          on.
+        <p className="mb-2">
+          The preview is not reachable. It ends with the session, and a session only has one when it was started with
+          Browser on. If it just started, the stream may not be up yet.
         </p>
-        {/* The stream may simply not be up yet (the tab can open before the run's endpoint does). */}
-        <button
-          type="button"
-          className="mt-2 rounded border border-border px-2 py-1 hover:bg-muted"
-          onClick={() => setAttempt(a => a + 1)}
-        >
+        <Button variant="outline" size="xs" onClick={() => setAttempt(a => a + 1)}>
           Retry
-        </button>
+        </Button>
       </div>
     )
   }
@@ -74,13 +70,14 @@ export function BrowserPanel({ projectId, runId }: { projectId: string; runId: s
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="min-h-0 flex-1 overflow-auto p-2">
-        {/* tabIndex makes the frame focusable so keystrokes have somewhere to land. */}
+        {/* tabIndex makes the frame focusable so keystrokes have somewhere to land; the ring
+            shows where they will land. */}
         <img
           ref={img}
           src={`${base}/stream?r=${attempt}`}
-          alt="The run's browser"
+          alt="The session's browser"
           tabIndex={0}
-          className="w-full cursor-crosshair rounded border border-border bg-muted"
+          className="w-full cursor-crosshair rounded border border-border bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
           onError={() => setFailedKey(streamKey)}
           onClick={event => send({ type: 'click', ...toPageCoords(event) })}
           onWheel={event => send({ type: 'scroll', ...toPageCoords(event), deltaY: event.deltaY })}

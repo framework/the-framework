@@ -64,6 +64,24 @@ export function isRunActive(events: readonly FrameworkEvent[]): boolean {
   return events.length > 0 && !events.some(event => event.kind === 'end')
 }
 
+/** How a run ended, off its single `end` event. */
+export interface RunOutcome {
+  ok: boolean
+  stopped: boolean
+  detail?: string
+}
+
+/**
+ * The run's ending, or undefined while it is still going (#948). The most important bit
+ * about a finished run used to live only in one small `✗ failed` feed line — the overview
+ * pill said "finished" for a crash and a clean pass alike.
+ */
+export function runOutcome(events: readonly FrameworkEvent[]): RunOutcome | undefined {
+  const end = events.find(event => event.kind === 'end')
+  if (!end || end.kind !== 'end') return undefined
+  return { ok: end.ok, stopped: end.stopped === true, ...(end.detail !== undefined ? { detail: end.detail } : {}) }
+}
+
 /**
  * The current run's slice of an accumulated live feed. The dashboard's live channel keeps
  * one long-lived subscription per project and appends every streamed event, but each run

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Composer, type ComposerHandle } from './Composer.js'
 import { sendMessage } from '../server/control.telefunc.js'
+import { useAction } from '../lib/use-action.js'
 
 // The live-chat composer (#714/#721): send more messages to a running run. Reuses the same shared
 // Composer the launcher uses, so `/` presets, `<` tags, and `@`/`#` mentions work here too. On
@@ -13,6 +14,7 @@ export function RunChat({
   runId,
   files,
   addContext,
+  removeContext,
   sessionName,
 }: {
   projectId: string
@@ -22,37 +24,51 @@ export function RunChat({
   files: string[]
   /** Add a path to the run Context (from an `@`/`#` mention). */
   addContext: (path: string) => void
+  /** Drop a path from the run Context when its chip leaves the editor (#948). */
+  removeContext?: ((path: string) => void) | undefined
   /** This session's name (#874), so a preset launched here targets it by default. */
   sessionName?: string | undefined
 }) {
   const composerRef = useRef<ComposerHandle>(null)
-  const [sending, setSending] = useState(false)
+  const { busy, error, run } = useAction()
+  // The last message that went through: a queued control entry is invisible until the agent
+  // drains it between turns, so without this the send looked like nothing happened (#948).
+  const [queued, setQueued] = useState<string | null>(null)
 
   const send = async (text: string): Promise<void> => {
-    if (sending) return
-    setSending(true)
-    try {
-      await sendMessage(projectId, text, runId ?? undefined)
+    if (busy) return
+    // sendMessage resolves void; map success to `true` so it is tellable from useAction's
+    // failure `undefined`.
+    const result = await run(
+      () => sendMessage(projectId, text, runId ?? undefined).then(() => true),
+      'Could not send — the session may have just ended. Your text is kept, try again.',
+    )
+    if (result) {
+      setQueued(text)
       composerRef.current?.clear()
-    } catch {
-      // Leave the text in place so the user can retry; the run may have just ended.
-    } finally {
-      setSending(false)
-      composerRef.current?.focus()
     }
+    composerRef.current?.focus()
   }
 
   return (
     <div className="border-t border-border p-2">
+      {queued && !error && (
+        <p role="status" className="mb-1 truncate px-2 text-xs text-muted-foreground">
+          Queued — the session reads it between turns: &ldquo;{queued}&rdquo;
+        </p>
+      )}
+      {error && <p role="alert" className="mb-1 px-2 text-xs text-red-500">{error}</p>}
       <Composer
         ref={composerRef}
         files={files}
         addContext={addContext}
+        removeContext={removeContext}
         onSubmit={send}
-        busy={sending}
+        busy={busy}
         submitLabel="Send"
         submitBusyLabel="Sending…"
         showAgentModel={false}
+        inSession
         sessionName={sessionName}
         placeholder="Message the session…  ( / commands · < tags · @ projects · # files )"
       />

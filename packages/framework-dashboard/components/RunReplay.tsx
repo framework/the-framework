@@ -7,6 +7,7 @@ import { RunActionBar } from './RunActionBar.js'
 import { RunHandoffPanel } from './RunHandoffPanel.js'
 import { RunResumeChat } from './RunResumeChat.js'
 import { useLoaded } from '../lib/use-async.js'
+import { runOutcome } from '../lib/live-state.js'
 
 // Replay one archived run: load its event log over a Telefunc RPC and render it in the same
 // EventList the live stream uses (no auto-scroll — it is a static log). The action bar rides
@@ -18,12 +19,14 @@ export function RunReplay({
   runId,
   files,
   addContext,
+  removeContext,
   onRunStarted,
 }: {
   projectId: string
   runId: string
   files: string[]
   addContext: (path: string) => void
+  removeContext?: ((path: string) => void) | undefined
   onRunStarted: (intent: string) => void
 }) {
   // null until the first answer: "Loading session…" and "no events" are different things.
@@ -59,10 +62,19 @@ export function RunReplay({
       {events.length === 0 ? (
         <div className="grid flex-1 place-items-center text-sm text-muted-foreground">This session has no events.</div>
       ) : (
-        <EventList events={events} stick={false} />
+        // Open at the end: the outcome, the final spend, and the last changes live there, and
+        // they are what a finished session gets opened for (#948). Scroll up for the history.
+        <EventList events={events} stick={false} openAt="end" />
       )}
-      {sessionId && (
-        <RunResumeChat projectId={projectId} runId={runId} sessionId={sessionId} driver={session?.driver} files={files} addContext={addContext} onRunStarted={onRunStarted} sessionName={sessionName} />
+      {sessionId ? (
+        <RunResumeChat projectId={projectId} runId={runId} sessionId={sessionId} driver={session?.driver} files={files} addContext={addContext} removeContext={removeContext} onRunStarted={onRunStarted} sessionName={sessionName} outcome={runOutcome(events)} />
+      ) : (
+        events.length > 0 && (
+          // Say why there is no composer here, instead of a wordless dead-end (#948).
+          <p className="border-t border-border p-3 text-xs text-muted-foreground">
+            This session can&rsquo;t be continued — it ended before the agent reported a session id to resume.
+          </p>
+        )
       )}
     </>
   )

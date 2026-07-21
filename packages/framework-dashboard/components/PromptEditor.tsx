@@ -20,18 +20,24 @@ import type { SuggestionItem } from './prompt-editor/SuggestionList.js'
 export interface PromptEditorHandle {
   clear: () => void
   focus: () => void
+  /** Load a template (a preset's prompt) into the editor. Returns whether it replaced a draft. */
+  loadTemplate: (text: string) => boolean
 }
 
 interface PromptEditorProps {
   onChange: (markdown: string) => void
   /** Cmd/Ctrl+Enter. */
   onSubmit: () => void
-  /** A preset picked from the `/` menu (so the form can flip to a `prompt` run). */
-  onPreset?: (label: string) => void
+  /** A preset picked from the `/` menu (so the form can flip to a `prompt` run). `replaced` says
+   *  whether a typed draft was overwritten — undo brings it back, and the form's note says so. */
+  onPreset?: (label: string, replaced: boolean) => void
   /** A project referenced via `@` (so the form can add it to the run context). */
   onMentionProject?: (path: string) => void
   /** A file referenced via `#` (so the form can add its repo-relative path to the run context). */
   onMentionFile?: (relPath: string) => void
+  /** An `@`/`#` chip left the editor (deleted, or replaced by a preset) — undo the context
+   *  focus it added, so the prompt and the Context set cannot diverge (#948). */
+  onMentionRemoved?: (path: string) => void
   projects: ProjectSummary[]
   /** The current project's files, repo-relative, for the `#` picker (#504). */
   files?: string[]
@@ -69,7 +75,7 @@ function applyTemplate(editor: Editor, text: string): void {
 }
 
 export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(function PromptEditor(
-  { onChange, onSubmit, onPreset, onMentionProject, onMentionFile, projects, files = [], presets, customPresets = [], onNewPreset, disabled = false, placeholder = 'Describe what to build…  ( / commands · < tags · @ projects · # files )', compact = false },
+  { onChange, onSubmit, onPreset, onMentionProject, onMentionFile, onMentionRemoved, projects, files = [], presets, customPresets = [], onNewPreset, disabled = false, placeholder = 'Describe what to build…  ( / commands · < tags · @ projects · # files )', compact = false },
   ref,
 ) {
   const [isEmpty, setIsEmpty] = useState(true)
@@ -83,6 +89,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   const onPresetRef = useRef(onPreset)
   const onMentionRef = useRef(onMentionProject)
   const onMentionFileRef = useRef(onMentionFile)
+  const onMentionRemovedRef = useRef(onMentionRemoved)
   const onChangeRef = useRef(onChange)
   const onSubmitRef = useRef(onSubmit)
   useEffect(() => {
@@ -94,20 +101,51 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     onPresetRef.current = onPreset
     onMentionRef.current = onMentionProject
     onMentionFileRef.current = onMentionFile
+    onMentionRemovedRef.current = onMentionRemoved
     onChangeRef.current = onChange
     onSubmitRef.current = onSubmit
   })
 
+  // The `@`/`#` chips currently in the doc, as their serialized texts. Deleting a chip must
+  // also undo the context focus it added (#948): the chip was the only visible sign of that
+  // focus, so a chipless prompt silently carrying it was a lie. Compared on every doc change;
+  // additions are handled by the pickers' own callbacks.
+  const mentionsRef = useRef<Set<string>>(new Set())
+  const syncMentions = (ed: Editor): void => {
+    const now = new Set<string>()
+    ed.state.doc.descendants(node => {
+      if (node.type.name === 'token' && (node.attrs.kind === 'project' || node.attrs.kind === 'file')) {
+        now.add(String(node.attrs.text))
+      }
+      return true
+    })
+    for (const gone of mentionsRef.current) {
+      if (now.has(gone)) continue
+      if (gone.startsWith('#')) {
+        onMentionRemovedRef.current?.(gone.slice(1))
+      } else if (gone.startsWith('@')) {
+        // A project chip carries its name; the context holds its path.
+        const project = projectsRef.current.find(p => p.name === gone.slice(1))
+        if (project) onMentionRemovedRef.current?.(project.path)
+      }
+    }
+    mentionsRef.current = now
+  }
+
   // Load a template into the live editor and sync the derived state (the empty flag + the
   // markdown out). Takes the editor as an argument so the `/` menu — whose closures are built
   // once, before useEditor resolves — can call it too, not only the imperative handle.
-  const loadTemplateInto = (ed: Editor, text: string): void => {
-    // Loading a preset replaces the whole editor, so guard typed work (#695/U11): a non-empty
-    // editor gets one confirm before its content is discarded. An empty editor loads silently.
-    if (!ed.isEmpty && typeof window !== 'undefined' && !window.confirm('Replace your current prompt with this preset?')) return
+  // Replacing a typed draft loads without a blocking confirm (#948): the replacement is one
+  // undo step (history groups the draft separately after its ~500ms window), and the caller
+  // gets `replaced` back so its note can say "undo brings it back".
+  const loadTemplateInto = (ed: Editor, text: string): boolean => {
+    const replaced = !ed.isEmpty
     applyTemplate(ed, text)
     setIsEmpty(ed.isEmpty)
     onChangeRef.current(ed.storage.markdown.getMarkdown())
+    // setContent does not emit an update, so reconcile the mention chips here too.
+    syncMentions(ed)
+    return replaced
   }
 
   const editor = useEditor({
@@ -151,16 +189,19 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
           if (item.id.startsWith('preset:')) {
             const preset = presetsRef.current.find(p => `preset:${p.id}` === item.id)
             if (preset) {
-              loadTemplateInto(ed, preset.render())
-              onPresetRef.current?.(preset.label)
+              // Drop the `/query` trigger first so it does not count as a replaced draft.
+              ed.chain().focus().deleteRange(range).run()
+              const replaced = loadTemplateInto(ed, preset.render())
+              onPresetRef.current?.(preset.label, replaced)
             }
             return
           }
           if (item.id.startsWith('custom-preset:')) {
             const preset = customPresetsRef.current.find(p => `custom-preset:${p.id}` === item.id)
             if (preset) {
-              loadTemplateInto(ed, preset.prompt)
-              onPresetRef.current?.(preset.label)
+              ed.chain().focus().deleteRange(range).run()
+              const replaced = loadTemplateInto(ed, preset.prompt)
+              onPresetRef.current?.(preset.label, replaced)
             }
             return
           }
@@ -196,6 +237,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       makeTrigger({
         char: '@',
         key: 'at',
+        emptyNote: 'No projects to reference yet.',
         items: query =>
           projectsRef.current
             .filter(p => p.name.toLowerCase().includes(query))
@@ -214,6 +256,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       makeTrigger({
         char: '#',
         key: 'hash',
+        emptyNote: 'No files indexed here yet.',
         items: query =>
           filesRef.current
             .filter(f => f.toLowerCase().includes(query.toLowerCase()))
@@ -227,7 +270,15 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       }),
     ],
     editorProps: {
-      attributes: { class: 'pe-prose focus:outline-none' },
+      // The bare contenteditable needs its textbox semantics spelled out (#948): without them a
+      // screen reader gets an unlabeled editable region, and the placeholder span is decorative.
+      attributes: {
+        class: 'pe-prose focus:outline-none',
+        role: 'textbox',
+        'aria-multiline': 'true',
+        'aria-label': 'Prompt',
+        'aria-placeholder': placeholder,
+      },
       handleKeyDown: (_view, event) => {
         if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
           event.preventDefault()
@@ -240,6 +291,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     onUpdate: ({ editor: ed }) => {
       setIsEmpty(ed.isEmpty)
       onChangeRef.current(ed.storage.markdown.getMarkdown())
+      syncMentions(ed)
     },
   })
 
@@ -248,8 +300,10 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
       editor?.commands.clearContent()
       setIsEmpty(true)
       onChangeRef.current('')
+      if (editor) syncMentions(editor)
     },
     focus: () => editor?.commands.focus('end'),
+    loadTemplate: (text: string) => (editor ? loadTemplateInto(editor, text) : false),
   }))
 
   useEffect(() => {

@@ -123,7 +123,9 @@ export function RunActionBar({
         {onDeleted && !active && runId && (
           <DeleteSessionButton projectId={projectId} runId={runId} label={label} onDeleted={onDeleted} />
         )}
-        {!session && info?.sessionId && (
+        {/* The session id is the exact string a `--resume` takes (#948), useful even when the deep
+            link below is also shown, so it is always offered for copy when a session has one. */}
+        {info?.sessionId && (
           <CopyButton text={info.sessionId} label={`Copy session id (${info.sessionId})`} className="p-1.5" />
         )}
         {session && (

@@ -221,7 +221,8 @@ export async function runChatPhase(session: DriverSession, messages: RunMessages
     deps.emit({ kind: 'settled' })
     const message = await messages.next(deps.signal)
     if (message === undefined) return { turn, exhausted } // Stop / budget cap: end the conversation.
-    deps.emit({ kind: 'log', message: `You: ${message.text}` })
+    // The message shows in the feed as the driver's own `start` event (the YOU row), so it is not
+    // echoed as a separate log line — that only duplicated it.
     deps.recordMessage?.('user', message.text, message.via)
     turn = await session.prompt(message.text, { ...signalOpt, resume: true })
     deps.emitTurnSignals(turn.text)

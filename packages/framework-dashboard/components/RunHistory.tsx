@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Plus } from 'lucide-react'
 import type { RunMeta, RunStatus } from '@gemstack/framework'
 import { AGENT_LABELS, agentForDriver } from '@gemstack/framework/client'
 import { Button } from './ui/button.js'
@@ -13,7 +14,7 @@ import { ScrollArea } from './ui/scroll-area.js'
 /** A label hidden in the collapsed strip, revealed by hover/focus on the rail (#862). */
 const FADED_LABEL = 'opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100'
 
-// The Runs rail (#314 second sidebar). "Live" is the permanent home/launcher — selecting it
+// The Runs rail (#314 second sidebar). "New session" is the permanent home/launcher — selecting it
 // shows the Start form + cards (ProjectHome), and it is never consumed by a run. Every run
 // (live + archived, from `onRuns`) is its own row below it; selecting a run shows that run's
 // own view (its live output while running, a replay once finished). `runs` is owned by the
@@ -103,15 +104,15 @@ export function RunHistory({
       </div>
       <ScrollArea className="min-h-0 flex-1">
         <div className="px-2">
-        {/* Permanent home / launcher — always present, never a run. */}
+        {/* Permanent home / launcher — always present, never a run: starting a new session. */}
         <Button
           variant="ghost"
           className={cn('mb-1 w-full justify-start', collapsed && 'justify-center px-0', atHome && 'bg-accent text-accent-foreground')}
           onClick={() => onSelect(null)}
-          title={collapsed ? 'Live' : undefined}
+          title={collapsed ? 'New session' : undefined}
         >
-          <span className={cn('inline-block h-2 w-2 shrink-0 rounded-full bg-primary', !collapsed && 'mr-2')} />
-          <span className={cn('whitespace-nowrap', label)}>Live</span>
+          <Plus className={cn('h-4 w-4 shrink-0', !collapsed && 'mr-2')} />
+          <span className={cn('whitespace-nowrap', label)}>New session</span>
         </Button>
 
         {/* A just-started run, before its run.json exists — highlighted while following it. */}

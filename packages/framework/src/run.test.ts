@@ -893,7 +893,8 @@ test('runAwaitRounds gives up after MAX_AWAIT_ROUNDS and reports it exhausted', 
 test('the run says it is parked each time it waits for the user (#785)', async () => {
   // The build settles, chat opens: that is the moment the agent stops working and the run is
   // waiting on you. Before #785 nothing said so, and the dashboard kept animating "running".
-  const driver = new FakeDriver({ respond: () => 'built it' })
+  const prompts: string[] = []
+  const driver = new FakeDriver({ respond: prompt => (prompts.push(prompt), 'built it') })
   const session = await driver.start({ cwd: '/tmp/ws' })
   const messages = new RunMessageQueue()
   const events: FrameworkEvent[] = []
@@ -915,7 +916,7 @@ test('the run says it is parked each time it waits for the user (#785)', async (
   // dashboard can stop animating the moment the agent stops. (The matching "working again"
   // edge is the driver's own `start` event, which applyEventToMeta clears the flag on.)
   assert.equal(events.filter(e => e.kind === 'settled').length, 2)
-  assert.ok(events.some(e => e.kind === 'log' && e.message === 'You: now add dark mode'), 'the chat turn ran between the two parks')
+  assert.ok(prompts.includes('now add dark mode'), 'the chat turn ran between the two parks')
 })
 
 test('runAwaitRounds does not report exhausted when a chat phase follows the opening cap (#742)', async () => {

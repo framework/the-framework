@@ -107,12 +107,11 @@ test('runPrompt stays open for a live-chat message and delivers it as a turn (#7
   })
   // The final turn is the chat reply, not the opening turn.
   assert.equal(text, 'added dark mode')
-  // The message rode a driver `start` event (so it shows in the feed) and was echoed as a log.
+  // The message rode a driver `start` event, which is how it shows in the feed (the YOU row).
   assert.ok(
     events.some(e => e.kind === 'driver' && e.event.type === 'start' && e.event.prompt === 'also add dark mode'),
     'the chat message was delivered as a driver turn',
   )
-  assert.ok(events.some(e => e.kind === 'log' && e.message === 'You: also add dark mode'))
   assert.deepEqual(events.at(-1), { kind: 'end', ok: true })
 })
 

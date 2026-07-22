@@ -50,3 +50,19 @@ describe('Markdown links (#948)', () => {
     expect(screen.getByText('curl https://example.com')).toBeTruthy()
   })
 })
+
+// `compact` shrinks the renderer a notch so a reply reads at the density of the event log.
+describe('Markdown compact', () => {
+  test('the body renders at text-xs', () => {
+    const { container } = render(<Markdown text="hello" compact />)
+    expect(container.querySelector('.text-xs')).toBeTruthy()
+  })
+
+  test('a heading is smaller than its full-size counterpart', () => {
+    const { unmount } = render(<Markdown text={'# Section'} compact />)
+    expect(screen.getByText('Section').className).toContain('text-sm')
+    unmount()
+    render(<Markdown text={'# Section'} />)
+    expect(screen.getByText('Section').className).toContain('text-lg')
+  })
+})

@@ -7,8 +7,14 @@ import { Fragment, type ReactNode } from 'react'
 // the reader wants to click; http(s) only, so no javascript: smuggling), and pipe tables
 // (#869 — an agent comparing options or listing files reaches for one, and it rendered as
 // raw pipes). Anything else falls through as a paragraph.
-export function Markdown({ text }: { text: string }) {
-  return <div className="space-y-2 text-sm leading-relaxed">{renderBlocks(text)}</div>
+// `compact` shrinks everything a notch (text-xs, smaller headings) so a reply reads at the density
+// of the surrounding event log rather than a full document.
+export function Markdown({ text, compact = false }: { text: string; compact?: boolean }) {
+  return (
+    <div className={compact ? 'space-y-1.5 text-xs leading-relaxed' : 'space-y-2 text-sm leading-relaxed'}>
+      {renderBlocks(text, compact)}
+    </div>
+  )
 }
 
 // A fenced-code block, rendered both when its closing fence arrives and when the doc ends
@@ -34,7 +40,7 @@ function isTableSeparator(row: string): boolean {
   return tableCells(row).length > 0 && tableCells(row).every(c => /^:?-{3,}:?$/.test(c))
 }
 
-function renderBlocks(text: string): ReactNode[] {
+function renderBlocks(text: string, compact = false): ReactNode[] {
   const lines = text.replace(/\r\n/g, '\n').split('\n')
   const blocks: ReactNode[] = []
   let list: ReactNode[] = []
@@ -121,7 +127,9 @@ function renderBlocks(text: string): ReactNode[] {
     if (heading) {
       flushList()
       const level = heading[1]!.length
-      const sizes = ['text-lg', 'text-base', 'text-sm', 'text-sm', 'text-sm', 'text-sm']
+      const sizes = compact
+        ? ['text-sm', 'text-sm', 'text-xs', 'text-xs', 'text-xs', 'text-xs']
+        : ['text-lg', 'text-base', 'text-sm', 'text-sm', 'text-sm', 'text-sm']
       blocks.push(
         <p key={key++} className={`font-semibold ${sizes[level - 1]}`}>
           {inline(heading[2]!)}

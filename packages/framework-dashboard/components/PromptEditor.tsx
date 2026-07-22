@@ -47,6 +47,8 @@ interface PromptEditorProps {
   presets: PresetEntry[]
   /** The user's saved presets (#626), loaded verbatim from the `/` menu (#722). */
   customPresets?: CustomPreset[]
+  /** The open project's shared presets (#1025), committed in its repo; loaded verbatim like the user's. */
+  projectPresets?: CustomPreset[]
   /** Open the create panel from the `/` menu's "New preset…" (#722). Omit where there is no panel
    *  (the compact navbar launch), which also drops the item. */
   onNewPreset?: () => void
@@ -78,7 +80,7 @@ function applyTemplate(editor: Editor, text: string): void {
 }
 
 export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(function PromptEditor(
-  { onChange, onSubmit, onPreset, onMentionProject, onMentionFile, onMentionRemoved, projects, files = [], presets, customPresets = [], onNewPreset, disabled = false, placeholder = 'Describe what to build…  ( / commands · < tags · @ projects · # files )', compact = false },
+  { onChange, onSubmit, onPreset, onMentionProject, onMentionFile, onMentionRemoved, projects, files = [], presets, customPresets = [], projectPresets = [], onNewPreset, disabled = false, placeholder = 'Describe what to build…  ( / commands · < tags · @ projects · # files )', compact = false },
   ref,
 ) {
   const [isEmpty, setIsEmpty] = useState(true)
@@ -88,6 +90,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   const filesRef = useRef(files)
   const presetsRef = useRef(presets)
   const customPresetsRef = useRef(customPresets)
+  const projectPresetsRef = useRef(projectPresets)
   const onNewPresetRef = useRef(onNewPreset)
   const onPresetRef = useRef(onPreset)
   const onMentionRef = useRef(onMentionProject)
@@ -100,6 +103,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
     filesRef.current = files
     presetsRef.current = presets
     customPresetsRef.current = customPresets
+    projectPresetsRef.current = projectPresets
     onNewPresetRef.current = onNewPreset
     onPresetRef.current = onPreset
     onMentionRef.current = onMentionProject
@@ -174,6 +178,11 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
           const customItems: SuggestionItem[] = customPresetsRef.current
             .filter(p => p.label.toLowerCase().includes(q))
             .map(p => ({ id: `custom-preset:${p.id}`, label: p.label, hint: 'saved preset', group: 'Presets' }))
+          // The open project's shared presets (#1025): same verbatim load, tagged so the hint tells
+          // them apart from your own.
+          const projectItems: SuggestionItem[] = projectPresetsRef.current
+            .filter(p => p.label.toLowerCase().includes(q))
+            .map(p => ({ id: `project-preset:${p.id}`, label: p.label, hint: 'project preset', group: 'Presets' }))
           // "New preset…" to capture the current prompt (#722), only where the create panel exists
           // (the full composer, not the compact navbar launch, which passes no onNewPreset).
           const newPresetItem: SuggestionItem[] =
@@ -186,7 +195,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
             hint: a.hint,
             group: 'Actions',
           }))
-          return [...presetItems, ...customItems, ...newPresetItem, ...actionItems]
+          return [...presetItems, ...customItems, ...projectItems, ...newPresetItem, ...actionItems]
         },
         onSelect: (item, { editor: ed, range }) => {
           if (item.id.startsWith('preset:')) {
@@ -201,6 +210,15 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
           }
           if (item.id.startsWith('custom-preset:')) {
             const preset = customPresetsRef.current.find(p => `custom-preset:${p.id}` === item.id)
+            if (preset) {
+              ed.chain().focus().deleteRange(range).run()
+              const replaced = loadTemplateInto(ed, preset.prompt)
+              onPresetRef.current?.(preset.label, replaced)
+            }
+            return
+          }
+          if (item.id.startsWith('project-preset:')) {
+            const preset = projectPresetsRef.current.find(p => `project-preset:${p.id}` === item.id)
             if (preset) {
               ed.chain().focus().deleteRange(range).run()
               const replaced = loadTemplateInto(ed, preset.prompt)

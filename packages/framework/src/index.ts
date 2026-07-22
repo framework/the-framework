@@ -220,6 +220,7 @@ export {
   writeProjectPreferences,
   resolvePreferences,
   registryPreferencesStore,
+  sanitizeCustomPresets,
   REGISTRY_FILE,
   PROJECT_PREFERENCE_KEYS,
   type ProjectRecord,
@@ -230,6 +231,11 @@ export {
   type CustomPreset,
   type RegistryFs,
 } from './registry.js'
+export {
+  readProjectPresets,
+  writeProjectPresets,
+  PROJECT_PRESETS_FILE,
+} from './project-presets.js'
 export {
   installProject,
   enumerateGitRepos,

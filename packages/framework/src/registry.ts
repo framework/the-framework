@@ -339,7 +339,7 @@ export function resolvePreferences(global: Preferences, project: ProjectPreferen
  * label/prompt are trimmed and length-capped, the list capped at {@link CUSTOM_PRESET_LIMITS.count},
  * and duplicate ids dropped. A malformed entry is skipped, not thrown — a bad registry never breaks the read.
  */
-function sanitizeCustomPresets(value: unknown): CustomPreset[] {
+export function sanitizeCustomPresets(value: unknown): CustomPreset[] {
   if (!Array.isArray(value)) return []
   const out: CustomPreset[] = []
   const seen = new Set<string>()

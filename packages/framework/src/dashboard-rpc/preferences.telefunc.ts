@@ -1,6 +1,7 @@
-import { contextPreferences } from './context.js'
+import { contextPreferences, resolveProjectPath } from './context.js'
 import { detectEditors, type EditorInfo } from '../dashboard/open-in-app.js'
-import type { Preferences, ProjectPreferences } from '../registry.js'
+import { readProjectPresets, writeProjectPresets } from '../project-presets.js'
+import type { CustomPreset, Preferences, ProjectPreferences } from '../registry.js'
 
 // The user-preferences surface behind the new dashboard (#410): the Global options (Autopilot,
 // Technical, Vanilla, Eco + its section drops) the Start form and choice gate share. Persisted
@@ -56,6 +57,35 @@ export async function saveProjectPreferences(
     return { ok: true }
   } catch {
     return { ok: false, error: 'failed to save preferences' }
+  }
+}
+
+/**
+ * A project's shared custom presets (#1025), committed into its `.the-framework/` so they travel
+ * with the repo — the team-shared counterpart to the user-tier {@link onPreferences} presets. Read
+ * from the project's own checkout, so this resolves the project id to its workspace path rather than
+ * touching the home registry. `[]` on a public host (no local checkout) or an unknown project.
+ */
+export async function onProjectPresets(projectId: string): Promise<CustomPreset[]> {
+  if (!contextPreferences()) return []
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return []
+  return readProjectPresets(cwd).catch(() => [])
+}
+
+/** Persist a project's shared custom presets into its `.the-framework/` (#1025). No-op-safe on a public host. */
+export async function saveProjectPresets(
+  projectId: string,
+  presets: CustomPreset[],
+): Promise<SavePreferencesResult> {
+  if (!contextPreferences()) return { ok: false, error: 'preferences are not enabled on this server' }
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return { ok: false, error: 'unknown project' }
+  try {
+    await writeProjectPresets(cwd, presets)
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'failed to save presets' }
   }
 }
 

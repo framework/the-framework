@@ -11,6 +11,8 @@ export {
   savePreferences,
   onProjectPreferences,
   saveProjectPreferences,
+  onProjectPresets,
+  saveProjectPresets,
   onEditors,
   onNotifyChannels,
   type SavePreferencesResult,

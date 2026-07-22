@@ -13,6 +13,10 @@ vi.mock('../lib/preferences.js', () => ({
   // #842: the launcher strip reads the resolved layers; nothing here sets a repo tier.
   usePreferenceSources: () => ({}),
   useProjectFileConfig: () => ({}),
+  // #1025: project presets; nothing here opens a project, so no shared presets and no project scope.
+  useProjectPresets: () => [],
+  saveProjectPresetList: vi.fn(),
+  useActiveProjectId: () => null,
 }))
 // The editor picker (#727) detects installed editors over Telefunc; stub it to none in the test.
 vi.mock('../lib/editors.js', () => ({ useDetectedEditors: () => [] }))

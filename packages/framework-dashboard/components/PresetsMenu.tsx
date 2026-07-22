@@ -28,24 +28,63 @@ export interface PresetEntry {
 // no sign that 13 launcher presets exist — and deleting lived in the options gear, a different
 // menu. This button is the one surface that loads, creates, and deletes; the `/` menu stays as
 // the fast path for those who know it.
+/** One saved (user or project) preset row: click loads it, the X deletes it. */
+function SavedPresetRow({
+  preset,
+  busy,
+  onLoad,
+  onDelete,
+}: {
+  preset: CustomPreset
+  busy: boolean
+  onLoad: (text: string, label: string) => void
+  onDelete: (id: string) => void
+}) {
+  return (
+    <DropdownMenuItem disabled={busy} onClick={() => onLoad(preset.prompt, preset.label)} className="items-center gap-2">
+      <span className="flex-1 truncate">{preset.label}</span>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={e => {
+          // Delete, not load — keep the row's own click out of it.
+          e.stopPropagation()
+          onDelete(preset.id)
+        }}
+        title={`Delete "${preset.label}"`}
+        aria-label={`Delete preset ${preset.label}`}
+        className="rounded p-0.5 text-[var(--color-muted-foreground)] hover:text-danger"
+      >
+        <X className="h-3.5 w-3.5" aria-hidden />
+      </button>
+    </DropdownMenuItem>
+  )
+}
+
 export function PresetsMenu({
   presets,
   customPresets,
+  projectPresets,
   busy,
   onLoad,
   onNew,
   onDelete,
+  onDeleteProject,
 }: {
   presets: PresetEntry[]
   customPresets: CustomPreset[]
+  /** The open project's shared presets, committed in its `.the-framework/` (#1025). */
+  projectPresets: CustomPreset[]
   busy: boolean
   /** Load a preset's prompt into the editor. `newSession` marks the ones that never append to
    *  the open session (#959); a saved preset is always a plain load. */
   onLoad: (text: string, label: string, newSession?: boolean) => void
   /** Open the create panel; absent where no panel renders. */
   onNew?: (() => void) | undefined
-  /** Delete a saved preset by id. */
+  /** Delete a saved user preset by id. */
   onDelete: (id: string) => void
+  /** Delete a shared project preset by id. */
+  onDeleteProject: (id: string) => void
 }) {
   return (
     <DropdownMenu>
@@ -78,23 +117,16 @@ export function PresetsMenu({
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Your presets</DropdownMenuLabel>
             {customPresets.map(p => (
-              <DropdownMenuItem key={p.id} disabled={busy} onClick={() => onLoad(p.prompt, p.label)} className="items-center gap-2">
-                <span className="flex-1 truncate">{p.label}</span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={e => {
-                    // Delete, not load — keep the row's own click out of it.
-                    e.stopPropagation()
-                    onDelete(p.id)
-                  }}
-                  title={`Delete "${p.label}"`}
-                  aria-label={`Delete preset ${p.label}`}
-                  className="rounded p-0.5 text-[var(--color-muted-foreground)] hover:text-danger"
-                >
-                  <X className="h-3.5 w-3.5" aria-hidden />
-                </button>
-              </DropdownMenuItem>
+              <SavedPresetRow key={p.id} preset={p} busy={busy} onLoad={onLoad} onDelete={onDelete} />
+            ))}
+          </DropdownMenuGroup>
+        )}
+        {projectPresets.length > 0 && (
+          <DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Project presets</DropdownMenuLabel>
+            {projectPresets.map(p => (
+              <SavedPresetRow key={p.id} preset={p} busy={busy} onLoad={onLoad} onDelete={onDeleteProject} />
             ))}
           </DropdownMenuGroup>
         )}

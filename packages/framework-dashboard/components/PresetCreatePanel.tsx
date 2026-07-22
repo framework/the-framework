@@ -8,6 +8,9 @@ import { Button } from './ui/button.js'
 
 const LABEL_MAX = 80
 
+/** Where a saved preset lives (#1025): private to the user, or committed into the project's repo. */
+export type PresetScope = 'user' | 'project'
+
 /** A fresh id for a saved preset. `crypto.randomUUID` is present in the browser + prerender runtime. */
 function newId(): string {
   return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `p-${Date.now()}`
@@ -16,23 +19,27 @@ function newId(): string {
 export function PresetCreatePanel({
   currentPrompt,
   busy,
+  canSaveToProject,
   onSave,
   onCancel,
 }: {
   /** The editor's current text, prefilled so you can save what you just wrote. */
   currentPrompt: string
   busy: boolean
-  onSave: (preset: CustomPreset) => void
+  /** Whether a project is open to commit a shared preset into (#1025); hides the scope choice otherwise. */
+  canSaveToProject: boolean
+  onSave: (preset: CustomPreset, scope: PresetScope) => void
   onCancel: () => void
 }) {
   const [label, setLabel] = useState('')
   const [prompt, setPrompt] = useState(currentPrompt)
+  const [scope, setScope] = useState<PresetScope>('user')
 
   const save = () => {
     const trimmedLabel = label.trim()
     const trimmedPrompt = prompt.trim()
     if (!trimmedLabel || !trimmedPrompt) return
-    onSave({ id: newId(), label: trimmedLabel, prompt: trimmedPrompt })
+    onSave({ id: newId(), label: trimmedLabel, prompt: trimmedPrompt }, canSaveToProject ? scope : 'user')
   }
 
   // Keyboard parity with the composer (#948): Esc cancels, ⌘/Ctrl+Enter saves.
@@ -67,6 +74,32 @@ export function PresetCreatePanel({
         onChange={e => setPrompt(e.target.value)}
         className="w-full resize-y rounded-md border border-border bg-background px-2 py-1 font-mono text-xs text-foreground"
       />
+      {canSaveToProject && (
+        <div className="flex items-center gap-2 text-xs text-[var(--color-muted-foreground)]">
+          <span>Save to</span>
+          <div className="inline-flex overflow-hidden rounded-md border border-border">
+            {(['user', 'project'] as const).map(value => (
+              <button
+                key={value}
+                type="button"
+                disabled={busy}
+                onClick={() => setScope(value)}
+                aria-pressed={scope === value}
+                className={
+                  scope === value
+                    ? 'bg-foreground px-2 py-0.5 text-background'
+                    : 'px-2 py-0.5 text-foreground hover:bg-[var(--color-muted)]'
+                }
+              >
+                {value === 'user' ? 'Just me' : 'This project'}
+              </button>
+            ))}
+          </div>
+          <span className="truncate">
+            {scope === 'project' ? 'Committed to the repo, shared with your team' : 'Private to you, on every project'}
+          </span>
+        </div>
+      )}
       <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
           Cancel

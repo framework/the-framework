@@ -9,6 +9,9 @@ import {
   themePreference,
   usePreferenceSources,
   useProjectFileConfig,
+  useProjectPresets,
+  saveProjectPresetList,
+  useActiveProjectId,
 } from '../lib/preferences.js'
 import { useLoaded } from '../lib/use-async.js'
 import { onProjects } from '../server/projects.telefunc.js'
@@ -147,6 +150,8 @@ export const Composer = forwardRef<ComposerHandle, {
   // The stored agent as a display name; an unknown stored value falls back to Claude Code.
   const agentLabel = AGENT_LABELS[AGENTS.includes(agent as AgentName) ? (agent as AgentName) : 'claude']
   const customPresets = preferences.customPresets ?? [] // #626: the user's own saved prompts
+  const projectPresets = useProjectPresets() // #1025: presets committed in the open project's repo
+  const activeProjectId = useActiveProjectId() // #1025: a project to commit a shared preset into
   const theme = themePreference(preferences) // #725: system (default) / light / dark
 
   // Vanilla removes the system prompt (nothing left for Eco to trim); Transparent turns off the
@@ -240,6 +245,7 @@ export const Composer = forwardRef<ComposerHandle, {
       files={files}
       presets={presets}
       customPresets={customPresets}
+      projectPresets={projectPresets}
       // The `/` menu offers "New preset…" only in the full composer, where the create panel renders;
       // the compact navbar launch has no panel, so it gets no callback (and no item).
       {...(compact ? {} : { onNewPreset: () => setAddingPreset(true) })}
@@ -270,10 +276,12 @@ export const Composer = forwardRef<ComposerHandle, {
         <PresetsMenu
           presets={presets}
           customPresets={customPresets}
+          projectPresets={projectPresets}
           busy={busy}
           onLoad={loadPresetFromMenu}
           onNew={() => setAddingPreset(true)}
           onDelete={id => updatePreferences({ customPresets: customPresets.filter(p => p.id !== id) })}
+          onDeleteProject={id => saveProjectPresetList(projectPresets.filter(p => p.id !== id))}
         />
       )}
       <OptionsMenu
@@ -358,12 +366,14 @@ export const Composer = forwardRef<ComposerHandle, {
         <PresetCreatePanel
           currentPrompt={prompt}
           busy={busy}
+          canSaveToProject={activeProjectId !== null}
           onCancel={() => {
             setAddingPreset(false)
             editorRef.current?.focus()
           }}
-          onSave={preset => {
-            updatePreferences({ customPresets: [...customPresets, preset] })
+          onSave={(preset, scope) => {
+            if (scope === 'project') saveProjectPresetList([...projectPresets, preset])
+            else updatePreferences({ customPresets: [...customPresets, preset] })
             setAddingPreset(false)
             editorRef.current?.focus()
           }}

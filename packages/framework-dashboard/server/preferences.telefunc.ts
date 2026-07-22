@@ -12,6 +12,8 @@ import {
   savePreferences,
   onProjectPreferences,
   saveProjectPreferences,
+  onProjectPresets,
+  saveProjectPresets,
   onEditors,
   onNotifyChannels,
 } from '@gemstack/framework/dashboard-rpc'
@@ -21,6 +23,8 @@ export {
   savePreferences,
   onProjectPreferences,
   saveProjectPreferences,
+  onProjectPresets,
+  saveProjectPresets,
   onEditors,
   onNotifyChannels,
 }

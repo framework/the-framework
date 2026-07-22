@@ -1,11 +1,13 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import type { FrameworkFileConfig, Preferences, ProjectPreferences, ProjectSummary } from '@gemstack/framework'
+import type { CustomPreset, FrameworkFileConfig, Preferences, ProjectPreferences, ProjectSummary } from '@gemstack/framework'
 import { preferencesFromFileConfig, notificationEnabled, PROJECT_PREFERENCE_KEYS } from '@gemstack/framework/client'
 import {
   onPreferences,
   savePreferences,
   onProjectPreferences,
   saveProjectPreferences,
+  onProjectPresets,
+  saveProjectPresets,
 } from '../server/preferences.telefunc.js'
 import { onProjects } from '../server/projects.telefunc.js'
 import { parseRoute } from './route.js'
@@ -36,6 +38,10 @@ const projectLoads = new Set<string>()
 const files = new Map<string, FrameworkFileConfig>()
 let filesLoading: Promise<void> | null = null
 let filesLoaded = false
+/** Each project's shared custom presets, committed in its `.the-framework/custom-presets.json` (#1025). */
+const projectPresets = new Map<string, CustomPreset[]>()
+const projectPresetLoads = new Set<string>()
+const EMPTY_PRESETS: CustomPreset[] = []
 /** Resolved snapshots, one per project, cleared on every notify. `useSyncExternalStore` compares
  * snapshots by identity, so resolving fresh on each read would re-render forever. */
 let resolved = new Map<string, Preferences>()
@@ -115,6 +121,7 @@ function ensureLoaded(projectId: string | null): void {
       })
   }
   if (!filesLoaded) loadFileConfigs()
+  ensureProjectPresetsLoaded(projectId)
   if (!projectId || projects.has(projectId) || projectLoads.has(projectId)) return
   projectLoads.add(projectId)
   void onProjectPreferences(projectId)
@@ -161,6 +168,53 @@ export function refreshFileConfigs(): void {
 
 if (typeof window !== 'undefined') window.addEventListener('focus', refreshFileConfigs)
 
+/** Load a project's shared custom presets (#1025) once, from its committed `.the-framework/`. */
+function ensureProjectPresetsLoaded(projectId: string | null): void {
+  if (!projectId || projectPresets.has(projectId) || projectPresetLoads.has(projectId)) return
+  projectPresetLoads.add(projectId)
+  void onProjectPresets(projectId)
+    .then(presets => {
+      // `??=` reasoning as elsewhere: a save during the load already wrote this entry.
+      if (!projectPresets.has(projectId)) projectPresets.set(projectId, presets)
+    })
+    .catch(() => {
+      if (!projectPresets.has(projectId)) projectPresets.set(projectId, [])
+    })
+    .finally(() => {
+      projectPresetLoads.delete(projectId)
+      notify()
+    })
+}
+
+/**
+ * The open project's shared custom presets (#1025): the ones committed into its `.the-framework/`,
+ * so everyone who clones the repo sees them. Empty with no project open, since there is no repo to
+ * read them from.
+ */
+export function useProjectPresets(): CustomPreset[] {
+  const projectId = typeof window === 'undefined' ? null : parseRoute(window.location.pathname).projectId
+  const value = useSyncExternalStore(
+    subscribe,
+    () => (projectId ? (projectPresets.get(projectId) ?? EMPTY_PRESETS) : EMPTY_PRESETS),
+    () => EMPTY_PRESETS,
+  )
+  useEffect(() => ensureProjectPresetsLoaded(projectId), [projectId])
+  return value
+}
+
+/**
+ * Replace the open project's shared presets, write-through then persist into its `.the-framework/`
+ * (#1025). Best-effort like {@link updatePreferences}: a failed save is not worth surfacing over a
+ * preset edit. A no-op when no project is open — there is no repo to commit them to.
+ */
+export function saveProjectPresetList(next: CustomPreset[]): void {
+  const projectId = activeProjectId()
+  if (!projectId) return
+  projectPresets.set(projectId, next)
+  void saveProjectPresets(projectId, next).catch(() => {})
+  notify()
+}
+
 /**
  * The project a write belongs to, read straight off the URL (#784 makes it the selection).
  * `updatePreferences` runs in an event handler rather than a render, so it reads the location
@@ -196,6 +250,11 @@ export function updatePreferences(patch: Partial<Preferences>): void {
     void saveProjectPreferences(projectId, next).catch(() => {})
   }
   notify()
+}
+
+/** The open project's id, or null on a view with none — for deciding a preset can be shared (#1025). */
+export function useActiveProjectId(): string | null {
+  return typeof window === 'undefined' ? null : parseRoute(window.location.pathname).projectId
 }
 
 /**

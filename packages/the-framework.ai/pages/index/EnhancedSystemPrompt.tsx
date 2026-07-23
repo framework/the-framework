@@ -27,7 +27,7 @@ export function EnhancedSystemPrompt() {
           The Framework appends its own system prompt that instructs AI to follow highly effective practices — such as
           dividing large work into subtasks and listing significant alternative solutions.
         </p>
-        <Note>Customizable (or fully opt-out).</Note>
+        <Note>You can customize it, or fully opt-out.</Note>
       </div>
       <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {ITEMS.map((item) => (

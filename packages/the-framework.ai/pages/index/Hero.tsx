@@ -146,6 +146,7 @@ export function Hero() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, alignItems: 'center', maxWidth: '100%' }}>
           <span style={kickerStyle}>Try</span>
           <div
+            className="try-box"
             style={{
               maxWidth: '100%',
               boxSizing: 'border-box',

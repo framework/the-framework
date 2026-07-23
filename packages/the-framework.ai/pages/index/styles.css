@@ -84,7 +84,8 @@ section[id] {
 .copy-tip-side {
   opacity: 0;
 }
-.copy-box:hover .try-badge,
+/* The try box's badge sits in its tab row, outside the hoverable `.copy-box`, hence `:has()`. */
+.try-box:has(.copy-box:hover) .try-badge,
 .try-badge.copied,
 .install-chip:hover .copy-tip-side,
 .copy-tip-side.copied {

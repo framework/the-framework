@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { cardStyle, mono, SectionHead, sectionStyle } from './ui'
 
 const ROW_STYLES = {
@@ -5,9 +6,9 @@ const ROW_STYLES = {
   good: { bg: '#232a2e', border: '#475258', labelColor: '#a7c080' },
 } as const
 
-type Row = { kind: keyof typeof ROW_STYLES; emoji: string; label: string; body: string }
-const bad = (body: string): Row => ({ kind: 'bad', emoji: '😕', label: 'Bad fix', body })
-const good = (body: string): Row => ({ kind: 'good', emoji: '🚀', label: 'Solution', body })
+type Row = { kind: keyof typeof ROW_STYLES; emoji: string; label: string; body: ReactNode }
+const bad = (body: ReactNode): Row => ({ kind: 'bad', emoji: '😕', label: 'Bad fix', body })
+const good = (body: ReactNode): Row => ({ kind: 'good', emoji: '🚀', label: 'Solution', body })
 
 const PROBLEMS: { title: string; desc?: string; rows: Row[] }[] = [
   {
@@ -15,7 +16,11 @@ const PROBLEMS: { title: string; desc?: string; rows: Row[] }[] = [
     rows: [
       bad('Appending "DON\'T BE LAZY" to your prompts → minimal improvement.'),
       good(
-        'Divide-and-conquer: The Framework instructs AI to split large tasks into smaller subtasks. By focusing on one unit of work at a time, AI spends significantly more effort overall, resulting in much higher-quality output.',
+        <>
+          <b>Divide-and-conquer</b>: The Framework instructs AI to split large tasks into smaller subtasks. By
+          focusing on one unit of work at a time, AI spends significantly more effort overall, resulting in much
+          higher-quality output.
+        </>,
       ),
       good(
         'Coverage guarantees: The Framework lets AI enumerate everything that needs to be done before writing code. AI then works through that checklist, ensuring comprehensive coverage and preventing lazy shortcuts.',

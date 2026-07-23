@@ -1,5 +1,3 @@
-// Extra <head> tags. vike-react already renders title/description/favicon from
-// +config.ts — including og:title/og:description — so only add what's missing.
 export default function Head() {
   return (
     <>

@@ -104,12 +104,13 @@ section[id] {
   content: '';
   position: absolute;
   left: -3%;
-  top: 52%;
+  top: 70%;
   width: 106%;
   height: 4px;
   border-radius: 2px;
   background: #e67e80;
-  rotate: -2deg;
+  opacity: 0.9;
+  rotate: -5deg;
   transform-origin: left center;
   transform: scaleX(0.1);
   animation: strike 1.6s cubic-bezier(0.65, 0, 0.35, 1) 0.6s forwards;

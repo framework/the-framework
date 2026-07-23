@@ -3,6 +3,7 @@ import { appendControl, type ControlEntry } from '../control.js'
 import { isSafeVia } from '../conversations.js'
 import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
 import { resolveProjectPath, resolveRunPath, contextPreferences, contextPreview } from './context.js'
+import { relayOr } from './relay-run.js'
 import { appendFlatTodoEntry } from '../todo-loop.js'
 import { findRun, isSafeRunId, type RunMeta } from '../store/index.js'
 import { removeProjectWorktree, deleteProjectRun } from '../worktrees.js'
@@ -45,7 +46,9 @@ async function appendControlFor(projectId: string, entry: ControlEntry, runId?: 
 
 /** Stop a live run (the Stop button): append a stop entry to the run's control log. */
 export async function sendStop(projectId: string, runId?: string): Promise<void> {
-  await appendControlFor(projectId, { kind: 'stop' }, runId)
+  return relayOr(runId, 'sendStop', [projectId, runId], async () => {
+    await appendControlFor(projectId, { kind: 'stop' }, runId)
+  }, undefined)
 }
 
 /**
@@ -60,7 +63,9 @@ export async function sendChoice(
   by: ChoiceBy = 'user',
   runId?: string,
 ): Promise<void> {
-  await appendControlFor(projectId, { kind: 'choice', id, pick, by }, runId)
+  return relayOr(runId, 'sendChoice', [projectId, id, pick, by, runId], async () => {
+    await appendControlFor(projectId, { kind: 'choice', id, pick, by }, runId)
+  }, undefined)
 }
 
 /**
@@ -76,8 +81,10 @@ export async function sendChoice(
 export async function sendMessage(projectId: string, text: string, runId?: string, via?: string): Promise<void> {
   const message = text.trim()
   if (!message) return
-  const origin = isSafeVia(via) ? { via } : {}
-  await appendControlFor(projectId, { kind: 'message', text: message, ...origin }, runId)
+  return relayOr(runId, 'sendMessage', [projectId, text, runId, via], async () => {
+    const origin = isSafeVia(via) ? { via } : {}
+    await appendControlFor(projectId, { kind: 'message', text: message, ...origin }, runId)
+  }, undefined)
 }
 
 /**
@@ -219,9 +226,11 @@ async function handoffTargetFor(projectId: string, runId: string): Promise<{ cwd
  * to a shared remote under the user's name, which is the user's call.
  */
 export async function sendPushBranch(projectId: string, runId: string): Promise<HandoffResult> {
-  const target = await handoffTargetFor(projectId, runId)
-  if (!target) return { ok: false, error: 'unknown session' }
-  return pushRunBranch(target.cwd, runBranchFor(target.run))
+  return relayOr(runId, 'sendPushBranch', [projectId, runId], async () => {
+    const target = await handoffTargetFor(projectId, runId)
+    if (!target) return { ok: false, error: 'unknown session' }
+    return pushRunBranch(target.cwd, runBranchFor(target.run))
+  }, { ok: false, error: 'could not reach the device' })
 }
 
 /**
@@ -232,9 +241,11 @@ export async function sendPushBranch(projectId: string, runId: string): Promise<
  * user, which is the point of "offer the next step rather than describe it".
  */
 export async function sendOpenPullRequest(projectId: string, runId: string): Promise<HandoffResult> {
-  const target = await handoffTargetFor(projectId, runId)
-  if (!target) return { ok: false, error: 'unknown session' }
-  return openSessionPullRequest(target.cwd, target.run)
+  return relayOr(runId, 'sendOpenPullRequest', [projectId, runId], async () => {
+    const target = await handoffTargetFor(projectId, runId)
+    if (!target) return { ok: false, error: 'unknown session' }
+    return openSessionPullRequest(target.cwd, target.run)
+  }, { ok: false, error: 'could not reach the device' })
 }
 
 /** What {@link sendQueueTicket} did: the backlog file written, or why it could not be. */

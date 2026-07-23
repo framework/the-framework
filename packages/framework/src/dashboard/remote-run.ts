@@ -76,6 +76,27 @@ export async function startRemoteRun(target: RemoteTarget, body: RelayStartBody)
   }
 }
 
+const RPC_TIMEOUT_MS = 60_000 // a relayed git push/PR runs over the network on the device
+
+/**
+ * Relay one run-scoped RPC to the device that owns a remote run (#1067 slice 2). The local daemon
+ * holds the device token, so a read/diff/handoff/push/PR for a relayed run runs ON the device: POST
+ * {fn, args} to the remote's /_relay/rpc over the #1051 cookie (no Origin), returning the device's
+ * result. Throws on an unreachable device or a non-2xx so the caller falls back to its own empty/error
+ * shape, the same way a failed local read does.
+ */
+export async function relayRpc(target: RemoteTarget, fn: string, args: unknown[]): Promise<unknown> {
+  const res = await fetch(`${trimSlashes(target.url)}/_relay/rpc`, {
+    method: 'POST',
+    headers: relayHeaders(target.token),
+    body: JSON.stringify({ fn, args }),
+    signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
+  })
+  if (!res.ok) throw new Error(`the device refused the request (${res.status})`)
+  const body = (await res.json()) as { result?: unknown }
+  return body.result
+}
+
 /**
  * Fetch-stream a remote run's newline-delimited events into `onEvent` until the remote closes the
  * body, the run ends, or `cancel()` is called. A 401 (the token was rotated) ends the stream
@@ -149,17 +170,23 @@ interface RelayedRun {
 /**
  * The local daemon's live relayed runs (#1067), keyed by the remote run id. Registering a run opens
  * an {@link EventStream} the dashboard reads through `onEvents`, fed by {@link streamRemoteEvents}
- * from the remote. This map is the only place a saved device's token lives daemon-side: in memory,
- * for the run's lifetime, dropped the moment the remote stream ends.
+ * from the remote. This map is where a saved device's token lives daemon-side: in memory, for the
+ * run's lifetime.
+ *
+ * The `targets` map outlives the event pump (#1067 slice 2): a finished remote run's post-run reads,
+ * push and open-PR still have to reach the device after its event stream has ended, so the device
+ * target is kept until {@link dispose} clears it, not dropped when the stream closes.
  */
 export class RelayedRuns {
   private readonly runs = new Map<string, RelayedRun>()
+  private readonly targets = new Map<string, RemoteTarget>()
 
   /** Open a local stream for a remote run and start pumping the remote's events into it. */
   register(runId: string, target: RemoteTarget): void {
+    this.targets.set(runId, target) // kept past the stream, for post-run reads/push/PR (slice 2)
     this.runs.get(runId)?.cancel() // a re-register (same id) replaces the old pump
     const stream = new EventStream<FrameworkEvent>()
-    const cancel = streamRemoteEvents(target, runId, event => stream.push(event), () => this.drop(runId))
+    const cancel = streamRemoteEvents(target, runId, event => stream.push(event), () => this.endStream(runId))
     this.runs.set(runId, { target, stream, cancel })
   }
 
@@ -168,21 +195,27 @@ export class RelayedRuns {
     return runId ? this.runs.get(runId)?.stream : undefined
   }
 
-  /** Close a relayed run's stream and forget its token. Idempotent. */
-  private drop(runId: string): void {
+  /** The device a relayed run runs on, kept past the event stream so post-run push/PR still reach it. */
+  target(runId: string | undefined): RemoteTarget | undefined {
+    return runId ? this.targets.get(runId) : undefined
+  }
+
+  /** Close a relayed run's event stream (not its target). Idempotent. */
+  private endStream(runId: string): void {
     const run = this.runs.get(runId)
     if (!run) return
     this.runs.delete(runId)
     run.stream.close() // a clean close surfaces as `done` in the browser, not a lost stream
   }
 
-  /** Stop every pump and close every stream, on daemon shutdown. */
+  /** Stop every pump, close every stream, and forget every device target, on daemon shutdown. */
   dispose(): void {
     for (const [runId, run] of this.runs) {
       run.cancel()
       run.stream.close()
       this.runs.delete(runId)
     }
+    this.targets.clear()
   }
 }
 

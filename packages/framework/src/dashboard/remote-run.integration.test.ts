@@ -5,11 +5,14 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { EventStream } from '@gemstack/ai-autopilot'
 import { startDashboard } from './server.js'
+import { relayRpc } from './remote-run.js'
 import { createProjectRuntime, delay } from '../daemon-runtime.js'
+import { dispatchRelayRpc } from '../dashboard-rpc/relay-dispatch.js'
 import { forwardStream } from '../dashboard-rpc/stream-channel.js'
 import { projectId } from '../registry.js'
 import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'
 import type { FrameworkEvent } from '../events.js'
+import type { HandoffResult } from './run-handoff.js'
 
 // The real two-daemon proof for "run on a connected device" (#1067). Two HTTP servers stand up on
 // loopback: daemon A (the browser's local daemon, a real project runtime) relays a run to daemon B
@@ -58,7 +61,14 @@ test('a run submitted with options.remote is created on the other daemon and its
   }
   const bTail = (runId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => forwardStream(bStreams.get(runId), onEvent)
   const bundle = await fakeBundle()
-  const deviceB = await startDashboard({ port: 0, clientBundleDir: bundle, token: TOKEN, onStart: bStart, relay: { tailEvents: bTail } })
+  // B's own home checkout, whose id the device-side dispatch forces every relayed RPC onto (slice 2), so
+  // a relayed read can only ever address B's own project. A plain temp dir (no repo, not registered), which
+  // is enough to prove the /_relay/rpc path: an unregistered home resolves to no checkout, so onGitStatus
+  // comes back null - proof the call reached B's own onGitStatus and returned over the endpoint.
+  const cwdB = await mkdtemp(join(tmpdir(), 'relay-b-'))
+  const homeIdB = projectId(resolve(cwdB))
+  const bRpc = (fn: string, args: unknown[]): Promise<unknown> => dispatchRelayRpc(homeIdB, fn, args)
+  const deviceB = await startDashboard({ port: 0, clientBundleDir: bundle, token: TOKEN, onStart: bStart, relay: { tailEvents: bTail, rpc: bRpc } })
 
   // Daemon A: the browser's own daemon, a real project runtime. Its onStart takes the remote branch.
   const cwdA = await mkdtemp(join(tmpdir(), 'relay-a-'))
@@ -87,10 +97,22 @@ test('a run submitted with options.remote is created on the other daemon and its
       events.map(e => (e as { message?: string; kind?: string }).message ?? (e as { kind?: string }).kind),
       ['hello from B', 'end'],
     )
+
+    // Slice 2: a run-scoped read relays to B over /_relay/rpc and comes back. The caller's arg[0] is
+    // A's local project id; B's dispatch drops it and reads against its own home, which has no repo
+    // registered, so onGitStatus returns null - proof the call reached B's onGitStatus and returned.
+    const gitStatus = await relayRpc({ url: deviceB.url, token: TOKEN }, 'onGitStatus', [homeIdA, B_RUN])
+    assert.equal(gitStatus, null)
+
+    // And a push runs ON the device: B_RUN is not a real session on B, so its sendPushBranch returns an
+    // ok:false HandoffResult - proof the push ran on B's side (its checkout, its remote) and came back.
+    const push = (await relayRpc({ url: deviceB.url, token: TOKEN }, 'sendPushBranch', [homeIdA, B_RUN])) as HandoffResult
+    assert.equal(push.ok, false)
   } finally {
     await runtimeA.dispose()
     await deviceB.close()
     await rm(bundle, { recursive: true, force: true })
     await rm(cwdA, { recursive: true, force: true })
+    await rm(cwdB, { recursive: true, force: true })
   }
 })

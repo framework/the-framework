@@ -9,7 +9,7 @@ import { BROWSER_PROXY_PREFIX, handleBrowserProxy } from './browser-proxy.js'
 import { makeTelefuncMount } from './telefunc-serve.js'
 import { requestPathname } from '../request-path.js'
 import type { AddProjectResult, PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from './types.js'
-import type { EventsSource, PreviewHandlers } from './telefunc-serve.js'
+import type { EventsSource, PreviewHandlers, RemoteRuns } from './telefunc-serve.js'
 import { handleRelayRequest, RELAY_PREFIX, type RelayHandlers } from './relay-endpoints.js'
 
 /** Options for {@link startDashboard}. */
@@ -88,11 +88,20 @@ export interface DashboardOptions {
    */
   eventsSource?: EventsSource
   /**
-   * Serve a relay-started run's events back to the daemon that relayed it here (#1067): the two
-   * `/_relay/*` endpoints (start + events). Only the daemon wires one, and both are fronted by the
-   * same `token` guard above, so a device without the cookie cannot start or read a run.
+   * The relayed-run lookup the read RPCs consult (#1067 slice 2); only the daemon wires it. A run-scoped
+   * RPC uses it to forward a remote run's read/steer/handoff to the device that owns it.
    */
-  relay?: { tailEvents: (runId: string, onEvent: (event: import('../events.js').FrameworkEvent) => void) => () => void }
+  remote?: RemoteRuns
+  /**
+   * Serve a relay-started run's events back to the daemon that relayed it here (#1067): the
+   * `/_relay/*` endpoints (start + events, plus the slice-2 `rpc`). Only the daemon wires one, and all
+   * are fronted by the same `token` guard above, so a device without the cookie cannot start or read a run.
+   */
+  relay?: {
+    tailEvents: (runId: string, onEvent: (event: import('../events.js').FrameworkEvent) => void) => () => void
+    /** Run one whitelisted run-scoped RPC against this daemon's own checkout (#1067 slice 2). */
+    rpc?: (fn: string, args: unknown[]) => Promise<unknown>
+  }
 }
 
 /** A running localhost dashboard: the prerendered SPA + its Telefunc mount. */
@@ -140,6 +149,7 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
     ...(opts.onAddProject ? { addProject: opts.onAddProject } : {}),
     ...(opts.preview ? { preview: opts.preview } : {}),
     ...(opts.eventsSource ? { eventsSource: opts.eventsSource } : {}),
+    ...(opts.remote ? { remote: opts.remote } : {}),
     preferences: opts.preferences ?? registryPreferencesStore(),
     quota,
   })
@@ -147,7 +157,9 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
   // The device-to-daemon relay endpoints (#1067): wired only when the daemon supplies both a start
   // and an events tail. Fronted by the same token guard as every other route below.
   const relayHandlers: RelayHandlers | undefined =
-    opts.onStart && opts.relay ? { start: opts.onStart, tailEvents: opts.relay.tailEvents } : undefined
+    opts.onStart && opts.relay
+      ? { start: opts.onStart, tailEvents: opts.relay.tailEvents, ...(opts.relay.rpc ? { rpc: opts.relay.rpc } : {}) }
+      : undefined
 
   const token = opts.token
   const server = createServer((req, res) => {

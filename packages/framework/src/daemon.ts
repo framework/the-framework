@@ -367,9 +367,11 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     onAddProject: runtime.onAddProject,
     preview: runtime.preview,
     // Relay a run to/from a connected device (#1067): the events source streams a run this daemon
-    // is relaying, and the `/_relay/*` endpoints let another daemon run a session here.
+    // is relaying, `remote` lets the read RPCs forward a remote run's reads/steer/push to its device
+    // (slice 2), and the `/_relay/*` endpoints let another daemon run + read + steer a session here.
     eventsSource: runtime.remoteEventsSource,
-    relay: { tailEvents: runtime.tailRelayEvents },
+    remote: runtime.remoteRuns,
+    relay: { tailEvents: runtime.tailRelayEvents, rpc: runtime.onRelayRpc },
     ...(token ? { token } : {}),
     ...(clientBundleDir ? { clientBundleDir } : {}),
   })

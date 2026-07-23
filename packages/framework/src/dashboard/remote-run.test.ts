@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { startRemoteRun, streamRemoteEvents, pingRemote, RelayedRuns } from './remote-run.js'
+import { startRemoteRun, streamRemoteEvents, pingRemote, relayRpc, RelayedRuns } from './remote-run.js'
 import type { FrameworkEvent } from '../events.js'
 
 // A throwaway loopback server; the handler decides how it answers. Returns its base url + close.
@@ -177,6 +177,64 @@ test('RelayedRuns closes cleanly on a 401 with no events (#1067)', async () => {
     const got: FrameworkEvent[] = []
     for await (const e of stream!) got.push(e)
     assert.equal(got.length, 0) // a clean close, so the browser sees `done`, not `lost`
+  } finally {
+    await srv.close()
+  }
+})
+
+test('relayRpc posts to /_relay/rpc with the fw_daemon cookie, no Origin, and returns the device result (#1067 slice 2)', async () => {
+  let captured: { method?: string | undefined; url?: string | undefined; cookie?: string | undefined; origin?: string | undefined; body: unknown } = { body: null }
+  const srv = await server((req, res) => {
+    let raw = ''
+    req.on('data', c => (raw += c))
+    req.on('end', () => {
+      captured = { method: req.method, url: req.url, cookie: req.headers.cookie, origin: req.headers.origin, body: JSON.parse(raw) }
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ result: { dirty: true, branch: 'main' } }))
+    })
+  })
+  try {
+    const result = await relayRpc({ url: srv.url, token: 'sekret' }, 'onGitStatus', ['pid', 'r1'])
+    assert.deepEqual(result, { dirty: true, branch: 'main' }) // the device's own result, unwrapped from {result}
+    assert.equal(captured.method, 'POST')
+    assert.equal(captured.url, '/_relay/rpc')
+    assert.equal(captured.cookie, 'fw_daemon=sekret') // the #1051 cookie, daemon to daemon
+    assert.equal(captured.origin, undefined) // NO Origin header, so it passes the remote CSRF guard
+    assert.deepEqual(captured.body, { fn: 'onGitStatus', args: ['pid', 'r1'] })
+  } finally {
+    await srv.close()
+  }
+})
+
+test('relayRpc throws on a non-2xx from the device (#1067 slice 2)', async () => {
+  const srv = await server((_req, res) => {
+    res.writeHead(500, { 'content-type': 'text/plain' })
+    res.end('rpc failed')
+  })
+  try {
+    await assert.rejects(relayRpc({ url: srv.url, token: 't' }, 'onGitStatus', []), /500|device/)
+  } finally {
+    await srv.close()
+  }
+})
+
+test('RelayedRuns.target outlives the event stream and dispose clears it (#1067 slice 2)', async () => {
+  const srv = await server((_req, res) => {
+    res.writeHead(200, { 'content-type': 'application/x-ndjson' })
+    res.write(`${JSON.stringify({ kind: 'log', message: 'hi' })}\n`)
+    res.end()
+  })
+  try {
+    const runs = new RelayedRuns()
+    const target = { url: srv.url, token: 't' }
+    runs.register('r1', target)
+    const stream = runs.get('r1')
+    assert.ok(stream)
+    for await (const _e of stream!) { /* drain until the device closes the body, ending the pump */ }
+    assert.equal(runs.get('r1'), undefined) // the event stream is gone once the device closes
+    assert.deepEqual(runs.target('r1'), target) // but the device target outlives it, for a post-run push/PR
+    runs.dispose()
+    assert.equal(runs.target('r1'), undefined) // cleared on shutdown
   } finally {
     await srv.close()
   }

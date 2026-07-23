@@ -26,8 +26,9 @@ import {
 } from './store/index.js'
 import type { FrameworkEvent } from './events.js'
 import type { StartRunKind, StartRunOptions, StartRunResult, AddProjectResult } from './dashboard/index.js'
-import type { EventsSource, PreviewHandlers } from './dashboard/telefunc-serve.js'
+import type { EventsSource, PreviewHandlers, RemoteRuns } from './dashboard/telefunc-serve.js'
 import { RelayedRuns, startRemoteRun } from './dashboard/remote-run.js'
+import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
 import { tailEvents } from './dashboard-rpc/events-tail.js'
 import { isSafeVia } from './conversations.js'
 import { createPreviewRuntime } from './preview-runtime.js'
@@ -189,6 +190,12 @@ export interface ProjectRuntime {
   /** Tail a relay-started run's on-disk events (#1067): the daemon's `/_relay/events` endpoint uses
    *  it to stream one run back to whichever daemon relayed it here. */
   tailRelayEvents: (runId: string, onEvent: (event: FrameworkEvent) => void) => () => void
+  /** The relayed-run lookup the dashboard's read RPCs consult (#1067 slice 2): which device a remote
+   *  run runs on, so a run-scoped RPC forwards there instead of resolving a local checkout. */
+  remoteRuns: RemoteRuns
+  /** The device side of the relay (#1067 slice 2): run one whitelisted read/steer/handoff RPC against
+   *  this daemon's own home checkout, for a daemon that relayed a run here. */
+  onRelayRpc: (fn: string, args: unknown[]) => Promise<unknown>
   /** Live runs on a project (#685), so a background job can tell an idle project from a busy one. */
   activeRunCount: (targetProjectId: string) => number
   /**
@@ -214,6 +221,12 @@ export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOption
   const starting = new Set<string>() // reserved keys mid-spawn, to close the async gap
   // Runs this daemon is relaying to/from a connected device (#1067): the local half of a remote run.
   const relayedRuns = new RelayedRuns()
+  // The relayed-run lookup the dashboard's read RPCs consult (#1067 slice 2): is this runId remote, and
+  // which device owns it. Outlives the event stream so a finished remote run's push/PR still reaches it.
+  const remoteRuns: RemoteRuns = { target: runId => relayedRuns.target(runId) }
+  // The device side of the relay (#1067 slice 2): run one whitelisted read/steer/handoff RPC against this
+  // daemon's own home checkout, for a daemon that relayed a run here. Home id forces the addressed project.
+  const onRelayRpc = (fn: string, args: unknown[]): Promise<unknown> => dispatchRelayRpc(homeId, fn, args)
 
   // A project id resolves to its repo path via the registry; the home id (or none)
   // resolves to the daemon's own `cwd` without a lookup.
@@ -536,6 +549,8 @@ export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOption
     preview: previews.preview,
     remoteEventsSource,
     tailRelayEvents,
+    remoteRuns,
+    onRelayRpc,
     activeRunCount,
     suspendRuns,
     dispose,

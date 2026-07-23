@@ -54,8 +54,8 @@ export function RunView({
   /** Where the run executes (#1053): `actions` swaps the live feed for a burst-mode affordance. */
   target?: 'local' | 'actions' | undefined
   /** The device this run executes on (#1067), when it is relayed to a connected one. Set only for a
-   *  just-started remote run: the local daemon has no worktree/diff/PR for it, so the panels that
-   *  read those are suppressed and a "runs on <device>" notice takes their place. */
+   *  just-started remote run: its diff, handoff, and push/PR now relay to the device (slice 2), so the
+   *  panels are shown, and a "runs on <device>" notice only flags that the browser preview stays local. */
   remoteLabel?: string | undefined
   files: string[]
   addContext: (path: string) => void
@@ -129,15 +129,15 @@ export function RunView({
       {/* What the session has touched, behind the branch row's disclosure. While it runs that is
           its worktree; once it ends, the branch it left behind. The live read needs the run's id:
           without one it falls back to the project root and would report the user's own dirty
-          files as the run's. A remote run's worktree lives on the device, not here (#1067), so this
-          local read is suppressed for it rather than reporting the wrong tree. */}
-      {live && runId && !remoteLabel && <RunChanges projectId={projectId} runId={runId} open={open} onSummary={onChangesSummary} />}
+          files as the run's. A remote run's worktree lives on the device, but the diff now relays
+          there (#1067 slice 2), so it is shown like a local run's, not suppressed. */}
+      {live && runId && <RunChanges projectId={projectId} runId={runId} open={open} onSummary={onChangesSummary} />}
       {!live && open && <RunHandoffDetails handoff={handoff.handoff} />}
       {/* A GitHub Actions run replays in a burst at the end (#1053), so the live feed looks stalled:
           say the wait is expected and link through to the live Actions run. */}
       <ActionsRunNotice target={target} events={shown} live={live} />
-      {/* A run relayed to a connected device (#1067): the live feed streams here, but its diff, PR,
-          and browser panels are not wired for remote runs yet. */}
+      {/* A run relayed to a connected device (#1067): its diff, handoff, and push/PR now relay to the
+          device (slice 2), so this notice only flags that the browser preview stays local-only for now. */}
       <RemoteRunNotice device={remoteLabel} />
       {/* Nothing to show yet is not the same thing in both states: a live run is waiting for its
           first event, a finished one is still reading its log. */}

@@ -1,7 +1,7 @@
 import { getContext } from 'telefunc'
 import { resolveRunCheckout } from '../store/index.js'
 import { defaultProjectsProvider, type ProjectsProvider } from '../dashboard/projects.js'
-import type { DashboardContext, EventsSource } from '../dashboard/telefunc-serve.js'
+import type { DashboardContext, EventsSource, RemoteRuns } from '../dashboard/telefunc-serve.js'
 import type { PreferencesStore } from '../registry.js'
 import type { QuotaSource } from '../dashboard/quota.js'
 
@@ -66,6 +66,16 @@ export function contextPreview(): DashboardContext['preview'] {
  */
 export function contextEventsSource(): EventsSource | undefined {
   return fromContext(ctx => ctx.eventsSource)
+}
+
+/**
+ * The relayed-run lookup on the context (#1067 slice 2), or undefined off the daemon. Only the daemon
+ * wires it; a run-scoped RPC uses it to tell an ordinary local run (resolve a local checkout) from one
+ * running on a connected device (forward the call there). Unset everywhere else, so those RPCs behave
+ * exactly as before.
+ */
+export function contextRemote(): RemoteRuns | undefined {
+  return fromContext(ctx => ctx.remote)
 }
 
 /**

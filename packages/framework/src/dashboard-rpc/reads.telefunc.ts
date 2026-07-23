@@ -18,6 +18,7 @@ import { readFileStatuses, type FileGitStatus } from '../dashboard/file-status.j
 import { readFileDiff, readFileChanges, type FileDiff, type FileChange } from '../dashboard/file-diff.js'
 import { readFileContent, type FileContent } from '../dashboard/file-read.js'
 import { contextProjects, resolveProjectPath, resolveRunPath } from './context.js'
+import { relayOr } from './relay-run.js'
 import type { FrameworkEvent } from '../events.js'
 
 // The read model behind the new dashboard (#405): the run history, a run's replay, the
@@ -102,38 +103,42 @@ export async function onRetainedWorktrees(projectId: string): Promise<string[]> 
  * working tree is the user's, not the agent's.
  */
 export async function onRunWorktree(projectId: string, runId: string): Promise<RunWorktree | null> {
-  const root = await resolveProjectPath(projectId)
-  if (!root || !isSafeRunId(runId)) return null
-  const path = await resolveRunPath(projectId, runId)
-  if (!path) return null
-  const own = path !== root
-  const [status, live] = await Promise.all([
-    readGitStatus(path).catch(() => undefined),
-    readLiveMetas(root).catch(() => []),
-  ])
-  // Size is only read for a checkout nothing is writing to: a live run's tree changes under the
-  // poll, and `du` over a build directory mid-build is a cost with no answer worth having.
-  const running = live.some(run => run.id === runId && run.status === 'running')
-  const size = own && !running ? await worktreeSize(path) : undefined
-  return {
-    path,
-    own,
-    dirty: status?.dirty ?? false,
-    ...(status?.branch ? { branch: status.branch } : {}),
-    ...(size !== undefined ? { sizeBytes: size } : {}),
-    // The same read already looked the PR up (#809): a session's branch is exactly the thing
-    // that has one, so the session's bar can show it like the project's does.
-    ...(status?.pr ? { pr: status.pr } : {}),
-    // Still being looked up rather than absent (#1028), so the bar can ask again shortly.
-    ...(status?.prPending ? { prPending: true } : {}),
-  }
+  return relayOr(runId, 'onRunWorktree', [projectId, runId], async () => {
+    const root = await resolveProjectPath(projectId)
+    if (!root || !isSafeRunId(runId)) return null
+    const path = await resolveRunPath(projectId, runId)
+    if (!path) return null
+    const own = path !== root
+    const [status, live] = await Promise.all([
+      readGitStatus(path).catch(() => undefined),
+      readLiveMetas(root).catch(() => []),
+    ])
+    // Size is only read for a checkout nothing is writing to: a live run's tree changes under the
+    // poll, and `du` over a build directory mid-build is a cost with no answer worth having.
+    const running = live.some(run => run.id === runId && run.status === 'running')
+    const size = own && !running ? await worktreeSize(path) : undefined
+    return {
+      path,
+      own,
+      dirty: status?.dirty ?? false,
+      ...(status?.branch ? { branch: status.branch } : {}),
+      ...(size !== undefined ? { sizeBytes: size } : {}),
+      // The same read already looked the PR up (#809): a session's branch is exactly the thing
+      // that has one, so the session's bar can show it like the project's does.
+      ...(status?.pr ? { pr: status.pr } : {}),
+      // Still being looked up rather than absent (#1028), so the bar can ask again shortly.
+      ...(status?.prPending ? { prPending: true } : {}),
+    }
+  }, null)
 }
 
 /** One archived run's event log for replay (or `[]` when the run or project is gone). */
 export async function onRun(projectId: string, runId: string): Promise<FrameworkEvent[]> {
-  const cwd = await resolveProjectPath(projectId)
-  if (!cwd) return []
-  return (await loadRunEvents(cwd, runId).catch(() => undefined)) ?? []
+  return relayOr(runId, 'onRun', [projectId, runId], async () => {
+    const cwd = await resolveProjectPath(projectId)
+    if (!cwd) return []
+    return (await loadRunEvents(cwd, runId).catch(() => undefined)) ?? []
+  }, [])
 }
 
 /** The surfaced PLAN/TODO docs at the workspace root, in sidebar order (or `[]`). */
@@ -183,7 +188,7 @@ export async function onDashboard(): Promise<DashboardData> {
  * Pass a live `runId` to list that run's worktree instead of the project root (#738).
  */
 export async function onProjectFiles(projectId: string, runId?: string): Promise<string[]> {
-  return withRunPath(projectId, runId, crawlRepoFiles, [])
+  return relayOr(runId, 'onProjectFiles', [projectId, runId], () => withRunPath(projectId, runId, crawlRepoFiles, []), [])
 }
 
 /**
@@ -192,7 +197,13 @@ export async function onProjectFiles(projectId: string, runId?: string): Promise
  * Pass a live `runId` to see that run's own worktree rather than the project root (#738).
  */
 export async function onProjectFileStatus(projectId: string, runId?: string): Promise<Record<string, FileGitStatus>> {
-  return withRunPath<Record<string, FileGitStatus>>(projectId, runId, readFileStatuses, {})
+  return relayOr<Record<string, FileGitStatus>>(
+    runId,
+    'onProjectFileStatus',
+    [projectId, runId],
+    () => withRunPath<Record<string, FileGitStatus>>(projectId, runId, readFileStatuses, {}),
+    {},
+  )
 }
 
 /**
@@ -204,12 +215,14 @@ export async function onProjectFileStatus(projectId: string, runId?: string): Pr
  * that thinks a file is untracked must not be able to make the server read it as one.
  */
 export async function onFileDiff(projectId: string, path: string, runId?: string): Promise<FileDiff | null> {
-  const cwd = await resolveRunPath(projectId, runId)
-  if (!cwd) return null
-  const statuses = await readFileStatuses(cwd).catch((): Record<string, FileGitStatus> => ({}))
-  const status = statuses[path]
-  if (!status) return null
-  return readFileDiff(cwd, path, status).catch(() => null)
+  return relayOr(runId, 'onFileDiff', [projectId, path, runId], async () => {
+    const cwd = await resolveRunPath(projectId, runId)
+    if (!cwd) return null
+    const statuses = await readFileStatuses(cwd).catch((): Record<string, FileGitStatus> => ({}))
+    const status = statuses[path]
+    if (!status) return null
+    return readFileDiff(cwd, path, status).catch(() => null)
+  }, null)
 }
 
 /**
@@ -222,10 +235,12 @@ export async function onFileDiff(projectId: string, path: string, runId?: string
  * works for every agent, not just the ones whose stream carries an edit payload.
  */
 export async function onRunChanges(projectId: string, runId?: string): Promise<FileChange[]> {
-  const cwd = await resolveRunPath(projectId, runId)
-  if (!cwd) return []
-  const statuses = await readFileStatuses(cwd).catch((): Record<string, FileGitStatus> => ({}))
-  return readFileChanges(cwd, statuses).catch(() => [])
+  return relayOr(runId, 'onRunChanges', [projectId, runId], async () => {
+    const cwd = await resolveRunPath(projectId, runId)
+    if (!cwd) return []
+    const statuses = await readFileStatuses(cwd).catch((): Record<string, FileGitStatus> => ({}))
+    return readFileChanges(cwd, statuses).catch(() => [])
+  }, [])
 }
 
 /**
@@ -237,7 +252,13 @@ export async function onRunChanges(projectId: string, runId?: string): Promise<F
  * file has a diff worth seeing, an unchanged one has only itself.
  */
 export async function onFileContent(projectId: string, path: string, runId?: string): Promise<FileContent | null> {
-  return withRunPath<FileContent | null>(projectId, runId, cwd => readFileContent(cwd, path), null)
+  return relayOr<FileContent | null>(
+    runId,
+    'onFileContent',
+    [projectId, path, runId],
+    () => withRunPath<FileContent | null>(projectId, runId, cwd => readFileContent(cwd, path), null),
+    null,
+  )
 }
 
 /** The project's GitHub URL from its `origin` remote (#489), or null (no remote / not GitHub / relay). */
@@ -253,9 +274,11 @@ export async function onGithubUrl(projectId: string): Promise<string | null> {
  * state that actually belong to it (#738).
  */
 export async function onGitStatus(projectId: string, runId?: string): Promise<GitStatus | null> {
-  const cwd = await resolveRunPath(projectId, runId)
-  if (!cwd) return null
-  return (await readGitStatus(cwd)) ?? null
+  return relayOr(runId, 'onGitStatus', [projectId, runId], async () => {
+    const cwd = await resolveRunPath(projectId, runId)
+    if (!cwd) return null
+    return (await readGitStatus(cwd)) ?? null
+  }, null)
 }
 
 /**
@@ -269,11 +292,13 @@ export async function onGitStatus(projectId: string, runId?: string): Promise<Gi
  * the branch is what this asks about.
  */
 export async function onRunHandoff(projectId: string, runId: string): Promise<RunHandoff | null> {
-  const cwd = await resolveProjectPath(projectId)
-  if (!cwd || !isSafeRunId(runId)) return null
-  const run = await findRun(cwd, runId).catch(() => undefined)
-  if (!run) return null
-  return (await readRunHandoff(cwd, runBranchFor(run)).catch(() => undefined)) ?? null
+  return relayOr(runId, 'onRunHandoff', [projectId, runId], async () => {
+    const cwd = await resolveProjectPath(projectId)
+    if (!cwd || !isSafeRunId(runId)) return null
+    const run = await findRun(cwd, runId).catch(() => undefined)
+    if (!run) return null
+    return (await readRunHandoff(cwd, runBranchFor(run)).catch(() => undefined)) ?? null
+  }, null)
 }
 
 /**

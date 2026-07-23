@@ -35,6 +35,13 @@ export interface PreviewHandlers {
  * Returns undefined when there is no in-memory stream, so `onEvents` falls back to tailing the log. */
 export type EventsSource = (projectId: string, runId?: string) => AsyncIterable<FrameworkEvent> | undefined
 
+/** Look up the device a relayed run (#1067) executes on, or undefined for an ordinary local run. The
+ *  daemon wires this from its live relayed-run map; a run-scoped RPC uses it to forward a remote run's
+ *  read/steer/handoff to that device instead of resolving a (nonexistent) local checkout. */
+export interface RemoteRuns {
+  target(runId: string | undefined): { url: string; token: string } | undefined
+}
+
 /**
  * The Telefunc request context the mount provides. `sendStart` reads `startRun` from it;
  * every project-keyed RPC reads `projects` (#427) — the daemon leaves it unset to use the
@@ -49,6 +56,9 @@ export interface DashboardContext {
   preview?: PreviewHandlers
   projects?: ProjectsProvider
   eventsSource?: EventsSource
+  /** The relayed-run lookup (#1067 slice 2): only the daemon wires it, so a run-scoped RPC can tell a
+   *  local run from one running on a connected device and forward the call there. */
+  remote?: RemoteRuns
   /** The user-preferences store (#410). The daemon/foreground wire the real registry file;
    * a public host (the relay) leaves it unset so `onPreferences`/`savePreferences` are inert. */
   preferences?: PreferencesStore

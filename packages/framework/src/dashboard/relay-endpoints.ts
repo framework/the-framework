@@ -16,6 +16,8 @@ import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'
  * - `GET  /_relay/ping` (#1072) a cookie-guarded reachability probe: 200 and an empty body, starts
  *   nothing. The online/offline status the dashboard shows is the local daemon calling this on each
  *   saved device with its token; a token-less caller is already 401'd by the #1051 guard above.
+ * - `POST /_relay/rpc` (#1067 slice 2) runs one whitelisted run-scoped RPC (a read/diff/steer/handoff/
+ *   push/PR) against this device's own checkout for the daemon relaying a run here, answering {result}.
  */
 export const RELAY_PREFIX = '/_relay'
 
@@ -23,6 +25,9 @@ export const RELAY_PREFIX = '/_relay'
 export interface RelayHandlers {
   start: (prompt: string, kind: StartRunKind, options: StartRunOptions, projectId?: string) => StartRunResult | Promise<StartRunResult>
   tailEvents: (runId: string, onEvent: (event: FrameworkEvent) => void) => () => void
+  /** Run one whitelisted read/steer/handoff RPC against THIS device's own checkout, for the daemon
+   *  relaying a run here (#1067 slice 2); the caller wraps the result as {result}. */
+  rpc?: (fn: string, args: unknown[]) => Promise<unknown>
 }
 
 /** The body `POST /_relay/start` accepts: exactly what a local Start needs, minus any project id. */
@@ -47,6 +52,7 @@ export async function handleRelayRequest(
   if (!handlers) return end(res, 404, 'relay not enabled')
   if (pathname === `${RELAY_PREFIX}/start`) return handleStart(req, res, handlers)
   if (pathname === `${RELAY_PREFIX}/events`) return handleEvents(req, res, handlers)
+  if (pathname === `${RELAY_PREFIX}/rpc`) return handleRpc(req, res, handlers)
   end(res, 404, 'not found')
 }
 
@@ -99,6 +105,29 @@ function handleEvents(req: IncomingMessage, res: ServerResponse, handlers: Relay
   const close = (): void => stop()
   res.on('close', close)
   req.on('close', close)
+}
+
+const MAX_RPC_BODY = 256 * 1024
+/** POST /_relay/rpc: run one whitelisted RPC on this device and answer {result}. */
+async function handleRpc(req: IncomingMessage, res: ServerResponse, handlers: RelayHandlers): Promise<void> {
+  if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
+  if (!handlers.rpc) return end(res, 404, 'relay rpc not enabled')
+  let body: { fn?: unknown; args?: unknown }
+  try {
+    body = (await readJsonBody(req, MAX_RPC_BODY)) as { fn?: unknown; args?: unknown }
+  } catch {
+    return end(res, 400, 'invalid request body')
+  }
+  const fn = typeof body.fn === 'string' ? body.fn : ''
+  const args = Array.isArray(body.args) ? body.args : []
+  if (!fn) return end(res, 400, 'missing rpc name')
+  try {
+    const result = await handlers.rpc(fn, args)
+    res.writeHead(200, { 'content-type': 'application/json' })
+    res.end(JSON.stringify({ result }))
+  } catch (err) {
+    end(res, 500, err instanceof Error ? err.message : 'rpc failed')
+  }
 }
 
 /** Read a capped JSON request body, rejecting on overflow or malformed JSON. */

@@ -52,12 +52,12 @@ export function Hero() {
       style={{
         maxWidth: 1120,
         margin: '0 auto',
-        padding: 'clamp(20px, 4vw, 32px) clamp(14px, 4vw, 24px) 40px',
+        padding: 'clamp(16px, 3vw, 24px) clamp(14px, 4vw, 24px) 32px',
         textAlign: 'center',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 24,
+        gap: 20,
       }}
     >
       <div
@@ -109,7 +109,7 @@ export function Hero() {
           style={{
             display: 'table',
             position: 'relative',
-            margin: '0 auto 12px',
+            margin: '0 auto 8px',
             fontSize: 'clamp(26px, 6vw, 42px)',
             fontWeight: 500,
             color: '#9da9a0',
@@ -139,7 +139,7 @@ export function Hero() {
           flexDirection: 'column',
           gap: 16,
           alignItems: 'center',
-          marginTop: 20,
+          marginTop: 12,
           maxWidth: '100%',
         }}
       >
@@ -280,7 +280,7 @@ export function Hero() {
 
       <div
         style={{
-          marginTop: 16,
+          marginTop: 12,
           paddingTop: 8,
           width: '100%',
           maxWidth: 1056,

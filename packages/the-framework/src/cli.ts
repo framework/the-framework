@@ -47,7 +47,7 @@ import {
 } from './config-layers.js'
 import { type EcoOptions } from './system-prompt.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
-import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher } from './update-check.js'
+import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
 import { appendLog, type LogEntry } from './logs.js'
 import { appendMessage, isSafeVia } from './conversations.js'
 import type { RecordMessage } from './await-gate.js'
@@ -1730,6 +1730,8 @@ async function runForegroundDaemonCmd(opts: CliOptions, io: CliIO): Promise<numb
   if (existing) {
     io.out(`◆ dashboard already running in the background: ${existing.url}`)
     io.out('  Stop it with `framework stop`, or open the URL above.')
+    // The dashboard this defers to *is* the background one, so its footer is the background one.
+    await printStartupFooter(io, { background: true })
     return 0
   }
   // #1051: pre-generate the shared token for a non-loopback bind so onListening (sync) can print
@@ -1745,6 +1747,10 @@ async function runForegroundDaemonCmd(opts: CliOptions, io: CliIO): Promise<numb
           printNonLoopbackAccess(io, state.host ?? DEFAULT_DAEMON_HOST, state.url, token)
         }
         io.out('  Ctrl+C to stop. Server logs stream below.')
+        // #312 asks bare `framework` to print the commands + version too. onListening is sync and
+        // runDaemon then blocks until signalled, so this is fire-and-forget by necessity: the
+        // update line lands a moment later, above the server logs.
+        void printStartupFooter(io, { background: false })
       },
     })
   } catch (err) {
@@ -1795,17 +1801,40 @@ async function ensureDaemonCmd(opts: CliOptions, io: CliIO): Promise<number> {
   // host that is bound, not the flag, so re-reporting an already-running loopback daemon stays quiet.
   const boundHost = state.host ?? DEFAULT_DAEMON_HOST
   if (!isLoopbackHost(boundHost)) printNonLoopbackAccess(io, boundHost, state.url, await readDaemonToken())
+  await printStartupFooter(io, { background: true })
+  return 0
+}
+
+/**
+ * The startup footer every dashboard path prints (#312): the convenience commands, the version,
+ * and then — once npm answers — whether that version is the latest.
+ *
+ * The update line is deliberately not awaited before the static lines. #312 asks for the static
+ * info first, and the foreground path (bare `framework`) blocks on the server forever, so a line
+ * printed after the await would never appear there at all. `checkForUpdate` is already forgiving:
+ * offline or slow (2.5s cap) resolves to 'unknown', which prints nothing.
+ *
+ * `background: false` drops the `framework stop` line — that stops a *detached* dashboard, and the
+ * foreground path tells you Ctrl+C instead.
+ */
+export function printStartupFooter(
+  io: CliIO,
+  opts: { background: boolean; fetchLatest?: VersionFetcher },
+): Promise<void> {
+  const version = frameworkVersion()
   io.out('')
   io.out('Type a prompt on the dashboard to start a session, or use:')
   io.out('  framework "<what to build>"   Build (streams to the dashboard)')
-  io.out('  framework stop                Stop the background dashboard')
+  if (opts.background) io.out('  framework stop                Stop the background dashboard')
   io.out('  framework --help              All options')
   io.out('')
-  io.out(`The Framework v${frameworkVersion()}`)
-  const status = await checkForUpdate(frameworkVersion(), nodeVersionFetcher())
-  const line = formatUpdateStatus(status)
-  if (line) io.out(line)
-  return 0
+  io.out(`The Framework v${version}`)
+  return checkForUpdate(version, opts.fetchLatest ?? nodeVersionFetcher())
+    .then(status => {
+      const line = formatUpdateStatus(status)
+      if (line) io.out(line)
+    })
+    .catch(() => {})
 }
 
 /** What `framework worktrees` was asked to do (#752). */

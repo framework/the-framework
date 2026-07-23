@@ -9,14 +9,17 @@ Stop babysitting your coding agents. You make the important decisions; AI does t
 
 <br clear="left" />
 
-:eyes: What is Vike: [vike.dev](https://vike.dev)  
+## What is this?
+
+See: [the-framework.ai](https://the-framework.ai)
 
 ## Quickstart
 
 ```bash
+# Install
 npm i -g @gemstack/the-framework
 the-framework # Spins up the dashboard
 
-# one-shot, no install:
-npx @gemstack/the-framework
+# Or one-shot (no install):
+npx @gemstack/the-framework # Spins up the dashboard
 ```

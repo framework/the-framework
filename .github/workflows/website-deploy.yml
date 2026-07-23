@@ -21,7 +21,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       # Vike prerenders the landing page (the-framework.ai) to static HTML in dist/client/.
-      - run: pnpm --filter @gemstack/the-framework.ai build
+      - run: pnpm --filter the-framework.ai-website build
 
       # public/ ships `CNAME` and `.nojekyll` into dist/client/, so `clean: true`
       # can wipe the branch on each deploy without losing them.

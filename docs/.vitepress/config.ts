@@ -5,8 +5,8 @@ export default defineConfig({
   description: 'Framework-agnostic tools for building AI applications in Node.',
   lang: 'en-US',
   // Served at the site root by default (local dev, and a custom domain like
-  // gemstack.land). The GitHub Pages workflow sets DOCS_BASE=/gemstack/ for the
-  // project-pages URL (gemstack-land.github.io/gemstack/). Drop that env once a
+  // gemstack.land). The GitHub Pages workflow sets DOCS_BASE=/the-framework/ for the
+  // project-pages URL (gemstack-land.github.io/the-framework/). Drop that env once a
   // custom domain is attached so the base returns to '/'.
   base: process.env.DOCS_BASE || '/',
   ignoreDeadLinks: 'localhostLinks',

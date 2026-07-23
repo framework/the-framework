@@ -5,6 +5,7 @@ import * as events from './events.telefunc.js'
 import * as projects from './projects.telefunc.js'
 import * as preferences from './preferences.telefunc.js'
 import * as quota from './quota.telefunc.js'
+import * as devices from './devices.telefunc.js'
 
 // The client bakes each RPC key from the dashboard's source path (relative to its Vite
 // root, keeping the `.ts` extension) as `"<telefuncFilePath>:<exportName>"`. Since the
@@ -18,6 +19,7 @@ export const DASHBOARD_TELEFUNC_KEYS = {
   projects: '/server/projects.telefunc.ts',
   preferences: '/server/preferences.telefunc.ts',
   quota: '/server/quota.telefunc.ts',
+  devices: '/server/devices.telefunc.ts',
 } as const
 
 // Every function export of these modules is a telefunction; each is registered under its own
@@ -30,6 +32,7 @@ const TELEFUNC_MODULES: Record<keyof typeof DASHBOARD_TELEFUNC_KEYS, Record<stri
   projects,
   preferences,
   quota,
+  devices,
 }
 
 let registered = false

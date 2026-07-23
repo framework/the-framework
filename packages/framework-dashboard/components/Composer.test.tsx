@@ -22,6 +22,8 @@ vi.mock('../lib/preferences.js', () => ({
 vi.mock('../lib/editors.js', () => ({ useDetectedEditors: () => [] }))
 // Composer loads its own projects for the `@` picker (#743); stub the read to none.
 vi.mock('../server/projects.telefunc.js', () => ({ onProjects: () => Promise.resolve([]) }))
+// The device health poll (#1072) reaches the daemon over Telefunc; stub it to no devices reachable.
+vi.mock('../server/devices.telefunc.js', () => ({ checkDevices: () => Promise.resolve({}) }))
 
 // Stub the Tiptap editor (it needs a real DOM/ProseMirror): a plain input driving onChange, a
 // "type-submit" button firing onSubmit, and a ref exposing the same handle the composer calls.

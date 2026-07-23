@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import { Laptop, MonitorSmartphone } from 'lucide-react'
 import { useConnectionProfiles, currentConnection, rememberLocalOrigin } from '../lib/profiles.js'
+import { useDeviceStatus } from '../lib/use-device-status.js'
 import { stashDraftFromUrl } from '../lib/draft-handoff.js'
+import { cn } from '../lib/utils.js'
 
 // The "connected to <label>" indicator (#1052): which daemon the dashboard is talking to. Every
 // transport is same-origin, so the browser's origin IS the connection — loopback is this machine's
@@ -9,6 +11,7 @@ import { stashDraftFromUrl } from '../lib/draft-handoff.js'
 // a remote box (where the agent runs on someone else's hardware) is never mistaken for your own.
 export function ConnectionIndicator() {
   const profiles = useConnectionProfiles()
+  const deviceStatus = useDeviceStatus(profiles) // #1072: reachability of the saved devices
   // Remember the loopback origin we launched from, so "Local" can return to the right port later.
   // Also move any carried draft (#1066) out of the URL at SPA boot, before it reaches the address bar.
   useEffect(() => {
@@ -17,8 +20,11 @@ export function ConnectionIndicator() {
     rememberLocalOrigin(window.location.origin, window.location.hostname)
   }, [])
   if (typeof window === 'undefined') return null
-  const { label, isLocal } = currentConnection(profiles, window.location.origin, window.location.hostname)
+  const origin = window.location.origin
+  const { label, isLocal } = currentConnection(profiles, origin, window.location.hostname)
   const Icon = isLocal ? Laptop : MonitorSmartphone
+  // On this machine the dot is trivially online; on a remote device it follows the poll (#1072).
+  const online = isLocal || deviceStatus[profiles.find(p => p.url === origin)?.id ?? ''] === 'online'
   return (
     <span
       title={isLocal ? 'Connected to this machine' : `Connected to ${label} — the agent runs on that device`}
@@ -28,6 +34,10 @@ export function ConnectionIndicator() {
           : 'inline-flex items-center gap-1.5 rounded-md border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/10 px-2 py-1 text-xs text-[var(--color-primary)]'
       }
     >
+      <span
+        aria-hidden
+        className={cn('h-2 w-2 shrink-0 rounded-full', online ? 'bg-success' : 'bg-muted-foreground/40')}
+      />
       <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
       <span className="max-w-[10rem] truncate">{label}</span>
     </span>

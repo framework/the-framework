@@ -111,6 +111,8 @@ describe('OptionsMenu (#654)', () => {
     onSelectDriver: vi.fn(),
     onConnectLocal: vi.fn(),
     onAddDevice: vi.fn(),
+    onRemove: vi.fn(),
+    status: {},
     ...over,
   })
 
@@ -223,6 +225,30 @@ describe('OptionsMenu (#654)', () => {
     openRunOn(connectionControl({ onAddDevice }))
     fireEvent.click(screen.getByText('Add a device…'))
     expect(onAddDevice).toHaveBeenCalled()
+  })
+
+  test('the X removes a device without selecting it (#1072)', () => {
+    const onRemove = vi.fn()
+    const onSelect = vi.fn()
+    openRunOn(connectionControl({ onRemove, onSelect }))
+    fireEvent.click(screen.getByRole('button', { name: /remove device Studio/i }))
+    expect(onRemove).toHaveBeenCalledWith(profiles()[0])
+    expect(onSelect).not.toHaveBeenCalled() // the row's own click stays out of it
+  })
+
+  test('an offline device row is marked offline (#1072)', () => {
+    openRunOn(connectionControl({ status: { [STUDIO_URL]: 'offline' } }))
+    // The url carries an "offline" note and the row is muted, so an unreachable device reads as such.
+    const offlineText = screen.getByText(/offline/i)
+    expect(offlineText).toBeTruthy()
+    expect((offlineText.closest('[role="menuitem"]') as HTMLElement).className).toMatch(/opacity-60/)
+  })
+
+  test('an online device row renders a status dot and is not marked offline (#1072)', () => {
+    openRunOn(connectionControl({ status: { [STUDIO_URL]: 'online' } }))
+    const row = rowOf(STUDIO_URL)
+    expect(row.querySelector('span.rounded-full')).not.toBeNull() // the dot renders per device
+    expect(row.className).not.toMatch(/opacity-60/)
   })
 
   test('the device rows are absent without a connection control (#1066)', () => {

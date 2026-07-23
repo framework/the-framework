@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { startRemoteRun, streamRemoteEvents, RelayedRuns } from './remote-run.js'
+import { startRemoteRun, streamRemoteEvents, pingRemote, RelayedRuns } from './remote-run.js'
 import type { FrameworkEvent } from '../events.js'
 
 // A throwaway loopback server; the handler decides how it answers. Returns its base url + close.
@@ -61,6 +61,40 @@ test('startRemoteRun surfaces a non-2xx from the device as an ok:false result (#
   } finally {
     await srv.close()
   }
+})
+
+test('pingRemote GETs /_relay/ping with the fw_daemon cookie and is true on a 2xx (#1072)', async () => {
+  let captured: { method?: string | undefined; url?: string | undefined; cookie?: string | undefined } = {}
+  const srv = await server((req, res) => {
+    captured = { method: req.method, url: req.url, cookie: req.headers.cookie }
+    res.writeHead(200, { 'content-type': 'text/plain' })
+    res.end()
+  })
+  try {
+    assert.equal(await pingRemote({ url: srv.url, token: 'sekret' }), true)
+    assert.equal(captured.method, 'GET')
+    assert.equal(captured.url, '/_relay/ping')
+    assert.equal(captured.cookie, 'fw_daemon=sekret') // the #1051 cookie, daemon to daemon
+  } finally {
+    await srv.close()
+  }
+})
+
+test('pingRemote is false on a non-2xx from the device (#1072)', async () => {
+  const srv = await server((_req, res) => {
+    res.writeHead(401, { 'content-type': 'text/plain' })
+    res.end('unauthorized')
+  })
+  try {
+    assert.equal(await pingRemote({ url: srv.url, token: 'wrong' }), false)
+  } finally {
+    await srv.close()
+  }
+})
+
+test('pingRemote is false when the device is unreachable (#1072)', async () => {
+  // A port nothing is listening on: the fetch rejects, which pingRemote swallows as offline.
+  assert.equal(await pingRemote({ url: 'http://127.0.0.1:1', token: 't' }), false)
 })
 
 test('streamRemoteEvents parses ndjson lines in order and ends when the body closes (#1067)', async () => {

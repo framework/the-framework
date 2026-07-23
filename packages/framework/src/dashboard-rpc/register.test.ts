@@ -7,6 +7,7 @@ import * as events from './events.telefunc.js'
 import * as projects from './projects.telefunc.js'
 import * as preferences from './preferences.telefunc.js'
 import * as quota from './quota.telefunc.js'
+import * as devices from './devices.telefunc.js'
 
 // Every telefunction the dashboard can call has to be registered here, because the daemon
 // serves a prebuilt bundle and has no Vite transform to discover them by file path. One that
@@ -20,6 +21,7 @@ const MODULES: Array<[string, Record<string, unknown>]> = [
   ['projects', projects],
   ['preferences', preferences],
   ['quota', quota],
+  ['devices', devices],
 ]
 
 test('every exported telefunction is registered (#866)', () => {

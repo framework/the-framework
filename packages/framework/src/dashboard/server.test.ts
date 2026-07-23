@@ -398,6 +398,21 @@ test('/_relay/events needs the cookie and streams the run\'s events as ndjson (#
   }
 })
 
+test('/_relay/ping is 401 without the cookie, 200 with it, and starts nothing (#1072)', async () => {
+  const { base, starts, close } = await relayDashboard()
+  try {
+    const unauth = await fetchAuth(`${base}/_relay/ping`)
+    assert.equal(unauth.status, 401) // the #1051 guard fronts the ping too
+
+    const ok = await fetchAuth(`${base}/_relay/ping`, `fw_daemon=${TOKEN}`)
+    assert.equal(ok.status, 200)
+    assert.equal(ok.body, '') // an empty body: it only proves reachability
+    assert.equal(starts.length, 0) // a health check must never spawn a run
+  } finally {
+    await close()
+  }
+})
+
 test('isSameOriginRequest: absent Origin passes; same host + loopback pass; evil.com fails', () => {
   const req = (headers: Record<string, string>): IncomingMessage => ({ headers } as IncomingMessage)
   assert.equal(isSameOriginRequest(req({})), true) // no Origin (curl / tests)

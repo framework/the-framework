@@ -1,7 +1,8 @@
 import type { Preferences } from '@gemstack/framework'
-import { Settings, Check, MonitorSmartphone, Plus } from 'lucide-react'
+import { Settings, Check, MonitorSmartphone, Plus, X } from 'lucide-react'
 import { updatePreferences } from '../lib/preferences.js'
 import type { ConnectionProfile } from '../lib/profiles.js'
+import type { DeviceStatus } from '../lib/use-device-status.js'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'
 import {
@@ -76,6 +77,23 @@ export type ConnectionControl = {
   /** Return to this machine's own daemon when currently on a remote one (#1066). */
   onConnectLocal: () => void
   onAddDevice: () => void
+  /** Drop a saved device (#1072). The caller clears the selection if this was the run target. */
+  onRemove: (profile: ConnectionProfile) => void
+  /** Each device's online/offline status (#1072); an id absent from the map is still being checked. */
+  status: Record<string, DeviceStatus>
+}
+
+/** A small reachability dot on a device row (#1072): green online, muted offline or still unknown. */
+function StatusDot({ status }: { status: DeviceStatus | undefined }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'mt-1.5 h-2 w-2 shrink-0 rounded-full',
+        status === 'online' ? 'bg-success' : 'bg-muted-foreground/40',
+      )}
+    />
+  )
 }
 
 // The run targets the gear offers (#1050). A single-select modeled on the agent tree (Check-marked
@@ -137,14 +155,37 @@ function RunTargetSub({ control, connection, busy }: { control: RunTargetControl
           <OptionLabel label="Claude web" description="Coming soon." />
         </DropdownMenuItem>
         {/* Saved devices (#1052/#1066/#1067): a click SELECTS the device as the run target (no
-            navigation): the local daemon relays the run to it and streams its events back. */}
-        {connection?.profiles.map(profile => (
-          <DropdownMenuItem key={profile.id} className="items-start" onClick={() => connection.onSelect(profile)}>
-            <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', isTargetDevice(profile) ? 'opacity-100' : 'opacity-0')} />
-            <MonitorSmartphone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-            <OptionLabel label={profile.label} description={profile.url} />
-          </DropdownMenuItem>
-        ))}
+            navigation): the local daemon relays the run to it and streams its events back. The dot
+            shows reachability (#1072) and the X removes the saved device. */}
+        {connection?.profiles.map(profile => {
+          const status = connection.status[profile.id]
+          const offline = status === 'offline'
+          return (
+            <DropdownMenuItem
+              key={profile.id}
+              className={cn('items-start gap-2', offline && 'opacity-60')}
+              onClick={() => connection.onSelect(profile)}
+            >
+              <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', isTargetDevice(profile) ? 'opacity-100' : 'opacity-0')} />
+              <MonitorSmartphone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <StatusDot status={status} />
+              <OptionLabel label={profile.label} description={offline ? `${profile.url} (offline)` : profile.url} />
+              <button
+                type="button"
+                onClick={e => {
+                  // Remove, not select: keep the row's own click out of it (#1072).
+                  e.stopPropagation()
+                  connection.onRemove(profile)
+                }}
+                title={`Remove ${profile.label}`}
+                aria-label={`Remove device ${profile.label}`}
+                className="mt-0.5 rounded p-0.5 text-[var(--color-muted-foreground)] hover:text-danger"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            </DropdownMenuItem>
+          )
+        })}
         {connection && (
           <DropdownMenuItem className="items-start" disabled={busy} onClick={() => connection.onAddDevice()}>
             <Plus className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />

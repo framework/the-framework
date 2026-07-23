@@ -21,8 +21,9 @@ import { PresetsMenu } from './PresetsMenu.js'
 import { AgentModelMenu, type AgentOption } from './AgentModelMenu.js'
 import { OptionsMenu, type OptionRow, type RunTarget } from './OptionsMenu.js'
 import { AddDeviceDialog } from './AddDeviceDialog.js'
-import { useConnectionProfiles, connectLocal, isLoopbackHost, type ConnectionProfile } from '../lib/profiles.js'
+import { useConnectionProfiles, connectLocal, isLoopbackHost, removeProfile, type ConnectionProfile } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId, selectRemoteDevice } from '../lib/remote-target.js'
+import { useDeviceStatus } from '../lib/use-device-status.js'
 import { stashDraftFromUrl, takePendingDraft } from '../lib/draft-handoff.js'
 import { ResolvedOptions } from './ResolvedOptions.js'
 import { ClaudeLogo, CodexLogo } from './agent-logos.js'
@@ -129,6 +130,7 @@ export const Composer = forwardRef<ComposerHandle, {
   // The saved daemons this browser can hop to (#1052). Which one we are on now comes from the URL,
   // fixed for the page's life (a device switch reloads), so it is read once rather than as state.
   const profiles = useConnectionProfiles()
+  const deviceStatus = useDeviceStatus(profiles) // #1072: online/offline per saved device
   const selectedDeviceId = useSelectedRemoteDeviceId() // #1067: the device this run targets, if any
   const currentUrl = typeof window === 'undefined' ? null : window.location.origin
   const isLocalConnection = typeof window === 'undefined' ? true : isLoopbackHost(window.location.hostname)
@@ -343,6 +345,12 @@ export const Composer = forwardRef<ComposerHandle, {
               onSelectDriver: () => selectRemoteDevice(null),
               onConnectLocal: connectLocal,
               onAddDevice: () => setAddingDevice(true),
+              // #1072: drop a saved device; clear the selection if it was the run target.
+              onRemove: (p: ConnectionProfile) => {
+                if (selectedDeviceId === p.id) selectRemoteDevice(null)
+                removeProfile(p.id)
+              },
+              status: deviceStatus,
             },
           })}
     />

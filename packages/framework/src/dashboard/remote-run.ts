@@ -30,6 +30,27 @@ export interface RelayStartBody {
 
 const START_TIMEOUT_MS = 15_000
 
+/** How long a status ping waits before calling a device offline (#1072): short, since it polls. */
+const PING_TIMEOUT_MS = 3_000
+
+/**
+ * Health-check a saved device (#1072): a cookie'd `GET /_relay/ping`, true on any 2xx, false on a
+ * non-2xx, an unreachable host, or the timeout. The token stays in memory for the check only, never
+ * persisted, same as {@link startRemoteRun}. This is how the browser's status dots learn reachable
+ * from not: it has the tokens, the daemon does the cross-origin request.
+ */
+export async function pingRemote(target: RemoteTarget): Promise<boolean> {
+  try {
+    const res = await fetch(`${trimSlashes(target.url)}/_relay/ping`, {
+      headers: { cookie: `fw_daemon=${target.token}` },
+      signal: AbortSignal.timeout(PING_TIMEOUT_MS),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 /** The two headers every relay request carries: JSON, and the #1051 cookie. No Origin on purpose. */
 function relayHeaders(token: string): Record<string, string> {
   return { 'content-type': 'application/json', cookie: `fw_daemon=${token}` }

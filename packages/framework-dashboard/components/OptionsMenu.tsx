@@ -1,4 +1,5 @@
 import type { Preferences } from '@gemstack/the-framework'
+import type { OptionRow } from '../lib/run-option-rows.js'
 import { Settings, Check, MonitorSmartphone, Plus, X } from 'lucide-react'
 import { updatePreferences } from '../lib/preferences.js'
 import type { ConnectionProfile } from '../lib/profiles.js'
@@ -21,20 +22,9 @@ import {
 // checkboxes. Each item writes its preference straight through; the menu stays open so several
 // can be flipped at once. Eco's sub-drops appear (indented) when Eco is on.
 
-/** One Global-option row: a preference key plus how its checkbox reads. */
-export type OptionRow = {
-  key: keyof Preferences
-  label: string
-  title: string
-  /** A short one-line summary shown under the label (#654). */
-  description?: string
-  checked: boolean
-  /** Disabled beyond the form-wide busy flag (e.g. Eco has nothing to trim under Vanilla). */
-  disabled?: boolean
-  /** Why it's disabled, shown in the description so a greyed row isn't a mystery (the `title`
-   * tooltip is suppressed on disabled dropdown items). Only rendered while {@link disabled}. */
-  disabledReason?: string
-}
+/** One Global-option row. Defined with the rules that build it (#958), and re-exported here so the
+ * menu's existing importers do not have to care where the table moved to. */
+export type { OptionRow } from '../lib/run-option-rows.js'
 
 function setOption(key: keyof Preferences, checked: boolean) {
   updatePreferences({ [key]: checked } as Partial<Preferences>)

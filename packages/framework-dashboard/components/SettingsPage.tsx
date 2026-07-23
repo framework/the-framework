@@ -1,12 +1,18 @@
 import type { ReactNode } from 'react'
-import { AGENTS, AGENT_LABELS } from '@gemstack/the-framework/client'
+import type { Preferences } from '@gemstack/the-framework'
+import { AGENTS, AGENT_LABELS, MAX_SPEND_OFFSET } from '@gemstack/the-framework/client'
 import { useDetectedEditors } from '../lib/editors.js'
 import { usePreferences, updatePreferences, themePreference, type ThemePreference } from '../lib/preferences.js'
+import { runOptionRows, type OptionRow } from '../lib/run-option-rows.js'
+import { useNotificationPermission } from '../lib/notification-permission.js'
+import { useLoaded } from '../lib/use-async.js'
+import { onNotifyChannels, type NotifyChannels } from '../server/preferences.telefunc.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { DevicesSettings } from './DevicesSettings.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Checkbox } from './ui/checkbox.js'
 import { ScrollArea } from './ui/scroll-area.js'
+import { cn } from '../lib/utils.js'
 
 // The settings page (#958): every setting in one place, and the Onboarding checklist.
 //
@@ -24,6 +30,15 @@ export function SettingsPage({ onSelectProject }: { onSelectProject?: ((id: stri
   const preferences = usePreferences()
   const editors = useDetectedEditors()
   const theme = themePreference(preferences)
+  // One shared table with the launcher (#958), rules already applied.
+  const { main: runOptions, eco: ecoRows } = runOptionRows(preferences)
+  // A notification toggle is a preference; whether it can deliver is a capability (#948). Both are
+  // shown, the same way the bell does, so a row cannot promise delivery that will not happen.
+  const permission = useNotificationPermission()
+  const channels = useLoaded<NotifyChannels | null>(onNotifyChannels, null, [])
+  const webhookReady = channels === null || channels.discordWebhook
+  const botReady = channels === null || channels.discordBot
+  const browserBlocked = permission === 'denied'
 
   return (
     <ScrollArea className="min-h-0 flex-1">
@@ -91,82 +106,44 @@ export function SettingsPage({ onSelectProject }: { onSelectProject?: ((id: stri
         {/* Beside "Run on", since a saved device is the other thing a session can run on. */}
         <DevicesSettings />
 
-        <Section title="Run options">
-          <ToggleRow
-            label="Transparent"
-            description="Run the agent completely raw: no system prompt, no gates, no TODO loop."
-            checked={preferences.transparent ?? false}
-            onChange={next => updatePreferences({ transparent: next })}
-          />
-          <ToggleRow
-            label="Autopilot"
-            description="Auto-accept mode: the agent keeps going instead of stopping to ask."
-            checked={preferences.autopilot ?? false}
-            onChange={next => updatePreferences({ autopilot: next })}
-          />
-          <ToggleRow
-            label="Technical"
-            description="Expose technical detail in what the agent reports back."
-            checked={preferences.technical ?? false}
-            onChange={next => updatePreferences({ technical: next })}
-          />
-          <ToggleRow
-            label="Vanilla"
-            description="Drop the built-in system prompt, keeping the signals the dashboard needs."
-            checked={preferences.vanilla ?? false}
-            onChange={next => updatePreferences({ vanilla: next })}
-          />
-          <ToggleRow
-            label="Quality follow-ups"
-            description="When a session is ready to merge, queue the review passes as TODO entries."
-            checked={preferences.onBeforeMergeableQuality ?? false}
-            onChange={next => updatePreferences({ onBeforeMergeableQuality: next })}
-          />
-          <ToggleRow
-            label="Browser"
-            description="Give the agent a real browser during the run."
-            checked={preferences.browser ?? false}
-            onChange={next => updatePreferences({ browser: next })}
-          />
+        {/* The same table the launcher renders (#958), so a rule cannot hold in one place and
+            not the other: Transparent overrides the rest, Eco is inert once the system prompt is
+            off, Browser is Claude-only, and the Eco drops need Eco. A row the rules disable is
+            shown greyed with its reason rather than hidden, since this is where you come to look. */}
+        <Section
+          title="Run options"
+          description="What a new session starts with. The launcher can still change them for one session."
+        >
+          {runOptions.map(row => (
+            <OptionToggleRow key={row.key} row={row} />
+          ))}
         </Section>
 
         <Section title="Eco" description="Drop sections of the system prompt to spend fewer tokens.">
-          <ToggleRow
-            label="Eco"
-            description="The coarse switch: trim the prompt everywhere."
-            checked={preferences.eco ?? false}
-            onChange={next => updatePreferences({ eco: next })}
-          />
-          <ToggleRow
-            label="Eco: planning"
-            description="Trim the planning section."
-            checked={preferences.ecoPlanning ?? false}
-            onChange={next => updatePreferences({ ecoPlanning: next })}
-          />
-          <ToggleRow
-            label="Eco: research"
-            description="Trim the research section."
-            checked={preferences.ecoResearch ?? false}
-            onChange={next => updatePreferences({ ecoResearch: next })}
-          />
-          <ToggleRow
-            label="Eco: maintenance"
-            description="Trim the maintenance section."
-            checked={preferences.ecoMaintenance ?? false}
-            onChange={next => updatePreferences({ ecoMaintenance: next })}
-          />
+          {ecoRows.map(row => (
+            <OptionToggleRow key={row.key} row={row} />
+          ))}
         </Section>
 
         <Section title="Notifications">
           <ToggleRow
             label="Browser"
-            description="Desktop notifications while the dashboard is open."
-            checked={preferences.notifyBrowser ?? true}
+            description={
+              browserBlocked
+                ? 'Blocked in your browser settings'
+                : 'Desktop notifications while the dashboard is open.'
+            }
+            checked={(preferences.notifyBrowser ?? true) && !browserBlocked}
+            disabled={browserBlocked}
             onChange={next => updatePreferences({ notifyBrowser: next })}
           />
           <ToggleRow
             label="Discord"
-            description="Deliver to Discord, so notifications reach you with no dashboard open."
+            description={
+              webhookReady
+                ? 'Deliver to Discord, so notifications reach you with no dashboard open.'
+                : 'Not configured — DISCORD_WEBHOOK is not set on the daemon'
+            }
             checked={preferences.notifyDiscord ?? false}
             onChange={next => updatePreferences({ notifyDiscord: next })}
           />
@@ -184,7 +161,11 @@ export function SettingsPage({ onSelectProject }: { onSelectProject?: ((id: stri
           />
           <ToggleRow
             label="Discord bot"
-            description="Let Discord messages start and steer sessions."
+            description={
+              botReady
+                ? 'Let Discord messages start and steer sessions.'
+                : 'Not configured — DISCORD_BOT_TOKEN is not set on the daemon'
+            }
             checked={preferences.discordBot ?? false}
             onChange={next => updatePreferences({ discordBot: next })}
           />
@@ -197,10 +178,14 @@ export function SettingsPage({ onSelectProject }: { onSelectProject?: ((id: stri
             checked={preferences.autoPm ?? false}
             onChange={next => updatePreferences({ autoPm: next })}
           />
+          {/* Bounded to the same ±MAX_SPEND_OFFSET the slider and the sanitizer use (#960). Without
+              it a typed 9999 was clamped to 50 on save while the box kept showing 9999. */}
           <NumberRow
             label="Spend offset"
-            description="How far unattended work sits from the quota boundary, in percentage points. Negative holds it back; positive lets it borrow from the days ahead."
+            description={`How far unattended work sits from the quota boundary, in percentage points (max ${MAX_SPEND_OFFSET}). Negative holds it back; positive lets it borrow from the days ahead.`}
             value={preferences.autoSpendOffset ?? 0}
+            min={-MAX_SPEND_OFFSET}
+            max={MAX_SPEND_OFFSET}
             onChange={value => updatePreferences({ autoSpendOffset: value })}
           />
         </Section>
@@ -223,15 +208,52 @@ function Section({ title, description, children }: { title: string; description?
   )
 }
 
-function Row({ label, description, control }: { label: string; description: string; control: ReactNode }) {
+function Row({
+  label,
+  description,
+  control,
+  dimmed = false,
+}: {
+  label: string
+  description: string
+  control: ReactNode
+  /** A row the rules turned off: greyed, but still shown with its reason. */
+  dimmed?: boolean
+}) {
   return (
     <div className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
       <div className="min-w-0">
-        <p className="text-sm">{label}</p>
+        <p className={cn('text-sm', dimmed && 'text-muted-foreground')}>{label}</p>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
       <div className="shrink-0">{control}</div>
     </div>
+  )
+}
+
+/**
+ * One row of the shared run-option table (#958).
+ *
+ * A row the rules disable keeps its place and shows *why* instead of vanishing, because the whole
+ * point of this page is to be where you look for a setting. `row.checked` is the effective value,
+ * so an option Transparent overrides reads off here exactly as it does in the launcher.
+ */
+function OptionToggleRow({ row }: { row: OptionRow }) {
+  const disabled = row.disabled ?? false
+  return (
+    <Row
+      label={row.label}
+      description={(disabled ? row.disabledReason : row.description) ?? row.description ?? ''}
+      dimmed={disabled}
+      control={
+        <Checkbox
+          checked={row.checked}
+          disabled={disabled}
+          onCheckedChange={next => updatePreferences({ [row.key]: next === true } as Partial<Preferences>)}
+          aria-label={row.label}
+        />
+      }
+    />
   )
 }
 
@@ -240,17 +262,28 @@ function ToggleRow({
   description,
   checked,
   onChange,
+  disabled = false,
 }: {
   label: string
   description: string
   checked: boolean
   onChange: (next: boolean) => void
+  /** A capability the daemon or browser withholds, e.g. notifications the browser has blocked. */
+  disabled?: boolean
 }) {
   return (
     <Row
       label={label}
       description={description}
-      control={<Checkbox checked={checked} onCheckedChange={next => onChange(next === true)} aria-label={label} />}
+      dimmed={disabled}
+      control={
+        <Checkbox
+          checked={checked}
+          disabled={disabled}
+          onCheckedChange={next => onChange(next === true)}
+          aria-label={label}
+        />
+      }
     />
   )
 }
@@ -325,11 +358,15 @@ function NumberRow({
   label,
   description,
   value,
+  min,
+  max,
   onChange,
 }: {
   label: string
   description: string
   value: number
+  min: number
+  max: number
   onChange: (next: number) => void
 }) {
   return (
@@ -340,7 +377,11 @@ function NumberRow({
         <input
           type="number"
           value={value}
-          onChange={e => onChange(Number(e.target.value) || 0)}
+          min={min}
+          max={max}
+          // Clamped here as well as on the input: `min`/`max` only constrain the spinner, so a typed
+          // value still has to be held to the range the sanitizer will enforce anyway (#960).
+          onChange={e => onChange(Math.min(Math.max(Math.round(Number(e.target.value) || 0), min), max))}
           aria-label={label}
           className="w-24 rounded-md border border-border bg-background px-2 py-1 text-sm"
         />

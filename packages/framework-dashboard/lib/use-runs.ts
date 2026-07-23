@@ -1,4 +1,4 @@
-import type { RunMeta } from '@gemstack/framework'
+import type { RunMeta } from '@gemstack/the-framework'
 import { onRuns } from '../server/reads.telefunc.js'
 import { usePolled } from './use-async.js'
 

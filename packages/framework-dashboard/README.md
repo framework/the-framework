@@ -8,7 +8,7 @@ It is a **projection of the same files the daemon writes** — no daemon process
 IPC:
 
 - **Projects sidebar** — a Telefunc RPC (`server/projects.telefunc.ts`) over the
-  global registry (`@gemstack/framework`'s `listProjects`).
+  global registry (`@gemstack/the-framework`'s `listProjects`).
 - **Read model** — Telefunc RPCs (`server/reads.telefunc.ts`) for run history, a
   run's replay, the surfaced PLAN/TODO docs, and the committed `LOGS.md`.
 - **Live event stream** — a Telefunc Channel (`server/events.telefunc.ts`) tailing
@@ -19,7 +19,7 @@ IPC:
 ## Run it
 
 ```bash
-pnpm --filter @gemstack/framework build   # the dashboard reads its registry + types
+pnpm --filter @gemstack/the-framework build   # the dashboard reads its registry + types
 pnpm --filter @gemstack/framework-dashboard dev
 # open http://localhost:4300
 ```

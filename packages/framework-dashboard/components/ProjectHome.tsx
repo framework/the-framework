@@ -1,4 +1,4 @@
-import type { FrameworkEvent } from '@gemstack/framework'
+import type { FrameworkEvent } from '@gemstack/the-framework'
 import { StartRunForm } from './StartRunForm.js'
 import { ProjectActions } from './ProjectActions.js'
 import { RunOverview } from './RunOverview.js'

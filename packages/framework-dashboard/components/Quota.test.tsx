@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { Preferences, QuotaView } from '@gemstack/framework'
+import type { Preferences, QuotaView } from '@gemstack/the-framework'
 
 const updatePreferences = vi.hoisted(() => vi.fn())
 let prefs: Preferences = {}

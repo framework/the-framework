@@ -1,4 +1,4 @@
-# @gemstack/framework
+# @gemstack/the-framework
 
 **The (AI) Framework** - turnkey, zero-config AI orchestration. Vite for AI.
 
@@ -8,11 +8,11 @@ orchestration the agent's own chat cannot show: the loop status, the review
 passes, and the run's own event stream.
 
 ```bash
-npm i -g @gemstack/framework
+npm i -g @gemstack/the-framework
 
-framework "a paginated orders page backed by an orders table, with sign-in"
+the-framework "a paginated orders page backed by an orders table, with sign-in"
 # or the deterministic offline demo (no CLI, no model):
-framework --fake
+the-framework --fake
 ```
 
 ## How it works
@@ -32,7 +32,7 @@ presets, deploy targets) and adds the two missing pieces:
   per loop pass). [`FakeDriver`](./src/driver/fake.ts) is a deterministic offline
   driver for `--fake` and tests. Codex / opencode slot in behind the same three
   methods.
-- **The product shell** - the `framework` CLI and the localhost
+- **The product shell** - the `the-framework` CLI and the localhost
   [dashboard](./src/dashboard/server.ts) over an event stream we own. The
   dashboard has a **Stop** button that interrupts the run from the browser (it
   aborts the same signal Ctrl+C does); the run ends cleanly as *stopped*, and a
@@ -52,7 +52,7 @@ conventions, add what was asked — instead of rebuilding it from scratch.
 ## Library API
 
 ```ts
-import { runFramework, ClaudeCodeDriver, startDashboard } from '@gemstack/framework'
+import { runFramework, ClaudeCodeDriver, startDashboard } from '@gemstack/the-framework'
 
 const dashboard = await startDashboard()
 console.log(dashboard.url)
@@ -68,10 +68,10 @@ await runFramework({
 ## CLI
 
 ```
-framework [intent...]          Build what you describe, from scratch.
-framework --fake               Offline demo (no CLI, no model, deterministic).
-framework doctor               Check prerequisites (Claude Code installed, etc.).
-framework relay                Host a run relay so teammates can watch a run (see below).
+the-framework [intent...]      Build what you describe, from scratch.
+the-framework --fake           Offline demo (no CLI, no model, deterministic).
+the-framework doctor           Check prerequisites (Claude Code installed, etc.).
+the-framework relay            Host a run relay so teammates can watch a run (see below).
 
   --cwd <dir>            Workspace the agent builds in (default: cwd).
   --model <id>           Model to pass through to the wrapped agent.
@@ -116,7 +116,7 @@ The orchestration state (the loop status and the run's event stream) is our part
 of the run, not the agent's chat transcript, so we persist it. Each run appends
 its event stream to `.the-framework/events.jsonl` in the workspace, with a small
 `run.json` snapshot beside it. Because the dashboard is a pure projection of that
-stream, a restart can replay it: `framework --resume` reopens the last run's
+stream, a restart can replay it: `the-framework --resume` reopens the last run's
 dashboard read-only, exactly
 as it looked, without running the agent again. Add `--cwd <dir>` to resume a run
 from another workspace. Pass `--no-persist` to skip writing state. We do not
@@ -168,8 +168,8 @@ The dashboard binds localhost. To let a teammate watch a run from another machin
 host a **relay** and publish the run to it:
 
 ```bash
-framework relay                                # on a reachable host; prints its URL
-framework "..." --share http://that-host:4488  # the run publishes its event stream to the relay
+the-framework relay                                # on a reachable host; prints its URL
+the-framework "..." --share http://that-host:4488  # the run publishes its event stream to the relay
 ```
 
 The run prints a shareable URL (`http://that-host:4488/r/<id>/`); open it from any
@@ -197,7 +197,7 @@ Pick one with `--preset`. Its review loop drives the build's checklist, so the
 loop's prompts are what gate each pass:
 
 ```bash
-framework --preset software-development "Add an orders page with sign-in"
+the-framework --preset software-development "Add an orders page with sign-in"
 ```
 
 A run only builds under a preset when you ask for one: `--preset` or

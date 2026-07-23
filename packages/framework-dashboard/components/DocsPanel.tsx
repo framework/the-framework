@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { WorkspaceDoc } from '@gemstack/framework'
+import type { WorkspaceDoc } from '@gemstack/the-framework'
 import { onDocs } from '../server/reads.telefunc.js'
 import { Button } from './ui/button.js'
 import { Markdown } from './Markdown.js'

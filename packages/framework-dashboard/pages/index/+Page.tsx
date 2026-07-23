@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Intervention, Activity, ProjectSummary } from '@gemstack/framework'
+import type { Intervention, Activity, ProjectSummary } from '@gemstack/the-framework'
 import { onProjectFiles, onInterventions, onActivity } from '../../server/reads.telefunc.js'
 import { onProjects } from '../../server/projects.telefunc.js'
 import { ProjectPicker } from '../../components/ProjectPicker.js'

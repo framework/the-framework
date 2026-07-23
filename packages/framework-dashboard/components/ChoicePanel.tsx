@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ChoiceRequest } from '@gemstack/framework'
+import type { ChoiceRequest } from '@gemstack/the-framework'
 import { sendChoice } from '../server/control.telefunc.js'
 import { useAction } from '../lib/use-action.js'
 import { usePreferences, updatePreferences, autopilotEnabled } from '../lib/preferences.js'

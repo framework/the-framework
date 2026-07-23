@@ -1,4 +1,4 @@
-import type { AgentName } from '@gemstack/framework/client'
+import type { AgentName } from '@gemstack/the-framework/client'
 
 // Monochrome brand logomarks for the coding agents (#656), so the run picker can show a logo
 // instead of the agent's name. They inherit the text colour (`fill="currentColor"`) and take a

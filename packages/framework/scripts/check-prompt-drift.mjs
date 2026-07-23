@@ -103,7 +103,7 @@ async function main() {
         `  snapshot: ${snapshot.length} chars, issue: ${onBeforeMergeableBlock.length} chars\n` +
         `  first difference at ${firstDifference(onBeforeMergeableBlock, snapshot, 'issue:', 'snapshot:')}\n` +
         `  It cannot be copied verbatim (it nests \`\${{ }}\` fragments). Re-flatten it into\n` +
-        `  prompts/on_before_mergeable_prompt.md, then run: pnpm --filter @gemstack/framework check:prompt-drift --update`,
+        `  prompts/on_before_mergeable_prompt.md, then run: pnpm --filter @gemstack/the-framework check:prompt-drift --update`,
     )
   }
 

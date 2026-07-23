@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { agentForDriver } from '@gemstack/framework/client'
+import { agentForDriver } from '@gemstack/the-framework/client'
 import { Composer, type ComposerHandle } from './Composer.js'
 import { sendMessage } from '../server/control.telefunc.js'
 import { useAction } from '../lib/use-action.js'

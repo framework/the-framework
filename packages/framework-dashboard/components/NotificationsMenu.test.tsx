@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { Preferences } from '@gemstack/framework'
+import type { Preferences } from '@gemstack/the-framework'
 
 const updatePreferences = vi.hoisted(() => vi.fn())
 // The daemon's channel capability (#948): both configured unless a test overrides it.

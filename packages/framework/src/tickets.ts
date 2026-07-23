@@ -18,7 +18,7 @@ export const TICKETS_DIR = 'tickets'
  * committed file. The package ships `prompts/ticketing_format.md` (see the `files` allowlist),
  * so an agent reads it at this cwd-relative path; the #683 context fragment points here.
  */
-export const TICKETING_FORMAT_FILE = 'node_modules/@gemstack/framework/prompts/ticketing_format.md'
+export const TICKETING_FORMAT_FILE = 'node_modules/@gemstack/the-framework/prompts/ticketing_format.md'
 
 /**
  * The flat, durable backlog/roadmap file — the confirmed-task queue (the "AI task queue"
@@ -36,7 +36,7 @@ export const FLAT_TODO_FILE = 'TODO_AGENTS.md'
  * fragment points here. The priority sections need no parser support: `parseTodoEntries` skips
  * headings and returns entries in file order, so a priority-sorted file drains in priority order.
  */
-export const TODO_FORMAT_FILE = 'node_modules/@gemstack/framework/prompts/todo_format.md'
+export const TODO_FORMAT_FILE = 'node_modules/@gemstack/the-framework/prompts/todo_format.md'
 
 /** The brief hyphen spelling from #682, read as a fallback after #674 settled on the underscore. */
 export const LEGACY_HYPHEN_TODO_FILE = 'TODO-AGENTS.md'

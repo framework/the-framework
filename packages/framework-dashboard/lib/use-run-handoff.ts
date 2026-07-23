@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { RunHandoff } from '@gemstack/framework'
+import type { RunHandoff } from '@gemstack/the-framework'
 import { onRunHandoff } from '../server/reads.telefunc.js'
 import { usePolled } from './use-async.js'
 import { useAction } from './use-action.js'

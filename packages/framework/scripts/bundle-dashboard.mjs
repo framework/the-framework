@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 // Copy the prerendered dashboard bundle (#405) into the framework package so a published
 // install can serve it (the daemon serves `dist/dashboard-client/**` as static files;
 // the workspace dev fallback serves the dashboard's own dist/client). framework-dashboard
-// is private/unpublished, so the assets must ride along inside @gemstack/framework's dist.
+// is private/unpublished, so the assets must ride along inside @gemstack/the-framework's dist.
 // Run after `@gemstack/framework-dashboard build` (which prerenders index.html).
 
 const here = dirname(fileURLToPath(import.meta.url))

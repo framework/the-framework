@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Play, ExternalLink, Square, ChevronDown } from 'lucide-react'
-import type { ServeTarget } from '@gemstack/framework'
+import type { ServeTarget } from '@gemstack/the-framework'
 import { sendPreview, onServeTargets, sendStopPreview, onPreviewStatus } from '../server/control.telefunc.js'
 import { useAction } from '../lib/use-action.js'
 import { Button } from './ui/button.js'

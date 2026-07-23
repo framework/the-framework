@@ -11,10 +11,10 @@ import {
   formatFrameworkEvent,
   runFramework,
   type AppPreview,
-} from '@gemstack/framework'
+} from '@gemstack/the-framework'
 
 /**
- * The showable end-to-end demo for `@gemstack/framework`: one prompt taken all
+ * The showable end-to-end demo for `@gemstack/the-framework`: one prompt taken all
  * the way to a *running, deployed* app, offline and deterministic.
  *
  * It drives the real product (`runFramework`) with the built-in **fake driver**

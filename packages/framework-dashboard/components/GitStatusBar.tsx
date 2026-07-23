@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import type { GitStatus, RunWorktree } from '@gemstack/framework'
+import type { GitStatus, RunWorktree } from '@gemstack/the-framework'
 import { ChevronRight, GitBranch } from 'lucide-react'
 import { onGitStatus, onRunWorktree } from '../server/reads.telefunc.js'
 import { usePolled } from '../lib/use-async.js'
-import { formatBytes } from '@gemstack/framework/client'
+import { formatBytes } from '@gemstack/the-framework/client'
 import { cn } from '../lib/utils.js'
 
 // The checkout in play (#491, part of #488): active branch, a clean/dirty dot, the linked PR.

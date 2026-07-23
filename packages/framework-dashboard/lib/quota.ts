@@ -1,4 +1,4 @@
-import type { QuotaView } from '@gemstack/framework'
+import type { QuotaView } from '@gemstack/the-framework'
 import { onQuota } from '../server/quota.telefunc.js'
 import { usePolled } from './use-async.js'
 

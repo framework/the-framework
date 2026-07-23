@@ -3,7 +3,7 @@
 One prompt, taken all the way to a **running, deployed app** — offline and
 deterministic, in a couple of seconds.
 
-This runs the real product (`@gemstack/framework`'s `runFramework`) with the
+This runs the real product (`@gemstack/the-framework`'s `runFramework`) with the
 built-in **fake driver**: no Claude Code, no model, no API keys. Same code a live
 run executes — preset detection, the full-fledged production-grade loop,
 deploy — just with scripted agent turns so it is instant
@@ -60,7 +60,7 @@ it — that is the localhost link, live until the run stops.
 Same flow, driven against Claude Code instead of the fake driver:
 
 ```bash
-npx @gemstack/framework "a paginated orders page with sign-in"
+npx @gemstack/the-framework "a paginated orders page with sign-in"
 ```
 
 That opens the localhost dashboard, wraps Claude Code as the coding agent, and runs

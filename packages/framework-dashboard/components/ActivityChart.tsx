@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ActivityDay } from '@gemstack/framework'
+import type { ActivityDay } from '@gemstack/the-framework'
 
 /** The local calendar day as the chart's date keys are written (YYYY-MM-DD). */
 function localDateKey(date: Date): string {

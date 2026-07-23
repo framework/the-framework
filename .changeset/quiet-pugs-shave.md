@@ -1,5 +1,5 @@
 ---
-'@gemstack/framework': patch
+'@gemstack/the-framework': patch
 ---
 
 Dashboard: make the `dark:` utilities follow the theme toggle instead of the OS.

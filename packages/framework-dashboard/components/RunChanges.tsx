@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
-import type { FileChange } from '@gemstack/framework'
+import type { FileChange } from '@gemstack/the-framework'
 import { onRunChanges } from '../server/reads.telefunc.js'
 import { usePolled } from '../lib/use-async.js'
 import { FilePreviewCard } from './FilePreview.js'

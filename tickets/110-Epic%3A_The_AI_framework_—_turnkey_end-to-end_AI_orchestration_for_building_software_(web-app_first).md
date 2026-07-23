@@ -17,7 +17,7 @@ Execution model (updated 2026-07-03, see #165): the shipped product **wraps the 
 - **Turnkey**: zero wiring. `npm install` and go.
 - **Opinionated**: knows Vike/Next + universal-orm. Data stays separate (universal-orm), as agreed.
 - **Open source, collaborative**: the community grows the prompt/flow library via PRs, and it stays turnkey for everyone.
-- Name (decided 2026-07-03): **"The Framework"**, tagline "The (AI) Framework", domain `the-framework.ai`, npm `@gemstack/framework` (`npm i -g`). Positioning shorthand: "Vite for AI" (turnkey/zero-config) vs competitors' "webpack for AI" (low-level).
+- Name (decided 2026-07-03): **"The Framework"**, tagline "The (AI) Framework", domain `the-framework.ai`, npm `@gemstack/the-framework` (`npm i -g`). Positioning shorthand: "Vite for AI" (turnkey/zero-config) vs competitors' "webpack for AI" (low-level).
 
 ## Children (buildable, in priority order)
 

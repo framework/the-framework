@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import type { CustomPreset, FrameworkFileConfig, Preferences, ProjectPreferences, ProjectSummary } from '@gemstack/framework'
-import { preferencesFromFileConfig, notificationEnabled, PROJECT_PREFERENCE_KEYS } from '@gemstack/framework/client'
+import type { CustomPreset, FrameworkFileConfig, Preferences, ProjectPreferences, ProjectSummary } from '@gemstack/the-framework'
+import { preferencesFromFileConfig, notificationEnabled, PROJECT_PREFERENCE_KEYS } from '@gemstack/the-framework/client'
 import {
   onPreferences,
   savePreferences,
@@ -305,10 +305,10 @@ export function useProjectFileConfig(): FrameworkFileConfig {
 
 const EMPTY_SOURCES: PreferenceSources = {}
 
-// Autopilot's default-on moved into @gemstack/framework with the rest of the preferences ->
+// Autopilot's default-on moved into @gemstack/the-framework with the rest of the preferences ->
 // run options mapping (#858), so the daemon resolves it the same way. Re-exported here because
 // every component reaches for it through this module.
-export { autopilotEnabled } from '@gemstack/framework/client'
+export { autopilotEnabled } from '@gemstack/the-framework/client'
 
 export type ThemePreference = NonNullable<Preferences['theme']>
 

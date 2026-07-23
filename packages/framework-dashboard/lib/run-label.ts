@@ -1,4 +1,4 @@
-import type { RunMeta } from '@gemstack/framework'
+import type { RunMeta } from '@gemstack/the-framework'
 import { formatDateTimeShort } from './format-date.js'
 
 // What to call a session in a list.

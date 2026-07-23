@@ -1,4 +1,4 @@
-import type { LogEntry } from '@gemstack/framework'
+import type { LogEntry } from '@gemstack/the-framework'
 import { onProjectLog } from '../server/reads.telefunc.js'
 import { Badge } from './ui/badge.js'
 import { usePolled } from '../lib/use-async.js'

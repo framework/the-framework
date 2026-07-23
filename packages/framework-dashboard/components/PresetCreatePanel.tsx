@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent } from 'react'
-import type { CustomPreset } from '@gemstack/framework'
+import type { CustomPreset } from '@gemstack/the-framework'
 import { Button } from './ui/button.js'
 import { Dialog } from './ui/dialog.js'
 

@@ -1,5 +1,5 @@
 ---
-'@gemstack/framework': patch
+'@gemstack/the-framework': patch
 ---
 
 `gitTimeoutMs()` no longer mistakes the value of a global git option for the subcommand, and a

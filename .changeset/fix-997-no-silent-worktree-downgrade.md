@@ -1,5 +1,5 @@
 ---
-'@gemstack/framework': patch
+'@gemstack/the-framework': patch
 ---
 
 Never silently downgrade a run into your own checkout when its worktree could not be created (#997).

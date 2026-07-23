@@ -1,5 +1,5 @@
 ---
-'@gemstack/framework': minor
+'@gemstack/the-framework': minor
 ---
 
 feat(framework): context fragment points the knowledge base at a `knowledge-base/` folder (#683)

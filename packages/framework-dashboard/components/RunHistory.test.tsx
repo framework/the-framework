@@ -1,4 +1,4 @@
-import type { RunMeta } from '@gemstack/framework'
+import type { RunMeta } from '@gemstack/the-framework'
 import { afterEach, describe, expect, test } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { RunHistory } from './RunHistory.js'

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
-import type { FrameworkEvent } from '@gemstack/framework'
+import type { FrameworkEvent } from '@gemstack/the-framework'
 import { ActionsRunNotice } from './ActionsRunNotice.js'
 
 afterEach(cleanup)

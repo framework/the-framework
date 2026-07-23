@@ -9,7 +9,7 @@ import * as devices from './devices.telefunc.js'
 
 // The client bakes each RPC key from the dashboard's source path (relative to its Vite
 // root, keeping the `.ts` extension) as `"<telefuncFilePath>:<exportName>"`. Since the
-// impls physically live here in @gemstack/framework (not in the dashboard), the no-Vite
+// impls physically live here in @gemstack/the-framework (not in the dashboard), the no-Vite
 // server can't discover them by file path — we register them under the exact baked keys
 // via Telefunc's `__decorateTelefunction`. Keys live here so a rename is a one-liner.
 export const DASHBOARD_TELEFUNC_KEYS = {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import type { Preferences } from '@gemstack/framework'
+import type { Preferences } from '@gemstack/the-framework'
 import { addProfile } from '../lib/profiles.js'
 import { selectRemoteDevice } from '../lib/remote-target.js'
 

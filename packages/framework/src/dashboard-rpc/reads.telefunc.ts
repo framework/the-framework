@@ -24,7 +24,7 @@ import type { FrameworkEvent } from '../events.js'
 // The read model behind the new dashboard (#405): the run history, a run's replay, the
 // surfaced PLAN/TODO docs, and the committed LOGS.md — each keyed by project id and
 // backed by the same readers the daemon's legacy /api/* endpoints use, so the dashboard
-// stays a projection of the same files. These implementations live in @gemstack/framework
+// stays a projection of the same files. These implementations live in @gemstack/the-framework
 // so the daemon can serve them in-process (the client imports them via re-export shims
 // in framework-dashboard, keeping the baked RPC keys `/server/reads.telefunc.ts`). The
 // live run stream is its own Telefunc Channel (events.telefunc.ts).

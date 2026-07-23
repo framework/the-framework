@@ -1,5 +1,5 @@
 ---
-'@gemstack/framework': minor
+'@gemstack/the-framework': minor
 ---
 
 Dashboard: the session log reads like a conversation. Your prompt is its own `YOU` row and the agent's turn is `AGENT`, so a message is no longer echoed twice — the redundant `You: …` log line is gone and the first prompt and every follow-up now read the same way.

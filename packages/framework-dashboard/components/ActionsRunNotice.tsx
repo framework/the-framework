@@ -1,5 +1,5 @@
 import { Github, ExternalLink } from 'lucide-react'
-import type { FrameworkEvent } from '@gemstack/framework'
+import type { FrameworkEvent } from '@gemstack/the-framework'
 import { actionsRunUrl } from '../lib/live-state.js'
 
 // The run view's affordance for a GitHub Actions target (#1053). An Actions run replays its

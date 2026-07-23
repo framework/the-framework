@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
-import type { FrameworkEvent } from '@gemstack/framework'
-import { runProgress, sessionInfo } from '@gemstack/framework/client'
+import type { FrameworkEvent } from '@gemstack/the-framework'
+import { runProgress, sessionInfo } from '@gemstack/the-framework/client'
 import { onRun, onRetainedWorktrees } from '../server/reads.telefunc.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useRunHandoff } from '../lib/use-run-handoff.js'

@@ -1,5 +1,5 @@
-import type { FrameworkEvent } from '@gemstack/framework'
-import { formatFrameworkEvent } from '@gemstack/framework/client'
+import type { FrameworkEvent } from '@gemstack/the-framework'
+import { formatFrameworkEvent } from '@gemstack/the-framework/client'
 import { useState } from 'react'
 import { eventKindLabel } from '../lib/event-labels.js'
 import { receivedAt } from '../lib/event-times.js'

@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import type { FrameworkEvent } from '@gemstack/framework'
-import { sessionInfo } from '@gemstack/framework/client'
+import type { FrameworkEvent } from '@gemstack/the-framework'
+import { sessionInfo } from '@gemstack/the-framework/client'
 import { Square, ExternalLink } from 'lucide-react'
 import { sendStop } from '../server/control.telefunc.js'
 import { useAction } from '../lib/use-action.js'

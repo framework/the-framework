@@ -1,5 +1,5 @@
 ---
-"@gemstack/framework": patch
+"@gemstack/the-framework": patch
 ---
 
 fix(framework): set the daemon token cookie SameSite=Lax so the "a device I have" connection hop works

@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import { composeRunSystem, type EcoOptions } from '@gemstack/framework/client'
+import { composeRunSystem, type EcoOptions } from '@gemstack/the-framework/client'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover.js'
 import { Checkbox } from './ui/checkbox.js'
 import { cn } from '../lib/utils.js'

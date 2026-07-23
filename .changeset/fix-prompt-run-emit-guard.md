@@ -1,5 +1,5 @@
 ---
-'@gemstack/framework': patch
+'@gemstack/the-framework': patch
 ---
 
 Stop a throwing onEvent listener from escaping a prompt run (runPrompt).

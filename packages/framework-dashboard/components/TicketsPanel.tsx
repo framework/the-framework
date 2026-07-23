@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { WorkspaceTicket } from '@gemstack/framework'
+import type { WorkspaceTicket } from '@gemstack/the-framework'
 import { ListPlus, Check } from 'lucide-react'
 import { onTickets } from '../server/reads.telefunc.js'
 import { sendQueueTicket, sendStart } from '../server/control.telefunc.js'

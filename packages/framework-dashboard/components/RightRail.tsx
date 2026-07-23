@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ChoiceRequest } from '@gemstack/framework'
+import type { ChoiceRequest } from '@gemstack/the-framework'
 import { DocsPanel } from './DocsPanel.js'
 import { ProjectLogPanel } from './ProjectLogPanel.js'
 import { ChoicesRail } from './ChoicesRail.js'

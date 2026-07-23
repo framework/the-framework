@@ -1,6 +1,6 @@
 ---
 '@gemstack/ai-autopilot': minor
-'@gemstack/framework': patch
+'@gemstack/the-framework': patch
 ---
 
 **Breaking (`@gemstack/ai-autopilot`):** the framework-detection exports are renamed so they no
@@ -32,4 +32,4 @@ unchanged: they were already unambiguous. The domain-preset exports (`defineDoma
 `builtinPresetsDir`, ...) are unchanged.
 
 No behavior change. As a side effect `@gemstack/ai-autopilot` no longer exports a `definePreset`
-that clashes with the unrelated `definePreset` in `@gemstack/framework`.
+that clashes with the unrelated `definePreset` in `@gemstack/the-framework`.

@@ -1,4 +1,4 @@
-import type { Overview } from '@gemstack/framework'
+import type { Overview } from '@gemstack/the-framework'
 import { onOverview } from '../server/reads.telefunc.js'
 import { usePolled } from './use-async.js'
 

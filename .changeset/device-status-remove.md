@@ -1,5 +1,5 @@
 ---
-'@gemstack/framework': minor
+'@gemstack/the-framework': minor
 '@gemstack/framework-dashboard': minor
 ---
 

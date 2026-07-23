@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@base-ui-components/react": "1.0.0-rc.0",
-    "@gemstack/framework": "workspace:^",
+    "@gemstack/the-framework": "workspace:^",
     "@shadcn/react": "^0.2.1",
     "@tiptap/core": "^2.10.0",
     "@tiptap/pm": "^2.10.0",

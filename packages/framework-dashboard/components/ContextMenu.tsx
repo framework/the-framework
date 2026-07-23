@@ -1,4 +1,4 @@
-import type { ProjectSummary } from '@gemstack/framework'
+import type { ProjectSummary } from '@gemstack/the-framework'
 import { Layers } from 'lucide-react'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'

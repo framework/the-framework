@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '@gemstack/framework'
-import { MAX_SPEND_OFFSET } from '@gemstack/framework/client'
+import type { DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '@gemstack/the-framework'
+import { MAX_SPEND_OFFSET } from '@gemstack/the-framework/client'
 import { useQuota } from '../lib/quota.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { weekTicks, quotaTone, limitPercent, TONE_NOTE, type QuotaTone } from '../lib/quota-bar.js'

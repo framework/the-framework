@@ -1,5 +1,5 @@
 ---
-'@gemstack/framework': minor
+'@gemstack/the-framework': minor
 ---
 
 feat(framework): remote-daemon lane, non-loopback bind guarded by a shared token (#1051)

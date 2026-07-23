@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { WorkspaceTicket } from '@gemstack/framework'
+import type { WorkspaceTicket } from '@gemstack/the-framework'
 
 const onTickets = vi.hoisted(() => vi.fn())
 const sendQueueTicket = vi.hoisted(() => vi.fn())

@@ -1,4 +1,4 @@
-import type { FrameworkEvent } from '@gemstack/framework'
+import type { FrameworkEvent } from '@gemstack/the-framework'
 import { TriangleAlert } from 'lucide-react'
 import { EventList } from './EventList.js'
 import { RunOverview } from './RunOverview.js'

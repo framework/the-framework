@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { ArrowUp, Loader2 } from 'lucide-react'
-import type { ProjectSummary } from '@gemstack/framework'
-import { AGENTS, AGENT_LABELS, LAUNCHER_PRESETS, type AgentName } from '@gemstack/framework/client'
+import type { ProjectSummary } from '@gemstack/the-framework'
+import { AGENTS, AGENT_LABELS, LAUNCHER_PRESETS, type AgentName } from '@gemstack/the-framework/client'
 import {
   usePreferences,
   updatePreferences,

@@ -1,4 +1,4 @@
-import type { RunStatus } from '@gemstack/framework'
+import type { RunStatus } from '@gemstack/the-framework'
 
 // How past runs ended (#471). These are the reserved status colours (good / warning /
 // critical), so every segment ships with a written label and count — identity is never

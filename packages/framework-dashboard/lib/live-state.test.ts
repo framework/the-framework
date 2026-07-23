@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { FrameworkEvent } from '@gemstack/framework'
+import type { FrameworkEvent } from '@gemstack/the-framework'
 import { agentViews, pendingChoices, isRunActive, currentRunEvents, runOutcome, actionsRunUrl } from './live-state.js'
 
 const view = (id: string, title: string, markdown: string): FrameworkEvent => ({ kind: 'view', id, title, markdown })

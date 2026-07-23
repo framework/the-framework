@@ -1,4 +1,4 @@
-import type { CustomPreset } from '@gemstack/framework'
+import type { CustomPreset } from '@gemstack/the-framework'
 import { SquareSlash, Plus, X } from 'lucide-react'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'

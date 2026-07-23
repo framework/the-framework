@@ -1,4 +1,4 @@
-import type { Preferences } from '@gemstack/framework'
+import type { Preferences } from '@gemstack/the-framework'
 import { Settings, Check, MonitorSmartphone, Plus, X } from 'lucide-react'
 import { updatePreferences } from '../lib/preferences.js'
 import type { ConnectionProfile } from '../lib/profiles.js'

@@ -1,5 +1,5 @@
 import { PreviewCard } from '@base-ui-components/react/preview-card'
-import type { FileContent, FileDiff } from '@gemstack/framework'
+import type { FileContent, FileDiff } from '@gemstack/the-framework'
 import { onFileContent, onFileDiff } from '../server/reads.telefunc.js'
 import { usePolled } from '../lib/use-async.js'
 import { ContentView, DiffStat, DiffView } from './DiffView.js'

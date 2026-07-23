@@ -298,7 +298,7 @@ Five ship built in (`software-development`, `web-development`, `data-science`,
 `loadDomainPreset(dir)`, and merge several with `composeDomainPresets(...)`
 (presets-of-presets). A mode variant (a `stem.<mode>.md` sibling carrying
 `metadata.conditions`) swaps in a leaner loop under a mode like `technical`.
-`@gemstack/framework` surfaces these to end users as `--preset`.
+`@gemstack/the-framework` surfaces these to end users as `--preset`.
 
 ## Guardrails
 

@@ -1,4 +1,4 @@
-// Re-export shim (#410): the user-preferences telefunctions live in @gemstack/framework so the
+// Re-export shim (#410): the user-preferences telefunctions live in @gemstack/the-framework so the
 // daemon serves them in-process, reading/writing the same `the-framework.json` as the registry.
 // Keeping this file at `server/preferences.telefunc.ts` means the client bakes the RPC key
 // `/server/preferences.telefunc.ts` — the exact key the daemon registers the impls under (see
@@ -16,7 +16,7 @@ import {
   saveProjectPresets,
   onEditors,
   onNotifyChannels,
-} from '@gemstack/framework/dashboard-rpc'
+} from '@gemstack/the-framework/dashboard-rpc'
 
 export {
   onPreferences,
@@ -28,4 +28,4 @@ export {
   onEditors,
   onNotifyChannels,
 }
-export type { EditorInfo, NotifyChannels } from '@gemstack/framework/dashboard-rpc'
+export type { EditorInfo, NotifyChannels } from '@gemstack/the-framework/dashboard-rpc'

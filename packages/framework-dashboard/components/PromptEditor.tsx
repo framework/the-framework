@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import type { ProjectSummary, CustomPreset } from '@gemstack/framework'
+import type { ProjectSummary, CustomPreset } from '@gemstack/the-framework'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from 'tiptap-markdown'

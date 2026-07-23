@@ -1,5 +1,5 @@
 ---
-'@gemstack/framework': minor
+'@gemstack/the-framework': minor
 ---
 
 Dashboard: semantic status colours, a real Checkbox, a stable Sessions rail, and no emoji glyphs.

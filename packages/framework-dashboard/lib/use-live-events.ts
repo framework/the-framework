@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { FrameworkEvent } from '@gemstack/framework'
+import type { FrameworkEvent } from '@gemstack/the-framework'
 import type { ClientChannel } from 'telefunc'
 import { onEvents } from '../server/events.telefunc.js'
 import { currentRunEvents } from './live-state.js'

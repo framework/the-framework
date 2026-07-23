@@ -5,7 +5,7 @@
 **Autonomous AI programming.**  
 Stop babysitting your coding agents. You make the important decisions; AI does the rest.
 
-[![npm](https://img.shields.io/npm/v/@gemstack/framework)](https://www.npmjs.com/package/@gemstack/framework) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE) [![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/qc8zvdzWNR)
+[![npm](https://img.shields.io/npm/v/@gemstack/the-framework)](https://www.npmjs.com/package/@gemstack/the-framework) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE) [![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/qc8zvdzWNR)
 
 <br clear="left" />
 
@@ -16,14 +16,14 @@ The Framework turns your coding agent into an autonomous teammate that plans, re
 ## Quickstart
 
 ```bash
-npm i -g @gemstack/framework
-framework "a paginated orders page backed by an orders table, with sign-in"
+npm i -g @gemstack/the-framework
+the-framework "a paginated orders page backed by an orders table, with sign-in"
 
 # one-shot, no install:
-npx @gemstack/framework "..."
+npx @gemstack/the-framework "..."
 
 # deterministic offline demo (no model, no API key):
-framework --fake
+the-framework --fake
 ```
 
 ## Stop babysitting
@@ -46,7 +46,7 @@ The Framework does not run its own agent. It drives a coding agent as a black bo
 - **Bring your own subscription.** Orchestrates through your existing Claude Code install, so there is no extra API bill.
 - **100% local.** Runs on your machine like a desktop app. No backdoors, no tracking; your knowledge base lives as `knowledge-base/*.md` in your own Git repo.
 
-See the [`@gemstack/framework` README](./packages/framework/README.md) for the CLI, the library API, and the driver seam.
+See the [`@gemstack/the-framework` README](./packages/framework/README.md) for the CLI, the library API, and the driver seam.
 
 ## Built on GemStack
 
@@ -63,7 +63,7 @@ Full docs live in [`docs/`](./docs/guide/index.md) (a hosted site is on the way)
 | [`ai‑sdk`](./packages/ai-sdk) | The agent runtime the rest of the AI family builds on: providers, agent loop, tools, streaming, middleware, structured output, memory, and evals. | [Guide](./docs/packages/ai-sdk/index.md) | [![npm](https://img.shields.io/npm/v/@gemstack/ai-sdk)](https://www.npmjs.com/package/@gemstack/ai-sdk) |
 | [`ai‑skills`](./packages/ai-skills) | Portable capability bundles: load `SKILL.md` skills (instructions, tools, resources) and compose them onto an agent on demand. | [Guide](./docs/packages/ai-skills.md) | [![npm](https://img.shields.io/npm/v/@gemstack/ai-skills)](https://www.npmjs.com/package/@gemstack/ai-skills) |
 | [`ai‑autopilot`](./packages/ai-autopilot) | The AI-building framework: a Supervisor (plan, dispatch, synthesize), a runner sandbox, surfaces, an event-triggered review/QA loop with a prompt library, framework presets (Vike/Next), and a bootstrap flow from nothing to a production-grade app. | [Guide](./docs/packages/ai-autopilot.md) | [![npm](https://img.shields.io/npm/v/@gemstack/ai-autopilot)](https://www.npmjs.com/package/@gemstack/ai-autopilot) |
-| [`framework`](./packages/framework) | **The (AI) Framework**: turnkey, zero-config orchestration on `ai-autopilot`. Wraps a coding-agent CLI (Claude Code) as a black box and takes an idea to a running app, with a live dashboard, Open Loop presets, an optional Docker sandbox, and a run relay for shared sessions. | [README](./packages/framework/README.md) | [![npm](https://img.shields.io/npm/v/@gemstack/framework)](https://www.npmjs.com/package/@gemstack/framework) |
+| [`framework`](./packages/framework) | **The (AI) Framework**: turnkey, zero-config orchestration on `ai-autopilot`. Wraps a coding-agent CLI (Claude Code) as a black box and takes an idea to a running app, with a live dashboard, Open Loop presets, an optional Docker sandbox, and a run relay for shared sessions. | [README](./packages/framework/README.md) | [![npm](https://img.shields.io/npm/v/@gemstack/the-framework)](https://www.npmjs.com/package/@gemstack/the-framework) |
 | [`ai‑mcp`](./packages/ai-mcp) | The agent/MCP bridge: consume a remote MCP server's tools as agent tools, and expose an agent as an MCP server. | [Guide](./docs/packages/ai-mcp.md) | [![npm](https://img.shields.io/npm/v/@gemstack/ai-mcp)](https://www.npmjs.com/package/@gemstack/ai-mcp) |
 | [`mcp`](./packages/mcp) | A standalone framework for *authoring* MCP servers: tools, resources, prompts, decorators, OAuth 2.1, a framework-neutral HTTP handler, and a test client. Agent-agnostic. | [Guide](./docs/packages/mcp.md) | [![npm](https://img.shields.io/npm/v/@gemstack/mcp)](https://www.npmjs.com/package/@gemstack/mcp) |
 | [`mcp‑connectors`](./packages/mcp-connectors) | The connector contract: define a service connector once with `defineConnector`, and compose any number into one MCP server with `mountConnectors`. Built on `@gemstack/mcp`; agent-agnostic. | [Guide](./docs/packages/mcp-connectors.md) | [![npm](https://img.shields.io/npm/v/@gemstack/mcp-connectors)](https://www.npmjs.com/package/@gemstack/mcp-connectors) |
@@ -114,7 +114,7 @@ pnpm typecheck
 pnpm test
 ```
 
-Working on `@gemstack/framework`, run `pnpm build` first: the framework tests need the dashboard bundle. Without `packages/framework-dashboard/dist/client`, the daemon answers `/_telefunc` with a 503 text body and `daemon.test.ts` fails on `JSON.parse` (`SyntaxError: Unexpected token 'h'`), which reads like a real regression but is a missing build step.
+Working on `@gemstack/the-framework`, run `pnpm build` first: the framework tests need the dashboard bundle. Without `packages/framework-dashboard/dist/client`, the daemon answers `/_telefunc` with a 503 text body and `daemon.test.ts` fails on `JSON.parse` (`SyntaxError: Unexpected token 'h'`), which reads like a real regression but is a missing build step.
 
 This is a pnpm + Turborepo + Changesets monorepo. Runnable examples live under [`examples/`](./examples): e.g. [`mcp-quickstart`](./examples/mcp-quickstart), [`autopilot-quickstart`](./examples/autopilot-quickstart) (Supervisor + runner + surfaces), and [`bootstrap-quickstart`](./examples/bootstrap-quickstart) (the whole bootstrap flow, offline). See [`.changeset/README.md`](./.changeset/README.md) for the release flow.
 

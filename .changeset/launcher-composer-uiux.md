@@ -1,5 +1,5 @@
 ---
-"@gemstack/framework": minor
+"@gemstack/the-framework": minor
 ---
 
 Dashboard launcher and rail UX pass:

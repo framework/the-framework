@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import type { ChoiceRequest } from '@gemstack/framework'
+import type { ChoiceRequest } from '@gemstack/the-framework'
 import { ChoicePanel } from './ChoicePanel.js'
 import { ScrollArea } from './ui/scroll-area.js'
 

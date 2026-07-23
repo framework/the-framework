@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import type { RunMeta } from '@gemstack/framework'
+import type { RunMeta } from '@gemstack/the-framework'
 
 const onRuns = vi.hoisted(() => vi.fn())
 vi.mock('../server/reads.telefunc.js', () => ({ onRuns }))

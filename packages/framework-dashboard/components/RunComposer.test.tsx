@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { Preferences } from '@gemstack/framework'
+import type { Preferences } from '@gemstack/the-framework'
 
 // The two writes this component chooses between: a control-log message into the open session, or
 // a run of its own.

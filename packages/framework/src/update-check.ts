@@ -6,7 +6,7 @@
  */
 
 /** The npm package this CLI ships as; the registry key for the version check. */
-export const PACKAGE_NAME = '@gemstack/framework'
+export const PACKAGE_NAME = '@gemstack/the-framework'
 
 /** Fetches the latest published version of `pkg`, or undefined on any failure. Injectable for tests. */
 export type VersionFetcher = (pkg: string) => Promise<string | undefined>

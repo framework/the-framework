@@ -1,5 +1,5 @@
 ---
-'@gemstack/framework': minor
+'@gemstack/the-framework': minor
 ---
 
 feat(framework): context fragment lists the recorded conversations (#683)

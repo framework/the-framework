@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import type { ProjectSummary } from '@gemstack/framework'
-import { runOptionsFromPreferences } from '@gemstack/framework/client'
+import type { ProjectSummary } from '@gemstack/the-framework'
+import { runOptionsFromPreferences } from '@gemstack/the-framework/client'
 import { onProjects } from '../server/projects.telefunc.js'
 import { onSystemPromptUser } from '../server/reads.telefunc.js'
 import { usePreferences, updatePreferences, autopilotEnabled } from '../lib/preferences.js'

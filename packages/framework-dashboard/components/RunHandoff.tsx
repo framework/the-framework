@@ -1,4 +1,4 @@
-import type { RunHandoff } from '@gemstack/framework'
+import type { RunHandoff } from '@gemstack/the-framework'
 import { GitPullRequest, Upload } from 'lucide-react'
 import { sendOpenPullRequest, sendPushBranch } from '../server/control.telefunc.js'
 import type { RunHandoffState } from '../lib/use-run-handoff.js'

@@ -1,4 +1,4 @@
-import type { FrameworkEvent } from '@gemstack/framework'
+import type { FrameworkEvent } from '@gemstack/the-framework'
 
 type EventKind = FrameworkEvent['kind']
 

@@ -101,7 +101,7 @@ importers:
       '@gemstack/ai-autopilot':
         specifier: workspace:^
         version: link:../../packages/ai-autopilot
-      '@gemstack/framework':
+      '@gemstack/the-framework':
         specifier: workspace:^
         version: link:../../packages/framework
     devDependencies:
@@ -274,7 +274,7 @@ importers:
       '@base-ui-components/react':
         specifier: 1.0.0-rc.0
         version: 1.0.0-rc.0(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@gemstack/framework':
+      '@gemstack/the-framework':
         specifier: workspace:^
         version: link:../framework
       '@shadcn/react':

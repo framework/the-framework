@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ProjectSummary } from '@gemstack/framework'
+import type { ProjectSummary } from '@gemstack/the-framework'
 import { ChevronDown, Check, LayoutDashboard, Plus } from 'lucide-react'
 import { onProjects } from '../server/projects.telefunc.js'
 import { AddProjectPanel } from './AddProjectPanel.js'

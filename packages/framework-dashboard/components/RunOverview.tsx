@@ -1,5 +1,5 @@
-import type { FrameworkEvent } from '@gemstack/framework'
-import { loopStatus, sessionInfo, deployPlan, runProgress } from '@gemstack/framework/client'
+import type { FrameworkEvent } from '@gemstack/the-framework'
+import { loopStatus, sessionInfo, deployPlan, runProgress } from '@gemstack/the-framework/client'
 import { Badge } from './ui/badge.js'
 import { isRunActive, runOutcome } from '../lib/live-state.js'
 import { describeSessionLink } from '../lib/session-link.js'
@@ -7,7 +7,7 @@ import { cn } from '../lib/utils.js'
 
 // The run overview (#431): the "moat" the wrapped agent's own chat cannot show, rebuilt
 // on the new dashboard. Each card is a pure projection of the event stream (run-view.ts
-// in @gemstack/framework) — the production-grade loop status, the deploy plan, and a link
+// in @gemstack/the-framework) — the production-grade loop status, the deploy plan, and a link
 // to the live session. Cards render only when their data has arrived, so an early run
 // shows nothing extra.
 export function RunOverview({ events, showSessionLink = true }: { events: FrameworkEvent[]; showSessionLink?: boolean }) {

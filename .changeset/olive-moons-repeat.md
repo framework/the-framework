@@ -1,5 +1,5 @@
 ---
-'@gemstack/framework': patch
+'@gemstack/the-framework': patch
 ---
 
 Dashboard: fix the Usage card's dividers rendering at full text brightness, and stop the

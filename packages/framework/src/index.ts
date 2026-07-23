@@ -1,5 +1,5 @@
 /**
- * `@gemstack/framework` — **The (AI) Framework**: turnkey, zero-config AI
+ * `@gemstack/the-framework` — **The (AI) Framework**: turnkey, zero-config AI
  * orchestration. It wraps a coding-agent CLI (Claude Code today) as a **black
  * box** and takes a user from an idea to a running app, with a localhost
  * dashboard that foregrounds the orchestration the agent's own chat cannot show.

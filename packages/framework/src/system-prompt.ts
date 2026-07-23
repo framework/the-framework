@@ -133,12 +133,12 @@ export const CONTEXT_DOCS: readonly ContextDoc[] = [
   { path: 'knowledge-base/MARKET_RESEARCH.md', comment: 'the market the project competes in' },
   // The catch-all (#683): any other file the agent parks under knowledge-base/.
   { path: 'knowledge-base/**.md', comment: 'more files holding knowledge related to the project' },
-  { path: 'tickets/**.md', comment: 'things to potentially work on; format: node_modules/@gemstack/framework/prompts/ticketing_format.md' },
+  { path: 'tickets/**.md', comment: 'things to potentially work on; format: node_modules/@gemstack/the-framework/prompts/ticketing_format.md' },
   // Recorded human conversations (#683/#908): the run committed each Discord/chat turn here, so a
   // future agent can read what was said. A read-only pointer, so it stays out of BUSINESS_KNOWLEDGE_DOCS.
   // Path inlined to keep this module node-free; pinned to THE_FRAMEWORK_DIR/CONVERSATIONS_DIR by a test.
   { path: '.the-framework/conversations/**.md', comment: 'recorded human conversations (e.g. via the Discord bot)' },
-  { path: 'TODO_AGENTS.md', comment: 'the AI task queue; format: node_modules/@gemstack/framework/prompts/todo_format.md' },
+  { path: 'TODO_AGENTS.md', comment: 'the AI task queue; format: node_modules/@gemstack/the-framework/prompts/todo_format.md' },
 ]
 
 /** The two halves of the rendered {@link SYSTEM_PROMPT_TEMPLATE}. */

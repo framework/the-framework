@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import type { Activity, Intervention } from '@gemstack/framework'
-import { activityKey, interventionKey, pickNewActivity, pickNewInterventions } from '@gemstack/framework/client'
+import type { Activity, Intervention } from '@gemstack/the-framework'
+import { activityKey, interventionKey, pickNewActivity, pickNewInterventions } from '@gemstack/the-framework/client'
 
 // Browser notifications for the two feeds the shell already polls (#627): the "needs you"
 // queue and the "new activity" feed. One engine — the identity half (key + new-item pick) is

@@ -1,4 +1,4 @@
-import type { FrameworkFileConfig, Preferences } from '@gemstack/framework'
+import type { FrameworkFileConfig, Preferences } from '@gemstack/the-framework'
 import type { PreferenceSources } from '../lib/preferences.js'
 import type { OptionRow } from './OptionsMenu.js'
 

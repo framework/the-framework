@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import type { QuotaView } from '@gemstack/framework'
+import type { QuotaView } from '@gemstack/the-framework'
 
 // The RPC is a telefunc shim over the wire, so stub it: these tests are about the
 // hook's own behavior (poll, keep-last-on-failure, stop on unmount), not the daemon.

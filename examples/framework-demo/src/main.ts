@@ -15,7 +15,7 @@ async function main(): Promise<void> {
   console.log(`  it served:        ${out.served.slice(0, 72)}${out.served.length > 72 ? '…' : ''}`)
 
   console.log('\nThat is the fake driver. To do it for real against Claude Code:')
-  console.log('  npx @gemstack/framework "a paginated orders page with sign-in"')
+  console.log('  npx @gemstack/the-framework "a paginated orders page with sign-in"')
 }
 
 main().catch(err => {

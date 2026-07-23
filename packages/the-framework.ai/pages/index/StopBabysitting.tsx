@@ -60,10 +60,7 @@ const PROBLEMS: { title: string; desc?: string; rows: Row[] }[] = [
 export function StopBabysitting() {
   return (
     <section id="stop-babysitting" style={sectionStyle}>
-      <SectionHead
-        title="Stop babysitting"
-        sub="Stop losing time micro-managing agents — focus on what matters instead."
-      />
+      <SectionHead title="Stop babysitting" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         {PROBLEMS.map((p) => (
           <div

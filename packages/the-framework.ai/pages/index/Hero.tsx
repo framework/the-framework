@@ -210,7 +210,7 @@ export function Hero() {
                   <span style={dollarStyle}>$ </span>
                   {cmds.try}
                 </span>
-                <span style={commentStyle}># One-shot run</span>
+                <span style={commentStyle}># One-shot (no install)</span>
               </div>
             </div>
           </div>

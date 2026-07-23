@@ -23,22 +23,22 @@ const PROBLEMS: { title: string; desc?: string; rows: Row[] }[] = [
         </>,
       ),
       good(
-        'Coverage guarantees: The Framework lets AI enumerate everything that needs to be done before writing code. AI then works through that checklist, ensuring comprehensive coverage and preventing lazy shortcuts.',
+        <><b>Coverage guarantees</b>: The Framework lets AI enumerate everything that needs to be done before writing code. AI then works through that checklist, ensuring comprehensive coverage and preventing lazy shortcuts.</>,
       ),
     ],
   },
   {
-    title: 'Lazy planning',
+    title: 'Lazy AI plans',
     rows: [
       bad('Tell AI to deep dive for each important aspect.'),
-      good('Powerful loop of critical feedback and research.'),
+      good(<>Automatic loop of critical self feedback ↔ research.</>),
     ],
   },
   {
     title: 'Lazy low-quality code',
     desc: 'Despite AI being able to write high-quality code, it often goes for the quickest/laziest solution (not correct, not maintainable, not DRY).',
     rows: [
-      bad('Appending "WRITE the HIGHEST quality code you ever wrote" to your prompts → minimal improvement.'),
+      bad('Appending "Write the BEST code you ever wrote" to your prompts → minimal improvement.'),
       good("The Framework makes AI question and review itself until it's highly confident about its implementation."),
     ],
   },
@@ -47,7 +47,7 @@ const PROBLEMS: { title: string; desc?: string; rows: Row[] }[] = [
     rows: [
       bad('Tell AI "don\'t do this, research alternatives".'),
       good(
-        'The Framework makes AI gauge the variability of its implementation: if there are alternatives with subtle pros and cons, show them to the user.',
+        'The Framework makes AI gauge the variability of its implementation: if there are alternatives with pros and cons, show them to the user.',
       ),
     ],
   },

@@ -20,10 +20,8 @@ function QueueCard({ title, children }: { title: string; children: ReactNode }) 
 
 export function Queues() {
   return (
-    <section id="queues" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <h3 style={h3Style}>2. Queues</h3>
-      </div>
+    <section id="queues" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <h3 style={h3Style}>2. Queues</h3>
       <div
         style={{
           display: 'grid',

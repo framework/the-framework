@@ -17,8 +17,8 @@ const CARDS = [
 const chipStyle: CSSProperties = {
   borderRadius: 8,
   padding: '7px 14px',
-  fontSize: 13.5,
-  fontWeight: 500,
+  fontSize: 14,
+  fontWeight: 600,
   color: '#d3c6aa',
 }
 
@@ -40,7 +40,7 @@ export function Prompts() {
           padding: '14px 18px',
         }}
       >
-        <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.6, color: '#9da9a0', textWrap: 'pretty' }}>
+        <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: '#9da9a0', textWrap: 'pretty' }}>
           Powered by <b style={{ color: '#d3c6aa', fontWeight: 600 }}>high-quality prompts</b> — state-of-the-art open source, or
           bring your own:
         </p>

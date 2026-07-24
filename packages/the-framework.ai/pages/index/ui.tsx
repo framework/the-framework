@@ -6,11 +6,13 @@ export const NPM_URL = 'https://www.npmjs.com/package/@gemstack/the-framework'
 
 export const mono = "'IBM Plex Mono', monospace" as const
 
-// A content section: max-width column with the shared vertical rhythm.
+// A content section: max-width column with the shared vertical rhythm. The
+// rhythm is a MARGIN, not padding: anchors target the border box, so nav
+// clicks land on the section's content instead of a screen of padding.
 export const sectionStyle: CSSProperties = {
   maxWidth: 1120,
-  margin: '0 auto',
-  padding: 'clamp(72px, 13vw, 140px) clamp(14px, 4vw, 24px) 0',
+  margin: 'clamp(72px, 13vw, 140px) auto 0',
+  padding: '0 clamp(14px, 4vw, 24px)',
   display: 'flex',
   flexDirection: 'column',
   gap: 36,

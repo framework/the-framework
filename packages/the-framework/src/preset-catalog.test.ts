@@ -24,6 +24,7 @@ const PARAMLESS = [
   presets.quickWins,
   presets.spikeAndPlan,
   presets.suggestNewTickets,
+  presets.suggestNewFeatures,
   presets.suggestTicketsToWorkOn,
   presets.drainQueue,
   presets.triageQuick,
@@ -38,8 +39,8 @@ test('every preset keeps its exact run-kind name', () => {
     [
       'drain-queue', 'import-tickets', 'maintainability', 'maintenance', 'market-research',
       'quick-wins', 'readability', 'research', 'security-audit', 'spike-and-plan',
-      'suggest-new-tickets', 'suggest-tickets-to-work-on', 'triage-consensual', 'triage-quick',
-      'ux',
+      'suggest-new-features', 'suggest-new-tickets', 'suggest-tickets-to-work-on',
+      'triage-consensual', 'triage-quick', 'ux',
     ],
   )
 })

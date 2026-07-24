@@ -10,6 +10,7 @@ import {
   PRESETS_RESEARCH,
   PRESETS_SECURITY_AUDIT,
   PRESETS_SPIKE_AND_PLAN,
+  PRESETS_SUGGEST_NEW_FEATURES,
   PRESETS_SUGGEST_NEW_TICKETS,
   PRESETS_SUGGEST_TICKETS_TO_WORK_ON,
   PRESETS_TRIAGE_CONSENSUAL,
@@ -100,6 +101,16 @@ export const presets = {
   suggestNewTickets: definePreset({ name: 'suggest-new-tickets', template: PRESETS_SUGGEST_NEW_TICKETS, label: 'Suggest new tickets' }),
 
   /**
+   * [Suggest new features] (#1109): the product-inward, generative corner of the PM cluster. It
+   * studies what the product does today and proposes net-new features as tickets in `tickets/`.
+   * Distinct from its neighbours: `suggestNewTickets` echoes a line the human types,
+   * `marketResearch` looks outward at the market, and `suggestTicketsToWorkOn` picks from tickets
+   * that already exist. Autonomous rather than gated — a proposal is a reviewable ticket, so the
+   * human triages later instead of approving mid-run, which also keeps it usable unattended.
+   */
+  suggestNewFeatures: definePreset({ name: 'suggest-new-features', template: PRESETS_SUGGEST_NEW_FEATURES, label: 'Suggest new features', tooltip: 'Propose net-new features as tickets in `tickets/`' }),
+
+  /**
    * [Suggest tickets to work on] (#698): the gated sibling of the triage pair. It ends in
    * `<AWAIT>`, so it is deliberately kept out of {@link AUTO_PM_JOBS} — firing it unattended
    * would wedge a run against a human who is not there.
@@ -143,6 +154,7 @@ export const LAUNCHER_PRESETS: readonly PresetDef[] = [
   presets.securityAudit,
   presets.ux,
   presets.suggestNewTickets,
+  presets.suggestNewFeatures,
   presets.suggestTicketsToWorkOn,
   presets.spikeAndPlan,
   presets.quickWins,

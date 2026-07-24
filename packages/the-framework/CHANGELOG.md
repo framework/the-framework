@@ -1,5 +1,81 @@
 # @gemstack/the-framework
 
+## 1.3.0
+
+### Minor Changes
+
+- a6983a7: Reclaim a session's worktree once its work has landed.
+
+  A run that failed or was stopped keeps its checkout so you can read what it was holding, and nothing ever took those back, so a machine accumulated one full checkout per such session forever. The daemon now sweeps the registered projects every ten minutes and removes the checkouts whose branch has landed.
+
+  Only the checkout goes. The branch, its commits, and the session's row and replayable log are kept, so everything this reclaims is a `git worktree add` away. That is what makes it safe to do without asking.
+
+  A branch counts as landed on either of two signals, because neither alone is enough. `git branch --merged` is the stronger one, since it proves the commits are reachable from the local base, but it only holds for a merge that kept them: a squash or rebase merge rewrites the commits, so the branch never becomes an ancestor and the signal never fires. A merged PR closes that gap. A closed-unmerged PR does not count as landed, since the checkout of rejected work is the one you are most likely to still want.
+
+  The sweep is conservative wherever the answer is unclear: a live run keeps its checkout, and so does a branch that no longer exists or one whose state cannot be read.
+
+  `framework worktrees sweep` runs the same pass on demand, next to the existing `prune` (which removes every checkout whose session is no longer running, landed or not).
+
+- a82411e: Print the commands and the version on bare `framework` too (#312).
+
+  #312 describes what `$ framework` should do, and two of its items were already built: the convenience command list and the version footer with the npm "up to date" check. Both lived only in `ensureDaemonCmd`, the `framework --daemon` path. Bare `framework`, the command the issue is actually about, foregrounds the dashboard instead and printed two lines: the URL and "Ctrl+C to stop".
+
+  Both paths now print one shared footer, so the version you are running is visible from the command people actually type, and so is a newer release when there is one.
+
+  The update line is not awaited before the static lines. #312 asks for the static info first, and the foreground path blocks on the server until it is signalled, so anything held back until after the registry call would never have been printed there at all. The check keeps its existing 2.5s cap and stays silent when npm is unreachable.
+
+  The foreground footer drops the `framework stop` line, which stops a detached dashboard; that path tells you Ctrl+C instead.
+
+- aa349a4: Manage saved devices from the settings page.
+
+  Adding and removing a device already worked, but only from the composer's "Run on" menu, and the composer only exists on a project launcher. From the Overview or the settings page there was no way to manage the roster at all. The settings page now has a **Devices** section listing each saved device with its origin and online/offline status, an Add device button, and a remove per row. The "Run on" picker still lists devices, because choosing a run target is a per-run act; which devices exist is configuration.
+
+  Removing a device from settings clears the run target when that device was the one selected, the same guard the composer already applied, so a run can never point at a device that is no longer saved.
+
+  The section states that devices are saved in the browser rather than on the server: unlike every other setting on the page, a device carries a token, so it stays in this browser's storage and never reaches the daemon.
+
+- afa43b1: Configure the Discord bot and webhook from the dashboard (#1095).
+
+  Both Discord credentials were daemon environment variables and nothing else, so enabling Discord meant editing the daemon's environment and restarting it. That made it the one onboarding step you could not finish in the product: the #958 checklist could tell you the daemon had no token, and then only tell you to go elsewhere.
+
+  The setup dialogs now take the credential. It is stored in the registry file at the same tier as the daemon token (#1051): top level, never in `preferences`, so it cannot reach the browser bundle or a per-project override. The file is written owner-only. The daemon rebuilds its Discord services on the save, so the bot connects and the notification watchers start without a restart.
+
+  The value only ever moves inward. There is no read that returns a credential: the dashboard is told which ones exist and where each came from, which is the presence-only contract `onNotifyChannels` has had since #948. A stored credential shows as saved, with Replace and Remove rather than a field holding a secret.
+
+  An environment variable still wins over a stored value, and the dialog says so instead of offering an edit the daemon would shadow. That is how a container, a systemd unit or a shared box keeps configuring the daemon it runs.
+
+  The bell, the settings rows and the checklist now read this from one shared value rather than three independent polls, so saving a credential in one place settles all of them at once.
+
+- e0517cf: The end-of-session handoff happens by itself: Push branch and Open PR are now checkboxes, ticked by default.
+
+  They used to be two buttons on a finished session, and the code was explicit that they should stay clicks, on the grounds that publishing the agent's work under your name is your call. In practice that meant a click per session for the thing you almost always want, and when nobody clicked, the work stayed on a local branch nobody was told about.
+
+  The call is still yours, it is just made once instead of every time. The two controls are now **pre-commitments** in the session action bar: whatever is still ticked when the session settles happens on its own. Leave them alone and it is zero-config. Untick either one while the session runs to opt out, and the old button comes back, so the deliberate path is never lost. A failure falls back to the button too, with git's or `gh`'s own reason beside it.
+
+  The pair is not independent, because `gh` will not open a PR for a branch the remote has never seen: ticking **Open PR** arms the push, and unticking **Push branch** unticks the PR.
+
+  The PR is opened as a **draft**, so firing on every session does not put a review request in anyone's inbox. That needed one change elsewhere: the interventions queue skipped every draft, on the grounds that a draft is not asking for review. For a PR the framework opened for itself that reasoning inverts, since then nothing would tell you the work exists at all. The queue now lists a draft on a `the-framework/*` branch and still skips drafts opened by hand.
+
+  New per-project preferences `autoPushBranch` and `autoOpenPr` set where the boxes start; both default on. The CLI has `--no-auto-push-branch` and `--no-auto-open-pr`, which travel as explicit `--no-*` flags for the same reason the repo-config toggles do: these default on, so silence would re-arm them.
+
+  The handoff runs after the on-before-mergeable quality pass, so anything that pass committed is included, and it commits the session's own pending work first, which teardown would otherwise only do after the run process had exited. It declines rather than acting on a stopped run, a branch that is gone, a session that committed nothing, a repo with no remote, and a branch that already has a PR.
+
+### Patch Changes
+
+- f1cab24: Fix two faults in opening a session's pull request, both found by driving the handoff against a real GitHub remote rather than a stubbed one.
+
+  **The PR base was a tracking ref, so opening a PR failed outright.** `RunHandoff.base` holds what `detectBase` reads out of `refs/remotes/origin/HEAD`, which is `origin/main`. That is correct for the two things the field is otherwise used for, since the commit range and the merged check are both asking git about a remote-tracking ref. It is not a thing you can open a PR against: `gh pr create --base origin/main` is rejected with `Base ref must be a branch`. The name is now converted at the `gh` boundary, leaving the field as the git ref it is. This affected the manual **Open PR** button too, on any repo whose default branch is discovered through `origin/HEAD`.
+
+  **The "this branch already has a PR" guard could be defeated by a cold cache.** The check read through the dashboard's cached PR lookup, which answers `prPending` rather than yes-or-no while it refreshes. "Not known yet" therefore read as "no PR", and a second handoff for the same branch went ahead and tried to open another one; only `gh` refusing the duplicate stopped it. The handoff now takes the uncached lookup and waits for a real answer. It runs once, at the end of a session, so it can afford to.
+
+- 2f8908c: Make the settings page obey the same run-option rules as the launcher (#958).
+
+  The settings page rendered the run options as flat, independently checkable boxes, while the launcher has real rules between them. So the page could show an option checked that the launcher shows off, and allowed combinations that mean nothing: Eco under Vanilla (nothing left to trim), Browser on Codex (inert, the browser rides Claude Code's MCP config), Auto maintenance without Post-merge cleanup, and anything under Transparent, which overrides the lot.
+
+  The table and its rules moved out of the composer into one module both surfaces render, so a rule cannot hold in one place and not the other. A row the rules disable is greyed and shows why, rather than disappearing, since the settings page is where you go to look for a setting. `checked` is now the effective value everywhere, so no surface claims an option is on while the run ignores it.
+
+  Two smaller cases of the same thing: the notification rows now show the delivery capability the bell already showed (browser permission blocked, `DISCORD_WEBHOOK` / `DISCORD_BOT_TOKEN` unset), and the spend offset is bounded to the same range as its slider and the sanitizer, instead of accepting a value that was silently clamped on save.
+
 ## 1.2.0
 
 ### Minor Changes

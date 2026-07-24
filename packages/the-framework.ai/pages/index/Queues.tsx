@@ -1,13 +1,21 @@
-import { cardStyle, SectionHead } from './ui'
+import type { ReactNode } from 'react'
+import { cardStyle, CodeChip, SectionHead } from './ui'
 
-const QUEUES = [
+const QUEUES: { title: string; paragraphs: ReactNode[] }[] = [
   {
     title: 'Human Queue',
-    desc: 'Queue of human reviews required — agents ask you to review (important) decisions with subtle pros and cons.',
+    paragraphs: [
+      'Queue of human reviews required — agents ask you to review (important) decisions with subtle pros and cons.',
+    ],
   },
   {
     title: 'AI Queue',
-    desc: 'Queue of future AI tasks — tasks can be added by humans, or by product management agents (autonomously if highly confident, or after your confirmation otherwise).',
+    paragraphs: [
+      'Queue of future AI tasks — tasks can be added by humans, or by product management agents (autonomously if highly confident, or after your confirmation otherwise).',
+      <>
+        It's just a <CodeChip fontSize={12}>TODO_AGENTS.md</CodeChip> file in your Git repositories.
+      </>,
+    ],
   },
 ]
 
@@ -28,7 +36,11 @@ export function Queues() {
             style={{ ...cardStyle, padding: 'clamp(16px, 4.5vw, 24px)', display: 'flex', flexDirection: 'column', gap: 10 }}
           >
             <h4 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>{q.title}</h4>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: '#9da9a0' }}>{q.desc}</p>
+            {q.paragraphs.map((p, i) => (
+              <p key={i} style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: '#9da9a0' }}>
+                {p}
+              </p>
+            ))}
           </div>
         ))}
       </div>

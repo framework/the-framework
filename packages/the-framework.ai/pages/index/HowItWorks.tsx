@@ -1,4 +1,4 @@
-import { CodeChip, h2Style, sectionStyle } from './ui'
+import { h2Style, sectionStyle } from './ui'
 import { EnhancedSystemPrompt } from './EnhancedSystemPrompt'
 import { Prompts } from './Prompts'
 import { Queues } from './Queues'
@@ -13,10 +13,7 @@ export function HowItWorks() {
         <p style={subStyle}>The Framework essentially does two things:</p>
         <ol style={{ ...subStyle, paddingLeft: 24 }}>
           <li>Adds its own system prompt (the "Enhanced System Prompt")</li>
-          <li>
-            Introduces a queue of AI tasks (it's just a <CodeChip fontSize={14}>TODO_AGENTS.md</CodeChip> file in your
-            Git repositories)
-          </li>
+          <li>Introduces a queue of AI tasks</li>
         </ol>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(44px, 8vw, 64px)' }}>

@@ -22,27 +22,41 @@ const chipStyle: CSSProperties = {
   color: '#d3c6aa',
 }
 
-// A demoted band, not a third pillar: one lead-in line and a chip per prompt
-// pack, each full description tucked into its title tooltip.
+// A demoted band, not a third pillar — a "super note": the Note visual language
+// (accent bar + tint) in the brand green rather than the caveat yellow, upright
+// rather than italic, since it holds rich content. Each chip's full description
+// is tucked into its title tooltip.
 export function Prompts() {
   return (
-    <section id="prompts" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.6, color: '#9da9a0', textWrap: 'pretty' }}>
-        <b style={{ color: '#d3c6aa', fontWeight: 600 }}>High-quality prompts</b> — state-of-the-art open source, or
-        bring your own:
-      </p>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-        {CARDS.map((c) => (
-          <span key={c.title} title={c.desc} style={{ ...cardStyle, ...chipStyle }}>
-            {c.title}
+    <section id="prompts">
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          background: 'rgba(167, 192, 128, 0.06)',
+          borderLeft: '3px solid #a7c080',
+          borderRadius: '0 8px 8px 0',
+          padding: '14px 18px',
+        }}
+      >
+        <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.6, color: '#9da9a0', textWrap: 'pretty' }}>
+          <b style={{ color: '#d3c6aa', fontWeight: 600 }}>High-quality prompts</b> — state-of-the-art open source, or
+          bring your own:
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {CARDS.map((c) => (
+            <span key={c.title} title={c.desc} style={{ ...cardStyle, ...chipStyle }}>
+              {c.title}
+            </span>
+          ))}
+          <span
+            title="Save your own tailored prompts."
+            style={{ ...chipStyle, background: 'transparent', border: '1.5px dashed #4f585e', color: '#a7c080' }}
+          >
+            ＋ Add yours
           </span>
-        ))}
-        <span
-          title="Save your own tailored prompts."
-          style={{ ...chipStyle, background: 'transparent', border: '1.5px dashed #4f585e', color: '#a7c080' }}
-        >
-          ＋ Add yours
-        </span>
+        </div>
       </div>
     </section>
   )

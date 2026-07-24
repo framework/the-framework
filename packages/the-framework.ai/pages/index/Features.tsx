@@ -42,15 +42,15 @@ export function Features() {
           <FeatureText>Get notified when AI is finished or needs you.</FeatureText>
         </div>
         <div style={{ ...featureCardStyle, gap: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Swarm of local computers</h3>
-          <FeatureText>Orchestrate agents across multiple local computers.</FeatureText>
-        </div>
-        <div style={{ ...featureCardStyle, gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Claude Code Web</h3>
           <FeatureText>
             <WipBadge style={{ marginRight: 3, display: 'inline-block' }} /> Orchestrate agents via Claude Code Web for
             0% local CPU usage.
           </FeatureText>
+        </div>
+        <div style={{ ...featureCardStyle, gap: 12 }}>
+          <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Swarm of local computers</h3>
+          <FeatureText>Orchestrate agents across multiple local computers.</FeatureText>
         </div>
       </div>
     </section>

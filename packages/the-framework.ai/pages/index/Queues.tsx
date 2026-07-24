@@ -7,12 +7,17 @@ function P({ children }: { children: ReactNode }) {
   return <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: '#9da9a0' }}>{children}</p>
 }
 
-function QueueCard({ title, children }: { title: string; children: ReactNode }) {
+function QueueCard({ title, icon, children }: { title: string; icon: string; children: ReactNode }) {
   return (
     <div
       style={{ ...cardStyle, padding: 'clamp(16px, 4.5vw, 24px)', display: 'flex', flexDirection: 'column', gap: 10 }}
     >
-      <h4 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>{title}</h4>
+      <h4 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
+        <span aria-hidden style={{ marginRight: 8 }}>
+          {icon}
+        </span>
+        {title}
+      </h4>
       {children}
     </div>
   )
@@ -29,7 +34,7 @@ export function Queues() {
           gap: 18,
         }}
       >
-        <QueueCard title="AI Queue">
+        <QueueCard title="AI Queue" icon="🤖">
           <P>
             Queue of future AI tasks — tasks are added by humans, or by{' '}
             <a href="#autonomous-ai">product management agents</a> (autonomously if highly confident, or after your
@@ -43,7 +48,7 @@ export function Queues() {
             Technically, it's just a <CodeChip fontSize={12}>TODO_AGENTS.md</CodeChip> file in your Git repositories.
           </P>
         </QueueCard>
-        <QueueCard title="Human Queue">
+        <QueueCard title="Human Queue" icon="🙋">
           <P>
             Queue of human reviews required — populated when agents ask you to review
             (important) decisions with subtle pros and cons.

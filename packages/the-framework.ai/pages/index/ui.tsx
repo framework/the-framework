@@ -10,7 +10,7 @@ export const mono = "'IBM Plex Mono', monospace" as const
 export const sectionStyle: CSSProperties = {
   maxWidth: 1120,
   margin: '0 auto',
-  padding: 'clamp(56px, 10vw, 90px) clamp(14px, 4vw, 24px) 0',
+  padding: 'clamp(64px, 11vw, 110px) clamp(14px, 4vw, 24px) 0',
   display: 'flex',
   flexDirection: 'column',
   gap: 36,
@@ -63,7 +63,7 @@ export function SectionHead({ title, sub }: { title: ReactNode; sub?: string | R
       }}
     >
       <h2 style={h2Style}>{title}</h2>
-      <span aria-hidden style={{ width: 52, height: 4, borderRadius: 2, background: '#a7c080' }} />
+      <span aria-hidden style={{ width: 68, height: 4, borderRadius: 2, background: '#a7c080' }} />
       {sub && <p style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: '#9da9a0' }}>{sub}</p>}
     </div>
   )

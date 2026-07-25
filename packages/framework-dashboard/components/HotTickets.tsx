@@ -12,15 +12,20 @@ import { cn } from '../lib/utils.js'
 
 const EMPTY: HotTicket[] = []
 
-// The three lanes the card shows (#1139): in progress, then the AI Queue, then high priority. Each
-// carries the dot colour that matches the rest of the status vocabulary (primary = active, warning =
-// queued, info = flagged). Laid out in two columns rather than stacked full-width, so the card stays
-// compact even when one lane runs long.
-const LANES: { key: HotBucket; label: string; dot: string }[] = [
+// The three lanes the card shows (#1139), each carrying the dot colour that matches the rest of the
+// status vocabulary (primary = active, warning = queued, info = flagged). Two columns (#1139): the
+// two lanes you act on off the queue — what is being worked, and what is queued next — stacked on
+// the left, with the priority shortlist alone on the right.
+interface LaneDef {
+  key: HotBucket
+  label: string
+  dot: string
+}
+const LEFT_LANES: LaneDef[] = [
   { key: 'in-progress', label: 'In progress', dot: 'bg-primary' },
   { key: 'ai-queue', label: 'AI Queue', dot: 'bg-warning' },
-  { key: 'high-priority', label: 'High priority', dot: 'bg-info' },
 ]
+const RIGHT_LANES: LaneDef[] = [{ key: 'high-priority', label: 'High priority', dot: 'bg-info' }]
 
 export function HotTickets({
   onSelectProject,
@@ -31,6 +36,16 @@ export function HotTickets({
   onSelectRun: (id: string, runId: string) => void
 }) {
   const { value: tickets } = usePolled<HotTicket[]>(onHotTickets, EMPTY, 10_000, [])
+
+  const renderLane = (lane: LaneDef) => (
+    <Lane
+      key={lane.key}
+      lane={lane}
+      tickets={tickets.filter(t => t.bucket === lane.key)}
+      onSelectProject={onSelectProject}
+      onSelectRun={onSelectRun}
+    />
+  )
 
   return (
     <Card>
@@ -44,16 +59,9 @@ export function HotTickets({
         {tickets.length === 0 ? (
           <p className="py-2 text-sm text-muted-foreground">No tickets yet.</p>
         ) : (
-          <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
-            {LANES.map(lane => (
-              <Lane
-                key={lane.key}
-                lane={lane}
-                tickets={tickets.filter(t => t.bucket === lane.key)}
-                onSelectProject={onSelectProject}
-                onSelectRun={onSelectRun}
-              />
-            ))}
+          <div className="grid items-start gap-x-8 gap-y-5 sm:grid-cols-2">
+            <div className="flex flex-col gap-5">{LEFT_LANES.map(renderLane)}</div>
+            <div className="flex flex-col gap-5">{RIGHT_LANES.map(renderLane)}</div>
           </div>
         )}
       </CardContent>
@@ -67,7 +75,7 @@ function Lane({
   onSelectProject,
   onSelectRun,
 }: {
-  lane: { key: HotBucket; label: string; dot: string }
+  lane: LaneDef
   tickets: HotTicket[]
   onSelectProject: (id: string) => void
   onSelectRun: (id: string, runId: string) => void

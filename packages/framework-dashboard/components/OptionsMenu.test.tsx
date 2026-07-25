@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { OptionRow, ConnectionControl, RunTarget } from './OptionsMenu.js'
 import type { ConnectionProfile } from '../lib/profiles.js'
+import { hoverTooltip } from '../test-utils.js'
 
 const updatePreferences = vi.hoisted(() => vi.fn())
 vi.mock('../lib/preferences.js', () => ({ updatePreferences }))
@@ -24,11 +25,11 @@ function open() {
 }
 
 describe('OptionsMenu (#654)', () => {
-  test('the trigger marks that options are on with a dot (#1046)', () => {
+  test('the trigger marks that options are on with a dot (#1046)', async () => {
     render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={false} busy={false} />)
     const trigger = screen.getByRole('button', { name: /session options/i })
-    // A presence dot now, not a number: the count lives in the title for a11y, the dot in the corner.
-    expect(trigger.getAttribute('title')).toMatch(/\bon$/)
+    // A presence dot now, not a number: the count is what the tooltip says, the dot in the corner.
+    expect((await hoverTooltip(trigger)).textContent).toMatch(/\bon$/)
     expect(trigger.querySelector('span.rounded-full')).not.toBeNull()
     expect(trigger.textContent).not.toContain('1') // no number in the badge anymore
   })

@@ -14,14 +14,16 @@ import { AGENTS, AGENT_LABELS, autopilotEnabled, handoffFromPreferences, type Ag
 export type OptionRow = {
   key: keyof Preferences
   label: string
+  /** The long form, shown in the row's tooltip. */
   title: string
   /** A short one-line summary shown under the label (#654). */
   description?: string
   checked: boolean
   /** Disabled beyond the form-wide busy flag (e.g. Eco has nothing to trim under Vanilla). */
   disabled?: boolean
-  /** Why it's disabled, shown in the description so a greyed row isn't a mystery (the `title`
-   * tooltip is suppressed on disabled dropdown items). Only rendered while {@link disabled}. */
+  /** Why it's disabled, shown in the description so a greyed row isn't a mystery (a disabled
+   * dropdown item takes no pointer events, so its tooltip never opens). Only rendered while
+   * {@link disabled}. */
   disabledReason?: string
 }
 

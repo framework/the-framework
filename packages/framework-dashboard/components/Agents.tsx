@@ -1,6 +1,7 @@
 import type { ActiveRun, RecentRun } from '@gemstack/the-framework'
 import { Bot } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { runLabel } from '../lib/run-label.js'
 import { formatAge, formatDateTime } from '../lib/format-date.js'
 
@@ -106,19 +107,25 @@ function AgentColumn({
 function AgentRow({ label, at, projectName, onOpen }: Omit<AgentRowData, 'key'>) {
   return (
     <li>
+      {/* No hint on the row itself: that a session row opens the session is the one thing this card
+          says already, and a tooltip on the row would sit over the one on the age (#1149). */}
       <button
         type="button"
         onClick={onOpen}
-        title="Open this session"
         className="flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
       >
         <span aria-hidden className="shrink-0 text-muted-foreground/50">•</span>
         <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
         <span className="shrink-0 text-xs text-muted-foreground">{projectName}</span>
         {at && (
-          <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground/80" title={formatDateTime(at)}>
-            {formatAge(at)}
-          </span>
+          <Tooltip>
+            <TooltipTrigger
+              render={<span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground/80" />}
+            >
+              {formatAge(at)}
+            </TooltipTrigger>
+            <TooltipContent>{formatDateTime(at)}</TooltipContent>
+          </Tooltip>
         )}
       </button>
     </li>

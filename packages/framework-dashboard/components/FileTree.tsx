@@ -125,10 +125,11 @@ export function FileTree({
           const name = path.slice(path.lastIndexOf('/') + 1)
           const isOn = selected.has(path)
           const git = status[path]
+          // No `title`: the hover preview card already leads with the full path, and a native
+          // tooltip on top of it is the slow system one the dashboard no longer uses (#1149).
           const item = (
             <FileItem
               icon={isOn ? Check : FileIcon}
-              title={path}
               className={'pointer-events-auto cursor-pointer' + (isOn ? ' text-primary' : '')}
               onClick={() => onToggle(path)}
               {...(git ? { gitStatus: git } : {})}

@@ -4,7 +4,7 @@ import type { ServeTarget } from '@gemstack/the-framework'
 import { sendPreview, onServeTargets, sendStopPreview, onPreviewStatus } from '../server/control.telefunc.js'
 import { useAction } from '../lib/use-action.js'
 import { Button } from './ui/button.js'
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './ui/tooltip.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup, DropdownMenuLabel } from './ui/dropdown-menu.js'
 
 // On-demand app Serve (#475): a per-project button that serves the project's built result
@@ -72,7 +72,7 @@ export function PreviewBar({
   // Open (the live URL ↗) joined to a Stop (⏹). When stopped, a plain Serve button, or — in a
   // multi-package repo — a split Serve + caret picker over the servable apps.
   const controls = (
-    <TooltipProvider delay={300} closeDelay={0}>
+    <>
       {url ? (
         <div className="inline-flex h-7 items-center overflow-hidden rounded-md border border-border">
           <Tooltip>
@@ -160,7 +160,7 @@ export function PreviewBar({
           <TooltipContent>{busy ? 'Starting…' : 'Serve the built result'}</TooltipContent>
         </Tooltip>
       )}
-    </TooltipProvider>
+    </>
   )
 
   // Inline: just the control, for the project action bar. Errors sit below on their own line.

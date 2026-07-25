@@ -4,6 +4,7 @@ import type { Preferences } from '@gemstack/the-framework'
 import { presets } from '@gemstack/the-framework/client'
 import { addProfile } from '../lib/profiles.js'
 import { selectRemoteDevice } from '../lib/remote-target.js'
+import { hoverTooltip } from '../test-utils.js'
 
 // Preferences are the shared daemon store; stub them so the composer reads a fixed value.
 const updatePreferences = vi.hoisted(() => vi.fn())
@@ -114,25 +115,29 @@ afterEach(cleanup)
 
 const STUDIO = 'http://192.168.1.5:4200'
 
+// The agent/model trigger wears the model it will run with — 'Default' with no preference stored —
+// and names the agent on hover (#1149), where it used to carry a `title`.
+const agentTrigger = () => screen.getByRole('button', { name: 'Default' })
+
 describe('Composer (#721)', () => {
-  test('renders the full control row: agent/model, options gear, and the submit button', () => {
+  test('renders the full control row: agent/model, options gear, and the submit button', async () => {
     renderComposer({ submitLabel: 'Start session' })
     // Presets have a visible surface again (#948): the `/` menu stays the fast path, the
     // button is the discoverable one.
     expect(screen.getByRole('button', { name: /Presets/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Session options' })).toBeTruthy()
-    expect(screen.getByTitle(/Agent: Claude Code/)).toBeTruthy() // the agent/model trigger
+    expect((await hoverTooltip(agentTrigger())).textContent).toContain('Agent: Claude Code')
     // The submit button appears only once the prompt has text (#721).
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'x' } })
     expect(screen.getByRole('button', { name: /Start session/ })).toBeTruthy()
   })
 
-  test('compact (#723) keeps the agent/model + options controls (#755)', () => {
+  test('compact (#723) keeps the agent/model + options controls (#755)', async () => {
     const { onSubmit } = renderComposer({ compact: true, submitLabel: 'Start' })
     // They used to be dropped here, which meant a navbar run silently used the stored agent,
     // model and options with nothing on screen saying which.
     expect(screen.queryByRole('button', { name: 'Session options' })).not.toBeNull()
-    expect(screen.queryByTitle(/Agent: Claude Code/)).not.toBeNull()
+    expect((await hoverTooltip(agentTrigger())).textContent).toContain('Agent: Claude Code')
     // The editor + submit still work (so `/` `<` `@` `#` triggers remain live in the editor).
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'quick run' } })
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
@@ -143,24 +148,25 @@ describe('Composer (#721)', () => {
     const { onSubmit } = renderComposer({ showAgentModel: false })
     // An in-session composer: the session is bound to the agent it started with, so offering the
     // select there would only ever rewrite the next session's default.
-    expect(screen.queryByTitle(/Agent:/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Default' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Session options' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'follow-up' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     expect(onSubmit).toHaveBeenCalledWith('follow-up', 'build', { newSession: false })
   })
 
-  test('option labels promise only what the code delivers (#801)', () => {
+  test('option labels promise only what the code delivers (#801)', async () => {
     prefs = { onBeforeMergeableQuality: true }
     renderComposer()
     fireEvent.click(screen.getByRole('button', { name: 'Session options' }))
     // Autopilot no longer claims to relax the maintenance stance: #556 took that section out of the
     // prompt, leaving the countdown as the whole feature. Scoped to the menu: the same label is on
-    // the resolved-options strip (#842), which carries its own "where it came from" title.
+    // the resolved-options strip (#842), which explains where the value came from instead.
     const menu = screen.getByRole('menu')
-    const autopilot = within(menu).getByText('Autopilot').closest('[title]')
-    expect(autopilot?.getAttribute('title')).not.toMatch(/maintenance/i)
-    expect(autopilot?.getAttribute('title')).toMatch(/countdown/i)
+    const autopilot = within(menu).getByText('Autopilot').closest('[role="menuitemcheckbox"]')!
+    const tip = await hoverTooltip(autopilot)
+    expect(tip.textContent).not.toMatch(/maintenance/i)
+    expect(tip.textContent).toMatch(/countdown/i)
   })
 
   test('Browser is disabled with a reason off Claude Code (#801)', () => {

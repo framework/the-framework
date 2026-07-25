@@ -8,6 +8,7 @@ import { Badge } from './ui/badge.js'
 import { useAction } from '../lib/use-action.js'
 import { cn } from '../lib/utils.js'
 import { ScrollArea } from './ui/scroll-area.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 /**
  * The prompt behind "Import tickets from GitHub" (#697), read from the preset rather than written
@@ -99,28 +100,34 @@ export function TicketsPanel({
           <div key={ticket.file} className="mb-1 rounded border border-border p-2">
             <div className="flex items-start gap-2">
               <span className="min-w-0 flex-1 text-sm font-medium">{ticket.title}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 shrink-0 gap-1 px-1.5 text-xs"
-                disabled={busy || queued.has(ticket.file)}
-                title={
-                  queued.has(ticket.file)
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 shrink-0 gap-1 px-1.5 text-xs"
+                      disabled={busy || queued.has(ticket.file)}
+                      onClick={() => void queue(ticket)}
+                    />
+                  }
+                >
+                  {queued.has(ticket.file) ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" /> Queued
+                    </>
+                  ) : (
+                    <>
+                      <ListPlus className="h-3.5 w-3.5" /> Queue
+                    </>
+                  )}
+                </TooltipTrigger>
+                <TooltipContent>
+                  {queued.has(ticket.file)
                     ? 'Already added to the queue'
-                    : 'Add to Queue (TODO_AGENTS.md), for the next session to work on'
-                }
-                onClick={() => void queue(ticket)}
-              >
-                {queued.has(ticket.file) ? (
-                  <>
-                    <Check className="h-3.5 w-3.5" /> Queued
-                  </>
-                ) : (
-                  <>
-                    <ListPlus className="h-3.5 w-3.5" /> Queue
-                  </>
-                )}
-              </Button>
+                    : 'Add to Queue (TODO_AGENTS.md), for the next session to work on'}
+                </TooltipContent>
+              </Tooltip>
             </div>
             {ticket.summary && <p className="mt-0.5 text-xs text-muted-foreground">{ticket.summary}</p>}
             <div className="mt-1 flex flex-wrap items-center gap-1.5">

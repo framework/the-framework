@@ -100,7 +100,7 @@ test('SYSTEM_PROMPT_TEMPLATE carries the #326 sections verbatim', () => {
   // its backlog, and `promoteQueue` only carries FLAT_TODO_FILE off a run's branch. When the two
   // disagree, an unattended run's queue is written to a name nothing ever promotes.
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes(`TODO_FILE: \`${FLAT_TODO_FILE}\``))
-  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('ADD_ANALYSIS_ENTRY: Add entry to the ANLYSIS_RESULT.md list'))
+  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('ADD_ANALYSIS_ENTRY: Add entry to the ANALYSIS_RESULT.md list'))
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('${{tf.prompt}}'))
   // The whole block is the branch-free doc now: #326 moved the one `tf.params.autopilot`
   // ternary out with the maintenance section, so `tf.prompt` is the only fragment left.

@@ -87,12 +87,16 @@ export function DropdownMenuCheckboxItem({
 
 export function DropdownMenuSubTrigger({ className, children, ...props }: ComponentProps<typeof Menu.SubmenuTrigger>) {
   return (
+    // The chevron is pushed to the end by its own `ml-auto`, not by `justify-between` on the row.
+    // Justifying the row spaces out *every* child, so a trigger whose label is plain text had it
+    // centred between the icon and the chevron while every ordinary item sat left, and the only
+    // way to sit straight was to remember a `flex-1` wrapper. Now both forms align the same.
     <Menu.SubmenuTrigger
-      className={cn(ITEM_CLASS, 'justify-between data-[popup-open]:bg-[var(--color-accent)]', className)}
+      className={cn(ITEM_CLASS, 'data-[popup-open]:bg-[var(--color-accent)]', className)}
       {...props}
     >
       {children}
-      <ChevronRight className="h-3.5 w-3.5 opacity-70" />
+      <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" />
     </Menu.SubmenuTrigger>
   )
 }

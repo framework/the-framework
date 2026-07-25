@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { AutoPmReport, Preferences, ProjectSummary } from '@gemstack/the-framework'
 import { AUTO_PM_ROUTINES, AUTO_PM_DRAIN_JOB } from '@gemstack/the-framework/client'
+import { hoverTooltip } from '../test-utils.js'
 
 // Everything the card reads goes through a lib module, so the mocks stop short of telefunc: an
 // unmocked `*.telefunc.js` in the import graph fails as an assertIsNotBrowser bug report.
@@ -97,7 +98,8 @@ describe('RoutineWork (#1159)', () => {
     expect(screen.getAllByRole('checkbox')).toHaveLength(1)
     fireEvent.click(screen.getByText('Auto-run'))
     expect(updatePreferences).toHaveBeenCalledWith({ autoPm: true })
-    expect(screen.getByTitle('Automatically run this prompt on a regular schedule.')).toBeTruthy()
+    const label = screen.getByText('Auto-run').closest('label')!
+    expect((await hoverTooltip(label)).textContent).toBe('Automatically run this prompt on a regular schedule.')
   })
 
   test('several projects get a picker, and Run now honours it', async () => {

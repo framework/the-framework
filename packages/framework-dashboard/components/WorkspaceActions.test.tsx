@@ -26,14 +26,10 @@ vi.mock('../lib/preferences.js', () => ({ usePreferences: () => prefs, updatePre
 vi.mock('../lib/editors.js', () => ({ useDetectedEditors: () => detectedEditors }))
 
 const { WorkspaceActions } = await import('./WorkspaceActions.js')
-const { TooltipProvider } = await import('./ui/tooltip.js')
 
-const renderActions = (runId?: string) =>
-  render(
-    <TooltipProvider>
-      <WorkspaceActions projectId="p1" runId={runId} />
-    </TooltipProvider>,
-  )
+// No TooltipProvider: every tooltip carries its own (zero) delay since #1149, so the component
+// renders standalone exactly as the bars render it.
+const renderActions = (runId?: string) => render(<WorkspaceActions projectId="p1" runId={runId} />)
 
 // The folder and editor buttons are icon-only; find them by their position among the buttons
 // (GitHub is an anchor, so the buttons are: folder, editor, serve).

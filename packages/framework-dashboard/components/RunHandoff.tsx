@@ -7,6 +7,7 @@ import { cn } from '../lib/utils.js'
 import { DiffStat } from './DiffView.js'
 import { Button } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // The end-of-session handoff (#799): what this session produced, and the next step offered rather
 // than described. Before this, a finished session showed no branch, no commits and no diff, so
@@ -132,10 +133,13 @@ function Arm({
   onChange: (checked: boolean) => void
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-x-1.5 select-none" title={title}>
-      <Checkbox checked={checked} disabled={disabled} onCheckedChange={next => onChange(next === true)} />
-      {label}
-    </label>
+    <Tooltip>
+      <TooltipTrigger render={<label className="flex cursor-pointer items-center gap-x-1.5 select-none" />}>
+        <Checkbox checked={checked} disabled={disabled} onCheckedChange={next => onChange(next === true)} />
+        {label}
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[22rem]">{title}</TooltipContent>
+    </Tooltip>
   )
 }
 

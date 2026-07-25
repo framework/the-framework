@@ -11,6 +11,7 @@ import { runLabel } from '../lib/run-label.js'
 import { AgentLogo } from './agent-logos.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
   Sidebar,
   SidebarContent,
@@ -247,9 +248,12 @@ export function RunHistory({
           <div className="min-w-0 flex-1" />
           <ThemeToggle />
           <NotificationsMenu />
-          <Button variant="ghost" size="sm" onClick={onSettings} title="Settings" aria-label="Settings">
-            <Settings className="h-4 w-4" aria-hidden />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger render={<Button variant="ghost" size="sm" onClick={onSettings} aria-label="Settings" />}>
+              <Settings className="h-4 w-4" aria-hidden />
+            </TooltipTrigger>
+            <TooltipContent>Settings</TooltipContent>
+          </Tooltip>
         </div>
       </SidebarFooter>
     </Sidebar>
@@ -274,12 +278,18 @@ function OverviewButton({ active, count, onClick }: { active: boolean; count: nu
       <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden />
       <span className="flex-1 text-left">Overview</span>
       {count > 0 && (
-        <span
-          className="min-w-5 rounded-full bg-primary px-1.5 text-center text-xs font-semibold text-primary-foreground tabular-nums"
-          title={`${count} item${count === 1 ? '' : 's'} in your Human Queue`}
-        >
-          {count}
-        </span>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span className="min-w-5 rounded-full bg-primary px-1.5 text-center text-xs font-semibold text-primary-foreground tabular-nums" />
+            }
+          >
+            {count}
+          </TooltipTrigger>
+          <TooltipContent>
+            {count} item{count === 1 ? '' : 's'} in your Human Queue
+          </TooltipContent>
+        </Tooltip>
       )}
     </button>
   )
@@ -332,11 +342,17 @@ function ProjectsNav({
               )}
             >
               {/* The activated dot the picker used, kept so the two project lists still read alike. */}
-              <span
-                aria-hidden
-                className={cn('h-2 w-2 shrink-0 rounded-full', p.activated ? 'bg-primary' : 'bg-muted-foreground')}
-                title={p.activated ? 'activated' : 'not activated'}
-              />
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span
+                      aria-hidden
+                      className={cn('h-2 w-2 shrink-0 rounded-full', p.activated ? 'bg-primary' : 'bg-muted-foreground')}
+                    />
+                  }
+                />
+                <TooltipContent>{p.activated ? 'activated' : 'not activated'}</TooltipContent>
+              </Tooltip>
               <span className="sr-only">{p.activated ? 'Activated' : 'Not activated'}: </span>
               <span className="flex-1 truncate text-left">{p.name}</span>
             </button>
@@ -402,10 +418,13 @@ function NewButton({
   if (projects.length === 0) {
     return (
       <>
-        <Button variant="ghost" className={cls} onClick={() => setAdding(true)} title="Add a project to start a session">
-          <Plus className="h-4 w-4 shrink-0" />
-          <span className="whitespace-nowrap">New session</span>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger render={<Button variant="ghost" className={cls} onClick={() => setAdding(true)} />}>
+            <Plus className="h-4 w-4 shrink-0" />
+            <span className="whitespace-nowrap">New session</span>
+          </TooltipTrigger>
+          <TooltipContent>Add a project to start a session</TooltipContent>
+        </Tooltip>
         {adding && <AddProjectPanel onAdded={() => onProjectAdded?.()} onClose={() => setAdding(false)} />}
       </>
     )
@@ -504,11 +523,23 @@ function RunRow({
         {(remote || agent) && (
           <span className="ml-auto flex shrink-0 items-center gap-1.5">
             {remote && (
-              <span title={remoteLabel ? `Runs on ${remoteLabel}` : 'Runs on a connected device'} className="flex items-center">
-                <MonitorSmartphone className="h-3 w-3 text-muted-foreground" aria-label={remoteLabel ? `Runs on ${remoteLabel}` : 'Runs on a connected device'} />
-              </span>
+              <Tooltip>
+                <TooltipTrigger render={<span className="flex items-center" />}>
+                  <MonitorSmartphone className="h-3 w-3 text-muted-foreground" aria-label={remoteLabel ? `Runs on ${remoteLabel}` : 'Runs on a connected device'} />
+                </TooltipTrigger>
+                <TooltipContent>{remoteLabel ? `Runs on ${remoteLabel}` : 'Runs on a connected device'}</TooltipContent>
+              </Tooltip>
             )}
-            {agent && <AgentLogo agent={agent} title={AGENT_LABELS[agent]} className="h-3 w-3 text-muted-foreground" />}
+            {agent && (
+              // The logo is the only thing naming the agent on this row, so the trigger carries the
+              // accessible name and the logo itself stays decorative.
+              <Tooltip>
+                <TooltipTrigger render={<span className="flex items-center" role="img" aria-label={AGENT_LABELS[agent]} />}>
+                  <AgentLogo agent={agent} className="h-3 w-3 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>{AGENT_LABELS[agent]}</TooltipContent>
+              </Tooltip>
+            )}
           </span>
         )}
       </span>

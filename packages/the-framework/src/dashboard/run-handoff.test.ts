@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { readRunHandoff, runBranchFor, pushRunBranch, openRunPullRequest, gitReason, runAutoHandoff, isSessionBranch, prBaseName } from './run-handoff.js'
+import { readRunHandoff, runBranchFor, pushRunBranch, openRunPullRequest, gitReason, runAutoHandoff, isSessionBranch, prBaseName, commitSessionWork } from './run-handoff.js'
 import { nodeGitRunner, GIT_SLOW_TIMEOUT_MS, type GitRunner } from '../project.js'
 import { CliTimeoutError, isCliTimeout } from '../cli-exec.js'
 
@@ -444,4 +444,99 @@ test('the PR base is the remote branch name, not the tracking ref (#1102)', asyn
   const at = ghCalls[0]?.indexOf('--base') ?? -1
   assert.notEqual(at, -1, 'the base should still be passed')
   assert.equal(ghCalls[0]?.[at + 1], 'main')
+})
+
+test('uncommitted work is counted from the session checkout, not the project (#1173)', async () => {
+  const { git, calls } = fakeGit({
+    ...REPO,
+    'rev-parse --verify --quiet refs/heads/the-framework/dirty': 'abc123\n',
+    remote: 'origin\n',
+    'symbolic-ref': 'origin/main\n',
+    log: '',
+    diff: '',
+    'rev-parse --verify --quiet refs/remotes': '',
+    branch: '',
+    status: ' M src/app.ts\n?? src/new.ts\n',
+  })
+  const handoff = await readRunHandoff('/repo', 'the-framework/dirty', {
+    git,
+    pr: async () => undefined,
+    checkout: '/repo/.the-framework/worktrees/r1',
+  })
+  // The branch really is empty; the work is real and sitting next to it. Both are true at once,
+  // which is the whole of #1173.
+  assert.equal(handoff?.empty, true)
+  assert.equal(handoff?.pending, 2)
+  assert.ok(calls.some(args => args[0] === 'status'), 'the checkout should have been asked')
+})
+
+test('pending is absent, not zero, when no session checkout was given (#1173)', async () => {
+  const { git, calls } = fakeGit({
+    ...REPO,
+    'rev-parse --verify --quiet refs/heads/the-framework/quiet': 'abc123\n',
+    remote: 'origin\n',
+    'symbolic-ref': 'origin/main\n',
+    log: '',
+    diff: '',
+    'rev-parse --verify --quiet refs/remotes': '',
+    branch: '',
+  })
+  const handoff = await readRunHandoff('/repo', 'the-framework/quiet', { git, pr: async () => undefined })
+  // "Nobody asked" must not read as "asked, tree clean": only the second may be shown as a dead end.
+  assert.equal(handoff?.pending, undefined)
+  assert.ok(!calls.some(args => args[0] === 'status'), 'no checkout means no status read')
+})
+
+test('commitSessionWork leaves the project checkout and other branches alone (#1173)', async () => {
+  const onBranch = fakeGit({ 'rev-parse --abbrev-ref HEAD': 'main\n' })
+  // The checkout IS the project root: the dirt there is the user's, whatever branch it is on. This
+  // is what `resolveRunCheckout` falls back to once a session's worktree is gone.
+  assert.equal(await commitSessionWork('/repo', '/repo', 'the-framework/x', onBranch.git), true)
+  assert.equal(onBranch.calls.length, 0, 'the project root should not even be inspected')
+
+  // Its own checkout, but parked on another branch: not this session's work to commit.
+  const elsewhere = fakeGit({ 'rev-parse --abbrev-ref HEAD': 'main\n' })
+  assert.equal(await commitSessionWork('/wt', '/repo', 'the-framework/x', elsewhere.git), true)
+  assert.ok(!elsewhere.calls.some(args => args[0] === 'commit'), 'nothing should be committed')
+})
+
+test('a real repo: the finishing step commits what the agent left in its worktree (#1173)', async () => {
+  // Rom's dead-end session, reproduced end to end: the agent edited a file, never committed, and
+  // the branch was 0 commits ahead, so `gh pr create` could only answer "No commits between main
+  // and the-framework/run-r1".
+  const dir = await mkdtemp(join(tmpdir(), 'handoff-settle-'))
+  const git = nodeGitRunner()
+  const branch = 'the-framework/run-r1'
+  try {
+    await exec('git', ['init', '-b', 'main', dir])
+    await exec('git', ['config', 'user.email', 'test@example.com'], { cwd: dir })
+    await exec('git', ['config', 'user.name', 'Test'], { cwd: dir })
+    await writeFile(join(dir, 'README.md'), 'base\n')
+    await exec('git', ['add', '-A'], { cwd: dir })
+    await exec('git', ['commit', '-m', 'base'], { cwd: dir })
+
+    // The session's own checkout, as #453 allocates it.
+    const checkout = join(dir, '.the-framework', 'worktrees', 'r1')
+    await exec('git', ['worktree', 'add', '-b', branch, checkout], { cwd: dir })
+    await writeFile(join(checkout, 'index.html'), '<h1>hi</h1>\n')
+
+    const before = await readRunHandoff(dir, branch, { git, pr: async () => undefined, checkout })
+    assert.equal(before?.empty, true, 'the branch carries nothing yet')
+    assert.equal(before?.pending, 1, 'and the work is sitting in the checkout')
+
+    assert.equal(await commitSessionWork(checkout, dir, branch, git), true)
+
+    const after = await readRunHandoff(dir, branch, { git, pr: async () => undefined, checkout })
+    assert.equal(after?.empty, false, 'the work is on the branch now, so a PR has something to say')
+    assert.equal(after?.pending, 0)
+    assert.deepEqual(after?.commits.map(c => c.subject), ['[The Framework] uncommitted changes'])
+    assert.deepEqual(after?.files.map(f => f.path), ['index.html'])
+
+    // Idempotent: pressing the button twice must not make an empty commit.
+    assert.equal(await commitSessionWork(checkout, dir, branch, git), true)
+    const again = await readRunHandoff(dir, branch, { git, pr: async () => undefined, checkout })
+    assert.equal(again?.commits.length, 1)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })

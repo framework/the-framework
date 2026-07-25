@@ -4,11 +4,11 @@ import { isSafeVia } from '../conversations.js'
 import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
 import { resolveProjectPath, resolveRunPath, contextPreferences, contextPreview } from './context.js'
 import { relayOr } from './relay-run.js'
-import { appendFlatTodoEntry } from '../todo-loop.js'
+import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
 import { findRun, isSafeRunId, type RunMeta } from '../store/index.js'
 import { removeProjectWorktree, deleteProjectRun } from '../worktrees.js'
-import { openSessionPullRequest, pushRunBranch, runBranchFor, type HandoffResult } from '../dashboard/run-handoff.js'
+import { commitSessionWork, openSessionPullRequest, pushRunBranch, runBranchFor, type HandoffResult } from '../dashboard/run-handoff.js'
 import type { ChoiceBy } from '../events.js'
 import type {
   DeleteSessionResult,
@@ -168,7 +168,19 @@ export async function sendStart(
   if (!startRun) return { ok: false, error: 'starting a session is not enabled on this server' }
   const text = prompt.trim()
   if (!text && kind !== 'research') return { ok: false, error: 'a non-empty prompt is required' }
-  return startRun(text, kind, options, projectId)
+  // A drain fired by hand is the same work the sweep does, so it says the same thing about itself
+  // (#1117). Resolved here rather than sent by the caller: the value lands on the run's meta and is
+  // rendered, so it is read off the queue on this side instead of trusted from a browser. An
+  // explicit ticket on the options wins, since a caller that names one knows better than a guess.
+  const ticket = options.ticket ?? (await ticketForStart(projectId, text))
+  return startRun(text, kind, ticket ? { ...options, ticket } : options, projectId)
+}
+
+/** The queue entry a hand-fired drain is about to work, or undefined for any other prompt (#1117). */
+async function ticketForStart(projectId: string, prompt: string): Promise<string | undefined> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return undefined
+  return ticketForPrompt(prompt, cwd).catch(() => undefined)
 }
 
 /**
@@ -249,11 +261,17 @@ export async function sendOpenInApp(projectId: string, target: OpenTarget, runId
  * The session's own branch, or undefined when the run/project is unknown. Shared by the two
  * handoff actions so they address exactly what {@link onRunHandoff} reports on.
  */
-async function handoffTargetFor(projectId: string, runId: string): Promise<{ cwd: string; run: RunMeta } | undefined> {
+async function handoffTargetFor(
+  projectId: string,
+  runId: string,
+): Promise<{ cwd: string; run: RunMeta; checkout: string } | undefined> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd || !isSafeRunId(runId)) return undefined
   const run = await findRun(cwd, runId).catch(() => undefined)
-  return run ? { cwd, run } : undefined
+  // The branch is read from the project repo; the tree the agent edited is its own checkout (#453),
+  // and for a session that has not committed, that is the only place its work exists.
+  const checkout = (await resolveRunPath(projectId, runId)) ?? cwd
+  return run ? { cwd, run, checkout } : undefined
 }
 
 /**
@@ -266,7 +284,11 @@ export async function sendPushBranch(projectId: string, runId: string): Promise<
   return relayOr(runId, 'sendPushBranch', [projectId, runId], async () => {
     const target = await handoffTargetFor(projectId, runId)
     if (!target) return { ok: false, error: 'unknown session' }
-    return pushRunBranch(target.cwd, runBranchFor(target.run))
+    const branch = runBranchFor(target.run)
+    if (!(await commitSessionWork(target.checkout, target.cwd, branch))) {
+      return { ok: false, error: 'could not commit the work this session left uncommitted' }
+    }
+    return pushRunBranch(target.cwd, branch)
   }, { ok: false, error: 'could not reach the device' })
 }
 
@@ -281,6 +303,9 @@ export async function sendOpenPullRequest(projectId: string, runId: string): Pro
   return relayOr(runId, 'sendOpenPullRequest', [projectId, runId], async () => {
     const target = await handoffTargetFor(projectId, runId)
     if (!target) return { ok: false, error: 'unknown session' }
+    if (!(await commitSessionWork(target.checkout, target.cwd, runBranchFor(target.run)))) {
+      return { ok: false, error: 'could not commit the work this session left uncommitted' }
+    }
     return openSessionPullRequest(target.cwd, target.run)
   }, { ok: false, error: 'could not reach the device' })
 }

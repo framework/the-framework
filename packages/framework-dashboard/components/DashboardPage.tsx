@@ -11,6 +11,7 @@ import { usePolled } from '../lib/use-async.js'
 import { usePreferences } from '../lib/preferences.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { HotTickets } from './HotTickets.js'
+import { RoutineWork } from './RoutineWork.js'
 import { cn } from '../lib/utils.js'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import { formatDateTime, formatRelative } from '../lib/format-date.js'
@@ -48,6 +49,10 @@ export function DashboardPage({
         <NeedsYou items={interventions} onSelectProject={onSelectProject} />
 
         <HotTickets onSelectProject={onSelectProject} />
+
+        {/* The scheduled jobs, and the button that fires one now (#1159). Above the tiles: it is
+            something to do, and the rest of the page is something to read. */}
+        <RoutineWork onSelectProject={onSelectProject} />
 
         {data === null ? (
           <p className="text-sm text-muted-foreground">Loading…</p>

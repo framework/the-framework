@@ -78,7 +78,7 @@ function HumanQueue({ items, onSelectProject }: { items: Intervention[]; onSelec
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-base">
           <Inbox className="h-4 w-4 text-muted-foreground" />
           Human Queue
           {items.length > 0 && (
@@ -87,9 +87,9 @@ function HumanQueue({ items, onSelectProject }: { items: Intervention[]; onSelec
             </span>
           )}
         </CardTitle>
-        <p className="text-sm text-muted-foreground">Agents awaiting your approval, review, or input</p>
+        <p className="text-xs text-muted-foreground">Agents awaiting your approval, review, or input</p>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent>
         {items.length === 0 ? (
           <p className="py-2 text-sm text-muted-foreground">AI doesn&apos;t need you.</p>
         ) : (
@@ -100,24 +100,24 @@ function HumanQueue({ items, onSelectProject }: { items: Intervention[]; onSelec
                   <button
                     type="button"
                     onClick={() => onSelectProject(item.projectId)}
-                    className="flex w-full items-center gap-2 py-2 text-left hover:opacity-80"
+                    className="flex w-full items-center gap-2.5 py-2 text-left hover:opacity-80"
                     title="Open the session to answer"
                   >
                     <MessageCircleQuestion className="h-4 w-4 shrink-0 text-warning" />
                     <span className="shrink-0 text-xs font-medium text-warning">Awaiting</span>
-                    <span className="truncate font-medium">{item.title}</span>
+                    <span className="truncate text-sm font-medium">{item.title}</span>
                     <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.projectName}</span>
                   </button>
                 ) : item.kind === 'unpushed' ? (
                   <button
                     type="button"
                     onClick={() => onSelectProject(item.projectId)}
-                    className="flex w-full items-center gap-2 py-2 text-left hover:opacity-80"
+                    className="flex w-full items-center gap-2.5 py-2 text-left hover:opacity-80"
                     title={`Open the session: work on ${item.branch ?? ''} was never pushed`}
                   >
                     <GitBranch className="h-4 w-4 shrink-0 text-info" />
                     <span className="shrink-0 text-xs font-medium text-info">Unpushed</span>
-                    <span className="truncate font-medium">{item.title}</span>
+                    <span className="truncate text-sm font-medium">{item.title}</span>
                     {/* An unknown count says nothing rather than the contradictory "0 commits". */}
                     {item.commits !== undefined && item.commits > 0 && (
                       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -131,12 +131,12 @@ function HumanQueue({ items, onSelectProject }: { items: Intervention[]; onSelec
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-2 py-2 hover:opacity-80"
+                    className="flex items-center gap-2.5 py-2 hover:opacity-80"
                     title={`Open PR #${item.number} on GitHub`}
                   >
                     <GitPullRequest className="h-4 w-4 shrink-0 text-success" />
                     <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">#{item.number}</span>
-                    <span className="truncate font-medium">{item.title}</span>
+                    <span className="truncate text-sm font-medium">{item.title}</span>
                     <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.projectName}</span>
                   </a>
                 )}
@@ -165,19 +165,19 @@ function AiQueue({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-base">
           <ListTodo className="h-4 w-4 text-muted-foreground" />
           AI Queue
         </CardTitle>
-        <p className="text-sm text-muted-foreground">Tasks AI will work on next</p>
+        <p className="text-xs text-muted-foreground">Tasks AI will work on next</p>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent>
         {loading ? (
           <p className="py-2 text-sm text-muted-foreground">Loading…</p>
         ) : withOpen.length === 0 ? (
           <p className="py-2 text-sm text-muted-foreground">Nothing queued.</p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {withOpen.map(q => (
               <li key={q.projectId}>
                 <button
@@ -186,9 +186,9 @@ function AiQueue({
                   className="flex w-full items-center gap-2 text-left hover:opacity-80"
                 >
                   <span className="truncate text-sm font-medium">{q.projectName}</span>
-                  <span className="ml-auto shrink-0 rounded-full border border-border px-2 text-xs text-muted-foreground">{q.open}</span>
+                  <span className="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">{q.open}</span>
                 </button>
-                <ul className="mt-1 space-y-0.5 pl-1">
+                <ul className="mt-1.5 space-y-1 pl-0.5">
                   {q.items
                     .filter(i => !i.done)
                     .map((item, i) => {
@@ -196,8 +196,8 @@ function AiQueue({
                       // so print the title rather than the source; the whole line stays in the tooltip.
                       const label = queueEntryLabel(item.text)
                       return (
-                        <li key={i} className="flex gap-1.5 text-xs text-muted-foreground">
-                          <span aria-hidden className="text-muted-foreground/60">•</span>
+                        <li key={i} className="flex gap-2 text-sm text-muted-foreground">
+                          <span aria-hidden className="text-muted-foreground/50">•</span>
                           <span className="truncate" title={item.text}>{label.text}</span>
                         </li>
                       )
@@ -255,13 +255,13 @@ function Agents({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-base">
           <Bot className="h-4 w-4 text-muted-foreground" />
           Agents
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+      <CardContent>
+        <div className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
           <AgentColumn heading="Current" description="Agents currently working" rows={current} loading={loading} empty="No agents working right now." />
           <AgentColumn heading="Recent" description="Agents finished working" rows={recent} loading={loading} empty="No sessions yet." />
         </div>
@@ -285,14 +285,18 @@ function AgentColumn({
 }) {
   return (
     <div className="min-w-0">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-foreground/80">{heading}</h4>
-      <p className="text-xs text-muted-foreground">{description}</p>
+      {/* Eyebrow + one-line description on a single ruled row, so the column reads as a labelled
+          section rather than two stacked muted lines. */}
+      <div className="flex items-baseline gap-2 border-b border-border pb-1.5">
+        <h4 className="shrink-0 text-xs font-semibold uppercase tracking-wide text-foreground">{heading}</h4>
+        <p className="truncate text-xs text-muted-foreground">{description}</p>
+      </div>
       {loading ? (
         <p className="py-2 text-sm text-muted-foreground">Loading…</p>
       ) : rows.length === 0 ? (
         <p className="py-2 text-sm text-muted-foreground">{empty}</p>
       ) : (
-        <ul className="mt-2 space-y-0.5">
+        <ul className="mt-1.5 space-y-0.5">
           {rows.map(r => (
             <AgentRow key={r.key} label={r.label} at={r.at} projectName={r.projectName} onOpen={r.onOpen} />
           ))}
@@ -309,13 +313,13 @@ function AgentRow({ label, at, projectName, onOpen }: Omit<AgentRowData, 'key'>)
         type="button"
         onClick={onOpen}
         title="Open this session"
-        className="flex w-full items-baseline gap-2 rounded-md px-2 py-1 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+        className="flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
       >
-        <span aria-hidden className="shrink-0 text-muted-foreground/60">•</span>
+        <span aria-hidden className="shrink-0 text-muted-foreground/50">•</span>
         <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
         <span className="shrink-0 text-xs text-muted-foreground">{projectName}</span>
         {at && (
-          <span className="shrink-0 text-xs tabular-nums text-muted-foreground" title={formatDateTime(at)}>
+          <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground/80" title={formatDateTime(at)}>
             {formatAge(at)}
           </span>
         )}

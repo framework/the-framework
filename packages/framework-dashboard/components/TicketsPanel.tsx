@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { WorkspaceTicket } from '@gemstack/the-framework'
+import { presets } from '@gemstack/the-framework/client'
 import { ListPlus, Check } from 'lucide-react'
 import { sendQueueTicket, sendStart } from '../server/control.telefunc.js'
 import { Button } from './ui/button.js'
@@ -9,12 +10,15 @@ import { cn } from '../lib/utils.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
 /**
- * The prompt behind "Import tickets from GitHub" (#697). Deliberately short: the agent has
- * `gh` and the ticket format already, and #674 settled that over-specifying a preset earns
- * nothing the context fragment does not already carry.
+ * The prompt behind "Import tickets from GitHub" (#697), read from the preset rather than written
+ * here. This panel and the onboarding checklist offer the same button under the same label, and
+ * they were sending different instructions: this text, against the preset's four bare words. Two
+ * prompts behind one label is a button whose behaviour depends on where it was pressed.
+ *
+ * Deliberately short even so: the agent has `gh` and the ticket format already, and #674 settled
+ * that over-specifying a preset earns nothing the context fragment does not already carry.
  */
-const IMPORT_PROMPT =
-  'Import this repo\'s open GitHub issues into tickets/, one file per issue, following the ticket format.'
+const IMPORT_PROMPT = presets.importTickets.render()
 
 /** How a priority reads, for the ones the format names. */
 const PRIORITY_TONE: Record<string, string> = {

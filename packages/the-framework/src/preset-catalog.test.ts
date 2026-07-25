@@ -210,8 +210,17 @@ test('one preset, and only one, always opens a session of its own (#959)', () =>
   // to do with whatever session the user happened to be reading when they clicked it.
   const marked = Object.values(presets).filter(p => p.newSession).map(p => p.name)
   assert.deepEqual(marked, ['import-tickets'])
-  assert.equal(presets.importTickets.template, 'Import tickets from GitHub')
-  assert.equal(presets.importTickets.render(), 'Import tickets from GitHub')
   assert.equal(LAUNCHER_PRESETS.includes(presets.importTickets), true)
+})
+
+test('the import preset names where the tickets go, not just the button (#697)', () => {
+  // It read "Import tickets from GitHub", the label repeated back: no destination, no format. The
+  // rail's panel had spelled out the real ask in its own constant, so the same button asked for two
+  // different things depending on where it was pressed. The instruction lives on the preset now.
+  const prompt = presets.importTickets.render()
+  assert.equal(prompt, presets.importTickets.template)
+  assert.match(prompt, /tickets\//)
+  assert.match(prompt, /one file per issue/)
+  assert.notEqual(prompt, presets.importTickets.label)
 })
 

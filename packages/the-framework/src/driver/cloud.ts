@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { spawn as nodeSpawn } from 'node:child_process'
+import { closeSync, mkdtempSync, openSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { killTree, registerChild, unregisterChild } from './child-registry.js'
 import { combineFraming, makeEmit } from './session-support.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn } from './types.js'
@@ -91,9 +94,10 @@ const SESSION_URL = /https:\/\/claude\.ai\/code\/(session_[A-Za-z0-9]+)\S*/
 
 /**
  * The workspace-trust question, matched with every space removed so a terminal that draws
- * the words with cursor moves rather than literal spaces still matches. Answering it is
- * safe: it defaults to "yes, I trust this folder", and this is the framework's own project
- * directory, which it has been running the agent in all along.
+ * the words with cursor moves rather than literal spaces still matches. The driver does not
+ * answer it: trusting a workspace is the user's call to make once, in their own terminal,
+ * not something a background run should decide on their behalf. It is detected only so the
+ * run says what it is parked on instead of timing out with nothing to show.
  */
 const TRUST_PROMPT = 'trustthisfolder'
 
@@ -151,6 +155,7 @@ export class CloudSession implements DriverSession {
     }
 
     let output = ''
+    let trusting = false
     let found: { url: string; sessionId: string } | undefined
     try {
       await (this.config.runPty ?? runPtyWithScript)({
@@ -171,7 +176,14 @@ export class CloudSession implements DriverSession {
             controller.abort()
             return
           }
-          if (clean.replace(/\s+/g, '').includes(TRUST_PROMPT)) this.emit({ type: 'notice', message: 'Accepting the workspace-trust prompt for this project.' })
+          if (!trusting && clean.replace(/\s+/g, '').includes(TRUST_PROMPT)) {
+            trusting = true
+            this.emit({
+              type: 'notice',
+              message: `Claude Code has not been trusted in ${this.cwd} yet, so it is asking before it will start. Run \`claude\` there once and accept, then try this again.`,
+            })
+            controller.abort()
+          }
         },
       })
     } finally {
@@ -236,7 +248,32 @@ function runPtyWithScript(opts: RunPtyOptions): Promise<void> {
       process.platform === 'darwin'
         ? ['-q', '/dev/null', 'sh', '-c', CLOUD_COMMAND]
         : ['-qec', CLOUD_COMMAND, '/dev/null']
-    const child = nodeSpawn('script', args, { cwd: opts.cwd, env, detached: true })
+    // stdin must be a FILE. BSD `script` reads its own stdin's terminal attributes to mirror
+    // them onto the pty it creates, and a pipe is a socketpair, so it dies with
+    // "tcgetattr/ioctl: Operation not supported on socket" before running anything. Under a
+    // daemon there is no terminal to inherit either, so the fd has to be something tcgetattr
+    // can fail on harmlessly, which a regular file is.
+    let dir: string
+    let stdin: number
+    try {
+      dir = mkdtempSync(join(tmpdir(), 'framework-cloud-'))
+      const path = join(dir, 'stdin')
+      writeFileSync(path, '')
+      stdin = openSync(path, 'r')
+    } catch (err) {
+      rejectPromise(new Error(`[framework] claude-web: could not prepare the pty input (${(err as Error).message})`))
+      return
+    }
+    const cleanup = () => {
+      try {
+        closeSync(stdin)
+        rmSync(dir, { recursive: true, force: true })
+      } catch {
+        // Best effort: a leftover temp file must not fail a run that otherwise worked.
+      }
+    }
+
+    const child = nodeSpawn('script', args, { cwd: opts.cwd, env, detached: true, stdio: [stdin, 'pipe', 'pipe'] })
     const pid = child.pid
     if (pid != null) registerChild(pid)
     let settled = false
@@ -247,6 +284,7 @@ function runPtyWithScript(opts: RunPtyOptions): Promise<void> {
         killTree(pid, 'SIGKILL')
         unregisterChild(pid)
       }
+      cleanup()
       if (err) rejectPromise(err)
       else resolvePromise()
     }
@@ -254,21 +292,7 @@ function runPtyWithScript(opts: RunPtyOptions): Promise<void> {
     // Aborting is the normal ending: the caller stops us the moment the session URL lands.
     opts.signal.addEventListener('abort', () => finish(), { once: true })
 
-    // The trust question is answered here rather than by the caller because it is a
-    // property of running the CLI on a fresh terminal, not of the hand-off. Enter takes
-    // the default, "yes, I trust this folder"; without it the invocation would sit at the
-    // dialog until the timeout. Answered at most once.
-    let seen = ''
-    let answered = false
-    const consume = (chunk: Buffer) => {
-      const text = chunk.toString('utf8')
-      seen += text
-      if (!answered && seen.replace(ANSI, '').replace(/\s+/g, '').includes(TRUST_PROMPT)) {
-        answered = true
-        child.stdin?.write('\r')
-      }
-      opts.onData(text)
-    }
+    const consume = (chunk: Buffer) => opts.onData(chunk.toString('utf8'))
     child.stdout?.on('data', consume)
     child.stderr?.on('data', consume)
     child.on('error', (err: Error) =>

@@ -96,6 +96,27 @@ test('a run that created no session fails with what the CLI said', async () => {
   await assert.rejects(session.prompt('go'), /no cloud session was created[\s\S]*Invalid API key/)
 })
 
+test('an untrusted workspace fails fast and says how to fix it, rather than hanging', async () => {
+  // The dialog is drawn with cursor moves, so the words arrive with no literal spaces
+  // between them — matching has to survive that, which is why this fixture looks like this.
+  const events: DriverEvent[] = []
+  const driver = new CloudDriver({
+    runTag: () => 'tag',
+    timeoutMs: 1000,
+    runPty: async opts => {
+      opts.onData('\x1b[2KQuick\x1b[Csafety\x1b[Ccheck\r\n1.\x1b[CYes,\x1b[CI\x1b[Ctrust\x1b[Cthis\x1b[Cfolder\r\n')
+      // The driver aborts synchronously from inside onData, so check before waiting: a
+      // listener added after the fact never fires.
+      if (!opts.signal.aborted) await new Promise<void>(r => opts.signal.addEventListener('abort', () => r(), { once: true }))
+    },
+  })
+  const session = await driver.start({ cwd: '/repo', onEvent: e => events.push(e) })
+  await assert.rejects(session.prompt('go'), /no cloud session was created/)
+  const notice = events.find(e => e.type === 'notice')
+  assert.ok(notice && /has not been trusted in \/repo/.test(notice.message))
+  assert.ok(notice && /Run `claude` there once/.test(notice.message))
+})
+
 test('an unsafe model id never reaches the shell', async () => {
   const calls: RunPtyOptions[] = []
   const session = await driverWith(CREATED, calls).start({ cwd: '/repo', model: 'opus"; rm -rf /' })

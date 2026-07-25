@@ -4,6 +4,7 @@ import { usePreferences, updatePreferences, notificationsEnabled, discordEnabled
 import { useNotifyChannels } from '../lib/notify-channels.js'
 import { cn } from '../lib/utils.js'
 import { OptionLabel } from './OptionsMenu.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -59,20 +60,26 @@ export function NotificationsMenu() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        type="button"
-        title={anyActive ? 'Notifications on' : 'Notifications'}
-        aria-label="Notifications"
-        className={cn(
-          'relative rounded-md p-1.5 hover:bg-accent',
-          anyActive ? 'text-foreground' : 'text-muted-foreground',
-        )}
-      >
-        {anyActive ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
-        {anyActive && (
-          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--color-primary)]" />
-        )}
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              type="button"
+              aria-label="Notifications"
+              className={cn(
+                'relative rounded-md p-1.5 hover:bg-accent',
+                anyActive ? 'text-foreground' : 'text-muted-foreground',
+              )}
+            />
+          }
+        >
+          {anyActive ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+          {anyActive && (
+            <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--color-primary)]" />
+          )}
+        </TooltipTrigger>
+        <TooltipContent>{anyActive ? 'Notifications on' : 'Notifications'}</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="min-w-[16rem]">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Deliver to</DropdownMenuLabel>
@@ -81,7 +88,6 @@ export function NotificationsMenu() {
               checked={browser}
               disabled={blocked}
               onCheckedChange={toggleBrowser}
-              title={browserHint}
               className="items-start"
             >
               <OptionLabel label="Browser" description={browserHint} />
@@ -90,7 +96,6 @@ export function NotificationsMenu() {
           <DropdownMenuCheckboxItem
             checked={discord}
             onCheckedChange={next => updatePreferences({ notifyDiscord: next })}
-            title={webhookReady ? 'Reaches you with no dashboard open' : 'Add a webhook on the settings page to deliver here'}
             className="items-start"
           >
             <OptionLabel
@@ -107,7 +112,6 @@ export function NotificationsMenu() {
           <DropdownMenuCheckboxItem
             checked={needsYou}
             onCheckedChange={next => updatePreferences({ notifyHumanIntervention: next })}
-            title="A session awaiting your answer, or a PR ready to review"
             className="items-start"
           >
             <OptionLabel label="Human Queue" description="A session awaiting you, or a PR to review" />
@@ -115,7 +119,6 @@ export function NotificationsMenu() {
           <DropdownMenuCheckboxItem
             checked={activity}
             onCheckedChange={next => updatePreferences({ notifyNewActivity: next })}
-            title="Also ping when a session starts or finishes, not just when something needs you"
             className="items-start"
           >
             <OptionLabel label="New activity" description="A session started or finished" />
@@ -129,7 +132,6 @@ export function NotificationsMenu() {
           <DropdownMenuCheckboxItem
             checked={discordBot}
             onCheckedChange={next => updatePreferences({ discordBot: next })}
-            title={botReady ? 'Lets Discord messages start and steer sessions' : 'Add a bot token on the settings page to enable the bot'}
             className="items-start"
           >
             <OptionLabel

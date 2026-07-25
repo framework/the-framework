@@ -6,6 +6,7 @@ import type { ConnectionProfile } from '../lib/profiles.js'
 import type { DeviceStatus } from '../lib/use-device-status.js'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -160,19 +161,25 @@ function RunTargetSub({ control, connection, busy }: { control: RunTargetControl
               <MonitorSmartphone className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
               <StatusDot status={status} />
               <OptionLabel label={profile.label} description={offline ? `${profile.url} (offline)` : profile.url} />
-              <button
-                type="button"
-                onClick={e => {
-                  // Remove, not select: keep the row's own click out of it (#1072).
-                  e.stopPropagation()
-                  connection.onRemove(profile)
-                }}
-                title={`Remove ${profile.label}`}
-                aria-label={`Remove device ${profile.label}`}
-                className="mt-0.5 rounded p-0.5 text-[var(--color-muted-foreground)] hover:text-danger"
-              >
-                <X className="h-3.5 w-3.5" aria-hidden />
-              </button>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      onClick={e => {
+                        // Remove, not select: keep the row's own click out of it (#1072).
+                        e.stopPropagation()
+                        connection.onRemove(profile)
+                      }}
+                      aria-label={`Remove device ${profile.label}`}
+                      className="mt-0.5 rounded p-0.5 text-[var(--color-muted-foreground)] hover:text-danger"
+                    />
+                  }
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                </TooltipTrigger>
+                <TooltipContent>Remove {profile.label}</TooltipContent>
+              </Tooltip>
             </DropdownMenuItem>
           )
         })}
@@ -187,22 +194,28 @@ function RunTargetSub({ control, connection, busy }: { control: RunTargetControl
   )
 }
 
-/** One preference checkbox row. The disabled reason rides the description (the `title`
- * tooltip is suppressed on disabled dropdown items), so a greyed row isn't a mystery. */
+/** One preference checkbox row. The disabled reason rides the description (the tooltip
+ * does not open on disabled dropdown items), so a greyed row isn't a mystery. */
 function OptionCheckboxRow({ row, busy, indent = false }: { row: OptionRow; busy: boolean; indent?: boolean }) {
   return (
-    <DropdownMenuCheckboxItem
-      checked={row.checked}
-      disabled={busy || !!row.disabled}
-      onCheckedChange={checked => setOption(row.key, checked)}
-      title={row.title}
-      className={indent ? 'items-start pl-8' : 'items-start'}
-    >
-      <OptionLabel
-        label={row.label}
-        description={row.disabled && row.disabledReason ? [row.description, `— ${row.disabledReason}`].filter(Boolean).join(' ') : row.description}
-      />
-    </DropdownMenuCheckboxItem>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <DropdownMenuCheckboxItem
+            checked={row.checked}
+            disabled={busy || !!row.disabled}
+            onCheckedChange={checked => setOption(row.key, checked)}
+            className={indent ? 'items-start pl-8' : 'items-start'}
+          />
+        }
+      >
+        <OptionLabel
+          label={row.label}
+          description={row.disabled && row.disabledReason ? [row.description, `— ${row.disabledReason}`].filter(Boolean).join(' ') : row.description}
+        />
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[22rem]">{row.title}</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -233,20 +246,26 @@ export function OptionsMenu({
   const activeCount = options.filter(o => o.checked && !o.disabled).length
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        type="button"
-        disabled={busy}
-        title={activeCount > 0 ? `${label} — ${activeCount} on` : label}
-        aria-label={label}
-        className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'relative h-8 w-8')}
-      >
-        <Settings className="h-4 w-4" />
-        {activeCount > 0 && (
-          // A small presence dot (#1046): that some options are on is the signal; the exact count
-          // is one click away in the menu, so the number was noise.
-          <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
-        )}
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              type="button"
+              disabled={busy}
+              aria-label={label}
+              className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'relative h-8 w-8')}
+            />
+          }
+        >
+          <Settings className="h-4 w-4" />
+          {activeCount > 0 && (
+            // A small presence dot (#1046): that some options are on is the signal; the exact count
+            // is one click away in the menu, so the number was noise.
+            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--color-primary)]" />
+          )}
+        </TooltipTrigger>
+        <TooltipContent>{activeCount > 0 ? `${label} — ${activeCount} on` : label}</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="min-w-[19rem] max-w-[22rem]">
         {runTarget && (
           <>

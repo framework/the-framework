@@ -6,6 +6,7 @@ import { useSelectedRemoteDeviceId, selectRemoteDevice } from '../lib/remote-tar
 import { AddDeviceDialog } from './AddDeviceDialog.js'
 import { Button } from './ui/button.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
 
 // Saved devices, as a settings section (#1052/#1072).
@@ -62,15 +63,21 @@ export function DevicesSettings() {
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <DeviceStatusBadge state={status[profile.id]} />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => remove(profile)}
-                    title={`Remove ${profile.label}`}
-                    aria-label={`Remove ${profile.label}`}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => remove(profile)}
+                          aria-label={`Remove ${profile.label}`}
+                        />
+                      }
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </TooltipTrigger>
+                    <TooltipContent>Remove {profile.label}</TooltipContent>
+                  </Tooltip>
                 </div>
               </li>
             ))}

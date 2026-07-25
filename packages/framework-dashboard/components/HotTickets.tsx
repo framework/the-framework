@@ -2,6 +2,7 @@ import type { HotTicket, HotBucket } from '@gemstack/the-framework'
 import { Flame } from 'lucide-react'
 import { onHotTickets } from '../server/reads.telefunc.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { usePolled } from '../lib/use-async.js'
 import { cn } from '../lib/utils.js'
 
@@ -88,18 +89,24 @@ function Lane({
         <ul className="mt-1.5">
           {tickets.map(t => (
             <li key={`${t.projectId}:${t.ticket.file}`}>
-              <button
-                type="button"
-                // A ticket being implemented names its run, and that session is what the row is
-                // reporting; one with no run yet has only its project to offer.
-                onClick={() => (t.runId ? onSelectRun(t.projectId, t.runId) : onSelectProject(t.projectId))}
-                title={t.ticket.summary || t.ticket.title}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-              >
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{t.ticket.title}</span>
-                <TicketTag ticket={t} />
-                <span className="shrink-0 text-xs text-muted-foreground">{t.projectName}</span>
-              </button>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      // A ticket being implemented names its run, and that session is what the row is
+                      // reporting; one with no run yet has only its project to offer.
+                      onClick={() => (t.runId ? onSelectRun(t.projectId, t.runId) : onSelectProject(t.projectId))}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+                    />
+                  }
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{t.ticket.title}</span>
+                  <TicketTag ticket={t} />
+                  <span className="shrink-0 text-xs text-muted-foreground">{t.projectName}</span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[24rem]">{t.ticket.summary || t.ticket.title}</TooltipContent>
+              </Tooltip>
             </li>
           ))}
         </ul>

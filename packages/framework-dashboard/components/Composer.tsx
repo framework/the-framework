@@ -28,6 +28,7 @@ import { stashDraftFromUrl, takePendingDraft } from '../lib/draft-handoff.js'
 import { ResolvedOptions } from './ResolvedOptions.js'
 import { ClaudeLogo, CodexLogo } from './agent-logos.js'
 import { Button } from './ui/button.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
 
 // The presets (#353/#433): each PREFILLS the editor with a rendered prompt and runs it verbatim
@@ -342,28 +343,34 @@ export const Composer = forwardRef<ComposerHandle, {
   // keeps it out of the a11y tree and role queries.
   const hasPrompt = !!prompt.trim()
   const submitButton = (
-    <Button
-      type="submit"
-      size="icon-sm"
-      onClick={submit}
-      disabled={busy || !hasPrompt || targetOffline}
-      aria-hidden={!hasPrompt}
-      tabIndex={hasPrompt ? undefined : -1}
-      aria-label={submitLabel}
-      title={busy ? submitBusyLabel : `${submitLabel}  (⌘↵ / Ctrl+Enter)`}
-      className={cn(
-        // `disabled:opacity-*` overrides the base (the button is disabled while empty/busy), so the
-        // hidden state must force it to 0 and the shown state back to full for the busy spinner.
-        'h-8 w-8 shrink-0 transition-[margin,opacity,transform] duration-150 ease-out',
-        hasPrompt
-          ? 'ml-0 translate-x-0 opacity-100 disabled:opacity-100'
-          // -2.375rem = the button's own w-8 (2rem) plus the row's gap-1.5 (0.375rem), so a hidden
-          // submit leaves the gear flush to the box edge — bottom and right padding stay equal.
-          : 'pointer-events-none -ml-[2.375rem] translate-x-2 opacity-0 disabled:opacity-0',
-      )}
-    >
-      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="submit"
+            size="icon-sm"
+            onClick={submit}
+            disabled={busy || !hasPrompt || targetOffline}
+            aria-hidden={!hasPrompt}
+            tabIndex={hasPrompt ? undefined : -1}
+            aria-label={submitLabel}
+            className={cn(
+              // `disabled:opacity-*` overrides the base (the button is disabled while empty/busy), so the
+              // hidden state must force it to 0 and the shown state back to full for the busy spinner.
+              'h-8 w-8 shrink-0 transition-[margin,opacity,transform] duration-150 ease-out',
+              hasPrompt
+                ? 'ml-0 translate-x-0 opacity-100 disabled:opacity-100'
+                // -2.375rem = the button's own w-8 (2rem) plus the row's gap-1.5 (0.375rem), so a hidden
+                // submit leaves the gear flush to the box edge — bottom and right padding stay equal.
+                : 'pointer-events-none -ml-[2.375rem] translate-x-2 opacity-0 disabled:opacity-0',
+            )}
+          />
+        }
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+      </TooltipTrigger>
+      <TooltipContent>{busy ? submitBusyLabel : `${submitLabel}  (⌘↵ / Ctrl+Enter)`}</TooltipContent>
+    </Tooltip>
   )
 
   // #1073: an offline target blocks Start; say so and point back to the "Run on" gear. No auto-fallback.

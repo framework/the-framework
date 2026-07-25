@@ -4,6 +4,7 @@ import { onDashboard } from '../server/reads.telefunc.js'
 import { interventionKey } from '@gemstack/the-framework/client'
 import { Quota } from './Quota.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { usePolled } from '../lib/use-async.js'
 import { usePreferences } from '../lib/preferences.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
@@ -97,48 +98,66 @@ function HumanQueue({ items, onSelectProject }: { items: Intervention[]; onSelec
             {items.map(item => (
               <li key={interventionKey(item)}>
                 {item.kind === 'awaiting' ? (
-                  <button
-                    type="button"
-                    onClick={() => onSelectProject(item.projectId)}
-                    className="flex w-full items-center gap-2 py-2 text-left hover:opacity-80"
-                    title="Open the session to answer"
-                  >
-                    <MessageCircleQuestion className="h-4 w-4 shrink-0 text-warning" />
-                    <span className="shrink-0 text-xs font-medium text-warning">Awaiting</span>
-                    <span className="truncate font-medium">{item.title}</span>
-                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.projectName}</span>
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <button
+                          type="button"
+                          onClick={() => onSelectProject(item.projectId)}
+                          className="flex w-full items-center gap-2 py-2 text-left hover:opacity-80"
+                        />
+                      }
+                    >
+                      <MessageCircleQuestion className="h-4 w-4 shrink-0 text-warning" />
+                      <span className="shrink-0 text-xs font-medium text-warning">Awaiting</span>
+                      <span className="truncate font-medium">{item.title}</span>
+                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.projectName}</span>
+                    </TooltipTrigger>
+                    <TooltipContent>Open the session to answer</TooltipContent>
+                  </Tooltip>
                 ) : item.kind === 'unpushed' ? (
-                  <button
-                    type="button"
-                    onClick={() => onSelectProject(item.projectId)}
-                    className="flex w-full items-center gap-2 py-2 text-left hover:opacity-80"
-                    title={`Open the session: work on ${item.branch ?? ''} was never pushed`}
-                  >
-                    <GitBranch className="h-4 w-4 shrink-0 text-info" />
-                    <span className="shrink-0 text-xs font-medium text-info">Unpushed</span>
-                    <span className="truncate font-medium">{item.title}</span>
-                    {/* An unknown count says nothing rather than the contradictory "0 commits". */}
-                    {item.commits !== undefined && item.commits > 0 && (
-                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                        {item.commits === 1 ? '1 commit' : `${item.commits} commits`}
-                      </span>
-                    )}
-                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.projectName}</span>
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <button
+                          type="button"
+                          onClick={() => onSelectProject(item.projectId)}
+                          className="flex w-full items-center gap-2 py-2 text-left hover:opacity-80"
+                        />
+                      }
+                    >
+                      <GitBranch className="h-4 w-4 shrink-0 text-info" />
+                      <span className="shrink-0 text-xs font-medium text-info">Unpushed</span>
+                      <span className="truncate font-medium">{item.title}</span>
+                      {/* An unknown count says nothing rather than the contradictory "0 commits". */}
+                      {item.commits !== undefined && item.commits > 0 && (
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                          {item.commits === 1 ? '1 commit' : `${item.commits} commits`}
+                        </span>
+                      )}
+                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.projectName}</span>
+                    </TooltipTrigger>
+                    <TooltipContent>{`Open the session: work on ${item.branch ?? ''} was never pushed`}</TooltipContent>
+                  </Tooltip>
                 ) : (
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 py-2 hover:opacity-80"
-                    title={`Open PR #${item.number} on GitHub`}
-                  >
-                    <GitPullRequest className="h-4 w-4 shrink-0 text-success" />
-                    <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">#{item.number}</span>
-                    <span className="truncate font-medium">{item.title}</span>
-                    <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.projectName}</span>
-                  </a>
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-2 py-2 hover:opacity-80"
+                        />
+                      }
+                    >
+                      <GitPullRequest className="h-4 w-4 shrink-0 text-success" />
+                      <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">#{item.number}</span>
+                      <span className="truncate font-medium">{item.title}</span>
+                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.projectName}</span>
+                    </TooltipTrigger>
+                    <TooltipContent>{`Open PR #${item.number} on GitHub`}</TooltipContent>
+                  </Tooltip>
                 )}
               </li>
             ))}
@@ -308,16 +327,18 @@ function AgentRow({ label, at, projectName, onOpen }: Omit<AgentRowData, 'key'>)
       <button
         type="button"
         onClick={onOpen}
-        title="Open this session"
         className="flex w-full items-baseline gap-2 rounded-md px-2 py-1 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
       >
         <span aria-hidden className="shrink-0 text-muted-foreground/60">•</span>
         <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
         <span className="shrink-0 text-xs text-muted-foreground">{projectName}</span>
         {at && (
-          <span className="shrink-0 text-xs tabular-nums text-muted-foreground" title={formatDateTime(at)}>
-            {formatAge(at)}
-          </span>
+          <Tooltip>
+            <TooltipTrigger render={<span className="shrink-0 text-xs tabular-nums text-muted-foreground" />}>
+              {formatAge(at)}
+            </TooltipTrigger>
+            <TooltipContent>{formatDateTime(at)}</TooltipContent>
+          </Tooltip>
         )}
       </button>
     </li>

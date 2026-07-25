@@ -5,6 +5,7 @@ import { onGitStatus, onRunWorktree } from '../server/reads.telefunc.js'
 import { usePolled } from '../lib/use-async.js'
 import { formatBytes } from '@gemstack/the-framework/client'
 import { cn } from '../lib/utils.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // The checkout in play (#491, part of #488): active branch, a clean/dirty dot, the linked PR.
 // Polled, so it tracks a run committing or branching. Hidden when there is no git repo (or on
@@ -124,30 +125,37 @@ export function GitStatusBar({
         )}
       >
         <GitBranch className="h-3.5 w-3.5 shrink-0" />
-        <span
-          className={cn('truncate', label ? 'max-w-[14rem]' : 'max-w-[16rem] font-medium text-foreground')}
-          title={branchTitle}
-        >
-          {branchText}
-        </span>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span className={cn('truncate', label ? 'max-w-[14rem]' : 'max-w-[16rem] font-medium text-foreground')} />
+            }
+          >
+            {branchText}
+          </TooltipTrigger>
+          <TooltipContent className="whitespace-pre-line">{branchTitle}</TooltipContent>
+        </Tooltip>
       </span>
-      <span className="flex shrink-0 items-center gap-1.5">
-        {/* Clean is neutral, not green. Green means "added / new / done" everywhere else, so a
-            green dot for "nothing changed" sat one pane away from the file tree's green dot for
-            "this folder HAS changes": the same colour for opposite facts. A clean tree is the
-            unremarkable default and has nothing to announce. */}
-        <span
-          className={cn('h-2 w-2 rounded-full', status.dirty ? 'bg-warning' : 'bg-muted-foreground')}
-          title={status.dirty ? dirtyLabel : 'Clean'}
-        />
-        <span className="text-muted-foreground">{status.dirty ? 'dirty' : 'clean'}</span>
-      </span>
+      {/* Clean is neutral, not green. Green means "added / new / done" everywhere else, so a
+          green dot for "nothing changed" sat one pane away from the file tree's green dot for
+          "this folder HAS changes": the same colour for opposite facts. A clean tree is the
+          unremarkable default and has nothing to announce. */}
+      <Tooltip>
+        <TooltipTrigger render={<span className="flex shrink-0 items-center gap-1.5" />}>
+          <span className={cn('h-2 w-2 rounded-full', status.dirty ? 'bg-warning' : 'bg-muted-foreground')} />
+          <span className="text-muted-foreground">{status.dirty ? 'dirty' : 'clean'}</span>
+        </TooltipTrigger>
+        <TooltipContent>{status.dirty ? dirtyLabel : 'Clean'}</TooltipContent>
+      </Tooltip>
       {runState}
       {/* Only a worktree has a size worth showing, and only once nothing is writing to it (#798). */}
       {size && (
-        <span className="hidden shrink-0 text-muted-foreground @4xl:inline" title="This session's worktree on disk">
-          {size}
-        </span>
+        <Tooltip>
+          <TooltipTrigger render={<span className="hidden shrink-0 text-muted-foreground @4xl:inline" />}>
+            {size}
+          </TooltipTrigger>
+          <TooltipContent>This session&apos;s worktree on disk</TooltipContent>
+        </Tooltip>
       )}
       {/* The branch is the only part that gives up width (#1026): it truncates with an ellipsis
           and still reads, where a half-cut "0 files · me" does not. The facts furthest from the
@@ -173,18 +181,24 @@ export function GitStatusBar({
         facts
       )}
       {status.pr && (
-        <a
-          href={status.pr.url}
-          target="_blank"
-          rel="noreferrer"
-          className={cn('flex shrink-0 items-center gap-1.5 text-primary hover:underline', !inline && 'ml-auto')}
-          title={status.pr.title}
-        >
-          <span>PR #{status.pr.number}</span>
-          <span className="rounded-full border border-border px-1.5 text-[10px] uppercase text-muted-foreground">
-            {status.pr.state.toLowerCase()}
-          </span>
-        </a>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <a
+                href={status.pr.url}
+                target="_blank"
+                rel="noreferrer"
+                className={cn('flex shrink-0 items-center gap-1.5 text-primary hover:underline', !inline && 'ml-auto')}
+              />
+            }
+          >
+            <span>PR #{status.pr.number}</span>
+            <span className="rounded-full border border-border px-1.5 text-[10px] uppercase text-muted-foreground">
+              {status.pr.state.toLowerCase()}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{status.pr.title}</TooltipContent>
+        </Tooltip>
       )}
     </>
   )

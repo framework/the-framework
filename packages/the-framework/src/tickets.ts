@@ -11,16 +11,6 @@ import { join } from 'node:path'
 export const TICKETS_DIR = 'tickets'
 
 /**
- * The ticket-format spec (#684): the static reference an agent opens to learn the
- * `tickets/<DATE>_<SLUG>.md` (and `.spike.md` / `.plan.md`) file shape. Per the #674 call it ships
- * *inside the installed package* rather than being materialized into the repo, so a future
- * breaking change to the format rides with the package version instead of going stale in a
- * committed file. The package ships `prompts/ticketing_format.md` (see the `files` allowlist),
- * so an agent reads it at this cwd-relative path; the #683 context fragment points here.
- */
-export const TICKETING_FORMAT_FILE = 'node_modules/@gemstack/the-framework/prompts/ticketing_format.md'
-
-/**
  * The flat, durable backlog/roadmap file — the confirmed-task queue (the "AI task queue"
  * the #683 context fragment names). Lives at the repo root as `TODO_AGENTS.md` (#682):
  * moved out of `tickets/` so that directory holds only tickets. This is the file a run
@@ -29,14 +19,14 @@ export const TICKETING_FORMAT_FILE = 'node_modules/@gemstack/the-framework/promp
  */
 export const FLAT_TODO_FILE = 'TODO_AGENTS.md'
 
-/**
- * The backlog-format spec (#880): the static reference an agent opens to learn how
- * {@link FLAT_TODO_FILE} is laid out — priority sections, URGENT first. Ships inside the
- * installed package for the same reason as {@link TICKETING_FORMAT_FILE}, and the #683 context
- * fragment points here. The priority sections need no parser support: `parseTodoEntries` skips
- * headings and returns entries in file order, so a priority-sorted file drains in priority order.
- */
-export const TODO_FORMAT_FILE = 'node_modules/@gemstack/the-framework/prompts/todo_format.md'
+// The format specs for {@link TICKETS_DIR} and {@link FLAT_TODO_FILE} (#684/#880) are no longer
+// named here as a path. They used to be the two `node_modules/@gemstack/the-framework/prompts/*.md`
+// pointers the #683 context fragment handed the agent, which only resolve when the framework is a
+// root dependency of the repo it works on — so the agent could not open them and both files drifted
+// from the format (#1163). The spec content now travels in the system channel itself; see
+// `CONTEXT_FORMATS` in system-prompt.ts. The priority sections that spec describes need no parser
+// support: `parseTodoEntries` skips headings and returns entries in file order, so a
+// priority-sorted file drains in priority order.
 
 /**
  * Which `## Priority N` section a ticket's own `priority:` key earns it, translating the ticket

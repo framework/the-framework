@@ -11,7 +11,8 @@ import {
   systemPromptBlock,
   SYSTEM_PROMPT_TEMPLATE,
 } from './system-prompt.js'
-import { FLAT_TODO_FILE, TICKETING_FORMAT_FILE, TODO_FORMAT_FILE } from './tickets.js'
+import { FLAT_TODO_FILE } from './tickets.js'
+import { TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { CONVERSATIONS_DIR } from './conversations.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
@@ -20,6 +21,8 @@ import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 const KNOWLEDGE_LINES = CONTEXT_DOCS.map(d => `- \`${d.path}\` (${d.comment})`).join('\n')
 /** The `Context:` block the context docs stand up on their own, with no dirs picked. */
 const KNOWLEDGE_CONTEXT = `Context:\n${KNOWLEDGE_LINES}`
+/** That block plus the two format specs it names, which travel in the channel with it (#1163). */
+const CONTEXT_BLOCK = [KNOWLEDGE_CONTEXT, TICKETING_FORMAT, TODO_FORMAT].join('\n\n')
 
 test('CONTEXT_DOCS is the #683 fragment: business knowledge plus the roadmap/queue pointers', () => {
   const paths = CONTEXT_DOCS.map(d => d.path)
@@ -42,13 +45,15 @@ test('CONTEXT_DOCS is the #683 fragment: business knowledge plus the roadmap/que
   for (const p of ['GOAL.md', 'knowledge-base/MARKET_RESEARCH.md', 'knowledge-base/**.md', 'tickets/**.md', '.the-framework/conversations/**.md', 'TODO_AGENTS.md']) {
     assert.ok(!businessPaths.includes(p))
   }
-  // The ticket-format pointer is inlined here (this module stays node-free), so pin it to the
-  // canonical constant in tickets.ts (#684) — they must never drift.
+  // The two format-bearing bullets name a section of this same channel (#1163), not a file to go
+  // and open: the spec they point at has to be something the agent has already been handed.
   const tickets = CONTEXT_DOCS.find(d => d.path === 'tickets/**.md')
-  assert.ok(tickets?.comment.includes(TICKETING_FORMAT_FILE), `expected the ${TICKETING_FORMAT_FILE} pointer`)
-  // Same for the #880 backlog-format pointer.
+  assert.match(tickets?.comment ?? '', /format: the "Ticket format" section below/)
   const todo = CONTEXT_DOCS.find(d => d.path === FLAT_TODO_FILE)
-  assert.ok(todo?.comment.includes(TODO_FORMAT_FILE), `expected the ${TODO_FORMAT_FILE} pointer`)
+  assert.match(todo?.comment ?? '', /format: the "TODO_AGENTS.md" section below/)
+  // Nothing here may point into node_modules: that path resolves only when the framework is a root
+  // dependency of the repo it works on, which is what left both specs unopenable (#1163).
+  for (const doc of CONTEXT_DOCS) assert.ok(!doc.comment.includes('node_modules/'), `${doc.path} points into node_modules`)
   // The conversations pointer (#683/#908) is inlined too, so pin its dir to the canonical
   // constants rather than a bare literal that could drift from where runs actually commit.
   const conversations = CONTEXT_DOCS.find(d => d.path.startsWith(`${THE_FRAMEWORK_DIR}/${CONVERSATIONS_DIR}/`))
@@ -127,13 +132,35 @@ test('renderSystemPrompt is not confused by a user prompt containing the heading
   assert.equal(user, sneaky)
 })
 
+test('the channel carries the ticket and backlog format specs, so a spec can be followed (#1163)', () => {
+  // The bug: both bullets pointed at `node_modules/@gemstack/the-framework/prompts/*.md`, which
+  // only exists when the framework is a root dependency of the repo it works on. Everywhere else --
+  // a global or npx install, a fresh worktree, this repo itself -- the agent was told to follow a
+  // format it could not open, and `TODO_AGENTS.md` and `tickets/` both drifted from it.
+  const block = systemPromptBlock()
+  for (const [heading, spec] of [
+    ['Ticket format', TICKETING_FORMAT],
+    ['TODO_AGENTS.md', TODO_FORMAT],
+  ] as const) {
+    assert.ok(block.includes(spec), `expected the ${heading} spec in the channel`)
+    assert.ok(block.includes(`# ${heading}`), `expected the ${heading} spec to open with its heading`)
+    // The bullet says "below", so the spec has to actually come after the bullets.
+    assert.ok(block.includes(`the "${heading}" section below`), `nothing names the ${heading} section`)
+    assert.ok(block.indexOf(spec) > block.indexOf(KNOWLEDGE_CONTEXT), `the ${heading} spec is not below the bullets`)
+  }
+  // Framework-authored content, so `--vanilla` drops it with the docs and the built-in prompt.
+  const vanilla = systemPromptBlock({ antiLazyPill: false, user: 'Only mine.' })
+  assert.ok(!vanilla.includes(TICKETING_FORMAT))
+  assert.ok(!vanilla.includes(TODO_FORMAT))
+})
+
 test('systemPromptBlock defaults to the knowledge-doc context line + the built-in #326 prompt', () => {
-  assert.equal(systemPromptBlock(), [KNOWLEDGE_CONTEXT, renderSystemPrompt().system].join('\n\n'))
+  assert.equal(systemPromptBlock(), [CONTEXT_BLOCK, renderSystemPrompt().system].join('\n\n'))
 })
 
 test('systemPromptBlock appends the user prompt after the built-in one', () => {
   const block = systemPromptBlock({ user: 'Ship small PRs.' })
-  assert.ok(block.startsWith(`${KNOWLEDGE_CONTEXT}\n\n# System prompt`))
+  assert.ok(block.startsWith(`${CONTEXT_BLOCK}\n\n# System prompt`))
   assert.ok(block.endsWith('Ship small PRs.'))
   assert.match(block, /AWAIT[\s\S]*Ship small PRs\./) // built-in first, then user
 })
@@ -171,11 +198,11 @@ test('systemPromptBlock is the #326 prompt and the user prompt, in that order, a
   // The knowledge docs (#537) join the Context line, which is paths, not prompt text.
   const block = systemPromptBlock({ user: 'Ship small PRs.', context: ['/work/api'] })
   const context = `Context: /work/api\n${KNOWLEDGE_LINES}`
-  assert.equal(block, [context, renderSystemPrompt().system, 'Ship small PRs.'].join('\n\n'))
+  assert.equal(block, [context, TICKETING_FORMAT, TODO_FORMAT, renderSystemPrompt().system, 'Ship small PRs.'].join('\n\n'))
 })
 
 test('systemPromptBlock ignores a whitespace-only user prompt', () => {
-  assert.equal(systemPromptBlock({ user: '   ' }), [KNOWLEDGE_CONTEXT, renderSystemPrompt().system].join('\n\n'))
+  assert.equal(systemPromptBlock({ user: '   ' }), [CONTEXT_BLOCK, renderSystemPrompt().system].join('\n\n'))
   assert.equal(systemPromptBlock({ antiLazyPill: false, user: '  \n ' }), '')
 })
 
@@ -264,7 +291,7 @@ test('composeRunSystem is exactly the #326 block + both emit protocols, and noth
   // the point: no persona, skill, or memory framing may ever be appended again. The #537
   // knowledge docs are in front of that, on the #439 context line: paths, not prompt text.
   const system = composeRunSystem()
-  assert.equal(system, [KNOWLEDGE_CONTEXT, renderSystemPrompt().system, AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n'))
+  assert.equal(system, [CONTEXT_BLOCK, renderSystemPrompt().system, AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n'))
 })
 
 test('composeRunSystem appends nothing after the protocols, whatever the options (#547)', () => {

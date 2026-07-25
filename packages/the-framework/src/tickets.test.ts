@@ -9,8 +9,6 @@ import {
   LEGACY_TICKETS_TODO_FILE,
   LEGACY_TODO_FILE,
   TICKETS_DIR,
-  TICKETING_FORMAT_FILE,
-  TODO_FORMAT_FILE,
   findFlatTodo,
   todoPriorityForTicket,
 } from './tickets.js'
@@ -25,9 +23,8 @@ test('the flat backlog lives at the root TODO_AGENTS.md, with the legacy locatio
 })
 
 test('the ticket-format spec ships in the package (not materialized), with priority/topics (#684/#674)', () => {
-  // Per Rom's #674 call it is not written into the repo; it ships inside the package and the
-  // context fragment reads it by its node_modules path, so the format versions with the package.
-  assert.equal(TICKETING_FORMAT_FILE, 'node_modules/@gemstack/the-framework/prompts/ticketing_format.md')
+  // Per the #674 call it is not written into the repo, so the format versions with the package.
+  // How the agent reads it is system-prompt.ts's job now (#1163): the content rides in the channel.
   // The spec teaches both file shapes and the revised #684 optional priority/topics fields.
   assert.ok(TICKETING_FORMAT.includes('tickets/<DATE>_<SLUG>.md'))
   assert.ok(TICKETING_FORMAT.includes('tickets/<DATE>_<SLUG>.spike.md'))
@@ -37,7 +34,6 @@ test('the ticket-format spec ships in the package (not materialized), with prior
 
 test('the backlog-format spec ships in the package and teaches the priority sections (#880)', () => {
   // Ships inside the package like the ticket format, so the layout versions with the package.
-  assert.equal(TODO_FORMAT_FILE, 'node_modules/@gemstack/the-framework/prompts/todo_format.md')
   assert.ok(TODO_FORMAT.includes(FLAT_TODO_FILE))
   // A numeric 0-10 scale, not named tiers: 10 is act-immediately, 0 is only-if-capacity.
   for (const section of ['## Priority 10 (critical', '## Priority 9', '## Priority 0 (only if capacity)']) {

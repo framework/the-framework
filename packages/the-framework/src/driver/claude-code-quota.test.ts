@@ -91,9 +91,10 @@ test('parseQuotaReadout never reports an empty reading as zero use (#521)', () =
 test('isTransientQuotaReason splits this-attempt failures from setup failures', () => {
   assert.equal(isTransientQuotaReason('fetch-failed'), true)
   assert.equal(isTransientQuotaReason('timeout'), true)
+  // One answer we could not read, not a statement about the install (#960).
+  assert.equal(isTransientQuotaReason('unrecognized'), true)
   assert.equal(isTransientQuotaReason('no-subscription'), false)
   assert.equal(isTransientQuotaReason('agent-not-found'), false)
-  assert.equal(isTransientQuotaReason('unrecognized'), false)
 })
 
 /** A fake process that emits `stdout` then closes with `code`. */

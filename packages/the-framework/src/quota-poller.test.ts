@@ -85,11 +85,26 @@ test('QuotaPoller gives up when the agent is missing (#525)', async () => {
   assert.equal(poller.isStopped, true)
 })
 
-test('QuotaPoller treats a reworded readout as authoritative and stops (#525)', async () => {
-  const { poller } = pollerOf([{ available: false, reason: 'unrecognized' }])
+test('QuotaPoller keeps polling after a readout it did not recognize (#960)', async () => {
+  const { poller, advance } = pollerOf([goodAt(10), { available: false, reason: 'unrecognized' }])
   await poller.poll()
-  // Polling on wouldn't reword it back; this needs a code change, not a retry.
-  assert.equal(poller.isStopped, true)
+  advance(1000)
+  await poller.poll()
+  // One unhandled answer is not a verdict on the account: an update notice ahead
+  // of the JSON reads exactly like this and is gone by the next read.
+  assert.equal(poller.isStopped, false)
+  assert.ok(poller.current().lastGood?.available)
+})
+
+test('QuotaPoller recovers once the readout is recognized again (#960)', async () => {
+  const { poller } = pollerOf([{ available: false, reason: 'unrecognized' }, goodAt(42)])
+  await poller.poll()
+  await poller.poll()
+  // The bug this pins: a single bad first read used to stop the poller for the
+  // daemon's whole life, so the usage bar never came back and looked reverted.
+  assert.equal(poller.isStopped, false)
+  assert.equal(poller.current().lastGood?.windows.find(w => w.kind === 'week')?.percentUsed, 42)
+  assert.equal(poller.intervalMs, DEFAULT_POLL_MS)
 })
 
 test('QuotaPoller survives a driver that throws (#525)', async () => {

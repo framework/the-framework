@@ -13,7 +13,8 @@ function localDateKey(date: Date): string {
 // quiet day still reads as an empty slot rather than a gap. Hovering a column names its day.
 // The columns are plain divs (#948): they act on nothing, so as buttons a keyboard user
 // tabbed through 14 focusable controls that did nothing on Enter. The read-out data rides
-// each column's title and the group's accessible description instead.
+// the hover read-out and the group's accessible description; no `title`, so the slow system
+// tooltip never doubles the instant read-out (#1149).
 export function ActivityChart({ data }: { data: ActivityDay[] }) {
   const [hover, setHover] = useState<number | null>(null)
   const max = Math.max(1, ...data.map(d => d.count))
@@ -31,7 +32,6 @@ export function ActivityChart({ data }: { data: ActivityDay[] }) {
         {data.map((d, i) => (
           <div
             key={d.date}
-            title={`${d.date}: ${runs(d.count)}`}
             onMouseEnter={() => setHover(i)}
             onMouseLeave={() => setHover(null)}
             className="flex h-full flex-1 items-end rounded-sm bg-muted/40"

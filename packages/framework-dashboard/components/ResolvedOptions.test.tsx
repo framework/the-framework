@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ResolvedOptions } from './ResolvedOptions.js'
 import type { OptionRow } from './OptionsMenu.js'
+import { hoverTooltip, unhoverTooltip } from '../test-utils.js'
 
 const rows = (over: Partial<Record<string, boolean>> = {}): OptionRow[] => [
   { key: 'autopilot', label: 'Autopilot', title: 'a', description: 'a', checked: over.autopilot ?? false },
@@ -36,7 +37,7 @@ describe('ResolvedOptions (#842)', () => {
     expect(screen.queryByText('Browser')).toBeNull()
   })
 
-  test('a value inherited from the repo yml is marked as not yours', () => {
+  test('a value inherited from the repo yml is marked as not yours', async () => {
     render(
       <ResolvedOptions
         options={rows({ autopilot: true, technical: true })}
@@ -44,12 +45,14 @@ describe('ResolvedOptions (#842)', () => {
         fileConfig={{}}
       />,
     )
-    const repo = screen.getByText('Technical control').closest('span')
-    const yours = screen.getByText('Autopilot').closest('span')
-    expect(repo?.textContent).toContain('repo')
-    expect(repo?.getAttribute('title')).toContain('the-framework.yml')
-    expect(yours?.textContent).not.toContain('repo')
-    expect(yours?.getAttribute('title')).toContain('Your setting')
+    const repo = screen.getByText('Technical control')
+    const yours = screen.getByText('Autopilot')
+    expect(repo.textContent).toContain('repo')
+    // Which tier a chip came from is a hover away, on the chip itself.
+    expect((await hoverTooltip(repo)).textContent).toContain('the-framework.yml')
+    unhoverTooltip(repo)
+    expect(yours.textContent).not.toContain('repo')
+    expect((await hoverTooltip(yours)).textContent).toContain('Your setting')
   })
 
   test('shows the yml keys the gear cannot set, always as the repo tier', () => {

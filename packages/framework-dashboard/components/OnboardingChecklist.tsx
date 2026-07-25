@@ -13,6 +13,7 @@ import { AddProjectPanel } from './AddProjectPanel.js'
 import { DiscordBotDialog, DiscordWebhookDialog, DISCORD_BOT_DESCRIPTION, DISCORD_WEBHOOK_DESCRIPTION } from './DiscordDialogs.js'
 import { Button } from './ui/button.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // The Onboarding checklist (#958): the integrations a new install needs, each with the state it
 // is actually in rather than a static list to read past.
@@ -118,7 +119,7 @@ export function OnboardingChecklist({
         <div className="flex flex-col items-end gap-1">
           <div className="flex flex-wrap justify-end gap-2">
             {suggestion?.cwd && !suggestion.cwdProjectId && (
-              <Button size="sm" onClick={addCwd} disabled={addingCwd} title={suggestion.cwd}>
+              <Button size="sm" onClick={addCwd} disabled={addingCwd}>
                 {addingCwd ? 'Adding…' : `Add ${suggestion.cwd} as project`}
               </Button>
             )}
@@ -209,15 +210,21 @@ export function OnboardingChecklist({
           </p>
         </div>
         {dismissible && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => updatePreferences({ onboardingDismissed: true })}
-            title="Remove, you can resume the onboarding on the settings page"
-            aria-label="Remove, you can resume the onboarding on the settings page"
-          >
-            <X className="h-4 w-4" aria-hidden />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => updatePreferences({ onboardingDismissed: true })}
+                  aria-label="Remove, you can resume the onboarding on the settings page"
+                />
+              }
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </TooltipTrigger>
+            <TooltipContent>Remove, you can resume the onboarding on the settings page</TooltipContent>
+          </Tooltip>
         )}
       </CardHeader>
       <CardContent>

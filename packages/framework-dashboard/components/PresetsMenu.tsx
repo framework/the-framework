@@ -3,6 +3,7 @@ import { SquareSlash, Plus, X } from 'lucide-react'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'
 import { OptionLabel } from './ui/option-label.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -43,20 +44,26 @@ function SavedPresetRow({
   return (
     <DropdownMenuItem disabled={busy} onClick={() => onLoad(preset.prompt, preset.label)} className="items-center gap-2">
       <span className="flex-1 truncate">{preset.label}</span>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={e => {
-          // Delete, not load — keep the row's own click out of it.
-          e.stopPropagation()
-          onDelete(preset.id)
-        }}
-        title={`Delete "${preset.label}"`}
-        aria-label={`Delete preset ${preset.label}`}
-        className="rounded p-0.5 text-[var(--color-muted-foreground)] hover:text-danger"
-      >
-        <X className="h-3.5 w-3.5" aria-hidden />
-      </button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <button
+              type="button"
+              disabled={busy}
+              onClick={e => {
+                // Delete, not load — keep the row's own click out of it.
+                e.stopPropagation()
+                onDelete(preset.id)
+              }}
+              aria-label={`Delete preset ${preset.label}`}
+              className="rounded p-0.5 text-[var(--color-muted-foreground)] hover:text-danger"
+            />
+          }
+        >
+          <X className="h-3.5 w-3.5" aria-hidden />
+        </TooltipTrigger>
+        <TooltipContent>Delete &quot;{preset.label}&quot;</TooltipContent>
+      </Tooltip>
     </DropdownMenuItem>
   )
 }
@@ -88,29 +95,44 @@ export function PresetsMenu({
 }) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        type="button"
-        disabled={busy}
-        aria-label="Presets"
-        title="Load a preset prompt — also available by typing / in the editor"
-        className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'h-8 w-8')}
-      >
-        <SquareSlash className="h-4 w-4" aria-hidden />
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              type="button"
+              disabled={busy}
+              aria-label="Presets"
+              className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'h-8 w-8')}
+            />
+          }
+        >
+          <SquareSlash className="h-4 w-4" aria-hidden />
+        </TooltipTrigger>
+        <TooltipContent>Load a preset prompt — also available by typing / in the editor</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="start" className="min-w-[16rem] max-w-[20rem]">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Presets</DropdownMenuLabel>
-          {presets.map(p => (
-            <DropdownMenuItem
-              key={p.id}
-              disabled={busy}
-              onClick={() => onLoad(p.render(), p.label, p.newSession)}
-              {...(p.tooltip ? { title: p.tooltip } : {})}
-              className="items-start"
-            >
-              <OptionLabel label={p.label} description={`/${p.id}`} />
-            </DropdownMenuItem>
-          ))}
+          {presets.map(p => {
+            const itemProps = {
+              disabled: busy,
+              onClick: () => onLoad(p.render(), p.label, p.newSession),
+              className: 'items-start',
+            }
+            const label = <OptionLabel label={p.label} description={`/${p.id}`} />
+            if (!p.tooltip)
+              return (
+                <DropdownMenuItem key={p.id} {...itemProps}>
+                  {label}
+                </DropdownMenuItem>
+              )
+            return (
+              <Tooltip key={p.id}>
+                <TooltipTrigger render={<DropdownMenuItem {...itemProps} />}>{label}</TooltipTrigger>
+                <TooltipContent className="max-w-[22rem]">{p.tooltip}</TooltipContent>
+              </Tooltip>
+            )
+          })}
         </DropdownMenuGroup>
         {customPresets.length > 0 && (
           <DropdownMenuGroup>

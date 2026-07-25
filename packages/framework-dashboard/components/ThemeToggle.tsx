@@ -3,6 +3,7 @@ import { usePreferences, updatePreferences, themePreference, type ThemePreferenc
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // The appearance control (#754). The theme has been switchable since #725, but it lived inside the
 // per-run options gear: an app-wide setting filed under one run's options, and absent entirely on a
@@ -27,13 +28,19 @@ export function ThemeToggle() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'shrink-0 text-muted-foreground')}
-        title={`Theme: ${current.label}`}
-        aria-label="Theme"
-      >
-        <Current className="h-4 w-4" />
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'shrink-0 text-muted-foreground')}
+              aria-label="Theme"
+            />
+          }
+        >
+          <Current className="h-4 w-4" />
+        </TooltipTrigger>
+        <TooltipContent>Theme: {current.label}</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end">
         {THEME_OPTIONS.map(t => {
           const Icon = t.icon
@@ -43,7 +50,6 @@ export function ThemeToggle() {
               // Keep the menu open so the theme visibly changes underneath the pick.
               closeOnClick={false}
               onClick={() => updatePreferences({ theme: t.value })}
-              title={`${t.label} theme`}
             >
               <Check className={cn('h-3.5 w-3.5 shrink-0', t.value === theme ? 'opacity-100' : 'opacity-0')} />
               <Icon className="h-3.5 w-3.5 shrink-0 opacity-70" />

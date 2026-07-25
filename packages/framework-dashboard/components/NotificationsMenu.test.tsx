@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Preferences } from '@gemstack/the-framework'
+import { hoverTooltip } from '../test-utils.js'
 
 const updatePreferences = vi.hoisted(() => vi.fn())
 // The daemon's channel capability (#948), read through the shared store since #1095: both
@@ -34,7 +35,10 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const open = () => fireEvent.click(screen.getByRole('button', { name: /notifications/i }))
+const bell = () => screen.getByRole('button', { name: /notifications/i })
+const open = () => fireEvent.click(bell())
+/** What the bell says on hover — the state read-out lives in its tooltip now (#1149). */
+const bellTooltip = async () => (await hoverTooltip(bell())).textContent
 
 describe('NotificationsMenu (#676)', () => {
   test('the popover groups methods and categories, both "Human Queue" and "New activity" toggleable', () => {
@@ -71,12 +75,12 @@ describe('NotificationsMenu (#676)', () => {
     expect((globalThis.Notification as unknown as { requestPermission: () => void }).requestPermission).toHaveBeenCalled()
   })
 
-  test('the bell reads active when a granted method is on, idle otherwise', () => {
+  test('the bell reads active when a granted method is on, idle otherwise', async () => {
     const { rerender } = render(<NotificationsMenu />) // default: browser on + granted
-    expect(screen.getByRole('button', { name: /notifications/i }).getAttribute('title')).toBe('Notifications on')
+    expect(await bellTooltip()).toBe('Notifications on')
     prefs = { notifyBrowser: false } // no method effectively on
     rerender(<NotificationsMenu />)
-    expect(screen.getByRole('button', { name: /notifications/i }).getAttribute('title')).toBe('Notifications')
+    expect(await bellTooltip()).toBe('Notifications')
   })
 
   test('a blocked browser permission disables the Browser toggle with a hint', () => {
@@ -105,10 +109,10 @@ describe('NotificationsMenu (#676)', () => {
     expect(updatePreferences).toHaveBeenCalledWith({ discordBot: true })
   })
 
-  test('turning the bot on does not light the bell, which is about notifications (#916)', () => {
+  test('turning the bot on does not light the bell, which is about notifications (#916)', async () => {
     prefs = { discordBot: true, notifyBrowser: false, notifyDiscord: false }
     render(<NotificationsMenu />)
-    expect(screen.getByRole('button', { name: /notifications/i }).getAttribute('title')).toBe('Notifications')
+    expect(await bellTooltip()).toBe('Notifications')
   })
 
   // #948: the toggle is a preference; delivery needs the daemon env var. An unconfigured
@@ -117,9 +121,7 @@ describe('NotificationsMenu (#676)', () => {
     channels.value = { discordWebhook: false, discordBot: false, sources: {}, editable: true }
     prefs = { notifyDiscord: true, notifyBrowser: false }
     render(<NotificationsMenu />)
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /notifications/i }).getAttribute('title')).toBe('Notifications'),
-    )
+    await waitFor(async () => expect(await bellTooltip()).toBe('Notifications'))
     open()
     expect(screen.getByText('Not configured — add a webhook in Settings')).toBeTruthy()
     expect(screen.getByText('Not configured — add a bot token in Settings')).toBeTruthy()
@@ -128,8 +130,6 @@ describe('NotificationsMenu (#676)', () => {
   test('a configured webhook keeps the bell lit for Discord delivery', async () => {
     prefs = { notifyDiscord: true, notifyBrowser: false }
     render(<NotificationsMenu />)
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: /notifications/i }).getAttribute('title')).toBe('Notifications on'),
-    )
+    await waitFor(async () => expect(await bellTooltip()).toBe('Notifications on'))
   })
 })

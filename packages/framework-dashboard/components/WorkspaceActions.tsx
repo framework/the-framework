@@ -27,8 +27,6 @@ import {
 // session and acts on the project's tree, a session passes its id and every action addresses its
 // own worktree instead. Opening a session in your editor is the whole point of a worktree, and
 // that was the one page where you could not.
-//
-// Must be rendered inside a TooltipProvider; the bars that use it own the delay.
 export function WorkspaceActions({
   projectId,
   runId,
@@ -88,15 +86,21 @@ export function WorkspaceActions({
         <TooltipContent>{runId ? "Open this session's folder" : 'Open folder'} (Finder / Explorer)</TooltipContent>
       </Tooltip>
       <DropdownMenu>
-        <DropdownMenuTrigger
-          type="button"
-          disabled={busy}
-          title="Open in editor"
-          aria-label="Open in editor"
-          className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
-        >
-          <Code className="h-3.5 w-3.5" />
-        </DropdownMenuTrigger>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger
+                type="button"
+                disabled={busy}
+                aria-label="Open in editor"
+                className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
+              />
+            }
+          >
+            <Code className="h-3.5 w-3.5" />
+          </TooltipTrigger>
+          <TooltipContent>Open in editor</TooltipContent>
+        </Tooltip>
         <DropdownMenuContent align="end" className="min-w-[15rem]">
           <DropdownMenuItem disabled={busy} onClick={() => void open('editor')}>
             <Code className="h-3.5 w-3.5 shrink-0" />
@@ -109,7 +113,6 @@ export function WorkspaceActions({
               disabled={busy}
               closeOnClick={false}
               onClick={() => updatePreferences({ editor: '' })}
-              title="Use $FRAMEWORK_EDITOR, or VS Code"
               className="items-start"
             >
               <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', editor ? 'opacity-0' : 'opacity-100')} />
@@ -121,7 +124,6 @@ export function WorkspaceActions({
                 disabled={busy}
                 closeOnClick={false}
                 onClick={() => updatePreferences({ editor: e.bin })}
-                title={`Open in ${e.label} (${e.bin})`}
                 className="items-start"
               >
                 <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', editor === e.bin ? 'opacity-100' : 'opacity-0')} />

@@ -19,13 +19,10 @@ export function RunOutcomes({ counts }: { counts: Record<RunStatus, number> }) {
   return (
     <div className="space-y-3">
       <div className="flex h-2.5 gap-[2px] overflow-hidden rounded-full">
+        {/* No `title`: the legend below already names every segment and count, and a system
+            tooltip is the one slow tooltip left in a dashboard of instant ones (#1149). */}
         {OUTCOMES.filter(o => counts[o.key] > 0).map(o => (
-          <div
-            key={o.key}
-            className={`${o.fill} rounded-full`}
-            style={{ width: `${(counts[o.key] / total) * 100}%` }}
-            title={`${o.label}: ${counts[o.key]}`}
-          />
+          <div key={o.key} className={`${o.fill} rounded-full`} style={{ width: `${(counts[o.key] / total) * 100}%` }} />
         ))}
       </div>
       <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm">

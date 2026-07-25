@@ -24,6 +24,7 @@ import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'
 import { OptionLabel } from './ui/option-label.js'
 import { ConfirmDialog } from './ui/confirm-dialog.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -127,14 +128,20 @@ export function SessionActionsMenu({
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger
-          type="button"
-          aria-label="Session actions"
-          title="Session actions"
-          className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
-        >
-          <MoreVertical className="h-3.5 w-3.5" />
-        </DropdownMenuTrigger>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger
+                type="button"
+                aria-label="Session actions"
+                className={buttonVariants({ variant: 'outline', size: 'icon-sm' })}
+              />
+            }
+          >
+            <MoreVertical className="h-3.5 w-3.5" />
+          </TooltipTrigger>
+          <TooltipContent>Session actions</TooltipContent>
+        </Tooltip>
         <DropdownMenuContent align="end" className="min-w-[14rem]">
           {githubUrl && (
             <DropdownMenuItem render={<a href={githubUrl} target="_blank" rel="noreferrer" />}>

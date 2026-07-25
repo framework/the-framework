@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { hoverTooltip } from '../test-utils.js'
 
 const updatePreferences = vi.hoisted(() => vi.fn())
 const usePreferences = vi.hoisted(() => vi.fn())
@@ -32,15 +33,17 @@ describe('ThemeToggle (#754)', () => {
     expect(updatePreferences).toHaveBeenCalledWith({ theme: 'dark' })
   })
 
-  test('the trigger shows the current theme, so the header says which is on', () => {
+  test('the trigger shows the current theme, so the header says which is on', async () => {
     usePreferences.mockReturnValue({ theme: 'dark' })
     render(<ThemeToggle />)
-    expect(screen.getByRole('button', { name: /theme/i }).getAttribute('title')).toBe('Theme: Dark')
+    const tip = await hoverTooltip(screen.getByRole('button', { name: /theme/i }))
+    expect(tip.textContent).toBe('Theme: Dark')
   })
 
-  test('an unset preference reads as system, the default', () => {
+  test('an unset preference reads as system, the default', async () => {
     usePreferences.mockReturnValue({})
     render(<ThemeToggle />)
-    expect(screen.getByRole('button', { name: /theme/i }).getAttribute('title')).toBe('Theme: System')
+    const tip = await hoverTooltip(screen.getByRole('button', { name: /theme/i }))
+    expect(tip.textContent).toBe('Theme: System')
   })
 })

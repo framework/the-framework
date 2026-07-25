@@ -36,8 +36,11 @@ function setOption(key: keyof Preferences, checked: boolean) {
 import { OptionLabel } from './ui/option-label.js'
 export { OptionLabel }
 
-/** Where a run executes (#1050). `local` runs on this device; `actions` on a GitHub Actions runner. */
-export type RunTarget = 'local' | 'actions'
+/**
+ * Where a run executes (#1050/#610). `local` runs on this device; `actions` on a GitHub Actions
+ * runner; `web` hands it to a Claude Code cloud session on the user's own account.
+ */
+export type RunTarget = 'local' | 'actions' | 'web'
 
 /** The single-select "Run on" control (#1050): the driver axis, at the top of the gear. */
 export type RunTargetControl = {
@@ -87,12 +90,13 @@ function StatusDot({ status }: { status: DeviceStatus | undefined }) {
   )
 }
 
-// The run targets the gear offers (#1050). A single-select modeled on the agent tree (Check-marked
-// rows), not the boolean OptionRow. "Claude web" is a disabled placeholder for the sibling axis in
-// #1049 that has not shipped yet, so the menu shows where this is going without promising it.
+// The run targets the gear offers (#1050/#610). A single-select modeled on the agent tree
+// (Check-marked rows), not the boolean OptionRow. "Claude web" describes the hand-off it is
+// rather than promising a streamed run: the session runs on claude.ai and opens its own PR.
 const RUN_TARGET_ROWS: { value: RunTarget; label: string; description: string }[] = [
   { value: 'local', label: 'This machine', description: 'Run on this machine, as today.' },
   { value: 'actions', label: 'GitHub Actions', description: 'Run on a fresh GitHub Actions runner.' },
+  { value: 'web', label: 'Claude web', description: 'Hand off to a Claude Code cloud session, which opens its own PR.' },
 ]
 
 // One flat "Run on" list (#1066/#1067): the driver rows, then the saved devices and "Add a device",
@@ -141,10 +145,6 @@ function RunTargetSub({ control, connection, busy }: { control: RunTargetControl
             <OptionLabel label={row.label} description={row.description} />
           </DropdownMenuItem>
         ))}
-        <DropdownMenuItem disabled className="items-start">
-          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-0" />
-          <OptionLabel label="Claude web" description="Coming soon." />
-        </DropdownMenuItem>
         {/* Saved devices (#1052/#1066/#1067): a click SELECTS the device as the run target (no
             navigation): the local daemon relays the run to it and streams its events back. The dot
             shows reachability (#1072) and the X removes the saved device. */}

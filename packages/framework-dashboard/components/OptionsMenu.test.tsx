@@ -121,6 +121,7 @@ describe('OptionsMenu (#654)', () => {
   // or the device url), so the summary echoing a driver/device label can't make a query ambiguous.
   const THIS_MACHINE = 'Run on this machine, as today.'
   const ACTIONS = 'Run on a fresh GitHub Actions runner.'
+  const CLAUDE_WEB = 'Hand off to a Claude Code cloud session, which opens its own PR.'
   const STUDIO_URL = 'http://192.168.1.5:4200'
   const rowOf = (token: string): HTMLElement => screen.getByText(token).closest('[role="menuitem"]') as HTMLElement
   const isChecked = (token: string): boolean => !!rowOf(token).querySelector('svg')?.classList.contains('opacity-100')
@@ -138,14 +139,39 @@ describe('OptionsMenu (#654)', () => {
     // The old two-axis framing is gone: no section header, no redundant "Local" duplicating this machine.
     expect(screen.queryByText('A device I have')).toBeNull()
     expect(screen.queryByText('Local')).toBeNull()
-    // The whole list renders as one: driver rows (renamed), the disabled placeholder, the device, and Add.
+    // The whole list renders as one: the three driver rows, the device, and Add.
     expect(screen.getByText(THIS_MACHINE)).toBeTruthy()
     expect(screen.getByText(ACTIONS)).toBeTruthy()
     expect(screen.getByText('Claude web')).toBeTruthy()
     expect(screen.getByText(STUDIO_URL)).toBeTruthy()
     expect(screen.getByText('Add a device…')).toBeTruthy()
-    // Claude web stays a disabled placeholder for the sibling axis that has not shipped.
-    expect(rowOf('Claude web').hasAttribute('data-disabled')).toBe(true)
+  })
+
+  test('Claude web is a real target now, not a disabled placeholder (#610)', () => {
+    openRunOn(connectionControl())
+    expect(rowOf(CLAUDE_WEB).hasAttribute('data-disabled')).toBe(false)
+  })
+
+  test('picking Claude web selects it as the run target (#610)', () => {
+    const onChange = vi.fn()
+    const connection = connectionControl()
+    render(
+      <OptionsMenu options={[]} ecoOptions={[]} showEco={false} busy={false} runTarget={{ value: 'local', onChange }} connection={connection} />,
+    )
+    open()
+    fireEvent.click(screen.getByText('Run on'))
+    fireEvent.click(screen.getByText('Claude web'))
+    expect(onChange).toHaveBeenCalledWith('web')
+    // Picking a driver row clears any selected device, so the one checkmark never doubles up.
+    expect(connection.onSelectDriver).toHaveBeenCalled()
+  })
+
+  test('the checkmark tracks Claude web when it is the target (#610)', () => {
+    openRunOn(connectionControl({ isLocal: true, selectedDeviceId: null }), 'web')
+    // Keyed off the row's description: with `web` selected the label also appears as the
+    // submenu's summary, so the label alone is no longer unique.
+    expect(isChecked(CLAUDE_WEB)).toBe(true)
+    expect(isChecked(THIS_MACHINE)).toBe(false)
   })
 
   test('on the local daemon with no device picked, the checkmark tracks the driver target (#1066)', () => {

@@ -166,8 +166,9 @@ export function startOptionFlags(options: StartRunOptions): string[] {
   if (typeof options.agent === 'string' && options.agent.trim() && options.agent !== 'claude') {
     flags.push('--agent', options.agent.trim())
   }
-  // Run target (#1050): only `actions` needs a flag; `local` is the default and emits nothing.
-  if (options.target === 'actions') flags.push('--run-on', 'actions')
+  // Run target (#1050/#610): only a non-local target needs a flag; `local` is the default and
+  // emits nothing, so a local run's argv is unchanged.
+  if (options.target === 'actions' || options.target === 'web') flags.push('--run-on', options.target)
   // The ticket this run implements (#1117): only ever a `tickets/<file>.md` the daemon read off
   // the queue entry, and re-checked on the other side before it reaches the run's meta.
   if (typeof options.ticket === 'string' && isTicketPath(options.ticket)) flags.push('--ticket', options.ticket)

@@ -160,11 +160,12 @@ export interface RunMeta {
    */
   browserStreamPort?: number
   /**
-   * Where this run executes (#1050/#1053): `actions` for a GitHub Actions run, `remote` when relayed
-   * to a connected device (#1067), absent for a local run. Persisted so the run view can tell a
-   * burst-mode Actions run from a stalled live feed and gate the browser pane off (#1053).
+   * Where this run executes (#1050/#1053/#610): `actions` for a GitHub Actions run, `web` for a
+   * Claude Code cloud session, `remote` when relayed to a connected device (#1067), absent for a
+   * local run. Persisted so the run view can tell a burst-mode Actions run from a stalled live
+   * feed, show a cloud run's session link after a reload, and gate the browser pane off (#1053).
    */
-  target?: 'local' | 'actions' | 'remote'
+  target?: 'local' | 'actions' | 'remote' | 'web'
   /** The connected device a remote run (#1067) executes on, for the session list + notice after a reload. */
   remoteLabel?: string
   /**
@@ -245,8 +246,8 @@ export interface OpenStoreOptions {
    * Falls back to a fresh run when there is nothing to reopen.
    */
   continueRun?: boolean
-  /** Where this run executes (#1053): recorded on the meta so the run view can read it. */
-  target?: 'local' | 'actions'
+  /** Where this run executes (#1053/#610): recorded on the meta so the run view can read it. */
+  target?: 'local' | 'actions' | 'web'
   /** A project-less topic run (#1120): recorded on the meta so a reader can tell it from a project run. */
   topic?: boolean
 }
@@ -336,7 +337,7 @@ function freshMeta(
   intent?: string,
   owner?: RunOwner,
   id?: string,
-  target?: 'local' | 'actions',
+  target?: 'local' | 'actions' | 'web',
   topic?: boolean,
 ): RunMeta {
   return {
@@ -348,8 +349,8 @@ function freshMeta(
     passes: 0,
     ...(owner ? { pid: owner.pid, host: owner.host } : {}),
     ...(intent ? { intent } : {}),
-    // Only `actions` travels; `local` is the default every reader already assumes.
-    ...(target === 'actions' ? { target } : {}),
+    // Only a non-local target travels; `local` is the default every reader already assumes.
+    ...(target && target !== 'local' ? { target } : {}),
     // Only the topic flag travels; a project run is the default (absent).
     ...(topic ? { topic: true } : {}),
   }

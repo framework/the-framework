@@ -95,8 +95,9 @@ export function runOptionsFromPreferences(preferences: Preferences, context: str
     ...(browser && agent === 'claude' ? { browser: true } : {}),
     ...(model ? { model } : {}),
     ...(agent !== 'claude' ? { agent } : {}),
-    // Run target (#1050): only `actions` travels; `local` is the default the CLI already assumes.
-    ...(target === 'actions' ? { target } : {}),
+    // Run target (#1050/#610): only a non-local target travels; `local` is the default the CLI
+    // already assumes, so a local run's options stay byte-identical to before either target existed.
+    ...(target && target !== 'local' ? { target } : {}),
     ...(context.length ? { context } : {}),
   }
 }

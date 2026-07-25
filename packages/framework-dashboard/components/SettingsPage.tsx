@@ -104,13 +104,14 @@ export function SettingsPage({
           />
           <SelectRow
             label="Run on"
-            description="Where a session executes: this machine, or a fresh GitHub Actions runner."
+            description="Where a session executes: this machine, a fresh GitHub Actions runner, or a Claude Code cloud session."
             value={preferences.target ?? 'local'}
             options={[
               { value: 'local', label: 'This device' },
               { value: 'actions', label: 'GitHub Actions' },
+              { value: 'web', label: 'Claude web' },
             ]}
-            onChange={value => updatePreferences({ target: value as 'local' | 'actions' })}
+            onChange={value => updatePreferences({ target: value as 'local' | 'actions' | 'web' })}
           />
         </Section>
 

@@ -10,8 +10,10 @@
 import {
   onPreferences,
   savePreferences,
+  patchPreferences,
   onProjectPreferences,
   saveProjectPreferences,
+  patchProjectPreferences,
   onProjectPresets,
   saveProjectPresets,
   onEditors,
@@ -22,8 +24,10 @@ import {
 export {
   onPreferences,
   savePreferences,
+  patchPreferences,
   onProjectPreferences,
   saveProjectPreferences,
+  patchProjectPreferences,
   onProjectPresets,
   saveProjectPresets,
   onEditors,

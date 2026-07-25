@@ -16,6 +16,8 @@ import {
   removeProject,
   writePreferences,
   writeProjectPreferences,
+  patchPreferences,
+  patchProjectPreferences,
   readSecrets,
   writeSecrets,
   REGISTRY_FILE,
@@ -315,6 +317,65 @@ test('writeProjectPreferences stores one project without touching the globals or
   })
   assert.deepEqual(await readProjectPreferences(APP_A.id, fs, ENV), { technical: true, model: 'opus' })
   assert.deepEqual(await readPreferences(fs, ENV), { autopilot: false })
+})
+
+test('patchPreferences merges only the keys it is given (#1148)', async () => {
+  // The dashboard used to send its whole cached object, so a tab that had been open since before
+  // someone else's change wrote the old value back over it. A patch touches only what it names.
+  const fs = memFs({ [FILE]: JSON.stringify({ projects: [], preferences: { theme: 'dark', agent: 'codex' } }) })
+
+  const stored = await patchPreferences({ notifyBrowser: true }, fs, ENV)
+
+  assert.deepEqual(stored, { theme: 'dark', agent: 'codex', notifyBrowser: true })
+  assert.deepEqual(await readPreferences(fs, ENV), stored)
+})
+
+test('a patched key still clears the way it always has (#1148)', async () => {
+  // No sentinel for "remove": the sanitizer already drops blanks and empty lists, which is how
+  // the dashboard clears the editor and the last custom preset.
+  const seed = { projects: [], preferences: { editor: 'code', theme: 'dark', customPresets: [{ id: 'a', label: 'A', prompt: 'p' }] } }
+  const fs = memFs({ [FILE]: JSON.stringify(seed) })
+
+  assert.deepEqual(await patchPreferences({ editor: '' }, fs, ENV), {
+    theme: 'dark',
+    customPresets: [{ id: 'a', label: 'A', prompt: 'p' }],
+  })
+  assert.deepEqual(await patchPreferences({ customPresets: [] }, fs, ENV), { theme: 'dark' })
+})
+
+test('patchPreferences sanitizes the merged result, not just the patch (#1148)', async () => {
+  // The one rule, applied once to the merge: an unknown key never lands, and a value outside the
+  // known set drops the key rather than being stored — the same answer `writePreferences` gives.
+  const fs = memFs({ [FILE]: JSON.stringify({ projects: [], preferences: { theme: 'dark', agent: 'codex' } }) })
+  assert.deepEqual(await patchPreferences({ theme: 'moon', bogus: 3 } as never, fs, ENV), { agent: 'codex' })
+})
+
+test('patchProjectPreferences merges one project and leaves the rest alone (#1148)', async () => {
+  const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A, APP_B], preferences: { theme: 'dark' } }) })
+  await writeProjectPreferences(APP_A.id, { model: 'opus', technical: true }, fs, ENV)
+  await writeProjectPreferences(APP_B.id, { eco: true }, fs, ENV)
+
+  const stored = await patchProjectPreferences(APP_A.id, { model: 'sonnet' }, fs, ENV)
+
+  assert.deepEqual(stored, { model: 'sonnet', technical: true })
+  assert.deepEqual(await readProjectPreferences(APP_B.id, fs, ENV), { eco: true })
+  assert.deepEqual(await readPreferences(fs, ENV), { theme: 'dark' })
+})
+
+test('a project patch cannot smuggle a user-level key onto the project (#1148)', async () => {
+  const fs = memFs()
+  // theme is about the user, not the repo (#840), so the project tier drops it either way.
+  assert.deepEqual(await patchProjectPreferences(APP_A.id, { theme: 'light', model: 'opus' } as never, fs, ENV), {
+    model: 'opus',
+  })
+})
+
+test('the preferences store exposes the patch pair the dashboard writes through (#1148)', async () => {
+  const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A], preferences: { theme: 'dark' } }) })
+  const store = registryPreferencesStore(fs, ENV)
+
+  assert.deepEqual(await store.patch!({ agent: 'codex' }), { theme: 'dark', agent: 'codex' })
+  assert.deepEqual(await store.patchProject!(APP_A.id, { model: 'opus' }), { model: 'opus' })
 })
 
 test('a project storing nothing drops its entry rather than leaving an empty object', async () => {

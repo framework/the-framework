@@ -40,6 +40,10 @@ export {
 // the session it was launched from. Pure string work, like the renderers below.
 export { defaultWhat, DEFAULT_WHAT, type PresetRenderContext } from './preset-prompt.js'
 export { presets, LAUNCHER_PRESETS, type PresetKey } from './preset-catalog.js'
+// The routines the idle sweep fires (#1159), so the dashboard can list them and run one on demand.
+// The jobs are built from the presets above and carry their prompt verbatim, so this needs no
+// backend of its own, and the list on screen is the list the daemon runs rather than a copy of it.
+export { AUTO_PM_ROUTINES, AUTO_PM_JOBS, AUTO_PM_DRAIN_JOB, AUTO_PM_MAINTENANCE_JOB, type AutoPmJob } from './auto-pm.js'
 // The identity + diff both notifier paths run, and the preference defaults both sides read (#627).
 // Pure, so the dashboard shares them rather than keeping copies that drift silently.
 export { interventionKey, pickNewInterventions, activityKey, pickNewActivity } from './dashboard/keys.js'

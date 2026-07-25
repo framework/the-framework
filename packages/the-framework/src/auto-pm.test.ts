@@ -7,12 +7,14 @@ import {
   AUTO_PM_JOBS,
   AUTO_PM_DRAIN_JOB,
   AUTO_PM_MAINTENANCE_JOB,
+  AUTO_PM_ROUTINES,
   type AutoPmDeps,
   type AutoPmJob,
   type AutoPmLoop,
   type AutoPmProject,
 } from './auto-pm.js'
 import { quotaBoundaryStatus, type QuotaBoundaryStatus } from './quota-boundary.js'
+import { presets, type PresetKey } from './preset-catalog.js'
 
 /** 2026-07-20T12:00:00Z. The week below resets in 5 days, so this is day 3 of 7 (42.8% allowed). */
 const T0 = Date.UTC(2026, 6, 20, 12, 0, 0)
@@ -506,4 +508,32 @@ test('only the draining job says it works the queue rather than filling it (#111
   assert.equal(AUTO_PM_DRAIN_JOB.drains, true)
   for (const job of AUTO_PM_JOBS) assert.notEqual(job.drains, true, `${job.name} must not claim to drain`)
   assert.notEqual(AUTO_PM_MAINTENANCE_JOB.drains, true)
+})
+
+/** The catalog key whose preset a routine fires, found by that preset's run-kind name. */
+function presetKey(name: string): PresetKey {
+  const key = (Object.keys(presets) as PresetKey[]).find(k => presets[k].name === name)
+  if (!key) throw new Error(`no preset is named ${name}`)
+  return key
+}
+
+test('AUTO_PM_ROUTINES is every job the sweep can fire, once each (#1159)', () => {
+  // The dashboard lists this rather than a copy of it, so a job added to the rotation reaches the
+  // screen without anyone remembering to put it there too.
+  const expected = [AUTO_PM_DRAIN_JOB, ...AUTO_PM_JOBS, AUTO_PM_MAINTENANCE_JOB]
+  assert.deepEqual(AUTO_PM_ROUTINES.map(j => j.name), expected.map(j => j.name))
+  assert.equal(new Set(AUTO_PM_ROUTINES.map(j => j.name)).size, AUTO_PM_ROUTINES.length)
+  // Draining leads: it is what the sweep does whenever there is queued work, and the only routine
+  // that turns a queue entry into commits.
+  assert.equal(AUTO_PM_ROUTINES[0]?.name, AUTO_PM_DRAIN_JOB.name)
+})
+
+test('every routine carries its preset label and a rendered prompt, so a list of them is runnable (#1159)', () => {
+  for (const job of AUTO_PM_ROUTINES) {
+    assert.equal(job.label, presets[presetKey(job.name)].label, `${job.name} must be labelled by its preset`)
+    assert.ok(job.describe.length > 0, `${job.name} must say what it does`)
+    assert.ok(job.prompt.trim().length > 0, `${job.name} must carry a prompt`)
+    // The prompt travels to the browser and is started verbatim, so nothing may be left unrendered.
+    assert.doesNotMatch(job.prompt, /\$\{\{/, `${job.name} must ship a rendered prompt`)
+  }
 })

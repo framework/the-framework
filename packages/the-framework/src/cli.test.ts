@@ -969,3 +969,8 @@ test('an unreachable npm registry costs the footer nothing (#312)', async () => 
   assert.ok(out.includes(`The Framework v${frameworkVersion()}`))
   assert.ok(!out.some(l => l.includes('Up to date') || l.includes('Update available')))
 })
+
+test('parseArgs reads --ticket, the ticket the daemon says this run implements (#1117)', () => {
+  assert.equal(parseArgs(['--ticket', 'tickets/2026-07-25_login.md', 'x']).ticket, 'tickets/2026-07-25_login.md')
+  assert.equal(parseArgs(['x']).ticket, undefined)
+})

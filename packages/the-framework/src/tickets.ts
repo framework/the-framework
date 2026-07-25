@@ -52,6 +52,35 @@ export function todoPriorityForTicket(priority?: string): number {
   }
 }
 
+/**
+ * The ticket a queue entry came from, or `undefined` for an entry that is just text (#1117).
+ *
+ * Queueing a ticket writes the entry as a markdown link back to it (#1164), so the identity the
+ * queue used to drop is already on the line — this is the read side of that write. Only a link
+ * into {@link TICKETS_DIR} counts, and only one whose target stays inside it: the result names a
+ * file a reader will go and open, so an entry linking anywhere else is treated as plain text
+ * rather than followed. A relative segment, an absolute path, a URL, or a nested directory all
+ * fail that test.
+ */
+export function ticketFromQueueEntry(entry: string): string | undefined {
+  const target = /\]\(([^)\s]+)\)/.exec(entry)?.[1]
+  return target && isTicketPath(target) ? target : undefined
+}
+
+/**
+ * Whether a string names a ticket file: `tickets/<name>.md`, and nothing else (#1117).
+ *
+ * The one gate for both ends of the link — what a queue entry is read as, and what the `--ticket`
+ * flag is allowed to record — because the result is a path the dashboard renders and a reader
+ * opens. A relative segment, an absolute path, a URL, a dotfile, or anything nested deeper all
+ * fail it, so no caller has to think about the difference.
+ */
+export function isTicketPath(path: string): boolean {
+  if (!path.startsWith(`${TICKETS_DIR}/`)) return false
+  const file = path.slice(TICKETS_DIR.length + 1)
+  return file.endsWith('.md') && !file.includes('/') && !file.startsWith('.')
+}
+
 /** The brief hyphen spelling from #682, read as a fallback after #674 settled on the underscore. */
 export const LEGACY_HYPHEN_TODO_FILE = 'TODO-AGENTS.md'
 

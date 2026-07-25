@@ -499,3 +499,11 @@ test('an out-of-band tick does not skew the next sweep (#1161)', async () => {
   loop.stop()
   assert.equal(loop.report().nextSweepAt, T0 + 60_000)
 })
+
+test('only the draining job says it works the queue rather than filling it (#1117)', () => {
+  // The marker is what tells the daemon which start can name a ticket. A rotation job that claimed
+  // it would name the entry it is about to *write*, which is not what it is doing.
+  assert.equal(AUTO_PM_DRAIN_JOB.drains, true)
+  for (const job of AUTO_PM_JOBS) assert.notEqual(job.drains, true, `${job.name} must not claim to drain`)
+  assert.notEqual(AUTO_PM_MAINTENANCE_JOB.drains, true)
+})

@@ -12,7 +12,7 @@ import { buildActivity, activityKey, postActivityDiscord } from './dashboard/act
 import { startAutoPm, AUTO_PM_JOBS, type AutoPmReport } from './auto-pm.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
 import { promoteQueue } from './queue-promote.js'
-import { findTodoBacklog } from './todo-loop.js'
+import { findTodoBacklog, nextQueuedTicket } from './todo-loop.js'
 import { startConversationCommitter } from './conversation-commit.js'
 import { startMergedWorktreeSweep } from './merged-worktrees.js'
 import { readConversation } from './conversations.js'
@@ -141,7 +141,12 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     maintenanceDue: async project => maintenanceDue(await readMaintenanceState(project.path), Date.now()),
     recordMaintenance: async project => mergeMaintenanceState(project.path, { sweptAt: new Date().toISOString() }),
     start: async (project, job) => {
-      const result = await startUnattended(project.id, job.prompt)
+      // A draining run works the queue's first open entry, and since #1164 that entry links back to
+      // the ticket it was queued from — so this is the one moment the framework knows what a run is
+      // about to implement, and can say so on the run's meta (#1117). Every other job puts work on
+      // the queue rather than taking it off, so there is nothing to name.
+      const ticket = job.drains ? await nextQueuedTicket(project.path).catch(() => undefined) : undefined
+      const result = await startUnattended(project.id, job.prompt, ticket ? { ticket } : {})
       return result.ok ? result.runId : undefined
     },
     // The daemon promotes the queue, never the agent (#852): the run stays sandboxed in its

@@ -10,6 +10,8 @@ import {
   LEGACY_TODO_FILE,
   TICKETS_DIR,
   findFlatTodo,
+  isTicketPath,
+  ticketFromQueueEntry,
   todoPriorityForTicket,
 } from './tickets.js'
 import { TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
@@ -92,4 +94,32 @@ test('a ticket priority maps onto the backlog format\'s numbered sections (#1164
   // 10 is reserved for critical production bugs and 0 for "only if capacity"; neither is
   // something a click on Queue should be able to claim.
   assert.equal(todoPriorityForTicket('critical'), 5)
+})
+
+test('ticketFromQueueEntry reads the ticket a queued entry links back to (#1117/#1164)', () => {
+  // The write side (#1164) queues a ticket as a markdown link, so the identity is on the line.
+  assert.equal(ticketFromQueueEntry('[Add a login page](tickets/2026-07-25_login.md)'), 'tickets/2026-07-25_login.md')
+  // An entry that is just text is exactly what it used to be: work with no ticket behind it.
+  assert.equal(ticketFromQueueEntry('Apply the maintainability preset'), undefined)
+  assert.equal(ticketFromQueueEntry('see the [docs](README.md)'), undefined)
+})
+
+test('only a plain file inside tickets/ counts as a ticket path (#1117)', () => {
+  assert.equal(isTicketPath('tickets/2026-07-25_login.md'), true)
+  // The result is a path a reader opens and the dashboard renders, so nothing may point out of
+  // tickets/, deeper than it, or at something that is not a ticket.
+  for (const bad of [
+    'tickets/../secrets.md',
+    'tickets/nested/deep.md',
+    'tickets/.hidden.md',
+    'tickets/notes.txt',
+    '/etc/passwd',
+    'https://example.com/x.md',
+    'TODO_AGENTS.md',
+    'tickets/',
+  ]) {
+    assert.equal(isTicketPath(bad), false, `expected ${bad} to be rejected`)
+  }
+  // A traversal dressed as a link is refused at the same gate.
+  assert.equal(ticketFromQueueEntry('[sneaky](tickets/../../etc/passwd)'), undefined)
 })

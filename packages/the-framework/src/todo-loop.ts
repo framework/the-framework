@@ -3,10 +3,10 @@ import { dirname, join } from 'node:path'
 import type { DriverSession } from './driver/index.js'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
 import { requestChoices, runAwaitRounds } from './await-gate.js'
-import { FLAT_TODO_FILE, findFlatTodo } from './tickets.js'
+import { FLAT_TODO_FILE, findFlatTodo, ticketFromQueueEntry } from './tickets.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
 
-export { FLAT_TODO_FILE, LEGACY_HYPHEN_TODO_FILE, LEGACY_TICKETS_TODO_FILE, LEGACY_TODO_FILE, TICKETS_DIR, todoPriorityForTicket } from './tickets.js'
+export { FLAT_TODO_FILE, LEGACY_HYPHEN_TODO_FILE, LEGACY_TICKETS_TODO_FILE, LEGACY_TODO_FILE, TICKETS_DIR, ticketFromQueueEntry, todoPriorityForTicket } from './tickets.js'
 
 /**
  * The backlog loop (#323): once the main work settles, consume the agent's own
@@ -222,6 +222,28 @@ export async function findTodoBacklog(cwd: string): Promise<TodoBacklog | undefi
     if (entries.length) return { name, entries }
   }
   return undefined
+}
+
+/**
+ * The ticket the next drain run will pick up, or `undefined` when there is none (#1117).
+ *
+ * "Next" is the first open entry of the flat backlog, because that is what the [Drain queue]
+ * preset says to work ("the FIRST open entry only") and {@link parseTodoEntries} returns entries
+ * in file order. Read from the project checkout, the same copy the sweep already consults when it
+ * decides whether there is anything to drain, so the entry this names is the entry that decision
+ * was made on.
+ *
+ * A best guess by construction: the run reads its own worktree a moment later, and an entry
+ * checked off in between would move it on. Being wrong here costs a mislabelled lane on the
+ * Overview and nothing else — no run is started or steered by this.
+ */
+export async function nextQueuedTicket(cwd: string): Promise<string | undefined> {
+  const name = await findFlatTodo(cwd)
+  if (!name) return undefined
+  const md = await readFile(join(cwd, name), 'utf8').catch(() => undefined)
+  if (md === undefined) return undefined
+  const first = parseTodoEntries(md)[0]
+  return first ? ticketFromQueueEntry(first) : undefined
 }
 
 /**

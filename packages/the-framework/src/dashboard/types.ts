@@ -77,6 +77,12 @@ export interface StartRunOptions {
    */
   unattended?: boolean
   /**
+   * The `tickets/<file>.md` this run implements (#1117); maps to `--ticket`. Set by the daemon
+   * when it starts a drain run and the queue entry it will work links back to a ticket, so the
+   * Overview can show that ticket as being implemented rather than guessing from its plan/spike.
+   */
+  ticket?: string
+  /**
    * The surface this run was asked for from (#917), e.g. `discord`; maps to `--via`. Recorded on
    * the session's conversation turns so a run started from a chat surface is not filed under the
    * dashboard. Absent = the local surface, exactly as before.

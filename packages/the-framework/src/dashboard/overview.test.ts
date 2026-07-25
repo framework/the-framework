@@ -140,3 +140,56 @@ test('buildHotTickets tolerates a project whose tickets cannot be read', async (
   })
   assert.deepEqual(hot.map(h => h.ticket.file), ['x.md'])
 })
+
+/** A live run meta carrying the ticket it is implementing (#1117). */
+const runOn = (id: string, ticket: string, status: RunMeta['status'] = 'running') =>
+  ({ version: 1, status, id, startedAt: 't', updatedAt: 't', passes: 0, ticket, cwd: '/w' }) as never
+
+test('ticketBucket: a run implementing it is in-progress, whatever the plan/spike says (#1117)', () => {
+  // The whole point of the link: a ticket nobody has planned yet, being coded right now, used to
+  // sit in `queued` because the only evidence the lane had was a plan/spike file.
+  assert.equal(ticketBucket(ticket('a'), true), 'in-progress')
+  assert.equal(ticketBucket(ticket('b', { priority: 'high' }), true), 'in-progress')
+  // Absent evidence, the #1112 inference is untouched.
+  assert.equal(ticketBucket(ticket('c', { planned: true }), false), 'in-progress')
+  assert.equal(ticketBucket(ticket('d'), false), 'queued')
+})
+
+test('buildHotTickets marks the ticket a live run is implementing, with its run id (#1117)', async () => {
+  const hot = await buildHotTickets([project('alpha', '/a')], {
+    tickets: async () => [ticket('2026-07-25_login.md'), ticket('2026-07-26_other.md')],
+    liveRuns: async () => [runOn('run-7', 'tickets/2026-07-25_login.md')],
+  })
+  const login = hot.find(h => h.ticket.file === '2026-07-25_login.md')
+  assert.equal(login?.bucket, 'in-progress', 'the ticket being coded is in progress')
+  assert.equal(login?.runId, 'run-7', 'and carries the run, so the card can link into it')
+  // The ticket nobody is on keeps its own lane and gains nothing.
+  const other = hot.find(h => h.ticket.file === '2026-07-26_other.md')
+  assert.equal(other?.bucket, 'queued')
+  assert.equal(other?.runId, undefined)
+})
+
+test('buildHotTickets ignores a finished run and another project\'s ticket (#1117)', async () => {
+  // A run that has ended is not implementing anything, however recently it stopped.
+  const finished = await buildHotTickets([project('alpha', '/a')], {
+    tickets: async () => [ticket('x.md')],
+    liveRuns: async () => [runOn('run-7', 'tickets/x.md', 'done')],
+  })
+  assert.equal(finished[0]?.runId, undefined)
+  assert.equal(finished[0]?.bucket, 'queued')
+
+  // A ticket path is only unique inside its own repo, so beta's run must not light up alpha's
+  // identically-named ticket.
+  const twoProjects = await buildHotTickets([project('alpha', '/a'), project('beta', '/b')], {
+    tickets: async () => [ticket('x.md')],
+    liveRuns: async cwd => (cwd === '/b' ? [runOn('run-9', 'tickets/x.md')] : []),
+  })
+  assert.deepEqual(
+    twoProjects.map(h => ({ p: h.projectName, run: h.runId })),
+    [
+      { p: 'beta', run: 'run-9' },
+      { p: 'alpha', run: undefined },
+    ],
+    'only beta reads as implementing, and it sorts into the in-progress lane first',
+  )
+})

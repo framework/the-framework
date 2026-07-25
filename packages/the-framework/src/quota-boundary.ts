@@ -41,8 +41,11 @@ export interface QuotaBoundary {
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 
-/** `Jul 25 at 7am (Asia/Jerusalem)`, with the minutes and the zone both optional. */
-const RESETS_AT = /^([a-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*(?:\(([^)]+)\))?$/i
+/**
+ * `Jul 25 at 7am (Asia/Jerusalem)`, with the minutes and the zone both optional. Newer Claude
+ * Code prints a comma where older versions print `at` — `Jul 25, 7am` — and both are in the wild.
+ */
+const RESETS_AT = /^([a-z]{3})\s+(\d{1,2})(?:\s+at\s+|,\s*)(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*(?:\(([^)]+)\))?$/i
 
 /** How far `zone` is ahead of UTC at `at`, in ms. */
 function zoneOffsetMs(at: number, zone: string): number {

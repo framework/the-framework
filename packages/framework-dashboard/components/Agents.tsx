@@ -52,13 +52,13 @@ export function Agents({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-base">
           <Bot className="h-4 w-4 text-muted-foreground" />
           Agents
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
-        <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+      <CardContent>
+        <div className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
           <AgentColumn heading="Current" description="Agents currently working" rows={current} loading={loading} empty="No agents working right now." />
           <AgentColumn heading="Recent" description="Agents finished working" rows={recent} loading={loading} empty="No sessions yet." />
         </div>
@@ -82,14 +82,18 @@ function AgentColumn({
 }) {
   return (
     <div className="min-w-0">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-foreground/80">{heading}</h4>
-      <p className="text-xs text-muted-foreground">{description}</p>
+      {/* Eyebrow + one-line description on a single ruled row, so the column reads as a labelled
+          section rather than two stacked muted lines. */}
+      <div className="flex items-baseline gap-2 border-b border-border pb-1.5">
+        <h4 className="shrink-0 text-xs font-semibold uppercase tracking-wide text-foreground">{heading}</h4>
+        <p className="truncate text-xs text-muted-foreground">{description}</p>
+      </div>
       {loading ? (
         <p className="py-2 text-sm text-muted-foreground">Loading…</p>
       ) : rows.length === 0 ? (
         <p className="py-2 text-sm text-muted-foreground">{empty}</p>
       ) : (
-        <ul className="mt-2 space-y-0.5">
+        <ul className="mt-1.5 space-y-0.5">
           {rows.map(r => (
             <AgentRow key={r.key} label={r.label} at={r.at} projectName={r.projectName} onOpen={r.onOpen} />
           ))}
@@ -106,13 +110,13 @@ function AgentRow({ label, at, projectName, onOpen }: Omit<AgentRowData, 'key'>)
         type="button"
         onClick={onOpen}
         title="Open this session"
-        className="flex w-full items-baseline gap-2 rounded-md px-2 py-1 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+        className="flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
       >
-        <span aria-hidden className="shrink-0 text-muted-foreground/60">•</span>
+        <span aria-hidden className="shrink-0 text-muted-foreground/50">•</span>
         <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
         <span className="shrink-0 text-xs text-muted-foreground">{projectName}</span>
         {at && (
-          <span className="shrink-0 text-xs tabular-nums text-muted-foreground" title={formatDateTime(at)}>
+          <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground/80" title={formatDateTime(at)}>
             {formatAge(at)}
           </span>
         )}

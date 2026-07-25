@@ -60,7 +60,7 @@ export function RoutineWork({ onSelectProject }: { onSelectProject: (id: string)
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-base">
           <CalendarClock className="h-4 w-4 text-muted-foreground" />
           Routine work
         </CardTitle>

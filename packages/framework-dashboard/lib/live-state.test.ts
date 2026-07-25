@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { FrameworkEvent } from '@gemstack/the-framework'
-import { agentViews, pendingChoices, isRunActive, currentRunEvents, runOutcome, actionsRunUrl } from './live-state.js'
+import { agentSettled, agentViews, pendingChoices, isRunActive, currentRunEvents, runOutcome, actionsRunUrl } from './live-state.js'
 
 const view = (id: string, title: string, markdown: string): FrameworkEvent => ({ kind: 'view', id, title, markdown })
 const choice = (id: string, title: string): FrameworkEvent => ({
@@ -149,5 +149,36 @@ describe('actionsRunUrl', () => {
     expect(
       actionsRunUrl([action('run https://github.com/o/r/actions/runs/1'), action('run https://github.com/o/r/actions/runs/2')]),
     ).toBe('https://github.com/o/r/actions/runs/2')
+  })
+})
+
+describe('agentSettled (#1173)', () => {
+  test('a session parked on you is settled, though its process is still up', () => {
+    // The whole bug: this run is `status: running` and will stay that way for as long as the
+    // conversation is open (#714), so anything keyed off liveness thinks the agent is still working.
+    expect(agentSettled([{ kind: 'log', message: 'go' }, { kind: 'settled' }])).toBe(true)
+    expect(agentSettled([{ kind: 'log', message: 'go' }])).toBe(false)
+    expect(agentSettled([])).toBe(false)
+  })
+
+  test('a new turn un-settles it, so answering a parked session puts it back to work', () => {
+    expect(
+      agentSettled([
+        { kind: 'settled' },
+        { kind: 'driver', event: { type: 'start' } } as never,
+      ]),
+    ).toBe(false)
+    // ...and settling again after that turn parks it once more.
+    expect(
+      agentSettled([
+        { kind: 'settled' },
+        { kind: 'driver', event: { type: 'start' } } as never,
+        { kind: 'settled' },
+      ]),
+    ).toBe(true)
+  })
+
+  test('a run that ended is not "settled" — it is over, which liveness already says', () => {
+    expect(agentSettled([{ kind: 'settled' }, { kind: 'end', ok: true }])).toBe(false)
   })
 })

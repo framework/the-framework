@@ -4,7 +4,7 @@ import { isSafeVia } from '../conversations.js'
 import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
 import { resolveProjectPath, resolveRunPath, contextPreferences, contextPreview } from './context.js'
 import { relayOr } from './relay-run.js'
-import { appendFlatTodoEntry } from '../todo-loop.js'
+import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
 import { findRun, isSafeRunId, type RunMeta } from '../store/index.js'
 import { removeProjectWorktree, deleteProjectRun } from '../worktrees.js'
@@ -168,7 +168,19 @@ export async function sendStart(
   if (!startRun) return { ok: false, error: 'starting a session is not enabled on this server' }
   const text = prompt.trim()
   if (!text && kind !== 'research') return { ok: false, error: 'a non-empty prompt is required' }
-  return startRun(text, kind, options, projectId)
+  // A drain fired by hand is the same work the sweep does, so it says the same thing about itself
+  // (#1117). Resolved here rather than sent by the caller: the value lands on the run's meta and is
+  // rendered, so it is read off the queue on this side instead of trusted from a browser. An
+  // explicit ticket on the options wins, since a caller that names one knows better than a guess.
+  const ticket = options.ticket ?? (await ticketForStart(projectId, text))
+  return startRun(text, kind, ticket ? { ...options, ticket } : options, projectId)
+}
+
+/** The queue entry a hand-fired drain is about to work, or undefined for any other prompt (#1117). */
+async function ticketForStart(projectId: string, prompt: string): Promise<string | undefined> {
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return undefined
+  return ticketForPrompt(prompt, cwd).catch(() => undefined)
 }
 
 /**

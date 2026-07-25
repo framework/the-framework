@@ -173,6 +173,13 @@ export default function Page() {
     go({ projectId: id, runId: null }) // switching projects always returns to the home launcher
   }
 
+  // Open one session by its (project, run): the Overview's cross-project rows — the sidebar recents
+  // and the Agents view (#1139) — jump straight into a session rather than only into its project.
+  const selectSession = (pid: string, rid: string) => {
+    setAdopting(false)
+    go({ projectId: pid, runId: rid })
+  }
+
   // "New" in the sidebar: start a fresh session in a named project (the sidebar decides which —
   // the current one, the only one, or a picked one). resetContext explicitly, since staying in the
   // same project would not trip the project-change effect above.
@@ -233,7 +240,7 @@ export default function Page() {
   const selectedRun = runId ? runs.find(run => run.id === runId) : undefined
   const renderMain = () => {
     if (view === 'settings') return <SettingsPage onSelectProject={selectProject} onDone={showDashboard} />
-    if (!projectId) return <DashboardPage onSelectProject={selectProject} interventions={interventions} />
+    if (!projectId) return <DashboardPage onSelectProject={selectProject} onSelectRun={selectSession} interventions={interventions} />
     if (unknownProject)
       return (
         <NotFound
@@ -330,10 +337,7 @@ export default function Page() {
           selectedRunId={runId}
           onSelect={selectRun}
           recentRuns={recentRuns}
-          onSelectRecent={(pid, rid) => {
-            setAdopting(false)
-            go({ projectId: pid, runId: rid })
-          }}
+          onSelectRecent={selectSession}
           projects={projects}
           onNewSessionInProject={newSessionInProject}
           onProjectAdded={() => {

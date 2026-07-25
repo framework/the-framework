@@ -28,15 +28,15 @@ describe('HotTickets (#1112)', () => {
   test('groups tickets into the three lanes and selecting one jumps into its project', async () => {
     onHotTickets.mockResolvedValue([
       ht('a.md', 'alpha', 'in-progress', { planned: true }),
-      ht('b.md', 'beta', 'next', { priority: 'high' }),
-      ht('c.md', 'alpha', 'queued'),
+      ht('b.md', 'beta', 'high-priority', { priority: 'high' }),
+      ht('c.md', 'alpha', 'ai-queue'),
     ])
     let picked: string | null = null
     render(<HotTickets onSelectProject={id => (picked = id)} />)
     await waitFor(() => expect(screen.getByText('a')).toBeTruthy())
     expect(screen.getByText('In progress')).toBeTruthy()
-    expect(screen.getByText('Up next')).toBeTruthy()
-    expect(screen.getByText('Queued')).toBeTruthy()
+    expect(screen.getByText('AI Queue')).toBeTruthy()
+    expect(screen.getByText('High priority')).toBeTruthy()
     fireEvent.click(screen.getByText('b'))
     expect(picked).toBe('beta')
   })

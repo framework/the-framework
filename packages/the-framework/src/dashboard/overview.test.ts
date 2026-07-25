@@ -102,31 +102,41 @@ const ticket = (file: string, over: Partial<WorkspaceTicket> = {}): WorkspaceTic
   ...over,
 })
 
-test('ticketBucket: planned/spiked is in-progress, high priority is next, else queued', () => {
+test('ticketBucket: in-progress > ai-queue > high-priority, else null (#1139)', () => {
   assert.equal(ticketBucket(ticket('a', { planned: true })), 'in-progress')
   assert.equal(ticketBucket(ticket('b', { spiked: true })), 'in-progress')
-  assert.equal(ticketBucket(ticket('c', { priority: 'high' })), 'next')
-  assert.equal(ticketBucket(ticket('d', { priority: 'p1' })), 'next')
-  assert.equal(ticketBucket(ticket('e')), 'queued')
-  assert.equal(ticketBucket(ticket('f', { priority: 'low' })), 'queued')
-  // A planned high-prio ticket is in-progress, not next: work already started outranks the flag.
-  assert.equal(ticketBucket(ticket('g', { planned: true, priority: 'high' })), 'in-progress')
+  assert.equal(ticketBucket(ticket('c', { priority: 'high' })), 'high-priority')
+  assert.equal(ticketBucket(ticket('d', { priority: 'p1' })), 'high-priority')
+  // Not in any of the three shown lanes: dropped from the card.
+  assert.equal(ticketBucket(ticket('e')), null)
+  assert.equal(ticketBucket(ticket('f', { priority: 'low' })), null)
+  // A queued ticket lands in the AI Queue, and that outranks a bare priority flag.
+  assert.equal(ticketBucket(ticket('g'), { queued: true }), 'ai-queue')
+  assert.equal(ticketBucket(ticket('h', { priority: 'high' }), { queued: true }), 'ai-queue')
+  // Work already under way outranks both: a planned (or queued-and-planned) ticket stays in-progress.
+  assert.equal(ticketBucket(ticket('i', { planned: true, priority: 'high' })), 'in-progress')
+  assert.equal(ticketBucket(ticket('j', { planned: true }), { queued: true }), 'in-progress')
 })
 
-test('buildHotTickets pools every project, buckets each, and orders lane-first', async () => {
+test('buildHotTickets pools every project, buckets each, drops the rest, and orders lane-first', async () => {
   const tickets: Record<string, WorkspaceTicket[]> = {
     '/a': [ticket('a1.md', { planned: true }), ticket('a2.md', { priority: 'high' })],
-    '/b': [ticket('b1.md')],
+    '/b': [ticket('b1.md'), ticket('b2.md')],
   }
   const hot = await buildHotTickets([project('alpha', '/a'), project('beta', '/b')], {
     tickets: async cwd => tickets[cwd] ?? [],
+    // beta's b1 is linked from its TODO_AGENTS.md, so it lands in the AI-Queue lane; b2 is in no
+    // lane and drops off the card entirely.
+    queue: async () => [
+      { projectId: 'beta', projectName: 'beta', open: 1, total: 1, items: [{ text: '[b one](tickets/b1.md) — a note', done: false }] },
+    ],
   })
   assert.deepEqual(
     hot.map(h => ({ p: h.projectName, f: h.ticket.file, b: h.bucket })),
     [
       { p: 'alpha', f: 'a1.md', b: 'in-progress' },
-      { p: 'alpha', f: 'a2.md', b: 'next' },
-      { p: 'beta', f: 'b1.md', b: 'queued' },
+      { p: 'beta', f: 'b1.md', b: 'ai-queue' },
+      { p: 'alpha', f: 'a2.md', b: 'high-priority' },
     ],
   )
 })
@@ -137,6 +147,7 @@ test('buildHotTickets tolerates a project whose tickets cannot be read', async (
       if (cwd === '/bad') throw new Error('unreadable')
       return [ticket('x.md', { priority: 'high' })]
     },
+    queue: async () => [],
   })
   assert.deepEqual(hot.map(h => h.ticket.file), ['x.md'])
 })
@@ -146,50 +157,51 @@ const runOn = (id: string, ticket: string, status: RunMeta['status'] = 'running'
   ({ version: 1, status, id, startedAt: 't', updatedAt: 't', passes: 0, ticket, cwd: '/w' }) as never
 
 test('ticketBucket: a run implementing it is in-progress, whatever the plan/spike says (#1117)', () => {
-  // The whole point of the link: a ticket nobody has planned yet, being coded right now, used to
-  // sit in `queued` because the only evidence the lane had was a plan/spike file.
-  assert.equal(ticketBucket(ticket('a'), true), 'in-progress')
-  assert.equal(ticketBucket(ticket('b', { priority: 'high' }), true), 'in-progress')
+  // The whole point of the link: a ticket nobody has planned yet, being coded right now, would
+  // otherwise fall through to a non-shown lane on the strength of a plan/spike file alone.
+  assert.equal(ticketBucket(ticket('a'), { implementing: true }), 'in-progress')
+  assert.equal(ticketBucket(ticket('b', { priority: 'high' }), { implementing: true }), 'in-progress')
   // Absent evidence, the #1112 inference is untouched.
-  assert.equal(ticketBucket(ticket('c', { planned: true }), false), 'in-progress')
-  assert.equal(ticketBucket(ticket('d'), false), 'queued')
+  assert.equal(ticketBucket(ticket('c', { planned: true }), { implementing: false }), 'in-progress')
+  assert.equal(ticketBucket(ticket('d'), { implementing: false }), null)
 })
 
 test('buildHotTickets marks the ticket a live run is implementing, with its run id (#1117)', async () => {
   const hot = await buildHotTickets([project('alpha', '/a')], {
     tickets: async () => [ticket('2026-07-25_login.md'), ticket('2026-07-26_other.md')],
     liveRuns: async () => [runOn('run-7', 'tickets/2026-07-25_login.md')],
+    queue: async () => [],
   })
   const login = hot.find(h => h.ticket.file === '2026-07-25_login.md')
   assert.equal(login?.bucket, 'in-progress', 'the ticket being coded is in progress')
   assert.equal(login?.runId, 'run-7', 'and carries the run, so the card can link into it')
-  // The ticket nobody is on keeps its own lane and gains nothing.
+  // The ticket nobody is on and nothing queues is in no lane, so it drops off the card (#1139).
   const other = hot.find(h => h.ticket.file === '2026-07-26_other.md')
-  assert.equal(other?.bucket, 'queued')
-  assert.equal(other?.runId, undefined)
+  assert.equal(other, undefined)
 })
 
 test('buildHotTickets ignores a finished run and another project\'s ticket (#1117)', async () => {
-  // A run that has ended is not implementing anything, however recently it stopped.
+  // A run that has ended is not implementing anything, however recently it stopped — so x.md carries
+  // no runId and sits in the AI Queue by its link alone.
   const finished = await buildHotTickets([project('alpha', '/a')], {
     tickets: async () => [ticket('x.md')],
     liveRuns: async () => [runOn('run-7', 'tickets/x.md', 'done')],
+    queue: async () => [{ projectId: 'alpha', projectName: 'alpha', open: 1, total: 1, items: [{ text: '[x](tickets/x.md)', done: false }] }],
   })
   assert.equal(finished[0]?.runId, undefined)
-  assert.equal(finished[0]?.bucket, 'queued')
+  assert.equal(finished[0]?.bucket, 'ai-queue')
 
   // A ticket path is only unique inside its own repo, so beta's run must not light up alpha's
-  // identically-named ticket.
+  // identically-named ticket. alpha's x.md is in no lane (no run, no queue link, no priority), so
+  // only beta's implementing copy survives.
   const twoProjects = await buildHotTickets([project('alpha', '/a'), project('beta', '/b')], {
     tickets: async () => [ticket('x.md')],
     liveRuns: async cwd => (cwd === '/b' ? [runOn('run-9', 'tickets/x.md')] : []),
+    queue: async () => [],
   })
   assert.deepEqual(
     twoProjects.map(h => ({ p: h.projectName, run: h.runId })),
-    [
-      { p: 'beta', run: 'run-9' },
-      { p: 'alpha', run: undefined },
-    ],
-    'only beta reads as implementing, and it sorts into the in-progress lane first',
+    [{ p: 'beta', run: 'run-9' }],
+    'only beta reads as implementing; alpha\'s same-named ticket is in no lane and drops off',
   )
 })

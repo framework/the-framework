@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { Preferences, QuotaView } from '@gemstack/the-framework'
+import type { AutoPmReport, Preferences, QuotaView } from '@gemstack/the-framework'
 
 const updatePreferences = vi.hoisted(() => vi.fn())
 let prefs: Preferences = {}
@@ -10,7 +10,8 @@ vi.mock('../lib/preferences.js', () => ({
 }))
 
 let view: QuotaView | undefined
-vi.mock('../lib/quota.js', () => ({ useQuota: () => view }))
+let autoPm: AutoPmReport | undefined
+vi.mock('../lib/quota.js', () => ({ useQuota: () => view, useAutoPm: () => autoPm }))
 
 const { Quota } = await import('./Quota.js')
 
@@ -37,6 +38,7 @@ function reading(percentUsed: number, limitOffset = 0): QuotaView {
 beforeEach(() => {
   prefs = {}
   view = undefined
+  autoPm = undefined
   updatePreferences.mockReset()
 })
 afterEach(cleanup)
@@ -129,3 +131,62 @@ describe('Quota (#960)', () => {
   })
 })
 
+
+describe('the auto-PM readout (#1161)', () => {
+  /** A sweep that considered one project, `minutesAgo` ago, with the next one an hour out. */
+  function swept(message: string, started = false, minutesAgo = 2): AutoPmReport {
+    return {
+      enabled: true,
+      sweptAt: Date.now() - minutesAgo * 60_000,
+      nextSweepAt: Date.now() + 60 * 60_000,
+      outcomes: [{ projectId: 'p1', path: '/Users/me/code/gemstack', started, message }],
+    }
+  }
+
+  test('says why nothing is running, rather than leaving the toggle to be guessed at', () => {
+    // The reason was always written — to the daemon's stdout, which the browser never shows.
+    view = reading(20)
+    autoPm = swept('4 runs are already going')
+    render(<Quota />)
+    expect(screen.getByText(/4 runs are already going/)).toBeTruthy()
+    expect(screen.getByText(/gemstack/)).toBeTruthy()
+  })
+
+  test('names the project by its directory, not its whole path', () => {
+    view = reading(20)
+    autoPm = swept('the quota could not be read')
+    render(<Quota />)
+    expect(screen.queryByText(/Users\/me\/code/)).toBeNull()
+  })
+
+  test('says when it last looked and when it will look again', () => {
+    view = reading(20)
+    autoPm = swept('draining the first open queue entry', true)
+    render(<Quota />)
+    expect(screen.getByText(/Last checked 2m ago/)).toBeTruthy()
+    expect(screen.getByText(/next in 1 hr/)).toBeTruthy()
+  })
+
+  test('stays quiet while the setting is off, since the box already says so', () => {
+    view = reading(20)
+    autoPm = { enabled: false, sweptAt: Date.now(), nextSweepAt: Date.now() + 60_000, outcomes: [] }
+    render(<Quota />)
+    expect(screen.queryByText(/Last checked/)).toBeNull()
+  })
+
+  test('a sweep that has not run yet reads as checking, never as an idle one', () => {
+    view = reading(20)
+    autoPm = { nextSweepAt: Date.now() + 60_000, outcomes: [] }
+    render(<Quota />)
+    expect(screen.getByText('Checking…')).toBeTruthy()
+    expect(screen.queryByText(/No projects/)).toBeNull()
+  })
+
+  test('says nothing at all on a host that runs no sweep', () => {
+    view = reading(20)
+    autoPm = undefined
+    render(<Quota />)
+    expect(screen.queryByText(/Last checked/)).toBeNull()
+    expect(screen.queryByText('Checking…')).toBeNull()
+  })
+})

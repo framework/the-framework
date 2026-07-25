@@ -550,6 +550,29 @@ test('registryPreferencesStore round-trips through the same file', async () => {
   assert.deepEqual(await store.read(), { vanilla: true })
 })
 
+test('registryPreferencesStore tells its listener which keys were written (#1161)', async () => {
+  // The daemon wakes auto PM only on the write that switched it on, so it needs the caller's own
+  // keys — the merged result would say "on" every time anything else was saved while it was on.
+  const fs = memFs()
+  const written: Preferences[] = []
+  const store = registryPreferencesStore(fs, ENV, patch => written.push(patch))
+  await store.save({ autoPm: true })
+  await store.patch?.({ vanilla: true })
+  assert.deepEqual(written, [{ autoPm: true }, { vanilla: true }])
+  // The patch still merged, so the listener's narrower view is not the stored one.
+  assert.deepEqual(await store.read(), { autoPm: true, vanilla: true })
+})
+
+test('a preferences listener that throws does not fail the write (#1161)', async () => {
+  // The write already landed; a listener must not be able to report otherwise.
+  const fs = memFs()
+  const store = registryPreferencesStore(fs, ENV, () => {
+    throw new Error('the daemon is mid-shutdown')
+  })
+  await store.save({ autoPm: true })
+  assert.deepEqual(await store.read(), { autoPm: true })
+})
+
 test('the registry file is never written in place, only renamed over (#991)', async () => {
   const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A], preferences: {} }) })
   await writePreferences({ vanilla: true }, fs, ENV)

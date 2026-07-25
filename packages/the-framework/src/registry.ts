@@ -827,15 +827,32 @@ export async function readDaemonToken(
 }
 
 /** A {@link PreferencesStore} bound to the real registry file, wired by the daemon so the
- * dashboard's preferences RPCs read/write the user's home file. */
+ * dashboard's preferences RPCs read/write the user's home file.
+ *
+ * `onChange` is handed **the keys the caller wrote**, not the merged result, so a listener can
+ * tell "this write switched the setting on" from "it was already on and something else changed"
+ * (#1161). It runs after the write has landed, and its failure is swallowed: the save succeeded,
+ * and a listener must not be able to report otherwise. Same shape as the Discord store's
+ * `onChange` (#1095), for the same reason — a setting saved in the browser has to reach the
+ * daemon's own services without a restart.
+ */
 export function registryPreferencesStore(
   fs: RegistryFs = nodeRegistryFs(),
   env: NodeJS.ProcessEnv = process.env,
+  onChange?: (written: Preferences) => void,
 ): PreferencesStore {
+  const changed = <T>(written: Preferences, result: T): T => {
+    try {
+      onChange?.(written)
+    } catch {
+      // The write landed; a listener that throws is not the writer's problem.
+    }
+    return result
+  }
   return {
     read: () => readPreferences(fs, env),
-    save: preferences => writePreferences(preferences, fs, env),
-    patch: patch => patchPreferences(patch, fs, env),
+    save: async preferences => changed(preferences, await writePreferences(preferences, fs, env)),
+    patch: async patch => changed(patch, await patchPreferences(patch, fs, env)),
     readProject: projectId => readProjectPreferences(projectId, fs, env),
     saveProject: (projectId, preferences) => writeProjectPreferences(projectId, preferences, fs, env),
     patchProject: (projectId, patch) => patchProjectPreferences(projectId, patch, fs, env),

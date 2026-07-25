@@ -1,4 +1,5 @@
-import { contextQuota } from './context.js'
+import { contextAutoPm, contextQuota } from './context.js'
+import type { AutoPmReport } from '../auto-pm.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
 // The usage panel's read surface (#533): where the account's subscription quota stands,
@@ -19,4 +20,22 @@ export async function onQuota(): Promise<QuotaView> {
   const source = contextQuota()
   if (!source) return noReading()
   return source.read().catch(() => noReading())
+}
+
+/**
+ * What auto PM last decided (#1161), for the line under the panel's toggle. It sits beside
+ * `onQuota` because it is the same panel and the same gate: auto PM spends against exactly the
+ * boundary drawn above it.
+ *
+ * `undefined` on a host with no sweep (the relay), which the panel reads as "nothing to say"
+ * rather than as an idle sweep — the distinction this whole read exists to make.
+ */
+export async function onAutoPm(): Promise<AutoPmReport | undefined> {
+  const report = contextAutoPm()
+  if (!report) return undefined
+  try {
+    return report()
+  } catch {
+    return undefined
+  }
 }

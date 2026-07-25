@@ -26,8 +26,13 @@ async function writeStub(dir: string, log: string): Promise<string> {
   return stub
 }
 
-/** 20ms apart, so 1500 attempts is a 30s ceiling — long enough for a slow runner (#1153). */
-const POLL_ATTEMPTS = 1500
+/**
+ * 20ms apart, so 750 attempts is a 15s ceiling: long enough for a slow runner (#1153), and short
+ * enough that the two polls a single re-home test runs still fit inside the suite's 60s per-test
+ * timeout (`--test-timeout` in scripts/run-tests.mjs) with the real git work between them. A 30s
+ * ceiling did not — two waits alone reached the cap, turning a slow test into a file timeout.
+ */
+const POLL_ATTEMPTS = 750
 
 /** The stub's recorded starts, waited for (a start spawns detached). */
 async function startedArgs(log: string, expected: number): Promise<string[][]> {

@@ -263,7 +263,7 @@ function Agents({
       <CardContent className="pt-0">
         <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
           <AgentColumn heading="Current" description="Agents currently working" rows={current} loading={loading} empty="No agents working right now." />
-          <AgentColumn heading="Recent" description="Agents finished working" rows={recent} loading={loading} empty="No finished sessions yet." />
+          <AgentColumn heading="Recent" description="Agents finished working" rows={recent} loading={loading} empty="No sessions yet." />
         </div>
       </CardContent>
     </Card>

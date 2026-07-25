@@ -27,7 +27,13 @@ import { cn } from '../lib/utils.js'
 // is the default rather than one repo's override — which is what a settings page should mean. The
 // per-project overrides stay where the run is configured, in the launcher's gear.
 
-export function SettingsPage({ onSelectProject }: { onSelectProject?: ((id: string) => void) | undefined; onDone?: () => void }) {
+export function SettingsPage({
+  onRunStarted,
+}: {
+  /** Where a session the onboarding checklist starts lands (#1169): on that session. */
+  onRunStarted: (projectId: string, intent: string, runId?: string) => void
+  onDone?: () => void
+}) {
   const preferences = usePreferences()
   const editors = useDetectedEditors()
   const theme = themePreference(preferences)
@@ -55,7 +61,7 @@ export function SettingsPage({ onSelectProject }: { onSelectProject?: ((id: stri
           </p>
         </div>
 
-        <OnboardingChecklist onSelectProject={onSelectProject} />
+        <OnboardingChecklist onRunStarted={onRunStarted} />
 
         <Section title="Appearance">
           <SelectRow

@@ -75,12 +75,24 @@ describe('TicketsPanel (#697)', () => {
 
   test('an empty tickets/ offers the GitHub import instead of a dead end', async () => {
     sendStart.mockResolvedValue({ ok: true, runId: 'r1' })
-    render(<TicketsPanel projectId="p1" tickets={[]} loaded />)
+    const onRunStarted = vi.fn()
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded onRunStarted={onRunStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     // A fixed prompt, so it takes the verbatim-text path rather than a build.
     expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
     expect(sendStart.mock.calls[0]?.[1]).toMatch(/GitHub issues into tickets\//i)
+    // The run id is what lands you on the import session rather than the project home (#1169).
+    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith(expect.any(String), 'r1'))
+  })
+
+  test('a refused import says why and moves you nowhere (#1169)', async () => {
+    sendStart.mockResolvedValue({ ok: false, error: 'a session is already active' })
+    const onRunStarted = vi.fn()
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded onRunStarted={onRunStarted} />)
+    fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
+    expect(await screen.findByText(/already active/i)).toBeTruthy()
+    expect(onRunStarted).not.toHaveBeenCalled()
   })
 
   test('no project renders nothing at all', () => {

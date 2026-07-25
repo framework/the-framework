@@ -180,6 +180,14 @@ export default function Page() {
     go({ projectId: id, runId: null }) // switching projects always returns to the home launcher
   }
 
+  // Naming a session in another project. The Overview's rows know which run they are about, and
+  // going through selectProject drops that on the way, landing on the launcher instead of the
+  // session the row was describing.
+  const selectRunInProject = (id: string, runId: string) => {
+    setAdopting(false)
+    go({ projectId: id, runId })
+  }
+
   // "New" in the sidebar: start a fresh session in a named project (the sidebar decides which —
   // the current one, the only one, or a picked one). resetContext explicitly, since staying in the
   // same project would not trip the project-change effect above.
@@ -240,7 +248,15 @@ export default function Page() {
   const selectedRun = runId ? runs.find(run => run.id === runId) : undefined
   const renderMain = () => {
     if (view === 'settings') return <SettingsPage onRunStarted={runStarted} onDone={showDashboard} />
-    if (!projectId) return <DashboardPage onSelectProject={selectProject} onRunStarted={runStarted} interventions={interventions} />
+    if (!projectId)
+      return (
+        <DashboardPage
+          onSelectProject={selectProject}
+          onSelectRun={selectRunInProject}
+          onRunStarted={runStarted}
+          interventions={interventions}
+        />
+      )
     if (unknownProject)
       return (
         <NotFound

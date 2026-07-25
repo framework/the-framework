@@ -11,6 +11,7 @@ import { usePolled } from '../lib/use-async.js'
 import { usePreferences } from '../lib/preferences.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { HotTickets } from './HotTickets.js'
+import { WorkingNow } from './WorkingNow.js'
 import { cn } from '../lib/utils.js'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import { formatDateTime, formatRelative } from '../lib/format-date.js'
@@ -23,10 +24,13 @@ import { ScrollArea } from './ui/scroll-area.js'
 // Selecting anything here jumps into that project. Shown by the shell when no project is picked.
 export function DashboardPage({
   onSelectProject,
+  onSelectRun,
   onRunStarted,
   interventions,
 }: {
   onSelectProject: (id: string) => void
+  /** Where a row that names one session lands: on that session, rather than its project's launcher. */
+  onSelectRun: (projectId: string, runId: string) => void
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
   onRunStarted: (projectId: string, intent: string, runId?: string) => void
   interventions: Intervention[]
@@ -47,7 +51,7 @@ export function DashboardPage({
 
         <NeedsYou items={interventions} onSelectProject={onSelectProject} />
 
-        <HotTickets onSelectProject={onSelectProject} />
+        <HotTickets onSelectProject={onSelectProject} onSelectRun={onSelectRun} />
 
         {data === null ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
@@ -84,7 +88,7 @@ export function DashboardPage({
                     <CardTitle>Working now</CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    <WorkingNow active={data.active} onSelectProject={onSelectProject} />
+                    <WorkingNow active={data.active} onSelectRun={onSelectRun} />
                   </CardContent>
                 </Card>
               </div>
@@ -225,41 +229,6 @@ function StatTile({
         <div className={cn('text-2xl font-semibold tabular-nums', accent && 'text-primary')}>{value}</div>
       </CardContent>
     </Card>
-  )
-}
-
-function WorkingNow({ active, onSelectProject }: { active: ActiveRun[]; onSelectProject: (id: string) => void }) {
-  if (active.length === 0) {
-    return <p className="py-2 text-sm text-muted-foreground">Nothing running.</p>
-  }
-  return (
-    <ul className="divide-y divide-border">
-      {active.map(run => (
-        // Keyed by project + run (#738): one project can have several runs in flight.
-        <li key={`${run.projectId}:${run.runId}`}>
-          <button
-            type="button"
-            onClick={() => onSelectProject(run.projectId)}
-            className="flex w-full flex-col items-start gap-0.5 py-2 text-left hover:opacity-80"
-          >
-            <span className="flex w-full items-center gap-1.5">
-              {/* Decorative dot + sr-only status (#695/U33): color alone reaches no screen reader. */}
-              <span
-                aria-hidden
-                className={cn('h-2 w-2 shrink-0 rounded-full', run.readyForMerge ? 'bg-success' : 'animate-pulse bg-warning')}
-                title={run.readyForMerge ? 'Ready for merge' : 'Building'}
-              />
-              <span className="sr-only">{run.readyForMerge ? 'Ready for merge' : 'Building'}: </span>
-              <span className="truncate font-medium">{run.projectName}</span>
-              {run.sessionName && <span className="truncate text-xs text-muted-foreground">{run.sessionName}</span>}
-            </span>
-            {(run.intent || run.scope) && (
-              <span className="truncate pl-3.5 text-xs text-muted-foreground">{run.intent || run.scope}</span>
-            )}
-          </button>
-        </li>
-      ))}
-    </ul>
   )
 }
 

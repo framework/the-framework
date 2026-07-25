@@ -51,7 +51,16 @@ export function TicketsPanel({
   if (!loaded) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>
 
   const queue = async (ticket: WorkspaceTicket) => {
-    const result = await run(() => sendQueueTicket(projectId, ticket.title), 'The ticket could not be queued.')
+    // The ticket travels with the entry (#1164): it decides which priority section the entry
+    // lands in, and it is what the queued line links back to.
+    const result = await run(
+      () =>
+        sendQueueTicket(projectId, ticket.title, {
+          file: ticket.file,
+          ...(ticket.priority ? { priority: ticket.priority } : {}),
+        }),
+      'The ticket could not be queued.',
+    )
     if (result?.ok) setQueued(prev => new Set(prev).add(ticket.file))
   }
 

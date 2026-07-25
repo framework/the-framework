@@ -38,6 +38,30 @@ export const FLAT_TODO_FILE = 'TODO_AGENTS.md'
  */
 export const TODO_FORMAT_FILE = 'node_modules/@gemstack/the-framework/prompts/todo_format.md'
 
+/**
+ * Which `## Priority N` section a ticket's own `priority:` key earns it, translating the ticket
+ * format's words into the backlog format's numbers (#1164).
+ *
+ * The two formats were specified separately and never mapped onto each other, so a ticket put on
+ * the queue had no ranked place to land. The scale's ends are reserved by `todo_format.md`
+ * itself: 10 is "rarely used, critical production bugs", which nothing queued by a click should
+ * claim, and 0 is "only if capacity", which is a decision about the ticket rather than a
+ * translation of it. An unmarked ticket sits in the middle, which is what the ticket format
+ * saying `priority:` is optional has to mean.
+ */
+export function todoPriorityForTicket(priority?: string): number {
+  switch (priority?.trim().toLowerCase()) {
+    case 'urgent':
+      return 9
+    case 'high':
+      return 7
+    case 'low':
+      return 2
+    default:
+      return 5
+  }
+}
+
 /** The brief hyphen spelling from #682, read as a fallback after #674 settled on the underscore. */
 export const LEGACY_HYPHEN_TODO_FILE = 'TODO-AGENTS.md'
 

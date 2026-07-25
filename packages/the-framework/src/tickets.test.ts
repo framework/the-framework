@@ -12,6 +12,7 @@ import {
   TICKETING_FORMAT_FILE,
   TODO_FORMAT_FILE,
   findFlatTodo,
+  todoPriorityForTicket,
 } from './tickets.js'
 import { TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 
@@ -82,4 +83,17 @@ test('findFlatTodo ignores a tickets/ directory that is not a file', async () =>
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
+})
+
+test('a ticket priority maps onto the backlog format\'s numbered sections (#1164)', () => {
+  assert.equal(todoPriorityForTicket('urgent'), 9)
+  assert.equal(todoPriorityForTicket('high'), 7)
+  assert.equal(todoPriorityForTicket('medium'), 5)
+  assert.equal(todoPriorityForTicket('low'), 2)
+  // The ticket format says `priority:` is optional, so an unmarked ticket has to mean something.
+  assert.equal(todoPriorityForTicket(undefined), 5)
+  assert.equal(todoPriorityForTicket('  HIGH  '), 7, 'the key is read verbatim off the ticket, so it may be shouted or padded')
+  // 10 is reserved for critical production bugs and 0 for "only if capacity"; neither is
+  // something a click on Queue should be able to claim.
+  assert.equal(todoPriorityForTicket('critical'), 5)
 })

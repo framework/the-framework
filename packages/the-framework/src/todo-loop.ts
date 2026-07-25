@@ -6,7 +6,7 @@ import { requestChoices, runAwaitRounds } from './await-gate.js'
 import { FLAT_TODO_FILE, findFlatTodo } from './tickets.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
 
-export { FLAT_TODO_FILE, LEGACY_HYPHEN_TODO_FILE, LEGACY_TICKETS_TODO_FILE, LEGACY_TODO_FILE, TICKETS_DIR, TICKETING_FORMAT_FILE, TODO_FORMAT_FILE } from './tickets.js'
+export { FLAT_TODO_FILE, LEGACY_HYPHEN_TODO_FILE, LEGACY_TICKETS_TODO_FILE, LEGACY_TODO_FILE, TICKETS_DIR, TICKETING_FORMAT_FILE, TODO_FORMAT_FILE, todoPriorityForTicket } from './tickets.js'
 
 /**
  * The backlog loop (#323): once the main work settles, consume the agent's own
@@ -107,17 +107,101 @@ export async function appendTodoEntry(cwd: string, entry: string): Promise<strin
  * queue #624 settled on, and the only one `promoteQueue` carries between branches (#852), so a
  * pick that landed in some run's own backlog could quietly never be seen again.
  */
-export async function appendFlatTodoEntry(cwd: string, entry: string): Promise<string | undefined> {
-  return writeTodoEntry(cwd, (await findFlatTodo(cwd)) ?? FLAT_TODO_FILE, entry)
+export async function appendFlatTodoEntry(
+  cwd: string,
+  entry: string,
+  priority?: number,
+): Promise<string | undefined> {
+  return writeTodoEntry(cwd, (await findFlatTodo(cwd)) ?? FLAT_TODO_FILE, entry, priority)
 }
 
-/** Append one open entry to a named backlog file. Never throws; resolves with the file written. */
-async function writeTodoEntry(cwd: string, name: string, entry: string): Promise<string | undefined> {
+/** A `## Priority 7` heading, with whatever gloss the format's example puts after the number. */
+const PRIORITY_HEADING = /^##\s+priority\s+(\d{1,2})\b/i
+
+/** Any second-level heading, which is where a priority section ends. */
+const SECTION_HEADING = /^##\s+/
+
+/**
+ * Place an open entry in the backlog's priority section (`prompts/todo_format.md`), creating the
+ * section when the file has none, and return the new document.
+ *
+ * Pure, because the placement is the whole point and it is much easier to pin here than through
+ * the filesystem. The old behaviour was a plain append, which put a just-queued ticket at the
+ * *end* of the file — and since the drain preset works "the FIRST open entry" and
+ * {@link parseTodoEntries} reads in file order, queueing something meant it would be worked last,
+ * behind everything already there (#1164).
+ *
+ * Placement rules, in the order they are tried:
+ * - a section for this priority already exists: the entry joins the end of it, so a queue keeps
+ *   its arrival order within a priority
+ * - otherwise the section is created before the first *lower*-priority section, since the format
+ *   sorts high to low
+ * - with no priority sections at all, it goes above the first heading of any kind: the file's
+ *   own sections are then unranked, and burying a deliberate pick under them is the bug
+ */
+export function insertTodoEntry(md: string, entry: string, priority: number): string {
+  const item = `- [ ] ${entry}`
+  const lines = md.split('\n')
+  const headings = lines
+    .map((line, index) => ({ index, priority: Number(PRIORITY_HEADING.exec(line)?.[1]) }))
+    .filter(h => Number.isFinite(h.priority))
+
+  const existing = headings.find(h => h.priority === priority)
+  if (existing) {
+    // The end of that section: the last line before the next heading that is not blank, so the
+    // entry lands under the section's last item rather than after its trailing blank line.
+    let end = lines.findIndex((line, index) => index > existing.index && SECTION_HEADING.test(line))
+    if (end === -1) end = lines.length
+    while (end > existing.index + 1 && lines[end - 1]!.trim() === '') end--
+    lines.splice(end, 0, item)
+    return lines.join('\n')
+  }
+
+  const section = [`## Priority ${priority}`, '', item, '']
+  const lower = headings.find(h => h.priority < priority)
+  if (lower) {
+    lines.splice(lower.index, 0, ...section)
+    return lines.join('\n')
+  }
+  if (headings.length) {
+    // Every existing section outranks it, so it goes last -- but still as its own section.
+    const last = headings[headings.length - 1]!
+    let end = lines.findIndex((line, index) => index > last.index && SECTION_HEADING.test(line))
+    if (end === -1) end = lines.length
+    while (end > last.index + 1 && lines[end - 1]!.trim() === '') end--
+    lines.splice(end, 0, '', ...section.slice(0, 3))
+    return lines.join('\n')
+  }
+  const firstHeading = lines.findIndex(line => SECTION_HEADING.test(line))
+  if (firstHeading === -1) {
+    const separator = md === '' || md.endsWith('\n') ? '' : '\n'
+    return `${md}${separator}${section.slice(0, 3).join('\n')}\n`
+  }
+  lines.splice(firstHeading, 0, ...section)
+  return lines.join('\n')
+}
+
+/**
+ * Write one open entry to a named backlog file. Never throws; resolves with the file written.
+ *
+ * With no `priority` this stays the plain append it always was: the resume note (#529) and the
+ * agent's own follow-ups are a running list, and the file's order is theirs to keep.
+ */
+async function writeTodoEntry(
+  cwd: string,
+  name: string,
+  entry: string,
+  priority?: number,
+): Promise<string | undefined> {
   const path = join(cwd, name)
   try {
     const existing = await readFile(path, 'utf8').catch(() => '')
-    const separator = existing === '' || existing.endsWith('\n') ? '' : '\n'
     await mkdir(dirname(path), { recursive: true }) // a legacy tickets/TODO.md still needs its dir
+    if (priority !== undefined) {
+      await writeFile(path, insertTodoEntry(existing, entry, priority), 'utf8')
+      return name
+    }
+    const separator = existing === '' || existing.endsWith('\n') ? '' : '\n'
     await writeFile(path, `${existing}${separator}- [ ] ${entry}\n`, 'utf8')
     return name
   } catch {

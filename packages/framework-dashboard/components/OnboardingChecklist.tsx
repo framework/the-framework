@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { DashboardData, OnboardingSuggestion } from '@gemstack/the-framework'
 import { presets } from '@gemstack/the-framework/client'
-import { Check, Circle, X } from 'lucide-react'
+import { Square, SquareCheckBig, X } from 'lucide-react'
 import { onDashboard } from '../server/reads.telefunc.js'
 import { onOnboarding, sendAddProject } from '../server/projects.telefunc.js'
 import { usePolled } from '../lib/use-async.js'
@@ -30,6 +30,13 @@ interface Step {
   label: string
   description: string
   done: boolean
+  /**
+   * Nothing breaks if this one is never done (#1139).
+   *
+   * Marked per step rather than by position, so the list can be reordered without the promise
+   * moving with it. Only the two steps the agent cannot work without are left unmarked.
+   */
+  optional?: boolean
   /** The action(s) offered while it is not done. */
   action?: React.ReactNode
 }
@@ -129,6 +136,7 @@ export function OnboardingChecklist({
       description:
         'tickets/ holds the bigger things to work on, in the repo. The agent plans and spikes from them, and they are the input the queue is filled from.',
       done: hasTickets,
+      optional: true,
       action: (
         <div className="flex flex-col items-end gap-1">
           <Button size="sm" onClick={importTickets} disabled={!targetProjectId || starting}>
@@ -144,6 +152,7 @@ export function OnboardingChecklist({
       label: 'Add the Discord bot',
       description: DISCORD_BOT_DESCRIPTION,
       done: channels?.discordBot ?? false,
+      optional: true,
       action: (
         <Button size="sm" variant="outline" onClick={() => setDiscordBotOpen(true)}>
           Set up the bot
@@ -155,6 +164,7 @@ export function OnboardingChecklist({
       label: 'Add browser notifications',
       description: 'Desktop pings while the dashboard is open, so a session waiting on you does not sit unnoticed.',
       done: browserGranted,
+      optional: true,
       action:
         permission === 'denied' ? (
           <span className="text-xs text-muted-foreground">Blocked in your browser settings</span>
@@ -171,6 +181,7 @@ export function OnboardingChecklist({
       label: 'Add Discord notifications',
       description: DISCORD_WEBHOOK_DESCRIPTION,
       done: channels?.discordWebhook ?? false,
+      optional: true,
       action: (
         <Button size="sm" variant="outline" onClick={() => setDiscordWebhookOpen(true)}>
           Add the webhook
@@ -207,13 +218,22 @@ export function OnboardingChecklist({
           {steps.map(step => (
             <li key={step.key} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
               <div className="flex min-w-0 items-start gap-3">
+                {/* A checkbox, not a circle: an outlined circle reads as a radio button, i.e. as
+                    one of a set you pick between, when these are independent things to tick (#1139). */}
                 {step.done ? (
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-primary)]" aria-label="Done" />
+                  <SquareCheckBig className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-primary)]" aria-label="Done" />
                 ) : (
-                  <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-label="Not done" />
+                  <Square className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-label="Not done" />
                 )}
                 <div className="min-w-0">
-                  <p className={step.done ? 'text-sm text-muted-foreground line-through' : 'text-sm'}>{step.label}</p>
+                  <p className={step.done ? 'text-sm text-muted-foreground line-through' : 'text-sm'}>
+                    {step.label}
+                    {step.optional && (
+                      <span className="ml-2 rounded-full border border-border px-1.5 py-0.5 align-middle text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
+                        Optional
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground">{step.description}</p>
                 </div>
               </div>

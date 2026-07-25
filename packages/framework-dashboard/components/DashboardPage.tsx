@@ -11,11 +11,8 @@ import { usePolled } from '../lib/use-async.js'
 import { usePreferences } from '../lib/preferences.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { HotTickets } from './HotTickets.js'
-<<<<<<< HEAD
 import { WorkingNow } from './WorkingNow.js'
-=======
 import { RoutineWork } from './RoutineWork.js'
->>>>>>> origin/main
 import { cn } from '../lib/utils.js'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import { formatDateTime, formatRelative } from '../lib/format-date.js'
@@ -28,19 +25,13 @@ import { ScrollArea } from './ui/scroll-area.js'
 // Selecting anything here jumps into that project. Shown by the shell when no project is picked.
 export function DashboardPage({
   onSelectProject,
-<<<<<<< HEAD
   onSelectRun,
-=======
->>>>>>> origin/main
   onRunStarted,
   interventions,
 }: {
   onSelectProject: (id: string) => void
-<<<<<<< HEAD
   /** Where a row that names one session lands: on that session, rather than its project's launcher. */
   onSelectRun: (projectId: string, runId: string) => void
-=======
->>>>>>> origin/main
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
   onRunStarted: (projectId: string, intent: string, runId?: string) => void
   interventions: Intervention[]

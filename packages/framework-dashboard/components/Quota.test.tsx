@@ -105,6 +105,23 @@ describe('Quota (#960)', () => {
     expect(screen.queryByLabelText('Unattended work stops at')).toBeNull()
   })
 
+  test('a readout it could not parse keeps the bar and dates it, rather than replacing it (#960)', () => {
+    // The poller now survives an unrecognized answer, so the earlier reading is still on screen.
+    // It has to say how old it is: an undated bar claims to be current.
+    view = { ...reading(20), unavailable: 'unrecognized', readAt: Date.now() - 90 * 60 * 1000 }
+    render(<Quota />)
+    expect(screen.getByRole('img')).toBeTruthy()
+    expect(screen.getByText(/from the reading before it/)).toBeTruthy()
+    expect(screen.getByText(/Last read/)).toBeTruthy()
+  })
+
+  test('an unrecognized readout with nothing retained says it will try again (#960)', () => {
+    view = { windows: [], unavailable: 'unrecognized' }
+    render(<Quota />)
+    // It used to read as terminal ("the boundary is off"), which is what made this look reverted.
+    expect(screen.getByText(/Trying again shortly/)).toBeTruthy()
+  })
+
   // The bug this test exists for: the slider used to be bound straight to the polled value, which
   // only refreshes every 30s. Each keypress recomputed from the same stale number and the thumb
   // snapped back, so twenty presses of an arrow key moved the limit by one.

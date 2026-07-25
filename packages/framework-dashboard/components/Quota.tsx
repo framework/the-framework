@@ -152,7 +152,11 @@ function unavailableNote(view: QuotaView): string | undefined {
     case 'agent-not-found':
       return 'Claude Code was not found, so usage cannot be read.'
     case 'unrecognized':
-      return 'Claude Code reported its usage in a way this version does not recognize, so the boundary is off.'
+      // The poller no longer gives up on this (#960), so where a reading survives, say it is
+      // behind rather than that the boundary is off, which read as terminal.
+      return view.windows.length
+        ? "Claude Code's latest usage readout wasn't one this version recognizes, so these numbers are from the reading before it."
+        : 'Claude Code reported its usage in a way this version does not recognize. Trying again shortly.'
     default:
       return view.windows.length
         ? "Couldn't refresh just now, so these numbers may be a little behind."
@@ -241,6 +245,9 @@ export function Quota() {
   const preferences = usePreferences()
   const [offset, setOffset] = useSpendOffset(view?.boundary?.limit.offset)
   const note = view ? unavailableNote(view) : undefined
+  // When the newest attempt failed but earlier numbers are still on screen, say how old they are.
+  // A retained reading can now outlive several failures (#960), and an undated bar claims to be now.
+  const staleAt = view?.unavailable !== undefined && view.windows.length > 0 ? view.readAt : undefined
   const week = view ? weekWindow(view.windows) : undefined
   // Everything else: the session window, and a model's own week. Never the account week, which
   // the bar above already is.
@@ -264,7 +271,12 @@ export function Quota() {
 
         {others.length ? <div className="space-y-1 border-t border-border pt-3">{others.map(w => <OtherWindow key={w.label} window={w} />)}</div> : null}
 
-        {note ? <p className="text-sm text-muted-foreground">{note}</p> : null}
+        {note ? (
+          <p className="text-sm text-muted-foreground">
+            {note}
+            {staleAt !== undefined ? ` Last read ${formatRelative(new Date(staleAt).toISOString())}.` : ''}
+          </p>
+        ) : null}
 
         {view ? (
           <div className="space-y-1 border-t border-border pt-3">

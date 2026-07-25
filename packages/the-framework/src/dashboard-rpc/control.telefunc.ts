@@ -5,6 +5,7 @@ import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-i
 import { resolveProjectPath, resolveRunPath, contextPreferences, contextPreview } from './context.js'
 import { relayOr } from './relay-run.js'
 import { appendFlatTodoEntry } from '../todo-loop.js'
+import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
 import { findRun, isSafeRunId, type RunMeta } from '../store/index.js'
 import { removeProjectWorktree, deleteProjectRun } from '../worktrees.js'
 import { openSessionPullRequest, pushRunBranch, runBranchFor, type HandoffResult } from '../dashboard/run-handoff.js'
@@ -292,6 +293,14 @@ export interface QueueTicketResult {
   error?: string
 }
 
+/** Which ticket a queued entry came from (#1164), so the entry can point back at it. */
+export interface QueuedTicket {
+  /** The ticket's filename inside `tickets/`, which is its identity. */
+  file: string
+  /** Its own `priority:` key, when it has one, which decides the section the entry lands in. */
+  priority?: string
+}
+
 /**
  * Put a ticket on the project's agent queue (#697), so the next drain run works it.
  *
@@ -299,12 +308,24 @@ export interface QueueTicketResult {
  * and asking an agent to append one line would cost a turn and could do anything else besides.
  * It writes the project checkout's flat backlog specifically, which is the durable queue #624
  * settled on and the one a worktree run's queue is promoted into (#852).
+ *
+ * Given a `ticket`, the entry is placed in the matching `## Priority N` section rather than
+ * appended to the end of the file, and it links back to the ticket it came from. Both halves of
+ * #1164: the entry used to land last in a file the drain preset works front to back, and it
+ * carried nothing but a title, so the ticket it came from was lost the moment it was queued.
  */
-export async function sendQueueTicket(projectId: string, entry: string): Promise<QueueTicketResult> {
+export async function sendQueueTicket(
+  projectId: string,
+  entry: string,
+  ticket?: QueuedTicket,
+): Promise<QueueTicketResult> {
   const trimmed = entry.trim()
   if (!trimmed) return { ok: false, error: 'a ticket is required' }
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'no such project' }
-  const file = await appendFlatTodoEntry(cwd, trimmed)
+  // A markdown link, so the file reads well and the agent draining it has the ticket to open.
+  // `parseTodoEntries` keeps the line verbatim, so the reference travels with the entry.
+  const text = ticket ? `[${trimmed}](${TICKETS_DIR}/${ticket.file})` : trimmed
+  const file = await appendFlatTodoEntry(cwd, text, ticket ? todoPriorityForTicket(ticket.priority) : undefined)
   return file ? { ok: true, file } : { ok: false, error: 'the queue could not be written' }
 }

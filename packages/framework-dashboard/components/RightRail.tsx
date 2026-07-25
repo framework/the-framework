@@ -49,8 +49,8 @@ export function RightRail({
   toggleContext: (path: string) => void
   /** Whether the selected run is serving a browser preview (#813), i.e. it was started with Browser on. */
   hasBrowser?: boolean
-  /** Where the selected run executes (#1053): an `actions` run has no browser on the runner, so no pane; `remote` (#1067) has none locally either. */
-  target?: 'local' | 'actions' | 'remote' | undefined
+  /** Where the selected run executes (#1053/#610): an `actions` run has no browser on the runner, so no pane; `remote` (#1067) has none locally either, and neither does a `web` cloud session. */
+  target?: 'local' | 'actions' | 'remote' | 'web' | undefined
   /** The selected run's production-grade loop verdict, pinned under the tabs rather than given a tab
    *  of its own: it is a standing fact about the run, not a panel you browse, so it stays readable
    *  whichever tab is open. Null for a run that never looped (a prototype scope, or a plain prompt). */

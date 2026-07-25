@@ -166,10 +166,13 @@ Options:
                          (default: claude). Codex reports no price and no quota,
                          so --max-cost and the consumption limits cannot gate it;
                          the session says so at startup rather than imply a guard.
-  --run-on <local|actions>   Where the run executes (default: local, this device).
-                         actions drives it on a fresh GitHub Actions runner; needs a
-                         GitHub origin remote and a user token in GH_TOKEN (repo +
-                         workflow scopes).
+  --run-on <local|actions|web>   Where the run executes (default: local, this
+                         device). actions drives it on a fresh GitHub Actions runner;
+                         needs a GitHub origin remote and a user token in GH_TOKEN
+                         (repo + workflow scopes). web hands the task to a Claude Code
+                         cloud session on your own account, which runs it off this
+                         machine and opens its own PR; follow it on claude.ai or pull
+                         it back with claude --teleport.
   --cwd <dir>            Workspace the agent builds in (default: current directory).
   --model <id>           Model to pass through to the wrapped agent.
   --via <surface>        Surface this run was started from (e.g. discord); recorded
@@ -278,9 +281,10 @@ export interface CliOptions {
   intent: string
   /** `--agent <claude|codex>`: which agent CLI drives the run (#542). Default `claude`. */
   agent: AgentName
-  /** `--run-on <local|actions>` (#1050): where the run executes. `actions` drives it on a GitHub
-   * Actions runner via ActionsDriver (#934); absent / `local` runs on this device as before. */
-  target?: 'local' | 'actions' | undefined
+  /** `--run-on <local|actions|web>` (#1050/#610): where the run executes. `actions` drives it on a
+   * GitHub Actions runner via ActionsDriver (#934); `web` hands it to a Claude Code cloud session
+   * via CloudDriver (#610); absent / `local` runs on this device as before. */
+  target?: 'local' | 'actions' | 'web' | undefined
   cwd?: string | undefined
   /**
    * `--run-id <id>` (#736): the id the daemon allocated for this run before spawning it. Its
@@ -543,7 +547,7 @@ export function parseArgs(argv: string[]): CliOptions {
       }
       case '--run-on': {
         const value = argv[++i]
-        if (value !== 'local' && value !== 'actions') opts.error = `invalid --run-on: ${value ?? '(missing)'}. Expected: local | actions`
+        if (value !== 'local' && value !== 'actions' && value !== 'web') opts.error = `invalid --run-on: ${value ?? '(missing)'}. Expected: local | actions | web`
         else opts.target = value
         break
       }
@@ -1660,6 +1664,17 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     }
     actionsConfig = { owner: slug.owner, repo: slug.repo, token }
     io.out(`◆ run on: GitHub Actions (${slug.owner}/${slug.repo})`)
+  }
+
+  // Run on Claude Code on the web (#610). Nothing to resolve: the CLI holds the account the
+  // cloud session is created under, so there is no token of ours and no repo config. The
+  // session clones this repo's remote at its current branch, so local commits that were never
+  // pushed are not in it — say so once here rather than let the cloud session look stale.
+  if (opts.target === 'web' && !fake) {
+    io.out('◆ run on: Claude Code on the web (a cloud session on your own account)')
+    if (!(await githubSlugFor(cwd))) {
+      io.out('  no GitHub remote here, so the CLI uploads a bundle of this repo instead.')
+    }
   }
 
   const driver: Driver = fake

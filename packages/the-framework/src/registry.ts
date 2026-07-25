@@ -99,8 +99,8 @@ export interface Preferences {
   editor?: string
   /** Dashboard color theme (#725): `system` (follow the OS, the default), `light`, or `dark`. Absent = system. */
   theme?: 'system' | 'light' | 'dark'
-  /** Where a run executes (#1050): `local` (this device, the default) or `actions` (a fresh GitHub Actions runner); maps to `--run-on`. Absent = local. */
-  target?: 'local' | 'actions'
+  /** Where a run executes (#1050/#610): `local` (this device, the default), `actions` (a fresh GitHub Actions runner) or `web` (a Claude Code cloud session); maps to `--run-on`. Absent = local. */
+  target?: 'local' | 'actions' | 'web'
   /**
    * Post a Discord message when a new item lands on the "needs you" queue (#627). Absent = off:
    * unlike the in-browser toggle, Discord reaches you when no dashboard is open, so it is opt-in.
@@ -371,8 +371,8 @@ const PREFERENCE_KEYS = Object.keys(BOOLEAN_PREFERENCES) as BooleanPreferenceKey
  * object never lands junk (or the wrong type) in the user's home file. */
 /** The color themes the dashboard offers (#725); anything else means the default `system`. */
 const KNOWN_THEMES = ['system', 'light', 'dark'] as const
-/** The run targets the dashboard offers (#1050); anything else means the default `local`. */
-const KNOWN_RUN_TARGETS = ['local', 'actions'] as const
+/** The run targets the dashboard offers (#1050/#610); anything else means the default `local`. */
+const KNOWN_RUN_TARGETS = ['local', 'actions', 'web'] as const
 
 function sanitizePreferences(value: unknown): Preferences {
   if (typeof value !== 'object' || value === null) return {}

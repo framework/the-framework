@@ -67,8 +67,8 @@ export interface StartRunOptions {
   model?: string
   /** Which coding agent drives the run (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
   agent?: string
-  /** Where this run executes (#1050): `local` (this device, the default) or `actions` (a fresh GitHub Actions runner via ActionsDriver); maps to `--run-on`. Absent = local, i.e. today's behavior. */
-  target?: 'local' | 'actions'
+  /** Where this run executes (#1050/#610): `local` (this device, the default), `actions` (a fresh GitHub Actions runner via ActionsDriver) or `web` (a Claude Code cloud session via CloudDriver); maps to `--run-on`. Absent = local, i.e. today's behavior. */
+  target?: 'local' | 'actions' | 'web'
   /**
    * Nobody is watching this run (#846): its choice gates take the recommended option instead of
    * parking for an answer, which is the fallback a fully headless run already uses and the one

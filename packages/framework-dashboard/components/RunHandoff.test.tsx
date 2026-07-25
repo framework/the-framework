@@ -67,7 +67,7 @@ describe('run handoff (#799)', () => {
     expect(screen.queryByText('add dark mode')).toBeNull()
     expect(screen.queryByText('src/theme.ts')).toBeNull()
     // The next step is never hidden behind the disclosure.
-    expect(screen.getByText('Push branch')).toBeTruthy()
+    expect(screen.getByText('Open PR')).toBeTruthy()
   })
 
   test('the branch name is not repeated — the action bar it sits in already says it (#1023)', async () => {
@@ -82,9 +82,10 @@ describe('run handoff (#799)', () => {
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('no changes')).toBeTruthy())
     expect(handoffExpandable({ ...worked, empty: true } as never)).toBe(false)
-    // Nothing to hand off means nothing to offer.
+    // Nothing to hand off, so no button — but it says why (#1173). A finished session showing no
+    // control and no sentence is exactly the dead end that made "what should I do now?" unanswerable.
     expect(screen.queryByText('Open PR')).toBeNull()
-    expect(screen.queryByText('Push branch')).toBeNull()
+    expect(screen.getByText('Nothing committed — no PR to open.')).toBeTruthy()
   })
 
   test('a branch that is gone is reported, not shown as work', async () => {
@@ -92,6 +93,7 @@ describe('run handoff (#799)', () => {
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('branch gone')).toBeTruthy())
     expect(screen.queryByText('Open PR')).toBeNull()
+    expect(screen.getByText('Branch gone — nothing to open a PR from.')).toBeTruthy()
   })
 
   test('push is offered only while the branch is unpushed', async () => {
@@ -101,14 +103,17 @@ describe('run handoff (#799)', () => {
     expect(screen.queryByText('Push branch')).toBeNull()
   })
 
-  test('pushing is a click, addressed at this session', async () => {
+  test('one button, and it opens the PR — pushing is not a competing choice (#1173)', async () => {
+    // "Push branch" and "Open PR" used to sit side by side as equals, and pushing without opening
+    // a PR is a step neither of us could put a purpose to. Opening a PR pushes on the way, so the
+    // one that names the outcome is the one that is offered.
     onRunHandoff.mockResolvedValue(worked)
     render(<Harness />)
-    await waitFor(() => expect(screen.getByText('Push branch')).toBeTruthy())
-    fireEvent.click(screen.getByText('Push branch'))
-    await waitFor(() => expect(sendPushBranch).toHaveBeenCalledWith('p1', 'run-1'))
-    // Nothing is published without the click.
-    expect(sendOpenPullRequest).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.getByText('Open PR')).toBeTruthy())
+    expect(screen.queryByText('Push branch')).toBeNull()
+    fireEvent.click(screen.getByText('Open PR'))
+    await waitFor(() => expect(sendOpenPullRequest).toHaveBeenCalledWith('p1', 'run-1'))
+    expect(sendPushBranch).not.toHaveBeenCalled()
   })
 
   test('a failed action surfaces its reason rather than doing nothing', async () => {
@@ -149,31 +154,35 @@ describe('run handoff (#799)', () => {
 describe('the handoff checkboxes (#1102)', () => {
   const armed = { push: true, pr: true }
 
-  test('both boxes start ticked, so a session left alone hands itself back', () => {
+  test('one ticked box, so a session left alone hands itself back (#1102/#1173)', () => {
     render(<HandoffArm projectId="p1" runId="run-1" state={armed} />)
-    expect(screen.getByText('Push branch')).toBeTruthy()
-    expect(screen.getByText('Open PR')).toBeTruthy()
     const boxes = screen.getAllByRole('checkbox')
-    expect(boxes).toHaveLength(2)
-    for (const box of boxes) expect(box.getAttribute('data-checked')).not.toBeNull()
+    expect(boxes).toHaveLength(1)
+    expect(screen.getByText('Open PR')).toBeTruthy()
+    expect(screen.queryByText('Push branch')).toBeNull()
+    expect(boxes[0]?.getAttribute('data-checked')).not.toBeNull()
   })
 
-  test('unticking Open PR leaves the push armed', async () => {
+  test('unticking it means the session hands off nothing at all (#1173)', async () => {
+    // One control governs the whole end-of-session step, so what the box says is what happens.
+    // It used to leave the push armed, which is a thing still happening that nothing on screen said.
     render(<HandoffArm projectId="p1" runId="run-1" state={armed} />)
     fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => expect(sendSetHandoff).toHaveBeenCalledWith('p1', 'run-1', true, false))
-  })
-
-  test('unticking Push branch unticks Open PR too: a PR cannot be opened for an unpushed branch', async () => {
-    render(<HandoffArm projectId="p1" runId="run-1" state={armed} />)
-    fireEvent.click(screen.getByText('Push branch'))
     await waitFor(() => expect(sendSetHandoff).toHaveBeenCalledWith('p1', 'run-1', false, false))
   })
 
-  test('ticking Open PR re-arms the push, since opening one needs the branch on the remote', async () => {
+  test('ticking it arms the push too, since opening a PR needs the branch on the remote', async () => {
     render(<HandoffArm projectId="p1" runId="run-1" state={{ push: false, pr: false }} />)
     fireEvent.click(screen.getByText('Open PR'))
     await waitFor(() => expect(sendSetHandoff).toHaveBeenCalledWith('p1', 'run-1', true, true))
+  })
+
+  test('a push-only session says "Push branch", rather than an unticked box while it pushes (#1173)', () => {
+    // Reachable from the settings, where push and PR are still separate. The one box names whatever
+    // this session will actually do, so it is never describing something other than what happens.
+    render(<HandoffArm projectId="p1" runId="run-1" state={{ push: true, pr: false }} />)
+    expect(screen.getByText('Push branch')).toBeTruthy()
+    expect(screen.getAllByRole('checkbox')[0]?.getAttribute('data-checked')).not.toBeNull()
   })
 
   test('the click holds until the run echoes it back, so the box does not bounce', async () => {
@@ -183,7 +192,6 @@ describe('the handoff checkboxes (#1102)', () => {
     fireEvent.click(screen.getByText('Open PR'))
     await waitFor(() => expect(sendSetHandoff).toHaveBeenCalled())
     rerender(<HandoffArm projectId="p1" runId="run-1" state={armed} />)
-    const pr = screen.getAllByRole('checkbox')[1]
-    expect(pr?.getAttribute('data-checked')).toBeNull()
+    expect(screen.getAllByRole('checkbox')[0]?.getAttribute('data-checked')).toBeNull()
   })
 })

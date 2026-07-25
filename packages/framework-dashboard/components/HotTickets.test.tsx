@@ -7,9 +7,14 @@ import type { HotTicket, HotBucket } from '@gemstack/the-framework'
 const onHotTickets = vi.hoisted(() => vi.fn())
 vi.mock('../server/reads.telefunc.js', () => ({ onHotTickets }))
 
-const { HotTickets } = await import('./HotTickets.js')
+const { HotTickets, workOnTicketDraft } = await import('./HotTickets.js')
+const { takePendingDraft } = await import('../lib/draft-handoff.js')
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  // The draft stash outlives a render, so a leftover would leak into the next test's assertion.
+  takePendingDraft()
+})
 
 const ht = (file: string, projectName: string, bucket: HotBucket, over: Record<string, unknown> = {}): HotTicket => ({
   projectId: projectName,
@@ -83,5 +88,30 @@ describe('a hot ticket that names a run opens that run', () => {
     fireEvent.click(await screen.findByText('b'))
     expect(onSelectProject).toHaveBeenCalledWith('beta')
     expect(onSelectRun).not.toHaveBeenCalled()
+  })
+})
+
+describe('a hot ticket with no run prefills the launcher it lands on', () => {
+  test('the click carries the ticket over as a composer draft', async () => {
+    onHotTickets.mockResolvedValue([ht('b.md', 'beta', 'ai-queue')])
+    render(<HotTickets onSelectProject={vi.fn()} onSelectRun={vi.fn()} />)
+    fireEvent.click(await screen.findByText('b'))
+    // Without this the row was a dead end: the launcher came up empty and the one fact the row
+    // carried — which ticket — was dropped. Composer takes this at mount (#1066).
+    expect(takePendingDraft()).toBe(workOnTicketDraft('b.md'))
+  })
+
+  test('the draft names the ticket file, not its title', async () => {
+    // The title is prose the agent would have to search for; the file is the ticket's identity.
+    expect(workOnTicketDraft('add-oauth.md')).toContain('tickets/add-oauth.md')
+  })
+
+  test('a ticket that opens a live session leaves no draft behind', async () => {
+    onHotTickets.mockResolvedValue([{ ...ht('a.md', 'alpha', 'in-progress'), runId: 'run-9' }])
+    render(<HotTickets onSelectProject={vi.fn()} onSelectRun={vi.fn()} />)
+    fireEvent.click(await screen.findByText('a'))
+    // That click goes to a session, not a launcher, so a draft stashed here would surface later
+    // on the next unrelated visit to one.
+    expect(takePendingDraft()).toBeNull()
   })
 })

@@ -3,14 +3,38 @@ import { Flame } from 'lucide-react'
 import { onHotTickets } from '../server/reads.telefunc.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { usePolled } from '../lib/use-async.js'
+import { stashPendingDraft } from '../lib/draft-handoff.js'
 import { cn } from '../lib/utils.js'
 
 // The Overview's "hot tickets" card (#1139): a cross-project glance at what the agent is working on
 // (in progress), what sits in the AI Queue, and what is flagged high priority — nothing else. A
 // projection of every project's `tickets/` + `TODO_AGENTS.md` over the `onHotTickets` read, polled
-// so it stays live. Selecting a ticket jumps into its project.
+// so it stays live. Selecting a ticket opens the session working it, or the launcher asking for it.
 
 const EMPTY: HotTicket[] = []
+
+/**
+ * The prompt a ticket row hands the launcher. Its vocabulary is the drain preset's ("work on … Do
+ * not start any other …"), narrowed to the one ticket the row names.
+ *
+ * Plain text rather than a preset: this is a draft the user reads and edits in the composer before
+ * sending, so there is no second, hidden version of the ask to drift from the button — which is
+ * what #1187 was about. Exported so the test asserts against this and not a copy.
+ */
+export function workOnTicketDraft(file: string): string {
+  return `Work on tickets/${file}. Do not start any other ticket.`
+}
+
+/**
+ * Open a ticket that no run is implementing (#1139). It has no session to jump to, so the click
+ * lands on its project's launcher — which used to arrive with an empty composer and the ticket
+ * forgotten, making the row a dead end. Stashing the draft first means the launcher rehydrates
+ * (#1066, launcher-only and taken once) prefilled with this ticket.
+ */
+function openTicket(ticket: HotTicket, onSelectProject: (id: string) => void): void {
+  stashPendingDraft(workOnTicketDraft(ticket.ticket.file))
+  onSelectProject(ticket.projectId)
+}
 
 // The three lanes the card shows (#1139), each carrying the dot colour that matches the rest of the
 // status vocabulary (primary = active, warning = queued, info = flagged). Two columns (#1139): the
@@ -99,8 +123,8 @@ function Lane({
               <button
                 type="button"
                 // A ticket being implemented names its run, and that session is what the row is
-                // reporting; one with no run yet has only its project to offer.
-                onClick={() => (t.runId ? onSelectRun(t.projectId, t.runId) : onSelectProject(t.projectId))}
+                // reporting; one with no run yet opens its project's launcher, asking for it.
+                onClick={() => (t.runId ? onSelectRun(t.projectId, t.runId) : openTicket(t, onSelectProject))}
                 title={t.ticket.summary || t.ticket.title}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
               >

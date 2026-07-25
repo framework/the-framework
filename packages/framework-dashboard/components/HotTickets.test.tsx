@@ -21,7 +21,7 @@ const ht = (file: string, projectName: string, bucket: HotBucket, over: Record<s
 describe('HotTickets (#1112)', () => {
   test('with no tickets it shows a hint', async () => {
     onHotTickets.mockResolvedValue([])
-    render(<HotTickets onSelectProject={() => {}} />)
+    render(<HotTickets onSelectProject={() => {}} onSelectRun={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('No tickets yet.')).toBeTruthy())
   })
 
@@ -32,7 +32,7 @@ describe('HotTickets (#1112)', () => {
       ht('c.md', 'alpha', 'ai-queue'),
     ])
     let picked: string | null = null
-    render(<HotTickets onSelectProject={id => (picked = id)} />)
+    render(<HotTickets onSelectProject={id => (picked = id)} onSelectRun={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('a')).toBeTruthy())
     expect(screen.getByText('In progress')).toBeTruthy()
     expect(screen.getByText('AI Queue')).toBeTruthy()
@@ -46,7 +46,7 @@ describe('HotTickets (#1112)', () => {
       { ...ht('a.md', 'alpha', 'in-progress', { planned: true }), runId: 'run-7' },
       ht('b.md', 'alpha', 'in-progress', { planned: true }),
     ])
-    render(<HotTickets onSelectProject={() => {}} />)
+    render(<HotTickets onSelectProject={() => {}} onSelectRun={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('a')).toBeTruthy())
     // Live work outranks the mark older work left behind, so the same lane can say which is which.
     expect(screen.getByText('implementing')).toBeTruthy()
@@ -57,7 +57,31 @@ describe('HotTickets (#1112)', () => {
     // The gap the run link opens up: in-progress used to imply planned-or-spiked, so a bare
     // implementing ticket would have shown an unexplained row.
     onHotTickets.mockResolvedValue([{ ...ht('a.md', 'alpha', 'in-progress'), runId: 'run-7' }])
-    render(<HotTickets onSelectProject={() => {}} />)
+    render(<HotTickets onSelectProject={() => {}} onSelectRun={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('implementing')).toBeTruthy())
+  })
+})
+
+describe('a hot ticket that names a run opens that run', () => {
+  test('an implemented ticket goes to its session, not its project home', async () => {
+    // The in-progress lane exists because a run said it is implementing this ticket (#1117), so
+    // the session it names is what the row is reporting on.
+    onHotTickets.mockResolvedValue([{ ...ht('a.md', 'alpha', 'in-progress'), runId: 'run-9' }])
+    const onSelectRun = vi.fn()
+    const onSelectProject = vi.fn()
+    render(<HotTickets onSelectProject={onSelectProject} onSelectRun={onSelectRun} />)
+    fireEvent.click(await screen.findByText('a'))
+    expect(onSelectRun).toHaveBeenCalledWith('alpha', 'run-9')
+    expect(onSelectProject).not.toHaveBeenCalled()
+  })
+
+  test('a ticket with no run still goes to its project', async () => {
+    onHotTickets.mockResolvedValue([ht('b.md', 'beta', 'ai-queue')])
+    const onSelectRun = vi.fn()
+    const onSelectProject = vi.fn()
+    render(<HotTickets onSelectProject={onSelectProject} onSelectRun={onSelectRun} />)
+    fireEvent.click(await screen.findByText('b'))
+    expect(onSelectProject).toHaveBeenCalledWith('beta')
+    expect(onSelectRun).not.toHaveBeenCalled()
   })
 })

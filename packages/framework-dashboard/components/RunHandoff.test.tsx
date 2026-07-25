@@ -88,6 +88,16 @@ describe('run handoff (#799)', () => {
     expect(screen.getByText('Nothing committed — no PR to open.')).toBeTruthy()
   })
 
+  test('an empty branch with work waiting in the tree is offered, not called a dead end (#1173)', async () => {
+    onRunHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true, pending: 2 })
+    render(<Harness />)
+    // The agent commits what it found and nothing it wrote, so a settled session holding its whole
+    // output in the tree is the ordinary case, not a session that did nothing. Opening the PR
+    // commits what is waiting, so the button is offered.
+    await waitFor(() => expect(screen.getByText('Open PR')).toBeTruthy())
+    expect(screen.queryByText('Nothing committed — no PR to open.')).toBeNull()
+  })
+
   test('a branch that is gone is reported, not shown as work', async () => {
     onRunHandoff.mockResolvedValue({ ...worked, exists: false, commits: [], files: [], empty: true })
     render(<Harness />)

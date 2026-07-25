@@ -62,6 +62,19 @@ export function formatAge(value: string | undefined, fallback = '—'): string {
 }
 
 /**
+ * How long until `at` (epoch ms), as "in 4 min" / "in 1 hr". Past due reads as "any moment": a
+ * schedule the daemon has not reached yet is imminent, not late. Shared by the usage panel's
+ * next-sweep line (#1161) and the routines card's auto-run label (#1159).
+ */
+export function formatUntil(at: number): string {
+  const minutes = Math.round((at - Date.now()) / 60_000)
+  if (minutes <= 0) return 'any moment'
+  if (minutes < 60) return `in ${minutes} min`
+  const hours = Math.round(minutes / 60)
+  return `in ${hours} hr`
+}
+
+/**
  * A timestamp as freshness (#948): "just now" / "12m ago" / "3h ago" / "2d ago", falling back
  * to the local date past a week. An at-a-glance board wants "2m ago", not today's date.
  */

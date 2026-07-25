@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AutoPmReport, DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '@gemstack/the-framework'
 import { MAX_SPEND_OFFSET } from '@gemstack/the-framework/client'
 import { useAutoPm, useQuota } from '../lib/quota.js'
-import { formatRelative } from '../lib/format-date.js'
+import { formatRelative, formatUntil } from '../lib/format-date.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { weekTicks, quotaTone, limitPercent, TONE_NOTE, type QuotaTone } from '../lib/quota-bar.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
@@ -194,15 +194,6 @@ function useSpendOffset(serverOffset: number | undefined): [number, (offset: num
   ]
 }
 
-/** How long until `at`, as "in 4 min" / "in 1 hr". Past due reads as "any moment". */
-function untilText(at: number): string {
-  const minutes = Math.round((at - Date.now()) / 60_000)
-  if (minutes <= 0) return 'any moment'
-  if (minutes < 60) return `in ${minutes} min`
-  const hours = Math.round(minutes / 60)
-  return `in ${hours} hr`
-}
-
 /** The repo a line is about, by the name you would call it: its directory. */
 function projectName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path
@@ -222,7 +213,7 @@ function AutoPmStatus({ report }: { report: AutoPmReport }) {
   return (
     <div className="space-y-0.5 text-xs text-muted-foreground">
       <p>
-        Last checked {formatRelative(new Date(report.sweptAt).toISOString())} · next {untilText(report.nextSweepAt)}
+        Last checked {formatRelative(new Date(report.sweptAt).toISOString())} · next {formatUntil(report.nextSweepAt)}
       </p>
       {report.outcomes.length === 0 ? (
         <p>No projects to work on.</p>

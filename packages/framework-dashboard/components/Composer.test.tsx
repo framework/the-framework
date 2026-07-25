@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { Preferences } from '@gemstack/the-framework'
+import { presets } from '@gemstack/the-framework/client'
 import { addProfile } from '../lib/profiles.js'
 import { selectRemoteDevice } from '../lib/remote-target.js'
 
@@ -184,7 +185,9 @@ describe('Composer (#721)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Presets/ }))
     fireEvent.click(screen.getByText('Import tickets from GitHub'))
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-    expect(onSubmit).toHaveBeenCalledWith('Import tickets from GitHub', 'prompt', { newSession: true })
+    // The menu row is the label; what is submitted is the preset's prompt. They used to be the same
+    // string, which is how the import shipped asking for nothing in particular (#697).
+    expect(onSubmit).toHaveBeenCalledWith(presets.importTickets.render(), 'prompt', { newSession: true })
 
     cleanup()
     const second = renderComposer()

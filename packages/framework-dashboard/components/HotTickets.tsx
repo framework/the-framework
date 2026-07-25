@@ -22,10 +22,14 @@ const LANES: { key: HotBucket; label: string; dot: string }[] = [
   { key: 'high-priority', label: 'High priority', dot: 'bg-info' },
 ]
 
-// A lane is capped so the card stays a glance; the rest is summarised as "+N more".
-const PER_LANE = 5
-
-export function HotTickets({ onSelectProject }: { onSelectProject: (id: string) => void }) {
+export function HotTickets({
+  onSelectProject,
+  onSelectRun,
+}: {
+  onSelectProject: (id: string) => void
+  /** A ticket a run is implementing knows which run (#1117), so its row opens that session. */
+  onSelectRun: (id: string, runId: string) => void
+}) {
   const { value: tickets } = usePolled<HotTicket[]>(onHotTickets, EMPTY, 10_000, [])
 
   return (
@@ -42,7 +46,13 @@ export function HotTickets({ onSelectProject }: { onSelectProject: (id: string) 
         ) : (
           <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
             {LANES.map(lane => (
-              <Lane key={lane.key} lane={lane} tickets={tickets.filter(t => t.bucket === lane.key)} onSelectProject={onSelectProject} />
+              <Lane
+                key={lane.key}
+                lane={lane}
+                tickets={tickets.filter(t => t.bucket === lane.key)}
+                onSelectProject={onSelectProject}
+                onSelectRun={onSelectRun}
+              />
             ))}
           </div>
         )}
@@ -55,13 +65,13 @@ function Lane({
   lane,
   tickets,
   onSelectProject,
+  onSelectRun,
 }: {
   lane: { key: HotBucket; label: string; dot: string }
   tickets: HotTicket[]
   onSelectProject: (id: string) => void
+  onSelectRun: (id: string, runId: string) => void
 }) {
-  const shown = tickets.slice(0, PER_LANE)
-  const more = tickets.length - shown.length
   const empty = tickets.length === 0
   return (
     <div>
@@ -73,12 +83,16 @@ function Lane({
         <span className="tabular-nums text-muted-foreground/70">{tickets.length}</span>
       </div>
       {!empty && (
+        // Every ticket in the lane, never a "+N more" — the card is the shortlist, and a lane you
+        // cannot read past is one you have to leave the page to act on.
         <ul className="mt-1.5">
-          {shown.map(t => (
+          {tickets.map(t => (
             <li key={`${t.projectId}:${t.ticket.file}`}>
               <button
                 type="button"
-                onClick={() => onSelectProject(t.projectId)}
+                // A ticket being implemented names its run, and that session is what the row is
+                // reporting; one with no run yet has only its project to offer.
+                onClick={() => (t.runId ? onSelectRun(t.projectId, t.runId) : onSelectProject(t.projectId))}
                 title={t.ticket.summary || t.ticket.title}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
               >
@@ -88,11 +102,6 @@ function Lane({
               </button>
             </li>
           ))}
-          {more > 0 && (
-            <li className="px-2 pt-0.5 text-xs text-muted-foreground">
-              +{more} more
-            </li>
-          )}
         </ul>
       )}
     </div>

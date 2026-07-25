@@ -140,6 +140,22 @@ export const presets = {
 export type PresetKey = keyof typeof presets
 
 /**
+ * Whether a prompt is the one that takes work OFF the queue (#1117).
+ *
+ * The daemon knows a drain by the `drains` flag on its job; a run started by hand arrives as bare
+ * prompt text with no such marking, so the text is all there is to recognise it by. Compared
+ * against the rendered preset rather than against a copy of its words, so rewording the preset
+ * cannot leave this behind — that drift would show up only as a lane on the Overview quietly
+ * staying empty, which is the kind of bug nobody reports.
+ *
+ * Deliberately exact: a prompt that merely mentions the queue is not a drain, and mistaking one
+ * for the other would name a ticket as being implemented by a run doing something else entirely.
+ */
+export function drainsQueue(prompt: string): boolean {
+  return prompt.trim() === presets.drainQueue.render().trim()
+}
+
+/**
  * The presets the launcher offers, in the order it shows them.
  *
  * One list rather than a `launcher: true` flag on each row: membership and order are the same

@@ -350,7 +350,9 @@ export { runOptionsFromPreferences, autopilotEnabled, preferencesFromFileConfig 
 export {
   startAutoPm,
   AUTO_PM_JOBS,
+  AUTO_PM_DRAIN_JOB,
   AUTO_PM_MAINTENANCE_JOB,
+  AUTO_PM_ROUTINES,
   autoPmDecision,
   quotaHeadroom,
   DEFAULT_AUTO_PM_INTERVAL_MS,

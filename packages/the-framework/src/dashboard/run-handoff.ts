@@ -3,7 +3,7 @@ import { cachedPrView, forgetPr, ghPrView, nodeGhRunner, type GhRunner, type Lin
 import { parseNumstat } from './file-diff.js'
 import { errorMessage } from '../error-message.js'
 import type { AutoHandoffSkip } from '../events.js'
-import type { RunMeta } from '../store/index.js'
+import { commitPendingWork, currentBranch, type RunMeta } from '../store/index.js'
 
 // What a finished session produced, and what is left to do with it (#799).
 //
@@ -64,12 +64,26 @@ export interface RunHandoff {
   pr?: LinkedPr
   /** The PR is not known yet, rather than absent (#1028): the lookup is still running. */
   prPending?: boolean
+  /**
+   * Files the session changed and never committed, counted in its own checkout (#1173).
+   *
+   * The agent is instructed to commit what it *found*, never what it *wrote*, so a settled session
+   * can hold its whole output in an uncommitted tree. That work is not on the branch yet, so it is
+   * not in {@link commits} and it does not make {@link empty} false. Absent when the caller did not
+   * say which checkout the session worked in.
+   */
+  pending?: number
 }
 
-/** Injectable seams so the reader is unit-testable off disk. */
+/** Injectable seams so the reader is unit-testable off disk, plus the checkout the session worked in. */
 export interface RunHandoffDeps {
   git?: GitRunner
   pr?: BranchPrLookup
+  /**
+   * The session's own checkout (#453), when it has one. The branch lives in the project repo and is
+   * read from there; uncommitted work does not, it sits in the tree the agent actually edited.
+   */
+  checkout?: string
 }
 
 /**
@@ -151,8 +165,9 @@ export async function readRunHandoff(
 
   const tip = (await run(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])).trim()
   const hasRemote = (await run(['remote'])).trim().length > 0
+  const pending = await countPendingWork(git, deps.checkout)
   if (!tip) {
-    return { branch, exists: false, commits: [], files: [], insertions: 0, deletions: 0, empty: true, hasRemote, pushed: false, merged: false }
+    return { branch, exists: false, commits: [], files: [], insertions: 0, deletions: 0, empty: true, hasRemote, pushed: false, merged: false, ...pending }
   }
 
   const base = await detectBase(run)
@@ -201,7 +216,51 @@ export async function readRunHandoff(
     merged: mergedOut.trim().length > 0,
     ...(pr.value ? { pr: pr.value } : {}),
     ...(pr.pending ? { prPending: true } : {}),
+    ...pending,
   }
+}
+
+/**
+ * How many files the session left uncommitted in its own checkout, as a spreadable field.
+ *
+ * Absent rather than 0 when no checkout was given: "nobody asked" and "asked, nothing pending" are
+ * different answers, and only the second one may be shown as a clean tree.
+ */
+async function countPendingWork(git: GitRunner, checkout: string | undefined): Promise<{ pending?: number }> {
+  if (!checkout) return {}
+  const status = await git(['status', '--porcelain'], checkout).catch(() => undefined)
+  if (status === undefined) return {}
+  const lines = status.split('\n').filter(line => line.trim().length > 0)
+  return { pending: lines.length }
+}
+
+/**
+ * Commit what a session left uncommitted, so what it did is what gets handed off (#1173).
+ *
+ * The agent is instructed to commit what it *found* before it starts, and nothing at the end, so a
+ * settled session routinely holds its whole output in an uncommitted tree: the branch carries no
+ * commit and a button offering to publish it can only fail with GitHub's "No commits between ...".
+ * The automatic handoff already commits this on the run's way out, but that happens when the run
+ * process exits, and the finishing step is offered as soon as the agent settles (#1178), which for
+ * a session left open for another turn is much earlier. Pressing the button is the same instruction
+ * given by hand, so it does the same thing rather than reporting a dead end.
+ *
+ * Two guards, because both failure modes end with the user's own work committed for them: the
+ * checkout has to be the session's own (#453) rather than the project root that `resolveRunCheckout`
+ * falls back to once a worktree is gone, and it has to be sitting on the session's branch.
+ *
+ * Returns whether the handoff may go ahead: true when there was nothing to do, when the guards say
+ * this is not ours to commit, or when the commit succeeded.
+ */
+export async function commitSessionWork(
+  checkout: string,
+  projectCwd: string,
+  branch: string,
+  git: GitRunner = nodeGitRunner(),
+): Promise<boolean> {
+  if (checkout === projectCwd) return true
+  if ((await currentBranch(checkout, git)) !== branch) return true
+  return commitPendingWork(checkout, git)
 }
 
 /** The outcome of a handoff action, in the `{ ok }` shape the dashboard's `useAction` understands. */

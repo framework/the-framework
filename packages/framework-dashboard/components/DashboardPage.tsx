@@ -8,16 +8,18 @@ import { usePolled } from '../lib/use-async.js'
 import { usePreferences } from '../lib/preferences.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { HotTickets } from './HotTickets.js'
+import { RoutineWork } from './RoutineWork.js'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import { runLabel } from '../lib/run-label.js'
 import { formatAge, formatDateTime } from '../lib/format-date.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
 // The Overview landing page (#1139): a focused at-a-glance board — usage first, then the two queues
-// (what needs a human, what the AI takes up next) side by side, the agents working now and just
-// finished, and the hot tickets across every project. Each section is a projection of the same
-// .the-framework files over the `onDashboard` Telefunc read, polled so it stays live; selecting a
-// row jumps into its project or straight into a session. Shown by the shell when no project is picked.
+// (what needs a human, what the AI takes up next) side by side, the routine jobs, the agents working
+// now and just finished, and the hot tickets across every project. Each section is a projection of
+// the same .the-framework files over the `onDashboard` Telefunc read, polled so it stays live;
+// selecting a row jumps into its project or straight into a session. Shown by the shell when no
+// project is picked.
 //
 // It replaced the denser board this started as (#471) — KPI tiles, a two-week activity chart, run
 // outcomes, and a projects table — cut here as redundant (#1139); the activity chart is meant to
@@ -25,11 +27,14 @@ import { ScrollArea } from './ui/scroll-area.js'
 export function DashboardPage({
   onSelectProject,
   onSelectRun,
+  onRunStarted,
   interventions,
 }: {
   onSelectProject: (id: string) => void
-  /** Open one session (project + run): the Agents rows link straight to a session URL. */
+  /** Open one session (project + run): the Agents and hot-ticket rows link straight to a session. */
   onSelectRun: (projectId: string, runId: string) => void
+  /** Where a session the onboarding checklist starts lands (#1169): on that session. */
+  onRunStarted: (projectId: string, intent: string, runId?: string) => void
   interventions: Intervention[]
 }) {
   const { value: data } = usePolled<DashboardData | null>(onDashboard, null, 5000, [])
@@ -41,7 +46,7 @@ export function DashboardPage({
   return (
     <ScrollArea className="min-h-0 flex-1">
       <div className="mx-auto max-w-6xl space-y-6 p-6">
-        {!onboardingDismissed && <OnboardingChecklist dismissible onSelectProject={onSelectProject} />}
+        {!onboardingDismissed && <OnboardingChecklist dismissible onRunStarted={onRunStarted} />}
 
         {/* Usage first (#1139): the one figure that governs everything the agent may do next. */}
         <Quota />
@@ -52,13 +57,13 @@ export function DashboardPage({
           <AiQueue queue={data?.queue ?? []} loading={loading} onSelectProject={onSelectProject} />
         </div>
 
-        {/* #1159 (routine/cron work) belongs here, below the AI Queue, once it has a data model to
-            back it — its own thread asks to postpone it until after the UX papercuts, so the slot is
-            reserved rather than filled. */}
+        {/* Routine work sits below the AI Queue (#1139/#1159): the scheduled jobs and the button
+            that fires one now. */}
+        <RoutineWork onSelectProject={onSelectProject} />
 
         <Agents working={data?.active ?? []} finished={data?.recentAgents ?? []} loading={loading} onSelectRun={onSelectRun} />
 
-        <HotTickets onSelectProject={onSelectProject} />
+        <HotTickets onSelectProject={onSelectProject} onSelectRun={onSelectRun} />
       </div>
     </ScrollArea>
   )
@@ -220,7 +225,8 @@ interface AgentRowData {
 
 // The Agents view (#1139): sessions working now (Current) and just finished (Recent), side by side.
 // Each row is the whole line, clickable straight into that session — its label is the one-liner the
-// sidebar shows (runLabel), and its age reads "22s ago" with the exact moment on hover.
+// sidebar shows (runLabel), and its age reads "22s ago" with the exact moment on hover. This is what
+// replaced the old "Working now" list.
 function Agents({
   working,
   finished,

@@ -136,6 +136,11 @@ export interface AutoPmJob {
   /** What it is doing, as the log line says it ("harvesting quick-wins"). */
   describe: string
   /**
+   * The user-facing name, for a surface that lists the routines (#1159). Read off the preset the
+   * job fires rather than written again here, so a relabelled preset relabels its routine.
+   */
+  label?: string
+  /**
    * This job works an entry already on the queue, rather than putting entries on it (#1117).
    *
    * Only the draining job has a specific piece of work it is about to pick up, so only it can be
@@ -167,14 +172,30 @@ export interface AutoPmJob {
  * idle tick tries the next job instead of retrying a job that is already running.
  */
 export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
-  { name: presets.quickWins.name, prompt: presets.quickWins.render(), describe: 'harvesting quick-wins from the plans' },
-  { name: presets.triageQuick.name, prompt: presets.triageQuick.render(), describe: 'triaging quick-win tickets' },
+  {
+    name: presets.quickWins.name,
+    prompt: presets.quickWins.render(),
+    describe: 'harvesting quick-wins from the plans',
+    label: presets.quickWins.label,
+  },
+  {
+    name: presets.triageQuick.name,
+    prompt: presets.triageQuick.render(),
+    describe: 'triaging quick-win tickets',
+    label: presets.triageQuick.label,
+  },
   {
     name: presets.triageConsensual.name,
     prompt: presets.triageConsensual.render(),
     describe: 'triaging consensual tickets',
+    label: presets.triageConsensual.label,
   },
-  { name: presets.spikeAndPlan.name, prompt: presets.spikeAndPlan.render(), describe: 'spiking & planning tickets' },
+  {
+    name: presets.spikeAndPlan.name,
+    prompt: presets.spikeAndPlan.render(),
+    describe: 'spiking & planning tickets',
+    label: presets.spikeAndPlan.label,
+  },
 ]
 
 /**
@@ -186,6 +207,7 @@ export const AUTO_PM_DRAIN_JOB: AutoPmJob = {
   name: presets.drainQueue.name,
   prompt: presets.drainQueue.render(),
   describe: 'draining the first open queue entry',
+  label: presets.drainQueue.label,
   drains: true,
 }
 
@@ -206,7 +228,23 @@ export const AUTO_PM_MAINTENANCE_JOB: AutoPmJob = {
   name: presets.maintenance.name,
   prompt: presets.maintenance.render(),
   describe: 'sweeping the codebase for maintenance work',
+  label: presets.maintenance.label,
 }
+
+/**
+ * Every routine the sweep can fire, in the order a surface should list them (#1159).
+ *
+ * Derived from the three constants above rather than written out again, so the list the dashboard
+ * shows and the jobs the daemon actually runs cannot drift. The order is the sweep's own precedence
+ * (#855/#882 read the other way round): draining comes first because it is what happens whenever
+ * there is queued work, the rotation is what happens when there is not, and the calendar-paced
+ * maintenance sweep is the exception outside both.
+ */
+export const AUTO_PM_ROUTINES: readonly AutoPmJob[] = [
+  AUTO_PM_DRAIN_JOB,
+  ...AUTO_PM_JOBS,
+  AUTO_PM_MAINTENANCE_JOB,
+]
 
 /**
  * What became of one attempt to land a run's queue (#852). The two flags are separate on purpose:

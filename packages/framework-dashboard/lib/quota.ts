@@ -1,5 +1,5 @@
-import type { QuotaView } from '@gemstack/the-framework'
-import { onQuota } from '../server/quota.telefunc.js'
+import type { AutoPmReport, QuotaView } from '@gemstack/the-framework'
+import { onQuota, onAutoPm } from '../server/quota.telefunc.js'
 import { usePolled } from './use-async.js'
 
 // The usage panel's data (#535). The daemon polls the agent for us and caches the answer,
@@ -17,4 +17,14 @@ const REFRESH_MS = 30_000
  */
 export function useQuota(): QuotaView | undefined {
   return usePolled<QuotaView | undefined>(onQuota, undefined, REFRESH_MS, []).value
+}
+
+/**
+ * What auto PM last decided (#1161), refreshed alongside the quota it spends against.
+ *
+ * Polled rather than read once: the sweep runs on the daemon's clock, not the browser's, so
+ * the panel finding out is a matter of asking again. `undefined` on a host with no sweep.
+ */
+export function useAutoPm(): AutoPmReport | undefined {
+  return usePolled<AutoPmReport | undefined>(onAutoPm, undefined, REFRESH_MS, []).value
 }

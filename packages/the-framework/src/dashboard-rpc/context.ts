@@ -5,6 +5,7 @@ import type { DashboardContext, EventsSource, RemoteRuns } from '../dashboard/te
 import type { PreferencesStore } from '../registry.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from '../dashboard/quota.js'
+import type { AutoPmReporter } from '../auto-pm.js'
 
 /**
  * Read one field off the Telefunc request context, or undefined when it is unset. Every
@@ -105,4 +106,13 @@ export function contextDiscord(): DiscordCredentialsStore | undefined {
  */
 export function contextQuota(): QuotaSource | undefined {
   return fromContext(ctx => ctx.quota)
+}
+
+/**
+ * Where auto PM's last decision is read from (#1161), or undefined on a host that runs no
+ * sweep. Only the daemon has one: the loop lives in its process, and a report from anywhere
+ * else would be describing a sweep nobody is running.
+ */
+export function contextAutoPm(): AutoPmReporter | undefined {
+  return fromContext(ctx => ctx.autoPm)
 }

@@ -7,6 +7,7 @@ import type { FrameworkEvent } from '../events.js'
 import type { PreferencesStore } from '../registry.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from './quota.js'
+import type { AutoPmReporter } from '../auto-pm.js'
 import type { AddProjectResult, PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from './types.js'
 import type { ServeTarget } from '../preview.js'
 import type { RunMeta } from '../store/index.js'
@@ -72,6 +73,8 @@ export interface DashboardContext {
   /** The Discord credentials store (#1095). The daemon wires one that also reloads its Discord
    * services on a save; a public host leaves it unset, so nothing there is configurable. */
   discord?: DiscordCredentialsStore
+  /** What auto PM last decided (#1161). Only the daemon runs the sweep, so only it wires this. */
+  autoPm?: AutoPmReporter
 }
 
 let instance: Telefunc | undefined

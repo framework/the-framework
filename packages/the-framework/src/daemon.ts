@@ -9,7 +9,7 @@ import { defaultQuotaSource } from './dashboard/quota.js'
 import { startBackgroundServices, resumeSuspendedRuns, type BackgroundServices } from './daemon-services.js'
 import { resolveDashboardBundle } from './dashboard/bundle.js'
 import { isActivated } from './project.js'
-import { addProject, ensureDaemonToken, listProjects, readPreferences, type Preferences } from './registry.js'
+import { addProject, ensureDaemonToken, listProjects, nodeRegistryFs, readPreferences, registryPreferencesStore, type Preferences } from './registry.js'
 import { listReposInDirectory } from './repos-directory.js'
 import { registryDiscordCredentialsStore } from './discord-credentials-store.js'
 import { JsonlTailer } from './jsonl-tail.js'
@@ -403,6 +403,15 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     // finishable in-product: the credential is written to the registry, then this daemon's own
     // Discord services are rebuilt against it, so the bot connects without a restart.
     discord: registryDiscordCredentialsStore({ env, onChange: () => services?.reloadDiscord() }),
+    // Same idea for "Spend what's left on the roadmap" (#1161): the sweep re-reads the preference
+    // per tick, so without this the box you just ticked sits there doing nothing for up to ten
+    // minutes and reads as broken. Only on the write that switches it *on* — an unrelated setting
+    // saved while it happens to be on is not a reason to go spend quota.
+    preferences: registryPreferencesStore(nodeRegistryFs(), env, written => {
+      if (written.autoPm === true) services?.wakeAutoPm()
+    }),
+    // Only the daemon runs the sweep, so only it can say what the sweep decided.
+    autoPm: () => services?.autoPmReport(),
     ...(token ? { token } : {}),
     ...(clientBundleDir ? { clientBundleDir } : {}),
   })

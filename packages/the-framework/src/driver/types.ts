@@ -207,11 +207,12 @@ export interface DriverQuotaWindow {
 /**
  * Why a quota read came back empty.
  *
- * The split that matters is transient vs authoritative. `fetch-failed` and
- * `timeout` describe *this attempt* (the agent's own usage fetch can be refused
- * upstream, with a penalty window), so a recent reading is still worth showing.
- * Every other reason describes the account or the install and is a statement
- * about the setup, so a retained reading must not outlive it.
+ * The split that matters is transient vs authoritative. `fetch-failed`,
+ * `timeout` and `unrecognized` describe *this attempt* (the agent's own usage
+ * fetch can be refused upstream, with a penalty window), so a recent reading is
+ * still worth showing and asking again may work. The remaining reasons describe
+ * the account or the install and are a statement about the setup, so a retained
+ * reading must not outlive them.
  */
 export type DriverQuotaUnavailableReason =
   /** The agent's own usage fetch failed, e.g. refused upstream. Transient. */
@@ -222,12 +223,19 @@ export type DriverQuotaUnavailableReason =
   | 'agent-not-found'
   /** The account has no subscription quota to report (e.g. API-key auth). */
   | 'no-subscription'
-  /** The agent answered, but not in a shape we recognize (it reworded the readout). */
+  /**
+   * The agent answered, but not in a shape we recognize (it reworded the readout).
+   *
+   * Transient, because it describes one answer rather than the install: an
+   * update notice printed ahead of the JSON, or empty stdout while the CLI
+   * swaps itself under a long-lived daemon, both land here and both are gone by
+   * the next read (#960).
+   */
   | 'unrecognized'
 
 /** Whether a {@link DriverQuotaUnavailableReason} describes this attempt rather than the setup. */
 export function isTransientQuotaReason(reason: DriverQuotaUnavailableReason): boolean {
-  return reason === 'fetch-failed' || reason === 'timeout'
+  return reason === 'fetch-failed' || reason === 'timeout' || reason === 'unrecognized'
 }
 
 /**

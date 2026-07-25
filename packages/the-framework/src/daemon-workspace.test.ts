@@ -293,6 +293,19 @@ test('binding a topic run re-homes it into the bound project: a worktree there, 
     await seedBoundTopicRun(scratch, runId, boundId, 'sess-xyz')
 
     const starts = await waitForArgs(join(home, 'started.log'), 2)
+    // When the second spawn does not arrive, say WHY (#1165). The daemon records a failed re-home
+    // as an event in the scratch log and retains the scratch, so the reason is on disk; without
+    // this the CI-only failure is a bare `1 !== 2` with nothing to act on. The passing case takes
+    // ~370ms, so a run that burns the whole poll budget has not been slow, it has gone wrong.
+    if (starts.length < 2) {
+      const events = await readFile(join(scratch, FRAMEWORK_DIR, EVENTS_FILE), 'utf8').catch(() => '<no scratch events log>')
+      const scratchGone = await stat(scratch).then(() => false, () => true)
+      assert.fail(
+        `the daemon never spawned the continued run.\n` +
+          `scratch removed: ${scratchGone}\n` +
+          `scratch events log:\n${events}`,
+      )
+    }
     assert.equal(starts.length, 2, 'the scratch run started, then the daemon spawned the continued run')
     const cont = starts[1]!
     const worktree = worktreePath(target, runId)

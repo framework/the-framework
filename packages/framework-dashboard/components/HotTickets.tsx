@@ -25,7 +25,14 @@ const LANES: { key: HotBucket; label: string; dot: string }[] = [
 // A lane is capped so the card stays a glance; the rest is summarised as "+N more".
 const PER_LANE = 5
 
-export function HotTickets({ onSelectProject }: { onSelectProject: (id: string) => void }) {
+export function HotTickets({
+  onSelectProject,
+  onSelectRun,
+}: {
+  onSelectProject: (id: string) => void
+  /** A ticket a run is implementing knows which run (#1117), so its row opens that session. */
+  onSelectRun: (id: string, runId: string) => void
+}) {
   const { value: tickets } = usePolled<HotTicket[]>(onHotTickets, EMPTY, 10_000, [])
 
   return (
@@ -42,7 +49,13 @@ export function HotTickets({ onSelectProject }: { onSelectProject: (id: string) 
         ) : (
           <div className="divide-y divide-border">
             {LANES.map(lane => (
-              <Lane key={lane.key} lane={lane} tickets={tickets.filter(t => t.bucket === lane.key)} onSelectProject={onSelectProject} />
+              <Lane
+                key={lane.key}
+                lane={lane}
+                tickets={tickets.filter(t => t.bucket === lane.key)}
+                onSelectProject={onSelectProject}
+                onSelectRun={onSelectRun}
+              />
             ))}
           </div>
         )}
@@ -55,10 +68,12 @@ function Lane({
   lane,
   tickets,
   onSelectProject,
+  onSelectRun,
 }: {
   lane: { key: HotBucket; label: string; dot: string }
   tickets: HotTicket[]
   onSelectProject: (id: string) => void
+  onSelectRun: (id: string, runId: string) => void
 }) {
   const shown = tickets.slice(0, PER_LANE)
   const more = tickets.length - shown.length
@@ -78,7 +93,9 @@ function Lane({
             <li key={`${t.projectId}:${t.ticket.file}`}>
               <button
                 type="button"
-                onClick={() => onSelectProject(t.projectId)}
+                // A ticket being implemented names its run, and that session is what the row is
+                // reporting; one with no run yet has only its project to offer.
+                onClick={() => (t.runId ? onSelectRun(t.projectId, t.runId) : onSelectProject(t.projectId))}
                 title={t.ticket.summary || t.ticket.title}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
               >

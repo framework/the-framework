@@ -19,7 +19,7 @@ export function ProjectHome({
 }: {
   projectId: string
   events: FrameworkEvent[]
-  /** Carries the started run's id through to the shell — dropping it is what #1169 was. */
+  /** Carries the started run's id through to the shell; dropping it is what #1169 was. */
   onRunStarted?: ((intent: string, runId?: string, runsOn?: string) => void) | undefined
   files: string[]
   context: Set<string>

@@ -19,6 +19,11 @@ test('parses the agent\'s reset prose to an epoch', () => {
   assert.equal(parseResetsAt('Jul 25 at 12pm (UTC)', NOW), Date.UTC(2026, 6, 25, 12, 0))
 })
 
+test('parses the comma phrasing newer Claude Code prints instead of `at`', () => {
+  assert.equal(parseResetsAt('Jul 25, 7am (UTC)', NOW), Date.UTC(2026, 6, 25, 7, 0))
+  assert.equal(parseResetsAt('Jul 26, 4:50am (Europe/Berlin)', NOW), Date.UTC(2026, 6, 26, 2, 50))
+})
+
 test('picks the year that puts the reset near now, across the new year', () => {
   const newYearsEve = Date.UTC(2026, 11, 31, 12, 0)
   assert.equal(parseResetsAt('Jan 3 at 7am (UTC)', newYearsEve), Date.UTC(2027, 0, 3, 7, 0))

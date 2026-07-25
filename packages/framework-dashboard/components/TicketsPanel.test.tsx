@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { WorkspaceTicket } from '@gemstack/the-framework'
+import { presets } from '@gemstack/the-framework/client'
 
 const sendQueueTicket = vi.hoisted(() => vi.fn())
 const sendStart = vi.hoisted(() => vi.fn())
@@ -81,6 +82,9 @@ describe('TicketsPanel (#697)', () => {
     // A fixed prompt, so it takes the verbatim-text path rather than a build.
     expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
     expect(sendStart.mock.calls[0]?.[1]).toMatch(/GitHub issues into tickets\//i)
+    // And it is the preset's own text: the onboarding checklist offers this button under the same
+    // label and sends `presets.importTickets`, so a second source here means one label, two asks.
+    expect(sendStart.mock.calls[0]?.[1]).toBe(presets.importTickets.render())
   })
 
   test('no project renders nothing at all', () => {

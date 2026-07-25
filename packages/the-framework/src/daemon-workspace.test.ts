@@ -27,12 +27,14 @@ async function writeStub(dir: string, log: string): Promise<string> {
 }
 
 /**
- * 20ms apart, so 750 attempts is a 15s ceiling: long enough for a slow runner (#1153), and short
- * enough that the two polls a single re-home test runs still fit inside the suite's 60s per-test
- * timeout (`--test-timeout` in scripts/run-tests.mjs) with the real git work between them. A 30s
- * ceiling did not — two waits alone reached the cap, turning a slow test into a file timeout.
+ * 20ms apart, so 500 attempts is a 10s ceiling. It is a backstop, not a slowness allowance: raising
+ * it never fixed anything (6s, then 30s, then 15s all failed the same way, #1153/#1165), because the
+ * re-home either lands in well under a second or has gone wrong. The ceiling only has to be small
+ * enough that the three waits one re-home test makes still fit inside the suite's 60s per-test
+ * timeout (`--test-timeout` in scripts/run-tests.mjs) with the real git work between them — at 30s
+ * a single wait reached that cap and turned a clean assertion failure into a file timeout.
  */
-const POLL_ATTEMPTS = 750
+const POLL_ATTEMPTS = 500
 
 /** The stub's recorded starts, waited for (a start spawns detached). */
 async function startedArgs(log: string, expected: number): Promise<string[][]> {
@@ -220,6 +222,10 @@ async function initRepo(prefix: string): Promise<string> {
  * A stub CLI that records its argv, then (for a topic run only) stays alive until the daemon
  * terminates it on re-home (a real topic run parks in the chat loop the same way). The continued
  * `prompt` run exits at once, so it never lingers past the test.
+ *
+ * The SIGTERM handler is installed BEFORE the argv is recorded (#1165): a re-home terminates this
+ * process, and a signal that lands before the handler exists takes the default disposition and
+ * kills it — so the run would vanish without ever saying it ran.
  */
 async function writeTopicStub(dir: string, log: string): Promise<string> {
   const stub = join(dir, 'topic-stub.cjs')
@@ -227,11 +233,11 @@ async function writeTopicStub(dir: string, log: string): Promise<string> {
     stub,
     `const fs = require('node:fs')\n` +
       `const argv = process.argv.slice(2)\n` +
-      `fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(argv) + '\\n')\n` +
       `if (argv.includes('--topic')) {\n` +
       `  const t = setInterval(() => {}, 1000)\n` +
       `  process.on('SIGTERM', () => { clearInterval(t); process.exit(0) })\n` +
-      `}\n`,
+      `}\n` +
+      `fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(argv) + '\\n')\n`,
   )
   return stub
 }
@@ -258,8 +264,6 @@ async function seedBoundTopicRun(scratch: string, runId: string, projectId: stri
 /**
  * Poll the stub's recorded starts until at least `expected` land, or time out.
  *
- * The budget is generous (#1153): a re-home tails an events file, resolves the project, adds a
- * git worktree and spawns, which a loaded CI runner does not finish in the 6s this used to allow.
  * The loop returns the moment the starts land, so the cap only ever costs time on a real failure.
  */
 async function waitForArgs(log: string, expected: number): Promise<string[][]> {
@@ -289,19 +293,32 @@ test('binding a topic run re-homes it into the bound project: a worktree there, 
     const runId = started.runId!
     const scratch = topicScratchPath(env, runId)
 
+    // Wait for the topic run to be UP before binding it (#1165). A real bind is written into the
+    // run's own event log by the run itself (`recordBind`, cli.ts), so the daemon can only ever see
+    // one from a process that is already running. Seeding it the instant `onStart` returns does not
+    // model that: the re-home it triggers terminates a child that may still be booting, which on a
+    // loaded runner kills it before it records anything — the run then looks like it never spawned,
+    // which is the CI-only `1 !== 2` this test kept failing with.
+    const topicStart = await waitForArgs(join(home, 'started.log'), 1)
+    assert.equal(topicStart.length, 1, 'the topic run spawned')
+    assert.equal(topicStart[0]!.includes('--topic'), true, 'and it is the topic run')
+
     // The run gets a session, then binds: exactly the state a real topic run reaches at its gate.
     await seedBoundTopicRun(scratch, runId, boundId, 'sess-xyz')
 
     const starts = await waitForArgs(join(home, 'started.log'), 2)
     // When the second spawn does not arrive, say WHY (#1165). The daemon records a failed re-home
     // as an event in the scratch log and retains the scratch, so the reason is on disk; without
-    // this the CI-only failure is a bare `1 !== 2` with nothing to act on. The passing case takes
-    // ~370ms, so a run that burns the whole poll budget has not been slow, it has gone wrong.
+    // this the failure is a bare `1 !== 2` with nothing to act on. The recorded starts go in too:
+    // "which spawn is missing" is the first question, and reading it off the scratch alone cost a
+    // round of CI. The passing case takes ~370ms, so a run that burns the whole poll budget has not
+    // been slow, it has gone wrong.
     if (starts.length < 2) {
       const events = await readFile(join(scratch, FRAMEWORK_DIR, EVENTS_FILE), 'utf8').catch(() => '<no scratch events log>')
       const scratchGone = await stat(scratch).then(() => false, () => true)
       assert.fail(
         `the daemon never spawned the continued run.\n` +
+          `recorded starts: ${JSON.stringify(starts)}\n` +
           `scratch removed: ${scratchGone}\n` +
           `scratch events log:\n${events}`,
       )

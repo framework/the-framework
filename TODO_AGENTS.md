@@ -15,3 +15,4 @@ surfaces it in the Overview Backlog.
 - [ ] Agentic PM: "Suggest new features" preset (#462, #538)
 - [ ] Notifications: "New activity" toggle (the default-off half of #627)
 - [ ] Modular: only-pick-what-you-need, all off = transparent Claude Code wrapper (#625)
+- [ ] Notifications

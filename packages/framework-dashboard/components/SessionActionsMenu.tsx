@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FrameworkEvent, ServeTarget } from '@gemstack/the-framework'
 import { sessionInfo } from '@gemstack/the-framework/client'
-import { MoreVertical, Github, FolderOpen, Code, Check, Play, ExternalLink, Square, FolderX, Trash2 } from 'lucide-react'
+import { MoreVertical, Github, FolderOpen, Code, Check, Play, ExternalLink, Square, FolderX, Trash2, Copy } from 'lucide-react'
 import { onGithubUrl } from '../server/reads.telefunc.js'
 import {
   sendOpenInApp,
@@ -20,6 +20,7 @@ import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { isRunActive } from '../lib/live-state.js'
 import { describeSessionLink } from '../lib/session-link.js'
+import { buildResumeCommand } from '../lib/resume-command.js'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'
 import { OptionLabel } from './ui/option-label.js'
@@ -63,7 +64,33 @@ export function SessionActionsMenu({
   onDeleted?: (() => void) | undefined
 }) {
   const active = isRunActive(events)
-  const session = describeSessionLink(sessionInfo(events))
+  const info = sessionInfo(events)
+  const session = describeSessionLink(info)
+
+  // Whether this session still has a checkout of its own. A live run is working in one, and a
+  // finished run only keeps one when it was retained (#737) — a clean run has had it removed by
+  // teardown. Without this the folder item promised the session's folder and silently opened the
+  // project root instead, because `resolveRunCheckout` falls back there once the worktree is gone.
+  const hasOwnFolder = active || retainedWorktree
+
+  // What to put on the clipboard to pick this session back up in a terminal (#1195). `mkdir -p`
+  // leads because the directory is usually gone by the time you want it: the CLI finds a session
+  // by the cwd it ran in, so the path has to exist again before `--resume` can see it. Recreating
+  // it empty is enough to read the conversation back.
+  const resumeCommand = buildResumeCommand(info)
+  // Flash a confirmation for a beat, the same feedback the CopyButton gives, since a click that
+  // only fills the clipboard has nothing else to show for itself.
+  const [copied, setCopied] = useState(false)
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(copiedTimer.current), [])
+  const copyResume = () => {
+    if (!resumeCommand) return
+    void navigator.clipboard?.writeText(resumeCommand).then(() => {
+      setCopied(true)
+      clearTimeout(copiedTimer.current)
+      copiedTimer.current = setTimeout(() => setCopied(false), 1500)
+    })
+  }
   // keepPrevious: hold the last repo URL while a new project's loads, so the item does not flicker.
   const githubUrl = useLoaded<string | null>(() => onGithubUrl(projectId), null, [projectId], true)
 
@@ -148,8 +175,16 @@ export function SessionActionsMenu({
               <Github className="h-3.5 w-3.5 shrink-0" /> Open on GitHub
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem disabled={busy} onClick={() => void openApp('files')}>
-            <FolderOpen className="h-3.5 w-3.5 shrink-0" /> {runId ? "Open session's folder" : 'Open folder'}
+          {/* Named for what it actually opens (#1195): once a session's worktree is gone this
+              resolves to the project root, and calling that "the session's folder" was a lie the
+              user could not see. */}
+          <DropdownMenuItem
+            disabled={busy}
+            onClick={() => void openApp('files')}
+            title={runId && !hasOwnFolder ? 'This session no longer has its own checkout' : undefined}
+          >
+            <FolderOpen className="h-3.5 w-3.5 shrink-0" />{' '}
+            {runId ? (hasOwnFolder ? "Open session's folder" : 'Open project folder') : 'Open folder'}
           </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger disabled={busy}>
@@ -189,6 +224,25 @@ export function SessionActionsMenu({
           {session && (
             <DropdownMenuItem render={<a href={session.href} target="_blank" rel="noreferrer" />}>
               <ExternalLink className="h-3.5 w-3.5 shrink-0" /> {session.label.replace(' ↗', '')}
+            </DropdownMenuItem>
+          )}
+          {/* The agent's session id (#1195), shown because it is the only handle on the
+              conversation once you leave the dashboard, and clickable because on its own an id is
+              not actionable: the click copies the command that reopens it in a terminal. Stays
+              open on click so the confirmation is visible. */}
+          {resumeCommand && info?.sessionId && (
+            <DropdownMenuItem closeOnClick={false} onClick={copyResume} title={resumeCommand}>
+              {copied ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-success" />
+              ) : (
+                <Copy className="h-3.5 w-3.5 shrink-0" />
+              )}
+              <span className="flex-1">
+                {copied ? 'Copied' : info.workspace ? 'Copy resume command' : 'Copy session id'}
+              </span>
+              <span className="ml-auto pl-3 font-mono text-[10px] text-muted-foreground">
+                {info.sessionId.slice(0, 8)}
+              </span>
             </DropdownMenuItem>
           )}
 

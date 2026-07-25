@@ -8,7 +8,9 @@ import { cn } from '../lib/utils.js'
 // The Overview's "hot tickets" card (#1139): a cross-project glance at what the agent is working on
 // (in progress), what sits in the AI Queue, and what is flagged high priority — nothing else. A
 // projection of every project's `tickets/` + `TODO_AGENTS.md` over the `onHotTickets` read, polled
-// so it stays live. Selecting a ticket jumps into its project.
+// so it stays live. A ticket a live run is implementing (#1117) opens that session; the rest are a
+// glance, not a link — there is no ticket view to open, and jumping to the project launcher was the
+// odd redirect the #1139 thread called out.
 
 const EMPTY: HotTicket[] = []
 
@@ -28,23 +30,15 @@ const LEFT_LANES: LaneDef[] = [
 const RIGHT_LANES: LaneDef[] = [{ key: 'high-priority', label: 'High priority', dot: 'bg-info' }]
 
 export function HotTickets({
-  onSelectProject,
   onSelectRun,
 }: {
-  onSelectProject: (id: string) => void
   /** A ticket a run is implementing knows which run (#1117), so its row opens that session. */
   onSelectRun: (id: string, runId: string) => void
 }) {
   const { value: tickets } = usePolled<HotTicket[]>(onHotTickets, EMPTY, 10_000, [])
 
   const renderLane = (lane: LaneDef) => (
-    <Lane
-      key={lane.key}
-      lane={lane}
-      tickets={tickets.filter(t => t.bucket === lane.key)}
-      onSelectProject={onSelectProject}
-      onSelectRun={onSelectRun}
-    />
+    <Lane key={lane.key} lane={lane} tickets={tickets.filter(t => t.bucket === lane.key)} onSelectRun={onSelectRun} />
   )
 
   return (
@@ -72,12 +66,10 @@ export function HotTickets({
 function Lane({
   lane,
   tickets,
-  onSelectProject,
   onSelectRun,
 }: {
   lane: LaneDef
   tickets: HotTicket[]
-  onSelectProject: (id: string) => void
   onSelectRun: (id: string, runId: string) => void
 }) {
   const empty = tickets.length === 0
@@ -96,23 +88,40 @@ function Lane({
         <ul className="mt-1.5">
           {tickets.map(t => (
             <li key={`${t.projectId}:${t.ticket.file}`}>
-              <button
-                type="button"
-                // A ticket being implemented names its run, and that session is what the row is
-                // reporting; one with no run yet has only its project to offer.
-                onClick={() => (t.runId ? onSelectRun(t.projectId, t.runId) : onSelectProject(t.projectId))}
-                title={t.ticket.summary || t.ticket.title}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-              >
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{t.ticket.title}</span>
-                <TicketTag ticket={t} />
-                <span className="shrink-0 text-xs text-muted-foreground">{t.projectName}</span>
-              </button>
+              {t.runId ? (
+                // A ticket being implemented names its run, and that session is what the row reports
+                // on, so its whole line opens that session.
+                <button
+                  type="button"
+                  onClick={() => onSelectRun(t.projectId, t.runId!)}
+                  title={`Open the session implementing ${t.ticket.title}`}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+                >
+                  <TicketBody ticket={t} />
+                </button>
+              ) : (
+                // Nothing to open yet: a queued or planned ticket has no session, and there is no
+                // ticket view to deep-link to, so the row is a glance rather than a link (#1139).
+                <div className="flex w-full items-center gap-2 px-2 py-1.5" title={t.ticket.summary || t.ticket.title}>
+                  <TicketBody ticket={t} />
+                </div>
+              )}
             </li>
           ))}
         </ul>
       )}
     </div>
+  )
+}
+
+/** The contents of one ticket row, shared by its clickable and glance-only forms. */
+function TicketBody({ ticket: t }: { ticket: HotTicket }) {
+  return (
+    <>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">{t.ticket.title}</span>
+      <TicketTag ticket={t} />
+      <span className="shrink-0 text-xs text-muted-foreground">{t.projectName}</span>
+    </>
   )
 }
 

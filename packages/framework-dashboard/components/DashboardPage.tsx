@@ -53,8 +53,8 @@ export function DashboardPage({
 
         {/* The two queues side by side (#1139): what needs you, and what the AI takes up next. */}
         <div className="grid items-start gap-4 lg:grid-cols-2">
-          <HumanQueue items={interventions} onSelectProject={onSelectProject} />
-          <AiQueue queue={data?.queue ?? []} loading={loading} onSelectProject={onSelectProject} />
+          <HumanQueue items={interventions} onSelectProject={onSelectProject} onSelectRun={onSelectRun} />
+          <AiQueue queue={data?.queue ?? []} loading={loading} />
         </div>
 
         {/* Routine work sits below the AI Queue (#1139/#1159): the scheduled jobs and the button
@@ -63,7 +63,7 @@ export function DashboardPage({
 
         <Agents working={data?.active ?? []} finished={data?.recentAgents ?? []} loading={loading} onSelectRun={onSelectRun} />
 
-        <HotTickets onSelectProject={onSelectProject} onSelectRun={onSelectRun} />
+        <HotTickets onSelectRun={onSelectRun} />
       </div>
     </ScrollArea>
   )
@@ -74,7 +74,20 @@ export function DashboardPage({
 // reject, so each links straight out to its PR; runs paused mid-flight on a question (#636), which
 // jump into that project's live view to answer; and work a finished session left unpushed. #627
 // notifications fire off the same set.
-function HumanQueue({ items, onSelectProject }: { items: Intervention[]; onSelectProject: (id: string) => void }) {
+function HumanQueue({
+  items,
+  onSelectProject,
+  onSelectRun,
+}: {
+  items: Intervention[]
+  onSelectProject: (id: string) => void
+  onSelectRun: (projectId: string, runId: string) => void
+}) {
+  // Awaiting and unpushed both name a run (#636/#860), so the row opens that session — which is what
+  // its "Open the session" promise says. Only if the id is somehow absent does it fall back to the
+  // project, rather than doing nothing.
+  const openSession = (item: Intervention) =>
+    item.runId ? onSelectRun(item.projectId, item.runId) : onSelectProject(item.projectId)
   return (
     <Card>
       <CardHeader>
@@ -99,7 +112,7 @@ function HumanQueue({ items, onSelectProject }: { items: Intervention[]; onSelec
                 {item.kind === 'awaiting' ? (
                   <button
                     type="button"
-                    onClick={() => onSelectProject(item.projectId)}
+                    onClick={() => openSession(item)}
                     className="flex w-full items-center gap-2.5 py-2 text-left hover:opacity-80"
                     title="Open the session to answer"
                   >
@@ -111,7 +124,7 @@ function HumanQueue({ items, onSelectProject }: { items: Intervention[]; onSelec
                 ) : item.kind === 'unpushed' ? (
                   <button
                     type="button"
-                    onClick={() => onSelectProject(item.projectId)}
+                    onClick={() => openSession(item)}
                     className="flex w-full items-center gap-2.5 py-2 text-left hover:opacity-80"
                     title={`Open the session: work on ${item.branch ?? ''} was never pushed`}
                   >
@@ -152,15 +165,7 @@ function HumanQueue({ items, onSelectProject }: { items: Intervention[]; onSelec
 // The AI Queue (#1139): every project's open `TODO_AGENTS.md` items — the work the framework picks
 // up on its own — grouped by project and shown in full. No "+N more": this is the plan, and a
 // collapsed plan is one you cannot read. Bullets, not checkboxes: nothing here is yours to tick off.
-function AiQueue({
-  queue,
-  loading,
-  onSelectProject,
-}: {
-  queue: ProjectQueue[]
-  loading: boolean
-  onSelectProject: (id: string) => void
-}) {
+function AiQueue({ queue, loading }: { queue: ProjectQueue[]; loading: boolean }) {
   const withOpen = queue.filter(q => q.open > 0)
   return (
     <Card>
@@ -180,14 +185,13 @@ function AiQueue({
           <ul className="space-y-4">
             {withOpen.map(q => (
               <li key={q.projectId}>
-                <button
-                  type="button"
-                  onClick={() => onSelectProject(q.projectId)}
-                  className="flex w-full items-center gap-2 text-left hover:opacity-80"
-                >
+                {/* A group header, not a link (#1139): this card is the read-only "what's next" list,
+                    and a project name that jumped to the launcher was the odd redirect the thread
+                    called out. The work itself is opened from Hot tickets and Agents below. */}
+                <div className="flex w-full items-center gap-2">
                   <span className="truncate text-sm font-medium">{q.projectName}</span>
                   <span className="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">{q.open}</span>
-                </button>
+                </div>
                 <ul className="mt-1.5 space-y-1 pl-0.5">
                   {q.items
                     .filter(i => !i.done)

@@ -9,7 +9,7 @@ import { readSuspendedRuns, writeSuspendedRuns, resumableRuns, readLiveMetas, li
 import { startKeyedWatcher, type KeyedWatcher } from './dashboard/keyed-watcher.js'
 import { buildInterventions, interventionKey, postInterventionsDiscord } from './dashboard/interventions.js'
 import { buildActivity, activityKey, postActivityDiscord } from './dashboard/activity.js'
-import { startAutoPm, AUTO_PM_JOBS } from './auto-pm.js'
+import { startAutoPm, AUTO_PM_JOBS, type AutoPmReport } from './auto-pm.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
 import { promoteQueue } from './queue-promote.js'
 import { findTodoBacklog } from './todo-loop.js'
@@ -57,6 +57,14 @@ export interface BackgroundServices {
    * never replays the open backlog as new notifications.
    */
   reloadDiscord: () => Promise<void>
+  /**
+   * Sweep now instead of at the next tick (#1161), because the `autoPm` preference was just
+   * switched on. The sweep re-reads the preference itself, so this only changes *when* it
+   * notices — but a ten-minute wait with nothing on screen is what made the toggle read as dead.
+   */
+  wakeAutoPm: () => void
+  /** What the last auto-PM sweep decided, for the usage panel to show (#1161). */
+  autoPmReport: () => AutoPmReport
 }
 
 /** What {@link startBackgroundServices} needs from the daemon. */
@@ -151,6 +159,11 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     },
     log,
   })
+
+  // Sweep once now rather than one interval from now (#1161): a daemon started with the setting
+  // already on would otherwise sit idle for ten minutes with quota going spare, which is exactly
+  // when it should be spending. Cheap and silent when the setting is off — it reads it and stops.
+  void autoPm.tick().catch(() => {})
 
   // Commit the conversations recorded on the main checkout (#912). A run's own worktree already
   // sweeps its transcript on teardown; nothing did the same for a chat held in the checkout itself,
@@ -325,6 +338,10 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     },
     flushConversations: () => conversationCommitter.flush().catch(() => 0),
     reloadDiscord,
+    // Not awaited, and safe to call when the preference went the other way: a sweep with the box
+    // unticked reads it, records "off", and starts nothing.
+    wakeAutoPm: () => void autoPm.tick().catch(() => {}),
+    autoPmReport: () => autoPm.report(),
   }
 }
 

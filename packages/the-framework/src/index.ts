@@ -361,6 +361,9 @@ export {
   type AutoPmLoop,
   type AutoPmProject,
   type AutoPmJob,
+  type AutoPmReport,
+  type AutoPmOutcome,
+  type AutoPmReporter,
 } from './auto-pm.js'
 export {
   PRESETS,

@@ -264,10 +264,52 @@ export interface AutoPmDeps {
   now?: () => number
 }
 
+/** What the last sweep decided about one project. */
+export interface AutoPmOutcome {
+  /** Registry id of the project considered. */
+  projectId: string
+  /** Its path, which is what the log line names and the panel shows. */
+  path: string
+  /** Whether a run was started for it. */
+  started: boolean
+  /** The sentence: what was started, or the reason for standing down. */
+  message: string
+}
+
+/**
+ * What auto PM has done lately (#1161).
+ *
+ * Every decision was already logged (#855), but the log is the daemon's stdout and the toggle
+ * lives in a browser, so from the dashboard a wedged sweep and a healthy idle one looked
+ * identical — the same failure #855 fixed one layer down.
+ */
+export interface AutoPmReport {
+  /** Whether the preference was on at the last sweep. `undefined` before the first one. */
+  enabled?: boolean
+  /** When the last sweep finished, epoch ms. `undefined` before the first one. */
+  sweptAt?: number
+  /** When the next sweep is due, epoch ms. */
+  nextSweepAt: number
+  /** One line per project the last sweep considered, in sweep order. */
+  outcomes: AutoPmOutcome[]
+}
+
+/**
+ * Where the dashboard reads {@link AutoPmReport} from. The daemon wires its live loop; a public
+ * host (the relay) leaves it unset, and one that has not finished starting answers `undefined`.
+ */
+export type AutoPmReporter = () => AutoPmReport | undefined
+
 /** A running sweep. */
 export interface AutoPmLoop {
-  /** Run one sweep now, rather than waiting for the next tick. Exposed for tests. */
+  /**
+   * Run one sweep now, rather than waiting for the next tick. Called when the preference is
+   * switched on (#1161) as well as from tests: the sweep re-reads it per tick, so without this
+   * the box you just ticked does nothing at all for a whole interval.
+   */
   tick(): Promise<void>
+  /** What the last sweep decided, for the dashboard to show (#1161). */
+  report(): AutoPmReport
   stop(): void
 }
 
@@ -283,6 +325,11 @@ export interface AutoPmLoop {
  */
 export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   const now = deps.now ?? (() => Date.now())
+  const intervalMs = deps.intervalMs ?? DEFAULT_AUTO_PM_INTERVAL_MS
+  const startedAt = now()
+  // What the last sweep decided, for `report()`. Undefined only in the moment before the
+  // start-up sweep below lands.
+  let lastSweep: { enabled: boolean; sweptAt: number; outcomes: AutoPmOutcome[] } | undefined
   const lastStart = new Map<string, number>()
   // Runs this loop started whose queue has not reached the checkout yet, oldest first.
   const pending = new Map<string, string[]>()
@@ -295,10 +342,16 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   const tick = async (): Promise<void> => {
     if (stopped || sweeping) return
     sweeping = true
+    let enabled = false
+    const outcomes: AutoPmOutcome[] = []
+    // Every branch that logs also records, so the panel says exactly what the log says.
+    const note = (project: AutoPmProject, started: boolean, message: string) =>
+      outcomes.push({ projectId: project.id, path: project.path, started, message })
     try {
       // The preference is the cheapest gate and the one the user flips most, so it is read
       // once per sweep rather than per project.
-      if (!(await deps.enabled().catch(() => false))) return
+      enabled = await deps.enabled().catch(() => false)
+      if (!enabled) return
       const projects = await deps.projects().catch(() => [])
       if (!projects.length) return
       // One reading for the whole sweep: it is an account-wide meter, and re-reading it per
@@ -322,6 +375,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
             // The queue the decision below reads was just filled, so that read is stale. Leave it
             // to the next tick, and let the backlog loop have the work in the meantime.
             deps.log(`[framework] auto PM: landed the queue from ${landed} run(s) in ${project.path}`)
+            note(project, false, `landed the queue from ${landed} finished run${landed === 1 ? '' : 's'}`)
             continue
           }
         }
@@ -337,6 +391,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         if (!decision.start) {
           // Logged, so a wedged sweep is distinguishable from a healthy idle one (#855).
           deps.log(`[framework] auto PM: standing down for ${project.path} — ${decision.reason}`)
+          note(project, false, decision.reason)
           continue
         }
         const index = nextJob.get(project.id) ?? 0
@@ -349,7 +404,10 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           : decision.mode === 'drain'
             ? (deps.drainJob ?? AUTO_PM_DRAIN_JOB)
             : deps.jobs[index % deps.jobs.length]
-        if (!job) continue
+        if (!job) {
+          note(project, false, 'there is no job to run')
+          continue
+        }
         // Re-checked here because everything above is awaited: a run spawned past a `stop()` is
         // missing from the live-run map the daemon has by then cleared, so nothing suspends or
         // terminates it (#983). Break, not continue: stopping is a verdict on the whole sweep.
@@ -372,20 +430,38 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           else if (decision.mode === 'pm') nextJob.set(project.id, index + 1)
           // Its queue lives on the run's branch until a later tick promotes it.
           pending.set(project.id, [...(pending.get(project.id) ?? []), runId])
+          note(project, true, job.describe)
         } else {
           lastStart.delete(project.id)
           deps.log(`[framework] auto PM: could not start a run in ${project.path}`)
+          note(project, false, 'the daemon could not start a run')
         }
       }
     } finally {
       sweeping = false
+      // Recorded even when the sweep returned early, so "switched off" and "on, and standing
+      // down for a reason" are distinguishable from the dashboard (#1161).
+      lastSweep = { enabled, sweptAt: now(), outcomes }
     }
   }
 
-  const timer = setInterval(() => void tick(), deps.intervalMs ?? DEFAULT_AUTO_PM_INTERVAL_MS)
+  const timer = setInterval(() => void tick(), intervalMs)
   timer.unref?.() // a background sweep must never be the reason the process stays up
+
+  /** When the interval next fires, counted from the anchor so an out-of-band {@link tick} cannot skew it. */
+  const nextSweepAt = () => startedAt + (Math.floor(Math.max(0, now() - startedAt) / intervalMs) + 1) * intervalMs
+
+  // The first sweep is the caller's to fire (see `startBackgroundServices`), not this
+  // constructor's: `tick` marks the loop busy synchronously, so a sweep started here would make
+  // the very next `tick()` a no-op — and every test that constructs a loop and ticks it would be
+  // asserting against a sweep it never awaited.
   return {
     tick,
+    report: () => ({
+      ...(lastSweep ? { enabled: lastSweep.enabled, sweptAt: lastSweep.sweptAt } : {}),
+      nextSweepAt: nextSweepAt(),
+      outcomes: lastSweep?.outcomes ?? [],
+    }),
     stop: () => {
       stopped = true
       clearInterval(timer)

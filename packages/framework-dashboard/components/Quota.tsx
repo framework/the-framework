@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import type { DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '@gemstack/the-framework'
+import type { AutoPmReport, DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '@gemstack/the-framework'
 import { MAX_SPEND_OFFSET } from '@gemstack/the-framework/client'
-import { useQuota } from '../lib/quota.js'
+import { useAutoPm, useQuota } from '../lib/quota.js'
+import { formatRelative } from '../lib/format-date.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { weekTicks, quotaTone, limitPercent, TONE_NOTE, type QuotaTone } from '../lib/quota-bar.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
@@ -189,8 +190,54 @@ function useSpendOffset(serverOffset: number | undefined): [number, (offset: num
   ]
 }
 
+/** How long until `at`, as "in 4 min" / "in 1 hr". Past due reads as "any moment". */
+function untilText(at: number): string {
+  const minutes = Math.round((at - Date.now()) / 60_000)
+  if (minutes <= 0) return 'any moment'
+  if (minutes < 60) return `in ${minutes} min`
+  const hours = Math.round(minutes / 60)
+  return `in ${hours} hr`
+}
+
+/** The repo a line is about, by the name you would call it: its directory. */
+function projectName(path: string): string {
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? path
+}
+
+/**
+ * What the sweep last did (#1161). Without this the toggle was the only thing the panel could
+ * say, so "on, and standing down because the queue could not be read" looked exactly like "on,
+ * and quietly working" — and the reasons were already being written, to a log in a terminal the
+ * dashboard user never sees.
+ */
+function AutoPmStatus({ report }: { report: AutoPmReport }) {
+  // The box itself already says it is off, and a sweep's report on a preference it read as off
+  // says nothing more than that.
+  if (report.enabled === false) return null
+  if (report.sweptAt === undefined) return <p className="text-xs text-muted-foreground">Checking…</p>
+  return (
+    <div className="space-y-0.5 text-xs text-muted-foreground">
+      <p>
+        Last checked {formatRelative(new Date(report.sweptAt).toISOString())} · next {untilText(report.nextSweepAt)}
+      </p>
+      {report.outcomes.length === 0 ? (
+        <p>No projects to work on.</p>
+      ) : (
+        report.outcomes.map(outcome => (
+          <p key={outcome.projectId}>
+            <span className={cn(outcome.started && 'text-foreground')}>{projectName(outcome.path)}</span>
+            {' — '}
+            {outcome.message}
+          </p>
+        ))
+      )}
+    </div>
+  )
+}
+
 export function Quota() {
   const view = useQuota()
+  const autoPm = useAutoPm()
   const preferences = usePreferences()
   const [offset, setOffset] = useSpendOffset(view?.boundary?.limit.offset)
   const note = view ? unavailableNote(view) : undefined
@@ -232,6 +279,7 @@ export function Quota() {
               When nothing is running, work the queue down and refill it rather than let the week's
               allowance expire. Only while the account is still under the line above.
             </p>
+            {autoPm ? <AutoPmStatus report={autoPm} /> : null}
           </div>
         ) : null}
 

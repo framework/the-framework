@@ -6,6 +6,7 @@ import { registryPreferencesStore, type PreferencesStore } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import { defaultQuotaSource, type QuotaSource } from './quota.js'
+import type { AutoPmReporter } from '../auto-pm.js'
 import { serveClientBundle } from './static.js'
 import { BROWSER_PROXY_PREFIX, handleBrowserProxy } from './browser-proxy.js'
 import { makeTelefuncMount } from './telefunc-serve.js'
@@ -76,6 +77,11 @@ export interface DashboardOptions {
    * own poller; the relay passes nothing and mounts no panel.
    */
   quota?: QuotaSource
+  /**
+   * What auto PM last decided (#1161), for the line under the panel's toggle. Only the daemon
+   * runs the sweep, so every other host leaves it unset and the panel says nothing about it.
+   */
+  autoPm?: AutoPmReporter
   /**
    * Serve the new dashboard bundle (#405) from this directory — the prerendered Vike SPA
    * (`index.html` + `assets/**`). The daemon also mounts the dashboard's Telefunc surface
@@ -161,6 +167,7 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
     ...(opts.remote ? { remote: opts.remote } : {}),
     preferences: opts.preferences ?? registryPreferencesStore(),
     discord: opts.discord ?? registryDiscordCredentialsStore(),
+    ...(opts.autoPm ? { autoPm: opts.autoPm } : {}),
     quota,
   })
 

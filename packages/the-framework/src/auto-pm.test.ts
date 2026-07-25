@@ -447,3 +447,55 @@ test('an unreadable sweep schedule falls back to the rotation (#882)', async () 
   loop.stop()
   assert.deepEqual(ran, ['first'])
 })
+
+test('the report names what a sweep started (#1161)', async () => {
+  const { loop } = harness()
+  await loop.tick()
+  loop.stop()
+  const report = loop.report()
+  assert.equal(report.enabled, true)
+  assert.equal(report.sweptAt, T0)
+  assert.deepEqual(report.outcomes, [
+    { projectId: 'p1', path: '/repo', started: true, message: 'doing the first thing' },
+  ])
+})
+
+test('the report carries the reason a sweep stood down (#1161)', async () => {
+  // The whole point: standing down for a reason must not look like quietly working. The reason
+  // was already logged, but the log is the daemon's stdout and the toggle is in a browser.
+  const { loop } = harness({ activeRuns: () => 2 })
+  await loop.tick()
+  loop.stop()
+  const [outcome] = loop.report().outcomes
+  assert.equal(outcome?.started, false)
+  assert.match(outcome?.message ?? '', /already going/)
+})
+
+test('the report says so when the preference is off (#1161)', async () => {
+  // Distinguishable from "on, and standing down": the panel hides the line entirely for off,
+  // and an off sweep considers no project, so it can have no per-project reason either.
+  const { loop } = harness({ enabled: async () => false })
+  await loop.tick()
+  loop.stop()
+  const report = loop.report()
+  assert.equal(report.enabled, false)
+  assert.deepEqual(report.outcomes, [])
+})
+
+test('the report offers a next sweep before the first one has run (#1161)', () => {
+  // The panel reads `sweptAt === undefined` as "checking…", so it must never read as an idle sweep.
+  const { loop } = harness({ intervalMs: 60_000 })
+  const report = loop.report()
+  loop.stop()
+  assert.equal(report.sweptAt, undefined)
+  assert.equal(report.enabled, undefined)
+  assert.equal(report.nextSweepAt, T0 + 60_000)
+})
+
+test('an out-of-band tick does not skew the next sweep (#1161)', async () => {
+  // Waking the loop when the box is ticked must not push the interval it is not driving.
+  const { loop } = harness({ intervalMs: 60_000 })
+  await loop.tick()
+  loop.stop()
+  assert.equal(loop.report().nextSweepAt, T0 + 60_000)
+})

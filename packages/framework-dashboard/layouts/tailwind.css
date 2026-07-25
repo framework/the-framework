@@ -24,27 +24,32 @@
   /* Let the browser paint native theme-matched scrollbars + form controls (the shadcn way).
      `.dark` flips it below. */
   color-scheme: light;
-  /* Everforest Light (medium). Cards recede a shade below the canvas, mirroring the dark theme
-     where panels are darker than the background. */
-  --background: #fdf6e3;
-  --foreground: #5c6a72;
-  --card: #f4f0d9;
-  --card-foreground: #5c6a72;
-  --muted: #efebd4;
-  --muted-foreground: #829181;
-  --border: #ddd8be;
-  --primary: #8da101;
-  --primary-foreground: #fdf6e3;
-  --accent: #efebd4;
-  --accent-foreground: #5c6a72;
+  /* Everforest's greens on a white canvas (#1141). Everforest Light is paper-coloured (#fdf6e3),
+     which reads as orange next to any other app; the identity people recognise is the green, not
+     the paper, so the hues stay and the canvas goes white. Cards sit on white too and are told
+     apart by their border, the usual light-mode direction (the dark theme still recedes).
+     The greens are darkened from Everforest Light, which was mixed for cream: #8da101 is 2.9:1 on
+     white, below readable for the small text these tokens carry. */
+  --background: #ffffff;
+  --foreground: #3a4248;
+  --card: #ffffff;
+  --card-foreground: #3a4248;
+  --muted: #f3f5f2;
+  --muted-foreground: #66756c;
+  --border: #e3e7e1;
+  --primary: #6f7f00;
+  --primary-foreground: #ffffff;
+  --accent: #eef1ec;
+  --accent-foreground: #3a4248;
 
   /* Status. Every status colour used to be a raw palette value, so "good" was six different
      greens and `amber-500` meant both "stopped" and "building, fine". These four are the whole
-     vocabulary, now on the Everforest Light accents. */
-  --success: #8da101;
-  --warning: #dfa000;
-  --danger: #f85552;
-  --info: #3a94c5;
+     vocabulary: Everforest's four hues, each darkened to stay readable on white (the shipped
+     Light tones run 2.3-3.4:1 there, which is why they are not used verbatim). */
+  --success: #6f7f00;
+  --warning: #9a6b00;
+  --danger: #d1403d;
+  --info: #2b7ba5;
 
   /* The brand mark's six strands (#757), darkest first, exactly as the brand ships them.
      Kept as variables so the mark can be re-ramped for a dark canvas without touching the SVG. */

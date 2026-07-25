@@ -20,6 +20,7 @@ import {
   registerReposDirectory,
   isNestedWithin,
 } from './daemon.js'
+import { listRuns } from './store/index.js'
 import { EVENTS_FILE, FRAMEWORK_DIR, addWorktree } from './store/index.js'
 import { controlPath } from './control.js'
 import { projectId, listProjects, addProject, writePreferences } from './registry.js'
@@ -581,14 +582,20 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
       return ids[nth - 1]!
     }
 
-    /** Poll for the archived history to appear, which is the teardown having run. */
-    const archived = async (runId: string): Promise<boolean> => {
+    /**
+     * Poll for the archived history to appear, which is the teardown having run. Asked through
+     * `listRuns` rather than by stat'ing a path: since #1179 a run is archived under whichever
+     * user ran it, and what this test cares about is that the project's history has it.
+     */
+    const archivedMeta = async (runId: string): Promise<{ branch?: string } | undefined> => {
       for (let i = 0; i < 150; i++) {
-        if (await stat(join(cwd, FRAMEWORK_DIR, 'runs', `${runId}.json`)).then(() => true, () => false)) return true
+        const found = (await listRuns(cwd).catch(() => [])).find(run => run.id === runId)
+        if (found) return found
         await new Promise(r => setTimeout(r, 20))
       }
-      return false
+      return undefined
     }
+    const archived = async (runId: string): Promise<boolean> => (await archivedMeta(runId)) !== undefined
 
     // A clean finish: history archived into the repo, worktree gone.
     const doneId = await runWith('done', 1)
@@ -601,10 +608,8 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
     assert.equal(gone, true, 'and its worktree is removed')
     // The branch is the only handle left on the work once the checkout goes, so it is recorded
     // while the worktree still exists (#799) — otherwise the handoff has nothing to read.
-    const doneMeta = JSON.parse(
-      await readFile(join(cwd, FRAMEWORK_DIR, 'runs', `${doneId}.json`), 'utf8'),
-    ) as { branch?: string }
-    assert.equal(doneMeta.branch, `the-framework/run-${doneId}`, "the finished run's branch is recorded")
+    const doneMeta = await archivedMeta(doneId)
+    assert.equal(doneMeta?.branch, `the-framework/run-${doneId}`, "the finished run's branch is recorded")
 
     // A failure: history archived too, but the checkout is kept so it can be inspected.
     const failedId = await runWith('failed', 2)

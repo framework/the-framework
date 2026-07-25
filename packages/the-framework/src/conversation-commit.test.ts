@@ -9,6 +9,8 @@ import {
   pendingConversations,
   startConversationCommitter,
   CONVERSATIONS_PATHSPEC,
+  SESSIONS_PATHSPEC,
+  COMMITTED_PATHSPECS,
   type PathProbe,
 } from './conversation-commit.js'
 
@@ -36,6 +38,25 @@ test('the pathspec names only the conversations directory (#912)', () => {
   assert.equal(CONVERSATIONS_PATHSPEC, '.the-framework/conversations')
 })
 
+test('the sessions pathspec is glob-magic and reaches the files, not just the directory (#1179)', () => {
+  // Two properties, and the second one failed silently: glob magic stops `*` at a separator, but it
+  // also matches whole file paths instead of treating a directory as a prefix — so without the
+  // trailing `/**` this names no file and `git add` commits nothing at all.
+  assert.equal(SESSIONS_PATHSPEC, ':(glob).the-framework/*/sessions/**')
+  assert.deepEqual(COMMITTED_PATHSPECS, [CONVERSATIONS_PATHSPEC, SESSIONS_PATHSPEC])
+})
+
+test('the commit message counts sessions by run, not by file (#1179)', () => {
+  // One archived run is two files, so counting files would have a single session commit say "2".
+  const run = ['.the-framework/git@example.com/sessions/r1.json', '.the-framework/git@example.com/sessions/r1.jsonl']
+  assert.equal(commitMessage(run), '[The Framework] a session')
+  assert.equal(commitMessage([...run, '.the-framework/git@example.com/sessions/r2.json']), '[The Framework] 2 sessions')
+  assert.equal(
+    commitMessage(['.the-framework/conversations/a.md', ...run]),
+    '[The Framework] a conversation and a session',
+  )
+})
+
 test('pending conversations are parsed from porcelain and sorted (#912)', async () => {
   const { git, calls } = fakeGit({
     status: ['?? .the-framework/conversations/b.md', ' M .the-framework/conversations/a.md', ''].join('\n'),
@@ -46,7 +67,7 @@ test('pending conversations are parsed from porcelain and sorted (#912)', async 
   ])
   assert.deepEqual(
     calls[0],
-    ['status', '--porcelain', '-uall', '--', CONVERSATIONS_PATHSPEC],
+    ['status', '--porcelain', '-uall', '--', ...COMMITTED_PATHSPECS],
     'the status read is path-scoped, and -uall names each untracked file',
   )
 })
@@ -123,15 +144,15 @@ test('a commit stages and commits the pathspec, and never add -A (#912)', async 
 
   assert.deepEqual(
     calls.find(args => args[0] === 'add'),
-    ['add', '--', CONVERSATIONS_PATHSPEC],
-    'staging is scoped to the pathspec',
+    ['add', '--', ...COMMITTED_PATHSPECS],
+    'staging is scoped to the pathspecs',
   )
   assert.deepEqual(calls.find(args => args[0] === 'commit'), [
     'commit',
     '-m',
     '[The Framework] a conversation',
     '--',
-    CONVERSATIONS_PATHSPEC,
+    ...COMMITTED_PATHSPECS,
   ])
   assert.ok(
     !calls.some(args => args.includes('-A') || args.includes('--all')),

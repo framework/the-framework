@@ -44,6 +44,18 @@ export const META_FILE = 'run.json'
  */
 export const RUNS_DIR = 'runs'
 
+/**
+ * Where a project's finished runs are archived now (#1179): `.the-framework/<user>/sessions/`,
+ * which the install-time ignore un-ignores so the history is committed and survives a
+ * `git clean -fdx`. {@link RUNS_DIR} stays the transient location — a run worktree still archives
+ * into its own throwaway checkout there, and it is where every run archived before this shipped
+ * still lives, so both are read.
+ *
+ * The name lives here beside its sibling rather than in `sessions.ts`, which owns the per-user
+ * naming: that module reads the store, so the constant travelling the other way would be a cycle.
+ */
+export const SESSIONS_DIR = 'sessions'
+
 /** Filesystem-safe, lexicographically-sortable run id from an ISO start time. */
 export function runIdFromStartedAt(startedAt: string): string {
   // ISO is fixed-width, so replacing the `:`/`.` separators keeps lexical order
@@ -515,21 +527,65 @@ export class RunStore {
   }
 }
 
-/** Paths of a run's archived log + meta under `.the-framework/runs/`. */
-function archivePaths(dir: string, id: string): { events: string; meta: string } {
-  const runs = join(dir, RUNS_DIR)
+/**
+ * The directory a run's archive lives in: this user's committed `sessions/` when a caller named
+ * one (#1179), else the transient `runs/`. Callers pass a user only where the archive is meant to
+ * be kept — the project's copy — never for the copy a run leaves inside its own worktree.
+ */
+function archiveDir(dir: string, user?: string): string {
+  return user ? join(dir, user, SESSIONS_DIR) : join(dir, RUNS_DIR)
+}
+
+/** Paths of a run's archived log + meta. */
+function archivePaths(dir: string, id: string, user?: string): { events: string; meta: string } {
+  const runs = archiveDir(dir, user)
   return { events: join(runs, `${id}.jsonl`), meta: join(runs, `${id}.json`) }
 }
 
 /**
- * Copy a run's live log + meta into `runs/<id>.jsonl` / `runs/<id>.json`. The live
- * files stay put (the daemon keeps tailing them until the next run); this is a
- * durable snapshot for the history list. Idempotent per id.
+ * Every directory a project's archived runs may sit in, newest scheme first: each user's
+ * `<user>/sessions/`, then the legacy `runs/`.
+ *
+ * Both are read because both exist in the wild: `runs/` holds everything archived before #1179,
+ * and a user directory is only created once that user has run something. Every user's sessions are
+ * listed, not just the reader's — the history is a team-visible record of what the agent has done
+ * to the repo, which is the point of committing it.
+ *
+ * A directory is recognized by having a readable `sessions/` child, so a stray file in
+ * `.the-framework/` is simply not one (readdir yields `[]` for anything that is not a directory).
  */
-async function archiveRun(fs: StoreFs, dir: string, meta: RunMeta, eventsPath: string): Promise<void> {
+/**
+ * Where one run's archive actually sits, searched across {@link archiveDirs}, or `undefined` when
+ * it is nowhere. A run id alone no longer names a path: which user archived it decides that, and a
+ * reader (the #762 continue, a removal) only has the id.
+ */
+async function findArchive(fs: StoreFs, dir: string, runId: string): Promise<{ events: string; meta: string } | undefined> {
+  for (const runsDir of await archiveDirs(fs, dir)) {
+    const paths = { events: join(runsDir, `${runId}.jsonl`), meta: join(runsDir, `${runId}.json`) }
+    if (await fs.exists(paths.meta)) return paths
+  }
+  return undefined
+}
+
+async function archiveDirs(fs: StoreFs, dir: string): Promise<string[]> {
+  const dirs: string[] = []
+  for (const name of await fs.readdir(dir)) {
+    const candidate = join(dir, name, SESSIONS_DIR)
+    if ((await fs.readdir(candidate)).length > 0) dirs.push(candidate)
+  }
+  dirs.push(join(dir, RUNS_DIR))
+  return dirs
+}
+
+/**
+ * Copy a run's live log + meta into its archive as `<id>.jsonl` / `<id>.json`. The live files stay
+ * put (the daemon keeps tailing them until the next run); this is a durable snapshot for the
+ * history list. Idempotent per id. `user` files it under that user's committed sessions (#1179).
+ */
+async function archiveRun(fs: StoreFs, dir: string, meta: RunMeta, eventsPath: string, user?: string): Promise<void> {
   if (!isSafeRunId(meta.id)) return
-  await fs.mkdir(join(dir, RUNS_DIR))
-  const out = archivePaths(dir, meta.id)
+  await fs.mkdir(archiveDir(dir, user))
+  const out = archivePaths(dir, meta.id, user)
   const events = (await fs.exists(eventsPath)) ? await fs.read(eventsPath) : ''
   await fs.write(out.events, events)
   await writeMetaFile(fs, out.meta, meta)
@@ -565,8 +621,8 @@ export async function restoreArchivedRun(
     if (!isSafeRunId(runId)) return false
     const dir = join(worktree, FRAMEWORK_DIR)
     if (await fs.exists(join(dir, META_FILE))) return false
-    const archive = archivePaths(join(repo, FRAMEWORK_DIR), runId)
-    if (!(await fs.exists(archive.meta))) return false
+    const archive = await findArchive(fs, join(repo, FRAMEWORK_DIR), runId)
+    if (!archive) return false
     await fs.mkdir(dir)
     await fs.write(join(dir, EVENTS_FILE), (await fs.exists(archive.events)) ? await fs.read(archive.events) : '')
     await fs.write(join(dir, META_FILE), await fs.read(archive.meta))
@@ -590,8 +646,15 @@ export async function listWorktreeDirs(cwd: string, fs: StoreFs = nodeStoreFs())
  * Archive a worktree run's history into the *main repo* (#737), returning the meta it archived.
  *
  * A run writes its `run.json` / `events.jsonl` inside its own worktree (#736), so deleting that
- * worktree would delete the run's history with it. This copies it to the repo's `runs/`, which is
- * the one place the dashboard's history reads from, so teardown becomes safe.
+ * worktree would delete the run's history with it. This copies it into the repo, which is the one
+ * place the dashboard's history reads from, so teardown becomes safe.
+ *
+ * `user` files the copy under that user's committed `sessions/` (#1179) instead of the transient
+ * `runs/`. It is this copy, not the one the run left in its own worktree, that is meant to last:
+ * every run in a git repo gets a worktree, so this is the only archive of it that outlives the
+ * checkout, and committing it is what makes the history survive `git clean -fdx`. The worktree's
+ * own copy deliberately stays untracked — it would otherwise be committed onto the run's branch as
+ * well and collide with this one on merge.
  *
  * A meta still marked `running` is flipped to `stopped` first: this runs when the process is
  * already gone, so `running` means it died without closing (crash, kill -9), exactly the case
@@ -603,6 +666,7 @@ export async function archiveWorktreeRun(
   repo: string,
   fs: StoreFs = nodeStoreFs(),
   branch?: string,
+  user?: string,
 ): Promise<RunMeta | undefined> {
   try {
     const worktreeDir = join(worktree, FRAMEWORK_DIR)
@@ -612,11 +676,22 @@ export async function archiveWorktreeRun(
     // The branch is read from the checkout by the caller and stamped here, because this is the
     // last moment it can be observed: the worktree is about to go (#799).
     const meta: RunMeta = branch ? { ...stopped, branch } : stopped
-    await archiveRun(fs, join(repo, FRAMEWORK_DIR), meta, join(worktreeDir, EVENTS_FILE))
+    await archiveRun(fs, join(repo, FRAMEWORK_DIR), meta, join(worktreeDir, EVENTS_FILE), user)
     return meta
   } catch {
     return undefined
   }
+}
+
+/**
+ * The archived log + meta paths of one run, wherever it is filed, or `[]` when it is nowhere.
+ * Exported so a caller that deletes a session (the dashboard's Remove) does not have to know which
+ * user archived it — before #1179 the path was derivable from the id alone, and now it is not.
+ */
+export async function archivedRunPaths(cwd: string, runId: string, fs: StoreFs = nodeStoreFs()): Promise<string[]> {
+  if (!isSafeRunId(runId)) return []
+  const archive = await findArchive(fs, join(cwd, FRAMEWORK_DIR), runId).catch(() => undefined)
+  return archive ? [archive.meta, archive.events] : []
 }
 
 /** Newest run first: an id sorts chronologically, so the id order IS the time order (no parse). */
@@ -651,12 +726,31 @@ function isDeadRunning(meta: RunMeta | undefined, isAlive: (pid: number) => bool
 }
 
 /**
- * List a project's archived runs, most-recent first. Reads every `runs/*.json`
- * meta; the id sorts chronologically so no timestamp parse is needed. Missing or
+ * Every archived meta a project has, across all of {@link archiveDirs}, with the path it came from.
+ * De-duplicated by run id, first directory winning: a run archived before #1179 and re-archived
+ * into its user's sessions afterwards exists in both places, and the history must show it once.
+ * The user directories are searched before `runs/`, so the committed copy is the one that wins.
+ */
+async function readAllArchivedMetaEntries(fs: StoreFs, dir: string): Promise<Array<{ path: string; meta: RunMeta }>> {
+  const seen = new Set<string>()
+  const entries: Array<{ path: string; meta: RunMeta }> = []
+  for (const runsDir of await archiveDirs(fs, dir)) {
+    for (const entry of await readArchivedMetaEntries(fs, runsDir).catch(() => [])) {
+      if (seen.has(entry.meta.id)) continue
+      seen.add(entry.meta.id)
+      entries.push(entry)
+    }
+  }
+  return entries
+}
+
+/**
+ * List a project's archived runs, most-recent first: every user's committed `sessions/` plus the
+ * legacy `runs/`. The id sorts chronologically so no timestamp parse is needed. Missing or
  * unreadable dir/entries are skipped, never thrown.
  */
 export async function listRuns(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<RunMeta[]> {
-  const entries = await readArchivedMetaEntries(fs, join(cwd, FRAMEWORK_DIR, RUNS_DIR))
+  const entries = await readAllArchivedMetaEntries(fs, join(cwd, FRAMEWORK_DIR))
   return entries.map(entry => entry.meta).sort(byIdDesc)
 }
 
@@ -694,9 +788,9 @@ export async function reconcileOrphanedRuns(
 ): Promise<number> {
   const dir = join(cwd, FRAMEWORK_DIR)
   let fixed = 0
-  // Archived runs stuck at `running` (e.g. a prior live run the next run never
-  // rescued). Done before the live run so its fresh archive isn't re-counted here.
-  for (const { path, meta } of await readArchivedMetaEntries(fs, join(dir, RUNS_DIR))) {
+  // Archived runs stuck at `running` (e.g. a prior live run the next run never rescued), wherever
+  // they are archived. Done before the live run so its fresh archive isn't re-counted here.
+  for (const { path, meta } of await readAllArchivedMetaEntries(fs, dir)) {
     if (!isDeadRunning(meta, isAlive)) continue
     try {
       await writeMetaFile(fs, path, { ...meta, status: 'stopped' })
@@ -823,9 +917,9 @@ export async function loadRunEvents(
   fs: StoreFs = nodeStoreFs(),
 ): Promise<FrameworkEvent[] | undefined> {
   if (!isSafeRunId(id)) return undefined
-  const path = archivePaths(join(cwd, FRAMEWORK_DIR), id).events
-  if (!(await fs.exists(path))) return undefined
-  return parseEventLog(await fs.read(path))
+  const archive = await findArchive(fs, join(cwd, FRAMEWORK_DIR), id)
+  if (!archive || !(await fs.exists(archive.events))) return undefined
+  return parseEventLog(await fs.read(archive.events))
 }
 
 /** A {@link StoreFs} backed by `node:fs/promises`. See {@link nodeFs}. */

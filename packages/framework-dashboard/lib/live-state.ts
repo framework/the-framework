@@ -123,6 +123,23 @@ export function actionsRunUrl(events: readonly FrameworkEvent[]): string | undef
 }
 
 /**
+ * The Claude Code cloud session a `web` run was handed to (#610), from the `action` event the
+ * CloudDriver emits once the session exists: its label is `cloud <url>`. Read from the event
+ * stream rather than from the run's meta for the same reason the Actions link is — the events
+ * are what a tab opened mid-run replays. The last match wins, so a session that handed off more
+ * than once points at its most recent cloud session. Absent until the hand-off has landed.
+ */
+export function cloudSession(events: readonly FrameworkEvent[]): { url: string; id: string } | undefined {
+  let found: { url: string; id: string } | undefined
+  for (const event of events) {
+    if (event.kind !== 'driver' || event.event.type !== 'action') continue
+    const match = /^cloud (https:\/\/claude\.ai\/code\/(session_[A-Za-z0-9]+)\S*)$/.exec(event.event.label)
+    if (match) found = { url: match[1]!, id: match[2]! }
+  }
+  return found
+}
+
+/**
  * The current run's slice of an accumulated live feed. The dashboard's live channel keeps
  * one long-lived subscription per project and appends every streamed event, but each run
  * truncates `events.jsonl` on disk and opens with exactly one `session` event

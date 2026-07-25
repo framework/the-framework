@@ -116,21 +116,20 @@ export function runOptionRows(preferences: Preferences): RunOptionRows {
       checked: onBeforeMergeableQuality && !transparent,
       ...overriddenByTransparent(transparent),
     },
-    // Where the two handoff boxes get their default (#1102). A session's own action bar can still
-    // untick them for that one run; this is what every new session starts from.
-    {
-      key: 'autoPushBranch',
-      label: 'Push branch',
-      description: 'Pushes the session branch to origin when it finishes.',
-      title: "Push the session's branch to origin when it finishes, so the work is never left only on this machine",
-      checked: handoff.push,
-      ...(handoff.pr ? { disabled: true, disabledReason: 'opening a PR already pushes the branch' } : {}),
-    },
+    // Where the handoff gets its default (#1102). A session's own action bar can still untick it for
+    // that one run; this is what every new session starts from.
+    //
+    // One row, not the `Push branch` / `Open PR` pair this used to be (#1164/#1173). Opening a PR
+    // pushes the branch on the way, so `Push branch` was disabled and explained away as "opening a
+    // PR already pushes the branch" whenever `Open PR` was on, which is the default: a control that
+    // is greyed out almost always, and that nobody could say the purpose of when it was not.
+    // Push-without-PR stays reachable where someone deliberately wanting it would look: the
+    // `autoPushBranch` preference key, the `--auto-push-branch` flag, and `the-framework.yml`.
     {
       key: 'autoOpenPr',
       label: 'Open PR',
       description: 'Opens a draft pull request when it finishes.',
-      title: 'Open a draft pull request when the session finishes. Draft, so it does not request review; it still shows on the needs-you queue',
+      title: 'Open a draft pull request when the session finishes, pushing the branch on the way. Draft, so it does not request review; it still shows on the needs-you queue',
       checked: handoff.pr,
     },
     // Claude-only (#801): the browser is wired through Claude Code's MCP config, so another agent's

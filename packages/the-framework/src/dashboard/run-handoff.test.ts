@@ -257,6 +257,38 @@ test('a real repo: the branch outlives its worktree and still reports its work (
   }
 })
 
+test('a real repo: a branch whose work is already in the base reports empty (#1164/#1173)', async () => {
+  // The bug this pins: the commit list used `base...branch`, git's SYMMETRIC difference, so a
+  // branch that had produced nothing of its own still reported the commits that were only on the
+  // base. `empty` stayed false, the dashboard offered Open PR, and GitHub refused it with
+  // "No commits between main and <branch>" — an action that could only ever fail.
+  const dir = await mkdtemp(join(tmpdir(), 'handoff-merged-'))
+  const git = nodeGitRunner()
+  try {
+    await exec('git', ['init', '-b', 'main', dir])
+    await exec('git', ['config', 'user.email', 'test@example.com'], { cwd: dir })
+    await exec('git', ['config', 'user.name', 'Test'], { cwd: dir })
+    await writeFile(join(dir, 'README.md'), 'base\n')
+    await exec('git', ['add', '-A'], { cwd: dir })
+    await exec('git', ['commit', '-m', 'base'], { cwd: dir })
+
+    // The session branches off and commits nothing: its edit was never committed, which is the
+    // shape a run that forgets to commit leaves behind.
+    await exec('git', ['branch', 'the-framework/demo'], { cwd: dir })
+    // Meanwhile the base moves on, which is the ordinary case on a repo anyone else is working in.
+    await writeFile(join(dir, 'README.md'), 'base, moved on\n')
+    await exec('git', ['commit', '-am', 'someone else landed this'], { cwd: dir })
+
+    const handoff = await readRunHandoff(dir, 'the-framework/demo', { git, pr: async () => undefined })
+    assert.equal(handoff?.exists, true)
+    assert.deepEqual(handoff?.commits, [], 'the base\'s own commits are not this session\'s work')
+    assert.equal(handoff?.empty, true, 'so there is nothing to open a PR for, and the bar says so')
+    assert.deepEqual(handoff?.files, [])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
 // The end-of-session handoff that fires by itself (#1102).
 
 /** A branch with one commit, a remote, and no PR: the case a handoff should act on. */

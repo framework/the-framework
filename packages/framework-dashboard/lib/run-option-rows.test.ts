@@ -10,6 +10,19 @@ const rows = (preferences: Preferences) => runOptionRows(preferences)
 const find = (list: OptionRow[], key: string) => list.find(r => r.key === key)!
 
 describe('runOptionRows', () => {
+  test('the handoff is one row, Open PR, not a pair with a greyed-out sibling (#1164/#1173)', () => {
+    // It used to offer `Push branch` beside it, disabled and explained away as "opening a PR
+    // already pushes the branch" whenever Open PR was on — which is the default, so the row was
+    // greyed out almost every time anyone opened the gear.
+    const main = rows({}).main
+    expect(main.filter(r => r.key === 'autoOpenPr')).toHaveLength(1)
+    expect(main.find(r => r.key === 'autoPushBranch')).toBeUndefined()
+    expect(find(main, 'autoOpenPr').checked).toBe(true)
+    // The preference itself is untouched: push-without-PR stays reachable from the-framework.yml
+    // and the CLI flag, it just no longer competes for attention in the menu.
+    expect(find(rows({ autoOpenPr: false }).main, 'autoOpenPr').checked).toBe(false)
+  })
+
   test('autopilot is on by default, and off only when explicitly turned off', () => {
     expect(find(rows({}).main, 'autopilot').checked).toBe(true)
     expect(find(rows({ autopilot: false }).main, 'autopilot').checked).toBe(false)

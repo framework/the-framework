@@ -6,7 +6,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { FakeDriver } from './driver/fake.js'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
-import { appendTodoEntry, appendFlatTodoEntry, findTodoBacklog, insertTodoEntry, nextQueuedTicket, parseTodoEntries, runTodoLoop } from './todo-loop.js'
+import { appendTodoEntry, appendFlatTodoEntry, findTodoBacklog, insertTodoEntry, nextQueuedTicket, parseTodoEntries, runTodoLoop, ticketForPrompt } from './todo-loop.js'
+import { drainsQueue, presets } from './preset-catalog.js'
+import { AUTO_PM_DRAIN_JOB, AUTO_PM_JOBS } from './auto-pm.js'
 
 async function tmpWorkspace(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'framework-todo-'))
@@ -493,4 +495,43 @@ test('nextQueuedTicket names the ticket the next drain run will pick up (#1117)'
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
+})
+
+test('ticketForPrompt names a ticket for a hand-fired drain, and for nothing else (#1117)', async () => {
+  const cwd = await tmpWorkspace()
+  try {
+    await writeFile(
+      join(cwd, 'TODO_AGENTS.md'),
+      ['## Priority 9', '', '- [ ] [Add a login page](tickets/2026-07-25_login.md)', ''].join('\n'),
+    )
+
+    // The drain preset, whatever its current wording: the sweep's own prompt, arriving by hand.
+    assert.equal(await ticketForPrompt(presets.drainQueue.render(), cwd), 'tickets/2026-07-25_login.md')
+    // Leading/trailing whitespace is what a textarea adds, not a different instruction.
+    assert.equal(await ticketForPrompt(`\n${presets.drainQueue.render()}  `, cwd), 'tickets/2026-07-25_login.md')
+
+    // Every other prompt implements whatever it likes; naming the queue's next entry for it would
+    // put a ticket in the in-progress lane on the strength of an unrelated run.
+    assert.equal(await ticketForPrompt('Work on the queue please', cwd), undefined)
+    assert.equal(await ticketForPrompt(presets.quickWins.render(), cwd), undefined)
+    assert.equal(await ticketForPrompt('', cwd), undefined)
+
+    // A read that throws is a lane label, not a run: it must never take the start down with it.
+    const boom = async () => {
+      throw new Error('unreadable queue')
+    }
+    assert.equal(await ticketForPrompt(presets.drainQueue.render(), cwd, boom), undefined)
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('the drain the sweep fires and the drain a click fires are the same drain (#1117)', () => {
+  // The daemon recognises its drain by the `drains` flag on the job; a click has only the text.
+  // If those two ever name different prompts, a hand-fired drain silently stops tagging tickets,
+  // which shows up as an empty lane rather than as an error.
+  assert.equal(AUTO_PM_DRAIN_JOB.drains, true)
+  assert.equal(drainsQueue(AUTO_PM_DRAIN_JOB.prompt), true)
+  // And nothing that merely puts work ON the queue counts as taking it off.
+  for (const job of AUTO_PM_JOBS) assert.equal(drainsQueue(job.prompt), false, `${job.name} is not a drain`)
 })

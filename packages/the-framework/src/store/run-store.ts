@@ -106,6 +106,14 @@ export interface RunMeta {
    * branch is guaranteed to be the one holding the commits.
    */
   branch?: string
+  /**
+   * The ticket this run is implementing (#1117), repo-relative (`tickets/<file>.md`).
+   *
+   * Set only when the framework picked the ticket itself, so the Overview can show a ticket that is
+   * being coded right now as `implementing` instead of inferring it from the plan/spike it left
+   * behind. Absent on every run nobody linked to a ticket.
+   */
+  ticket?: string
   /** Whether the agent signalled `setReadyForMerge()` (#326): building (false/absent) vs ready (true). */
   readyForMerge?: boolean
   /**
@@ -276,6 +284,9 @@ export function applyEventToMeta(meta: RunMeta, event: FrameworkEvent, at: strin
       break
     case 'handoff-armed':
       next.handoff = { push: event.push, pr: event.pr }
+      break
+    case 'ticket':
+      next.ticket = event.path
       break
     case 'settled':
       next.settledAt = at

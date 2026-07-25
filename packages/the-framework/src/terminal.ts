@@ -34,6 +34,8 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `◆ done for now — waiting for your next message`
     case 'bind':
       return `◆ bound to project ${event.projectId}`
+    case 'ticket':
+      return `  implementing ${event.path}`
     case 'on-before-mergeable':
       switch (event.outcome) {
         case 'queued':

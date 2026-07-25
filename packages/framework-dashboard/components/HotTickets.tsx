@@ -99,9 +99,21 @@ function Lane({
   )
 }
 
-// The one fact that earns the lane: the plan/spike that made it in-progress, or the priority that
-// made it next. Queued rows carry nothing extra — the lane already says it.
+// The one fact that earns the lane: a run implementing it right now, else the plan/spike that made
+// it in-progress, else the priority that made it next. Queued rows carry nothing extra — the lane
+// already says it.
+//
+// `implementing` is coloured rather than muted like the others (#1117), because it is the only tag
+// that describes something happening as you read it: `planned` and `spiked` are marks work left
+// behind, and a lane holding both should not read as though they were the same claim.
 function TicketTag({ ticket: t }: { ticket: HotTicket }) {
+  if (t.runId) {
+    return (
+      <span className="shrink-0 rounded border border-primary/40 px-1 text-[10px] uppercase tracking-wide text-primary">
+        implementing
+      </span>
+    )
+  }
   const tag = t.bucket === 'in-progress' ? (t.ticket.planned ? 'planned' : t.ticket.spiked ? 'spiked' : null) : t.bucket === 'next' ? t.ticket.priority ?? null : null
   if (!tag) return null
   return (

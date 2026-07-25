@@ -902,3 +902,14 @@ test('registerReposDirectory adds nothing while the opt-in is off (#1123)', asyn
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('startOptionFlags passes the ticket a run implements, and only a real one (#1117)', () => {
+  assert.deepEqual(startOptionFlags({ ticket: 'tickets/2026-07-25_login.md' }), ['--ticket', 'tickets/2026-07-25_login.md'])
+  // Nothing said = the run implements no particular ticket, which is every hand-written prompt.
+  assert.deepEqual(startOptionFlags({}), [])
+  // The value comes off a queue file an agent writes, so it is checked here as well as on the way
+  // in: a path that is not a ticket never becomes a flag.
+  for (const bad of ['tickets/../etc/passwd', '/etc/passwd', 'TODO_AGENTS.md', '']) {
+    assert.deepEqual(startOptionFlags({ ticket: bad }), [], `expected ${bad} to be dropped`)
+  }
+})

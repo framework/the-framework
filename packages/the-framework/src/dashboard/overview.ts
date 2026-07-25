@@ -2,6 +2,7 @@ import { readAllRuns, readLiveMetas, type LiveRun, type RunMeta, type RunStatus 
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
 import { readTickets, type WorkspaceTicket } from './tickets.js'
+import { TICKETS_DIR } from '../tickets.js'
 
 // The first-sidebar Overview (#437, part of #314): a cross-project glance at what the agent
 // is working on right now, the size of the backlog, and the recently active projects. It
@@ -91,6 +92,14 @@ export interface HotTicket {
   projectName: string
   bucket: HotBucket
   ticket: WorkspaceTicket
+  /**
+   * A run is implementing this ticket right now (#1117): its id, for the card to link into.
+   *
+   * The difference between "someone planned this at some point" and "this is being coded as you
+   * look at it", which the plan/spike proxy could not tell apart. Only set for a ticket a live run
+   * actually recorded (`RunMeta.ticket`), so absent still means the lane was inferred.
+   */
+  runId?: string
 }
 
 /** Priority values that read as "do this soon" — the "likely next" lane (#1112). */
@@ -98,13 +107,17 @@ const HIGH_PRIORITY = new Set(['high', 'urgent', 'critical', 'p0', 'p1', '0', '1
 
 /**
  * A ticket's lane (#1112):
- * - in-progress: the agent has planned or spiked it, i.e. work is under way. (There is no run↔ticket
- *   link, so a ticket being *implemented* right now is only visible through the plan/spike it left.)
+ * - in-progress: a run is implementing it right now (#1117), or failing that the agent has planned
+ *   or spiked it, so work is under way in the older, inferred sense.
  * - next: no plan/spike yet, but flagged high priority — likely the next thing picked up.
  * - queued: everything else open, the backlog waiting its turn.
+ *
+ * `implementing` outranks the plan/spike proxy rather than replacing it: a live run is the only
+ * hard evidence, and it exists for a drain run only, so the inference still carries every ticket
+ * someone is working by hand.
  */
-export function ticketBucket(ticket: WorkspaceTicket): HotBucket {
-  if (ticket.planned || ticket.spiked) return 'in-progress'
+export function ticketBucket(ticket: WorkspaceTicket, implementing = false): HotBucket {
+  if (implementing || ticket.planned || ticket.spiked) return 'in-progress'
   if (ticket.priority && HIGH_PRIORITY.has(ticket.priority)) return 'next'
   return 'queued'
 }
@@ -112,9 +125,11 @@ export function ticketBucket(ticket: WorkspaceTicket): HotBucket {
 /** How many hot tickets the Overview pools before the card trims per lane. */
 const HOT_TICKETS_LIMIT = 60
 
-/** Injectable reader so {@link buildHotTickets} is unit-testable off disk. */
+/** Injectable readers so {@link buildHotTickets} is unit-testable off disk. */
 export interface HotTicketsDeps {
   tickets?: (cwd: string) => Promise<WorkspaceTicket[]>
+  /** The project's live runs, read for the ticket each one recorded (#1117). */
+  liveRuns?: (cwd: string) => Promise<LiveRun[]>
 }
 
 /**
@@ -125,10 +140,25 @@ export interface HotTicketsDeps {
  */
 export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicketsDeps = {}): Promise<HotTicket[]> {
   const readT = deps.tickets ?? readTickets
+  const readRuns = deps.liveRuns ?? readLiveMetas
   const all: HotTicket[] = []
   for (const project of projects) {
+    // Which of this project's tickets are being implemented right now, by run id (#1117). Built
+    // per project because a ticket path is only unique within its own repo.
+    const implementing = new Map<string, string>()
+    for (const meta of await readRuns(project.path).catch(() => [])) {
+      if (meta.status !== 'running' || !meta.ticket) continue
+      implementing.set(meta.ticket, meta.id)
+    }
     for (const ticket of await readT(project.path).catch(() => [])) {
-      all.push({ projectId: project.id, projectName: project.name, bucket: ticketBucket(ticket), ticket })
+      const runId = implementing.get(`${TICKETS_DIR}/${ticket.file}`)
+      all.push({
+        projectId: project.id,
+        projectName: project.name,
+        bucket: ticketBucket(ticket, runId !== undefined),
+        ticket,
+        ...(runId ? { runId } : {}),
+      })
     }
   }
   const lane: Record<HotBucket, number> = { 'in-progress': 0, next: 1, queued: 2 }

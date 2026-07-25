@@ -135,6 +135,14 @@ export interface AutoPmJob {
   prompt: string
   /** What it is doing, as the log line says it ("harvesting quick-wins"). */
   describe: string
+  /**
+   * This job works an entry already on the queue, rather than putting entries on it (#1117).
+   *
+   * Only the draining job has a specific piece of work it is about to pick up, so only it can be
+   * told which ticket that is. Declared here rather than matched on {@link AutoPmJob.name} at the
+   * call site, so the job says what it does and a rename cannot quietly unhook it.
+   */
+  drains?: boolean
 }
 
 /**
@@ -178,6 +186,7 @@ export const AUTO_PM_DRAIN_JOB: AutoPmJob = {
   name: presets.drainQueue.name,
   prompt: presets.drainQueue.render(),
   describe: 'draining the first open queue entry',
+  drains: true,
 }
 
 /**

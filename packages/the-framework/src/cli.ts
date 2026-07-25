@@ -37,6 +37,7 @@ import {
 } from './run.js'
 import { FAKE_DEPLOY, FAKE_INTENT, FAKE_SIGNALS, fakeDriver } from './fake-script.js'
 import { readProjectSignals } from './project.js'
+import { isTicketPath } from './tickets.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from './config.js'
 import {
   describeResolvedConfig,
@@ -304,6 +305,8 @@ export interface CliOptions {
   resumeSession?: string | undefined
   /** `--via <surface>` (#917): the surface this run was started from, recorded on its conversation turns. Set by the daemon when a non-local surface (e.g. Discord) asked for the run. */
   via?: string | undefined
+  /** `--ticket <path>` (#1117): the `tickets/<file>.md` this run is implementing. Set by the daemon when it starts a drain run, from the ticket its queue entry links to; recorded on the run's meta. */
+  ticket?: string | undefined
   /** `--unattended`: no human is watching, so choice gates take the recommended option (#846). */
   unattended?: boolean
   scope: 'prototype' | 'full'
@@ -564,6 +567,9 @@ export function parseArgs(argv: string[]): CliOptions {
         break
       case '--via':
         opts.via = argv[++i]
+        break
+      case '--ticket':
+        opts.ticket = argv[++i]
         break
       case '--unattended':
         opts.unattended = true
@@ -1536,6 +1542,10 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // only thing a dashboard tab opened mid-run can read the boxes back from.
   announceHandoff = (push, pr) => onEvent({ kind: 'handoff-armed', push, pr })
   announceHandoff(armedHandoff.push, armedHandoff.pr)
+  // The ticket this run implements (#1117), if the daemon named one. Once, at start: it is a fact
+  // about why the run exists, not a state that changes, and folding it to meta is what lets the
+  // Overview mark that ticket as being implemented right now.
+  if (opts.ticket && isTicketPath(opts.ticket)) onEvent({ kind: 'ticket', path: opts.ticket })
   // Wired now the journal exists: a bind resolved from a topic run's gate folds to meta (#1121).
   recordBind = projectId => onEvent({ kind: 'bind', projectId })
 

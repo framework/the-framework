@@ -208,6 +208,17 @@ test('applyEventToMeta records the session name + ready-for-merge lifecycle sign
   assert.equal(ready.sessionName, 'add-comments') // ready doesn't clobber the name
 })
 
+test('applyEventToMeta records the ticket a run is implementing (#1117)', () => {
+  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  assert.equal(base.ticket, undefined, 'a run nobody linked to a ticket says nothing')
+  const on = applyEventToMeta(base, { kind: 'ticket', path: 'tickets/2026-07-25_login.md' }, AT)
+  assert.equal(on.ticket, 'tickets/2026-07-25_login.md')
+  // It is a fact about why the run exists, so it outlives the work: a reader looking at a finished
+  // run still gets to see which ticket it was.
+  const ended = applyEventToMeta(on, { kind: 'end', ok: true }, AT)
+  assert.equal(ended.ticket, 'tickets/2026-07-25_login.md')
+})
+
 test('applyEventToMeta tracks the pending choice gate a run is parked on (#636)', () => {
   const base = metaFromEvents(RUN.slice(0, 4), AT)
   assert.equal(base.pendingChoice, undefined)

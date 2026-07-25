@@ -38,6 +38,7 @@ import { isSafeVia } from './conversations.js'
 import { createPreviewRuntime } from './preview-runtime.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId, topicScratchPath } from './registry.js'
+import { isTicketPath } from './tickets.js'
 import { installProject, enumerateGitRepos } from './install.js'
 import { isGitRepo } from './project.js'
 import { isCliTimeout } from './cli-exec.js'
@@ -166,6 +167,9 @@ export function startOptionFlags(options: StartRunOptions): string[] {
   }
   // Run target (#1050): only `actions` needs a flag; `local` is the default and emits nothing.
   if (options.target === 'actions') flags.push('--run-on', 'actions')
+  // The ticket this run implements (#1117): only ever a `tickets/<file>.md` the daemon read off
+  // the queue entry, and re-checked on the other side before it reaches the run's meta.
+  if (typeof options.ticket === 'string' && isTicketPath(options.ticket)) flags.push('--ticket', options.ticket)
   // Unattended (#846): nobody is at the keyboard, so gates take the recommended option
   // rather than park for an answer that is not coming.
   if (options.unattended) flags.push('--unattended')

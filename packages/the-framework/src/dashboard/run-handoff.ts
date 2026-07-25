@@ -156,13 +156,23 @@ export async function readRunHandoff(
   }
 
   const base = await detectBase(run)
-  // Compare against the branch point, not the base tip, so commits that merely landed on the base
-  // after this session started are not read as the session's work.
-  const range = base ? `${base}...${branch}` : undefined
+  // Two ranges, because git's two spellings mean opposite things here and only one is right for
+  // each question (#1164/#1173).
+  //
+  // `base..branch` is the branch's OWN commits, which is what "what did this session produce"
+  // asks. `base...branch` in `git log` is the SYMMETRIC difference, so it also lists commits that
+  // are only on the base — exactly the thing the comment below says not to count. A session whose
+  // work is already merged then reported commits it did not make, `empty` stayed false, and the
+  // dashboard offered an Open PR that GitHub refuses with "No commits between main and <branch>".
+  //
+  // For the diff the three-dot form IS the right one: it is the change since the branch point,
+  // rather than a comparison against a base that has moved on since.
+  const logRange = base ? `${base}..${branch}` : undefined
+  const diffRange = base ? `${base}...${branch}` : undefined
 
   const [commitsOut, numstatOut, remoteTip, mergedOut] = await Promise.all([
-    range ? run(['log', '--format=%H%x1f%s', range]) : Promise.resolve(''),
-    range ? run(['diff', '--numstat', range]) : Promise.resolve(''),
+    logRange ? run(['log', '--format=%H%x1f%s', logRange]) : Promise.resolve(''),
+    diffRange ? run(['diff', '--numstat', diffRange]) : Promise.resolve(''),
     hasRemote ? run(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`]) : Promise.resolve(''),
     base ? run(['branch', '--list', '--merged', base, branch]) : Promise.resolve(''),
   ])

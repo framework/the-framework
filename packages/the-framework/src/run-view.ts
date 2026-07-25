@@ -127,6 +127,14 @@ export interface SessionInfo {
   fake?: boolean
   sessionId?: string
   sessionLink?: string
+  /**
+   * The directory the agent ran in (#1195), from the opening `session` event.
+   *
+   * Taken from the event rather than the filesystem on purpose: a run that finishes cleanly has
+   * its worktree removed (`tearDownWorktree`), so the event is the only surviving record of where
+   * the session lived — and that path is exactly what `claude --resume` needs to find it again.
+   */
+  workspace?: string
 }
 
 /**
@@ -138,7 +146,12 @@ export function sessionInfo(events: readonly FrameworkEvent[]): SessionInfo | nu
   let info: SessionInfo | null = null
   for (const event of events) {
     if (event.kind === 'session') {
-      info = { driver: event.driver, fake: event.fake, ...(event.sessionLink ? { sessionLink: event.sessionLink } : {}) }
+      info = {
+        driver: event.driver,
+        fake: event.fake,
+        workspace: event.workspace,
+        ...(event.sessionLink ? { sessionLink: event.sessionLink } : {}),
+      }
     } else if (event.kind === 'session-update') {
       info = { ...(info ?? {}), sessionId: event.sessionId, ...(event.sessionLink ? { sessionLink: event.sessionLink } : {}) }
     }

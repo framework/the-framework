@@ -222,9 +222,17 @@ export interface Registry {
 export interface PreferencesStore {
   read(): Promise<Preferences>
   save(preferences: Preferences): Promise<void>
+  /**
+   * Merge only the keys the caller changed (#1148) and hand back the stored result. Optional so an
+   * existing implementation of this seam keeps compiling; without it the caller falls back to
+   * {@link save}, which replaces the whole block from a snapshot that may already be stale.
+   */
+  patch?(patch: Preferences): Promise<Preferences>
   /** One project's overrides (#840). Optional so a host that only stores globals still compiles. */
   readProject?(projectId: string): Promise<ProjectPreferences>
   saveProject?(projectId: string, preferences: ProjectPreferences): Promise<void>
+  /** The {@link patch} counterpart for one project's overrides (#1148). */
+  patchProject?(projectId: string, patch: ProjectPreferences): Promise<ProjectPreferences>
 }
 
 /** The registry file name: a single file under `$XDG_CONFIG_HOME` (dotted under `$HOME`). */
@@ -673,6 +681,31 @@ export async function writePreferences(
   })
 }
 
+/**
+ * Merge `patch` over the stored preferences (#1148) and return the result.
+ *
+ * The counterpart to {@link writePreferences}, which replaces the whole block: a client that
+ * sends its entire snapshot replays every value it happens to hold, so a dashboard tab opened
+ * before someone else's change silently reverted it on the tab's next write, whatever key that
+ * write was actually about. Sending only the changed keys makes a write touch only what it names.
+ *
+ * Clearing needs no sentinel: {@link sanitizePreferences} already drops blank strings and empty
+ * lists, so `{ editor: '' }` merges in as blank and comes out absent, which is how the dashboard
+ * clears the editor today.
+ */
+export async function patchPreferences(
+  patch: Preferences,
+  fs: RegistryFs = nodeRegistryFs(),
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<Preferences> {
+  return serialize(async () => {
+    const registry = await readRegistry(fs, env)
+    const preferences = sanitizePreferences({ ...registry.preferences, ...patch })
+    await writeRegistry({ ...registry, preferences }, fs, env)
+    return preferences
+  })
+}
+
 /** One project's overrides (#840), or `{}` when it has none. */
 export async function readProjectPreferences(
   projectId: string,
@@ -699,6 +732,26 @@ export async function writeProjectPreferences(
     const { [projectId]: _previous, ...rest } = registry.projectPreferences
     const projectPreferences = Object.keys(sanitized).length ? { ...rest, [projectId]: sanitized } : rest
     await writeRegistry({ ...registry, projectPreferences }, fs, env)
+  })
+}
+
+/**
+ * Merge `patch` over one project's overrides (#1148) and return the result — {@link patchPreferences}
+ * for the project tier, and the same reason: the run options a tab holds are as stale as its globals.
+ */
+export async function patchProjectPreferences(
+  projectId: string,
+  patch: ProjectPreferences,
+  fs: RegistryFs = nodeRegistryFs(),
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<ProjectPreferences> {
+  return serialize(async () => {
+    const registry = await readRegistry(fs, env)
+    const { [projectId]: previous, ...rest } = registry.projectPreferences
+    const sanitized = sanitizeProjectPreferences({ ...previous, ...patch })
+    const projectPreferences = Object.keys(sanitized).length ? { ...rest, [projectId]: sanitized } : rest
+    await writeRegistry({ ...registry, projectPreferences }, fs, env)
+    return sanitized
   })
 }
 
@@ -782,7 +835,9 @@ export function registryPreferencesStore(
   return {
     read: () => readPreferences(fs, env),
     save: preferences => writePreferences(preferences, fs, env),
+    patch: patch => patchPreferences(patch, fs, env),
     readProject: projectId => readProjectPreferences(projectId, fs, env),
     saveProject: (projectId, preferences) => writeProjectPreferences(projectId, preferences, fs, env),
+    patchProject: (projectId, patch) => patchProjectPreferences(projectId, patch, fs, env),
   }
 }

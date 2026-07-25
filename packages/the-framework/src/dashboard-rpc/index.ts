@@ -9,14 +9,17 @@ export { onProjects, sendAddProject, onOnboarding } from './projects.telefunc.js
 export {
   onPreferences,
   savePreferences,
+  patchPreferences,
   onProjectPreferences,
   saveProjectPreferences,
+  patchProjectPreferences,
   onProjectPresets,
   saveProjectPresets,
   onEditors,
   onNotifyChannels,
   saveDiscordCredentials,
   type SavePreferencesResult,
+  type PatchPreferencesResult,
   type NotifyChannels,
 } from './preferences.telefunc.js'
 export type { CredentialSource, DiscordCredentialStatus, DiscordCredentialsPatch } from '../discord-credentials.js'

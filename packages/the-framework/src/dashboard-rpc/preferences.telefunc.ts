@@ -35,6 +35,27 @@ export async function savePreferences(preferences: Preferences): Promise<SavePre
   }
 }
 
+/** The outcome of a patch write (#1148): the stored result, so the caller can adopt it. */
+export type PatchPreferencesResult<T> = { ok: true; preferences: T } | { ok: false; error: string }
+
+/**
+ * Merge the keys the caller changed into the stored preferences (#1148), and hand back what is
+ * now stored. The write half of the fix for a stale tab reverting settings it never touched:
+ * {@link savePreferences} replaces the whole block, so a client's snapshot overwrote whatever
+ * anyone else had changed since it loaded. Returning the merged result also lets the caller
+ * adopt the truth it just wrote against, so a tab converges instead of staying stale.
+ */
+export async function patchPreferences(patch: Preferences): Promise<PatchPreferencesResult<Preferences>> {
+  const store = contextPreferences()
+  if (!store?.patch) return { ok: false, error: 'preferences are not enabled on this server' }
+  // Typed error rather than a rejection, like `savePreferences` — one shape for both failures.
+  try {
+    return { ok: true, preferences: await store.patch(patch) }
+  } catch {
+    return { ok: false, error: 'failed to save preferences' }
+  }
+}
+
 /**
  * One project's own run options (#840), or `{}` when it overrides nothing / the host stores
  * none. Separate from {@link onPreferences} rather than folded into it: the client needs the
@@ -56,6 +77,20 @@ export async function saveProjectPreferences(
   try {
     await store.saveProject(projectId, preferences)
     return { ok: true }
+  } catch {
+    return { ok: false, error: 'failed to save preferences' }
+  }
+}
+
+/** {@link patchPreferences} for one project's run options (#1148). */
+export async function patchProjectPreferences(
+  projectId: string,
+  patch: ProjectPreferences,
+): Promise<PatchPreferencesResult<ProjectPreferences>> {
+  const store = contextPreferences()
+  if (!store?.patchProject) return { ok: false, error: 'preferences are not enabled on this server' }
+  try {
+    return { ok: true, preferences: await store.patchProject(projectId, patch) }
   } catch {
     return { ok: false, error: 'failed to save preferences' }
   }

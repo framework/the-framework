@@ -3,9 +3,9 @@ import type { CustomPreset, FrameworkFileConfig, Preferences, ProjectPreferences
 import { preferencesFromFileConfig, notificationEnabled, PROJECT_PREFERENCE_KEYS } from '@gemstack/the-framework/client'
 import {
   onPreferences,
-  savePreferences,
+  patchPreferences,
   onProjectPreferences,
-  saveProjectPreferences,
+  patchProjectPreferences,
   onProjectPresets,
   saveProjectPresets,
 } from '../server/preferences.telefunc.js'
@@ -18,6 +18,10 @@ import { parseRoute } from './route.js'
 // countdown) reads one shared value and stays in lockstep: an update writes through to the
 // cache, notifies subscribers, and persists daemon-side. Prerender has no daemon, so the
 // server snapshot is the empty default and the real values load on the client.
+//
+// A write sends only the keys it changed (#1148) and adopts what comes back. Sending the whole
+// cached object meant a tab replayed every value it happened to hold, so a tab open since before
+// someone else's change reverted it on its next write — most visibly the theme.
 //
 // Two tiers since #840: the global object, and the open project's own run options on top of it.
 // Components never see the split — `usePreferences()` hands back the resolved result, so a
@@ -46,6 +50,21 @@ const EMPTY_PRESETS: CustomPreset[] = []
  * snapshots by identity, so resolving fresh on each read would re-render forever. */
 let resolved = new Map<string, Preferences>()
 let sources = new Map<string, PreferenceSources>()
+/**
+ * Write bookkeeping per tier (#1148), so nothing the daemon answers can replace the value the
+ * user just chose: `writes` orders one write's reply against a newer write's, and `pending`
+ * (still in flight, so its keys are not stored yet) tells a refresh to keep its hands off.
+ */
+let globalWrites = 0
+let globalPending = 0
+const projectWrites = new Map<string, number>()
+const projectPending = new Map<string, number>()
+
+function bump(map: Map<string, number>, key: string, by: number): number {
+  const next = (map.get(key) ?? 0) + by
+  map.set(key, next)
+  return next
+}
 const listeners = new Set<() => void>()
 
 function notify(): void {
@@ -166,7 +185,18 @@ export function refreshFileConfigs(): void {
   loadFileConfigs()
 }
 
-if (typeof window !== 'undefined') window.addEventListener('focus', refreshFileConfigs)
+if (typeof window !== 'undefined') {
+  const refreshAll = () => {
+    refreshFileConfigs()
+    refreshPreferences()
+  }
+  window.addEventListener('focus', refreshAll)
+  // Switching back to a tab in an already-focused window fires no `focus` event, and that is
+  // exactly when a tab is showing values someone changed in another one (#1148).
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshAll()
+  })
+}
 
 /** Load a project's shared custom presets (#1025) once, from its committed `.the-framework/`. */
 function ensureProjectPresetsLoaded(projectId: string | null): void {
@@ -241,15 +271,69 @@ export function updatePreferences(patch: Partial<Preferences>): void {
   const globalPatch = entries.filter(([key]) => !projectId || !PROJECT_KEYS.has(key))
 
   if (globalPatch.length) {
-    cache = { ...(cache ?? {}), ...Object.fromEntries(globalPatch) }
-    void savePreferences(cache).catch(() => {})
+    const changed = Object.fromEntries(globalPatch)
+    cache = { ...(cache ?? {}), ...changed }
+    const seq = ++globalWrites
+    globalPending++
+    void patchPreferences(changed)
+      .then(result => {
+        // Adopt what the daemon now stores, so this tab stops being stale about anything
+        // another tab changed. Skipped when a newer write has since gone out: that answer
+        // is the more recent truth, and it is about to arrive.
+        if (result.ok && seq === globalWrites) {
+          cache = result.preferences
+          notify()
+        }
+      })
+      .catch(() => {})
+      .finally(() => globalPending--)
   }
   if (projectId && projectPatch.length) {
-    const next = { ...(projects.get(projectId) ?? {}), ...Object.fromEntries(projectPatch) }
-    projects.set(projectId, next)
-    void saveProjectPreferences(projectId, next).catch(() => {})
+    const changed = Object.fromEntries(projectPatch)
+    projects.set(projectId, { ...(projects.get(projectId) ?? {}), ...changed })
+    const seq = bump(projectWrites, projectId, 1)
+    bump(projectPending, projectId, 1)
+    void patchProjectPreferences(projectId, changed)
+      .then(result => {
+        if (result.ok && seq === projectWrites.get(projectId)) {
+          projects.set(projectId, result.preferences)
+          notify()
+        }
+      })
+      .catch(() => {})
+      .finally(() => bump(projectPending, projectId, -1))
   }
   notify()
+}
+
+/**
+ * Re-read both preference tiers (#1148). Wired to the window regaining focus, next to
+ * {@link refreshFileConfigs}: a tab left open in the background is showing values someone else
+ * may have changed, and until #1148 it would also write them back.
+ *
+ * A tier with a write in flight is left alone, whether the write went out before this read or
+ * after it: until the daemon has stored those keys, no read of it can answer with them, and the
+ * write's own reply carries the merged truth anyway.
+ */
+export function refreshPreferences(): void {
+  const seq = globalWrites
+  void onPreferences()
+    .then(preferences => {
+      if (seq !== globalWrites || globalPending > 0) return
+      cache = preferences
+      notify()
+    })
+    .catch(() => {})
+  const projectId = activeProjectId()
+  if (!projectId) return
+  const projectSeq = projectWrites.get(projectId) ?? 0
+  void onProjectPreferences(projectId)
+    .then(preferences => {
+      if (projectSeq !== (projectWrites.get(projectId) ?? 0) || (projectPending.get(projectId) ?? 0) > 0) return
+      projects.set(projectId, preferences)
+      notify()
+    })
+    .catch(() => {})
 }
 
 /** The open project's id, or null on a view with none — for deciding a preset can be shared (#1025). */

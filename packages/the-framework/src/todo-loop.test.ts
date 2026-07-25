@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { FakeDriver } from './driver/fake.js'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
-import { appendTodoEntry, appendFlatTodoEntry, findTodoBacklog, parseTodoEntries, runTodoLoop } from './todo-loop.js'
+import { appendTodoEntry, appendFlatTodoEntry, findTodoBacklog, insertTodoEntry, parseTodoEntries, runTodoLoop } from './todo-loop.js'
 
 async function tmpWorkspace(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'framework-todo-'))
@@ -389,5 +389,75 @@ test('appendFlatTodoEntry writes the flat queue even when a session backlog exis
     assert.equal(await readFile(join(cwd, 'TODO_a-session.agent.md'), 'utf8'), '- [ ] a run\n- [ ] from the run\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+// The queue is worked front to back (the drain preset takes "the FIRST open entry" and
+// parseTodoEntries reads in file order), so where an entry lands *is* its priority. Appending at
+// the end, which is what queueing a ticket used to do, meant "work on this" put it last (#1164).
+
+test('a queued entry lands in its own priority section, not at the end of the file (#1164)', () => {
+  const md = ['# Backlog', '', '## Priority 7', '', '- [ ] an important thing', '', '## Priority 2', '', '- [ ] someday', ''].join('\n')
+  const out = insertTodoEntry(md, 'a medium thing', 5)
+  assert.match(out, /## Priority 5\n\n- \[ \] a medium thing/)
+  // Between the two it ranks against, and ahead of the low one it outranks.
+  assert.ok(out.indexOf('an important thing') < out.indexOf('a medium thing'))
+  assert.ok(out.indexOf('a medium thing') < out.indexOf('someday'))
+})
+
+test('an entry joins the section it belongs to when there already is one (#1164)', () => {
+  const md = ['## Priority 5', '', '- [ ] first', '', '## Priority 2', '', '- [ ] later', ''].join('\n')
+  const out = insertTodoEntry(md, 'second', 5)
+  assert.match(out, /- \[ \] first\n- \[ \] second/)
+  // One section, not a duplicate heading.
+  assert.equal(out.match(/## Priority 5/g)?.length, 1)
+})
+
+test('a file with no priority sections gets one above its own headings (#1164)', () => {
+  // The file's sections are unranked, so burying a deliberate pick beneath them is the bug.
+  const md = ['# Backlog', '', 'Some prose.', '', '## MVP v1', '', '- [ ] dogfooding', ''].join('\n')
+  const out = insertTodoEntry(md, 'queued thing', 5)
+  assert.ok(out.indexOf('queued thing') < out.indexOf('dogfooding'))
+  assert.ok(out.startsWith('# Backlog\n\nSome prose.\n'), 'the intro stays at the top')
+  assert.deepEqual(parseTodoEntries(out), ['queued thing', 'dogfooding'])
+})
+
+test('a backlog with nothing but prose still gets a section (#1164)', () => {
+  const out = insertTodoEntry('# Backlog\n\nSome prose.\n', 'queued thing', 5)
+  assert.match(out, /## Priority 5\n\n- \[ \] queued thing\n$/)
+})
+
+test('an entry that outranks everything in the file goes first (#1164)', () => {
+  const md = ['## Priority 2', '', '- [ ] someday', ''].join('\n')
+  const out = insertTodoEntry(md, 'urgent thing', 9)
+  assert.ok(out.indexOf('urgent thing') < out.indexOf('someday'))
+})
+
+test('an entry outranked by everything in the file goes last, in its own section (#1164)', () => {
+  const md = ['## Priority 9', '', '- [ ] urgent thing', ''].join('\n')
+  const out = insertTodoEntry(md, 'someday', 2)
+  assert.ok(out.indexOf('urgent thing') < out.indexOf('someday'))
+  assert.match(out, /## Priority 2\n\n- \[ \] someday/)
+})
+
+test('a section heading with the format\'s own gloss is still matched (#1164)', () => {
+  // `todo_format.md` writes "## Priority 10 (critical — act immediately)".
+  const md = ['## Priority 10 (critical)', '', '- [ ] the fire', ''].join('\n')
+  const out = insertTodoEntry(md, 'another fire', 10)
+  assert.equal(out.match(/## Priority 10/g)?.length, 1)
+  assert.match(out, /- \[ \] the fire\n- \[ \] another fire/)
+})
+
+test('appendFlatTodoEntry places by priority when given one, and appends when not (#1164)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'todo-priority-'))
+  try {
+    await writeFile(join(dir, 'TODO_AGENTS.md'), '# Backlog\n\n## MVP v1\n\n- [ ] old\n', 'utf8')
+    await appendFlatTodoEntry(dir, 'ranked', 5)
+    await appendFlatTodoEntry(dir, 'unranked')
+    const md = await readFile(join(dir, 'TODO_AGENTS.md'), 'utf8')
+    // The ranked one jumped the unranked backlog; the plain append stayed an append.
+    assert.deepEqual(parseTodoEntries(md), ['ranked', 'old', 'unranked'])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
   }
 })

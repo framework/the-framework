@@ -32,11 +32,27 @@ describe('TicketsPanel (#697)', () => {
     expect(screen.getByText('planned')).toBeTruthy()
   })
 
-  test('queueing a ticket writes it to the queue', async () => {
+  test('queueing a ticket writes it to the queue, with the ticket it came from (#1164)', async () => {
+    sendQueueTicket.mockResolvedValue({ ok: true, file: 'TODO_AGENTS.md' })
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ priority: 'high' })]} loaded />)
+    fireEvent.click(await screen.findByRole('button', { name: /queue/i }))
+    // The file is what the entry links back to; the priority is what ranks it in the queue.
+    await waitFor(() =>
+      expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'Do the thing', {
+        file: '2026-07-20_do-the-thing.md',
+        priority: 'high',
+      }),
+    )
+  })
+
+  test('an unprioritised ticket is queued without inventing one for it (#1164)', async () => {
+    // The ticket format says `priority:` is optional; what unmarked means is the server's call.
     sendQueueTicket.mockResolvedValue({ ok: true, file: 'TODO_AGENTS.md' })
     render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded />)
     fireEvent.click(await screen.findByRole('button', { name: /queue/i }))
-    await waitFor(() => expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'Do the thing'))
+    await waitFor(() =>
+      expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'Do the thing', { file: '2026-07-20_do-the-thing.md' }),
+    )
   })
 
   // The queue is a file, so a re-poll cannot tell us the row was queued: without remembering

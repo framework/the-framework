@@ -4,6 +4,7 @@ import type { DriverSession } from './driver/index.js'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
 import { requestChoices, runAwaitRounds } from './await-gate.js'
 import { FLAT_TODO_FILE, findFlatTodo, ticketFromQueueEntry } from './tickets.js'
+import { drainsQueue } from './preset-catalog.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
 
 export { FLAT_TODO_FILE, LEGACY_HYPHEN_TODO_FILE, LEGACY_TICKETS_TODO_FILE, LEGACY_TODO_FILE, TICKETS_DIR, ticketFromQueueEntry, todoPriorityForTicket } from './tickets.js'
@@ -244,6 +245,26 @@ export async function nextQueuedTicket(cwd: string): Promise<string | undefined>
   if (md === undefined) return undefined
   const first = parseTodoEntries(md)[0]
   return first ? ticketFromQueueEntry(first) : undefined
+}
+
+/**
+ * The ticket a run started by hand is about to implement, when that run is a drain (#1117).
+ *
+ * The daemon already does this for the sweep's own drain, off the `drains` flag on the job. A run
+ * fired from the dashboard reaches the same start with none of that context, so a hand-fired drain
+ * showed up working on nothing: the run implemented the ticket, and the lane it belonged in stayed
+ * empty. Same read as the sweep's, so both agree on which entry is next.
+ *
+ * Undefined for anything that is not a drain, and for a drain over an empty queue. The `read` seam
+ * is for tests; production always takes the default.
+ */
+export async function ticketForPrompt(
+  prompt: string,
+  cwd: string,
+  read: (cwd: string) => Promise<string | undefined> = nextQueuedTicket,
+): Promise<string | undefined> {
+  if (!drainsQueue(prompt)) return undefined
+  return read(cwd).catch(() => undefined)
 }
 
 /**

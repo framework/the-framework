@@ -190,6 +190,16 @@ export type FrameworkEvent =
    */
   | { kind: 'handoff-armed'; push: boolean; pr: boolean }
   /**
+   * The ticket this run was started to implement (#1117), as a repo-relative `tickets/<file>.md`.
+   *
+   * Emitted once at start, and only when the framework itself chose the ticket — today that is the
+   * [Drain queue] run, whose queue entry links back to the ticket it was queued from (#1164). An
+   * event rather than a start argument for the usual reason: only an event reaches the run's meta,
+   * and the meta is what a dashboard tab opened mid-run reads. Absent means nobody knows what this
+   * run is implementing, which is every hand-written prompt.
+   */
+  | { kind: 'ticket'; path: string }
+  /**
    * What the end-of-session handoff actually did (#1102): pushed and/or opened a draft PR,
    * declined for a reason that is not a fault, or failed at one of the two steps.
    *

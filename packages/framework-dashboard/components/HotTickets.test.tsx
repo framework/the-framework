@@ -40,4 +40,24 @@ describe('HotTickets (#1112)', () => {
     fireEvent.click(screen.getByText('b'))
     expect(picked).toBe('beta')
   })
+
+  test('a ticket a run is implementing right now says so, over its plan/spike (#1117)', async () => {
+    onHotTickets.mockResolvedValue([
+      { ...ht('a.md', 'alpha', 'in-progress', { planned: true }), runId: 'run-7' },
+      ht('b.md', 'alpha', 'in-progress', { planned: true }),
+    ])
+    render(<HotTickets onSelectProject={() => {}} />)
+    await waitFor(() => expect(screen.getByText('a')).toBeTruthy())
+    // Live work outranks the mark older work left behind, so the same lane can say which is which.
+    expect(screen.getByText('implementing')).toBeTruthy()
+    expect(screen.getByText('planned')).toBeTruthy()
+  })
+
+  test('a ticket being implemented with no plan or spike still gets a tag (#1117)', async () => {
+    // The gap the run link opens up: in-progress used to imply planned-or-spiked, so a bare
+    // implementing ticket would have shown an unexplained row.
+    onHotTickets.mockResolvedValue([{ ...ht('a.md', 'alpha', 'in-progress'), runId: 'run-7' }])
+    render(<HotTickets onSelectProject={() => {}} />)
+    await waitFor(() => expect(screen.getByText('implementing')).toBeTruthy())
+  })
 })

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { FakeDriver } from './driver/fake.js'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
-import { appendTodoEntry, appendFlatTodoEntry, findTodoBacklog, insertTodoEntry, parseTodoEntries, runTodoLoop } from './todo-loop.js'
+import { appendTodoEntry, appendFlatTodoEntry, findTodoBacklog, insertTodoEntry, nextQueuedTicket, parseTodoEntries, runTodoLoop } from './todo-loop.js'
 
 async function tmpWorkspace(): Promise<string> {
   return mkdtemp(join(tmpdir(), 'framework-todo-'))
@@ -459,5 +459,38 @@ test('appendFlatTodoEntry places by priority when given one, and appends when no
     assert.deepEqual(parseTodoEntries(md), ['ranked', 'old', 'unranked'])
   } finally {
     await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('nextQueuedTicket names the ticket the next drain run will pick up (#1117)', async () => {
+  const cwd = await tmpWorkspace()
+  try {
+    // Nothing queued at all: nothing to name.
+    assert.equal(await nextQueuedTicket(cwd), undefined)
+
+    // The drain preset works "the FIRST open entry only", so that is the entry this reads --
+    // priority order is already the file order the queue is written in (#1164).
+    await writeFile(
+      join(cwd, 'TODO_AGENTS.md'),
+      [
+        '## Priority 9',
+        '',
+        '- [x] [Already done](tickets/2026-07-01_done.md)',
+        '- [ ] [Add a login page](tickets/2026-07-25_login.md)',
+        '',
+        '## Priority 5',
+        '',
+        '- [ ] [Later](tickets/2026-07-26_later.md)',
+        '',
+      ].join('\n'),
+    )
+    assert.equal(await nextQueuedTicket(cwd), 'tickets/2026-07-25_login.md')
+
+    // A queue whose first open entry is plain text: a drain run there implements no ticket, and
+    // saying "the one below it" would label the wrong ticket as being worked.
+    await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] tidy the README\n- [ ] [Login](tickets/2026-07-25_login.md)\n')
+    assert.equal(await nextQueuedTicket(cwd), undefined)
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
   }
 })

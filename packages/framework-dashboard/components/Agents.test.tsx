@@ -62,7 +62,7 @@ describe('Agents (#1139)', () => {
   test('each column says so when it is empty, rather than the card vanishing', () => {
     render(<Agents working={[]} finished={[]} loading={false} onSelectRun={vi.fn()} />)
     expect(screen.getByText('No agents working right now.')).toBeTruthy()
-    expect(screen.getByText('No finished sessions yet.')).toBeTruthy()
+    expect(screen.getByText('No sessions yet.')).toBeTruthy()
   })
 
   test('loading is not the same as empty', () => {

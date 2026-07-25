@@ -67,7 +67,7 @@ describe('RunHistory (#785)', () => {
       </SidebarProvider>,
     )
     const rows = [...container.querySelectorAll('button')]
-    const home = rows.find(row => row.textContent?.trim() === 'New')
+    const home = rows.find(row => row.textContent?.trim() === 'New session')
     const starting = rows.find(row => row.textContent?.includes('starting…'))
     expect(starting?.className).toContain('bg-accent')
     expect(home?.className).not.toContain('bg-accent')
@@ -106,7 +106,7 @@ describe('RunHistory rows', () => {
   // the New launcher rather than vanishing.
   test('with no project and no recents it still renders New and an empty hint', () => {
     renderRail(<RunHistory projectId={null} runs={[]} recentRuns={[]} selectedRunId={null} onSelect={() => {}} />)
-    expect(screen.getByText('New')).toBeTruthy()
+    expect(screen.getByText('New session')).toBeTruthy()
     expect(screen.getByText('No sessions yet.')).toBeTruthy()
   })
 
@@ -150,7 +150,7 @@ describe('RunHistory New button (#new-button)', () => {
         onSelect={() => {}}
       />,
     )
-    fireEvent.click(screen.getByText('New'))
+    fireEvent.click(screen.getByText('New session'))
     expect(started).toBe('p1')
   })
 
@@ -166,7 +166,7 @@ describe('RunHistory New button (#new-button)', () => {
         onSelect={() => {}}
       />,
     )
-    fireEvent.click(screen.getByText('New'))
+    fireEvent.click(screen.getByText('New session'))
     expect(started).toBe('p9')
   })
 

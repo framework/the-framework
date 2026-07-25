@@ -161,7 +161,7 @@ export function RunHistory({
         {/* The mark + wordmark, the way home (#909), now that there is no navbar to hold them.
             A clear gap below it pushes New down; then New/Overview/Projects stack tight as one nav
             group (gap-0.5), with a little space again below the group (the header's pb-2) before
-            Recents. */}
+            the session list. */}
         <div className="px-1 pt-1 pb-4">
           <BrandLink working={working} onNavigate={onDashboard} />
         </div>
@@ -196,16 +196,16 @@ export function RunHistory({
           {/* pr-3 keeps the rows (and the active card) clear of the overlaid scrollbar (w-2.5). */}
           <SidebarGroup className="pt-3 pr-3">
             {/* The label sticks to the top of the scroll; the gradient strip under it (also sticky)
-                fades the rows into the background as they scroll up beneath the label. */}
-            {hasRecents && (
-              <div className="sticky top-0 z-10">
-                <SidebarGroupLabel className="rounded-none bg-background font-normal tracking-wide text-muted-foreground">Recents</SidebarGroupLabel>
-                {/* Absolute (hanging just below the label) so it does not push the first row down; it
-                    still overlays the rows scrolling up under it. `rail-fade` keeps it invisible at
-                    the top of the scroll (so it never dims the first row) and fades it in on scroll. */}
-                <div aria-hidden className="rail-fade pointer-events-none absolute inset-x-0 top-full h-4 bg-gradient-to-b from-background to-transparent" />
-              </div>
-            )}
+                fades the rows into the background as they scroll up beneath the label. Shown even
+                when the list is empty (#1147): the heading is what makes "No sessions yet." read as
+                the state of this list rather than a lonely line in the sidebar. */}
+            <div className="sticky top-0 z-10">
+              <SidebarGroupLabel className="rounded-none bg-background font-normal tracking-wide text-muted-foreground">Recent sessions</SidebarGroupLabel>
+              {/* Absolute (hanging just below the label) so it does not push the first row down; it
+                  still overlays the rows scrolling up under it. `rail-fade` keeps it invisible at
+                  the top of the scroll (so it never dims the first row) and fades it in on scroll. */}
+              <div aria-hidden className="rail-fade pointer-events-none absolute inset-x-0 top-full h-4 bg-gradient-to-b from-background to-transparent" />
+            </div>
             <SidebarGroupContent>
               <SidebarMenu className="gap-0.5">
                 {/* A just-started run, before its run.json exists — highlighted while following it. */}
@@ -393,7 +393,7 @@ function NewButton({
     return (
       <Button variant="ghost" className={cls} onClick={() => start(target)}>
         <Plus className="h-4 w-4 shrink-0" />
-        <span className="whitespace-nowrap">New</span>
+        <span className="whitespace-nowrap">New session</span>
       </Button>
     )
   }
@@ -404,7 +404,7 @@ function NewButton({
       <>
         <Button variant="ghost" className={cls} onClick={() => setAdding(true)} title="Add a project to start a session">
           <Plus className="h-4 w-4 shrink-0" />
-          <span className="whitespace-nowrap">New</span>
+          <span className="whitespace-nowrap">New session</span>
         </Button>
         {adding && <AddProjectPanel onAdded={() => onProjectAdded?.()} onClose={() => setAdding(false)} />}
       </>
@@ -416,7 +416,7 @@ function NewButton({
     <DropdownMenu>
       <DropdownMenuTrigger aria-label="New session" className={cn(buttonVariants({ variant: 'ghost' }), cls)}>
         <Plus className="h-4 w-4 shrink-0" />
-        <span className="whitespace-nowrap">New</span>
+        <span className="whitespace-nowrap">New session</span>
         <ChevronDown className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[13.5rem]">

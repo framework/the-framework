@@ -226,8 +226,14 @@ function tail(text: string, max = 600): string {
  * The shell command `script` hosts. A **fixed literal**: the prompt and the model arrive
  * as environment variables, so nothing the user typed is ever parsed as shell syntax.
  * `${FW_CLOUD_MODEL:+...}` adds the model flag only when one was chosen.
+ *
+ * **The prompt has to come directly after `--cloud`.** The description is that flag's own
+ * value rather than a loose positional argument, so anything in between claims the slot and
+ * the CLI stops with "--cloud requires a description". That is why this failed on an account
+ * with a model preference and worked without one: the model flag was sitting in the slot.
+ * Exported so a test can pin the order, which is load-bearing and not otherwise observable.
  */
-const CLOUD_COMMAND = 'exec "$FW_CLOUD_BIN" --cloud ${FW_CLOUD_MODEL:+--model "$FW_CLOUD_MODEL"} "$FW_CLOUD_PROMPT"'
+export const CLOUD_COMMAND = 'exec "$FW_CLOUD_BIN" --cloud "$FW_CLOUD_PROMPT" ${FW_CLOUD_MODEL:+--model "$FW_CLOUD_MODEL"}'
 
 /**
  * Run the CLI under a pty supplied by `script`, streaming its terminal output.

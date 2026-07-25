@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ChoiceRequest } from '@gemstack/the-framework'
+import type { ChoiceRequest, LogEntry, WorkspaceDoc, WorkspaceTicket } from '@gemstack/the-framework'
 import type { LoopStatus } from '@gemstack/the-framework/client'
 import { LoopStatusCard } from './LoopStatusCard.js'
 import { DocsPanel } from './DocsPanel.js'
@@ -13,6 +13,8 @@ import type { AgentView } from '../lib/live-state.js'
 import { Badge } from './ui/badge.js'
 import { Button } from './ui/button.js'
 import { cn } from '../lib/utils.js'
+import { usePolled } from '../lib/use-async.js'
+import { onDocs, onProjectLog, onTickets } from '../server/reads.telefunc.js'
 
 type Tab = 'files' | 'choices' | 'views' | 'browser' | 'tickets' | 'docs' | 'log'
 
@@ -56,6 +58,18 @@ export function RightRail({
   /** Told when a panel starts a session (the tickets import, #948), so the shell shows it. */
   onRunStarted?: ((intent: string, runId?: string) => void) | undefined
 }) {
+  // The three content panels are read here rather than each polling for itself: the rail has to
+  // know whether they have anything before it can decide which tabs to offer, and whether to be
+  // there at all (#1146). One read each, passed down; the panels render what they are given.
+  const { value: docs, loaded: docsLoaded } = usePolled<WorkspaceDoc[]>(projectId ? () => onDocs(projectId) : null, [], 4000, [projectId])
+  const { value: tickets, loaded: ticketsLoaded } = usePolled<WorkspaceTicket[]>(projectId ? () => onTickets(projectId) : null, [], 10_000, [projectId])
+  const { value: logs, loaded: logsLoaded } = usePolled<LogEntry[]>(projectId ? () => onProjectLog(projectId) : null, [], 10_000, [projectId])
+  // Hidden only once we KNOW it is empty: while the first read is out, the tab stays, so switching
+  // projects does not blink the rail out and back in.
+  const hasDocs = !docsLoaded || docs.length > 0
+  const hasTickets = !ticketsLoaded || tickets.length > 0
+  const hasLog = !logsLoaded || logs.length > 0
+
   const [tab, setTab] = useState<Tab>('docs')
   // Once the user picks a tab, stop auto-defaulting (#695/U22) — only a genuinely new choice
   // gate or the first view may still pull focus after that.
@@ -89,16 +103,22 @@ export function RightRail({
   if (!projectId) return null
 
   // Files first (#492): the project peek surface, before the run's own choices/views/docs/log.
+  // Every tab is earned by content (#1146): a tab that can only say "nothing yet" is one the rail
+  // does not offer, and a rail with no tabs left is not shown at all.
   const tabs: Tab[] = [
     ...(hasFiles ? ['files' as const] : []),
     ...(hasChoices ? ['choices' as const] : []),
     ...(hasViews ? ['views' as const] : []),
     // Only when the run actually has one (#813) — a dead tab teaches people the preview is broken.
     ...(showBrowser && runId ? ['browser' as const] : []),
-    'tickets',
-    'docs',
-    'log',
+    ...(hasTickets ? ['tickets' as const] : []),
+    ...(hasDocs ? ['docs' as const] : []),
+    ...(hasLog ? ['log' as const] : []),
   ]
+  if (tabs.length === 0) return null
+  // The remembered tab may have just lost its content (the last doc deleted, a gate resolved), so
+  // fall back to the first one that still exists rather than rendering an empty panel.
+  const active: Tab = tabs.includes(tab) ? tab : tabs[0]!
   const label = (t: Tab) =>
     t === 'files'
       ? 'Files'
@@ -131,10 +151,10 @@ export function RightRail({
           <Button
             key={t}
             role="tab"
-            aria-selected={tab === t}
+            aria-selected={active === t}
             variant="ghost"
             size="sm"
-            className={cn('h-7 gap-1.5 text-xs', tab === t && 'bg-accent text-accent-foreground')}
+            className={cn('h-7 gap-1.5 text-xs', active === t && 'bg-accent text-accent-foreground')}
             onClick={() => pickTab(t)}
           >
             {label(t)}
@@ -147,20 +167,20 @@ export function RightRail({
           scroller once the content outgrows what is left. That is what puts the verdict below
           directly under the last row rather than at the foot of an empty column. */}
       <div className="flex min-h-0 flex-col overflow-hidden">
-        {tab === 'files' && hasFiles ? (
+        {active === 'files' && hasFiles ? (
           <FileTree projectId={projectId} runId={runId} files={files} selected={context} onToggle={toggleContext} />
-        ) : tab === 'choices' && hasChoices ? (
+        ) : active === 'choices' && hasChoices ? (
           <ChoicesRail projectId={projectId} runId={runId} choices={choices} />
-        ) : tab === 'views' && hasViews ? (
+        ) : active === 'views' && hasViews ? (
           <ViewsRail views={views} />
-        ) : tab === 'browser' && showBrowser && runId ? (
+        ) : active === 'browser' && showBrowser && runId ? (
           <BrowserPanel projectId={projectId} runId={runId} />
-        ) : tab === 'tickets' ? (
-          <TicketsPanel projectId={projectId} onRunStarted={onRunStarted} />
-        ) : tab === 'log' ? (
-          <ProjectLogPanel projectId={projectId} />
+        ) : active === 'tickets' ? (
+          <TicketsPanel projectId={projectId} tickets={tickets} loaded={ticketsLoaded} onRunStarted={onRunStarted} />
+        ) : active === 'log' ? (
+          <ProjectLogPanel logs={logs} loaded={logsLoaded} />
         ) : (
-          <DocsPanel projectId={projectId} />
+          <DocsPanel docs={docs} loaded={docsLoaded} />
         )}
       </div>
       {/* Straight under the panel's content, not one of the tabs and not pinned to the floor: the

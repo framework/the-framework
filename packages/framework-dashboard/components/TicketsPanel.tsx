@@ -1,11 +1,9 @@
 import { useState } from 'react'
 import type { WorkspaceTicket } from '@gemstack/the-framework'
 import { ListPlus, Check } from 'lucide-react'
-import { onTickets } from '../server/reads.telefunc.js'
 import { sendQueueTicket, sendStart } from '../server/control.telefunc.js'
 import { Button } from './ui/button.js'
 import { Badge } from './ui/badge.js'
-import { usePolled } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
 import { cn } from '../lib/utils.js'
 import { ScrollArea } from './ui/scroll-area.js'
@@ -31,19 +29,18 @@ const PRIORITY_TONE: Record<string, string> = {
 // `tickets/` offers to import the repo's GitHub issues instead of just saying "nothing here".
 export function TicketsPanel({
   projectId,
+  tickets,
+  loaded,
   onRunStarted,
 }: {
   projectId: string | null
+  /** Read in the rail (#1146), which needs the count to decide whether to offer the tab. */
+  tickets: WorkspaceTicket[]
+  loaded: boolean
   /** Told when the import session starts, so the shell can show it (#948) — the button used
    *  to flip "Starting…" and leave you staring at the still-empty panel. */
   onRunStarted?: ((intent: string, runId?: string) => void) | undefined
 }) {
-  const { value: tickets, loaded } = usePolled<WorkspaceTicket[]>(
-    projectId ? () => onTickets(projectId) : null,
-    [],
-    10_000,
-    [projectId],
-  )
   // Which tickets this session has queued. The queue is a file, not a field on the ticket, so
   // there is nothing on the ticket to re-read; remembering the click is what stops a row
   // reading as un-queued the moment the poll returns.

@@ -5,11 +5,11 @@ SHOW_CHOICES: Show it via `showChoices()`
 AWAIT: Stop, await user answer before resuming
 SESSION_NAME: the name of the session
 TODO_FILE: `TODO_AGENTS.md`
-ADD_ANALYSIS_ENTRY: Add entry to the ANLYSIS_RESULT.md list
+ADD_ANALYSIS_ENTRY: Add entry to the ANALYSIS_RESULT.md list
 
 ## Analyze the user prompt
 
-Analyze the user prompt, follow the instructions, create ANLYSIS_RESULT.md that lists the analysis results, and show it via showMarkdownSecondary()
+Analyze the user prompt, follow the instructions, create ANALYSIS_RESULT.md that lists the analysis results, and show it via showMarkdownSecondary()
 
 ### Ambiguous prompt
 

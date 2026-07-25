@@ -54,7 +54,7 @@ export function topicBindBlock(projects: readonly string[] | undefined): string 
 /**
  * The system prompt (#326), verbatim, as a template. It supersedes the
  * anti-lazy-pill (#297/#301) it grew out of: the prompt is analyzed first into an
- * ANLYSIS_RESULT.md, an ambiguous prompt becomes a ranked `showChoices()` list, a
+ * ANALYSIS_RESULT.md, an ambiguous prompt becomes a ranked `showChoices()` list, a
  * large scope becomes a PLAN file to approve, a very large one also spins off a TODO
  * backlog (consumed by the backlog loop, #323), the work moves onto its own
  * `the-framework/<session>` branch before the first change, and the alternatives flow

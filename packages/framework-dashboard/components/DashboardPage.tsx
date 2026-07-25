@@ -23,9 +23,12 @@ import { ScrollArea } from './ui/scroll-area.js'
 // Selecting anything here jumps into that project. Shown by the shell when no project is picked.
 export function DashboardPage({
   onSelectProject,
+  onRunStarted,
   interventions,
 }: {
   onSelectProject: (id: string) => void
+  /** Where a session the onboarding checklist starts lands (#1169): on that session. */
+  onRunStarted: (projectId: string, intent: string, runId?: string) => void
   interventions: Intervention[]
 }) {
   const { value: data } = usePolled<DashboardData | null>(onDashboard, null, 5000, [])
@@ -40,7 +43,7 @@ export function DashboardPage({
           <h1 className="text-xl font-semibold">Overview</h1>
         </div>
 
-        {!onboardingDismissed && <OnboardingChecklist dismissible onSelectProject={onSelectProject} />}
+        {!onboardingDismissed && <OnboardingChecklist dismissible onRunStarted={onRunStarted} />}
 
         <NeedsYou items={interventions} onSelectProject={onSelectProject} />
 

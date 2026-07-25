@@ -137,17 +137,24 @@ export default function Page() {
   // route — a selected project's own `runs` (above) carry its rail.
   const { value: recentRuns } = usePolled<RecentRun[]>(projectId === null ? onRecentRuns : null, EMPTY_RECENT, 10_000, [projectId])
 
-  const onRunStarted = (intent: string, startedId?: string, runsOn?: string) => {
+  // A run just started in `inProject`, which is not always the selected one: the onboarding
+  // checklist starts one from the Overview and the settings page, where nothing is selected (#1169).
+  const runStarted = (inProject: string | null, intent: string, startedId?: string, runsOn?: string) => {
     setRunStart(prev => ({ tick: prev.tick + 1, intent, id: startedId ?? null, ...(runsOn ? { runsOn } : {}) }))
     setAdopting(startedId === undefined)
     // The picked context went with that run; the next launch starts from a clean focus (#948).
     resetContext()
     // Go to the run we just started — a real history entry, so Back returns to where you launched
     // from. Its row does not exist yet; the main pane shows it live on the strength of the id.
-    if (startedId !== undefined) go({ projectId, runId: startedId })
+    // With no id yet, land on its project so the effect below can adopt the running one; `go`
+    // no-ops when that is already the URL.
+    go({ projectId: inProject, runId: startedId ?? null })
     // The new run just appends to the rail; reload so its real row shows up quickly.
     reload()
   }
+
+  /** The same, for the surfaces that start a run inside the selected project. */
+  const onRunStarted = (intent: string, startedId?: string, runsOn?: string) => runStarted(projectId, intent, startedId, runsOn)
 
   // The no-id fallback only: adopt the running run as the selection once the poll surfaces it.
   // A correction rather than a step, so it replaces the history entry.
@@ -232,8 +239,8 @@ export default function Page() {
   // run streams its own feed and is steered by its own id (#749).
   const selectedRun = runId ? runs.find(run => run.id === runId) : undefined
   const renderMain = () => {
-    if (view === 'settings') return <SettingsPage onSelectProject={selectProject} onDone={showDashboard} />
-    if (!projectId) return <DashboardPage onSelectProject={selectProject} interventions={interventions} />
+    if (view === 'settings') return <SettingsPage onRunStarted={runStarted} onDone={showDashboard} />
+    if (!projectId) return <DashboardPage onSelectProject={selectProject} onRunStarted={runStarted} interventions={interventions} />
     if (unknownProject)
       return (
         <NotFound

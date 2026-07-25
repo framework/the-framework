@@ -43,11 +43,16 @@ interface Step {
 
 export function OnboardingChecklist({
   dismissible = false,
-  onSelectProject,
+  onRunStarted,
 }: {
   /** The Overview offers to hide it; the settings page always shows it. */
   dismissible?: boolean
-  onSelectProject?: ((id: string) => void) | undefined
+  /**
+   * Told about the session a step started, so the shell can land on it (#1169). The project
+   * travels with it: this renders on the Overview and the settings page, neither of which has
+   * one selected. Required, so a new mounting surface cannot quietly drop the navigation.
+   */
+  onRunStarted: (projectId: string, intent: string, runId?: string) => void
 }) {
   // Slower than the Overview's own 5s poll: onboarding state changes at human speed, and this
   // read fans out over every project to answer the tickets question.
@@ -96,9 +101,11 @@ export function OnboardingChecklist({
 
   const importTickets = async () => {
     if (!targetProjectId) return
-    const started = await start(targetProjectId, presets.importTickets.render(), 'prompt', {})
-    // The import runs as a session; follow it, since that is where its output appears.
-    if (started) onSelectProject?.(targetProjectId)
+    const intent = presets.importTickets.render()
+    const started = await start(targetProjectId, intent, 'prompt', {})
+    // Land on the session doing the import, not the project's launcher (#1169): its id is what
+    // the shell needs to show the live output. A refusal keeps you here, with `startError` shown.
+    if (started) onRunStarted(targetProjectId, intent, started.runId)
   }
 
   const steps: Step[] = [

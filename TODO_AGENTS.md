@@ -8,7 +8,7 @@ The agent queue. Each unchecked entry is worked front to back, highest priority 
 
 ## Priority 5
 
-- [ ] [Make `Import tickets from GitHub` open the session it just started](tickets/2026-07-25_import-tickets-redirects-wrong-page.md) — `importTickets` in `packages/framework-dashboard/components/OnboardingChecklist.tsx:90-95` starts the run and then calls `onSelectProject(targetProjectId)`, which lands on the project instead of the run doing the import. `TicketsPanel.importFromGithub` (`TicketsPanel.tsx:67-72`) already does the right thing with the same preset — it passes `result.runId` to `onRunStarted` — so mirror that: take the run id back from `useStartRun().start` and navigate to the run.
+- [x] [Make `Import tickets from GitHub` open the session it just started](tickets/2026-07-25_import-tickets-redirects-wrong-page.md) — `importTickets` in `packages/framework-dashboard/components/OnboardingChecklist.tsx:90-95` starts the run and then calls `onSelectProject(targetProjectId)`, which lands on the project instead of the run doing the import. `TicketsPanel.importFromGithub` (`TicketsPanel.tsx:67-72`) already does the right thing with the same preset — it passes `result.runId` to `onRunStarted` — so mirror that: take the run id back from `useStartRun().start` and navigate to the run.
 
 ## Priority 2
 

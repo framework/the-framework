@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { HandoffState, RunHandoff } from '@gemstack/the-framework'
-import { GitPullRequest, Upload } from 'lucide-react'
-import { sendOpenPullRequest, sendPushBranch, sendSetHandoff } from '../server/control.telefunc.js'
+import { GitPullRequest } from 'lucide-react'
+import { sendOpenPullRequest, sendSetHandoff } from '../server/control.telefunc.js'
 import type { RunHandoffState } from '../lib/use-run-handoff.js'
 import { cn } from '../lib/utils.js'
 import { DiffStat } from './DiffView.js'
@@ -89,25 +89,29 @@ export function HandoffArm({
       .finally(() => setBusy(false))
   }
 
-  // A PR needs the branch on the remote, so the two boxes are not independent: each carries the
-  // other where the pair would otherwise be impossible. Deciding this per box, rather than by
-  // normalising a pair, is what keeps it right in both directions — a shared rule cannot tell
-  // "ticked PR" from "unticked push" once it only has the resulting pair to look at.
+  // One box, labelled with what this session will actually do (#1173).
+  //
+  // It was two, "Push branch" and "Open PR", sitting as equals — and pushing without opening a PR
+  // is a thing neither Rom nor Suleiman could put a purpose to. A pair also has a state that reads
+  // as a contradiction (PR ticked, push not) that the code then has to keep quietly repairing.
+  //
+  // So: opening a PR is the outcome, pushing is how it gets there, and the label says whichever
+  // this session is set to. A push-only session still says "Push branch" rather than showing an
+  // unticked "Open PR" while pushing behind it — the box never describes something other than what
+  // will happen. Ticking it takes the full step; unticking it means the session hands off nothing.
+  const pushOnly = shown.push && !shown.pr
   return (
     <div className="flex items-center gap-x-3 whitespace-nowrap text-xs text-muted-foreground">
       <Arm
-        label="Push branch"
-        title="Push this session's branch to origin when it finishes."
-        checked={shown.push}
+        label={pushOnly ? 'Push branch' : 'Open PR'}
+        title={
+          pushOnly
+            ? "Push this session's branch to origin when it finishes. Set to push only, so no pull request is opened."
+            : 'Open a draft pull request when this session finishes, pushing the branch on the way.'
+        }
+        checked={shown.pr || pushOnly}
         disabled={busy}
-        onChange={push => set(push ? { push: true, pr: shown.pr } : { push: false, pr: false })}
-      />
-      <Arm
-        label="Open PR"
-        title="Open a draft pull request when this session finishes. Implies pushing the branch."
-        checked={shown.pr}
-        disabled={busy}
-        onChange={pr => set(pr ? { push: true, pr: true } : { push: shown.push, pr: false })}
+        onChange={on => set(on ? { push: true, pr: true } : { push: false, pr: false })}
       />
     </div>
   )
@@ -155,36 +159,38 @@ export function HandoffActions({
   state: RunHandoffState
 }) {
   const { handoff, busy, pending, act } = state
-  if (!handoff || !handoff.exists || handoff.empty || handoff.pr) return null
-  // While the PR lookup is still out (#1028), offering "Open PR" could mean offering to open a
-  // second one. Say nothing for the moment it takes rather than offer the wrong thing.
-  if (handoff.prPending) return null
-  // No remote means neither action can work, and a disabled button with no reason is worse than
-  // a sentence saying why.
-  if (!handoff.hasRemote) return <span className="text-xs text-muted-foreground">No remote to push to.</span>
+  if (!handoff) return null
+  // Once a PR exists the bar links it and the needs-you queue (#632) has it: offering to open one
+  // again is the single mistake this must not make. Same while the lookup is still out (#1028).
+  if (handoff.pr || handoff.prPending) return null
+  // From here every branch says something. A session that has finished and shows no control at all
+  // is #1173: the reason there is nothing to press is exactly what the reader came for.
+  if (!handoff.exists) return <Reason>Branch gone — nothing to open a PR from.</Reason>
+  // The case Rom hit: the agent wrote files and never committed, so the branch holds nothing to
+  // propose. Said plainly, because the tree reads "dirty" right beside it and the two together
+  // are the whole story.
+  if (handoff.empty) return <Reason>Nothing committed — no PR to open.</Reason>
+  if (!handoff.hasRemote) return <Reason>No remote to push to.</Reason>
+  // One button, not two (#1173). "Push branch" and "Open PR" sat side by side as equals, and
+  // neither Rom nor Suleiman could say what pushing without a PR was for — a control nobody can
+  // explain is a control nobody should have to read. Opening a PR pushes the branch on the way,
+  // so the one that names the outcome is the one that stays. Pushing alone is still reachable as
+  // a session setting for anyone who wants it, it just no longer competes here.
   return (
-    <>
-      {!handoff.pushed && (
-        <Button
-          variant="outline"
-          size="xs"
-          disabled={busy}
-          onClick={() => act('push', () => sendPushBranch(projectId, runId), 'Could not push the branch.')}
-        >
-          <Upload className="h-3.5 w-3.5" />
-          {pending === 'push' ? 'Pushing…' : 'Push branch'}
-        </Button>
-      )}
-      <Button
-        size="xs"
-        disabled={busy}
-        onClick={() => act('pr', () => sendOpenPullRequest(projectId, runId), 'Could not open the pull request.')}
-      >
-        <GitPullRequest className="h-3.5 w-3.5" />
-        {pending === 'pr' ? 'Opening PR…' : 'Open PR'}
-      </Button>
-    </>
+    <Button
+      size="xs"
+      disabled={busy}
+      onClick={() => act('pr', () => sendOpenPullRequest(projectId, runId), 'Could not open the pull request.')}
+    >
+      <GitPullRequest className="h-3.5 w-3.5" />
+      {pending === 'pr' ? 'Opening PR…' : 'Open PR'}
+    </Button>
   )
+}
+
+/** Why there is nothing to press. Reads as part of the bar, not as an error. */
+function Reason({ children }: { children: ReactNode }) {
+  return <span className="text-xs text-muted-foreground">{children}</span>
 }
 
 /** What the branch holds, revealed by the bar's disclosure. Never rendered when there is nothing. */

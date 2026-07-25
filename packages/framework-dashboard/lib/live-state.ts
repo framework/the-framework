@@ -64,6 +64,29 @@ export function isRunActive(events: readonly FrameworkEvent[]): boolean {
   return events.length > 0 && !events.some(event => event.kind === 'end')
 }
 
+/**
+ * Whether the agent has stopped working and parked on you (#785), rather than the run's process
+ * having exited.
+ *
+ * The two are not the same and the difference is the whole of #1173. A settled session stays
+ * alive as a conversation (#714) so it can take your next message, which means its status is
+ * still `running` long after the agent has finished. Anything that asks "is there anything more
+ * coming?" — whether to offer the handoff, whether to read the branch — has to ask this rather
+ * than whether the process is up, or a session that is plainly done offers nothing to do with it.
+ *
+ * A new turn un-settles it, the same rule the run's own meta folds (`settled` sets it, a driver
+ * `start` clears it), so this is that rule read off the stream rather than a second opinion.
+ */
+export function agentSettled(events: readonly FrameworkEvent[]): boolean {
+  let settled = false
+  for (const event of events) {
+    if (event.kind === 'settled') settled = true
+    else if (event.kind === 'driver' && event.event.type === 'start') settled = false
+    else if (event.kind === 'end') settled = false // it ended outright; `live` already says so
+  }
+  return settled
+}
+
 /** How a run ended, off its single `end` event. */
 export interface RunOutcome {
   ok: boolean

@@ -1,5 +1,5 @@
 import { renderTemplate } from './prompt-template.js'
-import { SYSTEM_PROMPT } from './prompts.generated.js'
+import { SYSTEM_PROMPT, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 
 /**
@@ -154,17 +154,45 @@ const INSIGHTS_DOC: ContextDoc = { path: 'knowledge-base/INSIGHTS.md', comment: 
 export const BUSINESS_KNOWLEDGE_DOCS: readonly ContextDoc[] = [DECISIONS_DOC, FACTS_DOC, INSIGHTS_DOC]
 
 /**
+ * The two file-format specs, carried in the run's own system channel (#1163).
+ *
+ * Two of the {@link CONTEXT_DOCS} have a shape the agent has to follow: `tickets/**.md` and
+ * `TODO_AGENTS.md`. The #674 call is that their spec ships *inside the package* rather than being
+ * materialized into the user's repo, so a change to the format rides with the package version
+ * instead of going stale in a committed file. What that call left open is how the agent reads it,
+ * and the answer was a path — `node_modules/@gemstack/the-framework/prompts/*.md`.
+ *
+ * That path only resolves when the framework happens to be a root dependency of the repo it is
+ * working on. It is not there for a global or npx install, not there in a fresh worktree before an
+ * install, and not there in this repo at all, where the framework is a workspace package rather
+ * than a dependency of the root. So the spec was unopenable, and the two files it governs drifted
+ * from it (#1163/#1162) with nothing to notice.
+ *
+ * Carrying the content keeps what #674 wanted — the spec still rides with the package version,
+ * and nothing is written into the user's repo — and makes it something the agent has already read
+ * rather than something it has to go and find. It is framework-authored prompt content, so like
+ * the context bullets it goes with the built-in prompt and `--vanilla` drops it.
+ */
+const CONTEXT_FORMATS: readonly string[] = [TICKETING_FORMAT, TODO_FORMAT]
+
+/** The heading each spec opens with, so a bullet can name the section that answers it. */
+const TICKET_FORMAT_HEADING = 'Ticket format'
+const TODO_FORMAT_HEADING = 'TODO_AGENTS.md'
+
+/**
  * Everything the agent keeps in context at the start of a run (#683), which
  * {@link systemPromptBlock} renders as the `Context:` bullets. A superset of
  * {@link BUSINESS_KNOWLEDGE_DOCS}: it adds `GOAL.md` and the roadmap/queue/history pointers the
  * agent reads but does *not* fold knowledge back into — `tickets/**.md` (the potential work,
- * whose file shape is the packaged `ticketing_format.md` spec, #684/#674), the `TODO_AGENTS.md`
- * task queue, and the committed conversations (#683/#908). Repo-root paths, because that is the
- * agent's cwd. README is left out: a repo's own `README.md` already covers the overview. The
- * ticket-format path is inlined rather than imported from `tickets.ts`: this module must stay free
- * of `node:fs` (it renders in the browser, #520), and a test pins the literal to
- * `TICKETING_FORMAT_FILE`. The `TODO_AGENTS.md` format pointer (#880) and the
- * `.the-framework/conversations/` path are inlined for the same reason and pinned by a test.
+ * whose file shape is the `Ticket format` spec, #684/#674), the `TODO_AGENTS.md` task queue (whose
+ * shape is the `TODO_AGENTS.md` spec, #880), and the committed conversations (#683/#908). Repo-root
+ * paths, because that is the agent's cwd. README is left out: a repo's own `README.md` already
+ * covers the overview.
+ *
+ * The two format-bearing bullets point at {@link CONTEXT_FORMATS}, which travels in the same
+ * channel, rather than at a file the agent has to go and open (#1163). The
+ * `.the-framework/conversations/` path is spelled out rather than imported so this module stays
+ * free of `node:fs` (it renders in the browser, #520); a test pins it to the canonical constants.
  */
 export const CONTEXT_DOCS: readonly ContextDoc[] = [
   DECISIONS_DOC,
@@ -177,12 +205,12 @@ export const CONTEXT_DOCS: readonly ContextDoc[] = [
   { path: 'knowledge-base/MARKET_RESEARCH.md', comment: 'the market the project competes in' },
   // The catch-all (#683): any other file the agent parks under knowledge-base/.
   { path: 'knowledge-base/**.md', comment: 'more files holding knowledge related to the project' },
-  { path: 'tickets/**.md', comment: 'things to potentially work on; format: node_modules/@gemstack/the-framework/prompts/ticketing_format.md' },
+  { path: 'tickets/**.md', comment: `things to potentially work on; format: the "${TICKET_FORMAT_HEADING}" section below` },
   // Recorded human conversations (#683/#908): the run committed each Discord/chat turn here, so a
   // future agent can read what was said. A read-only pointer, so it stays out of BUSINESS_KNOWLEDGE_DOCS.
   // Path inlined to keep this module node-free; pinned to THE_FRAMEWORK_DIR/CONVERSATIONS_DIR by a test.
   { path: '.the-framework/conversations/**.md', comment: 'recorded human conversations (e.g. via the Discord bot)' },
-  { path: 'TODO_AGENTS.md', comment: 'the AI task queue; format: node_modules/@gemstack/the-framework/prompts/todo_format.md' },
+  { path: 'TODO_AGENTS.md', comment: `the AI task queue; format: the "${TODO_FORMAT_HEADING}" section below` },
 ]
 
 /** The two halves of the rendered {@link SYSTEM_PROMPT_TEMPLATE}. */
@@ -315,7 +343,8 @@ export function systemPromptBlock(opts: SystemPromptOptions = {}): string {
     const bullets = docs.map(d => `- \`${d.path}\` (${d.comment})`)
     parts.push([head, ...bullets].join('\n'))
   }
-  if (includeBuiltin) parts.push(renderSystemPrompt(opts.tf).system)
+  // The formats the two format-bearing bullets name, right under the list that names them (#1163).
+  if (includeBuiltin) parts.push(...CONTEXT_FORMATS, renderSystemPrompt(opts.tf).system)
   const user = opts.user?.trim()
   if (user) parts.push(user)
   return parts.join('\n\n')

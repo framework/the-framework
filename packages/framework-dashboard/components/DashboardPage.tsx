@@ -37,7 +37,6 @@ export function DashboardPage({
       <div className="mx-auto max-w-6xl space-y-6 p-6">
         <div>
           <h1 className="text-xl font-semibold">Overview</h1>
-          <p className="text-sm text-muted-foreground">Everything the agent is doing, across every project.</p>
         </div>
 
         {!onboardingDismissed && <OnboardingChecklist dismissible onSelectProject={onSelectProject} />}

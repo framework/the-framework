@@ -27,6 +27,19 @@ export function stashDraftFromUrl(): void {
   window.history.replaceState(null, '', url.pathname + url.search + url.hash)
 }
 
+/**
+ * Carry a draft across an in-app navigation (#1139): the same stash the device hop uses, written
+ * directly rather than through the URL. For a click that knows what the next session should be
+ * about but lands on the launcher, where that knowledge would otherwise be dropped — a hot ticket
+ * with no run of its own.
+ *
+ * Deliberately not a `?draft=` param like the device hop: this navigation never leaves the tab, so
+ * there is nothing to hand another device and no reason to put the prompt in the address bar.
+ */
+export function stashPendingDraft(draft: string): void {
+  session()?.setItem(PENDING_DRAFT_KEY, draft)
+}
+
 /** The carried draft, if any, cleared as it is read so a reload does not re-seed it. */
 export function takePendingDraft(): string | null {
   const s = session()

@@ -185,17 +185,21 @@ export const Composer = forwardRef<ComposerHandle, {
     focus: () => editorRef.current?.focus(),
   }))
 
-  // Rehydrate a draft carried from another device (#1066), launcher-only. stashDraftFromUrl is
-  // idempotent, so calling it here is race-safe even if the SPA-entry call has not run yet. A carried
-  // draft is still a 'build', so seed the editor without flipping kind.
+  // Rehydrate a draft carried in — from another device (#1066) or from the click that navigated
+  // here (#1139) — launcher-only. stashDraftFromUrl is idempotent, so calling it here is race-safe
+  // even if the SPA-entry call has not run yet. A carried draft is still a 'build', so it seeds the
+  // editor without flipping kind.
+  //
+  // Handed to the editor as `initialText` rather than pushed through the handle: the draft is taken
+  // once and cleared, while `loadTemplate` silently does nothing until Tiptap has resolved
+  // (`immediatelyRender: false`), so pushing it at mount dropped the draft and left an empty
+  // composer. `prompt` then arrives the normal way, through the editor's own onChange.
+  const [carriedDraft, setCarriedDraft] = useState<string | undefined>(undefined)
   useEffect(() => {
     if (compact || inSession) return
     stashDraftFromUrl()
     const carried = takePendingDraft()
-    if (carried) {
-      editorRef.current?.loadTemplate(carried)
-      setPrompt(carried)
-    }
+    if (carried) setCarriedDraft(carried)
   }, [compact, inSession])
 
   // A synchronous latch alongside the async `busy` prop (#948): two fast ⌘↵ presses both read
@@ -263,6 +267,7 @@ export const Composer = forwardRef<ComposerHandle, {
       {...(compact ? {} : { onNewPreset: () => setAddingPreset(true) })}
       disabled={busy}
       {...(placeholder ? { placeholder } : {})}
+      {...(carriedDraft ? { initialText: carriedDraft } : {})}
     />
   )
 

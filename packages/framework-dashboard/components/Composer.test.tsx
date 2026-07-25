@@ -32,21 +32,45 @@ vi.mock('../server/devices.telefunc.js', () => ({ checkDevices }))
 
 // Stub the Tiptap editor (it needs a real DOM/ProseMirror): a plain input driving onChange, a
 // "type-submit" button firing onSubmit, and a ref exposing the same handle the composer calls.
+//
+// The stub models one thing about the real editor deliberately: `loadTemplate` does NOTHING until
+// the editor has resolved. Tiptap runs with `immediatelyRender: false`, so on the first render the
+// handle is a no-op that returns false — and a stub that answered it synchronously is exactly why a
+// carried draft passed here while arriving as an empty composer in a browser. An opening draft
+// therefore has to travel as `initialText`, which the editor applies when it is ready.
+// It also holds and renders its own text, so a test can ask what is IN the box rather than only
+// what Start would send. The two used to be assertable only together, which hid this exact bug: the
+// composer's own `prompt` state was set alongside the editor call, so a dropped `loadTemplate` still
+// submitted the right text while the user looked at an empty box and had nothing to edit.
 vi.mock('./PromptEditor.js', async () => {
-  const { forwardRef, useImperativeHandle } = await import('react')
+  const { forwardRef, useEffect, useImperativeHandle, useRef, useState } = await import('react')
   const PromptEditor = forwardRef((props: any, ref: any) => {
+    const [ready, setReady] = useState(false)
+    const [held, setHeld] = useState('')
+    useEffect(() => setReady(true), []) // resolves a render late, like useEditor
+    const put = (text: string) => {
+      setHeld(text)
+      props.onChange(text)
+    }
     useImperativeHandle(ref, () => ({
-      clear: () => props.onChange(''),
+      clear: () => put(''),
       focus: () => {},
       // Loading a preset puts its text in the box, which is what makes a loaded preset submittable.
       loadTemplate: (text: string) => {
-        props.onChange(text)
+        if (!ready) return false
+        put(text)
         return false
       },
     }))
+    const seeded = useRef(false)
+    useEffect(() => {
+      if (!ready || seeded.current || !props.initialText) return
+      seeded.current = true
+      put(props.initialText)
+    }, [ready, props.initialText])
     return (
       <div>
-        <input aria-label="prompt" onChange={e => props.onChange(e.target.value)} disabled={props.disabled} />
+        <input aria-label="prompt" value={held} onChange={e => put(e.target.value)} disabled={props.disabled} />
         <button type="button" onClick={() => props.onSubmit()}>
           editor-submit
         </button>
@@ -55,6 +79,9 @@ vi.mock('./PromptEditor.js', async () => {
   })
   return { PromptEditor }
 })
+
+/** What the editor is actually holding, as opposed to what Start would submit. */
+const editorText = (): string => (screen.getByLabelText('prompt') as HTMLInputElement).value
 
 const { Composer } = await import('./Composer.js')
 
@@ -205,6 +232,17 @@ describe('Composer (#721)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Start session/ }))
     expect(onSubmit).toHaveBeenCalledWith('carried from the studio box', 'build', { newSession: false })
     expect(sessionStorage.getItem('fw.pending-draft')).toBeNull() // taken once
+  })
+
+  test('a carried draft is IN the editor, not just in what Start would send (#1139)', () => {
+    // The regression the stub models: the draft is taken and cleared on the first render, while the
+    // editor is not there yet to receive it. Seeding it as `initialText` is what keeps those two
+    // facts from cancelling out. Asserted on the box rather than on submit, because submit was
+    // right the whole time this was broken — the user was the one looking at an empty composer.
+    const draft = 'Work on tickets/a.md. Do not start any other ticket.'
+    sessionStorage.setItem('fw.pending-draft', draft)
+    renderComposer({ submitLabel: 'Start session' })
+    expect(editorText()).toBe(draft)
   })
 
   test('an in-session composer does not rehydrate a carried draft (#1066)', () => {

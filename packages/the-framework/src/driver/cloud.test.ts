@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { CloudDriver, type RunPtyOptions } from './cloud.js'
+import { CLOUD_COMMAND, CloudDriver, type RunPtyOptions } from './cloud.js'
 import type { DriverEvent } from './types.js'
 
 /**
@@ -115,6 +115,24 @@ test('an untrusted workspace fails fast and says how to fix it, rather than hang
   const notice = events.find(e => e.type === 'notice')
   assert.ok(notice && /has not been trusted in \/repo/.test(notice.message))
   assert.ok(notice && /Run `claude` there once/.test(notice.message))
+})
+
+test('the prompt sits directly after --cloud, ahead of the model flag', () => {
+  // The description is `--cloud`'s own value, not a positional argument. With the model flag
+  // in between, every run on an account with a model preference died on "--cloud requires a
+  // description" while runs without one worked, which is what made it look unrelated to the
+  // model at first. Nothing else observes this order, so it is pinned here.
+  const promptAt = CLOUD_COMMAND.indexOf('"$FW_CLOUD_PROMPT"')
+  const modelAt = CLOUD_COMMAND.indexOf('FW_CLOUD_MODEL')
+  assert.ok(promptAt > 0 && modelAt > 0)
+  assert.ok(promptAt < modelAt, 'the prompt must be the argument to --cloud')
+  assert.match(CLOUD_COMMAND, /--cloud "\$FW_CLOUD_PROMPT"/)
+})
+
+test('the shell command never interpolates the prompt or the model as syntax', () => {
+  // Both arrive through the environment, so the hosted command stays a fixed literal.
+  assert.ok(!CLOUD_COMMAND.includes('${FW_CLOUD_PROMPT}'))
+  assert.match(CLOUD_COMMAND, /^exec "\$FW_CLOUD_BIN"/)
 })
 
 test('an unsafe model id never reaches the shell', async () => {

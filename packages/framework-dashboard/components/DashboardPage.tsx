@@ -12,6 +12,7 @@ import { usePreferences } from '../lib/preferences.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { HotTickets } from './HotTickets.js'
 import { cn } from '../lib/utils.js'
+import { queueEntryLabel } from '../lib/queue-entry.js'
 import { formatDateTime, formatRelative } from '../lib/format-date.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
@@ -281,12 +282,18 @@ function Backlog({ queue, onSelectProject }: { queue: ProjectQueue[]; onSelectPr
             {q.items
               .filter(i => !i.done)
               .slice(0, 3)
-              .map((item, i) => (
-                <li key={i} className="flex gap-1.5 text-xs text-muted-foreground">
-                  <span aria-hidden className="text-muted-foreground/60">▢</span>
-                  <span className="truncate" title={item.text}>{item.text}</span>
-                </li>
-              ))}
+              .map((item, i) => {
+                // The line is markdown, and a queued ticket is written as a link to it (#1164), so
+                // print the title rather than the source. The whole line stays in the tooltip: the
+                // agent's note after the link is worth having, just not at the cost of the title.
+                const label = queueEntryLabel(item.text)
+                return (
+                  <li key={i} className="flex gap-1.5 text-xs text-muted-foreground">
+                    <span aria-hidden className="text-muted-foreground/60">▢</span>
+                    <span className="truncate" title={item.text}>{label.text}</span>
+                  </li>
+                )
+              })}
             {q.open > 3 && <li className="pl-5 text-xs text-muted-foreground">+{q.open - 3} more</li>}
           </ul>
         </li>

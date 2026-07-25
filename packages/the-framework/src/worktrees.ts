@@ -11,8 +11,8 @@ import {
   worktreePath,
   worktreeSize,
   isSafeRunId,
+  archivedRunPaths,
   FRAMEWORK_DIR,
-  RUNS_DIR,
   type RunStatus,
 } from './store/index.js'
 
@@ -157,9 +157,10 @@ async function rmFile(path: string): Promise<void> {
  * This is the sibling of {@link removeProjectWorktree}, and the difference is the whole point.
  * Remove-worktree reclaims the checkout on disk and keeps the session — its row, its replayable
  * log — because the history was already archived. Delete removes that archive too: the run meta
- * (`runs/<id>.json`, what the rail lists) and its event log (`runs/<id>.jsonl`, what replays), so
- * the row is gone for good. It is the one destructive-of-history action, which is why the surfaces
- * that call it confirm first.
+ * (`<id>.json`, what the rail lists) and its event log (`<id>.jsonl`, what replays), wherever they
+ * are filed, so the row is gone for good. It is the one destructive-of-history action, which is
+ * why the surfaces that call it confirm first. Since #1179 that archive is committed, so the files
+ * go but the deletion is itself a change git will record.
  *
  * What it deliberately leaves is git's, not the dashboard's: the branch `the-framework/run-<id>`
  * (or the name the agent gave it) and its commits, the committed `LOGS.md` line, and the
@@ -187,11 +188,11 @@ export async function deleteProjectRun(cwd: string, runId: string, opts: DeleteR
       await removeWorktree(cwd, worktreePath(cwd, runId))
       await pruneWorktrees(cwd)
     }
-    // Then the records that put the row in the list. Tolerant of an absent file, so a half-deleted
-    // session (its worktree already gone) still finishes cleanly.
-    const runsDir = join(cwd, FRAMEWORK_DIR, RUNS_DIR)
-    await removeFile(join(runsDir, `${runId}.json`))
-    await removeFile(join(runsDir, `${runId}.jsonl`))
+    // Then the records that put the row in the list. Looked up rather than derived from the id: a
+    // session is archived under whichever user ran it (#1179), so the id alone no longer names its
+    // path. Tolerant of an absent file, so a half-deleted session (its worktree already gone)
+    // still finishes cleanly.
+    for (const path of await archivedRunPaths(cwd, runId)) await removeFile(path)
     return { ok: true }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }

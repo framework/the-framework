@@ -499,6 +499,57 @@ test('archiveWorktreeRun is forgiving of a worktree with no run', async () => {
   assert.equal(await archiveWorktreeRun(worktreeAt('nope'), CWD, memFs()), undefined)
 })
 
+const USER = 'git@brillout.com'
+const sessionsAt = (id: string, ext: string) => join(CWD, '.the-framework', USER, 'sessions', `${id}.${ext}`)
+
+test('a named user files the archive under their own sessions, not runs/ (#1179)', async () => {
+  // The whole point: `runs/` is gitignored, so a `git clean -fdx` took every session with it.
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, passes: 2 }, '{"kind":"log","message":"hi"}\n'))
+  await archiveWorktreeRun(worktreeAt('r1'), CWD, fs, undefined, USER)
+  assert.equal(fs.files.get(sessionsAt('r1', 'jsonl')), '{"kind":"log","message":"hi"}\n')
+  assert.equal((JSON.parse(fs.files.get(sessionsAt('r1', 'json'))!) as RunMeta).passes, 2)
+  assert.equal(fs.files.has(join(CWD, '.the-framework', 'runs', 'r1.json')), false, 'and not in the transient dir')
+})
+
+test('the history lists every user, and the runs archived before this shipped (#1179)', async () => {
+  // Both schemes coexist: `runs/` holds everything from before, and a teammate's directory is as
+  // much a part of the project's history as your own — that is what committing it is for.
+  const done = (id: string) => JSON.stringify({ version: 1, status: 'done', id, startedAt: AT, updatedAt: AT, passes: 0 })
+  const fs = memFs({
+    [join(CWD, '.the-framework', 'runs', 'r1.json')]: done('r1'),
+    [sessionsAt('r2', 'json')]: done('r2'),
+    [join(CWD, '.the-framework', 'someone@else.com', 'sessions', 'r3.json')]: done('r3'),
+  })
+  assert.deepEqual((await listRuns(CWD, fs)).map(run => run.id), ['r3', 'r2', 'r1'])
+})
+
+test('a run archived under both schemes is listed once (#1179)', async () => {
+  // A run archived before #1179 and re-archived after exists in both places; the history is a list
+  // of sessions, not of files.
+  const meta = JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, passes: 0 })
+  const fs = memFs({ [join(CWD, '.the-framework', 'runs', 'r1.json')]: meta, [sessionsAt('r1', 'json')]: meta })
+  assert.deepEqual((await listRuns(CWD, fs)).map(run => run.id), ['r1'])
+})
+
+test('an archived log replays wherever it is filed (#1179)', async () => {
+  // The id alone no longer names a path, so every reader has to look the run up.
+  const fs = memFs({
+    [sessionsAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, passes: 0 }),
+    [sessionsAt('r1', 'jsonl')]: '{"kind":"log","message":"replayed"}\n',
+  })
+  assert.deepEqual(await loadRunEvents(CWD, 'r1', fs), [{ kind: 'log', message: 'replayed' }])
+})
+
+test('a committed session stuck at running is reconciled too (#1179)', async () => {
+  // The boot reconcile used to sweep only `runs/`, so a crashed run archived under a user would
+  // have shown as live forever, with a Stop that does nothing.
+  const fs = memFs({
+    [sessionsAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT, passes: 0 }),
+  })
+  assert.equal(await reconcileOrphanedRuns(CWD, fs, () => false), 1)
+  assert.equal((JSON.parse(fs.files.get(sessionsAt('r1', 'json'))!) as RunMeta).status, 'stopped')
+})
+
 test('reconcileOrphanedRuns rescues a run a crashed daemon left in a worktree (#737)', async () => {
   const fs = memFs(worktreeFiles('r1', { version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT, passes: 0 }))
   assert.equal(await reconcileOrphanedRuns(CWD, fs), 1)

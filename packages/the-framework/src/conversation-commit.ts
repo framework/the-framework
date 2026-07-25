@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import type { ProjectSummary } from './dashboard/projects.js'
 import { CONVERSATIONS_DIR } from './conversations.js'
+import { SESSIONS_DIR } from './store/index.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { GitRunner } from './project.js'
 import { nodeGitRunner } from './project.js'
@@ -35,8 +36,29 @@ import { errorMessage } from './error-message.js'
  * who owns the chat bot does not invalidate any of this.
  */
 
-/** The pathspec every commit here is scoped to. Posix separators: it is a git pathspec, not a path. */
+/** The pathspec the conversations live under. Posix separators: it is a git pathspec, not a path. */
 export const CONVERSATIONS_PATHSPEC = `${THE_FRAMEWORK_DIR}/${CONVERSATIONS_DIR}`
+
+/**
+ * The committed session archives (#1179), under every user's own directory.
+ *
+ * `:(glob)` magic so the `*` stops at a path separator — a plain pathspec wildcard matches `/` too,
+ * and would reach further down `.the-framework/` than this means to.
+ *
+ * The trailing `/**` is load-bearing, and its absence is silent: glob magic matches the pattern
+ * against each file's whole path rather than treating a directory as a prefix, so
+ * `.the-framework/*​/sessions` matches no *file* and `git add` fails with "did not match any files"
+ * — a committer that commits nothing, every time. Only a real repo shows this.
+ */
+export const SESSIONS_PATHSPEC = `:(glob)${THE_FRAMEWORK_DIR}/*/${SESSIONS_DIR}/**`
+
+/**
+ * Everything this committer is scoped to. Both are records the daemon writes into the repo and
+ * nobody would think to commit by hand: the chat of a run (#908) and the run's own archived history
+ * (#1179). They share one debounce because they are written by the same events and a commit each
+ * would double the noise in the project's log.
+ */
+export const COMMITTED_PATHSPECS: readonly string[] = [CONVERSATIONS_PATHSPEC, SESSIONS_PATHSPEC]
 
 /** How often the committer looks for settled conversations. */
 export const COMMIT_POLL_MS = 30_000
@@ -63,10 +85,20 @@ export function nodePathProbe(): PathProbe {
   }
 }
 
-/** The commit message a batch writes. Says how many conversations moved, so the log line stands alone. */
+/**
+ * The commit message a batch writes. Names what moved, so the log line stands alone.
+ *
+ * Sessions are counted by run, not by file: one archived run is a `<id>.json` and a `<id>.jsonl`,
+ * and "2 sessions" for a single session would be a lie told by the batch's own commit message.
+ */
 export function commitMessage(files: string[]): string {
-  const what = files.length === 1 ? 'a conversation' : `${files.length} conversations`
-  return `[The Framework] ${what}`
+  const sessionFiles = files.filter(file => file.includes(`/${SESSIONS_DIR}/`))
+  const runs = new Set(sessionFiles.map(file => file.replace(/\.[^./]+$/, ''))).size
+  const conversations = files.length - sessionFiles.length
+  const parts: string[] = []
+  if (conversations > 0) parts.push(conversations === 1 ? 'a conversation' : `${conversations} conversations`)
+  if (runs > 0) parts.push(runs === 1 ? 'a session' : `${runs} sessions`)
+  return `[The Framework] ${parts.join(' and ')}`
 }
 
 /**
@@ -84,7 +116,7 @@ export function commitMessage(files: string[]): string {
  * through the middle of one. Only a real repo shows this; a per-file fake does not.
  */
 export async function pendingConversations(cwd: string, git: GitRunner = nodeGitRunner()): Promise<string[]> {
-  const out = await git(['status', '--porcelain', '-uall', '--', CONVERSATIONS_PATHSPEC], cwd).catch(() => '')
+  const out = await git(['status', '--porcelain', '-uall', '--', ...COMMITTED_PATHSPECS], cwd).catch(() => '')
   const files = new Set<string>()
   for (const line of out.split('\n')) {
     if (line.length < 4) continue
@@ -166,8 +198,8 @@ export async function commitConversations(
   if (files.length === 0) return { committed: false, reason: NOTHING_PENDING }
 
   try {
-    await git(['add', '--', CONVERSATIONS_PATHSPEC], cwd)
-    await git(['commit', '-m', commitMessage(files), '--', CONVERSATIONS_PATHSPEC], cwd)
+    await git(['add', '--', ...COMMITTED_PATHSPECS], cwd)
+    await git(['commit', '-m', commitMessage(files), '--', ...COMMITTED_PATHSPECS], cwd)
     return { committed: true, files }
   } catch (err) {
     return { committed: false, reason: errorMessage(err) }

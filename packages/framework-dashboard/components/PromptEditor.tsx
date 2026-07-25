@@ -55,6 +55,15 @@ interface PromptEditorProps {
   onNewPreset?: () => void
   disabled?: boolean
   placeholder?: string
+  /**
+   * Text to open with, applied once as soon as the editor exists (#1066/#1139).
+   *
+   * A prop rather than a mount-time `loadTemplate` call, because `immediatelyRender: false` leaves
+   * `editor` null on the first render: the handle's loadTemplate returns false and does nothing,
+   * so a caller that had already taken its one-shot draft lost it silently. Seeding through a prop
+   * lets the editor apply it when it is ready instead of the caller guessing when that is.
+   */
+  initialText?: string | undefined
   /** A shorter surface for the navbar quick-launch (#723): starts one line tall instead of ~three. */
   compact?: boolean
 }
@@ -81,7 +90,7 @@ function applyTemplate(editor: Editor, text: string): void {
 }
 
 export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(function PromptEditor(
-  { onChange, onSubmit, onPreset, onMentionProject, onMentionFile, onMentionRemoved, projects, files = [], presets, customPresets = [], projectPresets = [], onNewPreset, disabled = false, placeholder = 'Describe what to build…  ( / commands · < tags · @ projects · # files )', compact = false },
+  { onChange, onSubmit, onPreset, onMentionProject, onMentionFile, onMentionRemoved, projects, files = [], presets, customPresets = [], projectPresets = [], onNewPreset, disabled = false, placeholder = 'Describe what to build…  ( / commands · < tags · @ projects · # files )', initialText, compact = false },
   ref,
 ) {
   const [isEmpty, setIsEmpty] = useState(true)
@@ -331,6 +340,16 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
   useEffect(() => {
     editor?.setEditable(!disabled)
   }, [editor, disabled])
+
+  // Seed {@link PromptEditorProps.initialText} the moment the editor exists, and only ever once:
+  // it is an opening draft, not a controlled value, so re-applying it would overwrite whatever the
+  // user has typed since. The ref (not state) because seeding must not itself cause a render.
+  const seeded = useRef(false)
+  useEffect(() => {
+    if (!editor || seeded.current || !initialText) return
+    seeded.current = true
+    loadTemplateInto(editor, initialText)
+  }, [editor, initialText])
 
   // The placeholder is absolutely positioned, so it must share the editor's padding to sit exactly
   // where the first typed character will (#721). The full composer breathes with more room; the

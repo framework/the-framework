@@ -247,7 +247,7 @@ export function Quota() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Usage</CardTitle>
+        <CardTitle className="text-base">Usage</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {!view && <p className="text-sm text-muted-foreground">Reading your usage…</p>}

@@ -10,6 +10,17 @@ The custom tooltip is nice, but: (1) show it immediately (no delay), and (2) use
 
 High-priority UX paper cut: tooltip latency and inconsistency make the whole dashboard feel sluggish and unpolished, and the action/settings rows are touched on every session visit. The dropdown grouping decision also stabilizes layout across sessions with different action counts.
 
+## Status
+
+The OP's two items are done: every tooltip opens with no delay (the shared `TooltipTrigger`
+defaults to `delay={0}`, which beats any provider), and the ~40 remaining native `title=`
+tooltips on buttons, menu items and indicators are the custom one now — including the
+`Open in editor` button the second screenshot was taken on. What is left on the elements is
+`title` as an overflow fallback on `truncate` text, and `title` props on `Section`/`Dialog`.
+
+Still open: the thread's design follow-ups (auto-show the dropdown on hover so the `...`
+button can go, and the settings-row redesign).
+
 ## Source
 
 Imported from GitHub issue [gemstack-land/the-framework#1149](https://github.com/gemstack-land/the-framework/issues/1149), created 2026-07-25, label: `priority: high`, 4 comments.

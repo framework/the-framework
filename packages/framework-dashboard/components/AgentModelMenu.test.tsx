@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { AgentModelMenu, type AgentOption } from './AgentModelMenu.js'
+import { hoverTooltip } from '../test-utils.js'
 
 afterEach(cleanup)
 
@@ -31,12 +32,13 @@ function renderMenu(over: Partial<Parameters<typeof AgentModelMenu>[0]> = {}) {
 }
 
 describe('AgentModelMenu tree (#658)', () => {
-  test('the trigger shows the current agent logo and model', () => {
+  test('the trigger shows the current agent logo and model', async () => {
     renderMenu()
     const trigger = screen.getByRole('button')
     expect(trigger.querySelector('[data-testid="claude-logo"]')).toBeTruthy()
     expect(trigger.textContent).toContain('Opus')
-    expect(trigger.getAttribute('title')).toContain('Claude Code')
+    // The logo is the only thing naming the agent on the trigger, so hovering has to spell it out.
+    expect((await hoverTooltip(trigger)).textContent).toContain('Claude Code')
   })
 
   test('picking a model within an agent sets both the agent and the model', () => {

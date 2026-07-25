@@ -5,6 +5,7 @@ import { eventKindLabel } from '../lib/event-labels.js'
 import { receivedAt } from '../lib/event-times.js'
 import { Markdown } from './Markdown.js'
 import { Badge } from './ui/badge.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -146,9 +147,14 @@ export function EventList({
                     <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-foreground">{(formatFrameworkEvent(e) ?? '').trim()}</span>
                   )}
                   {chunkHead && at !== undefined && (
-                    <span className="ml-auto shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground" title={new Date(at).toLocaleString()}>
-                      {formatTime(at)}
-                    </span>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={<span className="ml-auto shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground" />}
+                      >
+                        {formatTime(at)}
+                      </TooltipTrigger>
+                      <TooltipContent>{new Date(at).toLocaleString()}</TooltipContent>
+                    </Tooltip>
                   )}
                 </MessageScrollerItem>
               )

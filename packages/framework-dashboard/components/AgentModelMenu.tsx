@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { ChevronDown, Check } from 'lucide-react'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -59,20 +60,26 @@ export function AgentModelMenu({
   const currentModelLabel = modelLabel(current, model)
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        type="button"
-        disabled={busy}
-        title={`Agent: ${current?.label ?? ''} · Model: ${currentModelLabel}`}
-        className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'gap-1.5 px-2 font-normal')}
-      >
-        {current?.icon ? (
-          <span className="flex h-4 w-4 items-center justify-center">{current.icon}</span>
-        ) : (
-          current?.label
-        )}
-        {currentModelLabel}
-        <ChevronDown className="h-3.5 w-3.5 opacity-70" />
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <DropdownMenuTrigger
+              type="button"
+              disabled={busy}
+              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'gap-1.5 px-2 font-normal')}
+            />
+          }
+        >
+          {current?.icon ? (
+            <span className="flex h-4 w-4 items-center justify-center">{current.icon}</span>
+          ) : (
+            current?.label
+          )}
+          {currentModelLabel}
+          <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+        </TooltipTrigger>
+        <TooltipContent>{`Agent: ${current?.label ?? ''} · Model: ${currentModelLabel}`}</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end">
         {agents.map(a => (
           <DropdownMenuSub key={a.value}>

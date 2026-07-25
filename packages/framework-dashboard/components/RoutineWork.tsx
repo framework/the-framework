@@ -11,6 +11,7 @@ import { formatUntil } from '../lib/format-date.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Button } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // The Overview's "Routine work" card (#1159): the jobs the idle sweep fires on a schedule, each with
 // a Run now button that starts it against a project immediately.
@@ -120,13 +121,13 @@ export function RoutineWork({ onSelectProject }: { onSelectProject: (id: string)
             {/* The same `autoPm` preference the usage panel offers (#1161), which is the point: one
                 switch, shown where the schedule it governs is listed. */}
             <div className="border-t border-border pt-3">
-              <label
-                className="flex cursor-pointer items-center gap-1.5 text-sm"
-                title="Automatically run this prompt on a regular schedule."
-              >
-                <Checkbox checked={autoRun} onCheckedChange={checked => updatePreferences({ autoPm: checked })} />
-                <span className="font-medium text-foreground">{autoRunLabel}</span>
-              </label>
+              <Tooltip>
+                <TooltipTrigger render={<label className="flex cursor-pointer items-center gap-1.5 text-sm" />}>
+                  <Checkbox checked={autoRun} onCheckedChange={checked => updatePreferences({ autoPm: checked })} />
+                  <span className="font-medium text-foreground">{autoRunLabel}</span>
+                </TooltipTrigger>
+                <TooltipContent>Automatically run this prompt on a regular schedule.</TooltipContent>
+              </Tooltip>
               <p className="mt-1 text-xs text-muted-foreground">
                 Only while nothing else is running and the week&apos;s allowance is not already spent.
               </p>

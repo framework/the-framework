@@ -1,6 +1,7 @@
 import type { FrameworkFileConfig, Preferences } from '@gemstack/the-framework'
 import type { PreferenceSources } from '../lib/preferences.js'
 import type { OptionRow } from './OptionsMenu.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 /**
  * What this session will actually run with, inline under the launcher (#842).
@@ -32,22 +33,27 @@ export function ResolvedOptions({
     <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
       <span className="mr-0.5">Settings:</span>
       {chips.map(chip => (
-        <span
-          key={chip.key}
-          title={
-            chip.repo
+        <Tooltip key={chip.key}>
+          <TooltipTrigger
+            render={
+              <span
+                className={
+                  chip.repo
+                    ? 'rounded border border-dashed border-border px-1.5 py-0.5'
+                    : 'rounded border border-transparent bg-muted px-1.5 py-0.5'
+                }
+              />
+            }
+          >
+            {chip.label}
+            {chip.repo && <span className="ml-1 opacity-70">repo</span>}
+          </TooltipTrigger>
+          <TooltipContent>
+            {chip.repo
               ? 'From this repo’s the-framework.yml, committed for everyone who clones it'
-              : 'Your setting, from the options gear'
-          }
-          className={
-            chip.repo
-              ? 'rounded border border-dashed border-border px-1.5 py-0.5'
-              : 'rounded border border-transparent bg-muted px-1.5 py-0.5'
-          }
-        >
-          {chip.label}
-          {chip.repo && <span className="ml-1 opacity-70">repo</span>}
-        </span>
+              : 'Your setting, from the options gear'}
+          </TooltipContent>
+        </Tooltip>
       ))}
     </div>
   )

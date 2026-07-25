@@ -252,12 +252,18 @@ export function Quota() {
       <CardContent className="space-y-4">
         {!view && <p className="text-sm text-muted-foreground">Reading your usage…</p>}
 
-        {/* Without a placeable week there is no axis to draw, so fall back to the plain figure
-            rather than an empty track, which would read as "nothing used". */}
+        {/* Without a placeable week there is no axis to draw. Say so, loudly — no fallback (Rom):
+            this used to degrade to the week as a plain figure, which hid a real defect for weeks —
+            a reset phrasing the parser didn't know just made the panel quietly plainer, and nothing
+            anywhere said the boundary was gone. Quote the text that failed: it is the bug report. */}
         {view?.boundary && week ? (
           <WeekBar status={view.boundary} percentUsed={week.percentUsed} offset={offset} />
-        ) : week ? (
-          <OtherWindow window={week} />
+        ) : view && view.windows.length ? (
+          <p role="alert" className="text-sm text-danger">
+            {week?.resetsAtText
+              ? `Couldn't parse quota: the week resets “${week.resetsAtText}”, which isn't a phrasing this version recognizes.`
+              : `Couldn't parse quota: the readout has no week this version can place.`}
+          </p>
         ) : null}
 
         {others.length ? <div className="space-y-1 border-t border-border pt-3">{others.map(w => <OtherWindow key={w.label} window={w} />)}</div> : null}

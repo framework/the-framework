@@ -105,6 +105,27 @@ describe('Quota (#960)', () => {
     expect(screen.queryByLabelText('Unattended work stops at')).toBeNull()
   })
 
+  test('a week it cannot place is an error, not a quietly plainer panel', () => {
+    // The failure this test exists for: Claude Code rephrased its reset times and the parser
+    // missed, so the boundary vanished — and the panel just showed the week as a plain figure,
+    // as if that were a design choice. No fallback: name the text that did not parse.
+    view = {
+      windows: [
+        { label: 'Current week (all models)', kind: 'week', percentUsed: 45, resetsAtText: 'Jul 28, 9pm (Europe/Berlin)' },
+        { label: 'Current session', kind: 'session', percentUsed: 3 },
+      ],
+      readAt: Date.now(),
+    }
+    render(<Quota />)
+    expect(screen.getByRole('alert').textContent).toMatch(/Couldn't parse quota/)
+    expect(screen.getByRole('alert').textContent).toMatch(/Jul 28, 9pm \(Europe\/Berlin\)/)
+    expect(screen.queryByRole('img')).toBeNull()
+    // No plain week row standing in for the bar; the session line is data, not fallback, and stays.
+    expect(screen.queryByText('Current week (all models)')).toBeNull()
+    expect(screen.getByText('Current session')).toBeTruthy()
+    expect(screen.queryByLabelText('Unattended work stops at')).toBeNull()
+  })
+
   test('a readout it could not parse keeps the bar and dates it, rather than replacing it (#960)', () => {
     // The poller now survives an unrecognized answer, so the earlier reading is still on screen.
     // It has to say how old it is: an undated bar claims to be current.

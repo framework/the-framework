@@ -5,25 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { usePolled } from '../lib/use-async.js'
 import { cn } from '../lib/utils.js'
 
-// The Overview's "hot tickets" card (#1112): a cross-project glance at what the agent is working on
-// (planned/spiked), what is likely next (high priority), and the queued rest. A projection of every
-// project's `tickets/` over the `onHotTickets` read, polled so it stays live. Selecting a ticket
-// jumps into its project. Advertised on the landing page, so it earns a place on the landing view.
+// The Overview's "hot tickets" card (#1139): a cross-project glance at what the agent is working on
+// (in progress), what sits in the AI Queue, and what is flagged high priority — nothing else. A
+// projection of every project's `tickets/` + `TODO_AGENTS.md` over the `onHotTickets` read, polled
+// so it stays live. Selecting a ticket jumps into its project.
 
 const EMPTY: HotTicket[] = []
 
-// The three lanes, in the order Rom listed them (#1112): worked-on, next, queued. Each carries the
-// dot colour that matches the rest of the status vocabulary (primary = active, warning = soon).
-// Stacked as full-width sections rather than columns, so an uneven split (the common case, where
-// most tickets sit queued) still reads as designed instead of two empty columns.
+// The three lanes the card shows (#1139): in progress, then the AI Queue, then high priority. Each
+// carries the dot colour that matches the rest of the status vocabulary (primary = active, warning =
+// queued, info = flagged). Laid out in two columns rather than stacked full-width, so the card stays
+// compact even when one lane runs long.
 const LANES: { key: HotBucket; label: string; dot: string }[] = [
   { key: 'in-progress', label: 'In progress', dot: 'bg-primary' },
-  { key: 'next', label: 'Up next', dot: 'bg-warning' },
-  { key: 'queued', label: 'Queued', dot: 'bg-muted-foreground' },
+  { key: 'ai-queue', label: 'AI Queue', dot: 'bg-warning' },
+  { key: 'high-priority', label: 'High priority', dot: 'bg-info' },
 ]
-
-// A lane is capped so the card stays a glance; the rest is summarised as "+N more".
-const PER_LANE = 5
 
 export function HotTickets({
   onSelectProject,
@@ -47,7 +44,7 @@ export function HotTickets({
         {tickets.length === 0 ? (
           <p className="py-2 text-sm text-muted-foreground">No tickets yet.</p>
         ) : (
-          <div className="divide-y divide-border">
+          <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
             {LANES.map(lane => (
               <Lane
                 key={lane.key}
@@ -75,11 +72,9 @@ function Lane({
   onSelectProject: (id: string) => void
   onSelectRun: (id: string, runId: string) => void
 }) {
-  const shown = tickets.slice(0, PER_LANE)
-  const more = tickets.length - shown.length
   const empty = tickets.length === 0
   return (
-    <div className="py-3 first:pt-0 last:pb-0">
+    <div>
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide">
         {/* An empty lane dims to a single header line rather than a paragraph, so the populated
             lane carries the card and the zeros still say "nothing here" at a glance. */}
@@ -88,8 +83,10 @@ function Lane({
         <span className="tabular-nums text-muted-foreground/70">{tickets.length}</span>
       </div>
       {!empty && (
+        // Every ticket in the lane, never a "+N more" — the card is the shortlist, and a lane you
+        // cannot read past is one you have to leave the page to act on.
         <ul className="mt-1.5">
-          {shown.map(t => (
+          {tickets.map(t => (
             <li key={`${t.projectId}:${t.ticket.file}`}>
               <button
                 type="button"
@@ -105,11 +102,6 @@ function Lane({
               </button>
             </li>
           ))}
-          {more > 0 && (
-            <li className="px-2 pt-0.5 text-xs text-muted-foreground">
-              +{more} more
-            </li>
-          )}
         </ul>
       )}
     </div>
@@ -117,8 +109,8 @@ function Lane({
 }
 
 // The one fact that earns the lane: a run implementing it right now, else the plan/spike that made
-// it in-progress, else the priority that made it next. Queued rows carry nothing extra — the lane
-// already says it.
+// it in-progress, else the priority that put it in the high-priority lane. AI-Queue rows carry
+// nothing extra — the lane already says it.
 //
 // `implementing` is coloured rather than muted like the others (#1117), because it is the only tag
 // that describes something happening as you read it: `planned` and `spiked` are marks work left
@@ -131,7 +123,16 @@ function TicketTag({ ticket: t }: { ticket: HotTicket }) {
       </span>
     )
   }
-  const tag = t.bucket === 'in-progress' ? (t.ticket.planned ? 'planned' : t.ticket.spiked ? 'spiked' : null) : t.bucket === 'next' ? t.ticket.priority ?? null : null
+  const tag =
+    t.bucket === 'in-progress'
+      ? t.ticket.planned
+        ? 'planned'
+        : t.ticket.spiked
+          ? 'spiked'
+          : null
+      : t.bucket === 'high-priority'
+        ? t.ticket.priority ?? null
+        : null
   if (!tag) return null
   return (
     <span className="shrink-0 rounded border border-border px-1 text-[10px] uppercase tracking-wide text-muted-foreground">

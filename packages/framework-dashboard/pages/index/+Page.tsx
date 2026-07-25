@@ -180,9 +180,10 @@ export default function Page() {
     go({ projectId: id, runId: null }) // switching projects always returns to the home launcher
   }
 
-  // Naming a session in another project. The Overview's rows know which run they are about, and
-  // going through selectProject drops that on the way, landing on the launcher instead of the
-  // session the row was describing.
+  // Naming a session in another project. The Overview's cross-project rows — the sidebar recents,
+  // the Agents view (#1139), and the hot tickets — know which run they are about, and going through
+  // selectProject drops that on the way, landing on the launcher instead of the session the row was
+  // describing.
   const selectRunInProject = (id: string, runId: string) => {
     setAdopting(false)
     go({ projectId: id, runId })
@@ -353,10 +354,7 @@ export default function Page() {
           selectedRunId={runId}
           onSelect={selectRun}
           recentRuns={recentRuns}
-          onSelectRecent={(pid, rid) => {
-            setAdopting(false)
-            go({ projectId: pid, runId: rid })
-          }}
+          onSelectRecent={selectRunInProject}
           projects={projects}
           onNewSessionInProject={newSessionInProject}
           onProjectAdded={() => {

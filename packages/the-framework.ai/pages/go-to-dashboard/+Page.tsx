@@ -2,11 +2,10 @@ import '../index/styles.css'
 import type { CSSProperties, ReactNode } from 'react'
 import { TopNav } from '../index/TopNav'
 import { Footer } from '../index/Footer'
-import { CodeChip } from '../index/ui'
 import { useCopy } from '../index/copy'
 import { currentPm, pickPm, PMS } from '../index/Hero'
 import type { Pm } from '../index/Hero'
-import { h2Style, kickerStyle, mono, Note } from '../index/ui'
+import { h2Style, kickerStyle, mono } from '../index/ui'
 
 const tipStyle: CSSProperties = {
   position: 'absolute',
@@ -102,37 +101,6 @@ function PmSnippet({ get }: { get: (pm: Pm) => string }) {
   )
 }
 
-/** The daemon's default bind (`DEFAULT_DAEMON_PORT`). */
-const DASHBOARD_URL = 'localhost:4200'
-
-// A link, not an auto-redirect: a public HTTPS page cannot probe loopback (Local Network Access),
-// so "is it running?" is unanswerable from here (#1135). New tab, so a miss keeps these steps.
-function OpenDashboard() {
-  return (
-    <a
-      href={'http://' + DASHBOARD_URL}
-      target="_blank"
-      rel="noreferrer"
-      className="nav-btn-primary"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        alignSelf: 'flex-start',
-        gap: 9,
-        marginTop: 4,
-        color: '#d3c6aa',
-        border: '1.5px solid #a7c080',
-        borderRadius: 8,
-        padding: '9px 15px',
-        fontWeight: 600,
-      }}
-    >
-      <img src="/assets/logo.svg" alt="" style={{ width: 16, height: 18, display: 'block' }} />
-      <span>Open dashboard</span>
-    </a>
-  )
-}
-
 function Step({ kicker, children }: { kicker: string; children: ReactNode }) {
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -161,11 +129,6 @@ export default function Page() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <h1 style={h2Style}>Go to dashboard</h1>
           <p style={pStyle}>The dashboard runs 100% locally — you open it from your terminal.</p>
-          <OpenDashboard />
-          <Note>
-            Opens <CodeChip fontSize={12}>{DASHBOARD_URL}</CodeChip> in a new tab. Nothing there? The Framework is not
-            running: start it below.
-          </Note>
         </div>
         <Step kicker="Run">
           <p style={pStyle}>If The Framework is installed, run it:</p>

@@ -66,21 +66,8 @@ export function TopNav() {
           fontSize: 14.5,
         }}
       >
-        {/* Primary via green border, not fill — the multicolor logo drowns on a green background. */}
-        <a
-          href="/go-to-dashboard"
-          className="nav-btn-primary"
-          style={{
-            ...navBtnStyle,
-            // 1.5px border with compensated padding: same outer box as the secondaries.
-            border: '1.5px solid #a7c080',
-            padding: '7px 13.5px',
-            fontWeight: 600,
-          }}
-        >
-          <img src="/assets/logo.svg" alt="" style={{ width: 16, height: 18, display: 'block' }} />
-          <span>Dashboard</span>
-        </a>
+        {/* No Dashboard button until opening it from here actually works (#1137): the dashboard is
+            a local daemon, and a public page cannot reach or detect one (#1135). */}
         <a href={DISCORD_URL} className="nav-btn" style={navBtnStyle}>
           <DiscordIcon width={16} height={13} />
           <span>Discord</span>

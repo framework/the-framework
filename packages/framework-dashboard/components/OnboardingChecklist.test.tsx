@@ -92,13 +92,8 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     await clickImport()
 
     // The project travels with it: this surface has none selected, so an id alone cannot be routed.
-<<<<<<< HEAD
     expect(startRun.start).toHaveBeenCalledWith('p1', presets.importTickets.render(), 'prompt', {})
     await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('p1', presets.importTickets.render(), 'run-7'))
-=======
-    expect(startRun.start).toHaveBeenCalledWith('p1', 'Import tickets from GitHub', 'prompt', {})
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('p1', 'Import tickets from GitHub', 'run-7'))
->>>>>>> origin/main
   })
 
   test('a project with no worktree hands up no id, so the shell can adopt the running one', async () => {
@@ -109,11 +104,7 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     render(<OnboardingChecklist onRunStarted={onRunStarted} />)
     await clickImport()
 
-<<<<<<< HEAD
     await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('p1', presets.importTickets.render(), undefined))
-=======
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('p1', 'Import tickets from GitHub', undefined))
->>>>>>> origin/main
   })
 
   test('a refused start says why and moves you nowhere', async () => {

@@ -1,19 +1,16 @@
 import { useState } from 'react'
 import type { WorkspaceDoc } from '@gemstack/the-framework'
-import { onDocs } from '../server/reads.telefunc.js'
 import { Button } from './ui/button.js'
 import { Markdown } from './Markdown.js'
-import { usePolled } from '../lib/use-async.js'
 import { cn } from '../lib/utils.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
-// The surfaced documents (#319/#328): the PLAN/TODO the agent writes, rendered beside
-// the run. Telefunc RPC (server/reads.telefunc.ts), polled so edits mid-run show up.
-export function DocsPanel({ projectId }: { projectId: string | null }) {
-  const { value: docs, loaded } = usePolled<WorkspaceDoc[]>(projectId ? () => onDocs(projectId) : null, [], 4000, [projectId])
+// The surfaced documents (#319/#328): the PLAN/TODO the agent writes, rendered beside the run.
+// The read lives in the rail (#1146), which needs to know whether there are any docs before it
+// offers the tab; this renders what it is handed.
+export function DocsPanel({ docs, loaded }: { docs: WorkspaceDoc[]; loaded: boolean }) {
   const [active, setActive] = useState(0)
 
-  if (!projectId) return null
   // Loading and empty are different facts (#948): without the guard, a project with docs
   // flashed "No PLAN/TODO docs yet." on every open while the first read was still out.
   if (!loaded) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>

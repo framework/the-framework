@@ -26,10 +26,13 @@ async function writeStub(dir: string, log: string): Promise<string> {
   return stub
 }
 
+/** 20ms apart, so 1500 attempts is a 30s ceiling — long enough for a slow runner (#1153). */
+const POLL_ATTEMPTS = 1500
+
 /** The stub's recorded starts, waited for (a start spawns detached). */
 async function startedArgs(log: string, expected: number): Promise<string[][]> {
   let lines: string[] = []
-  for (let i = 0; i < 100 && lines.length < expected; i++) {
+  for (let i = 0; i < POLL_ATTEMPTS && lines.length < expected; i++) {
     await new Promise(r => setTimeout(r, 20))
     lines = await readFile(log, 'utf8').then(s => s.split('\n').filter(Boolean), () => [])
   }
@@ -247,10 +250,16 @@ async function seedBoundTopicRun(scratch: string, runId: string, projectId: stri
   await writeFile(join(dir, EVENTS_FILE), JSON.stringify({ kind: 'bind', projectId }) + '\n')
 }
 
-/** Poll the stub's recorded starts until at least `expected` land, or time out. */
+/**
+ * Poll the stub's recorded starts until at least `expected` land, or time out.
+ *
+ * The budget is generous (#1153): a re-home tails an events file, resolves the project, adds a
+ * git worktree and spawns, which a loaded CI runner does not finish in the 6s this used to allow.
+ * The loop returns the moment the starts land, so the cap only ever costs time on a real failure.
+ */
 async function waitForArgs(log: string, expected: number): Promise<string[][]> {
   let lines: string[] = []
-  for (let i = 0; i < 300 && lines.length < expected; i++) {
+  for (let i = 0; i < POLL_ATTEMPTS && lines.length < expected; i++) {
     await new Promise(r => setTimeout(r, 20))
     lines = await readFile(log, 'utf8').then(s => s.split('\n').filter(Boolean), () => [])
   }
@@ -327,7 +336,7 @@ test('a bind to an unresolvable project retains the scratch and surfaces the fai
 
     // Wait for the daemon to see the bind and log its failure, rather than a second spawn.
     let events = ''
-    for (let i = 0; i < 300 && !events.includes('could not re-home'); i++) {
+    for (let i = 0; i < POLL_ATTEMPTS && !events.includes('could not re-home'); i++) {
       await new Promise(r => setTimeout(r, 20))
       events = await readFile(join(scratch, FRAMEWORK_DIR, EVENTS_FILE), 'utf8').catch(() => '')
     }

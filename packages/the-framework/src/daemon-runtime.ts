@@ -35,6 +35,7 @@ import { RelayedRuns, startRemoteRun } from './dashboard/remote-run.js'
 import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
 import { tailEvents } from './dashboard-rpc/events-tail.js'
 import { isSafeVia } from './conversations.js'
+import { ensureSessionsIgnored, resolveUserDir } from './sessions.js'
 import { createPreviewRuntime } from './preview-runtime.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId, topicScratchPath } from './registry.js'
@@ -388,7 +389,11 @@ export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOption
       // Where the work ended up, recorded before the checkout can go (#799). The branch outlives
       // the worktree and is the only handle the dashboard has left on a finished session.
       const branch = await currentBranch(worktree)
-      const meta = await archiveWorktreeRun(worktree, projectCwd, undefined, branch)
+      // Filed under the identity this repo commits as, and the ignore rules taught to keep it, so
+      // the session survives the repo being cleaned (#1179).
+      const user = await resolveUserDir(projectCwd)
+      await ensureSessionsIgnored(projectCwd, user).catch(() => false)
+      const meta = await archiveWorktreeRun(worktree, projectCwd, undefined, branch, user)
       if (meta?.status !== 'done') return // failed / stopped / unreadable: keep it for inspection
       // A finished run can still be holding an uncommitted edit (#786), and removing the
       // checkout would destroy it. Commit it to the run's branch, which outlives the

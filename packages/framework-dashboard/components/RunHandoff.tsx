@@ -166,13 +166,16 @@ export function HandoffActions({
   // From here every branch says something. A session that has finished and shows no control at all
   // is #1173: the reason there is nothing to press is exactly what the reader came for.
   if (!handoff.exists) return <Reason>Branch gone — nothing to open a PR from.</Reason>
-  // The case Rom hit: the agent wrote files and never committed, so the branch holds nothing to
-  // propose. Said plainly, because the tree reads "dirty" right beside it and the two together
-  // are the whole story.
-  if (handoff.empty) return <Reason>Nothing committed — no PR to open.</Reason>
+  // A branch with no commits and nothing waiting in the tree: the session genuinely produced
+  // nothing. Said plainly, rather than shown as a button that could only fail (#1173).
+  //
+  // Uncommitted work is the other half of that case and is not a dead end: the agent commits what
+  // it found before it starts and nothing at the end, so its whole output routinely sits in the
+  // tree. Opening the PR commits it first, so the button is offered rather than explained away.
+  if (handoff.empty && !handoff.pending) return <Reason>Nothing committed — no PR to open.</Reason>
   if (!handoff.hasRemote) return <Reason>No remote to push to.</Reason>
   // One button, not two (#1173). "Push branch" and "Open PR" sat side by side as equals, and
-  // neither Rom nor Suleiman could say what pushing without a PR was for — a control nobody can
+  // nobody could say what pushing without a PR was for — a control nobody can
   // explain is a control nobody should have to read. Opening a PR pushes the branch on the way,
   // so the one that names the outcome is the one that stays. Pushing alone is still reachable as
   // a session setting for anyone who wants it, it just no longer competes here.

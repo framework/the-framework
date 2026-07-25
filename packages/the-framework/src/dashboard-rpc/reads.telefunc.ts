@@ -318,7 +318,12 @@ export async function onRunHandoff(projectId: string, runId: string): Promise<Ru
     if (!cwd || !isSafeRunId(runId)) return null
     const run = await findRun(cwd, runId).catch(() => undefined)
     if (!run) return null
-    return (await readRunHandoff(cwd, runBranchFor(run)).catch(() => undefined)) ?? null
+    // Uncommitted work is the one thing the branch cannot answer (#1173), and it lives in the tree
+    // the agent edited. Only when that is a checkout of the session's own: per the note above,
+    // `resolveRunPath` falls back to the project root, whose dirt belongs to the user.
+    const checkout = await resolveRunPath(projectId, runId)
+    const deps = checkout && checkout !== cwd ? { checkout } : {}
+    return (await readRunHandoff(cwd, runBranchFor(run), deps).catch(() => undefined)) ?? null
   }, null)
 }
 

@@ -342,7 +342,7 @@ describe('Quota (#960)', () => {
     view = reading(20)
     render(<Quota />)
     await openTooltip(mainFigureTrigger())
-    expect(screen.getByText(/You are 2 days below the quota boundary — you're under-consuming: you spend slower/)).toBeTruthy()
+    expect(screen.getByText(/You are 2 days below the quota boundary\.\s*You're under-consuming: you spend slower/)).toBeTruthy()
   })
 
   test('the legend names the projected segment and gives the quota boundary a tooltip (#960 Edit)', () => {

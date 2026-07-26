@@ -6,6 +6,7 @@ DATE: yyyy-mm-dd
 SLUG: succinct kebab-case slug of the ticket title
 Body:
 ```md
+Status: open/closed
 Priority: 10-0 [optional, 10: critical — act immediately, 0: only if capacity]
 Topics: [list-of-topics] [optional]
 GitHub: [#42](https://github.com/org/repo/issues/42) [optional]

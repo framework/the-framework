@@ -208,3 +208,9 @@ test('there is no readCode: the workspace lives in a cloud VM', async () => {
   const session = await driverWith(CREATED).start({ cwd: '/repo' })
   assert.equal(session.readCode, undefined)
 })
+
+test('the driver declares itself a hand-off, so a run ends at the first prompt (#1225)', () => {
+  // Load-bearing rather than descriptive: this flag is what stops the run reviewing,
+  // improving and asking about work that left this machine with the first prompt.
+  assert.equal(driverWith(CREATED).handsOff, true)
+})

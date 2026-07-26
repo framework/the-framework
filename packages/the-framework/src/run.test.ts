@@ -939,3 +939,80 @@ test('runAwaitRounds does not report exhausted when a chat phase follows the ope
   assert.equal(result.exhausted, false)
   assert.equal(result.declined, false)
 })
+
+/**
+ * A driver whose every reply is the same note about where the work went (#1225) — the shape
+ * of a hand-off, whatever it hands off to. Named 'fake' so the workspace-verify stays off,
+ * which keeps these unit tests off the filesystem.
+ */
+function handsOffDriver(): { driver: Driver; prompts: () => readonly string[] } {
+  const prompts: string[] = []
+  const inner = new FakeDriver({
+    respond: (prompt: string) => {
+      prompts.push(prompt)
+      return 'Handed off. View the session: https://claude.ai/code/session_01ABC'
+    },
+    sessionId: 'session_01ABC',
+  })
+  return { driver: { name: 'fake', handsOff: true, start: opts => inner.start(opts) }, prompts: () => prompts }
+}
+
+test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1225)', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'framework-handsoff-'))
+  await writeFile(join(cwd, 'TODO.md'), '- [ ] leftover task\n')
+  try {
+    const events: FrameworkEvent[] = []
+    const asked: ChoiceRequest[] = []
+    const { driver, prompts } = handsOffDriver()
+    const { result, todo } = await runFramework({
+      intent: FAKE_INTENT,
+      driver,
+      cwd,
+      signals: FAKE_SIGNALS,
+      // Explicit, so this proves the hand-off outranks an opt-in rather than merely
+      // sharing a default with it.
+      todoLoop: true,
+      requestChoice: async req => {
+        asked.push(req)
+        return { picked: req.options[0]!.id, by: 'user' }
+      },
+      onEvent: e => events.push(e),
+    })
+
+    // The build prompt was the whole run: no checklist pass followed it, so nothing read the
+    // hand-off note as a reply and reported a missing verdict.
+    assert.equal(prompts().length, 1)
+    assert.ok(!prompts().some(p => /production-grade checklist/.test(p)))
+    assert.equal(result.passes, 0)
+    assert.deepEqual(result.blockers, [])
+    assert.equal(result.stoppedEarly, false)
+    // The backlog is still there and still unasked about: this machine has no standing to
+    // ask which item to start next when the work is somewhere it cannot see.
+    assert.equal(todo, undefined)
+    assert.deepEqual(asked, [])
+    assert.ok(!events.some(e => e.kind === 'choice'))
+    assert.match(await readFile(join(cwd, 'TODO.md'), 'utf8'), /leftover task/)
+    // And it says why it stopped, before the end.
+    const handed = events.findIndex(e => e.kind === 'log' && /^Handed off:/.test(e.message))
+    assert.ok(handed !== -1 && handed < events.findIndex(e => e.kind === 'end'))
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('a hand-off run does not stay open for messages (#1225)', async () => {
+  const { driver } = handsOffDriver()
+  // Left open on purpose: a run that still waited on it would never resolve, since the
+  // composer it waits for cannot reach the session it handed to.
+  const messages = new RunMessageQueue()
+  const run = runFramework({
+    intent: FAKE_INTENT,
+    driver,
+    cwd: '/tmp/ws',
+    signals: FAKE_SIGNALS,
+    messages,
+    onEvent: () => {},
+  })
+  const timer = new Promise<'waited'>(resolve => setTimeout(() => resolve('waited'), 2000).unref())
+  assert.notEqual(await Promise.race([run.then(() => 'ended' as const), timer]), 'waited')
+})

@@ -64,10 +64,23 @@ async function report(question) {
 
 const SESSION_POLL_MINUTES = 1
 
-/** Sessions the user closed the tab for. Reopening one they dismissed is user-hostile. */
+/**
+ * Sessions whose tab the user closed. Reopening one they dismissed is user-hostile.
+ *
+ * The key is versioned because the first version of this poisoned itself: it marked every
+ * watched session that had no tab open, so the moment any one claude.ai tab closed, all of them
+ * were dismissed forever and no tab ever opened again. Old lists are discarded rather than
+ * migrated, since every entry in them is suspect.
+ */
 async function dismissed() {
-  const { dismissedSessions } = await chrome.storage.local.get('dismissedSessions')
-  return new Set(dismissedSessions ?? [])
+  const { dismissedSessionsV2 } = await chrome.storage.local.get('dismissedSessionsV2')
+  return new Set(dismissedSessionsV2 ?? [])
+}
+
+/** Which session each tab we opened is showing, so a close can be attributed to one of them. */
+async function openedTabs() {
+  const { openedTabs } = await chrome.storage.local.get('openedTabs')
+  return openedTabs ?? {}
 }
 
 /**
@@ -117,7 +130,10 @@ async function openWatchedTabs() {
       continue
     }
     try {
-      await chrome.tabs.create({ url: session.url, active: false, pinned: true })
+      const tab = await chrome.tabs.create({ url: session.url, active: false, pinned: true })
+      // Remember which session this tab is, because a close event carries only the tab id and
+      // by then the URL is gone.
+      if (tab?.id != null) await chrome.storage.local.set({ openedTabs: { ...(await openedTabs()), [tab.id]: session.id } })
       opened++
     } catch (err) {
       return note({ ok: false, reason: `chrome.tabs.create failed: ${String(err?.message ?? err)}` })
@@ -127,24 +143,20 @@ async function openWatchedTabs() {
 }
 
 // Remember a closed tab so the next poll does not reopen it.
-chrome.tabs.onRemoved.addListener(async (_id, _info) => {
-  const open = await chrome.tabs.query({ url: 'https://claude.ai/code/*' })
-  const stillOpen = new Set(open.map(t => /\/code\/(session_[A-Za-z0-9]+)/.exec(t.url ?? '')?.[1]).filter(Boolean))
-  const { daemonUrl, token } = await chrome.storage.local.get(['daemonUrl', 'token'])
-  if (!token) return
-  try {
-    const res = await fetch(`${(daemonUrl || DEFAULT_DAEMON).replace(/\/+$/, '')}/_bridge/sessions`, {
-      headers: { authorization: `Bearer ${token}` },
-    })
-    if (!res.ok) return
-    const watched = (await res.json())?.sessions ?? []
-    const gone = watched.map(s => s.id).filter(id => !stillOpen.has(id))
-    if (!gone.length) return
-    const { dismissedSessions } = await chrome.storage.local.get('dismissedSessions')
-    await chrome.storage.local.set({ dismissedSessions: [...new Set([...(dismissedSessions ?? []), ...gone])].slice(-50) })
-  } catch {
-    // Best effort: failing to record a dismissal only risks reopening a tab.
-  }
+//
+// Only the session whose tab actually closed. The first version asked the daemon what it was
+// watching and dismissed everything without an open tab, which meant one close silently
+// blacklisted every session and the sweep went quiet for good.
+chrome.tabs.onRemoved.addListener(async tabId => {
+  const opened = await openedTabs()
+  const sessionId = opened[tabId]
+  if (!sessionId) return
+  const { [tabId]: _gone, ...rest } = opened
+  const { dismissedSessionsV2 } = await chrome.storage.local.get('dismissedSessionsV2')
+  await chrome.storage.local.set({
+    openedTabs: rest,
+    dismissedSessionsV2: [...new Set([...(dismissedSessionsV2 ?? []), sessionId])].slice(-50),
+  })
 })
 
 // An alarm rather than setInterval: an MV3 service worker is terminated when idle, and a timer

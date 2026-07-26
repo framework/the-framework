@@ -7,6 +7,7 @@ import { runOptionRows, type OptionRow } from '../lib/run-option-rows.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
 import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
+import { BridgeSettings } from './BridgeSettings.js'
 import { DevicesSettings } from './DevicesSettings.js'
 import { DiscordBotDialog, DiscordWebhookDialog } from './DiscordDialogs.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
@@ -210,6 +211,19 @@ export function SettingsPage({
             max={MAX_SPEND_OFFSET}
             onChange={value => updatePreferences({ autoSpendOffset: value })}
           />
+        </Section>
+
+        <Section
+          title="Claude web"
+          description="A Claude web run hands off and ends, so the questions its session asks never reach this dashboard. The browser bridge carries them back."
+        >
+          <ToggleRow
+            label="Browser bridge"
+            description="Opens one route on this daemon that a browser extension can reach, guarded by the token below."
+            checked={preferences.bridge ?? false}
+            onChange={next => updatePreferences({ bridge: next })}
+          />
+          <BridgeSettings enabled={preferences.bridge ?? false} onChange={next => updatePreferences({ bridge: next })} />
         </Section>
       </div>
 

@@ -23,6 +23,7 @@ import type { FrameworkEvent } from '../events.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
 import type { BridgeQuestion } from '../dashboard/bridge-endpoints.js'
 import type { BridgeContact } from '../dashboard/bridge-store.js'
+import { readDaemonToken, readPreferences, type Preferences } from '../registry.js'
 
 // The read model behind the new dashboard (#405): the run history, a run's replay, the
 // surfaced PLAN/TODO docs, and the committed LOGS.md — each keyed by project id and
@@ -382,4 +383,19 @@ export async function onBridgeQuestion(sessionId: string): Promise<BridgeQuestio
 export async function onBridgeStatus(): Promise<{ lastContact: BridgeContact | null; questions: number }> {
   const store = bridgeQuestions()
   return { lastContact: store.lastContact() ?? null, questions: store.list().length }
+}
+
+/**
+ * The bridge token, for the setup step where a user pastes it into the extension (#1237).
+ *
+ * Only while the bridge is on, so a daemon with the feature off never hands the secret to a
+ * page. Revealing it here is not a new exposure: anyone who can load this dashboard can already
+ * start runs on this machine, and on a non-loopback bind their browser is holding the same token
+ * as a cookie. What it replaces is the alternative, which was telling people to open
+ * `~/.the-framework.json` and copy a field out of it.
+ */
+export async function onBridgeToken(): Promise<string | null> {
+  const preferences = await readPreferences().catch((): Preferences => ({}))
+  if (preferences.bridge !== true) return null
+  return (await readDaemonToken().catch(() => undefined)) ?? null
 }

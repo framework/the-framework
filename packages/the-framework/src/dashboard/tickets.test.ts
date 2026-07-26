@@ -169,6 +169,46 @@ test('readTickets folds .spike.md and .plan.md into their ticket (#697)', async 
   )
 })
 
+test('readTickets surfaces the effort a spike recorded (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': '# Thing\n',
+    '2026-07-20_thing.spike.md': '# [Spike] Thing\n\n- Human intervention effort: low\n- Token consumption: 2h\n',
+  })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.effort, 'low')
+})
+
+test('readTickets falls back to the plan\'s effort when the spike names none (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': '# Thing\n',
+    '2026-07-20_thing.spike.md': '# [Spike] Thing\n\nNo estimate here.\n',
+    '2026-07-20_thing.plan.md': '# [Plan] Thing\n\nEstimated effort: medium\n',
+  })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.effort, 'medium')
+})
+
+test('readTickets leaves effort off when no sibling names one (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_a.md': '# A\n',
+    '2026-07-20_b.md': '# B\n',
+    // The format doc's own section header ends in a bare colon — not a value.
+    '2026-07-20_b.spike.md': '# [Spike] B\n\nEstimated effort (for each way to implement it):\n',
+  })
+  const byFile = new Map((await readTickets(cwd)).map(t => [t.file, t.effort]))
+  assert.equal(byFile.get('2026-07-20_a.md'), undefined)
+  assert.equal(byFile.get('2026-07-20_b.md'), undefined)
+})
+
+test('readTicket surfaces the spike\'s effort too, like readTickets (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': '# Thing\n',
+    '2026-07-20_thing.spike.md': '# [Spike] Thing\n\nHuman intervention effort: trivial\n',
+  })
+  const ticket = await readTicket(cwd, '2026-07-20_thing.md')
+  assert.equal(ticket?.effort, 'trivial')
+})
+
 test('readTickets ignores non-markdown files (#697)', async () => {
   const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n', 'notes.txt': 'nope' })
   assert.deepEqual((await readTickets(cwd)).map(t => t.file), ['2026-07-20_thing.md'])

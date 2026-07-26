@@ -74,6 +74,51 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(titles.findIndex(t => t?.includes('Older'))).toBeLessThan(titles.findIndex(t => t?.includes('Newer')))
   })
 
+  test('links the row\'s GitHub issue out, without hijacking the row\'s own click (#1144/#1265)', async () => {
+    const onOpen = vi.fn()
+    render(
+      <TicketsPanel
+        projectId="p1"
+        tickets={[ticket({ github: { label: '#42', url: 'https://github.com/org/repo/issues/42' } })]}
+        loaded
+        onOpen={onOpen}
+      />,
+    )
+    const link = await screen.findByRole('link', { name: /#42/ })
+    expect(link.getAttribute('href')).toBe('https://github.com/org/repo/issues/42')
+    // A sibling of the row's button, not a child: clicking the link must not open the detail page.
+    fireEvent.click(link)
+    expect(onOpen).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('Do the thing'))
+    expect(onOpen).toHaveBeenCalledWith('2026-07-20_do-the-thing.md')
+  })
+
+  test('shows the effort a spike recorded, and keeps the row meta in date/priority/GitHub order (#1144/#1265)', async () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
+    render(
+      <TicketsPanel
+        projectId="p1"
+        tickets={[
+          ticket({
+            spiked: true,
+            effort: 'low',
+            priority: '7',
+            date: twoDaysAgo,
+            github: { label: '#42', url: 'https://github.com/org/repo/issues/42' },
+          }),
+        ]}
+        loaded
+        onOpen={() => {}}
+      />,
+    )
+    expect(await screen.findByText('Effort: low')).toBeTruthy()
+    const row = screen.getByText('Do the thing').closest('li')!
+    const order = [row.textContent!.indexOf('ago'), row.textContent!.indexOf('Priority'), row.textContent!.indexOf('#42')]
+    expect(order.every(i => i !== -1)).toBe(true)
+    expect(order[0]).toBeLessThan(order[1]!)
+    expect(order[1]).toBeLessThan(order[2]!)
+  })
+
   test('calls out a closed ticket on its row; open carries no badge (#1144/#1230)', async () => {
     render(
       <TicketsPanel

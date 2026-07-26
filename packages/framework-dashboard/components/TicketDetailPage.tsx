@@ -108,6 +108,7 @@ export function TicketDetailPage({
                 ))}
                 {ticket.spiked && <Badge className="border-transparent px-0 text-[10px] uppercase">spiked</Badge>}
                 {ticket.planned && <Badge className="border-transparent px-0 text-[10px] uppercase">planned</Badge>}
+                {ticket.effort && <Badge className="border-transparent px-0 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>}
                 <span className="text-[10px] text-muted-foreground/70">{ticket.file}</span>
               </div>
               {error && <p className="mt-2 text-xs text-danger">{error}</p>}

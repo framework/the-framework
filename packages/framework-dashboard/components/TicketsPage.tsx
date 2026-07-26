@@ -87,15 +87,16 @@ export function TicketsPage({
         </div>
       </div>
       <ScrollArea className="min-h-0 flex-1">
-        {/* As wide as the page allows (#1144/#1265): no max-width, and enough columns at large
-            viewports that the backlog fills the space instead of leaving it idle. */}
+        {/* The full page width, no columns and no max-width (#1144/#1265): each project's table
+            spans the whole pane, so a row has room for its title and every piece of meta at once.
+            Columns looked tidy but split the one dimension the rows actually need. */}
         <div className="w-full p-6">
           {!loaded ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : groups.length === 0 ? (
             <p className="text-sm text-muted-foreground">No projects registered yet.</p>
           ) : (
-            <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-3">
+            <div className="space-y-8">
               {groups.map(g => {
                 const visible = sortTickets(g.tickets.filter(matchesFilter), sortBy)
                 return (

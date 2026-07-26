@@ -68,6 +68,12 @@ describe('TicketDetailPage (#1144)', () => {
     expect(screen.getByText('closed')).toBeTruthy()
   })
 
+  test('shows the effort a spike recorded, with the rest of the meta (#1144/#1265)', async () => {
+    onTicket.mockResolvedValue(ticket({ spiked: true, effort: 'low' }))
+    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
+    expect(await screen.findByText('Effort: low')).toBeTruthy()
+  })
+
   test('queueing writes it to the queue, with the ticket it came from (#1164)', async () => {
     onTicket.mockResolvedValue(ticket({ priority: 'high' }))
     sendQueueTicket.mockResolvedValue({ ok: true, file: 'TODO_AGENTS.md' })

@@ -34,6 +34,12 @@ export interface WorkspaceTicket {
   spiked: boolean
   /** Whether `<name>.plan.md` sits beside it, i.e. #685 already planned it. */
   planned: boolean
+  /**
+   * The effort estimate a spike or plan recorded (#1144/#1265), e.g. `low` or `2h`. The spike
+   * format asks for one ("Human intervention effort: trivial/low/…"), so the first `…effort…: value`
+   * line in the `.spike.md` (else the `.plan.md`) is it. Absent when no sibling names one.
+   */
+  effort?: string
 }
 
 /** A ticket's `GitHub:` link, split into what a reader clicks and where it goes. */
@@ -215,6 +221,34 @@ async function ticketDate(dir: string, file: string): Promise<string> {
 }
 
 /**
+ * A line naming an effort, e.g. `Human intervention effort: low` or `Estimated effort: 2h` —
+ * anything before the colon that ends in "effort", and a non-empty value after it. The spike
+ * format asks for these in prose rather than as a preamble key, so this scans whole lines.
+ */
+const EFFORT_LINE = /(?:^|[-*\s])[^:]*effort[^:]*:\s*(\S.*)/i
+
+/** Long enough for "trivial (option A) / high (option B)"; short enough to stay a badge. */
+const MAX_EFFORT_CHARS = 60
+
+/**
+ * The effort estimate recorded against a ticket (#1144/#1265): the first effort-naming line in
+ * its `.spike.md`, else its `.plan.md` — the spike is where the format asks for the estimate, so
+ * it wins when both name one. Undefined when neither sibling exists or names one.
+ */
+async function readEffort(dir: string, stem: string, spiked: boolean, planned: boolean): Promise<string | undefined> {
+  const sources = [...(spiked ? [`${stem}.spike.md`] : []), ...(planned ? [`${stem}.plan.md`] : [])]
+  for (const name of sources) {
+    const md = await readFile(join(dir, name), 'utf8').catch(() => undefined)
+    if (md === undefined) continue
+    for (const line of md.slice(0, MAX_TICKET_BYTES).split('\n')) {
+      const match = EFFORT_LINE.exec(line)
+      if (match) return match[1]!.trim().slice(0, MAX_EFFORT_CHARS)
+    }
+  }
+  return undefined
+}
+
+/**
  * The project's tickets, by filename, newest first (#1144). `[]` when the repo has no `tickets/`
  * directory at all, which is the state the view offers to import into.
  *
@@ -237,6 +271,9 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
     if (content === undefined) continue
     const stem = file.replace(/\.md$/, '')
     const { title, summary, status, priority, topics, github } = describe(content.slice(0, MAX_TICKET_BYTES))
+    const spiked = siblings.has(`${stem}.spike.md`)
+    const planned = siblings.has(`${stem}.plan.md`)
+    const effort = await readEffort(dir, stem, spiked, planned)
     tickets.push({
       file,
       title: title ?? titleFromFile(file),
@@ -246,8 +283,9 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
       ...(topics ? { topics } : {}),
       ...(github ? { github } : {}),
       date,
-      spiked: siblings.has(`${stem}.spike.md`),
-      planned: siblings.has(`${stem}.plan.md`),
+      spiked,
+      planned,
+      ...(effort ? { effort } : {}),
     })
   }
   // Newest first: what changed most recently is what the list is for (#1144), and it is the only
@@ -287,6 +325,9 @@ export async function readTicket(cwd: string, file: string): Promise<WorkspaceTi
   if (content === undefined) return null
   const stem = file.replace(/\.md$/, '')
   const { title, summary, status, priority, topics, github } = describe(content)
+  const spiked = names.includes(`${stem}.spike.md`)
+  const planned = names.includes(`${stem}.plan.md`)
+  const effort = await readEffort(dir, stem, spiked, planned)
   return {
     file,
     title: title ?? titleFromFile(file),
@@ -296,8 +337,9 @@ export async function readTicket(cwd: string, file: string): Promise<WorkspaceTi
     ...(topics ? { topics } : {}),
     ...(github ? { github } : {}),
     date,
-    spiked: names.includes(`${stem}.spike.md`),
-    planned: names.includes(`${stem}.plan.md`),
+    spiked,
+    planned,
+    ...(effort ? { effort } : {}),
     content,
   }
 }

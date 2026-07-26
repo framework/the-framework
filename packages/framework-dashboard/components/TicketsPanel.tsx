@@ -1,6 +1,6 @@
 import type { TicketsMeta, WorkspaceTicket } from '@gemstack/the-framework'
 import { presets } from '@gemstack/the-framework/client'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Github } from 'lucide-react'
 import { sendStart } from '../server/control.telefunc.js'
 import { onTicketsMeta } from '../server/reads.telefunc.js'
 import { Button } from './ui/button.js'
@@ -144,26 +144,22 @@ export function TicketsPanel({
       </div>
       <ul className="divide-y divide-border">
         {tickets.map(ticket => (
-          <li key={ticket.file}>
+          // The GitHub link sits beside the button rather than inside it: a link inside a button
+          // is invalid HTML, and the two go different places — the row to the detail page, the
+          // link out to the issue.
+          <li key={ticket.file} className="flex items-stretch transition-colors hover:bg-accent/60">
             <button
               type="button"
               onClick={() => onOpen(ticket.file)}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-accent/60"
+              className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm"
             >
               {/* Only closed is called out (#1144/#1230): open is the row's default assumption,
                   same as spiked/planned only showing when true. */}
               {ticket.status === 'closed' && (
                 <Badge className="shrink-0 border-transparent px-1.5 text-[10px] uppercase text-muted-foreground">closed</Badge>
               )}
-              {ticket.priority && (
-                <Badge className={cn('shrink-0 border-transparent px-1.5 text-[10px]', priorityTone(ticket.priority))}>
-                  Priority: {ticket.priority}
-                </Badge>
-              )}
               <span className="min-w-0 flex-1 truncate font-medium">{ticket.title}</span>
-              {/* Topics (#1144): capped so a heavily-tagged ticket cannot push the date off the
-                  row's end — the row is a one-liner, not a place to read every tag. */}
-              {ticket.topics?.slice(0, 3).map(topic => (
+              {ticket.topics?.map(topic => (
                 <Badge key={topic} className="hidden shrink-0 border-border px-1.5 text-[10px] text-muted-foreground sm:inline-flex">
                   {topic}
                 </Badge>
@@ -171,10 +167,31 @@ export function TicketsPanel({
               {/* What the agent has already done to this ticket, so it is clear what is left. */}
               {ticket.spiked && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">spiked</Badge>}
               {ticket.planned && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">planned</Badge>}
+              {ticket.effort && (
+                <Badge className="shrink-0 border-transparent px-1 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>
+              )}
+              {/* The trailing meta cluster, in the fixed order date, priority, GitHub (#1265) —
+                  the link itself is the sibling below. */}
               <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/70" title={formatDateTime(ticket.date)}>
                 {formatAge(ticket.date)}
               </span>
+              {ticket.priority && (
+                <Badge className={cn('shrink-0 border-transparent px-1 text-[10px]', priorityTone(ticket.priority))}>
+                  Priority: {ticket.priority}
+                </Badge>
+              )}
             </button>
+            {ticket.github && (
+              <a
+                href={ticket.github.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex shrink-0 items-center gap-1 px-3 text-[10px] text-muted-foreground hover:text-foreground hover:underline"
+              >
+                <Github className="h-3 w-3" aria-hidden />
+                {ticket.github.label}
+              </a>
+            )}
           </li>
         ))}
       </ul>

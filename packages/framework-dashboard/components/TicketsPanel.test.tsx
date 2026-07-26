@@ -93,7 +93,7 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(onOpen).toHaveBeenCalledWith('2026-07-20_do-the-thing.md')
   })
 
-  test('shows the effort a spike recorded, and keeps the row meta in date/priority/GitHub order (#1144/#1265)', async () => {
+  test('shows the effort a spike recorded, and keeps the row meta in priority/date/GitHub order (#1144/#1265)', async () => {
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
     render(
       <TicketsPanel
@@ -112,8 +112,9 @@ describe('TicketsPanel (#697/#1144)', () => {
       />,
     )
     expect(await screen.findByText('Effort: low')).toBeTruthy()
+    // Priority sits left of the date (#1265), the date left of the issue link.
     const row = screen.getByText('Do the thing').closest('li')!
-    const order = [row.textContent!.indexOf('ago'), row.textContent!.indexOf('Priority'), row.textContent!.indexOf('#42')]
+    const order = [row.textContent!.indexOf('Priority'), row.textContent!.indexOf('ago'), row.textContent!.indexOf('#42')]
     expect(order.every(i => i !== -1)).toBe(true)
     expect(order[0]).toBeLessThan(order[1]!)
     expect(order[1]).toBeLessThan(order[2]!)

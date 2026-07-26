@@ -115,7 +115,9 @@ export function TicketsPanel({
           above says "Import" instead: same work, but "update" would be a strange word for
           filling a directory that has never been filled. */}
       <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-2 py-1.5">
-        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+        {/* The stamp and its action side by side (#1265) — the button used to sit flush right,
+            a whole panel-width away from the line it acts on. */}
+        <span className="min-w-0 truncate text-xs text-muted-foreground">
           {meta.lastImportedAt
             ? `Updated from GitHub ${formatRelative(meta.lastImportedAt)}`
             : 'No record of an import yet'}
@@ -124,9 +126,9 @@ export function TicketsPanel({
           <TooltipTrigger
             render={
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="h-6 shrink-0 gap-1 px-1.5 text-xs"
+                className="h-6 shrink-0 gap-1 px-2 text-xs"
                 disabled={busy}
                 onClick={() => void updateFromGithub()}
               />
@@ -170,27 +172,31 @@ export function TicketsPanel({
               {ticket.effort && (
                 <Badge className="shrink-0 border-transparent px-1 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>
               )}
-              {/* The trailing meta cluster, in the fixed order date, priority, GitHub (#1265) —
-                  the link itself is the sibling below. */}
-              <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/70" title={formatDateTime(ticket.date)}>
+              {/* The trailing meta cluster (#1265): priority, then date, then the GitHub link (the
+                  sibling below). Fixed-width columns, rendered even when empty, so every row's
+                  meta lines up down the table instead of drifting with whatever a row happens
+                  to have. */}
+              <span className={cn('ml-auto w-24 shrink-0 text-right text-[10px]', priorityTone(ticket.priority))}>
+                {ticket.priority ? `Priority: ${ticket.priority}` : ''}
+              </span>
+              <span className="w-14 shrink-0 text-right text-[10px] text-muted-foreground/70" title={formatDateTime(ticket.date)}>
                 {formatAge(ticket.date)}
               </span>
-              {ticket.priority && (
-                <Badge className={cn('shrink-0 border-transparent px-1 text-[10px]', priorityTone(ticket.priority))}>
-                  Priority: {ticket.priority}
-                </Badge>
-              )}
             </button>
-            {ticket.github && (
+            {ticket.github ? (
               <a
                 href={ticket.github.url}
                 target="_blank"
                 rel="noreferrer"
-                className="flex shrink-0 items-center gap-1 px-3 text-[10px] text-muted-foreground hover:text-foreground hover:underline"
+                className="flex w-16 shrink-0 items-center justify-end gap-1 px-3 text-[10px] text-muted-foreground hover:text-foreground hover:underline"
               >
                 <Github className="h-3 w-3" aria-hidden />
                 {ticket.github.label}
               </a>
+            ) : (
+              // Same width as the link so the button's right edge — and with it the priority and
+              // date columns inside — stays put on a row with no issue to link.
+              <span className="w-16 shrink-0" aria-hidden />
             )}
           </li>
         ))}

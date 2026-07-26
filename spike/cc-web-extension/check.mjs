@@ -145,7 +145,12 @@ async function deliver(body, prepare) {
 }
 
 {
-  const { dom, result } = await deliver(`<p>nothing to type into</p>`)
+  const { dom, result } = await deliver(`<p>nothing to type into</p>`, w => {
+    // Shorten the composer wait: this page never gains one, and the real 20s is for claude.ai
+    // still rendering after a tab revive.
+    w.__tfComposerWaitMs = 100
+    return undefined
+  })
   const ok = !result.ok && /no composer/.test(result.note)
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  answer refuses honestly when there is no composer  (ok=${result.ok})`)

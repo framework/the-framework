@@ -382,7 +382,15 @@ function findSendButton() {
  * can be typed here is bounded by what the session itself offered.
  */
 async function deliverAnswer(text) {
-  const composer = findComposer()
+  // Wait for the composer rather than failing on its absence: the first live delivery landed
+  // right after a tab revive, and claude.ai takes well over the naive 5 seconds to render, so
+  // "no composer on the page" mostly means "not yet". The harness shortens the wait.
+  const deadline = Date.now() + (window.__tfComposerWaitMs ?? 20000)
+  let composer = findComposer()
+  while (!composer && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 500))
+    composer = findComposer()
+  }
   if (!composer) {
     answerStatus = 'failed: no composer on the page'
     return { ok: false, note: 'no composer on the page' }

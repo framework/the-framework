@@ -50,35 +50,77 @@ function deepText() {
  * shape to look for is a block that parses as JSON and carries `options`. Strategies run most
  * specific first and the winner is reported, so the real version can drop the weak ones.
  */
-function findPendingChoice() {
-  // `code` on its own now: the page has no <pre> at all, which is what round 1 established.
-  for (const el of deepQueryAll('pre code, pre, code')) {
-    const text = (el.textContent ?? '').trim()
-    if (!text.startsWith('{') || !text.includes('"options"')) continue
-    try {
-      const parsed = JSON.parse(text)
-      if (Array.isArray(parsed.options)) return { via: el.tagName.toLowerCase(), parsed }
-    } catch {
-      // A partially streamed block is not an error, just not ready yet.
-    }
-  }
-  // Fallback for a page that renders the block as plain text rather than in an element of
-  // its own. Walk the closing braces back until something parses.
-  const body = deepText()
-  const start = body.indexOf('{"title"') >= 0 ? body.indexOf('{"title"') : body.indexOf('{\n  "title"')
-  if (start >= 0) {
-    const slice = body.slice(start, start + 4000)
-    for (let end = slice.length; end > 20; end--) {
-      if (slice[end - 1] !== '}') continue
-      try {
-        const parsed = JSON.parse(slice.slice(0, end))
-        if (Array.isArray(parsed.options)) return { via: 'plain-text', parsed }
-      } catch {
-        // Keep walking back.
+/**
+ * Pull the first JSON object carrying `options` out of arbitrary surrounding text.
+ *
+ * Round 2 established the text is reachable, and that matching on a fixed prefix is not good
+ * enough: `{"title"` and `{\n  "title"` are two guesses at an indentation nobody promised us,
+ * and the block also arrives with prose around it. So this brace-matches instead, tracking
+ * strings and escapes so a brace inside a label cannot end the object early.
+ */
+function extractChoice(text, stats) {
+  if (!text.includes('"options"')) return undefined
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== '{') continue
+    let depth = 0
+    let inString = false
+    let escaped = false
+    for (let j = i; j < text.length; j++) {
+      const ch = text[j]
+      if (escaped) {
+        escaped = false
+        continue
+      }
+      if (ch === '\\') {
+        escaped = true
+        continue
+      }
+      if (ch === '"') {
+        inString = !inString
+        continue
+      }
+      if (inString) continue
+      if (ch === '{') depth++
+      else if (ch === '}') {
+        depth--
+        if (depth > 0) continue
+        const slice = text.slice(i, j + 1)
+        if (slice.includes('"options"')) {
+          if (stats) stats.candidates++
+          try {
+            const parsed = JSON.parse(slice)
+            if (Array.isArray(parsed.options)) return parsed
+            if (stats) stats.parsedWithoutOptions++
+          } catch (err) {
+            // Not this one, or still streaming. Record why, so a failing report says whether
+            // the block was never found or found and unparseable.
+            if (stats) {
+              stats.parseErrors++
+              stats.lastError = String(err.message ?? err).slice(0, 80)
+            }
+          }
+        }
+        break
       }
     }
   }
   return undefined
+}
+
+/**
+ * The question a parked run is waiting on. Our agents emit it as a fenced JSON block carrying
+ * `options`. Element-scoped first so the winner names where it was found, then the whole page
+ * as a fallback for a block split across elements by a syntax highlighter.
+ */
+function findPendingChoice() {
+  // `code` on its own: the page has <code> blocks with no <pre> wrapper (round 1), and they
+  // sit inside shadow roots (round 2).
+  for (const el of deepQueryAll('pre code, pre, code')) {
+    const parsed = extractChoice(el.textContent ?? '')
+    if (parsed) return { via: el.tagName.toLowerCase(), parsed }
+  }
+  const parsed = extractChoice(deepText())
+  return parsed ? { via: 'page-text', parsed } : undefined
 }
 
 /** The box an answer would be typed into, if this ever becomes two-way. */
@@ -108,8 +150,15 @@ function diagnostics() {
     }
   }
   const deep = deepText()
+  // Did the brace matcher find object-shaped candidates, and did any fail to parse? This is
+  // what separates "never found it" from "found it and could not read it".
+  const stats = { candidates: 0, parseErrors: 0, parsedWithoutOptions: 0, lastError: '' }
+  extractChoice(deep, stats)
   return {
     frame: IS_TOP ? 'top' : 'child',
+    jsonCandidates: stats.candidates,
+    jsonParseErrors: stats.parseErrors,
+    jsonLastError: stats.lastError,
     pre: deepQueryAll('pre').length,
     code: deepQueryAll('code').length,
     jsonishBlocks: codes.length,
@@ -197,6 +246,8 @@ if (!IS_TOP) {
         ['iframes', `${d.iframes} (reachable ${d.reachableFrames})`],
         ['"options" body', String(d.optionsInBodyText)],
         ['"options" deep', String(d.optionsInDeepText)],
+        ['json candidates', `${d.jsonCandidates} (parse errors ${d.jsonParseErrors})`],
+        ...(d.jsonLastError ? [['last parse error', d.jsonLastError]] : []),
         ['frame reported', fromFrame ? 'yes' : 'no'],
       )
     }

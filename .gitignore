@@ -22,6 +22,9 @@ docs/.vitepress/cache/
 # Generated from packages/the-framework/prompts/**/*.md by its gen-prompts script (#551).
 packages/the-framework/src/prompts.generated.ts
 
+# The Framework
+ANALYSIS_RESULT.md
+
 # The Framework writes run state into .the-framework/ when its daemon runs against a repo
 # in-tree (dev). Transient, mirroring the .gitignore the framework seeds on install; LOGS.md
 # stays the only committed part, so it is never ignored here.

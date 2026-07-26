@@ -31,6 +31,9 @@ function sessionIdFromUrl() {
  * where there is no extension runtime. Failures are swallowed: a page that cannot reach the
  * daemon must still show its panel rather than throw inside a DOM observer.
  */
+/** What the daemon last said about our report, so the panel can say why nothing arrived. */
+let bridgeStatus = 'not sent yet'
+
 function reportToDaemon(parsed) {
   const sessionId = sessionIdFromUrl()
   if (!sessionId || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
@@ -45,9 +48,16 @@ function reportToDaemon(parsed) {
   }
   if (!question.title || !question.options.length) return
   try {
-    chrome.runtime.sendMessage({ type: 'tf-question', question }, () => void chrome.runtime.lastError)
-  } catch {
-    // The worker can be asleep or the context invalidated after a reload; the next change retries.
+    chrome.runtime.sendMessage({ type: 'tf-question', question }, reply => {
+      // Silence here was the first thing to go wrong live: the worker answered "no token set"
+      // and nobody ever saw it, so a configured-looking extension simply did nothing.
+      if (chrome.runtime.lastError) bridgeStatus = chrome.runtime.lastError.message ?? 'worker unreachable'
+      else if (!reply) bridgeStatus = 'no reply from the worker'
+      else if (reply.ok) bridgeStatus = reply.skipped ? `sent (${reply.skipped})` : 'sent'
+      else bridgeStatus = reply.error ?? 'failed'
+    })
+  } catch (err) {
+    bridgeStatus = String(err?.message ?? err)
   }
 }
 
@@ -304,6 +314,7 @@ if (!IS_TOP) {
       ['title', winner.choiceTitle ?? '-'],
       ['options', winner.choiceOptions?.length ? winner.choiceOptions.join(' | ') : '-'],
       ['composer', top.composerFound ? top.composerVia : 'not found'],
+      ['bridge', bridgeStatus],
     ]
     if (!winner.choiceFound) {
       rows.push(

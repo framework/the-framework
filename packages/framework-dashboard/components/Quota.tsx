@@ -35,6 +35,8 @@ const TONE_TEXT: Record<QuotaTone, string> = {
   full: 'text-danger',
 }
 
+const SEP = ' · '
+
 /** The account's own week: the window the bar is about. */
 function weekWindow(windows: DriverQuotaWindow[]): DriverQuotaWindow | undefined {
   return windows.find(w => w.kind === 'week')
@@ -174,7 +176,7 @@ function WeekBar({
             {over ? 'over-consuming' : 'under-consuming'}: you spend {over ? 'faster' : 'slower'} than the week's pace allows.
           </TooltipContent>
         </Tooltip>
-        {' · '}
+        {SEP}
         <Tooltip>
           <TooltipTrigger render={<span className="cursor-default" />}>resets {formatResetDay(boundary.resetsAt)}</TooltipTrigger>
           <TooltipContent>{formatResetTooltip(boundary.resetsAt)}</TooltipContent>
@@ -183,7 +185,7 @@ function WeekBar({
             has nothing left for the tooltip to add. */}
         {others.length > 1 ? (
           <>
-            {' · '}
+            {SEP}
             <Tooltip>
               <TooltipTrigger render={<span className="cursor-default" />}>show all limits</TooltipTrigger>
               <TooltipContent>
@@ -258,7 +260,7 @@ function OtherWindow({ window }: { window: DriverQuotaWindow }) {
     <div className="flex items-baseline justify-between gap-2 text-xs">
       <span className="text-muted-foreground">{window.label}</span>
       <span className="text-muted-foreground">
-        {Math.round(window.percentUsed)}% used{window.resetsAtText ? ` · resets ${window.resetsAtText}` : ''}
+        {Math.round(window.percentUsed)}% used{window.resetsAtText ? `${SEP}resets ${window.resetsAtText}` : ''}
       </span>
     </div>
   )
@@ -270,7 +272,7 @@ function OtherWindowRow({ window }: { window: DriverQuotaWindow }) {
     <tr>
       <td className="pr-3 align-baseline text-muted-foreground">{window.label}</td>
       <td className="whitespace-nowrap align-baseline text-muted-foreground">
-        {Math.round(window.percentUsed)}% used{window.resetsAtText ? ` · resets ${window.resetsAtText}` : ''}
+        {Math.round(window.percentUsed)}% used{window.resetsAtText ? `${SEP}resets ${window.resetsAtText}` : ''}
       </td>
     </tr>
   )

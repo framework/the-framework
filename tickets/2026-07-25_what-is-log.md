@@ -1,3 +1,4 @@
+Status: open
 Priority: 8
 GitHub: [#1145](https://github.com/gemstack-land/the-framework/issues/1145)
 

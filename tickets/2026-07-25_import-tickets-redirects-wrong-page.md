@@ -1,3 +1,4 @@
+Status: closed
 GitHub: [#1169](https://github.com/gemstack-land/the-framework/issues/1169)
 
 # Click `Import tickets from GitHub` => redirects to the wrong page (should redirect the running session)

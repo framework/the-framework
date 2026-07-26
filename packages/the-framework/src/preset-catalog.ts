@@ -5,7 +5,6 @@ import {
   PRESETS_MAINTAINABILITY,
   PRESETS_MAINTENANCE,
   PRESETS_MARKET_RESEARCH,
-  PRESETS_QUICK_WINS,
   PRESETS_READABILITY,
   PRESETS_RESEARCH,
   PRESETS_SECURITY_AUDIT,
@@ -99,14 +98,6 @@ export const presets = {
    */
   updateTickets: definePreset({ name: 'update-tickets', template: PRESETS_UPDATE_TICKETS, label: 'Update from GitHub', newSession: true, tooltip: 'Bring `tickets/` up to date with the issues and comments changed since the last import.' }),
 
-  /**
-   * [Quick wins] (#773): harvest the cheap work out of the plans we already have. Reads the
-   * `.plan.md` companions the #684 format defines and appends the quick ones to `TODO_AGENTS.md`.
-   * This is the half of auto PM that closes the loop: [Spike & plan] turns tickets into plans,
-   * this turns plans into queued work, and the backlog loop drains the queue.
-   */
-  quickWins: definePreset({ name: 'quick-wins', template: PRESETS_QUICK_WINS, label: 'Quick wins' }),
-
   /** [Spike & plan] (#685): turn tickets into costed plans. */
   spikeAndPlan: definePreset({ name: 'spike-and-plan', template: PRESETS_SPIKE_AND_PLAN, label: 'Spike & plan' }),
 
@@ -149,7 +140,7 @@ export const presets = {
   triageConsensual: definePreset({ name: 'triage-consensual', template: PRESETS_TRIAGE_CONSENSUAL, label: 'Do consensual work', tooltip: 'Add `tickets/*.md` to queue (TODO_AGENTS.md), only significant (no quick-wins) and consensual tickets' }),
 } as const satisfies Record<string, PresetDef>
 
-/** The presets by key, e.g. `quickWins`. */
+/** The presets by key, e.g. `spikeAndPlan`. */
 export type PresetKey = keyof typeof presets
 
 /**
@@ -186,7 +177,6 @@ export const LAUNCHER_PRESETS: readonly PresetDef[] = [
   presets.suggestNewFeatures,
   presets.suggestTicketsToWorkOn,
   presets.spikeAndPlan,
-  presets.quickWins,
   presets.marketResearch,
   presets.importTickets,
   presets.updateTickets,

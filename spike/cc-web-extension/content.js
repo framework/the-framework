@@ -16,6 +16,8 @@
 // `check.mjs` covers all four offline, in jsdom, with no browser and no live session.
 
 const POLL_MS = 2000
+/** So the scrape can exclude our own panel from what it mirrors. */
+const PANEL_ID = 'tf-bridge-panel'
 const IS_TOP = window.top === window
 
 /** The cloud session this page is showing, which is the key the daemon joins runs on. */
@@ -75,17 +77,37 @@ let transcriptStatus = 'not sent yet'
  * heuristic is deliberate, because a wrong split would post gibberish that looks like output.
  */
 function transcript() {
-  const articles = deepQueryAll('article')
-  return articles
+  const blocks = deepQueryAll('article')
     .map((el, index) => {
       const text = (el.innerText ?? el.textContent ?? '').trim()
       if (!text) return undefined
-      // The composer lives in its own article on some layouts; an empty or input-only block is
-      // not a message.
+      // The composer lives in its own article on some layouts; an input-only block is not a
+      // message.
       if (el.querySelector('[contenteditable="true"], textarea')) return undefined
       return { seq: index, role: 'agent', text: text.slice(0, 8000) }
     })
     .filter(Boolean)
+  if (blocks.length) return blocks
+
+  // No article blocks on this page, which is what a live session turned out to look like. Rather
+  // than guess where one message ends and the next begins, mirror the page as a single block and
+  // let it be replaced as it grows. Crude, but it is the honest shape: we know what is on screen,
+  // not how it divides.
+  const text = pageText()
+  return text ? [{ seq: 0, role: 'agent', text: text.slice(0, 8000) }] : []
+}
+
+/** The session's own text, with our panel and the composer left out. */
+function pageText() {
+  const panel = document.getElementById(PANEL_ID)
+  const hidden = panel?.style.display
+  // Hide our own panel for the read, or the mirror would show the mirror.
+  if (panel) panel.style.display = 'none'
+  try {
+    return (document.body?.innerText ?? '').trim()
+  } finally {
+    if (panel) panel.style.display = hidden ?? ''
+  }
 }
 
 /**
@@ -349,6 +371,7 @@ if (!IS_TOP) {
   })
 
   const panel = document.createElement('div')
+  panel.id = PANEL_ID
   panel.style.cssText = [
     'position:fixed', 'bottom:16px', 'right:16px', 'z-index:2147483647',
     'width:360px', 'max-height:70vh', 'overflow:auto',

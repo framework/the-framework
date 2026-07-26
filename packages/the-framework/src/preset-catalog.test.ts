@@ -21,7 +21,6 @@ const PARAMETERIZED = [
 const PARAMLESS = [
   presets.marketResearch,
   presets.importTickets,
-  presets.quickWins,
   presets.spikeAndPlan,
   presets.suggestNewTickets,
   presets.suggestNewFeatures,
@@ -39,7 +38,7 @@ test('every preset keeps its exact run-kind name', () => {
     Object.values(presets).map(p => p.name).sort(),
     [
       'drain-queue', 'import-tickets', 'maintainability', 'maintenance', 'market-research',
-      'quick-wins', 'readability', 'research', 'security-audit', 'spike-and-plan',
+      'readability', 'research', 'security-audit', 'spike-and-plan',
       'suggest-new-features', 'suggest-new-tickets', 'suggest-tickets-to-work-on',
       'triage-consensual', 'triage-quick', 'update-tickets', 'ux',
     ],

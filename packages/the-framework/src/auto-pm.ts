@@ -5,8 +5,8 @@ import { presets } from './preset-catalog.js'
  * Auto PM (#685): spend leftover subscription quota on product management instead of
  * letting it expire. While the account is still under its quota boundary (#879) and nobody
  * is at the keyboard, the daemon runs the cycle by itself: it works the agent queue down entry by entry (#855),
- * and once that is empty it refills it — harvesting quick-wins, then spiking and planning
- * the tickets that have neither yet.
+ * and once that is empty it refills it — triaging tickets, then spiking and planning
+ * the ones that have neither yet.
  *
  * The whole feature is one policy question ("is now a good time to spend tokens on our
  * own roadmap?"), so that question lives here as a pure function and the daemon only
@@ -122,18 +122,16 @@ export function autoPmDecision(input: AutoPmInputs): AutoPmDecision {
 /**
  * One thing auto PM knows how to do while the machine is idle (#773).
  *
- * The jobs form a cycle, and the order matters: [Quick wins] turns existing plans into queued
- * work, [Spike & plan] turns tickets into plans. Harvesting first means a machine that already
- * has plans starts *doing* rather than planning more. Once a job queues something the sweep
- * switches to draining it (#855), and the rotation resumes where it left off once the queue is
- * empty again.
+ * The jobs form a cycle, and the order matters: triage turns tickets into queued work, [Spike &
+ * plan] turns the rest into plans. Once a job queues something the sweep switches to draining it
+ * (#855), and the rotation resumes where it left off once the queue is empty again.
  */
 export interface AutoPmJob {
   /** Stable id, used for the rotation and the log line. */
   name: string
   /** The prompt to run, verbatim. */
   prompt: string
-  /** What it is doing, as the log line says it ("harvesting quick-wins"). */
+  /** What it is doing, as the log line says it ("triaging quick-win tickets"). */
   describe: string
   /**
    * The user-facing name, for a surface that lists the routines (#1159). Read off the preset the
@@ -151,11 +149,9 @@ export interface AutoPmJob {
 }
 
 /**
- * The default cycle, ordered cheapest-and-readiest first: harvest the plans we have (#773), triage
- * the quick tickets (#891), then the significant-but-agreed ones (#892), and only then make more
- * plans (#685). A machine sitting on work it has already thought through should start *doing*
- * rather than planning, and planning is both the most expensive turn and the one whose output the
- * earlier jobs consume.
+ * The default cycle, ordered cheapest-and-readiest first: triage the quick tickets (#891), then
+ * the significant-but-agreed ones (#892), and only then make more plans (#685). Planning is the
+ * most expensive turn and the one whose output the earlier jobs consume, so it runs last.
  *
  * This rotation is what #891/#892 mean by "with a cron job regularly firing this preset". No
  * separate scheduler is involved and none is needed: the rotation already fires on every idle tick
@@ -172,12 +168,6 @@ export interface AutoPmJob {
  * idle tick tries the next job instead of retrying a job that is already running.
  */
 export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
-  {
-    name: presets.quickWins.name,
-    prompt: presets.quickWins.render(),
-    describe: 'harvesting quick-wins from the plans',
-    label: presets.quickWins.label,
-  },
   {
     name: presets.triageQuick.name,
     prompt: presets.triageQuick.render(),

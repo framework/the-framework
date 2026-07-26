@@ -125,7 +125,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     return deps.startRun(prompt, { ...options, ...extra, unattended: true }, projectId)
   }
 
-  // Auto PM (#685/#773): while the queue is dry and there is quota to spare, harvest quick-wins and
+  // Auto PM (#685/#773): while the queue is dry and there is quota to spare, triage and
   // spike & plan tickets rather than let the day's allowance expire unused.
   const autoPm = startAutoPm({
     projects,

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "status": "done",
+  "id": "2026-07-26T10-03-06-580Z",
+  "startedAt": "2026-07-26T10:03:07.746Z",
+  "updatedAt": "2026-07-26T11:12:01.562Z",
+  "passes": 5,
+  "pid": 302947,
+  "host": "rom-thinkpad-x280",
+  "intent": "Hello",
+  "target": "web",
+  "handoff": {
+    "push": true,
+    "pr": true
+  },
+  "driver": "claude-web",
+  "workspace": "/home/rom/code/the-framework/.the-framework/worktrees/2026-07-26T10-03-06-580Z",
+  "sessionLink": "https://claude.ai/code",
+  "scope": "full",
+  "sessionId": "session_01DZXtQbDRgb9PsbqZuqFniu",
+  "branch": "the-framework/run-2026-07-26T10-03-06-580Z"
+}

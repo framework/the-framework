@@ -130,12 +130,19 @@ export function autoPmDecision(input: AutoPmInputs): AutoPmDecision {
  * (#855), and the rotation resumes where it left off once the queue is empty again.
  */
 export interface AutoPmJob {
-  /** Stable id, used for the rotation and the log line. */
+  /** Stable id: the rotation and the opt-out list (#1209) key on it. */
   name: string
   /** The prompt to run, verbatim. */
   prompt: string
-  /** What it is doing, as the log line says it ("triaging quick-win tickets"). */
-  describe: string
+  /**
+   * A line saying what the job does, wherever its {@link label} does not already: under the label
+   * in the routines list, and as the log line's wording. Only the maintenance sweep carries one --
+   * "Maintenance" names its preset rather than the work -- while the other routines' labels read
+   * as what they do, so their rows stay one line and their log lines say the label itself rather
+   * than the same thing twice. Data on the job rather than a name matched in the dashboard, so a
+   * rename cannot quietly move the line around.
+   */
+  describe?: string
   /**
    * The user-facing name, for a surface that lists the routines (#1159). Read off the preset the
    * job fires rather than written again here, so a relabelled preset relabels its routine.
@@ -174,19 +181,16 @@ export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
   {
     name: presets.triageQuick.name,
     prompt: presets.triageQuick.render(),
-    describe: 'triaging quick-win tickets',
     label: presets.triageQuick.label,
   },
   {
     name: presets.triageConsensual.name,
     prompt: presets.triageConsensual.render(),
-    describe: 'triaging consensual tickets',
     label: presets.triageConsensual.label,
   },
   {
     name: presets.spikeAndPlan.name,
     prompt: presets.spikeAndPlan.render(),
-    describe: 'spiking & planning tickets',
     label: presets.spikeAndPlan.label,
   },
 ]
@@ -199,7 +203,6 @@ export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
 export const AUTO_PM_DRAIN_JOB: AutoPmJob = {
   name: presets.drainQueue.name,
   prompt: presets.drainQueue.render(),
-  describe: 'draining the first open queue entry',
   label: presets.drainQueue.label,
   drains: true,
 }
@@ -238,6 +241,9 @@ export const AUTO_PM_ROUTINES: readonly AutoPmJob[] = [
   ...AUTO_PM_JOBS,
   AUTO_PM_MAINTENANCE_JOB,
 ]
+
+/** The sentence a start is reported as: the log line and the outcome message say the same thing. */
+const doing = (job: AutoPmJob) => job.describe ?? job.label ?? job.name
 
 /**
  * What became of one attempt to land a run's queue (#852). The two flags are separate on purpose:
@@ -487,7 +493,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // Armed before the spawn, not after: starting is slow, and a tick that overlapped the
         // spawn would otherwise see no live run yet and start a second one.
         lastStart.set(project.id, now())
-        deps.log(`[framework] auto PM: ${job.describe} in ${project.path}`)
+        deps.log(`[framework] auto PM: ${doing(job)} in ${project.path}`)
         const runId = await deps.start(project, job).catch(() => undefined)
         if (runId) {
           // Advanced only on a start that took, so a refused job is retried rather than skipped.
@@ -502,7 +508,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           else if (decision.mode === 'pm') nextJob.set(project.id, index + 1)
           // Its queue lives on the run's branch until a later tick promotes it.
           pending.set(project.id, [...(pending.get(project.id) ?? []), runId])
-          note(project, true, job.describe)
+          note(project, true, doing(job))
         } else {
           lastStart.delete(project.id)
           deps.log(`[framework] auto PM: could not start a run in ${project.path}`)

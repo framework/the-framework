@@ -546,10 +546,18 @@ test('AUTO_PM_ROUTINES is every job the sweep can fire, once each (#1159)', () =
 test('every routine carries its preset label and a rendered prompt, so a list of them is runnable (#1159)', () => {
   for (const job of AUTO_PM_ROUTINES) {
     assert.equal(job.label, presets[presetKey(job.name)].label, `${job.name} must be labelled by its preset`)
-    assert.ok(job.describe.length > 0, `${job.name} must say what it does`)
     assert.ok(job.prompt.trim().length > 0, `${job.name} must carry a prompt`)
     // The prompt travels to the browser and is started verbatim, so nothing may be left unrendered.
     assert.doesNotMatch(job.prompt, /\$\{\{/, `${job.name} must ship a rendered prompt`)
+  }
+})
+
+test('only the maintenance sweep describes itself; the rest are just their label', () => {
+  // "Maintenance" names the preset rather than the work, so its row and log line keep the
+  // sentence; the other routines' labels already say what they do.
+  assert.equal(AUTO_PM_MAINTENANCE_JOB.describe, 'sweeping the codebase for maintenance work')
+  for (const job of [AUTO_PM_DRAIN_JOB, ...AUTO_PM_JOBS]) {
+    assert.equal(job.describe, undefined, `${job.name} must not say its label twice`)
   }
 })
 

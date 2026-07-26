@@ -32,13 +32,25 @@ function weekWindow(windows: DriverQuotaWindow[]): DriverQuotaWindow | undefined
 }
 
 /**
- * The week as one track.
+ * The week as one track — one bar, not three (#960 Edit): what's spent, where the week says it
+ * should be, and where unattended work actually stops all live in the same box, the last of them
+ * draggable right there rather than as a slider of its own underneath it.
  *
- * The marker is drawn at the boundary that actually gates the work, not at a smooth pro-rata line:
- * the boundary steps a seventh at a time (#879), and drawing a line the daemon does not act on
- * would be a prettier lie.
+ * The boundary is drawn at the step that actually gates the work, not at a smooth pro-rata line:
+ * it steps a seventh at a time (#879), and drawing a line the daemon does not act on would be a
+ * prettier lie. The limit, by contrast, really is continuous — it is a handle, not a reading.
  */
-function WeekBar({ status, percentUsed, offset }: { status: QuotaBoundaryStatus; percentUsed: number; offset: number }) {
+function WeekBar({
+  status,
+  percentUsed,
+  offset,
+  onChangeOffset,
+}: {
+  status: QuotaBoundaryStatus
+  percentUsed: number
+  offset: number
+  onChangeOffset: (offset: number) => void
+}) {
   const { boundary } = status
   const ticks = weekTicks(boundary.startsAt, boundary.resetsAt)
   // The mid-day-start case packs a label into a sliver of the week (#960); on one line it lands
@@ -62,27 +74,51 @@ function WeekBar({ status, percentUsed, offset }: { status: QuotaBoundaryStatus;
           </span>
         ))}
       </div>
-      <div role="img" aria-label={label} className="relative h-2.5 overflow-hidden rounded-full bg-muted">
-        <div
-          className={cn('h-full rounded-full transition-all', TONE_FILL[tone])}
-          style={{ width: `${Math.min(Math.max(percentUsed, 0), 100)}%` }}
-        />
-        {/* The boundary. Inside the same box as the fill, which is the whole point of one track. */}
-        <div
-          className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-foreground"
-          style={{ left: `${Math.min(Math.max(boundary.percent, 0), 100)}%` }}
-          aria-hidden
-        />
-        {/* Where unattended work actually stops, drawn only once it has been moved off the
-            boundary — an unmoved limit is the boundary, and two marks on one pixel would read
-            as a rendering fault rather than as agreement. */}
-        {offset !== 0 && (
+      <div className="relative h-4">
+        <div role="img" aria-label={label} className="absolute inset-x-0 top-[3px] h-2.5 overflow-hidden rounded-full bg-muted">
           <div
-            className="absolute inset-y-0 w-0.5 -translate-x-1/2 border-x border-foreground/70 bg-transparent"
-            style={{ left: `${limitPercent(boundary.percent, offset)}%` }}
+            className={cn('h-full rounded-full transition-all', TONE_FILL[tone])}
+            style={{ width: `${Math.min(Math.max(percentUsed, 0), 100)}%` }}
+          />
+          {/* The boundary. Inside the same box as the fill, which is the whole point of one track. */}
+          <div
+            className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-foreground"
+            style={{ left: `${Math.min(Math.max(boundary.percent, 0), 100)}%` }}
             aria-hidden
           />
-        )}
+        </div>
+        {/* The limit, as a real `<input type="range">` so it is draggable and keyboard-operable —
+            but valued on the bar's own 0-100 scale rather than the offset's, so the thumb the
+            browser draws lines up with the fill and boundary beneath it instead of a second,
+            differently-scaled track. A native thumb's position is always (value - min) / (max -
+            min) of the box, so min/max have to stay 0/100 exactly — anything narrower (say,
+            clamped to the offset's own reach) would stretch that fraction and the thumb would
+            drift from the boundary tick under it instead of sitting on it. The ±MAX_SPEND_OFFSET
+            reach is enforced in the change handler instead, on the offset it produces. At rest
+            (offset 0) the handle sits exactly on the boundary; dragging is what draws it as a mark
+            of its own. */}
+        <input
+          id="spend-limit"
+          type="range"
+          aria-label="Unattended work stops at"
+          className={cn(
+            'absolute inset-0 h-full w-full cursor-grab appearance-none bg-transparent',
+            '[&::-webkit-slider-runnable-track]:bg-transparent',
+            '[&::-moz-range-track]:border-none [&::-moz-range-track]:bg-transparent',
+            '[&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-1 [&::-webkit-slider-thumb]:appearance-none',
+            '[&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:border-x [&::-webkit-slider-thumb]:border-foreground [&::-webkit-slider-thumb]:bg-background',
+            '[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-1 [&::-moz-range-thumb]:rounded-sm',
+            '[&::-moz-range-thumb]:border-x [&::-moz-range-thumb]:border-foreground [&::-moz-range-thumb]:bg-background',
+          )}
+          min={0}
+          max={100}
+          step="any"
+          value={limitPercent(boundary.percent, offset)}
+          onChange={e => {
+            const rawOffset = Math.round(Number(e.target.value) - boundary.percent)
+            onChangeOffset(Math.min(Math.max(rawOffset, -MAX_SPEND_OFFSET), MAX_SPEND_OFFSET))
+          }}
+        />
       </div>
       <p className="text-xs text-muted-foreground">
         <span className="font-medium text-foreground">{Math.round(percentUsed)}% used</span>
@@ -94,13 +130,10 @@ function WeekBar({ status, percentUsed, offset }: { status: QuotaBoundaryStatus;
 }
 
 /**
- * The automatic-consumption limit, as a slider (#960).
- *
- * It sets an *offset* from the boundary, not an absolute percentage, so the limit travels with the
- * boundary through the week instead of being overtaken by it on day two. Centre is the default
- * policy: unattended work stops exactly where the account has spent its share of the week.
+ * The caption for the draggable limit on the bar above (#960 Edit): the control itself lives on
+ * the week bar, so this is only the number and the sentence that make a drag distance readable.
  */
-function SpendLimit({ offset, boundaryPercent, onChange }: { offset: number; boundaryPercent: number; onChange: (offset: number) => void }) {
+function SpendLimitCaption({ offset, boundaryPercent }: { offset: number; boundaryPercent: number }) {
   const limit = limitPercent(boundaryPercent, offset)
   return (
     <div className="space-y-1">
@@ -112,19 +145,9 @@ function SpendLimit({ offset, boundaryPercent, onChange }: { offset: number; bou
           {Math.round(limit)}%{offset === 0 ? ' · the boundary' : ` · ${offset > 0 ? '+' : ''}${offset} on the boundary`}
         </span>
       </div>
-      <input
-        id="spend-limit"
-        type="range"
-        className="w-full accent-[var(--color-primary)]"
-        min={-MAX_SPEND_OFFSET}
-        max={MAX_SPEND_OFFSET}
-        step={1}
-        value={offset}
-        onChange={e => onChange(Number(e.target.value))}
-      />
       <p className="text-xs text-muted-foreground">
         {offset === 0
-          ? 'Left of centre holds unattended work back; right of centre lets it borrow against the days still to come.'
+          ? 'Drag the handle on the bar above to move it — left holds unattended work back, right lets it borrow against the days still to come.'
           : offset > 0
             ? 'Unattended work may run ahead of the week, borrowing against the days still to come.'
             : 'Unattended work stands down before the week says it has to.'}
@@ -260,7 +283,7 @@ export function Quota() {
             a reset phrasing the parser didn't know just made the panel quietly plainer, and nothing
             anywhere said the boundary was gone. Quote the text that failed: it is the bug report. */}
         {view?.boundary && week ? (
-          <WeekBar status={view.boundary} percentUsed={week.percentUsed} offset={offset} />
+          <WeekBar status={view.boundary} percentUsed={week.percentUsed} offset={offset} onChangeOffset={setOffset} />
         ) : view && view.windows.length ? (
           <p role="alert" className="text-sm text-danger">
             {week?.resetsAtText
@@ -295,11 +318,11 @@ export function Quota() {
           </div>
         ) : null}
 
-        {/* Only where there is a boundary to offset from: without one there is no line to move,
-            and a slider over nothing would imply a limit that is not being applied. */}
-        {view?.boundary ? (
+        {/* Only where the bar above is actually drawn: the handle lives on it, and a caption for a
+            control that isn't on screen would name something the user cannot see. */}
+        {view?.boundary && week ? (
           <div className="border-t border-border pt-3">
-            <SpendLimit offset={offset} boundaryPercent={view.boundary.boundary.percent} onChange={setOffset} />
+            <SpendLimitCaption offset={offset} boundaryPercent={view.boundary.boundary.percent} />
           </div>
         ) : null}
       </CardContent>

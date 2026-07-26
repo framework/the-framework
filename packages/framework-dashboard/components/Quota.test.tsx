@@ -20,14 +20,19 @@ const STARTS_AT = new Date(2026, 6, 21, 19, 0, 0).getTime() // Tue evening, the 
 
 /** A reading with a placeable week, so the bar has an axis to draw. */
 function reading(percentUsed: number, limitOffset = 0): QuotaView {
-  const boundaryPercent = (4 / 7) * 100 // day four of seven
+  return readingAt(4, percentUsed, limitOffset) // day four of seven
+}
+
+/** Same, with the boundary at an arbitrary day — for the offset's clamp, which needs room to test. */
+function readingAt(day: number, percentUsed: number, limitOffset = 0): QuotaView {
+  const boundaryPercent = (day / 7) * 100
   return {
     windows: [
       { label: 'Current week (all models)', kind: 'week', percentUsed, resetsAtText: 'Jul 28 at 7pm' },
       { label: 'Current session', kind: 'session', percentUsed: 3 },
     ],
     boundary: {
-      boundary: { startsAt: STARTS_AT, resetsAt: STARTS_AT + WEEK_MS, day: 4, percent: boundaryPercent },
+      boundary: { startsAt: STARTS_AT, resetsAt: STARTS_AT + WEEK_MS, day, percent: boundaryPercent },
       limit: { percent: Math.min(Math.max(boundaryPercent + limitOffset, 0), 100), offset: limitOffset },
       windows: [{ label: 'Current week (all models)', percentUsed, reached: false }],
       reached: null,
@@ -78,13 +83,15 @@ describe('Quota (#960)', () => {
     expect(screen.getAllByRole('img')).toHaveLength(1)
   })
 
-  test('the slider writes an offset from the boundary, not an absolute percentage (#960)', () => {
+  test('the handle is valued on the bar\'s own scale, but stores an offset from the boundary (#960)', () => {
     view = reading(20)
     prefs = {}
     render(<Quota />)
-    const slider = screen.getByLabelText('Unattended work stops at')
-    expect((slider as HTMLInputElement).value).toBe('0')
-    fireEvent.change(slider, { target: { value: '15' } })
+    const slider = screen.getByLabelText('Unattended work stops at') as HTMLInputElement
+    const boundaryPercent = (4 / 7) * 100
+    // At rest it sits exactly on the boundary tick beneath it, not at some offset-scale zero.
+    expect(Number(slider.value)).toBeCloseTo(boundaryPercent, 5)
+    fireEvent.change(slider, { target: { value: String(boundaryPercent + 15) } })
     expect(updatePreferences).toHaveBeenCalledWith({ autoSpendOffset: 15 })
   })
 
@@ -150,22 +157,55 @@ describe('Quota (#960)', () => {
     view = reading(20, 0)
     render(<Quota />)
     const slider = screen.getByLabelText('Unattended work stops at') as HTMLInputElement
-    fireEvent.change(slider, { target: { value: '5' } })
-    expect(slider.value).toBe('5')
-    fireEvent.change(slider, { target: { value: '12' } })
-    expect(slider.value).toBe('12')
+    const boundaryPercent = (4 / 7) * 100
+    fireEvent.change(slider, { target: { value: String(boundaryPercent + 5) } })
+    expect(Number(slider.value)).toBeCloseTo(boundaryPercent + 5, 5)
+    fireEvent.change(slider, { target: { value: String(boundaryPercent + 12) } })
+    expect(Number(slider.value)).toBeCloseTo(boundaryPercent + 12, 5)
     expect(updatePreferences).toHaveBeenLastCalledWith({ autoSpendOffset: 12 })
   })
 
-  test('the drawn limit follows the slider, not the poll (#960)', () => {
+  test('the drawn limit follows the handle, not the poll (#960)', () => {
+    view = reading(20, 0)
+    render(<Quota />)
+    const slider = screen.getByLabelText('Unattended work stops at') as HTMLInputElement
+    const boundaryPercent = (4 / 7) * 100
+    // At rest the handle sits exactly on the boundary tick — one mark, not two.
+    expect(Number(slider.value)).toBeCloseTo(boundaryPercent, 5)
+    fireEvent.change(slider, { target: { value: String(boundaryPercent + 20) } })
+    // Moved, without waiting for the daemon to confirm it via the next poll.
+    expect(Number(slider.value)).toBeCloseTo(boundaryPercent + 20, 5)
+  })
+
+  // The handle is valued 0-100, the same scale as the fill and boundary beneath it (#960 Edit) —
+  // a native thumb's position is always (value - min) / (max - min) of the box, so min/max have to
+  // stay 0/100 for the thumb to land where the boundary tick does. That leaves the ±50 the offset
+  // is allowed to mean unenforced by the input itself, so the change handler has to clamp it.
+  test('dragged to the far end of the bar, the stored offset still clamps to +50 (#960 Edit)', () => {
+    // A boundary early in the week, so the bar's far (right) end is more than 50 points away.
+    view = readingAt(1, 20, 0)
+    render(<Quota />)
+    fireEvent.change(screen.getByLabelText('Unattended work stops at'), { target: { value: '100' } })
+    expect(updatePreferences).toHaveBeenLastCalledWith({ autoSpendOffset: 50 })
+  })
+
+  test('dragged to the near end of the bar, the stored offset still clamps to -50 (#960 Edit)', () => {
+    // A boundary late in the week, so the bar's near (left) end is more than 50 points away.
+    view = readingAt(6, 20, 0)
+    render(<Quota />)
+    fireEvent.change(screen.getByLabelText('Unattended work stops at'), { target: { value: '0' } })
+    expect(updatePreferences).toHaveBeenLastCalledWith({ autoSpendOffset: -50 })
+  })
+
+  test('one bar, not two: the handle is drawn on the week track itself (#960 Edit)', () => {
     view = reading(20, 0)
     const { container } = render(<Quota />)
-    const marks = () => container.querySelectorAll('[role="img"] > div').length
-    // Fill only: an unmoved limit sits on the boundary and is not drawn twice.
-    expect(marks()).toBe(2)
-    fireEvent.change(screen.getByLabelText('Unattended work stops at'), { target: { value: '20' } })
-    // Fill, boundary, and now the limit — without waiting for the daemon to confirm it.
-    expect(marks()).toBe(3)
+    // A single native range input, and it lives inside the same card section as the week track —
+    // not as a full-width slider of its own underneath it.
+    expect(container.querySelectorAll('input[type="range"]')).toHaveLength(1)
+    const bar = screen.getByRole('img')
+    const slider = screen.getByLabelText('Unattended work stops at')
+    expect(bar.parentElement).toBe(slider.parentElement)
   })
 })
 

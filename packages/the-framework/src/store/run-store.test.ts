@@ -15,6 +15,7 @@ import {
   reconcileOrphanedRuns,
   loadRunEvents,
   runIdFromStartedAt,
+  startedAtFromRunId,
   RUN_META_VERSION,
   type StoreFs,
   type RunMeta,
@@ -643,4 +644,11 @@ test('updatedAt tracks the last event, not the run start (settledAt likewise)', 
   await store.append({ kind: 'log', message: 'second' })
   assert.equal(store.snapshot().updatedAt, ticks[1], 'each event advances it')
   assert.equal(store.snapshot().startedAt, AT, 'the start is still the start')
+})
+
+test('startedAtFromRunId inverts runIdFromStartedAt, and refuses foreign ids (#1251)', () => {
+  const startedAt = '2026-07-26T21:17:39.507Z'
+  assert.equal(startedAtFromRunId(runIdFromStartedAt(startedAt)), startedAt)
+  assert.equal(startedAtFromRunId('not-a-run-id'), undefined)
+  assert.equal(startedAtFromRunId(''), undefined)
 })

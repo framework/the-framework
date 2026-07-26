@@ -3,9 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { WorkspaceTicket } from '@gemstack/the-framework'
 import { presets } from '@gemstack/the-framework/client'
 
-const sendQueueTicket = vi.hoisted(() => vi.fn())
 const sendStart = vi.hoisted(() => vi.fn())
-vi.mock('../server/control.telefunc.js', () => ({ sendQueueTicket, sendStart }))
+vi.mock('../server/control.telefunc.js', () => ({ sendStart }))
 
 // The last-import stamp (#1208). Mocked at the lib boundary like every other read here: an
 // unmocked `*.telefunc.js` anywhere in the import graph fails the whole file as an
@@ -19,6 +18,8 @@ const ticket = (over: Partial<WorkspaceTicket> = {}): WorkspaceTicket => ({
   file: '2026-07-20_do-the-thing.md',
   title: 'Do the thing',
   summary: 'The thing is not done.',
+  status: 'open',
+  date: '2026-01-01T00:00:00.000Z',
   spiked: false,
   planned: false,
   ...over,
@@ -30,64 +31,120 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
-  sendQueueTicket.mockReset()
   sendStart.mockReset()
 })
 
-describe('TicketsPanel (#697)', () => {
-  test('lists the tickets with what has already been done to them', async () => {
-    render(<TicketsPanel projectId="p1" tickets={[ticket({ priority: 'high', planned: true })]} loaded />)
+describe('TicketsPanel (#697/#1144)', () => {
+  test('lists the tickets as one-liners, with what has already been done to them', async () => {
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ priority: '8', planned: true })]} loaded onOpen={() => {}} />)
     expect(await screen.findByText('Do the thing')).toBeTruthy()
-    expect(screen.getByText('The thing is not done.')).toBeTruthy()
-    expect(screen.getByText('high')).toBeTruthy()
     expect(screen.getByText('planned')).toBeTruthy()
+    // The summary moved to the detail page (#1144); the list row is a one-liner.
+    expect(screen.queryByText('The thing is not done.')).toBeNull()
   })
 
-  test('queueing a ticket writes it to the queue, with the ticket it came from (#1164)', async () => {
-    sendQueueTicket.mockResolvedValue({ ok: true, file: 'TODO_AGENTS.md' })
-    render(<TicketsPanel projectId="p1" tickets={[ticket({ priority: 'high' })]} loaded />)
-    fireEvent.click(await screen.findByRole('button', { name: /queue/i }))
-    // The file is what the entry links back to; the priority is what ranks it in the queue.
-    await waitFor(() =>
-      expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'Do the thing', {
-        file: '2026-07-20_do-the-thing.md',
-        priority: 'high',
-      }),
+  test('shows meta on the row: priority spelled out, topics, and a human-readable date (#1144/#1265)', async () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
+    render(
+      <TicketsPanel
+        projectId="p1"
+        tickets={[ticket({ priority: '8', topics: ['dx', 'ui'], date: twoDaysAgo })]}
+        loaded
+        onOpen={() => {}}
+      />,
     )
+    // A bare "8" would be cryptic on its own; the row spells out what it is a rating of.
+    expect(await screen.findByText('Priority: 8')).toBeTruthy()
+    expect(screen.getByText('dx')).toBeTruthy()
+    expect(screen.getByText('ui')).toBeTruthy()
+    expect(screen.getByText('2d ago')).toBeTruthy()
   })
 
-  test('an unprioritised ticket is queued without inventing one for it (#1164)', async () => {
-    // The ticket format says `priority:` is optional; what unmarked means is the server's call.
-    sendQueueTicket.mockResolvedValue({ ok: true, file: 'TODO_AGENTS.md' })
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded />)
-    fireEvent.click(await screen.findByRole('button', { name: /queue/i }))
-    await waitFor(() =>
-      expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'Do the thing', { file: '2026-07-20_do-the-thing.md' }),
+  test('sorts by date is the server\'s job — the list renders whatever order it is given (#1144)', async () => {
+    // readTickets already sorts newest-first; the panel is not re-sorting behind the caller's back.
+    render(
+      <TicketsPanel
+        projectId="p1"
+        tickets={[ticket({ file: 'older.md', title: 'Older' }), ticket({ file: 'newer.md', title: 'Newer' })]}
+        loaded
+        onOpen={() => {}}
+      />,
     )
+    const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
+    expect(titles.findIndex(t => t?.includes('Older'))).toBeLessThan(titles.findIndex(t => t?.includes('Newer')))
   })
 
-  // The queue is a file, so a re-poll cannot tell us the row was queued: without remembering
-  // the click the button would invite the same entry to be added twice.
-  test('a queued ticket says so and cannot be queued twice', async () => {
-    sendQueueTicket.mockResolvedValue({ ok: true, file: 'TODO_AGENTS.md' })
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded />)
-    fireEvent.click(await screen.findByRole('button', { name: /queue/i }))
-    const queued = await screen.findByRole('button', { name: /queued/i })
-    expect((queued as HTMLButtonElement).disabled).toBe(true)
+  test('links the row\'s GitHub issue out, without hijacking the row\'s own click (#1144/#1265)', async () => {
+    const onOpen = vi.fn()
+    render(
+      <TicketsPanel
+        projectId="p1"
+        tickets={[ticket({ github: { label: '#42', url: 'https://github.com/org/repo/issues/42' } })]}
+        loaded
+        onOpen={onOpen}
+      />,
+    )
+    const link = await screen.findByRole('link', { name: /#42/ })
+    expect(link.getAttribute('href')).toBe('https://github.com/org/repo/issues/42')
+    // A sibling of the row's button, not a child: clicking the link must not open the detail page.
+    fireEvent.click(link)
+    expect(onOpen).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('Do the thing'))
+    expect(onOpen).toHaveBeenCalledWith('2026-07-20_do-the-thing.md')
   })
 
-  test('a failed queue write surfaces and leaves the row addable', async () => {
-    sendQueueTicket.mockResolvedValue({ ok: false, error: 'the queue could not be written' })
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded />)
-    fireEvent.click(await screen.findByRole('button', { name: /queue/i }))
-    expect(await screen.findByText(/could not be written/i)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /queued/i })).toBeNull()
+  test('shows the effort a spike recorded, and keeps the row meta in priority/date/GitHub order (#1144/#1265)', async () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
+    render(
+      <TicketsPanel
+        projectId="p1"
+        tickets={[
+          ticket({
+            spiked: true,
+            effort: 'low',
+            priority: '7',
+            date: twoDaysAgo,
+            github: { label: '#42', url: 'https://github.com/org/repo/issues/42' },
+          }),
+        ]}
+        loaded
+        onOpen={() => {}}
+      />,
+    )
+    expect(await screen.findByText('Effort: low')).toBeTruthy()
+    // Priority sits left of the date (#1265), the date left of the issue link.
+    const row = screen.getByText('Do the thing').closest('li')!
+    const order = [row.textContent!.indexOf('Priority'), row.textContent!.indexOf('ago'), row.textContent!.indexOf('#42')]
+    expect(order.every(i => i !== -1)).toBe(true)
+    expect(order[0]).toBeLessThan(order[1]!)
+    expect(order[1]).toBeLessThan(order[2]!)
+  })
+
+  test('calls out a closed ticket on its row; open carries no badge (#1144/#1230)', async () => {
+    render(
+      <TicketsPanel
+        projectId="p1"
+        tickets={[ticket({ file: 'closed.md', title: 'Closed one', status: 'closed' }), ticket({ file: 'open.md', title: 'Open one' })]}
+        loaded
+        onOpen={() => {}}
+      />,
+    )
+    expect(await screen.findByText('closed')).toBeTruthy()
+    // "open" is the default assumption, same as spiked/planned only showing when true — no badge for it.
+    expect(screen.queryByText('open')).toBeNull()
+  })
+
+  test('opening a row hands back its file, the slug the detail route uses (#1144)', async () => {
+    const onOpen = vi.fn()
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={onOpen} />)
+    fireEvent.click(await screen.findByText('Do the thing'))
+    expect(onOpen).toHaveBeenCalledWith('2026-07-20_do-the-thing.md')
   })
 
   test('an empty tickets/ offers the GitHub import instead of a dead end', async () => {
     sendStart.mockResolvedValue({ ok: true, runId: 'r1' })
     const onRunStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[]} loaded onRunStarted={onRunStarted} />)
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     // A fixed prompt, so it takes the verbatim-text path rather than a build.
@@ -103,7 +160,7 @@ describe('TicketsPanel (#697)', () => {
   test('a refused import says why and moves you nowhere (#1169)', async () => {
     sendStart.mockResolvedValue({ ok: false, error: 'a session is already active' })
     const onRunStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[]} loaded onRunStarted={onRunStarted} />)
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
     expect(await screen.findByText(/already active/i)).toBeTruthy()
     expect(onRunStarted).not.toHaveBeenCalled()
@@ -112,7 +169,7 @@ describe('TicketsPanel (#697)', () => {
   test('a filled tickets/ offers the update, and sends the update preset verbatim (#1208)', async () => {
     sendStart.mockResolvedValue({ ok: true, runId: 'r2' })
     const onRunStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onRunStarted={onRunStarted} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
@@ -123,33 +180,39 @@ describe('TicketsPanel (#697)', () => {
   })
 
   test('the update is not offered on an empty tickets/, where importing is the word (#1208)', async () => {
-    render(<TicketsPanel projectId="p1" tickets={[]} loaded />)
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} />)
     expect(await screen.findByRole('button', { name: /import tickets from github/i })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /update from github/i })).toBeNull()
   })
 
   test('the stamp says when tickets/ last caught up, and admits when it does not know (#1208)', async () => {
     onTicketsMeta.mockResolvedValue({ lastImportedAt: new Date(Date.now() - 3 * 60 * 60_000).toISOString() })
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} />)
     expect(await screen.findByText('Updated from GitHub 3h ago')).toBeTruthy()
     cleanup()
     // A repo imported before the stamp existed has none, and saying so beats inventing a date.
     onTicketsMeta.mockResolvedValue({})
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} />)
     expect(await screen.findByText('No record of an import yet')).toBeTruthy()
   })
 
   test('a refused update says why and moves you nowhere (#1208)', async () => {
     sendStart.mockResolvedValue({ ok: false, error: 'a session is already active' })
     const onRunStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onRunStarted={onRunStarted} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
     expect(await screen.findByText(/already active/i)).toBeTruthy()
     expect(onRunStarted).not.toHaveBeenCalled()
   })
 
+  test('an empty list with hiddenByFilter says so, rather than offering an import for work already done (#1144/#1230)', async () => {
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded hiddenByFilter={3} onOpen={() => {}} />)
+    expect(await screen.findByText(/3 tickets hidden by the current filter/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /import tickets from github/i })).toBeNull()
+  })
+
   test('no project renders nothing at all', () => {
-    const { container } = render(<TicketsPanel projectId={null} tickets={[]} loaded />)
+    const { container } = render(<TicketsPanel projectId={null} tickets={[]} loaded onOpen={() => {}} />)
     expect(container.textContent).toBe('')
   })
 })

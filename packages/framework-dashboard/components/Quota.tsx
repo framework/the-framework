@@ -172,7 +172,7 @@ function WeekBar({
             {consuming}: <span className={cn('font-medium', TONE_TEXT[tone])}>{formatDuration(Math.abs(deviationMs))}</span>
           </TooltipTrigger>
           <TooltipContent className="max-w-64">
-            You are {formatDurationLong(Math.abs(deviationMs))} {over ? 'above' : 'below'} the quota boundary — you're{' '}
+            You are {formatDurationLong(Math.abs(deviationMs))} {over ? 'above' : 'below'} the quota boundary.<br/><br/>You're{' '}
             {over ? 'over-consuming' : 'under-consuming'}: you spend {over ? 'faster' : 'slower'} than the week's pace allows.
           </TooltipContent>
         </Tooltip>

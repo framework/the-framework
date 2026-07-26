@@ -14,9 +14,10 @@ import {
   type AutoPmProject,
 } from './auto-pm.js'
 import { quotaBoundaryStatus, type QuotaBoundaryStatus } from './quota-boundary.js'
+import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 import { presets, type PresetKey } from './preset-catalog.js'
 
-/** 2026-07-20T12:00:00Z. The week below resets in 5 days, so this is day 3 of 7 (42.8% allowed). */
+/** 2026-07-20T12:00:00Z. The week below resets in 4 days 19 hours, so ~31.5% has elapsed (#960 Edit). */
 const T0 = Date.UTC(2026, 6, 20, 12, 0, 0)
 
 /** A reading where the account's week is `weekPercent` used. */
@@ -82,14 +83,30 @@ test('quotaHeadroom starts while the account is under the boundary (#879)', () =
 })
 
 test('quotaHeadroom stands down at the boundary, and says where it sits (#879)', () => {
-  // Day 3 of 7 allows 42.8%, so a week at 99% is well past it.
+  // ~31.5% has elapsed of the week, so a week at 99% is well past it.
   const decision = quotaHeadroom(status(99))
   assert.equal(decision.start, false)
-  assert.match(decision.start === false ? decision.reason : '', /99% used, at or past day 3 of the week's 43%/)
+  assert.match(decision.start === false ? decision.reason : '', /99% used, at or past day 3 of the week's 32%/)
+})
+
+test('quotaHeadroom names a fractional offset to one decimal, not fifteen digits (#960 Edit)', () => {
+  // The half-day default is 100/14 — the reason line should say "+7.1", not the raw double.
+  const boundary = quotaBoundaryStatus({
+    windows: [{ label: 'Current week (all models)', kind: 'week', percentUsed: 99, resetsAtText: 'Jul 25 at 7am (UTC)' }],
+    now: T0,
+    limitOffset: DEFAULT_SPEND_OFFSET,
+  })
+  if (!boundary) throw new Error('the fixture week should be placeable')
+  const decision = quotaHeadroom(boundary)
+  assert.equal(decision.start, false)
+  assert.match(decision.start === false ? decision.reason : '', /your 39% limit \(\+7\.1 on the week's 32%\)/)
 })
 
 test('quotaHeadroom stands down the moment the boundary is met, not only when it is passed (#879)', () => {
-  const decision = quotaHeadroom(status((3 / 7) * 100))
+  // Reads the boundary's own actual value back, rather than assuming a day/7 fraction (#960 Edit):
+  // percent is now the continuous elapsed share of the week, not a stepped one.
+  const boundaryPercent = status(0).boundary.percent
+  const decision = quotaHeadroom(status(boundaryPercent))
   assert.equal(decision.start, false)
 })
 

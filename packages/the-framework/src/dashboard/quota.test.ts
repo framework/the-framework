@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { pollerQuotaSource } from './quota.js'
 import { QuotaPoller } from '../quota-poller.js'
+import { DEFAULT_SPEND_OFFSET } from '../preference-defaults.js'
 import type { DriverQuota } from '../driver/index.js'
 
 /** 2026-07-20T12:00:00Z. The week below resets in 5 days, so this is day 3 of 7. */
@@ -86,4 +87,12 @@ test('stopping the source ends the polling (#533)', () => {
   const { source, poller } = sourceOf([week(10)])
   source.stop()
   assert.equal(poller.isStopped, true)
+})
+
+test('with no slider position given, the limit defaults to a half-day cushion above the boundary (#960 Edit)', async () => {
+  const { source, poller } = sourceOf([week(10)])
+  await poller.poll()
+  const view = await source.read()
+  assert.equal(view.boundary?.limit.offset, DEFAULT_SPEND_OFFSET)
+  assert.equal(view.boundary?.limit.percent, view.boundary!.boundary.percent + DEFAULT_SPEND_OFFSET)
 })

@@ -1,0 +1,5 @@
+---
+'@gemstack/the-framework': patch
+---
+
+The quota boundary (#879) now rises continuously with the clock — a plain pro-rated share of the elapsed week — instead of jumping to the next seventh once every 24 hours. A stepped boundary unlocked a whole day's worth of allowance the instant a new day began (including the entire week's worth on the last day), which read as generous on paper but let a burst of spending land the moment the clock ticked over rather than pacing with it. The usage panel's boundary line moves the same way it always did — it just draws whatever the framework reports. The per-run consumption guard (#519) measures against the same line, so it now carries the same half-day cushion unattended work gets by default: the continuous boundary starts the week at zero, and without the cushion the first whole percent the agent reports would have paused the user's own first run of the week — where the stepped line had always kept at least the current day's seventh in hand. The cushion is fixed, deliberately not the auto-spend slider: holding unattended work back must never tighten the gate on work the user asked for.

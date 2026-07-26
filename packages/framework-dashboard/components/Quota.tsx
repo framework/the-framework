@@ -119,13 +119,15 @@ function WeekBar({
           type="range"
           aria-label="Unattended work stops at"
           className={cn(
-            'absolute inset-0 h-full w-full cursor-ew-resize appearance-none bg-transparent',
+            'absolute inset-0 h-full w-full cursor-grab appearance-none bg-transparent active:cursor-grabbing',
             '[&::-webkit-slider-runnable-track]:bg-transparent',
             '[&::-moz-range-track]:border-none [&::-moz-range-track]:bg-transparent',
-            '[&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-1 [&::-webkit-slider-thumb]:appearance-none',
-            '[&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:border-x [&::-webkit-slider-thumb]:border-foreground/70 [&::-webkit-slider-thumb]:bg-transparent',
-            '[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-1 [&::-moz-range-thumb]:rounded-sm',
-            '[&::-moz-range-thumb]:border-x [&::-moz-range-thumb]:border-foreground/70 [&::-moz-range-thumb]:bg-transparent',
+            // A classic round knob, not the bracket-shaped mark this replaces — the split fill
+            // beneath already shows the range it sets, so the thumb only needs to read as a handle.
+            '[&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full',
+            '[&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-background [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:shadow-sm',
+            '[&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none',
+            '[&::-moz-range-thumb]:border [&::-moz-range-thumb]:border-background [&::-moz-range-thumb]:bg-foreground [&::-moz-range-thumb]:shadow-sm',
           )}
           min={0}
           max={100}
@@ -141,6 +143,20 @@ function WeekBar({
         <span className="font-medium text-foreground">{Math.round(percentUsed)}% used</span>
         {' · '}
         {TONE_NOTE[tone]}
+      </p>
+      {/* Whether the knob has left any room to project (#960 Edit): dragged all the way down onto
+          the used fill, there is nothing left for unattended work to spend, which is worth naming
+          as its own state rather than leaving as a bar that merely looks empty. */}
+      <p className="text-[11px] text-muted-foreground">
+        {projected.end > projected.start ? (
+          <>
+            ✅ Autonomous AI <em>enabled</em> <small className="text-muted-foreground/70">move slider to the left to disable</small>
+          </>
+        ) : (
+          <>
+            ❌ Autonomous AI <em>disabled</em> <small className="text-muted-foreground/70">move slider to the right to enable</small>
+          </>
+        )}
       </p>
       {/* The legend (#960 Edit): what the two shades of the bar and its line mean. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">

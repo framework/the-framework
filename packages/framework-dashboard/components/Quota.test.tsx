@@ -215,6 +215,20 @@ describe('Quota (#960)', () => {
     expect(bar.querySelectorAll('.opacity-35')).toHaveLength(0)
   })
 
+  test('names whether autonomous AI currently has room to spend (#960 Edit)', () => {
+    view = reading(20, 15) // limit 72% > 20% used: room left
+    const { container } = render(<Quota />)
+    expect(container.querySelector('em')?.textContent).toBe('enabled')
+    expect(screen.getByText(/move slider to the left to disable/)).toBeTruthy()
+  })
+
+  test('names autonomous AI as disabled once the knob leaves no room (#960 Edit)', () => {
+    view = reading(80, -50) // limit 7% < 80% used: no room
+    const { container } = render(<Quota />)
+    expect(container.querySelector('em')?.textContent).toBe('disabled')
+    expect(screen.getByText(/move slider to the right to enable/)).toBeTruthy()
+  })
+
   test('one bar, not two: the handle is drawn on the week track itself (#960 Edit)', () => {
     view = reading(20, 0)
     const { container } = render(<Quota />)

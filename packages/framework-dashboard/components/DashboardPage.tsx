@@ -59,7 +59,7 @@ export function DashboardPage({
 
         {/* Routine work sits below the AI Queue (#1139/#1159): the scheduled jobs and the button
             that fires one now. */}
-        <RoutineWork onSelectProject={onSelectProject} />
+        <RoutineWork onRunStarted={onRunStarted} />
 
         <Agents working={data?.active ?? []} finished={data?.recentAgents ?? []} loading={loading} onSelectRun={onSelectRun} />
 

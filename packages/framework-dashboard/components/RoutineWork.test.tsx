@@ -198,13 +198,15 @@ describe('RoutineWork (#1159)', () => {
     await waitFor(() => expect(sendAutoPmSweep).toHaveBeenCalledTimes(1))
   })
 
-  test('with auto-run off the trigger is disabled, since a sweep would just stand down (#1210)', async () => {
+  test('with auto-run off the trigger still sweeps once: the click is the ask (#1210)', async () => {
     prefs = { autoPm: false }
     render(<RoutineWork onRunStarted={() => {}} />)
-    const button = await screen.findByText('Trigger routine now')
-    expect(button.closest('button')!.disabled).toBe(true)
+    const button = (await screen.findByText('Trigger routine now')).closest('button')!
+    expect(button.disabled).toBe(false)
+    // The tooltip carries the one thing worth saying here: this is a one-shot, not an enrolment.
+    expect((await hoverTooltip(button)).textContent).toMatch(/Auto-run stays off/)
     fireEvent.click(button)
-    expect(sendAutoPmSweep).not.toHaveBeenCalled()
+    await waitFor(() => expect(sendAutoPmSweep).toHaveBeenCalledTimes(1))
   })
 
   test('a host with no sweep says so rather than looking like it worked (#1210)', async () => {

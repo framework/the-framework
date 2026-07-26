@@ -12,7 +12,7 @@ import { buildActivity, activityKey, postActivityDiscord } from './dashboard/act
 import { startAutoPm, AUTO_PM_JOBS, type AutoPmReport } from './auto-pm.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
 import { promoteQueue } from './queue-promote.js'
-import { findTodoBacklog, nextQueuedTicket } from './todo-loop.js'
+import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { startConversationCommitter } from './conversation-commit.js'
 import { startMergedWorktreeSweep } from './merged-worktrees.js'
 import { readConversation } from './conversations.js'
@@ -137,8 +137,13 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // Which routines the user unticked (#1209). Global rather than per project, like the master
     // switch it sits under: the rotation is one schedule for the machine, not one per repo.
     optedOut: async () => (await prefs()).autoPmOptOut ?? [],
-    backlogEmpty: async project => (await findTodoBacklog(project.path)) === undefined,
+    // The queue's open entries rather than a bare emptiness bit: a batch of concurrent drains is
+    // pinned one entry each (#1204), so the sweep needs the entries the decision was made on.
+    queue: async project => (await findTodoBacklog(project.path))?.entries ?? [],
     activeRuns: project => deps.activeRunCount(project.id),
+    // How many agents the routine may keep going per project (#1204). Global like the opt-outs;
+    // the sweep applies the default when it is unset.
+    concurrency: async () => (await prefs()).autoPmConcurrency,
     // The quota boundary is the gate (#879): auto PM has no budget notion of its own.
     quota: async () => (await deps.quota.read()).boundary,
     // The periodic codebase sweep (#882). The schedule is a file in the project checkout rather
@@ -147,21 +152,29 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     maintenanceDue: async project => maintenanceDue(await readMaintenanceState(project.path), Date.now()),
     recordMaintenance: async project => mergeMaintenanceState(project.path, { sweptAt: new Date().toISOString() }),
     start: async (project, job) => {
-      // A draining run works the queue's first open entry, and since #1164 that entry links back to
-      // the ticket it was queued from — so this is the one moment the framework knows what a run is
-      // about to implement, and can say so on the run's meta (#1117). Every other job puts work on
-      // the queue rather than taking it off, so there is nothing to name.
-      const ticket = job.drains ? await nextQueuedTicket(project.path).catch(() => undefined) : undefined
+      // A draining run works one open queue entry, and since #1164 that entry links back to the
+      // ticket it was queued from — so this is the one moment the framework knows what a run is
+      // about to implement, and can say so on the run's meta (#1117). A sweep-built drain names its
+      // own pinned entry (#1204), so the #1117 lane keeps working with several drains in flight;
+      // the first-open-entry read is the fallback for a drain job wired without one. Every other
+      // job puts work on the queue rather than taking it off, so there is nothing to name.
+      const ticket = job.drains
+        ? job.entry !== undefined
+          ? ticketFromQueueEntry(job.entry)
+          : await nextQueuedTicket(project.path).catch(() => undefined)
+        : undefined
       const result = await startUnattended(project.id, job.prompt, ticket ? { ticket } : {})
       return result.ok ? result.runId : undefined
     },
     // The daemon promotes the queue, never the agent (#852): the run stays sandboxed in its
     // worktree, and one known file is copied across once it has finished cleanly.
-    promote: async (project, runId) => {
+    promote: async (project, { runId, entry }) => {
       const run = (await listRuns(project.path).catch(() => [])).find(r => r.id === runId)
       // Unknown or still going: not settled, so it is tried again next tick.
       if (!run || run.status === 'running') return { settled: false, promoted: false }
-      const outcome = await promoteQueue(project.path, run)
+      // The entry it was pinned to travels with it (#1204), so the promotion lands that one entry
+      // rather than the run's whole view of the queue.
+      const outcome = await promoteQueue(project.path, { ...run, ...(entry !== undefined ? { entry } : {}) })
       if (!outcome.promoted) log(`[framework] auto PM: ${outcome.reason} (${runId})`)
       // A finished run is settled either way — one that wrote no queue is not going to start.
       // The exception (a checkout busy with the user's own queue edits) is the callee's to flag.

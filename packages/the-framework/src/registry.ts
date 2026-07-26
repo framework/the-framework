@@ -2,7 +2,13 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { isAgentName } from './agent-names.js'
 import { nodeFs } from './node-fs.js'
-import { PROJECT_PREFERENCE_KEYS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, type ProjectPreferences } from './preference-defaults.js'
+import {
+  PROJECT_PREFERENCE_KEYS,
+  MAX_SPEND_OFFSET,
+  DEFAULT_SPEND_OFFSET,
+  MAX_AUTO_PM_CONCURRENCY,
+  type ProjectPreferences,
+} from './preference-defaults.js'
 
 /**
  * The multi-project registry (#390): the list of projects the user has
@@ -133,6 +139,15 @@ export interface Preferences {
    */
   autoPmOptOut?: string[]
   /**
+   * How many agents the routine may keep going at once on one project (#1204). Absent defaults to
+   * `DEFAULT_AUTO_PM_CONCURRENCY`, and the value is clamped to `MAX_AUTO_PM_CONCURRENCY`.
+   *
+   * Only the draining routine fans out: it takes work *off* the queue, one pinned entry per agent,
+   * so several at once do disjoint work. The rotation invents work and each of its jobs rewrites
+   * the queue file, so it stays one run per tick whatever this says.
+   */
+  autoPmConcurrency?: number
+  /**
    * How far the automatic-consumption limit sits from the quota boundary, in percentage points
    * (#960). Absent defaults to {@link DEFAULT_SPEND_OFFSET} — a half-day cushion ahead of the
    * boundary — rather than sitting exactly on it (#960 Edit).
@@ -176,7 +191,14 @@ export interface Preferences {
 // The key list lives in the leaf `preference-defaults.ts` so the dashboard reads the same one
 // (a second copy there erased the type link, see that module); re-exported so this stays the
 // import site for everything that already reads it beside `Preferences`.
-export { PROJECT_PREFERENCE_KEYS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, type ProjectPreferences } from './preference-defaults.js'
+export {
+  PROJECT_PREFERENCE_KEYS,
+  MAX_SPEND_OFFSET,
+  DEFAULT_SPEND_OFFSET,
+  DEFAULT_AUTO_PM_CONCURRENCY,
+  MAX_AUTO_PM_CONCURRENCY,
+  type ProjectPreferences,
+} from './preference-defaults.js'
 
 /**
  * The credentials the daemon needs to reach a third party, set from the dashboard (#1095).
@@ -426,6 +448,12 @@ function sanitizePreferences(value: unknown): Preferences {
   // is dropped like every other empty list — nothing opted out is exactly what absent means.
   const optOut = sanitizeNameList(input['autoPmOptOut'])
   if (optOut.length) preferences.autoPmOptOut = optOut
+  // `autoPmConcurrency` (#1204) is a count of agents, so it is clamped like `autoSpendOffset` and
+  // additionally floored at one: zero concurrent agents is what the `autoPm` switch already spells,
+  // and a hand-edited nought would otherwise wedge the routine with the switch still reading on.
+  const concurrency = input['autoPmConcurrency']
+  if (typeof concurrency === 'number' && Number.isFinite(concurrency))
+    preferences.autoPmConcurrency = Math.min(Math.max(Math.round(concurrency), 1), MAX_AUTO_PM_CONCURRENCY)
   return preferences
 }
 

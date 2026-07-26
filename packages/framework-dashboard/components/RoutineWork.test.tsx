@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { AutoPmJob, AutoPmReport, Preferences, ProjectSummary } from '@gemstack/the-framework'
-import { AUTO_PM_ROUTINES, AUTO_PM_DRAIN_JOB, AUTO_PM_MAINTENANCE_JOB } from '@gemstack/the-framework/client'
+import {
+  AUTO_PM_ROUTINES,
+  AUTO_PM_DRAIN_JOB,
+  AUTO_PM_MAINTENANCE_JOB,
+  DEFAULT_AUTO_PM_CONCURRENCY,
+  MAX_AUTO_PM_CONCURRENCY,
+} from '@gemstack/the-framework/client'
 import { hoverTooltip } from '../test-utils.js'
 
 // Everything the card reads goes through a lib module, so the mocks stop short of telefunc: an
@@ -228,6 +234,38 @@ describe('RoutineWork (#1159)', () => {
     render(<RoutineWork onRunStarted={() => {}} />)
     await waitFor(() => expect(screen.getByText('Add a project to run a routine.')).toBeTruthy())
     expect(screen.queryByText('Run now')).toBeNull()
+  })
+
+  // #1204: how many agents the routine keeps going at once.
+
+  test('the concurrent-agents box shows the daemon default until it is set', async () => {
+    render(<RoutineWork onRunStarted={() => {}} />)
+    const box = (await screen.findByLabelText('Concurrent agents')) as HTMLInputElement
+    // The default rather than 1, so the number on screen is the number the sweep would use.
+    expect(box.value).toBe(String(DEFAULT_AUTO_PM_CONCURRENCY))
+    expect(box.max).toBe(String(MAX_AUTO_PM_CONCURRENCY))
+  })
+
+  test('typing a concurrency writes it, clamped to the cap', async () => {
+    render(<RoutineWork onRunStarted={() => {}} />)
+    const box = await screen.findByLabelText('Concurrent agents')
+    fireEvent.change(box, { target: { value: '5' } })
+    expect(updatePreferences).toHaveBeenCalledWith({ autoPmConcurrency: 5 })
+    // The store clamps too, but a number input still hands back whatever was typed into it.
+    fireEvent.change(box, { target: { value: '999' } })
+    expect(updatePreferences).toHaveBeenCalledWith({ autoPmConcurrency: MAX_AUTO_PM_CONCURRENCY })
+    fireEvent.change(box, { target: { value: '0' } })
+    expect(updatePreferences).toHaveBeenCalledWith({ autoPmConcurrency: 1 })
+    // An emptied box is not a preference: it must not write NaN into the home file.
+    updatePreferences.mockClear()
+    fireEvent.change(box, { target: { value: '' } })
+    expect(updatePreferences).not.toHaveBeenCalled()
+  })
+
+  test('the fine print follows the setting rather than promising an idle machine', async () => {
+    prefs = { autoPmConcurrency: 4 }
+    render(<RoutineWork onRunStarted={() => {}} />)
+    await waitFor(() => expect(screen.getByText(/Keeps up to 4 agents going at once/)).toBeTruthy())
   })
 
   test('a start already in flight disables every Run now', async () => {

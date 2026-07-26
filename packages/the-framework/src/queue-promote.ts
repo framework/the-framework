@@ -1,3 +1,5 @@
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { GitRunner } from './project.js'
 import { nodeGitRunner } from './project.js'
 import { FLAT_TODO_FILE } from './tickets.js'
@@ -58,8 +60,9 @@ export function promotionMessage(runId: string): string {
  */
 export async function promoteQueue(
   projectCwd: string,
-  run: { id: string; branch?: string | undefined },
+  run: { id: string; branch?: string | undefined; entry?: string | undefined },
   git: GitRunner = nodeGitRunner(),
+  write: (path: string, content: string) => Promise<void> = (path, content) => writeFile(path, content, 'utf8'),
 ): Promise<QueuePromotion> {
   const branch = run.branch
   if (!branch) return { promoted: false, reason: 'the run recorded no branch' }
@@ -77,6 +80,27 @@ export async function promoteQueue(
     const dirty = (await git(['status', '--porcelain', '--', FLAT_TODO_FILE], projectCwd)).trim()
     if (dirty) return { promoted: false, reason: 'the checkout has uncommitted queue changes', retry: true }
 
+    // A run pinned to one entry (#1204) lands that entry, not its whole file: with several drains
+    // in flight the wholesale copy below would carry each run's stale view of every *other* entry,
+    // and the last promotion of the tick would un-check whatever the earlier ones had just retired.
+    if (run.entry !== undefined) {
+      // The queue where the run forked, so an entry it *added* can be told from one somebody
+      // *removed* while it worked. Both look alike from the branch alone — present there, absent
+      // here — and `todo_format.md` makes removal the way to retire an entry, so guessing wrong
+      // resurrects work a human deliberately struck off. No merge base (a rewritten history, say)
+      // means no additions land: the check-off is the part that must not be lost.
+      const mergeBase = (await git(['merge-base', branch, 'HEAD'], projectCwd).catch(() => '')).trim()
+      const atBase = mergeBase
+        ? await git(['show', `${mergeBase}:${FLAT_TODO_FILE}`], projectCwd).catch(() => undefined)
+        : undefined
+      const landed = landPinnedEntry(inCheckout, fromBranch, run.entry, atBase)
+      if (landed === inCheckout) return { promoted: false, reason: 'the run left nothing to land on the queue' }
+      await write(join(projectCwd, FLAT_TODO_FILE), landed)
+      await git(['add', '--', FLAT_TODO_FILE], projectCwd)
+      await git(['commit', '-m', promotionMessage(run.id), '--', FLAT_TODO_FILE], projectCwd)
+      return { promoted: true, branch }
+    }
+
     // `checkout <branch> -- <path>` writes the file and stages it in one step, touching nothing
     // else in the tree. The commit is pathspec-scoped for the same reason: whatever else is
     // staged in the user's checkout is theirs and must not ride along.
@@ -86,4 +110,55 @@ export async function promoteQueue(
   } catch (err) {
     return { promoted: false, reason: errorMessage(err) }
   }
+}
+
+/** One markdown list item, by the grammar `parseTodoEntries` reads. */
+const ENTRY_LINE = /^(\s*(?:[-*]|\d+\.)\s+)(?:\[([ xX])\]\s*)?(.*)$/
+
+/** Every entry the document names, checked or not, so a re-add can tell "new" from "already there". */
+function entryTexts(md: string): Set<string> {
+  const texts = new Set<string>()
+  for (const line of md.split('\n')) {
+    const text = ENTRY_LINE.exec(line)?.[3]?.trim()
+    if (text) texts.add(text)
+  }
+  return texts
+}
+
+/**
+ * Land what a drain run pinned to one entry actually did (#1204): retire that entry, and keep any
+ * follow-ups it queued.
+ *
+ * Additive by construction, which is what makes it safe to run concurrently: it only ever checks a
+ * box or appends a line. It never unchecks, never removes, and never reorders, so two drains
+ * landing in either order compose, and the worst a wrong guess can do is leave a duplicate line
+ * for a human to delete rather than silently send an agent to redo finished work.
+ *
+ * A follow-up is an entry the run's branch has that `atBase` did not: written during the run. The
+ * fork point is what tells that from an entry somebody *removed* meanwhile, which looks identical
+ * from the branch alone and which `todo_format.md` makes the ordinary way to retire an entry. With
+ * no fork point to compare against, nothing is added -- resurrecting struck-off work is worse than
+ * leaving a follow-up on the branch, and the check-off still lands either way.
+ */
+export function landPinnedEntry(
+  inCheckout: string,
+  fromBranch: string,
+  entry: string,
+  atBase: string | undefined,
+): string {
+  const lines = inCheckout.split('\n').map(line => {
+    const item = ENTRY_LINE.exec(line)
+    if (!item || item[3]?.trim() !== entry || item[2] === undefined || item[2] !== ' ') return line
+    return `${item[1]}[x] ${item[3]!.trim()}`
+  })
+
+  if (atBase === undefined) return lines.join('\n')
+  const known = entryTexts(inCheckout)
+  const base = entryTexts(atBase)
+  const added = [...entryTexts(fromBranch)].filter(text => !known.has(text) && !base.has(text))
+  if (!added.length) return lines.join('\n')
+
+  const body = lines.join('\n')
+  const separator = body === '' || body.endsWith('\n') ? '' : '\n'
+  return `${body}${separator}${added.map(text => `- [ ] ${text}`).join('\n')}\n`
 }

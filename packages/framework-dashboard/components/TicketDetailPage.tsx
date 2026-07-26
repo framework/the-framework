@@ -94,9 +94,9 @@ export function TicketDetailPage({
                     href={ticket.github.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground hover:underline"
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
                   >
-                    <Github className="h-3 w-3" aria-hidden />
+                    <Github className="h-4 w-4" aria-hidden />
                     {ticket.github.label}
                   </a>
                 )}

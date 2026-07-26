@@ -161,22 +161,28 @@ export function TicketsPanel({
                 <Badge className="shrink-0 border-transparent px-1.5 text-[10px] uppercase text-muted-foreground">closed</Badge>
               )}
               <span className="min-w-0 flex-1 truncate font-medium">{ticket.title}</span>
-              {ticket.topics?.map(topic => (
-                <Badge key={topic} className="hidden shrink-0 border-border px-1.5 text-[10px] text-muted-foreground sm:inline-flex">
-                  {topic}
-                </Badge>
-              ))}
-              {/* What the agent has already done to this ticket, so it is clear what is left. */}
-              {ticket.spiked && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">spiked</Badge>}
-              {ticket.planned && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">planned</Badge>}
-              {ticket.effort && (
-                <Badge className="shrink-0 border-transparent px-1 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>
-              )}
+              {/* The tags, in a fixed-width column of their own (#1265): with each row's tags
+                  starting wherever its title ended, the stretch of blank between a short title
+                  and the right-hand meta read as dead space — pinned columns are what make the
+                  rows a table. */}
+              <span className="hidden w-64 shrink-0 items-center gap-1.5 overflow-hidden sm:flex">
+                {ticket.topics?.map(topic => (
+                  <Badge key={topic} className="shrink-0 border-border px-1.5 text-[10px] text-muted-foreground">
+                    {topic}
+                  </Badge>
+                ))}
+                {/* What the agent has already done to this ticket, so it is clear what is left. */}
+                {ticket.spiked && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">spiked</Badge>}
+                {ticket.planned && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">planned</Badge>}
+                {ticket.effort && (
+                  <Badge className="shrink-0 border-transparent px-1 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>
+                )}
+              </span>
               {/* The trailing meta cluster (#1265): priority, then date, then the GitHub link (the
                   sibling below). Fixed-width columns, rendered even when empty, so every row's
                   meta lines up down the table instead of drifting with whatever a row happens
                   to have. */}
-              <span className={cn('ml-auto w-24 shrink-0 text-right text-[10px]', priorityTone(ticket.priority))}>
+              <span className={cn('w-24 shrink-0 text-right text-[10px]', priorityTone(ticket.priority))}>
                 {ticket.priority ? `Priority: ${ticket.priority}` : ''}
               </span>
               <span className="w-14 shrink-0 text-right text-[10px] text-muted-foreground/70" title={formatDateTime(ticket.date)}>
@@ -188,15 +194,15 @@ export function TicketsPanel({
                 href={ticket.github.url}
                 target="_blank"
                 rel="noreferrer"
-                className="flex w-16 shrink-0 items-center justify-end gap-1 px-3 text-[10px] text-muted-foreground hover:text-foreground hover:underline"
+                className="flex w-20 shrink-0 items-center justify-end gap-1 px-3 text-xs text-muted-foreground hover:text-foreground hover:underline"
               >
-                <Github className="h-3 w-3" aria-hidden />
+                <Github className="h-4 w-4" aria-hidden />
                 {ticket.github.label}
               </a>
             ) : (
               // Same width as the link so the button's right edge — and with it the priority and
               // date columns inside — stays put on a row with no issue to link.
-              <span className="w-16 shrink-0" aria-hidden />
+              <span className="w-20 shrink-0" aria-hidden />
             )}
           </li>
         ))}

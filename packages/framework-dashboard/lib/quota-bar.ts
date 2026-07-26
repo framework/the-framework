@@ -2,14 +2,14 @@
 // DOM and read without React. Everything here is about *drawing* the week; where the boundary sits
 // and what it gates is the framework's (`quota-boundary.ts`), and this never re-derives it.
 
-/** A weekday label and where it sits along the week, 0-100. */
-export interface AxisTick {
-  /** Position across the bar, 0 at the start of the quota week and 100 at its reset. */
-  percent: number
-  /** The day's two-letter name, e.g. `TU`. */
+/** One quota-day's stretch of the bar, 0-100, and the label that names it. */
+export interface DaySegment {
+  /** Where this day starts across the bar, 0 at the start of the quota week. */
+  startPercent: number
+  /** Where it ends — the next day's start, or 100 for the last. */
+  endPercent: number
+  /** The day's two-letter name, e.g. `TU`, read at the segment's own start. */
   label: string
-  /** The first tick, which is the day the week began on rather than a midnight. */
-  start?: boolean
 }
 
 /**
@@ -24,48 +24,26 @@ function weekdayLabel(at: number): string {
   return new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(at).slice(0, 2).toUpperCase()
 }
 
-/**
- * The day labels across one quota week.
- *
- * The week starts whenever the account's does, which is generally mid-day, so the first label is
- * that day and the rest sit at each local midnight after it. That is why the start day appears
- * twice on a bar (once at the left edge, once again at its own midnight near the right): the week
- * is seven times twenty-four hours from an arbitrary moment, not seven calendar days.
- *
- * Midnight is re-derived each step rather than added as 24h, so a DST change does not slide every
- * later label by an hour.
- */
-export function weekTicks(startsAt: number, resetsAt: number, weekday: (at: number) => string = weekdayLabel): AxisTick[] {
-  const span = resetsAt - startsAt
-  if (!(span > 0)) return []
-  const ticks: AxisTick[] = [{ percent: 0, label: weekday(startsAt), start: true }]
-  const cursor = new Date(startsAt)
-  cursor.setHours(24, 0, 0, 0)
-  // A week has at most eight labels; the bound is a guard against a pathological span, not a rule.
-  while (cursor.getTime() < resetsAt && ticks.length < 9) {
-    const at = cursor.getTime()
-    ticks.push({ percent: ((at - startsAt) / span) * 100, label: weekday(at) })
-    cursor.setHours(24, 0, 0, 0)
-  }
-  return ticks
-}
+const DAY_MS = 24 * 60 * 60 * 1000
 
 /**
- * Which ticks would sit on top of the previous label if drawn on one line (#960).
+ * The week as seven equal quota-days (#960 Edit).
  *
- * The only gap that is ever too narrow is the first one — the partial day between a mid-day start
- * and the following midnight, which can be as short as a few minutes — so a tick within `minGapPercent`
- * of the last one placed on the line drops to a line of its own instead of overlapping it. Every
- * ordinary day-to-day gap (a seventh of the week, ~14.3%) clears the threshold, so this only ever
- * moves the one label the mid-day-start case produces.
+ * Each is a full 24h from the account's own start moment, not a calendar day — the week starts
+ * whenever the account's does, generally mid-day, so a segment runs (say) Tuesday evening to
+ * Wednesday evening and is still labelled `TU`, the day it started. That is what keeps every day
+ * shown exactly once: the earlier axis walked local midnights instead, which split the start day's
+ * 24h into two separate slivers (one at each end of the bar) and so had to draw `TU` twice.
  */
-export function tickRows(ticks: AxisTick[], minGapPercent = 8): boolean[] {
-  let lastPercent = -Infinity
-  return ticks.map(tick => {
-    if (tick.percent - lastPercent < minGapPercent) return true
-    lastPercent = tick.percent
-    return false
-  })
+export function weekDays(startsAt: number, resetsAt: number, weekday: (at: number) => string = weekdayLabel): DaySegment[] {
+  const span = resetsAt - startsAt
+  if (!(span > 0)) return []
+  const days = Math.max(1, Math.round(span / DAY_MS))
+  return Array.from({ length: days }, (_, i) => ({
+    startPercent: (i / days) * 100,
+    endPercent: ((i + 1) / days) * 100,
+    label: weekday(startsAt + i * DAY_MS),
+  }))
 }
 
 /** How the week is going, which is the bar's colour. */
@@ -105,5 +83,19 @@ export const TONE_NOTE: Record<QuotaTone, string> = {
  */
 export function limitPercent(boundaryPercent: number, offset: number): number {
   return Math.min(Math.max(boundaryPercent + offset, 0), 100)
+}
+
+/**
+ * The bar's second, dimmer segment (#960 Edit): the room between what has actually been used and
+ * where unattended work is allowed to stop. Drawn at reduced opacity, right after the solid "used"
+ * fill, so the two read as one bar split in two rather than a separate mark floating over it.
+ *
+ * Empty once the limit has already been reached or passed — there is no room left to project, and
+ * a segment of negative width would just be the "used" fill's own edge again.
+ */
+export function projectedRange(percentUsed: number, limit: number): { start: number; end: number } {
+  const start = Math.min(Math.max(percentUsed, 0), 100)
+  const end = Math.max(start, Math.min(Math.max(limit, 0), 100))
+  return { start, end }
 }
 

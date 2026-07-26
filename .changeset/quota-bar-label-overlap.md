@@ -2,4 +2,4 @@
 '@gemstack/framework-dashboard': patch
 ---
 
-Fixed two usage-bar bugs from #960: the day labels overlapped when the quota week starts mid-day (the first, partial day's label sat almost on top of the one beside it — now it drops to a line of its own), and the "unattended work stops at" limit rendered as its own full-width slider underneath the week bar rather than as a handle on it. The limit is now a draggable handle on the same track as the fill and the boundary, so the bar reads as one control instead of two.
+Reworked the usage bar per #960: each day of the quota week is now shown exactly once (centred in an equal seventh of the bar, delimited from its neighbours), instead of walking local midnights and repeating the start day at both ends. The bar itself now splits left-to-right into what's been used (solid) and the room left before unattended work stops (dimmed) — dragging that dimmed segment's own edge sets the limit, replacing the separate full-width slider that used to sit underneath the bar. A legend explains the two shades and the daily-boundary line.

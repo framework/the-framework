@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { weekTicks, tickRows, quotaTone } from './quota-bar.js'
+import { weekDays, quotaTone, limitPercent, projectedRange } from './quota-bar.js'
 
 // The bar's arithmetic. The default formatter is pinned to en-US on purpose (a localized short
 // weekday sliced to two characters is not distinguishing in every locale), so these assertions
@@ -8,51 +8,43 @@ const weekday = (at: number) => ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][new D
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
-describe('weekTicks', () => {
-  test('a week starting mid-day labels its start day at both ends (#960)', () => {
-    // Tuesday evening, local time, which is the case the issue draws: TU WE TH FR SA SU MO TU.
+describe('weekDays', () => {
+  test('a week starting mid-day still shows each day exactly once (#960 Edit)', () => {
+    // Tuesday evening, local time, which is the case the issue draws.
     const startsAt = new Date(2026, 6, 21, 19, 0, 0).getTime() // Tue 21 Jul 2026, 19:00 local
-    const ticks = weekTicks(startsAt, startsAt + WEEK_MS, weekday)
-    expect(ticks.map(t => t.label)).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO', 'TU'])
-    // The first is the start of the bar, not a midnight, and the rest climb toward the reset.
-    expect(ticks[0]).toMatchObject({ percent: 0, start: true })
-    expect(ticks[1]!.percent).toBeGreaterThan(0)
-    expect(ticks.at(-1)!.percent).toBeLessThan(100)
-    for (let i = 1; i < ticks.length; i++) expect(ticks[i]!.percent).toBeGreaterThan(ticks[i - 1]!.percent)
+    const days = weekDays(startsAt, startsAt + WEEK_MS, weekday)
+    // Seven equal 24h stretches from the start moment, not seven calendar days — so the start
+    // day's own 24h is one segment, not split into a sliver at each end of the bar.
+    expect(days.map(d => d.label)).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO'])
   })
 
-  test('a week starting exactly at midnight does not repeat its first day', () => {
+  test('a week starting exactly at midnight still shows each day exactly once', () => {
     const startsAt = new Date(2026, 6, 21, 0, 0, 0).getTime()
-    const ticks = weekTicks(startsAt, startsAt + WEEK_MS, weekday)
-    // The start is already a midnight, so the following midnights are WE..MO and the reset falls
-    // on the next TU midnight, which is the end of the bar rather than a label inside it.
-    expect(ticks.map(t => t.label)).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO'])
+    const days = weekDays(startsAt, startsAt + WEEK_MS, weekday)
+    expect(days.map(d => d.label)).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO'])
+  })
+
+  test('each day is an equal seventh of the bar, edge to edge with no gap between them', () => {
+    const startsAt = new Date(2026, 6, 21, 19, 0, 0).getTime()
+    const days = weekDays(startsAt, startsAt + WEEK_MS, weekday)
+    expect(days[0]!.startPercent).toBe(0)
+    expect(days.at(-1)!.endPercent).toBe(100)
+    for (const d of days) expect(d.endPercent - d.startPercent).toBeCloseTo(100 / 7, 5)
+    for (let i = 1; i < days.length; i++) expect(days[i]!.startPercent).toBe(days[i - 1]!.endPercent)
   })
 
   test('an empty or inverted span draws nothing rather than dividing by zero', () => {
-    expect(weekTicks(1000, 1000, weekday)).toEqual([])
-    expect(weekTicks(2000, 1000, weekday)).toEqual([])
+    expect(weekDays(1000, 1000, weekday)).toEqual([])
+    expect(weekDays(2000, 1000, weekday)).toEqual([])
   })
 })
 
-describe('tickRows', () => {
-  // The bug this exists for: a week starting Tuesday evening packs its second label (`WE`) into the
-  // first few percent of the bar, right beside `TU` at 0% — drawn on one line the two sit on top of
-  // each other. This is what the report's screenshot shows.
-  test('a label packed beside the one before it drops to a second line (#960)', () => {
-    const startsAt = new Date(2026, 6, 21, 19, 0, 0).getTime()
-    const ticks = weekTicks(startsAt, startsAt + WEEK_MS, weekday)
-    const rows = tickRows(ticks)
-    expect(rows[0]).toBe(false) // TU, the start
-    expect(rows[1]).toBe(true) // WE, a sliver of a day later — would sit on TU
-    expect(rows.slice(2)).toEqual(rows.slice(2).map(() => false)) // ordinary day gaps, one line
-  })
-
-  test('a week starting at midnight has no cramped gap, so every label stays on one line', () => {
-    const startsAt = new Date(2026, 6, 21, 0, 0, 0).getTime()
-    const ticks = weekTicks(startsAt, startsAt + WEEK_MS, weekday)
-    expect(tickRows(ticks)).toEqual(ticks.map(() => false))
-  })
+test('the built-in labels are a fixed two-letter notation, not the machine locale', () => {
+  // On a he-IL machine every short weekday begins `יו`, so a localized axis would label all seven
+  // days the same. The default formatter has to be locale-independent for the axis to mean anything.
+  const startsAt = new Date(2026, 6, 21, 19, 0, 0).getTime()
+  const labels = weekDays(startsAt, startsAt + WEEK_MS).map(d => d.label)
+  expect(labels).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO'])
 })
 
 describe('quotaTone', () => {
@@ -74,11 +66,18 @@ describe('quotaTone', () => {
   })
 })
 
-test('the built-in labels are a fixed two-letter notation, not the machine locale', () => {
-  // On a he-IL machine every short weekday begins `יו`, so a localized axis would label all seven
-  // days the same. The default formatter has to be locale-independent for the axis to mean anything.
-  const startsAt = new Date(2026, 6, 21, 19, 0, 0).getTime()
-  const labels = weekTicks(startsAt, startsAt + WEEK_MS).map(t => t.label)
-  expect(labels).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO', 'TU'])
-})
+describe('projectedRange', () => {
+  // The bar's second, dimmer segment: the room between what's used and where unattended work is
+  // allowed to stop.
+  test('spans from what is used to the limit, when there is room left', () => {
+    expect(projectedRange(20, 57)).toEqual({ start: 20, end: 57 })
+  })
 
+  test('is empty once the limit has already been reached or passed, not negative-width', () => {
+    expect(projectedRange(80, 57)).toEqual({ start: 80, end: 80 })
+  })
+
+  test('clamps both ends to the bar itself', () => {
+    expect(projectedRange(-10, 130)).toEqual({ start: 0, end: 100 })
+  })
+})

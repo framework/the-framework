@@ -65,14 +65,13 @@ describe('Quota (#960)', () => {
     expect(bar.getAttribute('aria-label')).toMatch(/day 4 of 7/)
   })
 
-  test('the start day appears at both ends of a week that began mid-day', () => {
+  test('a week that began mid-day still shows each day exactly once (#960 Edit)', () => {
     view = reading(20)
     render(<Quota />)
-    // The week is seven times twenty-four hours from a Tuesday evening, so it both opens and
-    // closes on a Tuesday. Eight labels, TU first and TU last.
+    // Seven equal 24h stretches from the Tuesday-evening start, not seven calendar days — so the
+    // start day is one label, not a sliver repeated at each end of the bar.
     const labels = screen.getAllByText(/^[A-Z]{2}$/).map(el => el.textContent)
-    expect(labels).toHaveLength(8)
-    expect(labels[0]).toBe(labels.at(-1))
+    expect(labels).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO'])
   })
 
   test('the session window is listed, but never as the bar', () => {
@@ -195,6 +194,25 @@ describe('Quota (#960)', () => {
     render(<Quota />)
     fireEvent.change(screen.getByLabelText('Unattended work stops at'), { target: { value: '0' } })
     expect(updatePreferences).toHaveBeenLastCalledWith({ autoSpendOffset: -50 })
+  })
+
+  test('the bar splits into used and projected segments, not a used amount plus a floating mark (#960 Edit)', () => {
+    view = reading(20, 15) // boundary 57%, offset 15 -> limit 72%
+    render(<Quota />)
+    const bar = screen.getByRole('img')
+    const [used, projected] = bar.querySelectorAll<HTMLElement>(':scope > div')
+    expect(used!.style.width).toBe('20%')
+    expect(projected!.style.left).toBe('20%')
+    expect(parseFloat(projected!.style.width)).toBeCloseTo(52.142857, 4) // 72% limit - 20% used
+    expect(projected!.className).toMatch(/opacity-35/)
+  })
+
+  test('nothing left to project once the limit has already been reached, so no dimmed segment is drawn', () => {
+    view = reading(80, -50) // boundary 57% - 50 = limit 7%, already well below the 80% used
+    render(<Quota />)
+    const bar = screen.getByRole('img')
+    // Used, the day delimiters, and the boundary line — no dimmed segment, since there is no room.
+    expect(bar.querySelectorAll('.opacity-35')).toHaveLength(0)
   })
 
   test('one bar, not two: the handle is drawn on the week track itself (#960 Edit)', () => {

@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AutoPmReport, DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '@gemstack/the-framework'
 import { MAX_SPEND_OFFSET } from '@gemstack/the-framework/client'
 import { useAutoPm, useQuota } from '../lib/quota.js'
 import { formatRelative, formatUntil } from '../lib/format-date.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
-import { weekTicks, tickRows, quotaTone, limitPercent, TONE_NOTE, type QuotaTone } from '../lib/quota-bar.js'
+import { weekDays, quotaTone, limitPercent, projectedRange, TONE_NOTE, type QuotaTone } from '../lib/quota-bar.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Checkbox } from './ui/checkbox.js'
 import { cn } from '../lib/utils.js'
@@ -31,14 +31,25 @@ function weekWindow(windows: DriverQuotaWindow[]): DriverQuotaWindow | undefined
   return windows.find(w => w.kind === 'week')
 }
 
+/** A swatch-and-word pair for the legend below the bar. */
+function LegendItem({ swatch, children }: { swatch: ReactNode; children: ReactNode }) {
+  return (
+    <span className="flex items-center gap-1">
+      {swatch}
+      {children}
+    </span>
+  )
+}
+
 /**
- * The week as one track — one bar, not three (#960 Edit): what's spent, where the week says it
- * should be, and where unattended work actually stops all live in the same box, the last of them
- * draggable right there rather than as a slider of its own underneath it.
+ * The week as one track, split in two (#960 Edit): what's already used, at full opacity, and the
+ * room left before unattended work stops, dimmed — one bar read left-to-right rather than a used
+ * amount plus a handle floating apart from it. Dragging the dim segment's own right edge is what
+ * moves that stop, so the control is the bar's shape rather than a slider laid over it.
  *
- * The boundary is drawn at the step that actually gates the work, not at a smooth pro-rata line:
- * it steps a seventh at a time (#879), and drawing a line the daemon does not act on would be a
- * prettier lie. The limit, by contrast, really is continuous — it is a handle, not a reading.
+ * The boundary is drawn at the step that actually gates the pace, not a smooth pro-rata line: it
+ * steps a seventh at a time (#879), and a line the daemon does not act on would be a prettier lie.
+ * The limit, by contrast, really is continuous — it is a handle, not a reading.
  */
 function WeekBar({
   status,
@@ -52,34 +63,41 @@ function WeekBar({
   onChangeOffset: (offset: number) => void
 }) {
   const { boundary } = status
-  const ticks = weekTicks(boundary.startsAt, boundary.resetsAt)
-  // The mid-day-start case packs a label into a sliver of the week (#960); on one line it lands
-  // on top of the label beside it, which is the bug this drops it to a second line for.
-  const rows = tickRows(ticks)
+  // Seven equal 24h stretches from the account's own start moment (#960 Edit), so each day is
+  // shown once, centred in its own share of the bar — not walked from local midnight, which split
+  // the start day into a sliver at each end and had to label both `TU`.
+  const days = weekDays(boundary.startsAt, boundary.resetsAt)
   const tone = quotaTone(percentUsed, boundary.percent)
+  const limit = limitPercent(boundary.percent, offset)
+  const projected = projectedRange(percentUsed, limit)
   const label = `${Math.round(percentUsed)}% of the week used, against a boundary of ${Math.round(boundary.percent)}% on day ${boundary.day} of 7`
 
   return (
     <div className="space-y-1.5">
-      {/* The day labels sit at each local midnight, so the start day appears at both ends when the
-          week began mid-day — which is the normal case. */}
-      <div className="relative h-7 text-[10px] font-medium tracking-wide text-muted-foreground">
-        {ticks.map((tick, i) => (
-          <span
-            key={`${tick.label}-${i}`}
-            className={cn('absolute', rows[i] ? 'top-3' : 'top-0', tick.start ? 'left-0' : '-translate-x-1/2')}
-            style={tick.start ? undefined : { left: `${tick.percent}%` }}
-          >
-            {tick.label}
+      {/* One label per day, centred in its own seventh of the bar. */}
+      <div className="relative h-4 text-[10px] font-medium tracking-wide text-muted-foreground">
+        {days.map(day => (
+          <span key={day.label} className="absolute top-0 -translate-x-1/2" style={{ left: `${(day.startPercent + day.endPercent) / 2}%` }}>
+            {day.label}
           </span>
         ))}
       </div>
       <div className="relative h-4">
         <div role="img" aria-label={label} className="absolute inset-x-0 top-[3px] h-2.5 overflow-hidden rounded-full bg-muted">
-          <div
-            className={cn('h-full rounded-full transition-all', TONE_FILL[tone])}
-            style={{ width: `${Math.min(Math.max(percentUsed, 0), 100)}%` }}
-          />
+          {/* Used, at full opacity. */}
+          <div className={cn('absolute inset-y-0 left-0 rounded-full', TONE_FILL[tone])} style={{ width: `${projected.start}%` }} />
+          {/* The room left before unattended work stops — the same colour, dimmed, right after the
+              used fill, so the two read as one bar split in two rather than a mark over it. */}
+          {projected.end > projected.start && (
+            <div
+              className={cn('absolute inset-y-0 rounded-full opacity-35', TONE_FILL[tone])}
+              style={{ left: `${projected.start}%`, width: `${projected.end - projected.start}%` }}
+            />
+          )}
+          {/* The day delimiters — a notch through the fill at each day's own start. */}
+          {days.slice(1).map(day => (
+            <div key={`${day.label}-delim`} className="absolute inset-y-0 w-px bg-background/60" style={{ left: `${day.startPercent}%` }} aria-hidden />
+          ))}
           {/* The boundary. Inside the same box as the fill, which is the whole point of one track. */}
           <div
             className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-foreground"
@@ -89,31 +107,30 @@ function WeekBar({
         </div>
         {/* The limit, as a real `<input type="range">` so it is draggable and keyboard-operable —
             but valued on the bar's own 0-100 scale rather than the offset's, so the thumb the
-            browser draws lines up with the fill and boundary beneath it instead of a second,
+            browser draws lines up with the dimmed segment's own edge instead of a second,
             differently-scaled track. A native thumb's position is always (value - min) / (max -
             min) of the box, so min/max have to stay 0/100 exactly — anything narrower (say,
             clamped to the offset's own reach) would stretch that fraction and the thumb would
-            drift from the boundary tick under it instead of sitting on it. The ±MAX_SPEND_OFFSET
-            reach is enforced in the change handler instead, on the offset it produces. At rest
-            (offset 0) the handle sits exactly on the boundary; dragging is what draws it as a mark
-            of its own. */}
+            drift from that edge instead of sitting on it. The ±MAX_SPEND_OFFSET reach is enforced
+            in the change handler instead, on the offset it produces. Dragging it is what changes
+            where the dimmed segment ends. */}
         <input
           id="spend-limit"
           type="range"
           aria-label="Unattended work stops at"
           className={cn(
-            'absolute inset-0 h-full w-full cursor-grab appearance-none bg-transparent',
+            'absolute inset-0 h-full w-full cursor-ew-resize appearance-none bg-transparent',
             '[&::-webkit-slider-runnable-track]:bg-transparent',
             '[&::-moz-range-track]:border-none [&::-moz-range-track]:bg-transparent',
             '[&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-1 [&::-webkit-slider-thumb]:appearance-none',
-            '[&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:border-x [&::-webkit-slider-thumb]:border-foreground [&::-webkit-slider-thumb]:bg-background',
+            '[&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:border-x [&::-webkit-slider-thumb]:border-foreground/70 [&::-webkit-slider-thumb]:bg-transparent',
             '[&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-1 [&::-moz-range-thumb]:rounded-sm',
-            '[&::-moz-range-thumb]:border-x [&::-moz-range-thumb]:border-foreground [&::-moz-range-thumb]:bg-background',
+            '[&::-moz-range-thumb]:border-x [&::-moz-range-thumb]:border-foreground/70 [&::-moz-range-thumb]:bg-transparent',
           )}
           min={0}
           max={100}
           step="any"
-          value={limitPercent(boundary.percent, offset)}
+          value={limit}
           onChange={e => {
             const rawOffset = Math.round(Number(e.target.value) - boundary.percent)
             onChangeOffset(Math.min(Math.max(rawOffset, -MAX_SPEND_OFFSET), MAX_SPEND_OFFSET))
@@ -125,6 +142,12 @@ function WeekBar({
         {' · '}
         {TONE_NOTE[tone]}
       </p>
+      {/* The legend (#960 Edit): what the two shades of the bar and its line mean. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+        <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm', TONE_FILL[tone])} aria-hidden />}>Used</LegendItem>
+        <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm opacity-35', TONE_FILL[tone])} aria-hidden />}>Autonomous AI (projected)</LegendItem>
+        <LegendItem swatch={<span className="h-2 w-0.5 bg-foreground" aria-hidden />}>Daily boundary</LegendItem>
+      </div>
     </div>
   )
 }

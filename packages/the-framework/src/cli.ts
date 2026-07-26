@@ -1869,9 +1869,13 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
 
   return settleRun(epilogue('session'), async () => {
     const { result, preview } = await runFramework(runOpts)
-    const successLine = result.productionGrade
-      ? `\n✓ production-grade in ${result.passes} pass(es).`
-      : `\n• prototype ready${result.stoppedEarly ? ` (stopped with ${result.blockers.length} blocker(s))` : ''}.`
+    // A hand-off ran no review passes by design (#1225), so neither of the build lines fits:
+    // "prototype ready" would claim this machine built something it never saw.
+    const successLine = driver.handsOff
+      ? '\n✓ handed off. The session continues where it was sent, and opens its own pull request.'
+      : result.productionGrade
+        ? `\n✓ production-grade in ${result.passes} pass(es).`
+        : `\n• prototype ready${result.stoppedEarly ? ` (stopped with ${result.blockers.length} blocker(s))` : ''}.`
     return { successLine, ...(preview ? { preview } : {}) }
   })
 }

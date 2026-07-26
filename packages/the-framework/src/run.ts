@@ -396,6 +396,15 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     // Topic runs only (#1121): resolves an await-bind-project / await-create-project gate.
     ...(opts.bind ? { bind: opts.bind } : {}),
   }
+  // A hand-off driver (#1225): the prompt leaves this machine and the reply never comes back,
+  // so the build prompt is the entire run. Every phase after it — the production-grade
+  // checklist, improving against its blockers, the backlog gate, live chat — would be reading
+  // the driver's own "handed off to <url>" summary as if the agent had written it. That is
+  // what put a `{ blockers }` verdict is missing complaint and an unanswerable "Start the next
+  // backlog item?" call on a dashboard whose agent was somewhere else entirely. So the phases
+  // are dropped rather than fed: Bootstrap skips its whole loop when no `checklist` step is
+  // given, which leaves scope -> build and nothing after it.
+  const handsOff = opts.driver.handsOff === true
   let preview: AppPreview | undefined
   try {
     const bootstrap = new Bootstrap({
@@ -405,8 +414,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
       steps: {
         scope: () => ({ scope: opts.scope ?? 'full', intent: opts.intent }),
         build: agentAwaitGate(driverBuild(session, workspaceOpt), session, gateDeps),
-        checklist,
-        improve: driverImprove(session, workspaceOpt),
+        ...(handsOff ? {} : { checklist, improve: driverImprove(session, workspaceOpt) }),
         ...(opts.deploy
           ? {
               deploy: opts.deployTarget
@@ -423,7 +431,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     // its reused tmp workspace could also carry stale files). The run signal
     // (Stop / budget cap #322) and the item cap bound it for unattended runs.
     let todo: TodoLoopResult | undefined
-    if (opts.todoLoop ?? opts.driver.name !== 'fake') {
+    if (!handsOff && (opts.todoLoop ?? opts.driver.name !== 'fake')) {
       todo = await runTodoLoop({
         session,
         cwd: opts.cwd,
@@ -441,7 +449,10 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     if (runner && s?.keepAlive) preview = await startAppPreview(runner, s, emit)
     // Live chat (#714): with the build settled, stay open for the user's own messages,
     // each continuing the same session. Ends on Stop / budget cap (next -> undefined).
-    if (opts.messages) {
+    // A hand-off run has no session here to continue: the CLI can start a cloud session and
+    // pull one back, but it cannot send a second message to one, so staying open would offer
+    // a composer whose every message answers itself. The run ends instead, with the link.
+    if (opts.messages && !handsOff) {
       await runChatPhase(session, opts.messages, { text: '' }, {
         ...(opts.requestChoice ? { requestChoice: opts.requestChoice } : {}),
         emit,
@@ -450,6 +461,9 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
         ...(opts.recordMessage ? { recordMessage: opts.recordMessage } : {}),
       })
     }
+    // Say why the run stops here, so a finished hand-off does not read as a run that gave up
+    // one phase in. The link itself is already on the driver's `cloud <url>` action.
+    if (handsOff) emit({ kind: 'log', message: 'Handed off: the rest of this run happens in its own session, which opens its own pull request.' })
     emit({ kind: 'end', ok: true })
     return { result, detection, events, ...(preview ? { preview } : {}), ...(loop ? { loop } : {}), ...(todo ? { todo } : {}) }
   } catch (err) {

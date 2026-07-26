@@ -34,6 +34,16 @@ export interface Driver {
    * way {@link DriverRateLimit} is omitted by drivers that can't emit it.
    */
   readQuota?(opts?: { signal?: AbortSignal }): Promise<DriverQuota>
+  /**
+   * This driver hands the task somewhere this machine cannot follow, so the first prompt is
+   * the whole run (#1225). Everything a run would do after that prompt — review the reply,
+   * improve against blockers, work the backlog, stay open for messages — reads a reply the
+   * agent never wrote, and asks the user questions the agent never asked.
+   *
+   * Optional and false by default: a driver that streams its agent's own replies (local,
+   * Actions, a device) omits it.
+   */
+  readonly handsOff?: boolean
 }
 
 /** How to boot a {@link DriverSession}. */

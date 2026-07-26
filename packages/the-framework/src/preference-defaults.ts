@@ -100,6 +100,16 @@ export function discordNotificationEnabled(
 export const MAX_SPEND_OFFSET = 50
 
 /**
+ * Where the slider sits before anyone has touched it, in percentage points (#960 Edit): half a
+ * day's worth of the week's allowance, ahead of the boundary.
+ *
+ * Landing exactly on the boundary reads as generous on paper but stops unattended work the moment
+ * the account is precisely on pace, which is normal jitter rather than overspending. A half-day
+ * cushion gives it room to breathe without meaningfully loosening the #879 policy.
+ */
+export const DEFAULT_SPEND_OFFSET = 100 / (7 * 2)
+
+/**
  * How many agents the routine sweep keeps going at once when `autoPmConcurrency` is unset (#1204).
  *
  * Two, not one: the point of the setting is that the sweep may overlap work, and a default of one

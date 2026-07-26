@@ -5,7 +5,6 @@ import {
   PRESETS_MAINTAINABILITY,
   PRESETS_MAINTENANCE,
   PRESETS_MARKET_RESEARCH,
-  PRESETS_QUICK_WINS,
   PRESETS_READABILITY,
   PRESETS_RESEARCH,
   PRESETS_SECURITY_AUDIT,
@@ -99,16 +98,8 @@ export const presets = {
    */
   updateTickets: definePreset({ name: 'update-tickets', template: PRESETS_UPDATE_TICKETS, label: 'Update from GitHub', newSession: true, tooltip: 'Bring `tickets/` up to date with the issues and comments changed since the last import.' }),
 
-  /**
-   * [Quick wins] (#773): harvest the cheap work out of the plans we already have. Reads the
-   * `.plan.md` companions the #684 format defines and appends the quick ones to `TODO_AGENTS.md`.
-   * This is the half of auto PM that closes the loop: [Spike & plan] turns tickets into plans,
-   * this turns plans into queued work, and the backlog loop drains the queue.
-   */
-  quickWins: definePreset({ name: 'quick-wins', template: PRESETS_QUICK_WINS, label: 'Quick wins' }),
-
   /** [Spike & plan] (#685): turn tickets into costed plans. */
-  spikeAndPlan: definePreset({ name: 'spike-and-plan', template: PRESETS_SPIKE_AND_PLAN, label: 'Spike & plan' }),
+  spikeAndPlan: definePreset({ name: 'spike-and-plan', template: PRESETS_SPIKE_AND_PLAN, label: 'Spike & plan tickets' }),
 
   /** [Suggest new tickets] (#462/#683): the dashboard prefills this one line and the user edits it freely. */
   suggestNewTickets: definePreset({ name: 'suggest-new-tickets', template: PRESETS_SUGGEST_NEW_TICKETS, label: 'Suggest new tickets' }),
@@ -131,7 +122,7 @@ export const presets = {
   suggestTicketsToWorkOn: definePreset({ name: 'suggest-tickets-to-work-on', template: PRESETS_SUGGEST_TICKETS_TO_WORK_ON, label: 'Suggest tickets to work on', tooltip: 'Add tickets to queue (TODO_AGENTS.md)' }),
 
   /** [Drain queue] (#855): work the entries already on `TODO_AGENTS.md`. */
-  drainQueue: definePreset({ name: 'drain-queue', template: PRESETS_DRAIN_QUEUE, label: 'Drain queue' }),
+  drainQueue: definePreset({ name: 'drain-queue', template: PRESETS_DRAIN_QUEUE, label: 'Spin up agents working on the AI queue' }),
 
   /**
    * [Do quick-win work] (#891) and [Do consensual work] (#892): read `tickets/*.md`, pick the ones
@@ -145,11 +136,11 @@ export const presets = {
    * already exists. That collision guard is what makes them safe to fire on a schedule: a triage
    * still in flight owns the branch, so the next firing does nothing instead of triaging twice.
    */
-  triageQuick: definePreset({ name: 'triage-quick', template: PRESETS_TRIAGE_QUICK, label: 'Do quick-win work', tooltip: 'Add `tickets/*.md` to queue (TODO_AGENTS.md), only quick-win and consensual tickets' }),
-  triageConsensual: definePreset({ name: 'triage-consensual', template: PRESETS_TRIAGE_CONSENSUAL, label: 'Do consensual work', tooltip: 'Add `tickets/*.md` to queue (TODO_AGENTS.md), only significant (no quick-wins) and consensual tickets' }),
+  triageQuick: definePreset({ name: 'triage-quick', template: PRESETS_TRIAGE_QUICK, label: 'Add quick-win work to AI Queue', tooltip: 'Add `tickets/*.md` to queue (TODO_AGENTS.md), only quick-win and consensual tickets' }),
+  triageConsensual: definePreset({ name: 'triage-consensual', template: PRESETS_TRIAGE_CONSENSUAL, label: 'Add consensual work to AI Queue', tooltip: 'Add `tickets/*.md` to queue (TODO_AGENTS.md), only significant (no quick-wins) and consensual tickets' }),
 } as const satisfies Record<string, PresetDef>
 
-/** The presets by key, e.g. `quickWins`. */
+/** The presets by key, e.g. `spikeAndPlan`. */
 export type PresetKey = keyof typeof presets
 
 /**
@@ -186,7 +177,6 @@ export const LAUNCHER_PRESETS: readonly PresetDef[] = [
   presets.suggestNewFeatures,
   presets.suggestTicketsToWorkOn,
   presets.spikeAndPlan,
-  presets.quickWins,
   presets.marketResearch,
   presets.importTickets,
   presets.updateTickets,

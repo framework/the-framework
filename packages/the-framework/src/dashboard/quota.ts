@@ -2,6 +2,7 @@ import { QuotaPoller } from '../quota-poller.js'
 import { quotaBoundaryStatus, type QuotaBoundaryStatus } from '../quota-boundary.js'
 import { ClaudeCodeDriver, type DriverQuotaUnavailableReason, type DriverQuotaWindow } from '../driver/index.js'
 import { readPreferences, type Preferences } from '../registry.js'
+import { DEFAULT_SPEND_OFFSET } from '../preference-defaults.js'
 
 /**
  * Everything the dashboard needs to draw the usage panel (#533): the account's
@@ -49,7 +50,7 @@ export function pollerQuotaSource(
   poller: QuotaPoller,
   now: () => number = () => Date.now(),
   /** The user's slider position, read per call so moving it takes effect without a restart (#960). */
-  limitOffset: () => number | Promise<number> = () => 0,
+  limitOffset: () => number | Promise<number> = () => DEFAULT_SPEND_OFFSET,
 ): QuotaSource {
   return {
     stop: () => poller.stop(),
@@ -85,6 +86,6 @@ export function defaultQuotaSource(env: NodeJS.ProcessEnv = process.env): QuotaS
   // policy, which is what a fresh install runs anyway.
   return pollerQuotaSource(poller, undefined, async () => {
     const prefs = await readPreferences(undefined, env).catch(() => ({}) as Preferences)
-    return prefs.autoSpendOffset ?? 0
+    return prefs.autoSpendOffset ?? DEFAULT_SPEND_OFFSET
   })
 }

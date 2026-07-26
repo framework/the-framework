@@ -1,110 +1,77 @@
-import type { ActiveRun, RecentRun } from '@gemstack/the-framework'
+import type { ActiveRun } from '@gemstack/the-framework'
 import { Bot } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
-import { runLabel } from '../lib/run-label.js'
 import { formatAge, formatDateTime } from '../lib/format-date.js'
 
-// The Overview's Agents card (#1139): sessions working now (Current) and just finished (Recent),
-// side by side. Each row is the whole line, clickable straight into that session — its label is the
-// one-liner the sidebar shows (runLabel), and its age reads "22s ago" with the exact moment on
-// hover. This is what replaced the old "Working now" list.
+// The Overview's Agents card (#1139): the sessions working right now. Each row is the whole line,
+// clickable straight into that session — its label is the one-liner the sidebar shows, and its age
+// reads "22s ago" with the exact moment on hover. This is what replaced the old "Working now" list.
+// The Recent column the card launched with is gone: finished sessions already live in the sidebar's
+// session list, so a second copy here said nothing new.
 //
 // Its own file rather than inline in DashboardPage, like every other card on the Overview: opening
 // a session from here is the behaviour #1189 exists to protect, and DashboardPage has no test file
 // to pin it in.
 
-/** One row: a session, and what opening it does. */
-interface AgentRowData {
-  key: string
-  /** The session's one-liner, the same the sidebar shows. */
-  label: string
-  /** ISO: last activity for a working agent, finish time for a finished one. */
-  at: string | undefined
-  projectName: string
-  onOpen: () => void
-}
-
 export function Agents({
   working,
-  finished,
   loading,
   onSelectRun,
 }: {
   working: ActiveRun[]
-  finished: RecentRun[]
   loading: boolean
   onSelectRun: (projectId: string, runId: string) => void
 }) {
-  const current: AgentRowData[] = working.map(a => ({
-    key: `${a.projectId}:${a.runId}`,
-    label: activeLabel(a),
-    at: a.updatedAt,
-    projectName: a.projectName,
-    onOpen: () => onSelectRun(a.projectId, a.runId),
-  }))
-  const recent: AgentRowData[] = finished.map(f => ({
-    key: `${f.projectId}:${f.run.id}`,
-    label: runLabel(f.run),
-    at: f.run.updatedAt,
-    projectName: f.projectName,
-    onOpen: () => onSelectRun(f.projectId, f.run.id),
-  }))
   return (
     <Card>
       <CardHeader>
+        {/* The one-line description sits beside the title rather than under a "Current" eyebrow of
+            its own: with the Recent column gone there is nothing left for column headers to tell
+            apart. */}
         <CardTitle className="flex items-center gap-2 text-base">
-          <Bot className="h-4 w-4 text-muted-foreground" />
+          <Bot className="h-4 w-4 shrink-0 text-muted-foreground" />
           Agents
+          <span className="truncate text-xs font-normal text-muted-foreground">Agents currently working</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
-          <AgentColumn heading="Current" description="Agents currently working" rows={current} loading={loading} empty="No agents working right now." />
-          <AgentColumn heading="Recent" description="Agents finished working" rows={recent} loading={loading} empty="No sessions yet." />
-        </div>
+        {loading ? (
+          <p className="py-2 text-sm text-muted-foreground">Loading…</p>
+        ) : working.length === 0 ? (
+          <p className="py-2 text-sm text-muted-foreground">No agents working right now.</p>
+        ) : (
+          <ul className="space-y-0.5">
+            {working.map(a => (
+              <AgentRow
+                key={`${a.projectId}:${a.runId}`}
+                label={activeLabel(a)}
+                at={a.updatedAt}
+                projectName={a.projectName}
+                onOpen={() => onSelectRun(a.projectId, a.runId)}
+              />
+            ))}
+          </ul>
+        )}
       </CardContent>
     </Card>
   )
 }
 
-function AgentColumn({
-  heading,
-  description,
-  rows,
-  loading,
-  empty,
+function AgentRow({
+  label,
+  at,
+  projectName,
+  onOpen,
 }: {
-  heading: string
-  description: string
-  rows: AgentRowData[]
-  loading: boolean
-  empty: string
+  /** The session's one-liner, the same the sidebar shows. */
+  label: string
+  /** ISO: the session's last activity. */
+  at: string | undefined
+  projectName: string
+  /** Open the session — project and run both, never just the launcher (#1189). */
+  onOpen: () => void
 }) {
-  return (
-    <div className="min-w-0">
-      {/* Eyebrow + one-line description on a single ruled row, so the column reads as a labelled
-          section rather than two stacked muted lines. */}
-      <div className="flex items-baseline gap-2 border-b border-border pb-1.5">
-        <h4 className="shrink-0 text-xs font-semibold uppercase tracking-wide text-foreground">{heading}</h4>
-        <p className="truncate text-xs text-muted-foreground">{description}</p>
-      </div>
-      {loading ? (
-        <p className="py-2 text-sm text-muted-foreground">Loading…</p>
-      ) : rows.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">{empty}</p>
-      ) : (
-        <ul className="mt-1.5 space-y-0.5">
-          {rows.map(r => (
-            <AgentRow key={r.key} label={r.label} at={r.at} projectName={r.projectName} onOpen={r.onOpen} />
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-function AgentRow({ label, at, projectName, onOpen }: Omit<AgentRowData, 'key'>) {
   return (
     <li>
       {/* No hint on the row itself: that a session row opens the session is the one thing this card

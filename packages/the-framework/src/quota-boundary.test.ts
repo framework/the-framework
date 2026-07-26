@@ -46,22 +46,38 @@ test('refuses prose it cannot place rather than guessing', () => {
   assert.equal(parseResetsAt('Jul 25 at 7am (Not/AZone)', NOW), undefined)
 })
 
-test('the boundary is the nth day of the week over seven', () => {
+test('percent rises continuously with the elapsed share of the week (#960 Edit)', () => {
   const resetsAt = NOW + 5 * DAY
   const start = resetsAt - QUOTA_WEEK_MS
-  // First second of the week is still day 1, so a seventh is already available.
-  assert.deepEqual(boundaryFromResetsAt(resetsAt, start), { startsAt: start, resetsAt, day: 1, percent: (1 / 7) * 100 })
+  // The first instant of the week: nothing has elapsed yet, so nothing is allowed yet either —
+  // no once-a-day jump hands out a whole seventh up front.
+  assert.deepEqual(boundaryFromResetsAt(resetsAt, start), { startsAt: start, resetsAt, day: 1, percent: 0 })
+  // A quarter of the way into the week (1.75 of 7 days) is a plain 25%, not rounded to a day.
+  assert.equal(boundaryFromResetsAt(resetsAt, start + 1.75 * DAY).percent, 25)
+  assert.equal(boundaryFromResetsAt(resetsAt, start + 3.5 * DAY).percent, 50)
+})
+
+test('day still names which day of the week now falls on, independently of percent', () => {
+  const resetsAt = NOW + 5 * DAY
+  const start = resetsAt - QUOTA_WEEK_MS
+  assert.equal(boundaryFromResetsAt(resetsAt, start).day, 1)
   assert.equal(boundaryFromResetsAt(resetsAt, start + DAY - 1).day, 1)
   // It steps at the second the week's own day rolls over, not at midnight.
   assert.equal(boundaryFromResetsAt(resetsAt, start + DAY).day, 2)
   assert.equal(boundaryFromResetsAt(resetsAt, start + 2.5 * DAY).day, 3)
 })
 
-test('the last day of the week allows the whole allowance', () => {
+test('the boundary reaches the full allowance exactly as the week resets, not a day early', () => {
   const resetsAt = NOW + DAY
-  const status = boundaryFromResetsAt(resetsAt, NOW)
-  assert.equal(status.day, 7)
-  assert.equal(status.percent, 100)
+  const start = resetsAt - QUOTA_WEEK_MS
+  // A day before the reset (day 7 of 7), only six sevenths have actually elapsed — the whole
+  // week's allowance is not handed out in a lump the moment day 7 begins.
+  const dayBefore = boundaryFromResetsAt(resetsAt, NOW)
+  assert.equal(dayBefore.day, 7)
+  assert.equal(dayBefore.percent, (6 / 7) * 100)
+  // Only at the exact instant the week resets does it reach 100.
+  assert.equal(boundaryFromResetsAt(resetsAt, resetsAt).percent, 100)
+  assert.equal(boundaryFromResetsAt(resetsAt, start).percent, 0)
 })
 
 test('a week already over reads as its last day, not as day eight', () => {
@@ -70,7 +86,7 @@ test('a week already over reads as its last day, not as day eight', () => {
 })
 
 test('measures the account week against the boundary', () => {
-  // Reset in 5 days => 2 days elapsed => day 3 => 42.8% allowed.
+  // Reset in 5 days => 2 days 5 hours elapsed => day 3, ~31.5% allowed continuously (#960 Edit).
   const status = quotaBoundaryStatus({ windows: [weekWindow(16)], now: NOW })
   assert.ok(status)
   assert.equal(status.boundary.day, 3)

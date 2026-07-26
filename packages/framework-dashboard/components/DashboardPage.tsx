@@ -14,10 +14,10 @@ import { Agents } from './Agents.js'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
-// The Overview landing page (#1139): a focused at-a-glance board — usage first, then the two queues
-// (what needs a human, what the AI takes up next) side by side, the routine jobs, the agents working
-// now and just finished, and the hot tickets across every project. Each section is a projection of
-// the same .the-framework files over the `onDashboard` Telefunc read, polled so it stays live;
+// The Overview landing page (#1139): a focused at-a-glance board — usage first, then what needs a
+// human (Human Queue) beside the agents working now stacked on what the AI takes up next (AI
+// Queue), the routine jobs, and the hot tickets across every project. Each section is a projection
+// of the same .the-framework files over the `onDashboard` Telefunc read, polled so it stays live;
 // selecting a row jumps into its project or straight into a session. Shown by the shell when no
 // project is picked.
 //
@@ -51,17 +51,20 @@ export function DashboardPage({
         {/* Usage first (#1139): the one figure that governs everything the agent may do next. */}
         <Quota />
 
-        {/* The two queues side by side (#1139): what needs you, and what the AI takes up next. */}
+        {/* The two queues side by side (#1139), with the agents working now sitting to the Human
+            Queue's right on top of the AI Queue: what needs you, who is on it, and what the AI
+            takes up next. */}
         <div className="grid items-start gap-4 lg:grid-cols-2">
           <HumanQueue items={interventions} onSelectProject={onSelectProject} onSelectRun={onSelectRun} />
-          <AiQueue queue={data?.queue ?? []} loading={loading} />
+          <div className="space-y-4">
+            <Agents working={data?.active ?? []} loading={loading} onSelectRun={onSelectRun} />
+            <AiQueue queue={data?.queue ?? []} loading={loading} />
+          </div>
         </div>
 
         {/* Routine work sits below the AI Queue (#1139/#1159): the scheduled jobs and the button
             that fires one now. */}
         <RoutineWork onRunStarted={onRunStarted} />
-
-        <Agents working={data?.active ?? []} finished={data?.recentAgents ?? []} loading={loading} onSelectRun={onSelectRun} />
 
         <HotTickets onSelectProject={onSelectProject} onSelectRun={onSelectRun} />
       </div>

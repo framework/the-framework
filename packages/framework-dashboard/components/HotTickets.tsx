@@ -82,7 +82,9 @@ export function HotTickets({
       </CardHeader>
       <CardContent>
         {tickets.length === 0 ? (
-          <p className="py-2 text-sm text-muted-foreground">No tickets yet.</p>
+          // Named lanes, not "no tickets": the card is a shortlist, and its empty state must not
+          // claim the backlog is empty when merely nothing qualifies (the /tickets page may be full).
+          <p className="py-2 text-sm text-muted-foreground">Nothing in progress, queued, or high priority.</p>
         ) : (
           <div className="grid items-start gap-x-8 gap-y-5 sm:grid-cols-2">
             <div className="flex flex-col gap-5">{LEFT_LANES.map(renderLane)}</div>

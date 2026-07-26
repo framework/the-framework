@@ -133,8 +133,24 @@ export interface HotTicket {
   runId?: string
 }
 
-/** Priority values that read as "do this soon" — the "high priority" lane (#1139). */
-const HIGH_PRIORITY = new Set(['high', 'urgent', 'critical', 'p0', 'p1', '0', '1'])
+/** Priority labels that read as "do this soon" — the "high priority" lane (#1139). */
+const HIGH_PRIORITY_LABELS = new Set(['high', 'urgent', 'critical', 'p0', 'p1'])
+
+/** Where the ticket format's 10-0 scale starts reading as high. */
+const HIGH_PRIORITY_FLOOR = 7
+
+/**
+ * Whether a `priority:` value reads as "do this soon". A bare number is the ticket format's own
+ * scale (`ticketing_format.md`: `10-0 … 10: critical — act immediately, 0: only if capacity`), so
+ * 7 and up qualify — NOT the P0/P1 convention, whose low-numbers-first reading only applies when
+ * written `p0`/`p1`. Getting that backwards is what kept a backlog full of `Priority: 8` tickets
+ * off the card entirely.
+ */
+function isHighPriority(priority: string): boolean {
+  if (HIGH_PRIORITY_LABELS.has(priority)) return true
+  const n = Number.parseInt(priority, 10)
+  return !Number.isNaN(n) && n >= HIGH_PRIORITY_FLOOR
+}
 
 /**
  * A ticket's lane (#1139), or null when it is in none of the three the card shows:
@@ -145,7 +161,8 @@ const HIGH_PRIORITY = new Set(['high', 'urgent', 'critical', 'p0', 'p1', '0', '1
  * - high-priority: none of the above, but flagged high priority; what a human would likely queue next.
  *
  * Precedence follows that order: work already under way outranks a queued ticket, which outranks a
- * bare priority flag. Everything else is dropped — the card is a shortlist, not the whole backlog.
+ * bare priority flag. Everything else is dropped — the card is a shortlist, not the whole backlog —
+ * and a closed ticket is dropped before any of it, since finished work is not hot however marked.
  *
  * `implementing` is the only hard evidence and exists for a drain run only, so the plan/spike proxy
  * still carries every ticket someone is working by hand.
@@ -154,9 +171,13 @@ export function ticketBucket(
   ticket: WorkspaceTicket,
   opts: { implementing?: boolean; queued?: boolean } = {},
 ): HotBucket | null {
+  // A closed ticket is finished work: in no lane, whatever marks (plan/spike/priority/queue entry)
+  // it left behind — those say how it was worked, not that it still is. A run that is somehow
+  // still implementing one shows in "Working now" on the strength of the run itself.
+  if (ticket.status === 'closed') return null
   if (opts.implementing || ticket.planned || ticket.spiked) return 'in-progress'
   if (opts.queued) return 'ai-queue'
-  if (ticket.priority && HIGH_PRIORITY.has(ticket.priority)) return 'high-priority'
+  if (ticket.priority && isHighPriority(ticket.priority)) return 'high-priority'
   return null
 }
 

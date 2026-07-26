@@ -120,6 +120,24 @@ test('ticketBucket: in-progress > ai-queue > high-priority, else null (#1139)', 
   assert.equal(ticketBucket(ticket('j', { planned: true }), { queued: true }), 'in-progress')
 })
 
+test('ticketBucket: a bare number is the ticket format\'s 10-0 scale, high from 7 up', () => {
+  // ticketing_format.md: `Priority: 10-0 … 10: critical — act immediately, 0: only if capacity`.
+  for (const high of ['10', '9', '8', '7']) {
+    assert.equal(ticketBucket(ticket(high, { priority: high })), 'high-priority', `priority ${high}`)
+  }
+  // 0 and 1 are that scale's LOWEST rungs — the inverse P0/P1 reading only applies written `p0`/`p1`.
+  for (const low of ['6', '5', '2', '1', '0']) {
+    assert.equal(ticketBucket(ticket(low, { priority: low })), null, `priority ${low}`)
+  }
+})
+
+test('ticketBucket: a closed ticket is in no lane, whatever marks it left behind', () => {
+  assert.equal(ticketBucket(ticket('a', { status: 'closed', planned: true })), null)
+  assert.equal(ticketBucket(ticket('b', { status: 'closed', priority: '10' })), null)
+  assert.equal(ticketBucket(ticket('c', { status: 'closed' }), { queued: true }), null)
+  assert.equal(ticketBucket(ticket('d', { status: 'closed' }), { implementing: true }), null)
+})
+
 test('buildHotTickets pools every project, buckets each, drops the rest, and orders lane-first', async () => {
   const tickets: Record<string, WorkspaceTicket[]> = {
     '/a': [ticket('a1.md', { planned: true }), ticket('a2.md', { priority: 'high' })],

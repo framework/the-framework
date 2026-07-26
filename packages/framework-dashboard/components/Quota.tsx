@@ -3,9 +3,9 @@ import { CircleHelp } from 'lucide-react'
 import type { DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '@gemstack/the-framework'
 import { MAX_SPEND_OFFSET } from '@gemstack/the-framework/client'
 import { useQuota } from '../lib/quota.js'
-import { formatRelative, formatResetDay, formatResetTooltip } from '../lib/format-date.js'
+import { formatRelative, formatResetDay, formatResetTooltip, formatDuration } from '../lib/format-date.js'
 import { updatePreferences } from '../lib/preferences.js'
-import { quotaTone, limitPercent, projectedRange, dailyLimitPercent, type QuotaTone } from '../lib/quota-bar.js'
+import { quotaTone, limitPercent, projectedRange, paceDeviationMs, type QuotaTone } from '../lib/quota-bar.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
@@ -74,6 +74,10 @@ function WeekBar({
   // pace calls for — worth flagging, since it is easy to drag past without meaning to.
   const pastBoundary = limit > boundary.percent
   const label = `${Math.round(percentUsed)}% of the week used, against a boundary of ${Math.round(boundary.percent)}% on day ${boundary.day} of 7`
+  // How far ahead of or behind the boundary's own pace consumption is, as a duration (#960 Edit):
+  // "53% used" said almost nothing about whether today's pace was being kept; "2h" does.
+  const deviationMs = paceDeviationMs(percentUsed, boundary.percent, boundary.resetsAt - boundary.startsAt)
+  const consuming = deviationMs >= 0 ? 'Over-consuming' : 'Under-consuming'
 
   return (
     <div className="space-y-1.5">
@@ -133,11 +137,12 @@ function WeekBar({
       <p className="text-xs text-muted-foreground">
         <Tooltip>
           <TooltipTrigger render={<span className="cursor-default font-medium text-foreground" />}>
-            {Math.round(dailyLimitPercent(percentUsed, boundary.percent))}% used
+            {consuming}: {formatDuration(Math.abs(deviationMs))}
           </TooltipTrigger>
           <TooltipContent className="max-w-64">
-            Ahead of (positive) or behind (negative) today's pace, in units of a full day's budget — 0% is exactly on pace.{' '}
-            {Math.round(percentUsed)}% of the week's allowance used against a {Math.round(boundary.percent)}% pace.
+            How far ahead of or behind today's pace consumption is. Over-consuming spends faster than the week's pace allows;
+            under-consuming spends slower. {Math.round(percentUsed)}% of the week's allowance used against a{' '}
+            {Math.round(boundary.percent)}% pace.
           </TooltipContent>
         </Tooltip>
         {' · '}

@@ -92,6 +92,22 @@ export function formatRelative(value: string | undefined, fallback = '—'): str
   return date.toLocaleDateString()
 }
 
+/**
+ * A plain duration, floored to its largest whole unit: "2s" / "10m" / "2h" / "1d" (#960 Edit) — no
+ * "ago", and no weeks: this backs the pace-deviation figure, which can never exceed the week
+ * itself. Floored for the reason {@link formatAge} is: "1d" should mean a full day has passed, not
+ * "close enough to one".
+ */
+export function formatDuration(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000))
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h`
+  return `${Math.floor(hours / 24)}d`
+}
+
 /** `8:59pm`, lowercase and unspaced — the hour and minute the reset formatters share. */
 function timeOfDay(date: Date): string {
   return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(/\s+/g, '')

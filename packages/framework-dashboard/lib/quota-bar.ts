@@ -33,18 +33,14 @@ export function limitPercent(boundaryPercent: number, offset: number): number {
   return Math.min(Math.max(boundaryPercent + offset, 0), 100)
 }
 
-/** How many days a quota week is divided into — the boundary steps one of these at a time. */
-const WEEK_DAYS = 7
-
 /**
- * Consumption against the daily budget, in units of a full day's worth of it (#960 Edit): 0% is
- * exactly on the boundary's pace, +100% is a whole day ahead, -100% a whole day behind. Unlike a
- * plain ratio against the boundary, this can run past ±100% — and negative, for an account that is
- * behind by more than a single day — which is the point: "53% used" read as a share of the *week*
- * told you almost nothing about whether today's pace was being kept.
+ * How far ahead of or behind the boundary's own pace consumption is, as a signed duration within
+ * the week (#960 Edit): positive is ahead (over-consuming), negative is behind (under-consuming).
+ * "53% used" read as a share of the *week* told a viewer almost nothing about whether today's pace
+ * was being kept; a duration ("2h", "1d") says exactly how much of the week that gap actually is.
  */
-export function dailyLimitPercent(percentUsed: number, boundaryPercent: number, days = WEEK_DAYS): number {
-  return (percentUsed - boundaryPercent) * days
+export function paceDeviationMs(percentUsed: number, boundaryPercent: number, weekMs: number): number {
+  return ((percentUsed - boundaryPercent) / 100) * weekMs
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { formatAge, formatDate, formatDateTime, formatUntil, formatResetDay, formatResetTooltip } from './format-date.js'
+import { formatAge, formatDate, formatDateTime, formatUntil, formatResetDay, formatResetTooltip, formatDuration } from './format-date.js'
 
 describe('format-date (#759)', () => {
   test('formats a real timestamp', () => {
@@ -69,6 +69,29 @@ describe('formatUntil (#1161/#1159)', () => {
     // The daemon ticks on its own clock, so "past due" here only ever means "about to happen".
     expect(formatUntil(Date.now() - 60_000)).toBe('any moment')
     expect(formatUntil(Date.now())).toBe('any moment')
+  })
+})
+
+describe('formatDuration (#960 Edit)', () => {
+  const S = 1000
+  const M = 60 * S
+  const H = 60 * M
+  const D = 24 * H
+
+  test('names seconds, minutes, hours and days, floored, no weeks', () => {
+    expect(formatDuration(2 * S)).toBe('2s')
+    expect(formatDuration(0)).toBe('0s')
+    // 90s is a minute and a half — floored to one minute, not rounded up to two.
+    expect(formatDuration(90 * S)).toBe('1m')
+    expect(formatDuration(10 * M)).toBe('10m')
+    expect(formatDuration(2 * H)).toBe('2h')
+    expect(formatDuration(D + 2 * H)).toBe('1d')
+    // Never exceeds a week's worth in practice, but nothing here forces that — floors to days regardless.
+    expect(formatDuration(9 * D)).toBe('9d')
+  })
+
+  test('a negative duration reads as its own magnitude, not below zero', () => {
+    expect(formatDuration(-5 * S)).toBe('0s')
   })
 })
 

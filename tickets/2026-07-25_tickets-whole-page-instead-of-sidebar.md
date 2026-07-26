@@ -1,3 +1,5 @@
+GitHub: [#1144](https://github.com/gemstack-land/the-framework/issues/1144)
+
 # Show tickets as whole page instead of sidebar
 
 ## TLDR

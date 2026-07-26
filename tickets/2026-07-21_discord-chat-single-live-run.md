@@ -1,4 +1,5 @@
-priority: low
+Priority: 2
+GitHub: [#945](https://github.com/gemstack-land/the-framework/issues/945)
 
 # Discord chat assumes one live run per project
 

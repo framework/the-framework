@@ -30,8 +30,9 @@ test('the ticket-format spec ships in the package (not materialized), with prior
   // The spec teaches both file shapes and the revised #684 optional priority/topics fields.
   assert.ok(TICKETING_FORMAT.includes('tickets/<DATE>_<SLUG>.md'))
   assert.ok(TICKETING_FORMAT.includes('tickets/<DATE>_<SLUG>.spike.md'))
-  assert.ok(TICKETING_FORMAT.includes('priority: low/medium/high/urgent'))
-  assert.ok(TICKETING_FORMAT.includes('topics:'))
+  assert.ok(TICKETING_FORMAT.includes('Priority: 10-0'))
+  assert.ok(TICKETING_FORMAT.includes('Topics:'))
+  assert.ok(TICKETING_FORMAT.includes('GitHub:'))
 })
 
 test('the backlog-format spec ships in the package and teaches the priority sections (#880)', () => {

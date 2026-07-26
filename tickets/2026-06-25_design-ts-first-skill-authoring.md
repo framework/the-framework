@@ -1,5 +1,6 @@
-priority: low
-topics: [enhancement]
+Priority: 2
+Topics: [enhancement]
+GitHub: [#11](https://github.com/gemstack-land/the-framework/issues/11)
 
 # Design: optional TS-first skill authoring (defineSkill) alongside SKILL.md
 

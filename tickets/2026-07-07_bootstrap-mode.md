@@ -1,5 +1,6 @@
-priority: low
-topics: [the-framework]
+Priority: 2
+Topics: [the-framework]
+GitHub: [#297](https://github.com/gemstack-land/the-framework/issues/297)
 
 # [The Framework] Bootstrap mode
 

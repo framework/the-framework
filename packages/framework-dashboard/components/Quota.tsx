@@ -35,7 +35,7 @@ const TONE_TEXT: Record<QuotaTone, string> = {
   full: 'text-danger',
 }
 
-const SEP = ' · '
+const SEP = ' — '
 
 /** The account's own week: the window the bar is about. */
 function weekWindow(windows: DriverQuotaWindow[]): DriverQuotaWindow | undefined {

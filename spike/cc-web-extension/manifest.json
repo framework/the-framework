@@ -5,9 +5,10 @@
   "description": "Spike only. Reads a Claude Code cloud session page and reports what it can extract. Sends nothing anywhere.",
   "content_scripts": [
     {
-      "matches": ["https://claude.ai/code/*"],
+      "matches": ["https://claude.ai/*"],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ]
 }

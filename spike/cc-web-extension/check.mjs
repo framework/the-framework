@@ -30,6 +30,9 @@ const block = JSON.stringify(
 const cases = [
   ['fenced code block', `<pre><code>${block}</code></pre><div contenteditable="true"></div>`, true],
   ['pre without code', `<pre>${block}</pre><textarea></textarea>`, true],
+  // The shape claude.ai actually uses: <code> with no <pre> wrapper at all. Round 1 of the
+  // spike missed the question entirely because the selector required a <pre>.
+  ['code without pre', `<code>${block}</code><div contenteditable="true"></div>`, true],
   ['no question present', `<pre><code>console.log(1)</code></pre><div contenteditable="true"></div>`, false],
 ]
 

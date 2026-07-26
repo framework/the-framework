@@ -24,10 +24,10 @@ const ht = (file: string, projectName: string, bucket: HotBucket, over: Record<s
 })
 
 describe('HotTickets (#1112)', () => {
-  test('with no tickets it shows a hint', async () => {
+  test('with no hot tickets it names the empty lanes rather than claiming no tickets exist', async () => {
     onHotTickets.mockResolvedValue([])
     render(<HotTickets onSelectProject={() => {}} onSelectRun={vi.fn()} />)
-    await waitFor(() => expect(screen.getByText('No tickets yet.')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Nothing in progress, queued, or high priority.')).toBeTruthy())
   })
 
   test('groups tickets into the three lanes and selecting one jumps into its project', async () => {

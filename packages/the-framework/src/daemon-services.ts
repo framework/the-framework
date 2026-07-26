@@ -11,10 +11,11 @@ import { buildInterventions, interventionKey, postInterventionsDiscord } from '.
 import { buildActivity, activityKey, postActivityDiscord } from './dashboard/activity.js'
 import { startAutoPm, AUTO_PM_JOBS, type AutoPmReport } from './auto-pm.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
-import { promoteQueue } from './queue-promote.js'
+import { claimedQueueEntries, promoteQueue } from './queue-promote.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { startConversationCommitter } from './conversation-commit.js'
 import { startMergedWorktreeSweep } from './merged-worktrees.js'
+import { resolveRunPr } from './dashboard/run-handoff.js'
 import { readConversation } from './conversations.js'
 import { startDiscordBot, DISCORD_VIA } from './discord/bot.js'
 import { startDiscordReplyMirror } from './discord/reply-mirror.js'
@@ -65,7 +66,7 @@ export interface BackgroundServices {
    * `onDemand` is the dashboard's trigger button (#1210): that sweep runs even while the
    * preference is off, because the click itself is the ask the preference would otherwise record.
    */
-  wakeAutoPm: (opts?: { onDemand?: boolean }) => void
+  wakeAutoPm: (opts?: { onDemand?: boolean; drainOnly?: boolean }) => void
   /** What the last auto-PM sweep decided, for the usage panel to show (#1161). */
   autoPmReport: () => AutoPmReport
 }
@@ -163,9 +164,19 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
           ? ticketFromQueueEntry(job.entry)
           : await nextQueuedTicket(project.path).catch(() => undefined)
         : undefined
-      const result = await startUnattended(project.id, job.prompt, ticket ? { ticket } : {})
+      // The pinned entry itself also rides along (#1253), so the claim on it reaches the run's
+      // meta and outlives both this process's memory and the run's local process.
+      const result = await startUnattended(project.id, job.prompt, {
+        ...(ticket ? { ticket } : {}),
+        ...(job.entry !== undefined ? { queueEntry: job.entry } : {}),
+      })
       return result.ok ? result.runId : undefined
     },
+    // The durable half of the drain pins (#1253): entries claimed by run metas rather than this
+    // process's memory. The PR lookup rides the #1257 cache, so a sweep costs at most one `gh`
+    // read per open entry per TTL.
+    claimedEntries: async (project, candidates) =>
+      claimedQueueEntries(project.path, candidates, { runs: listRuns, pr: resolveRunPr }),
     // The daemon promotes the queue, never the agent (#852): the run stays sandboxed in its
     // worktree, and one known file is copied across once it has finished cleanly.
     promote: async (project, { runId, entry }) => {

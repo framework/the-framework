@@ -75,21 +75,46 @@ describe('RoutineWork (#1159)', () => {
     }
   })
 
+  // The drain leads the list, and since #1204 its Run now goes to the sweep, so the plain-start
+  // tests click the first *rotation* row instead.
+  const ROTATION_JOB = AUTO_PM_ROUTINES[1]!
+
   test('Run now starts the routine prompt verbatim and selects the run it started (#1191)', async () => {
     const started: unknown[][] = []
     render(<RoutineWork onRunStarted={(...args) => started.push(args)} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
-    fireEvent.click(screen.getAllByText('Run now')[0]!)
-    // The drain job leads the list, and its prompt travels unchanged: this is the fast-forward.
+    fireEvent.click(screen.getAllByText('Run now')[1]!)
     await waitFor(() => expect(start).toHaveBeenCalled())
     const [projectId, prompt, kind] = start.mock.calls[0]!
     expect(projectId).toBe('p1')
-    expect(prompt).toBe(AUTO_PM_DRAIN_JOB.prompt)
+    expect(prompt).toBe(ROTATION_JOB.prompt)
     expect(kind).toBe('prompt')
     // The run id is the whole point: without it the shell renders the launcher, so "Run now"
     // landed on an empty composer with its own session nowhere on screen (#1191).
     await waitFor(() => expect(started).toHaveLength(1))
-    expect(started[0]).toEqual(['p1', AUTO_PM_DRAIN_JOB.prompt, 'run-1'])
+    expect(started[0]).toEqual(['p1', ROTATION_JOB.prompt, 'run-1'])
+  })
+
+  test("the drain's Run now fires a drain-only sweep, the only thing that can fan out (#1204)", async () => {
+    // Rom's demo click: "Spin up agents working on the AI queue" must spin up to the concurrency,
+    // one agent per entry. A plain start could only ever be one agent on the first entry.
+    sendAutoPmSweep.mockResolvedValue({ ok: true })
+    const started: unknown[][] = []
+    render(<RoutineWork onRunStarted={(...args) => started.push(args)} />)
+    await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
+    fireEvent.click(screen.getAllByText('Run now')[0]!)
+    await waitFor(() => expect(sendAutoPmSweep).toHaveBeenCalledWith({ drainOnly: true }))
+    expect(start).not.toHaveBeenCalled()
+    // No navigation: the batch lands in the Agents card, not one session's page.
+    expect(started).toHaveLength(0)
+  })
+
+  test("the drain's Run now on a host with no sweep says so instead of failing silently (#1204)", async () => {
+    sendAutoPmSweep.mockResolvedValue({ ok: false })
+    render(<RoutineWork onRunStarted={() => {}} />)
+    await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
+    fireEvent.click(screen.getAllByText('Run now')[0]!)
+    await waitFor(() => expect(screen.getByText(/not running the sweep/).textContent).toMatch(/nothing to trigger/))
   })
 
   test('a start that reports no run id still hands the project over, for the adopt fallback (#1191)', async () => {
@@ -97,9 +122,9 @@ describe('RoutineWork (#1159)', () => {
     const started: unknown[][] = []
     render(<RoutineWork onRunStarted={(...args) => started.push(args)} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
-    fireEvent.click(screen.getAllByText('Run now')[0]!)
+    fireEvent.click(screen.getAllByText('Run now')[1]!)
     await waitFor(() => expect(started).toHaveLength(1))
-    expect(started[0]).toEqual(['p1', AUTO_PM_DRAIN_JOB.prompt, undefined])
+    expect(started[0]).toEqual(['p1', ROTATION_JOB.prompt, undefined])
   })
 
   test('a failed start neither navigates nor leaves the button stuck on Starting', async () => {
@@ -108,7 +133,7 @@ describe('RoutineWork (#1159)', () => {
     const started: unknown[][] = []
     render(<RoutineWork onRunStarted={(...args) => started.push(args)} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
-    fireEvent.click(screen.getAllByText('Run now')[0]!)
+    fireEvent.click(screen.getAllByText('Run now')[1]!)
     await waitFor(() => expect(start).toHaveBeenCalled())
     expect(started).toHaveLength(0)
     await waitFor(() => expect(screen.queryByText('Starting…')).toBeNull())
@@ -169,9 +194,9 @@ describe('RoutineWork (#1159)', () => {
     render(<RoutineWork onRunStarted={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
     for (const button of screen.getAllByText('Run now')) expect((button as HTMLButtonElement).disabled).toBe(false)
-    fireEvent.click(screen.getAllByText('Run now')[0]!)
+    fireEvent.click(screen.getAllByText('Run now')[1]!)
     await waitFor(() => expect(start).toHaveBeenCalled())
-    expect(start.mock.calls[0]![1]).toBe(AUTO_PM_DRAIN_JOB.prompt)
+    expect(start.mock.calls[0]![1]).toBe(ROTATION_JOB.prompt)
   })
 
   test('auto-run on with nothing ticked says so, rather than counting down to nothing (#1209)', async () => {
@@ -191,7 +216,7 @@ describe('RoutineWork (#1159)', () => {
     render(<RoutineWork onRunStarted={() => {}} />)
     const select = await screen.findByLabelText('Run in')
     fireEvent.change(select, { target: { value: 'p2' } })
-    fireEvent.click(screen.getAllByText('Run now')[0]!)
+    fireEvent.click(screen.getAllByText('Run now')[1]!)
     await waitFor(() => expect(start).toHaveBeenCalled())
     expect(start.mock.calls[0]![0]).toBe('p2')
   })

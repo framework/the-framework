@@ -974,3 +974,7 @@ test('parseArgs reads --ticket, the ticket the daemon says this run implements (
   assert.equal(parseArgs(['--ticket', 'tickets/2026-07-25_login.md', 'x']).ticket, 'tickets/2026-07-25_login.md')
   assert.equal(parseArgs(['x']).ticket, undefined)
 })
+
+test('parseArgs reads --queue-entry, the queue entry a drain pinned this run to (#1253)', () => {
+  assert.equal(parseArgs(['--queue-entry', 'Fix the flaky teardown test', 'x']).queueEntry, 'Fix the flaky teardown test')
+})

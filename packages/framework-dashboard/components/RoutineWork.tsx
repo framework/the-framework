@@ -95,6 +95,19 @@ export function RoutineWork({
 
   const runNow = async (job: AutoPmJob) => {
     if (!projectId || busy) return
+    // The drain's Run now means "spin agents up on the queue" (#1204), and only the sweep can fan
+    // out — one agent per entry, up to the concurrency. A plain start could only ever be one
+    // agent reading the first entry. Drain-only, so an empty queue is reported on the card
+    // rather than the click quietly borrowing a rotation job. No navigation on purpose: the
+    // agents land in the Agents card, which is where a batch is watchable.
+    if (job.drains) {
+      setStarting(job.name)
+      setSweepNote(null)
+      const result = await sendAutoPmSweep({ drainOnly: true }).catch(() => ({ ok: false }))
+      setStarting(null)
+      if (!result.ok) setSweepNote('This dashboard is not running the sweep, so there is nothing to trigger here.')
+      return
+    }
     setStarting(job.name)
     // The global options only: the Overview has no project open, so the per-project tier (#840) is
     // not resolved here and the run starts on the same defaults a fresh launcher would use.

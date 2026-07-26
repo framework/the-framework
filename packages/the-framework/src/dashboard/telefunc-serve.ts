@@ -81,7 +81,7 @@ export interface DashboardContext {
    * immediately — a sweep can start runs and take a while, and the caller only needs to know it
    * was asked for.
    */
-  autoPmSweep?: () => void
+  autoPmSweep?: (opts?: { drainOnly?: boolean }) => void
 }
 
 let instance: Telefunc | undefined

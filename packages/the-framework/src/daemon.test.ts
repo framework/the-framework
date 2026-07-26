@@ -918,3 +918,11 @@ test('startOptionFlags passes the ticket a run implements, and only a real one (
     assert.deepEqual(startOptionFlags({ ticket: bad }), [], `expected ${bad} to be dropped`)
   }
 })
+
+test('startOptionFlags forwards the pinned queue entry verbatim, and drops a blank one (#1253)', () => {
+  assert.deepEqual(startOptionFlags({ queueEntry: 'Fix the flaky teardown test' }), [
+    '--queue-entry',
+    'Fix the flaky teardown test',
+  ])
+  assert.deepEqual(startOptionFlags({ queueEntry: '   ' }), [])
+})

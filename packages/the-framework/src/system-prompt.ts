@@ -209,7 +209,7 @@ export const CONTEXT_DOCS: readonly ContextDoc[] = [
   // Recorded human conversations (#683/#908): the run committed each Discord/chat turn here, so a
   // future agent can read what was said. A read-only pointer, so it stays out of BUSINESS_KNOWLEDGE_DOCS.
   // Path inlined to keep this module node-free; pinned to THE_FRAMEWORK_DIR/CONVERSATIONS_DIR by a test.
-  { path: '.the-framework/conversations/**.md', comment: 'recorded conversations between humans (e.g. via the Discord bot)' },
+  { path: '.the-framework/conversations/**.md', comment: 'conversations between humans, recorded by agents (e.g. the agent Discord bot)' },
   { path: 'TODO_AGENTS.md', comment: `the AI task queue; format: the "${TODO_FORMAT_HEADING}" section below` },
 ]
 

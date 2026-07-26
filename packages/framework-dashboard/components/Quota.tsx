@@ -152,31 +152,10 @@ function WeekBar({
         <span className="font-medium text-foreground">{Math.round(percentUsed)}% used</span>
         {' · '}
         <Tooltip>
-          <TooltipTrigger render={<span className="cursor-default underline decoration-dotted underline-offset-2" />}>
-            resets {formatResetDay(boundary.resetsAt)}
-          </TooltipTrigger>
+          <TooltipTrigger render={<span className="cursor-default" />}>resets {formatResetDay(boundary.resetsAt)}</TooltipTrigger>
           <TooltipContent>{formatResetTooltip(boundary.resetsAt)}</TooltipContent>
         </Tooltip>
       </p>
-      {/* Whether the knob has left any room to project (#960 Edit): dragged all the way down onto
-          the used fill, there is nothing left for unattended work to spend, which is worth naming
-          as its own state rather than leaving as a bar that merely looks empty. */}
-      <p className="text-[11px] text-muted-foreground">
-        {enabled ? (
-          <>
-            ✅ Autonomous AI <em>enabled</em> <small className="text-muted-foreground/70">move slider to the left to disable</small>
-          </>
-        ) : (
-          <>
-            ❌ Autonomous AI <em>disabled</em> <small className="text-muted-foreground/70">move slider to the right to enable</small>
-          </>
-        )}
-      </p>
-      {/* Easy to drag past without meaning to, since nothing else on the bar stops at the boundary
-          — the fill only stops there when the account is spending exactly on pace. */}
-      {pastBoundary && (
-        <p className="text-[11px] text-warning">⚠️ Past today's boundary — autonomous work may spend faster than the week's pace allows.</p>
-      )}
       {/* The legend (#960 Edit): what the two shades of the bar and its line mean. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm', TONE_FILL[tone])} aria-hidden />}>Used</LegendItem>
@@ -184,7 +163,7 @@ function WeekBar({
         <LegendItem swatch={<span className="h-2 w-0.5 bg-foreground" aria-hidden />}>
           <Tooltip>
             <TooltipTrigger render={<span className="inline-flex cursor-default items-center gap-0.5" />}>
-              Daily boundary
+              Daily budget
               <CircleHelp className="h-3 w-3" aria-hidden />
             </TooltipTrigger>
             <TooltipContent className="max-w-64">
@@ -193,6 +172,33 @@ function WeekBar({
             </TooltipContent>
           </Tooltip>
         </LegendItem>
+      </div>
+      {/* Whether the knob has left any room to project (#960 Edit): dragged all the way down onto
+          the used fill, there is nothing left for unattended work to spend, which is worth naming
+          as its own state rather than leaving as a bar that merely looks empty. The warning sits on
+          the same row, on the right — easy to drag past the budget without meaning to, since
+          nothing else on the bar stops there, and it belongs beside the state it qualifies. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+        <span>
+          {enabled ? (
+            <>
+              ✅ Autonomous AI <em>enabled</em> <small className="text-muted-foreground/70">move slider to the left to disable</small>
+            </>
+          ) : (
+            <>
+              ❌ Autonomous AI <em>disabled</em> <small className="text-muted-foreground/70">move slider to the right to enable</small>
+            </>
+          )}
+        </span>
+        {pastBoundary && (
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex cursor-default items-center gap-0.5 text-warning" />}>
+              ⚠️ Past daily budget
+              <CircleHelp className="h-3 w-3" aria-hidden />
+            </TooltipTrigger>
+            <TooltipContent>Autonomous AI will spend tokens faster than the week's pace allows</TooltipContent>
+          </Tooltip>
+        )}
       </div>
     </div>
   )
@@ -270,9 +276,9 @@ export function Quota() {
   // A retained reading can now outlive several failures (#960), and an undated bar claims to be now.
   const staleAt = view?.unavailable !== undefined && view.windows.length > 0 ? view.readAt : undefined
   const week = view ? weekWindow(view.windows) : undefined
-  // Everything else: the session window, and a model's own week. Never the account week, which
-  // the bar above already is.
-  const others = view?.windows.filter(w => w !== week) ?? []
+  // Every window, in the order Claude Code reports them — the session, the account's own week
+  // (also drawn as the bar above, but worth its own line here too), and a model's own week.
+  const others = view?.windows ?? []
 
   return (
     <Card>

@@ -111,8 +111,8 @@ describe('Quota (#960)', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/Couldn't parse quota/)
     expect(screen.getByRole('alert').textContent).toMatch(/Jul 28, 9pm \(Europe\/Berlin\)/)
     expect(screen.queryByRole('img')).toBeNull()
-    // No plain week row standing in for the bar; the session line is data, not fallback, and stays.
-    expect(screen.queryByText('Current week (all models)')).toBeNull()
+    // The alert stands on its own rather than being quietly swapped for a plain figure — but the
+    // windows Claude Code did report are still data, not a fallback, and still list.
     expect(screen.getByText('Current session')).toBeTruthy()
     expect(screen.queryByLabelText('Unattended work stops at')).toBeNull()
   })
@@ -218,16 +218,25 @@ describe('Quota (#960)', () => {
     expect(screen.getByText(/move slider to the right to enable/)).toBeTruthy()
   })
 
-  test('warns once the knob is dragged past today\'s boundary (#960 Edit)', () => {
+  test('warns once the knob is dragged past the daily budget (#960 Edit)', () => {
     view = reading(20, 0) // limit sits exactly on the boundary: not past it yet
     render(<Quota />)
-    expect(screen.queryByText(/Past today's boundary/)).toBeNull()
+    expect(screen.queryByText(/Past daily budget/)).toBeNull()
   })
 
-  test('a positive offset always reads as past the boundary, since the limit only moves that way (#960 Edit)', () => {
+  test('a positive offset always reads as past the daily budget, since the limit only moves that way (#960 Edit)', () => {
     view = reading(20, 15) // limit 57% + 15 = 72%, past the 57% boundary
     render(<Quota />)
-    expect(screen.getByText(/Past today's boundary/)).toBeTruthy()
+    expect(screen.getByText(/Past daily budget/)).toBeTruthy()
+  })
+
+  test('the warning sits beside the enabled/disabled status, not stacked below it (#960 Edit)', () => {
+    view = reading(20, 15)
+    const { container } = render(<Quota />)
+    const em = container.querySelector('em')
+    const row = em?.closest('div')
+    expect(row?.textContent).toMatch(/enabled/)
+    expect(row?.querySelector('svg.lucide-circle-help')).toBeTruthy()
   })
 
   test('one bar, not two: the handle is drawn on the week track itself (#960 Edit)', () => {
@@ -248,12 +257,27 @@ describe('Quota (#960)', () => {
     expect(screen.queryByText('Under the line, with room to spend.')).toBeNull()
   })
 
-  test('the legend names the projected segment and gives the boundary a tooltip (#960 Edit)', () => {
+  test('the legend names the projected segment and gives the daily budget a tooltip (#960 Edit)', () => {
     view = reading(20)
     const { container } = render(<Quota />)
     expect(screen.getByText('Autonomous AI usage (projected)')).toBeTruthy()
-    expect(screen.getByText('Daily boundary')).toBeTruthy()
+    expect(screen.getByText('Daily budget')).toBeTruthy()
     expect(container.querySelector('svg.lucide-circle-help')).toBeTruthy()
+  })
+
+  test('the reset tooltip trigger carries no underline (#960 Edit)', () => {
+    view = reading(20)
+    render(<Quota />)
+    const trigger = screen.getByText(/^resets /)
+    expect(trigger.className).not.toMatch(/underline/)
+  })
+
+  test('every window Claude Code reports gets its own line, including the account\'s own week (#960 Edit)', () => {
+    view = reading(20)
+    view.windows.push({ label: 'Current week (Fable)', kind: 'week-model', percentUsed: 12, resetsAtText: 'Jul 28 at 7pm' })
+    render(<Quota />)
+    const rows = screen.getAllByText(/Current (session|week)/).map(el => el.textContent)
+    expect(rows).toEqual(['Current week (all models)', 'Current session', 'Current week (Fable)'])
   })
 
   test('the roadmap-spend toggle is gone from this panel (#960 Edit)', () => {

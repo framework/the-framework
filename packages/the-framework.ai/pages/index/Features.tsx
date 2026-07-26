@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { cardStyle, SectionHead, sectionStyle, WipBadge } from './ui'
+import { cardStyle, SectionHead, sectionStyle } from './ui'
 
 const featureCardStyle = {
   ...cardStyle,
@@ -43,10 +43,7 @@ export function Features() {
         </div>
         <div style={{ ...featureCardStyle, gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Claude Code Web</h3>
-          <FeatureText>
-            <WipBadge style={{ marginRight: 3, display: 'inline-block' }} /> Orchestrate agents via Claude Code Web for
-            0% local CPU usage.
-          </FeatureText>
+          <FeatureText>Orchestrate agents via Claude Code Web for 0% local CPU usage.</FeatureText>
         </div>
         <div style={{ ...featureCardStyle, gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Swarm of local computers</h3>

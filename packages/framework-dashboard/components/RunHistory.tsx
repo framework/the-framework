@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, ChevronDown, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2 } from 'lucide-react'
+import { Plus, ChevronDown, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Ticket } from 'lucide-react'
 import type { RunMeta, RunStatus, RecentRun, ProjectSummary } from '@gemstack/the-framework'
 import { AGENT_LABELS, agentForDriver } from '@gemstack/the-framework/client'
 import { Button, buttonVariants } from './ui/button.js'
@@ -62,6 +62,8 @@ export function RunHistory({
   onDashboard = () => {},
   onSelectProject = () => {},
   onSettings = () => {},
+  onTickets,
+  ticketsActive = false,
   interventionCount = 0,
 }: {
   projectId: string | null
@@ -77,6 +79,12 @@ export function RunHistory({
   onSelectProject?: (projectId: string) => void
   /** Open Settings, from the sidebar footer where the navbar gear moved. */
   onSettings?: () => void
+  /** Open the cross-project Tickets view (#1144). Absent means the row is not offered at all —
+   *  the interim for a surface (like the relay) with nothing to route it to. */
+  onTickets?: (() => void) | undefined
+  /** Whether the Tickets view is the current one (list or a ticket's own page), so the row can
+   *  carry the active fill — and so Overview does not also claim it (both share `projectId === null`). */
+  ticketsActive?: boolean
   /** Human Queue count, shown on the Overview item and the picker (#632). */
   interventionCount?: number
   /** Cross-project recents for the Overview (no project selected): every project's sessions pooled. */
@@ -179,7 +187,10 @@ export function RunHistory({
         />
         {/* Overview: the way home, its own nav item directly under New and above the session list,
             more prominent than a menu row. Only this — the current view — carries the active fill. */}
-        <OverviewButton active={projectId === null} count={interventionCount} onClick={onDashboard} />
+        <OverviewButton active={projectId === null && !ticketsActive} count={interventionCount} onClick={onDashboard} />
+        {/* Tickets: every project's backlog, one section each (#1144), not a rail tab — below
+            Overview, since it is the same kind of cross-project destination. */}
+        {onTickets && <TicketsButton active={ticketsActive} onClick={onTickets} />}
         {/* Projects: its own nav item under Overview, same row style, expanding to an indented list
             of projects (not a dropdown). Selecting one navigates into it — the interim, until the
             filter-vs-navigate call is made. */}
@@ -257,6 +268,25 @@ export function RunHistory({
         </div>
       </SidebarFooter>
     </Sidebar>
+  )
+}
+
+// Tickets: a project's backlog as its own nav item (#1144), same row style as Overview. Only
+// rendered once a project is selected — there is nothing to open otherwise.
+function TicketsButton({ active, onClick }: { active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className={cn(
+        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+        active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-foreground hover:bg-sidebar-accent/60',
+      )}
+    >
+      <Ticket className="h-4 w-4 shrink-0" aria-hidden />
+      <span className="flex-1 text-left">Tickets</span>
+    </button>
   )
 }
 

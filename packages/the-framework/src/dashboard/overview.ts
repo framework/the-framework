@@ -83,6 +83,37 @@ export async function buildRecentRuns(projects: ProjectSummary[], deps: RecentRu
   return all.slice(0, RECENT_RUNS_LIMIT)
 }
 
+/** One project's tickets, for the cross-project Tickets page (#1144). */
+export interface ProjectTickets {
+  projectId: string
+  projectName: string
+  tickets: WorkspaceTicket[]
+}
+
+/** Injectable reader so {@link collectAllTickets} is unit-testable off disk. */
+export interface AllTicketsDeps {
+  tickets?: (cwd: string) => Promise<WorkspaceTicket[]>
+}
+
+/**
+ * Every registered project's tickets, one list per project (#1144) — the cross-project Tickets
+ * page. Unlike {@link buildHotTickets} this does not pool or bucket: a ticket belongs to one
+ * project, and the page's whole point is reading each project's backlog (and reaching its own
+ * import/update) rather than one merged feed. Kept in registry order, project included even when
+ * its list comes back empty, so import stays reachable there — the same read failing simply
+ * leaves that project's list empty rather than dropping the section.
+ */
+export async function collectAllTickets(projects: ProjectSummary[], deps: AllTicketsDeps = {}): Promise<ProjectTickets[]> {
+  const readT = deps.tickets ?? readTickets
+  return Promise.all(
+    projects.map(async project => ({
+      projectId: project.id,
+      projectName: project.name,
+      tickets: await readT(project.path).catch((): WorkspaceTicket[] => []),
+    })),
+  )
+}
+
 /** Which lane of the "hot tickets" overview (#1139) a ticket sits in. */
 export type HotBucket = 'in-progress' | 'ai-queue' | 'high-priority'
 

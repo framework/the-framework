@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ChoiceRequest, LogEntry, WorkspaceDoc, WorkspaceTicket } from '@gemstack/the-framework'
+import type { ChoiceRequest, LogEntry, WorkspaceDoc } from '@gemstack/the-framework'
 import type { LoopStatus } from '@gemstack/the-framework/client'
 import { LoopStatusCard } from './LoopStatusCard.js'
 import { DocsPanel } from './DocsPanel.js'
@@ -8,15 +8,14 @@ import { ChoicesRail } from './ChoicesRail.js'
 import { ViewsRail } from './ViewsRail.js'
 import { FileTree } from './FileTree.js'
 import { BrowserPanel } from './BrowserPanel.js'
-import { TicketsPanel } from './TicketsPanel.js'
 import type { AgentView } from '../lib/live-state.js'
 import { Badge } from './ui/badge.js'
 import { Button } from './ui/button.js'
 import { cn } from '../lib/utils.js'
 import { usePolled } from '../lib/use-async.js'
-import { onDocs, onProjectLog, onTickets } from '../server/reads.telefunc.js'
+import { onDocs, onProjectLog } from '../server/reads.telefunc.js'
 
-type Tab = 'files' | 'choices' | 'views' | 'browser' | 'tickets' | 'docs' | 'log'
+type Tab = 'files' | 'choices' | 'views' | 'browser' | 'docs' | 'log'
 
 // The right sidebar (#314 third rail): the interactive choice gates the run parks on
 // (#440), the ad-hoc markdown views the agent pushes (#441), the surfaced docs (PLAN/TODO),
@@ -34,7 +33,6 @@ export function RightRail({
   hasBrowser = false,
   target,
   loop,
-  onRunStarted,
 }: {
   projectId: string | null
   /** The selected run: resolves a choice pick's gate (#749) and scopes the tree to its worktree (#815). */
@@ -55,19 +53,16 @@ export function RightRail({
    *  of its own: it is a standing fact about the run, not a panel you browse, so it stays readable
    *  whichever tab is open. Null for a run that never looped (a prototype scope, or a plain prompt). */
   loop?: LoopStatus | null | undefined
-  /** Told when a panel starts a session (the tickets import, #948), so the shell shows it. */
-  onRunStarted?: ((intent: string, runId?: string) => void) | undefined
 }) {
-  // The three content panels are read here rather than each polling for itself: the rail has to
+  // The two content panels are read here rather than each polling for itself: the rail has to
   // know whether they have anything before it can decide which tabs to offer, and whether to be
   // there at all (#1146). One read each, passed down; the panels render what they are given.
+  // Tickets used to be a third one (#697) — now its own full page (#1144), not a rail read.
   const { value: docs, loaded: docsLoaded } = usePolled<WorkspaceDoc[]>(projectId ? () => onDocs(projectId) : null, [], 4000, [projectId])
-  const { value: tickets, loaded: ticketsLoaded } = usePolled<WorkspaceTicket[]>(projectId ? () => onTickets(projectId) : null, [], 10_000, [projectId])
   const { value: logs, loaded: logsLoaded } = usePolled<LogEntry[]>(projectId ? () => onProjectLog(projectId) : null, [], 10_000, [projectId])
   // Hidden only once we KNOW it is empty: while the first read is out, the tab stays, so switching
   // projects does not blink the rail out and back in.
   const hasDocs = !docsLoaded || docs.length > 0
-  const hasTickets = !ticketsLoaded || tickets.length > 0
   const hasLog = !logsLoaded || logs.length > 0
 
   const [tab, setTab] = useState<Tab>('docs')
@@ -111,7 +106,6 @@ export function RightRail({
     ...(hasViews ? ['views' as const] : []),
     // Only when the run actually has one (#813) — a dead tab teaches people the preview is broken.
     ...(showBrowser && runId ? ['browser' as const] : []),
-    ...(hasTickets ? ['tickets' as const] : []),
     ...(hasDocs ? ['docs' as const] : []),
     ...(hasLog ? ['log' as const] : []),
   ]
@@ -128,11 +122,9 @@ export function RightRail({
           ? 'Views'
           : t === 'browser'
             ? 'Browser'
-            : t === 'tickets'
-              ? 'Tickets'
-              : t === 'docs'
-                ? 'Docs'
-                : 'Log'
+            : t === 'docs'
+              ? 'Docs'
+              : 'Log'
   // The Files badge counts only selected files, not whole-repo entries (#661): the shared context
   // set also holds project paths (from the Start form's repo checkboxes), which aren't in `files`.
   const selectedFiles = files.filter(f => context.has(f)).length
@@ -175,8 +167,6 @@ export function RightRail({
           <ViewsRail views={views} />
         ) : active === 'browser' && showBrowser && runId ? (
           <BrowserPanel projectId={projectId} runId={runId} />
-        ) : active === 'tickets' ? (
-          <TicketsPanel projectId={projectId} tickets={tickets} loaded={ticketsLoaded} onRunStarted={onRunStarted} />
         ) : active === 'log' ? (
           <ProjectLogPanel logs={logs} loaded={logsLoaded} />
         ) : (

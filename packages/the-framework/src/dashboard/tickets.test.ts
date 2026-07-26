@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readTickets, readTicketsMeta, hasTickets } from './tickets.js'
+import { readTickets, readTicket, readTicketsMeta, hasTickets } from './tickets.js'
 
 async function repo(files: Record<string, string> = {}): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), 'tf-tickets-'))
@@ -35,16 +35,91 @@ test('readTickets reads the format: keys above the title, then the TLDR (#697)',
       'Because.',
     ].join('\n'),
   })
-  assert.deepEqual(await readTickets(cwd), [
-    {
-      file: '2026-07-20_do-the-thing.md',
-      title: 'Do the thing',
-      summary: 'The thing is not done.',
-      priority: 'high',
-      spiked: false,
-      planned: false,
-    },
-  ])
+  const [ticket, ...rest] = await readTickets(cwd)
+  assert.equal(rest.length, 0)
+  // `date` comes from the filename (#1144/#1265), so it is exact rather than a moment in the test
+  // run to merely check is parseable.
+  assert.deepEqual(ticket, {
+    file: '2026-07-20_do-the-thing.md',
+    title: 'Do the thing',
+    summary: 'The thing is not done.',
+    status: 'open',
+    priority: 'high',
+    topics: ['dx'],
+    date: '2026-07-20T00:00:00.000Z',
+    spiked: false,
+    planned: false,
+  })
+})
+
+test('readTickets reads the GitHub: link, split into its label and URL (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': 'GitHub: [#42](https://github.com/org/repo/issues/42)\n\n# Thing\n',
+  })
+  const [ticket] = await readTickets(cwd)
+  assert.deepEqual(ticket?.github, { label: '#42', url: 'https://github.com/org/repo/issues/42' })
+})
+
+test('readTickets leaves github off a ticket that names none (#1144/#1265)', async () => {
+  const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n' })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.github, undefined)
+})
+
+test('readTickets dates a ticket by its filename, not its mtime, when the filename carries one (#1144/#1265)', async () => {
+  const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n' })
+  // Editing the file bumps its mtime well past the filename's date; the filename still wins.
+  await new Promise(r => setTimeout(r, 1100))
+  await writeFile(join(cwd, 'tickets', '2026-07-20_thing.md'), '# Thing, edited\n', 'utf8')
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.date, '2026-07-20T00:00:00.000Z')
+})
+
+test('readTickets falls back to mtime when the filename carries no date (#1144/#1265)', async () => {
+  const cwd = await repo({ 'no-date-prefix.md': '# Thing\n' })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(Number.isNaN(Date.parse(ticket?.date as string)), false)
+  assert.notEqual(ticket?.date, undefined)
+})
+
+test('readTickets reads Status: closed, and defaults to open when the key is absent (#1144/#1230)', async () => {
+  const cwd = await repo({
+    'a-closed.md': 'Status: closed\n\n# Closed one\n',
+    'b-open.md': 'Status: open\n\n# Open one\n',
+    'c-unspecified.md': '# Unspecified one\n',
+  })
+  const byTitle = new Map((await readTickets(cwd)).map(t => [t.title, t.status]))
+  assert.equal(byTitle.get('Closed one'), 'closed')
+  assert.equal(byTitle.get('Open one'), 'open')
+  assert.equal(byTitle.get('Unspecified one'), 'open')
+})
+
+test('readTickets treats an unrecognised Status: value as open, not a throw (#1144/#1230)', async () => {
+  const cwd = await repo({ 'a.md': 'Status: archived\n\n# Thing\n' })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.status, 'open')
+})
+
+test('readTickets parses a multi-topic list, brackets and all (#1144)', async () => {
+  const cwd = await repo({ '2026-07-20_thing.md': 'topics: [dx, ui, docs]\n\n# Thing\n' })
+  const [ticket] = await readTickets(cwd)
+  assert.deepEqual(ticket?.topics, ['dx', 'ui', 'docs'])
+})
+
+test('readTickets leaves topics off a ticket that names none (#1144)', async () => {
+  const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n' })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.topics, undefined)
+})
+
+test('readTickets sorts newest-first by file mtime, not by filename (#1144)', async () => {
+  // Both alphabetically ahead of "z", so a filename sort would get this backwards.
+  const cwd = await repo({ 'a-older.md': '# Older\n', 'b-newer.md': '# Newer\n' })
+  // mtime has second resolution on some filesystems; a real gap keeps the order unambiguous.
+  await new Promise(r => setTimeout(r, 1100))
+  await writeFile(join(cwd, 'tickets', 'b-newer.md'), '# Newer\n', 'utf8')
+  const titles = (await readTickets(cwd)).map(t => t.title)
+  assert.deepEqual(titles, ['Newer', 'Older'])
 })
 
 // The tickets already in a repo are GitHub imports that predate the format, so nothing about
@@ -67,7 +142,9 @@ test('readTickets falls back to the filename when there is no heading (#697)', a
 
 test('readTickets decodes an escaped filename rather than throwing on a stray % (#697)', async () => {
   const cwd = await repo({ '1-100%_sure.md': 'prose\n', '2-a%20b.md': 'prose\n' })
-  const titles = (await readTickets(cwd)).map(t => t.title)
+  // Sorted before comparing: the list itself is newest-first by mtime (#1144), and these two
+  // are written close enough together that which one lands "newest" is not this test's concern.
+  const titles = (await readTickets(cwd)).map(t => t.title).sort()
   assert.deepEqual(titles, ['1-100% sure', '2-a b'])
 })
 
@@ -81,13 +158,55 @@ test('readTickets folds .spike.md and .plan.md into their ticket (#697)', async 
     '2026-07-21_other.md': '# Other\n\nprose\n',
   })
   const tickets = await readTickets(cwd)
+  // Sorted before comparing: the list itself is newest-first by mtime (#1144), and these two are
+  // written close enough together that which one lands "newest" is not this test's concern.
   assert.deepEqual(
-    tickets.map(t => [t.file, t.spiked, t.planned]),
+    tickets.map(t => [t.file, t.spiked, t.planned]).sort(),
     [
       ['2026-07-20_thing.md', true, true],
       ['2026-07-21_other.md', false, false],
     ],
   )
+})
+
+test('readTickets surfaces the effort a spike recorded (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': '# Thing\n',
+    '2026-07-20_thing.spike.md': '# [Spike] Thing\n\n- Human intervention effort: low\n- Token consumption: 2h\n',
+  })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.effort, 'low')
+})
+
+test('readTickets falls back to the plan\'s effort when the spike names none (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': '# Thing\n',
+    '2026-07-20_thing.spike.md': '# [Spike] Thing\n\nNo estimate here.\n',
+    '2026-07-20_thing.plan.md': '# [Plan] Thing\n\nEstimated effort: medium\n',
+  })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.effort, 'medium')
+})
+
+test('readTickets leaves effort off when no sibling names one (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_a.md': '# A\n',
+    '2026-07-20_b.md': '# B\n',
+    // The format doc's own section header ends in a bare colon — not a value.
+    '2026-07-20_b.spike.md': '# [Spike] B\n\nEstimated effort (for each way to implement it):\n',
+  })
+  const byFile = new Map((await readTickets(cwd)).map(t => [t.file, t.effort]))
+  assert.equal(byFile.get('2026-07-20_a.md'), undefined)
+  assert.equal(byFile.get('2026-07-20_b.md'), undefined)
+})
+
+test('readTicket surfaces the spike\'s effort too, like readTickets (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': '# Thing\n',
+    '2026-07-20_thing.spike.md': '# [Spike] Thing\n\nHuman intervention effort: trivial\n',
+  })
+  const ticket = await readTicket(cwd, '2026-07-20_thing.md')
+  assert.equal(ticket?.effort, 'trivial')
 })
 
 test('readTickets ignores non-markdown files (#697)', async () => {
@@ -110,6 +229,74 @@ test('hasTickets agrees with readTickets: a lone spike or plan is not a ticket (
 
 test('hasTickets ignores non-markdown files, like readTickets (#958)', async () => {
   assert.equal(await hasTickets(await repo({ 'notes.txt': 'nope' })), false)
+})
+
+// readTicket backs the detail page (#1144): the whole file, not just the head readTickets
+// caps at, plus the same metadata a list row shows.
+test('readTicket reads the whole file, metadata included (#1144)', async () => {
+  const body = ['priority: high', 'topics: [dx]', '', '# Do the thing', '', '## TLDR', '', 'The thing is not done.', '', 'More below the fold.'].join(
+    '\n',
+  )
+  const cwd = await repo({ '2026-07-20_do-the-thing.md': body })
+  const ticket = await readTicket(cwd, '2026-07-20_do-the-thing.md')
+  assert.deepEqual(ticket, {
+    file: '2026-07-20_do-the-thing.md',
+    title: 'Do the thing',
+    summary: 'The thing is not done.',
+    status: 'open',
+    priority: 'high',
+    topics: ['dx'],
+    date: '2026-07-20T00:00:00.000Z',
+    spiked: false,
+    planned: false,
+    content: body,
+  })
+})
+
+test('readTicket reads the GitHub: link too, like readTickets (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': 'GitHub: [#42](https://github.com/org/repo/issues/42)\n\n# Thing\n',
+  })
+  const ticket = await readTicket(cwd, '2026-07-20_thing.md')
+  assert.deepEqual(ticket?.github, { label: '#42', url: 'https://github.com/org/repo/issues/42' })
+})
+
+test('readTicket reads Status: closed too, like readTickets (#1144/#1230)', async () => {
+  const cwd = await repo({ 'a.md': 'Status: closed\n\n# Thing\n' })
+  const ticket = await readTicket(cwd, 'a.md')
+  assert.equal(ticket?.status, 'closed')
+})
+
+test('readTicket folds in its .spike.md/.plan.md siblings, like readTickets (#1144)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': '# Thing\n',
+    '2026-07-20_thing.spike.md': '# [Spike] Thing\n',
+    '2026-07-20_thing.plan.md': '# [Plan] Thing\n',
+  })
+  const ticket = await readTicket(cwd, '2026-07-20_thing.md')
+  assert.equal(ticket?.spiked, true)
+  assert.equal(ticket?.planned, true)
+})
+
+test('readTicket is null for a missing file (#1144)', async () => {
+  assert.equal(await readTicket(await repo(), 'nope.md'), null)
+})
+
+test('readTicket is null for a sibling file, which is not a ticket of its own (#1144)', async () => {
+  const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n', '2026-07-20_thing.spike.md': '# [Spike] Thing\n' })
+  assert.equal(await readTicket(cwd, '2026-07-20_thing.spike.md'), null)
+})
+
+test('readTicket refuses a path that escapes tickets/ (#1144)', async () => {
+  const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n' })
+  assert.equal(await readTicket(cwd, '../thing.md'), null)
+  assert.equal(await readTicket(cwd, '/etc/passwd.md'), null)
+  assert.equal(await readTicket(cwd, 'sub/thing.md'), null)
+})
+
+test('readTicket is null for meta.json, which is not a ticket either (#1144/#1208)', async () => {
+  const cwd = await repo({ 'meta.json': '{"lastImportedAt":"2026-07-20T10:00:00.000Z"}' })
+  assert.equal(await readTicket(cwd, 'meta.json'), null)
 })
 
 test('readTicketsMeta reads the last-import stamp (#1208)', async () => {

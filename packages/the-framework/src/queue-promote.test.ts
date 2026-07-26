@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { promoteQueue, landPinnedEntry } from './queue-promote.js'
+import { claimedQueueEntries, promoteQueue, landPinnedEntry } from './queue-promote.js'
 import type { GitRunner } from './project.js'
 
 // Pins the retry contract auto PM acts on: the callee flags the one retryable skip, so the
@@ -122,4 +122,50 @@ test('an entry removed by hand while the run worked is not resurrected (#1204)',
   const out = landPinnedEntry(checkout, BASE, 'entry a', BASE)
   assert.doesNotMatch(out, /entry b/)
   assert.match(out, /- \[x\] entry a/)
+})
+
+test('claimedQueueEntries: live and open-PR runs hold their entries, abandoned ones release them (#1253)', async () => {
+  const runs = [
+    { id: 'r1', status: 'running', queueEntry: 'entry a' },
+    { id: 'r2', status: 'done', queueEntry: 'entry b' }, // PR open: the web hand-off case
+    { id: 'r3', status: 'done', queueEntry: 'entry c' }, // PR closed unmerged: abandoned
+    { id: 'r4', status: 'failed', queueEntry: 'entry d' },
+    { id: 'r5', status: 'done', queueEntry: 'entry e' }, // no PR at all
+    { id: 'r6', status: 'done' }, // never pinned
+  ]
+  const claimed = await claimedQueueEntries('/repo', ['entry a', 'entry b', 'entry c', 'entry d', 'entry e'], {
+    runs: async () => runs,
+    pr: async (_path, run) => {
+      if (run.id === 'r2') return { value: { state: 'OPEN' }, pending: false }
+      if (run.id === 'r3') return { value: { state: 'CLOSED' }, pending: false }
+      return { value: undefined, pending: false }
+    },
+  })
+  assert.deepEqual(claimed.sort(), ['entry a', 'entry b'])
+})
+
+test('claimedQueueEntries: a PR lookup still warming counts as claimed, and only candidates are asked about (#1253)', async () => {
+  const asked: string[] = []
+  const claimed = await claimedQueueEntries('/repo', ['entry a'], {
+    runs: async () => [
+      { id: 'r1', status: 'done', queueEntry: 'entry a' },
+      { id: 'r2', status: 'done', queueEntry: 'entry z' }, // not a candidate: never looked up
+    ],
+    pr: async (_path, run) => {
+      asked.push(run.id)
+      return { value: undefined, pending: true }
+    },
+  })
+  assert.deepEqual(claimed, ['entry a'], 'slow answer = claimed, never handed out on a guess')
+  assert.deepEqual(asked, ['r1'])
+})
+
+test('claimedQueueEntries: an unreadable run list claims nothing rather than stalling the sweep (#1253)', async () => {
+  const claimed = await claimedQueueEntries('/repo', ['entry a'], {
+    runs: async () => {
+      throw new Error('no store')
+    },
+    pr: async () => ({ value: undefined, pending: false }),
+  })
+  assert.deepEqual(claimed, [])
 })

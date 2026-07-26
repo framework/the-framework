@@ -369,6 +369,15 @@ export interface AutoPmDeps {
    * still reads empty and the sweep would start the same work over again.
    */
   promote(project: AutoPmProject, run: { runId: string; entry?: string }): Promise<PromoteOutcome>
+  /**
+   * Which of `candidates` are claimed by a run outside this loop's memory (#1253): pinned to a
+   * run that is still live, or to a finished one whose PR is still open. The in-memory pin dies
+   * with the daemon, and a hands-off web run's local process ends at the hand-off while the cloud
+   * session still works the entry — both would otherwise put the same entry back on the market
+   * and fan it out to a second agent. Unreadable means unclaimed: the in-memory pins still guard
+   * the common case, and refusing the whole sweep over a `gh` hiccup would stall a healthy queue.
+   */
+  claimedEntries?(project: AutoPmProject, candidates: readonly string[]): Promise<readonly string[]>
   /** Progress line. */
   log(message: string): void
   /** Override the tick interval. */
@@ -426,8 +435,12 @@ export interface AutoPmLoop {
    * preference is consent to spend quota *unasked*, and a click is asking — so an on-demand sweep
    * runs with the preference off, and the master switch is the only gate it skips: every other
    * reason to stand down (live runs, cooldowns, the quota boundary, unticked routines) still holds.
+   *
+   * `drainOnly` narrows the sweep to working the queue (#1204): the drain row's Run now means
+   * "spin agents up on the queue", so a tick that would fall through to a rotation job (the queue
+   * is empty) says so instead of borrowing the click for work nobody asked for.
    */
-  tick(opts?: { onDemand?: boolean }): Promise<void>
+  tick(opts?: { onDemand?: boolean; drainOnly?: boolean }): Promise<void>
   /** What the last sweep decided, for the dashboard to show (#1161). */
   report(): AutoPmReport
   stop(): void
@@ -461,7 +474,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   let sweeping = false
   let stopped = false
 
-  const tick = async (opts?: { onDemand?: boolean }): Promise<void> => {
+  const tick = async (opts?: { onDemand?: boolean; drainOnly?: boolean }): Promise<void> => {
     if (stopped || sweeping) return
     sweeping = true
     let enabled = false
@@ -536,6 +549,12 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           note(project, false, decision.reason)
           continue
         }
+        // A drain-only sweep (#1204) works the queue or says why not — it never borrows the
+        // click for a rotation job the user did not ask for.
+        if (opts?.drainOnly && decision.mode !== 'drain') {
+          note(project, false, 'the queue is empty, so there is nothing to drain')
+          continue
+        }
         // Switching the draining routine off (#1209) stands the sweep down rather than falling
         // through to the rotation: the queue has work waiting, and answering "do not work it
         // automatically" by inventing more work is the opposite of what was asked.
@@ -581,7 +600,14 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           const assigned = new Set(
             (pending.get(project.id) ?? []).flatMap(run => (run.entry !== undefined ? [run.entry] : [])),
           )
-          const open = (entries ?? []).filter(entry => !assigned.has(entry))
+          const unassigned = (entries ?? []).filter(entry => !assigned.has(entry))
+          // The durable claims (#1253), asked only about entries the memory above did not already
+          // rule out: a run this loop never started (or has forgotten across a restart), or one
+          // whose local process ended at the web hand-off, may still own an entry via its meta.
+          const claimed = new Set(
+            unassigned.length ? await deps.claimedEntries?.(project, unassigned).catch(() => []) ?? [] : [],
+          )
+          const open = unassigned.filter(entry => !claimed.has(entry))
           if (!open.length) {
             note(project, false, 'every open queue entry is already being worked on')
             continue

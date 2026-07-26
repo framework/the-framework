@@ -200,6 +200,13 @@ export type FrameworkEvent =
    */
   | { kind: 'ticket'; path: string }
   /**
+   * The one queue entry this run was pinned to by the routine's drain (#1253). An event for the
+   * same reason `ticket` is: only an event reaches the run's meta, and the meta is what outlives
+   * the sweep's memory — the claim must survive a daemon restart, and a hands-off run whose local
+   * process ends at the hand-off while the cloud session still works the entry.
+   */
+  | { kind: 'queue-entry'; entry: string }
+  /**
    * What the end-of-session handoff actually did (#1102): pushed and/or opened a draft PR,
    * declined for a reason that is not a fault, or failed at one of the two steps.
    *

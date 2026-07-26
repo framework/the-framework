@@ -311,6 +311,8 @@ export interface CliOptions {
   via?: string | undefined
   /** `--ticket <path>` (#1117): the `tickets/<file>.md` this run is implementing. Set by the daemon when it starts a drain run, from the ticket its queue entry links to; recorded on the run's meta. */
   ticket?: string | undefined
+  /** `--queue-entry <text>` (#1253): the one queue entry a routine drain pinned this run to; recorded on the run's meta so the sweep's claim outlives the daemon and the local process. */
+  queueEntry?: string | undefined
   /** `--unattended`: no human is watching, so choice gates take the recommended option (#846). */
   unattended?: boolean
   scope: 'prototype' | 'full'
@@ -574,6 +576,9 @@ export function parseArgs(argv: string[]): CliOptions {
         break
       case '--ticket':
         opts.ticket = argv[++i]
+        break
+      case '--queue-entry':
+        opts.queueEntry = argv[++i]
         break
       case '--unattended':
         opts.unattended = true
@@ -1550,6 +1555,9 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // about why the run exists, not a state that changes, and folding it to meta is what lets the
   // Overview mark that ticket as being implemented right now.
   if (opts.ticket && isTicketPath(opts.ticket)) onEvent({ kind: 'ticket', path: opts.ticket })
+  // The queue entry a routine drain pinned this run to (#1253), same shape as the ticket above:
+  // once, at start, folded to meta — the durable half of the sweep's claim on the entry.
+  if (opts.queueEntry?.trim()) onEvent({ kind: 'queue-entry', entry: opts.queueEntry })
   // Wired now the journal exists: a bind resolved from a topic run's gate folds to meta (#1121).
   recordBind = projectId => onEvent({ kind: 'bind', projectId })
 

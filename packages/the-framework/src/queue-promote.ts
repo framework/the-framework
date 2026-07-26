@@ -162,3 +162,54 @@ export function landPinnedEntry(
   const separator = body === '' || body.endsWith('\n') ? '' : '\n'
   return `${body}${separator}${added.map(text => `- [ ] ${text}`).join('\n')}\n`
 }
+
+/** The little {@link claimedQueueEntries} needs to know about a run. Structurally a `RunMeta`. */
+export interface QueueClaimRun {
+  id: string
+  status: string
+  startedAt?: string
+  branch?: string
+  sessionName?: string
+  queueEntry?: string
+}
+
+/** Injectable seams for {@link claimedQueueEntries}: the runs on disk, and a run's PR. */
+export interface QueueClaimDeps {
+  runs(path: string): Promise<readonly QueueClaimRun[]>
+  pr(path: string, run: QueueClaimRun): Promise<{ value?: { state: string } | undefined; pending: boolean }>
+}
+
+/**
+ * Which of `candidates` are claimed by a run's meta rather than the sweep's memory (#1253).
+ *
+ * The in-memory pin dies with the daemon, and a hands-off web run's local process ends at the
+ * hand-off while the cloud session still works its entry — both put the entry back on the market
+ * and fan it out to a second agent. The meta is what survives: a live run claims its entry
+ * outright, and a finished one keeps the claim while its PR is open, because the work (including
+ * the entry's own check-off) travels in that PR and the merge is what closes the entry. A
+ * closed-unmerged PR releases the claim, as do failed and stopped runs: that work was abandoned,
+ * and the entry should be offered again. A PR lookup still warming counts as claimed — handing
+ * the entry out because the answer was slow is the exact double-assignment this prevents, and the
+ * next tick knows.
+ */
+export async function claimedQueueEntries(
+  path: string,
+  candidates: readonly string[],
+  deps: QueueClaimDeps,
+): Promise<string[]> {
+  const wanted = new Set(candidates)
+  const runs = (await deps.runs(path).catch((): QueueClaimRun[] => [])).filter(
+    run => run.queueEntry !== undefined && wanted.has(run.queueEntry),
+  )
+  const claimed = new Set<string>()
+  for (const run of runs) {
+    const entry = run.queueEntry
+    if (entry === undefined || claimed.has(entry)) continue
+    if (run.status === 'running') claimed.add(entry)
+    else if (run.status === 'done') {
+      const pr = await deps.pr(path, run).catch(() => ({ value: undefined, pending: false }))
+      if (pr.pending || pr.value?.state === 'OPEN') claimed.add(entry)
+    }
+  }
+  return [...claimed]
+}

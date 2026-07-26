@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { AutoPmJob, AutoPmReport, Preferences, ProjectSummary } from '@gemstack/the-framework'
-import { AUTO_PM_ROUTINES, AUTO_PM_DRAIN_JOB } from '@gemstack/the-framework/client'
+import { AUTO_PM_ROUTINES, AUTO_PM_DRAIN_JOB, AUTO_PM_MAINTENANCE_JOB } from '@gemstack/the-framework/client'
 import { hoverTooltip } from '../test-utils.js'
 
 // Everything the card reads goes through a lib module, so the mocks stop short of telefunc: an
@@ -55,6 +55,18 @@ describe('RoutineWork (#1159)', () => {
     render(<RoutineWork onRunStarted={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
     for (const job of AUTO_PM_ROUTINES) expect(screen.getByText(job.label ?? job.name)).toBeTruthy()
+  })
+
+  test('a routine that describes itself gets a line under its name; the rest are just their label', async () => {
+    render(<RoutineWork onRunStarted={() => {}} />)
+    await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
+    // Today that is the maintenance sweep alone, whose label does not say what it does.
+    expect(screen.getByText(AUTO_PM_MAINTENANCE_JOB.describe!)).toBeTruthy()
+    // A row without one is a single line: nothing else stands in as a subtitle.
+    for (const job of AUTO_PM_ROUTINES) {
+      const title = screen.getByText(routineName(job))
+      expect(title.parentElement!.childElementCount).toBe(job.describe ? 2 : 1)
+    }
   })
 
   test('Run now starts the routine prompt verbatim and selects the run it started (#1191)', async () => {

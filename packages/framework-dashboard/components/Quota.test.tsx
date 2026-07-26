@@ -371,7 +371,7 @@ describe('Quota (#960)', () => {
       screen.getByText("If your usage matches the quota boundary, then you're spending exactly what the week's pace allows."),
     ).toBeTruthy()
     expect(
-      screen.getByText('Fun fact: the quota boundary is shown exactly at the current time in the week usage bar graphic above.'),
+      screen.getByText('Fun fact: the quota boundary is shown exactly at the current time in the week usage bar above.'),
     ).toBeTruthy()
   })
 

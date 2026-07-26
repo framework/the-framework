@@ -169,8 +169,9 @@ export function RoutineWork({
               </p>
             )}
 
-            {/* The same `autoPm` preference the usage panel offers (#1161), which is the point: one
-                switch, shown where the schedule it governs is listed. */}
+            {/* The same `autoPm` preference the Settings page offers (#1161), which is the point:
+                one switch, shown where the schedule it governs is listed. (The usage panel's copy
+                of it is gone, #960 Edit.) */}
             <div className="border-t border-border pt-3">
               <div className="flex items-center justify-between gap-2">
                 <Tooltip>

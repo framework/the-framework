@@ -149,13 +149,37 @@ test('a safe model id is passed through', async () => {
   assert.equal(calls[0]?.model, 'claude-opus-5')
 })
 
-test('each prompt creates its own cloud session, since one cannot be continued', async () => {
+test('a run hands off ONCE, however many times the loop prompts', async () => {
+  // The regression this exists for: a run is not one prompt. The loop prompts per pass, and
+  // spawning a session each time turned one run into six of them racing on the same repo.
   const calls: RunPtyOptions[] = []
   const session = await driverWith(CREATED, calls).start({ cwd: '/repo' })
-  await session.prompt('first')
-  await session.prompt('second')
-  assert.equal(calls.length, 2)
-  assert.equal(calls[1]?.prompt, 'second')
+  const first = await session.prompt('build the thing')
+  const second = await session.prompt('now review it')
+  const third = await session.prompt('and again')
+  assert.equal(calls.length, 1, 'only the first prompt may spend a cloud session')
+  assert.equal(second.sessionId, first.sessionId)
+  assert.equal(third.sessionId, first.sessionId)
+})
+
+test('a later pass says the work is already in the cloud, rather than repeating the hand-off', async () => {
+  const session = await driverWith(CREATED).start({ cwd: '/repo' })
+  const first = await session.prompt('build the thing')
+  const second = await session.prompt('now review it')
+  assert.match(first.text, /^Handed off to Claude Code on the web/)
+  assert.match(second.text, /already handed off/i)
+  assert.match(second.text, /nothing further to do here/i)
+  // Both still point at the same place, so the run view links through either way.
+  assert.match(second.text, new RegExp(SESSION))
+})
+
+test('the cloud link event fires once, so the run view shows one session', async () => {
+  const events: DriverEvent[] = []
+  const session = await driverWith(CREATED).start({ cwd: '/repo', onEvent: e => events.push(e) })
+  await session.prompt('build the thing')
+  await session.prompt('now review it')
+  const links = events.filter(e => e.type === 'action' && e.label.startsWith('cloud '))
+  assert.equal(links.length, 1)
 })
 
 test('session ids are unique per session, so two runs never collide', async () => {

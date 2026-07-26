@@ -105,10 +105,17 @@ const TRUST_PROMPT = 'trustthisfolder'
 const SAFE_MODEL = /^[A-Za-z0-9._:-]+$/
 
 /**
- * One hand-off to Claude Code on the web. Each {@link prompt} creates its **own** cloud
- * session: the CLI can start a session and pull one back, but it cannot send a second
- * message to one, so there is no continuation to hold on to. A follow-up message therefore
- * starts a fresh cloud session rather than pretending to continue the first.
+ * One hand-off to Claude Code on the web — **exactly one, for the life of the session.**
+ *
+ * A run is not a single prompt. The loop prompts again for every pass (plan, build, review,
+ * the TODO backlog), so a driver that started a cloud session per prompt turned one run into
+ * six of them on the account. That is not a caveat, it is the wrong shape: the same task
+ * handed to six independent cloud VMs is six agents racing on one repo.
+ *
+ * So the first prompt hands off, and every later one reports the hand-off that already
+ * happened without spending another session. There is no continuation to offer either way —
+ * the CLI can start a cloud session and pull one back, but it cannot send a second message
+ * to one, so the honest answer to "keep going" is "this run is already over there".
  */
 export class CloudSession implements DriverSession {
   readonly id: string
@@ -117,6 +124,8 @@ export class CloudSession implements DriverSession {
   private readonly framing: string | undefined
   private readonly controllers = new Set<AbortController>()
   private disposed = false
+  /** The cloud session this run was handed to, once it exists. Set at most once. */
+  private handedOff: { url: string; sessionId: string } | undefined
 
   constructor(
     private readonly config: CloudDriverOptions,
@@ -133,6 +142,10 @@ export class CloudSession implements DriverSession {
     if (this.disposed) throw new Error('[framework] claude-web session disposed')
     const full = combineFraming(this.framing, opts.system, text)
     this.emit({ type: 'start', prompt: full })
+
+    // Already handed off: say so and spend nothing. This is the guard that keeps one run to
+    // one cloud session however many times the loop comes back round.
+    if (this.handedOff) return this.report(this.handedOff, 'again')
 
     const controller = new AbortController()
     this.controllers.add(controller)
@@ -193,17 +206,30 @@ export class CloudSession implements DriverSession {
 
     if (!found) throw new Error(`[framework] claude-web: no cloud session was created.\n${tail(output.replace(ANSI, ''))}`)
 
-    // `cloud <url>` mirrors the Actions driver's `run <url>`: the one event the run view
-    // reads to link through to where the work actually is.
-    this.emit({ type: 'action', label: `cloud ${found.url}` })
-    const summary = [
-      'Handed off to Claude Code on the web.',
-      '',
-      `View the session: ${found.url}`,
-      `Continue it here: claude --teleport ${found.sessionId}`,
-    ].join('\n')
-    this.emit({ type: 'result', text: summary, sessionId: found.sessionId })
-    return { text: summary, sessionId: found.sessionId }
+    this.handedOff = found
+    return this.report(found, 'first')
+  }
+
+  /**
+   * Report where this run went. The `first` hand-off emits the `cloud <url>` action the run
+   * view links through to — mirroring the Actions driver's `run <url>` — and a later pass
+   * says the work is already there, so a loop that keeps prompting cannot read the same turn
+   * as fresh progress and cannot spend a second session.
+   */
+  private report(session: { url: string; sessionId: string }, when: 'first' | 'again'): DriverTurn {
+    if (when === 'first') this.emit({ type: 'action', label: `cloud ${session.url}` })
+    const summary =
+      when === 'first'
+        ? ['Handed off to Claude Code on the web.', '', `View the session: ${session.url}`, `Continue it here: claude --teleport ${session.sessionId}`].join('\n')
+        : [
+            'This run was already handed off to Claude Code on the web, so there is nothing further to do here.',
+            'The work continues in that cloud session, which opens its own pull request.',
+            '',
+            `View the session: ${session.url}`,
+            `Continue it here: claude --teleport ${session.sessionId}`,
+          ].join('\n')
+    this.emit({ type: 'result', text: summary, sessionId: session.sessionId })
+    return { text: summary, sessionId: session.sessionId }
   }
 
   // No `readCode`: the cloud VM's workspace is not on this machine, and the branch it

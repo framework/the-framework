@@ -7,6 +7,8 @@ import { CopyButton } from './ui/copy-button.js'
 // streamed run: the session runs on Anthropic's infrastructure, does its own worktree and opens
 // its own PR, and there is no read-back API to follow it with — so the honest thing to show is
 // where the work went and how to reach it, rather than an empty feed that looks stalled.
+// That includes the questions it asks (#1225): a choice raised in the cloud session is answered
+// in the cloud session, because nothing carries it here and nothing could carry an answer back.
 // Renders nothing for any other target, so the run view can mount it unconditionally.
 export function CloudRunNotice({
   target,
@@ -22,7 +24,7 @@ export function CloudRunNotice({
       <Cloud className="h-3.5 w-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">
         {session
-          ? 'Running as a Claude Code cloud session. It opens its own pull request when it is done.'
+          ? 'Running as a Claude Code cloud session. It asks its questions and opens its own pull request over there, not here.'
           : 'Starting a Claude Code cloud session…'}
       </span>
       {session && (

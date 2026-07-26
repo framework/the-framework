@@ -30,6 +30,11 @@ describe('CloudRunNotice (#610)', () => {
     expect(screen.getByRole('status').textContent).toMatch(/opens its own pull request/i)
   })
 
+  test('says the session asks its questions over there, since none can be answered here (#1225)', () => {
+    render(<CloudRunNotice target="web" events={[handOff()]} />)
+    expect(screen.getByRole('status').textContent).toMatch(/asks its questions.*over there, not here/i)
+  })
+
   test('renders nothing for the other targets', () => {
     for (const target of ['local', 'actions', 'remote'] as const) {
       const { container } = render(<CloudRunNotice target={target} events={[handOff()]} />)

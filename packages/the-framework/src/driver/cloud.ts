@@ -37,6 +37,14 @@ import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverSta
  */
 export class CloudDriver implements Driver {
   readonly name = 'claude-web'
+  /**
+   * The run ends at the hand-off (#1225). A cloud session's replies stay in the cloud, so
+   * every later phase would be reading this driver's own summary of where the work went and
+   * treating it as the agent's answer: the checklist found no verdict in it and reported the
+   * app un-reviewable, and the backlog gate then asked the user which item to start next —
+   * a question from this machine about work that is no longer on it.
+   */
+  readonly handsOff = true
   constructor(private readonly opts: CloudDriverOptions = {}) {}
 
   start(opts: DriverStartOptions): Promise<DriverSession> {

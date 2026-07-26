@@ -224,7 +224,7 @@ function WeekBar({
                   of the weekly limit.
                 </p>
                 <p>If your usage matches the quota boundary, then you're spending exactly what the week's pace allows.</p>
-                <p>Fun fact: the quota boundary is shown exactly at the current time in the week usage bar graphic above.</p>
+                <p>Fun fact: the quota boundary is shown exactly at the current time in the week usage bar above.</p>
               </TooltipContent>
             </Tooltip>
           </LegendItem>

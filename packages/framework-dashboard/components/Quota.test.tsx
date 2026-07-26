@@ -9,6 +9,12 @@ async function openTooltip(trigger: HTMLElement) {
   await waitFor(() => expect(screen.getByRole('tooltip')).toBeTruthy())
 }
 
+/** The main figure's own trigger — its text is split across nodes (a coloured span for the
+ * duration), so an exact string match on `getByText` can't find it as one element. */
+function mainFigureTrigger(): HTMLElement {
+  return screen.getByText(/^resets /).closest('p')!.querySelector('.cursor-default')!
+}
+
 const updatePreferences = vi.hoisted(() => vi.fn())
 vi.mock('../lib/preferences.js', () => ({ updatePreferences }))
 
@@ -268,36 +274,47 @@ describe('Quota (#960)', () => {
     // 20% of the week used against a 57% (day 4/7) pace: 2.6 days behind, floored to 2d.
     view = reading(20)
     render(<Quota />)
-    expect(screen.getByText('Under-consuming: 2d')).toBeTruthy()
+    expect(mainFigureTrigger().textContent).toBe('Under-consuming: 2d')
     expect(screen.queryByText('20% used')).toBeNull()
     expect(screen.queryByText(/^-?\d+% used$/)).toBeNull()
+  })
+
+  test('the duration is bold and coloured to match the bar\'s own tone, the label plain (#960 Edit)', () => {
+    view = reading(20) // under-consuming: the bar's tone (and so the duration) reads green
+    render(<Quota />)
+    const trigger = mainFigureTrigger()
+    expect(trigger.className).not.toMatch(/font-medium/)
+    const duration = trigger.querySelector('span')!
+    expect(duration.textContent).toBe('2d')
+    expect(duration.className).toMatch(/font-medium/)
+    expect(duration.className).toMatch(/text-success/)
   })
 
   test('reads over-consuming (zero duration) exactly on the boundary\'s own pace', () => {
     view = reading((4 / 7) * 100)
     render(<Quota />)
-    expect(screen.getByText('Over-consuming: 0s')).toBeTruthy()
+    expect(mainFigureTrigger().textContent).toBe('Over-consuming: 0s')
   })
 
   test('reads over-consuming with a duration when ahead of pace', () => {
     // Boundary at day 1 of 7 (~14.3%), 60% used: well over three sevenths of the week ahead.
     view = readingAt(1, 60, 0)
     render(<Quota />)
-    expect(screen.getByText(/^Over-consuming: \d+d$/)).toBeTruthy()
+    expect(mainFigureTrigger().textContent).toMatch(/^Over-consuming: \d+d$/)
   })
 
-  test('the main figure has its own tooltip explaining what it measures (#960 Edit)', async () => {
+  test('the main figure has its own tooltip naming the deviation against the quota boundary (#960 Edit)', async () => {
     view = reading(20)
     render(<Quota />)
-    await openTooltip(screen.getByText('Under-consuming: 2d'))
-    expect(screen.getByText(/Over-consuming spends faster than the week's pace allows/)).toBeTruthy()
+    await openTooltip(mainFigureTrigger())
+    expect(screen.getByText(/You are 2 days below the quota boundary — you're under-consuming: you spend slower/)).toBeTruthy()
   })
 
-  test('the legend names the projected segment and gives the daily soft limit a tooltip (#960 Edit)', () => {
+  test('the legend names the projected segment and gives the quota boundary a tooltip (#960 Edit)', () => {
     view = reading(20)
     const { container } = render(<Quota />)
     expect(screen.getByText('Budget for Autonomous AI')).toBeTruthy()
-    expect(screen.getByText('Daily soft limit')).toBeTruthy()
+    expect(screen.getByText('Quota boundary')).toBeTruthy()
     expect(container.querySelector('svg.lucide-circle-help')).toBeTruthy()
   })
 

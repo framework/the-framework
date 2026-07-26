@@ -1,5 +1,14 @@
 import { describe, expect, test, vi } from 'vitest'
-import { formatAge, formatDate, formatDateTime, formatUntil, formatResetDay, formatResetTooltip, formatDuration } from './format-date.js'
+import {
+  formatAge,
+  formatDate,
+  formatDateTime,
+  formatUntil,
+  formatResetDay,
+  formatResetTooltip,
+  formatDuration,
+  formatDurationLong,
+} from './format-date.js'
 
 describe('format-date (#759)', () => {
   test('formats a real timestamp', () => {
@@ -92,6 +101,25 @@ describe('formatDuration (#960 Edit)', () => {
 
   test('a negative duration reads as its own magnitude, not below zero', () => {
     expect(formatDuration(-5 * S)).toBe('0s')
+  })
+})
+
+describe('formatDurationLong (#960 Edit)', () => {
+  const S = 1000
+  const M = 60 * S
+  const H = 60 * M
+  const D = 24 * H
+
+  test('spells out the unit, pluralized, for a sentence rather than a label', () => {
+    expect(formatDurationLong(1 * S)).toBe('1 second')
+    expect(formatDurationLong(2 * S)).toBe('2 seconds')
+    expect(formatDurationLong(1 * M)).toBe('1 minute')
+    expect(formatDurationLong(10 * M)).toBe('10 minutes')
+    expect(formatDurationLong(1 * H)).toBe('1 hour')
+    expect(formatDurationLong(2 * H)).toBe('2 hours')
+    expect(formatDurationLong(1 * D)).toBe('1 day')
+    expect(formatDurationLong(D + 2 * H)).toBe('1 day')
+    expect(formatDurationLong(2 * D)).toBe('2 days')
   })
 })
 

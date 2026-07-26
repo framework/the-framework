@@ -3,7 +3,7 @@ import { CircleHelp } from 'lucide-react'
 import type { DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '@gemstack/the-framework'
 import { MAX_SPEND_OFFSET } from '@gemstack/the-framework/client'
 import { useQuota } from '../lib/quota.js'
-import { formatRelative, formatResetDay, formatResetTooltip, formatDuration } from '../lib/format-date.js'
+import { formatRelative, formatResetDay, formatResetTooltip, formatDuration, formatDurationLong } from '../lib/format-date.js'
 import { updatePreferences } from '../lib/preferences.js'
 import { quotaTone, limitPercent, projectedRange, paceDeviationMs, type QuotaTone } from '../lib/quota-bar.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
@@ -25,6 +25,14 @@ const TONE_FILL: Record<QuotaTone, string> = {
   near: 'bg-info',
   over: 'bg-warning',
   full: 'bg-danger',
+}
+
+/** Same scale, as text — the pace-deviation duration is coloured to match the bar it is about. */
+const TONE_TEXT: Record<QuotaTone, string> = {
+  under: 'text-success',
+  near: 'text-info',
+  over: 'text-warning',
+  full: 'text-danger',
 }
 
 /** The account's own week: the window the bar is about. */
@@ -77,7 +85,8 @@ function WeekBar({
   // How far ahead of or behind the boundary's own pace consumption is, as a duration (#960 Edit):
   // "53% used" said almost nothing about whether today's pace was being kept; "2h" does.
   const deviationMs = paceDeviationMs(percentUsed, boundary.percent, boundary.resetsAt - boundary.startsAt)
-  const consuming = deviationMs >= 0 ? 'Over-consuming' : 'Under-consuming'
+  const over = deviationMs >= 0
+  const consuming = over ? 'Over-consuming' : 'Under-consuming'
 
   return (
     <div className="space-y-1.5">
@@ -136,13 +145,12 @@ function WeekBar({
       </div>
       <p className="text-xs text-muted-foreground">
         <Tooltip>
-          <TooltipTrigger render={<span className="cursor-default font-medium text-foreground" />}>
-            {consuming}: {formatDuration(Math.abs(deviationMs))}
+          <TooltipTrigger render={<span className="cursor-default" />}>
+            {consuming}: <span className={cn('font-medium', TONE_TEXT[tone])}>{formatDuration(Math.abs(deviationMs))}</span>
           </TooltipTrigger>
           <TooltipContent className="max-w-64">
-            How far ahead of or behind today's pace consumption is. Over-consuming spends faster than the week's pace allows;
-            under-consuming spends slower. {Math.round(percentUsed)}% of the week's allowance used against a{' '}
-            {Math.round(boundary.percent)}% pace.
+            You are {formatDurationLong(Math.abs(deviationMs))} {over ? 'above' : 'below'} the quota boundary — you're{' '}
+            {over ? 'over-consuming' : 'under-consuming'}: you spend {over ? 'faster' : 'slower'} than the week's pace allows.
           </TooltipContent>
         </Tooltip>
         {' · '}
@@ -183,12 +191,12 @@ function WeekBar({
           <LegendItem swatch={<span className="h-2 w-0.5 bg-foreground" aria-hidden />}>
             <Tooltip>
               <TooltipTrigger render={<span className="inline-flex cursor-default items-center gap-0.5" />}>
-                Daily soft limit
+                Quota boundary
                 <CircleHelp className="h-3 w-3" aria-hidden />
               </TooltipTrigger>
               <TooltipContent className="max-w-64">
                 Not a hard limit — just an indication of whether you're over- or under-consuming. It's calculated as a pro-rated share of
-                the weekly limit.
+                the weekly limit. If your usage matches the quota boundary, then you're spending exactly what the week's pace allows.
               </TooltipContent>
             </Tooltip>
           </LegendItem>

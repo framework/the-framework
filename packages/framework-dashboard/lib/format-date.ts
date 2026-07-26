@@ -108,6 +108,26 @@ export function formatDuration(ms: number): string {
   return `${Math.floor(hours / 24)}d`
 }
 
+/** `1 day` / `2 days`, singular only at exactly one. */
+function pluralize(n: number, unit: string): string {
+  return `${n} ${unit}${n === 1 ? '' : 's'}`
+}
+
+/**
+ * The same duration spelled out — "1 day" / "2 hours" / "10 minutes" / "2 seconds" (#960 Edit) —
+ * for a sentence (a tooltip explaining the figure {@link formatDuration} renders as "1d"), where an
+ * abbreviation reads as a label rather than as prose.
+ */
+export function formatDurationLong(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000))
+  if (seconds < 60) return pluralize(seconds, 'second')
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return pluralize(minutes, 'minute')
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return pluralize(hours, 'hour')
+  return pluralize(Math.floor(hours / 24), 'day')
+}
+
 /** `8:59pm`, lowercase and unspaced — the hour and minute the reset formatters share. */
 function timeOfDay(date: Date): string {
   return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(/\s+/g, '')

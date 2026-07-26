@@ -1,3 +1,4 @@
+Status: closed
 Priority: 2
 Topics: [enhancement, the-framework]
 GitHub: [#1117](https://github.com/gemstack-land/the-framework/issues/1117)

@@ -264,13 +264,17 @@ export function SessionActionsMenu({
                 <Play className="h-3.5 w-3.5 shrink-0" /> Serve
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuLabel>Serve which app</DropdownMenuLabel>
-                {targets.map(t => (
-                  <DropdownMenuItem key={t.id} disabled={busy} onClick={() => serve(t.id)}>
-                    <span className="truncate">{t.label}</span>
-                    <span className="ml-auto pl-3 text-xs text-muted-foreground">{t.script}</span>
-                  </DropdownMenuItem>
-                ))}
+                {/* Group parts need Menu.Group above them, or Base UI throws its error #31 and the
+                    boundary eats the whole view. Same list as PreviewBar's picker, same wrapper. */}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Serve which app</DropdownMenuLabel>
+                  {targets.map(t => (
+                    <DropdownMenuItem key={t.id} disabled={busy} onClick={() => serve(t.id)}>
+                      <span className="truncate">{t.label}</span>
+                      <span className="ml-auto pl-3 text-xs text-muted-foreground">{t.script}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           ) : (

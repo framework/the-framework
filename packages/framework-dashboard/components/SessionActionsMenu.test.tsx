@@ -111,3 +111,23 @@ describe('SessionActionsMenu (#toolbar-menu)', () => {
     await waitFor(() => expect(sendDeleteSession).toHaveBeenCalledWith('p1', 'run-1'))
   })
 })
+
+describe('the Serve submenu on a multi-app repo (#toolbar-menu)', () => {
+  test('renders its picker without blowing up the view', async () => {
+    // The label inside the submenu is a Menu group part; unwrapped it throws Base UI's error #31
+    // and the page boundary swallows the whole session view. This is the branch a monorepo hits
+    // as soon as the preview URL clears (e.g. right after Stop session).
+    onServeTargets.mockResolvedValue([
+      { id: 'root', label: 'gemstack', script: 'dev' },
+      { id: 'docs', label: 'docs', script: 'dev' },
+    ])
+    render(<SessionActionsMenu projectId="p1" runId="run-1" events={[]} onDeleted={vi.fn()} />)
+    openMenu()
+    // The row only becomes a submenu trigger once the async target list lands with more than one.
+    await waitFor(() => expect(screen.getByText('Serve').closest('[aria-haspopup]')).toBeTruthy())
+    fireEvent.click(screen.getByText('Serve'))
+    await waitFor(() => expect(screen.getByText('Serve which app')).toBeTruthy())
+    expect(screen.getByText('docs')).toBeTruthy()
+    onServeTargets.mockResolvedValue([])
+  })
+})

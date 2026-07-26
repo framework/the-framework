@@ -49,6 +49,14 @@ export interface BridgeEvent {
   receivedAt: string
 }
 
+/** What the page half of the bridge reports about itself, for diagnosis. */
+export interface BridgeHello {
+  version: string
+  sessionId?: string | undefined
+  note: string
+  at: string
+}
+
 /** A cloud session the extension should be watching. */
 export interface BridgeSession {
   id: string
@@ -64,6 +72,8 @@ export interface BridgeHandlers {
   recordEvent?: (event: BridgeEvent) => void
   /** Note that something reached the bridge, including when it was refused. */
   contact?: (route: string, status: number) => void
+  /** What the injected page script reports about itself. */
+  hello?: (hello: BridgeHello) => void
   /**
    * The cloud sessions worth watching, newest first. The extension cannot know a run started:
    * it only sees pages the user is already on, so without this the bridge works only when
@@ -101,6 +111,7 @@ export async function handleBridgeRequest(
   if (pathname === `${BRIDGE_PREFIX}/question`) return handleQuestion(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/sessions`) return handleSessions(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/events`) return handleEvents(req, res, handlers)
+  if (pathname === `${BRIDGE_PREFIX}/hello`) return handleHello(req, res, handlers)
   end(res, 404, 'not found')
 }
 
@@ -169,6 +180,31 @@ function validate(body: unknown, now: Date): BridgeQuestion | string {
     ...(typeof recommended === 'string' && recommended ? { recommended } : {}),
     receivedAt: now.toISOString(),
   }
+}
+
+/**
+ * `POST /_bridge/hello`: what the page half of the bridge is doing.
+ *
+ * Diagnosis kept needing a screenshot of a panel, which meant every wrong guess cost a round
+ * trip through a person. This lets the extension say for itself which version is injected and
+ * what its last scrape found, so the daemon can be asked instead.
+ */
+async function handleHello(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
+  if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
+  let body: unknown
+  try {
+    body = await readJsonBody(req, MAX_BODY)
+  } catch (err) {
+    return end(res, 400, (err as Error).message)
+  }
+  const raw = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>
+  handlers.hello?.({
+    version: typeof raw.version === 'string' ? raw.version.slice(0, 32) : 'unknown',
+    sessionId: typeof raw.sessionId === 'string' && SESSION_ID.test(raw.sessionId) ? raw.sessionId : undefined,
+    note: typeof raw.note === 'string' ? raw.note.slice(0, 300) : '',
+    at: (handlers.now ?? (() => new Date()))().toISOString(),
+  })
+  end(res, 204, '')
 }
 
 /** `POST /_bridge/events`: record a batch of transcript entries. */

@@ -22,6 +22,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch(err => sendResponse({ ok: false, reason: String(err?.message ?? err) }))
     return true
   }
+  if (message?.type === 'tf-hello') {
+    void post('/_bridge/hello', { version: message.version, sessionId: message.sessionId, note: message.note })
+      .then(sendResponse)
+      .catch(() => sendResponse({ ok: false }))
+    return true
+  }
   if (message?.type === 'tf-events') {
     void postEvents(message)
       .then(sendResponse)
@@ -57,6 +63,20 @@ async function report(question) {
     return { ok: false, error: `daemon answered ${res.status}: ${(await res.text()).slice(0, 200)}` }
   }
   lastSent.set(question.sessionId, fingerprint)
+  return { ok: true }
+}
+
+/** One authenticated POST to the daemon. */
+async function post(path, body) {
+  const { daemonUrl, token } = await chrome.storage.local.get(['daemonUrl', 'token'])
+  if (!token) return { ok: false, error: 'no token set' }
+  const base = (daemonUrl || DEFAULT_DAEMON).replace(/\/+$/, '')
+  const res = await fetch(`${base}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) return { ok: false, error: `daemon answered ${res.status}: ${(await res.text()).slice(0, 200)}` }
   return { ok: true }
 }
 

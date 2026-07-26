@@ -209,6 +209,7 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
         record: question => bridgeQuestions().record(question),
         contact: (route, status) => bridgeQuestions().recordContact(route, status),
         recordEvent: event => bridgeQuestions().recordEvent(event),
+        hello: hello => bridgeQuestions().recordHello(hello),
         ...(opts.bridgeSessions ? { sessions: opts.bridgeSessions } : {}),
       }
     : undefined

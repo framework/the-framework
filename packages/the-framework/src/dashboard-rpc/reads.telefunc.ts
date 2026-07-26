@@ -21,7 +21,7 @@ import { contextProjects, contextRemote, resolveProjectPath, resolveRunPath } fr
 import { relayOr } from './relay-run.js'
 import type { FrameworkEvent } from '../events.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
-import type { BridgeEvent, BridgeQuestion } from '../dashboard/bridge-endpoints.js'
+import type { BridgeEvent, BridgeHello, BridgeQuestion } from '../dashboard/bridge-endpoints.js'
 import type { BridgeContact } from '../dashboard/bridge-store.js'
 import { readDaemonToken, readPreferences, type Preferences } from '../registry.js'
 
@@ -380,9 +380,9 @@ export async function onBridgeQuestion(sessionId: string): Promise<BridgeQuestio
  * showing" cannot be diagnosed from the questions alone. A refused request at least proves
  * something is trying, and its status says which half is wrong.
  */
-export async function onBridgeStatus(): Promise<{ lastContact: BridgeContact | null; questions: number }> {
+export async function onBridgeStatus(): Promise<{ lastContact: BridgeContact | null; questions: number; page: BridgeHello | null }> {
   const store = bridgeQuestions()
-  return { lastContact: store.lastContact() ?? null, questions: store.list().length }
+  return { lastContact: store.lastContact() ?? null, questions: store.list().length, page: store.hello() ?? null }
 }
 
 /**

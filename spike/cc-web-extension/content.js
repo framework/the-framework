@@ -115,10 +115,28 @@ function pageText() {
  * mutation and a session's transcript is mostly stable, so sending it all each time would be a
  * few hundred kilobytes a second for no new information.
  */
+/**
+ * Tell the daemon what this injected script is and what it just saw.
+ *
+ * Diagnosis kept requiring a screenshot of the panel, so every wrong guess cost a round trip
+ * through a person. This says it directly: which version is running in the page, and what the
+ * last scrape found.
+ */
+function sayHello(sessionId, note) {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
+  const version = chrome.runtime.getManifest?.().version ?? '?'
+  try {
+    chrome.runtime.sendMessage({ type: 'tf-hello', sessionId, version, note }, () => void chrome.runtime.lastError)
+  } catch {
+    // Nothing to do; the next pass tries again.
+  }
+}
+
 function reportTranscript() {
   const sessionId = sessionIdFromUrl()
   if (!sessionId || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
   const blocks = transcript()
+  sayHello(sessionId, `articles ${deepQueryAll('article').length}, blocks ${blocks.length}, ${transcriptStatus}`)
   const events = blocks.filter(event => sentEvents.get(event.seq) !== event.text)
   if (!blocks.length) {
     transcriptStatus = 'no <article> blocks found'

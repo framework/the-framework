@@ -1,4 +1,4 @@
-import type { BridgeEvent, BridgeQuestion } from './bridge-endpoints.js'
+import type { BridgeEvent, BridgeHello, BridgeQuestion } from './bridge-endpoints.js'
 
 /** Most transcript entries kept per session, oldest dropped first. */
 export const MAX_SESSION_EVENTS = 300
@@ -35,6 +35,18 @@ export class BridgeQuestions {
    */
   recordContact(route: string, status: number): void {
     this.contact = { at: new Date().toISOString(), route, status }
+  }
+
+  private helloState: BridgeHello | undefined
+
+  /** What the injected page script last said about itself. */
+  recordHello(hello: BridgeHello): void {
+    this.helloState = hello
+  }
+
+  /** The page script's last report, or undefined if none has ever arrived. */
+  hello(): BridgeHello | undefined {
+    return this.helloState
   }
 
   /** The last contact, or undefined if nothing has ever reached the bridge. */

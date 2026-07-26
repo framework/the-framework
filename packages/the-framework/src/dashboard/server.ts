@@ -83,6 +83,11 @@ export interface DashboardOptions {
    */
   autoPm?: AutoPmReporter
   /**
+   * Fire an auto PM sweep now instead of waiting out the interval (#1210). Daemon-only for the
+   * same reason as {@link autoPm}: the loop runs in that process, so nowhere else has one.
+   */
+  autoPmSweep?: () => void
+  /**
    * Serve the new dashboard bundle (#405) from this directory — the prerendered Vike SPA
    * (`index.html` + `assets/**`). The daemon also mounts the dashboard's Telefunc surface
    * at `/_telefunc` (RPCs + the live-event Channel). Omit only for a broken install with
@@ -168,6 +173,7 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
     preferences: opts.preferences ?? registryPreferencesStore(),
     discord: opts.discord ?? registryDiscordCredentialsStore(),
     ...(opts.autoPm ? { autoPm: opts.autoPm } : {}),
+    ...(opts.autoPmSweep ? { autoPmSweep: opts.autoPmSweep } : {}),
     quota,
   })
 

@@ -75,6 +75,13 @@ export interface DashboardContext {
   discord?: DiscordCredentialsStore
   /** What auto PM last decided (#1161). Only the daemon runs the sweep, so only it wires this. */
   autoPm?: AutoPmReporter
+  /**
+   * Run an auto PM sweep now rather than at the next interval (#1210). Same reason `autoPm` is
+   * daemon-only: the loop lives in that process, so nowhere else has one to fire. Returns
+   * immediately — a sweep can start runs and take a while, and the caller only needs to know it
+   * was asked for.
+   */
+  autoPmSweep?: () => void
 }
 
 let instance: Telefunc | undefined

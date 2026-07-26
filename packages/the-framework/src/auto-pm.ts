@@ -82,10 +82,13 @@ export function quotaHeadroom(quota: QuotaBoundaryStatus | undefined): QuotaDeci
   if (reached) {
     // Name the line it actually stopped at (#960). With the slider moved, saying "the week's 43%"
     // when the run stopped at 63% would send someone looking for a bug that is a setting.
+    // The offset is rounded to one decimal for the sentence: a dragged slider stores integers,
+    // but the half-day default (#960 Edit) is 100/14 and fifteen digits of it would say less.
     const { limit, boundary } = quota
+    const offsetText = `${limit.offset > 0 ? '+' : ''}${Math.round(limit.offset * 10) / 10}`
     const line = limit.offset === 0
       ? `the week's ${Math.round(boundary.percent)}%`
-      : `your ${Math.round(limit.percent)}% limit (${limit.offset > 0 ? '+' : ''}${limit.offset} on the week's ${Math.round(boundary.percent)}%)`
+      : `your ${Math.round(limit.percent)}% limit (${offsetText} on the week's ${Math.round(boundary.percent)}%)`
     return {
       start: false,
       reason: `${reached.label} is ${Math.round(reached.percentUsed)}% used, at or past day ${boundary.day} of ${line}`,

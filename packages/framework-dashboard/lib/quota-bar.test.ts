@@ -64,8 +64,8 @@ test('the built-in labels are a fixed two-letter notation, not the machine local
 })
 
 describe('quotaTone', () => {
-  // The band exists so an account spending exactly as intended does not flip colour every day at
-  // the moment the boundary steps a seventh.
+  // The band exists so an account spending exactly as intended does not flicker between colours
+  // for the ordinary jitter of readings either side of the line.
   test('reads consumption against the boundary, with a band around it', () => {
     expect(quotaTone(10, 43)).toBe('under')
     expect(quotaTone(41, 43)).toBe('near')

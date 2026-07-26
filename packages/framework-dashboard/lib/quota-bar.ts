@@ -96,8 +96,9 @@ export function quotaTone(percentUsed: number, boundaryPercent: number, band = N
 
 /**
  * A day, as a share of the week (#960 Edit): how far above the boundary the limit has to drift
- * before it's worth flagging as eager rather than merely past it. The boundary itself steps a
- * whole day at a time, so a knob resting a few points ahead of it is normal, not eager.
+ * before it's worth flagging as eager rather than merely past it. The limit already rests half a
+ * day ahead by default, so a knob a few points past the boundary is the normal state — only one
+ * that clears a whole day's worth of pace is asking for faster-than-the-week on purpose.
  */
 export const ONE_DAY_PERCENT = 100 / 7
 

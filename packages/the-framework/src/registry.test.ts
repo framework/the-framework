@@ -23,6 +23,7 @@ import {
   REGISTRY_FILE,
   REGISTRY_FILE_MODE,
   MAX_SPEND_OFFSET,
+  MAX_AUTO_PM_CONCURRENCY,
   type Preferences,
   type ProjectRecord,
   type RegistryFs,
@@ -461,6 +462,29 @@ test('writePreferences round-trips and clamps the spend-limit slider (#960)', as
   await writePreferences({ autoSpendOffset: Number.NaN }, fs, ENV)
   assert.deepEqual(await readPreferences(fs, ENV), {})
   await writePreferences({ autoSpendOffset: '20' } as never, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), {})
+})
+
+test('writePreferences round-trips and clamps the concurrent-agents setting (#1204)', async () => {
+  const fs = memFs({ [FILE]: JSON.stringify([APP_A]) })
+  await writePreferences({ autoPmConcurrency: 4 }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 4 })
+
+  // Clamped to the same bound the browser control offers, and floored at one: zero agents is what
+  // the `autoPm` switch already spells, and a hand-edited nought would wedge the routine with the
+  // switch still reading on.
+  await writePreferences({ autoPmConcurrency: 9000 }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: MAX_AUTO_PM_CONCURRENCY })
+  await writePreferences({ autoPmConcurrency: 0 }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 1 })
+  await writePreferences({ autoPmConcurrency: -3 }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 1 })
+  // A whole number of agents, and nothing but a number at all.
+  await writePreferences({ autoPmConcurrency: 2.6 }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 3 })
+  await writePreferences({ autoPmConcurrency: Number.NaN }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), {})
+  await writePreferences({ autoPmConcurrency: '5' } as never, fs, ENV)
   assert.deepEqual(await readPreferences(fs, ENV), {})
 })
 

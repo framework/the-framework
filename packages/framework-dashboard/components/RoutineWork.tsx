@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import type { AutoPmJob, ProjectSummary } from '@gemstack/the-framework'
-import { AUTO_PM_ROUTINES, runOptionsFromPreferences } from '@gemstack/the-framework/client'
+import {
+  AUTO_PM_ROUTINES,
+  DEFAULT_AUTO_PM_CONCURRENCY,
+  MAX_AUTO_PM_CONCURRENCY,
+  runOptionsFromPreferences,
+} from '@gemstack/the-framework/client'
 import { CalendarClock, Play } from 'lucide-react'
 import { onProjects } from '../server/projects.telefunc.js'
 import { sendAutoPmSweep } from '../server/quota.telefunc.js'
@@ -66,6 +71,9 @@ export function RoutineWork({
     updatePreferences({
       autoPmOptOut: on ? optedOut.filter(name => name !== job.name) : [...optedOut, job.name],
     })
+  // How many agents the routine may keep going at once (#1204). Absent is the daemon's default
+  // rather than 1, so the number on screen is the number the sweep would use.
+  const concurrency = preferences.autoPmConcurrency ?? DEFAULT_AUTO_PM_CONCURRENCY
   // The countdown is the sweep's, and the sweep only reports once the daemon has run one. With
   // auto-run off, or before that first report, the box says what it does instead of when.
   const autoRunLabel =
@@ -208,8 +216,45 @@ export function RoutineWork({
                   </TooltipContent>
                 </Tooltip>
               </div>
+              {/* The concurrency setting (#1204). Beside the switch it qualifies, and worded as
+                  what it does rather than as a number: only draining fans out, because that is the
+                  routine that takes work off the queue one entry at a time. */}
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <Tooltip>
+                  <TooltipTrigger
+                    render={<label htmlFor="auto-pm-concurrency" className="cursor-pointer text-sm text-foreground" />}
+                  >
+                    Concurrent agents
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    How many agents the routine keeps going at once while there is queued work.
+                  </TooltipContent>
+                </Tooltip>
+                <input
+                  id="auto-pm-concurrency"
+                  type="number"
+                  min={1}
+                  max={MAX_AUTO_PM_CONCURRENCY}
+                  step={1}
+                  value={concurrency}
+                  onChange={event => {
+                    // Clamped here as well as in the store, because a number input still hands
+                    // back whatever was typed. An emptied box is mid-edit rather than a setting:
+                    // it has to be caught by hand, since `Number('')` is 0, not NaN, and the clamp
+                    // below would turn a cleared field into a saved 1.
+                    const typed = event.target.value.trim()
+                    if (!typed) return
+                    const next = Math.round(Number(typed))
+                    if (!Number.isFinite(next)) return
+                    updatePreferences({ autoPmConcurrency: Math.min(Math.max(next, 1), MAX_AUTO_PM_CONCURRENCY) })
+                  }}
+                  className="w-16 rounded border border-border bg-background px-2 py-1 text-sm text-foreground"
+                />
+              </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Only while nothing else is running and the week&apos;s allowance is not already spent.
+                {concurrency === 1
+                  ? "Only while nothing else is running and the week's allowance is not already spent."
+                  : `Keeps up to ${concurrency} agents going at once on queued work, and only while the week's allowance is not already spent.`}
               </p>
               {/* Auto-run on with every routine unticked is a schedule with nothing on it, and
                   from the countdown alone it looks like work is coming (#1209). */}

@@ -129,6 +129,10 @@ test('only POST reaches the question route, and ping proves reachability (#1237)
     assert.equal(get.status, 405)
     const ping = await fetch(`${s.url}${BRIDGE_PREFIX}/ping`, { headers: { authorization: `Bearer ${TOKEN}` } })
     assert.equal(ping.status, 200)
+    // The body is load-bearing, not decoration: the dashboard serves its SPA for any path it does
+    // not recognise, so a build with no bridge route also answers 200, with HTML. `ok` is how a
+    // client tells "the bridge is here" from "this dashboard is too old to have one".
+    assert.equal((await ping.text()).trim(), 'ok')
     // Ping is guarded too: reachability is not public.
     assert.equal((await fetch(`${s.url}${BRIDGE_PREFIX}/ping`)).status, 401)
   } finally {

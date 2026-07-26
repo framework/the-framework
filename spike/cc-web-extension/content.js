@@ -1,18 +1,55 @@
-// Spike for the Claude web bridge. Answers one question and nothing else: can an extension
-// running in the user's own session reliably find (a) the question a cloud agent is parked on
-// and (b) the box an answer would go into?
+// The page half of the Claude web bridge (#1237): find the question a cloud session is parked
+// on, and hand it to the service worker, which is the only part that talks to the daemon.
 //
-// It sends nothing anywhere. No host permissions are requested, so it cannot: the point is to
-// learn whether the DOM is readable before anyone designs a transport around it.
+// The token and the fetch deliberately live in the worker, not here. A content script shares a
+// tab with claude.ai, so nothing in this file should ever hold the secret that talks to a
+// daemon, and a fetch from here would carry the page's origin into a CORS check the daemon
+// refuses on purpose.
 //
-// Round 1 came back with the question plainly on screen but `"options"` absent from
-// document.body.innerText, and 32 <code> elements with zero <pre>. So two fixes: look at <code>
-// without requiring a <pre> parent, and stop assuming the top document's body is the whole page.
-// Shadow roots and iframes are both crossed here, and reported separately so the answer says
-// which one it was.
+// Four rounds of a read-only spike shaped the extraction below, and each failure is worth
+// keeping because each was a different obstacle:
+//   1. the page has <code> blocks with no <pre>, so a `pre code` selector examined nothing
+//   2. the message body sits behind shadow roots, so document.body.innerText never saw it
+//   3. fixed prefixes guessed an indentation nobody promised, so brace matching replaced them
+//   4. our own system prompt renders on the page, so its await-choices spec is a decoy
+//
+// `check.mjs` covers all four offline, in jsdom, with no browser and no live session.
 
 const POLL_MS = 2000
 const IS_TOP = window.top === window
+
+/** The cloud session this page is showing, which is the key the daemon joins runs on. */
+function sessionIdFromUrl() {
+  const match = /\/code\/(session_[A-Za-z0-9]+)/.exec(location.href)
+  return match ? match[1] : undefined
+}
+
+/**
+ * Hand a found question to the service worker, which owns the token and the fetch.
+ *
+ * Guarded on `chrome` existing so the offline harness (check.mjs) can run this file in jsdom,
+ * where there is no extension runtime. Failures are swallowed: a page that cannot reach the
+ * daemon must still show its panel rather than throw inside a DOM observer.
+ */
+function reportToDaemon(parsed) {
+  const sessionId = sessionIdFromUrl()
+  if (!sessionId || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
+  const question = {
+    sessionId,
+    title: String(parsed.title ?? '').slice(0, 500),
+    options: (parsed.options ?? [])
+      .map(o => (typeof o === 'string' ? { label: o } : { label: String(o?.label ?? ''), ...(o?.detail ? { detail: String(o.detail).slice(0, 500) } : {}) }))
+      .filter(o => o.label)
+      .slice(0, 20),
+    ...(parsed.recommended ? { recommended: String(parsed.recommended) } : {}),
+  }
+  if (!question.title || !question.options.length) return
+  try {
+    chrome.runtime.sendMessage({ type: 'tf-question', question }, () => void chrome.runtime.lastError)
+  } catch {
+    // The worker can be asleep or the context invalidated after a reload; the next change retries.
+  }
+}
 
 /** Every element matching a selector, including inside open shadow roots. */
 function deepQueryAll(selector, root = document, seen = new Set()) {
@@ -145,7 +182,9 @@ function findPendingChoice() {
     ? fromElements
     : extractChoices(deepText()).map(parsed => ({ via: 'page-text', parsed }))
   const real = candidates.filter(c => !isTemplate(c.parsed))
-  return real.at(-1) ?? undefined
+  const found = real.at(-1)
+  if (found) reportToDaemon(found.parsed)
+  return found ?? undefined
 }
 
 /** The box an answer would be typed into, if this ever becomes two-way. */
@@ -227,7 +266,7 @@ if (!IS_TOP) {
     }
   }
   send()
-  setInterval(send, POLL_MS)
+  watch(send)
 } else {
   let fromFrame
   window.addEventListener('message', e => {
@@ -315,5 +354,27 @@ if (!IS_TOP) {
   }
 
   render()
-  setInterval(render, POLL_MS)
+  watch(render)
+}
+
+/**
+ * Re-survey when the page actually changes, plus a slow heartbeat.
+ *
+ * Not a fast `setInterval`: this is designed to run in a background tab, and Chrome clamps timers
+ * in a tab hidden for more than about five minutes to roughly once a minute. The session's own
+ * stream mutates the DOM whenever anything happens, so an observer catches it immediately and the
+ * interval is only a backstop for a mutation we failed to see.
+ */
+function watch(run) {
+  let queued = false
+  const observer = new MutationObserver(() => {
+    if (queued) return
+    queued = true
+    setTimeout(() => {
+      queued = false
+      run()
+    }, 250)
+  })
+  observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true })
+  setInterval(run, 30 * POLL_MS)
 }

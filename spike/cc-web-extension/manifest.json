@@ -1,8 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "The Framework: Claude web bridge (spike)",
-  "version": "0.0.1",
-  "description": "Spike only. Reads a Claude Code cloud session page and reports what it can extract. Sends nothing anywhere.",
+  "name": "The Framework: Claude web bridge",
+  "version": "0.1.0",
+  "description": "Reports the question a Claude Code cloud session is parked on to your local The Framework dashboard.",
+  "permissions": ["storage"],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js" },
+  "options_page": "options.html",
   "content_scripts": [
     {
       "matches": ["https://claude.ai/*"],

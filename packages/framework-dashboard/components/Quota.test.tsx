@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { QuotaView } from '@gemstack/the-framework'
+
+/** Opens a Base UI tooltip in a test: hover alone leaves the popup unrendered until this settles. */
+async function openTooltip(trigger: HTMLElement) {
+  fireEvent.mouseEnter(trigger)
+  fireEvent.pointerEnter(trigger, { pointerType: 'mouse' })
+  await waitFor(() => expect(screen.getByRole('tooltip')).toBeTruthy())
+}
 
 const updatePreferences = vi.hoisted(() => vi.fn())
 vi.mock('../lib/preferences.js', () => ({ updatePreferences }))
@@ -58,22 +65,22 @@ describe('Quota (#960)', () => {
     expect(bar.getAttribute('aria-label')).toMatch(/day 4 of 7/)
   })
 
-  test('a week that began mid-day labels most of TU at the end of the bar, not the start (#960 Edit)', () => {
+  test('draws no day markers or separators on the bar (#960 Edit)', () => {
     view = reading(20)
     render(<Quota />)
-    // The reset falls on a Tuesday too, a week later, and the 19h right before it are more of
-    // Tuesday than the 5h sliver right after the week begins — so that is where the label goes,
-    // and each day still reads exactly once.
-    const labels = screen.getAllByText(/^[A-Z]{2}$/).map(el => el.textContent)
-    expect(labels).toEqual(['WE', 'TH', 'FR', 'SA', 'SU', 'MO', 'TU'])
+    // The axis is gone entirely — no two-letter weekday labels, no delimiter notches.
+    expect(screen.queryAllByText(/^[A-Z]{2}$/)).toHaveLength(0)
+    // Just the used and dimmed fills, and the boundary line — no day-delimiter notches between them.
+    expect(screen.getByRole('img').querySelectorAll(':scope > div')).toHaveLength(3)
   })
 
-  test('the session window is listed, but never as the bar', () => {
+  test('the session window is reachable through the bar\'s "show all limits" tooltip, never as its own bar', async () => {
     view = reading(20)
     render(<Quota />)
-    expect(screen.getByText('Current session')).toBeTruthy()
     // One bar, and it is the account's week.
     expect(screen.getAllByRole('img')).toHaveLength(1)
+    await openTooltip(screen.getByText('show all limits'))
+    expect(screen.getByText('Current session')).toBeTruthy()
   })
 
   test('the handle is valued on the bar\'s own scale, but stores an offset from the boundary (#960)', () => {
@@ -257,11 +264,11 @@ describe('Quota (#960)', () => {
     expect(screen.queryByText('Under the line, with room to spend.')).toBeNull()
   })
 
-  test('the legend names the projected segment and gives the daily budget a tooltip (#960 Edit)', () => {
+  test('the legend names the projected segment and gives the daily soft limit a tooltip (#960 Edit)', () => {
     view = reading(20)
     const { container } = render(<Quota />)
-    expect(screen.getByText('Autonomous AI usage (projected)')).toBeTruthy()
-    expect(screen.getByText('Daily budget')).toBeTruthy()
+    expect(screen.getByText('Budget for Autonomous AI')).toBeTruthy()
+    expect(screen.getByText('Daily soft limit')).toBeTruthy()
     expect(container.querySelector('svg.lucide-circle-help')).toBeTruthy()
   })
 
@@ -272,12 +279,35 @@ describe('Quota (#960)', () => {
     expect(trigger.className).not.toMatch(/underline/)
   })
 
-  test('every window Claude Code reports gets its own line, including the account\'s own week (#960 Edit)', () => {
+  test('every window Claude Code reports gets its own line, reachable through "show all limits" (#960 Edit)', async () => {
     view = reading(20)
     view.windows.push({ label: 'Current week (Fable)', kind: 'week-model', percentUsed: 12, resetsAtText: 'Jul 28 at 7pm' })
     render(<Quota />)
+    await openTooltip(screen.getByText('show all limits'))
     const rows = screen.getAllByText(/Current (session|week)/).map(el => el.textContent)
     expect(rows).toEqual(['Current week (all models)', 'Current session', 'Current week (Fable)'])
+  })
+
+  test('the legend and the enabled/disabled status share one row, the warning between them (#960 Edit)', () => {
+    view = reading(20, 15) // limit past the boundary, so the warning shows too
+    render(<Quota />)
+    const em = screen.getByText('enabled', { selector: 'em' })
+    const legend = screen.getByText('Used')
+    // Same row: the legend and the status line share the same immediate row container.
+    const row = em.closest('.justify-between')!
+    expect(legend.closest('.justify-between')).toBe(row)
+    // The warning sits to the left of the status, both within the row's own right-hand group.
+    const warning = screen.getByText('⚠️ Past daily budget')
+    const statusGroup = em.closest('span')!.parentElement!
+    expect(statusGroup.contains(warning)).toBe(true)
+    // DOCUMENT_POSITION_FOLLOWING (4) on the status span means the warning precedes it.
+    expect(warning.compareDocumentPosition(em.closest('span')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  test('"show all limits" is absent when there is nothing else to show', () => {
+    view = { ...reading(20), windows: reading(20).windows.filter(w => w.kind === 'week') }
+    render(<Quota />)
+    expect(screen.queryByText('show all limits')).toBeNull()
   })
 
   test('the roadmap-spend toggle is gone from this panel (#960 Edit)', () => {

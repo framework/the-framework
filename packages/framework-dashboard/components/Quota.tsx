@@ -5,7 +5,7 @@ import { MAX_SPEND_OFFSET } from '@gemstack/the-framework/client'
 import { useQuota } from '../lib/quota.js'
 import { formatRelative, formatResetDay, formatResetTooltip } from '../lib/format-date.js'
 import { updatePreferences } from '../lib/preferences.js'
-import { weekDays, quotaTone, limitPercent, projectedRange, type QuotaTone } from '../lib/quota-bar.js'
+import { quotaTone, limitPercent, projectedRange, type QuotaTone } from '../lib/quota-bar.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
@@ -57,18 +57,15 @@ function WeekBar({
   percentUsed,
   offset,
   onChangeOffset,
+  others,
 }: {
   status: QuotaBoundaryStatus
   percentUsed: number
   offset: number
   onChangeOffset: (offset: number) => void
+  others: DriverQuotaWindow[]
 }) {
   const { boundary } = status
-  // Calendar days (#960 Edit): each segment's width is how much of that day is actually in the
-  // week, so the axis places a label where most of that day falls rather than at a fixed seventh
-  // regardless of the clock. A mid-day start still leaves one day split into two same-named
-  // slivers straddling the reset — see {@link weekDays} — and only the larger keeps its label.
-  const days = weekDays(boundary.startsAt, boundary.resetsAt)
   const tone = quotaTone(percentUsed, boundary.percent)
   const limit = limitPercent(boundary.percent, offset)
   const projected = projectedRange(percentUsed, limit)
@@ -80,17 +77,6 @@ function WeekBar({
 
   return (
     <div className="space-y-1.5">
-      {/* One label per day, centred in its own share of the bar. */}
-      <div className="relative h-4 text-[10px] font-medium tracking-wide text-muted-foreground">
-        {days.map(
-          (day, i) =>
-            day.label && (
-              <span key={i} className="absolute top-0 -translate-x-1/2" style={{ left: `${(day.startPercent + day.endPercent) / 2}%` }}>
-                {day.label}
-              </span>
-            ),
-        )}
-      </div>
       <div className="relative h-4">
         <div role="img" aria-label={label} className="absolute inset-x-0 top-[3px] h-2.5 overflow-hidden rounded-full bg-muted">
           {/* Used, at full opacity. No corner between it and the segment after it — one bar, not
@@ -104,10 +90,6 @@ function WeekBar({
               style={{ left: `${projected.start}%`, width: `${projected.end - projected.start}%` }}
             />
           )}
-          {/* The day delimiters — a notch through the fill at each day's own start. */}
-          {days.slice(1).map((day, i) => (
-            <div key={i} className="absolute inset-y-0 w-1 bg-background/60" style={{ left: `${day.startPercent}%` }} aria-hidden />
-          ))}
           {/* The boundary. Inside the same box as the fill, which is the whole point of one track. */}
           <div
             className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-foreground"
@@ -155,56 +137,76 @@ function WeekBar({
           <TooltipTrigger render={<span className="cursor-default" />}>resets {formatResetDay(boundary.resetsAt)}</TooltipTrigger>
           <TooltipContent>{formatResetTooltip(boundary.resetsAt)}</TooltipContent>
         </Tooltip>
+        {/* Only where there's something beyond the week this bar already is — a lone account week
+            has nothing left for the tooltip to add. */}
+        {others.length > 1 ? (
+          <>
+            {' · '}
+            <Tooltip>
+              <TooltipTrigger render={<span className="cursor-default" />}>show all limits</TooltipTrigger>
+              <TooltipContent className="max-w-72">
+                <div className="space-y-1">
+                  {others.map(w => (
+                    <OtherWindow key={w.label} window={w} />
+                  ))}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </>
+        ) : null}
       </p>
-      {/* The legend (#960 Edit): what the two shades of the bar and its line mean. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-        <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm', TONE_FILL[tone])} aria-hidden />}>Used</LegendItem>
-        <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm opacity-35', TONE_FILL[tone])} aria-hidden />}>Autonomous AI usage (projected)</LegendItem>
-        <LegendItem swatch={<span className="h-2 w-0.5 bg-foreground" aria-hidden />}>
-          <Tooltip>
-            <TooltipTrigger render={<span className="inline-flex cursor-default items-center gap-0.5" />}>
-              Daily budget
-              <CircleHelp className="h-3 w-3" aria-hidden />
-            </TooltipTrigger>
-            <TooltipContent className="max-w-64">
-              Not a hard limit — just an indication of whether you're over- or under-consuming. It's calculated as a pro-rated share of
-              the weekly limit.
-            </TooltipContent>
-          </Tooltip>
-        </LegendItem>
-      </div>
-      {/* Whether the knob has left any room to project (#960 Edit): dragged all the way down onto
-          the used fill, there is nothing left for unattended work to spend, which is worth naming
-          as its own state rather than leaving as a bar that merely looks empty. The warning sits on
-          the same row, on the right — easy to drag past the budget without meaning to, since
-          nothing else on the bar stops there, and it belongs beside the state it qualifies. */}
+      {/* The legend, and — on the same row (#960 Edit) — whether the knob has left any room to
+          project. Grouped on the right since both describe the same knob: the warning first, since
+          it explains why the state beside it might be worth a second look. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-        <span>
-          {enabled ? (
-            <>
-              ✅ Autonomous AI <em>enabled</em> <small className="text-muted-foreground/70">move slider to the left to disable</small>
-            </>
-          ) : (
-            <>
-              ❌ Autonomous AI <em>disabled</em> <small className="text-muted-foreground/70">move slider to the right to enable</small>
-            </>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm', TONE_FILL[tone])} aria-hidden />}>Used</LegendItem>
+          <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm opacity-35', TONE_FILL[tone])} aria-hidden />}>Budget for Autonomous AI</LegendItem>
+          <LegendItem swatch={<span className="h-2 w-0.5 bg-foreground" aria-hidden />}>
+            <Tooltip>
+              <TooltipTrigger render={<span className="inline-flex cursor-default items-center gap-0.5" />}>
+                Daily soft limit
+                <CircleHelp className="h-3 w-3" aria-hidden />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-64">
+                Not a hard limit — just an indication of whether you're over- or under-consuming. It's calculated as a pro-rated share of
+                the weekly limit.
+              </TooltipContent>
+            </Tooltip>
+          </LegendItem>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          {pastBoundary && (
+            <Tooltip>
+              <TooltipTrigger render={<span className="inline-flex cursor-default items-center gap-0.5 text-warning" />}>
+                ⚠️ Past daily budget
+                <CircleHelp className="h-3 w-3" aria-hidden />
+              </TooltipTrigger>
+              <TooltipContent>Autonomous AI will spend tokens faster than the week's pace allows</TooltipContent>
+            </Tooltip>
           )}
-        </span>
-        {pastBoundary && (
-          <Tooltip>
-            <TooltipTrigger render={<span className="inline-flex cursor-default items-center gap-0.5 text-warning" />}>
-              ⚠️ Past daily budget
-              <CircleHelp className="h-3 w-3" aria-hidden />
-            </TooltipTrigger>
-            <TooltipContent>Autonomous AI will spend tokens faster than the week's pace allows</TooltipContent>
-          </Tooltip>
-        )}
+          <span>
+            {enabled ? (
+              <>
+                ✅ Autonomous AI <em>enabled</em> <small className="text-muted-foreground/70">move slider to the left to disable</small>
+              </>
+            ) : (
+              <>
+                ❌ Autonomous AI <em>disabled</em> <small className="text-muted-foreground/70">move slider to the right to enable</small>
+              </>
+            )}
+          </span>
+        </div>
       </div>
     </div>
   )
 }
 
-/** The windows the bar is not about (the session, and a model's own week), as one line each. */
+/**
+ * The windows the bar is not about (the session, and a model's own week), as one line each —
+ * tucked behind the bar's own "show all limits" tooltip normally, but the fallback below draws
+ * these directly when there is no bar to hide them in.
+ */
 function OtherWindow({ window }: { window: DriverQuotaWindow }) {
   return (
     <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -293,7 +295,7 @@ export function Quota() {
             a reset phrasing the parser didn't know just made the panel quietly plainer, and nothing
             anywhere said the boundary was gone. Quote the text that failed: it is the bug report. */}
         {view?.boundary && week ? (
-          <WeekBar status={view.boundary} percentUsed={week.percentUsed} offset={offset} onChangeOffset={setOffset} />
+          <WeekBar status={view.boundary} percentUsed={week.percentUsed} offset={offset} onChangeOffset={setOffset} others={others} />
         ) : view && view.windows.length ? (
           <p role="alert" className="text-sm text-danger">
             {week?.resetsAtText
@@ -302,7 +304,16 @@ export function Quota() {
           </p>
         ) : null}
 
-        {others.length ? <div className="space-y-1 border-t border-border pt-3">{others.map(w => <OtherWindow key={w.label} window={w} />)}</div> : null}
+        {/* Normally these live behind the bar's own "show all limits" tooltip — but without a bar
+            to hide them in, they still have to show up somewhere; the windows Claude Code did
+            report are data, not a fallback, and stay regardless. */}
+        {!(view?.boundary && week) && others.length ? (
+          <div className="space-y-1 border-t border-border pt-3">
+            {others.map(w => (
+              <OtherWindow key={w.label} window={w} />
+            ))}
+          </div>
+        ) : null}
 
         {note ? (
           <p className="text-sm text-muted-foreground">

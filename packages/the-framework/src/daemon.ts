@@ -412,9 +412,10 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     }),
     // Only the daemon runs the sweep, so only it can say what the sweep decided.
     autoPm: () => services?.autoPmReport(),
-    // ...and only it can be asked to sweep now (#1210), through the same wake the
-    // switched-on preference above uses.
-    autoPmSweep: () => services?.wakeAutoPm(),
+    // ...and only it can be asked to sweep now (#1210). On demand, not the plain wake the
+    // switched-on preference above uses: the button is an explicit ask, so the sweep runs even
+    // while auto-run is off — one sweep for the click, and the schedule stays off.
+    autoPmSweep: () => services?.wakeAutoPm({ onDemand: true }),
     ...(token ? { token } : {}),
     ...(clientBundleDir ? { clientBundleDir } : {}),
   })

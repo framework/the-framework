@@ -185,16 +185,16 @@ export function RoutineWork({
                 </Tooltip>
                 {/* The countdown's escape hatch (#1210): the sweep is on a long interval, so
                     without this the only way to fast-forward was to tick the box off and on
-                    again. Disabled while auto-run is off, because a sweep re-reads the
-                    preference and stands straight back down — a button that always did nothing
-                    would read as broken rather than as inapplicable. */}
+                    again. Live even while auto-run is off — that preference records consent to
+                    spend quota unasked, and clicking is asking — so the daemon sweeps once and
+                    the schedule stays off. */}
                 <Tooltip>
                   <TooltipTrigger
                     render={
                       <button
                         type="button"
                         onClick={sweepNow}
-                        disabled={!autoRun || sweeping}
+                        disabled={sweeping}
                         className="shrink-0 rounded border border-border px-2 py-1 text-xs text-foreground hover:bg-accent disabled:opacity-50"
                       />
                     }
@@ -204,7 +204,7 @@ export function RoutineWork({
                   <TooltipContent>
                     {autoRun
                       ? 'Run the scheduled sweep now instead of waiting for the countdown.'
-                      : 'Turn auto-run on first: a sweep checks the setting and stops when it is off.'}
+                      : 'Run the sweep once now. Auto-run stays off, so nothing further is scheduled.'}
                   </TooltipContent>
                 </Tooltip>
               </div>

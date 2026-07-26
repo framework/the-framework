@@ -358,8 +358,13 @@ export interface AutoPmLoop {
    * Run one sweep now, rather than waiting for the next tick. Called when the preference is
    * switched on (#1161) as well as from tests: the sweep re-reads it per tick, so without this
    * the box you just ticked does nothing at all for a whole interval.
+   *
+   * `onDemand` marks a sweep a person explicitly asked for (#1210's trigger button). The `autoPm`
+   * preference is consent to spend quota *unasked*, and a click is asking — so an on-demand sweep
+   * runs with the preference off, and the master switch is the only gate it skips: every other
+   * reason to stand down (live runs, cooldowns, the quota boundary, unticked routines) still holds.
    */
-  tick(): Promise<void>
+  tick(opts?: { onDemand?: boolean }): Promise<void>
   /** What the last sweep decided, for the dashboard to show (#1161). */
   report(): AutoPmReport
   stop(): void
@@ -391,7 +396,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   let sweeping = false
   let stopped = false
 
-  const tick = async (): Promise<void> => {
+  const tick = async (opts?: { onDemand?: boolean }): Promise<void> => {
     if (stopped || sweeping) return
     sweeping = true
     let enabled = false
@@ -401,9 +406,11 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
       outcomes.push({ projectId: project.id, path: project.path, started, message })
     try {
       // The preference is the cheapest gate and the one the user flips most, so it is read
-      // once per sweep rather than per project.
+      // once per sweep rather than per project. An on-demand sweep outranks it — the click is
+      // the consent the preference exists to record — but still reads it, so the report says
+      // where the box stood.
       enabled = await deps.enabled().catch(() => false)
-      if (!enabled) return
+      if (!enabled && !opts?.onDemand) return
       const projects = await deps.projects().catch(() => [])
       if (!projects.length) return
       // Read beside the master switch and for the same reason (#1209): it is the same preference

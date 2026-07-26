@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises'
+import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { TICKETS_DIR } from '../tickets.js'
 
@@ -15,6 +15,15 @@ export interface WorkspaceTicket {
   summary: string
   /** The optional `priority:` key, verbatim and lowercased. */
   priority?: string
+  /** The optional `topics:` key (`topics: [dx, ui]`), as bare tags. */
+  topics?: string[]
+  /**
+   * ISO 8601, the file's mtime (#1144). Not a date the ticket format records — imported tickets
+   * carry a filename number, not a date — so the filesystem is the one source that answers "when"
+   * for every ticket alike, dated or not, and moves forward when a ticket is edited in place (the
+   * GitHub update, #1208).
+   */
+  date: string
   /** Whether `<name>.spike.md` sits beside it. */
   spiked: boolean
   /** Whether `<name>.plan.md` sits beside it, i.e. #685 already planned it. */
@@ -105,7 +114,7 @@ function titleFromFile(file: string): string {
  * imports: a heading, prose, and a trailing `Source:` line), so anything missing falls back
  * rather than dropping the ticket from the list.
  */
-function describe(md: string): { title?: string; summary: string; priority?: string } {
+function describe(md: string): { title?: string; summary: string; priority?: string; topics?: string[] } {
   const lines = md.split('\n')
   const heading = lines.find(line => line.startsWith('# '))?.slice(2).trim()
 
@@ -117,6 +126,15 @@ function describe(md: string): { title?: string; summary: string; priority?: str
     ?.slice('priority:'.length)
     .trim()
     .toLowerCase()
+  // `topics: [dx, ui]` — the brackets are cosmetic (the format doc shows them, but nothing else
+  // in this reader requires them), so they are stripped rather than required.
+  const topicsLine = preamble.find(line => line.toLowerCase().startsWith('topics:'))?.slice('topics:'.length).trim()
+  const topics = topicsLine
+    ?.replace(/^\[/, '')
+    .replace(/\]$/, '')
+    .split(',')
+    .map(t => t.trim())
+    .filter(Boolean)
 
   // The TLDR is the ticket in one line, which is exactly what a list row wants.
   const tldrAt = lines.findIndex(line => line.trim().toLowerCase() === '## tldr')
@@ -124,12 +142,23 @@ function describe(md: string): { title?: string; summary: string; priority?: str
   const summary =
     body.find(line => line.trim() !== '' && !line.startsWith('#') && !line.startsWith('Source:'))?.trim() ?? ''
 
-  return { ...(heading ? { title: heading } : {}), ...(priority ? { priority } : {}), summary }
+  return {
+    ...(heading ? { title: heading } : {}),
+    ...(priority ? { priority } : {}),
+    ...(topics && topics.length > 0 ? { topics } : {}),
+    summary,
+  }
+}
+
+/** A file's mtime as ISO 8601, or the epoch when it cannot be stat'd — sorts last, not thrown. */
+async function fileDate(path: string): Promise<string> {
+  const info = await stat(path).catch(() => undefined)
+  return (info?.mtime ?? new Date(0)).toISOString()
 }
 
 /**
- * The project's tickets, by filename. `[]` when the repo has no `tickets/` directory at all,
- * which is the state the view offers to import into.
+ * The project's tickets, by filename, newest first (#1144). `[]` when the repo has no `tickets/`
+ * directory at all, which is the state the view offers to import into.
  *
  * A `.spike.md` or `.plan.md` is written *about* a ticket rather than being one, so it never
  * becomes a row of its own: it marks its ticket instead.
@@ -143,19 +172,27 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
   for (const file of md) {
     if (siblings.has(file)) continue
     // Only the head: a ticket can be long, and nothing below it is shown.
-    const content = await readFile(join(dir, file), 'utf8').catch(() => undefined)
+    const [content, date] = await Promise.all([
+      readFile(join(dir, file), 'utf8').catch(() => undefined),
+      fileDate(join(dir, file)),
+    ])
     if (content === undefined) continue
     const stem = file.replace(/\.md$/, '')
-    const { title, summary, priority } = describe(content.slice(0, MAX_TICKET_BYTES))
+    const { title, summary, priority, topics } = describe(content.slice(0, MAX_TICKET_BYTES))
     tickets.push({
       file,
       title: title ?? titleFromFile(file),
       summary,
       ...(priority ? { priority } : {}),
+      ...(topics ? { topics } : {}),
+      date,
       spiked: siblings.has(`${stem}.spike.md`),
       planned: siblings.has(`${stem}.plan.md`),
     })
   }
+  // Newest first: what changed most recently is what the list is for (#1144), and it is the only
+  // ordering that means the same thing for a dated ticket and a bare GitHub-imported one alike.
+  tickets.sort((a, b) => b.date.localeCompare(a.date))
   return tickets
 }
 
@@ -182,16 +219,21 @@ function isTicketFile(file: string): boolean {
 export async function readTicket(cwd: string, file: string): Promise<WorkspaceTicketDetail | null> {
   if (!isTicketFile(file)) return null
   const dir = join(cwd, TICKETS_DIR)
-  const content = await readFile(join(dir, file), 'utf8').catch(() => undefined)
+  const [content, date, names] = await Promise.all([
+    readFile(join(dir, file), 'utf8').catch(() => undefined),
+    fileDate(join(dir, file)),
+    readdir(dir).catch(() => [] as string[]),
+  ])
   if (content === undefined) return null
   const stem = file.replace(/\.md$/, '')
-  const names = await readdir(dir).catch(() => [] as string[])
-  const { title, summary, priority } = describe(content)
+  const { title, summary, priority, topics } = describe(content)
   return {
     file,
     title: title ?? titleFromFile(file),
     summary,
     ...(priority ? { priority } : {}),
+    ...(topics ? { topics } : {}),
+    date,
     spiked: names.includes(`${stem}.spike.md`),
     planned: names.includes(`${stem}.plan.md`),
     content,

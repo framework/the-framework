@@ -42,6 +42,18 @@ describe('parseRoute', () => {
     expect(parseRoute('/my-settings')).toEqual({ projectId: 'my-settings', runId: null })
   })
 
+  it('reads the cross-project Tickets list, which belongs to no project (#1144)', () => {
+    expect(parseRoute('/tickets')).toEqual({ view: 'tickets', projectId: null, runId: null })
+    // Trailing slash and stray segments are the same page, like every other route.
+    expect(parseRoute('/tickets/')).toEqual({ view: 'tickets', projectId: null, runId: null })
+    expect(parseRoute('/tickets/anything')).toEqual({ view: 'tickets', projectId: null, runId: null })
+  })
+
+  it('leaves every other first segment a project, so only the reserved word is taken (#1144)', () => {
+    expect(parseRoute('/tickets-a1b2')).toEqual({ projectId: 'tickets-a1b2', runId: null })
+    expect(parseRoute('/my-tickets')).toEqual({ projectId: 'my-tickets', runId: null })
+  })
+
   it('reads a project\'s tickets page, as its own view rather than a session (#1144)', () => {
     expect(parseRoute('/my-repo-a1b2/tickets')).toEqual({ view: 'tickets', projectId: 'my-repo-a1b2', runId: null, ticketSlug: null })
     // Trailing slash is the same page, like every other route.
@@ -91,6 +103,10 @@ describe('formatRoute', () => {
     expect(formatRoute({ view: 'settings', projectId: 'my-repo', runId: 'run-1' })).toBe('/settings')
   })
 
+  it('writes the cross-project Tickets list when no project is given (#1144)', () => {
+    expect(formatRoute({ view: 'tickets', projectId: null, runId: null })).toBe('/tickets')
+  })
+
   it('writes a project\'s tickets page, and it outranks a stale session id (#1144)', () => {
     expect(formatRoute({ view: 'tickets', projectId: 'my-repo', runId: null })).toBe('/my-repo/tickets')
     expect(formatRoute({ view: 'tickets', projectId: 'my-repo', runId: 'run-1' })).toBe('/my-repo/tickets')
@@ -110,6 +126,7 @@ describe('formatRoute', () => {
       { projectId: 'my-repo', runId: 'run-1' },
       { projectId: 'a b', runId: 'c/d' },
       { view: 'settings' as const, projectId: null, runId: null },
+      { view: 'tickets' as const, projectId: null, runId: null },
       { view: 'tickets' as const, projectId: 'my-repo', runId: null, ticketSlug: null },
       { view: 'tickets' as const, projectId: 'my-repo', runId: null, ticketSlug: '2026-07-20_thing.md' },
     ]) {

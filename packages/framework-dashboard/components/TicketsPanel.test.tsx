@@ -18,6 +18,7 @@ const ticket = (over: Partial<WorkspaceTicket> = {}): WorkspaceTicket => ({
   file: '2026-07-20_do-the-thing.md',
   title: 'Do the thing',
   summary: 'The thing is not done.',
+  date: '2026-01-01T00:00:00.000Z',
   spiked: false,
   planned: false,
   ...over,
@@ -39,6 +40,36 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(screen.getByText('planned')).toBeTruthy()
     // The summary moved to the detail page (#1144); the list row is a one-liner.
     expect(screen.queryByText('The thing is not done.')).toBeNull()
+  })
+
+  test('shows meta on the row: priority, topics, and a human-readable date (#1144)', async () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
+    render(
+      <TicketsPanel
+        projectId="p1"
+        tickets={[ticket({ priority: 'high', topics: ['dx', 'ui'], date: twoDaysAgo })]}
+        loaded
+        onOpen={() => {}}
+      />,
+    )
+    expect(await screen.findByText('high')).toBeTruthy()
+    expect(screen.getByText('dx')).toBeTruthy()
+    expect(screen.getByText('ui')).toBeTruthy()
+    expect(screen.getByText('2d ago')).toBeTruthy()
+  })
+
+  test('sorts by date is the server\'s job — the list renders whatever order it is given (#1144)', async () => {
+    // readTickets already sorts newest-first; the panel is not re-sorting behind the caller's back.
+    render(
+      <TicketsPanel
+        projectId="p1"
+        tickets={[ticket({ file: 'older.md', title: 'Older' }), ticket({ file: 'newer.md', title: 'Newer' })]}
+        loaded
+        onOpen={() => {}}
+      />,
+    )
+    const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
+    expect(titles.findIndex(t => t?.includes('Older'))).toBeLessThan(titles.findIndex(t => t?.includes('Newer')))
   })
 
   test('opening a row hands back its file, the slug the detail route uses (#1144)', async () => {

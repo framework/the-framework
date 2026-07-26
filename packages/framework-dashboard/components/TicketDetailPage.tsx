@@ -10,6 +10,7 @@ import { Badge } from './ui/badge.js'
 import { Markdown } from './Markdown.js'
 import { ScrollArea } from './ui/scroll-area.js'
 import { cn } from '../lib/utils.js'
+import { formatAge, formatDateTime } from '../lib/format-date.js'
 
 /** How a priority reads, same tones as the list's dot (#1144) but spelled out here. */
 const PRIORITY_TONE: Record<string, string> = {
@@ -83,8 +84,16 @@ export function TicketDetailPage({
                     {ticket.priority}
                   </Badge>
                 )}
+                {ticket.topics?.map(topic => (
+                  <Badge key={topic} className="border-border px-1.5 text-[10px] text-muted-foreground">
+                    {topic}
+                  </Badge>
+                ))}
                 {ticket.spiked && <Badge className="border-transparent px-0 text-[10px] uppercase">spiked</Badge>}
                 {ticket.planned && <Badge className="border-transparent px-0 text-[10px] uppercase">planned</Badge>}
+                <span className="text-[10px] text-muted-foreground/70" title={formatDateTime(ticket.date)}>
+                  {formatAge(ticket.date)}
+                </span>
                 <span className="text-[10px] text-muted-foreground/70">{ticket.file}</span>
               </div>
               {error && <p className="mt-2 text-xs text-danger">{error}</p>}

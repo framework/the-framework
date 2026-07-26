@@ -35,16 +35,42 @@ test('readTickets reads the format: keys above the title, then the TLDR (#697)',
       'Because.',
     ].join('\n'),
   })
-  assert.deepEqual(await readTickets(cwd), [
-    {
-      file: '2026-07-20_do-the-thing.md',
-      title: 'Do the thing',
-      summary: 'The thing is not done.',
-      priority: 'high',
-      spiked: false,
-      planned: false,
-    },
-  ])
+  const [ticket, ...rest] = await readTickets(cwd)
+  assert.equal(rest.length, 0)
+  // `date` is the file's mtime (#1144) — a moment in the test run, not a fixed value to compare.
+  const { date, ...withoutDate } = ticket!
+  assert.equal(Number.isNaN(Date.parse(date)), false)
+  assert.deepEqual(withoutDate, {
+    file: '2026-07-20_do-the-thing.md',
+    title: 'Do the thing',
+    summary: 'The thing is not done.',
+    priority: 'high',
+    topics: ['dx'],
+    spiked: false,
+    planned: false,
+  })
+})
+
+test('readTickets parses a multi-topic list, brackets and all (#1144)', async () => {
+  const cwd = await repo({ '2026-07-20_thing.md': 'topics: [dx, ui, docs]\n\n# Thing\n' })
+  const [ticket] = await readTickets(cwd)
+  assert.deepEqual(ticket?.topics, ['dx', 'ui', 'docs'])
+})
+
+test('readTickets leaves topics off a ticket that names none (#1144)', async () => {
+  const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n' })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.topics, undefined)
+})
+
+test('readTickets sorts newest-first by file mtime, not by filename (#1144)', async () => {
+  // Both alphabetically ahead of "z", so a filename sort would get this backwards.
+  const cwd = await repo({ 'a-older.md': '# Older\n', 'b-newer.md': '# Newer\n' })
+  // mtime has second resolution on some filesystems; a real gap keeps the order unambiguous.
+  await new Promise(r => setTimeout(r, 1100))
+  await writeFile(join(cwd, 'tickets', 'b-newer.md'), '# Newer\n', 'utf8')
+  const titles = (await readTickets(cwd)).map(t => t.title)
+  assert.deepEqual(titles, ['Newer', 'Older'])
 })
 
 // The tickets already in a repo are GitHub imports that predate the format, so nothing about
@@ -67,7 +93,9 @@ test('readTickets falls back to the filename when there is no heading (#697)', a
 
 test('readTickets decodes an escaped filename rather than throwing on a stray % (#697)', async () => {
   const cwd = await repo({ '1-100%_sure.md': 'prose\n', '2-a%20b.md': 'prose\n' })
-  const titles = (await readTickets(cwd)).map(t => t.title)
+  // Sorted before comparing: the list itself is newest-first by mtime (#1144), and these two
+  // are written close enough together that which one lands "newest" is not this test's concern.
+  const titles = (await readTickets(cwd)).map(t => t.title).sort()
   assert.deepEqual(titles, ['1-100% sure', '2-a b'])
 })
 
@@ -81,8 +109,10 @@ test('readTickets folds .spike.md and .plan.md into their ticket (#697)', async 
     '2026-07-21_other.md': '# Other\n\nprose\n',
   })
   const tickets = await readTickets(cwd)
+  // Sorted before comparing: the list itself is newest-first by mtime (#1144), and these two are
+  // written close enough together that which one lands "newest" is not this test's concern.
   assert.deepEqual(
-    tickets.map(t => [t.file, t.spiked, t.planned]),
+    tickets.map(t => [t.file, t.spiked, t.planned]).sort(),
     [
       ['2026-07-20_thing.md', true, true],
       ['2026-07-21_other.md', false, false],
@@ -115,13 +145,19 @@ test('hasTickets ignores non-markdown files, like readTickets (#958)', async () 
 // readTicket backs the detail page (#1144): the whole file, not just the head readTickets
 // caps at, plus the same metadata a list row shows.
 test('readTicket reads the whole file, metadata included (#1144)', async () => {
-  const body = ['priority: high', '', '# Do the thing', '', '## TLDR', '', 'The thing is not done.', '', 'More below the fold.'].join('\n')
+  const body = ['priority: high', 'topics: [dx]', '', '# Do the thing', '', '## TLDR', '', 'The thing is not done.', '', 'More below the fold.'].join(
+    '\n',
+  )
   const cwd = await repo({ '2026-07-20_do-the-thing.md': body })
-  assert.deepEqual(await readTicket(cwd, '2026-07-20_do-the-thing.md'), {
+  const ticket = await readTicket(cwd, '2026-07-20_do-the-thing.md')
+  const { date, ...withoutDate } = ticket ?? {}
+  assert.equal(Number.isNaN(Date.parse(date as string)), false)
+  assert.deepEqual(withoutDate, {
     file: '2026-07-20_do-the-thing.md',
     title: 'Do the thing',
     summary: 'The thing is not done.',
     priority: 'high',
+    topics: ['dx'],
     spiked: false,
     planned: false,
     content: body,

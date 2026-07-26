@@ -7,9 +7,8 @@ import { Button } from './ui/button.js'
 import { Badge } from './ui/badge.js'
 import { useAction } from '../lib/use-action.js'
 import { useLoaded } from '../lib/use-async.js'
-import { formatRelative } from '../lib/format-date.js'
+import { formatRelative, formatAge, formatDateTime } from '../lib/format-date.js'
 import { cn } from '../lib/utils.js'
-import { ScrollArea } from './ui/scroll-area.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 /**
@@ -36,19 +35,20 @@ const UPDATE_PROMPT = presets.updateTickets.render()
 /** Captured once: `useLoaded` treats a fresh `{}` literal as a new value on every render. */
 const NO_META: TicketsMeta = {}
 
-/** How a priority reads, as the one-liner's dot (#1144) — a full badge has no room on a single line. */
+/** How a priority reads, as the row's badge (#1144). */
 const PRIORITY_TONE: Record<string, string> = {
-  urgent: 'bg-danger',
-  high: 'bg-warning',
-  medium: 'bg-muted-foreground',
-  low: 'bg-muted-foreground',
+  urgent: 'text-danger',
+  high: 'text-warning',
+  medium: 'text-muted-foreground',
+  low: 'text-muted-foreground',
 }
 
-// The tickets list (#697/#1144): the project's `tickets/*.md` as one-liners, so the whole backlog
-// is scannable at a glance; a row's only action is opening its detail page (#1144), which is where
-// Queue, the summary, and the rest of the metadata live now. An empty `tickets/` offers to import
-// the repo's GitHub issues instead of just saying "nothing here"; a filled one offers to update it
-// (#1208) instead of a re-import re-walking the whole backlog.
+// The tickets list (#697/#1144): the project's `tickets/*.md` as one-liners — priority, topics,
+// what the agent already did to it, and how recently, all on the row — so the backlog is scannable
+// without opening one. A row's only action is opening its detail page (#1144), which is where
+// Queue and the summary live. An empty `tickets/` offers to import the repo's GitHub issues instead
+// of just saying "nothing here"; a filled one offers to update it (#1208) instead of a re-import
+// re-walking the whole backlog.
 export function TicketsPanel({
   projectId,
   tickets,
@@ -66,8 +66,8 @@ export function TicketsPanel({
   onRunStarted?: ((intent: string, runId?: string) => void) | undefined
 }) {
   const { busy, error, run } = useAction()
-  // When `tickets/` last caught up with GitHub. Read here rather than passed down: the rail polls
-  // the tickets themselves for the tab's row count, and it has no use for the stamp.
+  // When `tickets/` last caught up with GitHub. Read here rather than passed down: the cross-
+  // project page reads one ticket list per project, and this is the one extra read a section adds.
   const meta = useLoaded<TicketsMeta>(projectId ? () => onTicketsMeta(projectId) : null, NO_META, [projectId])
 
   if (!projectId) return null
@@ -85,7 +85,7 @@ export function TicketsPanel({
 
   if (tickets.length === 0) {
     return (
-      <div className="space-y-3 p-4 text-sm">
+      <div className="space-y-3 rounded-lg border border-border p-4 text-sm">
         <p className="text-muted-foreground">
           No tickets yet. Tickets live in <code className="rounded bg-muted px-1">tickets/</code> and are what the agent
           plans from.
@@ -99,12 +99,12 @@ export function TicketsPanel({
   }
 
   return (
-    <div className="flex min-h-0 flex-auto flex-col">
+    <div className="overflow-hidden rounded-lg border border-border">
       {error && <p className="border-b border-border p-2 text-xs text-danger">{error}</p>}
       {/* Offered once there is something to update (#1208). On an empty `tickets/` the button
           above says "Import" instead: same work, but "update" would be a strange word for
           filling a directory that has never been filled. */}
-      <div className="flex items-center gap-2 border-b border-border px-2 py-1.5">
+      <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-2 py-1.5">
         <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
           {meta.lastImportedAt
             ? `Updated from GitHub ${formatRelative(meta.lastImportedAt)}`
@@ -132,31 +132,37 @@ export function TicketsPanel({
           </TooltipContent>
         </Tooltip>
       </div>
-      <ScrollArea className="min-h-0 flex-auto">
-        <ul className="divide-y divide-border">
-          {tickets.map(ticket => (
-            <li key={ticket.file}>
-              <button
-                type="button"
-                onClick={() => onOpen(ticket.file)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-accent/60"
-              >
-                {ticket.priority && (
-                  <span
-                    aria-hidden
-                    title={ticket.priority}
-                    className={cn('h-1.5 w-1.5 shrink-0 rounded-full', PRIORITY_TONE[ticket.priority])}
-                  />
-                )}
-                <span className="min-w-0 flex-1 truncate font-medium">{ticket.title}</span>
-                {/* What the agent has already done to this ticket, so it is clear what is left. */}
-                {ticket.spiked && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">spiked</Badge>}
-                {ticket.planned && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">planned</Badge>}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </ScrollArea>
+      <ul className="divide-y divide-border">
+        {tickets.map(ticket => (
+          <li key={ticket.file}>
+            <button
+              type="button"
+              onClick={() => onOpen(ticket.file)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-accent/60"
+            >
+              {ticket.priority && (
+                <Badge className={cn('shrink-0 border-transparent px-1.5 text-[10px] uppercase', PRIORITY_TONE[ticket.priority])}>
+                  {ticket.priority}
+                </Badge>
+              )}
+              <span className="min-w-0 flex-1 truncate font-medium">{ticket.title}</span>
+              {/* Topics (#1144): capped so a heavily-tagged ticket cannot push the date off the
+                  row's end — the row is a one-liner, not a place to read every tag. */}
+              {ticket.topics?.slice(0, 3).map(topic => (
+                <Badge key={topic} className="hidden shrink-0 border-border px-1.5 text-[10px] text-muted-foreground sm:inline-flex">
+                  {topic}
+                </Badge>
+              ))}
+              {/* What the agent has already done to this ticket, so it is clear what is left. */}
+              {ticket.spiked && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">spiked</Badge>}
+              {ticket.planned && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">planned</Badge>}
+              <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/70" title={formatDateTime(ticket.date)}>
+                {formatAge(ticket.date)}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { buildOverview, buildRecentRuns, buildHotTickets, ticketBucket } from './overview.js'
+import { buildOverview, buildRecentRuns, buildHotTickets, collectAllTickets, ticketBucket } from './overview.js'
 import type { ProjectSummary } from './projects.js'
 import type { ProjectQueue } from './queue.js'
 import type { WorkspaceTicket } from './tickets.js'
@@ -97,6 +97,7 @@ const ticket = (file: string, over: Partial<WorkspaceTicket> = {}): WorkspaceTic
   file,
   title: file,
   summary: '',
+  date: '2026-01-01T00:00:00.000Z',
   spiked: false,
   planned: false,
   ...over,
@@ -139,6 +140,39 @@ test('buildHotTickets pools every project, buckets each, drops the rest, and ord
       { p: 'alpha', f: 'a2.md', b: 'high-priority' },
     ],
   )
+})
+
+// collectAllTickets backs the cross-project Tickets page (#1144): one list per project, unpooled
+// and unbucketed — the opposite of buildHotTickets, which merges and filters for the Overview card.
+test('collectAllTickets keeps one list per project, in registry order', async () => {
+  const tickets: Record<string, WorkspaceTicket[]> = {
+    '/a': [ticket('a1.md'), ticket('a2.md')],
+    '/b': [ticket('b1.md')],
+  }
+  const all = await collectAllTickets([project('alpha', '/a'), project('beta', '/b')], {
+    tickets: async cwd => tickets[cwd] ?? [],
+  })
+  assert.deepEqual(
+    all.map(g => ({ id: g.projectId, files: g.tickets.map(t => t.file) })),
+    [
+      { id: 'alpha', files: ['a1.md', 'a2.md'] },
+      { id: 'beta', files: ['b1.md'] },
+    ],
+  )
+})
+
+test('collectAllTickets keeps a project with no tickets, so import stays reachable there (#1144)', async () => {
+  const all = await collectAllTickets([project('empty', '/e')], { tickets: async () => [] })
+  assert.deepEqual(all, [{ projectId: 'empty', projectName: 'empty', tickets: [] }])
+})
+
+test('collectAllTickets tolerates a project whose tickets cannot be read (#1144)', async () => {
+  const all = await collectAllTickets([project('bad', '/bad')], {
+    tickets: async () => {
+      throw new Error('nope')
+    },
+  })
+  assert.deepEqual(all, [{ projectId: 'bad', projectName: 'bad', tickets: [] }])
 })
 
 test('buildHotTickets tolerates a project whose tickets cannot be read', async () => {

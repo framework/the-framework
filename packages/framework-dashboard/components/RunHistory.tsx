@@ -79,10 +79,11 @@ export function RunHistory({
   onSelectProject?: (projectId: string) => void
   /** Open Settings, from the sidebar footer where the navbar gear moved. */
   onSettings?: () => void
-  /** Open the selected project's tickets page (#1144). Absent means no project is selected, so
-   *  the row is not offered. */
-  onTickets?: ((projectId: string) => void) | undefined
-  /** Whether the tickets page is the current view, so the row can carry the active fill. */
+  /** Open the cross-project Tickets view (#1144). Absent means the row is not offered at all —
+   *  the interim for a surface (like the relay) with nothing to route it to. */
+  onTickets?: (() => void) | undefined
+  /** Whether the Tickets view is the current one (list or a ticket's own page), so the row can
+   *  carry the active fill — and so Overview does not also claim it (both share `projectId === null`). */
   ticketsActive?: boolean
   /** Human Queue count, shown on the Overview item and the picker (#632). */
   interventionCount?: number
@@ -184,14 +185,12 @@ export function RunHistory({
           onSelect={onSelect}
           onProjectAdded={onProjectAdded}
         />
-        {/* Tickets: the selected project's backlog as its own page (#1144), not a rail tab — only
-            offered once a project is picked, since tickets belong to one. */}
-        {projectId !== null && onTickets && (
-          <TicketsButton active={ticketsActive} onClick={() => onTickets(projectId)} />
-        )}
         {/* Overview: the way home, its own nav item directly under New and above the session list,
             more prominent than a menu row. Only this — the current view — carries the active fill. */}
-        <OverviewButton active={projectId === null} count={interventionCount} onClick={onDashboard} />
+        <OverviewButton active={projectId === null && !ticketsActive} count={interventionCount} onClick={onDashboard} />
+        {/* Tickets: every project's backlog, one section each (#1144), not a rail tab — below
+            Overview, since it is the same kind of cross-project destination. */}
+        {onTickets && <TicketsButton active={ticketsActive} onClick={onTickets} />}
         {/* Projects: its own nav item under Overview, same row style, expanding to an indented list
             of projects (not a dropdown). Selecting one navigates into it — the interim, until the
             filter-vs-navigate call is made. */}

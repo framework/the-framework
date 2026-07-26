@@ -213,12 +213,12 @@ export default function Page() {
     go({ view: 'settings', projectId: null, runId: null })
   }
 
-  // A project's tickets, as their own page (#1144): required reading for a demo, so it gets the
-  // full width rather than the 27rem right rail. Leaves the run selection alone — Back returns to
-  // whichever session was open.
-  const showTickets = (id: string) => {
+  // Tickets (#1144): every registered project's backlog, one section each — required reading for a
+  // demo, so it gets the full width rather than the 27rem right rail. A cross-project destination
+  // like the Overview, not scoped to whichever project happened to be selected.
+  const showTickets = () => {
     setAdopting(false)
-    go({ view: 'tickets', projectId: id, runId: null, ticketSlug: null })
+    go({ view: 'tickets', projectId: null, runId: null })
   }
 
   // One ticket's own page (#1144), by the same slug as its filename — what a one-liner row opens
@@ -266,6 +266,11 @@ export default function Page() {
   const selectedRun = runId ? runs.find(run => run.id === runId) : undefined
   const renderMain = () => {
     if (view === 'settings') return <SettingsPage onRunStarted={runStarted} onDone={showDashboard} />
+    // A ticket's own page needs both a project and a slug; anything short of that (including the
+    // bare cross-project route) is the list — every registered project, one section each.
+    if (view === 'tickets' && projectId && ticketSlug)
+      return <TicketDetailPage projectId={projectId} slug={ticketSlug} onBack={showTickets} />
+    if (view === 'tickets') return <TicketsPage onOpenTicket={openTicket} onRunStarted={runStarted} />
     if (!projectId)
       return (
         <DashboardPage
@@ -284,13 +289,6 @@ export default function Page() {
           onAction={showDashboard}
         />
       )
-    if (view === 'tickets') {
-      return ticketSlug ? (
-        <TicketDetailPage projectId={projectId} slug={ticketSlug} onBack={() => showTickets(projectId)} />
-      ) : (
-        <TicketsPage projectId={projectId} onOpenTicket={slug => openTicket(projectId, slug)} onRunStarted={onRunStarted} />
-      )
-    }
     if (runId === null) {
       // Just pressed Start on a project with no worktree: follow the live output until the poll
       // surfaces the run and the effect above adopts its id.

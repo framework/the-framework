@@ -268,6 +268,20 @@ test('sanitizePreferences keeps an absolute reposDirectory and drops junk (#1123
   assert.deepEqual(await readPreferences(fs, ENV), {})
 })
 
+test('sanitizePreferences keeps the routine opt-out list, trimmed and deduplicated (#1209)', async () => {
+  // A list preference, so like the string ones the boolean-only loop would eat it whole. Junk
+  // entries are dropped one by one rather than taking the list with them: losing the list would
+  // switch every routine back on, which spends quota nobody asked to spend.
+  const fs = memFs()
+  await writePreferences({ autoPmOptOut: ['drain-queue', ' maintenance ', 'drain-queue', '', 7 as never] }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { autoPmOptOut: ['drain-queue', 'maintenance'] })
+  // Empty is dropped like every other empty list, and means what absent means: nothing opted out.
+  // That is exactly what re-ticking the last unticked routine writes, so it has to clear the key.
+  assert.deepEqual(await patchPreferences({ autoPmOptOut: [] }, fs, ENV), {})
+  await writePreferences({ autoPmOptOut: 'drain-queue' as never }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), {})
+})
+
 test('reposDirectoryAutoGrant is a boolean preference, off by default (#1123)', async () => {
   const fs = memFs()
   assert.equal((await readPreferences(fs, ENV)).reposDirectoryAutoGrant, undefined) // absent = off

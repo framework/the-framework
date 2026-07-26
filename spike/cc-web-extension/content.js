@@ -399,7 +399,8 @@ if (!IS_TOP) {
     }
     panel.innerHTML = ''
     const head = document.createElement('div')
-    head.textContent = 'The Framework bridge (spike) - reads only'
+    const version = typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : '?'
+    head.textContent = `The Framework bridge v${version}`
     head.style.cssText = 'font-weight:600;margin-bottom:6px;color:#a7c080'
     panel.appendChild(head)
     for (const [k, v] of rows) {

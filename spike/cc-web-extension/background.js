@@ -159,7 +159,26 @@ async function openWatchedTabs() {
       return note({ ok: false, reason: `chrome.tabs.create failed: ${String(err?.message ?? err)}` })
     }
   }
-  return note({ ok: true, opened, of: sessions.length, ...(skipped.length ? { skipped: skipped.join(', ') } : {}) })
+  const closed = await closeStaleTabs(new Set(sessions.map(s => s.id)))
+  return note({ ok: true, opened, of: sessions.length, ...(closed ? { closed } : {}), ...(skipped.length ? { skipped: skipped.join(', ') } : {}) })
+}
+
+/**
+ * Close tabs we opened for sessions the daemon no longer watches.
+ *
+ * Without this a browser gains a pinned tab per run and never loses one, which is its own kind
+ * of broken. Only tabs this extension opened: a session the user opened themselves is theirs.
+ */
+async function closeStaleTabs(watched) {
+  const opened = await openedTabs()
+  const stale = Object.entries(opened).filter(([, sessionId]) => !watched.has(sessionId))
+  if (!stale.length) return 0
+  const rest = { ...opened }
+  for (const [tabId] of stale) delete rest[tabId]
+  // Drop the record first, so the close does not read as the user dismissing the session.
+  await chrome.storage.local.set({ openedTabs: rest })
+  for (const [tabId] of stale) await chrome.tabs.remove(Number(tabId)).catch(() => {})
+  return stale.length
 }
 
 // Remember a closed tab so the next poll does not reopen it.

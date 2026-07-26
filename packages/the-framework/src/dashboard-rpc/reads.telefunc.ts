@@ -22,6 +22,7 @@ import { relayOr } from './relay-run.js'
 import type { FrameworkEvent } from '../events.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
 import type { BridgeQuestion } from '../dashboard/bridge-endpoints.js'
+import type { BridgeContact } from '../dashboard/bridge-store.js'
 
 // The read model behind the new dashboard (#405): the run history, a run's replay, the
 // surfaced PLAN/TODO docs, and the committed LOGS.md — each keyed by project id and
@@ -369,4 +370,16 @@ export async function onSystemPromptUser(projectId: string): Promise<string | nu
 export async function onBridgeQuestion(sessionId: string): Promise<BridgeQuestion | null> {
   if (typeof sessionId !== 'string' || !/^session_[A-Za-z0-9]{1,128}$/.test(sessionId)) return null
   return bridgeQuestions().get(sessionId) ?? null
+}
+
+/**
+ * Whether anything has reached the browser bridge, and how it went (#1237).
+ *
+ * A misconfigured extension and an uninstalled one both leave no question behind, so "nothing is
+ * showing" cannot be diagnosed from the questions alone. A refused request at least proves
+ * something is trying, and its status says which half is wrong.
+ */
+export async function onBridgeStatus(): Promise<{ lastContact: BridgeContact | null; questions: number }> {
+  const store = bridgeQuestions()
+  return { lastContact: store.lastContact() ?? null, questions: store.list().length }
 }

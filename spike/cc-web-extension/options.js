@@ -19,6 +19,25 @@ function say(message, isError) {
   statusEl.className = isError ? 'error' : ''
 }
 
+/**
+ * Are the host permissions actually granted?
+ *
+ * Declaring them in the manifest is not the same as holding them: Chrome lists each site under
+ * "Site access" with its own toggle, and for an unpacked extension they can sit off. The daemon
+ * sends no CORS headers by design, so without the localhost grant the worker's fetch is blocked
+ * before it leaves the browser and the daemon sees nothing at all. That looked like every other
+ * failure and cost an evening, so it is checked first now.
+ */
+async function missingHosts(daemonUrl) {
+  const wanted = [`${daemonUrl}/`, 'https://claude.ai/']
+  const missing = []
+  for (const origin of wanted) {
+    const ok = await chrome.permissions.contains({ origins: [`${origin}*`] }).catch(() => false)
+    if (!ok) missing.push(origin)
+  }
+  return missing
+}
+
 document.getElementById('save').addEventListener('click', async () => {
   const daemonUrl = (daemonEl.value || DEFAULT_DAEMON).replace(/\/+$/, '')
   const token = tokenEl.value.trim()
@@ -28,6 +47,13 @@ document.getElementById('save').addEventListener('click', async () => {
   // Save then prove it: a token that is merely stored tells the user nothing, and the two ways
   // this goes wrong (bridge off, wrong token) are worth telling apart before they need it.
   say('Saved. Testing…')
+  const missing = await missingHosts(daemonUrl)
+  if (missing.length) {
+    return say(
+      `Chrome has not granted access to ${missing.join(' and ')}. Open chrome://extensions, find this extension, and switch those on under Site access.`,
+      true,
+    )
+  }
   try {
     const res = await fetch(`${daemonUrl}/_bridge/ping`, { headers: { authorization: `Bearer ${token}` } })
     if (res.status === 401) return say('The dashboard is reachable but rejected the token.', true)

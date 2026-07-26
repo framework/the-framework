@@ -12,6 +12,11 @@ travelling back is a separate slice, and today the dashboard links you to the se
 1. **Turn the bridge on in The Framework.** It is off by default; it opens the daemon's one route
    reachable from another origin, so it is an explicit choice.
 2. **Load the extension**: `chrome://extensions` -> Developer mode -> Load unpacked -> this directory.
+2b. **Grant site access.** On the extension's Details page, under **Site access**, switch on
+   `http://localhost/*`, `http://127.0.0.1/*` and `https://claude.ai/*`. Declaring host
+   permissions in the manifest does not grant them, and for an unpacked extension they can sit
+   off. Without the localhost grant the worker's fetch is blocked before it leaves the browser,
+   the daemon sees nothing, and it looks exactly like a wrong token.
 3. **Paste the token**: the extension's Options page. Hit *Save and test*, which pings the daemon
    and tells you which of the two failure modes you have (bridge off, or wrong token).
 4. Open a cloud session. The dashboard shows the question within a few seconds.

@@ -12,8 +12,32 @@ import type { BridgeQuestion } from './bridge-endpoints.js'
  * parked, and the bridge that reported it re-reports on reconnect, so surviving a daemon restart
  * would preserve a question that may already have been answered elsewhere.
  */
+/** The last time anything spoke to the bridge, and how it went. */
+export interface BridgeContact {
+  at: string
+  route: string
+  status: number
+}
+
 export class BridgeQuestions {
   private readonly bySession = new Map<string, BridgeQuestion>()
+  private contact: BridgeContact | undefined
+
+  /**
+   * Note that something reached the bridge, whatever the outcome.
+   *
+   * Failures are recorded too, and that is the point: an extension that is misconfigured looks
+   * exactly like one that is not installed, because both leave no question behind. A refused
+   * request at least proves something is trying.
+   */
+  recordContact(route: string, status: number): void {
+    this.contact = { at: new Date().toISOString(), route, status }
+  }
+
+  /** The last contact, or undefined if nothing has ever reached the bridge. */
+  lastContact(): BridgeContact | undefined {
+    return this.contact
+  }
 
   /** Record the question a session is parked on, replacing any earlier one for that session. */
   record(question: BridgeQuestion): void {

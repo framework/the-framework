@@ -45,6 +45,8 @@ export interface BridgeHandlers {
   /** The shared secret every bridge call must present. */
   token: string
   record: (question: BridgeQuestion) => void
+  /** Note that something reached the bridge, including when it was refused. */
+  contact?: (route: string, status: number) => void
   /**
    * The cloud sessions worth watching, newest first. The extension cannot know a run started:
    * it only sees pages the user is already on, so without this the bridge works only when
@@ -69,6 +71,7 @@ export async function handleBridgeRequest(
   handlers: BridgeHandlers | undefined,
 ): Promise<void> {
   if (!handlers) return end(res, 404, 'bridge not enabled')
+  seen(handlers, pathname, res)
   if (!authorized(req, handlers.token)) return end(res, 401, 'unauthorized')
   if (pathname === `${BRIDGE_PREFIX}/ping`) {
     if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
@@ -187,4 +190,10 @@ function readJsonBody(req: IncomingMessage, maxBytes: number): Promise<unknown> 
 function end(res: ServerResponse, status: number, message: string, headers: Record<string, string> = {}): void {
   res.writeHead(status, { 'content-type': 'text/plain', ...headers })
   res.end(message)
+}
+
+/** Wrap a route so its outcome is recorded whatever it was. */
+function seen(handlers: BridgeHandlers, pathname: string, res: ServerResponse): void {
+  if (!handlers.contact) return
+  res.once('finish', () => handlers.contact?.(pathname, res.statusCode))
 }

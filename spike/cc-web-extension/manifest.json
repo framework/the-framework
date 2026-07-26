@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "The Framework: Claude web bridge (spike)",
+  "version": "0.0.1",
+  "description": "Spike only. Reads a Claude Code cloud session page and reports what it can extract. Sends nothing anywhere.",
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/code/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

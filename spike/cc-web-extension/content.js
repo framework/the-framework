@@ -97,14 +97,37 @@ function transcript() {
   return text ? [{ seq: 0, role: 'agent', text: text.slice(0, 8000) }] : []
 }
 
-/** The session's own text, with our panel and the composer left out. */
+/**
+ * The conversation's text, without the rest of the application around it.
+ *
+ * Mirroring `body` sent the sidebar: "Home", "Code", "Artifacts", "Pinned", every nav label and
+ * a run of icon-font glyphs. `main` is the conversation on this page, so it is preferred and the
+ * body is only a last resort. Which one was used is reported, so a layout change shows up as a
+ * container change rather than as mystery text.
+ */
+function conversation() {
+  const main = deepQueryAll('main')[0] ?? deepQueryAll('[role="main"]')[0]
+  return { el: main ?? document.body, via: main ? 'main' : 'body' }
+}
+
+/** Private-use codepoints are icon-font glyphs, which carry no meaning outside their font. */
+const ICON_GLYPHS = /[\uE000-\uF8FF]/g
+
+/** The session's own text, with our panel and the application chrome left out. */
 function pageText() {
   const panel = document.getElementById(PANEL_ID)
   const hidden = panel?.style.display
   // Hide our own panel for the read, or the mirror would show the mirror.
   if (panel) panel.style.display = 'none'
   try {
-    return (document.body?.innerText ?? '').trim()
+    const { el } = conversation()
+    return (el?.innerText ?? '')
+      .replace(ICON_GLYPHS, '')
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .join('\n')
+      .trim()
   } finally {
     if (panel) panel.style.display = hidden ?? ''
   }
@@ -136,7 +159,7 @@ function reportTranscript() {
   const sessionId = sessionIdFromUrl()
   if (!sessionId || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
   const blocks = transcript()
-  sayHello(sessionId, `articles ${deepQueryAll('article').length}, blocks ${blocks.length}, ${transcriptStatus}`)
+  sayHello(sessionId, `articles ${deepQueryAll('article').length}, via ${conversation().via}, blocks ${blocks.length}, ${transcriptStatus}`)
   const events = blocks.filter(event => sentEvents.get(event.seq) !== event.text)
   if (!blocks.length) {
     transcriptStatus = 'no <article> blocks found'

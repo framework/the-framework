@@ -68,6 +68,16 @@ export function isSafeRunId(id: string): boolean {
   return /^[A-Za-z0-9_-]+$/.test(id)
 }
 
+/**
+ * The inverse of {@link runIdFromStartedAt}, for a caller that has the id but not the meta
+ * (#1251): the CLI's end-of-run handoff needs the start time to tell the run's own PR from a
+ * predecessor's on the same branch name. Undefined for an id that is not one of ours.
+ */
+export function startedAtFromRunId(id: string): string | undefined {
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/.exec(id)
+  return match ? `${match[1]}:${match[2]}:${match[3]}.${match[4]}Z` : undefined
+}
+
 /** Bumped when the on-disk shape changes, so a reader can detect an old file. */
 export const RUN_META_VERSION = 1
 

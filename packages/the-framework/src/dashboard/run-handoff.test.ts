@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { readRunHandoff, runBranchFor, pushRunBranch, openRunPullRequest, gitReason, runAutoHandoff, isSessionBranch, prBaseName, commitSessionWork } from './run-handoff.js'
+import { readRunHandoff, resolveRunPr, runBranchFor, pushRunBranch, openRunPullRequest, gitReason, runAutoHandoff, isSessionBranch, prBaseName, commitSessionWork } from './run-handoff.js'
+import { pickRunPr } from './gh.js'
 import { nodeGitRunner, GIT_SLOW_TIMEOUT_MS, type GitRunner } from '../project.js'
 import { CliTimeoutError, isCliTimeout } from '../cli-exec.js'
 
@@ -539,4 +540,67 @@ test('a real repo: the finishing step commits what the agent left in its worktre
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+test('pickRunPr trusts an open PR, and otherwise only one created after the run started (#1251)', () => {
+  const stale = { number: 1177, url: 'u1177', state: 'MERGED', title: 'old triage', createdAt: '2026-07-25T16:55:18Z' }
+  const own = { number: 1249, url: 'u1249', state: 'MERGED', title: 'this triage', createdAt: '2026-07-26T21:35:13Z' }
+  const later = { number: 1300, url: 'u1300', state: 'MERGED', title: 'even later', createdAt: '2026-07-26T23:00:00Z' }
+  const open = { number: 1301, url: 'u1301', state: 'OPEN', title: 'open one', createdAt: '2026-07-20T00:00:00Z' }
+  const since = '2026-07-26T21:17:39.507Z'
+
+  // The predecessor's merged PR is not this run's, however recently gh lists it.
+  assert.equal(pickRunPr([stale], since), undefined)
+  // The run's own PR still counts after it merges, and the oldest post-start entry is the one
+  // this run opened.
+  assert.equal(pickRunPr([later, own, stale], since)?.number, 1249)
+  // An open PR on the branch is where pushed commits land, whatever its age.
+  assert.equal(pickRunPr([stale, open], since)?.number, 1301)
+  // Without a start time only an open PR is trusted.
+  assert.equal(pickRunPr([stale, own, later]), undefined)
+  assert.equal(pickRunPr([stale, open])?.number, 1301)
+})
+
+test('a gone branch still reports its PR: it is a remote question (#1255)', async () => {
+  const { git } = fakeGit({ ...REPO, 'rev-parse --verify --quiet refs/heads/the-framework/run-r1': '', remote: 'origin\n' })
+  const handoff = await readRunHandoff('/repo', 'the-framework/run-r1', {
+    git,
+    pr: async () => ({ number: 1254, url: 'u1254', state: 'MERGED', title: 'web run', createdAt: '2026-07-26T21:52:58Z' }),
+  })
+  assert.equal(handoff?.exists, false)
+  assert.equal(handoff?.pr?.number, 1254)
+})
+
+test('resolveRunPr finds a web run through its run-id branch when the session-name branch is a reused pin (#1251)', async () => {
+  const asked: string[] = []
+  const stale = { number: 1177, url: 'u1177', state: 'MERGED', title: 'old triage', createdAt: '2026-07-25T16:55:18Z' }
+  const own = { number: 1249, url: 'u1249', state: 'OPEN', title: 'this triage', createdAt: '2026-07-26T21:35:13Z' }
+  const prs = async (_cwd: string, branch: string) => {
+    asked.push(branch)
+    if (branch === 'the-framework/triage-quick') return { value: [stale], pending: false }
+    if (branch === 'the-framework/run-2026-07-26T21-17-39-507Z') return { value: [own], pending: false }
+    return { value: [], pending: false }
+  }
+  const found = await resolveRunPr('/repo', { id: '2026-07-26T21-17-39-507Z', sessionName: 'triage-quick' }, prs)
+  assert.equal(found.value?.number, 1249)
+  assert.deepEqual(asked, ['the-framework/triage-quick', 'the-framework/run-2026-07-26T21-17-39-507Z'])
+})
+
+test('resolveRunPr prefers the recorded branch and stops at the first hit', async () => {
+  const asked: string[] = []
+  const prs = async (_cwd: string, branch: string) => {
+    asked.push(branch)
+    return { value: [{ number: 5, url: 'u5', state: 'OPEN', title: 'mine' }], pending: false }
+  }
+  const found = await resolveRunPr('/repo', { id: 'r1', branch: 'feat/mine', sessionName: 'named' }, prs)
+  assert.equal(found.value?.number, 5)
+  assert.deepEqual(asked, ['feat/mine'])
+})
+
+test('resolveRunPr reports pending only while nothing was found and a lookup is still running', async () => {
+  const prs = async (_cwd: string, branch: string) =>
+    branch === 'the-framework/run-r1' ? { value: undefined, pending: true } : { value: [], pending: false }
+  const found = await resolveRunPr('/repo', { id: 'r1', sessionName: 'named' }, prs)
+  assert.equal(found.value, undefined)
+  assert.equal(found.pending, true)
 })

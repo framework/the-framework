@@ -98,3 +98,19 @@ export function discordNotificationEnabled(
  * be one number both can import.
  */
 export const MAX_SPEND_OFFSET = 50
+
+/**
+ * How many agents the routine sweep keeps going at once when `autoPmConcurrency` is unset (#1204).
+ *
+ * Two, not one: the point of the setting is that the sweep may overlap work, and a default of one
+ * would make the feature invisible until someone finds the control. Two is the smallest number
+ * that does that while staying conservative about quota.
+ */
+export const DEFAULT_AUTO_PM_CONCURRENCY = 2
+
+/**
+ * The most agents the routine may be asked to keep going at once (#1204). Like
+ * {@link MAX_SPEND_OFFSET}, the control that writes the value is in the browser and the sanitizer
+ * that clamps it is in the daemon, so the bound has to be one number both can import.
+ */
+export const MAX_AUTO_PM_CONCURRENCY = 10

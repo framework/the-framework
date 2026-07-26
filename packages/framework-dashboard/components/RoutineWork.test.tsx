@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { AutoPmJob, AutoPmReport, Preferences, ProjectSummary } from '@gemstack/the-framework'
-import { AUTO_PM_ROUTINES, AUTO_PM_DRAIN_JOB } from '@gemstack/the-framework/client'
+import { AUTO_PM_ROUTINES, AUTO_PM_DRAIN_JOB, DEFAULT_AUTO_PM_CONCURRENCY, MAX_AUTO_PM_CONCURRENCY } from '@gemstack/the-framework/client'
 import { hoverTooltip } from '../test-utils.js'
 
 // Everything the card reads goes through a lib module, so the mocks stop short of telefunc: an
@@ -201,6 +201,37 @@ describe('RoutineWork (#1159)', () => {
     render(<RoutineWork onRunStarted={() => {}} />)
     fireEvent.click(await screen.findByText('Trigger routine now'))
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/not running the sweep/i))
+  })
+
+  test('the concurrent-agents field shows the default and writes the preference (#1204)', async () => {
+    render(<RoutineWork onRunStarted={() => {}} />)
+    const field = (await screen.findByLabelText('Concurrent agents')) as HTMLInputElement
+    // Unset shows the daemon's own default, so the number on screen is the number the sweep uses.
+    expect(field.value).toBe(String(DEFAULT_AUTO_PM_CONCURRENCY))
+    fireEvent.change(field, { target: { value: '10' } })
+    expect(updatePreferences).toHaveBeenCalledWith({ autoPmConcurrency: 10 })
+    // The fine print restates the cap, so the schedule's width is legible without the tooltip.
+    expect(screen.getByText(/Keeps up to 2 agents going at once/)).toBeTruthy()
+  })
+
+  test('the concurrent-agents field clamps what the control could not say (#1204)', async () => {
+    render(<RoutineWork onRunStarted={() => {}} />)
+    const field = await screen.findByLabelText('Concurrent agents')
+    fireEvent.change(field, { target: { value: '999' } })
+    expect(updatePreferences).toHaveBeenCalledWith({ autoPmConcurrency: MAX_AUTO_PM_CONCURRENCY })
+    fireEvent.change(field, { target: { value: '0' } })
+    expect(updatePreferences).toHaveBeenCalledWith({ autoPmConcurrency: 1 })
+    updatePreferences.mockClear()
+    fireEvent.change(field, { target: { value: '' } })
+    expect(updatePreferences).not.toHaveBeenCalled()
+  })
+
+  test('a saved concurrency shows, and the fine print follows it (#1204)', async () => {
+    prefs = { autoPmConcurrency: 1 }
+    render(<RoutineWork onRunStarted={() => {}} />)
+    const field = (await screen.findByLabelText('Concurrent agents')) as HTMLInputElement
+    expect(field.value).toBe('1')
+    expect(screen.getByText(/Keeps up to 1 agent going at once/)).toBeTruthy()
   })
 
   test('one project needs no picker', async () => {

@@ -23,6 +23,7 @@ import {
   REGISTRY_FILE,
   REGISTRY_FILE_MODE,
   MAX_SPEND_OFFSET,
+  MAX_AUTO_PM_CONCURRENCY,
   type Preferences,
   type ProjectRecord,
   type RegistryFs,
@@ -460,6 +461,27 @@ test('writePreferences round-trips and clamps the spend-limit slider (#960)', as
   await writePreferences({ autoSpendOffset: Number.NaN }, fs, ENV)
   assert.deepEqual(await readPreferences(fs, ENV), {})
   await writePreferences({ autoSpendOffset: '20' } as never, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), {})
+})
+
+test('writePreferences round-trips and clamps the routine concurrency (#1204)', async () => {
+  const fs = memFs({ [FILE]: JSON.stringify([APP_A]) })
+  await writePreferences({ autoPmConcurrency: 10 }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 10 })
+
+  // The same guard the slider gets (#960): a hand-edited file must not be able to ask for a
+  // fleet the control could not, ask for zero agents, or land junk in the home file.
+  await writePreferences({ autoPmConcurrency: 9000 }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: MAX_AUTO_PM_CONCURRENCY })
+  await writePreferences({ autoPmConcurrency: 0 }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 1 })
+  await writePreferences({ autoPmConcurrency: -3 }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 1 })
+  await writePreferences({ autoPmConcurrency: 2.6 }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { autoPmConcurrency: 3 })
+  await writePreferences({ autoPmConcurrency: Number.NaN }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), {})
+  await writePreferences({ autoPmConcurrency: '4' } as never, fs, ENV)
   assert.deepEqual(await readPreferences(fs, ENV), {})
 })
 

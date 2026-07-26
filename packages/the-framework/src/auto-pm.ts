@@ -1,5 +1,6 @@
 import type { QuotaBoundaryStatus } from './quota-boundary.js'
 import { presets } from './preset-catalog.js'
+import { DEFAULT_AUTO_PM_CONCURRENCY } from './preference-defaults.js'
 
 /**
  * Auto PM (#685): spend leftover subscription quota on product management instead of
@@ -34,8 +35,15 @@ export interface AutoPmInputs {
    * since #855 both answers now *start* something and only "we could not tell" does not.
    */
   backlogEmpty: boolean | undefined
-  /** Live runs on this project. Any run at all means the user's quota is already being spent. */
+  /** Live runs on this project, measured against {@link AutoPmInputs.concurrency}. */
   activeRuns: number
+  /**
+   * How many agents the routine may keep running on this project at once (#1204);
+   * {@link DEFAULT_AUTO_PM_CONCURRENCY} when unset. The sweep tops the project up to this many
+   * concurrent runs instead of standing down the moment anything at all is going. Floored at
+   * one: zero concurrent agents is spelled `enabled: false`.
+   */
+  concurrency?: number
   /** Where the account stands against its quota boundary, or `undefined` when it could not be read. */
   quota: QuotaBoundaryStatus | undefined
   /** Milliseconds since this project was last auto-started, or `undefined` if it never was. */
@@ -101,8 +109,14 @@ export function quotaHeadroom(quota: QuotaBoundaryStatus | undefined): QuotaDeci
  */
 export function autoPmDecision(input: AutoPmInputs): AutoPmDecision {
   if (!input.enabled) return { start: false, reason: 'auto PM is off' }
-  if (input.activeRuns > 0) {
-    return { start: false, reason: `${input.activeRuns} run${input.activeRuns === 1 ? ' is' : 's are'} already going` }
+  const concurrency = Math.max(1, Math.floor(input.concurrency ?? DEFAULT_AUTO_PM_CONCURRENCY))
+  if (input.activeRuns >= concurrency) {
+    // Name the cap it stopped at, for the same reason the quota refusal names its line (#960):
+    // with the setting raised or lowered, "already going" alone reads as a bug, not a setting.
+    return {
+      start: false,
+      reason: `${input.activeRuns} run${input.activeRuns === 1 ? ' is' : 's are'} already going, and the routine keeps at most ${concurrency} at once`,
+    }
   }
   const cooldownMs = input.cooldownMs ?? DEFAULT_AUTO_PM_COOLDOWN_MS
   if (input.sinceLastStartMs !== undefined && input.sinceLastStartMs < cooldownMs) {
@@ -148,6 +162,45 @@ export interface AutoPmJob {
    * call site, so the job says what it does and a rename cannot quietly unhook it.
    */
   drains?: boolean
+  /**
+   * The queue entry a {@link AutoPmJob.drains} job is pinned to (#1204). Set only on the
+   * per-start variants {@link pinnedDrainJob} builds — the catalog's own jobs carry none, since
+   * which entry is next is only known at the moment the sweep starts one.
+   */
+  entry?: string
+}
+
+/**
+ * A drain job pinned to one named queue entry (#1204).
+ *
+ * With a single agent, the stock prompt ("work on the FIRST open entry") is exact. With several
+ * agents going at once it is a collision: every drain forks the same checkout, so every one of
+ * them would pick the same first entry and implement it as many times over. Naming the entry in
+ * the prompt is what lets a batch of drains work disjoint entries.
+ *
+ * The pinned prompt also tells the agent to stop when the entry is already checked off or gone:
+ * the assignment is a snapshot, and a human may retire the entry between the sweep's read and the
+ * run's own.
+ */
+export function pinnedDrainJob(job: AutoPmJob, entry: string): AutoPmJob {
+  return {
+    ...job,
+    entry,
+    prompt: [
+      'Open TODO_AGENTS.md and work on this one open entry only, then check it off:',
+      '',
+      `- ${entry}`,
+      '',
+      'Do not start any other entry. If that entry is already checked off or no longer there, stop and do nothing.',
+    ].join('\n'),
+    describe: `draining the queue entry "${entryPreview(entry)}"`,
+  }
+}
+
+/** An entry as a log line can carry it: one line, bounded. */
+function entryPreview(entry: string): string {
+  const flat = entry.replace(/\s+/g, ' ').trim()
+  return flat.length > 80 ? `${flat.slice(0, 80)}…` : flat
 }
 
 /**
@@ -278,10 +331,22 @@ export interface AutoPmDeps {
    * a preference that cannot be read must not silently switch the whole rotation off.
    */
   optedOut?(): Promise<readonly string[]>
-  /** Whether a project's agent queue has run dry. */
-  backlogEmpty(project: AutoPmProject): Promise<boolean>
+  /**
+   * The open entries of a project's agent queue, in file order. Empty = the queue has run dry; a
+   * rejection = it could not be read, which fails closed exactly as the old boolean did (#855).
+   * The entries themselves (not just emptiness) because a batch of drains is pinned one entry
+   * each (#1204), and the assignment has to come from the same read the decision was made on.
+   */
+  queue(project: AutoPmProject): Promise<readonly string[]>
   /** How many runs are live on a project. */
   activeRuns(project: AutoPmProject): number
+  /**
+   * How many agents the routine may keep running per project (#1204). Re-read per tick like
+   * {@link AutoPmDeps.enabled}, so the setting takes effect without a restart. Unset or
+   * unreadable falls back to {@link DEFAULT_AUTO_PM_CONCURRENCY} rather than to one: the
+   * setting's absence has never meant "less".
+   */
+  concurrency?(): Promise<number | undefined>
   /** Where the account stands against its boundary, or `undefined` when there is no reading. */
   quota(): Promise<QuotaBoundaryStatus | undefined>
   /** The jobs to rotate through, in cycle order. Used only while the queue is empty. */
@@ -368,7 +433,9 @@ export interface AutoPmLoop {
 
 /**
  * Start the auto-PM sweep (#685): every {@link DEFAULT_AUTO_PM_INTERVAL_MS}, ask
- * {@link autoPmDecision} for each project and start a run for the ones that say yes.
+ * {@link autoPmDecision} for each project and start runs for the ones that say yes — topping
+ * each up to its concurrent-agent allowance (#1204) rather than one at a time, so a raised
+ * setting shows up as a fleet in one tick instead of one run per interval.
  *
  * Ticks never overlap — a sweep reads a live-run map that its own `start` calls mutate,
  * so a second sweep running over the first would decide against a stale picture.
@@ -384,8 +451,10 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   // start-up sweep below lands.
   let lastSweep: { enabled: boolean; sweptAt: number; outcomes: AutoPmOutcome[] } | undefined
   const lastStart = new Map<string, number>()
-  // Runs this loop started whose queue has not reached the checkout yet, oldest first.
-  const pending = new Map<string, string[]>()
+  // Runs this loop started whose queue has not reached the checkout yet, oldest first. A drain
+  // remembers the entry it was pinned to (#1204), so a later tick does not hand the same entry
+  // to a second agent while the first is still on it.
+  const pending = new Map<string, { runId: string; entry?: string }[]>()
   // Where each project is in the job cycle. Per project, not global: two repos idle at once
   // should each work through the rotation, not take alternate halves of it.
   const nextJob = new Map<string, number>()
@@ -415,6 +484,13 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
       // the cycle stays a cycle: with two of four off, the remaining two alternate instead of
       // every other tick landing on a job that cannot run.
       const rotation = deps.jobs.filter(job => !optedOut.has(job.name))
+      // How many agents each project may have going at once (#1204). Read beside the opt-outs
+      // and for the same reason: it is the same preference file, re-read so the setting takes
+      // effect mid-schedule. Floored at one — zero agents is the master switch's job.
+      const concurrency = Math.max(
+        1,
+        Math.floor((await deps.concurrency?.().catch(() => undefined)) ?? DEFAULT_AUTO_PM_CONCURRENCY),
+      )
       // One reading for the whole sweep: it is an account-wide meter, and re-reading it per
       // project would spend a rate-limited call to learn the same number.
       const quota = await deps.quota().catch(() => undefined)
@@ -423,12 +499,12 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // its entries are still on that run's branch, and the checkout cannot see them.
         const outstanding = pending.get(project.id) ?? []
         if (outstanding.length) {
-          const stillPending: string[] = []
+          const stillPending: { runId: string; entry?: string }[] = []
           let landed = 0
-          for (const runId of outstanding) {
-            const outcome = await deps.promote(project, runId).catch(() => ({ settled: false, promoted: false }))
+          for (const run of outstanding) {
+            const outcome = await deps.promote(project, run.runId).catch(() => ({ settled: false, promoted: false }))
             if (outcome.promoted) landed++
-            if (!outcome.settled) stillPending.push(runId)
+            if (!outcome.settled) stillPending.push(run)
           }
           if (stillPending.length) pending.set(project.id, stillPending)
           else pending.delete(project.id)
@@ -440,11 +516,14 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
             continue
           }
         }
+        const entries = await deps.queue(project).catch(() => undefined)
+        const activeRuns = deps.activeRuns(project)
         const since = lastStart.get(project.id)
         const decision = autoPmDecision({
           enabled: true,
-          backlogEmpty: await deps.backlogEmpty(project).catch(() => undefined),
-          activeRuns: deps.activeRuns(project),
+          backlogEmpty: entries === undefined ? undefined : entries.length === 0,
+          activeRuns,
+          concurrency,
           quota,
           ...(since !== undefined ? { sinceLastStartMs: now() - since } : {}),
           ...(deps.cooldownMs !== undefined ? { cooldownMs: deps.cooldownMs } : {}),
@@ -453,14 +532,6 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           // Logged, so a wedged sweep is distinguishable from a healthy idle one (#855).
           deps.log(`[framework] auto PM: standing down for ${project.path} — ${decision.reason}`)
           note(project, false, decision.reason)
-          continue
-        }
-        // Switching the draining routine off (#1209) stands the sweep down rather than falling
-        // through to the rotation: the queue has work waiting, and answering "do not work it
-        // automatically" by inventing more work is the opposite of what was asked.
-        const drainJob = wanted(deps.drainJob ?? AUTO_PM_DRAIN_JOB)
-        if (decision.mode === 'drain' && !drainJob) {
-          note(project, false, 'the queue has work waiting and its routine is switched off')
           continue
         }
         const index = nextJob.get(project.id) ?? 0
@@ -472,47 +543,106 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // more importantly, leaves its calendar untouched: it must come due normally once it is
         // switched back on, rather than having been silently ticked past while it was off.
         const maintenanceJob = wanted(deps.maintenanceJob ?? AUTO_PM_MAINTENANCE_JOB)
-        const sweep =
+        const sweepJob =
           decision.mode === 'pm' &&
           maintenanceJob !== undefined &&
           (await deps.maintenanceDue?.(project).catch(() => false)) === true
-        const job = sweep ? maintenanceJob : decision.mode === 'drain' ? drainJob : rotation[index % rotation.length]
-        if (!job) {
-          // Told apart on purpose: a rotation emptied by the checkboxes is a setting the user can
-          // see and undo, and reads nothing like a daemon wired without jobs at all.
-          note(
-            project,
-            false,
-            deps.jobs.length ? 'every routine that makes new work is switched off' : 'there is no job to run',
+            ? maintenanceJob
+            : undefined
+        // The batch: what to start this tick, at most the project's headroom of them (#1204).
+        // Built up front so the spawn loop below is the same for both modes.
+        const headroom = concurrency - activeRuns
+        const batch: { job: AutoPmJob; kind: 'drain' | 'pm' | 'sweep' }[] = []
+        if (decision.mode === 'drain') {
+          // Switching the draining routine off (#1209) stands the sweep down rather than falling
+          // through to the rotation: the queue has work waiting, and answering "do not work it
+          // automatically" by inventing more work is the opposite of what was asked.
+          const drainJob = wanted(deps.drainJob ?? AUTO_PM_DRAIN_JOB)
+          if (!drainJob) {
+            note(project, false, 'the queue has work waiting and its routine is switched off')
+            continue
+          }
+          // One agent per open entry, each pinned to its own (#1204): concurrent drains all fork
+          // the same checkout, so unpinned they would all pick the same first entry. An entry
+          // already assigned to a run still in flight is not offered again.
+          const assigned = new Set(
+            (pending.get(project.id) ?? []).flatMap(run => (run.entry !== undefined ? [run.entry] : [])),
           )
-          continue
+          const open = (entries ?? []).filter(entry => !assigned.has(entry))
+          batch.push(...open.slice(0, headroom).map(entry => ({ job: pinnedDrainJob(drainJob, entry), kind: 'drain' as const })))
+          if (!batch.length) {
+            note(project, false, 'every open queue entry is already being worked on')
+            continue
+          }
+        } else {
+          if (sweepJob) batch.push({ job: sweepJob, kind: 'sweep' })
+          // The rotation fills what headroom is left, each job at most once per tick: a rotation
+          // job pins its own branch, so a doubled one would spawn a run only for it to no-op.
+          for (let ahead = 0; batch.length < headroom && ahead < rotation.length; ahead++) {
+            batch.push({ job: rotation[(index + ahead) % rotation.length]!, kind: 'pm' })
+          }
+          if (!batch.length) {
+            // Told apart on purpose: a rotation emptied by the checkboxes is a setting the user
+            // can see and undo, and reads nothing like a daemon wired without jobs at all.
+            note(
+              project,
+              false,
+              deps.jobs.length ? 'every routine that makes new work is switched off' : 'there is no job to run',
+            )
+            continue
+          }
         }
         // Re-checked here because everything above is awaited: a run spawned past a `stop()` is
         // missing from the live-run map the daemon has by then cleared, so nothing suspends or
         // terminates it (#983). Break, not continue: stopping is a verdict on the whole sweep.
         if (stopped) break
-        // Armed before the spawn, not after: starting is slow, and a tick that overlapped the
-        // spawn would otherwise see no live run yet and start a second one.
+        // Armed before the first spawn and once for the whole batch: starting is slow, and a
+        // tick that overlapped the spawns would otherwise see too few live runs and top up over
+        // the cap.
         lastStart.set(project.id, now())
-        deps.log(`[framework] auto PM: ${job.describe} in ${project.path}`)
-        const runId = await deps.start(project, job).catch(() => undefined)
-        if (runId) {
-          // Advanced only on a start that took, so a refused job is retried rather than skipped.
-          // Draining does not advance it: it is not part of the cycle, and a queue worked off
-          // over several ticks must not skip the rotation forward once per entry.
+        const started: AutoPmJob[] = []
+        let rotationStarted = 0
+        for (const item of batch) {
+          // Re-checked per spawn, for the #983 reason above: a stop mid-batch must not spawn the rest.
+          if (stopped) break
+          deps.log(`[framework] auto PM: ${item.job.describe} in ${project.path}`)
+          const runId = await deps.start(project, item.job).catch(() => undefined)
+          if (!runId) {
+            // The batch ends at the first refusal: whatever refused this start is not going to
+            // take the next one a moment later, and a refused rotation job must be retried next
+            // tick rather than advanced past.
+            deps.log(`[framework] auto PM: could not start a run in ${project.path}`)
+            break
+          }
+          started.push(item.job)
+          // The rotation advances only past starts that took, so a refused job is retried rather
+          // than skipped. Draining does not advance it: it is not part of the cycle, and a queue
+          // worked off over several ticks must not skip the rotation forward once per entry.
           //
           // A sweep does not advance it either, and stamps its own schedule instead: it is paced
           // by the calendar, not the cycle, so borrowing this tick must not cost the rotation its
           // turn. Stamped after the start took for the same reason the rotation is -- a sweep the
           // daemon refused should be retried next tick, not postponed a whole interval.
-          if (sweep) await deps.recordMaintenance?.(project).catch(() => {})
-          else if (decision.mode === 'pm') nextJob.set(project.id, index + 1)
+          if (item.kind === 'sweep') await deps.recordMaintenance?.(project).catch(() => {})
+          else if (item.kind === 'pm') {
+            rotationStarted++
+            nextJob.set(project.id, index + rotationStarted)
+          }
           // Its queue lives on the run's branch until a later tick promotes it.
-          pending.set(project.id, [...(pending.get(project.id) ?? []), runId])
-          note(project, true, job.describe)
-        } else {
+          pending.set(project.id, [
+            ...(pending.get(project.id) ?? []),
+            { runId, ...(item.job.entry !== undefined ? { entry: item.job.entry } : {}) },
+          ])
+        }
+        if (started.length) {
+          // One line per project however many agents went out, because that is the shape the
+          // report has always had; a single start keeps its old wording exactly.
+          const described = started.map(job => job.describe).join('; ')
+          note(project, true, started.length === 1 ? described : `started ${started.length} agents: ${described}`)
+        } else if (!stopped) {
+          // Nothing took, so the cooldown is re-armed: a refused batch spent nothing, and
+          // holding it would strand the project.
           lastStart.delete(project.id)
-          deps.log(`[framework] auto PM: could not start a run in ${project.path}`)
           note(project, false, 'the daemon could not start a run')
         }
       }

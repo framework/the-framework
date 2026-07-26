@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import type { AutoPmJob, ProjectSummary } from '@gemstack/the-framework'
-import { AUTO_PM_ROUTINES, runOptionsFromPreferences } from '@gemstack/the-framework/client'
+import {
+  AUTO_PM_ROUTINES,
+  DEFAULT_AUTO_PM_CONCURRENCY,
+  MAX_AUTO_PM_CONCURRENCY,
+  runOptionsFromPreferences,
+} from '@gemstack/the-framework/client'
 import { CalendarClock, Play } from 'lucide-react'
 import { onProjects } from '../server/projects.telefunc.js'
 import { sendAutoPmSweep } from '../server/quota.telefunc.js'
@@ -60,6 +65,14 @@ export function RoutineWork({
   const autoRun = preferences.autoPm ?? false
   // Absent = nothing opted out, which is also what the store saves an empty list back as.
   const optedOut = preferences.autoPmOptOut ?? []
+  // How many agents the sweep may keep going at once per project (#1204). The same default the
+  // daemon applies, so the number on screen is the number the sweep uses.
+  const concurrency = preferences.autoPmConcurrency ?? DEFAULT_AUTO_PM_CONCURRENCY
+  const setConcurrency = (raw: string) => {
+    const value = Number(raw)
+    if (raw.trim() === '' || !Number.isFinite(value)) return
+    updatePreferences({ autoPmConcurrency: Math.round(Math.min(Math.max(value, 1), MAX_AUTO_PM_CONCURRENCY)) })
+  }
   // Written as the whole list rather than a delta: `updatePreferences` patches by key, and this
   // key's value *is* the set.
   const setRoutine = (job: AutoPmJob, on: boolean) =>
@@ -205,8 +218,33 @@ export function RoutineWork({
                   </TooltipContent>
                 </Tooltip>
               </div>
+              {/* The concurrent-agent setting (#1204): how wide the schedule may fan out. Beside
+                  the auto-run switch because it parameterizes the same sweep — raising it is how
+                  a standing queue becomes parallel sessions instead of one at a time. */}
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <Tooltip>
+                  <TooltipTrigger render={<label htmlFor="routine-concurrency" className="text-sm text-muted-foreground" />}>
+                    Concurrent agents
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    How many agents the routine may keep going at once per project.
+                  </TooltipContent>
+                </Tooltip>
+                <input
+                  id="routine-concurrency"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={MAX_AUTO_PM_CONCURRENCY}
+                  step={1}
+                  value={concurrency}
+                  onChange={e => setConcurrency(e.target.value)}
+                  className="w-16 rounded-md border border-border bg-transparent px-2 py-1 text-sm"
+                />
+              </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Only while nothing else is running and the week&apos;s allowance is not already spent.
+                Keeps up to {concurrency} agent{concurrency === 1 ? '' : 's'} going at once, and only while the
+                week&apos;s allowance is not already spent.
               </p>
               {/* Auto-run on with every routine unticked is a schedule with nothing on it, and
                   from the countdown alone it looks like work is coming (#1209). */}

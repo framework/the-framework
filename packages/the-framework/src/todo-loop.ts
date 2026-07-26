@@ -6,8 +6,13 @@ import { requestChoices, runAwaitRounds } from './await-gate.js'
 import { FLAT_TODO_FILE, findFlatTodo, ticketFromQueueEntry } from './tickets.js'
 import { drainsQueue } from './preset-catalog.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
+import { insertTodoEntry, parseTodoEntryLine } from './queue-merge.js'
 
 export { FLAT_TODO_FILE, LEGACY_HYPHEN_TODO_FILE, LEGACY_TICKETS_TODO_FILE, LEGACY_TODO_FILE, TICKETS_DIR, ticketFromQueueEntry, todoPriorityForTicket } from './tickets.js'
+// The queue's line grammar and section placement live in the leaf `queue-merge.ts` so the
+// promotion merge (#1204) reads the same one; re-exported so this stays the import site for
+// everything that already reads them beside the loop.
+export { insertTodoEntry, parseTodoEntryLine, type TodoEntryLine } from './queue-merge.js'
 
 /**
  * The backlog loop (#323): once the main work settles, consume the agent's own
@@ -36,21 +41,14 @@ export interface TodoBacklog {
  * The open entries of a backlog document: markdown list items (`-`, `*`, or
  * `1.`), where a task checkbox counts only while unchecked (`- [ ]`); a checked
  * `- [x]` entry is done. Headings, prose, and blank lines are not entries.
+ * The grammar itself is `parseTodoEntryLine` (queue-merge.ts), shared with the
+ * promotion merge so the two can never read the same line differently (#1204).
  */
 export function parseTodoEntries(md: string): string[] {
   const entries: string[] = []
   for (const line of md.split('\n')) {
-    const item = /^\s*(?:[-*]|\d+\.)\s+(.*)$/.exec(line)
-    if (!item) continue
-    const text = item[1]!.trim()
-    if (!text) continue
-    const task = /^\[([ xX])\]\s*(.*)$/.exec(text)
-    if (task) {
-      if (task[1] !== ' ') continue // checked off = done
-      if (task[2]!.trim()) entries.push(task[2]!.trim())
-    } else {
-      entries.push(text)
-    }
+    const entry = parseTodoEntryLine(line)
+    if (entry && entry.checked !== true) entries.push(entry.text)
   }
   return entries
 }
@@ -114,72 +112,6 @@ export async function appendFlatTodoEntry(
   priority?: number,
 ): Promise<string | undefined> {
   return writeTodoEntry(cwd, (await findFlatTodo(cwd)) ?? FLAT_TODO_FILE, entry, priority)
-}
-
-/** A `## Priority 7` heading, with whatever gloss the format's example puts after the number. */
-const PRIORITY_HEADING = /^##\s+priority\s+(\d{1,2})\b/i
-
-/** Any second-level heading, which is where a priority section ends. */
-const SECTION_HEADING = /^##\s+/
-
-/**
- * Place an open entry in the backlog's priority section (`prompts/todo_format.md`), creating the
- * section when the file has none, and return the new document.
- *
- * Pure, because the placement is the whole point and it is much easier to pin here than through
- * the filesystem. The old behaviour was a plain append, which put a just-queued ticket at the
- * *end* of the file — and since the drain preset works "the FIRST open entry" and
- * {@link parseTodoEntries} reads in file order, queueing something meant it would be worked last,
- * behind everything already there (#1164).
- *
- * Placement rules, in the order they are tried:
- * - a section for this priority already exists: the entry joins the end of it, so a queue keeps
- *   its arrival order within a priority
- * - otherwise the section is created before the first *lower*-priority section, since the format
- *   sorts high to low
- * - with no priority sections at all, it goes above the first heading of any kind: the file's
- *   own sections are then unranked, and burying a deliberate pick under them is the bug
- */
-export function insertTodoEntry(md: string, entry: string, priority: number): string {
-  const item = `- [ ] ${entry}`
-  const lines = md.split('\n')
-  const headings = lines
-    .map((line, index) => ({ index, priority: Number(PRIORITY_HEADING.exec(line)?.[1]) }))
-    .filter(h => Number.isFinite(h.priority))
-
-  const existing = headings.find(h => h.priority === priority)
-  if (existing) {
-    // The end of that section: the last line before the next heading that is not blank, so the
-    // entry lands under the section's last item rather than after its trailing blank line.
-    let end = lines.findIndex((line, index) => index > existing.index && SECTION_HEADING.test(line))
-    if (end === -1) end = lines.length
-    while (end > existing.index + 1 && lines[end - 1]!.trim() === '') end--
-    lines.splice(end, 0, item)
-    return lines.join('\n')
-  }
-
-  const section = [`## Priority ${priority}`, '', item, '']
-  const lower = headings.find(h => h.priority < priority)
-  if (lower) {
-    lines.splice(lower.index, 0, ...section)
-    return lines.join('\n')
-  }
-  if (headings.length) {
-    // Every existing section outranks it, so it goes last -- but still as its own section.
-    const last = headings[headings.length - 1]!
-    let end = lines.findIndex((line, index) => index > last.index && SECTION_HEADING.test(line))
-    if (end === -1) end = lines.length
-    while (end > last.index + 1 && lines[end - 1]!.trim() === '') end--
-    lines.splice(end, 0, '', ...section.slice(0, 3))
-    return lines.join('\n')
-  }
-  const firstHeading = lines.findIndex(line => SECTION_HEADING.test(line))
-  if (firstHeading === -1) {
-    const separator = md === '' || md.endsWith('\n') ? '' : '\n'
-    return `${md}${separator}${section.slice(0, 3).join('\n')}\n`
-  }
-  lines.splice(firstHeading, 0, ...section)
-  return lines.join('\n')
 }
 
 /**

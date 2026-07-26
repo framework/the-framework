@@ -1,6 +1,9 @@
+import { writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { GitRunner } from './project.js'
 import { nodeGitRunner } from './project.js'
 import { FLAT_TODO_FILE } from './tickets.js'
+import { mergeQueueDocuments } from './queue-merge.js'
 import { errorMessage } from './error-message.js'
 
 /**
@@ -46,7 +49,7 @@ export function promotionMessage(runId: string): string {
 }
 
 /**
- * Copy `TODO_AGENTS.md` from a finished run's branch into the project checkout and commit it.
+ * Land `TODO_AGENTS.md` from a finished run's branch in the project checkout and commit it.
  *
  * Skips, rather than forcing, when:
  * - the run recorded no branch (nothing to read from)
@@ -54,12 +57,19 @@ export function promotionMessage(runId: string): string {
  * - the checkout has uncommitted changes to the queue file — a human is mid-edit, and their work
  *   outranks an unattended tidy-up
  *
+ * A checkout that has not moved since the run forked takes the run's file wholesale, as this
+ * always did. One that *has* moved — another agent's promotion landed first (#1204), or a human
+ * committed queue edits — gets the run's changes merged on instead: the wholesale copy used to
+ * revert whatever landed in between, un-checking entries a concurrent run had just retired, and
+ * the sweep would then start the same work over again.
+ *
  * Never throws: this runs on a background tick with nothing to catch it.
  */
 export async function promoteQueue(
   projectCwd: string,
   run: { id: string; branch?: string | undefined },
   git: GitRunner = nodeGitRunner(),
+  write: (path: string, content: string) => Promise<void> = (path, content) => writeFile(path, content, 'utf8'),
 ): Promise<QueuePromotion> {
   const branch = run.branch
   if (!branch) return { promoted: false, reason: 'the run recorded no branch' }
@@ -76,6 +86,24 @@ export async function promoteQueue(
     // tick will try again, and until then auto PM simply does not start more work.
     const dirty = (await git(['status', '--porcelain', '--', FLAT_TODO_FILE], projectCwd)).trim()
     if (dirty) return { promoted: false, reason: 'the checkout has uncommitted queue changes', retry: true }
+
+    // The queue as it stood where the run forked off, so its own changes can be told apart from
+    // the checkout's moves since. No merge base at all (a rewritten history, say) falls back to
+    // the wholesale copy this always was.
+    const mergeBase = (await git(['merge-base', branch, 'HEAD'], projectCwd).catch(() => '')).trim()
+    const atBase = mergeBase ? await git(['show', `${mergeBase}:${FLAT_TODO_FILE}`], projectCwd).catch(() => '') : undefined
+
+    if (atBase !== undefined && atBase !== inCheckout) {
+      // The checkout moved since the fork: land only what the run itself did (#1204).
+      const merged = mergeQueueDocuments(atBase, inCheckout, fromBranch)
+      if (merged === inCheckout) {
+        return { promoted: false, reason: 'every queue change the run made is already in the checkout' }
+      }
+      await write(join(projectCwd, FLAT_TODO_FILE), merged)
+      await git(['add', '--', FLAT_TODO_FILE], projectCwd)
+      await git(['commit', '-m', promotionMessage(run.id), '--', FLAT_TODO_FILE], projectCwd)
+      return { promoted: true, branch }
+    }
 
     // `checkout <branch> -- <path>` writes the file and stages it in one step, touching nothing
     // else in the tree. The commit is pathspec-scoped for the same reason: whatever else is

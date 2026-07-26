@@ -285,8 +285,9 @@ export function Quota() {
               <span className="font-medium text-foreground">Spend what's left on the roadmap</span>
             </label>
             <p className="text-xs text-muted-foreground">
-              When nothing is running, work the queue down and refill it rather than let the week's
-              allowance expire. Only while the account is still under the line above.
+              Work the queue down and refill it rather than let the week's allowance expire, up to
+              the Routine work card's concurrent-agent setting. Only while the account is still
+              under the line above.
             </p>
             {autoPm ? <AutoPmStatus report={autoPm} /> : null}
           </div>

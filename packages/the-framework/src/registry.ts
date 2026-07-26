@@ -2,7 +2,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { isAgentName } from './agent-names.js'
 import { nodeFs } from './node-fs.js'
-import { PROJECT_PREFERENCE_KEYS, MAX_SPEND_OFFSET, type ProjectPreferences } from './preference-defaults.js'
+import { PROJECT_PREFERENCE_KEYS, MAX_SPEND_OFFSET, MAX_AUTO_PM_CONCURRENCY, type ProjectPreferences } from './preference-defaults.js'
 
 /**
  * The multi-project registry (#390): the list of projects the user has
@@ -133,6 +133,13 @@ export interface Preferences {
    */
   autoPmOptOut?: string[]
   /**
+   * How many agents {@link autoPm} may keep running at once per project (#1204). Absent =
+   * `DEFAULT_AUTO_PM_CONCURRENCY` (2). Kept as a whole number between 1 and
+   * `MAX_AUTO_PM_CONCURRENCY`; the sweep tops a project up to this many concurrent runs instead
+   * of standing down the moment anything is going.
+   */
+  autoPmConcurrency?: number
+  /**
    * How far the automatic-consumption limit sits from the quota boundary, in percentage points
    * (#960). Absent or `0` puts it exactly on the boundary, which is the default policy of #879:
    * unattended work stops once the account has spent its share of the week.
@@ -176,7 +183,7 @@ export interface Preferences {
 // The key list lives in the leaf `preference-defaults.ts` so the dashboard reads the same one
 // (a second copy there erased the type link, see that module); re-exported so this stays the
 // import site for everything that already reads it beside `Preferences`.
-export { PROJECT_PREFERENCE_KEYS, MAX_SPEND_OFFSET, type ProjectPreferences } from './preference-defaults.js'
+export { PROJECT_PREFERENCE_KEYS, MAX_SPEND_OFFSET, DEFAULT_AUTO_PM_CONCURRENCY, MAX_AUTO_PM_CONCURRENCY, type ProjectPreferences } from './preference-defaults.js'
 
 /**
  * The credentials the daemon needs to reach a third party, set from the dashboard (#1095).
@@ -409,11 +416,15 @@ function sanitizePreferences(value: unknown): Preferences {
   // it gets its own branch like `theme`, constrained to the known set (anything else = default `local`).
   if (typeof input['target'] === 'string' && (KNOWN_RUN_TARGETS as readonly string[]).includes(input['target']))
     preferences.target = input['target'] as (typeof KNOWN_RUN_TARGETS)[number]
-  // `autoSpendOffset` (#960) is the one numeric preference: a slider position in percentage
-  // points, clamped so a hand-edited file cannot push the limit somewhere the slider could not.
+  // The numeric preferences, each clamped so a hand-edited file cannot push the value somewhere
+  // its control could not: `autoSpendOffset` (#960) is a slider position in percentage points,
+  // `autoPmConcurrency` (#1204) a whole number of agents.
   const offset = input['autoSpendOffset']
   if (typeof offset === 'number' && Number.isFinite(offset))
     preferences.autoSpendOffset = Math.round(Math.min(Math.max(offset, -MAX_SPEND_OFFSET), MAX_SPEND_OFFSET))
+  const concurrency = input['autoPmConcurrency']
+  if (typeof concurrency === 'number' && Number.isFinite(concurrency))
+    preferences.autoPmConcurrency = Math.round(Math.min(Math.max(concurrency, 1), MAX_AUTO_PM_CONCURRENCY))
   // `reposDirectory` (#1123) is a string, so like `target` the boolean-only loop would eat it. Kept
   // only as a non-empty absolute path; a relative or junk value is dropped rather than persisted.
   const reposDir = typeof input['reposDirectory'] === 'string' ? input['reposDirectory'].trim() : ''

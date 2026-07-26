@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { quotaTone, limitPercent, projectedRange } from './quota-bar.js'
+import { quotaTone, limitPercent, projectedRange, dailyLimitPercent } from './quota-bar.js'
 
 describe('quotaTone', () => {
   // The band exists so an account spending exactly as intended does not flip colour every day at
@@ -17,6 +17,23 @@ describe('quotaTone', () => {
     // is a different thing from spending too fast.
     expect(quotaTone(100, 100)).toBe('full')
     expect(quotaTone(99, 100)).toBe('near')
+  })
+})
+
+describe('dailyLimitPercent', () => {
+  // A share of a full day's budget, not of the whole week — so it can run well past ±100%.
+  test('reads 0% exactly on the boundary\'s pace', () => {
+    expect(dailyLimitPercent(57, 57)).toBe(0)
+  })
+
+  test('reads positive when ahead of pace, in units of a full day', () => {
+    // A seventh of the week ahead is exactly one day's worth: +100%.
+    expect(dailyLimitPercent(100 / 7 + 20, 20)).toBeCloseTo(100, 5)
+  })
+
+  test('reads negative when behind pace, and can run past -100% (#960 Edit)', () => {
+    // Two sevenths of the week behind is two days' worth: -200%, the case the issue names.
+    expect(dailyLimitPercent(20 - (2 * 100) / 7, 20)).toBeCloseTo(-200, 5)
   })
 })
 

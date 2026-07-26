@@ -33,6 +33,20 @@ export function limitPercent(boundaryPercent: number, offset: number): number {
   return Math.min(Math.max(boundaryPercent + offset, 0), 100)
 }
 
+/** How many days a quota week is divided into — the boundary steps one of these at a time. */
+const WEEK_DAYS = 7
+
+/**
+ * Consumption against the daily budget, in units of a full day's worth of it (#960 Edit): 0% is
+ * exactly on the boundary's pace, +100% is a whole day ahead, -100% a whole day behind. Unlike a
+ * plain ratio against the boundary, this can run past ±100% — and negative, for an account that is
+ * behind by more than a single day — which is the point: "53% used" read as a share of the *week*
+ * told you almost nothing about whether today's pace was being kept.
+ */
+export function dailyLimitPercent(percentUsed: number, boundaryPercent: number, days = WEEK_DAYS): number {
+  return (percentUsed - boundaryPercent) * days
+}
+
 /**
  * The bar's second, dimmer segment (#960 Edit): the room between what has actually been used and
  * where unattended work is allowed to stop. Drawn at reduced opacity, right after the solid "used"

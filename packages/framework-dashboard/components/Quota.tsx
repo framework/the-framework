@@ -5,7 +5,7 @@ import { MAX_SPEND_OFFSET } from '@gemstack/the-framework/client'
 import { useQuota } from '../lib/quota.js'
 import { formatRelative, formatResetDay, formatResetTooltip } from '../lib/format-date.js'
 import { updatePreferences } from '../lib/preferences.js'
-import { quotaTone, limitPercent, projectedRange, type QuotaTone } from '../lib/quota-bar.js'
+import { quotaTone, limitPercent, projectedRange, dailyLimitPercent, type QuotaTone } from '../lib/quota-bar.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
@@ -131,7 +131,15 @@ function WeekBar({
         />
       </div>
       <p className="text-xs text-muted-foreground">
-        <span className="font-medium text-foreground">{Math.round(percentUsed)}% used</span>
+        <Tooltip>
+          <TooltipTrigger render={<span className="cursor-default font-medium text-foreground" />}>
+            {Math.round(dailyLimitPercent(percentUsed, boundary.percent))}% used
+          </TooltipTrigger>
+          <TooltipContent className="max-w-64">
+            Ahead of (positive) or behind (negative) today's pace, in units of a full day's budget — 0% is exactly on pace.{' '}
+            {Math.round(percentUsed)}% of the week's allowance used against a {Math.round(boundary.percent)}% pace.
+          </TooltipContent>
+        </Tooltip>
         {' · '}
         <Tooltip>
           <TooltipTrigger render={<span className="cursor-default" />}>resets {formatResetDay(boundary.resetsAt)}</TooltipTrigger>
@@ -144,12 +152,17 @@ function WeekBar({
             {' · '}
             <Tooltip>
               <TooltipTrigger render={<span className="cursor-default" />}>show all limits</TooltipTrigger>
-              <TooltipContent className="max-w-72">
-                <div className="space-y-1">
-                  {others.map(w => (
-                    <OtherWindow key={w.label} window={w} />
-                  ))}
-                </div>
+              <TooltipContent>
+                {/* A table, not stacked flex rows — each column has to line up across every window,
+                    which only a real table (rather than each row sizing its own two flex items)
+                    guarantees. */}
+                <table className="border-collapse text-left">
+                  <tbody>
+                    {others.map(w => (
+                      <OtherWindowRow key={w.label} window={w} />
+                    ))}
+                  </tbody>
+                </table>
               </TooltipContent>
             </Tooltip>
           </>
@@ -203,9 +216,8 @@ function WeekBar({
 }
 
 /**
- * The windows the bar is not about (the session, and a model's own week), as one line each —
- * tucked behind the bar's own "show all limits" tooltip normally, but the fallback below draws
- * these directly when there is no bar to hide them in.
+ * The windows the bar is not about (the session, and a model's own week), as one line each — for
+ * the fallback that draws these directly when there is no bar to tuck them behind.
  */
 function OtherWindow({ window }: { window: DriverQuotaWindow }) {
   return (
@@ -215,6 +227,18 @@ function OtherWindow({ window }: { window: DriverQuotaWindow }) {
         {Math.round(window.percentUsed)}% used{window.resetsAtText ? ` · resets ${window.resetsAtText}` : ''}
       </span>
     </div>
+  )
+}
+
+/** Same, as a table row for the "show all limits" tooltip, so every window's columns line up. */
+function OtherWindowRow({ window }: { window: DriverQuotaWindow }) {
+  return (
+    <tr>
+      <td className="pr-3 align-baseline text-muted-foreground">{window.label}</td>
+      <td className="whitespace-nowrap align-baseline text-muted-foreground">
+        {Math.round(window.percentUsed)}% used{window.resetsAtText ? ` · resets ${window.resetsAtText}` : ''}
+      </td>
+    </tr>
   )
 }
 

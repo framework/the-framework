@@ -264,6 +264,27 @@ describe('Quota (#960)', () => {
     expect(screen.queryByText('Under the line, with room to spend.')).toBeNull()
   })
 
+  test('the main figure reads against the daily budget, not the week, and can go negative (#960 Edit)', () => {
+    // 20% of the week used against a 57% (day 4/7) pace: well behind. (20 - 57.142857) * 7 ≈ -260.
+    view = reading(20)
+    render(<Quota />)
+    expect(screen.getByText('-260% used')).toBeTruthy()
+    expect(screen.queryByText('20% used')).toBeNull()
+  })
+
+  test('reads 0% exactly on the boundary\'s own pace', () => {
+    view = reading((4 / 7) * 100)
+    render(<Quota />)
+    expect(screen.getByText('0% used')).toBeTruthy()
+  })
+
+  test('the main figure has its own tooltip explaining what it measures (#960 Edit)', async () => {
+    view = reading(20)
+    render(<Quota />)
+    await openTooltip(screen.getByText('-260% used'))
+    expect(screen.getByText(/Ahead of \(positive\) or behind \(negative\)/)).toBeTruthy()
+  })
+
   test('the legend names the projected segment and gives the daily soft limit a tooltip (#960 Edit)', () => {
     view = reading(20)
     const { container } = render(<Quota />)
@@ -286,6 +307,18 @@ describe('Quota (#960)', () => {
     await openTooltip(screen.getByText('show all limits'))
     const rows = screen.getAllByText(/Current (session|week)/).map(el => el.textContent)
     expect(rows).toEqual(['Current week (all models)', 'Current session', 'Current week (Fable)'])
+  })
+
+  test('"show all limits" renders as a real table, not flex rows that drift out of alignment (#960 Edit)', async () => {
+    view = reading(20)
+    view.windows.push({ label: 'Current week (Fable)', kind: 'week-model', percentUsed: 12, resetsAtText: 'Jul 28 at 7pm' })
+    render(<Quota />)
+    await openTooltip(screen.getByText('show all limits'))
+    const tooltip = screen.getByRole('tooltip')
+    const table = tooltip.querySelector('table')!
+    expect(table).toBeTruthy()
+    expect(table.querySelectorAll('tr')).toHaveLength(3)
+    for (const row of table.querySelectorAll('tr')) expect(row.querySelectorAll('td')).toHaveLength(2)
   })
 
   test('the legend and the enabled/disabled status share one row, the warning between them (#960 Edit)', () => {

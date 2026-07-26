@@ -234,25 +234,57 @@ describe('Quota (#960)', () => {
     expect(screen.getByText(/move slider to the right to enable/)).toBeTruthy()
   })
 
-  test('warns once the knob is dragged past the daily budget (#960 Edit)', () => {
-    view = reading(20, 0) // limit sits exactly on the boundary: not past it yet
+  test('the enabled status has its own tooltip naming what enabled means (#960 Edit)', async () => {
+    view = reading(20, 15) // room left: enabled
     render(<Quota />)
-    expect(screen.queryByText(/Past daily budget/)).toBeNull()
+    await openTooltip(screen.getByText('enabled', { selector: 'em' }).closest('span')!)
+    expect(
+      screen.getByText(
+        'Autonomous AI enabled means that agents will automatically work on tasks in the AI queue, and tasks will be automatically added to the AI queue.',
+      ),
+    ).toBeTruthy()
   })
 
-  test('a positive offset always reads as past the daily budget, since the limit only moves that way (#960 Edit)', () => {
-    view = reading(20, 15) // limit 57% + 15 = 72%, past the 57% boundary
+  test('the disabled status has its own tooltip naming what disabled means (#960 Edit)', async () => {
+    view = reading(80, -50) // no room: disabled
     render(<Quota />)
-    expect(screen.getByText(/Past daily budget/)).toBeTruthy()
+    await openTooltip(screen.getByText('disabled', { selector: 'em' }).closest('span')!)
+    expect(
+      screen.getByText(
+        "Autonomous AI disabled means that agents won't automatically start to work — every new agentic work is triggered by you manually.",
+      ),
+    ).toBeTruthy()
+  })
+
+  test('no warning while the limit sits on, or only just past, the boundary (#960 Edit)', () => {
+    view = reading(20, 0) // limit sits exactly on the boundary: not past it yet
+    render(<Quota />)
+    expect(screen.queryByText(/Eager consumption/)).toBeNull()
+  })
+
+  test('no warning for an overshoot smaller than a full day above the boundary (#960 Edit)', () => {
+    // Boundary at 57.14%, offset 10: 67.14%, short of the ~14.29-point (one day) threshold.
+    view = reading(20, 10)
+    render(<Quota />)
+    expect(screen.queryByText(/Eager consumption/)).toBeNull()
+  })
+
+  test('warns once the offset clears a full day above the boundary (#960 Edit)', async () => {
+    // Boundary at 57.14%, offset 20: 77.14%, clearing the ~14.29-point (one day) threshold.
+    view = reading(20, 20)
+    render(<Quota />)
+    const warning = screen.getByText('⚠️ Eager consumption')
+    await openTooltip(warning)
+    expect(screen.getByText("Autonomous AI will spend tokens more than 1-day faster than the week's pace allows")).toBeTruthy()
   })
 
   test('the warning sits beside the enabled/disabled status, not stacked below it (#960 Edit)', () => {
-    view = reading(20, 15)
+    view = reading(20, 20)
     const { container } = render(<Quota />)
     const em = container.querySelector('em')
     const row = em?.closest('div')
     expect(row?.textContent).toMatch(/enabled/)
-    expect(row?.querySelector('svg.lucide-circle-help')).toBeTruthy()
+    expect(row?.querySelectorAll('svg.lucide-circle-help').length).toBeGreaterThan(0)
   })
 
   test('one bar, not two: the handle is drawn on the week track itself (#960 Edit)', () => {
@@ -321,6 +353,18 @@ describe('Quota (#960)', () => {
     expect(container.querySelector('svg.lucide-circle-help')).toBeTruthy()
   })
 
+  test('the quota boundary tooltip explains itself in its own paragraph, and ends on a fun fact (#960 Edit)', async () => {
+    view = reading(20)
+    render(<Quota />)
+    await openTooltip(screen.getByText('Quota boundary'))
+    expect(
+      screen.getByText("If your usage matches the quota boundary, then you're spending exactly what the week's pace allows."),
+    ).toBeTruthy()
+    expect(
+      screen.getByText('Fun fact: the quota boundary is shown exactly at the current time in the week usage bar graphic above.'),
+    ).toBeTruthy()
+  })
+
   test('the reset tooltip trigger carries no underline (#960 Edit)', () => {
     view = reading(20)
     render(<Quota />)
@@ -350,7 +394,7 @@ describe('Quota (#960)', () => {
   })
 
   test('the legend and the enabled/disabled status share one row, the warning between them (#960 Edit)', () => {
-    view = reading(20, 15) // limit past the boundary, so the warning shows too
+    view = reading(20, 20) // limit a full day past the boundary, so the warning shows too
     render(<Quota />)
     const em = screen.getByText('enabled', { selector: 'em' })
     const legend = screen.getByText('Used')
@@ -358,7 +402,7 @@ describe('Quota (#960)', () => {
     const row = em.closest('.justify-between')!
     expect(legend.closest('.justify-between')).toBe(row)
     // The warning sits to the left of the status, both within the row's own right-hand group.
-    const warning = screen.getByText('⚠️ Past daily budget')
+    const warning = screen.getByText('⚠️ Eager consumption')
     const statusGroup = em.closest('span')!.parentElement!
     expect(statusGroup.contains(warning)).toBe(true)
     // DOCUMENT_POSITION_FOLLOWING (4) on the status span means the warning precedes it.

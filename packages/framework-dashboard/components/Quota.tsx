@@ -5,7 +5,7 @@ import { MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '@gemstack/the-framework/
 import { useQuota } from '../lib/quota.js'
 import { formatRelative, formatResetDay, formatResetTooltip, formatDuration, formatDurationLong } from '../lib/format-date.js'
 import { updatePreferences } from '../lib/preferences.js'
-import { weekDays, quotaTone, limitPercent, projectedRange, paceDeviationMs, type QuotaTone } from '../lib/quota-bar.js'
+import { weekDays, quotaTone, limitPercent, projectedRange, paceDeviationMs, ONE_DAY_PERCENT, type QuotaTone } from '../lib/quota-bar.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
@@ -85,9 +85,10 @@ function WeekBar({
   const limit = limitPercent(boundary.percent, offset)
   const projected = projectedRange(percentUsed, limit)
   const enabled = projected.end > projected.start
-  // Past the pro-rated boundary, unattended work is allowed to spend faster than the week's own
-  // pace calls for — worth flagging, since it is easy to drag past without meaning to.
-  const pastBoundary = limit > boundary.percent
+  // A full day above the boundary, not merely past it — the boundary steps a day at a time on its
+  // own, so a knob resting a few points ahead is normal and only worth flagging once it clears a
+  // whole day's worth of pace.
+  const eagerConsumption = limit > boundary.percent + ONE_DAY_PERCENT
   const label = `${Math.round(percentUsed)}% of the week used, against a boundary of ${Math.round(boundary.percent)}% on day ${boundary.day} of 7`
   // How far ahead of or behind the boundary's own pace consumption is, as a duration (#960 Edit):
   // "53% used" said almost nothing about whether today's pace was being kept; "2h" does.
@@ -217,34 +218,45 @@ function WeekBar({
                 Quota boundary
                 <CircleHelp className="h-3 w-3" aria-hidden />
               </TooltipTrigger>
-              <TooltipContent className="max-w-64">
-                Not a hard limit — just an indication of whether you're over- or under-consuming. It's calculated as a pro-rated share of
-                the weekly limit. If your usage matches the quota boundary, then you're spending exactly what the week's pace allows.
+              <TooltipContent className="max-w-64 space-y-2">
+                <p>
+                  Not a hard limit — just an indication of whether you're over- or under-consuming. It's calculated as a pro-rated share
+                  of the weekly limit.
+                </p>
+                <p>If your usage matches the quota boundary, then you're spending exactly what the week's pace allows.</p>
+                <p>Fun fact: the quota boundary is shown exactly at the current time in the week usage bar graphic above.</p>
               </TooltipContent>
             </Tooltip>
           </LegendItem>
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          {pastBoundary && (
+          {eagerConsumption && (
             <Tooltip>
               <TooltipTrigger render={<span className="inline-flex cursor-default items-center gap-0.5 text-warning" />}>
-                ⚠️ Past daily budget
+                ⚠️  Eager consumption
                 <CircleHelp className="h-3 w-3" aria-hidden />
               </TooltipTrigger>
-              <TooltipContent>Autonomous AI will spend tokens faster than the week's pace allows</TooltipContent>
+              <TooltipContent>Autonomous AI will spend tokens more than 1-day faster than the week's pace allows</TooltipContent>
             </Tooltip>
           )}
-          <span>
-            {enabled ? (
-              <>
-                ✅ Autonomous AI <em>enabled</em> <small className="text-muted-foreground/70">move slider to the left to disable</small>
-              </>
-            ) : (
-              <>
-                ❌ Autonomous AI <em>disabled</em> <small className="text-muted-foreground/70">move slider to the right to enable</small>
-              </>
-            )}
-          </span>
+          <Tooltip>
+            <TooltipTrigger render={<span className="cursor-default" />}>
+              {enabled ? (
+                <>
+                  ✅ Autonomous AI <em>enabled</em> <small className="text-muted-foreground/70">move slider to the left to disable</small>
+                </>
+              ) : (
+                <>
+                  ❌ Autonomous AI <em>disabled</em> <small className="text-muted-foreground/70">move slider to the right to enable</small>
+                </>
+              )}
+            </TooltipTrigger>
+            <TooltipContent className="max-w-64">
+              {enabled
+                ? 'Autonomous AI enabled means that agents will automatically work on tasks in the AI queue, and tasks will be automatically added to the AI queue.'
+                : "Autonomous AI disabled means that agents won't automatically start to work — every new agentic work is triggered by you manually."}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </div>

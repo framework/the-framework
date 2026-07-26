@@ -95,6 +95,13 @@ export function quotaTone(percentUsed: number, boundaryPercent: number, band = N
 }
 
 /**
+ * A day, as a share of the week (#960 Edit): how far above the boundary the limit has to drift
+ * before it's worth flagging as eager rather than merely past it. The boundary itself steps a
+ * whole day at a time, so a knob resting a few points ahead of it is normal, not eager.
+ */
+export const ONE_DAY_PERCENT = 100 / 7
+
+/**
  * Where the automatic-consumption limit sits, given the boundary and the user's offset.
  *
  * The daemon computes this too, and its answer is the one that gates the work. This exists so the

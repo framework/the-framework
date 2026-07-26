@@ -27,12 +27,26 @@ const block = JSON.stringify(
   2,
 )
 
+// Indented differently on purpose: the parser must not depend on an indentation nobody
+// promised, which is what round 2 of the spike failed on.
+const wideBlock = JSON.stringify(JSON.parse(block), null, 4)
+// A highlighter splits a block into per-token elements; textContent still rejoins it.
+const highlighted = wideBlock
+  .split('\n')
+  .map(line => `<span class="line">${line.replace(/</g, '&lt;')}</span>`)
+  .join('\n')
+
 const cases = [
   ['fenced code block', `<pre><code>${block}</code></pre><div contenteditable="true"></div>`, true],
   ['pre without code', `<pre>${block}</pre><textarea></textarea>`, true],
-  // The shape claude.ai actually uses: <code> with no <pre> wrapper at all. Round 1 of the
-  // spike missed the question entirely because the selector required a <pre>.
+  // The shape claude.ai actually uses: <code> with no <pre> wrapper at all (round 1).
   ['code without pre', `<code>${block}</code><div contenteditable="true"></div>`, true],
+  ['four space indent', `<code>${wideBlock}</code><div contenteditable="true"></div>`, true],
+  ['split across spans by a highlighter', `<code>${highlighted}</code><div contenteditable="true"></div>`, true],
+  ['prose around the block', `<div>Your prompt "hi" is ambiguous! Let me clarify:</div><code>${block}</code><div>anything else?</div><div contenteditable="true"></div>`, true],
+  // Round 2's finding: the message body lives behind a shadow root, so nothing in the light
+  // DOM sees it. Built after parse, below.
+  ['inside a shadow root', { shadow: block }, true],
   ['no question present', `<pre><code>console.log(1)</code></pre><div contenteditable="true"></div>`, false],
 ]
 
@@ -40,10 +54,16 @@ const script = readFileSync(join(here, 'content.js'), 'utf8')
 let failed = 0
 
 for (const [name, body, expectFound] of cases) {
-  const dom = new JSDOM(`<!doctype html><html><body><main>${body}</main></body></html>`, {
+  const shadow = typeof body === 'object' ? body.shadow : undefined
+  const light = shadow ? '<div id="host"></div><div contenteditable="true"></div>' : body
+  const dom = new JSDOM(`<!doctype html><html><body><main>${light}</main></body></html>`, {
     url: 'https://claude.ai/code/session_01TEST',
     runScripts: 'outside-only',
   })
+  if (shadow) {
+    const host = dom.window.document.getElementById('host')
+    host.attachShadow({ mode: 'open' }).innerHTML = `<code>${shadow}</code>`
+  }
   dom.window.eval(script)
   // The panel is appended to documentElement, so it is a direct child rather than in the body.
   const text = [...dom.window.document.documentElement.children]

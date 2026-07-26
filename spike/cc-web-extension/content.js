@@ -52,6 +52,33 @@ function findComposer() {
 }
 
 /** Everything we managed to read, as the report to paste back into the issue. */
+/**
+ * What the page looks like, for the case where extraction fails. Without this a failed run
+ * reports only "no", which costs another round trip on someone's browser to learn anything.
+ * Structure and lengths only: no message text leaves the page, so the report stays safe to
+ * paste into a public issue.
+ */
+function diagnostics() {
+  const jsonish = [...document.querySelectorAll('pre, code')]
+    .map(el => (el.textContent ?? '').trim())
+    .filter(t => t.includes('"options"') || t.startsWith('{'))
+  const bodyText = document.body?.innerText ?? ''
+  return {
+    pre: document.querySelectorAll('pre').length,
+    code: document.querySelectorAll('code').length,
+    jsonishBlocks: jsonish.length,
+    jsonishLengths: jsonish.map(t => t.length).slice(0, 5),
+    // Which of the shapes we guessed at actually exist on the page.
+    hasTestidMessage: document.querySelectorAll('[data-testid*="message" i]').length,
+    hasRoleArticle: document.querySelectorAll('article, [role="article"]').length,
+    contentEditables: document.querySelectorAll('div[contenteditable="true"]').length,
+    textareas: document.querySelectorAll('textarea').length,
+    // Does the await block appear at all, even if we could not parse it out?
+    mentionsOptionsAnywhere: bodyText.includes('"options"'),
+    bodyTextLength: bodyText.length,
+  }
+}
+
 function survey() {
   const choice = findPendingChoice()
   const composer = findComposer()
@@ -64,6 +91,7 @@ function survey() {
     choiceOptions: (choice?.parsed?.options ?? []).map(o => o.label ?? o),
     composerFound: Boolean(composer),
     composerVia: composer?.via,
+    diagnostics: diagnostics(),
   }
 }
 
@@ -87,6 +115,10 @@ function render() {
     ['title', latest.choiceTitle ?? '-'],
     ['options', latest.choiceOptions.length ? latest.choiceOptions.join(' | ') : '-'],
     ['composer', latest.composerFound ? latest.composerVia : 'not found'],
+    // Only useful when something is missing, so it stays out of the way when both were found.
+    ...(latest.choiceFound && latest.composerFound
+      ? []
+      : [['why not', `pre ${latest.diagnostics.pre}, code ${latest.diagnostics.code}, json-ish ${latest.diagnostics.jsonishBlocks}, "options" on page: ${latest.diagnostics.mentionsOptionsAnywhere}`]]),
   ]
   panel.innerHTML = ''
   const head = document.createElement('div')

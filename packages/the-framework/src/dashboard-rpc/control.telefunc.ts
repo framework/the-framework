@@ -1,5 +1,6 @@
 import { getContext } from 'telefunc'
 import { appendControl, type ControlEntry } from '../control.js'
+import { bridgeQuestions } from '../dashboard/bridge-store.js'
 import { isSafeVia } from '../conversations.js'
 import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
 import { resolveProjectPath, resolveRunPath, contextPreferences, contextPreview } from './context.js'
@@ -84,6 +85,28 @@ export async function sendChoice(
   return relayOr(runId, 'sendChoice', [projectId, id, pick, by, runId], async () => {
     await appendControlFor(projectId, { kind: 'choice', id, pick, by }, runId)
   }, undefined)
+}
+
+/**
+ * Queue the user's pick for the question a Claude web session is parked on (#1237).
+ *
+ * Not a control-log write like {@link sendChoice}: a cloud run has no live local session to
+ * steer, so the pick goes to the bridge store, where the browser extension collects it, types
+ * it into the session's composer and submits. Only a label of the currently parked question is
+ * accepted, so this can never put arbitrary text in front of another product's agent. Local
+ * only, no relay: the bridge lives on the daemon the extension talks to.
+ */
+export async function sendBridgeAnswer(sessionId: string, label: string): Promise<{ ok: boolean; error?: string }> {
+  if (typeof sessionId !== 'string' || !/^session_[A-Za-z0-9]{1,128}$/.test(sessionId)) return { ok: false, error: 'unknown session' }
+  if (typeof label !== 'string' || !label.trim()) return { ok: false, error: 'an answer label is required' }
+  const queued = bridgeQuestions().queueAnswer(sessionId, label)
+  return typeof queued === 'string' ? { ok: false, error: queued } : { ok: true }
+}
+
+/** Withdraw a queued bridge answer (#1237). A no-op once the extension has delivered it. */
+export async function sendBridgeAnswerCancel(sessionId: string): Promise<void> {
+  if (typeof sessionId !== 'string' || !/^session_[A-Za-z0-9]{1,128}$/.test(sessionId)) return
+  bridgeQuestions().cancelAnswer(sessionId)
 }
 
 /**

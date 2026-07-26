@@ -14,6 +14,8 @@ import { requestPathname } from '../request-path.js'
 import type { AddProjectResult, PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from './types.js'
 import type { EventsSource, PreviewHandlers, RemoteRuns } from './telefunc-serve.js'
 import { handleRelayRequest, RELAY_PREFIX, type RelayHandlers } from './relay-endpoints.js'
+import { BRIDGE_PREFIX, handleBridgeRequest, type BridgeHandlers } from './bridge-endpoints.js'
+import { bridgeQuestions } from './bridge-store.js'
 
 /** Options for {@link startDashboard}. */
 export interface DashboardOptions {
@@ -122,6 +124,21 @@ export interface DashboardOptions {
     /** Run one whitelisted run-scoped RPC against this daemon's own checkout (#1067 slice 2). */
     rpc?: (fn: string, args: unknown[]) => Promise<unknown>
   }
+  /**
+   * The browser bridge (#1237): the token a Claude web extension presents to report the question
+   * its cloud session is parked on. Absent leaves every `/_bridge/*` route 404, which is default.
+   *
+   * Deliberately not {@link token}. That one guards a non-loopback bind and is absent on a normal
+   * loopback daemon, where what keeps other origins out of `/_telefunc` is the same-origin check.
+   * The bridge is the one route meant to be reached from another origin, so neither protects it
+   * and it authenticates on its own.
+   */
+  bridgeToken?: string
+  /**
+   * The cloud sessions the browser bridge should have a tab open for (#1237). Only the daemon
+   * wires one, since it is the process that can see every project's runs.
+   */
+  bridgeSessions?: () => Promise<import('./bridge-endpoints.js').BridgeSession[]>
 }
 
 /** A running localhost dashboard: the prerendered SPA + its Telefunc mount. */
@@ -184,11 +201,37 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
       ? { start: opts.onStart, tailEvents: opts.relay.tailEvents, ...(opts.relay.rpc ? { rpc: opts.relay.rpc } : {}) }
       : undefined
 
+  // The browser bridge (#1237). Off unless a token was supplied, and it carries that token itself
+  // rather than riding the #1051 guard, which a loopback daemon does not have.
+  const bridgeHandlers: BridgeHandlers | undefined = opts.bridgeToken
+    ? {
+        token: opts.bridgeToken,
+        record: question => bridgeQuestions().record(question),
+        contact: (route, status) => bridgeQuestions().recordContact(route, status),
+        recordEvent: event => bridgeQuestions().recordEvent(event),
+        hello: hello => bridgeQuestions().recordHello(hello),
+        answer: sessionId => {
+          const pending = bridgeQuestions().pendingAnswer(sessionId)
+          return pending ? { id: pending.id, label: pending.label } : undefined
+        },
+        answered: (sessionId, id, ok, note) => bridgeQuestions().resolveAnswer(sessionId, id, ok, note),
+        ...(opts.bridgeSessions ? { sessions: opts.bridgeSessions } : {}),
+      }
+    : undefined
+
   const token = opts.token
   const server = createServer((req, res) => {
     const pathname = requestPathname(req)
     if (pathname === undefined) {
       res.writeHead(400, { 'content-type': 'text/plain' }).end('bad request')
+      return
+    }
+    // The browser bridge (#1237) is checked BEFORE the #1051 guard, and is the only route that is.
+    // That guard's browser affordance is a `?token=` redirect meant for a human following a link,
+    // which is meaningless to an extension posting JSON; the bridge presents its own bearer token
+    // instead, so letting it past here costs nothing and skips a 302 it could not follow.
+    if (pathname === BRIDGE_PREFIX || pathname.startsWith(`${BRIDGE_PREFIX}/`)) {
+      void handleBridgeRequest(req, res, pathname, bridgeHandlers)
       return
     }
     // #1051: one guard fronting every route on a non-loopback bind; a no-op when no token is set.

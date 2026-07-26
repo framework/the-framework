@@ -13,6 +13,9 @@ import { addProject, ensureDaemonToken, listProjects, nodeRegistryFs, readPrefer
 import { listReposInDirectory } from './repos-directory.js'
 import { registryDiscordCredentialsStore } from './discord-credentials-store.js'
 import { JsonlTailer } from './jsonl-tail.js'
+import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
+import { readAllRuns } from './store/index.js'
+import type { BridgeSession } from './dashboard/index.js'
 
 /**
  * The persistent background dashboard (#302). Today the dashboard dies with the
@@ -348,6 +351,12 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // anyone who finds the port, so generate + persist the shared token the request guard requires. A
   // loopback bind needs none, so the local zero-config path stays byte-identical.
   const token = isLoopbackHost(host) ? undefined : await ensureDaemonToken(undefined, env)
+  // The browser bridge (#1237). Opt-in, because it opens the daemon's one route reachable from
+  // another origin. It reuses the #1051 shared secret rather than minting a second one: the two
+  // guard the same daemon, so a second secret would be another thing to rotate and leak without
+  // narrowing anything. On a loopback bind that secret may not exist yet, hence ensure, not read.
+  const bridgeOn = (await readPreferences(undefined, env).catch((): Preferences => ({}))).bridge === true
+  const bridgeToken = bridgeOn ? await ensureDaemonToken(undefined, env) : undefined
   // Steering (#344): the daemon owns no run, so its Stop button and choice picks
   // append to `.the-framework/control.jsonl`; the live run tails that file. Appends
   // are best-effort — a full disk must not take the dashboard down with it.
@@ -399,6 +408,8 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     eventsSource: runtime.remoteEventsSource,
     remote: runtime.remoteRuns,
     relay: { tailEvents: runtime.tailRelayEvents, rpc: runtime.onRelayRpc },
+    // The browser bridge (#1237): absent unless the preference is on, which 404s every route.
+    ...(bridgeToken ? { bridgeToken, bridgeSessions: () => listBridgeSessions(env) } : {}),
     // Configure Discord from the dashboard (#1095). `onChange` is the half that makes the step
     // finishable in-product: the credential is written to the registry, then this daemon's own
     // Discord services are rebuilt against it, so the bot connects without a restart.
@@ -494,4 +505,16 @@ function waitForShutdown(signal?: AbortSignal): Promise<void> {
     process.once('SIGTERM', done)
     signal?.addEventListener('abort', done, { once: true })
   })
+}
+
+/**
+ * The cloud sessions the browser bridge should have a tab open for (#1237).
+ *
+ * Across every registered project, because a cloud run is not tied to the daemon's home
+ * checkout, and best-effort per project so one unreadable repo cannot empty the list.
+ */
+async function listBridgeSessions(env: NodeJS.ProcessEnv): Promise<BridgeSession[]> {
+  const projects = await listProjects(undefined, env).catch(() => [])
+  const runs = (await Promise.all(projects.map(p => readAllRuns(p.path).catch(() => [])))).flat()
+  return bridgeSessionsFrom(runs, new Date())
 }

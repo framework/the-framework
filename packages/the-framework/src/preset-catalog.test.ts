@@ -174,7 +174,7 @@ test('Suggest tickets to work on gates on a human, unlike the triage pair (#698)
 })
 
 test('the triage pair splits on cost and both append to the queue (#891/#892)', () => {
-  assert.match(presets.triageQuick.template, /Only pick tickets that are quick-wins and consensual/)
+  assert.match(presets.triageQuick.template, /Only pick tickets that are quick-wins \(quick to implement\) and consensual/)
   assert.match(presets.triageQuick.template, /Add tickets to TODO_AGENTS\.md/)
   assert.match(presets.triageConsensual.template, /Only pick tickets that are significant \(no quick-wins\) and consensual/)
   assert.match(presets.triageConsensual.template, /Add tickets to TODO_AGENTS\.md/)
@@ -182,11 +182,11 @@ test('the triage pair splits on cost and both append to the queue (#891/#892)', 
 
 test('each triage preset pins its own session name and aborts on a taken branch (#891/#892)', () => {
   // The collision guard is what makes these safe to fire on a schedule: a triage already in
-  // flight owns the branch, so the next firing must do nothing rather than triage twice.
+  // flight owns the branch, so the next firing must abort and say so rather than triage twice.
   for (const preset of [presets.triageQuick, presets.triageConsensual]) {
     const out = preset.render()
     assert.match(out, new RegExp(`Always set <SESSION_NAME> to ${preset.name}`))
-    assert.match(out, /If branch the-framework\/<SESSION_NAME> already exists, abort and do nothing/)
+    assert.match(out, /If branch the-framework\/<SESSION_NAME> already exists, abort and tell user that the branch already exists and that triage is already pending/)
   }
   // Distinct session names, or the two would collide with each other rather than with their own
   // in-flight run.

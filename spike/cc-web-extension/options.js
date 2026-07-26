@@ -38,7 +38,20 @@ document.getElementById('save').addEventListener('click', async () => {
     // that as success would report "connected" to someone whose bridge does not exist.
     const body = (await res.text()).trim()
     if (body !== 'ok') return say('That dashboard has no bridge route. Update The Framework, then try again.', true)
-    say('Connected. The bridge is on and the token works.')
+
+    // Prove the read path too, not just auth. "Connected" on its own leaves the next question
+    // unanswered: does the daemon actually have anything for us to watch?
+    let watching = ''
+    try {
+      const list = await fetch(`${daemonUrl}/_bridge/sessions`, { headers: { authorization: `Bearer ${token}` } })
+      const sessions = list.ok ? ((await list.json())?.sessions ?? []) : []
+      watching = sessions.length
+        ? ` Watching ${sessions.length} recent cloud session${sessions.length === 1 ? '' : 's'}${autoOpenEl.checked ? ', tabs opening shortly.' : ' (tab opening is off).'}`
+        : ' No recent cloud sessions to watch yet.'
+    } catch {
+      watching = ' Could not list sessions.'
+    }
+    say(`Connected. The bridge is on and the token works.${watching}`)
   } catch {
     say(`Could not reach ${daemonUrl}. Is the dashboard running?`, true)
   }

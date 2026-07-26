@@ -46,6 +46,7 @@ const AGENT_UI: Record<AgentName, { icon: AgentOption['icon']; models: AgentOpti
     icon: <ClaudeLogo className="h-4 w-4" />,
     models: [
       { value: '', label: 'Default' },
+      { value: 'fable', label: 'Fable' },
       { value: 'opus', label: 'Opus' },
       { value: 'sonnet', label: 'Sonnet' },
       { value: 'haiku', label: 'Haiku' },

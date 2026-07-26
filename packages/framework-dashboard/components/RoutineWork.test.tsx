@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { AutoPmReport, Preferences, ProjectSummary } from '@gemstack/the-framework'
+import type { AutoPmJob, AutoPmReport, Preferences, ProjectSummary } from '@gemstack/the-framework'
 import { AUTO_PM_ROUTINES, AUTO_PM_DRAIN_JOB } from '@gemstack/the-framework/client'
 import { hoverTooltip } from '../test-utils.js'
 
@@ -29,6 +29,12 @@ vi.mock('../lib/use-start-run.js', () => ({
 const { RoutineWork } = await import('./RoutineWork.js')
 
 const project = (id: string, name: string): ProjectSummary => ({ id, path: `/repos/${name}`, name, activated: true })
+
+/** What the row shows, which is also its checkbox's label. */
+const routineName = (job: AutoPmJob) => job.label ?? job.name
+/** The row's own box, found through its label so the master at the foot can never be picked up instead. */
+const routineBox = (job: AutoPmJob) =>
+  screen.getByText(routineName(job)).closest('label')!.querySelector('[role="checkbox"]')!
 
 beforeEach(() => {
   prefs = {}
@@ -112,12 +118,54 @@ describe('RoutineWork (#1159)', () => {
   test('the checkbox is the one global preference, and carries the tooltip', async () => {
     render(<RoutineWork onRunStarted={() => {}} />)
     await waitFor(() => expect(screen.getByText('Auto-run')).toBeTruthy())
-    // One box for the whole card (#1159): a per-routine box flipping a global switch would lie.
-    expect(screen.getAllByRole('checkbox')).toHaveLength(1)
+    // One box per routine (#1209), plus the master at the foot.
+    expect(screen.getAllByRole('checkbox')).toHaveLength(AUTO_PM_ROUTINES.length + 1)
     fireEvent.click(screen.getByText('Auto-run'))
     expect(updatePreferences).toHaveBeenCalledWith({ autoPm: true })
     const label = screen.getByText('Auto-run').closest('label')!
-    expect((await hoverTooltip(label)).textContent).toBe('Automatically run this prompt on a regular schedule.')
+    expect((await hoverTooltip(label)).textContent).toBe('Automatically run the ticked routines on a regular schedule.')
+  })
+
+  test('every routine starts ticked, and unticking one records only that one (#1209)', async () => {
+    render(<RoutineWork onRunStarted={() => {}} />)
+    await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
+    // Nothing saved means nothing opted out: the schedule is whole until it is edited.
+    for (const job of AUTO_PM_ROUTINES) expect(routineBox(job).getAttribute('aria-checked')).toBe('true')
+    fireEvent.click(screen.getByText(routineName(AUTO_PM_DRAIN_JOB)))
+    expect(updatePreferences).toHaveBeenCalledWith({ autoPmOptOut: [AUTO_PM_DRAIN_JOB.name] })
+  })
+
+  test('an opted-out routine shows unticked, and re-ticking it drops only it (#1209)', async () => {
+    const other = AUTO_PM_ROUTINES[1]!.name
+    prefs = { autoPmOptOut: [AUTO_PM_DRAIN_JOB.name, other] }
+    render(<RoutineWork onRunStarted={() => {}} />)
+    await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
+    expect(routineBox(AUTO_PM_DRAIN_JOB).getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(screen.getByText(routineName(AUTO_PM_DRAIN_JOB)))
+    // The other opt-out survives: the row writes the whole set, so it must not clear its siblings.
+    expect(updatePreferences).toHaveBeenCalledWith({ autoPmOptOut: [other] })
+  })
+
+  test('Run now ignores the checkbox: it fires the routine once, on demand (#1209)', async () => {
+    prefs = { autoPmOptOut: AUTO_PM_ROUTINES.map(job => job.name) }
+    render(<RoutineWork onRunStarted={() => {}} />)
+    await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
+    for (const button of screen.getAllByText('Run now')) expect((button as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(screen.getAllByText('Run now')[0]!)
+    await waitFor(() => expect(start).toHaveBeenCalled())
+    expect(start.mock.calls[0]![1]).toBe(AUTO_PM_DRAIN_JOB.prompt)
+  })
+
+  test('auto-run on with nothing ticked says so, rather than counting down to nothing (#1209)', async () => {
+    prefs = { autoPm: true, autoPmOptOut: AUTO_PM_ROUTINES.map(job => job.name) }
+    render(<RoutineWork onRunStarted={() => {}} />)
+    await waitFor(() => expect(screen.getByText(/Every routine is unticked/)).toBeTruthy())
+    cleanup()
+    // One routine back on and the warning goes: the schedule has something to do again.
+    prefs = { autoPm: true, autoPmOptOut: AUTO_PM_ROUTINES.slice(1).map(job => job.name) }
+    render(<RoutineWork onRunStarted={() => {}} />)
+    await waitFor(() => expect(screen.getByText('Auto-run')).toBeTruthy())
+    expect(screen.queryByText(/Every routine is unticked/)).toBeNull()
   })
 
   test('several projects get a picker, and Run now honours it', async () => {

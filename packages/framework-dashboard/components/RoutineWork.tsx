@@ -22,8 +22,13 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 // for the two to drift. Run now takes the same path the launcher does (`sendStart` with the job's
 // prompt verbatim), so it starts the work now instead of asking the sweep to come round sooner.
 //
-// One auto-run checkbox for the whole card, not one per row: there is a single `autoPm` preference
-// (#685), and a per-row box that flipped a global switch would be a lie about what it controls.
+// Two tiers of checkbox, and they control different things (#1209). The one at the foot is the
+// `autoPm` preference (#685): whether the schedule runs at all. The one on each row is that
+// routine's place *in* the schedule, held as `autoPmOptOut` — so a row box no longer has to lie
+// about flipping the global switch, which is the reason the card first shipped without them.
+//
+// Opting *out* is what gets recorded, never opting in: every routine is on until it is unticked,
+// so a routine added by a later version runs for someone who saved the setting before it existed.
 
 /** Captured once: `useLoaded` treats a fresh `[]` literal as a new value on every render. */
 const NO_PROJECTS: ProjectSummary[] = []
@@ -53,6 +58,14 @@ export function RoutineWork({
   const projectId = (picked !== null && projects.some(p => p.id === picked) ? picked : projects[0]?.id) ?? null
 
   const autoRun = preferences.autoPm ?? false
+  // Absent = nothing opted out, which is also what the store saves an empty list back as.
+  const optedOut = preferences.autoPmOptOut ?? []
+  // Written as the whole list rather than a delta: `updatePreferences` patches by key, and this
+  // key's value *is* the set.
+  const setRoutine = (job: AutoPmJob, on: boolean) =>
+    updatePreferences({
+      autoPmOptOut: on ? optedOut.filter(name => name !== job.name) : [...optedOut, job.name],
+    })
   // The countdown is the sweep's, and the sweep only reports once the daemon has run one. With
   // auto-run off, or before that first report, the box says what it does instead of when.
   const autoRunLabel =
@@ -123,10 +136,19 @@ export function RoutineWork({
             <ul className="divide-y divide-border">
               {AUTO_PM_ROUTINES.map(job => (
                 <li key={job.name} className="flex items-center gap-3 py-2 first:pt-0">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{job.label ?? job.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{job.describe}</span>
-                  </span>
+                  {/* The row's own name is the box's label, so the whole title is a hit target and
+                      no second copy of the wording has to be invented for screen readers. Run now
+                      stays outside it: it fires the routine once, whatever the box says. */}
+                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                    <Checkbox
+                      checked={!optedOut.includes(job.name)}
+                      onCheckedChange={checked => setRoutine(job, checked)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{job.label ?? job.name}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{job.describe}</span>
+                    </span>
+                  </label>
                   <Button
                     type="button"
                     variant="outline"
@@ -156,7 +178,7 @@ export function RoutineWork({
                     <Checkbox checked={autoRun} onCheckedChange={checked => updatePreferences({ autoPm: checked })} />
                     <span className="font-medium text-foreground">{autoRunLabel}</span>
                   </TooltipTrigger>
-                  <TooltipContent>Automatically run this prompt on a regular schedule.</TooltipContent>
+                  <TooltipContent>Automatically run the ticked routines on a regular schedule.</TooltipContent>
                 </Tooltip>
                 {/* The countdown's escape hatch (#1210): the sweep is on a long interval, so
                     without this the only way to fast-forward was to tick the box off and on
@@ -186,6 +208,13 @@ export function RoutineWork({
               <p className="mt-1 text-xs text-muted-foreground">
                 Only while nothing else is running and the week&apos;s allowance is not already spent.
               </p>
+              {/* Auto-run on with every routine unticked is a schedule with nothing on it, and
+                  from the countdown alone it looks like work is coming (#1209). */}
+              {autoRun && AUTO_PM_ROUTINES.every(job => optedOut.includes(job.name)) && (
+                <p className="mt-1 text-xs text-warning">
+                  Every routine is unticked, so the schedule has nothing to run.
+                </p>
+              )}
               {sweepNote && (
                 <p role="status" className="mt-1 text-xs text-muted-foreground">
                   {sweepNote}

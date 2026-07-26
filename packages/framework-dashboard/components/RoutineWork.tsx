@@ -146,7 +146,9 @@ export function RoutineWork({
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{job.label ?? job.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{job.describe}</span>
+                      {job.describe && (
+                        <span className="block truncate text-xs text-muted-foreground">{job.describe}</span>
+                      )}
                     </span>
                   </label>
                   <Button

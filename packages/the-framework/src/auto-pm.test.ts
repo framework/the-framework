@@ -196,12 +196,10 @@ test('startAutoPm survives a project whose backlog cannot be read (#685)', async
   assert.deepEqual(started, [])
 })
 
-test('AUTO_PM_JOBS harvests, then triages, then plans (#773/#891/#892)', () => {
-  // Cheapest-and-readiest first: harvest existing plans, triage the cheap tickets, then the
-  // significant ones, and leave planning last — it is the priciest turn and the one whose
-  // output every earlier job consumes.
+test('AUTO_PM_JOBS triages, then plans (#773/#891/#892)', () => {
+  // Cheapest-and-readiest first: triage the cheap tickets, then the significant ones, and leave
+  // planning last — it is the priciest turn and the one whose output every earlier job consumes.
   assert.deepEqual(AUTO_PM_JOBS.map(j => j.name), [
-    'quick-wins',
     'triage-quick',
     'triage-consensual',
     'spike-and-plan',

@@ -160,12 +160,14 @@ export function TicketsPanel({
               {ticket.status === 'closed' && (
                 <Badge className="shrink-0 border-transparent px-1.5 text-[10px] uppercase text-muted-foreground">closed</Badge>
               )}
+              {/* The title is the row's one flexible column: it truncates when long and stretches
+                  when short, so the whole of a row's slack lands here — the way a table's wide
+                  first column carries the blank — instead of pooling mid-row between columns. */}
               <span className="min-w-0 flex-1 truncate font-medium">{ticket.title}</span>
-              {/* The tags, in a fixed-width column of their own (#1265): with each row's tags
-                  starting wherever its title ended, the stretch of blank between a short title
-                  and the right-hand meta read as dead space — pinned columns are what make the
-                  rows a table. */}
-              <span className="hidden w-64 shrink-0 items-center gap-1.5 overflow-hidden sm:flex">
+              {/* The tags, content-sized and packed against the priority column (#1265): their
+                  right edge is the aligned one, so rows with one tag and rows with four read as
+                  the same right-aligned column. */}
+              <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
                 {ticket.topics?.map(topic => (
                   <Badge key={topic} className="shrink-0 border-border px-1.5 text-[10px] text-muted-foreground">
                     {topic}
@@ -178,11 +180,10 @@ export function TicketsPanel({
                   <Badge className="shrink-0 border-transparent px-1 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>
                 )}
               </span>
-              {/* The trailing meta cluster (#1265): priority, then date, then the GitHub link (the
-                  sibling below). Fixed-width columns, rendered even when empty, so every row's
-                  meta lines up down the table instead of drifting with whatever a row happens
-                  to have. */}
-              <span className={cn('w-24 shrink-0 text-right text-[10px]', priorityTone(ticket.priority))}>
+              {/* Priority and date: snug fixed widths — barely wider than their content, kept
+                  fixed (and rendered even when empty) so the columns still line up down the
+                  table row to row. */}
+              <span className={cn('w-16 shrink-0 text-right text-[10px]', priorityTone(ticket.priority))}>
                 {ticket.priority ? `Priority: ${ticket.priority}` : ''}
               </span>
               <span className="w-14 shrink-0 text-right text-[10px] text-muted-foreground/70" title={formatDateTime(ticket.date)}>

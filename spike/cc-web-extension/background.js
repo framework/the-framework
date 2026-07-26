@@ -22,6 +22,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch(err => sendResponse({ ok: false, reason: String(err?.message ?? err) }))
     return true
   }
+  if (message?.type === 'tf-events') {
+    void postEvents(message)
+      .then(sendResponse)
+      .catch(err => sendResponse({ ok: false, error: String(err?.message ?? err) }))
+    return true
+  }
   if (message?.type !== 'tf-question') return false
   void report(message.question)
     .then(sendResponse)
@@ -51,6 +57,20 @@ async function report(question) {
     return { ok: false, error: `daemon answered ${res.status}: ${(await res.text()).slice(0, 200)}` }
   }
   lastSent.set(question.sessionId, fingerprint)
+  return { ok: true }
+}
+
+/** Send a batch of transcript entries. Same token and same discipline as the question. */
+async function postEvents({ sessionId, events }) {
+  const { daemonUrl, token } = await chrome.storage.local.get(['daemonUrl', 'token'])
+  if (!token) return { ok: false, error: 'no token set: open the extension options' }
+  const base = (daemonUrl || DEFAULT_DAEMON).replace(/\/+$/, '')
+  const res = await fetch(`${base}/_bridge/events`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: JSON.stringify({ sessionId, events }),
+  })
+  if (!res.ok) return { ok: false, error: `daemon answered ${res.status}: ${(await res.text()).slice(0, 200)}` }
   return { ok: true }
 }
 

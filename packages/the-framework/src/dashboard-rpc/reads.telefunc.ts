@@ -21,7 +21,7 @@ import { contextProjects, contextRemote, resolveProjectPath, resolveRunPath } fr
 import { relayOr } from './relay-run.js'
 import type { FrameworkEvent } from '../events.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
-import type { BridgeQuestion } from '../dashboard/bridge-endpoints.js'
+import type { BridgeEvent, BridgeQuestion } from '../dashboard/bridge-endpoints.js'
 import type { BridgeContact } from '../dashboard/bridge-store.js'
 import { readDaemonToken, readPreferences, type Preferences } from '../registry.js'
 
@@ -398,4 +398,10 @@ export async function onBridgeToken(): Promise<string | null> {
   const preferences = await readPreferences().catch((): Preferences => ({}))
   if (preferences.bridge !== true) return null
   return (await readDaemonToken().catch(() => undefined)) ?? null
+}
+
+/** What a Claude web session has said so far, as scraped by the browser bridge (#1237). */
+export async function onBridgeEvents(sessionId: string): Promise<BridgeEvent[]> {
+  if (typeof sessionId !== 'string' || !/^session_[A-Za-z0-9]{1,128}$/.test(sessionId)) return []
+  return bridgeQuestions().events(sessionId)
 }

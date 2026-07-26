@@ -5,7 +5,8 @@ import type { FrameworkEvent } from '@gemstack/the-framework'
 // The component reads the bridge over telefunc, and an unmocked telefunc module dies in the
 // browser test environment with `assertIsNotBrowser`, which reads as a telefunc bug and is not.
 const onBridgeQuestion = vi.fn(async () => null as unknown)
-vi.mock('../server/reads.telefunc.js', () => ({ onBridgeQuestion }))
+const onBridgeEvents = vi.fn(async () => [] as unknown)
+vi.mock('../server/reads.telefunc.js', () => ({ onBridgeQuestion, onBridgeEvents }))
 
 const { CloudRunNotice } = await import('./CloudRunNotice.js')
 
@@ -13,6 +14,8 @@ afterEach(() => {
   cleanup()
   onBridgeQuestion.mockReset()
   onBridgeQuestion.mockResolvedValue(null)
+  onBridgeEvents.mockReset()
+  onBridgeEvents.mockResolvedValue([])
 })
 
 const URL = 'https://claude.ai/code/session_01ABCdefGHIjklMNO?from=cli&m=0'
@@ -94,5 +97,28 @@ describe('the parked question the bridge reports (#1237)', () => {
   test('never asks before the hand-off lands: there is no session to ask about', () => {
     render(<CloudRunNotice target="web" events={[]} />)
     expect(onBridgeQuestion).not.toHaveBeenCalled()
+  })
+})
+
+describe('the transcript the bridge scrapes (#1237)', () => {
+  test('renders what the session has said, in order', async () => {
+    onBridgeEvents.mockResolvedValue([
+      { sessionId: 'session_01ABCdefGHIjklMNO', seq: 0, role: 'agent', text: 'Reading the repo', receivedAt: '' },
+      { sessionId: 'session_01ABCdefGHIjklMNO', seq: 1, role: 'agent', text: 'Found three packages', receivedAt: '' },
+    ])
+    render(<CloudRunNotice target="web" events={[handOff()]} />)
+    await waitFor(() => expect(screen.getByText('Reading the repo')).toBeTruthy())
+    expect(screen.getByText('Found three packages')).toBeTruthy()
+  })
+
+  test('shows nothing when the bridge has scraped nothing, so a run with no tab is unchanged', async () => {
+    render(<CloudRunNotice target="web" events={[handOff()]} />)
+    await waitFor(() => expect(onBridgeEvents).toHaveBeenCalled())
+    expect(screen.queryByText(/Reading the repo/)).toBeNull()
+  })
+
+  test('never asks before the hand-off, since there is no session to ask about', () => {
+    render(<CloudRunNotice target="web" events={[]} />)
+    expect(onBridgeEvents).not.toHaveBeenCalled()
   })
 })

@@ -34,6 +34,21 @@ export interface BridgeQuestion {
   receivedAt: string
 }
 
+/**
+ * One thing a cloud session did, as scraped from its page (#1237).
+ *
+ * `seq` is the message's position in the transcript, assigned by the extension, and it is what
+ * makes this idempotent: the page is re-read on every DOM change, so the same message arrives
+ * many times and the daemon keeps one copy per position rather than a growing pile of repeats.
+ */
+export interface BridgeEvent {
+  sessionId: string
+  seq: number
+  role: 'agent' | 'user'
+  text: string
+  receivedAt: string
+}
+
 /** A cloud session the extension should be watching. */
 export interface BridgeSession {
   id: string
@@ -45,6 +60,8 @@ export interface BridgeHandlers {
   /** The shared secret every bridge call must present. */
   token: string
   record: (question: BridgeQuestion) => void
+  /** Record what the session said, keyed by its position in the transcript. */
+  recordEvent?: (event: BridgeEvent) => void
   /** Note that something reached the bridge, including when it was refused. */
   contact?: (route: string, status: number) => void
   /**
@@ -62,6 +79,10 @@ const MAX_TITLE = 500
 const MAX_LABEL = 300
 const MAX_DETAIL = 500
 const MAX_OPTIONS = 20
+const MAX_EVENTS_BODY = 512 * 1024
+const MAX_EVENT_BATCH = 50
+const MAX_EVENT_TEXT = 8000
+const MAX_SEQ = 10_000
 
 /** Route a `/_bridge/*` request. A daemon with the bridge off 404s every route. */
 export async function handleBridgeRequest(
@@ -79,6 +100,7 @@ export async function handleBridgeRequest(
   }
   if (pathname === `${BRIDGE_PREFIX}/question`) return handleQuestion(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/sessions`) return handleSessions(req, res, handlers)
+  if (pathname === `${BRIDGE_PREFIX}/events`) return handleEvents(req, res, handlers)
   end(res, 404, 'not found')
 }
 
@@ -147,6 +169,46 @@ function validate(body: unknown, now: Date): BridgeQuestion | string {
     ...(typeof recommended === 'string' && recommended ? { recommended } : {}),
     receivedAt: now.toISOString(),
   }
+}
+
+/** `POST /_bridge/events`: record a batch of transcript entries. */
+async function handleEvents(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
+  if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
+  if (!handlers.recordEvent) return end(res, 404, 'events not enabled')
+  let body: unknown
+  try {
+    body = await readJsonBody(req, MAX_EVENTS_BODY)
+  } catch (err) {
+    return end(res, 400, (err as Error).message)
+  }
+  const events = validateEvents(body, (handlers.now ?? (() => new Date()))())
+  if (typeof events === 'string') return end(res, 400, events)
+  for (const event of events) handlers.recordEvent(event)
+  end(res, 204, '')
+}
+
+/**
+ * A batch, validated entry by entry. Rejects the whole batch on a bad entry rather than taking
+ * the good ones: a partial accept would leave gaps in the sequence the reader cannot distinguish
+ * from a message that has not arrived yet.
+ */
+function validateEvents(body: unknown, now: Date): BridgeEvent[] | string {
+  if (typeof body !== 'object' || body === null) return 'body must be an object'
+  const raw = body as Record<string, unknown>
+  const sessionId = raw.sessionId
+  if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) return 'sessionId must look like session_<id>'
+  if (!Array.isArray(raw.events) || raw.events.length === 0) return 'events must be a non-empty array'
+  if (raw.events.length > MAX_EVENT_BATCH) return `events must hold at most ${MAX_EVENT_BATCH} entries`
+  const out: BridgeEvent[] = []
+  for (const entry of raw.events) {
+    if (typeof entry !== 'object' || entry === null) return 'each event must be an object'
+    const { seq, role, text } = entry as Record<string, unknown>
+    if (typeof seq !== 'number' || !Number.isInteger(seq) || seq < 0 || seq > MAX_SEQ) return 'each event needs an integer seq'
+    if (role !== 'agent' && role !== 'user') return 'each event needs a role of agent or user'
+    if (typeof text !== 'string' || !text.trim()) return 'each event needs text'
+    out.push({ sessionId, seq, role, text: text.slice(0, MAX_EVENT_TEXT), receivedAt: now.toISOString() })
+  }
+  return out
 }
 
 /**

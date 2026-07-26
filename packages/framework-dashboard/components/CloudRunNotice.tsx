@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Cloud, ExternalLink, MessageCircleQuestion } from 'lucide-react'
-import type { BridgeQuestion, FrameworkEvent } from '@gemstack/the-framework'
-import { onBridgeQuestion } from '../server/reads.telefunc.js'
+import type { BridgeEvent, BridgeQuestion, FrameworkEvent } from '@gemstack/the-framework'
+import { onBridgeQuestion, onBridgeEvents } from '../server/reads.telefunc.js'
 import { cloudSession } from '../lib/live-state.js'
 import { CopyButton } from './ui/copy-button.js'
 
@@ -22,6 +22,7 @@ export function CloudRunNotice({
 }) {
   const session = target === 'web' ? cloudSession(events) : undefined
   const question = useBridgeQuestion(session?.id)
+  const transcript = useBridgeEvents(session?.id)
   if (target !== 'web') return null
   return (
     <div className="border-b border-border bg-muted/40">
@@ -50,6 +51,7 @@ export function CloudRunNotice({
           </>
         )}
       </div>
+      {transcript.length > 0 && <CloudTranscript events={transcript} />}
       {question && session && <ParkedQuestion question={question} url={session.url} />}
     </div>
   )
@@ -84,6 +86,52 @@ function ParkedQuestion({ question, url }: { question: BridgeQuestion; url: stri
       </div>
     </div>
   )
+}
+
+/**
+ * What the cloud session has said, as the bridge scraped it.
+ *
+ * Deliberately not styled as our own live feed. It is a mirror of another product's page, read
+ * through a browser extension, and presenting it as a first-class run log would overstate how
+ * much we actually know: there are no tool calls, no timings, and nothing arrives at all when
+ * the tab is closed.
+ */
+function CloudTranscript({ events }: { events: readonly BridgeEvent[] }) {
+  return (
+    <div className="max-h-80 space-y-2 overflow-y-auto border-t border-border px-4 py-2.5 text-xs">
+      {events.map(event => (
+        <div key={event.seq} className="whitespace-pre-wrap break-words text-muted-foreground">
+          {event.text}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Poll the daemon for this session's transcript, on the same cadence as the question. */
+function useBridgeEvents(sessionId: string | undefined): BridgeEvent[] {
+  const [events, setEvents] = useState<BridgeEvent[]>([])
+  useEffect(() => {
+    if (!sessionId) {
+      setEvents([])
+      return
+    }
+    let live = true
+    const read = () => {
+      void onBridgeEvents(sessionId)
+        .then(next => {
+          if (live) setEvents(next)
+        })
+        .catch(() => {})
+    }
+    read()
+    const timer = setInterval(read, POLL_MS)
+    return () => {
+      live = false
+      clearInterval(timer)
+    }
+  }, [sessionId])
+  return events
 }
 
 /**

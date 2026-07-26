@@ -61,6 +61,51 @@ function reportToDaemon(parsed) {
   }
 }
 
+/** What we last sent per position, so an unchanged message is not re-posted on every mutation. */
+const sentEvents = new Map()
+
+/**
+ * The transcript, as message blocks (#1237).
+ *
+ * `article` is the anchor: the page reports one per message, which is a far better handle than
+ * guessing at prose boundaries in a wall of text. Falling back to nothing rather than to a
+ * heuristic is deliberate, because a wrong split would post gibberish that looks like output.
+ */
+function transcript() {
+  const articles = deepQueryAll('article')
+  return articles
+    .map((el, index) => {
+      const text = (el.innerText ?? el.textContent ?? '').trim()
+      if (!text) return undefined
+      // The composer lives in its own article on some layouts; an empty or input-only block is
+      // not a message.
+      if (el.querySelector('[contenteditable="true"], textarea')) return undefined
+      return { seq: index, role: 'agent', text: text.slice(0, 8000) }
+    })
+    .filter(Boolean)
+}
+
+/**
+ * Post whatever changed since the last look. Only what changed: the observer fires on every DOM
+ * mutation and a session's transcript is mostly stable, so sending it all each time would be a
+ * few hundred kilobytes a second for no new information.
+ */
+function reportTranscript() {
+  const sessionId = sessionIdFromUrl()
+  if (!sessionId || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
+  const events = transcript().filter(event => sentEvents.get(event.seq) !== event.text)
+  if (!events.length) return
+  try {
+    chrome.runtime.sendMessage({ type: 'tf-events', sessionId, events }, reply => {
+      if (chrome.runtime.lastError) return
+      // Only remember what the daemon actually took, so a rejected batch is retried.
+      if (reply?.ok) for (const event of events) sentEvents.set(event.seq, event.text)
+    })
+  } catch {
+    // Worker asleep or context invalidated; the next mutation retries.
+  }
+}
+
 /** Every element matching a selector, including inside open shadow roots. */
 function deepQueryAll(selector, root = document, seen = new Set()) {
   const out = [...root.querySelectorAll(selector)]
@@ -194,6 +239,7 @@ function findPendingChoice() {
   const real = candidates.filter(c => !isTemplate(c.parsed))
   const found = real.at(-1)
   if (found) reportToDaemon(found.parsed)
+  reportTranscript()
   return found ?? undefined
 }
 

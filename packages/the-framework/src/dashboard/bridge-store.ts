@@ -1,4 +1,7 @@
-import type { BridgeQuestion } from './bridge-endpoints.js'
+import type { BridgeEvent, BridgeQuestion } from './bridge-endpoints.js'
+
+/** Most transcript entries kept per session, oldest dropped first. */
+export const MAX_SESSION_EVENTS = 300
 
 /**
  * The questions a Claude web session is parked on, keyed by its cloud session id (#1237).
@@ -39,6 +42,33 @@ export class BridgeQuestions {
     return this.contact
   }
 
+  private readonly eventsBySession = new Map<string, Map<number, BridgeEvent>>()
+
+  /**
+   * Record one transcript entry, keyed by its position.
+   *
+   * Keyed rather than appended because the page is re-read on every DOM change, so the same
+   * message arrives repeatedly and a growing list would be mostly duplicates. Position also lets
+   * a later read replace an earlier one, which is what a message still being streamed needs.
+   */
+  recordEvent(event: BridgeEvent): void {
+    let bySeq = this.eventsBySession.get(event.sessionId)
+    if (!bySeq) {
+      bySeq = new Map()
+      this.eventsBySession.set(event.sessionId, bySeq)
+    }
+    bySeq.set(event.seq, event)
+    // Bound it: a long session would otherwise grow without limit in a daemon that never restarts.
+    if (bySeq.size > MAX_SESSION_EVENTS) {
+      for (const seq of [...bySeq.keys()].sort((a, b) => a - b).slice(0, bySeq.size - MAX_SESSION_EVENTS)) bySeq.delete(seq)
+    }
+  }
+
+  /** That session's transcript so far, in order. */
+  events(sessionId: string): BridgeEvent[] {
+    return [...(this.eventsBySession.get(sessionId)?.values() ?? [])].sort((a, b) => a.seq - b.seq)
+  }
+
   /** Record the question a session is parked on, replacing any earlier one for that session. */
   record(question: BridgeQuestion): void {
     this.bySession.set(question.sessionId, question)
@@ -57,6 +87,7 @@ export class BridgeQuestions {
   /** Drop a session's question, once it is answered or its run is gone. */
   clear(sessionId: string): void {
     this.bySession.delete(sessionId)
+    this.eventsBySession.delete(sessionId)
   }
 }
 

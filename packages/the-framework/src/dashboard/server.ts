@@ -208,6 +208,7 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
         token: opts.bridgeToken,
         record: question => bridgeQuestions().record(question),
         contact: (route, status) => bridgeQuestions().recordContact(route, status),
+        recordEvent: event => bridgeQuestions().recordEvent(event),
         ...(opts.bridgeSessions ? { sessions: opts.bridgeSessions } : {}),
       }
     : undefined

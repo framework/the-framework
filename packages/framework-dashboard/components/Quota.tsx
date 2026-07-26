@@ -85,6 +85,9 @@ function WeekBar({
   const limit = limitPercent(boundary.percent, offset)
   const projected = projectedRange(percentUsed, limit)
   const enabled = projected.end > projected.start
+  // How far ahead of the boundary's own pace the knob itself sits, as a duration — the same
+  // arithmetic as the main figure's deviation, but of the limit rather than actual consumption.
+  const limitDeviationMs = paceDeviationMs(limit, boundary.percent, boundary.resetsAt - boundary.startsAt)
   // A full day above the boundary, not merely past it — the boundary steps a day at a time on its
   // own, so a knob resting a few points ahead is normal and only worth flagging once it clears a
   // whole day's worth of pace.
@@ -236,7 +239,7 @@ function WeekBar({
                 ⚠️  Eager consumption
                 <CircleHelp className="h-3 w-3" aria-hidden />
               </TooltipTrigger>
-              <TooltipContent>Autonomous AI will spend tokens more than 1-day faster than the week's pace allows</TooltipContent>
+              <TooltipContent>Autonomous AI will spend tokens {formatDurationLong(limitDeviationMs)} faster than the week's pace allows</TooltipContent>
             </Tooltip>
           )}
           <Tooltip>

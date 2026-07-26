@@ -270,12 +270,22 @@ describe('Quota (#960)', () => {
   })
 
   test('warns once the offset clears a full day above the boundary (#960 Edit)', async () => {
-    // Boundary at 57.14%, offset 20: 77.14%, clearing the ~14.29-point (one day) threshold.
+    // Boundary at 57.14%, offset 20: 77.14%, clearing the ~14.29-point (one day) threshold — a
+    // 20-point offset over a 7-day week is 1.4 days, floored to "1 day".
     view = reading(20, 20)
     render(<Quota />)
     const warning = screen.getByText('⚠️ Eager consumption')
     await openTooltip(warning)
-    expect(screen.getByText("Autonomous AI will spend tokens more than 1-day faster than the week's pace allows")).toBeTruthy()
+    expect(screen.getByText("Autonomous AI will spend tokens 1 day faster than the week's pace allows")).toBeTruthy()
+  })
+
+  test('the eager-consumption tooltip names the knob\'s own actual deviation, not a fixed figure (#960 Edit)', async () => {
+    // Offset 40 over a 7-day week is 2.8 days, floored to "2 days" — distinct from the other test's
+    // "1 day" at offset 20, proving the tooltip reads the real deviation rather than a hardcoded one.
+    view = reading(20, 40)
+    render(<Quota />)
+    await openTooltip(screen.getByText('⚠️ Eager consumption'))
+    expect(screen.getByText("Autonomous AI will spend tokens 2 days faster than the week's pace allows")).toBeTruthy()
   })
 
   test('the warning sits beside the enabled/disabled status, not stacked below it (#960 Edit)', () => {

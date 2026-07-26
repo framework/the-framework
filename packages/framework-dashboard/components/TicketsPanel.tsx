@@ -53,12 +53,17 @@ export function TicketsPanel({
   projectId,
   tickets,
   loaded,
+  hiddenByFilter = 0,
   onOpen,
   onRunStarted,
 }: {
   projectId: string | null
   tickets: WorkspaceTicket[]
   loaded: boolean
+  /** How many of this project's tickets the caller's status filter hid (#1144/#1230). An empty
+   *  `tickets` with some hidden reads as "filtered", not as "nothing here" — the import prompt
+   *  offers work that has already been done. */
+  hiddenByFilter?: number
   /** Open one ticket's detail page (#1144), by its file — the same slug the route uses. */
   onOpen: (file: string) => void
   /** Told when the import session starts, so the shell can show it (#948) — the button used
@@ -82,6 +87,18 @@ export function TicketsPanel({
 
   const importFromGithub = () => startImport(IMPORT_PROMPT, 'The import could not be started.')
   const updateFromGithub = () => startImport(UPDATE_PROMPT, 'The update could not be started.')
+
+  if (tickets.length === 0 && hiddenByFilter > 0) {
+    // Filtered to nothing, not genuinely empty (#1144/#1230): offering an import here would ask
+    // for work already done.
+    return (
+      <div className="rounded-lg border border-border p-4 text-sm">
+        <p className="text-muted-foreground">
+          {hiddenByFilter} ticket{hiddenByFilter === 1 ? '' : 's'} hidden by the current filter.
+        </p>
+      </div>
+    )
+  }
 
   if (tickets.length === 0) {
     return (
@@ -140,6 +157,11 @@ export function TicketsPanel({
               onClick={() => onOpen(ticket.file)}
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-accent/60"
             >
+              {/* Only closed is called out (#1144/#1230): open is the row's default assumption,
+                  same as spiked/planned only showing when true. */}
+              {ticket.status === 'closed' && (
+                <Badge className="shrink-0 border-transparent px-1.5 text-[10px] uppercase text-muted-foreground">closed</Badge>
+              )}
               {ticket.priority && (
                 <Badge className={cn('shrink-0 border-transparent px-1.5 text-[10px] uppercase', PRIORITY_TONE[ticket.priority])}>
                   {ticket.priority}

@@ -13,6 +13,9 @@ export interface WorkspaceTicket {
   title: string
   /** The `## TLDR` line, else the first prose line. Empty when the ticket has neither. */
   summary: string
+  /** The `status:` key (#1144/#1230). Defaults to `'open'` — a ticket written before the field
+   *  existed is still open work, not one this silently drops from the default view. */
+  status: 'open' | 'closed'
   /** The optional `priority:` key, verbatim and lowercased. */
   priority?: string
   /** The optional `topics:` key (`topics: [dx, ui]`), as bare tags. */
@@ -107,20 +110,29 @@ function titleFromFile(file: string): string {
 }
 
 /**
- * Read the head of a ticket: the optional `key: value` block above the title (`priority:`,
- * `topics:`, and whatever else is agreed later), the `# ` heading, and the `## TLDR`.
+ * Read the head of a ticket: the `key: value` block above the title (`status:`, `priority:`,
+ * `topics:`, and whatever else is agreed later — all but `status:` optional), the `# ` heading,
+ * and the `## TLDR`.
  *
  * Deliberately tolerant. The tickets already in a repo predate the format (they are GitHub
  * imports: a heading, prose, and a trailing `Source:` line), so anything missing falls back
  * rather than dropping the ticket from the list.
  */
-function describe(md: string): { title?: string; summary: string; priority?: string; topics?: string[] } {
+function describe(md: string): { title?: string; summary: string; status: 'open' | 'closed'; priority?: string; topics?: string[] } {
   const lines = md.split('\n')
   const heading = lines.find(line => line.startsWith('# '))?.slice(2).trim()
 
   // The key block is above the title, so stop there rather than reading keys out of the body.
   const headingAt = lines.findIndex(line => line.startsWith('# '))
   const preamble = headingAt === -1 ? [] : lines.slice(0, headingAt)
+  const statusValue = preamble
+    .find(line => line.toLowerCase().startsWith('status:'))
+    ?.slice('status:'.length)
+    .trim()
+    .toLowerCase()
+  // Anything other than an explicit `closed` reads as open: a ticket written before this key
+  // existed, or with a malformed value, is still open work rather than one this silently drops.
+  const status = statusValue === 'closed' ? 'closed' : 'open'
   const priority = preamble
     .find(line => line.toLowerCase().startsWith('priority:'))
     ?.slice('priority:'.length)
@@ -144,6 +156,7 @@ function describe(md: string): { title?: string; summary: string; priority?: str
 
   return {
     ...(heading ? { title: heading } : {}),
+    status,
     ...(priority ? { priority } : {}),
     ...(topics && topics.length > 0 ? { topics } : {}),
     summary,
@@ -178,11 +191,12 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
     ])
     if (content === undefined) continue
     const stem = file.replace(/\.md$/, '')
-    const { title, summary, priority, topics } = describe(content.slice(0, MAX_TICKET_BYTES))
+    const { title, summary, status, priority, topics } = describe(content.slice(0, MAX_TICKET_BYTES))
     tickets.push({
       file,
       title: title ?? titleFromFile(file),
       summary,
+      status,
       ...(priority ? { priority } : {}),
       ...(topics ? { topics } : {}),
       date,
@@ -226,11 +240,12 @@ export async function readTicket(cwd: string, file: string): Promise<WorkspaceTi
   ])
   if (content === undefined) return null
   const stem = file.replace(/\.md$/, '')
-  const { title, summary, priority, topics } = describe(content)
+  const { title, summary, status, priority, topics } = describe(content)
   return {
     file,
     title: title ?? titleFromFile(file),
     summary,
+    status,
     ...(priority ? { priority } : {}),
     ...(topics ? { topics } : {}),
     date,

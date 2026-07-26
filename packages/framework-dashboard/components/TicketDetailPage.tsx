@@ -20,6 +20,12 @@ const PRIORITY_TONE: Record<string, string> = {
   low: 'text-muted-foreground',
 }
 
+/** How a status reads (#1144/#1230): open is the active, expected state; closed fades back. */
+const STATUS_TONE: Record<'open' | 'closed', string> = {
+  open: 'text-success',
+  closed: 'text-muted-foreground',
+}
+
 // One ticket's own page (#1144): its entire markdown, not just the head the list row reads —
 // and where Queue lives now that the list is one-liners. `slug` is the same filename the list
 // row and the route carry, so this is a direct read by identity rather than a search through
@@ -78,7 +84,18 @@ export function TicketDetailPage({
                   )}
                 </Button>
               </div>
+              {/* The date leads, on the left of the description (#1144): it is what tells two
+                  similar-sounding tickets apart at a glance, before the meta below is read. */}
+              <div className="mt-2 flex items-start gap-3">
+                <span className="shrink-0 text-xs text-muted-foreground" title={formatDateTime(ticket.date)}>
+                  {formatAge(ticket.date)}
+                </span>
+                {ticket.summary && <p className="min-w-0 flex-1 text-sm text-muted-foreground">{ticket.summary}</p>}
+              </div>
+              {/* Meta below the description (#1144): status leads it, since open/closed is the
+                  first thing worth knowing about a ticket. */}
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <Badge className={cn('border-transparent px-0 text-[10px] uppercase', STATUS_TONE[ticket.status])}>{ticket.status}</Badge>
                 {ticket.priority && (
                   <Badge className={cn('border-transparent px-0 text-[10px] uppercase', PRIORITY_TONE[ticket.priority])}>
                     {ticket.priority}
@@ -91,9 +108,6 @@ export function TicketDetailPage({
                 ))}
                 {ticket.spiked && <Badge className="border-transparent px-0 text-[10px] uppercase">spiked</Badge>}
                 {ticket.planned && <Badge className="border-transparent px-0 text-[10px] uppercase">planned</Badge>}
-                <span className="text-[10px] text-muted-foreground/70" title={formatDateTime(ticket.date)}>
-                  {formatAge(ticket.date)}
-                </span>
                 <span className="text-[10px] text-muted-foreground/70">{ticket.file}</span>
               </div>
               {error && <p className="mt-2 text-xs text-danger">{error}</p>}

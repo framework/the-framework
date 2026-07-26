@@ -44,11 +44,30 @@ test('readTickets reads the format: keys above the title, then the TLDR (#697)',
     file: '2026-07-20_do-the-thing.md',
     title: 'Do the thing',
     summary: 'The thing is not done.',
+    status: 'open',
     priority: 'high',
     topics: ['dx'],
     spiked: false,
     planned: false,
   })
+})
+
+test('readTickets reads Status: closed, and defaults to open when the key is absent (#1144/#1230)', async () => {
+  const cwd = await repo({
+    'a-closed.md': 'Status: closed\n\n# Closed one\n',
+    'b-open.md': 'Status: open\n\n# Open one\n',
+    'c-unspecified.md': '# Unspecified one\n',
+  })
+  const byTitle = new Map((await readTickets(cwd)).map(t => [t.title, t.status]))
+  assert.equal(byTitle.get('Closed one'), 'closed')
+  assert.equal(byTitle.get('Open one'), 'open')
+  assert.equal(byTitle.get('Unspecified one'), 'open')
+})
+
+test('readTickets treats an unrecognised Status: value as open, not a throw (#1144/#1230)', async () => {
+  const cwd = await repo({ 'a.md': 'Status: archived\n\n# Thing\n' })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.status, 'open')
 })
 
 test('readTickets parses a multi-topic list, brackets and all (#1144)', async () => {
@@ -156,12 +175,19 @@ test('readTicket reads the whole file, metadata included (#1144)', async () => {
     file: '2026-07-20_do-the-thing.md',
     title: 'Do the thing',
     summary: 'The thing is not done.',
+    status: 'open',
     priority: 'high',
     topics: ['dx'],
     spiked: false,
     planned: false,
     content: body,
   })
+})
+
+test('readTicket reads Status: closed too, like readTickets (#1144/#1230)', async () => {
+  const cwd = await repo({ 'a.md': 'Status: closed\n\n# Thing\n' })
+  const ticket = await readTicket(cwd, 'a.md')
+  assert.equal(ticket?.status, 'closed')
 })
 
 test('readTicket folds in its .spike.md/.plan.md siblings, like readTickets (#1144)', async () => {

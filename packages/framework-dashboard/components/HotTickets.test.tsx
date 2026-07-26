@@ -20,7 +20,7 @@ const ht = (file: string, projectName: string, bucket: HotBucket, over: Record<s
   projectId: projectName,
   projectName,
   bucket,
-  ticket: { file, title: file.replace('.md', ''), summary: '', date: '2026-01-01T00:00:00.000Z', spiked: false, planned: false, ...over },
+  ticket: { file, title: file.replace('.md', ''), summary: '', status: 'open', date: '2026-01-01T00:00:00.000Z', spiked: false, planned: false, ...over },
 })
 
 describe('HotTickets (#1112)', () => {

@@ -97,6 +97,7 @@ const ticket = (file: string, over: Partial<WorkspaceTicket> = {}): WorkspaceTic
   file,
   title: file,
   summary: '',
+  status: 'open',
   date: '2026-01-01T00:00:00.000Z',
   spiked: false,
   planned: false,

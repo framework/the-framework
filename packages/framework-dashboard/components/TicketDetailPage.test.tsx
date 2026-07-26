@@ -12,6 +12,8 @@ const ticket = (over: Record<string, unknown> = {}) => ({
   file: '2026-07-20_do-the-thing.md',
   title: 'Do the thing',
   summary: 'The thing is not done.',
+  status: 'open',
+  date: '2026-01-01T00:00:00.000Z',
   spiked: false,
   planned: false,
   content: '# Do the thing\n\n## TLDR\n\nThe thing is not done.\n\nMore detail below the fold.',
@@ -37,6 +39,17 @@ describe('TicketDetailPage (#1144)', () => {
     expect(screen.getByText('high')).toBeTruthy()
     expect(screen.getByText('planned')).toBeTruthy()
     expect(onTicket).toHaveBeenCalledWith('p1', '2026-07-20_do-the-thing.md')
+  })
+
+  test('shows the date to the left of the description, and status in the meta below it (#1144/#1230)', async () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
+    onTicket.mockResolvedValue(ticket({ status: 'closed', date: twoDaysAgo, summary: 'A short description.' }))
+    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
+    const description = await screen.findByText('A short description.')
+    const dateRow = description.parentElement!
+    // The date is the description's left-hand sibling within the same row.
+    expect(dateRow.textContent?.startsWith('2d ago')).toBe(true)
+    expect(screen.getByText('closed')).toBeTruthy()
   })
 
   test('queueing writes it to the queue, with the ticket it came from (#1164)', async () => {

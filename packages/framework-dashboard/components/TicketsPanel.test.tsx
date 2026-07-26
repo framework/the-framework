@@ -18,6 +18,7 @@ const ticket = (over: Partial<WorkspaceTicket> = {}): WorkspaceTicket => ({
   file: '2026-07-20_do-the-thing.md',
   title: 'Do the thing',
   summary: 'The thing is not done.',
+  status: 'open',
   date: '2026-01-01T00:00:00.000Z',
   spiked: false,
   planned: false,
@@ -70,6 +71,20 @@ describe('TicketsPanel (#697/#1144)', () => {
     )
     const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
     expect(titles.findIndex(t => t?.includes('Older'))).toBeLessThan(titles.findIndex(t => t?.includes('Newer')))
+  })
+
+  test('calls out a closed ticket on its row; open carries no badge (#1144/#1230)', async () => {
+    render(
+      <TicketsPanel
+        projectId="p1"
+        tickets={[ticket({ file: 'closed.md', title: 'Closed one', status: 'closed' }), ticket({ file: 'open.md', title: 'Open one' })]}
+        loaded
+        onOpen={() => {}}
+      />,
+    )
+    expect(await screen.findByText('closed')).toBeTruthy()
+    // "open" is the default assumption, same as spiked/planned only showing when true — no badge for it.
+    expect(screen.queryByText('open')).toBeNull()
   })
 
   test('opening a row hands back its file, the slug the detail route uses (#1144)', async () => {
@@ -141,6 +156,12 @@ describe('TicketsPanel (#697/#1144)', () => {
     fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
     expect(await screen.findByText(/already active/i)).toBeTruthy()
     expect(onRunStarted).not.toHaveBeenCalled()
+  })
+
+  test('an empty list with hiddenByFilter says so, rather than offering an import for work already done (#1144/#1230)', async () => {
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded hiddenByFilter={3} onOpen={() => {}} />)
+    expect(await screen.findByText(/3 tickets hidden by the current filter/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /import tickets from github/i })).toBeNull()
   })
 
   test('no project renders nothing at all', () => {

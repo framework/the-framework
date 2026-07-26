@@ -37,19 +37,49 @@ test('readTickets reads the format: keys above the title, then the TLDR (#697)',
   })
   const [ticket, ...rest] = await readTickets(cwd)
   assert.equal(rest.length, 0)
-  // `date` is the file's mtime (#1144) — a moment in the test run, not a fixed value to compare.
-  const { date, ...withoutDate } = ticket!
-  assert.equal(Number.isNaN(Date.parse(date)), false)
-  assert.deepEqual(withoutDate, {
+  // `date` comes from the filename (#1144/#1265), so it is exact rather than a moment in the test
+  // run to merely check is parseable.
+  assert.deepEqual(ticket, {
     file: '2026-07-20_do-the-thing.md',
     title: 'Do the thing',
     summary: 'The thing is not done.',
     status: 'open',
     priority: 'high',
     topics: ['dx'],
+    date: '2026-07-20T00:00:00.000Z',
     spiked: false,
     planned: false,
   })
+})
+
+test('readTickets reads the GitHub: link, split into its label and URL (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': 'GitHub: [#42](https://github.com/org/repo/issues/42)\n\n# Thing\n',
+  })
+  const [ticket] = await readTickets(cwd)
+  assert.deepEqual(ticket?.github, { label: '#42', url: 'https://github.com/org/repo/issues/42' })
+})
+
+test('readTickets leaves github off a ticket that names none (#1144/#1265)', async () => {
+  const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n' })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.github, undefined)
+})
+
+test('readTickets dates a ticket by its filename, not its mtime, when the filename carries one (#1144/#1265)', async () => {
+  const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n' })
+  // Editing the file bumps its mtime well past the filename's date; the filename still wins.
+  await new Promise(r => setTimeout(r, 1100))
+  await writeFile(join(cwd, 'tickets', '2026-07-20_thing.md'), '# Thing, edited\n', 'utf8')
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.date, '2026-07-20T00:00:00.000Z')
+})
+
+test('readTickets falls back to mtime when the filename carries no date (#1144/#1265)', async () => {
+  const cwd = await repo({ 'no-date-prefix.md': '# Thing\n' })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(Number.isNaN(Date.parse(ticket?.date as string)), false)
+  assert.notEqual(ticket?.date, undefined)
 })
 
 test('readTickets reads Status: closed, and defaults to open when the key is absent (#1144/#1230)', async () => {
@@ -169,19 +199,26 @@ test('readTicket reads the whole file, metadata included (#1144)', async () => {
   )
   const cwd = await repo({ '2026-07-20_do-the-thing.md': body })
   const ticket = await readTicket(cwd, '2026-07-20_do-the-thing.md')
-  const { date, ...withoutDate } = ticket ?? {}
-  assert.equal(Number.isNaN(Date.parse(date as string)), false)
-  assert.deepEqual(withoutDate, {
+  assert.deepEqual(ticket, {
     file: '2026-07-20_do-the-thing.md',
     title: 'Do the thing',
     summary: 'The thing is not done.',
     status: 'open',
     priority: 'high',
     topics: ['dx'],
+    date: '2026-07-20T00:00:00.000Z',
     spiked: false,
     planned: false,
     content: body,
   })
+})
+
+test('readTicket reads the GitHub: link too, like readTickets (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': 'GitHub: [#42](https://github.com/org/repo/issues/42)\n\n# Thing\n',
+  })
+  const ticket = await readTicket(cwd, '2026-07-20_thing.md')
+  assert.deepEqual(ticket?.github, { label: '#42', url: 'https://github.com/org/repo/issues/42' })
 })
 
 test('readTicket reads Status: closed too, like readTickets (#1144/#1230)', async () => {

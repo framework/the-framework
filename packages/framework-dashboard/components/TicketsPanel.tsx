@@ -8,6 +8,7 @@ import { Badge } from './ui/badge.js'
 import { useAction } from '../lib/use-action.js'
 import { useLoaded } from '../lib/use-async.js'
 import { formatRelative, formatAge, formatDateTime } from '../lib/format-date.js'
+import { priorityTone } from '../lib/ticket-priority.js'
 import { cn } from '../lib/utils.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
@@ -34,14 +35,6 @@ const UPDATE_PROMPT = presets.updateTickets.render()
 
 /** Captured once: `useLoaded` treats a fresh `{}` literal as a new value on every render. */
 const NO_META: TicketsMeta = {}
-
-/** How a priority reads, as the row's badge (#1144). */
-const PRIORITY_TONE: Record<string, string> = {
-  urgent: 'text-danger',
-  high: 'text-warning',
-  medium: 'text-muted-foreground',
-  low: 'text-muted-foreground',
-}
 
 // The tickets list (#697/#1144): the project's `tickets/*.md` as one-liners — priority, topics,
 // what the agent already did to it, and how recently, all on the row — so the backlog is scannable
@@ -163,8 +156,8 @@ export function TicketsPanel({
                 <Badge className="shrink-0 border-transparent px-1.5 text-[10px] uppercase text-muted-foreground">closed</Badge>
               )}
               {ticket.priority && (
-                <Badge className={cn('shrink-0 border-transparent px-1.5 text-[10px] uppercase', PRIORITY_TONE[ticket.priority])}>
-                  {ticket.priority}
+                <Badge className={cn('shrink-0 border-transparent px-1.5 text-[10px]', priorityTone(ticket.priority))}>
+                  Priority: {ticket.priority}
                 </Badge>
               )}
               <span className="min-w-0 flex-1 truncate font-medium">{ticket.title}</span>

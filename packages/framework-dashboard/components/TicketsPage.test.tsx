@@ -108,3 +108,62 @@ describe('TicketsPage status filter (#1144/#1230)', () => {
     expect(screen.queryByRole('button', { name: /import tickets from github/i })).toBeNull()
   })
 })
+
+// The sort dropdown (#1144/#1265): the server already hands back newest-first, so "Date" is a
+// no-op; "Priority" re-sorts client-side, ties falling back to that same newest-first order.
+describe('TicketsPage sort (#1144/#1265)', () => {
+  test('defaults to the server\'s date order', async () => {
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [
+          ticket({ file: 'low.md', title: 'Low priority', priority: '2' }),
+          ticket({ file: 'high.md', title: 'High priority', priority: '9' }),
+        ],
+      },
+    ])
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
+    // 'low.md' is first in the fixture, standing in for "whatever order the server sent" — the
+    // default sort must not have reordered it.
+    expect(titles.findIndex(t => t?.includes('Low priority'))).toBeLessThan(titles.findIndex(t => t?.includes('High priority')))
+  })
+
+  test('sorting by priority puts the highest first, regardless of the server\'s order', async () => {
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [
+          ticket({ file: 'low.md', title: 'Low priority', priority: '2' }),
+          ticket({ file: 'high.md', title: 'High priority', priority: '9' }),
+        ],
+      },
+    ])
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('Low priority')
+    fireEvent.change(screen.getByRole('combobox', { name: /sort by/i }), { target: { value: 'priority' } })
+    const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
+    expect(titles.findIndex(t => t?.includes('High priority'))).toBeLessThan(titles.findIndex(t => t?.includes('Low priority')))
+  })
+
+  test('a priority tie falls back to newest first, not an arbitrary order', async () => {
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [
+          // Server order is already newest-first; both name the same priority.
+          ticket({ file: 'newer.md', title: 'Newer', priority: '5', date: '2026-02-01T00:00:00.000Z' }),
+          ticket({ file: 'older.md', title: 'Older', priority: '5', date: '2026-01-01T00:00:00.000Z' }),
+        ],
+      },
+    ])
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('Newer')
+    fireEvent.change(screen.getByRole('combobox', { name: /sort by/i }), { target: { value: 'priority' } })
+    const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
+    expect(titles.findIndex(t => t?.includes('Newer'))).toBeLessThan(titles.findIndex(t => t?.includes('Older')))
+  })
+})

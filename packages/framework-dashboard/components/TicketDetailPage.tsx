@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { WorkspaceTicketDetail } from '@gemstack/the-framework'
-import { ArrowLeft, Check, ListPlus } from 'lucide-react'
+import { ArrowLeft, Check, ListPlus, Github } from 'lucide-react'
 import { onTicket } from '../server/reads.telefunc.js'
 import { sendQueueTicket } from '../server/control.telefunc.js'
 import { usePolled } from '../lib/use-async.js'
@@ -11,14 +11,7 @@ import { Markdown } from './Markdown.js'
 import { ScrollArea } from './ui/scroll-area.js'
 import { cn } from '../lib/utils.js'
 import { formatAge, formatDateTime } from '../lib/format-date.js'
-
-/** How a priority reads, same tones as the list's dot (#1144) but spelled out here. */
-const PRIORITY_TONE: Record<string, string> = {
-  urgent: 'text-danger',
-  high: 'text-warning',
-  medium: 'text-muted-foreground',
-  low: 'text-muted-foreground',
-}
+import { priorityTone } from '../lib/ticket-priority.js'
 
 /** How a status reads (#1144/#1230): open is the active, expected state; closed fades back. */
 const STATUS_TONE: Record<'open' | 'closed', string> = {
@@ -84,23 +77,30 @@ export function TicketDetailPage({
                   )}
                 </Button>
               </div>
-              {/* The date leads, on the left of the description (#1144): it is what tells two
-                  similar-sounding tickets apart at a glance, before the meta below is read. */}
-              <div className="mt-2 flex items-start gap-3">
-                <span className="shrink-0 text-xs text-muted-foreground" title={formatDateTime(ticket.date)}>
+              {ticket.summary && <p className="mt-2 text-sm text-muted-foreground">{ticket.summary}</p>}
+              {/* All meta below the description (#1144/#1265): date, priority, then the GitHub
+                  link lead in that order, followed by the rest of what is known about the ticket. */}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] text-muted-foreground/70" title={formatDateTime(ticket.date)}>
                   {formatAge(ticket.date)}
                 </span>
-                {ticket.summary && <p className="min-w-0 flex-1 text-sm text-muted-foreground">{ticket.summary}</p>}
-              </div>
-              {/* Meta below the description (#1144): status leads it, since open/closed is the
-                  first thing worth knowing about a ticket. */}
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <Badge className={cn('border-transparent px-0 text-[10px] uppercase', STATUS_TONE[ticket.status])}>{ticket.status}</Badge>
                 {ticket.priority && (
-                  <Badge className={cn('border-transparent px-0 text-[10px] uppercase', PRIORITY_TONE[ticket.priority])}>
-                    {ticket.priority}
+                  <Badge className={cn('border-transparent px-0 text-[10px]', priorityTone(ticket.priority))}>
+                    Priority: {ticket.priority}
                   </Badge>
                 )}
+                {ticket.github && (
+                  <a
+                    href={ticket.github.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    <Github className="h-3 w-3" aria-hidden />
+                    {ticket.github.label}
+                  </a>
+                )}
+                <Badge className={cn('border-transparent px-0 text-[10px] uppercase', STATUS_TONE[ticket.status])}>{ticket.status}</Badge>
                 {ticket.topics?.map(topic => (
                   <Badge key={topic} className="border-border px-1.5 text-[10px] text-muted-foreground">
                     {topic}

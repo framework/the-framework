@@ -2,12 +2,15 @@ import { useState } from 'react'
 import type { ProjectTickets, WorkspaceTicket } from '@gemstack/the-framework'
 import { onAllTickets } from '../server/reads.telefunc.js'
 import { usePolled } from '../lib/use-async.js'
+import { parsePriority } from '../lib/ticket-priority.js'
 import { ScrollArea } from './ui/scroll-area.js'
 import { Checkbox } from './ui/checkbox.js'
 import { TicketsPanel } from './TicketsPanel.js'
 
 /** Stable initial for the cross-project tickets poll, so it does not churn on every render. */
 const EMPTY_GROUPS: ProjectTickets[] = []
+
+type SortBy = 'date' | 'priority'
 
 /** A status filter checkbox row (#1144/#1230): label, checked state, and what flips it. */
 function StatusFilter({ label, checked, onChange }: { label: string; checked: boolean; onChange: (next: boolean) => void }) {
@@ -17,6 +20,20 @@ function StatusFilter({ label, checked, onChange }: { label: string; checked: bo
       {label}
     </label>
   )
+}
+
+/**
+ * Orders a project's (already filtered) tickets for display (#1144/#1265). `readTickets` hands
+ * back newest-first, which is exactly what "Date" means here, so that option is a no-op; "Priority"
+ * re-sorts highest-first, and a tie — including two tickets that name none — falls back to that
+ * same newest-first order rather than an arbitrary one.
+ */
+function sortTickets(tickets: WorkspaceTicket[], sortBy: SortBy): WorkspaceTicket[] {
+  if (sortBy === 'date') return tickets
+  return [...tickets].sort((a, b) => {
+    const diff = (parsePriority(b.priority) ?? -1) - (parsePriority(a.priority) ?? -1)
+    return diff !== 0 ? diff : b.date.localeCompare(a.date)
+  })
 }
 
 // The Tickets view (#1144): every registered project's `tickets/*.md`, one section per project —
@@ -40,6 +57,7 @@ export function TicketsPage({
   // ticket is the one thing this view does not have to keep showing.
   const [showOpen, setShowOpen] = useState(true)
   const [showClosed, setShowClosed] = useState(false)
+  const [sortBy, setSortBy] = useState<SortBy>('date')
   const matchesFilter = (t: WorkspaceTicket) => (t.status === 'open' && showOpen) || (t.status === 'closed' && showClosed)
 
   return (
@@ -54,20 +72,32 @@ export function TicketsPage({
         <div className="flex items-center gap-4">
           <StatusFilter label="Open" checked={showOpen} onChange={setShowOpen} />
           <StatusFilter label="Closed" checked={showClosed} onChange={setShowClosed} />
+          <div className="flex items-center gap-1.5 text-sm text-foreground">
+            <label htmlFor="tickets-sort-by">Sort by:</label>
+            <select
+              id="tickets-sort-by"
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as SortBy)}
+              className="rounded-md border border-border bg-transparent px-2 py-1 text-sm"
+            >
+              <option value="date">Date</option>
+              <option value="priority">Priority</option>
+            </select>
+          </div>
         </div>
       </div>
       <ScrollArea className="min-h-0 flex-1">
+        {/* As wide as the page allows (#1144/#1265): no max-width, and enough columns at large
+            viewports that the backlog fills the space instead of leaving it idle. */}
         <div className="w-full p-6">
           {!loaded ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : groups.length === 0 ? (
             <p className="text-sm text-muted-foreground">No projects registered yet.</p>
           ) : (
-            // Wider than before (#1144): a 3-up grid left too little room for the row's meta once
-            // status joined priority/topics/date, so this caps at two.
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-6 lg:grid-cols-2 2xl:grid-cols-3">
               {groups.map(g => {
-                const visible = g.tickets.filter(matchesFilter)
+                const visible = sortTickets(g.tickets.filter(matchesFilter), sortBy)
                 return (
                   <section key={g.projectId} className="min-w-0 space-y-2">
                     <h2 className="truncate text-sm font-semibold">{g.projectName}</h2>

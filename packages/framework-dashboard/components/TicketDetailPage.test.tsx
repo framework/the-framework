@@ -30,25 +30,41 @@ afterEach(() => {
 // route carry, plus the Queue action the one-liner list no longer has room for.
 describe('TicketDetailPage (#1144)', () => {
   test('reads the ticket by slug and renders its full content', async () => {
-    onTicket.mockResolvedValue(ticket({ priority: 'high', planned: true }))
+    onTicket.mockResolvedValue(ticket({ priority: '8', planned: true }))
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
     // The title heads the page, and the markdown body repeats it as its own `# ` heading — two
     // matches for the bare text, so assert the page's own heading specifically.
     expect(await screen.findByRole('heading', { name: 'Do the thing' })).toBeTruthy()
     expect(screen.getByText('More detail below the fold.')).toBeTruthy()
-    expect(screen.getByText('high')).toBeTruthy()
+    // A bare "8" would be cryptic on its own (#1265); the badge spells out what it rates.
+    expect(screen.getByText('Priority: 8')).toBeTruthy()
     expect(screen.getByText('planned')).toBeTruthy()
     expect(onTicket).toHaveBeenCalledWith('p1', '2026-07-20_do-the-thing.md')
   })
 
-  test('shows the date to the left of the description, and status in the meta below it (#1144/#1230)', async () => {
+  test('shows the GitHub link, date, and priority in that order below the description (#1144/#1265)', async () => {
+    onTicket.mockResolvedValue(
+      ticket({ priority: '3', github: { label: '#42', url: 'https://github.com/org/repo/issues/42' }, summary: 'A short description.' }),
+    )
+    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
+    const description = await screen.findByText('A short description.')
+    const meta = description.nextElementSibling as HTMLElement
+    const order = [meta.textContent?.indexOf('ago'), meta.textContent?.indexOf('Priority'), meta.textContent?.indexOf('#42')]
+    expect(order.every(i => i !== undefined && i !== -1)).toBe(true)
+    expect(order[0]).toBeLessThan(order[1] as number)
+    expect(order[1]).toBeLessThan(order[2] as number)
+    const link = screen.getByRole('link', { name: /#42/ })
+    expect(link.getAttribute('href')).toBe('https://github.com/org/repo/issues/42')
+  })
+
+  test('shows the date and status in the meta below the description (#1144/#1230/#1265)', async () => {
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
     onTicket.mockResolvedValue(ticket({ status: 'closed', date: twoDaysAgo, summary: 'A short description.' }))
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
     const description = await screen.findByText('A short description.')
-    const dateRow = description.parentElement!
-    // The date is the description's left-hand sibling within the same row.
-    expect(dateRow.textContent?.startsWith('2d ago')).toBe(true)
+    // All meta, date included, moved below the description (#1265) — no longer beside it.
+    const meta = description.nextElementSibling as HTMLElement
+    expect(meta.textContent?.startsWith('2d ago')).toBe(true)
     expect(screen.getByText('closed')).toBeTruthy()
   })
 

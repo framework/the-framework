@@ -16,21 +16,32 @@ export interface WorkspaceTicket {
   /** The `status:` key (#1144/#1230). Defaults to `'open'` — a ticket written before the field
    *  existed is still open work, not one this silently drops from the default view. */
   status: 'open' | 'closed'
-  /** The optional `priority:` key, verbatim and lowercased. */
+  /** The optional `priority:` key, verbatim (a `0`-`10` string; `10` acts immediately). */
   priority?: string
   /** The optional `topics:` key (`topics: [dx, ui]`), as bare tags. */
   topics?: string[]
+  /** The optional `GitHub:` key (`GitHub: [#42](https://github.com/org/repo/issues/42)`), split
+   *  into the link text and the URL it points at. */
+  github?: TicketGithubLink
   /**
-   * ISO 8601, the file's mtime (#1144). Not a date the ticket format records — imported tickets
-   * carry a filename number, not a date — so the filesystem is the one source that answers "when"
-   * for every ticket alike, dated or not, and moves forward when a ticket is edited in place (the
-   * GitHub update, #1208).
+   * ISO 8601 (#1144/#1265). The `<DATE>_<SLUG>.md` filename's date when it has one — the format
+   * every ticket is written in, imports included — else the file's mtime, for the rare ticket that
+   * predates the format. Moves forward on an mtime-dated ticket edited in place (the GitHub update,
+   * #1208); a filename-dated one keeps the date it was created on, same as the file itself does.
    */
   date: string
   /** Whether `<name>.spike.md` sits beside it. */
   spiked: boolean
   /** Whether `<name>.plan.md` sits beside it, i.e. #685 already planned it. */
   planned: boolean
+}
+
+/** A ticket's `GitHub:` link, split into what a reader clicks and where it goes. */
+export interface TicketGithubLink {
+  /** As written, e.g. `#42` — not re-derived, in case the source ever names a PR differently. */
+  label: string
+  /** The issue/PR URL the label links to. */
+  url: string
 }
 
 /**
@@ -118,7 +129,14 @@ function titleFromFile(file: string): string {
  * imports: a heading, prose, and a trailing `Source:` line), so anything missing falls back
  * rather than dropping the ticket from the list.
  */
-function describe(md: string): { title?: string; summary: string; status: 'open' | 'closed'; priority?: string; topics?: string[] } {
+function describe(md: string): {
+  title?: string
+  summary: string
+  status: 'open' | 'closed'
+  priority?: string
+  topics?: string[]
+  github?: TicketGithubLink
+} {
   const lines = md.split('\n')
   const heading = lines.find(line => line.startsWith('# '))?.slice(2).trim()
 
@@ -148,6 +166,12 @@ function describe(md: string): { title?: string; summary: string; status: 'open'
     .map(t => t.trim())
     .filter(Boolean)
 
+  // `GitHub: [#42](https://github.com/org/repo/issues/42)` — a bare Markdown link, so pulling the
+  // label and URL back out of it is all parsing this needs.
+  const githubLine = preamble.find(line => line.toLowerCase().startsWith('github:'))?.slice('github:'.length).trim()
+  const githubMatch = githubLine ? /\[([^\]]+)\]\(([^)]+)\)/.exec(githubLine) : null
+  const github = githubMatch ? { label: githubMatch[1]!, url: githubMatch[2]! } : undefined
+
   // The TLDR is the ticket in one line, which is exactly what a list row wants.
   const tldrAt = lines.findIndex(line => line.trim().toLowerCase() === '## tldr')
   const body = tldrAt === -1 ? lines.slice(headingAt + 1) : lines.slice(tldrAt + 1)
@@ -159,14 +183,35 @@ function describe(md: string): { title?: string; summary: string; status: 'open'
     status,
     ...(priority ? { priority } : {}),
     ...(topics && topics.length > 0 ? { topics } : {}),
+    ...(github ? { github } : {}),
     summary,
   }
+}
+
+/** `<DATE>_<SLUG>.md`'s `<DATE>`, at midnight UTC. */
+const FILENAME_DATE = /^(\d{4}-\d{2}-\d{2})_/
+
+/**
+ * The date a ticket's own filename carries (#1144/#1265), when it carries one. Every ticket the
+ * format describes is written `<DATE>_<SLUG>.md` — imports included, since the import preset
+ * follows the same format — so this is the one true "when" for a ticket, unlike the file's mtime,
+ * which moves every time the file is merely edited (a GitHub update reconciling it, #1208).
+ */
+function dateFromFilename(file: string): string | undefined {
+  const match = FILENAME_DATE.exec(file)
+  return match ? `${match[1]}T00:00:00.000Z` : undefined
 }
 
 /** A file's mtime as ISO 8601, or the epoch when it cannot be stat'd — sorts last, not thrown. */
 async function fileDate(path: string): Promise<string> {
   const info = await stat(path).catch(() => undefined)
   return (info?.mtime ?? new Date(0)).toISOString()
+}
+
+/** A ticket's date (#1144/#1265): its filename's, else its mtime for the rare ticket predating
+ *  the dated-filename format. */
+async function ticketDate(dir: string, file: string): Promise<string> {
+  return dateFromFilename(file) ?? fileDate(join(dir, file))
 }
 
 /**
@@ -187,11 +232,11 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
     // Only the head: a ticket can be long, and nothing below it is shown.
     const [content, date] = await Promise.all([
       readFile(join(dir, file), 'utf8').catch(() => undefined),
-      fileDate(join(dir, file)),
+      ticketDate(dir, file),
     ])
     if (content === undefined) continue
     const stem = file.replace(/\.md$/, '')
-    const { title, summary, status, priority, topics } = describe(content.slice(0, MAX_TICKET_BYTES))
+    const { title, summary, status, priority, topics, github } = describe(content.slice(0, MAX_TICKET_BYTES))
     tickets.push({
       file,
       title: title ?? titleFromFile(file),
@@ -199,6 +244,7 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
       status,
       ...(priority ? { priority } : {}),
       ...(topics ? { topics } : {}),
+      ...(github ? { github } : {}),
       date,
       spiked: siblings.has(`${stem}.spike.md`),
       planned: siblings.has(`${stem}.plan.md`),
@@ -235,12 +281,12 @@ export async function readTicket(cwd: string, file: string): Promise<WorkspaceTi
   const dir = join(cwd, TICKETS_DIR)
   const [content, date, names] = await Promise.all([
     readFile(join(dir, file), 'utf8').catch(() => undefined),
-    fileDate(join(dir, file)),
+    ticketDate(dir, file),
     readdir(dir).catch(() => [] as string[]),
   ])
   if (content === undefined) return null
   const stem = file.replace(/\.md$/, '')
-  const { title, summary, status, priority, topics } = describe(content)
+  const { title, summary, status, priority, topics, github } = describe(content)
   return {
     file,
     title: title ?? titleFromFile(file),
@@ -248,6 +294,7 @@ export async function readTicket(cwd: string, file: string): Promise<WorkspaceTi
     status,
     ...(priority ? { priority } : {}),
     ...(topics ? { topics } : {}),
+    ...(github ? { github } : {}),
     date,
     spiked: names.includes(`${stem}.spike.md`),
     planned: names.includes(`${stem}.plan.md`),

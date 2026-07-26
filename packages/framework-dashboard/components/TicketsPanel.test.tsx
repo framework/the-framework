@@ -36,24 +36,25 @@ afterEach(() => {
 
 describe('TicketsPanel (#697/#1144)', () => {
   test('lists the tickets as one-liners, with what has already been done to them', async () => {
-    render(<TicketsPanel projectId="p1" tickets={[ticket({ priority: 'high', planned: true })]} loaded onOpen={() => {}} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ priority: '8', planned: true })]} loaded onOpen={() => {}} />)
     expect(await screen.findByText('Do the thing')).toBeTruthy()
     expect(screen.getByText('planned')).toBeTruthy()
     // The summary moved to the detail page (#1144); the list row is a one-liner.
     expect(screen.queryByText('The thing is not done.')).toBeNull()
   })
 
-  test('shows meta on the row: priority, topics, and a human-readable date (#1144)', async () => {
+  test('shows meta on the row: priority spelled out, topics, and a human-readable date (#1144/#1265)', async () => {
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
     render(
       <TicketsPanel
         projectId="p1"
-        tickets={[ticket({ priority: 'high', topics: ['dx', 'ui'], date: twoDaysAgo })]}
+        tickets={[ticket({ priority: '8', topics: ['dx', 'ui'], date: twoDaysAgo })]}
         loaded
         onOpen={() => {}}
       />,
     )
-    expect(await screen.findByText('high')).toBeTruthy()
+    // A bare "8" would be cryptic on its own; the row spells out what it is a rating of.
+    expect(await screen.findByText('Priority: 8')).toBeTruthy()
     expect(screen.getByText('dx')).toBeTruthy()
     expect(screen.getByText('ui')).toBeTruthy()
     expect(screen.getByText('2d ago')).toBeTruthy()

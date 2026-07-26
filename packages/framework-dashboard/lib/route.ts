@@ -17,29 +17,51 @@
  */
 export const SETTINGS_SEGMENT = 'settings'
 
+/**
+ * The one word that names the Tickets view (#1144), whether as the bare first segment (the
+ * cross-project list — every project's backlog, one section each, no single project selected) or
+ * as a project's second segment (`/{projectId}/tickets/{slug}`, one ticket's own page).
+ *
+ * Safe to reserve in both spots for the same reason as {@link SETTINGS_SEGMENT}: a project id
+ * always carries a `-<hash>` suffix, and a run id is derived from its start time
+ * (`runIdFromStartedAt`) — neither is ever this bare word.
+ */
+export const TICKETS_SEGMENT = 'tickets'
+
 /** What the dashboard is looking at, as carried by the URL. */
 export interface Route {
-  /** A top-level view belonging to no project (#958). Absent on the Overview/project/session axis. */
-  view?: 'settings'
-  /** The selected project, or null for the Overview. */
+  /** A top-level view belonging to no project (#958), or the Tickets view (#1144). */
+  view?: 'settings' | 'tickets'
+  /** The selected project, or null for the Overview — and for the cross-project Tickets list. */
   projectId: string | null
   /** The selected session (run id), or null for the project's home/launcher. */
   runId: string | null
+  /** One ticket's own page (#1144), by filename — the same slug as `WorkspaceTicket.file`. Only
+   *  meaningful with `view: 'tickets'` and a `projectId`; a ticket belongs to one project, so the
+   *  cross-project list (no `projectId`) never carries one. */
+  ticketSlug?: string | null
 }
 
 /** Read the route out of a path. Anything unparseable is the Overview, and extra segments are ignored. */
 export function parseRoute(pathname: string): Route {
-  const [projectId, runId] = pathname.split('/').filter(Boolean).map(decodeSegment)
-  if (projectId === SETTINGS_SEGMENT) return { view: 'settings', projectId: null, runId: null }
-  if (!projectId) return { projectId: null, runId: null }
-  return { projectId, runId: runId ?? null }
+  const [first, second, third] = pathname.split('/').filter(Boolean).map(decodeSegment)
+  if (first === SETTINGS_SEGMENT) return { view: 'settings', projectId: null, runId: null }
+  if (first === TICKETS_SEGMENT) return { view: 'tickets', projectId: null, runId: null }
+  if (!first) return { projectId: null, runId: null }
+  if (second === TICKETS_SEGMENT) return { view: 'tickets', projectId: first, runId: null, ticketSlug: third ?? null }
+  return { projectId: first, runId: second ?? null }
 }
 
 /** The path for a route — the inverse of {@link parseRoute}. */
-export function formatRoute({ view, projectId, runId }: Route): string {
+export function formatRoute({ view, projectId, runId, ticketSlug }: Route): string {
   if (view === 'settings') return `/${SETTINGS_SEGMENT}`
+  if (view === 'tickets' && !projectId) return `/${TICKETS_SEGMENT}`
   if (!projectId) return '/'
   const project = encodeURIComponent(projectId)
+  if (view === 'tickets') {
+    const base = `/${project}/${TICKETS_SEGMENT}`
+    return ticketSlug ? `${base}/${encodeURIComponent(ticketSlug)}` : base
+  }
   return runId ? `/${project}/${encodeURIComponent(runId)}` : `/${project}`
 }
 

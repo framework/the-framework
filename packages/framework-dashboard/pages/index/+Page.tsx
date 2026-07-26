@@ -8,6 +8,8 @@ import { SidebarProvider } from '../../components/ui/sidebar.js'
 import { ProjectHome } from '../../components/ProjectHome.js'
 import { DashboardPage } from '../../components/DashboardPage.js'
 import { SettingsPage } from '../../components/SettingsPage.js'
+import { TicketsPage } from '../../components/TicketsPage.js'
+import { TicketDetailPage } from '../../components/TicketDetailPage.js'
 import { RunView } from '../../components/RunView.js'
 import { runLabel } from '../../lib/run-label.js'
 import { RightRail } from '../../components/RightRail.js'
@@ -58,7 +60,7 @@ const EMPTY_RECENT: RecentRun[] = []
 // what the remembered-project state (#475) was for.
 export default function Page() {
   const { route, go } = useRoute()
-  const { view, projectId, runId } = route
+  const { view, projectId, runId, ticketSlug } = route
 
   // A just-started run: bump the tick so the Sessions rail shows an optimistic "starting…" row
   // with the typed prompt at once, before the spawned process writes its run.json. `id` is the
@@ -211,6 +213,21 @@ export default function Page() {
     go({ view: 'settings', projectId: null, runId: null })
   }
 
+  // Tickets (#1144): every registered project's backlog, one section each — required reading for a
+  // demo, so it gets the full width rather than the 27rem right rail. A cross-project destination
+  // like the Overview, not scoped to whichever project happened to be selected.
+  const showTickets = () => {
+    setAdopting(false)
+    go({ view: 'tickets', projectId: null, runId: null })
+  }
+
+  // One ticket's own page (#1144), by the same slug as its filename — what a one-liner row opens
+  // into, since Queue and the rest of its detail no longer fit on the list row.
+  const openTicket = (id: string, slug: string) => {
+    setAdopting(false)
+    go({ view: 'tickets', projectId: id, runId: null, ticketSlug: slug })
+  }
+
   // The live run feed is owned here so both the main view and the right rail's choice gates
   // (#440) read one shared Telefunc Channel. Hooks run before the relay early return below.
   // The run whose feed and controls are in play is simply the one in the URL; in the no-id
@@ -249,6 +266,11 @@ export default function Page() {
   const selectedRun = runId ? runs.find(run => run.id === runId) : undefined
   const renderMain = () => {
     if (view === 'settings') return <SettingsPage onRunStarted={runStarted} onDone={showDashboard} />
+    // A ticket's own page needs both a project and a slug; anything short of that (including the
+    // bare cross-project route) is the list — every registered project, one section each.
+    if (view === 'tickets' && projectId && ticketSlug)
+      return <TicketDetailPage projectId={projectId} slug={ticketSlug} onBack={showTickets} />
+    if (view === 'tickets') return <TicketsPage onOpenTicket={openTicket} onRunStarted={runStarted} />
     if (!projectId)
       return (
         <DashboardPage
@@ -368,22 +390,27 @@ export default function Page() {
           onDashboard={showDashboard}
           onSelectProject={selectProject}
           onSettings={showSettings}
+          onTickets={showTickets}
+          ticketsActive={view === 'tickets'}
           interventionCount={interventions.length}
         />
         <main className="flex min-w-0 flex-1 flex-col">{renderMain()}</main>
-        <RightRail
-          projectId={projectId}
-          runId={runId}
-          choices={choices}
-          views={views}
-          files={files}
-          context={context}
-          toggleContext={toggleContext}
-          hasBrowser={selectedRun?.status === 'running' && selectedRun.browserStreamPort !== undefined}
-          target={selectedRun?.target}
-          loop={loop}
-          onRunStarted={onRunStarted}
-        />
+        {/* The tickets page takes the full width itself (#1144): no rail beside it, the way
+            Settings takes the whole main pane with none either. */}
+        {view !== 'tickets' && (
+          <RightRail
+            projectId={projectId}
+            runId={runId}
+            choices={choices}
+            views={views}
+            files={files}
+            context={context}
+            toggleContext={toggleContext}
+            hasBrowser={selectedRun?.status === 'running' && selectedRun.browserStreamPort !== undefined}
+            target={selectedRun?.target}
+            loop={loop}
+          />
+        )}
       </div>
     </SidebarProvider>
   )

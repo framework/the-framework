@@ -3,9 +3,9 @@ import { loadUserSystemPrompt } from '../system-prompt-file.js'
 import { listProjectWorktrees } from '../worktrees.js'
 import { readLogs, type LogEntry } from '../logs.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
-import { readTickets, readTicketsMeta, type WorkspaceTicket, type TicketsMeta } from '../dashboard/tickets.js'
+import { readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta } from '../dashboard/tickets.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
-import { buildOverview, buildRecentRuns, buildHotTickets, type Overview, type RecentRun, type HotTicket } from '../dashboard/overview.js'
+import { buildOverview, buildRecentRuns, buildHotTickets, collectAllTickets, type Overview, type RecentRun, type HotTicket, type ProjectTickets } from '../dashboard/overview.js'
 import { buildInterventions, type Intervention } from '../dashboard/interventions.js'
 import { buildActivity, type Activity } from '../dashboard/activity.js'
 import { buildDashboard, type DashboardData } from '../dashboard/dashboard.js'
@@ -164,9 +164,19 @@ export async function onTickets(projectId: string): Promise<WorkspaceTicket[]> {
   return withProject(projectId, readTickets, [])
 }
 
+/** One ticket's full text, for its own detail page (#1144). Null when it does not exist. */
+export async function onTicket(projectId: string, file: string): Promise<WorkspaceTicketDetail | null> {
+  return withProject(projectId, cwd => readTicket(cwd, file), null)
+}
+
 /** When `tickets/` last caught up with GitHub (#1208), or `{}` when nothing has recorded it. */
 export async function onTicketsMeta(projectId: string): Promise<TicketsMeta> {
   return withProject(projectId, readTicketsMeta, {})
+}
+
+/** Every registered project's tickets, one list per project (#1144): the cross-project Tickets page. */
+export async function onAllTickets(): Promise<ProjectTickets[]> {
+  return withProjects(collectAllTickets)
 }
 
 /** The committed `.the-framework/LOGS.md` entries, newest-first (or `[]`). */

@@ -1,16 +1,15 @@
-import { useState } from 'react'
 import type { TicketsMeta, WorkspaceTicket } from '@gemstack/the-framework'
 import { presets } from '@gemstack/the-framework/client'
-import { ListPlus, Check, RefreshCw } from 'lucide-react'
-import { sendQueueTicket, sendStart } from '../server/control.telefunc.js'
+import { RefreshCw, Github } from 'lucide-react'
+import { sendStart } from '../server/control.telefunc.js'
 import { onTicketsMeta } from '../server/reads.telefunc.js'
 import { Button } from './ui/button.js'
 import { Badge } from './ui/badge.js'
 import { useAction } from '../lib/use-action.js'
 import { useLoaded } from '../lib/use-async.js'
-import { formatRelative } from '../lib/format-date.js'
+import { formatRelative, formatAge, formatDateTime } from '../lib/format-date.js'
+import { priorityTone } from '../lib/ticket-priority.js'
 import { cn } from '../lib/utils.js'
-import { ScrollArea } from './ui/scroll-area.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 /**
@@ -37,56 +36,40 @@ const UPDATE_PROMPT = presets.updateTickets.render()
 /** Captured once: `useLoaded` treats a fresh `{}` literal as a new value on every render. */
 const NO_META: TicketsMeta = {}
 
-/** How a priority reads, for the ones the format names. */
-const PRIORITY_TONE: Record<string, string> = {
-  urgent: 'text-danger',
-  high: 'text-warning',
-  medium: 'text-muted-foreground',
-  low: 'text-muted-foreground',
-}
-
-// The tickets view (#697): the project's `tickets/*.md`, so the backlog the agent plans from
-// is readable without opening the repo. Each row can be put on the agent queue, and an empty
-// `tickets/` offers to import the repo's GitHub issues instead of just saying "nothing here".
+// The tickets list (#697/#1144): the project's `tickets/*.md` as one-liners — priority, topics,
+// what the agent already did to it, and how recently, all on the row — so the backlog is scannable
+// without opening one. A row's only action is opening its detail page (#1144), which is where
+// Queue and the summary live. An empty `tickets/` offers to import the repo's GitHub issues instead
+// of just saying "nothing here"; a filled one offers to update it (#1208) instead of a re-import
+// re-walking the whole backlog.
 export function TicketsPanel({
   projectId,
   tickets,
   loaded,
+  hiddenByFilter = 0,
+  onOpen,
   onRunStarted,
 }: {
   projectId: string | null
-  /** Read in the rail (#1146), which needs the count to decide whether to offer the tab. */
   tickets: WorkspaceTicket[]
   loaded: boolean
+  /** How many of this project's tickets the caller's status filter hid (#1144/#1230). An empty
+   *  `tickets` with some hidden reads as "filtered", not as "nothing here" — the import prompt
+   *  offers work that has already been done. */
+  hiddenByFilter?: number
+  /** Open one ticket's detail page (#1144), by its file — the same slug the route uses. */
+  onOpen: (file: string) => void
   /** Told when the import session starts, so the shell can show it (#948) — the button used
    *  to flip "Starting…" and leave you staring at the still-empty panel. */
   onRunStarted?: ((intent: string, runId?: string) => void) | undefined
 }) {
-  // Which tickets this session has queued. The queue is a file, not a field on the ticket, so
-  // there is nothing on the ticket to re-read; remembering the click is what stops a row
-  // reading as un-queued the moment the poll returns.
-  const [queued, setQueued] = useState<Set<string>>(new Set())
   const { busy, error, run } = useAction()
-  // When `tickets/` last caught up with GitHub. Read here rather than passed down: the rail polls
-  // the tickets themselves for the tab's row count, and it has no use for the stamp.
+  // When `tickets/` last caught up with GitHub. Read here rather than passed down: the cross-
+  // project page reads one ticket list per project, and this is the one extra read a section adds.
   const meta = useLoaded<TicketsMeta>(projectId ? () => onTicketsMeta(projectId) : null, NO_META, [projectId])
 
   if (!projectId) return null
   if (!loaded) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>
-
-  const queue = async (ticket: WorkspaceTicket) => {
-    // The ticket travels with the entry (#1164): it decides which priority section the entry
-    // lands in, and it is what the queued line links back to.
-    const result = await run(
-      () =>
-        sendQueueTicket(projectId, ticket.title, {
-          file: ticket.file,
-          ...(ticket.priority ? { priority: ticket.priority } : {}),
-        }),
-      'The ticket could not be queued.',
-    )
-    if (result?.ok) setQueued(prev => new Set(prev).add(ticket.file))
-  }
 
   const startImport = async (prompt: string, failure: string) => {
     const result = await run(() => sendStart(projectId, prompt, 'prompt'), failure)
@@ -98,9 +81,21 @@ export function TicketsPanel({
   const importFromGithub = () => startImport(IMPORT_PROMPT, 'The import could not be started.')
   const updateFromGithub = () => startImport(UPDATE_PROMPT, 'The update could not be started.')
 
+  if (tickets.length === 0 && hiddenByFilter > 0) {
+    // Filtered to nothing, not genuinely empty (#1144/#1230): offering an import here would ask
+    // for work already done.
+    return (
+      <div className="rounded-lg border border-border p-4 text-sm">
+        <p className="text-muted-foreground">
+          {hiddenByFilter} ticket{hiddenByFilter === 1 ? '' : 's'} hidden by the current filter.
+        </p>
+      </div>
+    )
+  }
+
   if (tickets.length === 0) {
     return (
-      <div className="space-y-3 p-4 text-sm">
+      <div className="space-y-3 rounded-lg border border-border p-4 text-sm">
         <p className="text-muted-foreground">
           No tickets yet. Tickets live in <code className="rounded bg-muted px-1">tickets/</code> and are what the agent
           plans from.
@@ -114,13 +109,15 @@ export function TicketsPanel({
   }
 
   return (
-    <div className="flex min-h-0 flex-auto flex-col">
+    <div className="overflow-hidden rounded-lg border border-border">
       {error && <p className="border-b border-border p-2 text-xs text-danger">{error}</p>}
       {/* Offered once there is something to update (#1208). On an empty `tickets/` the button
           above says "Import" instead: same work, but "update" would be a strange word for
           filling a directory that has never been filled. */}
-      <div className="flex items-center gap-2 border-b border-border px-2 py-1.5">
-        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+      <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-2 py-1.5">
+        {/* The stamp and its action side by side (#1265) — the button used to sit flush right,
+            a whole panel-width away from the line it acts on. */}
+        <span className="min-w-0 truncate text-xs text-muted-foreground">
           {meta.lastImportedAt
             ? `Updated from GitHub ${formatRelative(meta.lastImportedAt)}`
             : 'No record of an import yet'}
@@ -129,9 +126,9 @@ export function TicketsPanel({
           <TooltipTrigger
             render={
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="h-6 shrink-0 gap-1 px-1.5 text-xs"
+                className="h-6 shrink-0 gap-1 px-2 text-xs"
                 disabled={busy}
                 onClick={() => void updateFromGithub()}
               />
@@ -147,57 +144,70 @@ export function TicketsPanel({
           </TooltipContent>
         </Tooltip>
       </div>
-      <ScrollArea className="min-h-0 flex-auto">
-        <div className="p-2">
+      <ul className="divide-y divide-border">
         {tickets.map(ticket => (
-          <div key={ticket.file} className="mb-1 rounded border border-border p-2">
-            <div className="flex items-start gap-2">
-              <span className="min-w-0 flex-1 text-sm font-medium">{ticket.title}</span>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 shrink-0 gap-1 px-1.5 text-xs"
-                      disabled={busy || queued.has(ticket.file)}
-                      onClick={() => void queue(ticket)}
-                    />
-                  }
-                >
-                  {queued.has(ticket.file) ? (
-                    <>
-                      <Check className="h-3.5 w-3.5" /> Queued
-                    </>
-                  ) : (
-                    <>
-                      <ListPlus className="h-3.5 w-3.5" /> Queue
-                    </>
-                  )}
-                </TooltipTrigger>
-                <TooltipContent>
-                  {queued.has(ticket.file)
-                    ? 'Already added to the queue'
-                    : 'Add to Queue (TODO_AGENTS.md), for the next session to work on'}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            {ticket.summary && <p className="mt-0.5 text-xs text-muted-foreground">{ticket.summary}</p>}
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              {ticket.priority && (
-                <Badge className={cn('border-transparent px-0 text-[10px] uppercase', PRIORITY_TONE[ticket.priority])}>
-                  {ticket.priority}
-                </Badge>
+          // The GitHub link sits beside the button rather than inside it: a link inside a button
+          // is invalid HTML, and the two go different places — the row to the detail page, the
+          // link out to the issue.
+          <li key={ticket.file} className="flex items-stretch transition-colors hover:bg-accent/60">
+            <button
+              type="button"
+              onClick={() => onOpen(ticket.file)}
+              className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm"
+            >
+              {/* Only closed is called out (#1144/#1230): open is the row's default assumption,
+                  same as spiked/planned only showing when true. */}
+              {ticket.status === 'closed' && (
+                <Badge className="shrink-0 border-transparent px-1.5 text-[10px] uppercase text-muted-foreground">closed</Badge>
               )}
-              {/* What the agent has already done to this ticket, so it is clear what is left. */}
-              {ticket.spiked && <Badge className="border-transparent px-0 text-[10px] uppercase">spiked</Badge>}
-              {ticket.planned && <Badge className="border-transparent px-0 text-[10px] uppercase">planned</Badge>}
-              <span className="truncate text-[10px] text-muted-foreground/70">{ticket.file}</span>
-            </div>
-          </div>
+              {/* The title is the row's one flexible column: it truncates when long and stretches
+                  when short, so the whole of a row's slack lands here — the way a table's wide
+                  first column carries the blank — instead of pooling mid-row between columns. */}
+              <span className="min-w-0 flex-1 truncate font-medium">{ticket.title}</span>
+              {/* The tags, content-sized and packed against the priority column (#1265): their
+                  right edge is the aligned one, so rows with one tag and rows with four read as
+                  the same right-aligned column. */}
+              <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
+                {ticket.topics?.map(topic => (
+                  <Badge key={topic} className="shrink-0 border-border px-1.5 text-[10px] text-muted-foreground">
+                    {topic}
+                  </Badge>
+                ))}
+                {/* What the agent has already done to this ticket, so it is clear what is left. */}
+                {ticket.spiked && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">spiked</Badge>}
+                {ticket.planned && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">planned</Badge>}
+                {ticket.effort && (
+                  <Badge className="shrink-0 border-transparent px-1 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>
+                )}
+              </span>
+              {/* Priority and date: snug fixed widths — barely wider than their content, kept
+                  fixed (and rendered even when empty) so the columns still line up down the
+                  table row to row. */}
+              <span className={cn('w-16 shrink-0 text-right text-[10px]', priorityTone(ticket.priority))}>
+                {ticket.priority ? `Priority: ${ticket.priority}` : ''}
+              </span>
+              <span className="w-14 shrink-0 text-right text-[10px] text-muted-foreground/70" title={formatDateTime(ticket.date)}>
+                {formatAge(ticket.date)}
+              </span>
+            </button>
+            {ticket.github ? (
+              <a
+                href={ticket.github.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex w-20 shrink-0 items-center justify-end gap-1 px-3 text-xs text-muted-foreground hover:text-foreground hover:underline"
+              >
+                <Github className="h-4 w-4" aria-hidden />
+                {ticket.github.label}
+              </a>
+            ) : (
+              // Same width as the link so the button's right edge — and with it the priority and
+              // date columns inside — stays put on a row with no issue to link.
+              <span className="w-20 shrink-0" aria-hidden />
+            )}
+          </li>
         ))}
-        </div>
-      </ScrollArea>
+      </ul>
     </div>
   )
 }

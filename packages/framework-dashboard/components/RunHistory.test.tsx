@@ -186,3 +186,30 @@ describe('RunHistory New button (#new-button)', () => {
     expect(screen.getByLabelText('New session').getAttribute('aria-haspopup')).toBeTruthy()
   })
 })
+
+// Tickets: a project's backlog as its own page (#1144), reached from the rail rather than a tab
+// in the right sidebar.
+describe('RunHistory tickets nav (#1144)', () => {
+  test('cross-project like Overview: offered with no project selected, and opens the Tickets view', () => {
+    let opened = false
+    renderRail(<RunHistory projectId={null} runs={[]} selectedRunId={null} onSelect={() => {}} onTickets={() => (opened = true)} />)
+    fireEvent.click(screen.getByText('Tickets'))
+    expect(opened).toBe(true)
+  })
+
+  test('still offered inside a project, since the view is cross-project either way', () => {
+    renderRail(<RunHistory projectId="p1" runs={[]} selectedRunId={null} onSelect={() => {}} onTickets={() => {}} />)
+    expect(screen.getByText('Tickets')).toBeTruthy()
+  })
+
+  test('carries the active fill while it is the current view, and Overview does not also claim it', () => {
+    renderRail(<RunHistory projectId={null} runs={[]} selectedRunId={null} onSelect={() => {}} onTickets={() => {}} ticketsActive />)
+    expect(screen.getByText('Tickets').closest('button')?.getAttribute('aria-current')).toBe('page')
+    expect(screen.getByText('Overview').closest('button')?.getAttribute('aria-current')).not.toBe('page')
+  })
+
+  test('not offered when the caller has nowhere to route it', () => {
+    renderRail(<RunHistory projectId={null} runs={[]} selectedRunId={null} onSelect={() => {}} />)
+    expect(screen.queryByText('Tickets')).toBeNull()
+  })
+})

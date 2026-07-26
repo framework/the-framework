@@ -1,5 +1,6 @@
-priority: medium
-topics: [enhancement]
+Priority: 5
+Topics: [enhancement]
+GitHub: [#109](https://github.com/gemstack-land/the-framework/issues/109)
 
 # ai-autopilot: sandboxed runner adapters (Docker / WebContainer / Flue)
 

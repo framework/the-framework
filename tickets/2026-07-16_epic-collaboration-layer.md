@@ -1,5 +1,6 @@
-priority: low
-topics: [the-framework]
+Priority: 2
+Topics: [the-framework]
+GitHub: [#606](https://github.com/gemstack-land/the-framework/issues/606)
 
 # Epic: Collaboration layer — agents as teammates in the comms layer
 

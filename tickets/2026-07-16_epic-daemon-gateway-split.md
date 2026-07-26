@@ -1,5 +1,6 @@
-priority: low
-topics: [the-framework]
+Priority: 2
+Topics: [the-framework]
+GitHub: [#605](https://github.com/gemstack-land/the-framework/issues/605)
 
 # Epic: Daemon + gateway split — headless 24/7 runtime, composable frontend
 

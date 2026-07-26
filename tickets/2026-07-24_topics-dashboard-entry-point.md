@@ -1,5 +1,6 @@
-priority: medium
-topics: [enhancement, the-framework, ux]
+Priority: 5
+Topics: [enhancement, the-framework, ux]
+GitHub: [#1124](https://github.com/gemstack-land/the-framework/issues/1124)
 
 # Topics: dashboard entry point and project-less addressing
 

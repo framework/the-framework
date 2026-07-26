@@ -1,4 +1,5 @@
-topics: [the-framework]
+Topics: [the-framework]
+GitHub: [#326](https://github.com/gemstack-land/the-framework/issues/326)
 
 # System prompt
 

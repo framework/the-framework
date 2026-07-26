@@ -1,5 +1,6 @@
-priority: low
-topics: [the-framework]
+Priority: 2
+Topics: [the-framework]
+GitHub: [#1039](https://github.com/gemstack-land/the-framework/issues/1039)
 
 # metaFromEvents anchors updatedAt to startedAt on replay
 

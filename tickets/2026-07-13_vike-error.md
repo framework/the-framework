@@ -1,4 +1,5 @@
-topics: [the-framework]
+Topics: [the-framework]
+GitHub: [#460](https://github.com/gemstack-land/the-framework/issues/460)
 
 # Vike error
 

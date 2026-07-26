@@ -62,10 +62,10 @@ export type AutoPmDecision = { start: true; mode: AutoPmMode } | AutoPmRefusal
 /**
  * Whether the budget allows spending unasked.
  *
- * The gate is the quota boundary (#879): by the nth day of the quota week, at most n/7 of the
- * week's allowance should be gone, so auto PM spends up to that line and stands down at it.
- * Work the user asks for is free to cross it and borrow against the days still to come; work
- * nobody asked for is exactly what the line is there to stop.
+ * The gate is the quota boundary (#879): the pro-rated share of the week's allowance elapsed so
+ * far, rising continuously with the clock (#960 Edit), so auto PM spends up to that line and
+ * stands down at it. Work the user asks for is free to cross it and borrow against the days still
+ * to come; work nobody asked for is exactly what the line is there to stop.
  *
  * **It fails closed on a quota it cannot read, and that is the opposite of the per-run guard.**
  * #519 settled that an unreadable quota must never *stop* the user's own work, so

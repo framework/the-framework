@@ -83,9 +83,9 @@ const NEAR_BAND = 5
 /**
  * Where consumption stands against the boundary.
  *
- * A band rather than a point, because the boundary moves a seventh of the week at a time: without
- * one the bar would flip from green to orange every day at the moment the boundary steps, on an
- * account that is spending exactly as intended.
+ * A band rather than a point, since spending exactly on pace still drifts a little either side of
+ * it from one reading to the next — without one the bar would flicker between colours for noise
+ * that says nothing about whether the account is actually on track.
  */
 export function quotaTone(percentUsed: number, boundaryPercent: number, band = NEAR_BAND): QuotaTone {
   if (percentUsed >= 100) return 'full'

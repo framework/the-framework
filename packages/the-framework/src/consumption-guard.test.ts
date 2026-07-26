@@ -4,7 +4,7 @@ import { startConsumptionGuard } from './consumption-guard.js'
 import { FakeDriver } from './driver/index.js'
 import type { Driver, DriverQuota, DriverQuotaWindow } from './driver/index.js'
 
-/** 2026-07-20T12:00:00Z. The week below resets in 5 days, so this is day 3 of 7 (42.8% allowed). */
+/** 2026-07-20T12:00:00Z. The week below resets in 5 days 19 hours, so ~31.5% has elapsed (#960 Edit). */
 const T0 = Date.UTC(2026, 6, 20, 12, 0, 0)
 
 function quotaDriver(...readings: DriverQuota[]): Driver {

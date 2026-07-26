@@ -58,9 +58,9 @@ function LegendItem({ swatch, children }: { swatch: ReactNode; children: ReactNo
  * amount plus a handle floating apart from it. Dragging the dim segment's own right edge is what
  * moves that stop, so the control is the bar's shape rather than a slider laid over it.
  *
- * The boundary is drawn at the step that actually gates the pace, not a smooth pro-rata line: it
- * steps a seventh at a time (#879), and a line the daemon does not act on would be a prettier lie.
- * The limit, by contrast, really is continuous — it is a handle, not a reading.
+ * The boundary is drawn exactly where it gates the pace — continuous, the same value the daemon
+ * acts on (#960 Edit), not a value that jumps once a day, so its position on the bar always names
+ * the actual instant `now` falls on. The limit is continuous too — it is a handle, not a reading.
  */
 function WeekBar({
   status,

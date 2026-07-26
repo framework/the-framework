@@ -1,5 +1,6 @@
 import { QuotaPoller } from './quota-poller.js'
 import { quotaBoundaryStatus } from './quota-boundary.js'
+import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 import type { Driver } from './driver/index.js'
 
 /** A live quota gate, and the polling behind it. */
@@ -7,7 +8,8 @@ export interface ConsumptionGuard {
   /**
    * Pass as `consumptionGate` to a run. Answers from the poller's cached
    * readings, so it is cheap enough to ask between every turn. The label of the
-   * window that reached the boundary, or null while there is room.
+   * window that reached the limit in force (the boundary plus its half-day
+   * cushion, #960 Edit), or null while there is room.
    */
   gate: () => string | null
   /** The poller feeding it, exposed so a caller can read the windows off it. */
@@ -59,7 +61,13 @@ export function startConsumptionGuard(opts: StartConsumptionGuardOptions): Consu
     gate: () => {
       const windows = poller.current().lastGood?.windows
       if (!windows) return null
-      const status = quotaBoundaryStatus({ windows, now: now(), ...(opts.model ? { model: opts.model } : {}) })
+      // The same half-day cushion unattended work gets by default (#960 Edit). The continuous
+      // boundary starts the week at zero, so without one the first integer percent the agent
+      // reports outruns it and the user's own first run of the week is paused over ordinary
+      // rounding — the stepped line this replaces always kept the current day's seventh in hand.
+      // Deliberately not the user's slider: that sets where *unattended* work stands down, and
+      // holding it back must never tighten the gate on work the user asked for.
+      const status = quotaBoundaryStatus({ windows, now: now(), limitOffset: DEFAULT_SPEND_OFFSET, ...(opts.model ? { model: opts.model } : {}) })
       return status?.reached?.label ?? null
     },
   }

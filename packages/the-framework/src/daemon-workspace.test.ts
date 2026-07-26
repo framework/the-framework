@@ -349,9 +349,13 @@ test('binding a topic run re-homes it into the bound project: a worktree there, 
   } finally {
     await runtime.suspendRuns().catch(() => {})
     await runtime.dispose()
-    await rm(home, { recursive: true, force: true })
-    await rm(config, { recursive: true, force: true })
-    await rm(target, { recursive: true, force: true })
+    // Retried: the continued run's daemon-side writes (meta, sessions, registry) can still be
+    // landing when this teardown starts, and a concurrent create inside a dir being removed fails
+    // the whole rm with ENOTEMPTY (#1165's teardown-race tail: the body passes, the cleanup flakes).
+    const retried = { recursive: true, force: true, maxRetries: 10, retryDelay: 100 } as const
+    await rm(home, retried)
+    await rm(config, retried)
+    await rm(target, retried)
   }
 })
 

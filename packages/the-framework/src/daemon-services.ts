@@ -61,8 +61,11 @@ export interface BackgroundServices {
    * Sweep now instead of at the next tick (#1161), because the `autoPm` preference was just
    * switched on. The sweep re-reads the preference itself, so this only changes *when* it
    * notices — but a ten-minute wait with nothing on screen is what made the toggle read as dead.
+   *
+   * `onDemand` is the dashboard's trigger button (#1210): that sweep runs even while the
+   * preference is off, because the click itself is the ask the preference would otherwise record.
    */
-  wakeAutoPm: () => void
+  wakeAutoPm: (opts?: { onDemand?: boolean }) => void
   /** What the last auto-PM sweep decided, for the usage panel to show (#1161). */
   autoPmReport: () => AutoPmReport
 }
@@ -125,7 +128,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     return deps.startRun(prompt, { ...options, ...extra, unattended: true }, projectId)
   }
 
-  // Auto PM (#685/#773): while the queue is dry and there is quota to spare, harvest quick-wins and
+  // Auto PM (#685/#773): while the queue is dry and there is quota to spare, triage and
   // spike & plan tickets rather than let the day's allowance expire unused.
   const autoPm = startAutoPm({
     projects,
@@ -346,9 +349,10 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     },
     flushConversations: () => conversationCommitter.flush().catch(() => 0),
     reloadDiscord,
-    // Not awaited, and safe to call when the preference went the other way: a sweep with the box
-    // unticked reads it, records "off", and starts nothing.
-    wakeAutoPm: () => void autoPm.tick().catch(() => {}),
+    // Not awaited. The plain wake is safe to call when the preference went the other way — the
+    // sweep re-reads the box, records "off", and starts nothing — while an on-demand one (#1210)
+    // runs regardless, because the click is the ask.
+    wakeAutoPm: opts => void autoPm.tick(opts).catch(() => {}),
     autoPmReport: () => autoPm.report(),
   }
 }

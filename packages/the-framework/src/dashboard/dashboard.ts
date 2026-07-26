@@ -2,7 +2,7 @@ import { listRuns, type RunMeta, type RunStatus } from '../store/index.js'
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
 import { hasTickets } from './tickets.js'
-import { buildOverview, type ActiveRun, type RecentProject, type RecentRun, type OverviewDeps } from './overview.js'
+import { buildOverview, type ActiveRun, type RecentProject, type OverviewDeps } from './overview.js'
 
 // The Overview dashboard page (#471): the cross-project rollup that used to live cramped in
 // the first sidebar, promoted to a real at-a-glance page. It reuses buildOverview for the
@@ -49,11 +49,6 @@ export interface DashboardData {
   activity: ActivityDay[]
   /** Runs going right now, most-recently-updated first (from {@link buildOverview}). */
   active: ActiveRun[]
-  /**
-   * Finished sessions across every project, most-recently-finished first (capped), for the Agents
-   * view's "Recent" column (#1139). The "Current" column reads {@link active}.
-   */
-  recentAgents: RecentRun[]
   /** The most recently active projects (capped). */
   recent: RecentProject[]
   /** Every registered project with its run/TODO rollup, most-recently-active first. */
@@ -64,9 +59,6 @@ export interface DashboardData {
 
 /** How many days of run activity the chart covers. */
 const ACTIVITY_DAYS = 14
-
-/** How many finished sessions the Agents view's "Recent" column pools across every project (#1139). */
-const RECENT_AGENTS_LIMIT = 20
 
 /** Injectable readers/clock so {@link buildDashboard} is unit-testable off disk. */
 export interface DashboardDeps extends OverviewDeps {
@@ -115,9 +107,6 @@ export async function buildDashboard(projects: ProjectSummary[], deps: Dashboard
 
   const runsByStatus: Record<RunStatus, number> = { running: 0, done: 0, stopped: 0, failed: 0 }
   const projectStats: ProjectStat[] = []
-  // Finished sessions across every project, for the Agents view's "Recent" column (#1139). Read
-  // off the same archived-runs pass that counts them, so it costs no extra disk.
-  const recentAgents: RecentRun[] = []
   let totalRuns = 0
   for (const project of projects) {
     const runs = await listRunsFor(project.path)
@@ -126,9 +115,6 @@ export async function buildDashboard(projects: ProjectSummary[], deps: Dashboard
       runsByStatus[run.status] += 1
       const key = localDateKey(new Date(run.startedAt))
       if (buckets.has(key)) buckets.set(key, buckets.get(key)! + 1)
-      // Archived runs are finished by definition; the guard is belt-and-braces against a
-      // just-self-healed row (#716) still reading as running.
-      if (run.status !== 'running') recentAgents.push({ projectId: project.id, projectName: project.name, run })
     }
     projectStats.push({
       projectId: project.id,
@@ -142,8 +128,6 @@ export async function buildDashboard(projects: ProjectSummary[], deps: Dashboard
     })
   }
   projectStats.sort((a, b) => (b.lastActivityAt ?? '').localeCompare(a.lastActivityAt ?? ''))
-  // Newest-finished first: a finished run's `updatedAt` is its last event, i.e. when it ended.
-  recentAgents.sort((a, b) => (b.run.updatedAt ?? '').localeCompare(a.run.updatedAt ?? ''))
 
   return {
     totals: {
@@ -155,7 +139,6 @@ export async function buildDashboard(projects: ProjectSummary[], deps: Dashboard
     runsByStatus,
     activity: dayKeys.map(date => ({ date, count: buckets.get(date) ?? 0 })),
     active: overview.active,
-    recentAgents: recentAgents.slice(0, RECENT_AGENTS_LIMIT),
     recent: overview.recent,
     projects: projectStats,
     queue,

@@ -44,17 +44,6 @@ test('buildDashboard rolls up totals, run-status, and per-project counts', async
   assert.equal(a.openTodos, 2)
   assert.equal(a.running, true)
   assert.equal(data.projects.find(p => p.projectId === 'b')!.running, false)
-
-  // Finished sessions feed the Agents view's "Recent" column, newest-finished first (#1139); the
-  // live running run is not one of them.
-  assert.deepEqual(
-    data.recentAgents.map(r => ({ p: r.projectName, id: r.run.id })),
-    [
-      { p: 'a', id: '2026-07-14T09:00:00Z' },
-      { p: 'a', id: '2026-07-13T09:00:00Z' },
-      { p: 'b', id: '2026-07-12T09:00:00Z' },
-    ],
-  )
 })
 
 test('buildDashboard buckets run activity across a 14-day window, oldest-first', async () => {

@@ -45,6 +45,10 @@ export async function onAutoPm(): Promise<AutoPmReport | undefined> {
  * write that switches the preference on triggers (#1167) — but until now nothing could ask for
  * it directly, so the only way to fast-forward was to tick the box off and on again.
  *
+ * The `autoPm` preference does not gate it: that preference is consent to spend quota *unasked*,
+ * and this call is asking. So with auto-run off the daemon still sweeps once — every other
+ * stand-down reason in force — and the schedule stays wherever the box says.
+ *
  * Returns whether a sweep was asked for, not what it decided: a sweep can start runs and take a
  * while, and `onAutoPm` is how the answer arrives. `false` on a host with no loop (the relay),
  * which the button reads as "nothing here to trigger".

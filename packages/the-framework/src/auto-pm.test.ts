@@ -14,9 +14,10 @@ import {
   type AutoPmProject,
 } from './auto-pm.js'
 import { quotaBoundaryStatus, type QuotaBoundaryStatus } from './quota-boundary.js'
+import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 import { presets, type PresetKey } from './preset-catalog.js'
 
-/** 2026-07-20T12:00:00Z. The week below resets in 5 days, so this is day 3 of 7 (42.8% allowed). */
+/** 2026-07-20T12:00:00Z. The week below resets in 4 days 19 hours, so ~31.5% has elapsed (#960 Edit). */
 const T0 = Date.UTC(2026, 6, 20, 12, 0, 0)
 
 /** A reading where the account's week is `weekPercent` used. */
@@ -82,14 +83,30 @@ test('quotaHeadroom starts while the account is under the boundary (#879)', () =
 })
 
 test('quotaHeadroom stands down at the boundary, and says where it sits (#879)', () => {
-  // Day 3 of 7 allows 42.8%, so a week at 99% is well past it.
+  // ~31.5% has elapsed of the week, so a week at 99% is well past it.
   const decision = quotaHeadroom(status(99))
   assert.equal(decision.start, false)
-  assert.match(decision.start === false ? decision.reason : '', /99% used, at or past day 3 of the week's 43%/)
+  assert.match(decision.start === false ? decision.reason : '', /99% used, at or past day 3 of the week's 32%/)
+})
+
+test('quotaHeadroom names a fractional offset to one decimal, not fifteen digits (#960 Edit)', () => {
+  // The half-day default is 100/14 — the reason line should say "+7.1", not the raw double.
+  const boundary = quotaBoundaryStatus({
+    windows: [{ label: 'Current week (all models)', kind: 'week', percentUsed: 99, resetsAtText: 'Jul 25 at 7am (UTC)' }],
+    now: T0,
+    limitOffset: DEFAULT_SPEND_OFFSET,
+  })
+  if (!boundary) throw new Error('the fixture week should be placeable')
+  const decision = quotaHeadroom(boundary)
+  assert.equal(decision.start, false)
+  assert.match(decision.start === false ? decision.reason : '', /your 39% limit \(\+7\.1 on the week's 32%\)/)
 })
 
 test('quotaHeadroom stands down the moment the boundary is met, not only when it is passed (#879)', () => {
-  const decision = quotaHeadroom(status((3 / 7) * 100))
+  // Reads the boundary's own actual value back, rather than assuming a day/7 fraction (#960 Edit):
+  // percent is now the continuous elapsed share of the week, not a stepped one.
+  const boundaryPercent = status(0).boundary.percent
+  const decision = quotaHeadroom(status(boundaryPercent))
   assert.equal(decision.start, false)
 })
 
@@ -147,6 +164,25 @@ test('startAutoPm starts nothing while the preference is off (#685)', async () =
   assert.deepEqual(started, [])
 })
 
+test('an on-demand tick sweeps with the preference off: the click is the ask (#1210)', async () => {
+  const { loop, started } = harness({ enabled: async () => false })
+  await loop.tick({ onDemand: true })
+  loop.stop()
+  assert.deepEqual(started, ['p1'])
+  // The report still says where the box stood, beside what the asked-for sweep did.
+  const report = loop.report()
+  assert.equal(report.enabled, false)
+  assert.equal(report.outcomes[0]?.started, true)
+})
+
+test('on demand skips only the master switch: every other stand-down still holds (#1210)', async () => {
+  const { loop, started } = harness({ enabled: async () => false, activeRuns: () => 1 })
+  await loop.tick({ onDemand: true })
+  loop.stop()
+  assert.deepEqual(started, [])
+  assert.match(loop.report().outcomes[0]?.message ?? '', /already going/)
+})
+
 test('startAutoPm does not start a second run for the same project (#685)', async () => {
   // The cooldown is what stops a tick that lands before the spawn registers from doubling up.
   const { loop, started } = harness()
@@ -179,12 +215,10 @@ test('startAutoPm survives a project whose backlog cannot be read (#685)', async
   assert.deepEqual(started, [])
 })
 
-test('AUTO_PM_JOBS harvests, then triages, then plans (#773/#891/#892)', () => {
-  // Cheapest-and-readiest first: harvest existing plans, triage the cheap tickets, then the
-  // significant ones, and leave planning last — it is the priciest turn and the one whose
-  // output every earlier job consumes.
+test('AUTO_PM_JOBS triages, then plans (#773/#891/#892)', () => {
+  // Cheapest-and-readiest first: triage the cheap tickets, then the significant ones, and leave
+  // planning last — it is the priciest turn and the one whose output every earlier job consumes.
   assert.deepEqual(AUTO_PM_JOBS.map(j => j.name), [
-    'quick-wins',
     'triage-quick',
     'triage-consensual',
     'spike-and-plan',
@@ -531,10 +565,18 @@ test('AUTO_PM_ROUTINES is every job the sweep can fire, once each (#1159)', () =
 test('every routine carries its preset label and a rendered prompt, so a list of them is runnable (#1159)', () => {
   for (const job of AUTO_PM_ROUTINES) {
     assert.equal(job.label, presets[presetKey(job.name)].label, `${job.name} must be labelled by its preset`)
-    assert.ok(job.describe.length > 0, `${job.name} must say what it does`)
     assert.ok(job.prompt.trim().length > 0, `${job.name} must carry a prompt`)
     // The prompt travels to the browser and is started verbatim, so nothing may be left unrendered.
     assert.doesNotMatch(job.prompt, /\$\{\{/, `${job.name} must ship a rendered prompt`)
+  }
+})
+
+test('only the maintenance sweep describes itself; the rest are just their label', () => {
+  // "Maintenance" names the preset rather than the work, so its row and log line keep the
+  // sentence; the other routines' labels already say what they do.
+  assert.equal(AUTO_PM_MAINTENANCE_JOB.describe, 'sweeping the codebase for maintenance work')
+  for (const job of [AUTO_PM_DRAIN_JOB, ...AUTO_PM_JOBS]) {
+    assert.equal(job.describe, undefined, `${job.name} must not say its label twice`)
   }
 })
 

@@ -2,18 +2,18 @@
  * The quota boundary (#879): how much of the account's week The Framework may
  * have spent by now.
  *
- * The whole policy is one line — by the nth day of the quota week, at most n/7
- * of the week's allowance should be gone — and it replaces the configurable
- * limits of #519. There is nothing to configure: the boundary is derived from
- * the account's own week, which the agent reports.
+ * The whole policy is one line — the boundary is the pro-rated share of the week's allowance that
+ * has elapsed, rising continuously with the clock rather than once a day (#960 Edit) — and it
+ * replaces the configurable limits of #519. There is nothing to configure: the boundary is derived
+ * from the account's own week, which the agent reports.
  *
  * Two properties fall out of it, and they are the point:
- * - Nothing is left on the floor. The boundary rises on its own, and the last
- *   day of the week allows the whole allowance, so a quiet week still gets
- *   spent rather than expiring.
+ * - Nothing is left on the floor. The boundary rises on its own and reaches the full allowance
+ *   exactly as the week resets, so a quiet week still gets spent rather than expiring.
  * - Low-priority work cannot starve high-priority work. Work the user asks for
- *   borrows against the days still to come; unattended work stands down as soon
- *   as the boundary is reached.
+ *   borrows against the days still to come; unattended work stands down once it
+ *   passes the boundary, by default a half-day cushion beyond it (#960 Edit) —
+ *   see {@link QuotaLimit}.
  */
 
 import type { DriverQuotaWindow } from './driver/index.js'
@@ -121,15 +121,23 @@ export function parseResetsAt(text: string, now: number): number | undefined {
 /**
  * Where the boundary sits, given when the week resets.
  *
- * `day` is 1-based and steps at the exact second the week's own day rolls over,
- * so the seventh day allows the entire allowance. That is deliberate: the last
- * day is the one where anything unspent is about to expire.
+ * `percent` is continuous — the plain elapsed share of the week (#960 Edit) — rather than a value
+ * that jumps once a day, so it always names the actual instant `now` falls on, on any axis that
+ * measures the week the same way. A stepped version once unlocked a whole day's allowance the
+ * moment a new day began (including the entire week's worth on the last day), which read as
+ * generous on paper but let a burst of spending land the instant the clock ticked over rather than
+ * pacing with it; continuous keeps the line honest about what has actually elapsed at the cost of
+ * that burst.
+ *
+ * `day` is 1-based and still names which day of the week `now` falls on — for callers that want to
+ * say "day 4 of 7" rather than a percentage — and steps at the exact second the week's own day
+ * rolls over, independently of `percent`.
  */
 export function boundaryFromResetsAt(resetsAt: number, now: number): QuotaBoundary {
   const startsAt = resetsAt - QUOTA_WEEK_MS
   const elapsedMs = Math.min(Math.max(now - startsAt, 0), QUOTA_WEEK_MS)
   const day = Math.min(WEEK_DAYS, Math.floor(elapsedMs / ONE_DAY_MS) + 1)
-  return { startsAt, resetsAt, day, percent: (day / WEEK_DAYS) * 100 }
+  return { startsAt, resetsAt, day, percent: (elapsedMs / QUOTA_WEEK_MS) * 100 }
 }
 
 /** One quota window measured against the boundary. */

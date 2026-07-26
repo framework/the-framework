@@ -5,8 +5,8 @@ import { presets } from './preset-catalog.js'
  * Auto PM (#685): spend leftover subscription quota on product management instead of
  * letting it expire. While the account is still under its quota boundary (#879) and nobody
  * is at the keyboard, the daemon runs the cycle by itself: it works the agent queue down entry by entry (#855),
- * and once that is empty it refills it — harvesting quick-wins, then spiking and planning
- * the tickets that have neither yet.
+ * and once that is empty it refills it — triaging tickets, then spiking and planning
+ * the ones that have neither yet.
  *
  * The whole feature is one policy question ("is now a good time to spend tokens on our
  * own roadmap?"), so that question lives here as a pure function and the daemon only
@@ -62,10 +62,10 @@ export type AutoPmDecision = { start: true; mode: AutoPmMode } | AutoPmRefusal
 /**
  * Whether the budget allows spending unasked.
  *
- * The gate is the quota boundary (#879): by the nth day of the quota week, at most n/7 of the
- * week's allowance should be gone, so auto PM spends up to that line and stands down at it.
- * Work the user asks for is free to cross it and borrow against the days still to come; work
- * nobody asked for is exactly what the line is there to stop.
+ * The gate is the quota boundary (#879): the pro-rated share of the week's allowance elapsed so
+ * far, rising continuously with the clock (#960 Edit), so auto PM spends up to that line and
+ * stands down at it. Work the user asks for is free to cross it and borrow against the days still
+ * to come; work nobody asked for is exactly what the line is there to stop.
  *
  * **It fails closed on a quota it cannot read, and that is the opposite of the per-run guard.**
  * #519 settled that an unreadable quota must never *stop* the user's own work, so
@@ -82,10 +82,13 @@ export function quotaHeadroom(quota: QuotaBoundaryStatus | undefined): QuotaDeci
   if (reached) {
     // Name the line it actually stopped at (#960). With the slider moved, saying "the week's 43%"
     // when the run stopped at 63% would send someone looking for a bug that is a setting.
+    // The offset is rounded to one decimal for the sentence: a dragged slider stores integers,
+    // but the half-day default (#960 Edit) is 100/14 and fifteen digits of it would say less.
     const { limit, boundary } = quota
+    const offsetText = `${limit.offset > 0 ? '+' : ''}${Math.round(limit.offset * 10) / 10}`
     const line = limit.offset === 0
       ? `the week's ${Math.round(boundary.percent)}%`
-      : `your ${Math.round(limit.percent)}% limit (${limit.offset > 0 ? '+' : ''}${limit.offset} on the week's ${Math.round(boundary.percent)}%)`
+      : `your ${Math.round(limit.percent)}% limit (${offsetText} on the week's ${Math.round(boundary.percent)}%)`
     return {
       start: false,
       reason: `${reached.label} is ${Math.round(reached.percentUsed)}% used, at or past day ${boundary.day} of ${line}`,
@@ -122,19 +125,24 @@ export function autoPmDecision(input: AutoPmInputs): AutoPmDecision {
 /**
  * One thing auto PM knows how to do while the machine is idle (#773).
  *
- * The jobs form a cycle, and the order matters: [Quick wins] turns existing plans into queued
- * work, [Spike & plan] turns tickets into plans. Harvesting first means a machine that already
- * has plans starts *doing* rather than planning more. Once a job queues something the sweep
- * switches to draining it (#855), and the rotation resumes where it left off once the queue is
- * empty again.
+ * The jobs form a cycle, and the order matters: triage turns tickets into queued work, [Spike &
+ * plan] turns the rest into plans. Once a job queues something the sweep switches to draining it
+ * (#855), and the rotation resumes where it left off once the queue is empty again.
  */
 export interface AutoPmJob {
-  /** Stable id, used for the rotation and the log line. */
+  /** Stable id: the rotation and the opt-out list (#1209) key on it. */
   name: string
   /** The prompt to run, verbatim. */
   prompt: string
-  /** What it is doing, as the log line says it ("harvesting quick-wins"). */
-  describe: string
+  /**
+   * A line saying what the job does, wherever its {@link label} does not already: under the label
+   * in the routines list, and as the log line's wording. Only the maintenance sweep carries one --
+   * "Maintenance" names its preset rather than the work -- while the other routines' labels read
+   * as what they do, so their rows stay one line and their log lines say the label itself rather
+   * than the same thing twice. Data on the job rather than a name matched in the dashboard, so a
+   * rename cannot quietly move the line around.
+   */
+  describe?: string
   /**
    * The user-facing name, for a surface that lists the routines (#1159). Read off the preset the
    * job fires rather than written again here, so a relabelled preset relabels its routine.
@@ -151,11 +159,9 @@ export interface AutoPmJob {
 }
 
 /**
- * The default cycle, ordered cheapest-and-readiest first: harvest the plans we have (#773), triage
- * the quick tickets (#891), then the significant-but-agreed ones (#892), and only then make more
- * plans (#685). A machine sitting on work it has already thought through should start *doing*
- * rather than planning, and planning is both the most expensive turn and the one whose output the
- * earlier jobs consume.
+ * The default cycle, ordered cheapest-and-readiest first: triage the quick tickets (#891), then
+ * the significant-but-agreed ones (#892), and only then make more plans (#685). Planning is the
+ * most expensive turn and the one whose output the earlier jobs consume, so it runs last.
  *
  * This rotation is what #891/#892 mean by "with a cron job regularly firing this preset". No
  * separate scheduler is involved and none is needed: the rotation already fires on every idle tick
@@ -173,27 +179,18 @@ export interface AutoPmJob {
  */
 export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
   {
-    name: presets.quickWins.name,
-    prompt: presets.quickWins.render(),
-    describe: 'harvesting quick-wins from the plans',
-    label: presets.quickWins.label,
-  },
-  {
     name: presets.triageQuick.name,
     prompt: presets.triageQuick.render(),
-    describe: 'triaging quick-win tickets',
     label: presets.triageQuick.label,
   },
   {
     name: presets.triageConsensual.name,
     prompt: presets.triageConsensual.render(),
-    describe: 'triaging consensual tickets',
     label: presets.triageConsensual.label,
   },
   {
     name: presets.spikeAndPlan.name,
     prompt: presets.spikeAndPlan.render(),
-    describe: 'spiking & planning tickets',
     label: presets.spikeAndPlan.label,
   },
 ]
@@ -206,7 +203,6 @@ export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
 export const AUTO_PM_DRAIN_JOB: AutoPmJob = {
   name: presets.drainQueue.name,
   prompt: presets.drainQueue.render(),
-  describe: 'draining the first open queue entry',
   label: presets.drainQueue.label,
   drains: true,
 }
@@ -245,6 +241,9 @@ export const AUTO_PM_ROUTINES: readonly AutoPmJob[] = [
   ...AUTO_PM_JOBS,
   AUTO_PM_MAINTENANCE_JOB,
 ]
+
+/** The sentence a start is reported as: the log line and the outcome message say the same thing. */
+const doing = (job: AutoPmJob) => job.describe ?? job.label ?? job.name
 
 /**
  * What became of one attempt to land a run's queue (#852). The two flags are separate on purpose:
@@ -359,8 +358,13 @@ export interface AutoPmLoop {
    * Run one sweep now, rather than waiting for the next tick. Called when the preference is
    * switched on (#1161) as well as from tests: the sweep re-reads it per tick, so without this
    * the box you just ticked does nothing at all for a whole interval.
+   *
+   * `onDemand` marks a sweep a person explicitly asked for (#1210's trigger button). The `autoPm`
+   * preference is consent to spend quota *unasked*, and a click is asking — so an on-demand sweep
+   * runs with the preference off, and the master switch is the only gate it skips: every other
+   * reason to stand down (live runs, cooldowns, the quota boundary, unticked routines) still holds.
    */
-  tick(): Promise<void>
+  tick(opts?: { onDemand?: boolean }): Promise<void>
   /** What the last sweep decided, for the dashboard to show (#1161). */
   report(): AutoPmReport
   stop(): void
@@ -392,7 +396,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   let sweeping = false
   let stopped = false
 
-  const tick = async (): Promise<void> => {
+  const tick = async (opts?: { onDemand?: boolean }): Promise<void> => {
     if (stopped || sweeping) return
     sweeping = true
     let enabled = false
@@ -402,9 +406,11 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
       outcomes.push({ projectId: project.id, path: project.path, started, message })
     try {
       // The preference is the cheapest gate and the one the user flips most, so it is read
-      // once per sweep rather than per project.
+      // once per sweep rather than per project. An on-demand sweep outranks it — the click is
+      // the consent the preference exists to record — but still reads it, so the report says
+      // where the box stood.
       enabled = await deps.enabled().catch(() => false)
-      if (!enabled) return
+      if (!enabled && !opts?.onDemand) return
       const projects = await deps.projects().catch(() => [])
       if (!projects.length) return
       // Read beside the master switch and for the same reason (#1209): it is the same preference
@@ -494,7 +500,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // Armed before the spawn, not after: starting is slow, and a tick that overlapped the
         // spawn would otherwise see no live run yet and start a second one.
         lastStart.set(project.id, now())
-        deps.log(`[framework] auto PM: ${job.describe} in ${project.path}`)
+        deps.log(`[framework] auto PM: ${doing(job)} in ${project.path}`)
         const runId = await deps.start(project, job).catch(() => undefined)
         if (runId) {
           // Advanced only on a start that took, so a refused job is retried rather than skipped.
@@ -509,7 +515,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           else if (decision.mode === 'pm') nextJob.set(project.id, index + 1)
           // Its queue lives on the run's branch until a later tick promotes it.
           pending.set(project.id, [...(pending.get(project.id) ?? []), runId])
-          note(project, true, job.describe)
+          note(project, true, doing(job))
         } else {
           lastStart.delete(project.id)
           deps.log(`[framework] auto PM: could not start a run in ${project.path}`)

@@ -91,3 +91,66 @@ export function formatRelative(value: string | undefined, fallback = '—'): str
   if (days <= 7) return `${days}d ago`
   return date.toLocaleDateString()
 }
+
+/**
+ * A plain duration, floored to its largest whole unit: "2s" / "10m" / "2h" / "1d" (#960 Edit) — no
+ * "ago", and no weeks: this backs the pace-deviation figure, which can never exceed the week
+ * itself. Floored for the reason {@link formatAge} is: "1d" should mean a full day has passed, not
+ * "close enough to one".
+ */
+export function formatDuration(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000))
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h`
+  return `${Math.floor(hours / 24)}d`
+}
+
+/** `1 day` / `2 days`, singular only at exactly one. */
+function pluralize(n: number, unit: string): string {
+  return `${n} ${unit}${n === 1 ? '' : 's'}`
+}
+
+/**
+ * The same duration spelled out — "1 day" / "2 hours" / "10 minutes" / "2 seconds" (#960 Edit) —
+ * for a sentence (a tooltip explaining the figure {@link formatDuration} renders as "1d"), where an
+ * abbreviation reads as a label rather than as prose.
+ */
+export function formatDurationLong(ms: number): string {
+  const seconds = Math.max(0, Math.floor(ms / 1000))
+  if (seconds < 60) return pluralize(seconds, 'second')
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return pluralize(minutes, 'minute')
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return pluralize(hours, 'hour')
+  return pluralize(Math.floor(hours / 24), 'day')
+}
+
+/** `8:59pm`, lowercase and unspaced — the hour and minute the reset formatters share. */
+function timeOfDay(date: Date): string {
+  return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(/\s+/g, '')
+}
+
+/**
+ * A quota reset, as the week it sits under already places it: "Tuesday 8:59pm" (#960 Edit), not a
+ * date — the bar above says which day of the week it is; naming the date again would be the
+ * calendar repeating itself. Pair with {@link formatResetTooltip} for the exact moment.
+ */
+export function formatResetDay(at: number): string {
+  const date = new Date(at)
+  return `${date.toLocaleDateString(undefined, { weekday: 'long' })} ${timeOfDay(date)}`
+}
+
+/**
+ * The same moment in full, for a tooltip: "Quota resets on Jul 28, 8:59pm (Europe/Berlin)". Names
+ * the zone rather than leaving it implicit, since the reset is the account's own clock, and a
+ * viewer working from a different one should not have to guess whether the two agree.
+ */
+export function formatResetTooltip(at: number): string {
+  const date = new Date(at)
+  const monthDay = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  return `Quota resets on ${monthDay}, ${timeOfDay(date)} (${zone})`
+}

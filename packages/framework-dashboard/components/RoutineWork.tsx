@@ -146,7 +146,9 @@ export function RoutineWork({
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium">{job.label ?? job.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{job.describe}</span>
+                      {job.describe && (
+                        <span className="block truncate text-xs text-muted-foreground">{job.describe}</span>
+                      )}
                     </span>
                   </label>
                   <Button
@@ -169,8 +171,9 @@ export function RoutineWork({
               </p>
             )}
 
-            {/* The same `autoPm` preference the usage panel offers (#1161), which is the point: one
-                switch, shown where the schedule it governs is listed. */}
+            {/* The same `autoPm` preference the Settings page offers (#1161), which is the point:
+                one switch, shown where the schedule it governs is listed. (The usage panel's copy
+                of it is gone, #960 Edit.) */}
             <div className="border-t border-border pt-3">
               <div className="flex items-center justify-between gap-2">
                 <Tooltip>
@@ -182,16 +185,16 @@ export function RoutineWork({
                 </Tooltip>
                 {/* The countdown's escape hatch (#1210): the sweep is on a long interval, so
                     without this the only way to fast-forward was to tick the box off and on
-                    again. Disabled while auto-run is off, because a sweep re-reads the
-                    preference and stands straight back down — a button that always did nothing
-                    would read as broken rather than as inapplicable. */}
+                    again. Live even while auto-run is off — that preference records consent to
+                    spend quota unasked, and clicking is asking — so the daemon sweeps once and
+                    the schedule stays off. */}
                 <Tooltip>
                   <TooltipTrigger
                     render={
                       <button
                         type="button"
                         onClick={sweepNow}
-                        disabled={!autoRun || sweeping}
+                        disabled={sweeping}
                         className="shrink-0 rounded border border-border px-2 py-1 text-xs text-foreground hover:bg-accent disabled:opacity-50"
                       />
                     }
@@ -201,7 +204,7 @@ export function RoutineWork({
                   <TooltipContent>
                     {autoRun
                       ? 'Run the scheduled sweep now instead of waiting for the countdown.'
-                      : 'Turn auto-run on first: a sweep checks the setting and stops when it is off.'}
+                      : 'Run the sweep once now. Auto-run stays off, so nothing further is scheduled.'}
                   </TooltipContent>
                 </Tooltip>
               </div>

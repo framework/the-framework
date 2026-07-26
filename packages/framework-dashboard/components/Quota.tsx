@@ -88,9 +88,9 @@ function WeekBar({
   // How far ahead of the boundary's own pace the knob itself sits, as a duration — the same
   // arithmetic as the main figure's deviation, but of the limit rather than actual consumption.
   const limitDeviationMs = paceDeviationMs(limit, boundary.percent, boundary.resetsAt - boundary.startsAt)
-  // A full day above the boundary, not merely past it — the boundary steps a day at a time on its
-  // own, so a knob resting a few points ahead is normal and only worth flagging once it clears a
-  // whole day's worth of pace.
+  // A full day above the boundary, not merely past it — the knob already rests half a day ahead
+  // by default, so a few points past the boundary is the normal state and only worth flagging
+  // once it clears a whole day's worth of pace.
   const eagerConsumption = limit > boundary.percent + ONE_DAY_PERCENT
   const label = `${Math.round(percentUsed)}% of the week used, against a boundary of ${Math.round(boundary.percent)}% on day ${boundary.day} of 7`
   // How far ahead of or behind the boundary's own pace consumption is, as a duration (#960 Edit):

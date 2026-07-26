@@ -4,7 +4,7 @@ import { MAX_SPEND_OFFSET } from '@gemstack/the-framework/client'
 import { useAutoPm, useQuota } from '../lib/quota.js'
 import { formatRelative, formatUntil } from '../lib/format-date.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
-import { weekTicks, quotaTone, limitPercent, TONE_NOTE, type QuotaTone } from '../lib/quota-bar.js'
+import { weekTicks, tickRows, quotaTone, limitPercent, TONE_NOTE, type QuotaTone } from '../lib/quota-bar.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Checkbox } from './ui/checkbox.js'
 import { cn } from '../lib/utils.js'
@@ -41,6 +41,9 @@ function weekWindow(windows: DriverQuotaWindow[]): DriverQuotaWindow | undefined
 function WeekBar({ status, percentUsed, offset }: { status: QuotaBoundaryStatus; percentUsed: number; offset: number }) {
   const { boundary } = status
   const ticks = weekTicks(boundary.startsAt, boundary.resetsAt)
+  // The mid-day-start case packs a label into a sliver of the week (#960); on one line it lands
+  // on top of the label beside it, which is the bug this drops it to a second line for.
+  const rows = tickRows(ticks)
   const tone = quotaTone(percentUsed, boundary.percent)
   const label = `${Math.round(percentUsed)}% of the week used, against a boundary of ${Math.round(boundary.percent)}% on day ${boundary.day} of 7`
 
@@ -48,11 +51,11 @@ function WeekBar({ status, percentUsed, offset }: { status: QuotaBoundaryStatus;
     <div className="space-y-1.5">
       {/* The day labels sit at each local midnight, so the start day appears at both ends when the
           week began mid-day — which is the normal case. */}
-      <div className="relative h-4 text-[10px] font-medium tracking-wide text-muted-foreground">
+      <div className="relative h-7 text-[10px] font-medium tracking-wide text-muted-foreground">
         {ticks.map((tick, i) => (
           <span
             key={`${tick.label}-${i}`}
-            className={cn('absolute top-0', tick.start ? 'left-0' : '-translate-x-1/2')}
+            className={cn('absolute', rows[i] ? 'top-3' : 'top-0', tick.start ? 'left-0' : '-translate-x-1/2')}
             style={tick.start ? undefined : { left: `${tick.percent}%` }}
           >
             {tick.label}

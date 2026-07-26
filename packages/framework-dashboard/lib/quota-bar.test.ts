@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { weekTicks, quotaTone } from './quota-bar.js'
+import { weekTicks, tickRows, quotaTone } from './quota-bar.js'
 
 // The bar's arithmetic. The default formatter is pinned to en-US on purpose (a localized short
 // weekday sliced to two characters is not distinguishing in every locale), so these assertions
@@ -32,6 +32,26 @@ describe('weekTicks', () => {
   test('an empty or inverted span draws nothing rather than dividing by zero', () => {
     expect(weekTicks(1000, 1000, weekday)).toEqual([])
     expect(weekTicks(2000, 1000, weekday)).toEqual([])
+  })
+})
+
+describe('tickRows', () => {
+  // The bug this exists for: a week starting Tuesday evening packs its second label (`WE`) into the
+  // first few percent of the bar, right beside `TU` at 0% — drawn on one line the two sit on top of
+  // each other. This is what the report's screenshot shows.
+  test('a label packed beside the one before it drops to a second line (#960)', () => {
+    const startsAt = new Date(2026, 6, 21, 19, 0, 0).getTime()
+    const ticks = weekTicks(startsAt, startsAt + WEEK_MS, weekday)
+    const rows = tickRows(ticks)
+    expect(rows[0]).toBe(false) // TU, the start
+    expect(rows[1]).toBe(true) // WE, a sliver of a day later — would sit on TU
+    expect(rows.slice(2)).toEqual(rows.slice(2).map(() => false)) // ordinary day gaps, one line
+  })
+
+  test('a week starting at midnight has no cramped gap, so every label stays on one line', () => {
+    const startsAt = new Date(2026, 6, 21, 0, 0, 0).getTime()
+    const ticks = weekTicks(startsAt, startsAt + WEEK_MS, weekday)
+    expect(tickRows(ticks)).toEqual(ticks.map(() => false))
   })
 })
 

@@ -50,6 +50,24 @@ export function weekTicks(startsAt: number, resetsAt: number, weekday: (at: numb
   return ticks
 }
 
+/**
+ * Which ticks would sit on top of the previous label if drawn on one line (#960).
+ *
+ * The only gap that is ever too narrow is the first one — the partial day between a mid-day start
+ * and the following midnight, which can be as short as a few minutes — so a tick within `minGapPercent`
+ * of the last one placed on the line drops to a line of its own instead of overlapping it. Every
+ * ordinary day-to-day gap (a seventh of the week, ~14.3%) clears the threshold, so this only ever
+ * moves the one label the mid-day-start case produces.
+ */
+export function tickRows(ticks: AxisTick[], minGapPercent = 8): boolean[] {
+  let lastPercent = -Infinity
+  return ticks.map(tick => {
+    if (tick.percent - lastPercent < minGapPercent) return true
+    lastPercent = tick.percent
+    return false
+  })
+}
+
 /** How the week is going, which is the bar's colour. */
 export type QuotaTone = 'under' | 'near' | 'over' | 'full'
 

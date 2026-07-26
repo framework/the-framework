@@ -36,6 +36,16 @@ const highlighted = wideBlock
   .map(line => `<span class="line">${line.replace(/</g, '&lt;')}</span>`)
   .join('\n')
 
+// The await-choices spec exactly as our system prompt states it, placeholders and all.
+// Escaped, because these fixtures go in through innerHTML and `<the question>` would otherwise
+// be parsed as an HTML tag and vanish from textContent. The real page escapes it too.
+const esc = t => t.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const SPEC = esc(JSON.stringify({
+  title: '<the question>',
+  options: [{ label: '<option>', detail: '<optional one-liner>' }],
+  recommended: '<the label to default to>',
+}, null, 2))
+
 const cases = [
   ['fenced code block', `<pre><code>${block}</code></pre><div contenteditable="true"></div>`, true],
   ['pre without code', `<pre>${block}</pre><textarea></textarea>`, true],
@@ -48,6 +58,12 @@ const cases = [
   // DOM sees it. Built after parse, below.
   ['inside a shadow root', { shadow: block }, true],
   ['no question present', `<pre><code>console.log(1)</code></pre><div contenteditable="true"></div>`, false],
+  // Round 3's finding: the page renders our system prompt, so the await-protocol spec appears
+  // as a JSON block with `options` before the agent has asked anything. Taking the first match
+  // reported "<the question>" as the question. The spec must lose to the real one.
+  ['protocol spec then the real question', `<pre><code>${SPEC}</code></pre><code>${block}</code><div contenteditable="true"></div>`, true],
+  // And on a session that has not asked yet, the spec alone must not count as a question.
+  ['protocol spec only', `<pre><code>${SPEC}</code></pre><div contenteditable="true"></div>`, false],
 ]
 
 const script = readFileSync(join(here, 'content.js'), 'utf8')

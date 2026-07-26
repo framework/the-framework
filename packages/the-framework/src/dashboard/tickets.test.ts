@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readTickets, hasTickets } from './tickets.js'
+import { readTickets, readTicketsMeta, hasTickets } from './tickets.js'
 
 async function repo(files: Record<string, string> = {}): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), 'tf-tickets-'))
@@ -110,4 +110,29 @@ test('hasTickets agrees with readTickets: a lone spike or plan is not a ticket (
 
 test('hasTickets ignores non-markdown files, like readTickets (#958)', async () => {
   assert.equal(await hasTickets(await repo({ 'notes.txt': 'nope' })), false)
+})
+
+test('readTicketsMeta reads the last-import stamp (#1208)', async () => {
+  const cwd = await repo({ 'meta.json': JSON.stringify({ lastImportedAt: '2026-07-20T10:00:00.000Z' }) })
+  assert.deepEqual(await readTicketsMeta(cwd), { lastImportedAt: '2026-07-20T10:00:00.000Z' })
+})
+
+test('readTicketsMeta answers "not known" for every way the file can be unusable (#1208)', async () => {
+  // The file is written by an agent and read straight into the UI, so each of these has to land on
+  // the same harmless answer rather than throwing at the view or rendering "Invalid Date".
+  assert.deepEqual(await readTicketsMeta(await repo()), {}, 'no tickets/ at all')
+  assert.deepEqual(await readTicketsMeta(await repo({ 'x.md': '# t' })), {}, 'no meta.json')
+  assert.deepEqual(await readTicketsMeta(await repo({ 'meta.json': 'not json' })), {}, 'not JSON')
+  assert.deepEqual(await readTicketsMeta(await repo({ 'meta.json': '"a string"' })), {}, 'JSON, but not an object')
+  assert.deepEqual(await readTicketsMeta(await repo({ 'meta.json': 'null' })), {}, 'JSON null')
+  assert.deepEqual(await readTicketsMeta(await repo({ 'meta.json': '{}' })), {}, 'no stamp in it')
+  assert.deepEqual(await readTicketsMeta(await repo({ 'meta.json': '{"lastImportedAt":17}' })), {}, 'not a string')
+  assert.deepEqual(await readTicketsMeta(await repo({ 'meta.json': '{"lastImportedAt":"soon"}' })), {}, 'unparseable')
+})
+
+test('meta.json is not mistaken for a ticket (#1208)', async () => {
+  // It sits inside tickets/, so a reader that took every file would list it as a row.
+  const cwd = await repo({ 'meta.json': '{"lastImportedAt":"2026-07-20T10:00:00.000Z"}', 'a.md': '# A ticket' })
+  assert.deepEqual((await readTickets(cwd)).map(t => t.file), ['a.md'])
+  assert.equal(await hasTickets(cwd), true)
 })

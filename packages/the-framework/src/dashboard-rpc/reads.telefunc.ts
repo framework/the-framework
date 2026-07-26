@@ -20,6 +20,10 @@ import { readFileContent, type FileContent } from '../dashboard/file-read.js'
 import { contextProjects, contextRemote, resolveProjectPath, resolveRunPath } from './context.js'
 import { relayOr } from './relay-run.js'
 import type { FrameworkEvent } from '../events.js'
+import { bridgeQuestions } from '../dashboard/bridge-store.js'
+import type { BridgeEvent, BridgeHello, BridgeQuestion } from '../dashboard/bridge-endpoints.js'
+import type { BridgeAnswer, BridgeContact } from '../dashboard/bridge-store.js'
+import { readDaemonToken, readPreferences, type Preferences } from '../registry.js'
 
 // The read model behind the new dashboard (#405): the run history, a run's replay, the
 // surfaced PLAN/TODO docs, and the committed LOGS.md — each keyed by project id and
@@ -351,4 +355,62 @@ export async function onSystemPromptUser(projectId: string): Promise<string | nu
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return null
   return (await loadUserSystemPrompt(cwd)) ?? null
+}
+
+/**
+ * The question a Claude web session is parked on, as reported by the browser bridge (#1237).
+ *
+ * Keyed by cloud session id rather than run id because that is what the bridge can see: it reads
+ * a claude.ai page, which knows its session and nothing about our runs. The run view already
+ * derives that id from the run's own `cloud <url>` event, so the join happens on the client
+ * without the daemon having to index runs by session.
+ *
+ * Returns null for anything unrecognised, so a run with no bridge, no question, or a target that
+ * is not `web` renders exactly as it did before.
+ */
+export async function onBridgeQuestion(sessionId: string): Promise<BridgeQuestion | null> {
+  if (typeof sessionId !== 'string' || !/^session_[A-Za-z0-9]{1,128}$/.test(sessionId)) return null
+  return bridgeQuestions().get(sessionId) ?? null
+}
+
+/**
+ * Whether anything has reached the browser bridge, and how it went (#1237).
+ *
+ * A misconfigured extension and an uninstalled one both leave no question behind, so "nothing is
+ * showing" cannot be diagnosed from the questions alone. A refused request at least proves
+ * something is trying, and its status says which half is wrong.
+ */
+export async function onBridgeStatus(): Promise<{ lastContact: BridgeContact | null; questions: number; page: BridgeHello | null }> {
+  const store = bridgeQuestions()
+  return { lastContact: store.lastContact() ?? null, questions: store.list().length, page: store.hello() ?? null }
+}
+
+/**
+ * The bridge token, for the setup step where a user pastes it into the extension (#1237).
+ *
+ * Only while the bridge is on, so a daemon with the feature off never hands the secret to a
+ * page. Revealing it here is not a new exposure: anyone who can load this dashboard can already
+ * start runs on this machine, and on a non-loopback bind their browser is holding the same token
+ * as a cookie. What it replaces is the alternative, which was telling people to open
+ * `~/.the-framework.json` and copy a field out of it.
+ */
+export async function onBridgeToken(): Promise<string | null> {
+  const preferences = await readPreferences().catch((): Preferences => ({}))
+  if (preferences.bridge !== true) return null
+  return (await readDaemonToken().catch(() => undefined)) ?? null
+}
+
+/**
+ * Where the answer picked for that session's question stands (#1237): queued for the
+ * extension, delivered, or failed with the extension's reason. Null when nothing was picked.
+ */
+export async function onBridgeAnswer(sessionId: string): Promise<BridgeAnswer | null> {
+  if (typeof sessionId !== 'string' || !/^session_[A-Za-z0-9]{1,128}$/.test(sessionId)) return null
+  return bridgeQuestions().answer(sessionId) ?? null
+}
+
+/** What a Claude web session has said so far, as scraped by the browser bridge (#1237). */
+export async function onBridgeEvents(sessionId: string): Promise<BridgeEvent[]> {
+  if (typeof sessionId !== 'string' || !/^session_[A-Za-z0-9]{1,128}$/.test(sessionId)) return []
+  return bridgeQuestions().events(sessionId)
 }

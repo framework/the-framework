@@ -238,6 +238,7 @@ test('every boolean preference survives a save; the sanitizer cannot silently dr
     notifyNewActivity: true,
     notifyHumanIntervention: true,
     autoPm: true,
+    bridge: true,
     onboardingDismissed: true,
     reposDirectoryAutoGrant: true,
   }

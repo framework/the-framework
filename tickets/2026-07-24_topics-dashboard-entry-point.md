@@ -1,3 +1,4 @@
+Status: open
 Priority: 5
 Topics: [enhancement, the-framework, ux]
 GitHub: [#1124](https://github.com/gemstack-land/the-framework/issues/1124)

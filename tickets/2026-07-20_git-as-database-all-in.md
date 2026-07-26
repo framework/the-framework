@@ -1,3 +1,4 @@
+Status: open
 GitHub: [#857](https://github.com/gemstack-land/the-framework/issues/857)
 
 # Git as database — all in

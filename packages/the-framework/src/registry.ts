@@ -123,6 +123,13 @@ export interface Preferences {
    */
   autoPm?: boolean
   /**
+   * The browser bridge (#1237): let an extension running in the user's own Claude session report
+   * the question a Claude web run is parked on, so it shows in the dashboard rather than only on
+   * claude.ai. **Absent = off.** It opens the daemon's one route reachable from another origin,
+   * so it is opt-in rather than a baseline, and turning it on is what mints the bridge token.
+   */
+  bridge?: boolean
+  /**
    * The routines {@link autoPm} must not fire, by {@link AutoPmJob.name} (#1209). Absent or empty
    * = every routine runs, which is what the sweep did before this existed.
    *
@@ -371,6 +378,7 @@ const BOOLEAN_PREFERENCES: Record<BooleanPreferenceKey, true> = {
   notifyNewActivity: true,
   notifyHumanIntervention: true,
   autoPm: true,
+  bridge: true,
   onboardingDismissed: true,
   reposDirectoryAutoGrant: true,
 }

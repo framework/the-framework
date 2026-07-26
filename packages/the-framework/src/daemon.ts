@@ -348,6 +348,12 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // anyone who finds the port, so generate + persist the shared token the request guard requires. A
   // loopback bind needs none, so the local zero-config path stays byte-identical.
   const token = isLoopbackHost(host) ? undefined : await ensureDaemonToken(undefined, env)
+  // The browser bridge (#1237). Opt-in, because it opens the daemon's one route reachable from
+  // another origin. It reuses the #1051 shared secret rather than minting a second one: the two
+  // guard the same daemon, so a second secret would be another thing to rotate and leak without
+  // narrowing anything. On a loopback bind that secret may not exist yet, hence ensure, not read.
+  const bridgeOn = (await readPreferences(undefined, env).catch((): Preferences => ({}))).bridge === true
+  const bridgeToken = bridgeOn ? await ensureDaemonToken(undefined, env) : undefined
   // Steering (#344): the daemon owns no run, so its Stop button and choice picks
   // append to `.the-framework/control.jsonl`; the live run tails that file. Appends
   // are best-effort — a full disk must not take the dashboard down with it.
@@ -399,6 +405,8 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     eventsSource: runtime.remoteEventsSource,
     remote: runtime.remoteRuns,
     relay: { tailEvents: runtime.tailRelayEvents, rpc: runtime.onRelayRpc },
+    // The browser bridge (#1237): absent unless the preference is on, which 404s every route.
+    ...(bridgeToken ? { bridgeToken } : {}),
     // Configure Discord from the dashboard (#1095). `onChange` is the half that makes the step
     // finishable in-product: the credential is written to the registry, then this daemon's own
     // Discord services are rebuilt against it, so the bot connects without a restart.

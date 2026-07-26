@@ -13,6 +13,9 @@ import { addProject, ensureDaemonToken, listProjects, nodeRegistryFs, readPrefer
 import { listReposInDirectory } from './repos-directory.js'
 import { registryDiscordCredentialsStore } from './discord-credentials-store.js'
 import { JsonlTailer } from './jsonl-tail.js'
+import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
+import { readAllRuns } from './store/index.js'
+import type { BridgeSession } from './dashboard/index.js'
 
 /**
  * The persistent background dashboard (#302). Today the dashboard dies with the
@@ -406,7 +409,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     remote: runtime.remoteRuns,
     relay: { tailEvents: runtime.tailRelayEvents, rpc: runtime.onRelayRpc },
     // The browser bridge (#1237): absent unless the preference is on, which 404s every route.
-    ...(bridgeToken ? { bridgeToken } : {}),
+    ...(bridgeToken ? { bridgeToken, bridgeSessions: () => listBridgeSessions(env) } : {}),
     // Configure Discord from the dashboard (#1095). `onChange` is the half that makes the step
     // finishable in-product: the credential is written to the registry, then this daemon's own
     // Discord services are rebuilt against it, so the bot connects without a restart.
@@ -501,4 +504,16 @@ function waitForShutdown(signal?: AbortSignal): Promise<void> {
     process.once('SIGTERM', done)
     signal?.addEventListener('abort', done, { once: true })
   })
+}
+
+/**
+ * The cloud sessions the browser bridge should have a tab open for (#1237).
+ *
+ * Across every registered project, because a cloud run is not tied to the daemon's home
+ * checkout, and best-effort per project so one unreadable repo cannot empty the list.
+ */
+async function listBridgeSessions(env: NodeJS.ProcessEnv): Promise<BridgeSession[]> {
+  const projects = await listProjects(undefined, env).catch(() => [])
+  const runs = (await Promise.all(projects.map(p => readAllRuns(p.path).catch(() => [])))).flat()
+  return bridgeSessionsFrom(runs, new Date())
 }

@@ -134,6 +134,11 @@ export interface DashboardOptions {
    * and it authenticates on its own.
    */
   bridgeToken?: string
+  /**
+   * The cloud sessions the browser bridge should have a tab open for (#1237). Only the daemon
+   * wires one, since it is the process that can see every project's runs.
+   */
+  bridgeSessions?: () => Promise<import('./bridge-endpoints.js').BridgeSession[]>
 }
 
 /** A running localhost dashboard: the prerendered SPA + its Telefunc mount. */
@@ -199,7 +204,11 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
   // The browser bridge (#1237). Off unless a token was supplied, and it carries that token itself
   // rather than riding the #1051 guard, which a loopback daemon does not have.
   const bridgeHandlers: BridgeHandlers | undefined = opts.bridgeToken
-    ? { token: opts.bridgeToken, record: question => bridgeQuestions().record(question) }
+    ? {
+        token: opts.bridgeToken,
+        record: question => bridgeQuestions().record(question),
+        ...(opts.bridgeSessions ? { sessions: opts.bridgeSessions } : {}),
+      }
     : undefined
 
   const token = opts.token

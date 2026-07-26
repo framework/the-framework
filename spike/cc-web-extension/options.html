@@ -28,6 +28,15 @@
     <label for="token">Bridge token</label>
     <input id="token" type="password" placeholder="paste the token from The Framework" autocomplete="off" />
 
+    <label style="font-weight:600;margin-top:18px;display:flex;align-items:center;gap:8px">
+      <input id="autoOpen" type="checkbox" style="width:auto" />
+      Open a pinned background tab for each recent cloud session
+    </label>
+    <p style="margin:4px 0 0;font-size:12px">
+      Without this the bridge only works while you happen to have the session open. With it, the
+      tabs open themselves, pinned and inactive, and close when you close them.
+    </p>
+
     <button id="save">Save and test</button>
     <div id="status" role="status"></div>
 

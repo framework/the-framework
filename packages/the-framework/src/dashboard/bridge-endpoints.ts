@@ -34,11 +34,23 @@ export interface BridgeQuestion {
   receivedAt: string
 }
 
+/** A cloud session the extension should be watching. */
+export interface BridgeSession {
+  id: string
+  url: string
+}
+
 /** What the daemon wires behind the bridge. Absent when the feature is off, which 404s it. */
 export interface BridgeHandlers {
   /** The shared secret every bridge call must present. */
   token: string
   record: (question: BridgeQuestion) => void
+  /**
+   * The cloud sessions worth watching, newest first. The extension cannot know a run started:
+   * it only sees pages the user is already on, so without this the bridge works only when
+   * somebody happens to be looking at claude.ai. This is how a tab gets opened for them.
+   */
+  sessions?: () => Promise<BridgeSession[]>
   now?: () => Date
 }
 
@@ -63,6 +75,7 @@ export async function handleBridgeRequest(
     return end(res, 200, 'ok')
   }
   if (pathname === `${BRIDGE_PREFIX}/question`) return handleQuestion(req, res, handlers)
+  if (pathname === `${BRIDGE_PREFIX}/sessions`) return handleSessions(req, res, handlers)
   end(res, 404, 'not found')
 }
 
@@ -131,6 +144,19 @@ function validate(body: unknown, now: Date): BridgeQuestion | string {
     ...(typeof recommended === 'string' && recommended ? { recommended } : {}),
     receivedAt: now.toISOString(),
   }
+}
+
+/**
+ * `GET /_bridge/sessions`: the cloud sessions the extension should have a tab for.
+ *
+ * Answers an empty list rather than a 404 when the daemon wired no lister, so an extension
+ * polling an older daemon degrades to doing nothing instead of reporting a fault.
+ */
+async function handleSessions(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
+  if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
+  const sessions = handlers.sessions ? await handlers.sessions().catch(() => []) : []
+  res.writeHead(200, { 'content-type': 'application/json' })
+  res.end(JSON.stringify({ sessions }))
 }
 
 /** Read a JSON body, refusing anything past the cap rather than buffering it. */

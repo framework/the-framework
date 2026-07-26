@@ -5,10 +5,13 @@ const DEFAULT_DAEMON = 'http://localhost:4200'
 const daemonEl = document.getElementById('daemon')
 const tokenEl = document.getElementById('token')
 const statusEl = document.getElementById('status')
+const autoOpenEl = document.getElementById('autoOpen')
 
-void chrome.storage.local.get(['daemonUrl', 'token']).then(({ daemonUrl, token }) => {
+void chrome.storage.local.get(['daemonUrl', 'token', 'autoOpen']).then(({ daemonUrl, token, autoOpen }) => {
   daemonEl.value = daemonUrl || DEFAULT_DAEMON
   tokenEl.value = token || ''
+  // Default on once configured, but stored explicitly so the worker never has to guess.
+  autoOpenEl.checked = autoOpen !== false
 })
 
 function say(message, isError) {
@@ -20,7 +23,7 @@ document.getElementById('save').addEventListener('click', async () => {
   const daemonUrl = (daemonEl.value || DEFAULT_DAEMON).replace(/\/+$/, '')
   const token = tokenEl.value.trim()
   if (!token) return say('Paste the bridge token first.', true)
-  await chrome.storage.local.set({ daemonUrl, token })
+  await chrome.storage.local.set({ daemonUrl, token, autoOpen: autoOpenEl.checked })
 
   // Save then prove it: a token that is merely stored tells the user nothing, and the two ways
   // this goes wrong (bridge off, wrong token) are worth telling apart before they need it.

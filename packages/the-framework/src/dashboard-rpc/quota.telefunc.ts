@@ -52,12 +52,16 @@ export async function onAutoPm(): Promise<AutoPmReport | undefined> {
  * Returns whether a sweep was asked for, not what it decided: a sweep can start runs and take a
  * while, and `onAutoPm` is how the answer arrives. `false` on a host with no loop (the relay),
  * which the button reads as "nothing here to trigger".
+ *
+ * `drainOnly` narrows the sweep to working the queue (#1204): the drain routine's Run now spins
+ * agents up on the queue's entries — the fan-out only the sweep can do — and an empty queue is
+ * reported rather than borrowed for a rotation job.
  */
-export async function sendAutoPmSweep(): Promise<{ ok: boolean }> {
+export async function sendAutoPmSweep(opts?: { drainOnly?: boolean }): Promise<{ ok: boolean }> {
   const sweep = contextAutoPmSweep()
   if (!sweep) return { ok: false }
   try {
-    sweep()
+    sweep(opts?.drainOnly ? { drainOnly: true } : undefined)
     return { ok: true }
   } catch {
     return { ok: false }

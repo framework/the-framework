@@ -435,8 +435,12 @@ export interface AutoPmLoop {
    * preference is consent to spend quota *unasked*, and a click is asking — so an on-demand sweep
    * runs with the preference off, and the master switch is the only gate it skips: every other
    * reason to stand down (live runs, cooldowns, the quota boundary, unticked routines) still holds.
+   *
+   * `drainOnly` narrows the sweep to working the queue (#1204): the drain row's Run now means
+   * "spin agents up on the queue", so a tick that would fall through to a rotation job (the queue
+   * is empty) says so instead of borrowing the click for work nobody asked for.
    */
-  tick(opts?: { onDemand?: boolean }): Promise<void>
+  tick(opts?: { onDemand?: boolean; drainOnly?: boolean }): Promise<void>
   /** What the last sweep decided, for the dashboard to show (#1161). */
   report(): AutoPmReport
   stop(): void
@@ -470,7 +474,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   let sweeping = false
   let stopped = false
 
-  const tick = async (opts?: { onDemand?: boolean }): Promise<void> => {
+  const tick = async (opts?: { onDemand?: boolean; drainOnly?: boolean }): Promise<void> => {
     if (stopped || sweeping) return
     sweeping = true
     let enabled = false
@@ -543,6 +547,12 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           // Logged, so a wedged sweep is distinguishable from a healthy idle one (#855).
           deps.log(`[framework] auto PM: standing down for ${project.path} — ${decision.reason}`)
           note(project, false, decision.reason)
+          continue
+        }
+        // A drain-only sweep (#1204) works the queue or says why not — it never borrows the
+        // click for a rotation job the user did not ask for.
+        if (opts?.drainOnly && decision.mode !== 'drain') {
+          note(project, false, 'the queue is empty, so there is nothing to drain')
           continue
         }
         // Switching the draining routine off (#1209) stands the sweep down rather than falling

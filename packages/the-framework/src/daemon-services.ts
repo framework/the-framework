@@ -66,7 +66,7 @@ export interface BackgroundServices {
    * `onDemand` is the dashboard's trigger button (#1210): that sweep runs even while the
    * preference is off, because the click itself is the ask the preference would otherwise record.
    */
-  wakeAutoPm: (opts?: { onDemand?: boolean }) => void
+  wakeAutoPm: (opts?: { onDemand?: boolean; drainOnly?: boolean }) => void
   /** What the last auto-PM sweep decided, for the usage panel to show (#1161). */
   autoPmReport: () => AutoPmReport
 }

@@ -835,3 +835,27 @@ test('an unreadable claim list means none: the in-memory pins still guard the co
   loop.stop()
   assert.equal(started.length, 1, 'a gh hiccup must not stall a healthy queue')
 })
+
+test('a drain-only sweep works the queue and never borrows the tick for the rotation (#1204)', async () => {
+  // The drain row's Run now: with entries waiting it fans out like any drain sweep...
+  const prompts: string[] = []
+  const { loop } = harness({
+    cooldownMs: 0,
+    concurrency: async () => 2,
+    queue: async () => ['entry a', 'entry b'],
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick({ onDemand: true, drainOnly: true })
+  loop.stop()
+  assert.equal(prompts.length, 2)
+
+  // ...and with an empty queue it says so instead of starting a rotation job.
+  const { loop: empty, started } = harness({ cooldownMs: 0, queue: async () => [] })
+  await empty.tick({ onDemand: true, drainOnly: true })
+  empty.stop()
+  assert.equal(started.length, 0)
+  assert.equal(empty.report().outcomes[0]?.message, 'the queue is empty, so there is nothing to drain')
+})

@@ -3,6 +3,8 @@
 Answers one question: can an extension running in the user's own Claude session reliably find
 the question a cloud run is parked on, and the box an answer would go into?
 
+Run `node check.mjs` from this directory to prove the parsing half against a synthetic page, with no browser and no live session needed.
+
 It **sends nothing anywhere**. There are no `host_permissions` in the manifest, so it cannot
 reach the daemon or any other host even if the code tried to. Transport is a separate problem
 (see the issue), and it is deliberately not part of this spike.

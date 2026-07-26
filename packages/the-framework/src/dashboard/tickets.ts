@@ -21,6 +21,24 @@ export interface WorkspaceTicket {
   planned: boolean
 }
 
+/**
+ * What `tickets/meta.json` records about the last import (#1208).
+ *
+ * Written by the agent doing the import, in the same commit as the tickets it describes, and read
+ * here so the view can say when `tickets/` last caught up with GitHub. A repo imported before this
+ * file existed simply has no stamp, which reads as "not known" rather than as an error.
+ */
+export interface TicketsMeta {
+  /** ISO 8601 UTC, the moment the last import began. Absent when nothing has recorded one. */
+  lastImportedAt?: string
+}
+
+/** The meta file's name inside `tickets/`. */
+const META_FILE = 'meta.json'
+
+/** Big enough for a stamp and whatever is agreed later; small enough that a junk file cannot be read whole. */
+const MAX_META_BYTES = 10_000
+
 /** How much of a ticket is read looking for its heading and TLDR. */
 const MAX_TICKET_BYTES = 4_000
 
@@ -37,6 +55,31 @@ const SIBLING = /\.(plan|spike)\.md$/
 export async function hasTickets(cwd: string): Promise<boolean> {
   const names = await readdir(join(cwd, TICKETS_DIR)).catch(() => [] as string[])
   return names.some(name => name.endsWith('.md') && !SIBLING.test(name))
+}
+
+/**
+ * The last-import stamp, or `{}` when there is none to read (#1208).
+ *
+ * Every failure lands on the same answer — no file, unreadable, not JSON, a `lastImportedAt` that
+ * is not a usable date — because the file is written by an agent and read into the UI. "We do not
+ * know when this last synced" is a true and harmless thing to say; throwing at the view over a
+ * malformed optional file is not.
+ */
+export async function readTicketsMeta(cwd: string): Promise<TicketsMeta> {
+  const raw = await readFile(join(cwd, TICKETS_DIR, META_FILE), 'utf8').catch(() => undefined)
+  if (raw === undefined) return {}
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw.slice(0, MAX_META_BYTES))
+  } catch {
+    return {}
+  }
+  if (typeof parsed !== 'object' || parsed === null) return {}
+  const stamp = (parsed as Record<string, unknown>)['lastImportedAt']
+  // Parsed rather than merely non-empty: the value is rendered as a date, and a string the
+  // browser cannot parse would show as "Invalid Date" in the one place claiming to be factual.
+  if (typeof stamp !== 'string' || Number.isNaN(Date.parse(stamp))) return {}
+  return { lastImportedAt: stamp }
 }
 
 /**

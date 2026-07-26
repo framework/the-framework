@@ -1,13 +1,18 @@
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 const onTickets = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onTickets }))
 // TicketsPanel (rendered here) reaches for these too; unmocked they pull the real telefunc client
 // into jsdom, same as TicketsPanel's own suite.
+const onTicketsMeta = vi.hoisted(() => vi.fn())
+vi.mock('../server/reads.telefunc.js', () => ({ onTickets, onTicketsMeta }))
 vi.mock('../server/control.telefunc.js', () => ({ sendQueueTicket: vi.fn(), sendStart: vi.fn() }))
 
 const { TicketsPage } = await import('./TicketsPage.js')
+
+beforeEach(() => {
+  onTicketsMeta.mockReset().mockResolvedValue({})
+})
 
 afterEach(cleanup)
 

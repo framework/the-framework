@@ -123,6 +123,16 @@ export interface Preferences {
    */
   autoPm?: boolean
   /**
+   * The routines {@link autoPm} must not fire, by {@link AutoPmJob.name} (#1209). Absent or empty
+   * = every routine runs, which is what the sweep did before this existed.
+   *
+   * Opted *out* rather than opted in, so the list only ever names exceptions: a routine added in a
+   * later version is on for everyone, instead of silently never running for whoever saved the
+   * setting before it shipped. It names routines rather than indexing them for the same reason
+   * {@link AutoPmJob.drains} is a flag — a reorder must not move which one is switched off.
+   */
+  autoPmOptOut?: string[]
+  /**
    * How far the automatic-consumption limit sits from the quota boundary, in percentage points
    * (#960). Absent or `0` puts it exactly on the boundary, which is the default policy of #879:
    * unattended work stops once the account has spent its share of the week.
@@ -410,7 +420,23 @@ function sanitizePreferences(value: unknown): Preferences {
   if (reposDir && isAbsolute(reposDir)) preferences.reposDirectory = reposDir
   const customPresets = sanitizeCustomPresets(input['customPresets'])
   if (customPresets.length) preferences.customPresets = customPresets
+  // `autoPmOptOut` (#1209) is a list of routine names, kept as free-form strings rather than
+  // checked against the catalog: this module is the storage layer and the catalog lives above it,
+  // and a name from a newer version must survive a downgrade rather than be erased by it. Empty
+  // is dropped like every other empty list — nothing opted out is exactly what absent means.
+  const optOut = sanitizeNameList(input['autoPmOptOut'])
+  if (optOut.length) preferences.autoPmOptOut = optOut
   return preferences
+}
+
+/** Trimmed, de-duplicated, and bounded in both directions, so a hand-edited file cannot grow the object without limit. */
+function sanitizeNameList(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const names = value
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map(entry => entry.trim().slice(0, 100))
+    .filter(Boolean)
+  return [...new Set(names)].slice(0, 50)
 }
 
 /**

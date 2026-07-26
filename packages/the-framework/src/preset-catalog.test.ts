@@ -29,6 +29,7 @@ const PARAMLESS = [
   presets.drainQueue,
   presets.triageQuick,
   presets.triageConsensual,
+  presets.updateTickets,
 ] as const
 
 test('every preset keeps its exact run-kind name', () => {
@@ -40,7 +41,7 @@ test('every preset keeps its exact run-kind name', () => {
       'drain-queue', 'import-tickets', 'maintainability', 'maintenance', 'market-research',
       'quick-wins', 'readability', 'research', 'security-audit', 'spike-and-plan',
       'suggest-new-features', 'suggest-new-tickets', 'suggest-tickets-to-work-on',
-      'triage-consensual', 'triage-quick', 'ux',
+      'triage-consensual', 'triage-quick', 'update-tickets', 'ux',
     ],
   )
 })
@@ -204,13 +205,14 @@ test('neither ungated triage preset waits on a human (#891/#892 vs #698)', () =>
   assert.ok(presets.suggestTicketsToWorkOn.template.includes('<AWAIT>'), 'the gated preset still awaits')
 })
 
-test('one preset, and only one, always opens a session of its own (#959)', () => {
+test('the two GitHub-import presets, and only those, always open a session of their own (#959/#1208)', () => {
   // The flag is a property of the work, not of the surface that fires it, so it is pinned here
-  // rather than in the dashboard: the import reads GitHub and writes `tickets/`, which has nothing
-  // to do with whatever session the user happened to be reading when they clicked it.
+  // rather than in the dashboard: both read GitHub and write `tickets/`, which has nothing to do
+  // with whatever session the user happened to be reading when they clicked.
   const marked = Object.values(presets).filter(p => p.newSession).map(p => p.name)
-  assert.deepEqual(marked, ['import-tickets'])
+  assert.deepEqual(marked.sort(), ['import-tickets', 'update-tickets'])
   assert.equal(LAUNCHER_PRESETS.includes(presets.importTickets), true)
+  assert.equal(LAUNCHER_PRESETS.includes(presets.updateTickets), true)
 })
 
 test('the import preset names where the tickets go, not just the button (#697)', () => {
@@ -222,5 +224,30 @@ test('the import preset names where the tickets go, not just the button (#697)',
   assert.match(prompt, /tickets\//)
   assert.match(prompt, /one file per issue/)
   assert.notEqual(prompt, presets.importTickets.label)
+  // It also leaves the stamp behind (#1208), so the first update has somewhere to resume from
+  // instead of re-importing the whole repo.
+  assert.match(prompt, /tickets\/meta\.json/)
+  assert.match(prompt, /lastImportedAt/)
+})
+
+test('the update preset resumes from the stamp and keeps our own work (#1208)', () => {
+  const prompt = presets.updateTickets.render()
+  assert.equal(prompt, presets.updateTickets.template)
+  // Resuming is the whole point: with no `since` an update is just a slower re-import.
+  assert.match(prompt, /tickets\/meta\.json/)
+  assert.match(prompt, /lastImportedAt/)
+  assert.match(prompt, /updated:>=/)
+  // Comments too, not only issues: a ticket whose issue gained a decisive comment has changed.
+  assert.match(prompt, /issues\/comments\?since=/)
+  // The timestamp is taken before the fetch, so an issue edited mid-run comes across next time
+  // rather than falling into the gap between the fetch and the stamp.
+  assert.match(prompt, /before you fetch anything/)
+  // The reconcile half. Clobbering the spikes and plans written against a ticket would throw away
+  // the agent's own work every time someone pressed the button.
+  assert.match(prompt, /\.spike\.md/)
+  assert.match(prompt, /\.plan\.md/)
+  assert.match(prompt, /closed/)
+  // And it must not read as the first import: that is the other preset, under the other button.
+  assert.notEqual(prompt, presets.importTickets.render())
 })
 

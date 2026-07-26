@@ -2,7 +2,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { isAgentName } from './agent-names.js'
 import { nodeFs } from './node-fs.js'
-import { PROJECT_PREFERENCE_KEYS, MAX_SPEND_OFFSET, type ProjectPreferences } from './preference-defaults.js'
+import { PROJECT_PREFERENCE_KEYS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, type ProjectPreferences } from './preference-defaults.js'
 
 /**
  * The multi-project registry (#390): the list of projects the user has
@@ -134,8 +134,8 @@ export interface Preferences {
   autoPmOptOut?: string[]
   /**
    * How far the automatic-consumption limit sits from the quota boundary, in percentage points
-   * (#960). Absent or `0` puts it exactly on the boundary, which is the default policy of #879:
-   * unattended work stops once the account has spent its share of the week.
+   * (#960). Absent defaults to {@link DEFAULT_SPEND_OFFSET} — a half-day cushion ahead of the
+   * boundary — rather than sitting exactly on it (#960 Edit).
    *
    * Negative holds unattended work back further; positive lets it borrow into the days still to
    * come. It is an *offset* rather than an absolute percentage so the limit travels with the
@@ -176,7 +176,7 @@ export interface Preferences {
 // The key list lives in the leaf `preference-defaults.ts` so the dashboard reads the same one
 // (a second copy there erased the type link, see that module); re-exported so this stays the
 // import site for everything that already reads it beside `Preferences`.
-export { PROJECT_PREFERENCE_KEYS, MAX_SPEND_OFFSET, type ProjectPreferences } from './preference-defaults.js'
+export { PROJECT_PREFERENCE_KEYS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, type ProjectPreferences } from './preference-defaults.js'
 
 /**
  * The credentials the daemon needs to reach a third party, set from the dashboard (#1095).

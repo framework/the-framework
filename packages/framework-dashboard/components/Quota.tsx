@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CircleHelp } from 'lucide-react'
 import type { DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '@gemstack/the-framework'
-import { MAX_SPEND_OFFSET } from '@gemstack/the-framework/client'
+import { MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '@gemstack/the-framework/client'
 import { useQuota } from '../lib/quota.js'
 import { formatRelative, formatResetDay, formatResetTooltip, formatDuration, formatDurationLong } from '../lib/format-date.js'
 import { updatePreferences } from '../lib/preferences.js'
@@ -286,7 +286,7 @@ function unavailableNote(view: QuotaView): string | undefined {
  * daemon's catches up with it, which is the point at which the two agree anyway.
  */
 function useSpendOffset(serverOffset: number | undefined): [number, (offset: number) => void] {
-  const [local, setLocal] = useState(serverOffset ?? 0)
+  const [local, setLocal] = useState(serverOffset ?? DEFAULT_SPEND_OFFSET)
   // What we last wrote, while the poll is still behind it. `null` means "follow the server".
   const pending = useRef<number | null>(null)
 

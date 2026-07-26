@@ -12,8 +12,9 @@
  *   day of the week allows the whole allowance, so a quiet week still gets
  *   spent rather than expiring.
  * - Low-priority work cannot starve high-priority work. Work the user asks for
- *   borrows against the days still to come; unattended work stands down as soon
- *   as the boundary is reached.
+ *   borrows against the days still to come; unattended work stands down once it
+ *   passes the boundary, by default a half-day cushion beyond it (#960 Edit) —
+ *   see {@link QuotaLimit}.
  */
 
 import type { DriverQuotaWindow } from './driver/index.js'

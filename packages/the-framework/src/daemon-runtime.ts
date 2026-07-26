@@ -172,6 +172,9 @@ export function startOptionFlags(options: StartRunOptions): string[] {
   // The ticket this run implements (#1117): only ever a `tickets/<file>.md` the daemon read off
   // the queue entry, and re-checked on the other side before it reaches the run's meta.
   if (typeof options.ticket === 'string' && isTicketPath(options.ticket)) flags.push('--ticket', options.ticket)
+  // The pinned queue entry (#1253): one line of agent-written queue text, passed verbatim (argv,
+  // never a shell) so the meta's claim matches the queue read byte for byte.
+  if (typeof options.queueEntry === 'string' && options.queueEntry.trim()) flags.push('--queue-entry', options.queueEntry)
   // Unattended (#846): nobody is at the keyboard, so gates take the recommended option
   // rather than park for an answer that is not coming.
   if (options.unattended) flags.push('--unattended')

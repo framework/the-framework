@@ -164,6 +164,25 @@ test('startAutoPm starts nothing while the preference is off (#685)', async () =
   assert.deepEqual(started, [])
 })
 
+test('an on-demand tick sweeps with the preference off: the click is the ask (#1210)', async () => {
+  const { loop, started } = harness({ enabled: async () => false })
+  await loop.tick({ onDemand: true })
+  loop.stop()
+  assert.deepEqual(started, ['p1'])
+  // The report still says where the box stood, beside what the asked-for sweep did.
+  const report = loop.report()
+  assert.equal(report.enabled, false)
+  assert.equal(report.outcomes[0]?.started, true)
+})
+
+test('on demand skips only the master switch: every other stand-down still holds (#1210)', async () => {
+  const { loop, started } = harness({ enabled: async () => false, activeRuns: () => 1 })
+  await loop.tick({ onDemand: true })
+  loop.stop()
+  assert.deepEqual(started, [])
+  assert.match(loop.report().outcomes[0]?.message ?? '', /already going/)
+})
+
 test('startAutoPm does not start a second run for the same project (#685)', async () => {
   // The cooldown is what stops a tick that lands before the spawn registers from doubling up.
   const { loop, started } = harness()

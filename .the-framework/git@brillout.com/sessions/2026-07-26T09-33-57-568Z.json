@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "status": "done",
+  "id": "2026-07-26T09-33-57-568Z",
+  "startedAt": "2026-07-26T09:33:58.274Z",
+  "updatedAt": "2026-07-26T09:38:25.028Z",
+  "passes": 0,
+  "pid": 286859,
+  "host": "rom-thinkpad-x280",
+  "intent": "Open TODO_AGENTS.md and work on the FIRST open entry only, then check it off. Do not start any other entry.",
+  "handoff": {
+    "push": true,
+    "pr": true
+  },
+  "ticket": "tickets/2026-07-25_bug-cannot-select-fable.md",
+  "driver": "claude-code",
+  "workspace": "/home/rom/code/the-framework/.the-framework/worktrees/2026-07-26T09-33-57-568Z",
+  "sessionLink": "https://claude.ai/code",
+  "sessionId": "1ecead44-dc07-4a69-bf94-77d762ec5af2",
+  "readyForMerge": true,
+  "branch": "the-framework/fable-model-picker"
+}

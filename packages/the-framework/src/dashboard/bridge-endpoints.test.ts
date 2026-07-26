@@ -151,3 +151,77 @@ test('no CORS headers are offered, so a page cannot post on the user behalf (#12
     await s.close()
   }
 })
+
+test('the queued answer is served to the extension, and its ack travels back (#1237)', async () => {
+  const acks: unknown[] = []
+  const s = await serve({
+    token: TOKEN,
+    record: () => {},
+    answer: sessionId => (sessionId === QUESTION.sessionId ? { id: 'ans-1', label: 'Work on the next TODO' } : undefined),
+    answered: (sessionId, id, ok, note) => void acks.push({ sessionId, id, ok, note }),
+  })
+  try {
+    const hit = await fetch(`${s.url}${BRIDGE_PREFIX}/answer?sessionId=${QUESTION.sessionId}`, {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    })
+    assert.equal(hit.status, 200)
+    assert.deepEqual(await hit.json(), { answer: { id: 'ans-1', label: 'Work on the next TODO' } })
+
+    const miss = await fetch(`${s.url}${BRIDGE_PREFIX}/answer?sessionId=session_01Unknown`, {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    })
+    assert.equal(miss.status, 200)
+    assert.deepEqual(await miss.json(), { answer: null })
+
+    const bad = await fetch(`${s.url}${BRIDGE_PREFIX}/answer?sessionId=not-a-session`, {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    })
+    assert.equal(bad.status, 400)
+
+    const ack = await fetch(`${s.url}${BRIDGE_PREFIX}/answered`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ sessionId: QUESTION.sessionId, id: 'ans-1', ok: true }),
+    })
+    assert.equal(ack.status, 204)
+    assert.deepEqual(acks, [{ sessionId: QUESTION.sessionId, id: 'ans-1', ok: true, note: undefined }])
+
+    const badAck = await fetch(`${s.url}${BRIDGE_PREFIX}/answered`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ sessionId: QUESTION.sessionId, id: 'ans-1', ok: 'yes' }),
+    })
+    assert.equal(badAck.status, 400)
+  } finally {
+    await s.close()
+  }
+})
+
+test('the answer routes demand the bearer token like every other one (#1237)', async () => {
+  const s = await serve({ token: TOKEN, record: () => {}, answer: () => ({ id: 'x', label: 'y' }), answered: () => {} })
+  try {
+    const read = await fetch(`${s.url}${BRIDGE_PREFIX}/answer?sessionId=${QUESTION.sessionId}`)
+    assert.equal(read.status, 401)
+    const ack = await fetch(`${s.url}${BRIDGE_PREFIX}/answered`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId: QUESTION.sessionId, id: 'x', ok: true }),
+    })
+    assert.equal(ack.status, 401)
+  } finally {
+    await s.close()
+  }
+})
+
+test('a daemon with no answer source degrades to null rather than failing (#1237)', async () => {
+  const s = await serve({ token: TOKEN, record: () => {} })
+  try {
+    const res = await fetch(`${s.url}${BRIDGE_PREFIX}/answer?sessionId=${QUESTION.sessionId}`, {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    })
+    assert.equal(res.status, 200)
+    assert.deepEqual(await res.json(), { answer: null })
+  } finally {
+    await s.close()
+  }
+})

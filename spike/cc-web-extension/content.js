@@ -93,8 +93,12 @@ function transcript() {
   // than guess where one message ends and the next begins, mirror the page as a single block and
   // let it be replaced as it grows. Crude, but it is the honest shape: we know what is on screen,
   // not how it divides.
+  //
+  // Sliced from the END: the page opens with the rendered system prompt, so a head slice sent
+  // 8000 characters of protocol spec and cut the session's actual activity off. The newest text
+  // is the mirror's whole point.
   const text = pageText()
-  return text ? [{ seq: 0, role: 'agent', text: text.slice(0, 8000) }] : []
+  return text ? [{ seq: 0, role: 'agent', text: text.slice(-8000) }] : []
 }
 
 /**
@@ -334,6 +338,92 @@ function findComposer() {
   return undefined
 }
 
+/** What the last delivery attempt did, for the panel. */
+let answerStatus = 'none delivered'
+
+/** Put text in the composer. execCommand is what the live page accepts; jsdom has no such thing. */
+function fillComposer(composer, text) {
+  if (composer.via === 'textarea') {
+    composer.el.value = text
+    composer.el.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  }
+  composer.el.focus()
+  let inserted = false
+  try {
+    inserted = document.execCommand('insertText', false, text)
+  } catch {
+    inserted = false
+  }
+  if (!inserted) {
+    // The offline harness lands here; a real ProseMirror/Lexical editor may ignore it, which the
+    // submit check below would surface as an empty send.
+    composer.el.textContent = text
+    composer.el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }))
+  }
+  return true
+}
+
+/** The button that sends the composer, wherever the page keeps it this week. */
+function findSendButton() {
+  const labelled = deepQueryAll('button[aria-label]').filter(
+    b => /send/i.test(b.getAttribute('aria-label') ?? '') && !b.disabled,
+  )
+  // The last one: pages render hidden or historical buttons above the live composer's.
+  return labelled.at(-1) ?? deepQueryAll('button[type="submit"]').at(-1)
+}
+
+/**
+ * Type the dashboard's pick into the composer and submit it (#1237).
+ *
+ * This is the one place the extension acts rather than observes, so it reports exactly what it
+ * did: which fill path, and whether the send was a button click or an Enter fallback. The text
+ * only ever comes from the daemon, which only accepts a label of the parked question, so what
+ * can be typed here is bounded by what the session itself offered.
+ */
+async function deliverAnswer(text) {
+  const composer = findComposer()
+  if (!composer) {
+    answerStatus = 'failed: no composer on the page'
+    return { ok: false, note: 'no composer on the page' }
+  }
+  fillComposer(composer, text)
+  // Let the editor's own event handling settle before submitting, or the click sends nothing.
+  await new Promise(resolve => setTimeout(resolve, 400))
+  const button = findSendButton()
+  if (button) {
+    button.click()
+    answerStatus = `sent via ${composer.via} + button`
+    return { ok: true, note: `filled ${composer.via}, clicked send button` }
+  }
+  for (const type of ['keydown', 'keyup']) {
+    composer.el.dispatchEvent(
+      new KeyboardEvent(type, { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }),
+    )
+  }
+  answerStatus = `sent via ${composer.via} + enter`
+  return { ok: true, note: `filled ${composer.via}, no send button, sent Enter` }
+}
+
+// The worker hands answers to the top frame only: the composer lives there, and a child frame
+// answering too would submit twice.
+if (IS_TOP && typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type !== 'tf-deliver-answer' || typeof message.text !== 'string') return false
+    void deliverAnswer(message.text)
+      .then(sendResponse)
+      .catch(err => sendResponse({ ok: false, note: String(err?.message ?? err) }))
+    return true
+  })
+}
+
+// The offline harness (check.mjs) runs this file in jsdom, where there is no extension runtime
+// to hand answers through. Exposed only there: on a real page `chrome` exists and nothing is
+// added to the window claude.ai can see.
+if (typeof chrome === 'undefined') {
+  window.__tfBridgeDeliverAnswer = deliverAnswer
+}
+
 /**
  * What the page looks like when extraction fails. Structure and lengths only, never message
  * text, so the report stays safe to paste into a public issue.
@@ -444,6 +534,7 @@ if (!IS_TOP) {
       ['options', winner.choiceOptions?.length ? winner.choiceOptions.join(' | ') : '-'],
       ['composer', top.composerFound ? top.composerVia : 'not found'],
       ['bridge', bridgeStatus],
+      ['answer', answerStatus],
       // Always shown: the transcript is the half that runs even when no question was asked, so
       // it needs its own line rather than sharing the question's.
       ['transcript', transcriptStatus],
@@ -512,8 +603,22 @@ if (!IS_TOP) {
  */
 function watch(run) {
   let queued = false
+  let interval
+  // Reloading the extension invalidates this script's runtime but leaves it running in the tab,
+  // where every chrome.* call now throws. Those throws land on the extension's error page and
+  // read as bugs, so a dead context stops watching instead of erroring once a minute forever.
+  const alive = () => {
+    try {
+      if (typeof chrome === 'undefined' || chrome.runtime?.id) return true
+    } catch {
+      // Reading chrome.runtime itself can throw once the context is gone.
+    }
+    observer.disconnect()
+    clearInterval(interval)
+    return false
+  }
   const observer = new MutationObserver(() => {
-    if (queued) return
+    if (queued || !alive()) return
     queued = true
     setTimeout(() => {
       queued = false
@@ -521,5 +626,7 @@ function watch(run) {
     }, 250)
   })
   observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true })
-  setInterval(run, 30 * POLL_MS)
+  interval = setInterval(() => {
+    if (alive()) run()
+  }, 30 * POLL_MS)
 }

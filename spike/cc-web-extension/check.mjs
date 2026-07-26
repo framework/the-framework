@@ -95,5 +95,62 @@ for (const [name, body, expectFound] of cases) {
   dom.window.close()
 }
 
+// ---------------------------------------------------------------------------
+// The write half (#1237): the dashboard's pick being typed into the composer and submitted.
+// jsdom has no execCommand, so these exercise the fallback fill; what they prove is the flow
+// around it: the composer is filled, a labelled send button is preferred, Enter is the
+// fallback, and a page with no composer is refused rather than guessed at.
+
+async function deliver(body, prepare) {
+  const dom = new JSDOM(`<!doctype html><html><body><main>${body}</main></body></html>`, {
+    url: 'https://claude.ai/code/session_01TEST',
+    runScripts: 'outside-only',
+  })
+  dom.window.eval(script)
+  const observed = prepare ? prepare(dom.window) : undefined
+  const result = await dom.window.__tfBridgeDeliverAnswer('Work on the next TODO')
+  return { dom, result, observed }
+}
+
+{
+  const { dom, result, observed } = await deliver(
+    `<div contenteditable="true"></div><button aria-label="Send message" id="send"></button>`,
+    w => {
+      const seen = { clicked: false }
+      w.document.getElementById('send').addEventListener('click', () => {
+        seen.clicked = true
+      })
+      return seen
+    },
+  )
+  const text = dom.window.document.querySelector('[contenteditable="true"]').textContent
+  const ok = result.ok && observed.clicked && /clicked send button/.test(result.note) && text === 'Work on the next TODO'
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  answer fills the composer and clicks send  (clicked=${observed.clicked}, text="${text}")`)
+  dom.window.close()
+}
+
+{
+  const { dom, result, observed } = await deliver(`<div contenteditable="true"></div>`, w => {
+    const seen = { enter: false }
+    w.document.querySelector('[contenteditable="true"]').addEventListener('keydown', e => {
+      if (e.key === 'Enter') seen.enter = true
+    })
+    return seen
+  })
+  const ok = result.ok && observed.enter && /sent Enter/.test(result.note)
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  answer falls back to Enter without a send button  (enter=${observed.enter})`)
+  dom.window.close()
+}
+
+{
+  const { dom, result } = await deliver(`<p>nothing to type into</p>`)
+  const ok = !result.ok && /no composer/.test(result.note)
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  answer refuses honestly when there is no composer  (ok=${result.ok})`)
+  dom.window.close()
+}
+
 console.log(failed ? `\n${failed} case(s) failed` : '\nall cases passed')
 process.exit(failed ? 1 : 0)

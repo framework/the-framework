@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Cloud, ExternalLink, MessageCircleQuestion } from 'lucide-react'
-import type { BridgeEvent, BridgeQuestion, FrameworkEvent } from '@gemstack/the-framework'
-import { onBridgeQuestion, onBridgeEvents } from '../server/reads.telefunc.js'
+import { Check, Cloud, ExternalLink, Loader2, MessageCircleQuestion, TriangleAlert } from 'lucide-react'
+import type { BridgeAnswer, BridgeEvent, BridgeQuestion, FrameworkEvent } from '@gemstack/the-framework'
+import { onBridgeQuestion, onBridgeEvents, onBridgeAnswer } from '../server/reads.telefunc.js'
+import { sendBridgeAnswer, sendBridgeAnswerCancel } from '../server/control.telefunc.js'
 import { cloudSession } from '../lib/live-state.js'
 import { CopyButton } from './ui/copy-button.js'
 
@@ -23,6 +24,7 @@ export function CloudRunNotice({
   const session = target === 'web' ? cloudSession(events) : undefined
   const question = useBridgeQuestion(session?.id)
   const transcript = useBridgeEvents(session?.id)
+  const answer = useBridgeAnswer(session?.id)
   if (target !== 'web') return null
   return (
     <div className="border-b border-border bg-muted/40">
@@ -52,7 +54,10 @@ export function CloudRunNotice({
         )}
       </div>
       {transcript.length > 0 && <CloudTranscript events={transcript} />}
-      {question && session && <ParkedQuestion question={question} url={session.url} />}
+      {question && session && (!answer || answer.state === 'failed') && (
+        <ParkedQuestion question={question} url={session.url} sessionId={session.id} failure={answer?.state === 'failed' ? answer : undefined} />
+      )}
+      {answer && session && answer.state !== 'failed' && <AnswerState answer={answer} url={session.url} sessionId={session.id} />}
     </div>
   )
 }
@@ -60,30 +65,118 @@ export function CloudRunNotice({
 /**
  * The question the session is parked on, once the browser bridge has reported one (#1237).
  *
- * Read only in this slice, and the copy says so rather than offering buttons that do nothing:
- * showing the question is the whole win here, and the pick travelling back is a separate
- * decision. So the options are listed as text and the link is the way to answer.
+ * Answering is a two-step pick-then-send, unlike the one-click gates of a local run: the send
+ * has the extension type into the user's own claude.ai session, so the pick is confirmed
+ * explicitly, and while it waits for delivery it can still be withdrawn. The link out stays as
+ * the manual path for whoever prefers to answer over there.
  */
-function ParkedQuestion({ question, url }: { question: BridgeQuestion; url: string }) {
+function ParkedQuestion({
+  question,
+  url,
+  sessionId,
+  failure,
+}: {
+  question: BridgeQuestion
+  url: string
+  sessionId: string
+  failure?: BridgeAnswer | undefined
+}) {
+  const [picked, setPicked] = useState<string | undefined>(undefined)
+  const [error, setError] = useState<string | undefined>(undefined)
+  const send = () => {
+    if (!picked) return
+    void sendBridgeAnswer(sessionId, picked)
+      .then(result => {
+        if (!result.ok) setError(result.error ?? 'could not queue the answer')
+      })
+      .catch(() => setError('could not reach the daemon'))
+  }
   return (
     <div className="flex gap-2 border-t border-border px-4 py-2.5 text-xs">
       <MessageCircleQuestion className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
       <div className="min-w-0 flex-1">
         <p className="font-medium text-foreground">{question.title}</p>
-        <ul className="mt-1 space-y-0.5 text-muted-foreground">
+        <div className="mt-1.5 flex flex-col items-start gap-1">
           {question.options.map(option => (
-            <li key={option.label}>
-              <span className={option.label === question.recommended ? 'text-foreground' : undefined}>{option.label}</span>
-              {option.label === question.recommended && <span className="ml-1 text-[10px] uppercase tracking-wide text-primary">recommended</span>}
-              {option.detail && <span className="ml-1 opacity-70">{option.detail}</span>}
-            </li>
+            <button
+              key={option.label}
+              type="button"
+              onClick={() => setPicked(option.label)}
+              aria-pressed={picked === option.label}
+              className={`rounded border px-2 py-1 text-left transition-colors ${
+                picked === option.label
+                  ? 'border-primary bg-primary/10 text-foreground'
+                  : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+              }`}
+            >
+              {option.label}
+              {option.label === question.recommended && (
+                <span className="ml-1.5 text-[10px] uppercase tracking-wide text-primary">recommended</span>
+              )}
+              {option.detail && <span className="ml-1.5 opacity-70">{option.detail}</span>}
+            </button>
           ))}
-        </ul>
-        <a href={url} target="_blank" rel="noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-primary hover:underline">
-          Answer it in the session
-          <ExternalLink className="h-3 w-3" aria-hidden />
-        </a>
+        </div>
+        {failure && (
+          <p className="mt-1.5 flex items-center gap-1 text-destructive">
+            <TriangleAlert className="h-3 w-3 shrink-0" aria-hidden />
+            Sending “{failure.label}” failed{failure.note ? `: ${failure.note}` : ''}. Pick again, or answer in the session.
+          </p>
+        )}
+        {error && <p className="mt-1.5 text-destructive">{error}</p>}
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={send}
+            disabled={!picked}
+            className="rounded bg-primary px-2.5 py-1 font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {picked ? `Send “${picked}”` : 'Pick an answer'}
+          </button>
+          <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+            Answer it in the session
+            <ExternalLink className="h-3 w-3" aria-hidden />
+          </a>
+        </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Where a sent answer stands (#1237). Queued means the extension has not collected it yet,
+ * which is the window where withdrawing it still means something; sent means it was typed
+ * into the session and submitted.
+ */
+function AnswerState({ answer, url, sessionId }: { answer: BridgeAnswer; url: string; sessionId: string }) {
+  return (
+    <div className="flex items-center gap-2 border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
+      {answer.state === 'queued' ? (
+        <>
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" aria-hidden />
+          <span className="min-w-0 flex-1">
+            Sending “{answer.label}” through your Claude web tab… It goes out the next time the extension checks in.
+          </span>
+          <button
+            type="button"
+            onClick={() => void sendBridgeAnswerCancel(sessionId).catch(() => {})}
+            className="shrink-0 rounded border border-border px-2 py-1 hover:border-primary/50 hover:text-foreground"
+          >
+            Cancel
+          </button>
+        </>
+      ) : (
+        <>
+          <Check className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+          <span className="min-w-0 flex-1">
+            Answered “{answer.label}”. The session continues over there and its transcript above follows along.
+          </span>
+          <a href={url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-primary hover:underline">
+            Open the session
+            <ExternalLink className="h-3 w-3" aria-hidden />
+          </a>
+        </>
+      )}
     </div>
   )
 }
@@ -132,6 +225,32 @@ function useBridgeEvents(sessionId: string | undefined): BridgeEvent[] {
     }
   }, [sessionId])
   return events
+}
+
+/** Poll the daemon for where this session's answer stands, on the question's cadence. */
+function useBridgeAnswer(sessionId: string | undefined): BridgeAnswer | undefined {
+  const [answer, setAnswer] = useState<BridgeAnswer | undefined>(undefined)
+  useEffect(() => {
+    if (!sessionId) {
+      setAnswer(undefined)
+      return
+    }
+    let live = true
+    const read = () => {
+      void onBridgeAnswer(sessionId)
+        .then(next => {
+          if (live) setAnswer(next ?? undefined)
+        })
+        .catch(() => {})
+    }
+    read()
+    const timer = setInterval(read, POLL_MS)
+    return () => {
+      live = false
+      clearInterval(timer)
+    }
+  }, [sessionId])
+  return answer
 }
 
 /**

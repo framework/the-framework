@@ -22,7 +22,7 @@ import { relayOr } from './relay-run.js'
 import type { FrameworkEvent } from '../events.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
 import type { BridgeEvent, BridgeHello, BridgeQuestion } from '../dashboard/bridge-endpoints.js'
-import type { BridgeContact } from '../dashboard/bridge-store.js'
+import type { BridgeAnswer, BridgeContact } from '../dashboard/bridge-store.js'
 import { readDaemonToken, readPreferences, type Preferences } from '../registry.js'
 
 // The read model behind the new dashboard (#405): the run history, a run's replay, the
@@ -398,6 +398,15 @@ export async function onBridgeToken(): Promise<string | null> {
   const preferences = await readPreferences().catch((): Preferences => ({}))
   if (preferences.bridge !== true) return null
   return (await readDaemonToken().catch(() => undefined)) ?? null
+}
+
+/**
+ * Where the answer picked for that session's question stands (#1237): queued for the
+ * extension, delivered, or failed with the extension's reason. Null when nothing was picked.
+ */
+export async function onBridgeAnswer(sessionId: string): Promise<BridgeAnswer | null> {
+  if (typeof sessionId !== 'string' || !/^session_[A-Za-z0-9]{1,128}$/.test(sessionId)) return null
+  return bridgeQuestions().answer(sessionId) ?? null
 }
 
 /** What a Claude web session has said so far, as scraped by the browser bridge (#1237). */

@@ -80,6 +80,10 @@ export interface BridgeHandlers {
    * somebody happens to be looking at claude.ai. This is how a tab gets opened for them.
    */
   sessions?: () => Promise<BridgeSession[]>
+  /** The answer queued in the dashboard for that session, waiting to be delivered (#1237). */
+  answer?: (sessionId: string) => { id: string; label: string } | undefined
+  /** The extension's word on what a delivery attempt did. */
+  answered?: (sessionId: string, id: string, ok: boolean, note?: string) => void
   now?: () => Date
 }
 
@@ -112,6 +116,8 @@ export async function handleBridgeRequest(
   if (pathname === `${BRIDGE_PREFIX}/sessions`) return handleSessions(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/events`) return handleEvents(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/hello`) return handleHello(req, res, handlers)
+  if (pathname === `${BRIDGE_PREFIX}/answer`) return handleAnswer(req, res, handlers)
+  if (pathname === `${BRIDGE_PREFIX}/answered`) return handleAnswered(req, res, handlers)
   end(res, 404, 'not found')
 }
 
@@ -245,6 +251,40 @@ function validateEvents(body: unknown, now: Date): BridgeEvent[] | string {
     out.push({ sessionId, seq, role, text: text.slice(0, MAX_EVENT_TEXT), receivedAt: now.toISOString() })
   }
   return out
+}
+
+/**
+ * `GET /_bridge/answer?sessionId=...`: the answer the dashboard queued for that session (#1237).
+ *
+ * Always 200 with `{answer: ...}`, null when there is nothing to deliver, so the extension can
+ * poll it blindly. Degrades to null on a daemon that wired no answer source, same as `sessions`.
+ */
+async function handleAnswer(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
+  if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
+  const sessionId = new URL(req.url ?? '', 'http://bridge.invalid').searchParams.get('sessionId')
+  if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) return end(res, 400, 'sessionId must look like session_<id>')
+  const answer = handlers.answer?.(sessionId)
+  res.writeHead(200, { 'content-type': 'application/json' })
+  res.end(JSON.stringify({ answer: answer ?? null }))
+}
+
+/** `POST /_bridge/answered`: what the extension's delivery attempt did. */
+async function handleAnswered(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
+  if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
+  let body: unknown
+  try {
+    body = await readJsonBody(req, MAX_BODY)
+  } catch (err) {
+    return end(res, 400, (err as Error).message)
+  }
+  if (typeof body !== 'object' || body === null) return end(res, 400, 'body must be an object')
+  const { sessionId, id, ok, note } = body as Record<string, unknown>
+  if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)) return end(res, 400, 'sessionId must look like session_<id>')
+  if (typeof id !== 'string' || !id || id.length > 64) return end(res, 400, 'id must be the answer id')
+  if (typeof ok !== 'boolean') return end(res, 400, 'ok must be a boolean')
+  if (note !== undefined && typeof note !== 'string') return end(res, 400, 'note must be a string')
+  handlers.answered?.(sessionId, id, ok, typeof note === 'string' ? note.slice(0, 300) : undefined)
+  end(res, 204, '')
 }
 
 /**

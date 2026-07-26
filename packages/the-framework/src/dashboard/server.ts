@@ -210,6 +210,11 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
         contact: (route, status) => bridgeQuestions().recordContact(route, status),
         recordEvent: event => bridgeQuestions().recordEvent(event),
         hello: hello => bridgeQuestions().recordHello(hello),
+        answer: sessionId => {
+          const pending = bridgeQuestions().pendingAnswer(sessionId)
+          return pending ? { id: pending.id, label: pending.label } : undefined
+        },
+        answered: (sessionId, id, ok, note) => bridgeQuestions().resolveAnswer(sessionId, id, ok, note),
         ...(opts.bridgeSessions ? { sessions: opts.bridgeSessions } : {}),
       }
     : undefined

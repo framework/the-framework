@@ -4,8 +4,11 @@ Reports the question a Claude Code cloud session is parked on to your local The 
 dashboard (#1237). A cloud run hands off and ends, so when the session later asks something there
 is nothing streaming back and the question is stranded on claude.ai. This carries it home.
 
-It reads the session page you are already signed into. It does not answer for you: the pick
-travelling back is a separate slice, and today the dashboard links you to the session to answer.
+It reads the session page you are already signed into, and since v0.7.0 it also carries your
+answer back: pick an option in the dashboard, confirm the send, and the extension types that
+label into the session's composer and submits it. It only ever types a label the session itself
+offered, the pick has to be confirmed in the dashboard, and a queued pick can be withdrawn until
+the extension collects it.
 
 ## Set it up
 
@@ -28,8 +31,8 @@ tab is enough, and Chrome only has to be running.
 
 | file | does |
 |---|---|
-| `content.js` | finds the question in the page, hands it to the worker |
-| `background.js` | holds the token, posts to `/_bridge/question`, dedupes repeats |
+| `content.js` | finds the question in the page, hands it to the worker; types a delivered answer into the composer and submits |
+| `background.js` | holds the token, posts to `/_bridge/question`, dedupes repeats, polls `/_bridge/answer` and acks deliveries |
 | `options.js` | where the token and dashboard URL are set, plus a connection test |
 | `check.mjs` | runs `content.js` against synthetic pages in jsdom, no browser needed |
 
@@ -49,6 +52,12 @@ catches the session's own DOM changes immediately; the slow interval is only a b
 node check.mjs
 ```
 
-Ten cases, including the four that broke it on a real session: `<code>` with no `<pre>`, content
-behind a shadow root, an indentation the parser had not guessed, and our own protocol spec
-appearing on the page as a decoy before the agent has asked anything.
+Thirteen cases: the ten extraction ones, including the four that broke it on a real session
+(`<code>` with no `<pre>`, content behind a shadow root, an indentation the parser had not
+guessed, and our own protocol spec appearing on the page as a decoy), plus three for the answer
+delivery: fill and click send, the Enter fallback, and refusing a page with no composer.
+
+After editing any file here, reload the extension on `chrome://extensions` AND reload the open
+claude.ai tabs: reloading the extension does not re-inject content scripts, and an orphaned
+script cannot hear the new worker. The panel shows the manifest version, which is how you tell
+a stale script from a current one.

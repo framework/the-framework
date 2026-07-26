@@ -24,6 +24,6 @@ export {
 } from './preferences.telefunc.js'
 export type { CredentialSource, DiscordCredentialStatus, DiscordCredentialsPatch } from '../discord-credentials.js'
 export { type EditorInfo } from '../dashboard/open-in-app.js'
-export { onQuota, onAutoPm } from './quota.telefunc.js'
+export { onQuota, onAutoPm, sendAutoPmSweep } from './quota.telefunc.js'
 export { checkDevices, type DeviceCheck } from './devices.telefunc.js'
 export { registerDashboardTelefunctions, DASHBOARD_TELEFUNC_KEYS } from './register.js'

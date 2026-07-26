@@ -1,4 +1,4 @@
-import { contextAutoPm, contextQuota } from './context.js'
+import { contextAutoPm, contextAutoPmSweep, contextQuota } from './context.js'
 import type { AutoPmReport } from '../auto-pm.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
@@ -37,5 +37,25 @@ export async function onAutoPm(): Promise<AutoPmReport | undefined> {
     return report()
   } catch {
     return undefined
+  }
+}
+
+/**
+ * Sweep now rather than at the next interval (#1210). The loop already had this — it is what a
+ * write that switches the preference on triggers (#1167) — but until now nothing could ask for
+ * it directly, so the only way to fast-forward was to tick the box off and on again.
+ *
+ * Returns whether a sweep was asked for, not what it decided: a sweep can start runs and take a
+ * while, and `onAutoPm` is how the answer arrives. `false` on a host with no loop (the relay),
+ * which the button reads as "nothing here to trigger".
+ */
+export async function sendAutoPmSweep(): Promise<{ ok: boolean }> {
+  const sweep = contextAutoPmSweep()
+  if (!sweep) return { ok: false }
+  try {
+    sweep()
+    return { ok: true }
+  } catch {
+    return { ok: false }
   }
 }

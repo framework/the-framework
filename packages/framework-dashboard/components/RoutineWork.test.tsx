@@ -9,6 +9,9 @@ import { hoverTooltip } from '../test-utils.js'
 const onProjects = vi.hoisted(() => vi.fn())
 vi.mock('../server/projects.telefunc.js', () => ({ onProjects }))
 
+const sendAutoPmSweep = vi.hoisted(() => vi.fn())
+vi.mock('../server/quota.telefunc.js', () => ({ sendAutoPmSweep }))
+
 const updatePreferences = vi.hoisted(() => vi.fn())
 let prefs: Preferences = {}
 vi.mock('../lib/preferences.js', () => ({ usePreferences: () => prefs, updatePreferences }))
@@ -36,6 +39,8 @@ beforeEach(() => {
   start.mockReset()
   start.mockResolvedValue({ ok: true, runId: 'run-1' })
   updatePreferences.mockReset()
+  sendAutoPmSweep.mockReset()
+  sendAutoPmSweep.mockResolvedValue({ ok: true })
 })
 afterEach(cleanup)
 
@@ -123,6 +128,31 @@ describe('RoutineWork (#1159)', () => {
     fireEvent.click(screen.getAllByText('Run now')[0]!)
     await waitFor(() => expect(start).toHaveBeenCalled())
     expect(start.mock.calls[0]![0]).toBe('p2')
+  })
+
+  test('Trigger routine now fires the sweep instead of waiting out the countdown (#1210)', async () => {
+    prefs = { autoPm: true }
+    render(<RoutineWork onRunStarted={() => {}} />)
+    const button = await screen.findByText('Trigger routine now')
+    fireEvent.click(button)
+    await waitFor(() => expect(sendAutoPmSweep).toHaveBeenCalledTimes(1))
+  })
+
+  test('with auto-run off the trigger is disabled, since a sweep would just stand down (#1210)', async () => {
+    prefs = { autoPm: false }
+    render(<RoutineWork onRunStarted={() => {}} />)
+    const button = await screen.findByText('Trigger routine now')
+    expect(button.closest('button')!.disabled).toBe(true)
+    fireEvent.click(button)
+    expect(sendAutoPmSweep).not.toHaveBeenCalled()
+  })
+
+  test('a host with no sweep says so rather than looking like it worked (#1210)', async () => {
+    prefs = { autoPm: true }
+    sendAutoPmSweep.mockResolvedValue({ ok: false })
+    render(<RoutineWork onRunStarted={() => {}} />)
+    fireEvent.click(await screen.findByText('Trigger routine now'))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/not running the sweep/i))
   })
 
   test('one project needs no picker', async () => {

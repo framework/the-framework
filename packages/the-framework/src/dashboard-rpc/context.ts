@@ -116,3 +116,11 @@ export function contextQuota(): QuotaSource | undefined {
 export function contextAutoPm(): AutoPmReporter | undefined {
   return fromContext(ctx => ctx.autoPm)
 }
+
+/**
+ * How a sweep is fired on demand (#1210), or undefined on a host that runs none. Same rule as
+ * {@link contextAutoPm}: only the daemon holds the loop, so only it can be asked to sweep.
+ */
+export function contextAutoPmSweep(): (() => void) | undefined {
+  return fromContext(ctx => ctx.autoPmSweep)
+}

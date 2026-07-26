@@ -3,6 +3,7 @@ import type { AutoPmJob, ProjectSummary } from '@gemstack/the-framework'
 import { AUTO_PM_ROUTINES, runOptionsFromPreferences } from '@gemstack/the-framework/client'
 import { CalendarClock, Play } from 'lucide-react'
 import { onProjects } from '../server/projects.telefunc.js'
+import { sendAutoPmSweep } from '../server/quota.telefunc.js'
 import { useAutoPm } from '../lib/quota.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { useStartRun } from '../lib/use-start-run.js'
@@ -43,6 +44,9 @@ export function RoutineWork({
   const [picked, setPicked] = useState<string | null>(null)
   // Which routine is in flight, so only its own button says "Starting…".
   const [starting, setStarting] = useState<string | null>(null)
+  // The on-demand sweep (#1210): in flight, and anything worth saying about the last attempt.
+  const [sweeping, setSweeping] = useState(false)
+  const [sweepNote, setSweepNote] = useState<string | null>(null)
 
   // The list arrives after the first render, and a project can be removed under a stale pick, so
   // the selection is validated against what is actually there rather than trusted.
@@ -53,6 +57,20 @@ export function RoutineWork({
   // auto-run off, or before that first report, the box says what it does instead of when.
   const autoRunLabel =
     autoRun && report?.nextSweepAt !== undefined ? `Auto-runs ${formatUntil(report.nextSweepAt)}` : 'Auto-run'
+
+  // Firing the sweep on demand (#1210). The answer is not the click's to report: a sweep decides
+  // per project and can start runs, and `report` (polled) is where that shows up. So this only
+  // says whether the daemon took the request, and gets out of the way once it has.
+  const sweepNow = async () => {
+    if (sweeping) return
+    setSweeping(true)
+    setSweepNote(null)
+    const result = await sendAutoPmSweep().catch(() => ({ ok: false }))
+    setSweeping(false)
+    // A host with no loop is the honest failure here, and the only one: the relay serves this
+    // same dashboard, and there the button has nothing to fire.
+    if (!result.ok) setSweepNote('This dashboard is not running the sweep, so there is nothing to trigger here.')
+  }
 
   const runNow = async (job: AutoPmJob) => {
     if (!projectId || busy) return
@@ -132,16 +150,47 @@ export function RoutineWork({
             {/* The same `autoPm` preference the usage panel offers (#1161), which is the point: one
                 switch, shown where the schedule it governs is listed. */}
             <div className="border-t border-border pt-3">
-              <Tooltip>
-                <TooltipTrigger render={<label className="flex cursor-pointer items-center gap-1.5 text-sm" />}>
-                  <Checkbox checked={autoRun} onCheckedChange={checked => updatePreferences({ autoPm: checked })} />
-                  <span className="font-medium text-foreground">{autoRunLabel}</span>
-                </TooltipTrigger>
-                <TooltipContent>Automatically run this prompt on a regular schedule.</TooltipContent>
-              </Tooltip>
+              <div className="flex items-center justify-between gap-2">
+                <Tooltip>
+                  <TooltipTrigger render={<label className="flex cursor-pointer items-center gap-1.5 text-sm" />}>
+                    <Checkbox checked={autoRun} onCheckedChange={checked => updatePreferences({ autoPm: checked })} />
+                    <span className="font-medium text-foreground">{autoRunLabel}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>Automatically run this prompt on a regular schedule.</TooltipContent>
+                </Tooltip>
+                {/* The countdown's escape hatch (#1210): the sweep is on a long interval, so
+                    without this the only way to fast-forward was to tick the box off and on
+                    again. Disabled while auto-run is off, because a sweep re-reads the
+                    preference and stands straight back down — a button that always did nothing
+                    would read as broken rather than as inapplicable. */}
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        onClick={sweepNow}
+                        disabled={!autoRun || sweeping}
+                        className="shrink-0 rounded border border-border px-2 py-1 text-xs text-foreground hover:bg-accent disabled:opacity-50"
+                      />
+                    }
+                  >
+                    {sweeping ? 'Triggering…' : 'Trigger routine now'}
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {autoRun
+                      ? 'Run the scheduled sweep now instead of waiting for the countdown.'
+                      : 'Turn auto-run on first: a sweep checks the setting and stops when it is off.'}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 Only while nothing else is running and the week&apos;s allowance is not already spent.
               </p>
+              {sweepNote && (
+                <p role="status" className="mt-1 text-xs text-muted-foreground">
+                  {sweepNote}
+                </p>
+              )}
             </div>
           </>
         )}

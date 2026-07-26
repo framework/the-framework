@@ -14,9 +14,10 @@ import {
   type AutoPmProject,
 } from './auto-pm.js'
 import { quotaBoundaryStatus, type QuotaBoundaryStatus } from './quota-boundary.js'
+import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 import { presets, type PresetKey } from './preset-catalog.js'
 
-/** 2026-07-20T12:00:00Z. The week below resets in 5 days 19 hours, so ~31.5% has elapsed (#960 Edit). */
+/** 2026-07-20T12:00:00Z. The week below resets in 4 days 19 hours, so ~31.5% has elapsed (#960 Edit). */
 const T0 = Date.UTC(2026, 6, 20, 12, 0, 0)
 
 /** A reading where the account's week is `weekPercent` used. */
@@ -86,6 +87,19 @@ test('quotaHeadroom stands down at the boundary, and says where it sits (#879)',
   const decision = quotaHeadroom(status(99))
   assert.equal(decision.start, false)
   assert.match(decision.start === false ? decision.reason : '', /99% used, at or past day 3 of the week's 32%/)
+})
+
+test('quotaHeadroom names a fractional offset to one decimal, not fifteen digits (#960 Edit)', () => {
+  // The half-day default is 100/14 — the reason line should say "+7.1", not the raw double.
+  const boundary = quotaBoundaryStatus({
+    windows: [{ label: 'Current week (all models)', kind: 'week', percentUsed: 99, resetsAtText: 'Jul 25 at 7am (UTC)' }],
+    now: T0,
+    limitOffset: DEFAULT_SPEND_OFFSET,
+  })
+  if (!boundary) throw new Error('the fixture week should be placeable')
+  const decision = quotaHeadroom(boundary)
+  assert.equal(decision.start, false)
+  assert.match(decision.start === false ? decision.reason : '', /your 39% limit \(\+7\.1 on the week's 32%\)/)
 })
 
 test('quotaHeadroom stands down the moment the boundary is met, not only when it is passed (#879)', () => {

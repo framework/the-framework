@@ -4,7 +4,7 @@ import { startConsumptionGuard } from './consumption-guard.js'
 import { FakeDriver } from './driver/index.js'
 import type { Driver, DriverQuota, DriverQuotaWindow } from './driver/index.js'
 
-/** 2026-07-20T12:00:00Z. The week below resets in 5 days 19 hours, so ~31.5% has elapsed (#960 Edit). */
+/** 2026-07-20T12:00:00Z. The week below resets in 4 days 19 hours, so ~31.5% has elapsed (#960 Edit). */
 const T0 = Date.UTC(2026, 6, 20, 12, 0, 0)
 
 function quotaDriver(...readings: DriverQuota[]): Driver {
@@ -67,6 +67,21 @@ test("startConsumptionGuard brings the run's own model window into the gate (#87
   await onSonnet.poller.poll()
   assert.equal(onSonnet.gate(), null)
   onSonnet.stop()
+})
+
+test('startConsumptionGuard keeps a half-day cushion, so a fresh week is not paused over its first percent (#960 Edit)', async () => {
+  // Half an hour into a fresh week the continuous boundary sits at ~0.3%, and the agent reports
+  // whole percentages — without the cushion, "1% used" would pause the user's own first run.
+  const halfHourIn = Date.UTC(2026, 6, 18, 7, 30, 0) // week runs Jul 18 7am -> Jul 25 7am (UTC)
+  const guard = startConsumptionGuard({ driver: quotaDriver(week(1), week(9)), now: () => halfHourIn })
+  assert.ok(guard)
+  // start() takes the first reading itself; let it land.
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(guard.gate(), null)
+  // The cushion is half a day (~7.1 points), not a blank cheque: past it, the gate still bites.
+  await guard.poller.poll()
+  assert.equal(guard.gate(), 'Current week (all models)')
+  guard.stop()
 })
 
 test('startConsumptionGuard gate carries on when the quota cannot be read (#531)', async () => {

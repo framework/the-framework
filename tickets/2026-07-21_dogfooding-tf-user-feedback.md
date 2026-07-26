@@ -1,3 +1,4 @@
+Status: open
 GitHub: [#936](https://github.com/gemstack-land/the-framework/issues/936)
 
 # Dogfooding: TF user feedback

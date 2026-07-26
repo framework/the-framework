@@ -1,3 +1,4 @@
+Status: open
 Priority: 2
 Topics: [question, the-framework]
 GitHub: [#1151](https://github.com/gemstack-land/the-framework/issues/1151)

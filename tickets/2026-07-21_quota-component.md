@@ -1,3 +1,4 @@
+Status: open
 Topics: [the-framework, ux]
 GitHub: [#960](https://github.com/gemstack-land/the-framework/issues/960)
 

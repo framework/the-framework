@@ -1,3 +1,4 @@
+Status: closed
 Priority: 5
 Topics: [the-framework]
 GitHub: [#610](https://github.com/gemstack-land/the-framework/issues/610)

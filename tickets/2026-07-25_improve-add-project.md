@@ -1,4 +1,5 @@
-priority: high
+Priority: 8
+GitHub: [#1150](https://github.com/gemstack-land/the-framework/issues/1150)
 
 # Improve "Add project"
 

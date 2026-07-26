@@ -1,5 +1,6 @@
-priority: low
-topics: [bug]
+Priority: 2
+Topics: [bug]
+GitHub: [#1143](https://github.com/gemstack-land/the-framework/issues/1143)
 
 # Bug: cannot select Fable
 

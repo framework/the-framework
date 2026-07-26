@@ -1,4 +1,5 @@
-priority: high
+Priority: 8
+GitHub: [#1139](https://github.com/gemstack-land/the-framework/issues/1139)
 
 # Improve dashboard
 

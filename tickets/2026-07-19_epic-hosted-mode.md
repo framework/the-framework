@@ -1,5 +1,6 @@
-priority: low
-topics: [the-framework]
+Priority: 2
+Topics: [the-framework]
+GitHub: [#806](https://github.com/gemstack-land/the-framework/issues/806)
 
 # Epic: Hosted mode. Run the agent on a server instead of the laptop / local machine
 

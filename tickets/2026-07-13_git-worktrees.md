@@ -1,4 +1,5 @@
-topics: [the-framework]
+Topics: [the-framework]
+GitHub: [#453](https://github.com/gemstack-land/the-framework/issues/453)
 
 # Git worktrees
 

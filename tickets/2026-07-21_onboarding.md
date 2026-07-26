@@ -1,4 +1,5 @@
-priority: high
+Priority: 8
+GitHub: [#958](https://github.com/gemstack-land/the-framework/issues/958)
 
 # Onboarding
 

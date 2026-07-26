@@ -1,4 +1,5 @@
-topics: [the-framework, ux]
+Topics: [the-framework, ux]
+GitHub: [#960](https://github.com/gemstack-land/the-framework/issues/960)
 
 # <Quota> component
 

@@ -44,6 +44,8 @@ export interface LinkedPr {
   /** OPEN / MERGED / CLOSED (as gh reports it). */
   state: string
   title: string
+  /** ISO creation time, when the read included it: what tells one run's PR from a predecessor's. */
+  createdAt?: string
 }
 
 /**
@@ -95,6 +97,64 @@ export function forgetPr(cwd: string, branch?: string): void {
 
 function prCacheKey(cwd: string, branch?: string): string {
   return `pr\u0000${cwd}\u0000${branch ?? ''}`
+}
+
+/**
+ * Every PR a branch name has ever had, newest first (#1251).
+ *
+ * `gh pr view <branch>` answers with the newest PR for that head *in any state*, so a session
+ * whose prompt pins its branch name (`the-framework/triage-quick`) inherits a predecessor's
+ * merged PR as its own. The list form keeps the whole history so {@link pickRunPr} can decide
+ * which entry, if any, belongs to the run asking. Resolves `[]` when gh is missing/unauthed —
+ * indistinguishable from "no PRs", which is what every caller would do with a failure anyway.
+ */
+export async function ghPrsForBranch(cwd: string, branch: string): Promise<LinkedPr[]> {
+  const fields = 'number,url,state,title,createdAt'
+  const args = ['pr', 'list', '--head', branch, '--state', 'all', '--limit', '20', '--json', fields]
+  const prs = await ghJson<LinkedPr[]>(args, cwd, [])
+  return prs.map(pr => ({
+    number: pr.number,
+    url: pr.url,
+    state: pr.state,
+    title: pr.title,
+    ...(pr.createdAt ? { createdAt: pr.createdAt } : {}),
+  }))
+}
+
+/** The cached form of {@link ghPrsForBranch}, shared through the same read-through cache (#1028). */
+export async function cachedPrsForBranch(cwd: string, branch: string): Promise<Cached<LinkedPr[]>> {
+  return cachedRead(branchPrsCacheKey(cwd, branch), () => ghPrsForBranch(cwd, branch))
+}
+
+/** Forget a branch's PR history, after an action that changes it (opening one). */
+export function forgetBranchPrs(cwd: string, branch: string): void {
+  invalidate(branchPrsCacheKey(cwd, branch))
+}
+
+/** Same unprintable separator idea as `prCacheKey`, spelled so paths cannot collide with it. */
+const KEY_SEP = String.fromCharCode(0)
+
+function branchPrsCacheKey(cwd: string, branch: string): string {
+  return ['prs', cwd, branch].join(KEY_SEP)
+}
+
+/**
+ * The PR that belongs to a run, out of every PR its branch name has had (#1251/#1255).
+ *
+ * An OPEN PR always counts: GitHub allows one open PR per head branch, so whatever is open on the
+ * run's branch is where its pushed commits land. A closed one counts only when it was created
+ * after the run started (`since`, the run's `startedAt`) — the oldest such entry, which is the one
+ * this run's handoff opened. Anything older is a previous run's PR wearing the same branch name,
+ * which is exactly what showed a merged two-day-old PR as a fresh session's own. Without `since`
+ * only an open PR is trusted.
+ */
+export function pickRunPr(prs: LinkedPr[], since?: string): LinkedPr | undefined {
+  const open = prs.find(pr => pr.state === 'OPEN')
+  if (open) return open
+  if (!since) return undefined
+  return prs
+    .filter(pr => pr.createdAt && pr.createdAt >= since)
+    .sort((a, b) => ((a.createdAt ?? '') < (b.createdAt ?? '') ? -1 : 1))[0]
 }
 
 /** An open PR on the interventions queue (#632). */

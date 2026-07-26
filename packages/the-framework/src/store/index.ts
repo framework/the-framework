@@ -17,6 +17,7 @@ export {
   restoreArchivedRun,
   listWorktreeDirs,
   runIdFromStartedAt,
+  startedAtFromRunId,
   isSafeRunId,
   FRAMEWORK_DIR,
   WORKTREES_DIR,

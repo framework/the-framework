@@ -1,9 +1,20 @@
 import { nodeGitRunner, type GitRunner } from '../project.js'
-import { cachedPrView, forgetPr, ghPrView, nodeGhRunner, type GhRunner, type LinkedPr, type BranchPrLookup } from './gh.js'
+import {
+  cachedPrsForBranch,
+  forgetBranchPrs,
+  forgetPr,
+  ghPrsForBranch,
+  nodeGhRunner,
+  pickRunPr,
+  type GhRunner,
+  type LinkedPr,
+  type BranchPrLookup,
+} from './gh.js'
+import type { Cached } from './cache.js'
 import { parseNumstat } from './file-diff.js'
 import { errorMessage } from '../error-message.js'
 import type { AutoHandoffSkip } from '../events.js'
-import { commitPendingWork, currentBranch, type RunMeta } from '../store/index.js'
+import { commitPendingWork, currentBranch, startedAtFromRunId, type RunMeta } from '../store/index.js'
 
 // What a finished session produced, and what is left to do with it (#799).
 //
@@ -84,6 +95,11 @@ export interface RunHandoffDeps {
    * read from there; uncommitted work does not, it sits in the tree the agent actually edited.
    */
   checkout?: string
+  /**
+   * When the run started (ISO), so the PR lookup can tell the run's own PR from an earlier run's
+   * on the same branch name (#1251). Without it, only an open PR is trusted.
+   */
+  since?: string
 }
 
 /**
@@ -100,6 +116,61 @@ export function runBranchFor(run: { id: string; branch?: string; sessionName?: s
 
 /** What every branch a session creates for itself is named under. */
 export const SESSION_BRANCH_PREFIX = 'the-framework/'
+
+/**
+ * The branch's PR as it applies to *this* run: the injected seam when the caller gave one, else
+ * the cached history filtered through {@link pickRunPr} with the run's start time (#1251).
+ */
+async function lookupRunPr(cwd: string, branch: string, deps: RunHandoffDeps): Promise<Cached<LinkedPr | undefined>> {
+  if (deps.pr) return { value: await deps.pr(cwd, branch).catch(() => undefined), pending: false }
+  const prs = await cachedPrsForBranch(cwd, branch).catch(() => ({ value: undefined, pending: false }))
+  return { value: prs.value ? pickRunPr(prs.value, deps.since) : undefined, pending: prs.pending }
+}
+
+/** What {@link resolveRunPr} needs to know about a run: structurally satisfied by {@link RunMeta}. */
+export interface RunPrRun {
+  id: string
+  startedAt?: string
+  branch?: string
+  sessionName?: string
+}
+
+/** The injectable lookup seam for {@link resolveRunPr}: a branch's cached PR history. */
+export type BranchPrsLookup = (cwd: string, branch: string) => Promise<Cached<LinkedPr[]>>
+
+/**
+ * The PR that belongs to a run, tried across every branch name the run may have worked under
+ * (#1251/#1255): the recorded branch, the session-name branch, then the run-id branch.
+ *
+ * The ladder is what makes a hands-off web run resolvable: its local worktree is torn down (or
+ * never existed), its meta may carry only a session name whose branch is a reused pin, but the
+ * cloud session pushed the run-id branch, which no other run can ever have. Each candidate is
+ * filtered through {@link pickRunPr} with the run's start time, so a predecessor's PR on a shared
+ * branch name is never the answer. `pending` only when nothing was found and a lookup is still
+ * running, so the caller can ask again rather than render "no PR".
+ */
+export async function resolveRunPr(
+  cwd: string,
+  run: RunPrRun,
+  prs: BranchPrsLookup = cachedPrsForBranch,
+): Promise<Cached<LinkedPr | undefined>> {
+  const since = run.startedAt ?? startedAtFromRunId(run.id)
+  const candidates = [
+    ...new Set([
+      ...(run.branch ? [run.branch] : []),
+      ...(run.sessionName ? [`${SESSION_BRANCH_PREFIX}${run.sessionName}`] : []),
+      `${SESSION_BRANCH_PREFIX}run-${run.id}`,
+    ]),
+  ]
+  let pending = false
+  for (const branch of candidates) {
+    const read = await prs(cwd, branch).catch((): Cached<LinkedPr[]> => ({ value: undefined, pending: false }))
+    if (read.pending) pending = true
+    const pr = read.value ? pickRunPr(read.value, since) : undefined
+    if (pr) return { value: pr, pending: false }
+  }
+  return { value: undefined, pending }
+}
 
 /**
  * Whether a branch is one a session made, rather than one the user did.
@@ -167,7 +238,25 @@ export async function readRunHandoff(
   const hasRemote = (await run(['remote'])).trim().length > 0
   const pending = await countPendingWork(git, deps.checkout)
   if (!tip) {
-    return { branch, exists: false, commits: [], files: [], insertions: 0, deletions: 0, empty: true, hasRemote, pushed: false, merged: false, ...pending }
+    // The branch being gone locally does not mean the work is: a hands-off web run pushes its
+    // branch and opens its PR remotely, and a merged branch gets deleted. The PR is a remote
+    // question, so it is still answerable — and it is the one thing left worth showing (#1255).
+    const pr = await lookupRunPr(cwd, branch, deps)
+    return {
+      branch,
+      exists: false,
+      commits: [],
+      files: [],
+      insertions: 0,
+      deletions: 0,
+      empty: true,
+      hasRemote,
+      pushed: false,
+      merged: false,
+      ...(pr.value ? { pr: pr.value } : {}),
+      ...(pr.pending ? { prPending: true } : {}),
+      ...pending,
+    }
   }
 
   const base = await detectBase(run)
@@ -196,9 +285,7 @@ export async function readRunHandoff(
   const files = parseHandoffFiles(numstatOut)
   // Read through the cache and allowed to arrive late (#1028): the commits, the files and
   // whether the branch is pushed are all local git, and none of them should wait on `gh`.
-  const pr = deps.pr
-    ? { value: await deps.pr(cwd, branch).catch(() => undefined), pending: false }
-    : await cachedPrView(cwd, branch).catch(() => ({ value: undefined, pending: false }))
+  const pr = await lookupRunPr(cwd, branch, deps)
 
   return {
     branch,
@@ -355,8 +442,9 @@ export async function openRunPullRequest(
     if (draft.draft) args.push('--draft')
     const out = (await gh(args, cwd)).trim()
     // The branch has a PR now, so the cached "no PR" must go or the bar would keep offering to
-    // open one for the next minute (#1028).
+    // open one for the next minute (#1028). Both caches: the single-PR view and the history.
     forgetPr(cwd, branch)
+    forgetBranchPrs(cwd, branch)
     // gh prints the new PR's URL as its last line.
     const url = out.split('\n').filter(Boolean).at(-1)
     return url ? { ok: true, url } : { ok: true }
@@ -379,11 +467,13 @@ export async function openSessionPullRequest(
   options: { draft?: boolean } = {},
 ): Promise<HandoffResult> {
   const branch = runBranchFor(run)
-  const handoff = await readRunHandoff(cwd, branch).catch(() => undefined)
+  const handoff = await readRunHandoff(cwd, branch, { since: run.startedAt }).catch(() => undefined)
+  // The run's PR first, even when its branch is gone locally: a hands-off web run's branch only
+  // ever existed on the remote, and its PR is the answer the button exists to give (#1255).
+  if (handoff?.pr) return { ok: true, url: handoff.pr.url }
   if (handoff && !handoff.exists) return { ok: false, error: `branch ${branch} no longer exists` }
   // Refuse rather than open an empty PR: a session that changed nothing has nothing to hand off.
   if (handoff?.empty) return { ok: false, error: 'this session produced no commits to open a PR for' }
-  if (handoff?.pr) return { ok: true, url: handoff.pr.url }
   return openRunPullRequest(cwd, branch, {
     title: run.sessionName ?? run.intent?.split('\n')[0]?.slice(0, 72) ?? `Session ${run.id}`,
     body: sessionPrBody(run),
@@ -438,13 +528,16 @@ export async function runAutoHandoff(
 ): Promise<AutoHandoffOutcome> {
   if (!intent.push && !intent.pr) return { outcome: 'skipped', reason: 'not-armed' }
   const branch = runBranchFor(run)
+  const since = run.startedAt ?? startedAtFromRunId(run.id)
   const { gh, ...readDeps } = deps
   // The UNcached PR lookup, deliberately. The dashboard's cache answers `prPending` rather than
   // yes-or-no (#1028), which is right for a panel repainting every 15s and wrong here: "not known
   // yet" would read as "no PR" and this would open a second one. Proved against a real remote —
   // only `gh` refusing the duplicate stopped it. This runs once, at the end of a session, so it
-  // can afford to wait for a real answer.
-  const state = await readRunHandoff(cwd, branch, { pr: ghPrView, ...readDeps }).catch(() => undefined)
+  // can afford to wait for a real answer. Filtered by the run's start time (#1251): a merged PR
+  // from an earlier run on the same branch name must not stop this run from opening its own.
+  const runPr: BranchPrLookup = async (c, b) => pickRunPr(await ghPrsForBranch(c, b), since)
+  const state = await readRunHandoff(cwd, branch, { pr: runPr, ...readDeps }).catch(() => undefined)
   if (!state || !state.exists) return { outcome: 'skipped', reason: 'branch-gone' }
   if (state.empty) return { outcome: 'skipped', reason: 'no-commits' }
   if (!state.hasRemote) return { outcome: 'skipped', reason: 'no-remote' }
@@ -480,7 +573,7 @@ export async function runAutoHandoff(
  * the PR. Narrower than {@link RunMeta} so the run process can call this before its meta is
  * final, and so a caller cannot quietly start depending on the rest of the run's state.
  */
-export type HandoffRun = Pick<RunMeta, 'id' | 'branch' | 'sessionName' | 'intent'>
+export type HandoffRun = Pick<RunMeta, 'id' | 'branch' | 'sessionName' | 'intent'> & Partial<Pick<RunMeta, 'startedAt'>>
 
 /** The PR body: what was asked for, and which session did it. */
 function sessionPrBody(run: HandoffRun): string {

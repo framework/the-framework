@@ -11,7 +11,7 @@ import { buildActivity, type Activity } from '../dashboard/activity.js'
 import { buildDashboard, type DashboardData } from '../dashboard/dashboard.js'
 import { githubUrlFor } from '../dashboard/github.js'
 import { readGitStatus, type GitStatus } from '../dashboard/git-status.js'
-import { readRunHandoff, runBranchFor, type RunHandoff } from '../dashboard/run-handoff.js'
+import { readRunHandoff, resolveRunPr, runBranchFor, type RunHandoff } from '../dashboard/run-handoff.js'
 import type { RunWorktree } from '../dashboard/types.js'
 import { crawlRepoFiles } from '../project.js'
 import { readFileStatuses, type FileGitStatus } from '../dashboard/file-status.js'
@@ -132,17 +132,26 @@ export async function onRunWorktree(projectId: string, runId: string): Promise<R
     // poll, and `du` over a build directory mid-build is a cost with no answer worth having.
     const running = live.some(run => run.id === runId && run.status === 'running')
     const size = own && !running ? await worktreeSize(path) : undefined
+    // In the run's own worktree, the checkout's branch is the run's, so the status read's PR is
+    // right. Once the worktree is gone the checkout is the project root, and its current branch
+    // has nothing to do with this run (#1255) — resolve by the run's own branch names instead.
+    const run = own ? undefined : await findRun(root, runId).catch(() => undefined)
+    const pr = own
+      ? { value: status?.pr, pending: status?.prPending ?? false }
+      : run
+        ? await resolveRunPr(root, run).catch(() => ({ value: undefined, pending: false }))
+        : { value: undefined, pending: false }
     return {
       path,
       own,
       dirty: status?.dirty ?? false,
       ...(status?.branch ? { branch: status.branch } : {}),
       ...(size !== undefined ? { sizeBytes: size } : {}),
-      // The same read already looked the PR up (#809): a session's branch is exactly the thing
-      // that has one, so the session's bar can show it like the project's does.
-      ...(status?.pr ? { pr: status.pr } : {}),
+      // A session's branch is exactly the thing that has a PR (#809), so the bar can show it
+      // like the project's does.
+      ...(pr.value ? { pr: pr.value } : {}),
       // Still being looked up rather than absent (#1028), so the bar can ask again shortly.
-      ...(status?.prPending ? { prPending: true } : {}),
+      ...(pr.pending ? { prPending: true } : {}),
     }
   }, null)
 }
@@ -341,7 +350,7 @@ export async function onRunHandoff(projectId: string, runId: string): Promise<Ru
     // the agent edited. Only when that is a checkout of the session's own: per the note above,
     // `resolveRunPath` falls back to the project root, whose dirt belongs to the user.
     const checkout = await resolveRunPath(projectId, runId)
-    const deps = checkout && checkout !== cwd ? { checkout } : {}
+    const deps = { since: run.startedAt, ...(checkout && checkout !== cwd ? { checkout } : {}) }
     return (await readRunHandoff(cwd, runBranchFor(run), deps).catch(() => undefined)) ?? null
   }, null)
 }

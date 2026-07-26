@@ -1,5 +1,6 @@
-priority: low
-topics: [the-framework]
+Priority: 2
+Topics: [the-framework]
+GitHub: [#607](https://github.com/gemstack-land/the-framework/issues/607)
 
 # Epic: Org layer — company / department / project scopes
 

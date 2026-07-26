@@ -1,5 +1,6 @@
-priority: medium
-topics: [enhancement, the-framework, ux]
+Priority: 5
+Topics: [enhancement, the-framework, ux]
+GitHub: [#1115](https://github.com/gemstack-land/the-framework/issues/1115)
 
 # Topics: start a conversation without a project, bind to one lazily
 

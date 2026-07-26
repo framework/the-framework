@@ -1,5 +1,6 @@
-priority: medium
-topics: [the-framework]
+Priority: 5
+Topics: [the-framework]
+GitHub: [#610](https://github.com/gemstack-land/the-framework/issues/610)
 
 # Drive Claude Code on the web instead of the CLI (MVP shortcut: free worktrees + PR, 0% local CPU)
 

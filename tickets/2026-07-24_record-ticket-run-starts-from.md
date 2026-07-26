@@ -1,5 +1,6 @@
-priority: low
-topics: [enhancement, the-framework]
+Priority: 2
+Topics: [enhancement, the-framework]
+GitHub: [#1117](https://github.com/gemstack-land/the-framework/issues/1117)
 
 # Record the ticket a run starts from, for a true 'implementing' status
 

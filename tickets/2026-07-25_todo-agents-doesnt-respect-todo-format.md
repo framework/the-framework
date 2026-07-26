@@ -1,5 +1,6 @@
-priority: high
-topics: [bug]
+Priority: 8
+Topics: [bug]
+GitHub: [#1163](https://github.com/gemstack-land/the-framework/issues/1163)
 
 # `TODO_AGENTS.md` doesn't respect `todo_format.md`
 

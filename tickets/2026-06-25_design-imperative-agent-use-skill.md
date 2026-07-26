@@ -1,5 +1,6 @@
-priority: low
-topics: [enhancement]
+Priority: 2
+Topics: [enhancement]
+GitHub: [#13](https://github.com/gemstack-land/the-framework/issues/13)
 
 # Design: optional imperative agent.use(skill) runtime composition
 

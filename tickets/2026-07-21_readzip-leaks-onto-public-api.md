@@ -1,4 +1,5 @@
-priority: low
+Priority: 2
+GitHub: [#947](https://github.com/gemstack-land/the-framework/issues/947)
 
 # readZip/ZipEntry leak onto the public API via the driver barrel
 

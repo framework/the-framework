@@ -1,5 +1,6 @@
-priority: medium
-topics: [bug, the-framework]
+Priority: 5
+Topics: [bug, the-framework]
+GitHub: [#1165](https://github.com/gemstack-land/the-framework/issues/1165)
 
 # test: the #1122 re-home test loses the bind under load (not a poll budget)
 

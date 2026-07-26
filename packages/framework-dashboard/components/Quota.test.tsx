@@ -1,17 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { AutoPmReport, Preferences, QuotaView } from '@gemstack/the-framework'
+import type { QuotaView } from '@gemstack/the-framework'
 
 const updatePreferences = vi.hoisted(() => vi.fn())
-let prefs: Preferences = {}
-vi.mock('../lib/preferences.js', () => ({
-  usePreferences: () => prefs,
-  updatePreferences,
-}))
+vi.mock('../lib/preferences.js', () => ({ updatePreferences }))
 
 let view: QuotaView | undefined
-let autoPm: AutoPmReport | undefined
-vi.mock('../lib/quota.js', () => ({ useQuota: () => view, useAutoPm: () => autoPm }))
+vi.mock('../lib/quota.js', () => ({ useQuota: () => view }))
 
 const { Quota } = await import('./Quota.js')
 
@@ -41,9 +36,7 @@ function readingAt(day: number, percentUsed: number, limitOffset = 0): QuotaView
 }
 
 beforeEach(() => {
-  prefs = {}
   view = undefined
-  autoPm = undefined
   updatePreferences.mockReset()
 })
 afterEach(cleanup)
@@ -65,13 +58,14 @@ describe('Quota (#960)', () => {
     expect(bar.getAttribute('aria-label')).toMatch(/day 4 of 7/)
   })
 
-  test('a week that began mid-day still shows each day exactly once (#960 Edit)', () => {
+  test('a week that began mid-day labels most of TU at the end of the bar, not the start (#960 Edit)', () => {
     view = reading(20)
     render(<Quota />)
-    // Seven equal 24h stretches from the Tuesday-evening start, not seven calendar days — so the
-    // start day is one label, not a sliver repeated at each end of the bar.
+    // The reset falls on a Tuesday too, a week later, and the 19h right before it are more of
+    // Tuesday than the 5h sliver right after the week begins — so that is where the label goes,
+    // and each day still reads exactly once.
     const labels = screen.getAllByText(/^[A-Z]{2}$/).map(el => el.textContent)
-    expect(labels).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO'])
+    expect(labels).toEqual(['WE', 'TH', 'FR', 'SA', 'SU', 'MO', 'TU'])
   })
 
   test('the session window is listed, but never as the bar', () => {
@@ -84,7 +78,6 @@ describe('Quota (#960)', () => {
 
   test('the handle is valued on the bar\'s own scale, but stores an offset from the boundary (#960)', () => {
     view = reading(20)
-    prefs = {}
     render(<Quota />)
     const slider = screen.getByLabelText('Unattended work stops at') as HTMLInputElement
     const boundaryPercent = (4 / 7) * 100
@@ -92,14 +85,6 @@ describe('Quota (#960)', () => {
     expect(Number(slider.value)).toBeCloseTo(boundaryPercent, 5)
     fireEvent.change(slider, { target: { value: String(boundaryPercent + 15) } })
     expect(updatePreferences).toHaveBeenCalledWith({ autoSpendOffset: 15 })
-  })
-
-  test('a moved limit is shown as a line of its own, and named', () => {
-    view = reading(20, 15)
-    render(<Quota />)
-    // 57% boundary + 15 = 72%, and the caption says which of the two it is.
-    expect(screen.getByText(/72%/)).toBeTruthy()
-    expect(screen.getByText(/\+15 on the boundary/)).toBeTruthy()
   })
 
   test('an unreadable quota explains itself instead of showing a zeroed bar', () => {
@@ -205,6 +190,10 @@ describe('Quota (#960)', () => {
     expect(projected!.style.left).toBe('20%')
     expect(parseFloat(projected!.style.width)).toBeCloseTo(52.142857, 4) // 72% limit - 20% used
     expect(projected!.className).toMatch(/opacity-35/)
+    // One bar, not two pills glued together: neither segment rounds its own corners — only the
+    // track's own overflow-hidden shapes the ends.
+    expect(used!.className).not.toMatch(/rounded/)
+    expect(projected!.className).not.toMatch(/rounded/)
   })
 
   test('nothing left to project once the limit has already been reached, so no dimmed segment is drawn', () => {
@@ -229,6 +218,18 @@ describe('Quota (#960)', () => {
     expect(screen.getByText(/move slider to the right to enable/)).toBeTruthy()
   })
 
+  test('warns once the knob is dragged past today\'s boundary (#960 Edit)', () => {
+    view = reading(20, 0) // limit sits exactly on the boundary: not past it yet
+    render(<Quota />)
+    expect(screen.queryByText(/Past today's boundary/)).toBeNull()
+  })
+
+  test('a positive offset always reads as past the boundary, since the limit only moves that way (#960 Edit)', () => {
+    view = reading(20, 15) // limit 57% + 15 = 72%, past the 57% boundary
+    render(<Quota />)
+    expect(screen.getByText(/Past today's boundary/)).toBeTruthy()
+  })
+
   test('one bar, not two: the handle is drawn on the week track itself (#960 Edit)', () => {
     view = reading(20, 0)
     const { container } = render(<Quota />)
@@ -239,64 +240,25 @@ describe('Quota (#960)', () => {
     const slider = screen.getByLabelText('Unattended work stops at')
     expect(bar.parentElement).toBe(slider.parentElement)
   })
-})
 
-
-describe('the auto-PM readout (#1161)', () => {
-  /** A sweep that considered one project, `minutesAgo` ago, with the next one an hour out. */
-  function swept(message: string, started = false, minutesAgo = 2): AutoPmReport {
-    return {
-      enabled: true,
-      sweptAt: Date.now() - minutesAgo * 60_000,
-      nextSweepAt: Date.now() + 60 * 60_000,
-      outcomes: [{ projectId: 'p1', path: '/Users/me/code/gemstack', started, message }],
-    }
-  }
-
-  test('says why nothing is running, rather than leaving the toggle to be guessed at', () => {
-    // The reason was always written — to the daemon's stdout, which the browser never shows.
+  test('names the reset as a weekday and a time, not a date the bar already implies (#960 Edit)', () => {
     view = reading(20)
-    autoPm = swept('4 runs are already going')
     render(<Quota />)
-    expect(screen.getByText(/4 runs are already going/)).toBeTruthy()
-    expect(screen.getByText(/gemstack/)).toBeTruthy()
+    expect(screen.getByText(/^resets /)).toBeTruthy()
+    expect(screen.queryByText('Under the line, with room to spend.')).toBeNull()
   })
 
-  test('names the project by its directory, not its whole path', () => {
+  test('the legend names the projected segment and gives the boundary a tooltip (#960 Edit)', () => {
     view = reading(20)
-    autoPm = swept('the quota could not be read')
-    render(<Quota />)
-    expect(screen.queryByText(/Users\/me\/code/)).toBeNull()
+    const { container } = render(<Quota />)
+    expect(screen.getByText('Autonomous AI usage (projected)')).toBeTruthy()
+    expect(screen.getByText('Daily boundary')).toBeTruthy()
+    expect(container.querySelector('svg.lucide-circle-help')).toBeTruthy()
   })
 
-  test('says when it last looked and when it will look again', () => {
+  test('the roadmap-spend toggle is gone from this panel (#960 Edit)', () => {
     view = reading(20)
-    autoPm = swept('draining the first open queue entry', true)
     render(<Quota />)
-    expect(screen.getByText(/Last checked 2m ago/)).toBeTruthy()
-    expect(screen.getByText(/next in 1 hr/)).toBeTruthy()
-  })
-
-  test('stays quiet while the setting is off, since the box already says so', () => {
-    view = reading(20)
-    autoPm = { enabled: false, sweptAt: Date.now(), nextSweepAt: Date.now() + 60_000, outcomes: [] }
-    render(<Quota />)
-    expect(screen.queryByText(/Last checked/)).toBeNull()
-  })
-
-  test('a sweep that has not run yet reads as checking, never as an idle one', () => {
-    view = reading(20)
-    autoPm = { nextSweepAt: Date.now() + 60_000, outcomes: [] }
-    render(<Quota />)
-    expect(screen.getByText('Checking…')).toBeTruthy()
-    expect(screen.queryByText(/No projects/)).toBeNull()
-  })
-
-  test('says nothing at all on a host that runs no sweep', () => {
-    view = reading(20)
-    autoPm = undefined
-    render(<Quota />)
-    expect(screen.queryByText(/Last checked/)).toBeNull()
-    expect(screen.queryByText('Checking…')).toBeNull()
+    expect(screen.queryByText(/Spend what's left on the roadmap/)).toBeNull()
   })
 })

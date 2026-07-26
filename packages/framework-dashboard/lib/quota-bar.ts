@@ -2,14 +2,17 @@
 // DOM and read without React. Everything here is about *drawing* the week; where the boundary sits
 // and what it gates is the framework's (`quota-boundary.ts`), and this never re-derives it.
 
-/** One quota-day's stretch of the bar, 0-100, and the label that names it. */
+/** One quota-day's stretch of the bar, 0-100, and the label that names it, if any. */
 export interface DaySegment {
   /** Where this day starts across the bar, 0 at the start of the quota week. */
   startPercent: number
-  /** Where it ends — the next day's start, or 100 for the last. */
+  /** Where it ends — the next local midnight, or 100 for the last. */
   endPercent: number
-  /** The day's two-letter name, e.g. `TU`, read at the segment's own start. */
-  label: string
+  /**
+   * The day's two-letter name, e.g. `TU`, or absent for the smaller of a mid-day start's two
+   * same-named slivers (see {@link weekDays}) — delimited, but silent, so the day still reads once.
+   */
+  label?: string | undefined
 }
 
 /**
@@ -24,26 +27,51 @@ function weekdayLabel(at: number): string {
   return new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(at).slice(0, 2).toUpperCase()
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000
-
 /**
- * The week as seven equal quota-days (#960 Edit).
+ * The week as calendar days (#960 Edit): segments run local midnight to local midnight, so a
+ * segment's width says how much of that day is actually in the week, and the axis places `TU`
+ * where most of Tuesday is — not at a fixed seventh regardless of the clock.
  *
- * Each is a full 24h from the account's own start moment, not a calendar day — the week starts
- * whenever the account's does, generally mid-day, so a segment runs (say) Tuesday evening to
- * Wednesday evening and is still labelled `TU`, the day it started. That is what keeps every day
- * shown exactly once: the earlier axis walked local midnights instead, which split the start day's
- * 24h into two separate slivers (one at each end of the bar) and so had to draw `TU` twice.
+ * A mid-day start splits its own day into two slivers straddling the reset — the tail end right
+ * after the week begins, and the whole day right before it resets a week later — and both are
+ * named the same weekday. Both are still delimited (real elapsed time, worth a boundary), but only
+ * the larger keeps its label, so the day still reads exactly once, at whichever end it mostly falls.
+ *
+ * Midnight is re-derived each step rather than added as 24h, so a DST change does not slide every
+ * later boundary by an hour.
  */
 export function weekDays(startsAt: number, resetsAt: number, weekday: (at: number) => string = weekdayLabel): DaySegment[] {
   const span = resetsAt - startsAt
   if (!(span > 0)) return []
-  const days = Math.max(1, Math.round(span / DAY_MS))
-  return Array.from({ length: days }, (_, i) => ({
-    startPercent: (i / days) * 100,
-    endPercent: ((i + 1) / days) * 100,
-    label: weekday(startsAt + i * DAY_MS),
-  }))
+  const bounds = [startsAt]
+  const cursor = new Date(startsAt)
+  cursor.setHours(24, 0, 0, 0)
+  while (cursor.getTime() < resetsAt) {
+    bounds.push(cursor.getTime())
+    cursor.setHours(24, 0, 0, 0)
+  }
+  bounds.push(resetsAt)
+
+  const days: DaySegment[] = []
+  for (let i = 0; i < bounds.length - 1; i++) {
+    const segStart = bounds[i]!
+    const segEnd = bounds[i + 1]!
+    days.push({
+      startPercent: ((segStart - startsAt) / span) * 100,
+      endPercent: ((segEnd - startsAt) / span) * 100,
+      label: weekday(segStart),
+    })
+  }
+
+  const first = days[0]!
+  const last = days.at(-1)!
+  if (days.length > 1 && first.label === last.label) {
+    const firstWidth = first.endPercent - first.startPercent
+    const lastWidth = last.endPercent - last.startPercent
+    if (firstWidth >= lastWidth) last.label = undefined
+    else first.label = undefined
+  }
+  return days
 }
 
 /** How the week is going, which is the bar's colour. */
@@ -64,14 +92,6 @@ export function quotaTone(percentUsed: number, boundaryPercent: number, band = N
   if (percentUsed > boundaryPercent + band) return 'over'
   if (percentUsed >= boundaryPercent - band) return 'near'
   return 'under'
-}
-
-/** What each tone means, in the words the panel says out loud. */
-export const TONE_NOTE: Record<QuotaTone, string> = {
-  under: 'Under the line, with room to spend.',
-  near: 'Tracking with the week.',
-  over: 'Ahead of the week, so unattended work stands down until the line catches up.',
-  full: 'The week is spent.',
 }
 
 /**

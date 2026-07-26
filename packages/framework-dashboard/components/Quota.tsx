@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { AutoPmReport, DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '@gemstack/the-framework'
+import { CircleHelp } from 'lucide-react'
+import type { DriverQuotaWindow, QuotaBoundaryStatus, QuotaView } from '@gemstack/the-framework'
 import { MAX_SPEND_OFFSET } from '@gemstack/the-framework/client'
-import { useAutoPm, useQuota } from '../lib/quota.js'
-import { formatRelative, formatUntil } from '../lib/format-date.js'
-import { usePreferences, updatePreferences } from '../lib/preferences.js'
-import { weekDays, quotaTone, limitPercent, projectedRange, TONE_NOTE, type QuotaTone } from '../lib/quota-bar.js'
+import { useQuota } from '../lib/quota.js'
+import { formatRelative, formatResetDay, formatResetTooltip } from '../lib/format-date.js'
+import { updatePreferences } from '../lib/preferences.js'
+import { weekDays, quotaTone, limitPercent, projectedRange, type QuotaTone } from '../lib/quota-bar.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
-import { Checkbox } from './ui/checkbox.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
 
 // The usage bar (#960): one week-long track, so "am I ahead or behind?" is a glance rather than a
@@ -63,40 +64,49 @@ function WeekBar({
   onChangeOffset: (offset: number) => void
 }) {
   const { boundary } = status
-  // Seven equal 24h stretches from the account's own start moment (#960 Edit), so each day is
-  // shown once, centred in its own share of the bar — not walked from local midnight, which split
-  // the start day into a sliver at each end and had to label both `TU`.
+  // Calendar days (#960 Edit): each segment's width is how much of that day is actually in the
+  // week, so the axis places a label where most of that day falls rather than at a fixed seventh
+  // regardless of the clock. A mid-day start still leaves one day split into two same-named
+  // slivers straddling the reset — see {@link weekDays} — and only the larger keeps its label.
   const days = weekDays(boundary.startsAt, boundary.resetsAt)
   const tone = quotaTone(percentUsed, boundary.percent)
   const limit = limitPercent(boundary.percent, offset)
   const projected = projectedRange(percentUsed, limit)
+  const enabled = projected.end > projected.start
+  // Past the pro-rated boundary, unattended work is allowed to spend faster than the week's own
+  // pace calls for — worth flagging, since it is easy to drag past without meaning to.
+  const pastBoundary = limit > boundary.percent
   const label = `${Math.round(percentUsed)}% of the week used, against a boundary of ${Math.round(boundary.percent)}% on day ${boundary.day} of 7`
 
   return (
     <div className="space-y-1.5">
-      {/* One label per day, centred in its own seventh of the bar. */}
+      {/* One label per day, centred in its own share of the bar. */}
       <div className="relative h-4 text-[10px] font-medium tracking-wide text-muted-foreground">
-        {days.map(day => (
-          <span key={day.label} className="absolute top-0 -translate-x-1/2" style={{ left: `${(day.startPercent + day.endPercent) / 2}%` }}>
-            {day.label}
-          </span>
-        ))}
+        {days.map(
+          (day, i) =>
+            day.label && (
+              <span key={i} className="absolute top-0 -translate-x-1/2" style={{ left: `${(day.startPercent + day.endPercent) / 2}%` }}>
+                {day.label}
+              </span>
+            ),
+        )}
       </div>
       <div className="relative h-4">
         <div role="img" aria-label={label} className="absolute inset-x-0 top-[3px] h-2.5 overflow-hidden rounded-full bg-muted">
-          {/* Used, at full opacity. */}
-          <div className={cn('absolute inset-y-0 left-0 rounded-full', TONE_FILL[tone])} style={{ width: `${projected.start}%` }} />
+          {/* Used, at full opacity. No corner between it and the segment after it — one bar, not
+              two pills glued together. */}
+          <div className={cn('absolute inset-y-0 left-0', TONE_FILL[tone])} style={{ width: `${projected.start}%` }} />
           {/* The room left before unattended work stops — the same colour, dimmed, right after the
               used fill, so the two read as one bar split in two rather than a mark over it. */}
-          {projected.end > projected.start && (
+          {enabled && (
             <div
-              className={cn('absolute inset-y-0 rounded-full opacity-35', TONE_FILL[tone])}
+              className={cn('absolute inset-y-0 opacity-35', TONE_FILL[tone])}
               style={{ left: `${projected.start}%`, width: `${projected.end - projected.start}%` }}
             />
           )}
           {/* The day delimiters — a notch through the fill at each day's own start. */}
-          {days.slice(1).map(day => (
-            <div key={`${day.label}-delim`} className="absolute inset-y-0 w-px bg-background/60" style={{ left: `${day.startPercent}%` }} aria-hidden />
+          {days.slice(1).map((day, i) => (
+            <div key={i} className="absolute inset-y-0 w-1 bg-background/60" style={{ left: `${day.startPercent}%` }} aria-hidden />
           ))}
           {/* The boundary. Inside the same box as the fill, which is the whole point of one track. */}
           <div
@@ -115,7 +125,6 @@ function WeekBar({
             in the change handler instead, on the offset it produces. Dragging it is what changes
             where the dimmed segment ends. */}
         <input
-          id="spend-limit"
           type="range"
           aria-label="Unattended work stops at"
           className={cn(
@@ -142,13 +151,18 @@ function WeekBar({
       <p className="text-xs text-muted-foreground">
         <span className="font-medium text-foreground">{Math.round(percentUsed)}% used</span>
         {' · '}
-        {TONE_NOTE[tone]}
+        <Tooltip>
+          <TooltipTrigger render={<span className="cursor-default underline decoration-dotted underline-offset-2" />}>
+            resets {formatResetDay(boundary.resetsAt)}
+          </TooltipTrigger>
+          <TooltipContent>{formatResetTooltip(boundary.resetsAt)}</TooltipContent>
+        </Tooltip>
       </p>
       {/* Whether the knob has left any room to project (#960 Edit): dragged all the way down onto
           the used fill, there is nothing left for unattended work to spend, which is worth naming
           as its own state rather than leaving as a bar that merely looks empty. */}
       <p className="text-[11px] text-muted-foreground">
-        {projected.end > projected.start ? (
+        {enabled ? (
           <>
             ✅ Autonomous AI <em>enabled</em> <small className="text-muted-foreground/70">move slider to the left to disable</small>
           </>
@@ -158,39 +172,28 @@ function WeekBar({
           </>
         )}
       </p>
+      {/* Easy to drag past without meaning to, since nothing else on the bar stops at the boundary
+          — the fill only stops there when the account is spending exactly on pace. */}
+      {pastBoundary && (
+        <p className="text-[11px] text-warning">⚠️ Past today's boundary — autonomous work may spend faster than the week's pace allows.</p>
+      )}
       {/* The legend (#960 Edit): what the two shades of the bar and its line mean. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
         <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm', TONE_FILL[tone])} aria-hidden />}>Used</LegendItem>
-        <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm opacity-35', TONE_FILL[tone])} aria-hidden />}>Autonomous AI (projected)</LegendItem>
-        <LegendItem swatch={<span className="h-2 w-0.5 bg-foreground" aria-hidden />}>Daily boundary</LegendItem>
+        <LegendItem swatch={<span className={cn('h-2 w-2 rounded-sm opacity-35', TONE_FILL[tone])} aria-hidden />}>Autonomous AI usage (projected)</LegendItem>
+        <LegendItem swatch={<span className="h-2 w-0.5 bg-foreground" aria-hidden />}>
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex cursor-default items-center gap-0.5" />}>
+              Daily boundary
+              <CircleHelp className="h-3 w-3" aria-hidden />
+            </TooltipTrigger>
+            <TooltipContent className="max-w-64">
+              Not a hard limit — just an indication of whether you're over- or under-consuming. It's calculated as a pro-rated share of
+              the weekly limit.
+            </TooltipContent>
+          </Tooltip>
+        </LegendItem>
       </div>
-    </div>
-  )
-}
-
-/**
- * The caption for the draggable limit on the bar above (#960 Edit): the control itself lives on
- * the week bar, so this is only the number and the sentence that make a drag distance readable.
- */
-function SpendLimitCaption({ offset, boundaryPercent }: { offset: number; boundaryPercent: number }) {
-  const limit = limitPercent(boundaryPercent, offset)
-  return (
-    <div className="space-y-1">
-      <div className="flex items-baseline justify-between gap-2 text-sm">
-        <label htmlFor="spend-limit" className="font-medium text-foreground">
-          Unattended work stops at
-        </label>
-        <span className="text-xs text-muted-foreground">
-          {Math.round(limit)}%{offset === 0 ? ' · the boundary' : ` · ${offset > 0 ? '+' : ''}${offset} on the boundary`}
-        </span>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        {offset === 0
-          ? 'Drag the handle on the bar above to move it — left holds unattended work back, right lets it borrow against the days still to come.'
-          : offset > 0
-            ? 'Unattended work may run ahead of the week, borrowing against the days still to come.'
-            : 'Unattended work stands down before the week says it has to.'}
-      </p>
     </div>
   )
 }
@@ -259,46 +262,8 @@ function useSpendOffset(serverOffset: number | undefined): [number, (offset: num
   ]
 }
 
-/** The repo a line is about, by the name you would call it: its directory. */
-function projectName(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).pop() ?? path
-}
-
-/**
- * What the sweep last did (#1161). Without this the toggle was the only thing the panel could
- * say, so "on, and standing down because the queue could not be read" looked exactly like "on,
- * and quietly working" — and the reasons were already being written, to a log in a terminal the
- * dashboard user never sees.
- */
-function AutoPmStatus({ report }: { report: AutoPmReport }) {
-  // The box itself already says it is off, and a sweep's report on a preference it read as off
-  // says nothing more than that.
-  if (report.enabled === false) return null
-  if (report.sweptAt === undefined) return <p className="text-xs text-muted-foreground">Checking…</p>
-  return (
-    <div className="space-y-0.5 text-xs text-muted-foreground">
-      <p>
-        Last checked {formatRelative(new Date(report.sweptAt).toISOString())} · next {formatUntil(report.nextSweepAt)}
-      </p>
-      {report.outcomes.length === 0 ? (
-        <p>No projects to work on.</p>
-      ) : (
-        report.outcomes.map(outcome => (
-          <p key={outcome.projectId}>
-            <span className={cn(outcome.started && 'text-foreground')}>{projectName(outcome.path)}</span>
-            {' — '}
-            {outcome.message}
-          </p>
-        ))
-      )}
-    </div>
-  )
-}
-
 export function Quota() {
   const view = useQuota()
-  const autoPm = useAutoPm()
-  const preferences = usePreferences()
   const [offset, setOffset] = useSpendOffset(view?.boundary?.limit.offset)
   const note = view ? unavailableNote(view) : undefined
   // When the newest attempt failed but earlier numbers are still on screen, say how old they are.
@@ -338,31 +303,6 @@ export function Quota() {
             {note}
             {staleAt !== undefined ? ` Last read ${formatRelative(new Date(staleAt).toISOString())}.` : ''}
           </p>
-        ) : null}
-
-        {view ? (
-          <div className="space-y-1 border-t border-border pt-3">
-            <label className="flex cursor-pointer items-center gap-1.5 text-sm">
-              <Checkbox
-                checked={preferences.autoPm ?? false}
-                onCheckedChange={checked => updatePreferences({ autoPm: checked })}
-              />
-              <span className="font-medium text-foreground">Spend what's left on the roadmap</span>
-            </label>
-            <p className="text-xs text-muted-foreground">
-              When nothing is running, work the queue down and refill it rather than let the week's
-              allowance expire. Only while the account is still under the line above.
-            </p>
-            {autoPm ? <AutoPmStatus report={autoPm} /> : null}
-          </div>
-        ) : null}
-
-        {/* Only where the bar above is actually drawn: the handle lives on it, and a caption for a
-            control that isn't on screen would name something the user cannot see. */}
-        {view?.boundary && week ? (
-          <div className="border-t border-border pt-3">
-            <SpendLimitCaption offset={offset} boundaryPercent={view.boundary.boundary.percent} />
-          </div>
         ) : null}
       </CardContent>
     </Card>

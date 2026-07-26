@@ -9,27 +9,41 @@ const weekday = (at: number) => ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'][new D
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 describe('weekDays', () => {
-  test('a week starting mid-day still shows each day exactly once (#960 Edit)', () => {
-    // Tuesday evening, local time, which is the case the issue draws.
+  test('a week starting mid-day labels most of TU at the end of the bar, not the start (#960 Edit)', () => {
+    // Tuesday evening, local time, which is the case the issue draws: reset is also a Tuesday, a
+    // week later, and the 19 hours right before it are more of Tuesday than the 5-hour sliver
+    // right after the week begins.
     const startsAt = new Date(2026, 6, 21, 19, 0, 0).getTime() // Tue 21 Jul 2026, 19:00 local
     const days = weekDays(startsAt, startsAt + WEEK_MS, weekday)
-    // Seven equal 24h stretches from the start moment, not seven calendar days — so the start
-    // day's own 24h is one segment, not split into a sliver at each end of the bar.
-    expect(days.map(d => d.label)).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO'])
+    expect(days.map(d => d.label)).toEqual([undefined, 'WE', 'TH', 'FR', 'SA', 'SU', 'MO', 'TU'])
+    // Each day still reads exactly once, filtering the unlabelled sliver out.
+    expect(days.map(d => d.label).filter(Boolean)).toEqual(['WE', 'TH', 'FR', 'SA', 'SU', 'MO', 'TU'])
+    // The labelled `TU` is the 19h segment right before the reset, not the 5h one at the start.
+    const tu = days.at(-1)!
+    expect(tu.endPercent - tu.startPercent).toBeGreaterThan(days[0]!.endPercent - days[0]!.startPercent)
   })
 
-  test('a week starting exactly at midnight still shows each day exactly once', () => {
+  test('a week starting just after midnight labels TU at the start instead, since that sliver is the bigger one', () => {
+    // Tuesday 2am: the 22h sliver from here to the next midnight dwarfs the 2h sliver of Tuesday
+    // that reappears right before the reset, so the label belongs at the start this time.
+    const startsAt = new Date(2026, 6, 21, 2, 0, 0).getTime()
+    const days = weekDays(startsAt, startsAt + WEEK_MS, weekday)
+    expect(days.map(d => d.label)).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO', undefined])
+    expect(days.map(d => d.label).filter(Boolean)).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO'])
+  })
+
+  test('a week starting exactly at midnight has no sliver to dedupe, and every day is an equal seventh', () => {
     const startsAt = new Date(2026, 6, 21, 0, 0, 0).getTime()
     const days = weekDays(startsAt, startsAt + WEEK_MS, weekday)
     expect(days.map(d => d.label)).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO'])
+    for (const d of days) expect(d.endPercent - d.startPercent).toBeCloseTo(100 / 7, 5)
   })
 
-  test('each day is an equal seventh of the bar, edge to edge with no gap between them', () => {
+  test('segments tile the bar edge to edge, whatever their individual widths', () => {
     const startsAt = new Date(2026, 6, 21, 19, 0, 0).getTime()
     const days = weekDays(startsAt, startsAt + WEEK_MS, weekday)
     expect(days[0]!.startPercent).toBe(0)
     expect(days.at(-1)!.endPercent).toBe(100)
-    for (const d of days) expect(d.endPercent - d.startPercent).toBeCloseTo(100 / 7, 5)
     for (let i = 1; i < days.length; i++) expect(days[i]!.startPercent).toBe(days[i - 1]!.endPercent)
   })
 
@@ -43,8 +57,10 @@ test('the built-in labels are a fixed two-letter notation, not the machine local
   // On a he-IL machine every short weekday begins `יו`, so a localized axis would label all seven
   // days the same. The default formatter has to be locale-independent for the axis to mean anything.
   const startsAt = new Date(2026, 6, 21, 19, 0, 0).getTime()
-  const labels = weekDays(startsAt, startsAt + WEEK_MS).map(d => d.label)
-  expect(labels).toEqual(['TU', 'WE', 'TH', 'FR', 'SA', 'SU', 'MO'])
+  const labels = weekDays(startsAt, startsAt + WEEK_MS)
+    .map(d => d.label)
+    .filter(Boolean)
+  expect(labels).toEqual(['WE', 'TH', 'FR', 'SA', 'SU', 'MO', 'TU'])
 })
 
 describe('quotaTone', () => {

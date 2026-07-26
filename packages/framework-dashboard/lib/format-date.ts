@@ -91,3 +91,30 @@ export function formatRelative(value: string | undefined, fallback = '—'): str
   if (days <= 7) return `${days}d ago`
   return date.toLocaleDateString()
 }
+
+/** `8:59pm`, lowercase and unspaced — the hour and minute the reset formatters share. */
+function timeOfDay(date: Date): string {
+  return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(/\s+/g, '')
+}
+
+/**
+ * A quota reset, as the week it sits under already places it: "Tuesday 8:59pm" (#960 Edit), not a
+ * date — the bar above says which day of the week it is; naming the date again would be the
+ * calendar repeating itself. Pair with {@link formatResetTooltip} for the exact moment.
+ */
+export function formatResetDay(at: number): string {
+  const date = new Date(at)
+  return `${date.toLocaleDateString(undefined, { weekday: 'long' })} ${timeOfDay(date)}`
+}
+
+/**
+ * The same moment in full, for a tooltip: "Quota resets on Jul 28, 8:59pm (Europe/Berlin)". Names
+ * the zone rather than leaving it implicit, since the reset is the account's own clock, and a
+ * viewer working from a different one should not have to guess whether the two agree.
+ */
+export function formatResetTooltip(at: number): string {
+  const date = new Date(at)
+  const monthDay = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  return `Quota resets on ${monthDay}, ${timeOfDay(date)} (${zone})`
+}

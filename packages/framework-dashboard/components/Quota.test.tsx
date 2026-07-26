@@ -71,13 +71,16 @@ describe('Quota (#960)', () => {
     expect(bar.getAttribute('aria-label')).toMatch(/day 4 of 7/)
   })
 
-  test('draws no day markers or separators on the bar (#960 Edit)', () => {
+  test('draws one day label per calendar day, and a separator between each (#960 Edit)', () => {
     view = reading(20)
     render(<Quota />)
-    // The axis is gone entirely — no two-letter weekday labels, no delimiter notches.
-    expect(screen.queryAllByText(/^[A-Z]{2}$/)).toHaveLength(0)
-    // Just the used and dimmed fills, and the boundary line — no day-delimiter notches between them.
-    expect(screen.getByRole('img').querySelectorAll(':scope > div')).toHaveLength(3)
+    // STARTS_AT is a Tuesday evening: the fixture's mid-day-start case, so `TU` reads once, at
+    // whichever end of the bar most of Tuesday actually falls (the end, here).
+    const labels = screen.getAllByText(/^[A-Z]{2}$/).map(el => el.textContent)
+    expect(labels).toEqual(['WE', 'TH', 'FR', 'SA', 'SU', 'MO', 'TU'])
+    // One separator less than the number of calendar days the week touches (no separator before
+    // the very first day), plus the used/dimmed fills and the boundary line.
+    expect(screen.getByRole('img').querySelectorAll(':scope > div')).toHaveLength(10)
   })
 
   test('the session window is reachable through the bar\'s "show all limits" tooltip, never as its own bar', async () => {

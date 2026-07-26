@@ -5,7 +5,7 @@ import { MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '@gemstack/the-framework/
 import { useQuota } from '../lib/quota.js'
 import { formatRelative, formatResetDay, formatResetTooltip, formatDuration, formatDurationLong } from '../lib/format-date.js'
 import { updatePreferences } from '../lib/preferences.js'
-import { quotaTone, limitPercent, projectedRange, paceDeviationMs, type QuotaTone } from '../lib/quota-bar.js'
+import { weekDays, quotaTone, limitPercent, projectedRange, paceDeviationMs, type QuotaTone } from '../lib/quota-bar.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
@@ -74,6 +74,11 @@ function WeekBar({
   others: DriverQuotaWindow[]
 }) {
   const { boundary } = status
+  // Calendar days (#960 Edit): each segment's width is how much of that day is actually in the
+  // week, so the axis places a label where most of that day falls rather than at a fixed seventh
+  // regardless of the clock. A mid-day start still leaves one day split into two same-named
+  // slivers straddling the reset — see {@link weekDays} — and only the larger keeps its label.
+  const days = weekDays(boundary.startsAt, boundary.resetsAt)
   const tone = quotaTone(percentUsed, boundary.percent)
   const limit = limitPercent(boundary.percent, offset)
   const projected = projectedRange(percentUsed, limit)
@@ -90,6 +95,17 @@ function WeekBar({
 
   return (
     <div className="space-y-1.5">
+      {/* One label per day, centred in its own share of the bar. */}
+      <div className="relative h-4 text-[10px] font-medium tracking-wide text-muted-foreground">
+        {days.map(
+          (day, i) =>
+            day.label && (
+              <span key={i} className="absolute top-0 -translate-x-1/2" style={{ left: `${(day.startPercent + day.endPercent) / 2}%` }}>
+                {day.label}
+              </span>
+            ),
+        )}
+      </div>
       <div className="relative h-4">
         <div role="img" aria-label={label} className="absolute inset-x-0 top-[3px] h-2.5 overflow-hidden rounded-full bg-muted">
           {/* Used, at full opacity. No corner between it and the segment after it — one bar, not
@@ -103,6 +119,11 @@ function WeekBar({
               style={{ left: `${projected.start}%`, width: `${projected.end - projected.start}%` }}
             />
           )}
+          {/* The day delimiters — a notch through the fill at each day's own start, white so it
+              reads against every tone the fill can be. */}
+          {days.slice(1).map((day, i) => (
+            <div key={i} className="absolute inset-y-0 w-1 bg-background/60" style={{ left: `${day.startPercent}%` }} aria-hidden />
+          ))}
           {/* The boundary. Inside the same box as the fill, which is the whole point of one track. */}
           <div
             className="absolute inset-y-0 w-0.5 -translate-x-1/2 bg-foreground"

@@ -15,6 +15,7 @@ import {
   PRESETS_SUGGEST_TICKETS_TO_WORK_ON,
   PRESETS_TRIAGE_CONSENSUAL,
   PRESETS_TRIAGE_QUICK,
+  PRESETS_UPDATE_TICKETS,
   PRESETS_UX,
 } from './prompts.generated.js'
 
@@ -80,11 +81,23 @@ export const presets = {
    * triage and planning presets have a backlog to read. One line of prompt, because the system
    * prompt already tells the agent what a ticket is and where it goes.
    *
-   * The only preset marked {@link PresetSpec.newSession}: importing is repo work, not a reply, so
-   * it opens its own session rather than appending to whichever one the user happens to be
-   * reading.
+   * Marked {@link PresetSpec.newSession}, like its update sibling: importing is repo work, not a
+   * reply, so it opens its own session rather than appending to whichever one the user happens to
+   * be reading.
    */
   importTickets: definePreset({ name: 'import-tickets', template: PRESETS_IMPORT_TICKETS, label: 'Import tickets from GitHub', newSession: true, tooltip: 'Fill `tickets/` from the GitHub issues. Always runs in a new session.' }),
+
+  /**
+   * [Update from GitHub] (#1208): the second and every later import. It resumes from the
+   * `lastImportedAt` in `tickets/meta.json` and reconciles rather than refilling — an existing
+   * ticket is edited in place, keeping the `.spike.md` and `.plan.md` written against it, and a
+   * closed issue's ticket goes.
+   *
+   * The timestamp is read by the agent out of the repo rather than rendered into the prompt: the
+   * file travels in the same commit as the tickets it describes, so a run whose work never landed
+   * cannot leave behind a stamp claiming those issues were imported.
+   */
+  updateTickets: definePreset({ name: 'update-tickets', template: PRESETS_UPDATE_TICKETS, label: 'Update from GitHub', newSession: true, tooltip: 'Bring `tickets/` up to date with the issues and comments changed since the last import.' }),
 
   /**
    * [Quick wins] (#773): harvest the cheap work out of the plans we already have. Reads the
@@ -176,6 +189,7 @@ export const LAUNCHER_PRESETS: readonly PresetDef[] = [
   presets.quickWins,
   presets.marketResearch,
   presets.importTickets,
+  presets.updateTickets,
   presets.maintenance,
   presets.triageQuick,
   presets.triageConsensual,

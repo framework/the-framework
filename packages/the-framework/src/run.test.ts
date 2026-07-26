@@ -1000,6 +1000,20 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
   }
 })
 
+test('a hand-off run is told the await gates are unavailable, a local one is not (#1234)', async () => {
+  // Our own prompt says "ambiguous prompt: showChoices + AWAIT". A cloud session that obeys it
+  // parks forever on a question nobody attached can answer. The hands-off block amends the
+  // await protocol for exactly these runs, and only these.
+  const systemOf = async (driver: Driver): Promise<string> => {
+    const events: FrameworkEvent[] = []
+    await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', signals: FAKE_SIGNALS, onEvent: e => events.push(e) })
+    const prompt = events.find(e => e.kind === 'system-prompt')
+    return prompt?.kind === 'system-prompt' ? prompt.text : ''
+  }
+  assert.ok((await systemOf(handsOffDriver().driver)).includes('Await gates are not available'))
+  assert.ok(!(await systemOf(new FakeDriver())).includes('Await gates are not available'))
+})
+
 test('a hand-off run does not stay open for messages (#1225)', async () => {
   const { driver } = handsOffDriver()
   // Left open on purpose: a run that still waited on it would never resolve, since the

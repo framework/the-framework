@@ -412,6 +412,9 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     }),
     // Only the daemon runs the sweep, so only it can say what the sweep decided.
     autoPm: () => services?.autoPmReport(),
+    // ...and only it can be asked to sweep now (#1210), through the same wake the
+    // switched-on preference above uses.
+    autoPmSweep: () => services?.wakeAutoPm(),
     ...(token ? { token } : {}),
     ...(clientBundleDir ? { clientBundleDir } : {}),
   })

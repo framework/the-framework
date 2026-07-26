@@ -44,3 +44,5 @@ export {
 } from './interventions.js'
 export { buildActivity, activityKey, pickNewActivity, activityLine, postActivityDiscord, type Activity, type ActivityDeps } from './activity.js'
 export { startKeyedWatcher, SeenTracker, type KeyedWatcher, type KeyedWatcherOptions } from './keyed-watcher.js'
+export { BRIDGE_PREFIX, handleBridgeRequest, type BridgeHandlers, type BridgeQuestion } from './bridge-endpoints.js'
+export { bridgeQuestions, resetBridgeQuestions, BridgeQuestions } from './bridge-store.js'

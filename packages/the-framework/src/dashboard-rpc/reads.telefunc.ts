@@ -20,6 +20,8 @@ import { readFileContent, type FileContent } from '../dashboard/file-read.js'
 import { contextProjects, contextRemote, resolveProjectPath, resolveRunPath } from './context.js'
 import { relayOr } from './relay-run.js'
 import type { FrameworkEvent } from '../events.js'
+import { bridgeQuestions } from '../dashboard/bridge-store.js'
+import type { BridgeQuestion } from '../dashboard/bridge-endpoints.js'
 
 // The read model behind the new dashboard (#405): the run history, a run's replay, the
 // surfaced PLAN/TODO docs, and the committed LOGS.md — each keyed by project id and
@@ -341,4 +343,20 @@ export async function onSystemPromptUser(projectId: string): Promise<string | nu
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return null
   return (await loadUserSystemPrompt(cwd)) ?? null
+}
+
+/**
+ * The question a Claude web session is parked on, as reported by the browser bridge (#1237).
+ *
+ * Keyed by cloud session id rather than run id because that is what the bridge can see: it reads
+ * a claude.ai page, which knows its session and nothing about our runs. The run view already
+ * derives that id from the run's own `cloud <url>` event, so the join happens on the client
+ * without the daemon having to index runs by session.
+ *
+ * Returns null for anything unrecognised, so a run with no bridge, no question, or a target that
+ * is not `web` renders exactly as it did before.
+ */
+export async function onBridgeQuestion(sessionId: string): Promise<BridgeQuestion | null> {
+  if (typeof sessionId !== 'string' || !/^session_[A-Za-z0-9]{1,128}$/.test(sessionId)) return null
+  return bridgeQuestions().get(sessionId) ?? null
 }

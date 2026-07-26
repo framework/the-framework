@@ -27,7 +27,15 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 /** Captured once: `useLoaded` treats a fresh `[]` literal as a new value on every render. */
 const NO_PROJECTS: ProjectSummary[] = []
 
-export function RoutineWork({ onSelectProject }: { onSelectProject: (id: string) => void }) {
+export function RoutineWork({
+  onRunStarted,
+}: {
+  /**
+   * Told which run the button just started (#1191). The project-carrying form, because the
+   * Overview has no project selected — each row picks one — so the shell cannot supply it.
+   */
+  onRunStarted: (projectId: string, intent: string, runId?: string) => void
+}) {
   const projects = useLoaded<ProjectSummary[]>(onProjects, NO_PROJECTS, [])
   const preferences = usePreferences()
   const report = useAutoPm()
@@ -53,9 +61,12 @@ export function RoutineWork({ onSelectProject }: { onSelectProject: (id: string)
     // not resolved here and the run starts on the same defaults a fresh launcher would use.
     const result = await start(projectId, job.prompt, 'prompt', runOptionsFromPreferences(preferences))
     setStarting(null)
-    // Jump into the project that is now working: the Overview has no view of a live run, and the
-    // point of the button is to watch what it started.
-    if (result) onSelectProject(projectId)
+    // Go to the run itself, not merely to its project (#1191): selecting the project renders the
+    // launcher, so the button that says "Run now" landed you on an empty composer and the session
+    // it had just started was nowhere on screen. Handing the id over is what makes it the
+    // selection; with no id yet the shell lands on the project and adopts the running run once the
+    // poll surfaces it, which is the same fallback every other start path uses.
+    if (result) onRunStarted(projectId, job.prompt, result.runId)
   }
 
   return (

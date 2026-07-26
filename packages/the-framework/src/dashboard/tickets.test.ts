@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { readTickets, hasTickets } from './tickets.js'
+import { readTickets, readTicket, hasTickets } from './tickets.js'
 
 async function repo(files: Record<string, string> = {}): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), 'tf-tickets-'))
@@ -110,4 +110,47 @@ test('hasTickets agrees with readTickets: a lone spike or plan is not a ticket (
 
 test('hasTickets ignores non-markdown files, like readTickets (#958)', async () => {
   assert.equal(await hasTickets(await repo({ 'notes.txt': 'nope' })), false)
+})
+
+// readTicket backs the detail page (#1144): the whole file, not just the head readTickets
+// caps at, plus the same metadata a list row shows.
+test('readTicket reads the whole file, metadata included (#1144)', async () => {
+  const body = ['priority: high', '', '# Do the thing', '', '## TLDR', '', 'The thing is not done.', '', 'More below the fold.'].join('\n')
+  const cwd = await repo({ '2026-07-20_do-the-thing.md': body })
+  assert.deepEqual(await readTicket(cwd, '2026-07-20_do-the-thing.md'), {
+    file: '2026-07-20_do-the-thing.md',
+    title: 'Do the thing',
+    summary: 'The thing is not done.',
+    priority: 'high',
+    spiked: false,
+    planned: false,
+    content: body,
+  })
+})
+
+test('readTicket folds in its .spike.md/.plan.md siblings, like readTickets (#1144)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': '# Thing\n',
+    '2026-07-20_thing.spike.md': '# [Spike] Thing\n',
+    '2026-07-20_thing.plan.md': '# [Plan] Thing\n',
+  })
+  const ticket = await readTicket(cwd, '2026-07-20_thing.md')
+  assert.equal(ticket?.spiked, true)
+  assert.equal(ticket?.planned, true)
+})
+
+test('readTicket is null for a missing file (#1144)', async () => {
+  assert.equal(await readTicket(await repo(), 'nope.md'), null)
+})
+
+test('readTicket is null for a sibling file, which is not a ticket of its own (#1144)', async () => {
+  const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n', '2026-07-20_thing.spike.md': '# [Spike] Thing\n' })
+  assert.equal(await readTicket(cwd, '2026-07-20_thing.spike.md'), null)
+})
+
+test('readTicket refuses a path that escapes tickets/ (#1144)', async () => {
+  const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n' })
+  assert.equal(await readTicket(cwd, '../thing.md'), null)
+  assert.equal(await readTicket(cwd, '/etc/passwd.md'), null)
+  assert.equal(await readTicket(cwd, 'sub/thing.md'), null)
 })

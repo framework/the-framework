@@ -6,16 +6,19 @@ import { TicketsPanel } from './TicketsPanel.js'
 /** Stable initial for the tickets poll, so it does not churn on every render. */
 const EMPTY_TICKETS: WorkspaceTicket[] = []
 
-// The tickets page (#1144): the project's `tickets/*.md` as its own full page rather than a tab
+// The tickets list (#1144): the project's `tickets/*.md` as its own full page rather than a tab
 // squeezed into the 27rem right rail — the backlog is what a demo wants read at full width, not
-// through a narrow window. Owns its own poll, the way the rail used to, since nothing else on this
-// page needs the read; the row rendering itself stays in TicketsPanel so the two surfaces agree on
-// what a ticket looks like.
+// through a narrow window. Each row is a one-liner; opening one goes to TicketDetailPage; the
+// project's own poll here since nothing else on this page needs the read. TicketsPanel owns the
+// row rendering so the list agrees with itself on what a ticket looks like.
 export function TicketsPage({
   projectId,
+  onOpenTicket,
   onRunStarted,
 }: {
   projectId: string
+  /** Open one ticket's detail page (#1144), by its file. */
+  onOpenTicket: (file: string) => void
   /** Told when the import session starts, so the shell can show it (#948). */
   onRunStarted?: ((intent: string, runId?: string) => void) | undefined
 }) {
@@ -30,7 +33,7 @@ export function TicketsPage({
         </p>
       </div>
       <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
-        <TicketsPanel projectId={projectId} tickets={tickets} loaded={loaded} onRunStarted={onRunStarted} />
+        <TicketsPanel projectId={projectId} tickets={tickets} loaded={loaded} onOpen={onOpenTicket} onRunStarted={onRunStarted} />
       </div>
     </div>
   )

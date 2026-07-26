@@ -9,6 +9,7 @@ import { ProjectHome } from '../../components/ProjectHome.js'
 import { DashboardPage } from '../../components/DashboardPage.js'
 import { SettingsPage } from '../../components/SettingsPage.js'
 import { TicketsPage } from '../../components/TicketsPage.js'
+import { TicketDetailPage } from '../../components/TicketDetailPage.js'
 import { RunView } from '../../components/RunView.js'
 import { runLabel } from '../../lib/run-label.js'
 import { RightRail } from '../../components/RightRail.js'
@@ -59,7 +60,7 @@ const EMPTY_RECENT: RecentRun[] = []
 // what the remembered-project state (#475) was for.
 export default function Page() {
   const { route, go } = useRoute()
-  const { view, projectId, runId } = route
+  const { view, projectId, runId, ticketSlug } = route
 
   // A just-started run: bump the tick so the Sessions rail shows an optimistic "starting…" row
   // with the typed prompt at once, before the spawned process writes its run.json. `id` is the
@@ -217,7 +218,14 @@ export default function Page() {
   // whichever session was open.
   const showTickets = (id: string) => {
     setAdopting(false)
-    go({ view: 'tickets', projectId: id, runId: null })
+    go({ view: 'tickets', projectId: id, runId: null, ticketSlug: null })
+  }
+
+  // One ticket's own page (#1144), by the same slug as its filename — what a one-liner row opens
+  // into, since Queue and the rest of its detail no longer fit on the list row.
+  const openTicket = (id: string, slug: string) => {
+    setAdopting(false)
+    go({ view: 'tickets', projectId: id, runId: null, ticketSlug: slug })
   }
 
   // The live run feed is owned here so both the main view and the right rail's choice gates
@@ -276,7 +284,13 @@ export default function Page() {
           onAction={showDashboard}
         />
       )
-    if (view === 'tickets') return <TicketsPage projectId={projectId} onRunStarted={onRunStarted} />
+    if (view === 'tickets') {
+      return ticketSlug ? (
+        <TicketDetailPage projectId={projectId} slug={ticketSlug} onBack={() => showTickets(projectId)} />
+      ) : (
+        <TicketsPage projectId={projectId} onOpenTicket={slug => openTicket(projectId, slug)} onRunStarted={onRunStarted} />
+      )
+    }
     if (runId === null) {
       // Just pressed Start on a project with no worktree: follow the live output until the poll
       // surfaces the run and the effect above adopts its id.

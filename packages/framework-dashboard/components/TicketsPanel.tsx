@@ -1,14 +1,11 @@
-import { useState } from 'react'
 import type { WorkspaceTicket } from '@gemstack/the-framework'
 import { presets } from '@gemstack/the-framework/client'
-import { ListPlus, Check } from 'lucide-react'
-import { sendQueueTicket, sendStart } from '../server/control.telefunc.js'
+import { sendStart } from '../server/control.telefunc.js'
 import { Button } from './ui/button.js'
 import { Badge } from './ui/badge.js'
 import { useAction } from '../lib/use-action.js'
 import { cn } from '../lib/utils.js'
 import { ScrollArea } from './ui/scroll-area.js'
-import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 /**
  * The prompt behind "Import tickets from GitHub" (#697), read from the preset rather than written
@@ -21,53 +18,38 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
  */
 const IMPORT_PROMPT = presets.importTickets.render()
 
-/** How a priority reads, for the ones the format names. */
+/** How a priority reads, as the one-liner's dot (#1144) — a full badge has no room on a single line. */
 const PRIORITY_TONE: Record<string, string> = {
-  urgent: 'text-danger',
-  high: 'text-warning',
-  medium: 'text-muted-foreground',
-  low: 'text-muted-foreground',
+  urgent: 'bg-danger',
+  high: 'bg-warning',
+  medium: 'bg-muted-foreground',
+  low: 'bg-muted-foreground',
 }
 
-// The tickets view (#697): the project's `tickets/*.md`, so the backlog the agent plans from
-// is readable without opening the repo. Each row can be put on the agent queue, and an empty
-// `tickets/` offers to import the repo's GitHub issues instead of just saying "nothing here".
+// The tickets list (#697/#1144): the project's `tickets/*.md` as one-liners, so the whole backlog
+// is scannable at a glance; a row's only action is opening its detail page (#1144), which is where
+// Queue, the summary, and the rest of the metadata live now. An empty `tickets/` offers to import
+// the repo's GitHub issues instead of just saying "nothing here".
 export function TicketsPanel({
   projectId,
   tickets,
   loaded,
+  onOpen,
   onRunStarted,
 }: {
   projectId: string | null
-  /** Read in the rail (#1146), which needs the count to decide whether to offer the tab. */
   tickets: WorkspaceTicket[]
   loaded: boolean
+  /** Open one ticket's detail page (#1144), by its file — the same slug the route uses. */
+  onOpen: (file: string) => void
   /** Told when the import session starts, so the shell can show it (#948) — the button used
    *  to flip "Starting…" and leave you staring at the still-empty panel. */
   onRunStarted?: ((intent: string, runId?: string) => void) | undefined
 }) {
-  // Which tickets this session has queued. The queue is a file, not a field on the ticket, so
-  // there is nothing on the ticket to re-read; remembering the click is what stops a row
-  // reading as un-queued the moment the poll returns.
-  const [queued, setQueued] = useState<Set<string>>(new Set())
   const { busy, error, run } = useAction()
 
   if (!projectId) return null
   if (!loaded) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>
-
-  const queue = async (ticket: WorkspaceTicket) => {
-    // The ticket travels with the entry (#1164): it decides which priority section the entry
-    // lands in, and it is what the queued line links back to.
-    const result = await run(
-      () =>
-        sendQueueTicket(projectId, ticket.title, {
-          file: ticket.file,
-          ...(ticket.priority ? { priority: ticket.priority } : {}),
-        }),
-      'The ticket could not be queued.',
-    )
-    if (result?.ok) setQueued(prev => new Set(prev).add(ticket.file))
-  }
 
   const importFromGithub = async () => {
     const result = await run(() => sendStart(projectId, IMPORT_PROMPT, 'prompt'), 'The import could not be started.')
@@ -95,55 +77,29 @@ export function TicketsPanel({
     <div className="flex min-h-0 flex-auto flex-col">
       {error && <p className="border-b border-border p-2 text-xs text-danger">{error}</p>}
       <ScrollArea className="min-h-0 flex-auto">
-        <div className="p-2">
-        {tickets.map(ticket => (
-          <div key={ticket.file} className="mb-1 rounded border border-border p-2">
-            <div className="flex items-start gap-2">
-              <span className="min-w-0 flex-1 text-sm font-medium">{ticket.title}</span>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 shrink-0 gap-1 px-1.5 text-xs"
-                      disabled={busy || queued.has(ticket.file)}
-                      onClick={() => void queue(ticket)}
-                    />
-                  }
-                >
-                  {queued.has(ticket.file) ? (
-                    <>
-                      <Check className="h-3.5 w-3.5" /> Queued
-                    </>
-                  ) : (
-                    <>
-                      <ListPlus className="h-3.5 w-3.5" /> Queue
-                    </>
-                  )}
-                </TooltipTrigger>
-                <TooltipContent>
-                  {queued.has(ticket.file)
-                    ? 'Already added to the queue'
-                    : 'Add to Queue (TODO_AGENTS.md), for the next session to work on'}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            {ticket.summary && <p className="mt-0.5 text-xs text-muted-foreground">{ticket.summary}</p>}
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              {ticket.priority && (
-                <Badge className={cn('border-transparent px-0 text-[10px] uppercase', PRIORITY_TONE[ticket.priority])}>
-                  {ticket.priority}
-                </Badge>
-              )}
-              {/* What the agent has already done to this ticket, so it is clear what is left. */}
-              {ticket.spiked && <Badge className="border-transparent px-0 text-[10px] uppercase">spiked</Badge>}
-              {ticket.planned && <Badge className="border-transparent px-0 text-[10px] uppercase">planned</Badge>}
-              <span className="truncate text-[10px] text-muted-foreground/70">{ticket.file}</span>
-            </div>
-          </div>
-        ))}
-        </div>
+        <ul className="divide-y divide-border">
+          {tickets.map(ticket => (
+            <li key={ticket.file}>
+              <button
+                type="button"
+                onClick={() => onOpen(ticket.file)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-accent/60"
+              >
+                {ticket.priority && (
+                  <span
+                    aria-hidden
+                    title={ticket.priority}
+                    className={cn('h-1.5 w-1.5 shrink-0 rounded-full', PRIORITY_TONE[ticket.priority])}
+                  />
+                )}
+                <span className="min-w-0 flex-1 truncate font-medium">{ticket.title}</span>
+                {/* What the agent has already done to this ticket, so it is clear what is left. */}
+                {ticket.spiked && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">spiked</Badge>}
+                {ticket.planned && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">planned</Badge>}
+              </button>
+            </li>
+          ))}
+        </ul>
       </ScrollArea>
     </div>
   )

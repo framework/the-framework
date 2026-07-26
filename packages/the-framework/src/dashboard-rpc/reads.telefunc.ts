@@ -3,7 +3,7 @@ import { loadUserSystemPrompt } from '../system-prompt-file.js'
 import { listProjectWorktrees } from '../worktrees.js'
 import { readLogs, type LogEntry } from '../logs.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
-import { readTickets, type WorkspaceTicket } from '../dashboard/tickets.js'
+import { readTickets, readTicket, type WorkspaceTicket, type WorkspaceTicketDetail } from '../dashboard/tickets.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
 import { buildOverview, buildRecentRuns, buildHotTickets, type Overview, type RecentRun, type HotTicket } from '../dashboard/overview.js'
 import { buildInterventions, type Intervention } from '../dashboard/interventions.js'
@@ -160,6 +160,11 @@ export async function onDocs(projectId: string): Promise<WorkspaceDoc[]> {
 /** The project's `tickets/*.md`, by filename (#697). `[]` when the repo has no `tickets/` yet. */
 export async function onTickets(projectId: string): Promise<WorkspaceTicket[]> {
   return withProject(projectId, readTickets, [])
+}
+
+/** One ticket's full text, for its own detail page (#1144). Null when it does not exist. */
+export async function onTicket(projectId: string, file: string): Promise<WorkspaceTicketDetail | null> {
+  return withProject(projectId, cwd => readTicket(cwd, file), null)
 }
 
 /** The committed `.the-framework/LOGS.md` entries, newest-first (or `[]`). */

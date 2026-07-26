@@ -34,23 +34,29 @@ export interface Route {
   projectId: string | null
   /** The selected session (run id), or null for the project's home/launcher. */
   runId: string | null
+  /** The ticket open on the tickets page (#1144), by filename — the same slug as `WorkspaceTicket.file`.
+   *  Only meaningful when `view` is `'tickets'`; null there means the list rather than one ticket. */
+  ticketSlug?: string | null
 }
 
 /** Read the route out of a path. Anything unparseable is the Overview, and extra segments are ignored. */
 export function parseRoute(pathname: string): Route {
-  const [projectId, second] = pathname.split('/').filter(Boolean).map(decodeSegment)
+  const [projectId, second, third] = pathname.split('/').filter(Boolean).map(decodeSegment)
   if (projectId === SETTINGS_SEGMENT) return { view: 'settings', projectId: null, runId: null }
   if (!projectId) return { projectId: null, runId: null }
-  if (second === TICKETS_SEGMENT) return { view: 'tickets', projectId, runId: null }
+  if (second === TICKETS_SEGMENT) return { view: 'tickets', projectId, runId: null, ticketSlug: third ?? null }
   return { projectId, runId: second ?? null }
 }
 
 /** The path for a route — the inverse of {@link parseRoute}. */
-export function formatRoute({ view, projectId, runId }: Route): string {
+export function formatRoute({ view, projectId, runId, ticketSlug }: Route): string {
   if (view === 'settings') return `/${SETTINGS_SEGMENT}`
   if (!projectId) return '/'
   const project = encodeURIComponent(projectId)
-  if (view === 'tickets') return `/${project}/${TICKETS_SEGMENT}`
+  if (view === 'tickets') {
+    const base = `/${project}/${TICKETS_SEGMENT}`
+    return ticketSlug ? `${base}/${encodeURIComponent(ticketSlug)}` : base
+  }
   return runId ? `/${project}/${encodeURIComponent(runId)}` : `/${project}`
 }
 

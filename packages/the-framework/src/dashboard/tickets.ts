@@ -115,3 +115,42 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
   }
   return tickets
 }
+
+/** One ticket, with its entire markdown rather than just the head (#1144's detail page). */
+export interface WorkspaceTicketDetail extends WorkspaceTicket {
+  /** The ticket's full text, unlike {@link readTickets}' head-only read. */
+  content: string
+}
+
+/**
+ * A bare filename inside `tickets/`: no path segments (so it cannot address another directory)
+ * and not one of a ticket's own siblings (a `.plan.md`/`.spike.md` is written about a ticket,
+ * not one itself, same as {@link readTickets}).
+ */
+function isTicketFile(file: string): boolean {
+  return /^[^/\\]+\.md$/.test(file) && !SIBLING.test(file)
+}
+
+/**
+ * One ticket by filename, full text included, for its own page (#1144) rather than the list's
+ * head-only row. Null when `file` is not a bare `.md` name, is a sibling rather than a ticket,
+ * or does not exist.
+ */
+export async function readTicket(cwd: string, file: string): Promise<WorkspaceTicketDetail | null> {
+  if (!isTicketFile(file)) return null
+  const dir = join(cwd, TICKETS_DIR)
+  const content = await readFile(join(dir, file), 'utf8').catch(() => undefined)
+  if (content === undefined) return null
+  const stem = file.replace(/\.md$/, '')
+  const names = await readdir(dir).catch(() => [] as string[])
+  const { title, summary, priority } = describe(content)
+  return {
+    file,
+    title: title ?? titleFromFile(file),
+    summary,
+    ...(priority ? { priority } : {}),
+    spiked: names.includes(`${stem}.spike.md`),
+    planned: names.includes(`${stem}.plan.md`),
+    content,
+  }
+}

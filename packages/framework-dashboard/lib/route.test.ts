@@ -43,15 +43,31 @@ describe('parseRoute', () => {
   })
 
   it('reads a project\'s tickets page, as its own view rather than a session (#1144)', () => {
-    expect(parseRoute('/my-repo-a1b2/tickets')).toEqual({ view: 'tickets', projectId: 'my-repo-a1b2', runId: null })
-    // Trailing slash and stray segments are the same page, like every other route.
-    expect(parseRoute('/my-repo-a1b2/tickets/')).toEqual({ view: 'tickets', projectId: 'my-repo-a1b2', runId: null })
+    expect(parseRoute('/my-repo-a1b2/tickets')).toEqual({ view: 'tickets', projectId: 'my-repo-a1b2', runId: null, ticketSlug: null })
+    // Trailing slash is the same page, like every other route.
+    expect(parseRoute('/my-repo-a1b2/tickets/')).toEqual({ view: 'tickets', projectId: 'my-repo-a1b2', runId: null, ticketSlug: null })
   })
 
   it('leaves every other second segment a session, so only the reserved word is taken (#1144)', () => {
     // A run id is derived from its start time, so it can never be the bare reserved word — but
     // anything merely starting with it still has to route to a session.
     expect(parseRoute('/my-repo/tickets-ab')).toEqual({ projectId: 'my-repo', runId: 'tickets-ab' })
+  })
+
+  it('reads one ticket\'s detail page, by the same slug as its filename (#1144)', () => {
+    expect(parseRoute('/my-repo-a1b2/tickets/2026-07-20_do-the-thing.md')).toEqual({
+      view: 'tickets',
+      projectId: 'my-repo-a1b2',
+      runId: null,
+      ticketSlug: '2026-07-20_do-the-thing.md',
+    })
+    // A stray segment past the slug is ignored, like every other route.
+    expect(parseRoute('/my-repo-a1b2/tickets/2026-07-20_do-the-thing.md/whatever')).toEqual({
+      view: 'tickets',
+      projectId: 'my-repo-a1b2',
+      runId: null,
+      ticketSlug: '2026-07-20_do-the-thing.md',
+    })
   })
 })
 
@@ -80,6 +96,13 @@ describe('formatRoute', () => {
     expect(formatRoute({ view: 'tickets', projectId: 'my-repo', runId: 'run-1' })).toBe('/my-repo/tickets')
   })
 
+  it('writes one ticket\'s detail page, slug encoded (#1144)', () => {
+    expect(formatRoute({ view: 'tickets', projectId: 'my-repo', runId: null, ticketSlug: '2026-07-20_do-the-thing.md' })).toBe(
+      '/my-repo/tickets/2026-07-20_do-the-thing.md',
+    )
+    expect(formatRoute({ view: 'tickets', projectId: 'my-repo', runId: null, ticketSlug: 'a b.md' })).toBe('/my-repo/tickets/a%20b.md')
+  })
+
   it('round-trips', () => {
     for (const route of [
       { projectId: null, runId: null },
@@ -87,7 +110,8 @@ describe('formatRoute', () => {
       { projectId: 'my-repo', runId: 'run-1' },
       { projectId: 'a b', runId: 'c/d' },
       { view: 'settings' as const, projectId: null, runId: null },
-      { view: 'tickets' as const, projectId: 'my-repo', runId: null },
+      { view: 'tickets' as const, projectId: 'my-repo', runId: null, ticketSlug: null },
+      { view: 'tickets' as const, projectId: 'my-repo', runId: null, ticketSlug: '2026-07-20_thing.md' },
     ]) {
       expect(parseRoute(formatRoute(route))).toEqual(route)
     }

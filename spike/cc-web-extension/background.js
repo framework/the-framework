@@ -15,6 +15,13 @@ const DEFAULT_DAEMON = 'http://localhost:4200'
 const lastSent = new Map()
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  // Run the sweep on demand, so the options page can prove it works without waiting on an alarm.
+  if (message?.type === 'tf-open-now') {
+    void openWatchedTabs()
+      .then(sendResponse)
+      .catch(err => sendResponse({ ok: false, reason: String(err?.message ?? err) }))
+    return true
+  }
   if (message?.type !== 'tf-question') return false
   void report(message.question)
     .then(sendResponse)
@@ -63,22 +70,33 @@ async function dismissed() {
   return new Set(dismissedSessions ?? [])
 }
 
+/**
+ * Record what the last attempt did, so the options page can show it.
+ *
+ * Every early return below used to be silent, which is how "tabs are not opening" became
+ * unanswerable without reading a service worker console. Each one now says which it was.
+ */
+async function note(state) {
+  await chrome.storage.local.set({ lastOpen: { ...state, at: new Date().toISOString() } })
+  return state
+}
+
 async function openWatchedTabs() {
   const { daemonUrl, token, autoOpen } = await chrome.storage.local.get(['daemonUrl', 'token', 'autoOpen'])
+  if (!token) return note({ ok: false, reason: 'no token set' })
   // Opt-in: opening tabs on someone's behalf should be asked for, not assumed.
-  if (!token || autoOpen === false) return
+  if (autoOpen === false) return note({ ok: false, reason: 'tab opening is switched off' })
   const base = (daemonUrl || DEFAULT_DAEMON).replace(/\/+$/, '')
 
   let sessions
   try {
     const res = await fetch(`${base}/_bridge/sessions`, { headers: { authorization: `Bearer ${token}` } })
-    if (!res.ok) return
+    if (!res.ok) return note({ ok: false, reason: `daemon answered ${res.status} listing sessions` })
     sessions = (await res.json())?.sessions
-  } catch {
-    // The dashboard is not running. Nothing to do, and nothing worth reporting.
-    return
+  } catch (err) {
+    return note({ ok: false, reason: `could not reach ${base}: ${String(err?.message ?? err)}` })
   }
-  if (!Array.isArray(sessions) || !sessions.length) return
+  if (!Array.isArray(sessions) || !sessions.length) return note({ ok: true, opened: 0, reason: 'no recent cloud sessions' })
 
   const skip = await dismissed()
   // One tab per session: match on the session id in the URL rather than the whole string, since
@@ -86,11 +104,26 @@ async function openWatchedTabs() {
   const open = await chrome.tabs.query({ url: 'https://claude.ai/code/*' })
   const already = new Set(open.map(t => /\/code\/(session_[A-Za-z0-9]+)/.exec(t.url ?? '')?.[1]).filter(Boolean))
 
+  let opened = 0
+  const skipped = []
   for (const session of sessions) {
     if (!session?.id || !session?.url) continue
-    if (already.has(session.id) || skip.has(session.id)) continue
-    await chrome.tabs.create({ url: session.url, active: false, pinned: true })
+    if (already.has(session.id)) {
+      skipped.push('already open')
+      continue
+    }
+    if (skip.has(session.id)) {
+      skipped.push('you closed it')
+      continue
+    }
+    try {
+      await chrome.tabs.create({ url: session.url, active: false, pinned: true })
+      opened++
+    } catch (err) {
+      return note({ ok: false, reason: `chrome.tabs.create failed: ${String(err?.message ?? err)}` })
+    }
   }
+  return note({ ok: true, opened, of: sessions.length, ...(skipped.length ? { skipped: skipped.join(', ') } : {}) })
 }
 
 // Remember a closed tab so the next poll does not reopen it.

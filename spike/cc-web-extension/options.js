@@ -56,3 +56,17 @@ document.getElementById('save').addEventListener('click', async () => {
     say(`Could not reach ${daemonUrl}. Is the dashboard running?`, true)
   }
 })
+
+
+// Run the tab sweep on demand. The alarm fires once a minute, which is a long time to sit
+// wondering whether anything is wrong, and every reason it might do nothing is now reported.
+document.getElementById('openNow').addEventListener('click', () => {
+  say('Opening…')
+  chrome.runtime.sendMessage({ type: 'tf-open-now' }, result => {
+    if (chrome.runtime.lastError) return say(chrome.runtime.lastError.message ?? 'the worker did not answer', true)
+    if (!result) return say('The worker did not answer. Try reloading the extension.', true)
+    if (!result.ok) return say(`Did nothing: ${result.reason}`, true)
+    if (!result.opened) return say(`Nothing to open${result.reason ? `: ${result.reason}` : ''}${result.skipped ? ` (${result.skipped})` : ''}.`)
+    say(`Opened ${result.opened} of ${result.of} session tabs${result.skipped ? ` (${result.skipped})` : ''}.`)
+  })
+})

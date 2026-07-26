@@ -64,6 +64,9 @@ function reportToDaemon(parsed) {
 /** What we last sent per position, so an unchanged message is not re-posted on every mutation. */
 const sentEvents = new Map()
 
+/** What happened to the last transcript report, for the panel. */
+let transcriptStatus = 'not sent yet'
+
 /**
  * The transcript, as message blocks (#1237).
  *
@@ -93,13 +96,29 @@ function transcript() {
 function reportTranscript() {
   const sessionId = sessionIdFromUrl()
   if (!sessionId || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
-  const events = transcript().filter(event => sentEvents.get(event.seq) !== event.text)
-  if (!events.length) return
+  const blocks = transcript()
+  const events = blocks.filter(event => sentEvents.get(event.seq) !== event.text)
+  if (!blocks.length) {
+    transcriptStatus = 'no <article> blocks found'
+    return
+  }
+  if (!events.length) {
+    transcriptStatus = `${blocks.length} block(s), unchanged`
+    return
+  }
   try {
     chrome.runtime.sendMessage({ type: 'tf-events', sessionId, events }, reply => {
-      if (chrome.runtime.lastError) return
+      if (chrome.runtime.lastError) {
+        transcriptStatus = chrome.runtime.lastError.message ?? 'worker unreachable'
+        return
+      }
       // Only remember what the daemon actually took, so a rejected batch is retried.
-      if (reply?.ok) for (const event of events) sentEvents.set(event.seq, event.text)
+      if (reply?.ok) {
+        for (const event of events) sentEvents.set(event.seq, event.text)
+        transcriptStatus = `sent ${events.length} of ${blocks.length} block(s)`
+      } else {
+        transcriptStatus = reply?.error ?? 'failed'
+      }
     })
   } catch {
     // Worker asleep or context invalidated; the next mutation retries.
@@ -361,6 +380,10 @@ if (!IS_TOP) {
       ['options', winner.choiceOptions?.length ? winner.choiceOptions.join(' | ') : '-'],
       ['composer', top.composerFound ? top.composerVia : 'not found'],
       ['bridge', bridgeStatus],
+      // Always shown: the transcript is the half that runs even when no question was asked, so
+      // it needs its own line rather than sharing the question's.
+      ['transcript', transcriptStatus],
+      ['articles', deepQueryAll('article').length],
     ]
     if (!winner.choiceFound) {
       rows.push(

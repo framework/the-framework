@@ -2,13 +2,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { AgentView } from '../lib/live-state.js'
 
-// The rail reads the three content panels itself now (#1146), so it can tell an empty one from a
-// full one. Stub the reads: the default project has docs, tickets and a log, so every tab is
-// earned and the tests below are about what the rail does with them.
+// The rail reads its content panels itself now (#1146), so it can tell an empty one from a full
+// one. Stub the reads: the default project has docs and a log, so every tab is earned and the
+// tests below are about what the rail does with them. Tickets moved to its own page (#1144) and
+// is no longer one of the rail's reads.
 const onDocs = vi.hoisted(() => vi.fn())
-const onTickets = vi.hoisted(() => vi.fn())
 const onProjectLog = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onDocs, onTickets, onProjectLog }))
+vi.mock('../server/reads.telefunc.js', () => ({ onDocs, onProjectLog }))
 
 // The panels themselves are rendered elsewhere; here they are stand-ins.
 vi.mock('./DocsPanel.js', () => ({ DocsPanel: () => <div>docs</div> }))
@@ -16,13 +16,11 @@ vi.mock('./ProjectLogPanel.js', () => ({ ProjectLogPanel: () => <div>log</div> }
 vi.mock('./FileTree.js', () => ({ FileTree: () => <div>files</div> }))
 vi.mock('./BrowserPanel.js', () => ({ BrowserPanel: () => <div>browser</div> }))
 vi.mock('./ChoicesRail.js', () => ({ ChoicesRail: () => <div>choices</div> }))
-vi.mock('./TicketsPanel.js', () => ({ TicketsPanel: () => <div>tickets</div> }))
 
 const { RightRail } = await import('./RightRail.js')
 
 beforeEach(() => {
   onDocs.mockReset().mockResolvedValue([{ name: 'PLAN.md', content: '# plan' }])
-  onTickets.mockReset().mockResolvedValue([{ file: 't.md', title: 'A ticket', summary: '', spiked: false, planned: false }])
   onProjectLog.mockReset().mockResolvedValue([{ kind: 'prompt', status: 'done', at: '2026-07-25T00:00:00.000Z', intent: 'x' }])
 })
 
@@ -120,14 +118,12 @@ describe('RightRail empty panels (#1146)', () => {
     render(<RightRail {...baseProps} />)
     await settle()
     expect(screen.queryByRole('tab', { name: /docs/i })).toBeNull()
-    // The panels that do have something are untouched.
-    expect(screen.getByRole('tab', { name: /tickets/i })).toBeTruthy()
+    // The panel that does have something is untouched.
     expect(screen.getByRole('tab', { name: /log/i })).toBeTruthy()
   })
 
   test('nothing anywhere means no rail at all', async () => {
     onDocs.mockResolvedValue([])
-    onTickets.mockResolvedValue([])
     onProjectLog.mockResolvedValue([])
     const { container } = render(<RightRail {...baseProps} />)
     await settle()
@@ -136,7 +132,6 @@ describe('RightRail empty panels (#1146)', () => {
 
   test('a live surface keeps the rail even when every read comes back empty', async () => {
     onDocs.mockResolvedValue([])
-    onTickets.mockResolvedValue([])
     onProjectLog.mockResolvedValue([])
     const { container } = render(<RightRail {...baseProps} views={[view]} />)
     await settle()
@@ -146,7 +141,6 @@ describe('RightRail empty panels (#1146)', () => {
 
   test('the tabs hold while the first read is still out, so switching projects does not blink', () => {
     onDocs.mockReturnValue(new Promise(() => {}))
-    onTickets.mockReturnValue(new Promise(() => {}))
     onProjectLog.mockReturnValue(new Promise(() => {}))
     render(<RightRail {...baseProps} />)
     // Not yet known to be empty is not the same as known to be empty.
@@ -164,6 +158,6 @@ describe('RightRail empty panels (#1146)', () => {
     await settle()
     expect(screen.queryByRole('tab', { name: /views/i })).toBeNull()
     // Not an empty panel: the rail falls back to the first tab that still has content.
-    expect(screen.getByRole('tab', { name: /tickets/i }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: /docs/i }).getAttribute('aria-selected')).toBe('true')
   })
 })

@@ -17,10 +17,19 @@
  */
 export const SETTINGS_SEGMENT = 'settings'
 
+/**
+ * The one second segment that names a view rather than a session (#1144): the project's tickets
+ * as their own page, not a tab in the right rail.
+ *
+ * Safe to reserve for the same reason as {@link SETTINGS_SEGMENT}: a run id is derived from its
+ * start time (`runIdFromStartedAt`), so it is never this bare word.
+ */
+export const TICKETS_SEGMENT = 'tickets'
+
 /** What the dashboard is looking at, as carried by the URL. */
 export interface Route {
-  /** A top-level view belonging to no project (#958). Absent on the Overview/project/session axis. */
-  view?: 'settings'
+  /** A top-level view belonging to no project (#958), or the project's tickets page (#1144). */
+  view?: 'settings' | 'tickets'
   /** The selected project, or null for the Overview. */
   projectId: string | null
   /** The selected session (run id), or null for the project's home/launcher. */
@@ -29,10 +38,11 @@ export interface Route {
 
 /** Read the route out of a path. Anything unparseable is the Overview, and extra segments are ignored. */
 export function parseRoute(pathname: string): Route {
-  const [projectId, runId] = pathname.split('/').filter(Boolean).map(decodeSegment)
+  const [projectId, second] = pathname.split('/').filter(Boolean).map(decodeSegment)
   if (projectId === SETTINGS_SEGMENT) return { view: 'settings', projectId: null, runId: null }
   if (!projectId) return { projectId: null, runId: null }
-  return { projectId, runId: runId ?? null }
+  if (second === TICKETS_SEGMENT) return { view: 'tickets', projectId, runId: null }
+  return { projectId, runId: second ?? null }
 }
 
 /** The path for a route — the inverse of {@link parseRoute}. */
@@ -40,6 +50,7 @@ export function formatRoute({ view, projectId, runId }: Route): string {
   if (view === 'settings') return `/${SETTINGS_SEGMENT}`
   if (!projectId) return '/'
   const project = encodeURIComponent(projectId)
+  if (view === 'tickets') return `/${project}/${TICKETS_SEGMENT}`
   return runId ? `/${project}/${encodeURIComponent(runId)}` : `/${project}`
 }
 

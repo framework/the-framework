@@ -8,6 +8,7 @@ import { SidebarProvider } from '../../components/ui/sidebar.js'
 import { ProjectHome } from '../../components/ProjectHome.js'
 import { DashboardPage } from '../../components/DashboardPage.js'
 import { SettingsPage } from '../../components/SettingsPage.js'
+import { TicketsPage } from '../../components/TicketsPage.js'
 import { RunView } from '../../components/RunView.js'
 import { runLabel } from '../../lib/run-label.js'
 import { RightRail } from '../../components/RightRail.js'
@@ -211,6 +212,14 @@ export default function Page() {
     go({ view: 'settings', projectId: null, runId: null })
   }
 
+  // A project's tickets, as their own page (#1144): required reading for a demo, so it gets the
+  // full width rather than the 27rem right rail. Leaves the run selection alone — Back returns to
+  // whichever session was open.
+  const showTickets = (id: string) => {
+    setAdopting(false)
+    go({ view: 'tickets', projectId: id, runId: null })
+  }
+
   // The live run feed is owned here so both the main view and the right rail's choice gates
   // (#440) read one shared Telefunc Channel. Hooks run before the relay early return below.
   // The run whose feed and controls are in play is simply the one in the URL; in the no-id
@@ -267,6 +276,7 @@ export default function Page() {
           onAction={showDashboard}
         />
       )
+    if (view === 'tickets') return <TicketsPage projectId={projectId} onRunStarted={onRunStarted} />
     if (runId === null) {
       // Just pressed Start on a project with no worktree: follow the live output until the poll
       // surfaces the run and the effect above adopts its id.
@@ -368,22 +378,27 @@ export default function Page() {
           onDashboard={showDashboard}
           onSelectProject={selectProject}
           onSettings={showSettings}
+          onTickets={showTickets}
+          ticketsActive={view === 'tickets'}
           interventionCount={interventions.length}
         />
         <main className="flex min-w-0 flex-1 flex-col">{renderMain()}</main>
-        <RightRail
-          projectId={projectId}
-          runId={runId}
-          choices={choices}
-          views={views}
-          files={files}
-          context={context}
-          toggleContext={toggleContext}
-          hasBrowser={selectedRun?.status === 'running' && selectedRun.browserStreamPort !== undefined}
-          target={selectedRun?.target}
-          loop={loop}
-          onRunStarted={onRunStarted}
-        />
+        {/* The tickets page takes the full width itself (#1144): no rail beside it, the way
+            Settings takes the whole main pane with none either. */}
+        {view !== 'tickets' && (
+          <RightRail
+            projectId={projectId}
+            runId={runId}
+            choices={choices}
+            views={views}
+            files={files}
+            context={context}
+            toggleContext={toggleContext}
+            hasBrowser={selectedRun?.status === 'running' && selectedRun.browserStreamPort !== undefined}
+            target={selectedRun?.target}
+            loop={loop}
+          />
+        )}
       </div>
     </SidebarProvider>
   )

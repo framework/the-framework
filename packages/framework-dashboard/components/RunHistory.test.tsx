@@ -186,3 +186,28 @@ describe('RunHistory New button (#new-button)', () => {
     expect(screen.getByLabelText('New session').getAttribute('aria-haspopup')).toBeTruthy()
   })
 })
+
+// Tickets: a project's backlog as its own page (#1144), reached from the rail rather than a tab
+// in the right sidebar.
+describe('RunHistory tickets nav (#1144)', () => {
+  test('offered once a project is selected, and opens that project\'s tickets', () => {
+    let opened: string | undefined
+    renderRail(
+      <RunHistory projectId="p1" runs={[]} selectedRunId={null} onSelect={() => {}} onTickets={id => (opened = id)} />,
+    )
+    fireEvent.click(screen.getByText('Tickets'))
+    expect(opened).toBe('p1')
+  })
+
+  test('not offered on the Overview, with no project selected', () => {
+    renderRail(<RunHistory projectId={null} runs={[]} selectedRunId={null} onSelect={() => {}} onTickets={() => {}} />)
+    expect(screen.queryByText('Tickets')).toBeNull()
+  })
+
+  test('carries the active fill while it is the current view', () => {
+    renderRail(
+      <RunHistory projectId="p1" runs={[]} selectedRunId={null} onSelect={() => {}} onTickets={() => {}} ticketsActive />,
+    )
+    expect(screen.getByText('Tickets').closest('button')?.getAttribute('aria-current')).toBe('page')
+  })
+})

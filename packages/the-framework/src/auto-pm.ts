@@ -272,6 +272,12 @@ export interface AutoPmDeps {
   projects(): Promise<readonly AutoPmProject[]>
   /** The `autoPm` preference, re-read per tick so the toggle takes effect without a restart. */
   enabled(): Promise<boolean>
+  /**
+   * The routines the user has switched off, by {@link AutoPmJob.name} (#1209). Re-read per tick
+   * for the same reason {@link AutoPmDeps.enabled} is, and an unreadable answer means none:
+   * a preference that cannot be read must not silently switch the whole rotation off.
+   */
+  optedOut?(): Promise<readonly string[]>
   /** Whether a project's agent queue has run dry. */
   backlogEmpty(project: AutoPmProject): Promise<boolean>
   /** How many runs are live on a project. */
@@ -401,6 +407,14 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
       if (!enabled) return
       const projects = await deps.projects().catch(() => [])
       if (!projects.length) return
+      // Read beside the master switch and for the same reason (#1209): it is the same preference
+      // file, and a routine switched off mid-sweep should not fire for the projects still to come.
+      const optedOut = new Set(await deps.optedOut?.().catch(() => []) ?? [])
+      const wanted = (job: AutoPmJob | undefined) => (job && !optedOut.has(job.name) ? job : undefined)
+      // The rotation, minus what is switched off. Filtered rather than skipped at the index, so
+      // the cycle stays a cycle: with two of four off, the remaining two alternate instead of
+      // every other tick landing on a job that cannot run.
+      const rotation = deps.jobs.filter(job => !optedOut.has(job.name))
       // One reading for the whole sweep: it is an account-wide meter, and re-reading it per
       // project would spend a rate-limited call to learn the same number.
       const quota = await deps.quota().catch(() => undefined)
@@ -441,18 +455,36 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           note(project, false, decision.reason)
           continue
         }
+        // Switching the draining routine off (#1209) stands the sweep down rather than falling
+        // through to the rotation: the queue has work waiting, and answering "do not work it
+        // automatically" by inventing more work is the opposite of what was asked.
+        const drainJob = wanted(deps.drainJob ?? AUTO_PM_DRAIN_JOB)
+        if (decision.mode === 'drain' && !drainJob) {
+          note(project, false, 'the queue has work waiting and its routine is switched off')
+          continue
+        }
         const index = nextJob.get(project.id) ?? 0
         // A due codebase sweep (#882) outranks the rotation: the rotation invents work, and the
         // sweep is a standing instruction to go find some. Only ever while the queue is empty --
         // a repo with entries waiting has plenty to do, and the sweep would only add more.
-        const sweep = decision.mode === 'pm' && (await deps.maintenanceDue?.(project).catch(() => false)) === true
-        const job = sweep
-          ? (deps.maintenanceJob ?? AUTO_PM_MAINTENANCE_JOB)
-          : decision.mode === 'drain'
-            ? (deps.drainJob ?? AUTO_PM_DRAIN_JOB)
-            : deps.jobs[index % deps.jobs.length]
+        //
+        // Asked before the schedule is read, so a switched-off sweep costs no disk read and,
+        // more importantly, leaves its calendar untouched: it must come due normally once it is
+        // switched back on, rather than having been silently ticked past while it was off.
+        const maintenanceJob = wanted(deps.maintenanceJob ?? AUTO_PM_MAINTENANCE_JOB)
+        const sweep =
+          decision.mode === 'pm' &&
+          maintenanceJob !== undefined &&
+          (await deps.maintenanceDue?.(project).catch(() => false)) === true
+        const job = sweep ? maintenanceJob : decision.mode === 'drain' ? drainJob : rotation[index % rotation.length]
         if (!job) {
-          note(project, false, 'there is no job to run')
+          // Told apart on purpose: a rotation emptied by the checkboxes is a setting the user can
+          // see and undo, and reads nothing like a daemon wired without jobs at all.
+          note(
+            project,
+            false,
+            deps.jobs.length ? 'every routine that makes new work is switched off' : 'there is no job to run',
+          )
           continue
         }
         // Re-checked here because everything above is awaited: a run spawned past a `stop()` is

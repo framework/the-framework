@@ -131,6 +131,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     projects,
     jobs: AUTO_PM_JOBS,
     enabled: async () => (await prefs()).autoPm === true,
+    // Which routines the user unticked (#1209). Global rather than per project, like the master
+    // switch it sits under: the rotation is one schedule for the machine, not one per repo.
+    optedOut: async () => (await prefs()).autoPmOptOut ?? [],
     backlogEmpty: async project => (await findTodoBacklog(project.path)) === undefined,
     activeRuns: project => deps.activeRunCount(project.id),
     // The quota boundary is the gate (#879): auto PM has no budget notion of its own.

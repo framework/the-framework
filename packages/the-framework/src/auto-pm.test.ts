@@ -537,3 +537,70 @@ test('every routine carries its preset label and a rendered prompt, so a list of
     assert.doesNotMatch(job.prompt, /\$\{\{/, `${job.name} must ship a rendered prompt`)
   }
 })
+
+test('a routine the user unticked is left out of the rotation (#1209)', async () => {
+  const { loop, ran } = harness({ cooldownMs: 0, optedOut: async () => ['first'] })
+  await loop.tick()
+  await loop.tick()
+  loop.stop()
+  // Filtered, not skipped at the index: with 'first' off, 'second' comes round every turn rather
+  // than every other one landing on a job that cannot run.
+  assert.deepEqual(ran, ['second', 'second'])
+})
+
+test('an unticked drain routine stands the sweep down, it does not fall through to the rotation (#1209)', async () => {
+  // The queue has work waiting. Answering "do not work it automatically" by inventing more work
+  // is the opposite of what the checkbox asked for.
+  const { loop, ran, logs } = harness({
+    cooldownMs: 0,
+    backlogEmpty: async () => false,
+    optedOut: async () => [AUTO_PM_DRAIN_JOB.name],
+  })
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(ran, [])
+  assert.equal(loop.report().outcomes[0]?.message, 'the queue has work waiting and its routine is switched off')
+  assert.ok(!logs.some(line => line.includes('draining')))
+})
+
+test('an unticked maintenance routine leaves its calendar alone (#1209)', async () => {
+  // Not merely skipped: stamping it would tick the schedule past while the box was off, so the
+  // sweep would not come due when it is ticked back on.
+  const stamped: string[] = []
+  const { loop, ran } = harness({
+    cooldownMs: 0,
+    maintenanceDue: async () => true,
+    recordMaintenance: async project => {
+      stamped.push(project.id)
+    },
+    optedOut: async () => [AUTO_PM_MAINTENANCE_JOB.name],
+  })
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(stamped, [])
+  assert.deepEqual(ran, ['first'])
+})
+
+test('unticking every routine starts nothing, and says which kind of nothing it is (#1209)', async () => {
+  const { loop, ran } = harness({
+    cooldownMs: 0,
+    optedOut: async () => AUTO_PM_ROUTINES.map(job => job.name).concat(JOBS.map(job => job.name)),
+  })
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(ran, [])
+  assert.equal(loop.report().outcomes[0]?.message, 'every routine that makes new work is switched off')
+})
+
+test('an unreadable opt-out list means none, never all (#1209)', async () => {
+  // Failing the other way would let one bad read switch the whole schedule off silently.
+  const { loop, ran } = harness({
+    cooldownMs: 0,
+    optedOut: async () => {
+      throw new Error('no registry')
+    },
+  })
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(ran, ['first'])
+})

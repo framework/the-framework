@@ -153,6 +153,8 @@ describe('TicketsPanel (#697/#1144)', () => {
     // And it is the preset's own text: the onboarding checklist offers this button under the same
     // label and sends `presets.importTickets`, so a second source here means one label, two asks.
     expect(sendStart.mock.calls[0]?.[1]).toBe(presets.importTickets.render())
+    // Unattended (#1279): a button-fired import ends at settle instead of parking in the chat loop.
+    expect(sendStart.mock.calls[0]?.[3]).toEqual({ unattended: true })
     // The run id is what lands you on the import session rather than the project home (#1169).
     await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith(expect.any(String), 'r1'))
   })

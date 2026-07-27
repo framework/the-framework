@@ -103,7 +103,8 @@ export function OnboardingChecklist({
   const importTickets = async () => {
     if (!targetProjectId) return
     const intent = presets.importTickets.render()
-    const started = await start(targetProjectId, intent, 'prompt', {})
+    // Unattended (#1279): a checklist-fired routine ends at settle instead of parking in the chat loop.
+    const started = await start(targetProjectId, intent, 'prompt', { unattended: true })
     // Land on the session doing the import, not the project's launcher (#1169): its id is what
     // the shell needs to show the live output. A refusal keeps you here, with `startError` shown.
     if (started) onRunStarted(targetProjectId, intent, started.runId)

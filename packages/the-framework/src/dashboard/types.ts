@@ -72,7 +72,9 @@ export interface StartRunOptions {
   /**
    * Nobody is watching this run (#846): its choice gates take the recommended option instead of
    * parking for an answer, which is the fallback a fully headless run already uses and the one
-   * autopilot would have clicked. Set by the work the daemon starts on its own (auto PM, #685).
+   * autopilot would have clicked. It also keeps the run out of the stay-open chat loop, so it
+   * ends at settle and its armed handoff fires. Set by the work the daemon starts on its own
+   * (auto PM, #685) and by dashboard surfaces that fire routine/preset work (#1279).
    * Stop still works — that aborts the run controller, not a gate.
    */
   unattended?: boolean

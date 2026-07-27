@@ -85,10 +85,13 @@ describe('RoutineWork (#1159)', () => {
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByText('Run now')[1]!)
     await waitFor(() => expect(start).toHaveBeenCalled())
-    const [projectId, prompt, kind] = start.mock.calls[0]!
+    const [projectId, prompt, kind, options] = start.mock.calls[0]!
     expect(projectId).toBe('p1')
     expect(prompt).toBe(ROTATION_JOB.prompt)
     expect(kind).toBe('prompt')
+    // Unattended (#1279): a card-fired routine ends at settle and its handoff fires, like the
+    // sweep's own runs, instead of parking in the stay-open chat loop.
+    expect(options).toMatchObject({ unattended: true })
     // The run id is the whole point: without it the shell renders the launcher, so "Run now"
     // landed on an empty composer with its own session nowhere on screen (#1191).
     await waitFor(() => expect(started).toHaveLength(1))

@@ -72,7 +72,9 @@ export function TicketsPanel({
   if (!loaded) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>
 
   const startImport = async (prompt: string, failure: string) => {
-    const result = await run(() => sendStart(projectId, prompt, 'prompt'), failure)
+    // Unattended (#1279): an import fired by a button is routine work, not a conversation — it
+    // ends at settle and its armed handoff fires, as when the sweep starts the same routine.
+    const result = await run(() => sendStart(projectId, prompt, 'prompt', { unattended: true }), failure)
     // Jump to the session doing the work, so its progress is watchable instead of the panel
     // sitting on stale rows until files land.
     if (result?.ok) onRunStarted?.(prompt, result.runId)

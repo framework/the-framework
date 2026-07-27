@@ -174,6 +174,14 @@ export interface AutoPmJob {
    * since which entry is next is known only at the moment the sweep starts one.
    */
   entry?: string
+  /**
+   * The branch this job's prompt pins via its constant session name, when it does (#1293). The
+   * triage prompts abort when `the-framework/<SESSION_NAME>` already exists, so a leftover branch
+   * whose PR was closed or merged jams the routine forever. Declared as data on the job, like
+   * {@link AutoPmJob.drains}, so the sweep can release the stale name before firing without
+   * matching on {@link AutoPmJob.name} at the call site.
+   */
+  pinnedBranch?: string
 }
 
 /**
@@ -233,11 +241,13 @@ export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
     name: presets.triageQuick.name,
     prompt: presets.triageQuick.render(),
     label: presets.triageQuick.label,
+    pinnedBranch: `the-framework/${presets.triageQuick.name}`,
   },
   {
     name: presets.triageConsensual.name,
     prompt: presets.triageConsensual.render(),
     label: presets.triageConsensual.label,
+    pinnedBranch: `the-framework/${presets.triageConsensual.name}`,
   },
   {
     name: presets.spikeAndPlan.name,
@@ -363,6 +373,13 @@ export interface AutoPmDeps {
   maintenanceJob?: AutoPmJob
   /** Start the PM run. Resolves the run's id, or undefined when the daemon refused. */
   start(project: AutoPmProject, job: AutoPmJob): Promise<string | undefined>
+  /**
+   * Release a {@link AutoPmJob.pinnedBranch} its closed PR left behind (#1293), called right
+   * before such a job fires. Injected because the release reads `gh` and mutates git, and this
+   * module is pure policy. Omitted (or throwing) means the branch stays and the job's own abort
+   * guard decides, exactly as before the seam existed.
+   */
+  releasePinned?(project: AutoPmProject, branch: string): Promise<unknown>
   /**
    * Land a finished run's queue in the project checkout (#852). Called before the sweep decides
    * anything: a run's queue lives on its own worktree branch, so until it is promoted the checkout
@@ -627,6 +644,9 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           // Re-checked per spawn, for the #983 reason above: a stop mid-batch must not spawn the rest.
           if (stopped) break
           deps.log(`[framework] auto PM: ${doing(item)} in ${project.path}`)
+          // A pinned-name job aborts itself when its branch already exists (#1293); a branch
+          // whose PR closed is not a pending triage, so it is released before the start.
+          if (item.pinnedBranch) await deps.releasePinned?.(project, item.pinnedBranch).catch(() => undefined)
           const runId = await deps.start(project, item).catch(() => undefined)
           if (!runId) {
             // The batch ends at the first refusal: whatever refused this start is not going to take

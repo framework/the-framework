@@ -1,9 +1,0 @@
-# The Framework: the committed project DB; session state is transient.
-*
-!.gitignore
-!LOGS.md
-!conversations/
-!conversations/**
-!git@brillout.com/
-!git@brillout.com/sessions/
-!git@brillout.com/sessions/**

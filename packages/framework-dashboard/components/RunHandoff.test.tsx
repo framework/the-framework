@@ -88,14 +88,32 @@ describe('run handoff (#799)', () => {
     expect(screen.getByText('Nothing committed — no PR to open.')).toBeTruthy()
   })
 
-  test('an empty branch with work waiting in the tree is offered, not called a dead end (#1173)', async () => {
-    onRunHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true, pending: 2 })
+  test('an empty branch with work waiting in the tree names the work, never a button (#1173)', async () => {
+    onRunHandoff.mockResolvedValue({
+      ...worked,
+      commits: [],
+      files: [],
+      insertions: 0,
+      deletions: 0,
+      empty: true,
+      pendingFiles: ['index.html', 'src/app.ts'],
+    })
     render(<Harness />)
-    // The agent commits what it found and nothing it wrote, so a settled session holding its whole
-    // output in the tree is the ordinary case, not a session that did nothing. Opening the PR
-    // commits what is waiting, so the button is offered.
-    await waitFor(() => expect(screen.getByText('Open PR')).toBeTruthy())
-    expect(screen.queryByText('Nothing committed — no PR to open.')).toBeNull()
+    // A no-diff branch never gets the Open PR button — GitHub would refuse it with "No commits
+    // between main and <branch>", the confusion this ticket started from. What is waiting is said
+    // by name instead, and the disclosure lists all of it.
+    await waitFor(() => expect(screen.getByText('Nothing committed — index.html, src/app.ts left uncommitted.')).toBeTruthy())
+    expect(screen.queryByText('Open PR')).toBeNull()
+    expect(screen.getByText('Uncommitted files')).toBeTruthy()
+    expect(screen.getByText('index.html')).toBeTruthy()
+  })
+
+  test('past two uncommitted files the rest are counted, and the hover carries them all (#1173)', async () => {
+    const pendingFiles = ['a.ts', 'b.ts', 'c.ts', 'd.ts']
+    onRunHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true, pendingFiles })
+    render(<Harness open={false} />)
+    const reason = await screen.findByText('Nothing committed — a.ts, b.ts and 2 more left uncommitted.')
+    expect(reason.getAttribute('title')).toBe(pendingFiles.join('\n'))
   })
 
   test('a branch that is gone is reported, not shown as work', async () => {

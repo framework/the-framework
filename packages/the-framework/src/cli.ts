@@ -215,9 +215,11 @@ Options:
                          inspect the DOM, and screenshot. Off by default (#452).
   --no-auto-push-branch  Do not push this session's branch to origin when it finishes.
                          Pushing is the default, so the work does not sit on a local
-                         branch nobody is told about (#1102).
+                         branch nobody is told about (#1102). Without either flag the
+                         repo's the-framework.yml autoPushBranch decides.
   --no-auto-open-pr      Do not open a draft PR when the session finishes. Opening one
-                         is the default; it implies the push above (#1102).
+                         is the default; it implies the push above (#1102). Without
+                         either flag the-framework.yml autoOpenPr decides.
   --unattended           Nobody is watching: choice gates take the recommended option
                          instead of waiting for an answer. Stop still works (#846).
   --kind <name>          Build event kind the preset's review loop fires for, e.g.
@@ -338,11 +340,13 @@ export interface CliOptions {
   browser: boolean
   /**
    * `--auto-push-branch` / `--no-auto-push-branch` (#1102): push this session's branch to `origin`
-   * when it finishes. On by default, which is what makes the handoff zero-config.
+   * when it finishes. Tri-state like the mode toggles (#841): `undefined` is "this run said
+   * nothing", so the repo's the-framework.yml decides, and nobody setting it resolves to on —
+   * which is what makes the handoff zero-config.
    */
-  autoPushBranch: boolean
-  /** `--auto-open-pr` / `--no-auto-open-pr` (#1102): open a draft PR when the session finishes. On by default; implies {@link autoPushBranch}. */
-  autoOpenPr: boolean
+  autoPushBranch?: boolean | undefined
+  /** `--auto-open-pr` / `--no-auto-open-pr` (#1102): open a draft PR when the session finishes. Tri-state like {@link autoPushBranch}; resolves to on. Implies the push. */
+  autoOpenPr?: boolean | undefined
   buildEvent?: string | undefined
   maxPasses?: number
   maxCost?: number
@@ -406,10 +410,9 @@ export function parseArgs(argv: string[]): CliOptions {
     context: [],
     onBeforeMergeable: false,
     browser: false,
-    // On unless said otherwise (#1102): the whole point is that a session left alone hands its
-    // work back by itself.
-    autoPushBranch: true,
-    autoOpenPr: true,
+    // The handoff pair is left unset here on purpose: like the mode toggles it resolves over the
+    // config layers (#841), where no layer setting it means on (#1102) — a session left alone
+    // hands its work back by itself.
     dashboard: true,
     relayServe: false,
     skipPermissions: false,
@@ -819,11 +822,16 @@ export function flagConfigLayer(opts: RunConfigFlags): ConfigLayer {
       // --vanilla is the negative face of the same key: it removes the built-in prompt.
       ...(opts.vanilla !== undefined ? { antiLazyPill: !opts.vanilla } : {}),
       ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
+      ...(opts.autoPushBranch !== undefined ? { autoPushBranch: opts.autoPushBranch } : {}),
+      ...(opts.autoOpenPr !== undefined ? { autoOpenPr: opts.autoOpenPr } : {}),
     },
   }
 }
 
-type RunConfigFlags = Pick<CliOptions, 'preset' | 'autopilot' | 'technical' | 'buildEvent' | 'vanilla' | 'transparent'>
+type RunConfigFlags = Pick<
+  CliOptions,
+  'preset' | 'autopilot' | 'technical' | 'buildEvent' | 'vanilla' | 'transparent' | 'autoPushBranch' | 'autoOpenPr'
+>
 
 /**
  * Resolve a run's config over its layers, nearest wins (#841): the run's flags, then the repo's
@@ -1449,7 +1457,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // disarm it at any point up to the moment it settles, which is the whole point of them being
   // pre-commitments rather than buttons. Opening a PR implies pushing, so the pair is normalised
   // wherever it is set.
-  const armedHandoff = { push: opts.autoPushBranch || opts.autoOpenPr, pr: opts.autoOpenPr }
+  const armedHandoff = { push: config.autoPushBranch || config.autoOpenPr, pr: config.autoOpenPr }
   // Assigned once the journal exists, which is after the control watcher is wired: a change that
   // arrives before then still lands on `armedHandoff`, it just has no event to announce it yet.
   let announceHandoff: ((push: boolean, pr: boolean) => void) | undefined

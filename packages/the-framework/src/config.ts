@@ -25,6 +25,15 @@ export interface FrameworkFileConfig {
    * coarse "only-pick-what-you-need" master off-switch, at the per-project tier. Default `false`.
    */
   transparent?: boolean
+  /**
+   * Push a session's branch to `origin` when it finishes (#1102/#1173). Default `true`. Whether a
+   * session publishes itself is a fact about the repo, so it belongs in the file that travels with
+   * it — this pair is where push-without-PR stays reachable now the launcher offers one `Open PR`
+   * row. Only meaningful with {@link autoOpenPr} off: opening a PR pushes on the way.
+   */
+  autoPushBranch?: boolean
+  /** Open a draft PR for a session's branch when it finishes (#1102/#1173). Default `true`; implies {@link autoPushBranch}. */
+  autoOpenPr?: boolean
 }
 
 /** Config file names read from the workspace root, in precedence order. */
@@ -37,7 +46,7 @@ export const STRING_CONFIG_KEYS = ['preset', 'event'] as const
  * resolution, and the resolved-config summary all iterate it, so a new mode is added here once and
  * flows through them (only its default and any renamed output field are declared per key).
  */
-export const BOOLEAN_CONFIG_KEYS = ['autopilot', 'technical', 'antiLazyPill', 'transparent'] as const
+export const BOOLEAN_CONFIG_KEYS = ['autopilot', 'technical', 'antiLazyPill', 'transparent', 'autoPushBranch', 'autoOpenPr'] as const
 /** Every config key, string then boolean, in declaration order. */
 export const CONFIG_KEYS = [...STRING_CONFIG_KEYS, ...BOOLEAN_CONFIG_KEYS] as const
 

@@ -494,9 +494,9 @@ test('uncommitted work is counted from the session checkout, not the project (#1
     checkout: '/repo/.the-framework/worktrees/r1',
   })
   // The branch really is empty; the work is real and sitting next to it. Both are true at once,
-  // which is the whole of #1173.
+  // which is the whole of #1173 — and the paths are what the bar names instead of a dead button.
   assert.equal(handoff?.empty, true)
-  assert.equal(handoff?.pending, 2)
+  assert.deepEqual(handoff?.pendingFiles, ['src/app.ts', 'src/new.ts'])
   assert.ok(calls.some(args => args[0] === 'status'), 'the checkout should have been asked')
 })
 
@@ -513,7 +513,7 @@ test('pending is absent, not zero, when no session checkout was given (#1173)', 
   })
   const handoff = await readRunHandoff('/repo', 'the-framework/quiet', { git, pr: async () => undefined })
   // "Nobody asked" must not read as "asked, tree clean": only the second may be shown as a dead end.
-  assert.equal(handoff?.pending, undefined)
+  assert.equal(handoff?.pendingFiles, undefined)
   assert.ok(!calls.some(args => args[0] === 'status'), 'no checkout means no status read')
 })
 
@@ -552,13 +552,13 @@ test('a real repo: the finishing step commits what the agent left in its worktre
 
     const before = await readRunHandoff(dir, branch, { git, pr: async () => undefined, checkout })
     assert.equal(before?.empty, true, 'the branch carries nothing yet')
-    assert.equal(before?.pending, 1, 'and the work is sitting in the checkout')
+    assert.deepEqual(before?.pendingFiles, ['index.html'], 'and the work is sitting in the checkout, by name')
 
     assert.equal(await commitSessionWork(checkout, dir, branch, git), true)
 
     const after = await readRunHandoff(dir, branch, { git, pr: async () => undefined, checkout })
     assert.equal(after?.empty, false, 'the work is on the branch now, so a PR has something to say')
-    assert.equal(after?.pending, 0)
+    assert.deepEqual(after?.pendingFiles, [])
     assert.deepEqual(after?.commits.map(c => c.subject), ['[The Framework] uncommitted changes'])
     assert.deepEqual(after?.files.map(f => f.path), ['index.html'])
 

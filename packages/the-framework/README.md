@@ -222,6 +222,8 @@ autopilot: true      # activate the preset's Autopilot mode variants
 technical: false
 event: bug-fix        # the build event kind its review loop fires for
 antiLazyPill: false   # remove the built-in system prompt (default: on)
+autoOpenPr: false     # do not open a draft PR when a session finishes (default: on)
+autoPushBranch: true  # with autoOpenPr off: still push the session's branch (default: on)
 ```
 
 Every field is optional. Config resolves layer by layer, and the nearest layer that
@@ -232,6 +234,10 @@ Every field is optional. Config resolves layer by layer, and the nearest layer t
   `--transparent` pairs) > the file's boolean > off. Without either flag the file
   decides, so a repo that turns a mode on can be turned back off for one run with
   `--no-<mode>`.
+- **handoff**: `--auto-open-pr` / `--no-auto-open-pr` (and the `--auto-push-branch`
+  pair) > the file's boolean > **on** (#1102): a session nobody configured pushes its
+  branch and opens a draft PR when it finishes. The launcher offers the one `Open PR`
+  toggle; push-without-PR lives here and in the flags.
 - **event**: `--kind` > `the-framework.yml` `event` > the preset's own default > `major-change`
 
 When any layer contributes something, the run narrates what won and where it came

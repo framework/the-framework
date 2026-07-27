@@ -2,7 +2,6 @@
 
 ## Priority 8
 
-- [Settle-moment UX: always offer `Open PR`, auto-commit, no-diff guard](tickets/2026-07-25_unclear-ux-what-now.md) — implement the in-thread maintainer decisions: default `[x] Open PR`; unattended runs commit their work automatically (safe: every run is on its own branch); when the branch has no diff, don't offer `Open PR` — say so and name the uncommitted work; launcher gear reduced to one `Open PR` row (the push setting stays available in `the-framework.yml` and the CLI flag). The `Auto commit`/`Auto push` settings split is explicitly postponed — do not add settings.
 - [Remove the "do NOT re-scaffold" babysitting paragraph from the system prompt](tickets/2026-07-26_remove-ugly-babysitting.md) — delete the paragraph at `packages/the-framework/src/steps.ts:62` and update the assertions in `packages/the-framework/src/steps.test.ts` (~lines 198 and 227) that match on its text.
 - [Root-cause the white-screen crash behind the Serve menu item](tickets/2026-07-25_bug-white-blank.md) — deterministic repro confirmed by the maintainer: hovering the "Serve" menu item blanks the whole UI; #1196 landed as an explicit mitigation and the issue was deliberately kept open for the real fix. Start from the Serve state in `packages/framework-dashboard/components/SessionActionsMenu.tsx` and the #1196 mitigation diff, find the crash, fix its root cause; if it turns out architectural rather than a contained bug, report the diagnosis instead of forcing a fix.
 

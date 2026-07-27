@@ -89,13 +89,30 @@ test('parseArgs reads --browser (#452)', () => {
   assert.equal(parseArgs(['--browser', 'x']).browser, true)
 })
 
-test('the handoff flags default ON, which is what makes it zero-config (#1102)', () => {
-  // Unlike every other toggle here, saying nothing means yes: a plain run pushes its branch and
-  // opens a draft PR when it finishes.
-  assert.equal(parseArgs(['x']).autoPushBranch, true)
-  assert.equal(parseArgs(['x']).autoOpenPr, true)
+test('the handoff flags resolve ON, which is what makes it zero-config (#1102)', () => {
+  // Unlike most toggles, nobody saying anything means yes: a plain run pushes its branch and
+  // opens a draft PR when it finishes. Tri-state at the flag tier (#841), so the repo's
+  // the-framework.yml can decide when the run says nothing (#1173).
+  assert.equal(parseArgs(['x']).autoPushBranch, undefined)
+  assert.equal(parseArgs(['x']).autoOpenPr, undefined)
   assert.equal(parseArgs(['--no-auto-push-branch', 'x']).autoPushBranch, false)
   assert.equal(parseArgs(['--no-auto-open-pr', 'x']).autoOpenPr, false)
+  const bare = mergeRunConfig(parseArgs(['x']), {})
+  assert.equal(bare.autoPushBranch, true)
+  assert.equal(bare.autoOpenPr, true)
+})
+
+test('the-framework.yml can disarm the handoff, and a flag overrides the file (#1173)', () => {
+  // The launcher gear offers one `Open PR` row; the push setting stays reachable here and as the
+  // CLI flag pair. Nearest layer wins, like every other yml boolean.
+  const fromFile = mergeRunConfig(parseArgs(['x']), { autoOpenPr: false })
+  assert.equal(fromFile.autoOpenPr, false)
+  assert.equal(fromFile.autoPushBranch, true) // push-only: the file said nothing about the push
+  assert.equal(fromFile.sources.autoOpenPr, 'the-framework.yml')
+  const overridden = mergeRunConfig(parseArgs(['--auto-open-pr', 'x']), { autoOpenPr: false })
+  assert.equal(overridden.autoOpenPr, true)
+  assert.equal(overridden.sources.autoOpenPr, 'flag')
+  assert.equal(mergeRunConfig(parseArgs(['x']), { autoPushBranch: false, autoOpenPr: false }).autoPushBranch, false)
 })
 
 test('parseArgs reads --resume-session to continue a finished run (#720)', () => {

@@ -53,6 +53,9 @@ test('resolveRunConfig: each layer can win, and each can be absent (#841)', () =
   assert.equal(bare.technical, RUN_CONFIG_DEFAULTS.technical)
   assert.equal(bare.antiLazyPill, RUN_CONFIG_DEFAULTS.antiLazyPill)
   assert.equal(bare.transparent, RUN_CONFIG_DEFAULTS.transparent)
+  // The handoff pair defaults on (#1102): a session nobody configured hands itself back.
+  assert.equal(bare.autoPushBranch, true)
+  assert.equal(bare.autoOpenPr, true)
   assert.equal(bare.presetName, undefined)
   assert.equal(bare.buildEvent, undefined)
   assert.deepEqual(bare.sources, {})

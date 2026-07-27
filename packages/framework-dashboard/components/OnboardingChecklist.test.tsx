@@ -92,7 +92,8 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     await clickImport()
 
     // The project travels with it: this surface has none selected, so an id alone cannot be routed.
-    expect(startRun.start).toHaveBeenCalledWith('p1', presets.importTickets.render(), 'prompt', {})
+    // Unattended (#1279): a checklist-fired routine ends at settle instead of parking in the chat loop.
+    expect(startRun.start).toHaveBeenCalledWith('p1', presets.importTickets.render(), 'prompt', { unattended: true })
     await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('p1', presets.importTickets.render(), 'run-7'))
   })
 

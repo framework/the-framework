@@ -86,7 +86,9 @@ export function createDriverEventHandler(opts: DriverEventHandlerOptions): Drive
     if (event.type !== 'result') return
     if (event.sessionId && event.sessionId !== lastSessionId) {
       lastSessionId = event.sessionId
-      const link = opts.sessionLink ? resolveSessionLink(opts.sessionLink, event.sessionId) : undefined
+      // A driver that knows its session's real URL (#1317, the cloud hand-off) beats the
+      // `--session-link` template, whose Claude default is the generic entry point.
+      const link = event.sessionLink ?? (opts.sessionLink ? resolveSessionLink(opts.sessionLink, event.sessionId) : undefined)
       emit({ kind: 'session-update', sessionId: event.sessionId, ...(link ? { sessionLink: link } : {}) })
     }
     if (!event.usage) return

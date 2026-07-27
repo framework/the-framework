@@ -270,8 +270,12 @@ export type DriverEvent =
   | { type: 'text'; text: string }
   /** The agent used a tool. We surface the name only, not the arguments. */
   | { type: 'action'; label: string }
-  /** The turn settled with this final text. */
-  | { type: 'result'; text: string; sessionId?: string; usage?: DriverUsage }
+  /**
+   * The turn settled with this final text. `sessionLink` is the real URL of the session,
+   * for a driver whose session has one of its own (#1317) — the cloud hand-off — so the
+   * meta can link there instead of the generic entry point; drivers without one omit it.
+   */
+  | { type: 'result'; text: string; sessionId?: string; sessionLink?: string; usage?: DriverUsage }
   /** Where the account's subscription quota stands (#517). */
   | { type: 'rate-limit'; limit: DriverRateLimit }
   /** The agent (or its transport) errored. */

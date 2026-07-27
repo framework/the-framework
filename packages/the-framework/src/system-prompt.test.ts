@@ -29,6 +29,7 @@ test('CONTEXT_DOCS is the #683 fragment: business knowledge plus the roadmap/que
   assert.deepEqual(paths, [
     'knowledge-base/DECISIONS.md',
     'GOAL.md',
+    'BUSINESS_LOGIC.md',
     'knowledge-base/FACTS.md',
     'knowledge-base/INSIGHTS.md',
     'knowledge-base/MARKET_RESEARCH.md',
@@ -39,10 +40,10 @@ test('CONTEXT_DOCS is the #683 fragment: business knowledge plus the roadmap/que
   ])
   // The business-knowledge docs are a subset the agent also updates at merge.
   for (const doc of BUSINESS_KNOWLEDGE_DOCS) assert.ok(paths.includes(doc.path), `missing ${doc.path}`)
-  // GOAL / market research / tickets / conversations / TODO_AGENTS are read-only context, so they
-  // are not in the merge-update set.
+  // GOAL / business logic / market research / tickets / conversations / TODO_AGENTS are read-only
+  // context, so they are not in the merge-update set.
   const businessPaths = BUSINESS_KNOWLEDGE_DOCS.map(d => d.path)
-  for (const p of ['GOAL.md', 'knowledge-base/MARKET_RESEARCH.md', 'knowledge-base/**.md', 'tickets/**.md', '.the-framework/conversations/**.md', 'TODO_AGENTS.md']) {
+  for (const p of ['GOAL.md', 'BUSINESS_LOGIC.md', 'knowledge-base/MARKET_RESEARCH.md', 'knowledge-base/**.md', 'tickets/**.md', '.the-framework/conversations/**.md', 'TODO_AGENTS.md']) {
     assert.ok(!businessPaths.includes(p))
   }
   // The two format-bearing bullets name a section of this same channel (#1163), not a file to go

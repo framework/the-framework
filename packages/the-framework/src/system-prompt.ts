@@ -182,9 +182,10 @@ const TODO_FORMAT_HEADING = 'TODO_AGENTS.md'
 /**
  * Everything the agent keeps in context at the start of a run (#683), which
  * {@link systemPromptBlock} renders as the `Context:` bullets. A superset of
- * {@link BUSINESS_KNOWLEDGE_DOCS}: it adds `GOAL.md` and the roadmap/queue/history pointers the
- * agent reads but does *not* fold knowledge back into — `tickets/**.md` (the potential work,
- * whose file shape is the `Ticket format` spec, #684/#674), the `TODO_AGENTS.md` task queue (whose
+ * {@link BUSINESS_KNOWLEDGE_DOCS}: it adds `GOAL.md`, `BUSINESS_LOGIC.md`, and the
+ * roadmap/queue/history pointers the agent reads but does *not* fold knowledge back into —
+ * `tickets/**.md` (the potential work, whose file shape is the `Ticket format` spec, #684/#674),
+ * the `TODO_AGENTS.md` task queue (whose
  * shape is the `TODO_AGENTS.md` spec, #880), and the committed conversations (#683/#908). Repo-root
  * paths, because that is the agent's cwd. README is left out: a repo's own `README.md` already
  * covers the overview.
@@ -197,6 +198,10 @@ const TODO_FORMAT_HEADING = 'TODO_AGENTS.md'
 export const CONTEXT_DOCS: readonly ContextDoc[] = [
   DECISIONS_DOC,
   { path: 'GOAL.md', comment: 'the goal of the project (long-term direction, scope, non-scope, ...)' },
+  // The codebase's business logic, documented (#683). Root-level beside GOAL.md, per the OP. A
+  // pointer the agent reads, not a doc it folds knowledge back into at merge, so it stays out of
+  // BUSINESS_KNOWLEDGE_DOCS.
+  { path: 'BUSINESS_LOGIC.md', comment: 'codebase business logic' },
   FACTS_DOC,
   INSIGHTS_DOC,
   // What the market looks like (#694): written by the [Market research] preset and read by the

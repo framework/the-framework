@@ -1,5 +1,5 @@
 import { nodeGitRunner, type GitRunner } from '../project.js'
-import { cachedPrView, type LinkedPr, type PrLookup } from './gh.js'
+import { cachedPrView, cachedPrsForBranch, pickRunPr, type LinkedPr, type PrLookup } from './gh.js'
 
 // The project panel's git status (#491, part of #488): the active branch, whether the tree is
 // dirty, and the linked PR. Branch + dirty are a local git read; the PR is a best-effort gh
@@ -20,6 +20,16 @@ export interface GitStatus {
 export interface GitStatusDeps {
   git?: GitRunner
   pr?: PrLookup
+  /**
+   * The run's start, when the status is read for a run's checkout (#1255). The default lookup is
+   * `gh pr view`, which answers the newest PR for the branch *in any state* — so a run on a reused
+   * pinned branch (`the-framework/triage-quick`) wears a predecessor's merged PR as its own badge.
+   * With `since` set the PR is picked from the branch's whole history by {@link pickRunPr}
+   * instead: an open PR, or a closed one no older than the run itself.
+   */
+  since?: string
+  /** The branch's full PR history, for the {@link GitStatusDeps.since} path (default {@link cachedPrsForBranch}). */
+  prs?: (cwd: string, branch: string) => Promise<LinkedPr[]>
 }
 
 /**
@@ -39,8 +49,21 @@ export async function readGitStatus(cwd: string, deps: GitStatusDeps = {}): Prom
   // The branch and the dirty flag are what this row is for, and they are ten milliseconds of git.
   // The PR is a `gh` call an order of magnitude slower, so it is read through the cache and is
   // allowed to arrive late (#1028) rather than holding the whole row back on every poll.
-  const pr = deps.pr
-    ? { value: await deps.pr(cwd).catch(() => undefined), pending: false }
-    : await cachedPrView(cwd).catch(() => ({ value: undefined, pending: false }))
+  const pr = await linkedPr(cwd, branch, deps)
   return { branch, dirty, ...(pr.value ? { pr: pr.value } : {}), ...(pr.pending ? { prPending: true } : {}) }
+}
+
+/** The PR half of the status: the injected seam, the run-scoped history pick, or the plain view. */
+async function linkedPr(
+  cwd: string,
+  branch: string,
+  deps: GitStatusDeps,
+): Promise<{ value: LinkedPr | undefined; pending: boolean }> {
+  if (deps.pr) return { value: await deps.pr(cwd).catch(() => undefined), pending: false }
+  if (deps.since === undefined) return cachedPrView(cwd).catch(() => ({ value: undefined, pending: false }))
+  if (deps.prs) return { value: pickRunPr(await deps.prs(cwd, branch).catch(() => []), deps.since), pending: false }
+  return cachedPrsForBranch(cwd, branch).then(
+    read => ({ value: pickRunPr(read.value ?? [], deps.since), pending: read.pending }),
+    () => ({ value: undefined, pending: false }),
+  )
 }

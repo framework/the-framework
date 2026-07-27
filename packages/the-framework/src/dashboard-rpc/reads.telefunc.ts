@@ -1,4 +1,4 @@
-import { findRun, readLiveMetas, readAllRuns, loadRunEvents, worktreeSize, isSafeRunId, type RunMeta } from '../store/index.js'
+import { findRun, readLiveMetas, readAllRuns, loadRunEvents, worktreeSize, isSafeRunId, startedAtFromRunId, type RunMeta } from '../store/index.js'
 import { loadUserSystemPrompt } from '../system-prompt-file.js'
 import { listProjectWorktrees } from '../worktrees.js'
 import { readLogs, type LogEntry } from '../logs.js'
@@ -124,17 +124,21 @@ export async function onRunWorktree(projectId: string, runId: string): Promise<R
     const path = await resolveRunPath(projectId, runId)
     if (!path) return null
     const own = path !== root
+    // Since-filtered like every run-scoped PR read (#1255): in the run's own worktree the
+    // checkout's branch is the run's, but a reused pinned branch has a predecessor's PR history.
+    const since = startedAtFromRunId(runId)
     const [status, live] = await Promise.all([
-      readGitStatus(path).catch(() => undefined),
+      readGitStatus(path, since !== undefined ? { since } : {}).catch(() => undefined),
       readLiveMetas(root).catch(() => []),
     ])
     // Size is only read for a checkout nothing is writing to: a live run's tree changes under the
     // poll, and `du` over a build directory mid-build is a cost with no answer worth having.
     const running = live.some(run => run.id === runId && run.status === 'running')
     const size = own && !running ? await worktreeSize(path) : undefined
-    // In the run's own worktree, the checkout's branch is the run's, so the status read's PR is
-    // right. Once the worktree is gone the checkout is the project root, and its current branch
-    // has nothing to do with this run (#1255) — resolve by the run's own branch names instead.
+    // In the run's own worktree, the checkout's branch is the run's, so the (since-filtered)
+    // status read's PR is right. Once the worktree is gone the checkout is the project root, and
+    // its current branch has nothing to do with this run (#1255) — resolve by the run's own
+    // branch names instead.
     const run = own ? undefined : await findRun(root, runId).catch(() => undefined)
     const pr = own
       ? { value: status?.pr, pending: status?.prPending ?? false }
@@ -320,13 +324,15 @@ export async function onGithubUrl(projectId: string): Promise<string | null> {
 /**
  * The project's git status (#491): active branch, dirty flag, linked PR. Null when not a repo /
  * relay. Pass a live `runId` to read that run's worktree, which is the branch and the dirty
- * state that actually belong to it (#738).
+ * state that actually belong to it (#738). A run-scoped read is since-filtered (#1255): a run on
+ * a reused pinned branch must not wear a predecessor's merged PR as its own badge.
  */
 export async function onGitStatus(projectId: string, runId?: string): Promise<GitStatus | null> {
   return relayOr(runId, 'onGitStatus', [projectId, runId], async () => {
     const cwd = await resolveRunPath(projectId, runId)
     if (!cwd) return null
-    return (await readGitStatus(cwd)) ?? null
+    const since = runId !== undefined ? startedAtFromRunId(runId) : undefined
+    return (await readGitStatus(cwd, since !== undefined ? { since } : {})) ?? null
   }, null)
 }
 

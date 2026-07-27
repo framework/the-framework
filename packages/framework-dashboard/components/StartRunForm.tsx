@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ProjectSummary } from '@gemstack/the-framework'
 import { runOptionsFromPreferences } from '@gemstack/the-framework/client'
-import { onProjects } from '../server/projects.telefunc.js'
+import { onClaudeTrust, onProjects } from '../server/projects.telefunc.js'
 import { onSystemPromptUser } from '../server/reads.telefunc.js'
 import { usePreferences, updatePreferences, autopilotEnabled } from '../lib/preferences.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
@@ -87,6 +87,18 @@ export function StartRunForm({
     ...(remoteDevice ? { remote: { url: remoteDevice.url, token: remoteDevice.token, label: remoteDevice.label } } : {}),
   }
 
+  // A web run on a project Claude Code has not been trusted in dies on the CLI's interactive
+  // trust dialog (#1314), so say so BEFORE the run is spent, with the one-time fix (#1318).
+  // Read only when web is the target; `known: false` (config unreadable) shows nothing rather
+  // than crying wolf, and the run's own failure advice remains the fallback.
+  const web = options.target === 'web' && !remoteDevice
+  const trust = useLoaded<Awaited<ReturnType<typeof onClaudeTrust>>>(
+    () => (web ? onClaudeTrust(projectId) : Promise.resolve(null)),
+    null,
+    [projectId, web],
+  )
+  const untrusted = web && trust !== null && trust.known && !trust.trusted
+
   const submit = async (text: string, submitKind: 'build' | 'prompt') => {
     if (busy) return
     setNote('Starting…')
@@ -168,6 +180,15 @@ export function StartRunForm({
           expanded, tall) Context disclosure, past the fold from the Start button that caused it. */}
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       {note && !error && <p role="status" className="mt-2 text-xs text-muted-foreground">{note}</p>}
+      {/* The doomed-web-run warning (#1318): before the start, not after three dead runs (#1314). */}
+      {untrusted && (
+        <p role="alert" className="mt-2 text-xs text-warning">
+          Claude Code has not been trusted in this project, so a Claude web run cannot start a cloud
+          session. One-time fix: run <code className="font-mono">claude</code> in{' '}
+          <code className="font-mono">{trust!.root}</code> once and accept the trust prompt, then start
+          the session — future runs inherit it.
+        </p>
+      )}
     </form>
   )
 }

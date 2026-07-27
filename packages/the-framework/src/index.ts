@@ -184,6 +184,7 @@ export {
   gitBusy,
   commitMessage,
   nodePathProbe,
+  pathspecsFor,
   CONVERSATIONS_PATHSPEC,
   COMMIT_POLL_MS,
   COMMIT_MAX_WAIT_MS,

@@ -21,7 +21,8 @@ import { errorMessage } from './error-message.js'
  * Path-scoped, never `git add -A`. The pathspec names the conversations directory and nothing
  * else, the way `queue-promote.ts` names the queue file, so whatever the user has in progress
  * cannot ride along in our commit. A pathspec commit also leaves their index alone: what they had
- * staged is still staged afterwards.
+ * staged is still staged afterwards. Scoped down further at commit time to the pathspecs that
+ * actually have something pending — see {@link pathspecsFor}.
  *
  * Debounced on an idle window rather than committed per turn. A chat turn is seconds apart, and a
  * commit each would bury the project's real history under transcript noise. A poll that sees the
@@ -59,6 +60,34 @@ export const SESSIONS_PATHSPEC = `:(glob)${THE_FRAMEWORK_DIR}/*/${SESSIONS_DIR}/
  * would double the noise in the project's log.
  */
 export const COMMITTED_PATHSPECS: readonly string[] = [CONVERSATIONS_PATHSPEC, SESSIONS_PATHSPEC]
+
+/**
+ * Which pending file belongs to which pathspec, so a pathspec with nothing under it can be left out
+ * of `add`/`commit` (see {@link pathspecsFor}). Kept beside the pathspecs themselves: a predicate
+ * that drifts from the pattern it mirrors would silently drop a file from every commit.
+ */
+const PATHSPEC_MEMBERSHIP: ReadonlyArray<readonly [pathspec: string, holds: (file: string) => boolean]> = [
+  [CONVERSATIONS_PATHSPEC, file => file.startsWith(`${CONVERSATIONS_PATHSPEC}/`)],
+  [SESSIONS_PATHSPEC, file => file.startsWith(`${THE_FRAMEWORK_DIR}/`) && file.includes(`/${SESSIONS_DIR}/`)],
+]
+
+/**
+ * The subset of {@link COMMITTED_PATHSPECS} that `files` actually has something under.
+ *
+ * `git add` and `git commit` are all-or-nothing about their pathspecs: one that matches no file
+ * aborts the whole command with "pathspec ... did not match any files", so passing both patterns
+ * unconditionally means a project that has sessions but has never recorded a conversation — every
+ * project, until its first chat — fails to commit and puts that failure in the daemon log on every
+ * poll. Nothing to commit under a pattern is the ordinary state, not an error, so the pattern is
+ * dropped instead.
+ *
+ * This covers the empty directory as well as the missing one, and the two fail in different places:
+ * `git add` tolerates an existing-but-empty directory, and then `git commit` rejects it, because by
+ * then the pathspec has to match a file git knows about.
+ */
+export function pathspecsFor(files: readonly string[]): string[] {
+  return PATHSPEC_MEMBERSHIP.filter(([, holds]) => files.some(holds)).map(([pathspec]) => pathspec)
+}
 
 /** How often the committer looks for settled conversations. */
 export const COMMIT_POLL_MS = 30_000
@@ -178,11 +207,13 @@ export async function gitBusy(
 const NOTHING_PENDING = 'no conversation changes'
 
 /**
- * Stage and commit the pending conversations under `cwd`, scoped to {@link CONVERSATIONS_PATHSPEC}.
+ * Stage and commit the pending conversations under `cwd`, scoped to {@link COMMITTED_PATHSPECS}.
  *
  * `add` before `commit` because a brand-new conversation is untracked, and `git commit -- <path>`
  * only knows paths git already knows. Both are pathspec-scoped, so the staging is as narrow as the
- * commit and the user's own staged work is neither swept in nor disturbed.
+ * commit and the user's own staged work is neither swept in nor disturbed, and both are narrowed to
+ * the pathspecs that have something pending ({@link pathspecsFor}) — a pathspec matching nothing is
+ * a hard error to git, and "no conversation has been recorded here yet" is not an error at all.
  *
  * Never throws: this runs on a background tick with nothing to catch it.
  */
@@ -197,9 +228,16 @@ export async function commitConversations(
   const files = await pendingConversations(cwd, git)
   if (files.length === 0) return { committed: false, reason: NOTHING_PENDING }
 
+  // Only the pathspecs that have something pending, or git aborts on the one that matches nothing.
+  // An empty result should be unreachable — `status` was scoped to these same pathspecs — but an
+  // empty pathspec list means "everything", which would sweep the user's whole checkout into our
+  // commit, so it reads as nothing pending rather than as a commit.
+  const pathspecs = pathspecsFor(files)
+  if (pathspecs.length === 0) return { committed: false, reason: NOTHING_PENDING }
+
   try {
-    await git(['add', '--', ...COMMITTED_PATHSPECS], cwd)
-    await git(['commit', '-m', commitMessage(files), '--', ...COMMITTED_PATHSPECS], cwd)
+    await git(['add', '--', ...pathspecs], cwd)
+    await git(['commit', '-m', commitMessage(files), '--', ...pathspecs], cwd)
     return { committed: true, files }
   } catch (err) {
     return { committed: false, reason: errorMessage(err) }

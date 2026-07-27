@@ -310,6 +310,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
   const system = composeRunSystem({
     antiLazyPill: opts.antiLazyPill,
     browser: opts.browser,
+    handsOff: opts.driver.handsOff === true,
     topic: opts.topic,
     ...(topicProjects ? { topicProjects } : {}),
     transparent: opts.transparent,

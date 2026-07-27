@@ -59,7 +59,7 @@ test('CONTEXT_DOCS is the #683 fragment: business knowledge plus the roadmap/que
   const conversations = CONTEXT_DOCS.find(d => d.path.startsWith(`${THE_FRAMEWORK_DIR}/${CONVERSATIONS_DIR}/`))
   assert.ok(conversations, `expected the ${THE_FRAMEWORK_DIR}/${CONVERSATIONS_DIR}/ pointer`)
 })
-import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
+import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 
 test('loadUserSystemPrompt reads and trims SYSTEM.md', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'system-prompt-'))
@@ -329,6 +329,29 @@ test('the browser section survives --vanilla but not transparent (#824)', () => 
   // keeps it. Transparent means an empty channel, so nothing at all.
   assert.ok(composeRunSystem({ antiLazyPill: false, browser: true }).includes(BROWSER_PROTOCOL))
   assert.equal(composeRunSystem({ transparent: true, browser: true }), '')
+})
+
+test('composeRunSystem stays quiet about hands-off unless the run is one (#1234)', () => {
+  // A local run's gates work; telling it they do not would auto-answer questions a human is
+  // sitting right there to take.
+  assert.ok(!composeRunSystem().includes(HANDS_OFF_PROTOCOL))
+})
+
+test('composeRunSystem declares the await gates unavailable on a hands-off run (#1234)', () => {
+  // A cloud session that obeys "ambiguous prompt: showChoices + AWAIT" parks forever on a
+  // question nobody attached can answer, and the session is spent for nothing. The block rides
+  // right after the await protocol it amends, and the signal protocol stays last (#547).
+  const system = composeRunSystem({ handsOff: true })
+  assert.ok(system.includes(HANDS_OFF_PROTOCOL))
+  assert.ok(system.indexOf(HANDS_OFF_PROTOCOL) > system.indexOf(AWAIT_PROTOCOL))
+  assert.ok(system.endsWith(SIGNAL_PROTOCOL), 'the signal protocol is still last (#547)')
+})
+
+test('the hands-off block survives --vanilla but not transparent (#1234)', () => {
+  // Availability is a property of the session, not of the built-in prompt: --vanilla still
+  // teaches the gates, so it still has to say they cannot be answered here.
+  assert.ok(composeRunSystem({ antiLazyPill: false, handsOff: true }).includes(HANDS_OFF_PROTOCOL))
+  assert.equal(composeRunSystem({ transparent: true, handsOff: true }), '')
 })
 
 test('composeRunSystem keeps the emit protocols even with the built-in prompt off (#500/#501)', () => {

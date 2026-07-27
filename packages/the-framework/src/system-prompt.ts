@@ -1,6 +1,6 @@
 import { renderTemplate } from './prompt-template.js'
 import { SYSTEM_PROMPT, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
-import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
+import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 
 /**
  * Topic-run bind protocol (#1121): told only to a project-less "topic" run (#1120) so the agent
@@ -316,6 +316,13 @@ export interface SystemPromptOptions {
    * {@link topic}. The node side reads {@link ./registry.listProjects} and passes the paths in.
    */
   topicProjects?: readonly string[] | undefined
+  /**
+   * This run hands off to a remote session nothing local can steer (#1231), so the await gates
+   * are not available in it (#1234). Appends {@link HANDS_OFF_PROTOCOL} right after the await
+   * protocol it amends, so an ambiguous prompt takes its most plausible reading and says so,
+   * instead of parking a cloud session forever on a question nobody attached can answer.
+   */
+  handsOff?: boolean | undefined
 }
 
 /**
@@ -382,5 +389,9 @@ export function composeRunSystem(opts: RunSystemOptions = {}): string {
   // after it and keeps the signal protocol last (#547). Carries the registered-project list as
   // context (#1129). Topic-only, so a normal channel is unchanged.
   const topicBind = opts.topic ? [topicBindBlock(opts.topicProjects)] : []
-  return [...(promptBlock ? [promptBlock] : []), ...browser, AWAIT_PROTOCOL, ...topicBind, SIGNAL_PROTOCOL].join('\n\n')
+  // Right after the await protocol it amends (#1234): the gates are taught, then declared
+  // unavailable, which keeps the emit contract intact for the parser while telling the agent
+  // not to reach for it. The signal protocol stays last (#547).
+  const handsOff = opts.handsOff ? [HANDS_OFF_PROTOCOL] : []
+  return [...(promptBlock ? [promptBlock] : []), ...browser, AWAIT_PROTOCOL, ...handsOff, ...topicBind, SIGNAL_PROTOCOL].join('\n\n')
 }

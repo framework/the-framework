@@ -14,7 +14,7 @@ import type { Cached } from './cache.js'
 import { parseNumstat } from './file-diff.js'
 import { errorMessage } from '../error-message.js'
 import type { AutoHandoffSkip } from '../events.js'
-import { commitPendingWork, currentBranch, startedAtFromRunId, type RunMeta } from '../store/index.js'
+import { commitPendingWork, currentBranch, startedAtFromRunId, FRAMEWORK_DIR, type RunMeta } from '../store/index.js'
 
 // What a finished session produced, and what is left to do with it (#799).
 //
@@ -62,7 +62,9 @@ export interface RunHandoff {
   deletions: number
   /**
    * The session produced nothing to hand off: the branch exists but carries no commit the base
-   * does not already have. Said out loud, rather than shown as an empty branch.
+   * does not already have — or nothing beyond the framework's own bookkeeping (#1291), which is
+   * committed for provenance, never as publishable work. Said out loud, rather than shown as an
+   * empty branch.
    */
   empty: boolean
   /** The repo has a remote to push to at all. */
@@ -216,6 +218,11 @@ function parseHandoffFiles(out: string): HandoffFile[] {
   return parseNumstat(out).map(({ path, added, removed, binary }) => ({ path, insertions: added, deletions: removed, binary }))
 }
 
+/** The framework's own paper trail (#1291): conversation records, LOGS, session archives. */
+function isBookkeepingPath(path: string): boolean {
+  return path === FRAMEWORK_DIR || path.startsWith(`${FRAMEWORK_DIR}/`)
+}
+
 /**
  * Read what a finished session left behind, from the project repo, for `branch`.
  *
@@ -296,8 +303,12 @@ export async function readRunHandoff(
     insertions: files.reduce((sum, f) => sum + f.insertions, 0),
     deletions: files.reduce((sum, f) => sum + f.deletions, 0),
     // A session that changed nothing is a real outcome, not an error: it gets said, not shown as
-    // an empty branch with buttons that would push nothing.
-    empty: commits.length === 0,
+    // an empty branch with buttons that would push nothing. Bookkeeping-only counts as nothing
+    // (#1291): every run's branch carries the framework's own records — the #326 pre-work commit
+    // sweeps in the conversation file the daemon just wrote — and publishing those alone produced
+    // junk PRs of pure paper trail. The files decide, not the commits: a branch of bookkeeping
+    // sweeps has commits and still nothing to hand off.
+    empty: commits.length === 0 || files.every(file => isBookkeepingPath(file.path)),
     hasRemote,
     pushed: remoteTip.trim() === tip,
     merged: mergedOut.trim().length > 0,

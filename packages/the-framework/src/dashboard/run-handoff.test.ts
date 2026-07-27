@@ -386,6 +386,35 @@ test('a session that committed nothing is not published (#1102)', async () => {
   assert.deepEqual(outcome, { outcome: 'skipped', reason: 'no-commits' })
 })
 
+test('a branch of pure framework bookkeeping is empty, and is not published (#1291)', async () => {
+  // The observed junk PR: one "[The Framework] Uncommited changes" commit sweeping in the
+  // conversation record the daemon wrote at start, and nothing else on the branch.
+  const bookkeeping = {
+    ...READY,
+    log: `abc123${SEP}[The Framework] Uncommited changes`,
+    diff: '21\t0\t.the-framework/conversations/2026-07-27T14-21-36-276Z.md\n2\t0\t.the-framework/LOGS.md',
+  }
+  const { git } = fakeGit(bookkeeping)
+  const handoff = await readRunHandoff('/repo', 'the-framework/x', { git, pr: async () => undefined })
+  assert.equal(handoff?.empty, true, 'paper trail is provenance, not work')
+  const outcome = await runAutoHandoff(
+    '/repo',
+    { id: 'r1', branch: 'the-framework/x' },
+    { push: true, pr: true },
+    { git: fakeGit(bookkeeping).git, pr: async () => undefined, gh: async () => assert.fail('nothing to publish') },
+  )
+  assert.deepEqual(outcome, { outcome: 'skipped', reason: 'no-commits' })
+})
+
+test('bookkeeping alongside real work does not make a branch empty (#1291)', async () => {
+  const { git } = fakeGit({
+    ...READY,
+    diff: '21\t0\t.the-framework/conversations/r1.md\n3\t1\tsrc/app.ts',
+  })
+  const handoff = await readRunHandoff('/repo', 'the-framework/x', { git, pr: async () => undefined })
+  assert.equal(handoff?.empty, false)
+})
+
 test('a repo with no remote is a skip, not a failure (#1102)', async () => {
   const { git } = fakeGit({ ...READY, remote: '' })
   const outcome = await runAutoHandoff(

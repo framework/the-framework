@@ -96,3 +96,103 @@ Consequence: nearly every run branch carries bookkeeping commits even when the a
 - Pinned preset names share one branch across runs; a closed PR never releases it (#1293).
 - Web runs record a branch that holds none of the work (#1277).
 - The prompt tells the agent to create a branch the daemon already created; removing that step is the #326 surface.
+
+---
+
+## Chapter 2: starting a session from the composer
+
+What happens, in order, between the Start click and a working agent, and what every composer control actually does. Anchors verified on main.
+
+### 2.1 The submit chain
+
+**Name.** Two composers start sessions: the launcher's `StartRunForm` and the in-session `RunComposer`. Both funnel into one telefunc write, `sendStart`.
+
+**How it works.**
+1. `StartRunForm` builds options from the saved preferences plus the picked context (`StartRunForm.tsx:85-88`) and submits (`:96`). A preset submit adds `unattended: true`; a typed prompt stays attended (#1279).
+2. `RunComposer` has three branches (`RunComposer.tsx:62-111`): new session -> `start(projectId, text, 'prompt', {})`; live run -> `sendMessage` (a control-log write, not a start); ended-but-resumable -> `start` with `resumeSession` + `continueRunId`.
+3. Both go through `useStartRun` (`lib/use-start-run.ts:29`) -> `sendStart` (`dashboard-rpc/control.telefunc.ts:184`): rejects an empty prompt (unless research), resolves a `tickets/*.md` from the prompt server-side (`:198`, an explicit `options.ticket` wins), then calls the daemon's `startRun`.
+
+Open seam: the `RunComposer` new-session branch sends `{}`, so a session started from inside another session ignores every saved preference the launcher would have applied.
+
+**How to test.** `StartRunForm.test.tsx:60` (preset -> unattended), `RunComposer.test.tsx:74-87` (new-session branch), `Composer.test.tsx:188/:277` (submit paths).
+
+### 2.2 What the daemon does before the agent exists
+
+**Name.** `onStart` (`daemon-runtime.ts:746-858`) turns one telefunc call into a detached child in its own worktree. The daemon writes almost nothing; the child owns its own record.
+
+**How it works, in order.**
+1. `options.remote` short-circuits to the relay: the run happens on another device, only a memory stub is kept (`:756-777`).
+2. `options.topic` short-circuits to a scratch-dir run that later re-homes onto a project (`:780`, `:661-734`).
+3. Project resolution against the registry (`:781`), spawn binary resolution (`:784`).
+4. Workspace: `continueRunId` re-attaches the recorded branch (`continueWorkspace`, `:418`); otherwise `allocateWorkspace` (`:456`) creates `.the-framework/worktrees/<runId>` on `the-framework/run-<runId>` and links dependencies. In a git repo a failed `worktree add` fails the start (#997); a non-repo falls back to the main checkout.
+5. Busy guard per project/worktree key (`:802-808`).
+6. Flags: `startOptionFlags` (`:239-289`) maps the options to `--model`, `--agent`, `--run-on`, `--unattended`, `--ticket`, `--queue-entry`, `--via`, `--resume-session`, the tri-state `--[no-]autopilot/technical/vanilla/transparent/auto-push-branch/auto-open-pr`, the three `--eco-*`, `--context` (repeated), `--browser`, `--on-before-mergeable`. `onStart` itself appends `--no-dashboard`, `--cwd`, `--run-id`, `--continue-run`.
+7. `spawnDetached` with stderr to `.the-framework/stderr.log` (`:821-834`); exit handlers arm `markFailedStart` -> `tearDownWorktree` -> `retryTransientDeath` (`:837-852`).
+
+Who writes what: the child writes `run.json`, `events.jsonl` and LOGS.md; the daemon writes only the stderr file, a `failed` marker when the child died before its own meta (#1261), and the post-exit archive (`tearDownWorktree`, `:492-519`). There is no daemon-side quota gate on a manual start: the #879 boundary lives in the child (`startConsumptionGuard`, `cli.ts:1734`); only the auto-PM sweep checks quota before starting.
+
+**How to test.** `daemon-workspace.test.ts:62/:95` (allocation and fallback), `:586/:607` (transient retry); fake-agent level: one start must yield exactly one worktree, one branch, one child, and a `run.json` written by the child.
+
+### 2.3 The child's run, in order
+
+**Name.** The spawned `cli.ts` run (`runBuild`, `cli.ts:1285-1901`) owns the session record and the whole lifecycle up to settle.
+
+**How it works, in order.**
+1. Config layering: CLI flags over `the-framework.yml` (`mergeRunConfig`, `:1305`); preflight for the chosen agent (`:1351`).
+2. First writes: `RunStore.open` creates `run.json` + `events.jsonl` (`:1419`); `handoff-armed`, `ticket`, `queue-entry`, then the `branch` event with the checkout's actual branch (`:1559-1572`, #1277).
+3. The attended/unattended switch: `requestChoice` is wired only when a dashboard or control channel exists and `--unattended` is absent (`:1514`); that same bit decides the stay-open chat queue (`:1522`). Unattended = gates auto-answer, no chat phase, the run ends at settle (#1279).
+4. Control channel: `watchControl` tails stop/message/handoff/bind/choice picks (`:1462`).
+5. Target and driver: `actions` requires a GitHub slug + `GH_TOKEN` or the run fails (exit 2, `:1679`); `web` prints a notice; `createRunDriver` (`run-driver.ts:27`) picks ActionsDriver / CloudDriver / local Claude or Codex; `fake` picks the stub driver.
+6. The #879 consumption guard starts (`:1734`, off under transparent).
+7. Prompt composition: `composeRunSystem` (`system-prompt.ts:385-402`) joins prompt block, optional BROWSER_PROTOCOL, AWAIT_PROTOCOL, HANDS_OFF_PROTOCOL (hands-off drivers), topic bind, SIGNAL_PROTOCOL; context fragments ride `--context`.
+8. Two run shapes: prompt/research/transparent -> `runPrompt` (`prompt-run.ts:103`: session-start, system-prompt event, driver start, await rounds with the chat loop); build -> `runFramework` (`run.ts:277`: scope -> build -> checklist steps, todo loop, then the chat phase, all gate steps skipped for hands-off drivers).
+9. Per turn, `createTurnSignalEmitter` (`turn-gate.ts:442`) parses views, `set-session-name` (the rename trigger, chapter 1.2), ready-for-merge; blocking gates come from `parseAwaitGate` (choices, multi-select, confirmation, browser, bind/create-project).
+10. Settle (`settleRun`, `cli.ts:888-942`), in this exact order: clear interrupt -> on-before-mergeable hook -> `maybeAutoHandoff` (chapter 1.5) -> `finishLog` (LOGS.md) -> `store.close()` (archives the run) -> stay up only if a local dashboard is attached. The catch path skips the handoff entirely.
+11. Process exit -> daemon teardown: failed-start marker (no-op if the meta exists), archive, worktree retained unless `done`, transient-death retry (max 2, #1281).
+
+**How to test.** `cli.test.ts:983` (branch event + rename), `run-handoff.test.ts` (settle-side handoff), `daemon-workspace.test.ts` (teardown + retry); fake-agent level: a scripted driver stepping the whole order, asserting the event sequence in `events.jsonl` matches steps 2-10.
+
+### 2.4 How the dashboard learns
+
+**Name.** No push from the daemon on start: the composer navigates optimistically and the polls adopt the run.
+
+**How it works.** `onRuns` poll every 2s (`lib/use-runs.ts:10`); the live event feed is a telefunc channel, not a poll (`lib/use-live-events.ts:35`). On start the page bumps a tick, resets context, and navigates with the returned `runId` (`pages/index/+Page.tsx:144-156`); a start that returned no id lands on the project and adopts the first `running` run the poll surfaces (`:163-171`, the #1191 fallback).
+
+**How to test.** `+Page` navigation tests; fake-agent level: submit, assert the run page shows the new run within one poll interval.
+
+### 2.5 The composer options
+
+Every control, the option it maps to, the flag it becomes, and whether a test pins it. Full mapping: `Composer.tsx`, `lib/run-option-rows.ts`, `daemon-runtime.ts:239-289`.
+
+| Control | Option -> flag | Pinned by |
+|---|---|---|
+| Typed prompt | positional prompt, kind `build` | `Composer.test.tsx:188` |
+| Preset picker (`/`) | kind `prompt` + `unattended: true` | `PresetsMenu.test.tsx:38-81`, `StartRunForm.test.tsx:60` |
+| Preset "new session" | forces the empty-options new-session branch | `RunComposer.test.tsx:74-87` |
+| Custom/project presets | preference/file, not a run option | `PresetCreatePanel.test.tsx` |
+| Agent | `agent` -> `--agent` (only non-claude) | `AgentModelMenu.test.tsx:44/:52` |
+| Model | `model` -> `--model` | `AgentModelMenu.test.tsx:35` |
+| Run on machine/Actions/web | `target` -> `--run-on actions\|web` | `OptionsMenu.test.tsx:80-177` |
+| Run on saved device | `remote` (relay, never a flag) | `OptionsMenu.test.tsx:184/:199` |
+| Transparent | `transparent` -> `--[no-]transparent` | `run-option-rows.test.ts:31/:109` |
+| Autopilot (default on) | `autopilot` -> `--[no-]autopilot` | `run-option-rows.test.ts:26` |
+| Technical control | `technical` -> `--[no-]technical` | `run-option-rows.test.ts:31` |
+| Vanilla (no system prompt) | `vanilla` -> `--[no-]vanilla` | `run-option-rows.test.ts:52`, `SystemPromptDisclosure.test.tsx:81` |
+| Eco + its three subs | `eco.*` -> `--eco-auto-planning/-research/-maintenance` | `run-option-rows.test.ts:52-98` |
+| Post-merge cleanup | `onBeforeMergeable` -> `--on-before-mergeable` | `run-option-rows.test.ts:98` |
+| Open PR | `autoOpenPr` (implies `autoPushBranch`) -> both flags | `run-option-rows.test.ts:13` |
+| Browser | `browser` (Claude-only) -> `--browser` | `run-option-rows.test.ts:64` |
+| Context picker (`#`, other repos) | `context: string[]` -> repeated `--context` | `ContextMenu.test.tsx:30-60` |
+| System-prompt disclosure | writes `vanilla`/`transparent` only | `SystemPromptDisclosure.test.tsx:27-115` |
+| "In play" strip | display-only | `ResolvedOptions.test.tsx` |
+
+Options with no composer surface (daemon/internal only): `unattended` (implicit on preset submits, auto-PM, retries), `ticket` (server-resolved), `queueEntry` (drains), `via` (other surfaces), `resumeSession`/`continueRunId` (set by `RunComposer`, not user-choosable), `topic` (its telefunc is not re-exported by the dashboard shim, so nothing reaches it), `autoPushBranch` alone (push-without-PR only via preference key, flag, or `the-framework.yml`).
+
+Disabled logic worth knowing: in-session composers bake everything at spawn, so agent/model/run-on/gear options vanish (#831/#833); Transparent greys autopilot/technical/vanilla/cleanup; Vanilla or Transparent greys Eco; Browser needs Claude and no Transparent; submit is disabled when empty, busy, or the picked device is offline.
+
+### Open seams in this chapter
+
+- `RunComposer`'s new-session branch sends empty options: saved preferences apply only to launcher starts.
+- No daemon-side quota gate on manual starts; only the sweep checks before starting (the child guard catches it later).
+- `topic` runs are built end to end but unreachable from the dashboard.
+- Push-without-PR exists as an option with no surface.

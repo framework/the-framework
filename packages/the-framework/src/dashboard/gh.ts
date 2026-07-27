@@ -183,3 +183,41 @@ export async function ghPrList(cwd: string): Promise<OpenPr[]> {
 
 /** Lists a checkout's open PRs; resolves `[]` when there is no remote / gh is unavailable. */
 export type PrLister = (cwd: string) => Promise<OpenPr[]>
+
+/** One open PR's diff of a single file (#1313). */
+export interface OpenPrFilePatch {
+  number: number
+  patch: string
+}
+
+/**
+ * The `file` diff of every open PR that touches it (#1313). One `gh api` read per open PR, so
+ * callers go through {@link cachedOpenPrFilePatches}. The files endpoint belongs to the base
+ * repo, so cross-fork PRs answer too. First 100 changed files per PR only — a PR burying the
+ * queue file deeper than that simply contributes no claim, which is today's behavior anyway.
+ * Resolves `[]` when gh is missing/unauthed.
+ */
+export async function ghOpenPrFilePatches(cwd: string, file: string, prs?: OpenPr[]): Promise<OpenPrFilePatch[]> {
+  const open = prs ?? (await ghPrList(cwd))
+  const patches: OpenPrFilePatch[] = []
+  for (const pr of open) {
+    const files = await ghJson<{ filename: string; patch?: string }[]>(
+      ['api', `repos/{owner}/{repo}/pulls/${pr.number}/files?per_page=100`],
+      cwd,
+      [],
+    )
+    const patch = files.find(f => f.filename === file)?.patch
+    if (patch) patches.push({ number: pr.number, patch })
+  }
+  return patches
+}
+
+/**
+ * The cached form of {@link ghOpenPrFilePatches} (#1028). The cold budget is generous where the
+ * PR caches' is not: the one caller is the sweep's claim check, and a drain the user just clicked
+ * should wait a few seconds for the real answer rather than stand down for a whole tick.
+ */
+export async function cachedOpenPrFilePatches(cwd: string, file: string): Promise<Cached<OpenPrFilePatch[]>> {
+  const key = ['pr-file-patches', cwd, file].join(KEY_SEP)
+  return cachedRead(key, () => ghOpenPrFilePatches(cwd, file), { ttlMs: 60_000, budgetMs: 5_000 })
+}

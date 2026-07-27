@@ -13,6 +13,8 @@ import { startAutoPm, AUTO_PM_JOBS, type AutoPmReport } from './auto-pm.js'
 import { releaseStalePinnedBranch } from './stale-branch.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
 import { claimedQueueEntries, promoteQueue } from './queue-promote.js'
+import { FLAT_TODO_FILE } from './tickets.js'
+import { cachedOpenPrFilePatches } from './dashboard/gh.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { startConversationCommitter } from './conversation-commit.js'
 import { startMergedWorktreeSweep } from './merged-worktrees.js'
@@ -179,7 +181,13 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // process's memory. The PR lookup rides the #1257 cache, so a sweep costs at most one `gh`
     // read per open entry per TTL.
     claimedEntries: async (project, candidates) =>
-      claimedQueueEntries(project.path, candidates, { runs: listRuns, pr: resolveRunPr }),
+      claimedQueueEntries(project.path, candidates, {
+        runs: listRuns,
+        pr: resolveRunPr,
+        // The cross-machine leg (#1313): an open PR retires its entry whichever machine — or
+        // cloud session — drained it. Rides the same #1028 cache as the PR lookups.
+        queuePatches: path => cachedOpenPrFilePatches(path, FLAT_TODO_FILE),
+      }),
     // The daemon promotes the queue, never the agent (#852): the run stays sandboxed in its
     // worktree, and one known file is copied across once it has finished cleanly.
     promote: async (project, { runId, entry }) => {

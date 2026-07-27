@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { AgentView } from '../lib/live-state.js'
 
 // The rail reads its content panels itself now (#1146), so it can tell an empty one from a full
@@ -99,9 +99,25 @@ describe('RightRail loop status', () => {
 
   test('it survives a tab switch, since it belongs to the run and not to a panel', () => {
     render(<RightRail {...baseProps} loop={loop} />)
-    fireEvent.click(screen.getByRole('tab', { name: /log/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /history/i }))
     expect(screen.getByText('log')).toBeTruthy()
     expect(screen.getByText(/loop status/i)).toBeTruthy()
+  })
+})
+
+describe('RightRail tab labels (#1145)', () => {
+  test('the committed session history is History, not Log', () => {
+    render(<RightRail {...baseProps} />)
+    expect(screen.getByRole('tab', { name: /history/i })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: /^log$/i })).toBeNull()
+  })
+
+  test('a tab says what it holds when hovered', async () => {
+    render(<RightRail {...baseProps} />)
+    const tab = screen.getByRole('tab', { name: /history/i })
+    fireEvent.mouseEnter(tab)
+    fireEvent.pointerEnter(tab, { pointerType: 'mouse' })
+    await waitFor(() => expect(screen.getByRole('tooltip').textContent).toContain('LOGS.md'))
   })
 })
 
@@ -119,7 +135,7 @@ describe('RightRail empty panels (#1146)', () => {
     await settle()
     expect(screen.queryByRole('tab', { name: /docs/i })).toBeNull()
     // The panel that does have something is untouched.
-    expect(screen.getByRole('tab', { name: /log/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /history/i })).toBeTruthy()
   })
 
   test('nothing anywhere means no rail at all', async () => {

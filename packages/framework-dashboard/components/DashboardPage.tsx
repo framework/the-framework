@@ -1,5 +1,5 @@
-import type { DashboardData, ProjectQueue, Intervention } from '@gemstack/the-framework'
-import { GitBranch, GitPullRequest, Inbox, ListTodo, MessageCircleQuestion } from 'lucide-react'
+import type { DashboardData, Intervention } from '@gemstack/the-framework'
+import { GitBranch, GitPullRequest, Inbox, MessageCircleQuestion } from 'lucide-react'
 import { onDashboard } from '../server/reads.telefunc.js'
 import { interventionKey } from '@gemstack/the-framework/client'
 import { Quota } from './Quota.js'
@@ -11,7 +11,7 @@ import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { HotTickets } from './HotTickets.js'
 import { RoutineWork } from './RoutineWork.js'
 import { Agents } from './Agents.js'
-import { queueEntryLabel } from '../lib/queue-entry.js'
+import { AiQueue } from './AiQueue.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
 // The Overview landing page (#1139): a focused at-a-glance board — usage first, then what needs a
@@ -27,12 +27,15 @@ import { ScrollArea } from './ui/scroll-area.js'
 export function DashboardPage({
   onSelectProject,
   onSelectRun,
+  onOpenTicket,
   onRunStarted,
   interventions,
 }: {
   onSelectProject: (id: string) => void
   /** Open one session (project + run): the Agents and hot-ticket rows link straight to a session. */
   onSelectRun: (projectId: string, runId: string) => void
+  /** Open one ticket's own page (#1144): a queued entry links to its ticket, so its row does too. */
+  onOpenTicket: (projectId: string, file: string) => void
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
   onRunStarted: (projectId: string, intent: string, runId?: string) => void
   interventions: Intervention[]
@@ -58,7 +61,7 @@ export function DashboardPage({
           <HumanQueue items={interventions} onSelectProject={onSelectProject} onSelectRun={onSelectRun} />
           <div className="space-y-4">
             <Agents working={data?.active ?? []} loading={loading} onSelectRun={onSelectRun} />
-            <AiQueue queue={data?.queue ?? []} loading={loading} />
+            <AiQueue queue={data?.queue ?? []} loading={loading} onOpenTicket={onOpenTicket} onRunStarted={onRunStarted} />
           </div>
         </div>
 
@@ -175,60 +178,6 @@ function HumanQueue({
                   </Tooltip>
 
                 )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-// The AI Queue (#1139): every project's open `TODO_AGENTS.md` items — the work the framework picks
-// up on its own — grouped by project and shown in full. No "+N more": this is the plan, and a
-// collapsed plan is one you cannot read. Bullets, not checkboxes: nothing here is yours to tick off.
-function AiQueue({ queue, loading }: { queue: ProjectQueue[]; loading: boolean }) {
-  const withOpen = queue.filter(q => q.open > 0)
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ListTodo className="h-4 w-4 text-muted-foreground" />
-          AI Queue
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">Tasks AI will work on next</p>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <p className="py-2 text-sm text-muted-foreground">Loading…</p>
-        ) : withOpen.length === 0 ? (
-          <p className="py-2 text-sm text-muted-foreground">Nothing queued.</p>
-        ) : (
-          <ul className="space-y-4">
-            {withOpen.map(q => (
-              <li key={q.projectId}>
-                {/* A group header, not a link (#1139): this card is the read-only "what's next" list,
-                    and a project name that jumped to the launcher was the odd redirect the thread
-                    called out. The work itself is opened from Hot tickets and Agents below. */}
-                <div className="flex w-full items-center gap-2">
-                  <span className="truncate text-sm font-medium">{q.projectName}</span>
-                  <span className="ml-auto shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">{q.open}</span>
-                </div>
-                <ul className="mt-1.5 space-y-1 pl-0.5">
-                  {q.items
-                    .filter(i => !i.done)
-                    .map((item, i) => {
-                      // The line is markdown, and a queued ticket is written as a link to it (#1164),
-                      // so print the title rather than the source; the whole line stays in the tooltip.
-                      const label = queueEntryLabel(item.text)
-                      return (
-                        <li key={i} className="flex gap-2 text-sm text-muted-foreground">
-                          <span aria-hidden className="text-muted-foreground/50">•</span>
-                          <span className="truncate" title={item.text}>{label.text}</span>
-                        </li>
-                      )
-                    })}
-                </ul>
               </li>
             ))}
           </ul>

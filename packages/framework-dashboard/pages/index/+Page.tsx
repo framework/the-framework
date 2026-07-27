@@ -276,6 +276,7 @@ export default function Page() {
         <DashboardPage
           onSelectProject={selectProject}
           onSelectRun={selectRunInProject}
+          onOpenTicket={openTicket}
           onRunStarted={runStarted}
           interventions={interventions}
         />

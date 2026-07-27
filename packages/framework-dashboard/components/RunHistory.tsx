@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, ChevronDown, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Ticket } from 'lucide-react'
+import { Plus, ChevronDown, Cloud, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Ticket } from 'lucide-react'
 import type { RunMeta, RunStatus, RecentRun, ProjectSummary } from '@gemstack/the-framework'
 import { AGENT_LABELS, agentForDriver } from '@gemstack/the-framework/client'
 import { Button, buttonVariants } from './ui/button.js'
@@ -238,6 +238,7 @@ export function RunHistory({
                       active={row.active}
                       waiting={row.run.settledAt !== undefined}
                       remote={row.run.target === 'remote'}
+                      cloud={row.run.target === 'web'}
                       {...(row.run.remoteLabel ? { remoteLabel: row.run.remoteLabel } : {})}
                       onClick={row.onClick}
                     />
@@ -496,6 +497,7 @@ function RunRow({
   dim = false,
   waiting = false,
   remote = false,
+  cloud = false,
   remoteLabel,
 }: {
   status: RunStatus
@@ -510,12 +512,18 @@ function RunRow({
   waiting?: boolean
   /** Runs on a connected device (#1067): the row gets a device glyph next to the agent logo. */
   remote?: boolean
+  /** A Claude Code cloud session (#1263): the row gets a cloud glyph beside the agent logo. */
+  cloud?: boolean
   /** The device's label, for the glyph's tooltip. */
   remoteLabel?: string | undefined
 }) {
   // Only a live run can be waiting on you; a finished one is just finished.
   const parked = waiting && status === 'running'
   const agent = agentForDriver(driver)
+  // A web run's local process ends at the hand-off by design, so its `done` is about this
+  // machine, not the session (#1264): the cloud side keeps working and opens its own PR. Saying
+  // "done" under ten working cloud agents is the lie the demo would put on camera.
+  const inCloud = cloud && status === 'done'
   // The title only fades + marquees when it actually overflows the fixed-width rail; a short one
   // shows plainly. Measured here since CSS cannot tell. The rail width is fixed, so intent is the
   // only thing that changes the answer.
@@ -543,14 +551,15 @@ function RunRow({
         {status === 'running' && (
           <span className={cn('inline-block h-2 w-2 shrink-0 rounded-full', parked ? 'bg-muted-foreground' : 'animate-pulse bg-primary')} />
         )}
-        <Badge className={cn('shrink-0 border-transparent px-0 text-[10px] uppercase', parked ? 'text-muted-foreground' : STATUS_TONE[status])}>
-          {parked ? 'waiting' : status}
+        <Badge className={cn('shrink-0 border-transparent px-0 text-[10px] uppercase', parked ? 'text-muted-foreground' : inCloud ? 'text-primary' : STATUS_TONE[status])}>
+          {parked ? 'waiting' : inCloud ? 'in cloud' : status}
         </Badge>
         <span className="truncate text-xs font-normal text-muted-foreground">{subtitle}</span>
         {/* Right cluster: a device glyph when the run is relayed to a connected device (#1067),
-            then the agent logo. The logo is the only thing naming the agent on this row, so it
-            carries a title rather than being decorative. */}
-        {(remote || agent) && (
+            a cloud glyph for a Claude Code cloud session (#1263), then the agent logo. The logo
+            is the only thing naming the agent on this row, so it carries a title rather than
+            being decorative. */}
+        {(remote || cloud || agent) && (
           <span className="ml-auto flex shrink-0 items-center gap-1.5">
             {remote && (
               <Tooltip>
@@ -558,6 +567,14 @@ function RunRow({
                   <MonitorSmartphone className="h-3 w-3 text-muted-foreground" aria-label={remoteLabel ? `Runs on ${remoteLabel}` : 'Runs on a connected device'} />
                 </TooltipTrigger>
                 <TooltipContent>{remoteLabel ? `Runs on ${remoteLabel}` : 'Runs on a connected device'}</TooltipContent>
+              </Tooltip>
+            )}
+            {cloud && (
+              <Tooltip>
+                <TooltipTrigger render={<span className="flex items-center" />}>
+                  <Cloud className="h-3 w-3 text-muted-foreground" aria-label="Runs as a Claude Code cloud session" />
+                </TooltipTrigger>
+                <TooltipContent>Runs as a Claude Code cloud session; it works and opens its PR over there.</TooltipContent>
               </Tooltip>
             )}
             {agent && (

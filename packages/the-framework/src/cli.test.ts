@@ -13,6 +13,7 @@ import {
   chooseSessionLink,
   claudeDriverOptions,
   CLAUDE_CODE_SESSION_LIST,
+  createRunJournal,
   ecoOptions,
   frameworkVersion,
   mergeRunConfig,
@@ -977,4 +978,38 @@ test('parseArgs reads --ticket, the ticket the daemon says this run implements (
 
 test('parseArgs reads --queue-entry, the queue entry a drain pinned this run to (#1253)', () => {
   assert.equal(parseArgs(['--queue-entry', 'Fix the flaky teardown test', 'x']).queueEntry, 'Fix the flaky teardown test')
+})
+
+test('naming the session renames the run-id branch and records it as a branch event (#1277)', async t => {
+  const { execFileSync } = await import('node:child_process')
+  const repo = await mkdtemp(join(tmpdir(), 'fw-journal-'))
+  t.after(() => rm(repo, { recursive: true, force: true }))
+  const git = (...args: string[]): string => execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
+  git('init', '-q')
+  git('config', 'user.email', 'test@example.com')
+  git('config', 'user.name', 'Test')
+  git('commit', '--allow-empty', '-q', '-m', 'seed')
+  // The state allocateWorkspace leaves a run in: checked out on its run-id branch (#736).
+  git('checkout', '-q', '-b', 'the-framework/run-r1')
+  const { io, out } = capture()
+  const journal = createRunJournal({
+    io,
+    cwd: repo,
+    store: undefined,
+    publisher: undefined,
+    runId: 'r1',
+    kind: 'prompt',
+    title: 'a run',
+    beforeLog: async () => {},
+  })
+  journal.onEvent({ kind: 'session-name', name: 'cool-name' })
+  // The rename runs off the event asynchronously; wait for the recorded branch to come through.
+  for (let i = 0; i < 200 && !out.some(line => line.includes('branch: the-framework/cool-name')); i++) {
+    await new Promise(res => setTimeout(res, 10))
+  }
+  assert.ok(
+    out.some(line => line.includes('branch: the-framework/cool-name')),
+    `expected a branch event, got: ${out.join('; ')}`,
+  )
+  assert.equal(git('rev-parse', '--abbrev-ref', 'HEAD').trim(), 'the-framework/cool-name')
 })

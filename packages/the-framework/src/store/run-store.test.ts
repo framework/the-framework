@@ -663,3 +663,12 @@ test('applyEventToMeta records the queue entry a drain pinned the run to (#1253)
   const ended = applyEventToMeta(on, { kind: 'end', ok: true }, AT)
   assert.equal(ended.queueEntry, 'Fix the flaky teardown test')
 })
+
+test('applyEventToMeta records the branch a branch event names (#1277)', () => {
+  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const on = applyEventToMeta(base, { kind: 'branch', branch: 'the-framework/run-r1' }, AT)
+  assert.equal(on.branch, 'the-framework/run-r1')
+  // A rename mid-run replaces it: the meta always names the branch the work is on now.
+  const renamed = applyEventToMeta(on, { kind: 'branch', branch: 'the-framework/cool-name' }, AT)
+  assert.equal(renamed.branch, 'the-framework/cool-name')
+})

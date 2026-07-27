@@ -34,6 +34,7 @@ import type { FrameworkEvent } from './events.js'
 import type { StartRunKind, StartRunOptions, StartRunResult, AddProjectResult } from './dashboard/index.js'
 import type { EventsSource, PreviewHandlers, RemoteRuns } from './dashboard/telefunc-serve.js'
 import { RelayedRuns, startRemoteRun } from './dashboard/remote-run.js'
+import { runBranchFor } from './dashboard/run-handoff.js'
 import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
 import { tailEvents } from './dashboard-rpc/events-tail.js'
 import { isSafeVia } from './conversations.js'
@@ -375,7 +376,10 @@ export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOption
       const existing = await stat(path).then(s => s.isDirectory()).catch(() => false)
       if (!existing) {
         const archived = (await listRuns(projectCwd).catch(() => [])).find(run => run.id === runId)
-        const branch = archived?.sessionName ? `the-framework/${archived.sessionName}` : runBranchName(runId)
+        // The recorded branch first (#1277): an agent that branched itself (#326 allows it) has
+        // its work there, and re-attaching by the session-name guess would continue the run on a
+        // branch without its previous commits.
+        const branch = runBranchFor(archived ?? { id: runId })
         await attachWorktree(projectCwd, { runId, branch })
         await linkDependencies(projectCwd, path).catch(() => [])
       }

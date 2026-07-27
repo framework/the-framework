@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, writeFile, readFile, rm, stat, realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { createProjectRuntime, cleanupTimedOutWorktree, tearDownTopicScratch, moveTopicRunHistory } from './daemon-runtime.js'
+import { createProjectRuntime, cleanupTimedOutWorktree, tearDownTopicScratch, moveTopicRunHistory, markFailedStart, runStderrPath } from './daemon-runtime.js'
 import { CliTimeoutError } from './cli-exec.js'
-import { FRAMEWORK_DIR, WORKTREES_DIR, EVENTS_FILE, META_FILE, worktreePath, runBranchName, RUN_META_VERSION, type RunMeta } from './store/index.js'
+import { FRAMEWORK_DIR, WORKTREES_DIR, EVENTS_FILE, META_FILE, worktreePath, runBranchName, RUN_META_VERSION, startedAtFromRunId, type RunMeta } from './store/index.js'
 import { topicScratchPath, addProject, projectId } from './registry.js'
 import { nodeGitRunner } from './project.js'
 
@@ -422,6 +422,101 @@ test('moveTopicRunHistory copies the log and re-marks the meta as a bound projec
     assert.equal(moved.id, 'run1', 'the run id and its history are preserved')
     assert.equal(moved.intent, 'draft a plan')
     assert.match(await readFile(join(worktree, FRAMEWORK_DIR, EVENTS_FILE), 'utf8'), /hello/, 'the event log came along')
+  } finally {
+    await rm(base, { recursive: true, force: true })
+  }
+})
+
+/** A stub CLI that prints a boot error to stderr and dies without ever opening its run store (#1261). */
+async function writeDyingStub(dir: string): Promise<string> {
+  const stub = join(dir, 'dying-stub.cjs')
+  await writeFile(
+    stub,
+    `process.stderr.write("Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'some-workspace-dep'\\n")\n` + `process.exit(1)\n`,
+  )
+  return stub
+}
+
+/** Poll a checkout until its `run.json` appears, or time out. */
+async function waitForMeta(cwd: string): Promise<RunMeta | undefined> {
+  for (let i = 0; i < POLL_ATTEMPTS; i++) {
+    const raw = await readFile(join(cwd, FRAMEWORK_DIR, META_FILE), 'utf8').catch(() => '')
+    if (raw) return JSON.parse(raw) as RunMeta
+    await new Promise(r => setTimeout(r, 20))
+  }
+  return undefined
+}
+
+/** Poll a checkout's event log until `pattern` shows up, and return what was read. */
+async function waitForLogLine(cwd: string, pattern: RegExp): Promise<string> {
+  let events = ''
+  for (let i = 0; i < POLL_ATTEMPTS && !pattern.test(events); i++) {
+    await new Promise(r => setTimeout(r, 20))
+    events = await readFile(join(cwd, FRAMEWORK_DIR, EVENTS_FILE), 'utf8').catch(() => '')
+  }
+  return events
+}
+
+test('a worktree run whose child dies at boot is marked failed instead of waiting forever (#1261)', async () => {
+  const cwd = await initRepo('framework-bootfail-')
+  const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeDyingStub(cwd) })
+  try {
+    const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; runId?: string }
+    assert.equal(result.ok, true, 'the Start itself succeeds; the death is asynchronous')
+    const runId = result.runId!
+    const worktree = worktreePath(cwd, runId)
+
+    // The whole point: the child never wrote a lifecycle, so the daemon leaves one.
+    const meta = await waitForMeta(worktree)
+    assert.ok(meta, 'the daemon wrote a run.json for the dead child')
+    assert.equal(meta.status, 'failed', 'marked failed, so the page stops saying "Waiting for the session to start"')
+    assert.equal(meta.id, runId, 'under the run id the worktree is named with')
+    assert.equal(meta.startedAt, startedAtFromRunId(runId), 'dated by its run id, not by when the daemon noticed')
+    assert.equal(meta.intent, 'build a thing', 'carrying the prompt, so the run row is identifiable')
+
+    // The cause is visible: the child's stderr was captured and its tail is in the run log.
+    const events = await waitForLogLine(worktree, /failed to start/)
+    assert.match(events, /The session failed to start: its process exited with code 1/)
+    assert.match(events, /Cannot find package 'some-workspace-dep'/, 'the stderr tail names the actual boot error')
+    assert.match(await readFile(runStderrPath(worktree), 'utf8'), /ERR_MODULE_NOT_FOUND/, 'the full stderr file is kept')
+
+    // Failed, so the teardown's retention rule keeps the checkout for inspection.
+    assert.equal(await stat(worktree).then(s => s.isDirectory(), () => false), true, 'the worktree is retained')
+  } finally {
+    await runtime.dispose()
+    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
+
+test('a topic run whose child dies at boot is marked failed and its scratch retained (#1261)', async () => {
+  const home = await realpath(await mkdtemp(join(tmpdir(), 'framework-bootfail-topic-')))
+  const config = await realpath(await mkdtemp(join(tmpdir(), 'framework-bootfail-cfg-')))
+  const env = { XDG_CONFIG_HOME: config }
+  const runtime = createProjectRuntime({ cwd: home, env, binPath: await writeDyingStub(home) })
+  try {
+    const result = (await runtime.onStart('draft a ticket', 'build', { topic: true })) as { ok: boolean; runId?: string }
+    assert.equal(result.ok, true)
+    const scratch = topicScratchPath(env, result.runId!)
+
+    const meta = await waitForMeta(scratch)
+    assert.equal(meta?.status, 'failed', 'the scratch run is marked failed too')
+    await waitForLogLine(scratch, /failed to start/)
+    assert.equal(await stat(scratch).then(s => s.isDirectory(), () => false), true, 'the scratch is retained for inspection')
+  } finally {
+    await runtime.dispose()
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    await rm(config, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
+
+test('a child that wrote its own lifecycle is left alone by the failed-start marker (#1261)', async () => {
+  const base = await realpath(await mkdtemp(join(tmpdir(), 'framework-bootfail-skip-')))
+  try {
+    await writeRunMeta(base, 'done')
+    assert.equal(await markFailedStart(base, 'run1', 'build a thing', 'its process exited with code 0'), false)
+    const meta = JSON.parse(await readFile(join(base, FRAMEWORK_DIR, META_FILE), 'utf8')) as RunMeta
+    assert.equal(meta.status, 'done', 'the run reported its own end; the marker does not rewrite history')
+    assert.equal(await stat(join(base, FRAMEWORK_DIR, EVENTS_FILE)).then(() => true, () => false), false, 'and no failure line is invented')
   } finally {
     await rm(base, { recursive: true, force: true })
   }

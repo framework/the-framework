@@ -44,3 +44,46 @@ test('collectQueue skips a project whose docs read throws', async () => {
   const queues = await collectQueue([project('boom', '/boom'), project('ok', '/ok')], read)
   assert.deepEqual(queues.map(q => q.projectId), ['ok'])
 })
+
+test('link-style entries with no checkbox are open items, like the sweep reads them (#1296)', () => {
+  // The observed blocker: a triage-written queue in the #1164 link style read as "Nothing queued"
+  // while the sweep drained it happily.
+  const md = [
+    '# TODO_AGENTS',
+    '',
+    '## Priority 8',
+    '',
+    '- [Settle-moment UX: always offer Open PR](tickets/2026-07-25_unclear-ux.md) — offer the box',
+    '  and keep the push setting available.',
+    '- [Remove the babysitting paragraph](tickets/2026-07-26_remove-babysitting.md) — steps.ts:62',
+    '',
+    '## Priority 7',
+    '',
+    '- [x] already handled',
+    'prose that is not an entry',
+  ].join('\n')
+  const items = parseTodoItems(md)
+  assert.deepEqual(
+    items.map(i => [i.done, i.text.slice(0, 20)]),
+    [
+      [false, '[Settle-moment UX: a'],
+      [false, '[Remove the babysitt'],
+      [true, 'already handled'],
+    ],
+  )
+})
+
+test('parseTodoItems agrees with the sweep parser on which entries are open (#1296)', async () => {
+  const { parseTodoEntries } = await import('../todo-loop.js')
+  const md = [
+    '- [Link entry](tickets/a.md) — do the thing',
+    '- [ ] open checkbox entry',
+    '- [x] done entry',
+    '* starred plain entry',
+    '1. numbered entry',
+    '  continuation line, not an entry',
+    '## a heading',
+  ].join('\n')
+  const open = parseTodoItems(md).filter(i => !i.done).map(i => i.text)
+  assert.deepEqual(open, parseTodoEntries(md))
+})

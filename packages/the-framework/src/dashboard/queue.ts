@@ -24,15 +24,31 @@ export interface ProjectQueue {
   items: QueueItem[]
 }
 
-// A GitHub-style task-list line: `- [ ] text` or `* [x] text` (any leading indent).
-const TASK_LINE = /^\s*[-*]\s+\[([ xX])\]\s+(.*\S)\s*$/
+// A markdown list item (`-`, `*`, or `1.`), any leading indent. Same rule as the sweep's
+// `parseTodoEntries` (todo-loop.ts), deliberately: the queue's readers must agree on what an
+// entry is, or the card says "Nothing queued" while the sweep drains the same file (#1296).
+const LIST_ITEM = /^\s*(?:[-*]|\d+\.)\s+(.*\S)\s*$/
+// A GitHub-style task checkbox at the start of an item's text: `[ ]` open, `[x]` done.
+const CHECKBOX = /^\[([ xX])\]\s*(.*)$/
 
-/** Parse the task-list entries out of a TODO doc; non-checklist lines are ignored. */
+/**
+ * Parse the queue entries out of a TODO doc; headings, prose and blank lines are ignored.
+ *
+ * Every list item is an entry, open unless its checkbox is checked — the sweep's semantics
+ * (#1296). Triage agents write the #1164 link style (`- [Title](tickets/x.md) — ...`) with no
+ * checkbox, and the old checkbox-only regex read that whole queue as empty.
+ */
 export function parseTodoItems(content: string): QueueItem[] {
   const items: QueueItem[] = []
   for (const line of content.split('\n')) {
-    const match = TASK_LINE.exec(line)
-    if (match) items.push({ text: match[2]!, done: match[1] !== ' ' })
+    const item = LIST_ITEM.exec(line)
+    if (!item) continue
+    const task = CHECKBOX.exec(item[1]!)
+    if (task) {
+      if (task[2]!.trim()) items.push({ text: task[2]!.trim(), done: task[1] !== ' ' })
+    } else {
+      items.push({ text: item[1]!, done: false })
+    }
   }
   return items
 }

@@ -14,6 +14,7 @@ import {
   attachWorktree,
   worktreePath,
   listRuns,
+  archivedRunPaths,
   commitPendingWork,
   currentBranch,
   removeWorktree,
@@ -189,6 +190,48 @@ export async function markFailedStart(cwd: string, runId: string, intent: string
 }
 
 /**
+ * Driver deaths worth one more try (#1281): the connection dropped or the API buckled mid-run —
+ * failures about the transport, not the work. Conservative on purpose: a run that failed for any
+ * reason this does not name stays failed, because retrying a real failure just re-runs it.
+ */
+const TRANSIENT_FAILURE =
+  /connection closed|connection reset|connection error|econnreset|etimedout|socket hang up|overloaded|rate.?limit|api error: 5\d\d|internal server error/i
+
+/** Whether a run's failure detail names a transient transport error (#1281). */
+export function isTransientRunFailure(detail: string | undefined): boolean {
+  return detail !== undefined && TRANSIENT_FAILURE.test(detail)
+}
+
+/**
+ * The detail the run's own `end` event failed with, off its archived event log (#1281), or
+ * undefined when the run did not fail by its own report. Only a child-written `end` counts: a
+ * boot death (#1261) never writes one, and retrying a run that cannot boot would just re-crash.
+ */
+export function lastRunFailureDetail(eventsJsonl: string): string | undefined {
+  let detail: string | undefined
+  for (const line of eventsJsonl.split('\n')) {
+    if (!line.trim()) continue
+    try {
+      const event = JSON.parse(line) as { kind?: string; ok?: boolean; detail?: string }
+      if (event.kind === 'end') detail = event.ok === false ? event.detail : undefined
+    } catch {
+      // A malformed line is not this reader's problem; the events around it still count.
+    }
+  }
+  return detail
+}
+
+/** How many times a transiently-dead run is continued before its failure stands (#1281). */
+export const MAX_TRANSIENT_RETRIES = 2
+
+/** The pause before a retry (#1281): long enough for a dropped connection to be worth re-trying. */
+export const TRANSIENT_RETRY_DELAY_MS = 15_000
+
+/** What the continued session is told (#1281), in the #923 resume prompt's shape. */
+export const RETRY_PROMPT =
+  'This session died to a transient connection error, not because anyone asked it to stop. Look at what you had already done, then carry on from there and finish the work.'
+
+/**
  * Translate the dashboard's Global options (#314) into CLI flags for the spawned
  * run. Only enabled toggles emit a flag, so a default (all-off) start is
  * byte-identical to before. `parseArgs` on the other side accepts every one.
@@ -292,6 +335,8 @@ export interface ProjectRuntimeOptions {
   env: NodeJS.ProcessEnv
   /** The CLI entry to spawn runs with (#345); undefined uses `process.argv[1]`. */
   binPath?: string | undefined
+  /** The pause before a transient-death retry (#1281); undefined uses {@link TRANSIENT_RETRY_DELAY_MS}. A test seam. */
+  retryDelayMs?: number | undefined
 }
 
 /** The per-project run + preview surface the dashboard drives, plus its teardown. */
@@ -330,7 +375,7 @@ export interface ProjectRuntime {
  * with no project id (or the home id) resolves to it without a registry lookup. Split out of
  * {@link runDaemon} so the daemon body reads as lifecycle and this reads as business logic.
  */
-export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOptions): ProjectRuntime {
+export function createProjectRuntime({ cwd, env, binPath, retryDelayMs }: ProjectRuntimeOptions): ProjectRuntime {
   const homeId = projectId(resolve(cwd))
   // The run-key namespace for project-less topic runs (#1120): `@`-prefixed so it can never equal a
   // real project id (projectId always appends `-<hash>`), so a topic run belongs to no project.
@@ -471,6 +516,54 @@ export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOption
     } catch {
       // A worktree we could not retire is a worktree left on disk, which is the safe direction.
     }
+  }
+
+  // One more try for a run the API dropped mid-work (#1281): the failure is about the transport,
+  // not the work, and the continue-run machinery (#762/#923) reopens the retained checkout on its
+  // recorded branch (#1278). Counted in memory on purpose: a daemon restart already re-resumes
+  // runs (#923), and a lost count only ever grants one extra attempt.
+  const runRetries = new Map<string, number>()
+  const retryTransientDeath = async (
+    projectCwd: string,
+    targetProjectId: string | undefined,
+    runId: string,
+    options: StartRunOptions,
+  ): Promise<void> => {
+    const attempts = runRetries.get(runId) ?? 0
+    if (attempts >= MAX_TRANSIENT_RETRIES) return
+    const meta = (await listRuns(projectCwd).catch((): RunMeta[] => [])).find(run => run.id === runId)
+    // Only a run that failed by its own report, and only a local one: a web/actions run's
+    // lifecycle lives elsewhere and is not this daemon's to replay. A stopped run stays stopped.
+    if (meta?.status !== 'failed') return
+    if (meta.target !== undefined && meta.target !== 'local') return
+    const jsonl = (await archivedRunPaths(projectCwd, runId).catch((): string[] => [])).find(path => path.endsWith('.jsonl'))
+    const detail = jsonl ? lastRunFailureDetail(await readFile(jsonl, 'utf8').catch(() => '')) : undefined
+    if (!isTransientRunFailure(detail)) return
+    runRetries.set(runId, attempts + 1)
+    console.log(
+      `[framework] session ${runId} died to a transient error (${detail}); continuing it in ${(retryDelayMs ?? TRANSIENT_RETRY_DELAY_MS) / 1000}s, attempt ${attempts + 1} of ${MAX_TRANSIENT_RETRIES}`,
+    )
+    // Unref'd: a pending retry must never hold the daemon open, and a daemon that exits first
+    // simply does not retry — #923's resume owns the restart case.
+    const timer = setTimeout(() => {
+      void onStart(
+        RETRY_PROMPT,
+        'build',
+        {
+          ...options,
+          // Unattended like #923's resume: nobody is watching a retry, and the run must end.
+          unattended: true,
+          continueRunId: runId,
+          ...(meta.sessionId ? { resumeSession: meta.sessionId } : {}),
+          // The drain's pin rides along (#1268), so the claim survives onto the continued meta.
+          ...(meta.queueEntry ? { queueEntry: meta.queueEntry } : {}),
+        },
+        targetProjectId,
+      ).then(result => {
+        if (!result.ok) console.log(`[framework] could not continue session ${runId} after its transient death: ${result.error}`)
+      })
+    }, retryDelayMs ?? TRANSIENT_RETRY_DELAY_MS)
+    timer.unref?.()
   }
 
   /**
@@ -746,8 +839,13 @@ export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOption
         const { cwd: checkout, runId } = workspace
         if (!runId) return
         // The failed marker lands before the teardown reads the meta (#1261), so a boot death is
-        // archived as `failed` and the worktree is then kept for inspection, not removed.
-        void markFailedStart(checkout, runId, prompt, detail).finally(() => void tearDownWorktree(projectCwd, checkout, runId))
+        // archived as `failed` and the worktree is then kept for inspection, not removed. After
+        // teardown the archive is readable, which is when a transient death earns a retry (#1281).
+        void markFailedStart(checkout, runId, prompt, detail).finally(() =>
+          void tearDownWorktree(projectCwd, checkout, runId).finally(() =>
+            void retryTransientDeath(projectCwd, targetProjectId, runId, options),
+          ),
+        )
       }
       child.once('error', err => settle(`its process could not be spawned (${errorMessage(err)})`))
       child.once('exit', (code, signal) => settle(exitDetail(code, signal)))

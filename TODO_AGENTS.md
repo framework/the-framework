@@ -2,7 +2,6 @@
 
 ## Priority 9
 
-- [Verify the concurrent-agents setting actually works](tickets/2026-07-25_concurrent-agents-setting.md) — the implementation landed on `main` via #1252 but is unverified ("Done, but not sure it works"); verification is the named remaining step. Exercise the setting end-to-end (a routine spins up the configured number of concurrent agents), fix what's broken if the fix is small, otherwise report the diagnosis. The thread's open question (driving "Run now" concurrency from routine tasks) stays out of scope.
 - [Dry-run the Human Queue demo flow and fix glaring breaks](tickets/2026-07-25_nice-demo-human-queue.md) — the maintainer hasn't tested the flow and needs it to demo well: click a Human Queue item → see the list of choices → pick one → done. Walk that exact path, fix only glaring breaks that would show on camera ("non-glaring paper cuts are okay" per the ticket), and report the state of the flow either way.
 
 ## Priority 8

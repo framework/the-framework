@@ -19,6 +19,13 @@ export interface SuspendedRun {
   sessionId?: string
   /** When the daemon stopped it, ISO. */
   suspendedAt: string
+  /**
+   * The queue entry a drain pinned the run to (#1268), carried across the restart so the resumed
+   * run re-emits it. Its meta is what keeps the entry off the sweep's market (#1253), and the
+   * meta rebuilt on `--continue-run` proved able to lose the fold — a released pin means a second
+   * agent on work the resumed one is still doing.
+   */
+  queueEntry?: string
 }
 
 function suspendedPath(cwd: string): string {

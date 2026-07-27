@@ -747,6 +747,9 @@ export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOption
         runId,
         suspendedAt: new Date().toISOString(),
         ...(meta?.sessionId ? { sessionId: meta.sessionId } : {}),
+        // The drain's pin travels with the record (#1268): the resumed run re-emits it, so the
+        // sweep's claim on the entry (#1253) survives the restart even if the meta replay drops it.
+        ...(meta?.queueEntry ? { queueEntry: meta.queueEntry } : {}),
       }
       byProject.set(projectCwd, [...(byProject.get(projectCwd) ?? []), entry])
     }

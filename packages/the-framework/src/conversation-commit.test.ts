@@ -1,11 +1,13 @@
 import { strict as assert } from 'node:assert'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import type { ProjectSummary } from './dashboard/projects.js'
-import type { GitRunner } from './project.js'
+import { nodeGitRunner, type GitRunner } from './project.js'
 import {
   commitConversations,
   commitMessage,
   gitBusy,
+  pathspecsFor,
   pendingConversations,
   startConversationCommitter,
   CONVERSATIONS_PATHSPEC,
@@ -137,10 +139,13 @@ test('a non-repo is busy rather than committed into (#912)', async () => {
 test('a commit stages and commits the pathspec, and never add -A (#912)', async () => {
   const { git, calls } = fakeGit({
     'rev-parse': '/repo/.git\n',
-    status: '?? .the-framework/conversations/a.md',
+    status: ['?? .the-framework/conversations/a.md', '?? .the-framework/git@example.com/sessions/r1.json'].join('\n'),
   })
   const outcome = await commitConversations('/repo', git, noLocks)
-  assert.deepEqual(outcome, { committed: true, files: ['.the-framework/conversations/a.md'] })
+  assert.deepEqual(outcome, {
+    committed: true,
+    files: ['.the-framework/conversations/a.md', '.the-framework/git@example.com/sessions/r1.json'],
+  })
 
   assert.deepEqual(
     calls.find(args => args[0] === 'add'),
@@ -150,7 +155,7 @@ test('a commit stages and commits the pathspec, and never add -A (#912)', async 
   assert.deepEqual(calls.find(args => args[0] === 'commit'), [
     'commit',
     '-m',
-    '[The Framework] a conversation',
+    '[The Framework] a conversation and a session',
     '--',
     ...COMMITTED_PATHSPECS,
   ])
@@ -158,6 +163,98 @@ test('a commit stages and commits the pathspec, and never add -A (#912)', async 
     !calls.some(args => args.includes('-A') || args.includes('--all')),
     'the user checkout is never swept wholesale',
   )
+})
+
+test('a pathspec with nothing under it is left out rather than failing the commit', async () => {
+  // git aborts the whole `add`/`commit` on a pathspec that matches no file, so a project that has
+  // sessions but has never recorded a conversation — every project, until its first chat — used to
+  // fail on every poll and put "pathspec ... did not match any files" in the daemon log each time.
+  assert.deepEqual(pathspecsFor(['.the-framework/conversations/a.md']), [CONVERSATIONS_PATHSPEC])
+  assert.deepEqual(pathspecsFor(['.the-framework/git@example.com/sessions/r1.json']), [SESSIONS_PATHSPEC])
+  assert.deepEqual(
+    pathspecsFor(['.the-framework/conversations/a.md', '.the-framework/git@example.com/sessions/r1.json']),
+    [...COMMITTED_PATHSPECS],
+    'both are passed when both have something pending',
+  )
+  assert.deepEqual(pathspecsFor([]), [], 'and nothing pending names no pathspec at all')
+})
+
+test('a project with no conversations directory commits its sessions without a pathspec error', async () => {
+  const { git, calls } = fakeGit({
+    'rev-parse': '/repo/.git\n',
+    status: '?? .the-framework/git@example.com/sessions/r1.json',
+  })
+  const outcome = await commitConversations('/repo', git, noLocks)
+  assert.deepEqual(outcome, { committed: true, files: ['.the-framework/git@example.com/sessions/r1.json'] })
+  assert.deepEqual(
+    calls.find(args => args[0] === 'add'),
+    ['add', '--', SESSIONS_PATHSPEC],
+    'the conversations pathspec, which would match nothing, is not passed',
+  )
+  assert.deepEqual(calls.find(args => args[0] === 'commit'), [
+    'commit',
+    '-m',
+    '[The Framework] a session',
+    '--',
+    SESSIONS_PATHSPEC,
+  ])
+})
+
+test('a pending file under neither pathspec is skipped, never committed with an empty pathspec', async () => {
+  // Unreachable in practice — `status` is scoped to the same pathspecs — but an empty pathspec list
+  // means "everything" to git, so the fallback has to be a skip and not a wide-open commit.
+  const { git, calls } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? src/app.ts' })
+  assert.deepEqual(await commitConversations('/repo', git, noLocks), {
+    committed: false,
+    reason: 'no conversation changes',
+  })
+  assert.ok(!calls.some(args => args[0] === 'add' || args[0] === 'commit'), 'nothing touched the index')
+})
+
+test('against real git: a missing or empty conversations directory is quietly skipped, not an error', async () => {
+  // Real git because the fake one never rejects a pathspec, and the rejection is the whole bug. It
+  // also shows the two failures land in different commands: `add` tolerates an existing-but-empty
+  // directory and `commit` is the one that rejects it, once the pathspec must match a known file.
+  const { mkdtemp, mkdir, writeFile, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+
+  const repo = await mkdtemp(join(tmpdir(), 'fw-commit-'))
+  const git = nodeGitRunner()
+  try {
+    await git(['init', '-q'], repo)
+    await git(['config', 'user.email', 'git@example.com'], repo)
+    await git(['config', 'user.name', 'Test'], repo)
+    const fw = join(repo, '.the-framework')
+    await mkdir(join(fw, 'git@example.com', 'sessions'), { recursive: true })
+    await writeFile(join(fw, 'git@example.com', 'sessions', 'r1.json'), '{"id":"r1"}\n')
+
+    // No `.the-framework/conversations` at all: the state of every project before its first chat.
+    const first = await commitConversations(repo, git)
+    assert.deepEqual(first, { committed: true, files: ['.the-framework/git@example.com/sessions/r1.json'] })
+
+    // And an existing directory holding nothing git can see, which `add` lets through.
+    await mkdir(join(fw, 'conversations'), { recursive: true })
+    await writeFile(join(fw, 'git@example.com', 'sessions', 'r2.json'), '{"id":"r2"}\n')
+    const second = await commitConversations(repo, git)
+    assert.deepEqual(second, { committed: true, files: ['.the-framework/git@example.com/sessions/r2.json'] })
+
+    // The real conversation still commits once there is one, and nothing else rode along.
+    await writeFile(join(fw, 'conversations', 'a.md'), '# chat\n')
+    await writeFile(join(repo, 'user-work.txt'), 'not ours\n')
+    const third = await commitConversations(repo, git)
+    assert.deepEqual(third, { committed: true, files: ['.the-framework/conversations/a.md'] })
+
+    const log = await git(['log', '--format=%s'], repo)
+    assert.deepEqual(log.trim().split('\n'), [
+      '[The Framework] a conversation',
+      '[The Framework] a session',
+      '[The Framework] a session',
+    ])
+    const status = await git(['status', '--porcelain', '-uall'], repo)
+    assert.equal(status.trim(), '?? user-work.txt', "the user's own work is left where it was")
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
 })
 
 test('a busy repo is skipped without staging anything (#912)', async () => {

@@ -261,7 +261,9 @@ export class CloudSession implements DriverSession {
             `View the session: ${session.url}`,
             `Continue it here: claude --teleport ${session.sessionId}`,
           ].join('\n')
-    this.emit({ type: 'result', text: summary, sessionId: session.sessionId })
+    // The result also carries the session's real URL (#1317): the action above is what the
+    // run view links through, the result is what reaches the meta.
+    this.emit({ type: 'result', text: summary, sessionId: session.sessionId, sessionLink: session.url })
     return { text: summary, sessionId: session.sessionId }
   }
 

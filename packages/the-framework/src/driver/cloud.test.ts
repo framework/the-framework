@@ -52,6 +52,8 @@ test('the session link rides an `action` event, the way the Actions run link doe
   await session.prompt('go')
   assert.ok(events.some(e => e.type === 'action' && e.label === `cloud ${URL}`))
   assert.ok(events.some(e => e.type === 'result' && e.sessionId === SESSION))
+  // The result also carries the real URL (#1317), which is what reaches the run meta.
+  assert.ok(events.some(e => e.type === 'result' && e.sessionLink === URL))
 })
 
 test('the prompt carries the session framing and the per-call system prompt', async () => {

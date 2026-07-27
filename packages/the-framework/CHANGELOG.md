@@ -1,5 +1,14 @@
 # @gemstack/the-framework
 
+## 1.4.3
+
+### Patch Changes
+
+- 6b64d67: A run whose child dies at boot no longer shows "Waiting for the session to start" forever. Runs spawn detached with their stdio dropped, so a child that crashed before opening its run store (a dangling workspace link was the observed case) died invisibly: no run.json, no log line, a session page polling for a start that already failed. The daemon's exit handler now writes the minimal failed meta the page needs, dated by the run id, and the child's stderr is captured to a file in its checkout so the run log can quote the actual boot error. A child that wrote its own lifecycle is left alone, and the existing retention rules then keep the failed checkout for inspection.
+- 9b54b0b: A Claude web run no longer deadlocks on an ambiguous prompt. The system prompt tells the agent to show choices and await on ambiguity, and a cloud session obeyed it into a question nobody attached could answer, spending the session for nothing. A hands-off run's system channel now declares the await gates unavailable in that session, right after the await protocol it amends, so the agent takes the most plausible reading, says which assumption it made, and carries the work through. Worded as availability rather than as a rule, so it deletes itself cleanly once choices become a per-session capability.
+- 01aa1ca: A web run's session log no longer dead-ends at "Handed off: …". The bridge mirror now streams into one live boxed row pinned at the tail of the log, right where the hand-off happens, with a "Connecting to the cloud session…" placeholder so a web run never shows dead air. The box is clearly labelled as a best-effort view of the Claude tab rather than merged into ordinary log rows: events.jsonl is durable provenance-clean data, the mirror is a tab scrape, and the boundary stays visible. The scrape is also scrubbed of the claude.ai UI chrome it dragged in (tile-focus hints, "Show message actions", bare model names), matched per line and anchored so a message that merely mentions a model is untouched.
+- 7aedf24: A run's branch is recorded on its meta from the start, and updated when the framework renames the run-id branch after the agent names the session, instead of being stamped only at teardown. Continuing a run re-attaches the recorded branch, so a run whose agent created its own branch is no longer continued on a branch without its previous commits.
+
 ## 1.4.2
 
 ### Patch Changes

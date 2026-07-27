@@ -163,6 +163,38 @@ export function landPinnedEntry(
   return `${body}${separator}${added.map(text => `- [ ] ${text}`).join('\n')}\n`
 }
 
+/** A queue-file diff carried by one open PR (#1313). Structurally `OpenPrFilePatch`. */
+export interface QueuePatch {
+  patch: string
+}
+
+/**
+ * Which of `candidates` a unified diff retires (#1313): the patch adds the entry checked, or
+ * removes its open form without re-adding it open.
+ *
+ * Diff lines are exact about what the PR itself changed, which is what makes this safe: an entry
+ * merely *absent* on a branch that forked before the entry was added never counts, and that
+ * failure mode is what ruled out comparing whole files. A remove-and-re-add-open pair (a
+ * formatting shuffle) cancels out. "Open" follows the sweep's grammar: any list item is open
+ * unless its checkbox is ticked (#1164/#1297).
+ */
+export function entriesRetiredByPatch(patch: string, candidates: readonly string[]): string[] {
+  const addedChecked = new Set<string>()
+  const addedOpen = new Set<string>()
+  const removedOpen = new Set<string>()
+  for (const raw of patch.split('\n')) {
+    const sign = raw[0]
+    if ((sign !== '+' && sign !== '-') || raw.startsWith('+++') || raw.startsWith('---')) continue
+    const item = ENTRY_LINE.exec(raw.slice(1))
+    const text = item?.[3]?.trim()
+    if (!text) continue
+    const open = item![2] === undefined || item![2] === ' '
+    if (sign === '+') (open ? addedOpen : addedChecked).add(text)
+    else if (open) removedOpen.add(text)
+  }
+  return candidates.filter(text => addedChecked.has(text) || (removedOpen.has(text) && !addedOpen.has(text)))
+}
+
 /** The little {@link claimedQueueEntries} needs to know about a run. Structurally a `RunMeta`. */
 export interface QueueClaimRun {
   id: string
@@ -177,6 +209,11 @@ export interface QueueClaimRun {
 export interface QueueClaimDeps {
   runs(path: string): Promise<readonly QueueClaimRun[]>
   pr(path: string, run: QueueClaimRun): Promise<{ value?: { state: string } | undefined; pending: boolean }>
+  /**
+   * The queue-file diffs of the repo's open PRs (#1313), whoever opened them. Absent = claims
+   * stay local-only, as before — the graceful shape for a repo with no remote or no gh.
+   */
+  queuePatches?(path: string): Promise<{ value?: readonly QueuePatch[] | undefined; pending: boolean }>
 }
 
 /**
@@ -209,6 +246,19 @@ export async function claimedQueueEntries(
     else if (run.status === 'done') {
       const pr = await deps.pr(path, run).catch(() => ({ value: undefined, pending: false }))
       if (pr.pending || pr.value?.state === 'OPEN') claimed.add(entry)
+    }
+  }
+
+  // The cross-machine leg (#1313): another daemon's drain — or a cloud session — is invisible to
+  // this machine's run metas, but its open PR is not, and the PR's queue diff carries the entry's
+  // check-off or removal. A lookup still warming claims everything for one tick, for the same
+  // reason a pending PR lookup does above: handing an entry out because the answer was slow is
+  // the exact double-assignment this exists to prevent.
+  if (deps.queuePatches && claimed.size < wanted.size) {
+    const patches = await deps.queuePatches(path).catch(() => undefined)
+    if (patches?.pending) return [...wanted]
+    for (const { patch } of patches?.value ?? []) {
+      for (const text of entriesRetiredByPatch(patch, candidates)) claimed.add(text)
     }
   }
   return [...claimed]

@@ -409,7 +409,15 @@ export async function resumeSuspendedRuns(
       const options = await resolveProjectRunOptions(record.id, env)
       const result = await startRun(
         RESUME_PROMPT,
-        { ...options, unattended: true, continueRunId: run.runId, ...(run.sessionId ? { resumeSession: run.sessionId } : {}) },
+        {
+          ...options,
+          unattended: true,
+          continueRunId: run.runId,
+          ...(run.sessionId ? { resumeSession: run.sessionId } : {}),
+          // Hand the drain's pin back (#1268): the resumed process re-emits the queue-entry
+          // event, so the claim reaches the rebuilt meta whether or not the replay kept it.
+          ...(run.queueEntry ? { queueEntry: run.queueEntry } : {}),
+        },
         record.id,
       )
       log(

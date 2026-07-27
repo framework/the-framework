@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { CLOUD_COMMAND, CloudDriver, type RunPtyOptions } from './cloud.js'
+import { CLOUD_COMMAND, CloudDriver, trustRootOf, type RunPtyOptions } from './cloud.js'
 import type { DriverEvent } from './types.js'
 
 /**
@@ -111,10 +111,40 @@ test('an untrusted workspace fails fast and says how to fix it, rather than hang
     },
   })
   const session = await driver.start({ cwd: '/repo', onEvent: e => events.push(e) })
-  await assert.rejects(session.prompt('go'), /no cloud session was created/)
+  await assert.rejects(session.prompt('go'), /no cloud session was created — the workspace is not trusted[\s\S]*Run `claude` in \/repo once/)
   const notice = events.find(e => e.type === 'notice')
   assert.ok(notice && /has not been trusted in \/repo/.test(notice.message))
-  assert.ok(notice && /Run `claude` there once/.test(notice.message))
+  assert.ok(notice && /Run `claude` in \/repo once/.test(notice.message))
+})
+
+test('trust advice for a run worktree names the project root, which outlives the worktree', async () => {
+  // Trust is per directory and inherited downward (a fresh worktree of a trusted root shows
+  // no dialog), so trusting the root once covers every run worktree — the old advice named
+  // the ephemeral worktree path, which is gone before anyone could follow it.
+  const events: DriverEvent[] = []
+  const driver = new CloudDriver({
+    runTag: () => 'tag',
+    timeoutMs: 1000,
+    runPty: async opts => {
+      opts.onData('Quick\x1b[Csafety\x1b[Ccheck\r\n1.\x1b[CYes,\x1b[CI\x1b[Ctrust\x1b[Cthis\x1b[Cfolder\r\n')
+      if (!opts.signal.aborted) await new Promise<void>(r => opts.signal.addEventListener('abort', () => r(), { once: true }))
+    },
+  })
+  const cwd = '/repo/.the-framework/worktrees/2026-07-27T17-30-20-703Z'
+  const session = await driver.start({ cwd, onEvent: e => events.push(e) })
+  await assert.rejects(session.prompt('go'), /Run `claude` in \/repo once/)
+  const notice = events.find(e => e.type === 'notice')
+  assert.ok(notice && /has not been trusted in \/repo,/.test(notice.message), 'the notice must name the root, not the worktree')
+  assert.ok(notice && !notice.message.includes('/worktrees/'), 'the worktree path helps nobody')
+})
+
+test('trustRootOf strips exactly the run-worktree suffix and nothing else', () => {
+  assert.equal(trustRootOf('/repo/.the-framework/worktrees/2026-01-01T00-00-00-000Z'), '/repo')
+  assert.equal(trustRootOf('/repo'), '/repo')
+  assert.equal(trustRootOf('/repo/packages/app'), '/repo/packages/app')
+  // A deeper path inside a run worktree is not the worktree itself: leave it alone rather
+  // than guess.
+  assert.equal(trustRootOf('/repo/.the-framework/worktrees/run1/nested'), '/repo/.the-framework/worktrees/run1/nested')
 })
 
 test('the prompt sits directly after --cloud, ahead of the model flag', () => {

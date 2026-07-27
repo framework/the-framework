@@ -12,7 +12,7 @@ const sendBridgeAnswer = vi.fn(async () => ({ ok: true }) as { ok: boolean; erro
 const sendBridgeAnswerCancel = vi.fn(async () => undefined)
 vi.mock('../server/control.telefunc.js', () => ({ sendBridgeAnswer, sendBridgeAnswerCancel }))
 
-const { CloudRunNotice } = await import('./CloudRunNotice.js')
+const { CloudRunNotice, CloudMirrorRow, scrubMirrorText } = await import('./CloudRunNotice.js')
 
 afterEach(() => {
   cleanup()
@@ -151,25 +151,69 @@ describe('answering from the dashboard (#1237)', () => {
   })
 })
 
-describe('the transcript the bridge scrapes (#1237)', () => {
-  test('renders what the session has said, in order', async () => {
+describe('the mirror row at the log tail (#1265)', () => {
+  test('renders what the session has said, in order, inside one labelled box', async () => {
     onBridgeEvents.mockResolvedValue([
       { sessionId: 'session_01ABCdefGHIjklMNO', seq: 0, role: 'agent', text: 'Reading the repo', receivedAt: '' },
       { sessionId: 'session_01ABCdefGHIjklMNO', seq: 1, role: 'agent', text: 'Found three packages', receivedAt: '' },
     ])
-    render(<CloudRunNotice target="web" events={[handOff()]} />)
+    render(<CloudMirrorRow target="web" events={[handOff()]} />)
     await waitFor(() => expect(screen.getByText('Reading the repo')).toBeTruthy())
     expect(screen.getByText('Found three packages')).toBeTruthy()
+    // The provenance boundary: the box says what it is, so a scrape never reads as the run's own log.
+    expect(screen.getByRole('status', { name: /Cloud session mirror/i })).toBeTruthy()
   })
 
-  test('shows nothing when the bridge has scraped nothing, so a run with no tab is unchanged', async () => {
-    render(<CloudRunNotice target="web" events={[handOff()]} />)
+  test('shows a connecting placeholder before anything is scraped, so a web run never shows dead air', async () => {
+    render(<CloudMirrorRow target="web" events={[handOff()]} />)
     await waitFor(() => expect(onBridgeEvents).toHaveBeenCalled())
+    expect(screen.getByText(/Connecting to the cloud session/i)).toBeTruthy()
+  })
+
+  test('drops the claude.ai UI chrome the tail scrape drags in', async () => {
+    onBridgeEvents.mockResolvedValue([
+      {
+        sessionId: 'session_01ABCdefGHIjklMNO',
+        seq: 0,
+        role: 'agent',
+        text: 'Arrow keys move the tile focus\nReading the repo\nShow message actions\nSonnet 4.5\nFound three packages',
+        receivedAt: '',
+      },
+    ])
+    render(<CloudMirrorRow target="web" events={[handOff()]} />)
+    await waitFor(() => expect(screen.getByText(/Reading the repo/)).toBeTruthy())
+    expect(screen.getByText(/Found three packages/)).toBeTruthy()
+    expect(screen.queryByText(/Arrow keys move the tile/)).toBeNull()
+    expect(screen.queryByText(/Show message actions/)).toBeNull()
+  })
+
+  test('renders nothing before the hand-off or for other targets, so the feed mounts it unconditionally', () => {
+    expect(render(<CloudMirrorRow target="web" events={[]} />).container.firstChild).toBeNull()
+    expect(render(<CloudMirrorRow target="local" events={[handOff()]} />).container.firstChild).toBeNull()
+    expect(onBridgeEvents).not.toHaveBeenCalled()
+  })
+
+  test('the notice pane no longer carries the transcript: the mirror lives at the log tail instead', async () => {
+    onBridgeEvents.mockResolvedValue([
+      { sessionId: 'session_01ABCdefGHIjklMNO', seq: 0, role: 'agent', text: 'Reading the repo', receivedAt: '' },
+    ])
+    render(<CloudRunNotice target="web" events={[handOff()]} />)
+    await waitFor(() => expect(onBridgeQuestion).toHaveBeenCalled())
     expect(screen.queryByText(/Reading the repo/)).toBeNull()
   })
+})
 
-  test('never asks before the hand-off, since there is no session to ask about', () => {
-    render(<CloudRunNotice target="web" events={[]} />)
-    expect(onBridgeEvents).not.toHaveBeenCalled()
+describe('scrubMirrorText (#1265)', () => {
+  test('is anchored per line: a message that mentions a model or arrows is untouched', () => {
+    const text = 'We should use Sonnet 4.5 for this\nArrow keys move the tile focus\ndone'
+    expect(scrubMirrorText(text)).toBe('We should use Sonnet 4.5 for this\ndone')
+  })
+
+  test('collapses the holes the dropped lines leave', () => {
+    expect(scrubMirrorText('a\n\nShow message actions\n\nb')).toBe('a\n\nb')
+  })
+
+  test('an all-chrome block scrubs to nothing, so the row can skip it entirely', () => {
+    expect(scrubMirrorText('Haiku 4.5\nShow message actions')).toBe('')
   })
 })

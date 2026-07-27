@@ -1,6 +1,6 @@
 import type { FrameworkEvent } from '@gemstack/the-framework'
 import { formatFrameworkEvent } from '@gemstack/the-framework/client'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { eventKindLabel } from '../lib/event-labels.js'
 import { receivedAt } from '../lib/event-times.js'
 import { Markdown } from './Markdown.js'
@@ -110,11 +110,15 @@ export function EventList({
   events,
   stick = true,
   openAt,
+  tail,
 }: {
   events: FrameworkEvent[]
   stick?: boolean
   /** Where a non-following log opens; a replay opens at the outcome (#948), not page one. */
   openAt?: 'start' | 'end'
+  /** Pinned after the last row, inside the scroller (#1265): the log's "and then…" — a web run's
+   *  live mirror box — that must scroll (and stick) with the log rather than float over it. */
+  tail?: ReactNode
 }) {
   return (
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>
@@ -159,6 +163,7 @@ export function EventList({
                 </MessageScrollerItem>
               )
             })}
+            {tail}
           </MessageScrollerContent>
         </MessageScrollerViewport>
         <MessageScrollerButton />

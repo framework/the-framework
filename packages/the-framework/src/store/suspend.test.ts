@@ -63,3 +63,17 @@ test('resumableRuns keeps recent work and drops what has gone stale (#923)', () 
   )
   assert.deepEqual(resumableRuns([], NOW), [])
 })
+
+test("the drain's pin rides the record and survives the round-trip and the age filter (#1268)", async () => {
+  const cwd = await tmpWorkspace()
+  try {
+    const pinned: SuspendedRun[] = [{ runId: '2026-c', suspendedAt: AT, queueEntry: 'entry alpha: add a footer note' }]
+    await writeSuspendedRuns(cwd, pinned)
+    // Byte-for-byte: the claim (#1253) is matched against the queue text verbatim, so any
+    // normalization here would silently release the pin on resume.
+    assert.deepEqual(await readSuspendedRuns(cwd), pinned)
+    assert.deepEqual(resumableRuns(pinned, NOW), pinned)
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})

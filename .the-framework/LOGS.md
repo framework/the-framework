@@ -18,3 +18,10 @@
 - run: 2026-07-26T09-33-57-568Z
 - session: [1ecead44-dc07-4a69-bf94-77d762ec5af2](https://claude.ai/code)
 - branch: the-framework/fable-model-picker
+
+## 2026-07-27T23:07:34.019Z · prompt · Open TODO_AGENTS.md and work on this one open entry only, then check it off. Do not start any other entry. The entry:\n\n[What is "Log"?](tickets/2026-07-25_what-is-log.md)
+
+- status: done
+- run: 2026-07-27T23-05-13-126Z
+- session: 019fa5d3-49f3-7132-a9cf-58c14b74643b
+- branch: the-framework/run-2026-07-27T23-05-13-126Z

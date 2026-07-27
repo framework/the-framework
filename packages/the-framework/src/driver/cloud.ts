@@ -109,6 +109,26 @@ const SESSION_URL = /https:\/\/claude\.ai\/code\/(session_[A-Za-z0-9]+)\S*/
  */
 const TRUST_PROMPT = 'trustthisfolder'
 
+/**
+ * The project root a run worktree belongs to, which is where trust has to be granted.
+ *
+ * The CLI records trust per directory and everything under a trusted directory inherits it
+ * (verified live: a fresh worktree of a trusted root boots straight to the REPL, a fresh
+ * worktree of an untrusted root always shows the dialog). A run's cwd is an ephemeral
+ * worktree — gone before the user could act on advice that names it — so the only advice
+ * that works is: trust the root once, and every run worktree under it is covered.
+ */
+export function trustRootOf(cwd: string): string {
+  const match = /^(.+?)\/\.the-framework\/worktrees\/[^/]+\/?$/.exec(cwd)
+  return match ? match[1]! : cwd
+}
+
+/** The one-time fix for an untrusted workspace, phrased against the root, not the worktree. */
+function trustAdvice(cwd: string): string {
+  const root = trustRootOf(cwd)
+  return `Run \`claude\` in ${root} once and accept the trust prompt — run worktrees inherit the root's trust — then start a new web run.`
+}
+
 /** Model ids we will pass through, kept to characters that cannot act as shell syntax. */
 const SAFE_MODEL = /^[A-Za-z0-9._:-]+$/
 
@@ -201,7 +221,7 @@ export class CloudSession implements DriverSession {
             trusting = true
             this.emit({
               type: 'notice',
-              message: `Claude Code has not been trusted in ${this.cwd} yet, so it is asking before it will start. Run \`claude\` there once and accept, then try this again.`,
+              message: `Claude Code has not been trusted in ${trustRootOf(this.cwd)}, so it asks before it will start and the cloud session is never created. ${trustAdvice(this.cwd)}`,
             })
             controller.abort()
           }
@@ -212,6 +232,11 @@ export class CloudSession implements DriverSession {
       this.controllers.delete(controller)
     }
 
+    // The trust dialog is a one-time, per-root fix, so fail with that instead of the raw
+    // dialog text — three identical "no cloud session was created" runs in a row is what
+    // this looked like before the failure named its own cure.
+    if (!found && trusting)
+      throw new Error(`[framework] claude-web: no cloud session was created — the workspace is not trusted by Claude Code. ${trustAdvice(this.cwd)}`)
     if (!found) throw new Error(`[framework] claude-web: no cloud session was created.\n${tail(output.replace(ANSI, ''))}`)
 
     this.handedOff = found

@@ -10,6 +10,7 @@ import { startKeyedWatcher, type KeyedWatcher } from './dashboard/keyed-watcher.
 import { buildInterventions, interventionKey, postInterventionsDiscord } from './dashboard/interventions.js'
 import { buildActivity, activityKey, postActivityDiscord } from './dashboard/activity.js'
 import { startAutoPm, AUTO_PM_JOBS, type AutoPmReport } from './auto-pm.js'
+import { releaseStalePinnedBranch } from './stale-branch.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
 import { claimedQueueEntries, promoteQueue } from './queue-promote.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
@@ -152,6 +153,8 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // rebooted daily would otherwise sweep every morning and never reach its interval.
     maintenanceDue: async project => maintenanceDue(await readMaintenanceState(project.path), Date.now()),
     recordMaintenance: async project => mergeMaintenanceState(project.path, { sweptAt: new Date().toISOString() }),
+    // A pinned routine branch left behind by a closed PR blocks every later firing (#1293).
+    releasePinned: (project, branch) => releaseStalePinnedBranch(project.path, branch),
     start: async (project, job) => {
       // A draining run works one open queue entry, and since #1164 that entry links back to the
       // ticket it was queued from — so this is the one moment the framework knows what a run is

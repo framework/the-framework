@@ -859,3 +859,58 @@ test('a drain-only sweep works the queue and never borrows the tick for the rota
   assert.equal(started.length, 0)
   assert.equal(empty.report().outcomes[0]?.message, 'the queue is empty, so there is nothing to drain')
 })
+
+test('a pinned job has its stale branch released before it fires (#1293)', async () => {
+  const order: string[] = []
+  const { loop } = harness({
+    jobs: [{ name: 'triage-quick', prompt: 'p', pinnedBranch: 'the-framework/triage-quick' }],
+    releasePinned: async (_project, branch) => {
+      order.push(`release:${branch}`)
+    },
+    start: async (_project, job) => {
+      order.push(`start:${job.name}`)
+      return 'run-1'
+    },
+  })
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(order, ['release:the-framework/triage-quick', 'start:triage-quick'])
+})
+
+test('an unpinned job never asks for a release, and a failing release does not stop the start (#1293)', async () => {
+  const releases: string[] = []
+  const unpinned = harness({
+    releasePinned: async (_project, branch) => {
+      releases.push(branch)
+    },
+  })
+  await unpinned.loop.tick()
+  unpinned.loop.stop()
+  assert.deepEqual(releases, [])
+  assert.deepEqual(unpinned.ran, ['first'])
+
+  // A release that could not happen leaves the routine exactly as jammed as it was; the job's own
+  // abort guard decides, exactly as before the seam existed.
+  const failing = harness({
+    jobs: [{ name: 'triage-quick', prompt: 'p', pinnedBranch: 'the-framework/triage-quick' }],
+    releasePinned: async () => {
+      throw new Error('gh is down')
+    },
+  })
+  await failing.loop.tick()
+  failing.loop.stop()
+  assert.deepEqual(failing.ran, ['triage-quick'])
+})
+
+test('the triage jobs declare exactly the branch their prompts pin (#1293)', () => {
+  const pinned = AUTO_PM_JOBS.filter(job => job.pinnedBranch !== undefined)
+  assert.deepEqual(pinned.map(job => job.name), ['triage-quick', 'triage-consensual'])
+  for (const job of pinned) {
+    // The release targets the branch the prompt's abort guard tests, so the two must not drift.
+    assert.equal(job.pinnedBranch, `the-framework/${job.name}`)
+    assert.ok(
+      job.prompt.includes(`Always set <SESSION_NAME> to ${job.name}`),
+      `${job.name} must pin the session name its release targets`,
+    )
+  }
+})

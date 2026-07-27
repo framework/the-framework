@@ -1,5 +1,5 @@
 import type { FrameworkEvent } from './events.js'
-import { PROTOCOLS_BROWSER, PROTOCOLS_AWAIT, PROTOCOLS_SIGNAL } from './prompts.generated.js'
+import { PROTOCOLS_BROWSER, PROTOCOLS_AWAIT, PROTOCOLS_HANDS_OFF, PROTOCOLS_SIGNAL } from './prompts.generated.js'
 import type { ChoicesOption } from './await-gate.js'
 import type { MultiSelectOption } from './await-gate.js'
 
@@ -14,6 +14,15 @@ import type { MultiSelectOption } from './await-gate.js'
  * #326 wording still being written. The text lives in `prompts/protocols/await.md` (#551).
  */
 export const AWAIT_PROTOCOL = PROTOCOLS_AWAIT
+
+/**
+ * Told to a hands-off run only (#1234): the await gates {@link AWAIT_PROTOCOL} just taught are
+ * not available in this session, so an ambiguous prompt takes its most plausible reading instead
+ * of parking forever on a question nobody attached can answer. Worded as availability rather
+ * than as a rule, so it deletes itself cleanly once choices become a per-session capability.
+ * The text lives in `prompts/protocols/hands_off.md`.
+ */
+export const HANDS_OFF_PROTOCOL = PROTOCOLS_HANDS_OFF
 
 /**
  * Told to the agent only when the run has a browser (#824): that it has one, and that anything

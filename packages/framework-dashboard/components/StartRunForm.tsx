@@ -90,7 +90,10 @@ export function StartRunForm({
   const submit = async (text: string, submitKind: 'build' | 'prompt') => {
     if (busy) return
     setNote('Starting…')
-    const result = await start(projectId, text, submitKind, options)
+    // A preset run (`submitKind === 'prompt'`) is fired work, not a conversation: it runs
+    // unattended (#1279), ending at settle with its armed handoff firing, exactly as the same
+    // routine does when the auto-PM sweep starts it. A typed prompt keeps the stay-open chat.
+    const result = await start(projectId, text, submitKind, submitKind === 'prompt' ? { ...options, unattended: true } : options)
     setNote(null)
     if (result) {
       // Show the run in the Runs rail immediately (#405): the spawned process writes its run.json

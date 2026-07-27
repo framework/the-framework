@@ -111,7 +111,10 @@ export function RoutineWork({
     setStarting(job.name)
     // The global options only: the Overview has no project open, so the per-project tier (#840) is
     // not resolved here and the run starts on the same defaults a fresh launcher would use.
-    const result = await start(projectId, job.prompt, 'prompt', runOptionsFromPreferences(preferences))
+    // Unattended (#1279): a routine fired by a card is the same work the sweep starts, so it runs
+    // the same way — gates auto-answer, the run ends at settle, and the armed handoff fires,
+    // instead of parking in the stay-open chat loop with its PR never opened.
+    const result = await start(projectId, job.prompt, 'prompt', { ...runOptionsFromPreferences(preferences), unattended: true })
     setStarting(null)
     // Go to the run itself, not merely to its project (#1191): selecting the project renders the
     // launcher, so the button that says "Run now" landed you on an empty composer and the session

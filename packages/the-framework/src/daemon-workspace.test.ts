@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, writeFile, readFile, rm, stat, realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { createProjectRuntime, cleanupTimedOutWorktree, tearDownTopicScratch, moveTopicRunHistory, markFailedStart, runStderrPath } from './daemon-runtime.js'
+import { createProjectRuntime, cleanupTimedOutWorktree, tearDownTopicScratch, moveTopicRunHistory, markFailedStart, runStderrPath, isTransientRunFailure, lastRunFailureDetail, MAX_TRANSIENT_RETRIES } from './daemon-runtime.js'
 import { CliTimeoutError } from './cli-exec.js'
 import { FRAMEWORK_DIR, WORKTREES_DIR, EVENTS_FILE, META_FILE, worktreePath, runBranchName, RUN_META_VERSION, startedAtFromRunId, type RunMeta } from './store/index.js'
 import { topicScratchPath, addProject, projectId } from './registry.js'
@@ -519,5 +519,111 @@ test('a child that wrote its own lifecycle is left alone by the failed-start mar
     assert.equal(await stat(join(base, FRAMEWORK_DIR, EVENTS_FILE)).then(() => true, () => false), false, 'and no failure line is invented')
   } finally {
     await rm(base, { recursive: true, force: true })
+  }
+})
+
+test('isTransientRunFailure names transport deaths, not work failures (#1281)', () => {
+  assert.equal(
+    isTransientRunFailure('[framework] claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'),
+    true,
+  )
+  assert.equal(isTransientRunFailure('read ECONNRESET'), true)
+  assert.equal(isTransientRunFailure('API Error: 529 overloaded'), true)
+  // A boot death (#1261) or a real failure is not a retry candidate.
+  assert.equal(isTransientRunFailure('its process exited with code 1 before reporting anything'), false)
+  assert.equal(isTransientRunFailure('AssertionError: expected 2 to equal 3'), false)
+  assert.equal(isTransientRunFailure(undefined), false)
+})
+
+test('lastRunFailureDetail reads the child-written end, and only a failed one (#1281)', () => {
+  const line = (event: object) => JSON.stringify(event) + '\n'
+  assert.equal(lastRunFailureDetail(line({ kind: 'session' }) + line({ kind: 'end', ok: false, detail: 'boom' })), 'boom')
+  assert.equal(lastRunFailureDetail(line({ kind: 'end', ok: true })), undefined)
+  assert.equal(lastRunFailureDetail('not json\n' + line({ kind: 'end', ok: false, detail: 'boom' })), 'boom')
+  assert.equal(lastRunFailureDetail(''), undefined)
+  // A continued log whose last end succeeded: the earlier failure no longer counts.
+  assert.equal(lastRunFailureDetail(line({ kind: 'end', ok: false, detail: 'boom' }) + line({ kind: 'end', ok: true })), undefined)
+})
+
+/**
+ * A stub CLI that behaves like a run whose driver died mid-work: it writes its own lifecycle
+ * (run.json + a failed `end` carrying `detail`), records each spawn, and exits 1.
+ */
+async function writeFailingRunStub(dir: string, detail: string): Promise<string> {
+  const stub = join(dir, 'failing-run-stub.cjs')
+  await writeFile(
+    stub,
+    `const fs = require('node:fs')
+const path = require('node:path')
+const args = process.argv.slice(2)
+const cwd = args[args.indexOf('--cwd') + 1]
+const runId = args[args.indexOf('--run-id') + 1]
+fs.appendFileSync(path.join(cwd, 'spawned.log'), (args.includes('--continue-run') ? 'continue' : 'start') + '\\n')
+const dir = path.join(cwd, '.the-framework')
+fs.mkdirSync(dir, { recursive: true })
+const now = new Date().toISOString()
+fs.writeFileSync(
+  path.join(dir, 'run.json'),
+  JSON.stringify({ version: ${RUN_META_VERSION}, status: 'failed', id: runId, startedAt: now, updatedAt: now, passes: 0, driver: 'claude-code' }),
+)
+fs.appendFileSync(path.join(dir, 'events.jsonl'), JSON.stringify({ kind: 'end', ok: false, detail: ${JSON.stringify(detail)} }) + '\\n')
+process.exit(1)
+`,
+  )
+  return stub
+}
+
+/** Poll the worktree's spawn record until `expected` lines show up, or time out. */
+async function waitForSpawns(worktree: string, expected: number): Promise<string[]> {
+  let lines: string[] = []
+  for (let i = 0; i < POLL_ATTEMPTS && lines.length < expected; i++) {
+    await new Promise(r => setTimeout(r, 20))
+    lines = (await readFile(join(worktree, 'spawned.log'), 'utf8').catch(() => '')).trim().split('\n').filter(Boolean)
+  }
+  return lines
+}
+
+test('a run that dies to a transient API error is continued, at most twice (#1281)', async () => {
+  const cwd = await initRepo('framework-transient-')
+  const detail = '[framework] claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'
+  const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeFailingRunStub(cwd, detail), retryDelayMs: 25 })
+  try {
+    const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; runId?: string }
+    assert.equal(result.ok, true)
+    const worktree = worktreePath(cwd, result.runId!)
+    // The retry continues the SAME run in its retained checkout, rather than starting a new one.
+    const lines = await waitForSpawns(worktree, 1 + MAX_TRANSIENT_RETRIES)
+    assert.deepEqual(lines, ['start', 'continue', 'continue'])
+    // And the cap holds: a run that keeps dying transiently stays failed.
+    await new Promise(r => setTimeout(r, 400))
+    const after = (await readFile(join(worktree, 'spawned.log'), 'utf8')).trim().split('\n').filter(Boolean)
+    assert.equal(after.length, 1 + MAX_TRANSIENT_RETRIES)
+  } finally {
+    await runtime.dispose()
+    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
+
+test('a run that fails on its own terms is not retried (#1281)', async () => {
+  const cwd = await initRepo('framework-nontransient-')
+  const runtime = createProjectRuntime({
+    cwd,
+    env: {},
+    binPath: await writeFailingRunStub(cwd, 'AssertionError: expected 2 to equal 3'),
+    retryDelayMs: 25,
+  })
+  try {
+    const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; runId?: string }
+    assert.equal(result.ok, true)
+    const worktree = worktreePath(cwd, result.runId!)
+    const lines = await waitForSpawns(worktree, 1)
+    assert.deepEqual(lines, ['start'])
+    // Give a wrong retry every chance to fire before declaring it absent.
+    await new Promise(r => setTimeout(r, 400))
+    const after = (await readFile(join(worktree, 'spawned.log'), 'utf8')).trim().split('\n').filter(Boolean)
+    assert.deepEqual(after, ['start'], 'a real failure stands; only transport deaths earn a retry')
+  } finally {
+    await runtime.dispose()
+    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })

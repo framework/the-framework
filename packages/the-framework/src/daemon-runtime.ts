@@ -1,8 +1,10 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { basename, join, resolve } from 'node:path'
+import { closeSync, mkdirSync, openSync } from 'node:fs'
+import { basename, dirname, join, resolve } from 'node:path'
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import {
   runIdFromStartedAt,
+  startedAtFromRunId,
   addWorktree,
   runBranchName,
   linkDependencies,
@@ -125,10 +127,64 @@ export async function moveTopicRunHistory(scratchCwd: string, worktreeCwd: strin
 }
 
 /** Spawn a detached, unref'd framework child (`node <binPath> <args...>`) that outlives us. */
-export function spawnDetached(binPath: string, args: string[]): ChildProcess {
-  const child = spawn(process.execPath, [binPath, ...args], { detached: true, stdio: 'ignore' })
+export function spawnDetached(binPath: string, args: string[], stderrFile?: string): ChildProcess {
+  // stderr goes to a file, never a pipe: a detached child must not block on a dead parent's pipe
+  // buffer, and the file is what makes a silent boot death diagnosable (#1261). Best-effort — a
+  // run must still start when the log cannot be opened.
+  let fd: number | undefined
+  if (stderrFile) {
+    try {
+      mkdirSync(dirname(stderrFile), { recursive: true })
+      fd = openSync(stderrFile, 'w')
+    } catch {}
+  }
+  const child = spawn(process.execPath, [binPath, ...args], { detached: true, stdio: ['ignore', 'ignore', fd ?? 'ignore'] })
+  if (fd !== undefined) closeSync(fd)
   child.unref()
   return child
+}
+
+/** Where a spawned run's stderr lands (#1261), so a child that dies at boot leaves a trace. */
+export function runStderrPath(cwd: string): string {
+  return join(cwd, FRAMEWORK_DIR, 'stderr.log')
+}
+
+/** One line saying how a child ended, for the failed-start marker (#1261). */
+function exitDetail(code: number | null, signal: NodeJS.Signals | null): string {
+  return code !== null
+    ? `its process exited with code ${code} before reporting anything`
+    : `its process was killed by ${signal ?? 'a signal'} before reporting anything`
+}
+
+/**
+ * Leave a `failed` marker behind a child that died before writing its own lifecycle (#1261).
+ *
+ * A healthy run's first act is opening its store (`run.json` + `events.jsonl`); a child that
+ * exited without one never booted — a module resolution error being the observed case — and with
+ * stdio detached the crash went nowhere, so the session page polled "Waiting for the session to
+ * start" forever. The daemon's exit handler is the one place that knows, so it writes the minimal
+ * meta the page needs and surfaces the child's stderr tail in the run log. A child that wrote its
+ * own meta is left alone: its lifecycle is its own to report.
+ */
+export async function markFailedStart(cwd: string, runId: string, intent: string, detail: string): Promise<boolean> {
+  const metaPath = join(cwd, FRAMEWORK_DIR, META_FILE)
+  if (await stat(metaPath).then(() => true, () => false)) return false
+  const now = new Date().toISOString()
+  const meta: RunMeta = {
+    version: RUN_META_VERSION,
+    status: 'failed',
+    id: runId,
+    startedAt: startedAtFromRunId(runId) ?? now,
+    updatedAt: now,
+    passes: 0,
+    ...(intent.trim() ? { intent } : {}),
+  }
+  const stderrTail = (await readFile(runStderrPath(cwd), 'utf8').catch(() => '')).trim().slice(-2000)
+  await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true }).catch(() => {})
+  await writeFile(metaPath, JSON.stringify(meta, null, 2) + '\n').catch(() => {})
+  await appendRunLog(cwd, `The session failed to start: ${detail}.` + (stderrTail ? `\n\n${stderrTail}` : ''))
+  console.log(`[framework] run ${runId} failed to start: ${detail}`)
+  return true
 }
 
 /**
@@ -459,25 +515,33 @@ export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOption
     // A short continuation note in the spirit of continuationPrompt: the resumed session already
     // carries the whole conversation, so this only tells it where it now is.
     const note = `You have been moved into project ${basename(projectCwd)} and are now working in its checkout. Continue where you left off.`
-    const continued = spawnDetached(realBin, [
-      'prompt',
-      note,
-      ...startOptionFlags(options),
-      '--no-dashboard',
-      '--cwd',
-      workspace.cwd,
-      ...(workspace.runId ? ['--run-id', workspace.runId] : []),
-      // Reopen the moved run rather than truncating it, and resume the agent session so the
-      // conversation continues seamlessly. `--topic` is dropped: this is an ordinary project run now.
-      '--continue-run',
-      ...(sessionId ? ['--resume-session', sessionId] : []),
-    ])
-    const settle = (): void => {
+    const continued = spawnDetached(
+      realBin,
+      [
+        'prompt',
+        note,
+        ...startOptionFlags(options),
+        '--no-dashboard',
+        '--cwd',
+        workspace.cwd,
+        ...(workspace.runId ? ['--run-id', workspace.runId] : []),
+        // Reopen the moved run rather than truncating it, and resume the agent session so the
+        // conversation continues seamlessly. `--topic` is dropped: this is an ordinary project run now.
+        '--continue-run',
+        ...(sessionId ? ['--resume-session', sessionId] : []),
+      ],
+      workspace.runId ? runStderrPath(workspace.cwd) : undefined,
+    )
+    const settle = (detail: string): void => {
       activeRuns.delete(key)
-      if (workspace.runId) void tearDownWorktree(projectCwd, workspace.cwd, workspace.runId)
+      const { cwd: checkout, runId: movedRunId } = workspace
+      if (!movedRunId) return
+      // The moved meta is normally already there, so the marker no-ops; it only writes when the
+      // copy was torn AND the resumed child died at boot (#1261) — the same hang either way.
+      void markFailedStart(checkout, movedRunId, '', detail).finally(() => void tearDownWorktree(projectCwd, checkout, movedRunId))
     }
-    continued.once('error', settle)
-    continued.once('exit', settle)
+    continued.once('error', err => settle(`its process could not be spawned (${errorMessage(err)})`))
+    continued.once('exit', (code, signal) => settle(exitDetail(code, signal)))
     if (continued.pid !== undefined) activeRuns.set(key, continued.pid)
     // Re-home succeeded, so the scratch is spent: remove it outright. The retain-on-failure rule is
     // for a run that ended in scratch, not one that moved on with its conversation intact.
@@ -526,30 +590,36 @@ export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOption
           : kind === 'prompt'
             ? ['prompt', prompt]
             : [prompt]
-      const child = spawnDetached(realBin, [
-        ...runArgs,
-        ...startOptionFlags(options),
-        '--no-dashboard',
-        '--cwd',
-        scratchCwd,
-        '--run-id',
-        runId,
-        '--topic',
-      ])
+      const child = spawnDetached(
+        realBin,
+        [
+          ...runArgs,
+          ...startOptionFlags(options),
+          '--no-dashboard',
+          '--cwd',
+          scratchCwd,
+          '--run-id',
+          runId,
+          '--topic',
+        ],
+        runStderrPath(scratchCwd),
+      )
       // Re-home on bind (#1122): once, and only on a committed re-home. `rehomed` gates the scratch
       // teardown below; `inFlight` stops a second bind racing a re-home already underway, but a bind
       // that failed to re-home leaves the watcher armed so a later bind (to a good project) retries.
       let rehomed = false
       let inFlight = false
       let stopBindWatch = (): void => {}
-      const settle = (): void => {
+      const settle = (detail: string): void => {
         activeRuns.delete(key)
         stopBindWatch()
-        // A committed re-home removes the scratch itself; otherwise fall back to the retain-on-fail rule.
-        if (!rehomed) void tearDownTopicScratch(scratchCwd)
+        if (rehomed) return // a committed re-home removes the scratch itself
+        // The failed marker lands before the teardown reads the meta (#1261), so a boot death is
+        // recorded and the retain-on-fail rule then keeps the scratch for inspection.
+        void markFailedStart(scratchCwd, runId, prompt, detail).finally(() => void tearDownTopicScratch(scratchCwd))
       }
-      child.once('error', settle)
-      child.once('exit', settle)
+      child.once('error', err => settle(`its process could not be spawned (${errorMessage(err)})`))
+      child.once('exit', (code, signal) => settle(exitDetail(code, signal)))
       stopBindWatch = tailEvents<FrameworkEvent>(join(scratchCwd, FRAMEWORK_DIR, EVENTS_FILE), event => {
         if (rehomed || inFlight || event.kind !== 'bind') return
         inFlight = true
@@ -651,24 +721,32 @@ export function createProjectRuntime({ cwd, env, binPath }: ProjectRuntimeOption
             : [prompt]
       // `--run-id` hands the run the id its worktree is named with, so the directory and the
       // run recorded inside it are one string — and tells it the framework owns its branch.
-      const child = spawnDetached(realBin, [
-        ...runArgs,
-        ...startOptionFlags(options),
-        '--no-dashboard',
-        '--cwd',
-        workspace.cwd,
-        ...(workspace.runId ? ['--run-id', workspace.runId] : []),
-        // Reopen the run's log instead of truncating it: the follow-up IS that run.
-        ...(continued ? ['--continue-run'] : []),
-      ])
+      const child = spawnDetached(
+        realBin,
+        [
+          ...runArgs,
+          ...startOptionFlags(options),
+          '--no-dashboard',
+          '--cwd',
+          workspace.cwd,
+          ...(workspace.runId ? ['--run-id', workspace.runId] : []),
+          // Reopen the run's log instead of truncating it: the follow-up IS that run.
+          ...(continued ? ['--continue-run'] : []),
+        ],
+        ...(workspace.runId ? [runStderrPath(workspace.cwd)] : []),
+      )
       // The run narrates itself through its own `.the-framework/events.jsonl`, which the
       // dashboard streams over a Telefunc Channel; the daemon just tracks liveness.
-      const settle = (): void => {
+      const settle = (detail: string): void => {
         activeRuns.delete(key)
-        if (workspace.runId) void tearDownWorktree(projectCwd, workspace.cwd, workspace.runId)
+        const { cwd: checkout, runId } = workspace
+        if (!runId) return
+        // The failed marker lands before the teardown reads the meta (#1261), so a boot death is
+        // archived as `failed` and the worktree is then kept for inspection, not removed.
+        void markFailedStart(checkout, runId, prompt, detail).finally(() => void tearDownWorktree(projectCwd, checkout, runId))
       }
-      child.once('error', settle)
-      child.once('exit', settle)
+      child.once('error', err => settle(`its process could not be spawned (${errorMessage(err)})`))
+      child.once('exit', (code, signal) => settle(exitDetail(code, signal)))
       if (child.pid !== undefined) activeRuns.set(key, child.pid)
       // Hand back the run's id (#761) so the dashboard can select this run rather than guess.
       return { ok: true, ...(workspace.runId ? { runId: workspace.runId } : {}) }

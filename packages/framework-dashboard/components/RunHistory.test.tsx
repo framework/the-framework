@@ -213,3 +213,53 @@ describe('RunHistory tickets nav (#1144)', () => {
     expect(screen.queryByText('Tickets')).toBeNull()
   })
 })
+
+describe('cloud sessions on the rail (#1263/#1264)', () => {
+  test('a finished web run reads as in cloud, not done: the session is still working over there', () => {
+    renderRail(
+      <RunHistory
+        projectId="p1"
+        runs={[run({ status: 'done', target: 'web', driver: 'claude-web' })]}
+        selectedRunId={null}
+        onSelect={() => {}}
+      />,
+    )
+    expect(screen.getByText('in cloud')).toBeTruthy()
+    expect(screen.queryByText('done')).toBeNull()
+  })
+
+  test('a web run stopped early is just stopped: nothing is working anywhere', () => {
+    renderRail(
+      <RunHistory
+        projectId="p1"
+        runs={[run({ status: 'stopped', target: 'web', driver: 'claude-web' })]}
+        selectedRunId={null}
+        onSelect={() => {}}
+      />,
+    )
+    expect(screen.getByText('stopped')).toBeTruthy()
+    expect(screen.queryByText('in cloud')).toBeNull()
+  })
+
+  test('a web run shows the cloud glyph and still names its agent (#1263)', () => {
+    renderRail(
+      <RunHistory
+        projectId="p1"
+        runs={[run({ status: 'done', target: 'web', driver: 'claude-web' })]}
+        selectedRunId={null}
+        onSelect={() => {}}
+      />,
+    )
+    expect(screen.getByLabelText('Runs as a Claude Code cloud session')).toBeTruthy()
+    // claude-web is still Claude: where it runs is the target, not the agent.
+    expect(screen.getByLabelText('Claude Code')).toBeTruthy()
+  })
+
+  test('a local finished run keeps its plain done badge and gets no cloud glyph', () => {
+    renderRail(
+      <RunHistory projectId="p1" runs={[run({ status: 'done', driver: 'claude-code' })]} selectedRunId={null} onSelect={() => {}} />,
+    )
+    expect(screen.getByText('done')).toBeTruthy()
+    expect(screen.queryByLabelText('Runs as a Claude Code cloud session')).toBeNull()
+  })
+})

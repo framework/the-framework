@@ -38,6 +38,8 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `  implementing ${event.path}`
     case 'queue-entry':
       return `  working the queue entry: ${event.entry}`
+    case 'branch':
+      return `  branch: ${event.branch}`
     case 'on-before-mergeable':
       switch (event.outcome) {
         case 'queued':

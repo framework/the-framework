@@ -207,6 +207,14 @@ export type FrameworkEvent =
    */
   | { kind: 'queue-entry'; entry: string }
   /**
+   * The branch the run's work is on (#1277), observed off the checkout rather than guessed:
+   * emitted at start with the branch the run actually begins on, and again when the framework
+   * renames the run-id branch after the agent names the session. Folded to `RunMeta.branch`,
+   * which every surface resolves first — before this event the branch was stamped only at
+   * teardown (#799), so any read before that guessed between three naming schemes.
+   */
+  | { kind: 'branch'; branch: string }
+  /**
    * What the end-of-session handoff actually did (#1102): pushed and/or opened a draft PR,
    * declined for a reason that is not a fault, or failed at one of the two steps.
    *

@@ -1090,7 +1090,7 @@ function conversationRecorder(deps: {
 }
 
 /** What the run journal exposes to the epilogue. See {@link createRunJournal}. */
-interface RunJournal {
+export interface RunJournal {
   onEvent: (event: FrameworkEvent) => void
   /** The session name the agent chose via setSessionName() (#326), once it has. */
   sessionName: () => string | undefined
@@ -1111,9 +1111,9 @@ interface RunJournal {
  * branch once the agent names its session (#736), and re-emits a held browser-stream port
  * right after `session` so it lands in the slice the dashboard renders (#829). These jobs sat
  * inline in runCli across six mutable locals; the journal is their one owner, and runCli reads
- * the getters.
+ * the getters. Exported for the rename-records-the-branch test (#1277).
  */
-function createRunJournal(deps: {
+export function createRunJournal(deps: {
   io: CliIO
   cwd: string
   store: RunStore | undefined
@@ -1149,8 +1149,15 @@ function createRunJournal(deps: {
     if (event.kind === 'session-name') {
       sessionName = event.name
       // The framework-owned checkout (#736) was branched as `the-framework/run-<id>` before a
-      // name existed; put the readable name on it now. No-ops when the agent branched itself.
-      if (deps.runId) void renameRunBranch(cwd, runBranchName(deps.runId), `the-framework/${event.name}`)
+      // name existed; put the readable name on it now. No-ops when the agent branched itself,
+      // and only a rename that happened is recorded (#1277) — a guessed name on the meta is
+      // exactly what the branch event exists to end.
+      if (deps.runId) {
+        const renamed = `the-framework/${event.name}`
+        void renameRunBranch(cwd, runBranchName(deps.runId), renamed).then(didRename => {
+          if (didRename) onEvent({ kind: 'branch', branch: renamed })
+        })
+      }
     }
     if (event.kind === 'end') {
       if (event.stopped) stoppedCleanly = true
@@ -1558,6 +1565,11 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // The queue entry a routine drain pinned this run to (#1253), same shape as the ticket above:
   // once, at start, folded to meta — the durable half of the sweep's claim on the entry.
   if (opts.queueEntry?.trim()) onEvent({ kind: 'queue-entry', entry: opts.queueEntry })
+  // The branch this run actually starts on (#1277): recorded, not guessed, so surfaces reading
+  // the meta mid-run resolve the same name teardown will later confirm. Undefined outside a git
+  // checkout (a non-repo project), and then nothing is recorded.
+  const startBranch = await currentBranch(cwd)
+  if (startBranch) onEvent({ kind: 'branch', branch: startBranch })
   // Wired now the journal exists: a bind resolved from a topic run's gate folds to meta (#1121).
   recordBind = projectId => onEvent({ kind: 'bind', projectId })
 

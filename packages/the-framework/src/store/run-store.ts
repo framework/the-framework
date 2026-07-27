@@ -121,11 +121,12 @@ export interface RunMeta {
   /** The session name the agent chose (#326), also its `the-framework/<name>` branch. */
   sessionName?: string
   /**
-   * The branch the run's work landed on, recorded while its worktree still exists (#799).
+   * The branch the run's work is on: folded from `branch` events as the run observes it (#1277),
+   * and corrected at teardown while the worktree still exists (#799).
    *
-   * Not reliably derivable afterwards: a clean run loses its checkout, and the #326 prompt lets
-   * the agent create its own branch, so neither `the-framework/<sessionName>` nor the run-id
-   * branch is guaranteed to be the one holding the commits.
+   * Not reliably derivable instead of recorded: a clean run loses its checkout, and the #326
+   * prompt lets the agent create its own branch, so neither `the-framework/<sessionName>` nor
+   * the run-id branch is guaranteed to be the one holding the commits.
    */
   branch?: string
   /**
@@ -321,6 +322,9 @@ export function applyEventToMeta(meta: RunMeta, event: FrameworkEvent, at: strin
       break
     case 'queue-entry':
       next.queueEntry = event.entry
+      break
+    case 'branch':
+      next.branch = event.branch
       break
     case 'settled':
       next.settledAt = at

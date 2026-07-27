@@ -39,4 +39,20 @@ describe('EventList conversation rows', () => {
     expect(screen.queryByLabelText('Expand message')).toBeNull()
     expect(screen.getByText('all done')).toBeTruthy()
   })
+
+  test('the tail renders inside the scroller, after the last row (#1265)', () => {
+    render(
+      <EventList
+        events={[{ kind: 'driver', event: { type: 'text', text: 'all done' } }]}
+        stick={false}
+        tail={<div data-testid="tail-box">and then…</div>}
+      />,
+    )
+    const tail = screen.getByTestId('tail-box')
+    const viewport = screen.getByLabelText('Session output')
+    expect(viewport.contains(tail)).toBe(true)
+    const row = screen.getByText('all done')
+    // The tail follows the log rather than floating over it: document order puts it after the rows.
+    expect(row.compareDocumentPosition(tail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
 })

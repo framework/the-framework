@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { FrameworkEvent } from '@gemstack/the-framework'
 import { TriangleAlert } from 'lucide-react'
 import { EventList } from './EventList.js'
@@ -19,6 +20,7 @@ export function RunFeed({
   stick = true,
   openAt,
   emptyLabel = 'Waiting for the session to start…',
+  tail,
 }: {
   events: FrameworkEvent[]
   showSessionLink?: boolean
@@ -34,6 +36,8 @@ export function RunFeed({
   openAt?: 'start' | 'end'
   /** What an empty feed says: a live run is waiting, a finished one has nothing to replay. */
   emptyLabel?: string
+  /** Rendered after the last log row, inside the scroller (#1265): a web run's live mirror box. */
+  tail?: ReactNode
 }) {
   const lostBanner = lost && (
     <div role="status" className="flex items-center gap-2 border-b border-border bg-warning/10 px-4 py-2 text-xs text-warning">
@@ -53,7 +57,7 @@ export function RunFeed({
     <>
       {lostBanner}
       <RunOverview events={events} showSessionLink={showSessionLink} showName={showName} showStatus={showStatus} showLoop={showLoop} />
-      <EventList events={events} stick={stick} {...(openAt ? { openAt } : {})} />
+      <EventList events={events} stick={stick} {...(openAt ? { openAt } : {})} {...(tail ? { tail } : {})} />
     </>
   )
 }

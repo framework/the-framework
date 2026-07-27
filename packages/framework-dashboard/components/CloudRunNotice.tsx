@@ -23,7 +23,6 @@ export function CloudRunNotice({
 }) {
   const session = target === 'web' ? cloudSession(events) : undefined
   const question = useBridgeQuestion(session?.id)
-  const transcript = useBridgeEvents(session?.id)
   const answer = useBridgeAnswer(session?.id)
   if (target !== 'web') return null
   return (
@@ -53,7 +52,6 @@ export function CloudRunNotice({
           </>
         )}
       </div>
-      {transcript.length > 0 && <CloudTranscript events={transcript} />}
       {question && session && (!answer || answer.state === 'failed') && (
         <ParkedQuestion question={question} url={session.url} sessionId={session.id} failure={answer?.state === 'failed' ? answer : undefined} />
       )}
@@ -182,21 +180,70 @@ function AnswerState({ answer, url, sessionId }: { answer: BridgeAnswer; url: st
 }
 
 /**
- * What the cloud session has said, as the bridge scraped it.
- *
- * Deliberately not styled as our own live feed. It is a mirror of another product's page, read
- * through a browser extension, and presenting it as a first-class run log would overstate how
- * much we actually know: there are no tool calls, no timings, and nothing arrives at all when
- * the tab is closed.
+ * Lines of claude.ai UI chrome the tail scrape drags in (#1265). The mirror is `main`'s rendered
+ * text, so tile-focus hints, per-message action affordances and the bare model name ride along
+ * with the conversation. Matched per line, anchored, so a message that merely mentions a model
+ * is untouched.
  */
-function CloudTranscript({ events }: { events: readonly BridgeEvent[] }) {
+const MIRROR_CHROME = [
+  /^Arrow keys move the tile/i,
+  /^Show message actions$/i,
+  /^(Claude\s+)?(Fable|Opus|Sonnet|Haiku)(\s+\d[\d.]*)?$/i,
+]
+
+/** Drop the scraped-in UI chrome from a mirror block, collapsing the holes it leaves. */
+export function scrubMirrorText(text: string): string {
+  return text
+    .split('\n')
+    .filter(line => !MIRROR_CHROME.some(chrome => chrome.test(line.trim())))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/**
+ * The one live boxed row at the tail of a web run's log (#1265): the log itself dead-ends at
+ * "Handed off: …", and this is what happens after — the bridge mirror streaming in place, with a
+ * connecting placeholder so a web run never shows dead air.
+ *
+ * Deliberately a single clearly-labelled box rather than ordinary log rows: `events.jsonl` is
+ * durable provenance-clean data, the mirror is a best-effort tab scrape read through a browser
+ * extension — no tool calls, no timings, nothing at all when the tab is closed — and one visible
+ * boundary keeps the two from being confused. Renders nothing for any other target (or before the
+ * hand-off names a session), so the feed can mount it unconditionally.
+ */
+export function CloudMirrorRow({
+  target,
+  events,
+}: {
+  target?: 'local' | 'actions' | 'remote' | 'web' | undefined
+  events: readonly FrameworkEvent[]
+}) {
+  const session = target === 'web' ? cloudSession(events) : undefined
+  const transcript = useBridgeEvents(session?.id)
+  if (target !== 'web' || !session) return null
+  const blocks = transcript.map(event => scrubMirrorText(event.text)).filter(Boolean)
   return (
-    <div className="max-h-80 space-y-2 overflow-y-auto border-t border-border px-4 py-2.5 text-xs">
-      {events.map(event => (
-        <div key={event.seq} className="whitespace-pre-wrap break-words text-muted-foreground">
-          {event.text}
+    <div role="status" aria-label="Cloud session mirror" className="mt-2 rounded-md border border-border bg-muted/40 font-sans">
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-1.5 text-[10px] text-muted-foreground">
+        <Cloud className="h-3 w-3 shrink-0 text-primary" aria-hidden />
+        <span className="font-medium uppercase tracking-wide">Cloud session mirror</span>
+        <span className="opacity-70">a best-effort view of the Claude tab, not the run's own log</span>
+      </div>
+      {blocks.length > 0 ? (
+        <div className="max-h-80 space-y-2 overflow-y-auto px-3 py-2 text-xs">
+          {blocks.map((text, i) => (
+            <div key={i} className="whitespace-pre-wrap break-words text-muted-foreground">
+              {text}
+            </div>
+          ))}
         </div>
-      ))}
+      ) : (
+        <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" aria-hidden />
+          Connecting to the cloud session…
+        </div>
+      )}
     </div>
   )
 }

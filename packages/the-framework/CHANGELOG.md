@@ -1,5 +1,14 @@
 # @gemstack/the-framework
 
+## 1.4.1
+
+### Patch Changes
+
+- c53b802: The sessions rail is honest about cloud runs (#1263, #1264): a finished `Run on: Claude web` session reads "in cloud" instead of "done" (its local process ended at the hand-off; the cloud session keeps working and opens its own PR), rows carry a cloud glyph for web sessions, and a web run's row names its agent again (claude-web is still Claude).
+- 13024b3: "Spin up agents working on the AI queue" now does what it says (#1204): the drain routine's Run now fires a drain-only sweep, which fans out to the concurrency setting, one agent per open queue entry, instead of starting a single agent on the first entry. An empty queue is reported on the card rather than the click being borrowed for a rotation job.
+- 13024b3: Fix a pinned queue entry being handed out to a second agent (#1253). The routine's drain pins lived only in the daemon's memory, so a hands-off web run (whose local process ends at the hand-off while the cloud session still works the entry) and a daemon restart both put the entry back on the market, fanning it out again and opening duplicate PRs. The pinned entry now travels to the run's meta (`--queue-entry`, like `--ticket`), and the sweep derives durable claims from the metas: a live run holds its entry, a finished one holds it while its PR is open, and failed/stopped runs release it.
+- 0bc296a: Fix the session view crashing (Base UI error #31) on multi-app repos once the preview URL clears, e.g. right after Stop session: the session menu's "Serve which app" submenu label was missing its menu-group wrapper.
+
 ## 1.4.0
 
 ### Minor Changes

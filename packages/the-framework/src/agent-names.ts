@@ -31,6 +31,8 @@ export const AGENT_LABELS: Record<AgentName, string> = {
  * name differs from its own needs a case here, like claude's does.
  */
 export function agentForDriver(driver: string | undefined): AgentName | undefined {
-  if (driver === 'claude-code') return 'claude'
+  // Every surface Claude runs on is still Claude (#1263): the local CLI, the cloud session, and
+  // the Actions runner. Where it runs is the run's `target`, not its agent.
+  if (driver === 'claude-code' || driver === 'claude-web' || driver === 'github-actions') return 'claude'
   return isAgentName(driver) ? driver : undefined
 }

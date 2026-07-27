@@ -7,6 +7,7 @@ import {
   userDirName,
   sessionsDir,
   sessionsGitignore,
+  withoutPerUserRules,
   ensureSessionsIgnored,
   resolveUserDir,
   forgetUserDirs,
@@ -74,8 +75,8 @@ test('sessions live under the user, inside .the-framework (#1179)', () => {
 test('the ignore rules re-include every directory on the way down (#1179)', () => {
   // The seeded allow-list ignores everything with `*`, and git never descends into an ignored
   // directory — so un-ignoring only the files would never be reached.
-  const rules = sessionsGitignore('me@example.com')
-  assert.equal(rules, '!me@example.com/\n!me@example.com/sessions/\n!me@example.com/sessions/**\n')
+  const rules = sessionsGitignore()
+  assert.equal(rules, '!*/\n!*/sessions/\n!*/sessions/**\n')
 })
 
 test('a repo with no ignore file gets the full allow-list plus its rules (#1179)', async () => {
@@ -83,7 +84,7 @@ test('a repo with no ignore file gets the full allow-list plus its rules (#1179)
   assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), true)
   const written = fs.files.get(IGNORE)!
   assert.ok(written.startsWith(LOGS_GITIGNORE), 'the transient run state stays ignored')
-  assert.ok(written.includes('!me@example.com/sessions/**'))
+  assert.ok(written.includes('!*/sessions/**'))
 })
 
 test('an existing ignore file is appended to, once (#1179)', async () => {
@@ -91,18 +92,44 @@ test('an existing ignore file is appended to, once (#1179)', async () => {
   assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), true)
   assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), false, 'already there, so nothing written')
   const written = fs.files.get(IGNORE)!
-  assert.equal(written.match(/!me@example\.com\/sessions\/\*\*/g)?.length, 1)
+  assert.equal(written.match(/!\*\/sessions\/\*\*/g)?.length, 1)
 })
 
-test('a second user adds their own rules beside the first (#1179)', async () => {
-  // Two people on one repo is the case the per-user directory exists for, and the ignore file has
-  // to name both or the second one's history is silently untracked.
+test('a second user writes nothing: the rules already cover them (#1312)', async () => {
+  // The whole point of the glob. Under the per-user form this was two writes to a tracked file,
+  // one per person, each dirtying its own checkout.
   const fs = memFs({ [IGNORE]: LOGS_GITIGNORE })
-  await ensureSessionsIgnored('/repo', 'a@example.com', fs)
-  await ensureSessionsIgnored('/repo', 'b@example.com', fs)
+  assert.equal(await ensureSessionsIgnored('/repo', 'a@example.com', fs), true)
+  assert.equal(await ensureSessionsIgnored('/repo', 'b@example.com', fs), false, 'the glob already covers them')
   const written = fs.files.get(IGNORE)!
-  assert.ok(written.includes('!a@example.com/sessions/**'))
-  assert.ok(written.includes('!b@example.com/sessions/**'))
+  assert.equal(written.match(/!\*\/sessions\/\*\*/g)?.length, 1)
+  assert.ok(!written.includes('@example.com'), 'no user is named')
+})
+
+test('a file still naming users is upgraded to the glob form, once (#1312)', async () => {
+  const legacy = LOGS_GITIGNORE + '!a@example.com/\n!a@example.com/sessions/\n!a@example.com/sessions/**\n'
+  const fs = memFs({ [IGNORE]: legacy })
+  assert.equal(await ensureSessionsIgnored('/repo', 'b@example.com', fs), true)
+  const written = fs.files.get(IGNORE)!
+  assert.ok(written.includes('!*/sessions/**'), 'the glob is in')
+  assert.ok(!written.includes('a@example.com'), 'the per-user lines came out in the same write')
+  assert.equal(await ensureSessionsIgnored('/repo', 'c@example.com', fs), false, 'and it never writes again')
+})
+
+test('the upgrade keeps every line it does not recognize (#1312)', () => {
+  // The conversations rules (#908) sit in the same file and are a literal directory, not a user.
+  const before = LOGS_GITIGNORE + '!conversations/\n!conversations/**\n!a@x.com/\n!a@x.com/sessions/\n!a@x.com/sessions/**\n# mine\n!keep-me/\n'
+  const after = withoutPerUserRules(before)
+  assert.ok(after.includes('!conversations/'), 'conversations survive')
+  assert.ok(after.includes('!conversations/**'))
+  assert.ok(after.includes('# mine'), 'comments survive')
+  assert.ok(after.includes('!keep-me/'), 'an unrelated rule survives')
+  assert.ok(!after.includes('a@x.com'), 'only the named user goes')
+})
+
+test('a file with no per-user rules is returned untouched (#1312)', () => {
+  const md = LOGS_GITIGNORE + '!conversations/\n!conversations/**\n'
+  assert.equal(withoutPerUserRules(md), md)
 })
 
 test('an unrecognized ignore file is left alone (#1179)', async () => {

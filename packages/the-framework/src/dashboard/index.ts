@@ -21,6 +21,7 @@ export { readGitStatus, type GitStatus } from './git-status.js'
 export { ghPrView, ghPrList, ghJson, nodeGhRunner, type LinkedPr, type OpenPr, type PrLookup, type BranchPrLookup, type PrLister, type GhRunner } from './gh.js'
 export { readFileDiff, readFileChanges, safeRepoPath, type FileDiff, type FileChange } from './file-diff.js'
 export { readFileContent, type FileContent } from './file-read.js'
+export { readAnalysisResult, parseAnalysisResult, type RunAnalysis } from './analysis-result.js'
 export {
   readRunHandoff,
   runBranchFor,

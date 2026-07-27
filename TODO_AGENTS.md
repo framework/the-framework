@@ -15,7 +15,6 @@
 
 - [Show agent error messages in red in the session log](tickets/2026-07-25_show-agent-error-red.md) — maintainer pre-authorized this for autonomous AI pickup ("only if quick-win"); bail out and report if it turns out non-trivial.
 - [Highlight the user prompt on the run page](tickets/2026-07-25_where-see-user-prompt.md) — highlight the sent user prompt (the text next to `YOU`) in blue; additionally show it as the first log entry if that stays trivial ("only if quick-win").
-- [Surface the prompt analysis in the dashboard](tickets/2026-07-25_show-prompt-analysis.md) — on the run page, show from the run's `ANALYSIS_RESULT.md`: Scope (one word), Variability (one word), Plan yes/no (label "Whether the work includes a plan"), New tickets yes/no (label "Whether the work spans over new tickets"). Parse tolerantly and hide fields that are absent; maintainer pre-authorized this for autonomous AI pickup ("only if quick-win").
 - [Fix the empty dropdown at the bottom of the settings UI](tickets/2026-07-25_empty-settings-dropdown.md) — diagnose why an empty dropdown renders; either give it its intended content or stop rendering it (the ticket accepts both outcomes).
 
 ## Priority 2

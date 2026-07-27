@@ -12,6 +12,7 @@ import { buildDashboard, type DashboardData } from '../dashboard/dashboard.js'
 import { githubUrlFor } from '../dashboard/github.js'
 import { readGitStatus, type GitStatus } from '../dashboard/git-status.js'
 import { readRunHandoff, resolveRunPr, runBranchFor, type RunHandoff } from '../dashboard/run-handoff.js'
+import { readAnalysisResult, type RunAnalysis } from '../dashboard/analysis-result.js'
 import type { RunWorktree } from '../dashboard/types.js'
 import { crawlRepoFiles } from '../project.js'
 import { readFileStatuses, type FileGitStatus } from '../dashboard/file-status.js'
@@ -358,6 +359,26 @@ export async function onRunHandoff(projectId: string, runId: string): Promise<Ru
     const checkout = await resolveRunPath(projectId, runId)
     const deps = { since: run.startedAt, ...(checkout && checkout !== cwd ? { checkout } : {}) }
     return (await readRunHandoff(cwd, runBranchFor(run), deps).catch(() => undefined)) ?? null
+  }, null)
+}
+
+/**
+ * The prompt analysis the session wrote at its worktree root (#1180): `ANALYSIS_RESULT.md`'s
+ * scope / variability / plan / new-tickets facts, parsed forgivingly. Null when the file is
+ * absent or carries none of them — the strip hides rather than showing empties.
+ *
+ * Read only from the run's *own* checkout. The file is gitignored and agent-written, so once a
+ * clean run's worktree is gone, `resolveRunPath`'s project-root fallback would serve whatever
+ * analysis some other agent last left at the root as though it were this run's — the same
+ * misattribution the handoff read guards against (#799).
+ */
+export async function onRunAnalysis(projectId: string, runId: string): Promise<RunAnalysis | null> {
+  return relayOr(runId, 'onRunAnalysis', [projectId, runId], async () => {
+    const root = await resolveProjectPath(projectId)
+    if (!root || !isSafeRunId(runId)) return null
+    const cwd = await resolveRunPath(projectId, runId)
+    if (!cwd || cwd === root) return null
+    return readAnalysisResult(cwd).catch(() => null)
   }, null)
 }
 

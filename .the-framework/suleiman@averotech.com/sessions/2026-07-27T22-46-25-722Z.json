@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "status": "stopped",
+  "id": "2026-07-27T22-46-25-722Z",
+  "startedAt": "2026-07-27T22:46:26.440Z",
+  "updatedAt": "2026-07-27T23:11:19.649Z",
+  "passes": 1,
+  "pid": 46578,
+  "host": "Suleimans-MacBook-Pro.local",
+  "intent": "Work on tickets/2026-07-25_what-is-log.md. Do not start any other ticket.",
+  "handoff": {
+    "push": true,
+    "pr": true
+  },
+  "branch": "the-framework/dns-rebinding-guard",
+  "driver": "claude-code",
+  "workspace": "/Users/suleiman/Projects/gemstack/.the-framework/worktrees/2026-07-27T22-46-25-722Z",
+  "sessionLink": "https://claude.ai/code",
+  "scope": "full",
+  "sessionId": "b762635b-580a-45da-bcec-60fd87ac3697",
+  "readyForMerge": true
+}

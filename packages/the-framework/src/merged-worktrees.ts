@@ -119,6 +119,19 @@ export async function removeMergedWorktrees(cwd: string, deps: MergedSweepDeps =
     if (!state || !state.exists) continue
     const via = landedVia(state)
     if (!via) continue
+    // The ancestor signal cannot tell a branch whose commits are now in the base from one that
+    // never had any (#1325): both answer `base..branch` with nothing, and a zero-commit branch is
+    // trivially reachable from the base. A run that died at boot is exactly the second case, and
+    // its checkout is the one most worth reading — so it was being destroyed for looking like the
+    // success it is the opposite of.
+    //
+    // `empty` cannot be the guard, tempting as it looks: a genuinely merged branch is empty by the
+    // same measure (`base..branch` is the branch's own commits, run-handoff.ts:276), so gating on
+    // it would switch the local signal off altogether. What separates the two is what the run did,
+    // which only its meta records. So the ancestor signal on its own reclaims a checkout for a run
+    // that finished cleanly; anything else — failed, stopped, or a run whose meta is missing
+    // entirely — needs the PR to say the work landed.
+    if (via === 'branch' && meta?.status !== 'done') continue
     const outcome = await remove(cwd, row.runId)
     if (outcome.ok) result.removed.push({ runId: row.runId, branch, via })
     else result.failed.push({ runId: row.runId, error: outcome.error })

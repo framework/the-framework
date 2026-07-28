@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "status": "stopped",
+  "id": "2026-07-28T23-17-35-130Z",
+  "startedAt": "2026-07-28T23:17:35.707Z",
+  "updatedAt": "2026-07-28T23:17:43.403Z",
+  "passes": 1,
+  "pid": 97823,
+  "host": "Suleimans-MacBook-Pro.local",
+  "intent": "Create a file test03.md containing the single line \"just test, delete me\". Nothing else",
+  "handoff": {
+    "push": true,
+    "pr": true
+  },
+  "branch": "the-framework/run-2026-07-28T23-17-35-130Z",
+  "driver": "claude-code",
+  "workspace": "/Users/suleiman/Projects/gemstack/.the-framework/worktrees/2026-07-28T23-17-35-130Z",
+  "sessionLink": "https://claude.ai/code",
+  "scope": "full",
+  "sessionId": "da3955b7-b063-4d77-8ac6-07dff51279b0",
+  "pendingChoice": {
+    "id": "todo-next",
+    "title": "Start the next backlog item? (23 open)"
+  }
+}

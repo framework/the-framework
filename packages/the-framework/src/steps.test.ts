@@ -228,6 +228,8 @@ test('extendPrompt names the work and the workspace, and nothing else (#1224)', 
   assert.match(prompt, /existing codebase/i)
   // #1224: the rules telling it how to behave are gone, not reworded.
   assert.doesNotMatch(prompt, /do NOT re-scaffold|swap its stack|smallest coherent|read the existing code first/i)
+  // #1356: the scope verdict is asked for, so trivial runs actually emit it.
+  assert.match(prompt, /`set-scope` block/)
 })
 
 test('driverImprove scaffolds from scratch when the workspace is empty, else fixes blockers (#182)', async () => {

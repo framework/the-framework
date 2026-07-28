@@ -63,6 +63,10 @@ export function buildPrompt(intent: string): string {
 export function extendPrompt(intent: string): string {
   return [
     `Work within the existing codebase in this workspace to deliver: ${intent}`,
+    // Asked for here, not just offered by the signal protocol (#1356): a trivial run never has a
+    // "sizing" moment on its own, so the optional block goes unemitted and the full checklist
+    // runs for a one-line change. What the verdict means stays in the protocol text.
+    'Also emit a `set-scope` block sizing this work (`small` / `large` / `very-large`).',
     'When done, summarize what you changed in one short paragraph.',
   ].join('\n')
 }

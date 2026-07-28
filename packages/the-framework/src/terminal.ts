@@ -28,6 +28,8 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `▶ view: ${event.title}`
     case 'session-name':
       return `  session: ${event.name}`
+    case 'scope-verdict':
+      return `  scope: ${event.scope}`
     case 'ready-for-merge':
       return `✓ ready for merge`
     case 'settled':

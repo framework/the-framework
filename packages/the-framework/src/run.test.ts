@@ -475,6 +475,53 @@ test('a build turn that stops to ask fires a live gate and resumes on the pick (
   assert.equal(result.productionGrade, true)
 })
 
+test('a build that declares small scope skips the production-grade checklist (#1356)', async () => {
+  const driver = new FakeDriver({
+    respond: (prompt: string): string => {
+      if (/Build this app end to end/.test(prompt))
+        return 'One-line change, done.\n```set-scope\nsmall\n```'
+      if (/production-grade checklist/.test(prompt)) throw new Error('the checklist must not dispatch (#1356)')
+      return 'done'
+    },
+    sessionId: 'scope1356',
+  })
+  const events: FrameworkEvent[] = []
+  const { result } = await runFramework({
+    intent: FAKE_INTENT,
+    driver,
+    cwd: '/tmp/ws',
+    signals: FAKE_SIGNALS,
+    onEvent: e => events.push(e),
+  })
+  // The pass resolved clean without an agent, and the dashboard says why instead of showing a
+  // silent instant pass.
+  assert.equal(result.productionGrade, true)
+  assert.equal(result.passes, 1)
+  assert.ok(events.some(e => e.kind === 'scope-verdict' && e.scope === 'small'))
+  assert.ok(events.some(e => e.kind === 'log' && /Skipping the production-grade checklist/.test(e.message)))
+})
+
+test('a large or missing verdict keeps the full checklist (#1356)', async () => {
+  for (const tail of ['\n```set-scope\nlarge\n```', '']) {
+    const prompts: string[] = []
+    const driver = new FakeDriver({
+      respond: (prompt: string): string => {
+        prompts.push(prompt)
+        if (/Build this app end to end/.test(prompt)) return `Built the whole feature.${tail}`
+        if (/production-grade checklist/.test(prompt)) return 'Reviewed.\n```json\n{ "blockers": [] }\n```'
+        return 'done'
+      },
+      sessionId: 'scope1356full',
+    })
+    const events: FrameworkEvent[] = []
+    await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', signals: FAKE_SIGNALS, onEvent: e => events.push(e) })
+    // The gate only ever drops work the agent explicitly said was unnecessary (#1356): no
+    // verdict — an older prompt, a run without the protocols — reviews exactly as before.
+    assert.ok(prompts.some(p => /production-grade checklist/.test(p)), `expected a checklist pass with tail ${JSON.stringify(tail)}`)
+    assert.ok(!events.some(e => e.kind === 'log' && /Skipping the production-grade checklist/.test(e.message)))
+  }
+})
+
 test('a build turn that stops to showMultiSelect fires a checklist gate and resumes (#339)', async () => {
   const awaitBlock =
     'Rated the problems.\n```await-multiselect\n' +

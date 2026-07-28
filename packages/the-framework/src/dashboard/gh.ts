@@ -177,13 +177,32 @@ export async function ghMergePr(cwd: string, number: number, gh: GhRunner = node
     return { outcome: 'auto-armed' }
   } catch (err) {
     const refusal = errorMessage(err)
-    if (!DIRECT_MERGE_FALLBACK.test(refusal)) return { outcome: 'failed', error: refusal }
-    try {
-      await gh(['pr', 'merge', String(number), '--squash'], cwd)
-      return { outcome: 'merged' }
-    } catch (direct) {
-      return { outcome: 'failed', error: errorMessage(direct) }
+    // A draft cannot be merged or auto-merged. The armed handoff opens its PR ready, but the
+    // already-open path can find a draft a *previous* run left behind — mark it ready and try
+    // once more, because an armed merge is the statement that its review already happened.
+    if (/draft/i.test(refusal)) {
+      try {
+        await gh(['pr', 'ready', String(number)], cwd)
+        await gh(['pr', 'merge', String(number), '--squash', '--auto'], cwd)
+        return { outcome: 'auto-armed' }
+      } catch (retry) {
+        const readyRefusal = errorMessage(retry)
+        if (!DIRECT_MERGE_FALLBACK.test(readyRefusal)) return { outcome: 'failed', error: readyRefusal }
+        return directMerge(cwd, number, gh)
+      }
     }
+    if (!DIRECT_MERGE_FALLBACK.test(refusal)) return { outcome: 'failed', error: refusal }
+    return directMerge(cwd, number, gh)
+  }
+}
+
+/** The direct-merge half of {@link ghMergePr}, shared by its two ways of getting there. */
+async function directMerge(cwd: string, number: number, gh: GhRunner): Promise<AutoMergeOutcome> {
+  try {
+    await gh(['pr', 'merge', String(number), '--squash'], cwd)
+    return { outcome: 'merged' }
+  } catch (direct) {
+    return { outcome: 'failed', error: errorMessage(direct) }
   }
 }
 

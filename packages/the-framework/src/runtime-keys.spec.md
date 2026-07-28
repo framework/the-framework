@@ -1,0 +1,1 @@
+The composite key scheme for the daemon runtime's per-project state (#736): `<projectKey>::<runId>` for run-scoped entries, bare project key for project-scoped ones (fallback run, preview) — `scopedKey`/`parseScopedKey`/`keyBelongsTo` built and parsed only here because three call sites used to hand-roll the encoding separately.

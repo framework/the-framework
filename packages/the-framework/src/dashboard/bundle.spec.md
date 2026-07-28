@@ -1,0 +1,1 @@
+Locates the prerendered dashboard bundle directory (#405): `dist/dashboard-client` in the published package, else the workspace's `packages/framework-dashboard/dist/client`; returns the dir only when its `index.html` exists (else undefined, and the caller serves the legacy page). Shared by the daemon and the per-run foreground dashboard (#427).

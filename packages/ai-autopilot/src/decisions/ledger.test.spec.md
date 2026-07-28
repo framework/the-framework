@@ -1,1 +1,0 @@
-Tests for `ledger.ts` — covers record/query with the `reject`/`accept` shorthands, in-place replacement on re-recording the same id (reject → accept keeps size 1), and `consult`: surfacing a rejected re-pitch with score/overlap, `wasRejected` distinguishing rejected vs accepted vs never-decided, threshold/status/limit filtering, and an empty idea matching nothing.

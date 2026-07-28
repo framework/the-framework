@@ -1,0 +1,1 @@
+"1. Enhanced System Prompt" subsection (`#enhanced-system-prompt`, rendered inside `HowItWorks`): a card explaining the system prompt The Framework appends (divide work into subtasks, list alternatives) with a checklist (anti-laziness, no important decisions without asking, improved interaction/planning) and a customize/opt-out `Note`.

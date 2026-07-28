@@ -1,1 +1,0 @@
-Tests for `compose.ts` — covers base-first instruction ordering, empty-body skill omission, own-tool-wins collision namespacing (`docs__search`), collisions between two skills (second yields), `execute` preservation on rename, agent-before-skill middleware order, and `surface()` summaries.

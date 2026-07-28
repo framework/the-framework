@@ -1,1 +1,0 @@
-Tests for `ResolvedOptions.tsx` (#842) — covers rendering nothing when no options are in play, listing checked options, excluding disabled ones, marking repo-yml-inherited values with a "repo" tag plus per-chip tooltip naming the tier (`the-framework.yml` vs "Your setting"), and always showing gear-less yml keys (`preset`, `event`) as repo-tier.

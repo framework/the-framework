@@ -1,1 +1,0 @@
-Tests for `define.ts` — covers `definePrompt` defaults/freezing and rejection of non-kebab ids, missing `run`, bad `passes`; and `defineLoop` normalization (single→array, de-dupe) and non-empty `on`/`run` requirements.

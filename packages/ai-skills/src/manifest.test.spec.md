@@ -1,1 +1,0 @@
-Tests for `manifest.ts` — covers full-manifest parsing (all optional fields + trimmed body), missing-fence / invalid-YAML / missing-required-field errors, rejection of names outside `[a-zA-Z0-9_-]` (e.g. `foo.bar`), unknown-key tolerance-and-drop, body-less skills, and the `source` label carried into errors.

@@ -1,1 +1,0 @@
-Tests for `RunChanges.tsx` (#817) — covers listing changed files with counts from the run worktree, reporting totals upward via `onSummary` for the collapsed bar (#1023), rendering nothing (and reporting zero) for a session that changed nothing, lazy diff reads (no `onFileDiff` call until a row is expanded), and a failed read staying silent instead of throwing.

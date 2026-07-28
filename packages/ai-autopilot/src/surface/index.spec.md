@@ -1,0 +1,1 @@
+Barrel for the surfaces — re-exports `EventStream`/`formatEvent`/`terminalSink` and `launchAutopilot` with their types; its doc comment states the surface idea (terminal / in-page / background all consume the same `onEvent` stream, differing only in rendering and blocking).

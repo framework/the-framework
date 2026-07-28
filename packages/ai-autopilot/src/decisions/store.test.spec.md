@@ -1,1 +1,0 @@
-Tests for `store.ts` — via an in-memory `LedgerFs` (which also proves the RunnerFs-shaped seam): empty ledger when the file is absent, save-to-`DECISIONS.md`/load-back equivalence (including `wasRejected` still working), and a custom path.

@@ -1,1 +1,0 @@
-Tests for `library-connector.ts` — via `mountConnectors` + `McpTestClient`: the three tools are exposed namespaced as `library_*`, `search-books` filters by title substring, and `get-book` returns one book by id.

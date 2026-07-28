@@ -1,1 +1,0 @@
-Tests for `agent.ts` — covers `agentOverview` parsing a structured overview from an `AiFake`-stubbed model (asserting the previous overview and reason reach the prompt), and `overviewLoopPrompt` refreshing on a material loop event while leaving the overview untouched on an immaterial one.

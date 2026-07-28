@@ -1,0 +1,1 @@
+Public entry for `@gemstack/ai-sdk/computer-use` — re-exports the action vocabulary (`actions.js`), the Playwright executor (`playwright.js`), the `computerUseTool` factory (`tool.js`), and the error classes (`errors.js`), with quick-start examples in the module JSDoc.

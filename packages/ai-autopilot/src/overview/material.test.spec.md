@@ -1,1 +1,0 @@
-Tests for `material.ts` — covers each signal (build/config, test-tooling, many-files-across-areas, summary restructure words, extraPatterns/custom threshold) plus the negatives: a big single-area change and a routine edit are not material.

@@ -1,0 +1,11 @@
+The launcher's Start-a-session form (#405): wraps the shared Composer and owns the one write through the daemon's `startRun`, the system-prompt preview and the Context selector.
+
+## TLDR
+
+- Submit: `useStartRun().start(projectId, text, kind, options)` where `options = runOptionsFromPreferences(preferences, [...context])` — the daemon's own mapping (#858), read once so submit and system-prompt preview cannot disagree; success calls `onRunStarted(text, runId, remoteDevice?.label)` to seed the optimistic rail row (#405/#761) and clears the editor.
+- A preset submit (`kind === 'prompt'`) runs `unattended: true` (#1279 — fired work ends at settle, armed handoff fires, like the auto-PM sweep's runs); a typed prompt (`'build'`) keeps the stay-open chat.
+- Context selector (#439/#314/#504): the shell-owned `context` set mixes whole repo paths and file paths; split by membership in `projects.map(p => p.path)`; the current project is never offered as a focus target (#665); summary counts "N projects · M files"; picked paths become one `Context:` line in the system prompt.
+- Remote target (#1067): a picked device (from `useConnectionProfiles` + `useSelectedRemoteDeviceId`) adds memory-only `options.remote = {url, token, label}` — the token is a per-browser secret and is never persisted; absent, the options are byte-identical to a local start.
+- Web-run trust preflight (#1314/#1318): when `target === 'web'` (and not remote), `onClaudeTrust(projectId)` is read; `known && !trusted` renders a warning naming the one-time fix (`claude` in `<root>`, accept the trust prompt) BEFORE a run is spent; `known: false` shows nothing rather than crying wolf.
+- `SystemPromptDisclosure` (#863) rides the resolved row (#1046), fed the actual send options (browser/eco/autopilot/context) plus the repo's own SYSTEM.md via `onSystemPromptUser` (#872 — reading it is Node-bound, so without this read the "entire prompt" preview under-reported).
+- Feedback next to the button (#948): error/status render directly under the composer, not below a possibly-tall Context disclosure; editing after a failed start resets the stale error; preset loads set a note ("preset loaded — review or edit", or the undo hint when it replaced a draft).

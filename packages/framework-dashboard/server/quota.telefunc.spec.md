@@ -1,0 +1,1 @@
+Re-export shim (#535) pinning the baked RPC key `/server/quota.telefunc.ts` for the usage-panel telefunctions `onQuota`, `onAutoPm`, and `sendAutoPmSweep`, implemented in `@gemstack/the-framework/dashboard-rpc` — the daemon serves them in-process, off the quota poller it owns for its whole life. Imported-then-exported, not `export ... from` (#1014, see `server/.spec.md`).

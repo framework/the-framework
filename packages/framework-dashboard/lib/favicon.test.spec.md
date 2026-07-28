@@ -1,1 +1,0 @@
-Tests for `favicon.ts` (#875) — covers swapping the Vike-emitted link in place (no second link), creating a link when the page has none, the `enabled=false` hands-off mode, and the state → icon-file mapping.

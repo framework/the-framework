@@ -1,1 +1,0 @@
-Tests for `chat-mentions.ts` — covers mention extraction/stripping (unknown slugs left intact, dedupe with order, case-insensitivity, email and trailing-punctuation non-matches, no `lastIndex` leak of the shared global regex) and routing-rule rendering (single vs ordered multi-mention, custom tool name/arg key, null for no mentions).

@@ -5,6 +5,15 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createProjectRuntime, cleanupTimedOutWorktree, tearDownTopicScratch, moveTopicRunHistory, markFailedStart, runStderrPath, isTransientRunFailure, lastRunFailureDetail, MAX_TRANSIENT_RETRIES } from './daemon-runtime.js'
 import { CliTimeoutError } from './cli-exec.js'
+import type { PreflightResult } from './preflight.js'
+
+/**
+ * A ready agent, injected into every start below (#1326). A daemon start now preflights the
+ * picked agent's CLI, and these tests are about worktrees and teardown, not about whether the
+ * machine running them happens to have `claude` installed and logged in.
+ */
+const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
+
 import { FRAMEWORK_DIR, WORKTREES_DIR, EVENTS_FILE, META_FILE, worktreePath, runBranchName, RUN_META_VERSION, startedAtFromRunId, type RunMeta } from './store/index.js'
 import { topicScratchPath, addProject, projectId } from './registry.js'
 import { nodeGitRunner } from './project.js'
@@ -79,7 +88,7 @@ test('a repo whose worktree could not be created fails the run instead of borrow
     await writeFile(join(cwd, FRAMEWORK_DIR, WORKTREES_DIR), '')
 
     const log = join(cwd, 'started.log')
-    const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeStub(cwd, log) })
+    const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd, env: {}, binPath: await writeStub(cwd, log) })
     const result = await runtime.onStart('build a thing', 'build')
 
     assert.equal(result.ok, false, 'the Start is refused rather than downgraded into the main checkout')
@@ -96,7 +105,7 @@ test('a project that is not a git repo still falls back to the main checkout, an
   const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-alloc-nogit-')))
   try {
     const log = join(cwd, 'started.log')
-    const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeStub(cwd, log) })
+    const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd, env: {}, binPath: await writeStub(cwd, log) })
     let result: { ok: boolean; runId?: string } | undefined
     const logged = await withCapturedLog(async () => {
       result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; runId?: string }
@@ -140,7 +149,7 @@ test('a project-less topic run spawns in a neutral scratch dir with no worktree 
     const log = join(home, 'started.log')
     // XDG_CONFIG_HOME steers the scratch dir the same way it steers the registry file.
     const env = { XDG_CONFIG_HOME: config }
-    const runtime = createProjectRuntime({ cwd: home, env, binPath: await writeStub(home, log) })
+    const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd: home, env, binPath: await writeStub(home, log) })
     const result = (await runtime.onStart('draft a ticket', 'build', { topic: true })) as { ok: boolean; runId?: string }
 
     assert.equal(result.ok, true, 'a topic run starts without a project')
@@ -280,7 +289,7 @@ test('binding a topic run re-homes it into the bound project: a worktree there, 
   const config = await realpath(await mkdtemp(join(tmpdir(), 'framework-rehome-cfg-')))
   const target = await initRepo('framework-rehome-target-')
   const env = { XDG_CONFIG_HOME: config }
-  const runtime = createProjectRuntime({ cwd: home, env, binPath: await writeTopicStub(home, join(home, 'started.log')) })
+  const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd: home, env, binPath: await writeTopicStub(home, join(home, 'started.log')) })
   try {
     // The DIFFERENT, newly chosen project the run will move into: the #1122 delta over continue-run,
     // which only ever re-homed a run into the project it already belonged to.
@@ -364,7 +373,7 @@ test('a bind to an unresolvable project retains the scratch and surfaces the fai
   const config = await realpath(await mkdtemp(join(tmpdir(), 'framework-rehome-fail-cfg-')))
   const env = { XDG_CONFIG_HOME: config }
   const log = join(home, 'started.log')
-  const runtime = createProjectRuntime({ cwd: home, env, binPath: await writeTopicStub(home, log) })
+  const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd: home, env, binPath: await writeTopicStub(home, log) })
   try {
     const started = (await runtime.onStart('draft a plan', 'build', { topic: true })) as { ok: boolean; runId?: string }
     const runId = started.runId!
@@ -459,7 +468,7 @@ async function waitForLogLine(cwd: string, pattern: RegExp): Promise<string> {
 
 test('a worktree run whose child dies at boot is marked failed instead of waiting forever (#1261)', async () => {
   const cwd = await initRepo('framework-bootfail-')
-  const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeDyingStub(cwd) })
+  const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd, env: {}, binPath: await writeDyingStub(cwd) })
   try {
     const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; runId?: string }
     assert.equal(result.ok, true, 'the Start itself succeeds; the death is asynchronous')
@@ -492,7 +501,7 @@ test('a topic run whose child dies at boot is marked failed and its scratch reta
   const home = await realpath(await mkdtemp(join(tmpdir(), 'framework-bootfail-topic-')))
   const config = await realpath(await mkdtemp(join(tmpdir(), 'framework-bootfail-cfg-')))
   const env = { XDG_CONFIG_HOME: config }
-  const runtime = createProjectRuntime({ cwd: home, env, binPath: await writeDyingStub(home) })
+  const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd: home, env, binPath: await writeDyingStub(home) })
   try {
     const result = (await runtime.onStart('draft a ticket', 'build', { topic: true })) as { ok: boolean; runId?: string }
     assert.equal(result.ok, true)
@@ -586,7 +595,7 @@ async function waitForSpawns(worktree: string, expected: number): Promise<string
 test('a run that dies to a transient API error is continued, at most twice (#1281)', async () => {
   const cwd = await initRepo('framework-transient-')
   const detail = '[framework] claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'
-  const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeFailingRunStub(cwd, detail), retryDelayMs: 25 })
+  const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd, env: {}, binPath: await writeFailingRunStub(cwd, detail), retryDelayMs: 25 })
   try {
     const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; runId?: string }
     assert.equal(result.ok, true)
@@ -606,7 +615,7 @@ test('a run that dies to a transient API error is continued, at most twice (#128
 
 test('a run that fails on its own terms is not retried (#1281)', async () => {
   const cwd = await initRepo('framework-nontransient-')
-  const runtime = createProjectRuntime({
+  const runtime = createProjectRuntime({ agentPreflight: agentReady,
     cwd,
     env: {},
     binPath: await writeFailingRunStub(cwd, 'AssertionError: expected 2 to equal 3'),
@@ -622,6 +631,126 @@ test('a run that fails on its own terms is not retried (#1281)', async () => {
     await new Promise(r => setTimeout(r, 400))
     const after = (await readFile(join(worktree, 'spawned.log'), 'utf8')).trim().split('\n').filter(Boolean)
     assert.deepEqual(after, ['start'], 'a real failure stands; only transport deaths earn a retry')
+  } finally {
+    await runtime.dispose()
+    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
+
+/**
+ * #1326: a run must not spend a branch and a worktree on an agent that can never start.
+ *
+ * This is what #1323 looked like from outside: every session died before writing its run.json,
+ * on both agents, across six projects, and the only visible trace was run branches piling up
+ * while the dashboard sat on "Waiting for the session to start...". The failure was a logged-out
+ * CLI, which resolves and answers `--version` exactly like a working one.
+ */
+
+/** A preflight seam that reports a logged-out CLI, as `claude auth status` would. */
+const loggedOut = (agent: 'claude' | 'codex'): Promise<PreflightResult> =>
+  Promise.resolve({
+    ok: false,
+    checks: [
+      { name: 'node', ok: true, detail: process.version },
+      { name: `${agent} auth`, ok: false, detail: `\`${agent}\` is not logged in. Run \`${agent} auth login\`, then start the session again.` },
+    ],
+  })
+
+test('a start on a logged-out agent is refused, and spends no branch or worktree (#1326)', async () => {
+  const cwd = await initRepo('framework-preflight-')
+  const log = join(cwd, 'spawned.log')
+  const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeStub(cwd, log), agentPreflight: loggedOut })
+  const git = nodeGitRunner()
+  try {
+    const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; error?: string }
+    assert.equal(result.ok, false)
+    // The reason names the fix, rather than leaving the user to guess at a dead run.
+    assert.match(result.error!, /not logged in/)
+    assert.match(result.error!, /auth login/)
+
+    // Nothing was spent: no worktrees directory, and no run branch on the repo.
+    const worktrees = await stat(join(cwd, FRAMEWORK_DIR, WORKTREES_DIR)).then(() => true, () => false)
+    assert.equal(worktrees, false, 'a refused start creates no worktree')
+    const branches = await git(['branch', '--list', 'the-framework/run-*'], cwd)
+    assert.equal(branches.trim(), '', 'a refused start creates no run branch')
+
+    // And no agent was spawned, so there is no dead run to explain afterwards.
+    await new Promise(r => setTimeout(r, 200))
+    assert.equal(await readFile(log, 'utf8').catch(() => ''), '')
+  } finally {
+    await runtime.dispose()
+    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
+
+test('an actions run starts without a local agent CLI at all (#1326)', async () => {
+  // An `actions` run executes on a GitHub Actions runner and is driven over the API, so gating it
+  // on a local login would refuse a start that works perfectly well.
+  const cwd = await initRepo('framework-preflight-actions-')
+  const log = join(cwd, 'spawned.log')
+  let probed = false
+  const runtime = createProjectRuntime({
+    cwd,
+    env: {},
+    binPath: await writeStub(cwd, log),
+    agentPreflight: agent => {
+      probed = true
+      return loggedOut(agent)
+    },
+  })
+  try {
+    const result = (await runtime.onStart('build a thing', 'build', { target: 'actions' })) as { ok: boolean }
+    assert.equal(result.ok, true)
+    assert.equal(probed, false, 'a run that needs no local CLI is not gated on one')
+  } finally {
+    await runtime.dispose()
+    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
+
+test('a passing preflight is probed once for a burst of starts (#1326)', async () => {
+  // Two probes cost around half a second, which is more than the one-at-a-time guard's window.
+  const cwd = await initRepo('framework-preflight-cache-')
+  const log = join(cwd, 'spawned.log')
+  let probes = 0
+  const runtime = createProjectRuntime({
+    cwd,
+    env: {},
+    binPath: await writeStub(cwd, log),
+    agentPreflight: () => {
+      probes++
+      return Promise.resolve({ ok: true, checks: [{ name: 'claude', ok: true, detail: '1.2.3' }] })
+    },
+  })
+  try {
+    assert.equal(((await runtime.onStart('one', 'build')) as { ok: boolean }).ok, true)
+    await runtime.onStart('two', 'build')
+    await runtime.onStart('three', 'build')
+    assert.equal(probes, 1, 'a pass is cached; only a failure is re-probed every time')
+  } finally {
+    await runtime.dispose()
+    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  }
+})
+
+test('a logged-out agent is re-probed on every start, so logging in is picked up at once (#1326)', async () => {
+  const cwd = await initRepo('framework-preflight-recheck-')
+  const log = join(cwd, 'spawned.log')
+  let probes = 0
+  const runtime = createProjectRuntime({
+    cwd,
+    env: {},
+    binPath: await writeStub(cwd, log),
+    agentPreflight: agent => {
+      probes++
+      // Logged out, then logged in: the fix must land on the next Start, not after a timeout.
+      return probes === 1 ? loggedOut(agent) : Promise.resolve({ ok: true, checks: [] })
+    },
+  })
+  try {
+    assert.equal(((await runtime.onStart('one', 'build')) as { ok: boolean }).ok, false)
+    assert.equal(((await runtime.onStart('two', 'build')) as { ok: boolean }).ok, true)
+    assert.equal(probes, 2)
   } finally {
     await runtime.dispose()
     await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })

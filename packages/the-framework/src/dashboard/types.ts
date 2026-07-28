@@ -31,6 +31,20 @@ export interface OnboardingSuggestion {
 }
 
 /**
+ * Whether the picked agent's CLI can start a run (#1326), as the launcher needs to hear it:
+ * what is wrong and what fixes it, never what is right. Both lists are already written for a
+ * human, so the warning renders them rather than mapping codes to copy.
+ */
+export interface AgentReady {
+  /** False when a Start would die before the session exists. */
+  ok: boolean
+  /** Blocking problems, each naming its own fix. Empty when {@link ok}. */
+  problems: string[]
+  /** Non-blocking warnings, chiefly running as root, which breaks every agent identically. */
+  warnings: string[]
+}
+
+/**
  * The dashboard's Global options (#314), posted alongside a Start. Each maps to a
  * run flag: Autopilot + Technical to modes, Vanilla to removing the built-in
  * system prompt, and Eco to the fine-grained #326 section drops. Absent fields

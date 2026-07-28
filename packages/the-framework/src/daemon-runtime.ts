@@ -48,6 +48,15 @@ import { installProject, enumerateGitRepos } from './install.js'
 import { isGitRepo } from './project.js'
 import { isCliTimeout } from './cli-exec.js'
 import { errorMessage } from './error-message.js'
+import { preflight, preflightProblems, type PreflightResult } from './preflight.js'
+import { isAgentName, type AgentName } from './agent-names.js'
+
+/**
+ * How long a passing agent preflight (#1326) is trusted before it is probed again. Short enough
+ * that logging out mid-session is noticed within a session's worth of starts, long enough that a
+ * burst of starts pays for the probes once.
+ */
+const AGENT_READY_TTL_MS = 30_000
 
 /**
  * The daemon's per-project business logic (#393/#736): spawning runs into worktrees, installing
@@ -337,6 +346,8 @@ export interface ProjectRuntimeOptions {
   binPath?: string | undefined
   /** The pause before a transient-death retry (#1281); undefined uses {@link TRANSIENT_RETRY_DELAY_MS}. A test seam. */
   retryDelayMs?: number | undefined
+  /** How a start checks the agent can run (#1326); undefined runs the real {@link preflight}. A test seam. */
+  agentPreflight?: ((agent: AgentName) => Promise<PreflightResult>) | undefined
 }
 
 /** The per-project run + preview surface the dashboard drives, plus its teardown. */
@@ -375,7 +386,7 @@ export interface ProjectRuntime {
  * with no project id (or the home id) resolves to it without a registry lookup. Split out of
  * {@link runDaemon} so the daemon body reads as lifecycle and this reads as business logic.
  */
-export function createProjectRuntime({ cwd, env, binPath, retryDelayMs }: ProjectRuntimeOptions): ProjectRuntime {
+export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPreflight }: ProjectRuntimeOptions): ProjectRuntime {
   const homeId = projectId(resolve(cwd))
   // The run-key namespace for project-less topic runs (#1120): `@`-prefixed so it can never equal a
   // real project id (projectId always appends `-<hash>`), so a topic run belongs to no project.
@@ -434,6 +445,34 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs }: Projec
       console.log(`[framework] could not continue session ${runId} (${errorMessage(err)}); starting a new one`)
       return undefined
     }
+  }
+
+  /**
+   * Whether the agent this run picked can actually start (#1326), as one line to show when it
+   * cannot. `undefined` means go.
+   *
+   * Only the two targets that spend the local CLI are gated. An `actions` run executes on a
+   * GitHub Actions runner and drives it over the API, so a laptop with no `claude` on it starts
+   * that run perfectly well; a `web` run is started *by* the local CLI under a pty, so it needs
+   * the binary and the login exactly as a local run does. A `remote` run never reaches here,
+   * having been handed to its device further up.
+   *
+   * Only a *pass* is cached, and only briefly. Two probes cost around half a second, which is
+   * nothing against a run but more than the window the one-at-a-time guard closes in, so paying
+   * it on every Start would make back-to-back starts race. Caching the failure instead would be
+   * the worse trade: logging in has to be picked up by the very next Start, not by a timeout or
+   * a daemon restart, so a broken setup is re-probed every time and costs only the user who
+   * already cannot run anything.
+   */
+  const readyUntil = new Map<AgentName, number>()
+  const checkAgentReady = async (options: StartRunOptions): Promise<string | undefined> => {
+    if (options.target === 'actions') return undefined
+    const agent = isAgentName(options.agent) ? options.agent : 'claude'
+    if ((readyUntil.get(agent) ?? 0) > Date.now()) return undefined
+    const result = await (agentPreflight ? agentPreflight(agent) : preflight({ agent }))
+    if (!result.ok) return preflightProblems(result).join('; ')
+    readyUntil.set(agent, Date.now() + AGENT_READY_TTL_MS)
+    return undefined
   }
 
   /**
@@ -787,6 +826,14 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs }: Projec
     } catch (err) {
       return { ok: false, error: errorMessage(err) }
     }
+
+    // A run must not spend a branch and a worktree on an agent that can never start (#1326).
+    // That is what #1323 looked like from outside: six projects' worth of run branches piling up
+    // while every session died before writing run.json, with the dashboard stuck on "Waiting for
+    // the session to start...". Probed here, above the allocation, because this is the one place
+    // a daemon-started run is born; the CLI's own path has gated on preflight since #542.
+    const preflightError = await checkAgentReady(options)
+    if (preflightError) return { ok: false, error: preflightError }
 
     // Continuing an existing run (#762) reuses its id, checkout and log; anything else is new.
     const continued = options.continueRunId ? await continueWorkspace(projectCwd, options.continueRunId) : undefined

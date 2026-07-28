@@ -11,6 +11,24 @@ import { AGENT_LABELS, type AgentName } from './agent-names.js'
  */
 export { AGENTS, isAgentName, agentForDriver, AGENT_LABELS, type AgentName } from './agent-names.js'
 
+/**
+ * How an agent CLI answers "am I logged in?", and what fixes it when the answer is no (#1326).
+ *
+ * The exit code cannot decide this on its own: `claude auth status` prints its answer as JSON
+ * and exits 0 either way. So each agent reads its own answer, and anything unrecognised comes
+ * back `undefined` (could not say) rather than `false`. That asymmetry is deliberate. A wrong
+ * "you are logged out" blocks a setup that works, which is worse than the silent dead run this
+ * exists to prevent, so only a CLI that says no out loud fails preflight.
+ */
+export interface AgentAuthSpec {
+  /** The args that make the CLI report its login state, e.g. `auth status`. */
+  args: readonly string[]
+  /** Reads the CLI's answer out of its output. `undefined` when it could not say. */
+  loggedIn: (result: { ok: boolean; output: string }) => boolean | undefined
+  /** The one command that fixes a logged-out CLI. */
+  fix: string
+}
+
 /** What we know about an agent before we run it. */
 export interface AgentSpec {
   /** How to say it in a sentence, e.g. "Claude Code". */
@@ -19,6 +37,8 @@ export interface AgentSpec {
   bin: string
   /** Shown when preflight cannot find {@link bin}. */
   installHint: string
+  /** How preflight asks the CLI whether it is logged in (#1326). */
+  auth: AgentAuthSpec
   /**
    * Whether the agent prices its own turns. When it doesn't, the spend cap
    * (#322) has no number to gate on and silently never fires, so the CLI says
@@ -33,12 +53,35 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
     label: AGENT_LABELS.claude,
     bin: 'claude',
     installHint: 'install Claude Code and make sure `claude` is on your PATH: https://claude.com/claude-code',
+    auth: {
+      args: ['auth', 'status'],
+      // Prints JSON (`{"loggedIn": true, "authMethod": ...}`) and exits 0 either way, so the
+      // flag is the answer and the exit code is not. A version too old to know the subcommand
+      // prints usage instead, which parses as nothing and correctly reads as "could not say".
+      loggedIn: ({ output }) => {
+        try {
+          const parsed: unknown = JSON.parse(output)
+          const value = (parsed as Record<string, unknown> | null)?.loggedIn
+          return typeof value === 'boolean' ? value : undefined
+        } catch {
+          return undefined
+        }
+      },
+      fix: 'claude auth login',
+    },
     reportsCost: true,
   },
   codex: {
     label: AGENT_LABELS.codex,
     bin: 'codex',
     installHint: 'install the Codex CLI and make sure `codex` is on your PATH: https://developers.openai.com/codex/cli',
+    auth: {
+      args: ['login', 'status'],
+      // Answers in a sentence rather than JSON: "Logged in using ChatGPT", or a "Not logged in".
+      // The negative is tested first, since it contains the positive as a substring.
+      loggedIn: ({ output }) => (/not logged in/i.test(output) ? false : /logged in/i.test(output) ? true : undefined),
+      fix: 'codex login',
+    },
     reportsCost: false,
   },
 }

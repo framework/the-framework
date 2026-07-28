@@ -1680,6 +1680,32 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     io.err('note: no Chrome found, so --browser falls back to its own browser (no preview).')
   }
 
+  /**
+   * Give up before a driver exists, on a config fault the run cannot recover from.
+   *
+   * These aborts sit in an awkward window: `run.json` already says `running` (it is written back
+   * at :1433), but {@link settleRun} — which owns the `end` event and the handle cleanup — does
+   * not wrap anything until its `ctx` is built further down. Returning raw therefore left the run
+   * recorded as `running` forever with nobody to correct it, and the dashboard showed a session
+   * that never moved. So close it out here the same way settleRun would: say why, record the
+   * failure, release the handles.
+   *
+   * Best-effort throughout, like every other persistence call on this path: a store that cannot
+   * write its own failure must still let the process exit, which is the whole point of the fix.
+   */
+  const abortBeforeDriver = async (reason: string): Promise<number> => {
+    io.err(reason)
+    try {
+      await store?.append({ kind: 'end', ok: false, detail: reason })
+      await store?.close()
+    } catch {
+      // Persistence is never allowed to be the thing that keeps a failing run alive.
+    }
+    control?.close()
+    await sharedBrowser?.close().catch(() => {})
+    return 2
+  }
+
   // Run on GitHub Actions (#1050): owner/repo come from the project's origin remote, the token from
   // GH_TOKEN. The token is read from the environment, never the committed the-framework.yml, since a
   // repo file is public and this must be a user PAT. Resolved before the driver so a missing remote
@@ -1689,12 +1715,12 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     const slug = await githubSlugFor(cwd)
     const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN
     if (!slug) {
-      io.err('--run-on actions needs a GitHub origin remote on this repo.')
-      return 2
+      return await abortBeforeDriver('--run-on actions needs a GitHub origin remote on this repo.')
     }
     if (!token) {
-      io.err('--run-on actions needs a GitHub user token in GH_TOKEN (repo + workflow scopes).')
-      return 2
+      return await abortBeforeDriver(
+        '--run-on actions needs a GitHub user token in GH_TOKEN (repo + workflow scopes).',
+      )
     }
     actionsConfig = { owner: slug.owner, repo: slug.repo, token }
     io.out(`◆ run on: GitHub Actions (${slug.owner}/${slug.repo})`)

@@ -1,0 +1,1 @@
+Tests for `markdown.ts` — covers the serialize → parse round-trip through `DecisionLedger`, forgiving parsing of a hand-written file (missing `[status]` → `rejected`), skipping a rationale-less section instead of throwing, and the serialized shape (header, `[status]` tag, tags metadata).

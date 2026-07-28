@@ -1,0 +1,1 @@
+Package entry — re-exports the two bridge functions (`mcpClientTools`, `mcpServerFromAgent`) and the public types from `types.ts`; `@modelcontextprotocol/sdk` is an optional peer needed only at runtime by whichever bridge you call.

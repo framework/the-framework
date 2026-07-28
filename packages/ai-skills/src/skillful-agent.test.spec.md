@@ -1,0 +1,1 @@
+Tests for `skillful-agent.ts` — covers composed `instructions()`/`tools()` output, own-tool-wins collision namespacing (`s__escalate`), empty defaults when only `baseInstructions()` is given, and an end-to-end `AiFake` agent-loop run asserting the composed system prompt and skill tools actually reach the provider call.

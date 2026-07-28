@@ -1,0 +1,1 @@
+Tests for `tools.ts` — invokes the tools' server handlers directly: `consult_decisions` surfaces a prior rejected idea, `record_decision` appends and fires `onRecord` for persistence, the `record: false` toggle and `prefix` naming work, and `decisionBriefing` lists only rejected ideas (accepted choices excluded) and is `''` when empty.

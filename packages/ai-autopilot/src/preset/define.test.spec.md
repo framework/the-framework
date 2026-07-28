@@ -1,0 +1,1 @@
+Tests for `define.ts` — covers freezing and defaulting (title→name, empty description/lists), carrying loops/prompts, rejection of missing/non-kebab names, and optional `defaultEvent` omitted when blank.

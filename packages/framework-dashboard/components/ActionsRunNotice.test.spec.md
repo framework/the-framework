@@ -1,0 +1,1 @@
+Tests for `ActionsRunNotice.tsx` (#1053) — covers the burst-wait explanation while live, the link appearing only once a driver `action` event carries the Actions run URL, the finished-run copy change, and rendering nothing for local/unset targets.

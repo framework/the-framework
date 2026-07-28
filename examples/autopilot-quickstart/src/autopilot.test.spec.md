@@ -1,0 +1,1 @@
+Tests for `autopilot.ts` — covers the offline quickstart end-to-end: a 3-subtask plan routed to the right workers (all ok), files written into the sandbox (seed `package.json` surviving), post-build exec + `:5173` preview URL, terminal-sink lines, and event order (`plan` first, `synthesize` last).

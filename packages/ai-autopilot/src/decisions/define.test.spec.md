@@ -1,0 +1,1 @@
+Tests for `define.ts` — covers `defineDecision` defaults (status `rejected`, id = title slug), freezing, tag normalization/dedupe, omission of blank optionals, `DecisionError` on missing title/rationale/unknown status or an empty slug, and the `slugify`/`tokenize` helpers (kebab-case, stop-word + short-token dropping).

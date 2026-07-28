@@ -1,0 +1,1 @@
+Tests for preset discovery in `load.ts` — covers `loadDomainPresetsFrom` (loads every subdirectory with a `preset.md` sorted by name, skips manifest-less subdirectories, returns `[]` for a missing directory, results pickable via `selectPreset`) and `builtinDomainPresets` enumerating the shipped set including `software-development` with all loop-referenced prompt ids resolving.

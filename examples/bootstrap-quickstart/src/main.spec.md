@@ -1,0 +1,1 @@
+CLI entry (`pnpm start`) for the offline capstone: runs `runCapstone` and prints the narration stream, detected preset, sandbox files, outcome (scope, production-grade passes, deploy plan + URL), and the CODE-OVERVIEW summary/sections.

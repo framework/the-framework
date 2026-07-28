@@ -1,0 +1,1 @@
+Tests for `loader.ts` — builds temp skill dirs (full skill with `tools.mjs` + `resources/`, and a bare one); covers manifest/instructions/tools/resources/dir loading, dedupe of named-plus-default-array tool export, `loadTools: false` (surface-before-compose), tool-less/resource-less skills, the missing-`SKILL.md` `SkillManifestError`, and order-preserving `loadSkills`.

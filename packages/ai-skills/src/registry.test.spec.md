@@ -1,0 +1,1 @@
+Tests for `registry.ts` — covers frontmatter-only discovery (non-skill dirs ignored; index entries carry no `tools`), `load()` caching (same instance), the undiscovered-name error including the available-names hint, empty index for a missing root, order-preserving `loadAll`, and skip-with-`onError` of a fence-less `SKILL.md` without failing the scan.

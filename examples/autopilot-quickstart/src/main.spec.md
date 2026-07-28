@@ -1,0 +1,1 @@
+CLI entry (`pnpm start`) that runs `runQuickstart` and prints what each surface exposed: live terminal progress, sandbox files, build + preview URL, and the Supervisor's synthesized result; offline via `AiFake`.

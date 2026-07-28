@@ -1,0 +1,1 @@
+Tests for `AddDeviceDialog.tsx` (#1052) — covers saving a pasted `?token=` URL as a profile (host-derived label, real localStorage via `listProfiles`), refusing a token-less URL, and the optional label overriding the host default.

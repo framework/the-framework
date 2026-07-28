@@ -1,0 +1,1 @@
+Tests for `conditions.ts` — covers stem extraction (hyphens are not separators), condition normalization, and winner selection: base fallback, active-variant-beats-base, ineligible variants, variant-without-base, most-specific-wins, and per-stem independence.

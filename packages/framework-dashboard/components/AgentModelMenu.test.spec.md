@@ -1,0 +1,1 @@
+Tests for `AgentModelMenu.tsx` (#658) — covers the trigger showing the current agent logo + model with the tooltip naming the agent, a submenu pick setting both agent and model together, and each agent's submenu listing only its own models.

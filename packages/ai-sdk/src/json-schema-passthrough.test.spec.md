@@ -1,0 +1,1 @@
+Tests for `tool.ts`'s `jsonSchema` passthrough — a pre-built JSON Schema on `ToolDefinitionOptions` takes precedence over the zod-derived schema in both `ToolBuilder.toSchema()` and `toolToSchema()`, survives `.server()` attachment, and zod remains the fallback when `jsonSchema` is omitted (MCP/OpenAPI-imported tools rely on this).

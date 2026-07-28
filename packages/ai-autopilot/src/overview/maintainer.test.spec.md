@@ -1,0 +1,1 @@
+Tests for `maintainer.ts` — covers material gating (regenerate + persist on material change, skip untouched on immaterial, previous overview threaded to `regenerate`), unconditional `generate()`, `load()` from an in-memory `OverviewFs`, observer isolation, and the required-`regenerate` constructor guard.

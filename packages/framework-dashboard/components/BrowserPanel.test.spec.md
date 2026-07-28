@@ -1,0 +1,1 @@
+Tests for `BrowserPanel.tsx` (#946 failure recovery) — covers the error → Retry → restored stream cycle (distinct `?r=N` URL per attempt), repeated retries, and that a failure latched on one run does not carry to another run or replay when returning to the failed run.

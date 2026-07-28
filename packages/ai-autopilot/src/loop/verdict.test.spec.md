@@ -1,0 +1,1 @@
+Tests for `verdict.ts` — covers fenced-json parsing (passing/blockers/notes), trimming and dropping empty blockers, last-verdict-wins, the bare-object fallback, and `undefined` for absent/malformed verdicts (distinct from failing).

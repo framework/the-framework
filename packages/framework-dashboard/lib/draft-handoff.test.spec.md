@@ -1,0 +1,1 @@
+Tests for `draft-handoff.ts` (#1066) — covers moving `?draft=` into sessionStorage while stripping only that param from the URL, take-then-clear semantics, and the no-draft no-op, round-tripping through jsdom's real sessionStorage/history.

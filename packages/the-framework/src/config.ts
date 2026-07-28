@@ -34,6 +34,13 @@ export interface FrameworkFileConfig {
   autoPushBranch?: boolean
   /** Open a draft PR for a session's branch when it finishes (#1102/#1173). Default `true`; implies {@link autoPushBranch}. */
   autoOpenPr?: boolean
+  /**
+   * Merge a session's PR once it is opened (#1216). Default `false`, unlike the pair above:
+   * publishing a branch is reversible, landing it on the default branch is not, so a repo has to
+   * say it wants that out loud. Meant for work whose review already happened before the run — the
+   * quick-win and consensual routines merge what a plan the human could veto already settled.
+   */
+  autoMerge?: boolean
 }
 
 /** Config file names read from the workspace root, in precedence order. */
@@ -46,7 +53,7 @@ export const STRING_CONFIG_KEYS = ['preset', 'event'] as const
  * resolution, and the resolved-config summary all iterate it, so a new mode is added here once and
  * flows through them (only its default and any renamed output field are declared per key).
  */
-export const BOOLEAN_CONFIG_KEYS = ['autopilot', 'technical', 'antiLazyPill', 'transparent', 'autoPushBranch', 'autoOpenPr'] as const
+export const BOOLEAN_CONFIG_KEYS = ['autopilot', 'technical', 'antiLazyPill', 'transparent', 'autoPushBranch', 'autoOpenPr', 'autoMerge'] as const
 /** Every config key, string then boolean, in declaration order. */
 export const CONFIG_KEYS = [...STRING_CONFIG_KEYS, ...BOOLEAN_CONFIG_KEYS] as const
 

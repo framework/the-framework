@@ -151,6 +151,9 @@ test('the concurrency setting on disk is the number of agents the routine spins 
       assert.ok(start.prompt.includes(start.options.queueEntry!), 'the prompt pins the entry the claim names')
       // Nobody is at the keyboard, so a gate must auto-answer rather than park (#846/#1279).
       assert.equal(start.options.unattended, true)
+      // The drain job lands its own PRs (#1216): the flag rides the start so it reaches the run
+      // as --auto-merge.
+      assert.equal(start.options.autoMerge, true)
       assert.equal(start.projectId, 'proj-1')
     }
     // The ticket the entry links to rides along, so the four agents land in four lanes (#1117).

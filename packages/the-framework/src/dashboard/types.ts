@@ -77,6 +77,8 @@ export interface StartRunOptions {
   autoPushBranch?: boolean
   /** Open a draft PR for the session's branch when it finishes (#1102); maps to `--auto-open-pr`. Implies {@link autoPushBranch}. */
   autoOpenPr?: boolean
+  /** Merge the session's PR once it is opened (#1216); maps to `--auto-merge`. Tri-state like {@link autoOpenPr}, but resolves to off: landing on the default branch has to be asked for. */
+  autoMerge?: boolean
   /** The model to run the wrapped agent on (#628); maps to `--model`. Absent = the driver's own default. */
   model?: string
   /** Which coding agent drives the run (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */

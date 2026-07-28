@@ -375,6 +375,87 @@ test('a branch that already has a PR is never given a second one (#1102)', async
   assert.deepEqual(outcome, { outcome: 'skipped', reason: 'already-open' })
 })
 
+test('an armed merge follows the PR it just opened (#1216)', async () => {
+  const gh: string[][] = []
+  const { git } = fakeGit({ ...READY, push: '' })
+  const outcome = await runAutoHandoff(
+    '/repo',
+    { id: 'r1', branch: 'the-framework/x', sessionName: 'x', intent: 'build it' },
+    { push: true, pr: true, merge: true },
+    {
+      git,
+      pr: async () => undefined,
+      gh: async args => {
+        gh.push(args)
+        return args[1] === 'create' ? 'https://github.com/o/r/pull/9\n' : ''
+      },
+    },
+  )
+  // Auto-merge first: the PR lands when its checks pass, not before them.
+  assert.deepEqual(gh[1], ['pr', 'merge', '9', '--squash', '--auto'])
+  assert.deepEqual(outcome, {
+    outcome: 'done',
+    pushed: true,
+    url: 'https://github.com/o/r/pull/9',
+    merge: { outcome: 'auto-armed' },
+  })
+})
+
+test('without the merge flag the PR is left alone, exactly as before (#1216)', async () => {
+  const gh: string[][] = []
+  const { git } = fakeGit({ ...READY, push: '' })
+  await runAutoHandoff(
+    '/repo',
+    { id: 'r1', branch: 'the-framework/x' },
+    { push: true, pr: true },
+    { git, pr: async () => undefined, gh: async args => (gh.push(args), 'https://github.com/o/r/pull/9\n') },
+  )
+  assert.deepEqual(gh.map(args => args[1]), ['create'], 'no merge call without the flag')
+})
+
+test('a merge that fails is reported on a handoff that still succeeded (#1216)', async () => {
+  // The PR exists either way; a human can still merge it by hand. Turning the refusal into a
+  // failed handoff would misreport the half that worked.
+  const { git } = fakeGit({ ...READY, push: '' })
+  const outcome = await runAutoHandoff(
+    '/repo',
+    { id: 'r1', branch: 'the-framework/x' },
+    { push: true, pr: true, merge: true },
+    {
+      git,
+      pr: async () => undefined,
+      gh: async args => {
+        if (args[1] === 'create') return 'https://github.com/o/r/pull/9\n'
+        throw new Error('GraphQL: Base branch was modified')
+      },
+    },
+  )
+  assert.equal(outcome.outcome, 'done')
+  assert.deepEqual('merge' in outcome ? outcome.merge : undefined, {
+    outcome: 'failed',
+    error: 'GraphQL: Base branch was modified',
+  })
+})
+
+test('an armed merge takes the already-open PR a predecessor left (#1216)', async () => {
+  // A daemon restart or rerun finds the PR its predecessor opened: the merge is the half that
+  // has not happened yet, and the skip reason still says why no second PR was opened.
+  const gh: string[][] = []
+  const { git } = fakeGit(READY)
+  const outcome = await runAutoHandoff(
+    '/repo',
+    { id: 'r1', branch: 'the-framework/x' },
+    { push: true, pr: true, merge: true },
+    {
+      git,
+      pr: async () => ({ number: 4, url: 'https://github.com/o/r/pull/4', state: 'OPEN', title: 'already' }),
+      gh: async args => (gh.push(args), ''),
+    },
+  )
+  assert.deepEqual(gh, [['pr', 'merge', '4', '--squash', '--auto']])
+  assert.deepEqual(outcome, { outcome: 'skipped', reason: 'already-open', merge: { outcome: 'auto-armed' } })
+})
+
 test('a session that committed nothing is not published (#1102)', async () => {
   const { git } = fakeGit({ ...READY, log: '', diff: '' })
   const outcome = await runAutoHandoff(

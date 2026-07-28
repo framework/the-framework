@@ -259,6 +259,9 @@ export function startOptionFlags(options: StartRunOptions): string[] {
     // loud or the run would re-arm what the launcher just disarmed.
     ['autoPushBranch', '--auto-push-branch'],
     ['autoOpenPr', '--auto-open-pr'],
+    // Tri-state like the mode toggles (#1216): defaults OFF, but the repo file may turn it on, so
+    // an explicit launcher `false` has to travel as `--no-auto-merge` to win over it.
+    ['autoMerge', '--auto-merge'],
   ] as const) {
     const value = options[key]
     if (value === true) flags.push(flag)

@@ -3,6 +3,7 @@ The `gh` CLI in one place: the dashboard's JSON reads (PR lookups, PR lists, per
 ## TLDR
 
 - `nodeGhRunner()`: the write-action runner (60s timeout, rejects with gh's own stderr); reads use a separate 8s runner that never surfaces errors.
+- `ghMergePr(cwd, number)` (#1216): `gh pr merge --squash --auto` first (the PR lands when its checks pass); where GitHub refuses auto-merge (repo setting off, or the PR already in clean status — both carry the `enablePullRequestAutoMerge` marker) it merges directly. Never throws; resolves an `AutoMergeOutcome` (`auto-armed` / `merged` / `failed`+error) the handoff reports.
 - `ghJson` is the one forgiving `--json` read: resolves the caller's `empty` when gh is missing/unauthed or output is not JSON.
 - `ghPrView` (PR for a branch, or the checkout's current branch) and `ghPrsForBranch` (every PR a branch name has *ever* had, any state, newest first, #1251), each with a cached form (`cachedPrView`, `cachedPrsForBranch`) and invalidator (`forgetPr`, `forgetBranchPrs`).
 - `pickRunPr(prs, since)` attributes a PR to a run: an OPEN PR always counts (GitHub allows one open PR per head branch); a closed one only when created at/after the run's start — the oldest such — else it is a predecessor's PR wearing the same branch name.

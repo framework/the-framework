@@ -1,5 +1,7 @@
 import { cliRunner, type CliRunner } from '../cli-exec.js'
 import { cachedRead, invalidate, type Cached } from './cache.js'
+import { errorMessage } from '../error-message.js'
+import type { AutoMergeOutcome } from '../events.js'
 
 /**
  * The `gh` CLI, in one place: the two JSON reads the dashboard makes and the runner its write
@@ -147,6 +149,42 @@ export async function ghPrsForBranch(cwd: string, branch: string): Promise<Linke
     title: pr.title,
     ...(pr.createdAt ? { createdAt: pr.createdAt } : {}),
   }))
+}
+
+/**
+ * The refusals that mean "auto-merge is not available here, merge directly instead" (#1216).
+ *
+ * gh surfaces GitHub's GraphQL errors verbatim: `Pull request Auto merge is not allowed for this
+ * repository` where the repo setting is off, and `Pull request is in clean status` where nothing
+ * blocks the PR — auto-merge is *only* for PRs that cannot land yet, so a green PR gets the same
+ * refusal and the direct merge is exactly what was meant. Matched loosely (both carry the
+ * `enablePullRequestAutoMerge` marker) so a rephrase on GitHub's side degrades to a reported
+ * failure, never a wrong merge.
+ */
+const DIRECT_MERGE_FALLBACK = /auto[- ]?merge is not allowed|clean status|enablePullRequestAutoMerge|protected branch/i
+
+/**
+ * Merge a PR the handoff just opened (#1216): GitHub auto-merge first, so the PR lands when its
+ * checks pass rather than before them; merged directly where the repo does not allow auto-merge.
+ * Squash in both forms — a session's branch is working history, not a story worth preserving.
+ *
+ * Never throws: the caller reports the outcome alongside the handoff's, and a merge that could
+ * not happen must not turn a successful handoff into a failed one.
+ */
+export async function ghMergePr(cwd: string, number: number, gh: GhRunner = nodeGhRunner()): Promise<AutoMergeOutcome> {
+  try {
+    await gh(['pr', 'merge', String(number), '--squash', '--auto'], cwd)
+    return { outcome: 'auto-armed' }
+  } catch (err) {
+    const refusal = errorMessage(err)
+    if (!DIRECT_MERGE_FALLBACK.test(refusal)) return { outcome: 'failed', error: refusal }
+    try {
+      await gh(['pr', 'merge', String(number), '--squash'], cwd)
+      return { outcome: 'merged' }
+    } catch (direct) {
+      return { outcome: 'failed', error: errorMessage(direct) }
+    }
+  }
 }
 
 /** The cached form of {@link ghPrsForBranch}, shared through the same read-through cache (#1028). */

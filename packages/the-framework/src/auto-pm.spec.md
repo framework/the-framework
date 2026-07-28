@@ -3,7 +3,7 @@ Auto PM (#685): pure policy + sweep loop that spends leftover subscription quota
 ## TLDR
 
 - `autoPmDecision()` / `quotaHeadroom()` — pure per-project policy, cheapest check first: enabled → concurrency cap (#1204) → cooldown → queue readable → quota headroom; yields `{start, mode: 'drain'|'pm'}` or a refusal whose reason reads as a sentence.
-- `AUTO_PM_JOBS` — the idle rotation, cheapest-and-readiest first: triage-quick (#891), triage-consensual (#892), spike-and-plan. `AUTO_PM_DRAIN_JOB` (#855) and the calendar-paced `AUTO_PM_MAINTENANCE_JOB` (#882) sit outside it; `AUTO_PM_ROUTINES` derives the dashboard list from all of them so screen and daemon cannot drift (#1159).
+- `AUTO_PM_JOBS` — the idle rotation, cheapest-and-readiest first: triage-quick (#891), triage-consensual (#892), spike-and-plan. `AUTO_PM_DRAIN_JOB` (#855) and the calendar-paced `AUTO_PM_MAINTENANCE_JOB` (#882) sit outside it; `AUTO_PM_ROUTINES` derives the dashboard list from all of them so screen and daemon cannot drift (#1159). Only the drain job carries `autoMerge: true` (#1216): what it implements was triaged as consensual quick-win work, so its review happened on the queue before the run.
 - `pinnedDrainJob()` — a drain rewritten to one named queue entry, with a stop-if-gone guard (#1204).
 - `startAutoPm(deps)` — the tick loop: promote finished runs' queues (#852), decide per project, pick the job, fan drains out to concurrency, log and record an `AutoPmReport` (#1161). Every reading/effect is injected via `AutoPmDeps` so the loop tests off disk.
 

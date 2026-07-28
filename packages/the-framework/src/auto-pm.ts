@@ -182,6 +182,13 @@ export interface AutoPmJob {
    * matching on {@link AutoPmJob.name} at the call site.
    */
   pinnedBranch?: string
+  /**
+   * Merge this job's PR once its run opens it (#1216). Set on the drain job: what it implements
+   * has already been triaged as consensual, quick-win work a human could have vetoed on the
+   * queue, so its PR is the one kind whose review happened before the run. Declared as data on
+   * the job for the same no-name-matching reason as {@link AutoPmJob.drains}.
+   */
+  autoMerge?: boolean
 }
 
 /**
@@ -277,6 +284,7 @@ export const AUTO_PM_DRAIN_JOB: AutoPmJob = {
   prompt: presets.drainQueue.render(),
   label: presets.drainQueue.label,
   drains: true,
+  autoMerge: true,
 }
 
 /**

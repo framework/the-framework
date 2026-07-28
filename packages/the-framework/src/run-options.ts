@@ -37,6 +37,7 @@ export function preferencesFromFileConfig(file: FrameworkFileConfig): Preference
     // launcher offers a single `Open PR` row.
     ...(file.autoPushBranch !== undefined ? { autoPushBranch: file.autoPushBranch } : {}),
     ...(file.autoOpenPr !== undefined ? { autoOpenPr: file.autoOpenPr } : {}),
+    ...(file.autoMerge !== undefined ? { autoMerge: file.autoMerge } : {}),
   }
 }
 
@@ -95,6 +96,9 @@ export function runOptionsFromPreferences(preferences: Preferences, context: str
     // the run's own default turn back on what the launcher just showed as off.
     autoPushBranch: handoff.push,
     autoOpenPr: handoff.pr,
+    // Same explicitness the other way round (#1216): it defaults OFF, but the repo file may say
+    // on, and the launcher's settled answer has to win over it.
+    autoMerge: preferences.autoMerge ?? false,
     // Claude-only (#801): another agent's driver takes no MCP servers, so sending it would only earn
     // the CLI's "no effect" notice. Matches the box being disabled off Claude Code.
     ...(browser && agent === 'claude' ? { browser: true } : {}),

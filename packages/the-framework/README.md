@@ -224,6 +224,7 @@ event: bug-fix        # the build event kind its review loop fires for
 antiLazyPill: false   # remove the built-in system prompt (default: on)
 autoOpenPr: false     # do not open a draft PR when a session finishes (default: on)
 autoPushBranch: true  # with autoOpenPr off: still push the session's branch (default: on)
+autoMerge: true       # merge the session's PR once it is opened (default: off)
 ```
 
 Every field is optional. Config resolves layer by layer, and the nearest layer that

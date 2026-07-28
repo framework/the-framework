@@ -14,4 +14,4 @@ Resolves a run's settings (preset, build event, boolean modes) across ordered co
 
 ## Facts
 
-- Defaults: `autopilot`/`technical`/`transparent` false, `antiLazyPill` true.
+- Defaults: `autopilot`/`technical`/`transparent` false, `antiLazyPill` true, `autoPushBranch`/`autoOpenPr` true (#1102), `autoMerge` false (#1216: landing on the default branch has to be asked for).

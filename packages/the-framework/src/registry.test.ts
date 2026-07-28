@@ -232,6 +232,7 @@ test('every boolean preference survives a save; the sanitizer cannot silently dr
     browser: true,
     autoPushBranch: true,
     autoOpenPr: true,
+    autoMerge: true,
     transparent: true,
     notifyBrowser: true,
     notifyDiscord: true,

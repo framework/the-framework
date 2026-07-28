@@ -19,7 +19,16 @@ test('an empty preference set still starts a run in autopilot (#858)', () => {
     transparent: false,
     autoPushBranch: true,
     autoOpenPr: true,
+    // Explicit for the same reason with the opposite default (#1216): it is OFF unless asked for,
+    // and a repo file that asked must not win over a launcher that showed it off.
+    autoMerge: false,
   })
+})
+
+test('auto-merge travels explicitly in both directions (#1216)', () => {
+  assert.equal(runOptionsFromPreferences({ autoMerge: true }).autoMerge, true)
+  assert.equal(runOptionsFromPreferences({ autoMerge: false }).autoMerge, false)
+  assert.equal(runOptionsFromPreferences({}).autoMerge, false)
 })
 
 test('the handoff defaults to armed, and opening a PR implies pushing (#1102)', () => {
@@ -64,6 +73,8 @@ test('preferencesFromFileConfig maps the repo yml onto the preference keys (#842
     autoPushBranch: false,
     autoOpenPr: false,
   })
+  // And so does auto-merge (#1216): whether sessions may land their own PRs is a fact about the repo.
+  assert.deepEqual(preferencesFromFileConfig({ autoMerge: true }), { autoMerge: true })
   // preset and event have no preference counterpart, so they are not mapped.
   assert.deepEqual(preferencesFromFileConfig({ preset: 'software-development', event: 'bug-fix' }), {})
 })

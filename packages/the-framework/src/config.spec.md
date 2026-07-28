@@ -2,7 +2,7 @@ Loads and validates the per-repo `the-framework.yml` run defaults (#204), so a p
 
 ## TLDR
 
-- `FrameworkFileConfig`: strings `preset`, `event`; booleans `autopilot`, `technical`, `antiLazyPill`, `transparent`.
+- `FrameworkFileConfig`: strings `preset`, `event`; booleans `autopilot`, `technical`, `antiLazyPill`, `transparent`, `autoPushBranch`/`autoOpenPr` (#1102), `autoMerge` (#1216).
 - `loadFrameworkConfig(dir)` tries `the-framework.yml` then `.yaml`; missing yields `{}`, malformed is reported via `onWarn` and treated as `{}` — never a failed run. CLI flags override whatever it returns.
 - `parseFrameworkConfig` throws on a non-map document or mistyped field so the loader can surface it as a warning.
 

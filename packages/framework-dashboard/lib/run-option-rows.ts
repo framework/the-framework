@@ -134,6 +134,20 @@ export function runOptionRows(preferences: Preferences): RunOptionRows {
       title: 'Open a draft pull request when the session finishes, pushing the branch on the way. Draft, so it does not request review; it still shows on the needs-you queue',
       checked: handoff.pr,
     },
+    // Default-off, unlike the row above (#1216): publishing a branch is reversible, landing it on
+    // the default branch is not. The routines that merge their own work (the queue drain) say so
+    // per job rather than through this box.
+    {
+      key: 'autoMerge',
+      label: 'Auto-merge',
+      description: 'Merges the pull request once it is opened.',
+      title:
+        'Merge the pull request the session opens: GitHub auto-merge where the repo allows it, so it lands when checks pass; merged directly otherwise',
+      checked: (preferences.autoMerge ?? false) && handoff.pr,
+      ...(handoff.pr
+        ? {}
+        : { disabled: true, disabledReason: 'nothing to merge while Open PR is off' }),
+    },
     // Claude-only (#801): the browser is wired through Claude Code's MCP config, so another agent's
     // driver takes no MCP servers and the box would be checkable but inert.
     {

@@ -73,6 +73,8 @@ export interface Preferences {
   autoPushBranch?: boolean
   /** Open a draft PR for a session's branch when it finishes (#1102). Absent = on; implies {@link autoPushBranch}. */
   autoOpenPr?: boolean
+  /** Merge a session's PR once it is opened (#1216). Absent = off: landing on the default branch has to be asked for, unlike the default-on publish pair above. */
+  autoMerge?: boolean
   /**
    * Transparent mode (#625): run the wrapped agent raw — no framework system prompt, emit
    * protocols, consumption guard, dashboard, or TODO loop, so a run is identical to `claude -p`.
@@ -393,6 +395,7 @@ const BOOLEAN_PREFERENCES: Record<BooleanPreferenceKey, true> = {
   browser: true,
   autoPushBranch: true,
   autoOpenPr: true,
+  autoMerge: true,
   transparent: true,
   notifyBrowser: true,
   notifyDiscord: true,

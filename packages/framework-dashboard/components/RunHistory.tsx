@@ -104,23 +104,36 @@ export function RunHistory({
    *  the run's real id. A run that did report one is selected by URL instead (#784). */
   followLive?: boolean
 }) {
-  const [optimistic, setOptimistic] = useState<string | null>(null)
+  // The optimistic row, and the runs that already existed when Start was clicked. The two are one
+  // piece of state on purpose: the row stands in for a session that is not in `known` yet, so a
+  // snapshot taken at any other moment would be measuring against the wrong list.
+  const [optimistic, setOptimistic] = useState<{ intent: string; known: ReadonlySet<string> } | null>(null)
 
   useEffect(() => {
-    if (startTick > 0) setOptimistic(startIntent)
+    if (startTick > 0) setOptimistic({ intent: startIntent, known: new Set(runs.map(run => run.id)) })
   }, [startTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasRunning = runs.some(run => run.status === 'running')
   const newestRunningId = runs.find(run => run.status === 'running')?.id
+  // The handover: the row this one stands in for has landed once a run appears that was not in the
+  // list when Start was clicked — whatever its status.
+  //
+  // Watching `running` alone was too narrow. The runs list polls every 2s, so a session that starts
+  // and finishes inside one interval is never once observed running, and the stand-in had nothing to
+  // hand over to: it sat beside the finished session's own row, claiming a second session was
+  // starting, until the deadline below swept it. That was hard to hit while a broken run hung as
+  // `running` forever; it stopped being hard once such runs began failing in milliseconds.
+  const landed = optimistic !== null && runs.some(run => !optimistic.known.has(run.id))
   useEffect(() => {
-    if (hasRunning) setOptimistic(null)
-  }, [hasRunning])
+    if (landed) setOptimistic(null)
+  }, [landed])
   useEffect(() => {
     setOptimistic(null)
   }, [projectId])
-  // A failed start has no running run to hand over to, so without a deadline the row said
-  // "starting…" forever (#948). The Start form surfaces the actual error; this just stops
-  // the rail pretending.
+  // A start that never produces a run at all has nothing to hand over to either, so without a
+  // deadline the row said "starting…" forever (#948). The Start form surfaces the actual error;
+  // this just stops the rail pretending. Still the backstop, not the usual path: `landed` above
+  // retires the row as soon as the real one exists.
   useEffect(() => {
     if (optimistic === null || hasRunning) return
     const timer = setTimeout(() => setOptimistic(null), 20_000)
@@ -130,7 +143,9 @@ export function RunHistory({
   // The Overview pools every project's sessions; a selected project shows just its own.
   const crossProject = projectId === null && recentRuns !== undefined
   // On the Overview the optimistic launch row belongs to a project, so it only applies in-project.
-  const showOptimistic = !crossProject && optimistic !== null && !hasRunning
+  // `landed` is checked here as well as in its effect so the stand-in and the real row are never
+  // painted together for a frame while the effect is still queued.
+  const showOptimistic = !crossProject && optimistic !== null && !hasRunning && !landed
 
   // A session selected but not in the list is one just started, whose row lands with its run.json
   // a beat later (#784): the optimistic row is standing in for it, so highlight that. Following a
@@ -223,7 +238,7 @@ export function RunHistory({
                 {/* A just-started run, before its run.json exists — highlighted while following it. */}
                 {showOptimistic && (
                   <SidebarMenuItem>
-                    <RunRow status="running" intent={optimistic ?? undefined} subtitle="starting…" active={starting} dim onClick={() => onSelect(null)} />
+                    <RunRow status="running" intent={optimistic?.intent ?? undefined} subtitle="starting…" active={starting} dim onClick={() => onSelect(null)} />
                   </SidebarMenuItem>
                 )}
                 {rows.map(row => (

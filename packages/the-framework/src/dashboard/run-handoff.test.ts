@@ -393,6 +393,9 @@ test('an armed merge follows the PR it just opened (#1216)', async () => {
   )
   // Auto-merge first: the PR lands when its checks pass, not before them.
   assert.deepEqual(gh[1], ['pr', 'merge', '9', '--squash', '--auto'])
+  // Ready, not draft: GitHub refuses to merge drafts, so an armed merge and --draft are
+  // mutually exclusive on the same PR.
+  assert.ok(!gh[0]?.includes('--draft'), `expected no --draft in ${JSON.stringify(gh[0])}`)
   assert.deepEqual(outcome, {
     outcome: 'done',
     pushed: true,

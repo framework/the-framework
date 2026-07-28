@@ -92,6 +92,45 @@ test('any other refusal is reported, not retried as a direct merge (#1216)', asy
   assert.deepEqual(calls, [['pr', 'merge', '9', '--squash', '--auto']])
 })
 
+test('a draft PR is marked ready and the auto-merge retried (#1216)', async () => {
+  // The already-open path can find a draft a previous run's handoff left behind. GitHub refuses
+  // to merge or auto-merge drafts, so the draft refusal means ready-then-retry, not failure.
+  const calls: string[][] = []
+  let drafted = true
+  const gh: GhRunner = async args => {
+    calls.push(args)
+    if (args[1] === 'ready') {
+      drafted = false
+      return ''
+    }
+    if (drafted) throw new Error('GraphQL: Pull request is in draft state and cannot be merged')
+    return ''
+  }
+  assert.deepEqual(await ghMergePr('/repo', 9, gh), { outcome: 'auto-armed' })
+  assert.deepEqual(calls, [
+    ['pr', 'merge', '9', '--squash', '--auto'],
+    ['pr', 'ready', '9'],
+    ['pr', 'merge', '9', '--squash', '--auto'],
+  ])
+})
+
+test('a readied draft still falls through to the direct merge where auto-merge is not allowed (#1216)', async () => {
+  let drafted = true
+  const calls: string[][] = []
+  const gh: GhRunner = async args => {
+    calls.push(args)
+    if (args[1] === 'ready') {
+      drafted = false
+      return ''
+    }
+    if (drafted) throw new Error('GraphQL: Pull request is in draft state and cannot be merged')
+    if (args.includes('--auto')) throw new Error('Pull request Auto merge is not allowed for this repository')
+    return ''
+  }
+  assert.deepEqual(await ghMergePr('/repo', 9, gh), { outcome: 'merged' })
+  assert.deepEqual(calls.at(-1), ['pr', 'merge', '9', '--squash'])
+})
+
 test('a direct merge that also fails reports the second refusal (#1216)', async () => {
   const gh: GhRunner = async args => {
     if (args.includes('--auto')) throw new Error('Pull request Auto merge is not allowed for this repository')

@@ -22,7 +22,7 @@ The end-of-session handoff (#799): reads what a finished session left on its bra
 - `commitSessionWork` guards twice — checkout must not be the project root (the `resolveRunCheckout` fallback once a worktree is gone, #453) and must sit on the session's branch — because both failure modes end with the *user's* own work committed for them.
 - `prBaseName` strips `origin/` at the gh boundary only: the field holds a git ref (`origin/main`, what detectBase/log/merged checks need) while `gh pr create --base` wants a remote branch name and rejects `origin/main` with "Base ref must be a branch".
 - `gitReason` surfaces git's own `fatal:`/`error:`/`remote:` line rather than execFile's "Command failed: git push …" preamble.
-- Auto-handoff PRs are drafts on purpose (no review request in anyone's inbox); the interventions queue was taught to keep listing a session's draft, or it would be invisible in both places at once. The manual button opens ready-for-review (a PR a human asked for by name is asking for review).
+- Auto-handoff PRs are drafts on purpose (no review request in anyone's inbox); the interventions queue was taught to keep listing a session's draft, or it would be invisible in both places at once. The manual button opens ready-for-review (a PR a human asked for by name is asking for review). An armed merge (#1216) also opens ready: GitHub refuses to merge drafts, and the merge is armed precisely because the review happened before the run.
 - `ARMED_HANDOFF` defaults both push and pr to true: the common case (session simply left alone) costs nothing.
 - Commit subjects are parsed with a unit separator (`%x1f`) since a subject can hold anything.
 

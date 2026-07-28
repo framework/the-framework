@@ -581,7 +581,10 @@ export async function runAutoHandoff(
       {
         title: run.sessionName ?? run.intent?.split('\n')[0]?.slice(0, 72) ?? `Session ${run.id}`,
         body: sessionPrBody(run),
-        draft: true,
+        // GitHub refuses to merge or auto-merge a draft, so an armed merge (#1216) opens the PR
+        // ready: its review happened on the queue before the run, which is the same reason the
+        // merge is armed at all. Draft stays the default for PRs a human is meant to look at.
+        draft: !intent.merge,
         ...(state.base ? { base: state.base } : {}),
       },
       { ...(readDeps.git ? { git: readDeps.git } : {}), ...(gh ? { gh } : {}) },

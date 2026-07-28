@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "status": "stopped",
+  "id": "2026-07-28T19-11-17-637Z",
+  "startedAt": "2026-07-28T19:11:18.415Z",
+  "updatedAt": "2026-07-28T19:11:34.953Z",
+  "passes": 0,
+  "pid": 98929,
+  "host": "Suleimans-MacBook-Pro.local",
+  "intent": "hi",
+  "handoff": {
+    "push": true,
+    "pr": true
+  },
+  "branch": "the-framework/run-2026-07-28T19-11-17-637Z",
+  "driver": "claude-code",
+  "workspace": "/Users/suleiman/Projects/gemstack/.the-framework/worktrees/2026-07-28T19-11-17-637Z",
+  "sessionLink": "https://claude.ai/code",
+  "scope": "full",
+  "sessionId": "32f09485-dfe6-4869-8ee0-4e586d66e97a"
+}

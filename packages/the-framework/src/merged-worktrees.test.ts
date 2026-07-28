@@ -14,6 +14,7 @@ import { readRunHandoff, type RunHandoff } from './dashboard/run-handoff.js'
 import { addWorktree, runBranchName } from './store/index.js'
 import { nodeGitRunner } from './project.js'
 import type { WorktreeRow } from './worktrees.js'
+import type { RunMeta } from './store/index.js'
 
 // #1036: a session's checkout is reclaimed once its work has landed. The branch, its commits and
 // the session's own records are kept, which is what makes deleting the checkout safe at all.
@@ -60,13 +61,21 @@ test('a branch with neither signal has not landed (#1036)', () => {
   assert.equal(landedVia(handoff()), undefined)
 })
 
+/**
+ * A run that finished cleanly. The local signal only reclaims a checkout for one of these
+ * (#1325), so a sweep test that is not about the run's outcome says so with this.
+ */
+function doneRun(id: string, status: RunMeta['status'] = 'done'): RunMeta {
+  return { version: 1, status, id, startedAt: '2026-07-27T20:00:00.000Z', updatedAt: '2026-07-27T20:01:00.000Z', passes: 0 }
+}
+
 /** A sweep over fixed rows, recording which run ids removal was asked for. */
-function fakeSweep(rows: WorktreeRow[], states: Record<string, RunHandoff | undefined>) {
+function fakeSweep(rows: WorktreeRow[], states: Record<string, RunHandoff | undefined>, metas?: RunMeta[]) {
   const asked: string[] = []
   const run = (over: { remove?: (cwd: string, runId: string) => Promise<{ ok: true } | { ok: false; error: string }> } = {}) =>
     removeMergedWorktrees('/repo', {
       worktrees: async () => rows,
-      runs: async () => [],
+      runs: async () => metas ?? rows.map(r => doneRun(r.runId)),
       handoff: async (_cwd, branch) => states[branch],
       remove: async (_cwd, runId) => {
         asked.push(runId)
@@ -236,7 +245,7 @@ test('a merged session loses its checkout and keeps its branch and commit (#1036
   const git = nodeGitRunner()
   try {
     await git(['merge', '--no-ff', '-m', 'merge the session', branch], repo)
-    const result = await removeMergedWorktrees(repo, { handoff: localHandoff })
+    const result = await removeMergedWorktrees(repo, { handoff: localHandoff, runs: async () => [doneRun(RUN_ID)] })
 
     assert.deepEqual(result.removed, [{ runId: RUN_ID, branch, via: 'branch' }])
     await assert.rejects(() => stat(path), 'the checkout is gone')
@@ -294,11 +303,60 @@ test('uncommitted work in a landed checkout is committed to the kept branch, not
     await git(['merge', '--no-ff', '-m', 'merge the session', branch], repo)
     await writeFile(join(path, 'notes.txt'), 'something the agent had not committed\n')
 
-    const result = await removeMergedWorktrees(repo, { handoff: localHandoff })
+    const result = await removeMergedWorktrees(repo, { handoff: localHandoff, runs: async () => [doneRun(RUN_ID)] })
     assert.deepEqual(result.failed, [])
     await assert.rejects(() => stat(path), 'the checkout is gone')
     assert.match(await git(['show', `${branch}:notes.txt`], repo), /had not committed/, 'the stray work is on the branch')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }
+})
+
+// #1325: a run that died at boot never commits, so its branch tip is the base tip and
+// `git branch --merged` lists it like any landed work. Its checkout is the evidence of what went
+// wrong, and the sweep was deleting it while reporting it as merged.
+
+test('a run that died at boot keeps its checkout, however merged its empty branch looks (#1325)', async () => {
+  const { asked, run } = fakeSweep(
+    [row({ runId: 'boot-dead' })],
+    // Exactly what a zero-commit branch reads as: an ancestor of the base, with nothing on it.
+    { 'the-framework/run-boot-dead': handoff({ branch: 'the-framework/run-boot-dead', merged: true, empty: true }) },
+    [doneRun('boot-dead', 'failed')],
+  )
+  assert.deepEqual(await run(), { removed: [], failed: [] })
+  assert.deepEqual(asked, [], 'the checkout of a failed run is the one most worth reading')
+})
+
+test('a stopped run keeps its checkout on the local signal alone (#1325)', async () => {
+  const { asked, run } = fakeSweep(
+    [row({ runId: 'stopped' })],
+    { 'the-framework/run-stopped': handoff({ branch: 'the-framework/run-stopped', merged: true }) },
+    [doneRun('stopped', 'stopped')],
+  )
+  await run()
+  assert.deepEqual(asked, [])
+})
+
+test('a run with no meta at all is kept: unknown is not landed (#1325)', async () => {
+  // The pre-#1272 shape of the same failure — a child that died before writing any meta.
+  const { asked, run } = fakeSweep(
+    [row({ runId: 'no-meta' })],
+    { 'the-framework/run-no-meta': handoff({ branch: 'the-framework/run-no-meta', merged: true }) },
+    [],
+  )
+  await run()
+  assert.deepEqual(asked, [])
+})
+
+test('a merged PR still reclaims a failed run: the remote said the work landed (#1325)', async () => {
+  // The guard is on the ancestor signal only. GitHub saying MERGED is a statement about the work,
+  // not an artefact of the branch being empty, so it survives whatever the run's own outcome was.
+  const { asked, run } = fakeSweep(
+    [row({ runId: 'failed-but-merged' })],
+    { 'the-framework/run-failed-but-merged': handoff({ branch: 'the-framework/run-failed-but-merged', pr: pr('MERGED') }) },
+    [doneRun('failed-but-merged', 'failed')],
+  )
+  const result = await run()
+  assert.deepEqual(asked, ['failed-but-merged'])
+  assert.deepEqual(result.removed, [{ runId: 'failed-but-merged', branch: 'the-framework/run-failed-but-merged', via: 'pr' }])
 })

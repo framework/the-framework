@@ -6,6 +6,14 @@ import { tmpdir } from 'node:os'
 import { createProjectRuntime, cleanupTimedOutWorktree, tearDownTopicScratch, moveTopicRunHistory, markFailedStart, runStderrPath, isTransientRunFailure, lastRunFailureDetail, MAX_TRANSIENT_RETRIES } from './daemon-runtime.js'
 import { CliTimeoutError } from './cli-exec.js'
 import type { PreflightResult } from './preflight.js'
+
+/**
+ * A ready agent, injected into every start below (#1326). A daemon start now preflights the
+ * picked agent's CLI, and these tests are about worktrees and teardown, not about whether the
+ * machine running them happens to have `claude` installed and logged in.
+ */
+const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
+
 import { FRAMEWORK_DIR, WORKTREES_DIR, EVENTS_FILE, META_FILE, worktreePath, runBranchName, RUN_META_VERSION, startedAtFromRunId, type RunMeta } from './store/index.js'
 import { topicScratchPath, addProject, projectId } from './registry.js'
 import { nodeGitRunner } from './project.js'
@@ -80,7 +88,7 @@ test('a repo whose worktree could not be created fails the run instead of borrow
     await writeFile(join(cwd, FRAMEWORK_DIR, WORKTREES_DIR), '')
 
     const log = join(cwd, 'started.log')
-    const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeStub(cwd, log) })
+    const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd, env: {}, binPath: await writeStub(cwd, log) })
     const result = await runtime.onStart('build a thing', 'build')
 
     assert.equal(result.ok, false, 'the Start is refused rather than downgraded into the main checkout')
@@ -97,7 +105,7 @@ test('a project that is not a git repo still falls back to the main checkout, an
   const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-alloc-nogit-')))
   try {
     const log = join(cwd, 'started.log')
-    const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeStub(cwd, log) })
+    const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd, env: {}, binPath: await writeStub(cwd, log) })
     let result: { ok: boolean; runId?: string } | undefined
     const logged = await withCapturedLog(async () => {
       result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; runId?: string }
@@ -141,7 +149,7 @@ test('a project-less topic run spawns in a neutral scratch dir with no worktree 
     const log = join(home, 'started.log')
     // XDG_CONFIG_HOME steers the scratch dir the same way it steers the registry file.
     const env = { XDG_CONFIG_HOME: config }
-    const runtime = createProjectRuntime({ cwd: home, env, binPath: await writeStub(home, log) })
+    const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd: home, env, binPath: await writeStub(home, log) })
     const result = (await runtime.onStart('draft a ticket', 'build', { topic: true })) as { ok: boolean; runId?: string }
 
     assert.equal(result.ok, true, 'a topic run starts without a project')
@@ -281,7 +289,7 @@ test('binding a topic run re-homes it into the bound project: a worktree there, 
   const config = await realpath(await mkdtemp(join(tmpdir(), 'framework-rehome-cfg-')))
   const target = await initRepo('framework-rehome-target-')
   const env = { XDG_CONFIG_HOME: config }
-  const runtime = createProjectRuntime({ cwd: home, env, binPath: await writeTopicStub(home, join(home, 'started.log')) })
+  const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd: home, env, binPath: await writeTopicStub(home, join(home, 'started.log')) })
   try {
     // The DIFFERENT, newly chosen project the run will move into: the #1122 delta over continue-run,
     // which only ever re-homed a run into the project it already belonged to.
@@ -365,7 +373,7 @@ test('a bind to an unresolvable project retains the scratch and surfaces the fai
   const config = await realpath(await mkdtemp(join(tmpdir(), 'framework-rehome-fail-cfg-')))
   const env = { XDG_CONFIG_HOME: config }
   const log = join(home, 'started.log')
-  const runtime = createProjectRuntime({ cwd: home, env, binPath: await writeTopicStub(home, log) })
+  const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd: home, env, binPath: await writeTopicStub(home, log) })
   try {
     const started = (await runtime.onStart('draft a plan', 'build', { topic: true })) as { ok: boolean; runId?: string }
     const runId = started.runId!
@@ -460,7 +468,7 @@ async function waitForLogLine(cwd: string, pattern: RegExp): Promise<string> {
 
 test('a worktree run whose child dies at boot is marked failed instead of waiting forever (#1261)', async () => {
   const cwd = await initRepo('framework-bootfail-')
-  const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeDyingStub(cwd) })
+  const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd, env: {}, binPath: await writeDyingStub(cwd) })
   try {
     const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; runId?: string }
     assert.equal(result.ok, true, 'the Start itself succeeds; the death is asynchronous')
@@ -493,7 +501,7 @@ test('a topic run whose child dies at boot is marked failed and its scratch reta
   const home = await realpath(await mkdtemp(join(tmpdir(), 'framework-bootfail-topic-')))
   const config = await realpath(await mkdtemp(join(tmpdir(), 'framework-bootfail-cfg-')))
   const env = { XDG_CONFIG_HOME: config }
-  const runtime = createProjectRuntime({ cwd: home, env, binPath: await writeDyingStub(home) })
+  const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd: home, env, binPath: await writeDyingStub(home) })
   try {
     const result = (await runtime.onStart('draft a ticket', 'build', { topic: true })) as { ok: boolean; runId?: string }
     assert.equal(result.ok, true)
@@ -587,7 +595,7 @@ async function waitForSpawns(worktree: string, expected: number): Promise<string
 test('a run that dies to a transient API error is continued, at most twice (#1281)', async () => {
   const cwd = await initRepo('framework-transient-')
   const detail = '[framework] claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'
-  const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeFailingRunStub(cwd, detail), retryDelayMs: 25 })
+  const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd, env: {}, binPath: await writeFailingRunStub(cwd, detail), retryDelayMs: 25 })
   try {
     const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; runId?: string }
     assert.equal(result.ok, true)
@@ -607,7 +615,7 @@ test('a run that dies to a transient API error is continued, at most twice (#128
 
 test('a run that fails on its own terms is not retried (#1281)', async () => {
   const cwd = await initRepo('framework-nontransient-')
-  const runtime = createProjectRuntime({
+  const runtime = createProjectRuntime({ agentPreflight: agentReady,
     cwd,
     env: {},
     binPath: await writeFailingRunStub(cwd, 'AssertionError: expected 2 to equal 3'),

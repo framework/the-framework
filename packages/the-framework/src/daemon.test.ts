@@ -20,6 +20,14 @@ import {
   registerReposDirectory,
   isNestedWithin,
 } from './daemon.js'
+import type { PreflightResult } from './preflight.js'
+
+/**
+ * A ready agent, injected into every daemon below (#1326). A start now preflights the picked
+ * agent's CLI, and these tests are about the daemon's own behavior, not about whether the
+ * machine running them happens to have `claude` installed and logged in.
+ */
+const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
 import { listRuns } from './store/index.js'
 import { EVENTS_FILE, FRAMEWORK_DIR, addWorktree } from './store/index.js'
 import { controlPath } from './control.js'
@@ -310,7 +318,7 @@ test('runDaemon serves the dashboard, records its state, and cleans up on shutdo
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const done = runDaemon(cwd, { port: 0, signal: ac.signal, env })
+    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
 
     // Wait for the daemon to bind and report itself.
     let state = await readDaemonState(env)
@@ -341,7 +349,7 @@ test('runDaemon comes up on a fresh workspace with no .the-framework yet', async
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const done = runDaemon(cwd, { port: 0, signal: ac.signal, env })
+    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
     let state = await readDaemonState(env)
     for (let i = 0; i < 100 && !state; i++) {
       await new Promise(r => setTimeout(r, 20))
@@ -371,7 +379,7 @@ test('onServeTargets lists a monorepo\'s servable apps over telefunc (#651)', as
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const done = runDaemon(cwd, { port: 0, signal: ac.signal, env })
+    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
     let state = await readDaemonState(env)
     for (let i = 0; i < 100 && !state; i++) {
       await new Promise(r => setTimeout(r, 20))
@@ -421,7 +429,7 @@ test("a session's Serve reads its own worktree, not the project's checkout (#797
       JSON.stringify({ name: 'new-thing', scripts: { dev: 'vite' } }),
     )
 
-    const done = runDaemon(cwd, { port: 0, signal: ac.signal, env })
+    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
     let state = await readDaemonState(env)
     for (let i = 0; i < 100 && !state; i++) {
       await new Promise(r => setTimeout(r, 20))
@@ -479,7 +487,7 @@ setTimeout(() => {}, 800)
 `,
     )
     const env = await configEnv(cwd)
-    const done = runDaemon(cwd, { port: 0, signal: ac.signal, binPath: stub, env })
+    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
     let state = await readDaemonState(env)
     for (let i = 0; i < 100 && !state; i++) {
       await new Promise(r => setTimeout(r, 20))
@@ -561,7 +569,7 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
 `,
     )
     const env = await configEnv(cwd)
-    const done = runDaemon(cwd, { port: 0, signal: ac.signal, binPath: stub, env })
+    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
     let state = await readDaemonState(env)
     for (let i = 0; i < 100 && !state; i++) {
       await new Promise(r => setTimeout(r, 20))
@@ -646,7 +654,7 @@ setTimeout(() => {}, 600)
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const done = runDaemon(cwd, { port: 0, signal: ac.signal, binPath: stub, env })
+    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
     let state = await readDaemonState(env)
     for (let i = 0; i < 100 && !state; i++) {
       await new Promise(r => setTimeout(r, 20))
@@ -703,7 +711,7 @@ fs.appendFileSync(path.join(args[args.indexOf('--cwd') + 1], 'started.log'), JSO
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const done = runDaemon(cwd, { port: 0, signal: ac.signal, binPath: stub, env })
+    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
     let state = await readDaemonState(env)
     for (let i = 0; i < 100 && !state; i++) {
       await new Promise(r => setTimeout(r, 20))
@@ -766,7 +774,7 @@ test('sendStart refuses to re-exec a test entry as the run (#345)', async () => 
   const ac = new AbortController()
   try {
     // No binPath: argv[1] here is this test file — the fork-bomb guard must trip.
-    const done = runDaemon(cwd, { port: 0, signal: ac.signal, env })
+    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
     let state = await readDaemonState(env)
     for (let i = 0; i < 100 && !state; i++) {
       await new Promise(r => setTimeout(r, 20))
@@ -793,7 +801,7 @@ test('runDaemon steers through the control log: sendStop / sendChoice append ent
   const prevXdg = process.env['XDG_CONFIG_HOME']
   process.env['XDG_CONFIG_HOME'] = env['XDG_CONFIG_HOME']
   try {
-    const done = runDaemon(cwd, { port: 0, signal: ac.signal, env })
+    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
     let state = await readDaemonState(env)
     for (let i = 0; i < 100 && !state; i++) {
       await new Promise(r => setTimeout(r, 20))

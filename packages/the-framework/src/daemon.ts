@@ -3,7 +3,7 @@ import { basename, dirname, join, relative, resolve, isAbsolute } from 'node:pat
 import type { FrameworkEvent } from './events.js'
 import { FRAMEWORK_DIR, isPidAlive, reconcileOrphanedRuns } from './store/index.js'
 import { startDashboard, type Dashboard, type StartRunOptions } from './dashboard/index.js'
-import { createProjectRuntime, delay, resolveSpawnBin, spawnDetached, terminate } from './daemon-runtime.js'
+import { createProjectRuntime, delay, resolveSpawnBin, spawnDetached, terminate, type ProjectRuntimeOptions } from './daemon-runtime.js'
 export { startOptionFlags } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
 import { startBackgroundServices, resumeSuspendedRuns, type BackgroundServices } from './daemon-services.js'
@@ -329,6 +329,8 @@ export interface RunDaemonOptions {
   binPath?: string
   /** Env for the global liveness path (#393). Default `process.env`; injectable for tests. */
   env?: NodeJS.ProcessEnv
+  /** How a start checks the picked agent can run (#1326); default the real `preflight`. For tests. */
+  agentPreflight?: ProjectRuntimeOptions['agentPreflight']
   /** Called once the server has bound and recorded its state, before it blocks (#456). For the foreground banner. */
   onListening?: (state: DaemonState) => void
   /** How often to re-assert the state file, ms (#922). Default {@link DAEMON_STATE_HEARTBEAT_MS}; for tests. */
@@ -381,7 +383,12 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
 
   // Everything the dashboard drives per project — run spawning, project install, and app
   // previews — lives in the runtime, so this body stays about the daemon's own lifecycle.
-  const runtime = createProjectRuntime({ cwd, env, ...(opts.binPath !== undefined ? { binPath: opts.binPath } : {}) })
+  const runtime = createProjectRuntime({
+    cwd,
+    env,
+    ...(opts.binPath !== undefined ? { binPath: opts.binPath } : {}),
+    ...(opts.agentPreflight !== undefined ? { agentPreflight: opts.agentPreflight } : {}),
+  })
 
   // The daemon serves the prerendered Vike + Telefunc dashboard (#405/#426): the SPA reads
   // each project's `.the-framework/events.jsonl` over a Telefunc Channel and steers over

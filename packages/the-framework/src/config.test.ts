@@ -27,6 +27,15 @@ test('parseFrameworkConfig reads the transparent toggle (#625)', () => {
   assert.throws(() => parseFrameworkConfig('transparent: nope\n'), /"transparent" must be a boolean/)
 })
 
+test('parseFrameworkConfig reads the handoff pair (#1173)', () => {
+  // Where the push setting lives now the launcher gear offers a single `Open PR` row.
+  assert.deepEqual(parseFrameworkConfig('autoPushBranch: false\nautoOpenPr: false\n'), {
+    autoPushBranch: false,
+    autoOpenPr: false,
+  })
+  assert.throws(() => parseFrameworkConfig('autoOpenPr: nope\n'), /"autoOpenPr" must be a boolean/)
+})
+
 test('parseFrameworkConfig treats an empty document as {}', () => {
   assert.deepEqual(parseFrameworkConfig(''), {})
   assert.deepEqual(parseFrameworkConfig('# just a comment\n'), {})

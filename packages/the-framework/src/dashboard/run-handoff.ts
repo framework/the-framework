@@ -12,6 +12,7 @@ import {
 } from './gh.js'
 import type { Cached } from './cache.js'
 import { parseNumstat } from './file-diff.js'
+import { parsePorcelain } from './file-status.js'
 import { errorMessage } from '../error-message.js'
 import type { AutoHandoffSkip } from '../events.js'
 import { commitPendingWork, currentBranch, startedAtFromRunId, FRAMEWORK_DIR, type RunMeta } from '../store/index.js'
@@ -78,14 +79,16 @@ export interface RunHandoff {
   /** The PR is not known yet, rather than absent (#1028): the lookup is still running. */
   prPending?: boolean
   /**
-   * Files the session changed and never committed, counted in its own checkout (#1173).
+   * The files the session changed and never committed, read from its own checkout (#1173).
    *
    * The agent is instructed to commit what it *found*, never what it *wrote*, so a settled session
    * can hold its whole output in an uncommitted tree. That work is not on the branch yet, so it is
-   * not in {@link commits} and it does not make {@link empty} false. Absent when the caller did not
-   * say which checkout the session worked in.
+   * not in {@link commits} and it does not make {@link empty} false. Paths rather than a count,
+   * because a no-diff branch must *name* what is waiting instead of offering an Open PR that
+   * GitHub can only refuse. Absent when the caller did not say which checkout the session worked
+   * in — "nobody asked" and "asked, tree clean" are different answers.
    */
-  pending?: number
+  pendingFiles?: string[]
 }
 
 /** Injectable seams so the reader is unit-testable off disk, plus the checkout the session worked in. */
@@ -319,29 +322,29 @@ export async function readRunHandoff(
 }
 
 /**
- * How many files the session left uncommitted in its own checkout, as a spreadable field.
+ * The files the session left uncommitted in its own checkout, as a spreadable field.
  *
- * Absent rather than 0 when no checkout was given: "nobody asked" and "asked, nothing pending" are
- * different answers, and only the second one may be shown as a clean tree.
+ * Absent rather than `[]` when no checkout was given (or git could not answer): "nobody asked" and
+ * "asked, nothing pending" are different answers, and only the second one may be shown as a clean
+ * tree.
  */
-async function countPendingWork(git: GitRunner, checkout: string | undefined): Promise<{ pending?: number }> {
+async function countPendingWork(git: GitRunner, checkout: string | undefined): Promise<{ pendingFiles?: string[] }> {
   if (!checkout) return {}
   const status = await git(['status', '--porcelain'], checkout).catch(() => undefined)
   if (status === undefined) return {}
-  const lines = status.split('\n').filter(line => line.trim().length > 0)
-  return { pending: lines.length }
+  return { pendingFiles: parsePorcelain(status).map(entry => entry.path) }
 }
 
 /**
  * Commit what a session left uncommitted, so what it did is what gets handed off (#1173).
  *
- * The agent is instructed to commit what it *found* before it starts, and nothing at the end, so a
- * settled session routinely holds its whole output in an uncommitted tree: the branch carries no
- * commit and a button offering to publish it can only fail with GitHub's "No commits between ...".
- * The automatic handoff already commits this on the run's way out, but that happens when the run
- * process exits, and the finishing step is offered as soon as the agent settles (#1178), which for
- * a session left open for another turn is much earlier. Pressing the button is the same instruction
- * given by hand, so it does the same thing rather than reporting a dead end.
+ * The automatic handoff commits the session's leftovers on the run's way out, but that happens
+ * when the run process exits, and the finishing step is offered as soon as the agent settles
+ * (#1178), which for a session left open for another turn is much earlier. Pressing the button is
+ * the same instruction given by hand, so it sweeps the same leftovers into what it publishes. The
+ * button only shows for a branch that already carries commits (#1173): a no-diff branch names its
+ * uncommitted work instead of offering a step, so this never turns "nothing committed" into a PR
+ * by itself.
  *
  * Two guards, because both failure modes end with the user's own work committed for them: the
  * checkout has to be the session's own (#453) rather than the project root that `resolveRunCheckout`

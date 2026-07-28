@@ -1,1 +1,0 @@
-CLI entry (`pnpm start:live`) for the live capstone: runs `runLiveCapstone` (real model + `LocalRunner`; needs `ANTHROPIC_API_KEY`) and prints the narration stream, detected preset, real scaffolded files with byte sizes, outcome (scope, production-grade, deploy plan), and the overview summary.

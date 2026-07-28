@@ -1,1 +1,0 @@
-Runnable demo (`pnpm start`) that mounts the reference connector via `mountConnectors([library], { name, credentials })` and drives it with `McpTestClient` — `listTools()` plus two `callTool`s — no server or transport needed; the `credentials` seam resolves `${ID.toUpperCase()}_TOKEN` env vars the way a real orchestrator would resolve real tokens.

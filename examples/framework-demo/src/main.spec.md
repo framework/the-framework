@@ -1,1 +1,0 @@
-CLI entry (`pnpm start`) that runs `runDemo`, prints the live narration and outcome (preset, production-grade passes, deploy target/URL, local preview URL, first served bytes), then points at the real command: `npx @gemstack/the-framework "..."`.

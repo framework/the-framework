@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { FRAMEWORK_DIR } from './store/run-store.js'
 import {
   appendControl,
   controlPath,
@@ -154,4 +155,40 @@ test('a handoff entry needs both booleans, so a half-written line cannot disarm 
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
+})
+
+/**
+ * The committed half of `.the-framework/` (#313/#857): the ignore file, the session list, the
+ * conversations, and each user's session history. Everything else in there is runtime state that
+ * belongs to one machine and one moment.
+ */
+function isCommittedFrameworkFile(path: string): boolean {
+  const rest = path.slice(path.indexOf(`${FRAMEWORK_DIR}/`) + FRAMEWORK_DIR.length + 1)
+  if (rest === '.gitignore' || rest === 'LOGS.md') return true
+  if (rest.startsWith('conversations/')) return true
+  const [, sessions] = rest.split('/')
+  return sessions === 'sessions'
+}
+
+test('no runtime state under .the-framework is tracked in git (#1298/#1311)', async () => {
+  // #1311 untracked `control.jsonl` and added nothing to keep it untracked, so eighteen hours
+  // later a run's own branch committed an empty one straight back onto main (#1309). The rule is
+  // wider than that one file: `.the-framework/` is transient except the committed DB, and a
+  // tracked run.json or events.jsonl would churn every checkout the same way.
+  const { execFileSync } = await import('node:child_process')
+  const git = (args: string[], cwd: string): string => execFileSync('git', args, { cwd, encoding: 'utf8' })
+
+  let root: string
+  try {
+    root = git(['rev-parse', '--show-toplevel'], process.cwd()).trim()
+  } catch {
+    return // not a git checkout (an installed package, say): there is nothing to guard here
+  }
+
+  const tracked = git(['ls-files'], root)
+    .split('\n')
+    .filter(path => path.includes(`${FRAMEWORK_DIR}/`))
+    .filter(path => !isCommittedFrameworkFile(path))
+
+  assert.deepEqual(tracked, [], `runtime state is tracked:\n${tracked.join('\n')}`)
 })

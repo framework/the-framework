@@ -7,6 +7,7 @@ The dashboard's request/result vocabulary (#345/#396/#475): the shapes the Start
 - Results: `StartRunResult` (with `runId` — needed since concurrent runs #736 mean "the running one" no longer identifies the run just started, #761), `AddProjectResult`, `PreviewResult`/`PreviewStatus`, `RemoveWorktreeResult` (#737), `DeleteSessionResult` (#1032).
 - `RunWorktree` (#798): where a session works — path, own-vs-fallback, dirty, branch, size, PR (+`prPending` #1028).
 - `OnboardingSuggestion` (#958): the server's own cwd as the one-click first project; both fields null where adding is not wired (the relay), so a public host never discloses filesystem layout.
+- `AgentReady` (#1326): whether the picked agent's CLI can start a run, as `{ ok, problems[], warnings[] }`. Carries what is wrong and what fixes it, never what is right, so no version string or account identity reaches the browser. Both lists are already written for a human.
 
 ## Facts
 

@@ -1,11 +1,12 @@
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 // Everything the form reads goes through a lib module, so the mocks stop short of telefunc: an
 // unmocked `*.telefunc.js` in the import graph fails as an assertIsNotBrowser bug report.
 const onProjects = vi.hoisted(() => vi.fn())
 const onClaudeTrust = vi.hoisted(() => vi.fn())
-vi.mock('../server/projects.telefunc.js', () => ({ onProjects, onClaudeTrust }))
+const onAgentReady = vi.hoisted(() => vi.fn())
+vi.mock('../server/projects.telefunc.js', () => ({ onProjects, onClaudeTrust, onAgentReady }))
 
 const onSystemPromptUser = vi.hoisted(() => vi.fn())
 vi.mock('../server/reads.telefunc.js', () => ({ onSystemPromptUser }))
@@ -46,10 +47,17 @@ vi.mock('./SystemPromptDisclosure.js', () => ({ SystemPromptDisclosure: () => nu
 
 const { StartRunForm } = await import('./StartRunForm.js')
 
+// A ready agent by default (#1326), so every other test renders the form it means to test
+// rather than the "your CLI cannot start a run" warning.
+beforeEach(() => {
+  onAgentReady.mockResolvedValue({ ok: true, problems: [], warnings: [] })
+})
+
 afterEach(() => {
   cleanup()
   start.mockReset()
   onClaudeTrust.mockReset()
+  onAgentReady.mockReset()
   prefs.current = {}
 })
 
@@ -122,5 +130,63 @@ describe('StartRunForm web-run trust warning (#1318)', () => {
     await waitFor(() => expect(onProjects).toHaveBeenCalled())
     expect(onClaudeTrust).not.toHaveBeenCalled()
     expect(screen.queryByText(/has not been trusted/)).toBeNull()
+  })
+})
+
+describe('StartRunForm agent preflight warning (#1326)', () => {
+  // #1323: every session died before writing run.json and the only visible trace was run
+  // branches piling up. The launcher says why before the Start, the way #1318 does for trust.
+  test('a logged-out agent is named in the launcher, with the command that fixes it', async () => {
+    onProjects.mockResolvedValue([])
+    onSystemPromptUser.mockResolvedValue(null)
+    onAgentReady.mockResolvedValue({
+      ok: false,
+      problems: ['claude auth: `claude` is not logged in. Run `claude auth login`, then start the session again.'],
+      warnings: [],
+    })
+    render(<StartRunForm {...props} />)
+    await waitFor(() => expect(screen.getByText(/is not logged in/)).toBeTruthy())
+    expect(screen.getByText(/claude auth login/)).toBeTruthy()
+  })
+
+  test('a root daemon warns without claiming the start will fail', async () => {
+    onProjects.mockResolvedValue([])
+    onSystemPromptUser.mockResolvedValue(null)
+    onAgentReady.mockResolvedValue({
+      ok: true,
+      problems: [],
+      warnings: ['running as root, so the agent looks for credentials under root’s home and will not find yours.'],
+    })
+    render(<StartRunForm {...props} />)
+    await waitFor(() => expect(screen.getByText(/running as root/)).toBeTruthy())
+  })
+
+  test('a ready agent shows nothing at all', async () => {
+    onProjects.mockResolvedValue([])
+    onSystemPromptUser.mockResolvedValue(null)
+    render(<StartRunForm {...props} />)
+    await waitFor(() => expect(onAgentReady).toHaveBeenCalled())
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  test('the agent is re-probed when the picked agent changes, since the answer is per CLI', async () => {
+    onProjects.mockResolvedValue([])
+    onSystemPromptUser.mockResolvedValue(null)
+    const first = render(<StartRunForm {...props} />)
+    await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('claude'))
+    first.unmount()
+
+    prefs.current = { agent: 'codex' }
+    render(<StartRunForm {...props} />)
+    await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('codex'))
+  })
+
+  test('an actions run is not gated on a local CLI it never uses', async () => {
+    onProjects.mockResolvedValue([])
+    onSystemPromptUser.mockResolvedValue(null)
+    prefs.current = { target: 'actions' }
+    render(<StartRunForm {...props} />)
+    await waitFor(() => expect(onProjects).toHaveBeenCalled())
+    expect(onAgentReady).not.toHaveBeenCalled()
   })
 })

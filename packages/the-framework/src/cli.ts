@@ -1240,8 +1240,11 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   }
   if (opts.doctor) {
     const result = await preflight({ agent: opts.agent })
-    for (const check of result.checks) io.out(`${check.ok ? '✓' : '✗'} ${check.name}: ${check.detail}`)
-    io.out(result.ok ? '\nAll good. You are ready to build.' : '\nSome checks failed. Fix them, then try again.')
+    // A warning is neither a tick nor a cross (#1326): running as root is not a failed check,
+    // but printing it with a ✓ would file the one thing that breaks every run under "all good".
+    for (const check of result.checks) io.out(`${check.warn ? '!' : check.ok ? '✓' : '✗'} ${check.name}: ${check.detail}`)
+    if (result.ok && result.checks.some(c => c.warn)) io.out('\nNo failures, but read the warnings above before you start a session.')
+    else io.out(result.ok ? '\nAll good. You are ready to build.' : '\nSome checks failed. Fix them, then try again.')
     return result.ok ? 0 : 1
   }
 
@@ -1358,6 +1361,9 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // run, which needs the wrapped agent.
   if (!fake && !opts.skipPreflight) {
     const pre = await preflight({ agent: opts.agent })
+    // Warnings travel even on a pass (#1326): running as root does not fail a check, but it is
+    // why every run after it dies with an empty log, so it is said before the spending, not after.
+    for (const check of pre.checks.filter(c => c.warn)) io.err(`! ${check.name}: ${check.detail}`)
     if (!pre.ok) {
       for (const check of pre.checks.filter(c => !c.ok)) io.err(`✗ ${check.name}: ${check.detail}`)
       io.err('Preflight failed. Fix the above, or pass --skip-preflight, or try `framework --fake`.')

@@ -1,6 +1,9 @@
 import { getContext } from 'telefunc'
 import { contextProjects } from './context.js'
 import { readClaudeTrust, type ClaudeTrust } from '../claude-trust.js'
+import { preflight, preflightProblems } from '../preflight.js'
+import { isAgentName } from '../agent-names.js'
+import type { AgentReady } from '../dashboard/types.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
 import type { AddProjectResult, OnboardingSuggestion } from '../dashboard/types.js'
 import type { DashboardContext } from '../dashboard/telefunc-serve.js'
@@ -55,4 +58,23 @@ export async function onClaudeTrust(projectId: string): Promise<(ClaudeTrust & {
   const root = projects.find(p => p.id === projectId)?.path
   if (!root) return null
   return { ...(await readClaudeTrust(root)), root }
+}
+
+/**
+ * Whether the picked agent's CLI can start a run at all (#1326): installed, logged in, and not
+ * running as root. The launcher says so before the Start, the way #1318 warns about folder trust,
+ * rather than leaving the user with a spent branch and a dashboard stuck on "Waiting for the
+ * session to start..." (#1323).
+ *
+ * Reports problems only, and only ones the user can act on. The passing checks carry the version
+ * string and the logged-in account, which are of no use to a launcher and have no business
+ * reaching a browser that may be a relay guest, so they stay on this side.
+ */
+export async function onAgentReady(agent: string): Promise<AgentReady> {
+  const result = await preflight({ agent: isAgentName(agent) ? agent : 'claude' })
+  return {
+    ok: result.ok,
+    problems: preflightProblems(result),
+    warnings: result.checks.filter(c => c.warn).map(c => c.detail),
+  }
 }

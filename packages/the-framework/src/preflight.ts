@@ -9,6 +9,12 @@ import { AGENT_SPECS, type AgentName } from './agent.js'
  *
  * It probes the agent the run actually picked (#542), so `--agent codex` is
  * checked against `codex` and fails on `codex` being missing, not `claude`.
+ *
+ * Installed is not the same as usable (#1326). Our first external-user report (#1323) was a
+ * CLI that resolved fine and was logged out, under a daemon started with `sudo`: every session
+ * died before writing its run.json, on both agents, across six projects, while the daemon went
+ * on spending a branch and a worktree per attempt. So preflight also asks the CLI whether it is
+ * authenticated, and says so when the daemon runs as root.
  */
 
 /** One preflight check's outcome. */
@@ -17,6 +23,12 @@ export interface PreflightCheck {
   ok: boolean
   /** Human-readable detail: the version when ok, or how to fix it when not. */
   detail: string
+  /**
+   * A problem worth saying out loud that must not block the run. Root is the case: a container
+   * legitimately runs everything as root, so refusing to start there would break more than it
+   * explains.
+   */
+  warn?: boolean
 }
 
 /** The result of running all preflight checks. */
@@ -25,15 +37,30 @@ export interface PreflightResult {
   checks: PreflightCheck[]
 }
 
-/** Probe a binary for a version string. Injectable so tests need no real CLI. */
-export type VersionProbe = (bin: string) => Promise<{ ok: boolean; stdout: string }>
+/**
+ * Run `<bin> <args>` and report whether it succeeded and everything it said. Injectable so
+ * tests need no real CLI.
+ *
+ * `output` merges stdout and stderr on purpose: the two CLIs disagree about where a status line
+ * belongs, and a check reading only stdout would call a CLI that answered on stderr "could not
+ * say".
+ */
+export type CliProbe = (bin: string, args: readonly string[]) => Promise<{ ok: boolean; output: string }>
 
-function defaultProbe(bin: string): Promise<{ ok: boolean; stdout: string }> {
+/** @deprecated The probe runs more than `--version` now. Use {@link CliProbe}. */
+export type VersionProbe = CliProbe
+
+function defaultProbe(bin: string, args: readonly string[]): Promise<{ ok: boolean; output: string }> {
   return new Promise(resolvePromise => {
-    execFile(bin, ['--version'], { timeout: 10_000 }, (err, stdout) => {
-      resolvePromise({ ok: !err, stdout: String(stdout) })
+    execFile(bin, [...args], { timeout: 10_000 }, (err, stdout, stderr) => {
+      resolvePromise({ ok: !err, output: `${String(stdout)}${String(stderr)}` })
     })
   })
+}
+
+/** Whether this process runs as root. Windows has no uid, and is never root by this test. */
+function runningAsRoot(): boolean {
+  return process.getuid?.() === 0
 }
 
 /** Options for {@link preflight}. */
@@ -42,13 +69,21 @@ export interface PreflightOptions {
   agent?: AgentName
   /** The CLI binary to probe. Default the agent's own. */
   bin?: string
-  /** Version probe override (tests). Default runs `<bin> --version`. */
-  probe?: VersionProbe
+  /** CLI probe override (tests). Default runs the real binary. */
+  probe?: CliProbe
+  /** Root check override (tests). Default reads this process's uid. */
+  isRoot?: () => boolean
+  /** The invoking user `sudo` recorded, named in the root warning. Default read from the environment. */
+  sudoUser?: string | undefined
 }
 
 /**
- * Run the preflight checks: Node is implicit (we are running), and the picked
- * agent's CLI must be installed. Returns every check plus an overall `ok`.
+ * Run the preflight checks: Node is implicit (we are running), the picked agent's CLI must be
+ * installed, and it must be logged in. Returns every check plus an overall `ok`, which counts
+ * failures only, so a warning travels without blocking anything.
+ *
+ * The auth probe is skipped when the CLI is missing: a binary that does not resolve cannot
+ * answer a second question, and one "not found" beats two lines saying the same thing.
  */
 export async function preflight(opts: PreflightOptions = {}): Promise<PreflightResult> {
   const agent = opts.agent ?? 'claude'
@@ -57,12 +92,47 @@ export async function preflight(opts: PreflightOptions = {}): Promise<PreflightR
   const probe = opts.probe ?? defaultProbe
   const checks: PreflightCheck[] = [{ name: 'node', ok: true, detail: process.version }]
 
-  const cli = await probe(bin)
+  const cli = await probe(bin, ['--version'])
   checks.push(
     cli.ok
-      ? { name: agent, ok: true, detail: cli.stdout.trim() || 'installed' }
+      ? { name: agent, ok: true, detail: cli.output.trim() || 'installed' }
       : { name: agent, ok: false, detail: `\`${bin}\` not found — ${spec.installHint}` },
   )
 
+  if (cli.ok) {
+    const loggedIn = spec.auth.loggedIn(await probe(bin, spec.auth.args))
+    // Only an explicit no fails. `undefined` means the CLI would not say, and a run that might
+    // work is worth more than a warning we cannot stand behind.
+    if (loggedIn === false) {
+      checks.push({
+        name: `${agent} auth`,
+        ok: false,
+        detail: `\`${bin}\` is not logged in. Run \`${spec.auth.fix}\`, then start the session again.`,
+      })
+    } else if (loggedIn === true) {
+      checks.push({ name: `${agent} auth`, ok: true, detail: 'logged in' })
+    }
+  }
+
+  // Root is the #1323 trap, and it fails every agent identically: `sudo` moves `HOME`, the CLI
+  // looks for its credentials under root's home instead of the user's, finds none, and every run
+  // dies the same way with the same empty log. Named here because the failure it causes says
+  // nothing at all about its cause.
+  if ((opts.isRoot ?? runningAsRoot)()) {
+    const sudoUser = opts.sudoUser !== undefined ? opts.sudoUser : process.env.SUDO_USER
+    const asUser = sudoUser ? `\`${sudoUser}\`` : 'your own user'
+    checks.push({
+      name: 'root',
+      ok: true,
+      warn: true,
+      detail: `running as root, so the agent looks for credentials under root's home and will not find yours. Restart the daemon as ${asUser}, without \`sudo\`.`,
+    })
+  }
+
   return { ok: checks.every(c => c.ok), checks }
+}
+
+/** The failing checks, one line each, the way a user is told what to fix. */
+export function preflightProblems(result: PreflightResult): string[] {
+  return result.checks.filter(c => !c.ok).map(c => `${c.name}: ${c.detail}`)
 }

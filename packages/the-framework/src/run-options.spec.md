@@ -10,6 +10,6 @@ Pure mapping from the user's resolved preferences to the `StartRunOptions` a run
 ## Decisions
 
 - Lives here in node-free pure code, not the dashboard client: auto PM (#685) also starts runs and used to pass nothing, so unattended runs ignored agent/model/per-project settings. Re-exported from the browser-safe `./client` entry (#431).
-- The toggles `the-framework.yml` also owns (autopilot/technical/vanilla/transparent) and the default-ON handoff pair travel explicitly, `false` included: the caller already resolved every layer it can see, and sending nothing would let a lower layer turn back on what the launcher just showed as off (#842, #1102).
+- The toggles `the-framework.yml` also owns (autopilot/technical/vanilla/transparent) and the default-ON handoff pair travel explicitly, `false` included: the caller already resolved every layer it can see, and sending nothing would let a lower layer turn back on what the launcher just showed as off (#842, #1102). `autoMerge` travels explicitly for the mirror-image reason (#1216): it defaults OFF, and a repo file that turned it on must not win over a launcher that showed it off.
 - `browser` is sent only for the `claude` agent (#801): another agent's driver takes no MCP servers, so sending it would only earn the CLI's "no effect" notice.
 - Takes the merged view, not the two tiers: who wins between global and project setting is `resolvePreferences`' job.

@@ -11,6 +11,6 @@ The dashboard's request/result vocabulary (#345/#396/#475): the shapes the Start
 
 ## Facts
 
-- `autoPushBranch` is tri-state like the `the-framework.yml` toggles: it defaults ON, so an explicit `false` must travel as `--no-auto-push-branch` or the run's own default would re-enable what the launcher showed as off.
+- `autoPushBranch` is tri-state like the `the-framework.yml` toggles: it defaults ON, so an explicit `false` must travel as `--no-auto-push-branch` or the run's own default would re-enable what the launcher showed as off. `autoMerge` (#1216) is tri-state with the opposite default: OFF unless a layer says otherwise.
 - `remote` (`{url, token, label}`) is memory-only relay config set at submit time from a saved device — NEVER persisted to Preferences/registry and never a CLI flag (a device token is a per-browser secret); it is stripped before forwarding so the remote runs locally and never relays onward.
 - `unattended` makes choice gates take the recommended option, keeps the run out of the stay-open chat loop (ends at settle so the armed handoff fires); Stop still works — it aborts the run controller, not a gate.

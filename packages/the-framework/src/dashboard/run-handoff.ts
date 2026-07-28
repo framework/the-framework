@@ -3,6 +3,7 @@ import {
   cachedPrsForBranch,
   forgetBranchPrs,
   forgetPr,
+  ghMergePr,
   ghPrsForBranch,
   nodeGhRunner,
   pickRunPr,
@@ -14,7 +15,7 @@ import type { Cached } from './cache.js'
 import { parseNumstat } from './file-diff.js'
 import { parsePorcelain } from './file-status.js'
 import { errorMessage } from '../error-message.js'
-import type { AutoHandoffSkip } from '../events.js'
+import type { AutoHandoffSkip, AutoMergeOutcome } from '../events.js'
 import { commitPendingWork, currentBranch, startedAtFromRunId, FRAMEWORK_DIR, type RunMeta } from '../store/index.js'
 
 // What a finished session produced, and what is left to do with it (#799).
@@ -505,6 +506,12 @@ export async function openSessionPullRequest(
 export interface HandoffIntent {
   push: boolean
   pr: boolean
+  /**
+   * Merge the PR once it is opened (#1216). Absent = off, unlike the pair above: landing work on
+   * the default branch is not something to arm by default. No action-bar checkbox mutates it —
+   * it comes settled off the run's config.
+   */
+  merge?: boolean
 }
 
 /** Both halves armed — the default a session starts from. */
@@ -518,8 +525,8 @@ export const ARMED_HANDOFF: HandoffIntent = { push: true, pr: true }
  * for the same reason a skipped on-before-mergeable is — silence reads as "it ran and did nothing".
  */
 export type AutoHandoffOutcome =
-  | { outcome: 'skipped'; reason: AutoHandoffSkip }
-  | { outcome: 'done'; pushed: boolean; url?: string }
+  | { outcome: 'skipped'; reason: AutoHandoffSkip; merge?: AutoMergeOutcome }
+  | { outcome: 'done'; pushed: boolean; url?: string; merge?: AutoMergeOutcome }
   | { outcome: 'failed'; step: 'push' | 'pr'; error: string }
 
 /**
@@ -556,8 +563,15 @@ export async function runAutoHandoff(
   if (state.empty) return { outcome: 'skipped', reason: 'no-commits' }
   if (!state.hasRemote) return { outcome: 'skipped', reason: 'no-remote' }
   // A PR already covers both halves: it means the branch is published and the human has a place
-  // to answer. Opening a second one is the one mistake this must never make.
-  if (state.pr) return { outcome: 'skipped', reason: 'already-open' }
+  // to answer. Opening a second one is the one mistake this must never make. An armed merge
+  // (#1216) still applies to the open PR — this is a rerun or a restart finding the PR its
+  // predecessor opened, and the merge is the half that has not happened yet.
+  if (state.pr) {
+    if (intent.merge && state.pr.state === 'OPEN') {
+      return { outcome: 'skipped', reason: 'already-open', merge: await ghMergePr(cwd, state.pr.number, gh) }
+    }
+    return { outcome: 'skipped', reason: 'already-open' }
+  }
 
   if (intent.pr) {
     // `openRunPullRequest` pushes first, so the PR half subsumes the push half.
@@ -573,7 +587,19 @@ export async function runAutoHandoff(
       { ...(readDeps.git ? { git: readDeps.git } : {}), ...(gh ? { gh } : {}) },
     )
     if (!opened.ok) return { outcome: 'failed', step: 'pr', error: opened.error }
-    return { outcome: 'done', pushed: true, ...(opened.url ? { url: opened.url } : {}) }
+    // The merge half (#1216), only after the PR half succeeded. The number comes off the URL gh
+    // just printed; the lookup is the fallback for a gh that answered without one. Failing to
+    // resolve a number is a reported merge failure, never a failed handoff — the PR is there.
+    const merge = intent.merge
+      ? await (async (): Promise<AutoMergeOutcome> => {
+          const lookup = readDeps.pr ?? runPr
+          const number = prNumberFromUrl(opened.url) ?? (await lookup(cwd, branch).catch(() => undefined))?.number
+          return number !== undefined
+            ? ghMergePr(cwd, number, gh)
+            : { outcome: 'failed', error: 'could not resolve the PR number to merge' }
+        })()
+      : undefined
+    return { outcome: 'done', pushed: true, ...(opened.url ? { url: opened.url } : {}), ...(merge ? { merge } : {}) }
   }
 
   if (state.pushed) return { outcome: 'skipped', reason: 'already-pushed' }
@@ -588,6 +614,12 @@ export async function runAutoHandoff(
  * final, and so a caller cannot quietly start depending on the rest of the run's state.
  */
 export type HandoffRun = Pick<RunMeta, 'id' | 'branch' | 'sessionName' | 'intent'> & Partial<Pick<RunMeta, 'startedAt'>>
+
+/** The PR number out of the URL `gh pr create` prints, e.g. `…/pull/123` (#1216). */
+function prNumberFromUrl(url: string | undefined): number | undefined {
+  const match = url?.match(/\/pull\/(\d+)(?:$|[/?#])/)
+  return match ? Number(match[1]) : undefined
+}
 
 /** The PR body: what was asked for, and which session did it. */
 function sessionPrBody(run: HandoffRun): string {

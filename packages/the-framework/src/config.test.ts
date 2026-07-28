@@ -36,6 +36,11 @@ test('parseFrameworkConfig reads the handoff pair (#1173)', () => {
   assert.throws(() => parseFrameworkConfig('autoOpenPr: nope\n'), /"autoOpenPr" must be a boolean/)
 })
 
+test('parseFrameworkConfig reads the auto-merge toggle (#1216)', () => {
+  assert.deepEqual(parseFrameworkConfig('autoMerge: true\n'), { autoMerge: true })
+  assert.throws(() => parseFrameworkConfig('autoMerge: nope\n'), /"autoMerge" must be a boolean/)
+})
+
 test('parseFrameworkConfig treats an empty document as {}', () => {
   assert.deepEqual(parseFrameworkConfig(''), {})
   assert.deepEqual(parseFrameworkConfig('# just a comment\n'), {})

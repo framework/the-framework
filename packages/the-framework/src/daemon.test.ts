@@ -93,6 +93,14 @@ test('a disarmed handoff travels as the --no-* form, since it defaults on (#1102
   ])
 })
 
+test('auto-merge is tri-state too: both spellings travel, absence says nothing (#1216)', () => {
+  // Defaults OFF, but the repo yml may turn it on, so an explicit launcher false has to travel
+  // as --no-auto-merge to win over the file.
+  assert.deepEqual(startOptionFlags({ autoMerge: true }), ['--auto-merge'])
+  assert.deepEqual(startOptionFlags({ autoMerge: false }), ['--no-auto-merge'])
+  assert.deepEqual(startOptionFlags({}), [])
+})
+
 test('startOptionFlags spells an explicit off as the --no-* form (#842)', () => {
   // The launcher resolves the repo yml itself now, so a toggle it shows as off has to travel as
   // one: without --no-autopilot the file would turn it back on inside the run (#841).

@@ -23,6 +23,19 @@ describe('runOptionRows', () => {
     expect(find(rows({ autoOpenPr: false }).main, 'autoOpenPr').checked).toBe(false)
   })
 
+  test('Auto-merge is off by default and needs Open PR to mean anything (#1216)', () => {
+    // Default-off, unlike the row above: publishing a branch is reversible, landing it on the
+    // default branch is not.
+    const main = rows({}).main
+    expect(find(main, 'autoMerge').checked).toBe(false)
+    expect(find(main, 'autoMerge').disabled).toBeUndefined()
+    expect(find(rows({ autoMerge: true }).main, 'autoMerge').checked).toBe(true)
+    // With Open PR off there is nothing to merge: effective value off, and the row says why.
+    const noPr = find(rows({ autoMerge: true, autoOpenPr: false }).main, 'autoMerge')
+    expect(noPr.checked).toBe(false)
+    expect(noPr.disabled).toBe(true)
+  })
+
   test('autopilot is on by default, and off only when explicitly turned off', () => {
     expect(find(rows({}).main, 'autopilot').checked).toBe(true)
     expect(find(rows({ autopilot: false }).main, 'autopilot').checked).toBe(false)

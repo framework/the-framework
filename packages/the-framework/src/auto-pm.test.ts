@@ -940,6 +940,16 @@ test('an unpinned job never asks for a release, and a failing release does not s
   assert.deepEqual(failing.ran, ['triage-quick'])
 })
 
+test('only the drain job lands its own PRs (#1216)', () => {
+  // The drain implements queue entries whose triage a human could have vetoed, so its review
+  // happened before the run. Every other job writes tickets/plans and has nothing to merge —
+  // an autoMerge there would be a run landing unreviewed work.
+  assert.equal(AUTO_PM_DRAIN_JOB.autoMerge, true)
+  for (const job of [...AUTO_PM_JOBS, AUTO_PM_MAINTENANCE_JOB]) {
+    assert.equal(job.autoMerge, undefined, `${job.name} must not auto-merge`)
+  }
+})
+
 test('the triage jobs declare exactly the branch their prompts pin (#1293)', () => {
   const pinned = AUTO_PM_JOBS.filter(job => job.pinnedBranch !== undefined)
   assert.deepEqual(pinned.map(job => job.name), ['triage-quick', 'triage-consensual'])

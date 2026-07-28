@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ProjectSummary } from '@gemstack/the-framework'
 import { runOptionsFromPreferences } from '@gemstack/the-framework/client'
-import { onClaudeTrust, onProjects } from '../server/projects.telefunc.js'
+import { onAgentReady, onClaudeTrust, onProjects } from '../server/projects.telefunc.js'
 import { onSystemPromptUser } from '../server/reads.telefunc.js'
 import { usePreferences, updatePreferences, autopilotEnabled } from '../lib/preferences.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
@@ -99,6 +99,17 @@ export function StartRunForm({
   )
   const untrusted = web && trust !== null && trust.known && !trust.trusted
 
+  // Can the picked agent's CLI start a run at all (#1326)? An `actions` run needs nothing local,
+  // and a remote run executes on its own device, so neither is probed here. Re-read when the agent
+  // changes, since the answer is per CLI: `claude` being logged in says nothing about `codex`.
+  const localAgent = options.target !== 'actions' && !remoteDevice
+  const agent = options.agent ?? 'claude'
+  const ready = useLoaded<Awaited<ReturnType<typeof onAgentReady>> | null>(
+    () => (localAgent ? onAgentReady(agent) : Promise.resolve(null)),
+    null,
+    [agent, localAgent],
+  )
+
   const submit = async (text: string, submitKind: 'build' | 'prompt') => {
     if (busy) return
     setNote('Starting…')
@@ -189,6 +200,18 @@ export function StartRunForm({
           the session — future runs inherit it.
         </p>
       )}
+      {/* The agent cannot start at all (#1326): said here, before the Start spends a branch and a
+          worktree on a session that dies before it exists (#1323). Each line names its own fix. */}
+      {ready?.problems.map(problem => (
+        <p key={problem} role="alert" className="mt-2 text-xs text-danger">
+          {problem}
+        </p>
+      ))}
+      {ready?.warnings.map(warning => (
+        <p key={warning} role="alert" className="mt-2 text-xs text-warning">
+          {warning}
+        </p>
+      ))}
     </form>
   )
 }

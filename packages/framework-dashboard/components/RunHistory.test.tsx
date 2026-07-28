@@ -73,6 +73,54 @@ describe('RunHistory (#785)', () => {
     expect(home?.className).not.toContain('bg-accent')
   })
 
+  test('the starting row retires when the run it stands in for lands, even if it never ran', () => {
+    // The runs list polls every 2s, so a session that starts and fails inside one interval is never
+    // once observed `running`. The stand-in used to wait for a running row to hand over to, so it
+    // sat beside the finished session's own row claiming a second session was starting, until a
+    // 20s deadline swept it. Landing is the handover, whatever status the run landed in.
+    const { container, rerender } = renderRail(
+      <RunHistory projectId="p1" runs={[]} selectedRunId={null} onSelect={() => {}} startTick={0} startIntent="" />,
+    )
+    rerender(
+      <SidebarProvider>
+        <RunHistory projectId="p1" runs={[]} selectedRunId={null} onSelect={() => {}} startTick={1} startIntent="hi" />
+      </SidebarProvider>,
+    )
+    expect([...container.querySelectorAll('button')].some(row => row.textContent?.includes('starting…'))).toBe(true)
+
+    // The poll catches up: the run is already over, and was never seen running.
+    rerender(
+      <SidebarProvider>
+        <RunHistory
+          projectId="p1"
+          runs={[run({ id: 'run-9', status: 'failed', intent: 'hi' })]}
+          selectedRunId={null}
+          onSelect={() => {}}
+          startTick={1}
+          startIntent="hi"
+        />
+      </SidebarProvider>,
+    )
+    const rows = [...container.querySelectorAll('button')]
+    expect(rows.some(row => row.textContent?.includes('starting…'))).toBe(false)
+    expect(rows.some(row => row.textContent?.includes('failed'))).toBe(true)
+  })
+
+  test('the starting row survives a run that was already there when Start was clicked', () => {
+    // The guard against retiring the stand-in on the wrong evidence: an older session in the list
+    // is not the one being waited for, so its presence must not count as the handover.
+    const older = run({ id: 'run-old', status: 'done', intent: 'earlier work' })
+    const { container, rerender } = renderRail(
+      <RunHistory projectId="p1" runs={[older]} selectedRunId={null} onSelect={() => {}} startTick={0} startIntent="" />,
+    )
+    rerender(
+      <SidebarProvider>
+        <RunHistory projectId="p1" runs={[older]} selectedRunId={null} onSelect={() => {}} startTick={1} startIntent="hi" />
+      </SidebarProvider>,
+    )
+    expect([...container.querySelectorAll('button')].some(row => row.textContent?.includes('starting…'))).toBe(true)
+  })
+
   test('a finished run is finished, never waiting', () => {
     // settledAt is cleared on `end`, but a stale one must not relabel a terminal status.
     renderRail(

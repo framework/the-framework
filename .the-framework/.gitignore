@@ -4,9 +4,6 @@
 !LOGS.md
 !conversations/
 !conversations/**
-!git@brillout.com/
-!git@brillout.com/sessions/
-!git@brillout.com/sessions/**
-!suleiman@averotech.com/
-!suleiman@averotech.com/sessions/
-!suleiman@averotech.com/sessions/**
+!*/
+!*/sessions/
+!*/sessions/**

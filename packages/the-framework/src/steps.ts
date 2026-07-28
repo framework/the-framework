@@ -50,19 +50,19 @@ export function buildPrompt(intent: string): string {
 }
 
 /**
- * Framing for a run against an *existing* codebase: extend it, do not rebuild it.
- * The greenfield {@link buildPrompt} tells the agent the workspace may be empty
- * and to scaffold from scratch, which is the wrong instruction when the user
- * pointed the framework at a project that already exists (#185). Chosen when the
- * workspace already holds source at build time.
+ * Framing for a run against an *existing* codebase. The greenfield {@link buildPrompt} tells the
+ * agent the workspace may be empty and to scaffold from scratch, which is the wrong instruction
+ * when the user pointed the framework at a project that already exists (#185).
+ *
+ * Naming the workspace is the whole job. The rules that used to follow it (do not re-scaffold,
+ * read the existing code first, make the smallest coherent set of changes) were dropped in #1224:
+ * they told a capable agent how to do its work rather than what the work was, and the one thing it
+ * cannot infer, that this codebase already exists, is in the first line. Chosen when the workspace
+ * already holds source at build time.
  */
 export function extendPrompt(intent: string): string {
   return [
     `Work within the existing codebase in this workspace to deliver: ${intent}`,
-    'This project already exists — do NOT re-scaffold or rebuild it, and do not',
-    'replace its structure or swap its stack. Read the existing code first, follow',
-    'its conventions, and make the smallest coherent set of changes that adds what',
-    'is asked; new files and dependencies are fine when the feature needs them.',
     'When done, summarize what you changed in one short paragraph.',
   ].join('\n')
 }

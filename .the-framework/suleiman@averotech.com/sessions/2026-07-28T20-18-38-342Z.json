@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "status": "failed",
+  "id": "2026-07-28T20-18-38-342Z",
+  "startedAt": "2026-07-28T20:18:39.104Z",
+  "updatedAt": "2026-07-28T20:18:39.131Z",
+  "passes": 0,
+  "pid": 47528,
+  "host": "Suleimans-MacBook-Pro.local",
+  "intent": "hi",
+  "target": "actions",
+  "handoff": {
+    "push": true,
+    "pr": false
+  },
+  "branch": "the-framework/run-2026-07-28T20-18-38-342Z"
+}

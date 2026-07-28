@@ -44,7 +44,7 @@ const EMPTY_ACTIVITY: Activity[] = []
 /** Stable initial for the cross-project recents poll, so it does not churn on every render. */
 const EMPTY_RECENT: RecentRun[] = []
 
-// The dashboard shell (#405 phase 2): Sessions | main | Docs/Log rail, with the project
+// The dashboard shell (#405 phase 2): Sessions | main | Docs/History rail, with the project
 // selection in the top nav as a dropdown since #772 (it used to be a rail of its own). The main pane
 // is one of three views chosen by the selection: the project home/launcher (Live, the default —
 // Start form + cards) or one session's own view (RunView), live or finished — the same frame

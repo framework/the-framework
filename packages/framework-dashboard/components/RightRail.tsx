@@ -11,11 +11,26 @@ import { BrowserPanel } from './BrowserPanel.js'
 import type { AgentView } from '../lib/live-state.js'
 import { Badge } from './ui/badge.js'
 import { Button } from './ui/button.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
 import { usePolled } from '../lib/use-async.js'
 import { onDocs, onProjectLog } from '../server/reads.telefunc.js'
 
-type Tab = 'files' | 'choices' | 'views' | 'browser' | 'docs' | 'log'
+type Tab = 'files' | 'choices' | 'views' | 'browser' | 'docs' | 'history'
+
+// A one-word tab only works when the reader already knows the system. The former "Log" was
+// read as agent output or a console stream, not the durable project history it actually is.
+const TABS: Record<Tab, { label: string; help: string }> = {
+  files: { label: 'Files', help: 'The project’s files — click one to add it to the next session’s context.' },
+  choices: { label: 'Choices', help: 'Questions this session is parked on, waiting for your answer.' },
+  views: { label: 'Views', help: 'Documents the agent pushed up during the session — a plan, a summary, a writeup.' },
+  browser: { label: 'Browser', help: 'Live view of the browser this session is driving.' },
+  docs: { label: 'Docs', help: 'The PLAN/TODO markdown files at the root of the workspace.' },
+  history: {
+    label: 'History',
+    help: 'Every finished session in this project, from the committed .the-framework/LOGS.md — it outlives the sidebar’s recent sessions, which are local and untracked.',
+  },
+}
 
 // The right sidebar (#314 third rail): the interactive choice gates the run parks on
 // (#440), the ad-hoc markdown views the agent pushes (#441), the surfaced docs (PLAN/TODO),
@@ -107,24 +122,12 @@ export function RightRail({
     // Only when the run actually has one (#813) — a dead tab teaches people the preview is broken.
     ...(showBrowser && runId ? ['browser' as const] : []),
     ...(hasDocs ? ['docs' as const] : []),
-    ...(hasLog ? ['log' as const] : []),
+    ...(hasLog ? ['history' as const] : []),
   ]
   if (tabs.length === 0) return null
   // The remembered tab may have just lost its content (the last doc deleted, a gate resolved), so
   // fall back to the first one that still exists rather than rendering an empty panel.
   const active: Tab = tabs.includes(tab) ? tab : tabs[0]!
-  const label = (t: Tab) =>
-    t === 'files'
-      ? 'Files'
-      : t === 'choices'
-        ? 'Choices'
-        : t === 'views'
-          ? 'Views'
-          : t === 'browser'
-            ? 'Browser'
-            : t === 'docs'
-              ? 'Docs'
-              : 'Log'
   // The Files badge counts only selected files, not whole-repo entries (#661): the shared context
   // set also holds project paths (from the Start form's repo checkboxes), which aren't in `files`.
   const selectedFiles = files.filter(f => context.has(f)).length
@@ -140,18 +143,24 @@ export function RightRail({
           Announced as the tabset it visually is. */}
       <div role="tablist" aria-label="Rail panels" className="flex flex-wrap gap-1 p-2">
         {tabs.map(t => (
-          <Button
-            key={t}
-            role="tab"
-            aria-selected={active === t}
-            variant="ghost"
-            size="sm"
-            className={cn('h-7 gap-1.5 text-xs', active === t && 'bg-accent text-accent-foreground')}
-            onClick={() => pickTab(t)}
-          >
-            {label(t)}
-            {count(t) > 0 && <Badge className="border-primary/40 text-primary">{count(t)}</Badge>}
-          </Button>
+          <Tooltip key={t}>
+            <TooltipTrigger
+              render={
+                <Button
+                  role="tab"
+                  aria-selected={active === t}
+                  variant="ghost"
+                  size="sm"
+                  className={cn('h-7 gap-1.5 text-xs', active === t && 'bg-accent text-accent-foreground')}
+                  onClick={() => pickTab(t)}
+                />
+              }
+            >
+              {TABS[t].label}
+              {count(t) > 0 && <Badge className="border-primary/40 text-primary">{count(t)}</Badge>}
+            </TooltipTrigger>
+            <TooltipContent className="max-w-64">{TABS[t].help}</TooltipContent>
+          </Tooltip>
         ))}
       </div>
       {/* The panel is as tall as it needs to be, and no taller than the rail allows: it sizes to its
@@ -167,7 +176,7 @@ export function RightRail({
           <ViewsRail views={views} />
         ) : active === 'browser' && showBrowser && runId ? (
           <BrowserPanel projectId={projectId} runId={runId} />
-        ) : active === 'log' ? (
+        ) : active === 'history' ? (
           <ProjectLogPanel logs={logs} loaded={logsLoaded} />
         ) : (
           <DocsPanel docs={docs} loaded={docsLoaded} />

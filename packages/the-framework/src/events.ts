@@ -90,6 +90,19 @@ export type AutoHandoffSkip =
   /** A fake/offline run: nothing real to publish. */
   | 'fake-run'
 
+/**
+ * How the merge half of a handoff went (#1216), when the run was armed for it. Lives here beside
+ * {@link AutoHandoffSkip} for the same leaf-module reason.
+ *
+ * `auto-armed` is the preferred outcome: GitHub's own auto-merge takes the PR, so it lands when
+ * its checks pass rather than before them. `merged` is the fallback where the repo does not allow
+ * auto-merge and the PR was merged directly. `failed` never fails the handoff — the PR exists
+ * either way, a human can still merge it by hand.
+ */
+export type AutoMergeOutcome =
+  | { outcome: 'auto-armed' | 'merged' }
+  | { outcome: 'failed'; error: string }
+
 /** Who resolved a {@link ChoiceRequest}: a human, the autopilot countdown, or a headless auto-accept. */
 export type ChoiceBy = 'user' | 'autopilot' | 'auto'
 
@@ -221,8 +234,8 @@ export type FrameworkEvent =
    * Same reason as on-before-mergeable above: a dashboard-started run has no stdout anyone reads,
    * so an outcome that is not an event is an outcome nobody learns.
    */
-  | { kind: 'handoff'; outcome: 'skipped'; reason: AutoHandoffSkip }
-  | { kind: 'handoff'; outcome: 'done'; pushed: boolean; url?: string }
+  | { kind: 'handoff'; outcome: 'skipped'; reason: AutoHandoffSkip; merge?: AutoMergeOutcome }
+  | { kind: 'handoff'; outcome: 'done'; pushed: boolean; url?: string; merge?: AutoMergeOutcome }
   | { kind: 'handoff'; outcome: 'failed'; step: 'push' | 'pr'; error: string }
   /**
    * The work has settled and the run is parked on the user (#785): it stays open as a

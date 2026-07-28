@@ -28,6 +28,8 @@ export interface RunConfigValues {
   autoPushBranch?: boolean | undefined
   /** Open a draft PR for a session's branch when it finishes (#1102/#1173). */
   autoOpenPr?: boolean | undefined
+  /** Merge the session's PR once it is opened (#1216). */
+  autoMerge?: boolean | undefined
 }
 
 /** One tier of config, with the label the run narrates when this tier wins a key. */
@@ -47,6 +49,9 @@ export const RUN_CONFIG_DEFAULTS = {
   // itself back.
   autoPushBranch: true,
   autoOpenPr: true,
+  // Off by default (#1216): landing work on the default branch is not reversible the way pushing
+  // a branch is, so it has to be asked for.
+  autoMerge: false,
 } as const
 
 /**
@@ -74,6 +79,7 @@ export interface ResolvedRunConfig {
   transparent: boolean
   autoPushBranch: boolean
   autoOpenPr: boolean
+  autoMerge: boolean
   /** Winning layer name per key; a key left to its default is absent here. */
   sources: Partial<Record<keyof RunConfigValues, string>>
 }

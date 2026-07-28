@@ -2,7 +2,7 @@ Single home for preference constants both the daemon and the dashboard must agre
 
 ## TLDR
 
-- `PROJECT_PREFERENCE_KEYS` (#840): the preference keys a project may override (autopilot, technical, vanilla, eco*, browser, autoPushBranch/autoOpenPr (#1102), transparent, model, agent, target, ...); `ProjectPreferences` is the `Pick<Preferences, ...>` of them.
+- `PROJECT_PREFERENCE_KEYS` (#840): the preference keys a project may override (autopilot, technical, vanilla, eco*, browser, autoPushBranch/autoOpenPr (#1102), autoMerge (#1216), transparent, model, agent, target, ...); `ProjectPreferences` is the `Pick<Preferences, ...>` of them.
 - `NOTIFICATION_DEFAULTS` + `notificationEnabled()`: what an unset notification preference means; `discordNotificationEnabled()` composes method (`notifyDiscord`) AND category.
 - Slider bounds shared browser↔daemon: `MAX_SPEND_OFFSET` (50pp) / `DEFAULT_SPEND_OFFSET` (half a day's worth of the week's allowance, #960); `DEFAULT_AUTO_PM_CONCURRENCY` (2) / `MAX_AUTO_PM_CONCURRENCY` (10) (#1204).
 

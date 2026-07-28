@@ -3,7 +3,7 @@ The Global run options as one pure-data table (#314) — `runOptionRows(preferen
 ## TLDR
 
 - `OptionRow`: `key` (a `Preferences` key), `label`, `title` (tooltip), `description` (#654), `checked`, optional `disabled` + `disabledReason`.
-- Main rows: Transparent, Autopilot, Technical control, Disable system prompt (vanilla), Eco, Post-merge cleanup (`onBeforeMergeableQuality`), Open PR (`autoOpenPr`), Browser. Eco sub-drops: `ecoPlanning`, `ecoResearch`, `ecoMaintenance`.
+- Main rows: Transparent, Autopilot, Technical control, Disable system prompt (vanilla), Eco, Post-merge cleanup (`onBeforeMergeableQuality`), Open PR (`autoOpenPr`), Auto-merge (`autoMerge`, #1216: default off, disabled while Open PR is off — nothing to merge), Browser. Eco sub-drops: `ecoPlanning`, `ecoResearch`, `ecoMaintenance`.
 - Rules: Transparent (#625) is the master off-switch overriding everything below it; Eco is inert under Vanilla/Transparent (no system prompt left to trim); eco sub-drops need Eco in force; `ecoMaintenance` additionally needs Post-merge cleanup (#556 moved Maintenance into the on-before-mergeable prompt); Browser needs `agent === 'claude'` (#801, rides Claude Code's MCP config).
 
 ## Decisions

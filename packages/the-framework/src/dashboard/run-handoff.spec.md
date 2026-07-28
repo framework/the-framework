@@ -6,6 +6,7 @@ The end-of-session handoff (#799): reads what a finished session left on its bra
 - `runBranchFor(run)`: recorded branch, else `the-framework/<sessionName>`, else `the-framework/run-<id>`; `isSessionBranch` = the `the-framework/` prefix (a naming-convention guess, used only for how loudly to surface, never to act).
 - `resolveRunPr` (#1251/#1255): tries the run's PR across every branch name it may have used (recorded → session-name → run-id), each filtered by `pickRunPr` + start time — what makes a hands-off web run (worktree gone, cloud pushed the run-id branch) resolvable.
 - Actions: `commitSessionWork` (commit what the session left uncommitted, guarded), `pushRunBranch`, `openRunPullRequest` (pushes first; invalidates both PR caches after), `openSessionPullRequest` (refuses gone/empty; returns the existing PR), `runAutoHandoff` (#1102: the armed push/draft-PR at session end, reporting an `AutoHandoffOutcome` event, #835).
+- The merge half (#1216): `HandoffIntent.merge` (absent = off, no checkbox mutates it) has `runAutoHandoff` call `ghMergePr` on the PR it just opened (number off gh's URL, lookup as fallback) — and on the `already-open` skip's OPEN PR, which is a rerun/restart finding its predecessor's PR. The outcome rides the handoff outcome as `merge`; a merge failure never fails the handoff (the PR is there either way).
 
 ## Problems
 

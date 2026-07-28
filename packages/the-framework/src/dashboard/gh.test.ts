@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { githubToken } from './gh.js'
+import { ghMergePr, githubToken } from './gh.js'
 import type { GhRunner } from './gh.js'
 
 /** A `gh` that answers with `stdout`, or rejects, and records what it was asked. */
@@ -52,4 +52,53 @@ test('an empty environment variable falls through to the CLI rather than countin
   // `GH_TOKEN=` in a shell profile is the same as unset, and used to be treated as a real value.
   const { gh } = fakeGh('gho_from_cli\n')
   assert.equal(await githubToken('/repo', { GH_TOKEN: '' }, gh), 'gho_from_cli')
+})
+
+test('ghMergePr arms GitHub auto-merge, so the PR lands when its checks pass (#1216)', async () => {
+  const { gh, calls } = fakeGh('')
+  assert.deepEqual(await ghMergePr('/repo', 9, gh), { outcome: 'auto-armed' })
+  assert.deepEqual(calls, [['pr', 'merge', '9', '--squash', '--auto']])
+})
+
+test('a repo that does not allow auto-merge gets the direct merge instead (#1216)', async () => {
+  // gh surfaces GitHub's GraphQL refusal verbatim; both known spellings carry the
+  // enablePullRequestAutoMerge marker.
+  for (const refusal of [
+    'GraphQL: Pull request Auto merge is not allowed for this repository (enablePullRequestAutoMerge)',
+    'GraphQL: Pull request is in clean status (enablePullRequestAutoMerge)',
+  ]) {
+    const calls: string[][] = []
+    const gh: GhRunner = async args => {
+      calls.push(args)
+      if (args.includes('--auto')) throw new Error(refusal)
+      return ''
+    }
+    assert.deepEqual(await ghMergePr('/repo', 9, gh), { outcome: 'merged' })
+    assert.deepEqual(calls, [
+      ['pr', 'merge', '9', '--squash', '--auto'],
+      ['pr', 'merge', '9', '--squash'],
+    ])
+  }
+})
+
+test('any other refusal is reported, not retried as a direct merge (#1216)', async () => {
+  // A merge conflict, a permissions problem, a network failure: retrying those without --auto
+  // would either fail again or, worse, land a PR GitHub just said not to.
+  const { gh, calls } = fakeGh(new Error('GraphQL: Pull request is not mergeable'))
+  assert.deepEqual(await ghMergePr('/repo', 9, gh), {
+    outcome: 'failed',
+    error: 'GraphQL: Pull request is not mergeable',
+  })
+  assert.deepEqual(calls, [['pr', 'merge', '9', '--squash', '--auto']])
+})
+
+test('a direct merge that also fails reports the second refusal (#1216)', async () => {
+  const gh: GhRunner = async args => {
+    if (args.includes('--auto')) throw new Error('Pull request Auto merge is not allowed for this repository')
+    throw new Error('GraphQL: Base branch was modified')
+  }
+  assert.deepEqual(await ghMergePr('/repo', 9, gh), {
+    outcome: 'failed',
+    error: 'GraphQL: Base branch was modified',
+  })
 })

@@ -222,6 +222,11 @@ Options:
   --no-auto-open-pr      Do not open a draft PR when the session finishes. Opening one
                          is the default; it implies the push above (#1102). Without
                          either flag the-framework.yml autoOpenPr decides.
+  --auto-merge           Merge the session's PR once it is opened (#1216): GitHub
+                         auto-merge when the repo allows it (lands when checks pass),
+                         else merged directly. Off by default — landing on the default
+                         branch has to be asked for. Without either flag
+                         the-framework.yml autoMerge decides.
   --unattended           Nobody is watching: choice gates take the recommended option
                          instead of waiting for an answer. Stop still works (#846).
   --kind <name>          Build event kind the preset's review loop fires for, e.g.
@@ -349,6 +354,8 @@ export interface CliOptions {
   autoPushBranch?: boolean | undefined
   /** `--auto-open-pr` / `--no-auto-open-pr` (#1102): open a draft PR when the session finishes. Tri-state like {@link autoPushBranch}; resolves to on. Implies the push. */
   autoOpenPr?: boolean | undefined
+  /** `--auto-merge` / `--no-auto-merge` (#1216): merge the session's PR once it is opened. Tri-state like {@link autoOpenPr}; resolves to off. */
+  autoMerge?: boolean | undefined
   buildEvent?: string | undefined
   maxPasses?: number
   maxCost?: number
@@ -500,6 +507,12 @@ export function parseArgs(argv: string[]): CliOptions {
         break
       case '--no-auto-open-pr':
         opts.autoOpenPr = false
+        break
+      case '--auto-merge':
+        opts.autoMerge = true
+        break
+      case '--no-auto-merge':
+        opts.autoMerge = false
         break
       case '--eco-auto-planning':
         opts.eco.autoPlanning = true
@@ -826,13 +839,14 @@ export function flagConfigLayer(opts: RunConfigFlags): ConfigLayer {
       ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
       ...(opts.autoPushBranch !== undefined ? { autoPushBranch: opts.autoPushBranch } : {}),
       ...(opts.autoOpenPr !== undefined ? { autoOpenPr: opts.autoOpenPr } : {}),
+      ...(opts.autoMerge !== undefined ? { autoMerge: opts.autoMerge } : {}),
     },
   }
 }
 
 type RunConfigFlags = Pick<
   CliOptions,
-  'preset' | 'autopilot' | 'technical' | 'buildEvent' | 'vanilla' | 'transparent' | 'autoPushBranch' | 'autoOpenPr'
+  'preset' | 'autopilot' | 'technical' | 'buildEvent' | 'vanilla' | 'transparent' | 'autoPushBranch' | 'autoOpenPr' | 'autoMerge'
 >
 
 /**
@@ -1465,7 +1479,9 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // disarm it at any point up to the moment it settles, which is the whole point of them being
   // pre-commitments rather than buttons. Opening a PR implies pushing, so the pair is normalised
   // wherever it is set.
-  const armedHandoff = { push: config.autoPushBranch || config.autoOpenPr, pr: config.autoOpenPr }
+  // Merge is carried alongside but has no checkbox (#1216): it is a per-run/per-repo setting, not
+  // an action-bar pre-commitment, so nothing mutates it after this line.
+  const armedHandoff = { push: config.autoPushBranch || config.autoOpenPr, pr: config.autoOpenPr, merge: config.autoMerge }
   // Assigned once the journal exists, which is after the control watcher is wired: a change that
   // arrives before then still lands on `armedHandoff`, it just has no event to announce it yet.
   let announceHandoff: ((push: boolean, pr: boolean) => void) | undefined
@@ -1656,6 +1672,12 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     if (outcome.outcome === 'failed') io.err(`✗ could not ${outcome.step === 'pr' ? 'open the PR' : 'push the branch'}: ${outcome.error}`)
     else if (outcome.outcome === 'done' && outcome.url) io.out(`\n◆ Opened ${outcome.url}`)
     else if (outcome.outcome === 'done') io.out(`\n◆ Pushed ${branch}.`)
+    // The merge half (#1216) rides on the outcome rather than being its own step: a merge that
+    // could not happen must not read as a failed handoff, the PR is there either way.
+    const merge = outcome.outcome !== 'failed' ? outcome.merge : undefined
+    if (merge?.outcome === 'auto-armed') io.out('◆ Auto-merge armed: the PR lands when its checks pass.')
+    else if (merge?.outcome === 'merged') io.out('◆ Merged the PR.')
+    else if (merge?.outcome === 'failed') io.err(`✗ could not merge the PR: ${merge.error}`)
   }
 
   // A mode/kind given with no preset in effect has nothing to act on: note it.

@@ -175,6 +175,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       const result = await startUnattended(project.id, job.prompt, {
         ...(ticket ? { ticket } : {}),
         ...(job.entry !== undefined ? { queueEntry: job.entry } : {}),
+        // The job says its PRs may land themselves (#1216): the drain implements work whose
+        // review already happened on the queue. Rides to the run as `--auto-merge`.
+        ...(job.autoMerge ? { autoMerge: true } : {}),
       })
       return result.ok ? result.runId : undefined
     },

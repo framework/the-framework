@@ -1030,3 +1030,63 @@ test('naming the session renames the run-id branch and records it as a branch ev
   )
   assert.equal(git('rev-parse', '--abbrev-ref', 'HEAD').trim(), 'the-framework/cool-name')
 })
+
+/**
+ * A `--run-on actions` run with no token must end as `failed`, and must end at all.
+ *
+ * Both halves regressed together. The config check sits after `run.json` is written but before
+ * `settleRun` owns the run, so returning raw left the status at `running` with nobody to correct
+ * it; and the control tail it had already wired held the event loop open, so the process never
+ * exited either. From the dashboard that was a session stuck on "running" forever, with the real
+ * reason sitting unread in stderr.log.
+ *
+ * Driven through the real binary rather than a unit seam: the defect was the process failing to
+ * exit, which only a process can demonstrate. `--skip-preflight` keeps it independent of whether
+ * an agent CLI is installed — the abort under test happens well before any driver starts.
+ */
+test('a --run-on actions run with no GH_TOKEN ends failed instead of hanging as running', async t => {
+  const { execFileSync, spawn } = await import('node:child_process')
+  const repo = await mkdtemp(join(tmpdir(), 'fw-actions-abort-'))
+  t.after(() => rm(repo, { recursive: true, force: true }))
+  const git = (...args: string[]): string => execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
+  git('init', '-q')
+  git('config', 'user.email', 'test@example.com')
+  git('config', 'user.name', 'Test')
+  git('remote', 'add', 'origin', 'https://github.com/example/repo.git')
+  git('commit', '--allow-empty', '-q', '-m', 'seed')
+
+  const bin = new URL('./bin.js', import.meta.url)
+  // Scrubbed, not overridden: an inherited token from the developer's shell would take the run
+  // past the very branch under test.
+  const { GH_TOKEN: _gh, GITHUB_TOKEN: _gathub, ...env } = process.env
+  const exit = await new Promise<number | null>((resolvePromise, rejectPromise) => {
+    const child = spawn(
+      process.execPath,
+      [bin.pathname, 'hi', '--run-on', 'actions', '--skip-preflight', '--no-dashboard', '--run-id', 'r-actions', '--cwd', repo],
+      { cwd: repo, env, stdio: 'ignore' },
+    )
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL')
+      rejectPromise(new Error('the run never exited; it hung with its status left at running'))
+    }, 30_000)
+    child.once('error', rejectPromise)
+    child.once('exit', code => {
+      clearTimeout(timer)
+      resolvePromise(code)
+    })
+  })
+  assert.equal(exit, 2)
+
+  const meta = JSON.parse(await readFile(join(repo, FRAMEWORK_DIR, 'run.json'), 'utf8')) as {
+    status: string
+  }
+  assert.equal(meta.status, 'failed')
+  const events = (await readFile(join(repo, FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
+    .split('\n')
+    .filter(Boolean)
+    .map(l => JSON.parse(l) as { kind: string; ok?: boolean; detail?: string })
+  const end = events.find(e => e.kind === 'end')
+  assert.ok(end, `expected an end event, got: ${events.map(e => e.kind).join(', ')}`)
+  assert.equal(end.ok, false)
+  assert.match(end.detail ?? '', /GH_TOKEN/)
+})

@@ -64,7 +64,11 @@ export class JsonlTailer<T> {
 export interface FollowFileOptions {
   /** How often the backstop poll runs. */
   pollMs: number
-  /** Let the process exit with the poll still scheduled (steering must never hold it open). */
+  /**
+   * Let the process exit with the tail still running (steering must never hold it open).
+   * Covers both handles this opens — the poll timer *and* the `fs.watch` — since either one
+   * on its own is enough to keep the event loop alive.
+   */
   unref?: boolean
 }
 
@@ -106,6 +110,12 @@ export function followFile(dir: string, pull: () => Promise<void>, opts: FollowF
       watcher?.close()
       watcher = undefined
     })
+    // Unref the watcher, not just the poll below: an `fs.watch` handle refs the event loop on
+    // its own, so unrefing only the timer left `unref: true` a half-measure that still pinned the
+    // process open. That is what wedged a run whose config check failed before its watcher had an
+    // owner to close it — the CLI returned, and the process then sat there forever with the run
+    // recorded as `running`.
+    if (opts.unref) watcher?.unref()
   } catch {
     // dir may not be watchable everywhere; the poll backstop still covers it
   }

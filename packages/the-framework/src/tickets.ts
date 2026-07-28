@@ -38,9 +38,20 @@ export const FLAT_TODO_FILE = 'TODO_AGENTS.md'
  * claim, and 0 is "only if capacity", which is a decision about the ticket rather than a
  * translation of it. An unmarked ticket sits in the middle, which is what the ticket format
  * saying `priority:` is optional has to mean.
+ *
+ * A number is taken at its word, because that is what the ticket format actually specifies
+ * (`Priority: 10-0`) and what every ticket in this repo writes. Only the words were mapped when
+ * this was written for #1164, so a numeric priority fell through to the middle and every ticket
+ * queued at 5 regardless of what it said. Out-of-range and fractional values are not clamped into
+ * something plausible: they are not a priority on this scale, and inventing one hides the typo.
  */
 export function todoPriorityForTicket(priority?: string): number {
-  switch (priority?.trim().toLowerCase()) {
+  const written = priority?.trim()
+  if (written !== undefined && /^\d+$/.test(written)) {
+    const value = Number(written)
+    if (value >= 0 && value <= 10) return value
+  }
+  switch (written?.toLowerCase()) {
     case 'urgent':
       return 9
     case 'high':

@@ -195,7 +195,7 @@ test('driverBuild extends an existing project instead of rebuilding it (#185)', 
     })
     // Existing codebase: extend framing, and no from-scratch scaffolding language.
     assert.equal(session.prompts.length, 1)
-    assert.match(session.prompts[0]!, /existing codebase|do NOT re-scaffold/i)
+    assert.match(session.prompts[0]!, /existing codebase/i)
     assert.doesNotMatch(session.prompts[0]!, /scaffold the whole project|workspace may be empty/i)
     const plan = events.find(e => e.type === 'plan')
     assert.ok(plan?.type === 'plan')
@@ -221,10 +221,13 @@ test('driverBuild uses greenfield framing for an empty workspace (#185)', async 
   }
 })
 
-test('extendPrompt names the intent and forbids a rebuild', () => {
+test('extendPrompt names the work and the workspace, and nothing else (#1224)', () => {
   const prompt = extendPrompt('add a settings page')
   assert.match(prompt, /add a settings page/)
-  assert.match(prompt, /do NOT re-scaffold|do not.*swap its stack/i)
+  // The one thing the agent cannot infer: this codebase already exists.
+  assert.match(prompt, /existing codebase/i)
+  // #1224: the rules telling it how to behave are gone, not reworded.
+  assert.doesNotMatch(prompt, /do NOT re-scaffold|swap its stack|smallest coherent|read the existing code first/i)
 })
 
 test('driverImprove scaffolds from scratch when the workspace is empty, else fixes blockers (#182)', async () => {

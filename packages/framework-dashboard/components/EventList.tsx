@@ -67,6 +67,41 @@ function isTurnBoundary(e: FrameworkEvent): boolean {
   return e.kind === 'driver' && e.event.type === 'start'
 }
 
+/**
+ * Whether a row reports a failure, which reads in red (#1199). Two shapes say it: the agent (or
+ * its transport) erroring mid-run, and the run settling badly. A *stopped* run is neither, since
+ * the user asked for that, so it stays neutral rather than being coloured like a fault.
+ */
+function isFailure(e: FrameworkEvent): boolean {
+  if (e.kind === 'driver') return e.event.type === 'error'
+  return e.kind === 'end' && !e.ok && !e.stopped
+}
+
+/**
+ * The row's colour. The user's own turn is blue so it stands out from the agent's work (#1170), a
+ * failure is red (#1199), and everything else keeps the muted log tone.
+ */
+function rowTone(e: FrameworkEvent): string {
+  if (isFailure(e)) return 'text-danger'
+  if (e.kind === 'driver' && e.event.type === 'start') return 'text-info'
+  return ''
+}
+
+/**
+ * Hoist the run's first prompt to the top of the log (#1170).
+ *
+ * It is emitted after the `session` and `system-prompt` events, so the one line the reader wrote
+ * themselves opened three rows down, under a char-count summary of a prompt they did not write.
+ * Only the *first* prompt moves: a later turn is part of the conversation and belongs where it
+ * happened. The rows it jumps keep their order, so the log reads as "what I asked, then
+ * everything that followed".
+ */
+function promptFirst(events: FrameworkEvent[]): FrameworkEvent[] {
+  const at = events.findIndex(isTurnBoundary)
+  if (at <= 0) return events
+  return [events[at]!, ...events.slice(0, at), ...events.slice(at + 1)]
+}
+
 /** HH:MM:SS in the reader's locale, for the arrival-time column. */
 function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString()
@@ -125,17 +160,19 @@ export function EventList({
       <MessageScroller className="flex-1">
         <MessageScrollerViewport aria-label="Session output">
           <MessageScrollerContent className="gap-1 p-4 font-mono text-xs">
-            {events.map((e, i) => {
+            {promptFirst(events).map((e, i, rows) => {
               const disclosable = disclosableText(e)
               const message = messageText(e)
-              const prev = i > 0 ? events[i - 1] : undefined
+              const prev = i > 0 ? rows[i - 1] : undefined
               const chunkHead = !prev || rowGroup(prev) !== rowGroup(e)
               const at = receivedAt(e)
               return (
                 <MessageScrollerItem key={i} messageId={String(i)} scrollAnchor={isTurnBoundary(e)} className="flex items-start gap-2">
                   {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("system prompt") to sit on one line. */}
                   <span className="w-28 shrink-0">
-                    {chunkHead && <Badge className="mt-0.5 text-[10px] uppercase text-muted-foreground">{rowLabel(e)}</Badge>}
+                    {chunkHead && (
+                      <Badge className={`mt-0.5 text-[10px] uppercase ${rowTone(e) || 'text-muted-foreground'}`}>{rowLabel(e)}</Badge>
+                    )}
                   </span>
                   {disclosable ? (
                     <details className="min-w-0 flex-1">
@@ -148,7 +185,9 @@ export function EventList({
                     // A prompt (YOU) or a reply (AGENT): compact Markdown, collapsed to its first line when long.
                     <Message text={message} />
                   ) : (
-                    <span className="min-w-0 flex-1 whitespace-pre-wrap break-words text-foreground">{(formatFrameworkEvent(e) ?? '').trim()}</span>
+                    <span className={`min-w-0 flex-1 whitespace-pre-wrap break-words ${rowTone(e) || 'text-foreground'}`}>
+                      {(formatFrameworkEvent(e) ?? '').trim()}
+                    </span>
                   )}
                   {chunkHead && at !== undefined && (
                     <Tooltip>

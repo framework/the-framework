@@ -25,7 +25,7 @@ export function Cta() {
           textWrap: 'pretty',
         }}
       >
-        Join our community of next-gen developers <Emoji e="💪" />
+        Join our community of agentic developers <Emoji e="💪" />
         <Emoji e="🦾" />
       </h2>
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center' }}>

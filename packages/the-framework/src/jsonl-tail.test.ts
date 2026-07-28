@@ -110,3 +110,48 @@ test('a watcher error does not throw, and the poll keeps the tail alive (#996)',
     await rm(cwd, { recursive: true, force: true })
   }
 })
+
+/**
+ * `unref: true` must cover both handles `followFile` opens, not just the poll timer.
+ *
+ * The watcher was left ref'd, so a caller that opted out of holding the process open was still
+ * held open by it. That only stayed invisible while every caller closed its tail on the way out;
+ * a run that aborted on a config fault before its tail had an owner never exited, and sat there
+ * with the run recorded as `running` forever.
+ *
+ * Asserted in a child process, because that is the actual claim: not "unref was called" but "the
+ * process is able to exit". A ref'd watcher hangs it until the test timeout kills it.
+ */
+test('followFile with unref lets the process exit, watcher included', async () => {
+  const { spawn } = await import('node:child_process')
+  const cwd = await tmpWorkspace()
+  await writeFile(join(cwd, 'events.jsonl'), line('seed'))
+  const moduleUrl = new URL('./jsonl-tail.js', import.meta.url).href
+  try {
+    const code = await new Promise<number | null>((resolvePromise, rejectPromise) => {
+      // Nothing else in this child holds the loop: if it exits, the tail let go of it.
+      const child = spawn(
+        process.execPath,
+        [
+          '-e',
+          `import(${JSON.stringify(moduleUrl)}).then(m => {` +
+            `m.followFile(${JSON.stringify(cwd)}, async () => {}, { pollMs: 20, unref: true })` +
+            `})`,
+        ],
+        { stdio: 'ignore' },
+      )
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL')
+        rejectPromise(new Error('followFile({ unref: true }) kept the process alive'))
+      }, 10_000)
+      child.once('error', rejectPromise)
+      child.once('exit', exitCode => {
+        clearTimeout(timer)
+        resolvePromise(exitCode)
+      })
+    })
+    assert.equal(code, 0)
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})

@@ -1,6 +1,6 @@
 # @gemstack/the-framework
 
-**The (AI) Framework** - turnkey, zero-config AI orchestration. Vite for AI.
+**The (AI) Framework** - Ship faster. Decide smartly.
 
 It wraps a coding-agent CLI (Claude Code today) as a **black box** and takes you
 from an idea to a running app, with a localhost dashboard that foregrounds the

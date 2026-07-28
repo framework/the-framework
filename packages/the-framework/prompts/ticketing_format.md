@@ -61,6 +61,9 @@ For an existing ticket (e.g. `tickets/2042-01-01_some-ticket.md`), a detailed pl
 
 Body:
 ```md
+Effort: quick-win/significant
+Consensus: consensual/open-questions
+
 # [Plan] Ticket title
 
 ## TLDR
@@ -81,6 +84,11 @@ Body:
 
 [optional: more info (any heading and format you want)]
 ```
+
+The two header keys are the plan's verdict on its own ticket, and they are read by the machine:
+- `Effort`: is implementing this a small, contained change (`quick-win`) or not (`significant`)?
+- `Consensus`: is there a single fairly obvious plan, with zero open questions and zero variability (`consensual`), or is there something left to decide (`open-questions`)?
+- `Effort: quick-win` together with `Consensus: consensual` puts the ticket on `TODO_AGENTS.md` and an agent implements it unattended, so write that pair only when that is an acceptable outcome. A plan with a `Hard problems` or `Variability` section is never a quick-win. A missing or unrecognized key means no autonomous implementation.
 
 Typical plan content:
 - Concrete and detailed plan on how to implement the ticket, for example:

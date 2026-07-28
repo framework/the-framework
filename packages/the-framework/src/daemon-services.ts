@@ -13,6 +13,7 @@ import { startAutoPm, AUTO_PM_JOBS, type AutoPmReport } from './auto-pm.js'
 import { releaseStalePinnedBranch } from './stale-branch.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
 import { claimedQueueEntries, promoteQueue } from './queue-promote.js'
+import { promotePlannedQuickWins } from './planned-quick-wins.js'
 import { FLAT_TODO_FILE } from './tickets.js'
 import { cachedOpenPrFilePatches } from './dashboard/gh.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
@@ -202,6 +203,13 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // The exception (a checkout busy with the user's own queue edits) is the callee's to flag.
       const retry = !outcome.promoted && outcome.retry === true
       return { settled: !retry, promoted: outcome.promoted }
+    },
+    // Carry a plan's own verdict onto the queue (#1334). The daemon writes for the same reason it
+    // promotes: the checkout is not the agent's to touch.
+    promotePlans: async project => {
+      const outcome = await promotePlannedQuickWins(project.path)
+      if (outcome.blocked) log(`[framework] auto PM: ${outcome.reason} (${project.path})`)
+      return outcome.queued
     },
     log,
   })

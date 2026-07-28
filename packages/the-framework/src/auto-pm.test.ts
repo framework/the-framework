@@ -237,14 +237,52 @@ test('startAutoPm survives a project whose backlog cannot be read (#685)', async
   assert.deepEqual(started, [])
 })
 
-test('AUTO_PM_JOBS triages, then plans (#773/#891/#892)', () => {
-  // Cheapest-and-readiest first: triage the cheap tickets, then the significant ones, and leave
-  // planning last — it is the priciest turn and the one whose output every earlier job consumes.
+test('AUTO_PM_JOBS imports, triages, then plans (#773/#891/#892/#1334)', () => {
+  // Importing leads: it is the only job that can add a ticket none of the others have seen, so a
+  // rotation without it eventually triages and plans a set that nothing ever refills (#1334).
+  // Then cheapest-and-readiest: the cheap tickets, the significant ones, and planning last — the
+  // priciest turn, and the one whose output every earlier job consumes.
   assert.deepEqual(AUTO_PM_JOBS.map(j => j.name), [
+    'update-tickets',
     'triage-quick',
     'triage-consensual',
     'spike-and-plan',
   ])
+})
+
+test('a plan promoted this tick is drained this tick, not the next one (#1334)', async () => {
+  // The promotion has to happen before the queue is read, or a plan landing between two ticks
+  // waits out a whole cooldown while the sweep invents work instead.
+  const order: string[] = []
+  let promoted = false
+  const { loop, ran } = harness({
+    cooldownMs: 0,
+    promotePlans: async () => {
+      order.push('promote')
+      promoted = true
+      return ['[A](tickets/a.md)']
+    },
+    queue: async () => {
+      order.push('read')
+      return promoted ? ['[A](tickets/a.md)'] : []
+    },
+  })
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(order, ['promote', 'read'])
+  // A queue with work in it drains rather than running a rotation job (#855).
+  assert.deepEqual(ran, [AUTO_PM_DRAIN_JOB.name])
+})
+
+test('a sweep with nothing planned behaves exactly as before the seam (#1334)', async () => {
+  // Omitted, and throwing, must both leave the rotation running: this promotion is an addition,
+  // never a gate on the tick.
+  for (const promotePlans of [undefined, async () => { throw new Error('gh is down') }]) {
+    const { loop, ran } = harness({ cooldownMs: 0, ...(promotePlans ? { promotePlans } : {}) })
+    await loop.tick()
+    loop.stop()
+    assert.deepEqual(ran, ['first'])
+  }
 })
 
 test('the rotation is the schedule the triage presets asked for (#891/#892)', () => {

@@ -218,9 +218,15 @@ function entryPreview(entry: string): string {
 }
 
 /**
- * The default cycle, ordered cheapest-and-readiest first: triage the quick tickets (#891), then
- * the significant-but-agreed ones (#892), and only then make more plans (#685). Planning is the
- * most expensive turn and the one whose output the earlier jobs consume, so it runs last.
+ * The default cycle: bring the tickets across from GitHub (#1208), triage the quick ones (#891),
+ * then the significant-but-agreed ones (#892), and only then make more plans (#685). Planning is
+ * the most expensive turn and the one whose output the earlier jobs consume, so it runs last.
+ *
+ * Importing leads because it is the only job that can add a ticket none of the others have seen
+ * (#1334): a routine that triages and plans a set nothing ever refills eventually has nothing
+ * left to do, and a new issue would wait for a human to press the button. It is safe to repeat --
+ * the preset resumes from `tickets/meta.json`'s `lastImportedAt` and reconciles, so a firing with
+ * nothing changed since the last one is a no-op rather than a re-import.
  *
  * This rotation is what #891/#892 mean by "with a cron job regularly firing this preset". No
  * separate scheduler is involved and none is needed: the rotation already fires on every idle tick
@@ -237,6 +243,11 @@ function entryPreview(entry: string): string {
  * idle tick tries the next job instead of retrying a job that is already running.
  */
 export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
+  {
+    name: presets.updateTickets.name,
+    prompt: presets.updateTickets.render(),
+    label: presets.updateTickets.label,
+  },
   {
     name: presets.triageQuick.name,
     prompt: presets.triageQuick.render(),
@@ -386,6 +397,16 @@ export interface AutoPmDeps {
    * still reads empty and the sweep would start the same work over again.
    */
   promote(project: AutoPmProject, run: { runId: string; entry?: string }): Promise<PromoteOutcome>
+  /**
+   * Put every ticket its plan calls a consensual quick-win on the queue (#1334), asked once per
+   * project per tick, just before the queue is read.
+   *
+   * Here rather than as a rotation job because no agent turn is involved: the plan already made
+   * the call, and this only carries it onto the queue the drain reads. Injected like the rest, so
+   * the loop keeps testing off disk. Omitted (or throwing) means nothing is promoted, which is
+   * the behaviour that existed before the seam.
+   */
+  promotePlans?(project: AutoPmProject): Promise<readonly string[]>
   /**
    * Which of `candidates` are claimed by a run outside this loop's memory (#1253): pinned to a
    * run that is still live, or to a finished one whose PR is still open. The in-memory pin dies
@@ -547,6 +568,14 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
             note(project, false, `landed the queue from ${landed} finished run${landed === 1 ? '' : 's'}`)
             continue
           }
+        }
+        // Before the queue is read, so a plan that landed since the last tick is drained this
+        // tick rather than after one more cooldown (#1334).
+        const planned = (await deps.promotePlans?.(project).catch(() => [])) ?? []
+        if (planned.length) {
+          deps.log(
+            `[framework] auto PM: queued ${planned.length} planned quick-win${planned.length === 1 ? '' : 's'} in ${project.path}`,
+          )
         }
         const entries = await deps.queue(project).catch(() => undefined)
         const activeRuns = deps.activeRuns(project)

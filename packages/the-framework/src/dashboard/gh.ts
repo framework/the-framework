@@ -28,6 +28,34 @@ export function nodeGhRunner(): GhRunner {
  */
 const readGh = cliRunner({ bin: 'gh', timeoutMs: 8_000 })
 
+/**
+ * The GitHub token an Actions run authenticates with (#1352).
+ *
+ * `GH_TOKEN` / `GITHUB_TOKEN` win, because CI sets them and must beat whatever `gh` happens to be
+ * logged in as on the runner. With neither set, fall back to the `gh` CLI's own credential — the
+ * same one every PR this framework opens is already authenticated by. A machine that can open a PR
+ * could always have run an Actions session too; it just had no way to say so, and the run failed
+ * with the credential sitting one `gh auth token` away.
+ *
+ * Undefined when there is no token to be had (gh missing, logged out, or refusing to hand it over),
+ * which the caller turns into the run's stated reason for not starting. Deliberately quiet about
+ * *why* gh declined: the caller's message names both ways to fix it, and a keyring prompt's stderr
+ * is not something to put in front of someone who simply has not set GH_TOKEN.
+ */
+export async function githubToken(
+  cwd: string,
+  env: Record<string, string | undefined> = process.env,
+  gh: GhRunner = readGh,
+): Promise<string | undefined> {
+  const fromEnv = env['GH_TOKEN'] ?? env['GITHUB_TOKEN']
+  if (fromEnv) return fromEnv
+  try {
+    return (await gh(['auth', 'token'], cwd)).trim() || undefined
+  } catch {
+    return undefined
+  }
+}
+
 /** A forgiving `gh --json` read: resolves `empty` when gh is missing/unauthed, or its output is not JSON. */
 export async function ghJson<T>(args: string[], cwd: string, empty: T): Promise<T> {
   try {

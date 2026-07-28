@@ -1044,7 +1044,7 @@ test('naming the session renames the run-id branch and records it as a branch ev
  * exit, which only a process can demonstrate. `--skip-preflight` keeps it independent of whether
  * an agent CLI is installed — the abort under test happens well before any driver starts.
  */
-test('a --run-on actions run with no GH_TOKEN ends failed instead of hanging as running', async t => {
+test('a --run-on actions run with no token anywhere ends failed instead of hanging as running', async t => {
   const { execFileSync, spawn } = await import('node:child_process')
   const repo = await mkdtemp(join(tmpdir(), 'fw-actions-abort-'))
   t.after(() => rm(repo, { recursive: true, force: true }))
@@ -1055,10 +1055,19 @@ test('a --run-on actions run with no GH_TOKEN ends failed instead of hanging as 
   git('remote', 'add', 'origin', 'https://github.com/example/repo.git')
   git('commit', '--allow-empty', '-q', '-m', 'seed')
 
+  // "No token" has to mean no token *anywhere* since #1352, or this asserts nothing on a developer
+  // machine whose `gh` is logged in: the env vars are scrubbed, and a stub `gh` that refuses goes
+  // first on PATH so the CLI fallback finds nothing either. The rest of PATH is kept, because the
+  // run still resolves its origin remote with the real git.
+  const stubBin = await mkdtemp(join(tmpdir(), 'fw-actions-stub-bin-'))
+  t.after(() => rm(stubBin, { recursive: true, force: true }))
+  await writeFile(join(stubBin, 'gh'), '#!/bin/sh\nexit 1\n', { mode: 0o755 })
+
   const bin = new URL('./bin.js', import.meta.url)
   // Scrubbed, not overridden: an inherited token from the developer's shell would take the run
   // past the very branch under test.
-  const { GH_TOKEN: _gh, GITHUB_TOKEN: _gathub, ...env } = process.env
+  const { GH_TOKEN: _gh, GITHUB_TOKEN: _gathub, ...rest } = process.env
+  const env = { ...rest, PATH: `${stubBin}:${rest.PATH ?? ''}` }
   const exit = await new Promise<number | null>((resolvePromise, rejectPromise) => {
     const child = spawn(
       process.execPath,
@@ -1088,5 +1097,7 @@ test('a --run-on actions run with no GH_TOKEN ends failed instead of hanging as 
   const end = events.find(e => e.kind === 'end')
   assert.ok(end, `expected an end event, got: ${events.map(e => e.kind).join(', ')}`)
   assert.equal(end.ok, false)
+  // The reason names both ways out (#1352): the variable CI sets, and the login a laptop has.
   assert.match(end.detail ?? '', /GH_TOKEN/)
+  assert.match(end.detail ?? '', /gh auth login/)
 })

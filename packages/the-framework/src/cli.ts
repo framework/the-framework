@@ -16,6 +16,7 @@ import { type ClaudeCodeDriverOptions, type Driver, type DriverSession, type Per
 import { AGENTS, AGENT_SPECS, isAgentName, type AgentName } from './agent.js'
 import { createRunDriver } from './run-driver.js'
 import { githubSlugFor } from './dashboard/github.js'
+import { githubToken } from './dashboard/gh.js'
 import type { ActionsDriverOptions } from './driver/index.js'
 import { launchSharedBrowser, withBrowser, type SharedBrowser } from './browser.js'
 import { connectCdp, startBrowserStream, type BrowserStream } from './browser-stream.js'
@@ -168,8 +169,9 @@ Options:
                          the session says so at startup rather than imply a guard.
   --run-on <local|actions|web>   Where the run executes (default: local, this
                          device). actions drives it on a fresh GitHub Actions runner;
-                         needs a GitHub origin remote and a user token in GH_TOKEN
-                         (repo + workflow scopes). web hands the task to a Claude Code
+                         needs a GitHub origin remote and a user token with repo +
+                         workflow scopes, from GH_TOKEN or from "gh auth login".
+                         web hands the task to a Claude Code
                          cloud session on your own account, which runs it off this
                          machine and opens its own PR; follow it on claude.ai or pull
                          it back with claude --teleport.
@@ -1707,19 +1709,25 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   }
 
   // Run on GitHub Actions (#1050): owner/repo come from the project's origin remote, the token from
-  // GH_TOKEN. The token is read from the environment, never the committed the-framework.yml, since a
-  // repo file is public and this must be a user PAT. Resolved before the driver so a missing remote
-  // or token fails the run with a clear reason rather than deep inside ActionsDriver.
+  // the environment or, failing that, the `gh` CLI (#1352) — never the committed the-framework.yml,
+  // since a repo file is public and this must be a user credential. Resolved before the driver so a
+  // missing remote or token fails the run with a clear reason rather than deep inside ActionsDriver.
   let actionsConfig: ActionsDriverOptions | undefined
   if (opts.target === 'actions' && !fake) {
     const slug = await githubSlugFor(cwd)
-    const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN
+    const token = await githubToken(cwd)
     if (!slug) {
       return await abortBeforeDriver('--run-on actions needs a GitHub origin remote on this repo.')
     }
     if (!token) {
+      // Both ways out, because neither is guessable from the other: the env var is what CI sets,
+      // and `gh auth login` is what a laptop has. Says which process needs it, too — the daemon
+      // hands each run its own environment, so exporting the variable in a shell does nothing for
+      // a daemon that is already up.
       return await abortBeforeDriver(
-        '--run-on actions needs a GitHub user token in GH_TOKEN (repo + workflow scopes).',
+        '--run-on actions needs a GitHub user token (repo + workflow scopes): set GH_TOKEN in the environment ' +
+          'the daemon runs in, or log in with `gh auth login`. It must belong to a user, not an App — the agent ' +
+          'workflow refuses a bot-triggered run.',
       )
     }
     actionsConfig = { owner: slug.owner, repo: slug.repo, token }

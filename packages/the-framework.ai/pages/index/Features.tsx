@@ -30,6 +30,20 @@ export function Features() {
             installation, like humans do.
           </FeatureText>
         </div>
+        <div style={{ ...featureCardStyle, gap: 12 }}>
+          <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Optimal quota usage</h3>
+          <FeatureText>
+            Stop wasting unused quota — The Framework drives AI autonomy for optimal quota usage:
+            maximum daily usage while keeping enough quota space for manual prompts.
+          </FeatureText>
+        </div>
+        <div style={{ ...featureCardStyle, gap: 12 }}>
+          <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Bring your own prompts</h3>
+          <FeatureText>
+            Save and quickly re-use your favorite prompts. Share some per-project with your
+            teammates, while keeping others as personal prompts.
+          </FeatureText>
+        </div>
         <div style={{ ...featureCardStyle, gap: 14 }}>
           <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Dashboard</h3>
           <FeatureText>

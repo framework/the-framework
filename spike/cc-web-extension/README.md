@@ -52,10 +52,11 @@ catches the session's own DOM changes immediately; the slow interval is only a b
 node check.mjs
 ```
 
-Thirteen cases: the ten extraction ones, including the four that broke it on a real session
+Fourteen cases: the ten extraction ones, including the four that broke it on a real session
 (`<code>` with no `<pre>`, content behind a shadow root, an indentation the parser had not
-guessed, and our own protocol spec appearing on the page as a decoy), plus three for the answer
-delivery: fill and click send, the Enter fallback, and refusing a page with no composer.
+guessed, and our own protocol spec appearing on the page as a decoy), three for the answer
+delivery: fill and click send, the Enter fallback, and refusing a page with no composer, and
+one for the panel's collapse toggle folding it to its title bar and back.
 
 After editing any file here, reload the extension on `chrome://extensions` AND reload the open
 claude.ai tabs: reloading the extension does not re-inject content scripts, and an orphaned

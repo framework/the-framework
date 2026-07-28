@@ -522,6 +522,24 @@ if (!IS_TOP) {
 
   let latest = survey()
 
+  // Whether the panel is folded down to its title bar. Remembered in chrome.storage rather than
+  // the page's localStorage: the preference should survive a reload, and nothing the extension
+  // keeps should be readable by the page it watches. Restored asynchronously, so the panel can
+  // open expanded for a beat before the remembered fold lands.
+  let collapsed = false
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    try {
+      chrome.storage.local.get('panelCollapsed', stored => {
+        if (!chrome.runtime.lastError && stored?.panelCollapsed) {
+          collapsed = true
+          render()
+        }
+      })
+    } catch {
+      // Dead context; the panel starts expanded, and reloading the tab is the fix anyway.
+    }
+  }
+
   const button = (label, onClick) => {
     const b = document.createElement('button')
     b.textContent = label
@@ -536,6 +554,37 @@ if (!IS_TOP) {
     latest = { ...top, fromFrame: fromFrame ?? null }
     const winner = top.choiceFound ? top : fromFrame?.choiceFound ? fromFrame : top
     const d = top.diagnostics
+    panel.innerHTML = ''
+    panel.style.width = collapsed ? 'auto' : '360px'
+    const head = document.createElement('div')
+    head.style.cssText = `display:flex;align-items:center;gap:8px${collapsed ? '' : ';margin-bottom:6px'}`
+    const title = document.createElement('span')
+    const version = typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : '?'
+    title.textContent = `The Framework bridge v${version}`
+    title.style.cssText = 'font-weight:600;color:#a7c080;flex:1'
+    const toggle = document.createElement('button')
+    toggle.textContent = collapsed ? '+' : '−'
+    toggle.title = collapsed ? 'Expand' : 'Collapse'
+    toggle.setAttribute('aria-label', toggle.title)
+    toggle.setAttribute('aria-expanded', String(!collapsed))
+    toggle.style.cssText =
+      'flex:none;width:20px;height:20px;padding:0;cursor:pointer;background:#2d3441;color:#dbdbdb;border:1px solid #3a4150;border-radius:5px;font:inherit;line-height:1'
+    toggle.addEventListener('click', () => {
+      collapsed = !collapsed
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        try {
+          chrome.storage.local.set({ panelCollapsed: collapsed }, () => void chrome.runtime.lastError)
+        } catch {
+          // Dead context; the choice still holds until the tab reloads.
+        }
+      }
+      render()
+    })
+    head.append(title, toggle)
+    panel.appendChild(head)
+    // Folded, the title bar is all there is to draw. The survey above still ran: collapsing
+    // hides the detail, not the bridge, so the daemon keeps hearing from this page.
+    if (collapsed) return
     const rows = [
       ['question found', winner.choiceFound ? `yes (${winner.choiceVia}${winner === fromFrame ? ', in iframe' : ''})` : 'no'],
       ['title', winner.choiceTitle ?? '-'],
@@ -560,12 +609,6 @@ if (!IS_TOP) {
         ['frame reported', fromFrame ? 'yes' : 'no'],
       )
     }
-    panel.innerHTML = ''
-    const head = document.createElement('div')
-    const version = typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : '?'
-    head.textContent = `The Framework bridge v${version}`
-    head.style.cssText = 'font-weight:600;margin-bottom:6px;color:#a7c080'
-    panel.appendChild(head)
     for (const [k, v] of rows) {
       const line = document.createElement('div')
       line.style.cssText = 'display:flex;gap:8px;margin:2px 0'

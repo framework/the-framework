@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "The Framework: Claude web bridge",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Shows the question a Claude Code cloud session is parked on in your local The Framework dashboard, and types the answer you pick there back into the session.",
   "permissions": [
     "storage",

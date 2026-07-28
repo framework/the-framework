@@ -54,6 +54,15 @@ describe('pendingChoices', () => {
     expect(req).not.toHaveProperty('kind')
     expect(req).toMatchObject({ id: 'c1', title: 'Approve?' })
   })
+
+  test('an end event expires every open gate (#1359)', () => {
+    // A run that died mid-gate never wrote choice-resolved; the store's surrogate end is what
+    // says the question's audience is gone. Rendering past it left the panel answerable forever.
+    const end: FrameworkEvent = { kind: 'end', ok: false, stopped: true, detail: 'its process died without reporting an end' }
+    expect(pendingChoices([choice('c1', 'One?'), choice('c2', 'Two?'), end])).toEqual([])
+    // A gate asked after a (continued) run's next leg opens fresh — end only closes what came before.
+    expect(pendingChoices([choice('c1', 'One?'), end, choice('c2', 'Two?')]).map(c => c.id)).toEqual(['c2'])
+  })
 })
 
 describe('isRunActive', () => {

@@ -1,0 +1,1 @@
+Barrel for the framework-detection seam (#115) — re-exports `defineFrameworkPreset`, `detectFramework`, the built-in presets/registry (`vikePreset`, `nextPreset`, `builtinFrameworkPresets`, `FrameworkPresetRegistry`, `builtinFrameworkPresetRegistry`), and the types.

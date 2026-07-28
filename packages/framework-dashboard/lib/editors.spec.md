@@ -1,0 +1,1 @@
+`useDetectedEditors()` — loads the editors installed on the daemon's machine once over Telefunc for the "Preferred editor" picker (#727); `[]` until the read resolves and on public hosts with no local checkout (where the picker shows only the escape-hatch "Default").

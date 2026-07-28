@@ -1,0 +1,1 @@
+Runtime-agnostic base64 helpers (`toBase64`, `fromBase64`, `base64ToUtf8`) — prefer `btoa`/`atob` when present, fall back to `globalThis.Buffer`, so they work in Node, browsers, React Native, and Electron.

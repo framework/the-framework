@@ -1,0 +1,1 @@
+Re-export shim (#405) pinning the baked RPC key `/server/events.telefunc.ts` for `onEvents`, the live-event Telefunc Channel implemented in `@gemstack/the-framework/dashboard-rpc` and served in-process by the daemon. Imported-then-exported, not `export ... from` (#1014, see `server/.spec.md`).

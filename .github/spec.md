@@ -1,0 +1,1 @@
+GitHub configuration for the repo; its only content is `workflows/` — the five Actions workflows (CI, the ActionsDriver-dispatched agent runner, prompt-drift check, changesets release, website deploy).

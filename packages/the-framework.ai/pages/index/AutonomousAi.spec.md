@@ -1,0 +1,1 @@
+"Autonomous AI" landing section (`#autonomous-ai`): two static cards — Autonomous Product Management (test/review, tickets, conversation capture to `conversations/<DATE>_<TOPICS_SLUG>.md`, market research) and Autonomous Coding (quick-wins, refactoring, UX, consensual work) — plus two reassurance `Note`s (agents still ask for confirmation; you pick the autonomicity level).

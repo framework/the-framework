@@ -1,0 +1,1 @@
+Generic controlled/uncontrolled state hook: seeds internal state from `value` ?? `defaultValue`, re-syncs when a defined `value` prop changes, and returns a setter that updates internal state and forwards `(next, ...rest)` to `onChange` (the `Rest` type param lets change handlers carry extra args, e.g. an event).

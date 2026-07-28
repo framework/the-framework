@@ -1,0 +1,1 @@
+Builds the `openai` SDK client via dynamic import (optional dependency, resolved on first use); forwards `apiKey`, `baseURL`, `organization`, and `defaultHeaders` from `OpenAIConfig`, omitting unset fields so SDK defaults survive.

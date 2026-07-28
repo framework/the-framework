@@ -1,0 +1,1 @@
+Azure OpenAI provider (`name: 'azure'`) built via `defineOpenAiCompatible` with deliberately no default base URL — the Azure endpoint encodes the resource and deployment names, so `baseUrl` must always come from the caller.

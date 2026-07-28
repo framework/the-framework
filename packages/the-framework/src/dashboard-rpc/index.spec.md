@@ -1,0 +1,1 @@
+Barrel re-exporting the dashboard's whole Telefunc surface (reads, control, events, projects, preferences, quota, devices, registration); implementations live in this package so `sendStart` can reach the daemon's `startRun`, and the framework-dashboard client imports them through thin shims so the baked RPC keys stay `/server/*.telefunc.ts`.

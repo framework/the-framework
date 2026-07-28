@@ -1,0 +1,1 @@
+Site footer (shared with subpages): brand lockup plus Discord/GitHub/npm links; uses `justify-content: space-between` (not an auto margin) so wrapped links align left under the brand, and stacks centered below 480px via `styles.css`.

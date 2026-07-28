@@ -1,0 +1,1 @@
+Fluent reranking facade — `Reranker.of(query, documents).model('cohere/rerank-v3.5').topK(5).rank()` resolves a `RerankingAdapter` via `AiRegistry.resolveReranking` (falls back to the registry default model string) and forwards query/documents/model/topK.

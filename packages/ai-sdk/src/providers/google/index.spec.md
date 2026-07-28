@@ -1,0 +1,1 @@
+Public-surface barrel of the Google provider: `GoogleConfig`, `GoogleProvider`, chat exports (`GoogleAdapter`, `mapGeminiFinishReason`, `toGeminiContents`), `filterToGeminiString`, and the vector-store mappers used by tests.

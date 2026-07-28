@@ -1,0 +1,1 @@
+Types-only file defining `ZodLikeObject` (`{ shape: Record<string, unknown> }`) — a structural type both Zod v3 and v4 object schemas satisfy, so user code type-checks against either major without a version bump in `@gemstack/mcp`.

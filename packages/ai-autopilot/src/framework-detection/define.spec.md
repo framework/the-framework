@@ -1,0 +1,1 @@
+`defineFrameworkPreset` — validates a `FrameworkPresetSpec` and returns a deeply frozen `FrameworkPreset`, throwing `FrameworkPresetError` at definition time on a missing/non-kebab-case `name` or missing `framework` label; `signals.dependencies`/`signals.files` default to frozen empty arrays so callers never null-check.

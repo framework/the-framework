@@ -1,0 +1,1 @@
+Menu-item label with an optional muted one-line description under it (#654), shared by the options/notifications/presets menus; lives in `ui/` so a menu can use it without dragging in another menu's module and its preference wiring.

@@ -24,6 +24,10 @@ export interface RunConfigValues {
   antiLazyPill?: boolean | undefined
   /** Run the wrapped agent fully raw (#625). */
   transparent?: boolean | undefined
+  /** Push a session's branch to `origin` when it finishes (#1102/#1173). */
+  autoPushBranch?: boolean | undefined
+  /** Open a draft PR for a session's branch when it finishes (#1102/#1173). */
+  autoOpenPr?: boolean | undefined
 }
 
 /** One tier of config, with the label the run narrates when this tier wins a key. */
@@ -39,6 +43,10 @@ export const RUN_CONFIG_DEFAULTS = {
   technical: false,
   antiLazyPill: true,
   transparent: false,
+  // On by default (#1102): the zero-config handoff is what makes a session left alone hand
+  // itself back.
+  autoPushBranch: true,
+  autoOpenPr: true,
 } as const
 
 /**
@@ -64,6 +72,8 @@ export interface ResolvedRunConfig {
   technical: boolean
   antiLazyPill: boolean
   transparent: boolean
+  autoPushBranch: boolean
+  autoOpenPr: boolean
   /** Winning layer name per key; a key left to its default is absent here. */
   sources: Partial<Record<keyof RunConfigValues, string>>
 }

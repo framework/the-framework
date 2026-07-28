@@ -58,6 +58,12 @@ test('preferencesFromFileConfig maps the repo yml onto the preference keys (#842
   assert.deepEqual(preferencesFromFileConfig({ antiLazyPill: false }), { vanilla: true })
   assert.deepEqual(preferencesFromFileConfig({ antiLazyPill: true }), { vanilla: false })
   assert.deepEqual(preferencesFromFileConfig({ transparent: true }), { transparent: true })
+  // The handoff pair rides the committed file too (#1173): the push setting's home now the
+  // launcher gear offers a single `Open PR` row.
+  assert.deepEqual(preferencesFromFileConfig({ autoPushBranch: false, autoOpenPr: false }), {
+    autoPushBranch: false,
+    autoOpenPr: false,
+  })
   // preset and event have no preference counterpart, so they are not mapped.
   assert.deepEqual(preferencesFromFileConfig({ preset: 'software-development', event: 'bug-fix' }), {})
 })

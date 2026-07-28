@@ -32,6 +32,11 @@ export function preferencesFromFileConfig(file: FrameworkFileConfig): Preference
     ...(file.technical !== undefined ? { technical: file.technical } : {}),
     ...(file.transparent !== undefined ? { transparent: file.transparent } : {}),
     ...(file.antiLazyPill !== undefined ? { vanilla: !file.antiLazyPill } : {}),
+    // The handoff pair (#1102/#1173): whether a session publishes itself is a fact about the repo,
+    // so the committed file may say it — and it is where push-without-PR stays reachable now the
+    // launcher offers a single `Open PR` row.
+    ...(file.autoPushBranch !== undefined ? { autoPushBranch: file.autoPushBranch } : {}),
+    ...(file.autoOpenPr !== undefined ? { autoOpenPr: file.autoOpenPr } : {}),
   }
 }
 

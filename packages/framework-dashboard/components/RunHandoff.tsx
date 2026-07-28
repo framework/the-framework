@@ -24,9 +24,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 const MAX_COMMITS = 6
 const MAX_FILES = 10
 
-/** True when there is a commit list and a file list worth expanding the bar for. */
+/** True when there is a commit list, a file list, or uncommitted work worth expanding the bar for. */
 export function handoffExpandable(handoff: RunHandoff | null): boolean {
-  return Boolean(handoff && handoff.exists && !handoff.empty)
+  return Boolean(handoff && handoff.exists && (!handoff.empty || handoff.pendingFiles?.length))
 }
 
 /** The one-line verdict, in the action bar: what the session left behind, or that it left nothing. */
@@ -170,13 +170,16 @@ export function HandoffActions({
   // From here every branch says something. A session that has finished and shows no control at all
   // is #1173: the reason there is nothing to press is exactly what the reader came for.
   if (!handoff.exists) return <Reason>Branch gone — nothing to open a PR from.</Reason>
-  // A branch with no commits and nothing waiting in the tree: the session genuinely produced
-  // nothing. Said plainly, rather than shown as a button that could only fail (#1173).
-  //
-  // Uncommitted work is the other half of that case and is not a dead end: the agent commits what
-  // it found before it starts and nothing at the end, so its whole output routinely sits in the
-  // tree. Opening the PR commits it first, so the button is offered rather than explained away.
-  if (handoff.empty && !handoff.pending) return <Reason>Nothing committed — no PR to open.</Reason>
+  // A branch with no diff never gets the button (#1173): there is nothing GitHub would accept a PR
+  // for, and offering one that fails with "No commits between main and <branch>" is the dead end
+  // this bar exists to prevent. When the tree holds uncommitted work, that work is named — the
+  // reader's next step is to have the session commit it (the composer is right below), and an
+  // unattended run commits it by itself on the way out.
+  if (handoff.empty) {
+    const pending = handoff.pendingFiles ?? []
+    if (pending.length === 0) return <Reason>Nothing committed — no PR to open.</Reason>
+    return <Reason title={pending.join('\n')}>Nothing committed — {namePending(pending)} left uncommitted.</Reason>
+  }
   if (!handoff.hasRemote) return <Reason>No remote to push to.</Reason>
   // One button, not two (#1173). "Push branch" and "Open PR" sat side by side as equals, and
   // nobody could say what pushing without a PR was for — a control nobody can
@@ -195,9 +198,25 @@ export function HandoffActions({
   )
 }
 
+/**
+ * The uncommitted paths, worded for a one-line bar: the first couple named, the rest counted.
+ * The full list is one hover (the Reason's title) or one disclosure (the details pane) away.
+ */
+function namePending(paths: string[]): string {
+  const shown = paths.slice(0, 2).join(', ')
+  const rest = paths.length - Math.min(paths.length, 2)
+  return rest > 0 ? `${shown} and ${rest} more` : shown
+}
+
 /** Why there is nothing to press. Reads as part of the bar, not as an error. */
-function Reason({ children }: { children: ReactNode }) {
-  return <span className="text-xs text-muted-foreground">{children}</span>
+function Reason({ children, title }: { children: ReactNode; title?: string }) {
+  // Capped and truncated: the bar's actions never shrink, so a long file name must ellipsize here
+  // rather than push the row wide.
+  return (
+    <span className="inline-block max-w-[24rem] truncate align-middle text-xs text-muted-foreground" {...(title ? { title } : {})}>
+      {children}
+    </span>
+  )
 }
 
 /** What the branch holds, revealed by the bar's disclosure. Never rendered when there is nothing. */
@@ -205,14 +224,16 @@ export function RunHandoffDetails({ handoff }: { handoff: RunHandoff | null }) {
   if (!handoffExpandable(handoff) || !handoff) return null
   // A column with no rows is a heading over nothing: a session can commit all of its work and
   // leave the tree clean, and then "Changed files" has nothing to list.
-  const both = handoff.commits.length > 0 && handoff.files.length > 0
+  const pendingFiles = handoff.pendingFiles ?? []
+  const sections = [handoff.commits.length > 0, handoff.files.length > 0, pendingFiles.length > 0].filter(Boolean).length
   return (
     <section
-      className={cn('grid gap-3 border-b border-border px-4 py-3 text-xs', both && 'sm:grid-cols-2')}
+      className={cn('grid gap-3 border-b border-border px-4 py-3 text-xs', sections > 1 && 'sm:grid-cols-2')}
       aria-label="Session handoff"
     >
       {handoff.commits.length > 0 && <Commits handoff={handoff} />}
       {handoff.files.length > 0 && <Files handoff={handoff} />}
+      {pendingFiles.length > 0 && <PendingFiles paths={pendingFiles} />}
     </section>
   )
 }
@@ -231,6 +252,25 @@ function Commits({ handoff }: { handoff: RunHandoff }) {
             <span className="truncate" title={commit.subject}>
               {commit.subject}
             </span>
+          </li>
+        ))}
+      </ul>
+      {rest > 0 && <p className="mt-1 text-muted-foreground">and {rest} more</p>}
+    </div>
+  )
+}
+
+/** The work the session never committed (#1173) — the full list behind the bar's one-line naming. */
+function PendingFiles({ paths }: { paths: string[] }) {
+  const shown = paths.slice(0, MAX_FILES)
+  const rest = paths.length - shown.length
+  return (
+    <div>
+      <h3 className="mb-1.5 text-muted-foreground">Uncommitted files</h3>
+      <ul className="space-y-1">
+        {shown.map(path => (
+          <li key={path} className="truncate" title={path}>
+            {path}
           </li>
         ))}
       </ul>

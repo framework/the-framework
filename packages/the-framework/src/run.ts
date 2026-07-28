@@ -25,7 +25,7 @@ import { snapshotWorkspace } from './sandbox.js'
 import type { Driver, DriverSession } from './driver/index.js'
 import { composeRunSystem, type EcoOptions, type TfContext } from './system-prompt.js'
 import { createRunControls, emitSessionStart, endStopDetail } from './run-telemetry.js'
-import { AWAIT_PROTOCOL, createTurnSignalEmitter } from './turn-gate.js'
+import { AWAIT_PROTOCOL, createTurnSignalEmitter, type ScopeVerdict } from './turn-gate.js'
 import { drainGates, runChatPhase, type BindProjectDeps, type RecordMessage } from './await-gate.js'
 import { leaveResumeNote, runTodoLoop, type TodoLoopResult } from './todo-loop.js'
 import { continueAfterChoice, decideDeploy, deployWith, domainLoopChecklist, driverBuild, driverChecklist, driverImprove, driverLoopPrompts } from './steps.js'
@@ -276,7 +276,12 @@ export interface RunFrameworkResult {
  */
 export async function runFramework(opts: RunFrameworkOptions): Promise<RunFrameworkResult> {
   const events: FrameworkEvent[] = []
+  // The agent's latest scope verdict (#1356), read off the event stream: every phase that
+  // parses turn signals (the build, its await rounds) already emits through here, so the
+  // checklist gate below needs no plumbing of its own.
+  let declaredScope: ScopeVerdict | undefined
   const emit = (event: FrameworkEvent) => {
+    if (event.kind === 'scope-verdict') declaredScope = event.scope
     events.push(event)
     if (opts.onEvent) {
       try {
@@ -380,6 +385,17 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     injectedRunner: opts.runner !== undefined,
     emit,
   })
+  // The scope gate (#1356). The Bootstrap fixes its scope before the build runs, but the
+  // agent only sizes the work *during* the build — so the gate sits on the checklist step
+  // instead: a build that declared small scope resolves the pass clean without dispatching
+  // anyone, because an app-wide review costs more than the change it would examine and sits
+  // between the task and the handoff. Only an explicit `small` skips; no verdict keeps the
+  // full checklist, so the gate can only ever drop work the agent said was unnecessary.
+  const gatedChecklist: typeof checklist = async ctx => {
+    if (declaredScope !== 'small') return checklist(ctx)
+    emit({ kind: 'log', message: 'Skipping the production-grade checklist: the build declared small scope.' })
+    return { blockers: [] }
+  }
 
   // A real driver writes files to the workspace, so the build/improve steps can
   // detect an empty workspace and hard-scaffold it (#182). The fake driver writes
@@ -415,7 +431,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
       steps: {
         scope: () => ({ scope: opts.scope ?? 'full', intent: opts.intent }),
         build: agentAwaitGate(driverBuild(session, workspaceOpt), session, gateDeps),
-        ...(handsOff ? {} : { checklist, improve: driverImprove(session, workspaceOpt) }),
+        ...(handsOff ? {} : { checklist: gatedChecklist, improve: driverImprove(session, workspaceOpt) }),
         ...(opts.deploy
           ? {
               deploy: opts.deployTarget

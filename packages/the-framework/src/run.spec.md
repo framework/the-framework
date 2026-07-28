@@ -12,6 +12,7 @@ The build-run orchestrator: `runFramework()` drives ai-autopilot's `Bootstrap` (
 ## Problems
 
 - Hand-off drivers (#1225): the prompt leaves the machine and the reply never comes back, so every phase after build would read the driver's own "handed off to <url>" summary as agent output — producing a bogus missing-verdict blocker and an unanswerable backlog gate. Fix: with `driver.handsOff`, checklist/improve steps are omitted (Bootstrap then skips its whole loop), the todo loop and chat phase are skipped, and a closing log explains the run continues in its own session.
+- Scope gate (#1356): the Bootstrap fixes scope before the build, but the agent sizes the work *during* it — so the gate wraps the checklist step instead. A `scope-verdict` event of `small` (from a `set-scope` block, tracked off the emit stream) makes the checklist resolve `{ blockers: [] }` without dispatching, after a log saying why. Only an explicit `small` skips: no verdict (older prompts, no protocols) keeps the full checklist, and `handsOff` is untouched.
 - An empty workspace after the build turn means the agent stalled instead of scaffolding (#182) — unless the turn ended on an await block (#337/#339), in which case it stopped *on purpose* to ask and the scaffold retry must not clobber the question.
 - The fake driver writes no files, so workspace verification and the todo loop are disabled for it to stay deterministic.
 

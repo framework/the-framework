@@ -157,5 +157,33 @@ async function deliver(body, prepare) {
   dom.window.close()
 }
 
+// ---------------------------------------------------------------------------
+// The collapse toggle: the panel folds down to its title bar and unfolds back with the rows
+// intact. chrome.storage is extension-only, so in jsdom the fold simply lives for the page's
+// lifetime, which is exactly the degradation the guard in content.js promises.
+
+{
+  const dom = new JSDOM(
+    `<!doctype html><html><body><main><pre><code>${block}</code></pre><div contenteditable="true"></div></main></body></html>`,
+    { url: 'https://claude.ai/code/session_01TEST', runScripts: 'outside-only' },
+  )
+  dom.window.eval(script)
+  const panel = dom.window.document.getElementById('tf-bridge-panel')
+  // The toggle is the one button carrying aria-expanded; Copy report and Fill composer do not.
+  const toggle = () => panel.querySelector('button[aria-expanded]')
+  const expanded = /question found/.test(panel.textContent)
+  toggle().click()
+  const folded =
+    !/question found/.test(panel.textContent) &&
+    /The Framework bridge/.test(panel.textContent) &&
+    toggle().getAttribute('aria-expanded') === 'false'
+  toggle().click()
+  const restored = /question found\s*yes/.test(panel.textContent)
+  const ok = expanded && folded && restored
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  panel folds to its title bar and back  (expanded=${expanded}, folded=${folded}, restored=${restored})`)
+  dom.window.close()
+}
+
 console.log(failed ? `\n${failed} case(s) failed` : '\nall cases passed')
 process.exit(failed ? 1 : 0)

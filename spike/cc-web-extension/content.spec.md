@@ -6,7 +6,7 @@ Content-script half of the Claude web bridge (#1237): finds the question a cloud
 - `isTemplate()` filters the decoy: the page renders our own system prompt, so its await-choices spec (all-placeholder `<...>` values) appears as a JSON block before any real question.
 - Transcript: one block per `article` element (composer-only articles skipped); with no articles, mirrors the conversation container (`main`/`[role=main]` preferred over `body`, icon-font glyphs `-` stripped) as one block sliced from the END; only changed blocks re-post (`sentEvents` by seq).
 - Answer delivery (top frame only): waits up to 20s for a composer, fills contenteditable via `execCommand('insertText')` with a `textContent` + `InputEvent` fallback (or sets `textarea.value`), settles 400ms, clicks the LAST enabled `aria-label~=send` button, else dispatches Enter keydown/keyup.
-- Panel: fixed bottom-right in the top frame; rows for question/composer/bridge/answer/transcript status + failure diagnostics; collapsible (fold stored in `chrome.storage`, restored async); "Copy report" and "Fill composer (does not send)" buttons.
+- Panel: fixed bottom-right in the top frame; rows for question/composer/bridge/answer/transcript status + failure diagnostics; collapsible down to a compact `TF` tab, full title in the tooltip (fold stored in `chrome.storage`, restored async); "Copy report" and "Fill composer (does not send)" buttons.
 - Child frames run the same survey and `postMessage` findings up to the top frame — a child-frame find means the content lives in an iframe, which is the finding.
 - `watch()`: MutationObserver (debounced 250ms) plus a slow interval backstop (60s); an `alive()` guard disconnects both once the extension context dies.
 

@@ -4,7 +4,7 @@ Offline harness that runs `content.js` inside jsdom against synthetic pages — 
 
 - 10 extraction cases, including the four that broke real sessions: `<code>` with no `<pre>`, content behind an open shadow root, a 4-space indentation, and the system-prompt spec as a decoy (spec-then-real must pick the real question; spec alone must find nothing); also a highlighter splitting the block across spans, prose around it, and a no-question page.
 - 3 delivery cases via `window.__tfBridgeDeliverAnswer`: fill + click of the `aria-label="Send message"` button, Enter fallback when no button exists, and honest refusal on a composer-less page (wait shortened via `window.__tfComposerWaitMs`).
-- 1 collapse case: the panel folds to its title bar (the toggle is the one button with `aria-expanded`) and restores with rows intact.
+- 1 collapse case: the panel folds to a compact `TF` tab — the full title gone from its text — (the toggle is the one button with `aria-expanded`) and restores with rows intact.
 - Assertions read the injected panel's text — the panel is appended to `documentElement`, not `body`.
 
 ## Facts

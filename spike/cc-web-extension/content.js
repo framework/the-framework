@@ -522,7 +522,7 @@ if (!IS_TOP) {
 
   let latest = survey()
 
-  // Whether the panel is folded down to its title bar. Remembered in chrome.storage rather than
+  // Whether the panel is folded down to a compact TF tab. Remembered in chrome.storage rather than
   // the page's localStorage: the preference should survive a reload, and nothing the extension
   // keeps should be readable by the page it watches. Restored asynchronously, so the panel can
   // open expanded for a beat before the remembered fold lands.
@@ -556,11 +556,16 @@ if (!IS_TOP) {
     const d = top.diagnostics
     panel.innerHTML = ''
     panel.style.width = collapsed ? 'auto' : '360px'
+    panel.style.padding = collapsed ? '6px 8px' : '10px 12px'
     const head = document.createElement('div')
     head.style.cssText = `display:flex;align-items:center;gap:8px${collapsed ? '' : ';margin-bottom:6px'}`
     const title = document.createElement('span')
     const version = typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : '?'
-    title.textContent = `The Framework bridge v${version}`
+    const fullTitle = `The Framework bridge v${version}`
+    // Folded, the label shrinks to "TF": the fold exists to give the corner back, so the full
+    // name and version retreat to the tooltip.
+    title.textContent = collapsed ? 'TF' : fullTitle
+    if (collapsed) title.title = fullTitle
     title.style.cssText = 'font-weight:600;color:#a7c080;flex:1'
     const toggle = document.createElement('button')
     toggle.textContent = collapsed ? '+' : '−'
@@ -582,7 +587,7 @@ if (!IS_TOP) {
     })
     head.append(title, toggle)
     panel.appendChild(head)
-    // Folded, the title bar is all there is to draw. The survey above still ran: collapsing
+    // Folded, the TF tab is all there is to draw. The survey above still ran: collapsing
     // hides the detail, not the bridge, so the daemon keeps hearing from this page.
     if (collapsed) return
     const rows = [

@@ -9,7 +9,7 @@ async function main(): Promise<void> {
 
   console.log('\n--- outcome ---')
   console.log(`  preset detected:  ${out.framework}`)
-  console.log(`  production-grade: ${out.productionGrade} (in ${out.passes} pass(es))`)
+  console.log(`  serve gate:       ${out.productionGrade ? 'passed' : 'not clean'} (in ${out.passes} pass(es))`)
   console.log(`  deployed to:      ${out.deployTarget} → ${out.deployUrl}`)
   console.log(`  running locally:  ${out.previewUrl}`)
   console.log(`  it served:        ${out.served.slice(0, 72)}${out.served.length > 72 ? '…' : ''}`)

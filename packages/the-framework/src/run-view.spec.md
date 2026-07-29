@@ -2,7 +2,7 @@ Pure projections of the `FrameworkEvent` stream into the dashboard's overview-ca
 
 ## TLDR
 
-- `loopStatus()`: the production-grade loop's latest verdict from `checklist`/`improve`/`done` bootstrap events (pass number, blockers, production-grade, finished); null until a checklist ran (a prototype build never loops).
+- `loopStatus()`: the review loop's latest verdict from `checklist`/`improve`/`done` bootstrap events (pass number, blockers, production-grade, finished); null until a checklist ran — a prototype build never loops, and neither does a run with no review configured (#1372): `done` with zero passes opens no status.
 - `deployPlan()`: the chosen deploy plan from the latest `deploy` bootstrap event, or null.
 - `runProgress()` (#326): latest `session-name` and whether `ready-for-merge` fired — drives the status label + dot (orange building, green ready).
 - `handoffState()` (#1102): what the session is armed to push/PR from `handoff-armed` events (latest wins; checkboxes re-emit on change) and how the handoff ended (`handoff` event: done/skipped/failed).

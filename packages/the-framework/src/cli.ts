@@ -1976,9 +1976,12 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     // "prototype ready" would claim this machine built something it never saw.
     const successLine = driver.handsOff
       ? '\n✓ handed off. The session continues where it was sent, and opens its own pull request.'
-      : result.productionGrade
-        ? `\n✓ production-grade in ${result.passes} pass(es).`
-        : `\n• prototype ready${result.stoppedEarly ? ` (stopped with ${result.blockers.length} blocker(s))` : ''}.`
+      : result.passes === 0
+        // No review passes: the run had no review configured (#1372 — no preset, no serve).
+        ? '\n✓ done.'
+        : result.productionGrade
+          ? `\n✓ review passed in ${result.passes} pass(es).`
+          : `\n• review not clean${result.stoppedEarly ? ` (stopped with ${result.blockers.length} blocker(s))` : ''}.`
     return { successLine, ...(preview ? { preview } : {}) }
   })
 }

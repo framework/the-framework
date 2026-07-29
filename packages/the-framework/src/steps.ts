@@ -1,6 +1,6 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { definePrompt, LoopEngine, parseVerdict, promptInstructions, renderTask } from '@gemstack/ai-autopilot'
+import { definePrompt, LoopEngine, promptInstructions, renderTask } from '@gemstack/ai-autopilot'
 import type {
   BuildContext,
   DeployContext,
@@ -24,10 +24,13 @@ import { continuationPrompt, parseAwaitGate, type ParsedAwaitGate } from './turn
  *
  * These implement the injectable steps of ai-autopilot's `Bootstrap` by running
  * everything *through* a {@link DriverSession} (option A, #166): build / improve
- * are prompts that let the wrapped agent's own loop do the work; the checklist
- * re-prompts and gates on the `{ blockers }` verdict the agent ends its output
- * with. Reusing the `Bootstrap` spine keeps scope, narration, the loop gate, and
- * deploy for free; only *who runs the inner loop* changes.
+ * are prompts that let the wrapped agent's own loop do the work; a domain
+ * preset's review loop (#252) gates on the `{ blockers }` verdicts its prompts
+ * report. There is no built-in review — the agent is treated as a black box
+ * (#1372), so a run reviews only what the user opted into (a preset) or what is
+ * mechanically checkable (the serve gate). Reusing the `Bootstrap` spine keeps
+ * scope, narration, the loop gate, and deploy for free; only *who runs the inner
+ * loop* changes.
  */
 
 const ZERO_USAGE = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
@@ -63,10 +66,6 @@ export function buildPrompt(intent: string): string {
 export function extendPrompt(intent: string): string {
   return [
     `Work within the existing codebase in this workspace to deliver: ${intent}`,
-    // Asked for here, not just offered by the signal protocol (#1356): a trivial run never has a
-    // "sizing" moment on its own, so the optional block goes unemitted and the full checklist
-    // runs for a one-line change. What the verdict means stays in the protocol text.
-    'Also emit a `set-scope` block sizing this work (`small` / `large` / `very-large`).',
     'When done, summarize what you changed in one short paragraph.',
   ].join('\n')
 }
@@ -86,16 +85,6 @@ export function scaffoldPrompt(intent: string): string {
     'dependencies, and do not stop until the requested features exist and the app runs.',
   ].join('\n')
 }
-
-/** The default production-grade checklist prompt. Ends with a `{ blockers }` verdict. */
-export const PRODUCTION_GRADE_PROMPT = [
-  'Review the app in this workspace against a production-grade checklist:',
-  'correctness, error handling, auth where user data is involved, input validation,',
-  'sensible structure, and that it actually builds and runs.',
-  'Do NOT fix anything now. Report only.',
-  'End your reply with a fenced ```json block: { "blockers": ["<concrete work still required>", ...] }.',
-  'An empty blockers array means the app is production-grade.',
-].join('\n')
 
 /** Compose the improve prompt for a set of blockers. */
 export function improvePrompt(blockers: readonly string[]): string {
@@ -269,53 +258,24 @@ export function driverBuild(
 }
 
 /**
- * The checklist step: re-prompt the driver with the production-grade checklist
- * and parse the `{ blockers }` verdict from its output. This is the outcome
- * gate: the loop repeats until the verdict is empty (#113 / guardrail #3).
- */
-export function driverChecklist(
-  session: DriverSession,
-  opts: { prompt?: string } & DriverStepOptions = {},
-): (ctx: LoopPassContext) => Promise<Verdict> {
-  const prompt = opts.prompt ?? PRODUCTION_GRADE_PROMPT
-  return async ctx => {
-    const turn = await session.prompt(prompt, {
-      ...(opts.system ? { system: opts.system } : {}),
-      ...(ctx.signal ? { signal: ctx.signal } : {}),
-    })
-    // Fail closed: a reply with no parseable { blockers } verdict is not a pass.
-    // Surface it as a blocker so the loop re-prompts (and, at maxPasses, stops with
-    // it) rather than declaring the app production-grade off an unverifiable reply.
-    return parseVerdict(turn.text) ?? { blockers: [MISSING_VERDICT_BLOCKER] }
-  }
-}
-
-/** The blocker surfaced when a checklist reply omits the required `{ blockers }` verdict. */
-export const MISSING_VERDICT_BLOCKER =
-  'End your reply with the required fenced ```json { "blockers": [...] } verdict; it was missing.'
-
-/**
  * A checklist step backed by a domain preset's review loop (#252): each pass
  * dispatches a `major-change` (by default) loop event, so the preset's review
  * chain fires through the wrapped agent, and returns the union of the `{ blockers }`
- * verdicts its prompts reported. This is what makes "the domain loop replaces the
- * built-in checklist" concrete — Bootstrap keeps its pass/improve/maxPasses
- * machinery, the domain policy just decides what "production-grade" means.
+ * verdicts its prompts reported. Bootstrap keeps its pass/improve/maxPasses
+ * machinery, the domain policy just decides what blocks.
  *
- * A preset with no loop for the event kind is not a review at all: it falls back
- * to `fallback` (the built-in production-grade checklist) when given, so a run is
- * never left silently unreviewed, else nothing blocks.
+ * A preset with no loop for the event kind is not a review at all: nothing
+ * blocks. The user opted into *this preset's* reviews, not a substitute (#1372 —
+ * the built-in checklist that used to fill this gap is gone).
  */
 export function domainLoopChecklist(
   loop: LoopEngine,
-  opts: { kind?: string; fallback?: (ctx: LoopPassContext) => Promise<Verdict> } = {},
+  opts: { kind?: string } = {},
 ): (ctx: LoopPassContext) => Promise<Verdict> {
   const kind = opts.kind ?? 'major-change'
   return async ctx => {
     const event: LoopEvent = { kind, summary: ctx.intent }
-    if (loop.matches(event).length === 0) {
-      return opts.fallback ? opts.fallback(ctx) : { blockers: [] }
-    }
+    if (loop.matches(event).length === 0) return { blockers: [] }
     return verdictFromLoopRun(await loop.handle(event))
   }
 }

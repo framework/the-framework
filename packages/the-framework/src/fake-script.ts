@@ -5,10 +5,10 @@ import type { DeployDecision } from './run.js'
 /**
  * The deterministic `--fake` scenario: a small Vike + Prisma orders app.
  * It wires a {@link FakeDriver} whose scripted turns walk the exact prompt order
- * the flow issues (build summary, checklist-with-blocker, improve, clean
- * checklist), so the whole scope -> deploy flow runs offline with no CLI and no
- * model, ending production-grade. Mirrors the ai-autopilot bootstrap-quickstart,
- * but driven entirely *through* the driver seam.
+ * the flow issues — one build turn (#1372: with no preset and no serve config
+ * nothing reviews the build, so the build is the whole loop) — so the
+ * scope -> deploy flow runs offline with no CLI and no model, driven entirely
+ * *through* the driver seam.
  */
 
 /** The default intent the `--fake` demo builds. */
@@ -34,20 +34,12 @@ const BUILD_TURN: FakeTurn = {
   actions: ['Write', 'Write', 'Bash'],
   usage: FAKE_USAGE,
 }
-const CHECKLIST_BLOCKER: FakeTurn = {
-  text: 'Reviewed the app.\n```json\n{ "blockers": ["No authentication on the orders page yet"] }\n```',
-  actions: ['Read', 'Grep'],
-  usage: FAKE_USAGE,
-}
-const IMPROVE: FakeTurn = { text: 'Added a +guard to the orders page (vike-auth) so it requires a signed-in user.', actions: ['Edit'], usage: FAKE_USAGE }
-const CHECKLIST_CLEAN: FakeTurn = { text: 'Reviewed again.\n```json\n{ "blockers": [] }\n```', actions: ['Read'], usage: FAKE_USAGE }
-
-const TURNS: FakeTurn[] = [BUILD_TURN, CHECKLIST_BLOCKER, IMPROVE, CHECKLIST_CLEAN]
+const TURNS: FakeTurn[] = [BUILD_TURN]
 
 // Demo variants that make the build stop to ask, so the turn-boundary gates (#337
 // single-select / #339 multi-select checklist) can be seen offline. The build turn ends
 // with an await block; the framework shows the gate, waits, then re-prompts (RESUME_TURN),
-// and the run continues to review as usual. Needs the dashboard on (so requestChoice is
+// and the run continues as usual. Needs the dashboard on (so requestChoice is
 // wired); selected via FRAMEWORK_FAKE_AWAIT=choices|multiselect|confirmation.
 const AWAIT_CHOICES_TURN: FakeTurn = {
   text:
@@ -80,9 +72,8 @@ export function demoTurns(awaitMode: string | undefined): FakeTurn[] {
     : awaitMode === 'confirmation' ? AWAIT_CONFIRMATION_TURN
     : undefined
   if (!askTurn) return TURNS
-  // The build asks (askTurn), the gate resolves, the framework re-prompts (RESUME_TURN),
-  // then the normal review turns follow.
-  return [askTurn, RESUME_TURN, CHECKLIST_BLOCKER, IMPROVE, CHECKLIST_CLEAN]
+  // The build asks (askTurn), the gate resolves, the framework re-prompts (RESUME_TURN).
+  return [askTurn, RESUME_TURN]
 }
 
 /** Build the scripted {@link FakeDriver} for the demo. */

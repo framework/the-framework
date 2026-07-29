@@ -10,9 +10,10 @@ describe('framework demo: one prompt → a running, deployed app (offline)', () 
     // Preset detection picked Vike from the demo's deps signals.
     assert.equal(out.framework, 'Vike')
 
-    // The full-fledged loop blocked once (no auth) then cleared → production-grade.
+    // The serve gate is the only checklist (#1372: no built-in agent review) and the
+    // app booted first try, so the loop cleared in one pass.
     assert.equal(out.productionGrade, true)
-    assert.equal(out.passes, 2)
+    assert.equal(out.passes, 1)
 
     // Deploy ran the real cloudflareTarget adapter → a live workers.dev URL.
     assert.equal(out.deployTarget, 'cloudflare')
@@ -23,9 +24,9 @@ describe('framework demo: one prompt → a running, deployed app (offline)', () 
     assert.match(out.served, /Orders/)
     assert.match(out.served, /Ada Lovelace/)
 
-    // The narration told the whole story: the prompt, then a production-grade end.
+    // The narration told the whole story: the prompt, the serve gate clearing, the end.
     assert.ok(lines.some(l => l.includes(DEMO_INTENT)))
-    assert.ok(lines.some(l => l.includes('production-grade')))
+    assert.ok(lines.some(l => l.includes('review passed')))
     assert.ok(lines.some(l => l.includes('your app is running at')))
   })
 })

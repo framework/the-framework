@@ -759,16 +759,17 @@ test('runCli --fake skips preflight (offline never needs the agent CLI)', async 
   assert.equal(code, 0)
 })
 
-test('runCli --fake --no-dashboard runs the whole flow offline to production-grade', async () => {
+test('runCli --fake --no-dashboard runs the whole flow offline', async () => {
   const { io, out } = capture()
   const code = await runCli(['--fake', '--no-dashboard'], io)
   assert.equal(code, 0)
   const text = out.join('\n')
   assert.match(text, /scope: full/) // the run opens on scope now that the architect is gone
   assert.match(text, /Build this app end to end/)
-  assert.match(text, /checklist pass 1/)
-  assert.match(text, /production-grade/)
+  // #1372: nothing reviews the build — no checklist pass, straight to deploy.
+  assert.doesNotMatch(text, /checklist pass/)
   assert.match(text, /deploy: SSR/)
+  assert.match(text, /\u2713 done/)
 })
 
 test('runCli --transparent runs a bare prompt raw, skipping the build flow + wrapping (#625/#678)', async () => {
@@ -831,7 +832,7 @@ test('a live daemon steers a dashboard-less run through its gates via control.js
       // The steered build now stays open waiting for a chat message or Stop (#714). Once it has
       // been steered through its gate and produced its output, end it with a Stop, exactly as the
       // dashboard's Stop button would; otherwise `done` never resolves and the run hangs.
-      if (answered.has('await-choices') && /production-grade/.test(out.join('\n'))) {
+      if (answered.has('await-choices') && /\u2713 done/.test(out.join('\n'))) {
         await appendControl(cwd, { kind: 'stop' })
         break
       }
@@ -840,7 +841,7 @@ test('a live daemon steers a dashboard-less run through its gates via control.js
 
     assert.equal(await done, 0)
     assert.ok(answered.has('await-choices'), 'the build await gate parked and was steered')
-    assert.match(out.join('\n'), /production-grade/)
+    assert.match(out.join('\n'), /\u2713 done/)
     // The resolution was attributed to the steering user, not a headless auto-accept.
     const resolved = (await readFile(eventsPath, 'utf8'))
       .split('\n')

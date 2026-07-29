@@ -29,7 +29,7 @@ function recordingDriver(): { driver: Driver; system: () => string } {
   return { driver, system: () => captured }
 }
 
-test('runFramework drives the whole flow through the driver, offline, to production-grade', async () => {
+test('runFramework drives the whole flow through the driver, offline', async () => {
   const events: FrameworkEvent[] = []
   const { result, detection } = await runFramework({
     intent: FAKE_INTENT,
@@ -43,9 +43,9 @@ test('runFramework drives the whole flow through the driver, offline, to product
   // Preset detection picked Vike from the deps.
   assert.equal(detection.framework, 'Vike')
 
-  // The full-fledged loop blocked once (no auth) then cleared.
-  assert.equal(result.productionGrade, true)
-  assert.equal(result.passes, 2)
+  // No preset and no serve config, so nothing reviewed the build (#1372):
+  // the loop never ran and the build turn was the whole run.
+  assert.equal(result.passes, 0)
   assert.deepEqual(result.blockers, [])
 
   // The deploy phase decided SSR -> cloudflare.
@@ -444,7 +444,6 @@ test('a build turn that stops to ask fires a live gate and resumes on the pick (
     respond: (prompt: string): string => {
       if (/Build this app end to end/.test(prompt)) return awaitBlock // the build stops to ask
       if (/You paused to ask/.test(prompt)) return 'Built it with Postgres. Done.' // the resume
-      if (/production-grade checklist/.test(prompt)) return 'Reviewed.\n```json\n{ "blockers": [] }\n```'
       return 'done'
     },
     sessionId: 'gate337',
@@ -472,54 +471,31 @@ test('a build turn that stops to ask fires a live gate and resumes on the pick (
   // The pick was narrated and the driver was re-prompted to continue from it.
   assert.ok(events.some(e => e.kind === 'log' && /Continuing with your choice: Postgres/.test(e.message)))
   assert.ok(prompts.some(p => /You paused to ask.*Which data store.*chose: Postgres/s.test(p)))
-  assert.equal(result.productionGrade, true)
+  assert.equal(result.passes, 0) // nothing reviewed the build (#1372)
 })
 
-test('a build that declares small scope skips the production-grade checklist (#1356)', async () => {
+test('a run with no preset and no serve config reviews nothing (#1372)', async () => {
+  const prompts: string[] = []
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
-      if (/Build this app end to end/.test(prompt))
-        return 'One-line change, done.\n```set-scope\nsmall\n```'
-      if (/production-grade checklist/.test(prompt)) throw new Error('the checklist must not dispatch (#1356)')
+      prompts.push(prompt)
+      if (/Build this app end to end/.test(prompt)) return 'Built it. Done.'
       return 'done'
     },
-    sessionId: 'scope1356',
+    sessionId: 'blackbox1372',
   })
-  const events: FrameworkEvent[] = []
   const { result } = await runFramework({
     intent: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
     signals: FAKE_SIGNALS,
-    onEvent: e => events.push(e),
+    onEvent: () => {},
   })
-  // The pass resolved clean without an agent, and the dashboard says why instead of showing a
-  // silent instant pass.
-  assert.equal(result.productionGrade, true)
-  assert.equal(result.passes, 1)
-  assert.ok(events.some(e => e.kind === 'scope-verdict' && e.scope === 'small'))
-  assert.ok(events.some(e => e.kind === 'log' && /Skipping the production-grade checklist/.test(e.message)))
-})
-
-test('a large or missing verdict keeps the full checklist (#1356)', async () => {
-  for (const tail of ['\n```set-scope\nlarge\n```', '']) {
-    const prompts: string[] = []
-    const driver = new FakeDriver({
-      respond: (prompt: string): string => {
-        prompts.push(prompt)
-        if (/Build this app end to end/.test(prompt)) return `Built the whole feature.${tail}`
-        if (/production-grade checklist/.test(prompt)) return 'Reviewed.\n```json\n{ "blockers": [] }\n```'
-        return 'done'
-      },
-      sessionId: 'scope1356full',
-    })
-    const events: FrameworkEvent[] = []
-    await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', signals: FAKE_SIGNALS, onEvent: e => events.push(e) })
-    // The gate only ever drops work the agent explicitly said was unnecessary (#1356): no
-    // verdict — an older prompt, a run without the protocols — reviews exactly as before.
-    assert.ok(prompts.some(p => /production-grade checklist/.test(p)), `expected a checklist pass with tail ${JSON.stringify(tail)}`)
-    assert.ok(!events.some(e => e.kind === 'log' && /Skipping the production-grade checklist/.test(e.message)))
-  }
+  // The agent is a black box (#1372): with no opted-in review (preset) and no mechanical
+  // gate (serve), the build prompt is the only prompt the agent ever sees.
+  assert.equal(prompts.length, 1)
+  assert.equal(result.passes, 0)
+  assert.deepEqual(result.blockers, [])
 })
 
 test('a build turn that stops to showMultiSelect fires a checklist gate and resumes (#339)', async () => {
@@ -531,7 +507,6 @@ test('a build turn that stops to showMultiSelect fires a checklist gate and resu
     respond: (prompt: string): string => {
       if (/Build this app end to end/.test(prompt)) return awaitBlock
       if (/You paused to ask/.test(prompt)) return 'Added the picks to TODO. Done.'
-      if (/production-grade checklist/.test(prompt)) return 'Reviewed.\n```json\n{ "blockers": [] }\n```'
       return 'done'
     },
     sessionId: 'multi339',
@@ -569,7 +544,6 @@ test('a build turn that stops for plan approval resumes on Approve (#358)', asyn
     respond: (prompt: string): string => {
       if (/Build this app end to end/.test(prompt)) return awaitBlock
       if (/You paused to ask/.test(prompt)) return 'Built the plan out. Done.'
-      if (/production-grade checklist/.test(prompt)) return 'Reviewed.\n```json\n{ "blockers": [] }\n```'
       return 'done'
     },
     sessionId: 'confirm358',
@@ -599,7 +573,7 @@ test('a build turn that stops for plan approval resumes on Approve (#358)', asyn
   // Approved: the driver was re-prompted to continue and the run finished.
   assert.ok(events.some(e => e.kind === 'log' && /Continuing with your choice: Approve/.test(e.message)))
   assert.ok(prompts.some(p => /You paused to ask.*Approve the orders plan.*chose: Approve/s.test(p)))
-  assert.equal(result.productionGrade, true)
+  assert.equal(result.passes, 0) // nothing reviewed the build (#1372)
 })
 
 test('a declined plan stops the run cleanly instead of building on (#358)', async () => {
@@ -609,7 +583,6 @@ test('a declined plan stops the run cleanly instead of building on (#358)', asyn
     respond: (prompt: string): string => {
       if (/Build this app end to end/.test(prompt)) return awaitBlock
       if (/You paused to ask/.test(prompt)) resumed = true
-      if (/production-grade checklist/.test(prompt)) resumed = true // a declined plan must not be reviewed either
       return 'done'
     },
     sessionId: 'decline358',
@@ -640,7 +613,6 @@ test('without a requestChoice handler a build that asks is not gated (#337 headl
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
       if (/Build this app end to end/.test(prompt)) return 'built it\n```await-choices\n{ "options": [{ "label": "A" }] }\n```'
-      if (/production-grade checklist/.test(prompt)) return 'Reviewed.\n```json\n{ "blockers": [] }\n```'
       return 'done'
     },
     sessionId: 'headless337',
@@ -1026,10 +998,9 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
       onEvent: e => events.push(e),
     })
 
-    // The build prompt was the whole run: no checklist pass followed it, so nothing read the
-    // hand-off note as a reply and reported a missing verdict.
+    // The build prompt was the whole run: no phase followed it, so nothing read the
+    // hand-off note as a reply.
     assert.equal(prompts().length, 1)
-    assert.ok(!prompts().some(p => /production-grade checklist/.test(p)))
     assert.equal(result.passes, 0)
     assert.deepEqual(result.blockers, [])
     assert.equal(result.stoppedEarly, false)

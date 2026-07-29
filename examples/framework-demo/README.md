@@ -5,8 +5,8 @@ deterministic, in a couple of seconds.
 
 This runs the real product (`@gemstack/the-framework`'s `runFramework`) with the
 built-in **fake driver**: no Claude Code, no model, no API keys. Same code a live
-run executes — preset detection, the full-fledged production-grade loop,
-deploy — just with scripted agent turns so it is instant
+run executes — preset detection, build, the serve gate, deploy — just with
+scripted agent turns so it is instant
 and repeatable. Two things are genuinely real, not narrated:
 
 - **the app boots and serves** — the serve gate starts a real HTTP server and the
@@ -27,33 +27,30 @@ Prompt:  "A paginated orders page backed by an orders table, with sign-in."
 
 --- live narration ---
 ◆ fake in /tmp/framework-demo-xxxx
-  Detected Vike (confidence 2); framing with 3 persona(s)
+  Detected Vike (confidence 2)
 ▶ scope: full — "A paginated orders page backed by an orders table, with sign-in."
-  Checking the app is production-grade
+  Built the orders app: an orders schema and migration, a paginated /orders page, and a sign-in stub.
   serve: start: node server.js
   serve: fetch http://localhost:50106/ -> 200
-  ✗ checklist pass 1: No authentication on the orders page yet
-  → improving: No authentication on the orders page yet
-  serve: start: node server.js
-  serve: fetch http://localhost:50106/ -> 200
-  ✓ checklist pass 2: production-grade
+  ✓ checklist pass 1: no blockers
 ▶ deploy: SSR → cloudflare (per-request orders data + server-side auth)
-✓ production-grade in 2 pass(es)
+✓ review passed after 1 pass(es)
 ▶ your app is running at http://localhost:50106
-✓ done
+✓ finished
 
 --- outcome ---
   preset detected:  Vike
-  production-grade: true (in 2 pass(es))
+  serve gate:       passed (in 1 pass(es))
   deployed to:      cloudflare → https://orders-app.gemstack.workers.dev
   running locally:  http://localhost:50106
   it served:        <!doctype html><meta charset=utf-8><title>Orders</title> <h1>Orders</h1>…
 ```
 
-The loop does not take the agent's word for "production-grade": it **boots the app
-and fetches it** every pass (the `serve:` lines), and blocks until both the review
-and the real server pass. When it finishes, the app is left running so you can open
-it — that is the localhost link, live until the run stops.
+The run does not take the agent's word for it: the serve gate **boots the app and
+fetches it** (the `serve:` lines) and blocks until the real server responds. That is
+the only checklist here — the agent is treated as a black box, with no built-in
+review prompts layered on top (#1372). When it finishes, the app is left running so
+you can open it — that is the localhost link, live until the run stops.
 
 ## The real thing
 
@@ -64,5 +61,5 @@ npx @gemstack/the-framework "a paginated orders page with sign-in"
 ```
 
 That opens the localhost dashboard, wraps Claude Code as the coding agent, and runs
-the identical scope → build → production-grade loop → deploy — writing
-real files and, with `--serve`, leaving the real app running behind a preview link.
+the identical scope → build → serve gate → deploy flow — writing real files and,
+with `--serve`, leaving the real app running behind a preview link.

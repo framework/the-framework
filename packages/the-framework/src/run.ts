@@ -208,7 +208,7 @@ export interface RunFrameworkOptions {
   consumptionGate?: () => string | null
   /**
    * Run the backlog loop (#323) after the build settles: consume the agent's own
-   * `TODO_<slug>.agent.md` / `TODO_AGENTS.md` one entry per turn until empty, gating
+   * `TODO_AGENTS.md` one entry per turn until empty, gating
    * before each entry when {@link requestChoice} is wired. Default: on for real
    * drivers, off for the fake one (its scripted demo writes no backlog and must
    * stay deterministic). Set explicitly to force either way.

@@ -2,7 +2,7 @@ The repo conventions for the human-facing roadmap: the `tickets/` directory (#62
 
 ## TLDR
 
-- `TICKETS_DIR` = `tickets/` (only ticket files, `<DATE>_<SLUG>.md`, since #682 moved the backlog out); `FLAT_TODO_FILE` = root `TODO_AGENTS.md` — the durable AI task queue a run drains and the dashboard surfaces (session-scoped `TODO_<slug>.agent.md` files are separate).
+- `TICKETS_DIR` = `tickets/` (only ticket files, `<DATE>_<SLUG>.md`, since #682 moved the backlog out); `FLAT_TODO_FILE` = root `TODO_AGENTS.md` — the durable AI task queue a run drains and the dashboard surfaces (the session-scoped `TODO_<slug>.agent.md` files are retired, #1369).
 - `findFlatTodo()`: locates the flat backlog newest-convention-first: `TODO_AGENTS.md` → legacy `TODO-AGENTS.md` (hyphen spelling from the #682 brief) → `tickets/TODO.md` (#629 location) → root `TODO.md` (pre-#629). New backlogs are always created at `FLAT_TODO_FILE`.
 - `todoPriorityForTicket()` (#1164): maps a ticket's `priority:` words onto the backlog's number scale — urgent→9, high→7, low→2, unmarked→5.
 - `ticketFromQueueEntry()` / `isTicketPath()` (#1117): read a queue entry's markdown link back to its ticket; only `tickets/<name>.md` counts (no relative segments, absolute paths, URLs, dotfiles, or nesting) — one gate for both ends of the link, since the result is a path the dashboard renders and a reader opens.

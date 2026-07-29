@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { DriverSession } from './driver/index.js'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
@@ -21,12 +21,9 @@ export { FLAT_TODO_FILE, LEGACY_HYPHEN_TODO_FILE, LEGACY_TICKETS_TODO_FILE, LEGA
  * consumes the whole backlog unattended; autopilot off pauses before each entry.
  */
 
-/** The session-scoped backlog filename the #326 prompt writes. */
-export const TODO_FILE_PATTERN = /^TODO_[a-z0-9-]+\.agent\.md$/
-
 /** A located backlog: its filename and the entries still open. */
 export interface TodoBacklog {
-  /** The backlog filename (workspace-root relative, e.g. `TODO_feat-x.agent.md`). */
+  /** The backlog filename (workspace-root relative, e.g. `TODO_AGENTS.md`). */
   name: string
   /** The open (unchecked) entries, in file order. */
   entries: string[]
@@ -56,36 +53,7 @@ export function parseTodoEntries(md: string): string[] {
 }
 
 /**
- * The workspace's backlog files, best first: the most recently modified
- * session-scoped `TODO_<slug>.agent.md` (#323/#326), then the flat backlog
- * (`TODO_AGENTS.md`, or a legacy `tickets/TODO.md` / root `TODO.md`) — the same
- * convention as the doc sidebar.
- */
-async function backlogCandidates(cwd: string): Promise<string[]> {
-  let names: string[]
-  try {
-    names = (await readdir(cwd, { withFileTypes: true })).filter(e => e.isFile()).map(e => e.name)
-  } catch {
-    return []
-  }
-  const scoped = names.filter(name => TODO_FILE_PATTERN.test(name))
-  const candidates: string[] = []
-  if (scoped.length > 1) {
-    // More than one session's backlog: the newest is this run's.
-    const withTimes = await Promise.all(
-      scoped.map(async name => ({ name, mtime: (await stat(join(cwd, name)).catch(() => undefined))?.mtimeMs ?? 0 })),
-    )
-    candidates.push(...withTimes.sort((a, b) => b.mtime - a.mtime).map(e => e.name))
-  } else {
-    candidates.push(...scoped)
-  }
-  const flat = await findFlatTodo(cwd)
-  if (flat) candidates.push(flat)
-  return candidates
-}
-
-/**
- * Append an open entry to this run's backlog, creating the flat {@link FLAT_TODO_FILE}
+ * Append an open entry to the workspace's backlog, creating the flat {@link FLAT_TODO_FILE}
  * when the workspace has none. Resolves with the file written, or `undefined` if
  * it couldn't be written.
  *
@@ -95,18 +63,17 @@ async function backlogCandidates(cwd: string): Promise<string[]> {
  * unwinding, and must not mask the reason it stopped.
  */
 export async function appendTodoEntry(cwd: string, entry: string): Promise<string | undefined> {
-  return writeTodoEntry(cwd, (await backlogCandidates(cwd))[0] ?? FLAT_TODO_FILE, entry)
+  return writeTodoEntry(cwd, (await findFlatTodo(cwd)) ?? FLAT_TODO_FILE, entry)
 }
 
 /**
- * Append an open entry to the workspace's *flat* backlog specifically, creating
+ * Append an open entry to the workspace's flat backlog with a priority, creating
  * {@link FLAT_TODO_FILE} when there is none.
  *
- * The difference from {@link appendTodoEntry} is which file wins while a session-scoped
- * `TODO_<slug>.agent.md` is lying around: that one belongs to a run, and something a human
- * queued from the dashboard (#697) belongs to the project. The flat file is the durable global
- * queue #624 settled on, and the only one `promoteQueue` carries between branches (#852), so a
- * pick that landed in some run's own backlog could quietly never be seen again.
+ * The difference from {@link appendTodoEntry} is the priority placement (#1164): a dashboard
+ * pick (#697) lands in its `## Priority N` section rather than at the end of the file. The flat
+ * file is the durable global queue #624 settled on, and the only one `promoteQueue` carries
+ * between branches (#852).
  */
 export async function appendFlatTodoEntry(
   cwd: string,
@@ -211,18 +178,18 @@ async function writeTodoEntry(
 }
 
 /**
- * Locate the workspace's backlog and its open entries. Returns `undefined` when
- * no backlog exists or none of them has an open entry.
+ * Locate the workspace's backlog and its open entries: the flat file via `findFlatTodo`
+ * (`TODO_AGENTS.md`, or a legacy `tickets/TODO.md` / root `TODO.md`). Returns `undefined`
+ * when no backlog exists or it has no open entry. Session-scoped `TODO_<slug>.agent.md`
+ * files are retired (#1369) — a leftover one in the checkout is ignored.
  */
 export async function findTodoBacklog(cwd: string): Promise<TodoBacklog | undefined> {
-  const candidates = await backlogCandidates(cwd)
-  for (const name of candidates) {
-    const md = await readFile(join(cwd, name), 'utf8').catch(() => undefined)
-    if (md === undefined) continue
-    const entries = parseTodoEntries(md)
-    if (entries.length) return { name, entries }
-  }
-  return undefined
+  const name = await findFlatTodo(cwd)
+  if (!name) return undefined
+  const md = await readFile(join(cwd, name), 'utf8').catch(() => undefined)
+  if (md === undefined) return undefined
+  const entries = parseTodoEntries(md)
+  return entries.length ? { name, entries } : undefined
 }
 
 /**

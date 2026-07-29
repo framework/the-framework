@@ -3,8 +3,8 @@ The backlog loop (#323): once the main work settles, consume the agent's own TOD
 ## TLDR
 
 - `parseTodoEntries()`: open entries = markdown list items (`-`, `*`, `1.`) whose checkbox is absent or unchecked; checked `[x]` = done; headings/prose/blanks are not entries.
-- `backlogCandidates()` / `findTodoBacklog()`: the most recently modified session-scoped `TODO_<slug>.agent.md` first (the newest is this run's), then the flat file via `findFlatTodo`.
-- `appendTodoEntry()` (whichever backlog wins) vs `appendFlatTodoEntry()` (the durable global queue specifically — a human's dashboard pick landing in some run's own backlog could quietly never be seen again, #697/#624/#852).
+- `findTodoBacklog()`: the flat file via `findFlatTodo` (`TODO_AGENTS.md`, or a legacy `tickets/TODO.md` / root `TODO.md`); a leftover session-scoped `TODO_<slug>.agent.md` is ignored (#1369).
+- `appendTodoEntry()` (plain append — resume notes and agent follow-ups) vs `appendFlatTodoEntry()` (priority placement for dashboard picks, #697/#1164). Both write the flat queue — the durable one `promoteQueue` carries between branches (#624/#852).
 - `insertTodoEntry()` (#1164): pure priority placement into the `## Priority N` sections — join an existing section's end, create before the first lower-priority section, or land above the first heading; a plain append had put a just-queued ticket at the *end* of the file, worked last.
 - `nextQueuedTicket()` / `ticketForPrompt()` (#1117): the ticket the next drain run will pick up (first open entry of the flat backlog, same read as the sweep's) — a best guess that only labels an Overview lane, never starts or steers a run.
 - `leaveResumeNote()` (#529): a paused run leaves `Resume <session-name>` on the backlog so a later run picks the work back up — the backlog is already what a run drains, so a resume note needs no machinery of its own.
@@ -22,10 +22,10 @@ The backlog loop (#323): once the main work settles, consume the agent's own TOD
 - One `createTurnSignalEmitter` for the whole backlog, so `ready-for-merge` fires once across every item and a session name only re-emits on an actual rename.
 - A backlog turn is a turn like any other: await gates and signals are honored (via `runAwaitRounds`); a declined plan ends the item turn and the stall check takes it from there.
 - Plain append (no priority) is kept for resume notes and agent follow-ups: those are a running list whose order is theirs.
+- The session-scoped `TODO_<SESSION_NAME>.agent.md` backlog is retired (#1369): `TODO_AGENTS.md` superseded it — the system prompt migrated long ago, and the [Research] preset (its last writer) now points at the flat queue too. A leftover session file in a checkout is ignored, not drained.
 
 ## Facts
 
-- `TODO_FILE_PATTERN` = `/^TODO_[a-z0-9-]+\.agent\.md$/` (the session-scoped filename the #326 prompt writes).
 - The item prompt pins scope: "work on the FIRST open entry only … check the entry off (or remove it). Do not start any other entry."
 - Drain detection (`ticketForPrompt`) keys off `drainsQueue(prompt)` from the preset catalog.
 

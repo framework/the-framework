@@ -1667,7 +1667,13 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     // (`tearDownWorktree`), so at this point the tree can still hold real work. Pushing first
     // would publish a branch missing the session's last edits. Its own checkout only: a plain
     // `framework "..."` runs in the user's tree, where committing for them is not ours to do.
-    if (opts.runId) await commitPendingWork(cwd)
+    //
+    // The result is load-bearing (#1376): a commit that failed here and was ignored let the
+    // handoff judge a branch missing the session's work — "committed nothing", skip — while the
+    // teardown's identical commit landed seconds later, stranding real work on a local branch
+    // nobody was told about. A failed commit is now its own skip, said out loud, and the
+    // teardown still rescues the work onto the branch afterwards.
+    if (opts.runId && !(await commitPendingWork(cwd))) return skip('commit-failed')
 
     // The branch as it is now, not as it was named at start: #326 lets the agent rename it, and
     // the rename is exactly what the PR should be opened against.

@@ -157,7 +157,22 @@ test('commitPendingWork leaves a clean checkout alone (#786)', async () => {
 test('commitPendingWork reports failure so the caller keeps the checkout (#786)', async () => {
   // No git identity, a refusing hook: the work is still only in the working tree, so the
   // caller must not go on to remove it.
-  assert.equal(await commitPendingWork('/wt', failingGit), false)
+  assert.equal(await commitPendingWork('/wt', failingGit, { attempts: 2, delayMs: 1 }), false)
+})
+
+test('commitPendingWork retries past a transient failure (#1376)', async () => {
+  // The daemon's conversation committer works in the same checkout and is busiest at session
+  // end, so the first attempt can lose an index.lock race. Losing it must not become the
+  // handoff's "committed nothing": wait out the lock and commit on the retry.
+  let failures = 1
+  const calls: string[][] = []
+  const git: GitRunner = async args => {
+    calls.push(args)
+    if (args[0] === 'commit' && failures-- > 0) throw new Error('fatal: Unable to create index.lock: File exists')
+    return args[0] === 'status' ? ' M test04.md\n' : ''
+  }
+  assert.equal(await commitPendingWork('/wt', git, { delayMs: 1 }), true)
+  assert.equal(calls.filter(c => c[0] === 'commit').length, 2, 'first commit lost the race, the retry won')
 })
 
 test('removeWorktree tries a plain removal before forcing (#786)', async () => {

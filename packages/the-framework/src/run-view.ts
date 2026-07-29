@@ -105,9 +105,15 @@ export interface HandoffState {
  * Both halves start armed, so a run from before this existed — which emits no `handoff-armed` —
  * reads as armed, which is what it will actually do once it is running new code. Latest wins: the
  * checkboxes re-emit on every change.
+ *
+ * `initial` seeds the armed pair for a reader whose event stream missed the opening
+ * `handoff-armed` (#1376): the run writes it as its very first event, before the live channel has
+ * attached, so a live tab can only learn the real state from the run record's mirror
+ * (`RunRecord.handoff`) — without it, a session the launcher armed push-only reads as "Open PR".
+ * A `handoff-armed` event in the stream still wins: it is newer than any record snapshot.
  */
-export function handoffState(events: readonly FrameworkEvent[]): HandoffState {
-  const state: HandoffState = { push: true, pr: true }
+export function handoffState(events: readonly FrameworkEvent[], initial?: { push: boolean; pr: boolean }): HandoffState {
+  const state: HandoffState = { push: initial?.push ?? true, pr: initial?.pr ?? true }
   for (const event of events) {
     if (event.kind === 'handoff-armed') {
       state.push = event.push

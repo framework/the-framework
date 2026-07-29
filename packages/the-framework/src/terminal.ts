@@ -120,6 +120,8 @@ function handoffSkipReason(reason: AutoHandoffSkip): string {
       return 'the branch no longer exists'
     case 'no-commits':
       return 'the session committed nothing'
+    case 'commit-failed':
+      return "the session's pending work could not be committed, so nothing was published (the work stays on its branch)"
     case 'no-remote':
       return 'this repo has no remote to push to'
     case 'already-open':

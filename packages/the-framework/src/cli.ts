@@ -60,6 +60,7 @@ import { materializePresets } from './presets.js'
 import { daemonStatus, ensureDaemon, isLoopbackHost, registerHomeProject, runDaemon, stopDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { appendControl, resetControl, watchControl, type ControlWatcher } from './control.js'
 import { RunMessageQueue } from './run-messages.js'
+import { createGateKeepalive } from './gate-keepalive.js'
 import { nodeGitRunner } from './project.js'
 import { addProject, ensureDaemonToken, listProjects, readDaemonToken, readPreferences, resolveProjectPath } from './registry.js'
 import { startConsumptionGuard } from './consumption-guard.js'
@@ -1543,15 +1544,27 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // An unattended run (#846) is steerable but unwatched: keep the control channel for Stop and
   // live messages, and leave requestChoice unset so each gate takes its recommended option. Auto
   // PM (#685) fires when nobody is there, and a parked gate would hang it until someone looked.
+  //
+  // Each parked wait is held by the keepalive (#1359): a daemon-spawned run (--no-dashboard, all
+  // stdio detached, per-prompt driver children, unref'd control watcher) has nothing else ref'd
+  // between turns, so Node ran out of scheduled work and exited 0 mid-await — the gate's picks
+  // then landed in control.jsonl with nobody left to read them.
+  const gateKeepalive = createGateKeepalive()
   const requestChoice =
     (dashboard || control) && !opts.unattended
-      ? (req: ChoiceRequest): Promise<ChoicePick> => new Promise(resolve => pendingChoices.set(req.id, resolve))
+      ? (req: ChoiceRequest): Promise<ChoicePick> =>
+          gateKeepalive.hold(new Promise(resolve => pendingChoices.set(req.id, resolve)))
       : undefined
 
   // Whether to hand the run the live-chat queue (#714) once it settles. Steerable is not enough
   // (#905): a terminal run with --no-dashboard could be reached by a daemon's dashboard, but
   // nobody is waiting in it, and it used to park forever on a message that never came.
-  const chatQueue = isInteractive(opts, newDashboard) && requestChoice ? { messages } : {}
+  // The parked message wait is the same empty-event-loop hazard as a parked gate (#1359), so it
+  // is held the same way; a Stop closes the queue, which releases the hold.
+  const chatQueue =
+    isInteractive(opts, newDashboard) && requestChoice
+      ? { messages: { next: (signal?: AbortSignal) => gateKeepalive.hold(messages.next(signal)) } }
+      : {}
 
   // Persist the chat into the committed conversation (#908/#857), so a clone carries what was
   // said and not just the fact a run happened. Keyed by the same run id LOGS.md records, which

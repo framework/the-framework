@@ -338,6 +338,7 @@ export default function Page() {
         lost={lost}
         target={selectedRun.target}
         remoteLabel={selectedRun.remoteLabel}
+        armedDefault={selectedRun.handoff}
         onRunStarted={onRunStarted}
         onLoopStatus={setLoop}
         onDeleted={() => {

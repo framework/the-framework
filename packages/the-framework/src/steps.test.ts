@@ -9,11 +9,9 @@ import {
   deployWith,
   domainLoopChecklist,
   driverBuild,
-  driverChecklist,
   driverImprove,
   extendPrompt,
   isWorkspaceEmpty,
-  MISSING_VERDICT_BLOCKER,
   verdictFromLoopRun,
 } from './steps.js'
 
@@ -40,21 +38,15 @@ test('domainLoopChecklist dispatches a review event and unions the prompts block
   assert.deepEqual(verdict.blockers, ['fix X']) // union across the chain (b reported none)
 })
 
-test('domainLoopChecklist falls back to the built-in checklist when no loop matches the event (#252)', async () => {
+test('domainLoopChecklist blocks nothing when no loop matches the event (#1372)', async () => {
   const loop = new LoopEngine({
     loops: [defineLoop({ on: 'bug-fix', run: ['x'] })], // no major-change loop
     prompts: [definePrompt({ id: 'x', run: async () => '' })],
   })
-  let fellBack = false
-  const checklist = domainLoopChecklist(loop, {
-    fallback: async () => {
-      fellBack = true
-      return { blockers: ['from built-in'] }
-    },
-  })
-  const verdict = await checklist({ pass: 1, intent: 'x', blockers: [] })
-  assert.equal(fellBack, true)
-  assert.deepEqual(verdict.blockers, ['from built-in'])
+  // The user opted into this preset's reviews, not a substitute: an event kind the
+  // preset has no loop for reviews nothing (the built-in checklist fallback is gone).
+  const verdict = await domainLoopChecklist(loop)({ pass: 1, intent: 'x', blockers: [] })
+  assert.deepEqual(verdict.blockers, [])
 })
 
 test('verdictFromLoopRun surfaces a review that failed to execute as a blocker', () => {
@@ -82,20 +74,6 @@ test('driverBuild emits supervisor events and returns the driver summary', async
     events.map(e => e.type),
     ['plan', 'dispatch-start', 'dispatch-result', 'synthesize'],
   )
-})
-
-test('driverChecklist parses the { blockers } verdict', async () => {
-  const session = await new FakeDriver({
-    turns: [{ text: 'review\n```json\n{"blockers":["no auth"]}\n```' }],
-  }).start({ cwd: '/ws' })
-  const verdict = await driverChecklist(session)({ pass: 1, intent: 'x', blockers: [] })
-  assert.deepEqual(verdict.blockers, ['no auth'])
-})
-
-test('driverChecklist fails closed on a verdict-less reply (not passing)', async () => {
-  const session = await new FakeDriver({ turns: [{ text: 'looks fine to me' }] }).start({ cwd: '/ws' })
-  const verdict = await driverChecklist(session)({ pass: 1, intent: 'x', blockers: [] })
-  assert.deepEqual(verdict.blockers, [MISSING_VERDICT_BLOCKER])
 })
 
 test('deployWith runs the target against the decided plan and uses its name', async () => {
@@ -228,8 +206,8 @@ test('extendPrompt names the work and the workspace, and nothing else (#1224)', 
   assert.match(prompt, /existing codebase/i)
   // #1224: the rules telling it how to behave are gone, not reworded.
   assert.doesNotMatch(prompt, /do NOT re-scaffold|swap its stack|smallest coherent|read the existing code first/i)
-  // #1356: the scope verdict is asked for, so trivial runs actually emit it.
-  assert.match(prompt, /`set-scope` block/)
+  // #1372: the set-scope ask went with the production-grade gate it existed to skip.
+  assert.doesNotMatch(prompt, /set-scope/)
 })
 
 test('driverImprove scaffolds from scratch when the workspace is empty, else fixes blockers (#182)', async () => {

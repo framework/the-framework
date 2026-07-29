@@ -39,9 +39,11 @@ presets, deploy targets) and adds the two missing pieces:
   persisted run reflects that so `--resume` shows it stopped.
 
 Everything runs *through* the driver (single execution path): build and improve
-are prompts; the production-grade checklist gates on the `{ blockers }` verdict
-the agent ends its output with. What stack to build on is the agent's own call -
-The Framework does not pick one for it.
+are prompts; a domain preset's review loop, when you pick one, gates on the
+`{ blockers }` verdicts its prompts report. Without a preset (and without
+`--serve`) nothing reviews the build: the agent is treated as a clever black
+box, and The Framework does not second-guess it (#1372). What stack to build on
+is the agent's own call - The Framework does not pick one for it.
 
 **From-scratch or existing project.** Point `--cwd` at an empty directory and the
 agent scaffolds the whole app from scratch. Point it at a project that already has
@@ -193,7 +195,7 @@ Five ship built in:
 - `biological-science` — experimental-design + data-provenance + statistical-rigor
   review; analysis-root-cause + regression-test on a fix.
 
-Pick one with `--preset`. Its review loop drives the build's checklist, so the
+Pick one with `--preset`. Its review loop is the build's checklist, so the
 loop's prompts are what gate each pass:
 
 ```bash

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { continuationPrompt, isDeclinedConfirmation, parseAwaitGate, parseChoicesGate, parseConfirmationGate, parseMarkdownViews, parseMultiSelectGate, parseScopeVerdict, parseSessionName, parseReadyForMerge } from './turn-gate.js'
+import { continuationPrompt, isDeclinedConfirmation, parseAwaitGate, parseChoicesGate, parseConfirmationGate, parseMarkdownViews, parseMultiSelectGate, parseSessionName, parseReadyForMerge } from './turn-gate.js'
 
 const block = (json: string): string => 'Here are the options.\n```await-choices\n' + json + '\n```'
 const multiBlock = (json: string): string => 'Pick some.\n```await-multiselect\n' + json + '\n```'
@@ -197,22 +197,5 @@ test('parseReadyForMerge is true only when a ready-for-merge block is present (#
   assert.equal(parseReadyForMerge('```ready-for-merge```'), true) // empty, no inner newline
 })
 
-test('parseScopeVerdict reads the verdict from a set-scope block (#1356)', () => {
-  assert.equal(parseScopeVerdict('No verdict in this turn.'), undefined)
-  assert.equal(parseScopeVerdict('```set-scope\nsmall\n```'), 'small')
-  assert.equal(parseScopeVerdict('analysis first…\n```set-scope\n  Large  \n```\n…then work'), 'large')
-  assert.equal(parseScopeVerdict('```set-scope\n\nvery-large\nignored\n```'), 'very-large')
-})
 
-test('parseScopeVerdict ignores a spelling the protocol does not name (#1356)', () => {
-  // The verdict can skip review work, so a guess ("tiny" ≈ small?) is the one mistake this
-  // must never make — an unknown word is no verdict at all.
-  assert.equal(parseScopeVerdict('```set-scope\ntiny\n```'), undefined)
-  assert.equal(parseScopeVerdict('```set-scope\nvery large\n```'), undefined)
-  // …and does not erase a valid verdict from an earlier block in the same turn.
-  assert.equal(parseScopeVerdict('```set-scope\nsmall\n```\n```set-scope\ntiny\n```'), 'small')
-})
 
-test('parseScopeVerdict keeps the later block when the agent revises mid-turn (#1356)', () => {
-  assert.equal(parseScopeVerdict('```set-scope\nsmall\n```\noh wait…\n```set-scope\nlarge\n```'), 'large')
-})

@@ -28,8 +28,6 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `▶ view: ${event.title}`
     case 'session-name':
       return `  session: ${event.name}`
-    case 'scope-verdict':
-      return `  scope: ${event.scope}`
     case 'ready-for-merge':
       return `✓ ready for merge`
     case 'settled':
@@ -172,14 +170,17 @@ function formatBootstrapEvent(event: BootstrapEvent): string {
       return `    build/${event.event.type}`
     case 'checklist':
       return event.passing
-        ? `  ✓ checklist pass ${event.pass}: production-grade`
+        ? `  ✓ checklist pass ${event.pass}: no blockers`
         : `  ✗ checklist pass ${event.pass}: ${event.blockers.join('; ')}`
     case 'improve':
       return `  → improving: ${event.blockers.join('; ')}`
     case 'deploy':
       return `▶ deploy: ${event.plan.render.toUpperCase()} → ${event.plan.target} (${event.plan.reason})`
     case 'done':
-      return `✓ ${event.result.productionGrade ? 'production-grade' : 'prototype'} in ${event.result.passes} pass(es)`
+      // No review passes means no review was configured (#1372), not an unfinished app.
+      return event.result.passes > 0
+        ? `✓ ${event.result.productionGrade ? 'review passed' : 'blockers remain'} after ${event.result.passes} pass(es)`
+        : '✓ done'
   }
 }
 

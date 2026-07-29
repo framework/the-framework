@@ -233,30 +233,6 @@ export function parseReadyForMerge(text: string): boolean {
   return /```ready-for-merge(?:\s[\s\S]*?)?```/.test(text)
 }
 
-/** The verdicts a `set-scope` block may carry (#1356), exactly as the protocol spells them. */
-const SCOPE_VERDICTS = ['small', 'large', 'very-large'] as const
-
-/** The agent's own sizing of the work (#1356): what a `set-scope` block declared. */
-export type ScopeVerdict = (typeof SCOPE_VERDICTS)[number]
-
-/**
- * Parse the scope the agent declared this turn (#1356), from the last `set-scope` block
- * (per {@link SIGNAL_PROTOCOL}) — its first non-empty line. Returns `undefined` when the
- * turn declared none (the common case). An unrecognized spelling is ignored rather than
- * guessed at: the verdict can skip review work, so only the protocol's exact words count.
- * A later block in the same turn wins (the agent revised while working).
- */
-export function parseScopeVerdict(text: string): ScopeVerdict | undefined {
-  const re = /```set-scope\s+([\s\S]*?)```/g
-  let verdict: ScopeVerdict | undefined
-  for (const m of text.matchAll(re)) {
-    const line = (m[1] ?? '').split('\n').map(l => l.trim()).find(Boolean)?.toLowerCase()
-    const known = SCOPE_VERDICTS.find(v => v === line)
-    if (known) verdict = known
-  }
-  return verdict
-}
-
 /** Find the body + start index of the last fenced block with `tag` in `text`. */
 function lastBlock(text: string, tag: string): { body: string; index: number } | undefined {
   const re = new RegExp('```' + tag + '\\s+([\\s\\S]*?)```', 'g')
@@ -465,7 +441,6 @@ function tagged<K extends ParsedAwaitGate['kind'], G extends object>(kind: K, ga
  */
 export function createTurnSignalEmitter(emit: (event: FrameworkEvent) => void): (text: string) => void {
   let named: string | undefined
-  let scoped: ScopeVerdict | undefined
   let ready = false
   return (text: string): void => {
     for (const view of parseMarkdownViews(text)) emit({ kind: 'view', ...view })
@@ -473,12 +448,6 @@ export function createTurnSignalEmitter(emit: (event: FrameworkEvent) => void): 
     if (name && name !== named) {
       named = name
       emit({ kind: 'session-name', name })
-    }
-    // Dedupes like the name: re-emits only on an actual revision (#1356).
-    const scope = parseScopeVerdict(text)
-    if (scope && scope !== scoped) {
-      scoped = scope
-      emit({ kind: 'scope-verdict', scope })
     }
     if (!ready && parseReadyForMerge(text)) {
       ready = true

@@ -25,10 +25,10 @@ import { snapshotWorkspace } from './sandbox.js'
 import type { Driver, DriverSession } from './driver/index.js'
 import { composeRunSystem, type EcoOptions, type TfContext } from './system-prompt.js'
 import { createRunControls, emitSessionStart, endStopDetail } from './run-telemetry.js'
-import { AWAIT_PROTOCOL, createTurnSignalEmitter, type ScopeVerdict } from './turn-gate.js'
+import { AWAIT_PROTOCOL, createTurnSignalEmitter } from './turn-gate.js'
 import { drainGates, runChatPhase, type BindProjectDeps, type RecordMessage } from './await-gate.js'
 import { leaveResumeNote, runTodoLoop, type TodoLoopResult } from './todo-loop.js'
-import { continueAfterChoice, decideDeploy, deployWith, domainLoopChecklist, driverBuild, driverChecklist, driverImprove, driverLoopPrompts } from './steps.js'
+import { continueAfterChoice, decideDeploy, deployWith, domainLoopChecklist, driverBuild, driverImprove, driverLoopPrompts } from './steps.js'
 import { OPEN_LOOP_MODES, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import type { RunMessages } from './run-messages.js'
 import { errorMessage } from './error-message.js'
@@ -49,9 +49,9 @@ export interface DeployDecision {
 
 /**
  * How to actually boot and serve the generated app so the loop can gate on it
- * *running*, not just on an agent's review. When set, the production-grade
- * checklist also installs, (builds,) starts the app, and fetches it; a failure
- * becomes a blocker the loop hands back to the agent to fix.
+ * *running*, not just on an agent's review. When set, the run's checklist step
+ * installs, (builds,) starts the app, and fetches it; a failure becomes a
+ * blocker the loop hands back to the agent to fix.
  */
 export interface ServeConfig {
   /** The command that starts the app (e.g. `npm run dev`). */
@@ -135,8 +135,8 @@ export interface RunFrameworkOptions {
    * The loop event kind the review phase dispatches (#265) — this is what makes a
    * run a bug fix vs a feature: `bug-fix` fires the preset's bug-fix loop, the
    * default `major-change` fires its major-change loop. Overrides the preset's own
-   * `defaultEvent`. A kind the preset has no loop for falls back to the built-in
-   * checklist, so a run is never left unreviewed. No-op without a preset.
+   * `defaultEvent`. A kind the preset has no loop for reviews nothing (#1372).
+   * No-op without a preset.
    */
   buildEvent?: string
   /** Max full-fledged passes. Default {@link DEFAULT_MAX_PASSES} (5). */
@@ -258,8 +258,8 @@ export interface RunFrameworkResult {
    * The domain preset's review policy, materialized against this run's driver:
    * its loops plus its prompts as driver-backed passes. Present only when a
    * {@link RunFrameworkOptions.preset} was supplied. It also drives the run's
-   * production-grade review phase (#252): each checklist pass dispatches a
-   * `major-change` event through it, so its chain replaces the built-in checklist.
+   * review phase (#252): each checklist pass dispatches a `major-change` event
+   * through it.
    */
   loop?: LoopEngine
   /** How the backlog loop (#323) ended, when it ran. */
@@ -276,12 +276,7 @@ export interface RunFrameworkResult {
  */
 export async function runFramework(opts: RunFrameworkOptions): Promise<RunFrameworkResult> {
   const events: FrameworkEvent[] = []
-  // The agent's latest scope verdict (#1356), read off the event stream: every phase that
-  // parses turn signals (the build, its await rounds) already emits through here, so the
-  // checklist gate below needs no plumbing of its own.
-  let declaredScope: ScopeVerdict | undefined
   const emit = (event: FrameworkEvent) => {
-    if (event.kind === 'scope-verdict') declaredScope = event.scope
     events.push(event)
     if (opts.onEvent) {
       try {
@@ -364,8 +359,9 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     onEvent: onDriverEvent,
   })
 
-  // The domain preset's review policy (exposed on the result) and the production-grade
-  // review checklist it drives.
+  // The domain preset's review policy (exposed on the result) and the review
+  // checklist it drives — absent without a preset (#1372): the agent is a black
+  // box, so nothing reviews its work unless the user opted in.
   const { loop, reviewChecklist } = buildReview(session, domainPreset, {
     ...(opts.buildEvent ? { buildEvent: opts.buildEvent } : {}),
     signal: runSignal,
@@ -385,17 +381,6 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     injectedRunner: opts.runner !== undefined,
     emit,
   })
-  // The scope gate (#1356). The Bootstrap fixes its scope before the build runs, but the
-  // agent only sizes the work *during* the build — so the gate sits on the checklist step
-  // instead: a build that declared small scope resolves the pass clean without dispatching
-  // anyone, because an app-wide review costs more than the change it would examine and sits
-  // between the task and the handoff. Only an explicit `small` skips; no verdict keeps the
-  // full checklist, so the gate can only ever drop work the agent said was unnecessary.
-  const gatedChecklist: typeof checklist = async ctx => {
-    if (declaredScope !== 'small') return checklist(ctx)
-    emit({ kind: 'log', message: 'Skipping the production-grade checklist: the build declared small scope.' })
-    return { blockers: [] }
-  }
 
   // A real driver writes files to the workspace, so the build/improve steps can
   // detect an empty workspace and hard-scaffold it (#182). The fake driver writes
@@ -414,13 +399,14 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     ...(opts.bind ? { bind: opts.bind } : {}),
   }
   // A hand-off driver (#1225): the prompt leaves this machine and the reply never comes back,
-  // so the build prompt is the entire run. Every phase after it — the production-grade
-  // checklist, improving against its blockers, the backlog gate, live chat — would be reading
+  // so the build prompt is the entire run. Every phase after it — the review checklist,
+  // improving against its blockers, the backlog gate, live chat — would be reading
   // the driver's own "handed off to <url>" summary as if the agent had written it. That is
-  // what put a `{ blockers }` verdict is missing complaint and an unanswerable "Start the next
+  // what put a verdict-is-missing complaint and an unanswerable "Start the next
   // backlog item?" call on a dashboard whose agent was somewhere else entirely. So the phases
   // are dropped rather than fed: Bootstrap skips its whole loop when no `checklist` step is
-  // given, which leaves scope -> build and nothing after it.
+  // given, which leaves scope -> build and nothing after it. A run with no preset and no
+  // serve config has no checklist either (#1372), and skips the loop the same way.
   const handsOff = opts.driver.handsOff === true
   let preview: AppPreview | undefined
   try {
@@ -431,7 +417,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
       steps: {
         scope: () => ({ scope: opts.scope ?? 'full', intent: opts.intent }),
         build: agentAwaitGate(driverBuild(session, workspaceOpt), session, gateDeps),
-        ...(handsOff ? {} : { checklist: gatedChecklist, improve: driverImprove(session, workspaceOpt) }),
+        ...(handsOff || !checklist ? {} : { checklist, improve: driverImprove(session, workspaceOpt) }),
         ...(opts.deploy
           ? {
               deploy: opts.deployTarget
@@ -442,6 +428,13 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
       },
     })
     const result = await bootstrap.run()
+    // The run controls (budget #322, decline #358, quota #529) abort between phases.
+    // The review loop used to be the phase after the build and observed the abort for
+    // free; with no checklist step the bootstrap can settle without ever re-checking
+    // (#1372), so the run must look for itself before treating the result as a success.
+    if (runSignal.aborted) {
+      throw runSignal.reason instanceof Error ? runSignal.reason : new Error('[framework] run stopped')
+    }
     // The backlog loop (#323): with the build settled, consume the agent's own
     // TODO backlog one gated entry per turn until it is empty. Default on for
     // real drivers (the fake demo writes no backlog and must stay deterministic;
@@ -504,20 +497,19 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
 }
 
 /**
- * Materialize the domain preset's review policy against the run's driver, and the
- * production-grade review checklist it drives. Default: the built-in checklist. With a
- * domain preset, its loop *replaces* the checklist (#252) — each pass fires the preset's
- * review chain through the driver — falling back to the built-in when the preset has no
- * loop for the build event, so a run is never left unreviewed. The build event kind: an
- * explicit run choice wins, else the preset's own default, else `major-change` — how a
- * `bug-fix` run reaches the preset's bug-fix loop (#265). The `loop` is returned so the
- * caller can expose it on the result.
+ * Materialize the domain preset's review policy against the run's driver, and the review
+ * checklist it drives (#252) — each pass fires the preset's review chain through the
+ * driver. Without a preset there is no review checklist at all (#1372): the agent is
+ * treated as a black box, so the run reviews only what the user opted into. The build
+ * event kind: an explicit run choice wins, else the preset's own default, else
+ * `major-change` — how a `bug-fix` run reaches the preset's bug-fix loop (#265). The
+ * `loop` is returned so the caller can expose it on the result.
  */
 function buildReview(
   session: DriverSession,
   domainPreset: DomainPreset | undefined,
   ctx: { buildEvent?: string; signal: AbortSignal; emit: (event: FrameworkEvent) => void },
-): { loop: LoopEngine | undefined; reviewChecklist: NonNullable<BootstrapSteps['checklist']> } {
+): { loop: LoopEngine | undefined; reviewChecklist: BootstrapSteps['checklist'] } {
   const loop = domainPreset
     ? new LoopEngine({
         loops: [...domainPreset.loops],
@@ -525,9 +517,7 @@ function buildReview(
       })
     : undefined
   const buildEvent = ctx.buildEvent ?? domainPreset?.defaultEvent ?? 'major-change'
-  const reviewChecklist = loop
-    ? domainLoopChecklist(loop, { kind: buildEvent, fallback: driverChecklist(session) })
-    : driverChecklist(session)
+  const reviewChecklist = loop ? domainLoopChecklist(loop, { kind: buildEvent }) : undefined
   if (loop && domainPreset) {
     ctx.emit({ kind: 'log', message: `Review policy: the ${domainPreset.title} loop drives the ${buildEvent} review` })
   }
@@ -539,14 +529,15 @@ function buildReview(
  * `serveCheck` verifies the app actually boots, and `mergeChecklists` runs it alongside
  * the review. A docker sandbox re-seeds the container from the host source before every
  * check (the build writes to the host each pass); local reads the host dir live, so it
- * needs no sync. Without a runner/serve the review checklist stands alone.
+ * needs no sync. Without a runner/serve the review checklist stands alone — which may be
+ * no checklist at all (#1372: no preset, no serve → nothing gates the build).
  */
 function withServeCheck(
-  review: NonNullable<BootstrapSteps['checklist']>,
+  review: BootstrapSteps['checklist'],
   runner: RunnerSession | undefined,
   serve: ServeConfig | undefined,
   ctx: { sandbox: 'local' | 'docker'; cwd: string; injectedRunner: boolean; emit: (event: FrameworkEvent) => void },
-): NonNullable<BootstrapSteps['checklist']> {
+): BootstrapSteps['checklist'] {
   if (!runner || !serve) return review
   const check = serveCheck(runner, {
     serve: serve.command,
@@ -558,7 +549,7 @@ function withServeCheck(
     onProgress: message => ctx.emit({ kind: 'log', message: `serve: ${message}` }),
   })
   const serveStep = ctx.sandbox === 'docker' && !ctx.injectedRunner ? syncThenServe(runner, ctx.cwd, check, ctx.emit) : check
-  return mergeChecklists(review, serveStep)
+  return review ? mergeChecklists(review, serveStep) : serveStep
 }
 
 
@@ -596,9 +587,20 @@ function agentAwaitGate(
     const emitTurnSignals = createTurnSignalEmitter(emit)
     let run = await base(ctx)
     emitTurnSignals(run.text)
+    // The run controls (budget #322, quota #529) abort on the build turn's own usage.
+    // The build can be the bootstrap's last step (#1372: no checklist without a preset or
+    // serve config), so a stop the loop would once have caught must throw here — otherwise
+    // the bootstrap settles an aborted run as done.
+    const throwIfStopped = () => {
+      if (!deps.signal?.aborted) return
+      throw deps.signal.reason instanceof Error ? deps.signal.reason : new Error('[framework] run stopped')
+    }
     // Headless: nobody to ask, so the build's turn stands as it is rather than auto-answering
     // its own question. (The prompt paths differ here — they resolve to the recommended pick.)
-    if (!requestChoice) return run
+    if (!requestChoice) {
+      throwIfStopped()
+      return run
+    }
 
     const drained = await drainGates(run, { ...deps, emitTurnSignals }, (question, answer) =>
       continueAfterChoice(session, ctx, question, answer),
@@ -608,6 +610,7 @@ function agentAwaitGate(
     if (drained.declined) deps.onDecline?.()
     // The agent kept asking past the limit: proceed with the latest turn rather than loop.
     else if (drained.exhausted) emit({ kind: 'log', message: 'Proceeding with the build (await limit reached).' })
+    throwIfStopped()
     return drained.turn
   }
 }

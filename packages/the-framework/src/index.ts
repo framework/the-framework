@@ -21,10 +21,10 @@
  *
  * ## Driver-backed steps
  * ai-autopilot's `Bootstrap` steps, re-implemented to run everything *through*
- * the driver (option A): build / improve are prompts, the checklist gates on the
- * `{ blockers }` verdict.
+ * the driver (option A): build / improve are prompts; a domain preset's review
+ * loop gates on the `{ blockers }` verdicts its prompts report (#252, #1372).
  *
- * - {@link driverBuild} / {@link driverChecklist} / {@link driverImprove}
+ * - {@link driverBuild} / {@link driverImprove}
  *
  * ## Run + product shell
  * - {@link runFramework} — detect the preset, drive the whole bootstrap flow, and
@@ -35,14 +35,12 @@
 export * from './driver/index.js'
 export {
   driverBuild,
-  driverChecklist,
   driverImprove,
   decideDeploy,
   deployWith,
   buildPrompt,
   extendPrompt,
   improvePrompt,
-  PRODUCTION_GRADE_PROMPT,
   isWorkspaceEmpty,
   type DriverStepOptions,
 } from './steps.js'

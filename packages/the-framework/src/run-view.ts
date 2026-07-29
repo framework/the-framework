@@ -20,8 +20,10 @@ export interface LoopStatus {
 
 /**
  * The latest checklist verdict (#431), from the `checklist`/`improve`/`done` bootstrap
- * events. Null until a checklist has run (a prototype build never loops). `done` closes
- * it out with the final production-grade verdict.
+ * events. Null until a checklist has run — a prototype build never loops, and neither
+ * does a run with no review configured (#1372: no preset, no serve); `done` with zero
+ * passes is not a loop ending, so it does not open a status either. `done` closes an
+ * open status out with the final verdict.
  */
 export function loopStatus(events: readonly FrameworkEvent[]): LoopStatus | null {
   let status: LoopStatus | null = null
@@ -34,6 +36,7 @@ export function loopStatus(events: readonly FrameworkEvent[]): LoopStatus | null
       status = { pass: e.pass, passing: false, blockers: [...e.blockers], productionGrade: false, finished: false }
     } else if (e.type === 'done') {
       const r = e.result
+      if (r.passes === 0 && !status) continue
       status = {
         pass: r.passes,
         passing: r.productionGrade,

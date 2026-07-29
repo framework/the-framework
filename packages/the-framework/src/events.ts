@@ -179,14 +179,6 @@ export type FrameworkEvent =
    */
   | { kind: 'session-name'; name: string }
   /**
-   * The agent's own sizing of the work (#1356), from a `set-scope` block. `small` lets the
-   * run skip the production-grade checklist — an app-wide review would cost more than the
-   * change it examines. No verdict means no claim, and the checklist runs as it always has;
-   * the gate only ever drops work the agent explicitly said was unnecessary. Re-emitted when
-   * the agent revises the verdict mid-run.
-   */
-  | { kind: 'scope-verdict'; scope: 'small' | 'large' | 'very-large' }
-  /**
    * The agent signalled `setReadyForMerge()` (#326): it believes the work is complete
    * and ready for human review. Non-blocking — it flips the run's dashboard status from
    * building (orange) to ready (green); the on-before-mergeable quality prompts hang off it.

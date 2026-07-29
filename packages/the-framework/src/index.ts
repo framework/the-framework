@@ -334,7 +334,6 @@ export {
   findTodoBacklog,
   parseTodoEntries,
   insertTodoEntry,
-  TODO_FILE_PATTERN,
   FLAT_TODO_FILE,
   LEGACY_HYPHEN_TODO_FILE,
   LEGACY_TICKETS_TODO_FILE,

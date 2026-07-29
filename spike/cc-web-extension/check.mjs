@@ -158,9 +158,10 @@ async function deliver(body, prepare) {
 }
 
 // ---------------------------------------------------------------------------
-// The collapse toggle: the panel folds down to its title bar and unfolds back with the rows
-// intact. chrome.storage is extension-only, so in jsdom the fold simply lives for the page's
-// lifetime, which is exactly the degradation the guard in content.js promises.
+// The collapse toggle: the panel folds down to a compact "TF" tab — the full title retreats to
+// the tooltip so the fold actually gives the corner back — and unfolds with the rows intact.
+// chrome.storage is extension-only, so in jsdom the fold simply lives for the page's lifetime,
+// which is exactly the degradation the guard in content.js promises.
 
 {
   const dom = new JSDOM(
@@ -171,17 +172,18 @@ async function deliver(body, prepare) {
   const panel = dom.window.document.getElementById('tf-bridge-panel')
   // The toggle is the one button carrying aria-expanded; Copy report and Fill composer do not.
   const toggle = () => panel.querySelector('button[aria-expanded]')
-  const expanded = /question found/.test(panel.textContent)
+  const expanded = /question found/.test(panel.textContent) && /The Framework bridge/.test(panel.textContent)
   toggle().click()
   const folded =
     !/question found/.test(panel.textContent) &&
-    /The Framework bridge/.test(panel.textContent) &&
+    !/The Framework bridge/.test(panel.textContent) &&
+    /TF/.test(panel.textContent) &&
     toggle().getAttribute('aria-expanded') === 'false'
   toggle().click()
   const restored = /question found\s*yes/.test(panel.textContent)
   const ok = expanded && folded && restored
   if (!ok) failed++
-  console.log(`${ok ? 'PASS' : 'FAIL'}  panel folds to its title bar and back  (expanded=${expanded}, folded=${folded}, restored=${restored})`)
+  console.log(`${ok ? 'PASS' : 'FAIL'}  panel folds to a compact TF tab and back  (expanded=${expanded}, folded=${folded}, restored=${restored})`)
   dom.window.close()
 }
 

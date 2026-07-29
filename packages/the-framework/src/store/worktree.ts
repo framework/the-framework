@@ -131,18 +131,34 @@ export function parseWorktreeList(porcelain: string): WorktreeInfo[] {
  * Returns whether the checkout is safe to remove: true when it was already clean or
  * the work is now committed, false when the commit failed (no git identity, a hook
  * refusing it). False means keep the checkout, which is the safe direction.
+ *
+ * Retries before giving up (#1376): the daemon's conversation committer works in the same
+ * checkout and is busiest exactly when this runs (session end), so a first attempt can lose
+ * an `index.lock` race. That transient loss is how a session's real work got judged
+ * "committed nothing" by the handoff while the teardown's identical commit, seconds later,
+ * succeeded. A short wait outlasts the committer's hold; a persistent failure (identity,
+ * hooks) still comes back false.
  */
-export async function commitPendingWork(path: string, run: GitRunner = nodeGitRunner()): Promise<boolean> {
-  try {
-    const status = await run(['status', '--porcelain'], path)
-    if (!status.trim()) return true
-    await run(['add', '-A'], path)
-    // Same wording as the install-time safety commit (install.ts), for one vocabulary.
-    await run(['commit', '-m', '[The Framework] uncommitted changes'], path)
-    return true
-  } catch {
-    return false
+export async function commitPendingWork(
+  path: string,
+  run: GitRunner = nodeGitRunner(),
+  retry: { attempts?: number; delayMs?: number } = {},
+): Promise<boolean> {
+  const attempts = Math.max(1, retry.attempts ?? 3)
+  const delayMs = retry.delayMs ?? 300
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const status = await run(['status', '--porcelain'], path)
+      if (!status.trim()) return true
+      await run(['add', '-A'], path)
+      // Same wording as the install-time safety commit (install.ts), for one vocabulary.
+      await run(['commit', '-m', '[The Framework] uncommitted changes'], path)
+      return true
+    } catch {
+      if (attempt < attempts) await new Promise(resolve => setTimeout(resolve, delayMs))
+    }
   }
+  return false
 }
 
 /**

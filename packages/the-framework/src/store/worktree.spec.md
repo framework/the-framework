@@ -5,7 +5,7 @@ Git-worktree lifecycle for concurrent runs (#453/#735): add, attach, list, remov
 - `worktreePath` / `runBranchName` (`the-framework/run-<runId>` — the run id exists before the agent names the session).
 - `addWorktree` (`worktree add -b <branch>`, run-id validated path-safe so callers can never traverse out) and `attachWorktree` (#762: check an *existing* branch out for a continued run, no `-b`) both reject on git failure — a run needs its checkout.
 - `listWorktrees`/`parseWorktreeList` parse `git worktree list --porcelain` (blank-line-separated records; branch stripped of `refs/heads/`); forgiving (`[]` on failure).
-- `commitPendingWork` (#786) commits whatever the run left uncommitted on the run's own branch before teardown; returns whether removal is safe (false = keep the checkout).
+- `commitPendingWork` (#786) commits whatever the run left uncommitted on the run's own branch before teardown; returns whether removal is safe (false = keep the checkout). Retries with a short backoff (#1376): the conversation committer shares the checkout and is busiest at session end, and losing its `index.lock` race once must not read as a failure — that silent loss is how the handoff judged real work "committed nothing".
 - `removeWorktree`: plain removal first (refuses unclean checkouts), then `--force` with a log line; idempotent. `pruneWorktrees` drops stale admin entries; never touches a live worktree.
 - `renameRunBranch` (#736): rename `the-framework/run-<id>` to `the-framework/<sessionName>` once the agent names the session — only when the checkout is still on the run-id branch, never throws.
 - `worktreeSize` via `du -sk` (5s timeout, does not follow the symlinked deps); undefined on any failure — it only labels a "remove this" button.

@@ -19,9 +19,9 @@ import {
  *
  * It drives the real product (`runFramework`) with the built-in **fake driver**
  * (no Claude Code, no model, no keys) so the whole flow — preset detection,
- * architect decisions, build, the full-fledged production-grade loop, and deploy
- * — runs the same code a live run does, just with scripted agent turns. Two
- * things are genuinely real, not narrated:
+ * architect decisions, build, the serve gate (#1372: the only checklist without
+ * a domain preset), and deploy — runs the same code a live run does, just with
+ * scripted agent turns. Two things are genuinely real, not narrated:
  *
  *  - the app **boots and serves**: the serve gate starts a real HTTP server and
  *    the run leaves it running, so the demo can `fetch` it and prove it works;
@@ -39,7 +39,7 @@ export const DEMO_INTENT = FAKE_INTENT
 export interface DemoOutcome {
   /** The detected framework preset (Vike, from the demo's deps signals). */
   framework: string | undefined
-  /** Whether the loop reached production-grade, and in how many passes. */
+  /** Whether the serve-gate loop cleared, and in how many passes. */
   productionGrade: boolean
   passes: number
   /** The deploy result: the target and the (simulated) live URL. */

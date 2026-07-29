@@ -160,6 +160,19 @@ describe('promotePlannedQuickWins (#1334)', () => {
     }
   })
 
+  it('a PENDING lock placeholder promotes nothing (#1327)', async () => {
+    // A concurrent spike agent's claim is a `.plan.md` too, but it carries no verdict keys, so it
+    // must fail closed here — the ticket is being planned right now, not planned.
+    const h = harness({
+      'TODO_AGENTS.md': QUEUE,
+      'tickets/a.md': ticket('Do the thing'),
+      'tickets/a.plan.md': 'PENDING:spike-1-0\n',
+    })
+    const out = await h.run()
+    assert.deepEqual(out.queued, [])
+    assert.equal(h.written['TODO_AGENTS.md'], undefined)
+  })
+
   it('does not queue the same ticket twice', async () => {
     const h = harness({
       'TODO_AGENTS.md': ['## Priority 8', '', '- [Already there](tickets/a.md)', ''].join('\n'),

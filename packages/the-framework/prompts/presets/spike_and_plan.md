@@ -1,5 +1,7 @@
 Spike & plan every ticket that has no spike or plan yet, most important first.
 
+A `.spike.md` or `.plan.md` that already exists counts even when it only reads `PENDING:<agent>` — that placeholder is another agent's claim on the ticket, so leave both files alone and skip the ticket.
+
 End each plan with its verdict, written as two keys in the plan file's header (the block above the title, beside `Status:`):
 
 - `Effort: quick-win` when implementing it is a small, contained change, `Effort: significant` otherwise.

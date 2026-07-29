@@ -1,6 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { TICKETS_DIR } from '../tickets.js'
+import { isSpikeLock } from '../spike-locks.js'
 
 /**
  * One ticket in `tickets/` (#697). The dashboard lists these so the backlog the agent plans
@@ -30,10 +31,19 @@ export interface WorkspaceTicket {
    * #1208); a filename-dated one keeps the date it was created on, same as the file itself does.
    */
   date: string
-  /** Whether `<name>.spike.md` sits beside it. */
+  /** Whether a real `<name>.spike.md` sits beside it — a `PENDING:` placeholder (#1327) does not
+   *  count: that marks a spike in flight, not one done. */
   spiked: boolean
-  /** Whether `<name>.plan.md` sits beside it, i.e. #685 already planned it. */
+  /** Whether a real `<name>.plan.md` sits beside it, i.e. #685 already planned it. A `PENDING:`
+   *  placeholder does not count, same as {@link WorkspaceTicket.spiked}. */
   planned: boolean
+  /**
+   * Whether a concurrent spike agent holds this ticket (#1327): a sibling exists whose content is
+   * still the `PENDING:<agent>` placeholder the daemon locked it with. Mutually informative with
+   * the two flags above rather than exclusive — a ticket whose real spike landed while its plan
+   * stayed PENDING is `spiked` and `locked` at once.
+   */
+  locked?: boolean
   /**
    * The effort estimate a spike or plan recorded (#1144/#1265), e.g. `low` or `2h`. The spike
    * format asks for one ("Human intervention effort: trivial/low/…"), so the first `…effort…: value`
@@ -233,12 +243,12 @@ const MAX_EFFORT_CHARS = 60
 /**
  * The effort estimate recorded against a ticket (#1144/#1265): the first effort-naming line in
  * its `.spike.md`, else its `.plan.md` — the spike is where the format asks for the estimate, so
- * it wins when both name one. Undefined when neither sibling exists or names one.
+ * it wins when both name one. Undefined when neither sibling names one. Takes the contents in
+ * that order rather than re-reading the files: the caller has already read them to tell a real
+ * sibling from a `PENDING:` placeholder (#1327), and a placeholder names no effort anyway.
  */
-async function readEffort(dir: string, stem: string, spiked: boolean, planned: boolean): Promise<string | undefined> {
-  const sources = [...(spiked ? [`${stem}.spike.md`] : []), ...(planned ? [`${stem}.plan.md`] : [])]
-  for (const name of sources) {
-    const md = await readFile(join(dir, name), 'utf8').catch(() => undefined)
+function effortFrom(sources: readonly (string | undefined)[]): string | undefined {
+  for (const md of sources) {
     if (md === undefined) continue
     for (const line of md.slice(0, MAX_TICKET_BYTES).split('\n')) {
       const match = EFFORT_LINE.exec(line)
@@ -246,6 +256,19 @@ async function readEffort(dir: string, stem: string, spiked: boolean, planned: b
     }
   }
   return undefined
+}
+
+/**
+ * One sibling's state (#1327): absent, a `PENDING:` lock, or a real document whose content the
+ * effort scan can use. Read whole rather than stat'd, because existence stopped being the answer
+ * the moment a placeholder could exist — and the effort scan wanted the content anyway.
+ */
+async function readSibling(dir: string, name: string, siblings: Set<string>): Promise<{ real: boolean; pending: boolean; md?: string }> {
+  if (!siblings.has(name)) return { real: false, pending: false }
+  const md = await readFile(join(dir, name), 'utf8').catch(() => undefined)
+  // An unreadable sibling keeps the pre-#1327 answer its existence gave: spiked, not locked.
+  if (md === undefined) return { real: true, pending: false }
+  return isSpikeLock(md) ? { real: false, pending: true } : { real: true, pending: false, md }
 }
 
 /**
@@ -271,9 +294,12 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
     if (content === undefined) continue
     const stem = file.replace(/\.md$/, '')
     const { title, summary, status, priority, topics, github } = describe(content.slice(0, MAX_TICKET_BYTES))
-    const spiked = siblings.has(`${stem}.spike.md`)
-    const planned = siblings.has(`${stem}.plan.md`)
-    const effort = await readEffort(dir, stem, spiked, planned)
+    const [spike, plan] = await Promise.all([
+      readSibling(dir, `${stem}.spike.md`, siblings),
+      readSibling(dir, `${stem}.plan.md`, siblings),
+    ])
+    const locked = spike.pending || plan.pending
+    const effort = effortFrom([spike.md, plan.md])
     tickets.push({
       file,
       title: title ?? titleFromFile(file),
@@ -283,8 +309,9 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
       ...(topics ? { topics } : {}),
       ...(github ? { github } : {}),
       date,
-      spiked,
-      planned,
+      spiked: spike.real,
+      planned: plan.real,
+      ...(locked ? { locked } : {}),
       ...(effort ? { effort } : {}),
     })
   }
@@ -325,9 +352,13 @@ export async function readTicket(cwd: string, file: string): Promise<WorkspaceTi
   if (content === undefined) return null
   const stem = file.replace(/\.md$/, '')
   const { title, summary, status, priority, topics, github } = describe(content)
-  const spiked = names.includes(`${stem}.spike.md`)
-  const planned = names.includes(`${stem}.plan.md`)
-  const effort = await readEffort(dir, stem, spiked, planned)
+  const present = new Set(names)
+  const [spike, plan] = await Promise.all([
+    readSibling(dir, `${stem}.spike.md`, present),
+    readSibling(dir, `${stem}.plan.md`, present),
+  ])
+  const locked = spike.pending || plan.pending
+  const effort = effortFrom([spike.md, plan.md])
   return {
     file,
     title: title ?? titleFromFile(file),
@@ -337,8 +368,9 @@ export async function readTicket(cwd: string, file: string): Promise<WorkspaceTi
     ...(topics ? { topics } : {}),
     ...(github ? { github } : {}),
     date,
-    spiked,
-    planned,
+    spiked: spike.real,
+    planned: plan.real,
+    ...(locked ? { locked } : {}),
     ...(effort ? { effort } : {}),
     content,
   }

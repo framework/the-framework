@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { writeFileSync } from 'node:fs'
-import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { FakeDriver } from './driver/fake.js'
@@ -58,7 +58,7 @@ test('the #880 priority sections need no parser support: headings are skipped, s
   ])
 })
 
-test('findTodoBacklog prefers the newest session-scoped file, falls back to flat TODO.md', async () => {
+test('findTodoBacklog reads the flat backlog and falls back to a flat TODO.md', async () => {
   const cwd = await tmpWorkspace()
   try {
     assert.equal(await findTodoBacklog(cwd), undefined) // nothing yet
@@ -66,20 +66,9 @@ test('findTodoBacklog prefers the newest session-scoped file, falls back to flat
     await writeFile(join(cwd, 'TODO.md'), '- flat entry\n')
     assert.equal((await findTodoBacklog(cwd))?.name, 'TODO.md')
 
-    // A session-scoped backlog wins over the flat one.
-    await writeFile(join(cwd, 'TODO_feat-x.agent.md'), '- [ ] scoped entry\n')
-    assert.deepEqual(await findTodoBacklog(cwd), { name: 'TODO_feat-x.agent.md', entries: ['scoped entry'] })
-
-    // Two sessions: the most recently modified wins.
-    await writeFile(join(cwd, 'TODO_feat-y.agent.md'), '- newer entry\n')
-    const past = new Date(Date.now() - 60_000)
-    await utimes(join(cwd, 'TODO_feat-x.agent.md'), past, past)
-    assert.equal((await findTodoBacklog(cwd))?.name, 'TODO_feat-y.agent.md')
-
-    // A fully checked-off scoped backlog is skipped in favor of the next candidate.
-    await writeFile(join(cwd, 'TODO_feat-y.agent.md'), '- [x] all done\n')
-    await writeFile(join(cwd, 'TODO_feat-x.agent.md'), '- [x] all done\n')
-    assert.equal((await findTodoBacklog(cwd))?.name, 'TODO.md')
+    // A fully checked-off backlog is no backlog.
+    await writeFile(join(cwd, 'TODO.md'), '- [x] all done\n')
+    assert.equal(await findTodoBacklog(cwd), undefined)
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
@@ -91,9 +80,9 @@ test('findTodoBacklog reads the flat backlog from the root TODO_AGENTS.md (#682)
     await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] roadmap entry\n')
     assert.deepEqual(await findTodoBacklog(cwd), { name: 'TODO_AGENTS.md', entries: ['roadmap entry'] })
 
-    // A session-scoped backlog still wins over the flat one, wherever the flat one lives.
+    // The retired session-scoped backlog (#1369) is ignored, even when it has open entries.
     await writeFile(join(cwd, 'TODO_feat-x.agent.md'), '- [ ] scoped entry\n')
-    assert.equal((await findTodoBacklog(cwd))?.name, 'TODO_feat-x.agent.md')
+    assert.equal((await findTodoBacklog(cwd))?.name, 'TODO_AGENTS.md')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
@@ -127,7 +116,7 @@ test('appendTodoEntry creates the root TODO_AGENTS.md when the workspace has no 
 
 test('runTodoLoop works the backlog to empty, one entry per turn (#323)', async () => {
   const cwd = await tmpWorkspace()
-  const file = join(cwd, 'TODO_feat-x.agent.md')
+  const file = join(cwd, 'TODO_AGENTS.md')
   await writeFile(file, '- [ ] first task\n- [ ] second task\n')
   try {
     const events: FrameworkEvent[] = []
@@ -144,9 +133,9 @@ test('runTodoLoop works the backlog to empty, one entry per turn (#323)', async 
     const session = await driver.start({ cwd })
     const result = await runTodoLoop({ session, cwd, emit: e => events.push(e) })
 
-    assert.deepEqual(result, { completed: 2, reason: 'empty', file: 'TODO_feat-x.agent.md' })
+    assert.deepEqual(result, { completed: 2, reason: 'empty', file: 'TODO_AGENTS.md' })
     assert.equal(prompts.length, 2)
-    assert.match(prompts[0]!, /TODO_feat-x\.agent\.md/)
+    assert.match(prompts[0]!, /TODO_AGENTS\.md/)
     assert.match(prompts[0]!, /FIRST open entry only/)
     // Narrated: the opening count, each item, and the completion line.
     assert.ok(events.some(e => e.kind === 'log' && /has 2 open item\(s\)/.test(e.message)))
@@ -316,7 +305,7 @@ test('an aborted signal ends the loop before starting another entry', async () =
 
 test('a backlog turn emits its signals: views, session name, ready-for-merge', async () => {
   const cwd = await tmpWorkspace()
-  const file = join(cwd, 'TODO_feat-x.agent.md')
+  const file = join(cwd, 'TODO_AGENTS.md')
   await writeFile(file, '- [ ] tidy the login redirect\n')
   try {
     const events: FrameworkEvent[] = []
@@ -353,7 +342,7 @@ test('a backlog turn emits its signals: views, session name, ready-for-merge', a
 
 test('ready-for-merge is emitted once across a multi-item backlog', async () => {
   const cwd = await tmpWorkspace()
-  const file = join(cwd, 'TODO_feat-x.agent.md')
+  const file = join(cwd, 'TODO_AGENTS.md')
   await writeFile(file, '- [ ] first task\n- [ ] second task\n')
   try {
     const events: FrameworkEvent[] = []
@@ -374,21 +363,19 @@ test('ready-for-merge is emitted once across a multi-item backlog', async () => 
   }
 })
 
-// #697: a human queueing a ticket from the dashboard means the project's queue, not whichever
-// run's session-scoped backlog happens to be lying in the checkout. Only the flat file is
-// carried between branches by promoteQueue (#852), so the other one can vanish unseen.
-test('appendFlatTodoEntry writes the flat queue even when a session backlog exists (#697)', async () => {
+// #697/#1369: everything lands on the project's flat queue — a leftover session-scoped
+// backlog in the checkout is retired and never written to. Only the flat file is carried
+// between branches by promoteQueue (#852), so an entry elsewhere could vanish unseen.
+test('both append helpers write the flat queue even when a session backlog exists (#697/#1369)', async () => {
   const cwd = await tmpWorkspace()
   try {
     await writeFile(join(cwd, 'TODO_a-session.agent.md'), '- [ ] a run\n', 'utf8')
 
-    // The run-facing helper prefers the session file, which is what it is for.
-    assert.equal(await appendTodoEntry(cwd, 'from the run'), 'TODO_a-session.agent.md')
-
-    // The dashboard-facing one does not.
+    assert.equal(await appendTodoEntry(cwd, 'from the run'), 'TODO_AGENTS.md')
     assert.equal(await appendFlatTodoEntry(cwd, 'Do ticket 42'), 'TODO_AGENTS.md')
-    assert.equal(await readFile(join(cwd, 'TODO_AGENTS.md'), 'utf8'), '- [ ] Do ticket 42\n')
-    assert.equal(await readFile(join(cwd, 'TODO_a-session.agent.md'), 'utf8'), '- [ ] a run\n- [ ] from the run\n')
+    assert.equal(await readFile(join(cwd, 'TODO_AGENTS.md'), 'utf8'), '- [ ] from the run\n- [ ] Do ticket 42\n')
+    // The leftover session file is untouched.
+    assert.equal(await readFile(join(cwd, 'TODO_a-session.agent.md'), 'utf8'), '- [ ] a run\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

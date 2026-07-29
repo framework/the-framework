@@ -108,12 +108,15 @@ test('UX runs to completion instead of gating on a human (#962)', () => {
   assert.match(out, /that's a sign you've been lazy/)
 })
 
-test('Research gates on a multi-select and writes its own review/TODO files (#331)', () => {
+test('Research gates on a multi-select and writes its own review file (#331)', () => {
   assert.match(presets.research.template, /problem variability/)
   assert.match(presets.research.template, /showMultiSelect\(\)/)
   assert.match(presets.research.template, /<AWAIT>/)
   assert.match(presets.research.template, /<REVIEW_FILE>/)
   assert.match(presets.research.template, /<TODO_FILE>/)
+  // #1369: the deep-dive picks land on the flat queue, not a session-scoped backlog.
+  assert.match(presets.research.template, /TODO_FILE: `TODO_AGENTS\.md`/)
+  assert.doesNotMatch(presets.research.template, /TODO_<SESSION_NAME>/)
 })
 
 test('the Maintenance template queues work rather than doing it (#881)', () => {

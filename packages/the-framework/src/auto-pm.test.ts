@@ -4,6 +4,7 @@ import {
   autoPmDecision,
   quotaHeadroom,
   startAutoPm,
+  pinnedSpikeJob,
   AUTO_PM_JOBS,
   AUTO_PM_DRAIN_JOB,
   AUTO_PM_MAINTENANCE_JOB,
@@ -12,6 +13,7 @@ import {
   type AutoPmJob,
   type AutoPmLoop,
   type AutoPmProject,
+  type SpikeAssignment,
 } from './auto-pm.js'
 import { quotaBoundaryStatus, type QuotaBoundaryStatus } from './quota-boundary.js'
 import { DEFAULT_SPEND_OFFSET, DEFAULT_AUTO_PM_CONCURRENCY } from './preference-defaults.js'
@@ -785,6 +787,158 @@ test('live runs count against the concurrency, so the sweep tops up rather than 
   await loop.tick()
   loop.stop()
   assert.equal(started.length, 1)
+})
+
+// #1327: [Spike & plan] fans out too — the one rotation job that writes per-ticket sibling files
+// rather than the shared queue document, so agents pinned one ticket each do disjoint work. The
+// PENDING locks are what make the batch safe beyond this process's memory, so no locks means no
+// fan-out.
+
+const SPIKE_JOB: AutoPmJob = { name: 'spike', prompt: 'Spike & plan every ticket that has no spike or plan yet.', fansOut: true }
+
+test('a fansOut job fans out to the concurrency, one locked ticket per agent (#1327)', async () => {
+  const prompts: string[] = []
+  const lockCalls: SpikeAssignment[][] = []
+  const { loop } = harness({
+    jobs: [SPIKE_JOB],
+    cooldownMs: 0,
+    concurrency: async () => 3,
+    spikeCandidates: async () => ['a.md', 'b.md', 'c.md', 'd.md'],
+    lockSpikes: async (_p, assignments) => {
+      lockCalls.push([...assignments])
+      return assignments
+    },
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick()
+  loop.stop()
+  assert.equal(prompts.length, 3, 'the batch stops at the concurrency, not at the candidate count')
+  // Pinned to *different* tickets, in the candidates' own most-important-first order.
+  assert.match(prompts[0]!, /tickets\/a\.md/)
+  assert.match(prompts[1]!, /tickets\/b\.md/)
+  assert.match(prompts[2]!, /tickets\/c\.md/)
+  // The whole batch was locked in one call, before any agent started, and each agent's prompt
+  // names the id its own lock carries.
+  assert.equal(lockCalls.length, 1)
+  assert.equal(lockCalls[0]!.length, 3)
+  assert.equal(new Set(lockCalls[0]!.map(a => a.agentId)).size, 3)
+  assert.match(prompts[0]!, new RegExp(`PENDING:${lockCalls[0]![0]!.agentId}`))
+})
+
+test('only the tickets the lock actually claimed go out (#1327)', async () => {
+  // A lost race — b.md's sibling appeared between the enumeration and the lock — costs that one
+  // agent, not the batch.
+  const prompts: string[] = []
+  const { loop } = harness({
+    jobs: [SPIKE_JOB],
+    cooldownMs: 0,
+    concurrency: async () => 3,
+    spikeCandidates: async () => ['a.md', 'b.md', 'c.md'],
+    lockSpikes: async (_p, assignments) => assignments.filter(a => a.ticket !== 'b.md'),
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick()
+  loop.stop()
+  assert.equal(prompts.length, 2)
+  assert.ok(prompts.every(prompt => !/tickets\/b\.md/.test(prompt)))
+})
+
+test('a lock that claimed nothing falls back to the stock single agent (#1327)', async () => {
+  // One unpinned agent is the pre-#1327 behaviour and needs no lock to be safe; fanning out
+  // unguarded is exactly the double-work the locks exist to prevent.
+  const prompts: string[] = []
+  const { loop } = harness({
+    jobs: [SPIKE_JOB],
+    cooldownMs: 0,
+    concurrency: async () => 3,
+    spikeCandidates: async () => ['a.md', 'b.md'],
+    lockSpikes: async () => [],
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick()
+  loop.stop()
+  assert.equal(prompts.length, 1)
+  assert.equal(prompts[0], SPIKE_JOB.prompt)
+})
+
+test('without the lock seam the job stays one per tick however high the concurrency (#1327)', async () => {
+  const { loop, started } = harness({
+    jobs: [SPIKE_JOB],
+    cooldownMs: 0,
+    concurrency: async () => 5,
+    spikeCandidates: async () => ['a.md', 'b.md', 'c.md'],
+  })
+  await loop.tick()
+  loop.stop()
+  assert.equal(started.length, 1)
+})
+
+test('a ticket a live spike run is pinned to is not offered again (#1327)', async () => {
+  // The lock files also guard this on disk, but the in-memory pin answers first and without
+  // re-reading anything — same as a drain's entry.
+  const prompts: string[] = []
+  const { loop } = harness({
+    jobs: [SPIKE_JOB],
+    cooldownMs: 0,
+    concurrency: async () => 1,
+    spikeCandidates: async () => ['a.md', 'b.md'],
+    lockSpikes: async (_p, assignments) => assignments,
+    promote: async () => ({ settled: false, promoted: false }), // still in flight
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick()
+  await loop.tick()
+  loop.stop()
+  assert.equal(prompts.length, 2)
+  assert.match(prompts[0]!, /tickets\/a\.md/)
+  assert.match(prompts[1]!, /tickets\/b\.md/)
+})
+
+test('nothing left to spike advances the rotation rather than retrying it forever (#1327)', async () => {
+  // "Every ticket has a spike or plan" is this job's work being done, not a refusal: the next
+  // tick must land on the next job, and the tick must not spend a cooldown on having started
+  // nothing.
+  const { loop, ran } = harness({
+    jobs: [SPIKE_JOB, { name: 'second', prompt: 'do the second thing' }],
+    cooldownMs: 0,
+    spikeCandidates: async () => [],
+    lockSpikes: async (_p, assignments) => assignments,
+  })
+  await loop.tick()
+  assert.match(loop.report().outcomes[0]?.message ?? '', /already has a spike or plan/)
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(ran, ['second'])
+})
+
+test('pinnedSpikeJob appends the pin, so the preset keeps its own rules verbatim (#1327)', () => {
+  const pinned = pinnedSpikeJob(SPIKE_JOB, { ticket: '2026-07-25_x.md', agentId: 'spike-7-0' })
+  // Appended, not spliced: the maintainer owns the preset's wording, and a rewrite must not be
+  // able to silently lose the pin.
+  assert.ok(pinned.prompt.startsWith(SPIKE_JOB.prompt))
+  assert.match(pinned.prompt, /exactly one ticket, `tickets\/2026-07-25_x\.md`/)
+  assert.match(pinned.prompt, /tickets\/2026-07-25_x\.spike\.md/)
+  assert.match(pinned.prompt, /PENDING:spike-7-0/)
+  assert.equal(pinned.ticket, '2026-07-25_x.md')
+})
+
+test('the catalog job that fans out is [Spike & plan], and only it (#1327)', () => {
+  assert.deepEqual(
+    AUTO_PM_JOBS.filter(job => job.fansOut).map(job => job.name),
+    [presets.spikeAndPlan.name],
+  )
 })
 
 test('the rotation stays one run per tick however high the concurrency (#1204)', async () => {

@@ -24,3 +24,4 @@ One session's view, running or finished (#1026): a stable frame (action bar + di
 - run ends: `live` flips → `onRun` read → `shown` swaps to archived behind on-screen events → `working` false → handoff read fires → bar summary/actions swap → feed goes static at end
 - disclosure: bar toggle → `SessionDetails` + (`RunChanges` | `RunHandoffDetails`)
 - loop verdict: `loopStatus(shown)` → `onLoopStatus(loop)` on value change → RightRail pins it → cleared on unmount
+- `armedDefault` (#1376): the armed handoff pair from the run record, seeded into `handoffState` — the opening `handoff-armed` event predates the live channel's attach, so without the record's mirror a push-only session shows a ticked "Open PR".

@@ -169,6 +169,40 @@ test('readTickets folds .spike.md and .plan.md into their ticket (#697)', async 
   )
 })
 
+test('a PENDING placeholder reads as a lock, not as a spike or plan (#1327)', async () => {
+  // The daemon locks a ticket for a concurrent spike agent by pre-creating its siblings as
+  // `PENDING:<agent>` placeholders. Counting those as spiked would make the dashboard claim work
+  // that has not happened — and hide the ticket from "no spike or plan yet" for the wrong reason.
+  const cwd = await repo({
+    '2026-07-20_thing.md': '# Thing\n\nprose\n',
+    '2026-07-20_thing.spike.md': 'PENDING:spike-1-0\n',
+    '2026-07-20_thing.plan.md': 'PENDING:spike-1-0\n',
+  })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.spiked, false)
+  assert.equal(ticket?.planned, false)
+  assert.equal(ticket?.locked, true)
+  assert.equal(ticket?.effort, undefined)
+  // The detail page answers the same way the list does.
+  const detail = await readTicket(cwd, '2026-07-20_thing.md')
+  assert.equal(detail?.locked, true)
+  assert.equal(detail?.spiked, false)
+})
+
+test('a real spike beside a PENDING plan is spiked and locked at once (#1327)', async () => {
+  const cwd = await repo({
+    '2026-07-20_thing.md': '# Thing\n\nprose\n',
+    '2026-07-20_thing.spike.md': '# [Spike] Thing\n\n- Human intervention effort: low\n',
+    '2026-07-20_thing.plan.md': 'PENDING:spike-1-0\n',
+  })
+  const [ticket] = await readTickets(cwd)
+  assert.equal(ticket?.spiked, true)
+  assert.equal(ticket?.planned, false)
+  assert.equal(ticket?.locked, true)
+  // The effort comes from the real spike; the placeholder contributes nothing.
+  assert.equal(ticket?.effort, 'low')
+})
+
 test('readTickets surfaces the effort a spike recorded (#1144/#1265)', async () => {
   const cwd = await repo({
     '2026-07-20_thing.md': '# Thing\n',

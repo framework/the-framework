@@ -14,7 +14,9 @@ import { releaseStalePinnedBranch } from './stale-branch.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
 import { claimedQueueEntries, promoteQueue } from './queue-promote.js'
 import { promotePlannedQuickWins } from './planned-quick-wins.js'
-import { FLAT_TODO_FILE } from './tickets.js'
+import { FLAT_TODO_FILE, TICKETS_DIR } from './tickets.js'
+import { acquireSpikeLocks, releaseStaleSpikeLocks } from './spike-locks.js'
+import { readTickets } from './dashboard/tickets.js'
 import { cachedOpenPrFilePatches } from './dashboard/gh.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { startConversationCommitter } from './conversation-commit.js'
@@ -158,6 +160,23 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     recordMaintenance: async project => mergeMaintenanceState(project.path, { sweptAt: new Date().toISOString() }),
     // A pinned routine branch left behind by a closed PR blocks every later firing (#1293).
     releasePinned: (project, branch) => releaseStalePinnedBranch(project.path, branch),
+    // The tickets a [Spike & plan] fan-out may claim (#1327): open, with no sibling at all —
+    // real or PENDING — most important first. Stale locks are released first, so a crashed
+    // agent's ticket comes back on the market in the same read that offers it.
+    spikeCandidates: async project => {
+      await releaseStaleSpikeLocks(project.path, { log })
+      const rank = (priority?: string) => {
+        const n = Number(priority)
+        return Number.isFinite(n) ? n : -1
+      }
+      return (await readTickets(project.path))
+        .filter(ticket => ticket.status === 'open' && !ticket.spiked && !ticket.planned && !ticket.locked)
+        .sort((a, b) => rank(b.priority) - rank(a.priority))
+        .map(ticket => ticket.file)
+    },
+    // The daemon writes and pushes the locks, never the agent (#1327/#1320): a cloud session has
+    // no push access, and a claim that stayed local would not reach the machines it exists for.
+    lockSpikes: (project, assignments) => acquireSpikeLocks(project.path, assignments, { log }),
     start: async (project, job) => {
       // A draining run works one open queue entry, and since #1164 that entry links back to the
       // ticket it was queued from — so this is the one moment the framework knows what a run is
@@ -169,7 +188,11 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         ? job.entry !== undefined
           ? ticketFromQueueEntry(job.entry)
           : await nextQueuedTicket(project.path).catch(() => undefined)
-        : undefined
+        : // A fanned-out spike is pinned to one ticket too (#1327), so its meta names it the
+          // same way a pinned drain's does.
+          job.ticket !== undefined
+          ? `${TICKETS_DIR}/${job.ticket}`
+          : undefined
       // The pinned entry itself also rides along (#1253), so the claim on it reaches the run's
       // meta and outlives both this process's memory and the run's local process.
       const result = await startUnattended(project.id, job.prompt, {

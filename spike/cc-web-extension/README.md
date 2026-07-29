@@ -56,7 +56,7 @@ Fourteen cases: the ten extraction ones, including the four that broke it on a r
 (`<code>` with no `<pre>`, content behind a shadow root, an indentation the parser had not
 guessed, and our own protocol spec appearing on the page as a decoy), three for the answer
 delivery: fill and click send, the Enter fallback, and refusing a page with no composer, and
-one for the panel's collapse toggle folding it to its title bar and back.
+one for the panel's collapse toggle folding it down to a compact `TF` tab and back.
 
 After editing any file here, reload the extension on `chrome://extensions` AND reload the open
 claude.ai tabs: reloading the extension does not re-inject content scripts, and an orphaned

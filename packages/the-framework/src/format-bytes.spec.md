@@ -1,0 +1,1 @@
+Formats a byte count as a glanceable label (#798): `1536` → `1.5 KB` (one decimal below 10 when unit > B, whole numbers otherwise, units B..TB); absent/negative/unparseable reads as an en dash like a missing date.

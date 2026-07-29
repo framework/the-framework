@@ -672,3 +672,81 @@ test('applyEventToMeta records the branch a branch event names (#1277)', () => {
   const renamed = applyEventToMeta(on, { kind: 'branch', branch: 'the-framework/cool-name' }, AT)
   assert.equal(renamed.branch, 'the-framework/cool-name')
 })
+
+// #1359: a run that dies holding an open gate. The process exited without writing `end` (the
+// empty-event-loop death), so every flip of a dead `running` run must write the ending on its
+// behalf: an `end` event in the log (what expires the dashboard's question) and a meta without
+// the pendingChoice (what clears the "needs you" surfaces).
+const CHOICE_LINE = '{"kind":"choice","id":"todo-next","title":"Start the next backlog item?","options":[{"id":"proceed","label":"Go"},{"id":"stop","label":"Stop"}]}\n'
+const deadGatedMeta = (id: string): string =>
+  JSON.stringify({
+    version: RUN_META_VERSION,
+    status: 'running',
+    id,
+    startedAt: AT,
+    updatedAt: AT,
+    passes: 1,
+    pid: 999999,
+    host: HERE,
+    pendingChoice: { id: 'todo-next', title: 'Start the next backlog item?' },
+  })
+const lastEvent = (jsonl: string): Record<string, unknown> => {
+  const lines = jsonl.trim().split('\n')
+  return JSON.parse(lines[lines.length - 1]!) as Record<string, unknown>
+}
+
+test('readLiveMeta writes the end a dead run never did: log + meta + archive (#1359)', async () => {
+  const fs = memFs({ [META]: deadGatedMeta('2026-gated'), [EVENTS]: CHOICE_LINE })
+  const healed = await readLiveMeta(CWD, fs, () => false)
+  assert.equal(healed!.status, 'stopped')
+  assert.equal(healed!.pendingChoice, undefined, 'a dead run is not awaiting anything')
+  // The live log now ends: a dashboard replaying it sees the run finish and expires the gate.
+  const end = lastEvent(fs.files.get(EVENTS)!)
+  assert.equal(end['kind'], 'end')
+  assert.equal(end['ok'], false)
+  assert.equal(end['stopped'], true)
+  // The archived copy carries the ending too — it is what history readers replay.
+  const archived = fs.files.get(join(RUNS, '2026-gated.jsonl'))!
+  assert.equal(lastEvent(archived)['kind'], 'end')
+  assert.equal((JSON.parse(fs.files.get(join(RUNS, '2026-gated.json'))!) as RunMeta).pendingChoice, undefined)
+})
+
+test('archiveWorktreeRun writes the missing end into the worktree before copying (#1359)', async () => {
+  const fs = memFs(worktreeFiles('r1', JSON.parse(deadGatedMeta('r1')) as Record<string, unknown>, CHOICE_LINE))
+  const meta = await archiveWorktreeRun(worktreeAt('r1'), CWD, fs)
+  assert.equal(meta?.status, 'stopped')
+  assert.equal(meta?.pendingChoice, undefined)
+  // Both copies of the log end — the worktree's own (a live tail may still be reading it)
+  // and the archive the history replays.
+  assert.equal(lastEvent(fs.files.get(join(worktreeAt('r1'), '.the-framework', 'events.jsonl'))!)['kind'], 'end')
+  assert.equal(lastEvent(fs.files.get(join(CWD, '.the-framework', 'runs', 'r1.jsonl'))!)['kind'], 'end')
+})
+
+test('archiveWorktreeRun leaves a run that wrote its own ending alone (#1359)', async () => {
+  const events = '{"kind":"end","ok":true}\n'
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, passes: 1 }, events))
+  await archiveWorktreeRun(worktreeAt('r1'), CWD, fs)
+  assert.equal(fs.files.get(join(worktreeAt('r1'), '.the-framework', 'events.jsonl')), events, 'no surrogate end on a clean run')
+})
+
+test('reconcileOrphanedRuns ends an archived run stuck at running, gate included (#1359)', async () => {
+  const fs = memFs({
+    [join(RUNS, 'a.json')]: deadGatedMeta('a'),
+    [join(RUNS, 'a.jsonl')]: CHOICE_LINE,
+  })
+  assert.equal(await reconcileOrphanedRuns(CWD, fs, () => false), 1)
+  const meta = JSON.parse(fs.files.get(join(RUNS, 'a.json'))!) as RunMeta
+  assert.equal(meta.status, 'stopped')
+  assert.equal(meta.pendingChoice, undefined)
+  assert.equal(lastEvent(fs.files.get(join(RUNS, 'a.jsonl'))!)['kind'], 'end')
+})
+
+test('reconcileOrphanedRuns ends a dead worktree run in place and in the archive (#1359)', async () => {
+  const fs = memFs(worktreeFiles('wt1', JSON.parse(deadGatedMeta('wt1')) as Record<string, unknown>, CHOICE_LINE))
+  assert.equal(await reconcileOrphanedRuns(CWD, fs, () => false), 1)
+  const inPlace = JSON.parse(fs.files.get(join(worktreeAt('wt1'), '.the-framework', 'run.json'))!) as RunMeta
+  assert.equal(inPlace.status, 'stopped')
+  assert.equal(inPlace.pendingChoice, undefined)
+  assert.equal(lastEvent(fs.files.get(join(worktreeAt('wt1'), '.the-framework', 'events.jsonl'))!)['kind'], 'end')
+  assert.equal(lastEvent(fs.files.get(join(CWD, '.the-framework', 'runs', 'wt1.jsonl'))!)['kind'], 'end')
+})

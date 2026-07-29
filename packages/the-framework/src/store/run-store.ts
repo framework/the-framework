@@ -417,14 +417,39 @@ function writeMetaFile(fs: StoreFs, path: string, meta: RunMeta): Promise<void> 
 }
 
 /**
+ * The `end` event written on behalf of a run whose process died without reporting one (#1359):
+ * a crash, a `kill -9`, or the empty-event-loop exit a parked gate used to cause. Every reader
+ * of the stream — the dashboard's outcome pill, its choice rail, the meta fold — keys "over"
+ * off a single `end` event, so a death that skipped it left the run's last question rendering
+ * as answerable forever while its picks were read by nobody.
+ */
+export function orphanEndEvent(): FrameworkEvent {
+  return { kind: 'end', ok: false, stopped: true, detail: 'its process died without reporting an end' }
+}
+
+/**
+ * Record a dead run's missing ending in place (#1359): append the surrogate `end` event to the
+ * checkout's live log and fold it into the meta via {@link applyEventToMeta} — so the status
+ * flips to `stopped` and a `pendingChoice` the run died holding expires exactly as a run-written
+ * end would expire it. Best-effort on both writes: healing must never make a read throw.
+ */
+async function recordOrphanEnd(fs: StoreFs, dir: string, meta: RunMeta): Promise<RunMeta> {
+  const event = orphanEndEvent()
+  await fs.append(join(dir, EVENTS_FILE), JSON.stringify(event) + '\n').catch(() => {})
+  const ended = applyEventToMeta(meta, event, new Date().toISOString())
+  await writeMetaFile(fs, join(dir, META_FILE), ended).catch(() => {})
+  return ended
+}
+
+/**
  * Flip the live run at `dir` to `stopped` and archive it, returning the stopped meta. The
  * shared tail of every self-heal: a `running` meta whose process is gone must both stop
- * showing as live and keep its history. Best-effort on both writes — healing must never
- * make a read throw.
+ * showing as live and keep its history. The flip goes through {@link recordOrphanEnd}, so
+ * the log gains the `end` event the dead process never wrote (#1359) before the archive
+ * copies it. Best-effort on both writes — healing must never make a read throw.
  */
 async function stopAndArchiveLive(fs: StoreFs, dir: string, meta: RunMeta): Promise<RunMeta> {
-  const stopped: RunMeta = { ...meta, status: 'stopped' }
-  await writeMetaFile(fs, join(dir, META_FILE), stopped).catch(() => {})
+  const stopped = await recordOrphanEnd(fs, dir, meta)
   await archivePriorRun(fs, dir).catch(() => {})
   return stopped
 }
@@ -698,7 +723,10 @@ export async function archiveWorktreeRun(
     const worktreeDir = join(worktree, FRAMEWORK_DIR)
     const live = await readMetaFile(fs, join(worktreeDir, META_FILE))
     if (!live?.id || !isSafeRunId(live.id)) return undefined
-    const stopped: RunMeta = live.status === 'running' ? { ...live, status: 'stopped' } : live
+    // The flip writes the worktree's own log + meta too (#1359): the death gains its `end`
+    // event before the archive copies the log, so no reader — live tail or archived replay —
+    // is left holding an open gate for a dead run.
+    const stopped: RunMeta = live.status === 'running' ? await recordOrphanEnd(fs, worktreeDir, live) : live
     // The branch is read from the checkout by the caller and stamped here, because this is the
     // last moment it can be observed: the worktree is about to go (#799).
     const meta: RunMeta = branch ? { ...stopped, branch } : stopped
@@ -819,7 +847,12 @@ export async function reconcileOrphanedRuns(
   for (const { path, meta } of await readAllArchivedMetaEntries(fs, dir)) {
     if (!isDeadRunning(meta, isAlive)) continue
     try {
-      await writeMetaFile(fs, path, { ...meta, status: 'stopped' })
+      // The archived pair sits side by side (`<id>.json` + `<id>.jsonl`), so the surrogate end
+      // (#1359) lands in both: the replayed log sees the run finish, and the meta fold drops
+      // the pendingChoice the run died holding.
+      const event = orphanEndEvent()
+      await fs.append(path.replace(/\.json$/, '.jsonl'), JSON.stringify(event) + '\n').catch(() => {})
+      await writeMetaFile(fs, path, applyEventToMeta(meta, event, new Date().toISOString()))
       fixed++
     } catch {
       // write failed — best-effort, skip
@@ -843,7 +876,9 @@ export async function reconcileOrphanedRuns(
     const worktreeDir = join(dir, WORKTREES_DIR, name, FRAMEWORK_DIR)
     const meta = await readMetaFile(fs, join(worktreeDir, META_FILE))
     if (!isDeadRunning(meta, isAlive)) continue
-    await writeMetaFile(fs, join(worktreeDir, META_FILE), { ...meta, status: 'stopped' }).catch(() => {})
+    // recordOrphanEnd rather than a bare status flip (#1359): the worktree's log gains the
+    // `end` event first, so the archive below copies a stream that actually ends.
+    await recordOrphanEnd(fs, worktreeDir, meta)
     await archiveWorktreeRun(join(dir, WORKTREES_DIR, name), cwd, fs).catch(() => undefined)
     fixed++
   }

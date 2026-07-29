@@ -14,12 +14,22 @@ type ChoiceEvent = { kind: 'choice' } & ChoiceRequest
  * `choice` with an id already open) replaces the earlier one in place; a resolved gate
  * never lingers. The run can park on several gates at once (#440 shows them all at once
  * in the right rail), so this returns the list rather than just the latest.
+ *
+ * An `end` event closes every open gate — the same "a finished run is not awaiting anything"
+ * rule the run's own meta fold applies. This is what expires a dead run's question (#1359):
+ * a run that died mid-gate never wrote `choice-resolved`, and the store's surrogate end is
+ * the only signal that the question's audience is gone, so rendering past it left the panel
+ * answerable forever while its picks were read by nobody.
  */
 export function pendingChoices(events: readonly FrameworkEvent[]): ChoiceRequest[] {
   const open = new Map<string, ChoiceRequest>()
   for (const event of events) {
     if (event.kind === 'choice-resolved') {
       open.delete(event.id)
+      continue
+    }
+    if (event.kind === 'end') {
+      open.clear()
       continue
     }
     if (event.kind === 'choice') {

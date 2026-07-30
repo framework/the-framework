@@ -92,6 +92,24 @@ export function isTicketPath(path: string): boolean {
   return file.endsWith('.md') && !file.includes('/') && !file.startsWith('.')
 }
 
+/**
+ * The GitHub issue a ticket tracks, as a `#42` reference, or `undefined` when it tracks none.
+ *
+ * Read off the ticket's `GitHub: [#42](…/issues/42)` header line (`prompts/ticketing_format.md`).
+ * The number comes from the URL when there is one — the label is display text, the URL is the
+ * identity — with the label's own `#42` as the fallback for a hand-written line.
+ *
+ * This is what lets a merge close the ticket's issue (#1334): the reference rides the PR title
+ * as `(fix #42)`, and GitHub's squash subject inherits the title.
+ */
+export function ticketIssueRef(md: string): string | undefined {
+  const line = md.split('\n').find(l => l.trim().toLowerCase().startsWith('github:'))
+  if (!line) return undefined
+  const url = /\((?:[^)]*\/)?(?:issues|pull)\/(\d+)\)/.exec(line)
+  const match = url ?? /#(\d+)/.exec(line)
+  return match ? `#${match[1]}` : undefined
+}
+
 /** The brief hyphen spelling from #682, read as a fallback after #674 settled on the underscore. */
 export const LEGACY_HYPHEN_TODO_FILE = 'TODO-AGENTS.md'
 

@@ -717,3 +717,25 @@ test('resolveRunPr reports pending only while nothing was found and a lookup is 
   assert.equal(found.value, undefined)
   assert.equal(found.pending, true)
 })
+
+test("a run implementing a ticket carries its issue as `(fix #42)` in the PR title (#1334)", async () => {
+  // The squash-merge subject inherits the title, so this is what closes the ticket's issue on
+  // merge; without it an auto-merged quick-win leaves its ticket open.
+  const gh: string[][] = []
+  const { git } = fakeGit({ ...READY, push: '' })
+  await runAutoHandoff(
+    '/repo',
+    { id: 'r1', branch: 'the-framework/x', sessionName: 'fix-login', fixes: '#42' },
+    { push: true, pr: true },
+    {
+      git,
+      pr: async () => undefined,
+      gh: async args => {
+        gh.push(args)
+        return 'https://github.com/o/r/pull/9\n'
+      },
+    },
+  )
+  const title = gh[0]?.[gh[0].indexOf('--title') + 1]
+  assert.equal(title, 'fix-login (fix #42)')
+})

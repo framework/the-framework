@@ -68,18 +68,19 @@ test('deployPlan returns the chosen deploy target from the deploy event; latest 
 
 test('a run with no handoff events reads as armed, matching what it will do (#1102)', () => {
   // An older run emits no `handoff-armed`. Reading that as disarmed would show two unticked boxes
-  // for a session that is in fact going to push and open a PR.
-  assert.deepEqual(handoffState([]), { push: true, pr: true })
+  // for a session that is in fact going to push and open a PR. Merge is the opposite (#1382): it
+  // is opt-in, so silence must read as off.
+  assert.deepEqual(handoffState([]), { push: true, pr: true, merge: false })
 })
 
 test('handoffState seeds from the run record when the stream missed the opening event (#1376)', () => {
   // The run writes `handoff-armed` as its very first event, before the live channel attaches, so
   // a live tab folds a stream without it. The record's mirror is the truth then: a push-only run
   // must not read as "Open PR".
-  assert.deepEqual(handoffState([], { push: true, pr: false }), { push: true, pr: false })
+  assert.deepEqual(handoffState([], { push: true, pr: false }), { push: true, pr: false, merge: false })
   // A `handoff-armed` in the stream is newer than any record snapshot: it wins over the seed.
   const rearmed: FrameworkEvent[] = [{ kind: 'handoff-armed', push: true, pr: true }]
-  assert.deepEqual(handoffState(rearmed, { push: true, pr: false }), { push: true, pr: true })
+  assert.deepEqual(handoffState(rearmed, { push: true, pr: false }), { push: true, pr: true, merge: false })
 })
 
 test('handoffState takes the latest arming, so unticking a box sticks (#1102)', () => {
@@ -87,7 +88,18 @@ test('handoffState takes the latest arming, so unticking a box sticks (#1102)', 
     { kind: 'handoff-armed', push: true, pr: true },
     { kind: 'handoff-armed', push: true, pr: false },
   ]
-  assert.deepEqual(handoffState(events), { push: true, pr: false })
+  assert.deepEqual(handoffState(events), { push: true, pr: false, merge: false })
+})
+
+test('handoffState carries the merge arming, and an event without it keeps the seed (#1382)', () => {
+  // A merge-armed run must never read as "draft PR": that lie is the whole of #1382.
+  const armed: FrameworkEvent[] = [{ kind: 'handoff-armed', push: true, pr: true, merge: true }]
+  assert.deepEqual(handoffState(armed), { push: true, pr: true, merge: true })
+  // Seeded from the record mirror when the stream missed the opening event, like push/pr (#1376).
+  assert.deepEqual(handoffState([], { push: true, pr: true, merge: true }), { push: true, pr: true, merge: true })
+  // A pre-#1382 event carries no merge field: it must not flip a seeded arming off.
+  const old: FrameworkEvent[] = [{ kind: 'handoff-armed', push: true, pr: true }]
+  assert.deepEqual(handoffState(old, { push: true, pr: true, merge: true }), { push: true, pr: true, merge: true })
 })
 
 test('handoffState carries the outcome once the handoff has run (#1102)', () => {

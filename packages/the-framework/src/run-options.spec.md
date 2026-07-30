@@ -4,7 +4,7 @@ Pure mapping from the user's resolved preferences to the `StartRunOptions` a run
 
 - `runOptionsFromPreferences()`: the one mapping (autopilot defaults on, browser Claude-only, eco drops suppressed under vanilla/transparent, four eco preferences collapsed into one object, non-local `target` only when set).
 - `preferencesFromFileConfig()` (#842): a repo's committed `the-framework.yml` translated into preference keys (only keys the file set come back; `antiLazyPill` is the file's name for the inverse of `vanilla`).
-- `handoffFromPreferences()` (#1102): both halves default on; opening a PR implies pushing (gh won't open one for a branch the remote has never seen), normalised here rather than in the three places that read it.
+- `handoffFromPreferences()` (#1102/#1379): both halves default on; a ladder, so `autoPushBranch` is the master and turning it off yields `{push: false, pr: false}` whatever the PR half says. gh won't open a PR for a branch the remote has never seen, so "PR without push" was never honourable — it used to force push back *on*, which left "publish nothing" unreachable from the launcher. Normalised here rather than in the three places that read it.
 - `autopilotEnabled()`: absent = on (the demo default, matching old localStorage semantics).
 
 ## Decisions

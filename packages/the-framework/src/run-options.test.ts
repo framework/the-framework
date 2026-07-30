@@ -31,12 +31,14 @@ test('auto-merge travels explicitly in both directions (#1216)', () => {
   assert.equal(runOptionsFromPreferences({}).autoMerge, false)
 })
 
-test('the handoff defaults to armed, and opening a PR implies pushing (#1102)', () => {
+test('the handoff defaults to armed, and push is the rung under the PR (#1102/#1379)', () => {
   assert.deepEqual(handoffFromPreferences({}), { push: true, pr: true })
-  // Unticking only the push half while the PR half stays on cannot disarm the push: `gh` will not
-  // open a PR for a branch the remote has never seen, so the pair is normalised rather than left
-  // to fail at the end of a session.
-  assert.deepEqual(handoffFromPreferences({ autoPushBranch: false }), { push: true, pr: true })
+  // Turning the push rung off publishes nothing, whatever the PR half says: `gh` will not open a
+  // PR for a branch the remote has never seen, so "PR without push" was never a state a run could
+  // honour. It used to resolve that by forcing push back on, which left "publish nothing"
+  // unreachable from the launcher — the ladder resolves it the other way.
+  assert.deepEqual(handoffFromPreferences({ autoPushBranch: false }), { push: false, pr: false })
+  assert.deepEqual(handoffFromPreferences({ autoPushBranch: false, autoOpenPr: true }), { push: false, pr: false })
   assert.deepEqual(handoffFromPreferences({ autoOpenPr: false }), { push: true, pr: false })
   assert.deepEqual(handoffFromPreferences({ autoPushBranch: false, autoOpenPr: false }), { push: false, pr: false })
 })

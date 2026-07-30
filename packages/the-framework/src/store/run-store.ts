@@ -155,8 +155,12 @@ export interface RunMeta {
    * obeys it, and a tab opened after the run started has no event history to fold — the same
    * reason {@link browserStreamPort} is here. Absent means an older run, which the reader treats
    * as armed, matching what that run will actually do.
+   *
+   * `merge` mirrors the auto-merge arming (#1216, #1382) — display-only, like the rest of this
+   * field: the run merges off its own config, never off the meta. Absent on records from before
+   * #1382, which the reader treats as off.
    */
-  handoff?: { push: boolean; pr: boolean }
+  handoff?: { push: boolean; pr: boolean; merge?: boolean }
   /**
    * The choice gate the run is currently parked on (#636): set when a `choice` event fires and
    * cleared when its `choice-resolved` (or the run's `end`) arrives. Present means the run is
@@ -315,7 +319,7 @@ export function applyEventToMeta(meta: RunMeta, event: FrameworkEvent, at: strin
       next.browserStreamPort = event.port
       break
     case 'handoff-armed':
-      next.handoff = { push: event.push, pr: event.pr }
+      next.handoff = { push: event.push, pr: event.pr, ...(event.merge !== undefined ? { merge: event.merge } : {}) }
       break
     case 'ticket':
       next.ticket = event.path

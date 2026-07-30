@@ -118,21 +118,30 @@ export function runOptionRows(preferences: Preferences): RunOptionRows {
       checked: onBeforeMergeableQuality && !transparent,
       ...overriddenByTransparent(transparent),
     },
-    // Where the handoff gets its default (#1102). A session's own action bar can still untick it for
-    // that one run; this is what every new session starts from.
+    // Where the handoff gets its default (#1102). A session's own action bar can still untick the
+    // whole ladder for that one run (#1173); this is what every new session starts from.
     //
-    // One row, not the `Push branch` / `Open PR` pair this used to be (#1164/#1173). Opening a PR
-    // pushes the branch on the way, so `Push branch` was disabled and explained away as "opening a
-    // PR already pushes the branch" whenever `Open PR` was on, which is the default: a control that
-    // is greyed out almost always, and that nobody could say the purpose of when it was not.
-    // Push-without-PR stays reachable where someone deliberately wanting it would look: the
-    // `autoPushBranch` preference key, the `--auto-push-branch` flag, and `the-framework.yml`.
+    // The publish ladder (#1379): three rungs, each enabled only while the one below it is on. The
+    // pair this replaced (#1164/#1173) showed only `Open PR`, so "Open PR: off" silently meant
+    // "push-only" — a user who read that as "publishing off" still got their branch pushed, and the
+    // launcher disagreed with the session header, where unticking means the session hands off
+    // nothing. A strict ladder cannot express the contradictory state (PR on / push off) that made
+    // the old two-equal-boxes UI unreadable, and it finally makes "publish nothing" reachable here
+    // rather than only via the preference key, `--auto-push-branch`, and `the-framework.yml`.
+    {
+      key: 'autoPushBranch',
+      label: 'Push branch',
+      description: 'Pushes the session branch when it finishes.',
+      title: "Push the session's branch to the remote when it finishes. The bottom rung: with this off the session publishes nothing, and neither PR nor merge can run",
+      checked: handoff.push,
+    },
     {
       key: 'autoOpenPr',
       label: 'Open PR',
       description: 'Opens a draft pull request when it finishes.',
       title: 'Open a draft pull request when the session finishes, pushing the branch on the way. Draft, so it does not request review; it still shows on the needs-you queue',
       checked: handoff.pr,
+      ...(handoff.push ? {} : { disabled: true, disabledReason: 'nothing to open while Push branch is off' }),
     },
     // Default-off, unlike the row above (#1216): publishing a branch is reversible, landing it on
     // the default branch is not. The routines that merge their own work (the queue drain) say so

@@ -180,19 +180,24 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
   // `projects` is passed raw (may be undefined) so the mount falls back to the global
   // registry, byte-identical to the daemon default; the per-run dashboard passes a
   // single-project provider, the relay an empty one.
-  const telefuncMount = makeTelefuncMount({
-    ...(opts.onStart ? { startRun: opts.onStart } : {}),
-    ...(opts.projects ? { projects: opts.projects } : {}),
-    ...(opts.onAddProject ? { addProject: opts.onAddProject } : {}),
-    ...(opts.preview ? { preview: opts.preview } : {}),
-    ...(opts.eventsSource ? { eventsSource: opts.eventsSource } : {}),
-    ...(opts.remote ? { remote: opts.remote } : {}),
-    preferences: opts.preferences ?? registryPreferencesStore(),
-    discord: opts.discord ?? registryDiscordCredentialsStore(),
-    ...(opts.autoPm ? { autoPm: opts.autoPm } : {}),
-    ...(opts.autoPmSweep ? { autoPmSweep: opts.autoPmSweep } : {}),
-    quota,
-  })
+  const telefuncMount = makeTelefuncMount(
+    {
+      ...(opts.onStart ? { startRun: opts.onStart } : {}),
+      ...(opts.projects ? { projects: opts.projects } : {}),
+      ...(opts.onAddProject ? { addProject: opts.onAddProject } : {}),
+      ...(opts.preview ? { preview: opts.preview } : {}),
+      ...(opts.eventsSource ? { eventsSource: opts.eventsSource } : {}),
+      ...(opts.remote ? { remote: opts.remote } : {}),
+      preferences: opts.preferences ?? registryPreferencesStore(),
+      discord: opts.discord ?? registryDiscordCredentialsStore(),
+      ...(opts.autoPm ? { autoPm: opts.autoPm } : {}),
+      ...(opts.autoPmSweep ? { autoPmSweep: opts.autoPmSweep } : {}),
+      quota,
+    },
+    // The bound host, so the mount can reject a rebound `Host`: a page on evil.com whose DNS
+    // answers 127.0.0.1 is same-origin to the browser, so the Origin check alone lets it in.
+    { host },
+  )
 
   // The device-to-daemon relay endpoints (#1067): wired only when the daemon supplies both a start
   // and an events tail. Fronted by the same token guard as every other route below.

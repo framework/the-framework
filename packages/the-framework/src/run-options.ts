@@ -50,12 +50,17 @@ export function autopilotEnabled(preferences: Preferences): boolean {
  * The end-of-session handoff a set of preferences arms (#1102). Both halves default on, which is
  * what makes it zero-config: a session left alone pushes its branch and opens a draft PR.
  *
- * Opening a PR implies pushing — `gh` will not open one for a branch the remote has never seen —
- * so the pair is normalised here rather than in the three places that read it.
+ * A ladder, not a pair (#1379): pushing is the rung under opening a PR, so `autoPushBranch` is the
+ * master and turning it off publishes nothing. `gh` will not open a PR for a branch the remote has
+ * never seen, so "PR without push" was never a state a run could honour — it used to resolve the
+ * contradiction by turning push back *on*, which meant a launcher that offered "publish nothing"
+ * could not deliver it. Normalised here rather than in the three places that read it.
+ *
+ * Defaults are untouched: both on, so anyone who never opens the menu gets identical behaviour.
  */
 export function handoffFromPreferences(preferences: Preferences): { push: boolean; pr: boolean } {
-  const pr = preferences.autoOpenPr ?? true
-  return { push: pr || (preferences.autoPushBranch ?? true), pr }
+  const push = preferences.autoPushBranch ?? true
+  return { push, pr: push && (preferences.autoOpenPr ?? true) }
 }
 
 /**

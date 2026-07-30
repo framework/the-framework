@@ -25,6 +25,15 @@ import { nodeGitRunner } from './project.js'
  * agent at the user's working tree and its uncommitted work.
  */
 
+/**
+ * Teardown options for every `rm` in this file. Starts spawn detached, and daemon-side writes
+ * (meta, sessions, registry) can still be landing when a teardown begins; a concurrent create
+ * inside a dir being removed fails the whole rm with ENOTEMPTY (#1165's teardown-race tail —
+ * the body passes, the cleanup flakes, #1398). Retrying absorbs that tail. Half the file already
+ * used these options ad hoc; the flake lived in the teardowns that did not.
+ */
+const RETRIED_RM = { recursive: true, force: true, maxRetries: 10, retryDelay: 100 } as const
+
 /** A stub CLI that records the argv it was spawned with, so a start is observable. */
 async function writeStub(dir: string, log: string): Promise<string> {
   const stub = join(dir, 'stub-cli.cjs')
@@ -97,7 +106,7 @@ test('a repo whose worktree could not be created fails the run instead of borrow
     assert.deepEqual(await startedArgs(log, 1), [], 'no run was spawned at all')
     await runtime.dispose()
   } finally {
-    await rm(cwd, { recursive: true, force: true })
+    await rm(cwd, RETRIED_RM)
   }
 })
 
@@ -122,7 +131,7 @@ test('a project that is not a git repo still falls back to the main checkout, an
     assert.match(logged, /is not a git repository, so it gets no worktree/)
     await runtime.dispose()
   } finally {
-    await rm(cwd, { recursive: true, force: true })
+    await rm(cwd, RETRIED_RM)
   }
 })
 
@@ -164,8 +173,8 @@ test('a project-less topic run spawns in a neutral scratch dir with no worktree 
     assert.equal(await stat(scratch).then(s => s.isDirectory(), () => false), true, 'the scratch dir exists')
     await runtime.dispose()
   } finally {
-    await rm(home, { recursive: true, force: true })
-    await rm(config, { recursive: true, force: true })
+    await rm(home, RETRIED_RM)
+    await rm(config, RETRIED_RM)
   }
 })
 
@@ -191,7 +200,7 @@ test('a topic scratch dir is removed on a clean finish and retained on failure o
     await tearDownTopicScratch(running)
     assert.equal(await exists(running), true, 'a run still going keeps its scratch dir')
   } finally {
-    await rm(base, { recursive: true, force: true })
+    await rm(base, RETRIED_RM)
   }
 })
 
@@ -210,7 +219,7 @@ test('a SIGTERMed worktree add has its partial checkout removed, other failures 
     await cleanupTimedOutWorktree(repo, 'run1', new CliTimeoutError('git', ['worktree', 'add'], 120_000))
     assert.equal(await exists(), false, 'a timeout kill takes its half-written checkout with it')
   } finally {
-    await rm(repo, { recursive: true, force: true })
+    await rm(repo, RETRIED_RM)
   }
 })
 
@@ -358,13 +367,9 @@ test('binding a topic run re-homes it into the bound project: a worktree there, 
   } finally {
     await runtime.suspendRuns().catch(() => {})
     await runtime.dispose()
-    // Retried: the continued run's daemon-side writes (meta, sessions, registry) can still be
-    // landing when this teardown starts, and a concurrent create inside a dir being removed fails
-    // the whole rm with ENOTEMPTY (#1165's teardown-race tail: the body passes, the cleanup flakes).
-    const retried = { recursive: true, force: true, maxRetries: 10, retryDelay: 100 } as const
-    await rm(home, retried)
-    await rm(config, retried)
-    await rm(target, retried)
+    await rm(home, RETRIED_RM)
+    await rm(config, RETRIED_RM)
+    await rm(target, RETRIED_RM)
   }
 })
 
@@ -397,8 +402,8 @@ test('a bind to an unresolvable project retains the scratch and surfaces the fai
   } finally {
     await runtime.suspendRuns().catch(() => {})
     await runtime.dispose()
-    await rm(home, { recursive: true, force: true })
-    await rm(config, { recursive: true, force: true })
+    await rm(home, RETRIED_RM)
+    await rm(config, RETRIED_RM)
   }
 })
 
@@ -432,7 +437,7 @@ test('moveTopicRunHistory copies the log and re-marks the meta as a bound projec
     assert.equal(moved.intent, 'draft a plan')
     assert.match(await readFile(join(worktree, FRAMEWORK_DIR, EVENTS_FILE), 'utf8'), /hello/, 'the event log came along')
   } finally {
-    await rm(base, { recursive: true, force: true })
+    await rm(base, RETRIED_RM)
   }
 })
 
@@ -493,7 +498,7 @@ test('a worktree run whose child dies at boot is marked failed instead of waitin
     assert.equal(await stat(worktree).then(s => s.isDirectory(), () => false), true, 'the worktree is retained')
   } finally {
     await runtime.dispose()
-    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    await rm(cwd, RETRIED_RM)
   }
 })
 
@@ -513,8 +518,8 @@ test('a topic run whose child dies at boot is marked failed and its scratch reta
     assert.equal(await stat(scratch).then(s => s.isDirectory(), () => false), true, 'the scratch is retained for inspection')
   } finally {
     await runtime.dispose()
-    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
-    await rm(config, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    await rm(home, RETRIED_RM)
+    await rm(config, RETRIED_RM)
   }
 })
 
@@ -527,7 +532,7 @@ test('a child that wrote its own lifecycle is left alone by the failed-start mar
     assert.equal(meta.status, 'done', 'the run reported its own end; the marker does not rewrite history')
     assert.equal(await stat(join(base, FRAMEWORK_DIR, EVENTS_FILE)).then(() => true, () => false), false, 'and no failure line is invented')
   } finally {
-    await rm(base, { recursive: true, force: true })
+    await rm(base, RETRIED_RM)
   }
 })
 
@@ -609,7 +614,7 @@ test('a run that dies to a transient API error is continued, at most twice (#128
     assert.equal(after.length, 1 + MAX_TRANSIENT_RETRIES)
   } finally {
     await runtime.dispose()
-    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    await rm(cwd, RETRIED_RM)
   }
 })
 
@@ -633,7 +638,7 @@ test('a run that fails on its own terms is not retried (#1281)', async () => {
     assert.deepEqual(after, ['start'], 'a real failure stands; only transport deaths earn a retry')
   } finally {
     await runtime.dispose()
-    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    await rm(cwd, RETRIED_RM)
   }
 })
 
@@ -679,7 +684,7 @@ test('a start on a logged-out agent is refused, and spends no branch or worktree
     assert.equal(await readFile(log, 'utf8').catch(() => ''), '')
   } finally {
     await runtime.dispose()
-    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    await rm(cwd, RETRIED_RM)
   }
 })
 
@@ -704,7 +709,7 @@ test('an actions run starts without a local agent CLI at all (#1326)', async () 
     assert.equal(probed, false, 'a run that needs no local CLI is not gated on one')
   } finally {
     await runtime.dispose()
-    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    await rm(cwd, RETRIED_RM)
   }
 })
 
@@ -729,7 +734,7 @@ test('a passing preflight is probed once for a burst of starts (#1326)', async (
     assert.equal(probes, 1, 'a pass is cached; only a failure is re-probed every time')
   } finally {
     await runtime.dispose()
-    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    await rm(cwd, RETRIED_RM)
   }
 })
 
@@ -753,6 +758,6 @@ test('a logged-out agent is re-probed on every start, so logging in is picked up
     assert.equal(probes, 2)
   } finally {
     await runtime.dispose()
-    await rm(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+    await rm(cwd, RETRIED_RM)
   }
 })

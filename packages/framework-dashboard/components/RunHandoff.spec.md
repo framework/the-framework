@@ -10,7 +10,7 @@ The end-of-session handoff surfaces (#799): what the session produced and the ne
 
 ## Decisions
 
-- One checkbox and one button, not two (#1173): "Push branch"+"Open PR" sat as equals and nobody could put a purpose to pushing without a PR; opening a PR pushes on the way, so the outcome-naming control stays. A push-only session (still settable in Settings) relabels the box "Push branch" — the box never describes something other than what will happen.
+- One checkbox and one button, not two (#1173): "Push branch"+"Open PR" sat as equals and nobody could put a purpose to pushing without a PR; opening a PR pushes on the way, so the outcome-naming control stays. A push-only session (still settable in Settings) relabels the box "Push branch" — the box never describes something other than what will happen. A merge-armed session (#1382) relabels it "Open PR & merge" for the same reason: merge has no checkbox (#1216), but a box saying "Open PR" about a run that lands on main by itself is the lie the label rule exists to prevent.
 - `HandoffArm` holds a `pending` optimistic state until the event stream echoes the click back: the instruction round-trips through a file the run tails, so rendering the stale value would flick the box under the cursor (same shape the quota slider needed for a polled value, #979).
 - Unticking the one box disarms both push and PR (`sendSetHandoff(p, r, false, false)`) — it no longer leaves the push quietly armed.
 - `HandoffActions` returns null while `handoff.pr || handoff.prPending` (#1028): offering to open a PR that exists is "the single mistake this must not make"; the interventions queue (#632) has it by then.

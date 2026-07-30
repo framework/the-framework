@@ -95,6 +95,12 @@ export interface HandoffState {
   push: boolean
   /** Open a draft PR on finish. Implies {@link push}. */
   pr: boolean
+  /**
+   * Merge the PR once opened (#1216) — armed at launch, no checkbox, never changes mid-run.
+   * Unlike the pair above this defaults to off: merging is opt-in, so a stream from before the
+   * event carried it (#1382) must not read as a run that will land on main by itself.
+   */
+  merge: boolean
   /** How the handoff ended, once it has run. Absent while the session is still going. */
   result?: { outcome: 'skipped'; reason: AutoHandoffSkip } | { outcome: 'done'; url?: string } | { outcome: 'failed'; error: string }
 }
@@ -112,12 +118,17 @@ export interface HandoffState {
  * (`RunRecord.handoff`) — without it, a session the launcher armed push-only reads as "Open PR".
  * A `handoff-armed` event in the stream still wins: it is newer than any record snapshot.
  */
-export function handoffState(events: readonly FrameworkEvent[], initial?: { push: boolean; pr: boolean }): HandoffState {
-  const state: HandoffState = { push: initial?.push ?? true, pr: initial?.pr ?? true }
+export function handoffState(
+  events: readonly FrameworkEvent[],
+  initial?: { push: boolean; pr: boolean; merge?: boolean },
+): HandoffState {
+  const state: HandoffState = { push: initial?.push ?? true, pr: initial?.pr ?? true, merge: initial?.merge ?? false }
   for (const event of events) {
     if (event.kind === 'handoff-armed') {
       state.push = event.push
       state.pr = event.pr
+      // Absent on pre-#1382 events: keep the seed rather than flipping an armed merge off.
+      if (event.merge !== undefined) state.merge = event.merge
     } else if (event.kind === 'handoff') {
       state.result =
         event.outcome === 'done'

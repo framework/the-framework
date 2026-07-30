@@ -30,6 +30,29 @@ test('formatFrameworkEvent renders a multi-select choice as a checklist (#332)',
   assert.equal(line, '? Pick problems to deep-dive\n    [x] auth flow\n    [ ] routing')
 })
 
+test('formatFrameworkEvent says the armed line as what will happen, merge included (#1382)', () => {
+  // A merge-armed run opens a ready PR and lands it by itself — the line must own that, not say
+  // "draft PR" about a run that is configured to merge to main unattended.
+  assert.equal(
+    formatFrameworkEvent({ kind: 'handoff-armed', push: true, pr: true, merge: true }),
+    '  when this ends: push the branch, open a PR, and merge it',
+  )
+  assert.equal(
+    formatFrameworkEvent({ kind: 'handoff-armed', push: true, pr: true, merge: false }),
+    '  when this ends: push the branch and open a draft PR',
+  )
+  // A pre-#1382 event has no merge field and must keep its old line.
+  assert.equal(
+    formatFrameworkEvent({ kind: 'handoff-armed', push: true, pr: true }),
+    '  when this ends: push the branch and open a draft PR',
+  )
+  // Merge without a PR cannot happen at fire time; the line never promises it.
+  assert.equal(
+    formatFrameworkEvent({ kind: 'handoff-armed', push: true, pr: false, merge: true }),
+    '  when this ends: push the branch',
+  )
+})
+
 test('formatFrameworkEvent renders a single-select choice with the recommended mark (#304)', () => {
   const line = formatFrameworkEvent({
     kind: 'choice',

@@ -168,6 +168,15 @@ test('metaFromEvents reconstructs the same snapshot as live appends', async () =
   assert.equal(meta.startedAt, AT)
 })
 
+test('applyEventToMeta mirrors the merge arming onto the meta, so a mid-run tab can read it (#1382)', () => {
+  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const armed = applyEventToMeta(base, { kind: 'handoff-armed', push: true, pr: true, merge: true }, AT)
+  assert.deepEqual(armed.handoff, { push: true, pr: true, merge: true })
+  // A pre-#1382 event has no merge field: the mirror stays shaped like the event, not padded.
+  const old = applyEventToMeta(base, { kind: 'handoff-armed', push: true, pr: false }, AT)
+  assert.deepEqual(old.handoff, { push: true, pr: false })
+})
+
 test('applyEventToMeta marks a thrown run as failed', () => {
   const base = metaFromEvents(RUN.slice(0, 4), AT)
   const failed = applyEventToMeta(base, { kind: 'end', ok: false, detail: 'boom' }, AT)

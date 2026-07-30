@@ -11,5 +11,5 @@ Pure projections of the `FrameworkEvent` stream into the dashboard's overview-ca
 ## Decisions
 
 - Kept in this package (not the dashboard) so the projections are unit-tested against the real event shapes.
-- `handoffState` starts `{push: true, pr: true}`: a run from before the feature emits no `handoff-armed` and must read as armed, which is what it will actually do on new code.
+- `handoffState` starts `{push: true, pr: true, merge: false}`: a run from before the feature emits no `handoff-armed` and must read as armed, which is what it will actually do on new code. Merge defaults the other way (#1382) — it is opt-in, so silence must not read as a run that lands on main by itself; an event without the field keeps the seed rather than flipping an armed merge off.
 - `SessionInfo.workspace` comes from the event, not the filesystem: a clean finish removes the worktree, so the event is the only surviving record of where the session lived — exactly what `claude --resume` needs (#1195).

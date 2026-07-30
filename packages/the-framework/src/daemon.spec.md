@@ -28,7 +28,7 @@ The machine-global daemon lifecycle (#302/#393): the liveness state file, ensure
 ## Facts
 
 - `DEFAULT_DAEMON_PORT` 4200; `DAEMON_STATE_HEARTBEAT_MS` 5000; ensure/stop grace default 5000ms.
-- `isLoopbackHost`: `localhost`, `::1`, `[::1]`, `127.*` — anything else gates behind the token.
+- `isLoopbackHost`: `localhost`, `::1`, `[::1]`, `127.*` — anything else gates behind the token. Defined in `loopback-host.ts` (the Telefunc mount shares it) and re-exported here.
 - `state.host` is absent in files written before #1051; readers treat it as optional.
 - `EventTailer` is `JsonlTailer<FrameworkEvent>` kept under its historical public name.
 - `listBridgeSessions` collects cloud runs across every registered project (a cloud run is not tied to the home checkout), best-effort per project so one unreadable repo cannot empty the list.

@@ -10,7 +10,7 @@ export {
   type SummarizeDeps,
 } from './projects.js'
 export { resolveDashboardBundle } from './bundle.js'
-export { makeTelefuncMount, isSameOriginRequest, type EventsSource } from './telefunc-serve.js'
+export { makeTelefuncMount, isSameOriginRequest, isExpectedHost, type EventsSource } from './telefunc-serve.js'
 export { serveClientBundle } from './static.js'
 export { readDocs, DOC_CATEGORIES, type WorkspaceDoc } from './docs.js'
 export { readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta, type TicketGithubLink } from './tickets.js'

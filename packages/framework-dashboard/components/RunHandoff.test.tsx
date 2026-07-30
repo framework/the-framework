@@ -180,7 +180,7 @@ describe('run handoff (#799)', () => {
 })
 
 describe('the handoff checkboxes (#1102)', () => {
-  const armed = { push: true, pr: true }
+  const armed = { push: true, pr: true, merge: false }
 
   test('one ticked box, so a session left alone hands itself back (#1102/#1173)', () => {
     render(<HandoffArm projectId="p1" runId="run-1" state={armed} />)
@@ -200,7 +200,7 @@ describe('the handoff checkboxes (#1102)', () => {
   })
 
   test('ticking it arms the push too, since opening a PR needs the branch on the remote', async () => {
-    render(<HandoffArm projectId="p1" runId="run-1" state={{ push: false, pr: false }} />)
+    render(<HandoffArm projectId="p1" runId="run-1" state={{ push: false, pr: false, merge: false }} />)
     fireEvent.click(screen.getByText('Open PR'))
     await waitFor(() => expect(sendSetHandoff).toHaveBeenCalledWith('p1', 'run-1', true, true))
   })
@@ -208,9 +208,15 @@ describe('the handoff checkboxes (#1102)', () => {
   test('a push-only session says "Push branch", rather than an unticked box while it pushes (#1173)', () => {
     // Reachable from the settings, where push and PR are still separate. The one box names whatever
     // this session will actually do, so it is never describing something other than what happens.
-    render(<HandoffArm projectId="p1" runId="run-1" state={{ push: true, pr: false }} />)
+    render(<HandoffArm projectId="p1" runId="run-1" state={{ push: true, pr: false, merge: false }} />)
     expect(screen.getByText('Push branch')).toBeTruthy()
     expect(screen.getAllByRole('checkbox')[0]?.getAttribute('data-checked')).not.toBeNull()
+  })
+
+  test('a merge-armed session says "Open PR & merge" — never "Open PR" about a run that lands on main (#1382)', () => {
+    render(<HandoffArm projectId="p1" runId="run-1" state={{ push: true, pr: true, merge: true }} />)
+    expect(screen.getByText('Open PR & merge')).toBeTruthy()
+    expect(screen.queryByText('Open PR')).toBeNull()
   })
 
   test('the click holds until the run echoes it back, so the box does not bounce', async () => {

@@ -13,6 +13,7 @@ import { addProject, ensureDaemonToken, listProjects, nodeRegistryFs, readPrefer
 import { listReposInDirectory } from './repos-directory.js'
 import { registryDiscordCredentialsStore } from './discord-credentials-store.js'
 import { JsonlTailer } from './jsonl-tail.js'
+import { isLoopbackHost } from './loopback-host.js'
 import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
 import { readAllRuns } from './store/index.js'
 import type { BridgeSession } from './dashboard/index.js'
@@ -48,11 +49,10 @@ export const DEFAULT_DAEMON_HOST = '127.0.0.1'
 
 /**
  * True when `host` is a loopback address the browser reaches without leaving the machine (#1051).
- * A bind-all (`0.0.0.0`, `::`) or a routable address is not, and gates behind the shared token.
+ * Defined in its own leaf module so the dashboard's Telefunc mount can share the one definition
+ * without importing this one back (a cycle); re-exported here for the callers that already had it.
  */
-export function isLoopbackHost(host: string): boolean {
-  return host === 'localhost' || host === '::1' || host === '[::1]' || host.startsWith('127.')
-}
+export { isLoopbackHost }
 
 /** What a running daemon writes so a later `framework` invocation can find it. */
 export interface DaemonState {

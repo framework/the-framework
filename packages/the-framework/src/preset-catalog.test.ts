@@ -114,9 +114,11 @@ test('Research gates on a multi-select and writes its own review file (#331)', (
   assert.match(presets.research.template, /<AWAIT>/)
   assert.match(presets.research.template, /<REVIEW_FILE>/)
   assert.match(presets.research.template, /<TODO_FILE>/)
-  // #1369: the deep-dive picks land on the flat queue, not a session-scoped backlog.
-  assert.match(presets.research.template, /TODO_FILE: `TODO_AGENTS\.md`/)
-  assert.doesNotMatch(presets.research.template, /TODO_<SESSION_NAME>/)
+  // Session-scoped on purpose (42fd47d, brillout on #1370): routing the deep-dive picks to the
+  // flat `TODO_AGENTS.md` queue delays the research work, because the queue is what gets drained
+  // into follow-up agents. These picks stay beside the review file for the session instead.
+  assert.match(presets.research.template, /TODO_FILE: `TODO_<SESSION_NAME>\.agent\.md`/)
+  assert.doesNotMatch(presets.research.template, /TODO_AGENTS\.md/)
 })
 
 test('the Maintenance template queues work rather than doing it (#881)', () => {

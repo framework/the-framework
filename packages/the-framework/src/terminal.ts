@@ -51,6 +51,9 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       }
     case 'handoff-armed': {
       // Said as what will happen, not as two flags: the line is read once, at a glance.
+      // A merge-armed run's PR is opened ready, not draft, and lands by itself — the line must say
+      // so (#1382): merging unattended is the one consequence a reader cannot be left to infer.
+      if (event.pr && event.merge) return `  when this ends: push the branch, open a PR, and merge it`
       if (event.pr) return `  when this ends: push the branch and open a draft PR`
       if (event.push) return `  when this ends: push the branch`
       return `  when this ends: nothing — push and PR are both off`

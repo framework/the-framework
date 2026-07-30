@@ -3,7 +3,7 @@ One session's view, running or finished (#1026): a stable frame (action bar + di
 ## TLDR
 
 - Replaced the old RunLive/RunReplay pair: swapping components at status flip remounted everything (bar blanked, feed showed "Loading session…", composer rebuilt) at the exact moment the user is most likely reading.
-- Event source: while live, the channel's `events`; once ended, the archived log (`onRun`) is read and swapped in *behind* the events already on screen (`shown = live ? events : archived ?? events`) so nothing blanks.
+- Event source: while live, the channel's `events`; once ended, the archived log (`onRun`) is read and swapped in *behind* the events already on screen (`shown = live ? events : archived?.length ? archived : events`) so nothing blanks. An empty archive counts as not-there-yet (#1383): `onRun` answers `[]` for "not archived yet" as well as "gone", and a Stop races the archive write — swapping to that `[]` blanked a populated feed to "This session has no events." until refresh.
 - `working = live && !agentSettled(events)` — the agent still working is NOT the run process being up (#1173): a settled session parks on the user but stays alive for messages (#785/#714), so its status reads `running` indefinitely; keying the handoff off `live` showed arming checkboxes forever.
 - Bar summary swaps once: live counts (`ChangesSummary` fed by `RunChanges.onSummary`) → handoff summary, only after `handoff.loaded` (#1030, no blank beat); auto-handoff failures surface in the bar (#1102) since the returning buttons alone look like nothing was tried.
 - Bar `actions`: `HandoffArm` while working, `HandoffActions` after; disclosure (`open`) reveals `SessionDetails` (agent+spend strip, #322) plus `RunChanges` (working) or `RunHandoffDetails` (settled).

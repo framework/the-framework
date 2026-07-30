@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
@@ -38,7 +39,7 @@ import {
 } from './run.js'
 import { FAKE_DEPLOY, FAKE_INTENT, FAKE_SIGNALS, fakeDriver } from './fake-script.js'
 import { readProjectSignals } from './project.js'
-import { isTicketPath } from './tickets.js'
+import { isTicketPath, ticketIssueRef } from './tickets.js'
 import { sessionTodoPending } from './todo-loop.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from './config.js'
 import {
@@ -1701,11 +1702,18 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     const branch = await currentBranch(cwd)
     if (!branch) return skip('branch-gone')
     const sessionName = journal.sessionName()
+    // The ticket's GitHub issue rides the PR title as `(fix #42)` (#1334): the squash-merge
+    // subject inherits the title, so the merge closes the issue — without it, an auto-merged
+    // quick-win leaves its ticket open. Best-effort: a ticket that cannot be read fixes nothing.
+    const fixes = opts.ticket && isTicketPath(opts.ticket)
+      ? ticketIssueRef(await readFile(join(cwd, opts.ticket), 'utf8').catch(() => ''))
+      : undefined
     const run = {
       id: opts.runId ?? '',
       branch,
       ...(sessionName ? { sessionName } : {}),
       ...(intent ? { intent } : {}),
+      ...(fixes ? { fixes } : {}),
     }
     const handedOff = await runAutoHandoff(cwd, run, armed)
     const outcome =

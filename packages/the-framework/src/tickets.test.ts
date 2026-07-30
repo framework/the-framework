@@ -12,6 +12,7 @@ import {
   findFlatTodo,
   isTicketPath,
   ticketFromQueueEntry,
+  ticketIssueRef,
   todoPriorityForTicket,
 } from './tickets.js'
 import { TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
@@ -123,4 +124,16 @@ test('only a plain file inside tickets/ counts as a ticket path (#1117)', () => 
   }
   // A traversal dressed as a link is refused at the same gate.
   assert.equal(ticketFromQueueEntry('[sneaky](tickets/../../etc/passwd)'), undefined)
+})
+
+test('ticketIssueRef reads the issue off the GitHub header line, URL first (#1334)', () => {
+  const md = 'Status: open\nGitHub: [#42](https://github.com/org/repo/issues/42)\n\n# T\n'
+  assert.equal(ticketIssueRef(md), '#42')
+  // The URL is the identity: a label that disagrees with it loses.
+  assert.equal(ticketIssueRef('GitHub: [gh-7](https://github.com/o/r/issues/99)\n'), '#99')
+  // A hand-written line with no URL still counts by its label.
+  assert.equal(ticketIssueRef('GitHub: #13\n'), '#13')
+  // No header, or one naming no number, fixes nothing.
+  assert.equal(ticketIssueRef('# A ticket with no GitHub line\n'), undefined)
+  assert.equal(ticketIssueRef('GitHub: none yet\n'), undefined)
 })

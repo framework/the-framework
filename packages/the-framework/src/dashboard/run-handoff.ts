@@ -490,7 +490,7 @@ export async function openSessionPullRequest(
   // Refuse rather than open an empty PR: a session that changed nothing has nothing to hand off.
   if (handoff?.empty) return { ok: false, error: 'this session produced no commits to open a PR for' }
   return openRunPullRequest(cwd, branch, {
-    title: run.sessionName ?? run.intent?.split('\n')[0]?.slice(0, 72) ?? `Session ${run.id}`,
+    title: sessionPrTitle(run),
     body: sessionPrBody(run),
     ...(handoff?.base ? { base: handoff.base } : {}),
     ...(options.draft ? { draft: true } : {}),
@@ -598,7 +598,7 @@ export async function runAutoHandoff(
       cwd,
       branch,
       {
-        title: run.sessionName ?? run.intent?.split('\n')[0]?.slice(0, 72) ?? `Session ${run.id}`,
+        title: sessionPrTitle(run),
         body: sessionPrBody(run),
         // GitHub refuses to merge or auto-merge a draft, so an armed merge (#1216) opens the PR
         // ready: its review happened on the queue before the run, which is the same reason the
@@ -635,7 +635,21 @@ export async function runAutoHandoff(
  * the PR. Narrower than {@link RunMeta} so the run process can call this before its meta is
  * final, and so a caller cannot quietly start depending on the rest of the run's state.
  */
-export type HandoffRun = Pick<RunMeta, 'id' | 'branch' | 'sessionName' | 'intent'> & Partial<Pick<RunMeta, 'startedAt'>>
+export type HandoffRun = Pick<RunMeta, 'id' | 'branch' | 'sessionName' | 'intent'> &
+  Partial<Pick<RunMeta, 'startedAt'>> & {
+    /**
+     * The GitHub issue the run's ticket tracks (`#42`), when it implements one (#1334). Carried
+     * into the PR title as `(fix #42)` so the squash-merge commit — which inherits the title —
+     * closes the issue; without it an auto-merged quick-win leaves its ticket open.
+     */
+    fixes?: string
+  }
+
+/** The PR title for a session (#1102), with the ticket's issue reference riding along (#1334). */
+function sessionPrTitle(run: Pick<HandoffRun, 'id' | 'sessionName' | 'intent' | 'fixes'>): string {
+  const title = run.sessionName ?? run.intent?.split('\n')[0]?.slice(0, 72) ?? `Session ${run.id}`
+  return run.fixes ? `${title} (fix ${run.fixes})` : title
+}
 
 /** The PR number out of the URL `gh pr create` prints, e.g. `…/pull/123` (#1216). */
 function prNumberFromUrl(url: string | undefined): number | undefined {

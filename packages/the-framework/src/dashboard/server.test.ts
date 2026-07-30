@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { startDashboard } from './server.js'
-import { isSameOriginRequest } from './telefunc-serve.js'
+import { isExpectedHost, isSameOriginRequest } from './telefunc-serve.js'
 import type { FrameworkEvent } from '../events.js'
 import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'
 import type { IncomingMessage } from 'node:http'
@@ -63,6 +63,24 @@ function rawRequest(url: string, requestLine: string): Promise<string> {
 function postCrossOrigin(url: string): Promise<{ status: number; body: string }> {
   return new Promise((resolvePromise, rejectPromise) => {
     const req = request(url, { method: 'POST', headers: { origin: 'http://evil.com', 'content-type': 'application/json' } }, res => {
+      let body = ''
+      res.on('data', c => (body += c))
+      res.on('end', () => resolvePromise({ status: res.statusCode ?? 0, body }))
+    })
+    req.on('error', rejectPromise)
+    req.end('{}')
+  })
+}
+
+/**
+ * A POST as a DNS-rebinding attacker's page makes it: the browser resolved `evil.com` to
+ * 127.0.0.1, so it believes the request is same-origin and sends a matching `Origin` — the
+ * `Host` is the only header that still names who the page really is.
+ */
+function postRebound(url: string, host = 'evil.com'): Promise<{ status: number; body: string }> {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const headers = { host, origin: `http://${host}`, 'content-type': 'application/json' }
+    const req = request(url, { method: 'POST', headers }, res => {
       let body = ''
       res.on('data', c => (body += c))
       res.on('end', () => resolvePromise({ status: res.statusCode ?? 0, body }))
@@ -174,6 +192,25 @@ test('the Telefunc mount rejects a cross-origin POST (CSRF guard)', async () => 
     const { status, body } = await postCrossOrigin(dash.url + '/_telefunc')
     assert.equal(status, 403)
     assert.match(body, /cross-origin/)
+  } finally {
+    await dash.close()
+    await rm(bundle, { recursive: true, force: true })
+  }
+})
+
+test('the Telefunc mount rejects a rebound Host, which the Origin check alone lets through', async () => {
+  const bundle = await fakeBundle()
+  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  try {
+    // The attack: same-origin as far as the browser is concerned, so `isSameOriginRequest` passes it.
+    const rebound = await postRebound(dash.url + '/_telefunc')
+    assert.equal(rebound.status, 403)
+    assert.match(rebound.body, /Host/)
+
+    // The real thing still gets through: same request, but the Host the user actually typed.
+    // It reaches telefunc, which logs a parse error over the `{}` body — expected, not a failure.
+    const loopback = await postRebound(dash.url + '/_telefunc', new URL(dash.url).host)
+    assert.notEqual(loopback.status, 403)
   } finally {
     await dash.close()
     await rm(bundle, { recursive: true, force: true })
@@ -421,4 +458,23 @@ test('isSameOriginRequest: absent Origin passes; same host + loopback pass; evil
   assert.equal(isSameOriginRequest(req({ origin: 'http://[::1]' })), true)
   assert.equal(isSameOriginRequest(req({ host: 'localhost:4200', origin: 'http://evil.com' })), false)
   assert.equal(isSameOriginRequest(req({ origin: 'not-a-url' })), false)
+})
+
+test('isExpectedHost: on a loopback bind only a loopback Host passes (DNS rebinding)', () => {
+  const req = (headers: Record<string, string>): IncomingMessage => ({ headers } as IncomingMessage)
+  const bound = '127.0.0.1'
+  assert.equal(isExpectedHost(req({ host: '127.0.0.1:4200' }), bound), true)
+  assert.equal(isExpectedHost(req({ host: 'localhost:4200' }), bound), true)
+  assert.equal(isExpectedHost(req({ host: '[::1]:4200' }), bound), true) // the port split must not eat the IPv6 colons
+  assert.equal(isExpectedHost(req({ host: 'evil.com' }), bound), false) // rebound: resolves here, names someone else
+  assert.equal(isExpectedHost(req({ host: 'evil.com:4200' }), bound), false)
+  assert.equal(isExpectedHost(req({}), bound), false) // HTTP/1.1 requires Host; every browser sends it
+
+  // A non-loopback bind is reached by a name we cannot predict, so there is nothing to check
+  // against — that case gates behind the shared token (#1051) instead. The relay passes no host.
+  assert.equal(isExpectedHost(req({ host: 'evil.com' }), '0.0.0.0'), true)
+  assert.equal(isExpectedHost(req({ host: 'dash.example.com' }), undefined), true)
+
+  // The bound address itself passes even when it is not one of the loopback spellings.
+  assert.equal(isExpectedHost(req({ host: 'localhost:4200' }), 'localhost'), true)
 })

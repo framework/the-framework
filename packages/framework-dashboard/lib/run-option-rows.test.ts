@@ -10,17 +10,31 @@ const rows = (preferences: Preferences) => runOptionRows(preferences)
 const find = (list: OptionRow[], key: string) => list.find(r => r.key === key)!
 
 describe('runOptionRows', () => {
-  test('the handoff is one row, Open PR, not a pair with a greyed-out sibling (#1164/#1173)', () => {
-    // It used to offer `Push branch` beside it, disabled and explained away as "opening a PR
-    // already pushes the branch" whenever Open PR was on — which is the default, so the row was
-    // greyed out almost every time anyone opened the gear.
+  test('the publish ladder shows all three rungs, in order, both on by default (#1379)', () => {
+    // The pair this replaced showed only Open PR, so "Open PR: off" silently meant push-only — the
+    // launcher said publishing was off while the session header armed "Push branch: on".
     const main = rows({}).main
-    expect(main.filter(r => r.key === 'autoOpenPr')).toHaveLength(1)
-    expect(main.find(r => r.key === 'autoPushBranch')).toBeUndefined()
+    const ladder = main.filter(r => ['autoPushBranch', 'autoOpenPr', 'autoMerge'].includes(r.key))
+    expect(ladder.map(r => r.key)).toEqual(['autoPushBranch', 'autoOpenPr', 'autoMerge'])
+    expect(find(main, 'autoPushBranch').checked).toBe(true)
     expect(find(main, 'autoOpenPr').checked).toBe(true)
-    // The preference itself is untouched: push-without-PR stays reachable from the-framework.yml
-    // and the CLI flag, it just no longer competes for attention in the menu.
     expect(find(rows({ autoOpenPr: false }).main, 'autoOpenPr').checked).toBe(false)
+  })
+
+  test('Open PR needs Push branch, and unticking push disarms the whole ladder (#1379)', () => {
+    // The gating is what makes the contradictory state (PR on / push off) unreachable, and what
+    // finally makes "publish nothing" expressible from the launcher.
+    const noPush = rows({ autoPushBranch: false, autoOpenPr: true, autoMerge: true }).main
+    expect(find(noPush, 'autoPushBranch').checked).toBe(false)
+    const pr = find(noPush, 'autoOpenPr')
+    expect(pr.checked).toBe(false)
+    expect(pr.disabled).toBe(true)
+    expect(pr.disabledReason).toMatch(/Push branch/)
+    // The rung above it goes with it rather than staying live over a disarmed PR.
+    expect(find(noPush, 'autoMerge').checked).toBe(false)
+    expect(find(noPush, 'autoMerge').disabled).toBe(true)
+    // With push on, Open PR is an ordinary live row again.
+    expect(find(rows({}).main, 'autoOpenPr').disabled).toBeUndefined()
   })
 
   test('Auto-merge is off by default and needs Open PR to mean anything (#1216)', () => {

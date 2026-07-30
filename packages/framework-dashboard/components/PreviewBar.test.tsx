@@ -39,8 +39,20 @@ describe('PreviewBar serve picker (#651)', () => {
     render(<PreviewBar projectId="p2" inline />)
     // >1 target → a split control: [primary Serve, caret picker].
     await waitFor(() => expect(screen.getAllByRole('button')).toHaveLength(2))
-    fireEvent.click(screen.getAllByRole('button')[1]!) // open the caret dropdown
-    fireEvent.click(await screen.findByText('api'))
+    // Open the caret dropdown, re-clicking only while it still reads closed (#1398): a click
+    // dispatched before the trigger's listeners are attached opens nothing, and one findByText
+    // then times out on a menu that will never mount ("Unable to find … api" on a loaded CI
+    // runner, the caret's DOM dump still at aria-expanded="false"). Guarding on aria-expanded
+    // keeps the retry from toggling a menu that did open.
+    await waitFor(
+      () => {
+        const caret = screen.getAllByRole('button')[1]!
+        if (caret.getAttribute('aria-expanded') !== 'true') fireEvent.click(caret)
+        expect(caret.getAttribute('aria-expanded')).toBe('true')
+      },
+      { timeout: 5000 },
+    )
+    fireEvent.click(await screen.findByText('api', undefined, { timeout: 5000 }))
     await waitFor(() => expect(sendPreview).toHaveBeenCalledWith('p2', 'apps/api', undefined))
   })
 

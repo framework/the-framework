@@ -22,7 +22,7 @@ The backlog loop (#323): once the main work settles, consume the agent's own TOD
 - One `createTurnSignalEmitter` for the whole backlog, so `ready-for-merge` fires once across every item and a session name only re-emits on an actual rename.
 - A backlog turn is a turn like any other: await gates and signals are honored (via `runAwaitRounds`); a declined plan ends the item turn and the stall check takes it from there.
 - Plain append (no priority) is kept for resume notes and agent follow-ups: those are a running list whose order is theirs.
-- The session-scoped `TODO_<SESSION_NAME>.agent.md` backlog is retired (#1369): `TODO_AGENTS.md` superseded it — the system prompt migrated long ago, and the [Research] preset (its last writer) now points at the flat queue too. A leftover session file in a checkout is ignored, not drained.
+- The session-scoped `TODO_<SESSION_NAME>.agent.md` backlog is retired *as a drained queue* (#1369): `TODO_AGENTS.md` superseded it and the system prompt migrated long ago. A session file in a checkout is ignored here, not drained. The [Research] preset still writes one on purpose (42fd47d): its deep-dive picks are session notes, and putting them on the flat queue would spawn follow-up agents that delay the research itself.
 
 ## Facts
 

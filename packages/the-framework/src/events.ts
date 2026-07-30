@@ -205,8 +205,13 @@ export type FrameworkEvent =
    *
    * This is what makes the boxes survive a reload: the control channel carries the instruction,
    * but only an event reaches the run's meta, which is the one thing a tab opened later can read.
+   *
+   * `merge` carries the auto-merge arming (#1216) so the armed line can say the most consequential
+   * half of the plan (#1382): without it a merge-armed run advertised "open a draft PR" and then
+   * merged to main. Optional because journals written before #1382 lack it; absent reads as off,
+   * the conservative display. It has no checkbox and never changes mid-run, so re-emits repeat it.
    */
-  | { kind: 'handoff-armed'; push: boolean; pr: boolean }
+  | { kind: 'handoff-armed'; push: boolean; pr: boolean; merge?: boolean }
   /**
    * The ticket this run was started to implement (#1117), as a repo-relative `tickets/<file>.md`.
    *

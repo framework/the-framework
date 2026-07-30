@@ -9,5 +9,5 @@ Measure "problem variability" of ${{ tf.params.what }}
 
 AWAIT: Stop, await user answer before resuming
 REVIEW_FILE: `REVIEW-PROBLEMS_<SESSION_NAME>.agent.md`
-TODO_FILE: `TODO_AGENTS.md`
+TODO_FILE: `TODO_<SESSION_NAME>.agent.md`
 SESSION_NAME: the name of the current Git branch — sanitize it to be a SLUG, if name is generic (e.g. `main`) then create a succinct SLUG

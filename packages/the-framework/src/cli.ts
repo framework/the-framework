@@ -1601,7 +1601,10 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // Put the armed state on the run's meta (#1102), and keep it there as the checkboxes change it.
   // The control channel carries the instruction, but only an event reaches meta, and meta is the
   // only thing a dashboard tab opened mid-run can read the boxes back from.
-  announceHandoff = (push, pr) => onEvent({ kind: 'handoff-armed', push, pr })
+  // Merge rides along from the closure rather than the signature (#1382): it has no checkbox and
+  // never changes after launch, but every armed line must carry it or the meta a mid-run tab
+  // reads back would say "draft PR" about a run that is set to merge.
+  announceHandoff = (push, pr) => onEvent({ kind: 'handoff-armed', push, pr, merge: armedHandoff.merge === true })
   announceHandoff(armedHandoff.push, armedHandoff.pr)
   // The ticket this run implements (#1117), if the daemon named one. Once, at start: it is a fact
   // about why the run exists, not a state that changes, and folding it to meta is what lets the

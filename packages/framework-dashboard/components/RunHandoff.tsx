@@ -101,14 +101,19 @@ export function HandoffArm({
   // unticked "Open PR" while pushing behind it — the box never describes something other than what
   // will happen. Ticking it takes the full step; unticking it means the session hands off nothing.
   const pushOnly = shown.push && !shown.pr
+  // Merge arming has no checkbox (#1216) but the label must own it (#1382): a box saying "Open PR"
+  // on a run that will land on main by itself is the lie this component exists to not tell.
+  const merges = state.merge && !pushOnly
   return (
     <div className="flex items-center gap-x-3 whitespace-nowrap text-xs text-muted-foreground">
       <Arm
-        label={pushOnly ? 'Push branch' : 'Open PR'}
+        label={pushOnly ? 'Push branch' : merges ? 'Open PR & merge' : 'Open PR'}
         title={
           pushOnly
             ? "Push this session's branch to origin when it finishes. Set to push only, so no pull request is opened."
-            : 'Open a draft pull request when this session finishes, pushing the branch on the way.'
+            : merges
+              ? 'Open a pull request when this session finishes and merge it once it is open, pushing the branch on the way.'
+              : 'Open a draft pull request when this session finishes, pushing the branch on the way.'
         }
         checked={shown.pr || pushOnly}
         disabled={busy}

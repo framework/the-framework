@@ -24,11 +24,12 @@ export const SPIKE_LOCK_PREFIX = 'PENDING:'
 
 /**
  * How old a PENDING lock must be before it is presumed dead and released. Generous against the
- * slowest live path — a cloud spike that queues before it runs — because a lock released under a
- * live agent re-opens the double-work window the lock exists to close, while a dead agent's
- * ticket only waits one interval longer.
+ * slowest live path — spiking and planning can take hours, on top of a cloud queue — because a
+ * lock released under a live agent re-opens the double-work window the lock exists to close,
+ * while a dead agent's ticket only waits one interval longer. This is a bug-recovery mechanism
+ * that ideally never fires (#1364 review), so erring long costs nearly nothing.
  */
-export const SPIKE_LOCK_STALE_MS = 60 * 60 * 1000
+export const SPIKE_LOCK_STALE_MS = 6 * 60 * 60 * 1000
 
 /** Whether a sibling's content is a PENDING placeholder rather than a real spike or plan. */
 export function isSpikeLock(md: string): boolean {
@@ -81,6 +82,25 @@ const defaultPrTouches = async (cwd: string, file: string): Promise<boolean | un
   return value === undefined ? undefined : value.length > 0
 }
 
+/**
+ * Push the just-made lock commit to origin's default branch — the branch other machines fork
+ * from, the only place a lock closes the cross-machine window (#1320, #1364 review). Pushed only
+ * when the checkout is *on* that branch: `HEAD:main` from anywhere else would carry the branch's
+ * own commits onto main, and the old `HEAD:<current branch>` published whatever branch the
+ * checkout happened to be on. Resolves false when the push was skipped for that reason; a failed
+ * push still throws, so each caller keeps its own log line.
+ */
+async function pushLockCommit(git: GitRunner, cwd: string): Promise<boolean> {
+  const current = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd)).trim()
+  // `origin/main` in almost every checkout; asked rather than assumed, with the assumption as
+  // the fallback for a clone whose origin/HEAD was never set.
+  const head = await git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], cwd).then(out => out.trim(), () => 'origin/main')
+  const target = head.replace(/^origin\//, '')
+  if (current !== target) return false
+  await git(['push', 'origin', `HEAD:${target}`], cwd)
+  return true
+}
+
 /** A ticket filename's lock paths, relative to the repo root. */
 function lockPaths(ticket: string): { spike: string; plan: string } {
   const stem = ticket.replace(/\.md$/, '')
@@ -92,8 +112,8 @@ function lockPaths(ticket: string): { spike: string; plan: string } {
 
 /**
  * Claim `assignments`' tickets for their agents: write both placeholder siblings per ticket,
- * commit the whole batch in one pathspec-scoped commit, and push it to the branch the checkout is
- * on. Resolves the subset actually locked — a ticket whose sibling appeared since the candidates
+ * commit the whole batch in one pathspec-scoped commit, and push it to origin's default branch
+ * ({@link pushLockCommit}). Resolves the subset actually locked — a ticket whose sibling appeared since the candidates
  * were enumerated is skipped, not overwritten: an existing file is someone's claim or someone's
  * work, and either outranks this batch.
  *
@@ -141,8 +161,8 @@ export async function acquireSpikeLocks(
     return []
   }
   try {
-    const branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd)).trim()
-    await git(['push', 'origin', `HEAD:${branch}`], cwd)
+    if (!(await pushLockCommit(git, cwd)))
+      log(`[framework] spike locks: the checkout is not on the default branch, so the lock commit was not pushed — agents on other machines cannot see these ${locked.length} claim(s)`)
   } catch {
     log(`[framework] spike locks: the lock commit could not be pushed, so agents on other machines cannot see these ${locked.length} claim(s)`)
   }
@@ -207,8 +227,8 @@ export async function releaseStaleSpikeLocks(cwd: string, deps: SpikeLockDeps = 
     await git(['add', '--', ...files], cwd)
     await git(['commit', '-m', releaseMessage(files.length), '--', ...files], cwd)
     try {
-      const branch = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd)).trim()
-      await git(['push', 'origin', `HEAD:${branch}`], cwd)
+      if (!(await pushLockCommit(git, cwd)))
+        log(`[framework] spike locks: the checkout is not on the default branch, so the release commit was not pushed`)
     } catch {
       log(`[framework] spike locks: the release commit could not be pushed`)
     }

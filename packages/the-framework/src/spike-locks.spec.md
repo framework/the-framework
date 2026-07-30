@@ -2,15 +2,15 @@ The PENDING lock for concurrent spike agents (#1327): before a fanned-out [Spike
 
 ## TLDR
 
-- `acquireSpikeLocks(cwd, assignments)` — write both placeholders per ticket, one pathspec-scoped batch commit, push `HEAD:<current branch>`; resolves the subset actually locked. Skips a ticket whose sibling already exists (real or placeholder). Commit failure rolls the files back and resolves `[]`; push failure keeps the batch and logs.
-- `releaseStaleSpikeLocks(cwd)` — frees a lock that is all three of: still a placeholder, older than `SPIKE_LOCK_STALE_MS` (60 min, by its last commit time), and untouched by any open PR. One batch commit + best-effort push; resolves the released tickets.
+- `acquireSpikeLocks(cwd, assignments)` — write both placeholders per ticket, one pathspec-scoped batch commit, push to origin's default branch, only when the checkout is on it (`HEAD:main` from a feature branch would carry that branch's commits onto main — #1364 review); resolves the subset actually locked. Skips a ticket whose sibling already exists (real or placeholder). Commit failure rolls the files back and resolves `[]`; push failure keeps the batch and logs.
+- `releaseStaleSpikeLocks(cwd)` — frees a lock that is all three of: still a placeholder, older than `SPIKE_LOCK_STALE_MS` (6 h, by its last commit time — spiking and planning can take hours, and this is recovery, ideally never needed), and untouched by any open PR. One batch commit + best-effort push; resolves the released tickets.
 - `isSpikeLock(md)` / `spikeLockContent(agentId)` — the placeholder telling: first non-blank content starts with `PENDING:`. Shared with the dashboard's ticket reader so a lock never renders as a real spike.
 
 ## Problems
 
 - The guard cannot be daemon memory: a hands-off web run's local process ends at the hand-off (#1253), another machine's daemon shares nothing, and the #1313 PR-diff claims only start once a PR exists. The lock files cover the window *before* a PR; #1313 covers after.
 - Agents cannot push (#1320), so the daemon writes and pushes the locks — a lock that only existed inside the run it protects would protect nothing.
-- A dead agent must not brick its ticket forever, hence the staleness rule (#1327's thread): PENDING + no open PR + N minutes.
+- A dead agent must not brick its ticket forever, hence the staleness rule (#1327's thread): PENDING + no open PR + N hours.
 
 ## Decisions
 

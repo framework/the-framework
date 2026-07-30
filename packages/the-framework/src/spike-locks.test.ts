@@ -25,6 +25,7 @@ function checkout(files: Record<string, string> = {}) {
     git: async (args, _cwd) => {
       gitCalls.push(args)
       if (args[0] === 'rev-parse') return 'main\n'
+      if (args[0] === 'symbolic-ref') return 'origin/main\n'
       if (args[0] === 'log') return commitTimes.get(args[args.length - 1]!) ?? ''
       return ''
     },
@@ -207,4 +208,26 @@ test('releaseStaleSpikeLocks never touches a real spike or plan (#1327)', async 
   assert.deepEqual(released, ['a.md'])
   assert.equal(disk.has(join(CWD, 'tickets/a.spike.md')), true)
   assert.equal(disk.has(join(CWD, 'tickets/a.plan.md')), false)
+})
+
+test('a checkout on a feature branch keeps its lock commit local rather than pushing (#1364 review)', async () => {
+  // The push exists to land locks where other machines fork from: origin's default branch.
+  // From any other branch, `HEAD:main` would carry that branch's own commits onto main, and the
+  // old `HEAD:<current branch>` published whatever branch the checkout happened to be on — so
+  // the push is skipped, said out loud, and the commit still guards local forks.
+  const { gitCalls, logs, deps } = checkout({ 'tickets/a.md': '# a' })
+  const onFeature: SpikeLockDeps = {
+    ...deps,
+    git: async (args, cwd) => {
+      if (args[0] === 'rev-parse') {
+        gitCalls.push(args)
+        return 'my-feature\n'
+      }
+      return deps.git!(args, cwd)
+    },
+  }
+  const locked = await acquireSpikeLocks(CWD, [{ ticket: 'a.md', agentId: 'agent-0' }], onFeature)
+  assert.equal(locked.length, 1, 'the commit still locks: only the cross-machine push is off')
+  assert.equal(gitCalls.some(args => args[0] === 'push'), false)
+  assert.ok(logs.some(line => /not on the default branch/.test(line)))
 })

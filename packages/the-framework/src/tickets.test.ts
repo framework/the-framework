@@ -28,10 +28,12 @@ test('the flat backlog lives at the root TODO_AGENTS.md, with the legacy locatio
 test('the ticket-format spec ships in the package (not materialized), with priority/topics (#684/#674)', () => {
   // Per the #674 call it is not written into the repo, so the format versions with the package.
   // How the agent reads it is system-prompt.ts's job now (#1163): the content rides in the channel.
-  // The spec teaches both file shapes and the revised #684 optional priority/topics fields.
+  // The spec teaches the file shapes and the revised #684 optional priority/topics fields.
+  // #1420 folded the spike into the plan (Effort/Uncertainty 0-10) and added the .lock.md claim.
   assert.ok(TICKETING_FORMAT.includes('tickets/<DATE>_<SLUG>.md'))
-  assert.ok(TICKETING_FORMAT.includes('tickets/<DATE>_<SLUG>.spike.md'))
-  assert.ok(TICKETING_FORMAT.includes('Priority: 10-0'))
+  assert.ok(TICKETING_FORMAT.includes('tickets/<DATE>_<SLUG>.plan.md'))
+  assert.ok(TICKETING_FORMAT.includes('tickets/<DATE>_<SLUG>.lock.md'))
+  assert.ok(TICKETING_FORMAT.includes('Priority: 0-10'))
   assert.ok(TICKETING_FORMAT.includes('Topics:'))
   assert.ok(TICKETING_FORMAT.includes('GitHub:'))
 })

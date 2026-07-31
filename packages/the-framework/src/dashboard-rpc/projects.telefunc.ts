@@ -85,9 +85,13 @@ export async function onRepoAutoMerge(projectId: string): Promise<RepoAutoMerge 
  * Reports problems only, and only ones the user can act on. The passing checks carry the version
  * string and the logged-in account, which are of no use to a launcher and have no business
  * reaching a browser that may be a relay guest, so they stay on this side.
+ *
+ * `publish` adds the `gh` half (#1419): a launcher with the PR/merge rung armed wants to hear
+ * about a missing or logged-out GitHub CLI now, not discover it hours later as a session whose
+ * publishing silently stopped at the pushed branch.
  */
-export async function onAgentReady(agent: string): Promise<AgentReady> {
-  const result = await preflight({ agent: isAgentName(agent) ? agent : 'claude' })
+export async function onAgentReady(agent: string, publish?: boolean): Promise<AgentReady> {
+  const result = await preflight({ agent: isAgentName(agent) ? agent : 'claude', publish: publish === true })
   return {
     ok: result.ok,
     problems: preflightProblems(result),

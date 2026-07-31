@@ -8,7 +8,11 @@ import type { DriverEvent } from './types.js'
 
 test('StreamJsonParser surfaces assistant text + tool names, keeps the result', () => {
   const p = new StreamJsonParser()
-  assert.deepEqual(p.push(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-1' })), [])
+  // The very first line announces the session id (#1322): surfaced immediately, not held for
+  // `result`, so a turn that is stopped mid-flight keeps its `claude --resume` handle.
+  assert.deepEqual(p.push(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-1' })), [
+    { type: 'session', sessionId: 'sess-1' },
+  ])
   const assistant = p.push(
     JSON.stringify({
       type: 'assistant',
@@ -65,6 +69,14 @@ test('StreamJsonParser omits costUsd (never 0) when tokens report but no price (
   assert.equal(usage?.costUsd, undefined)
   assert.equal(Object.prototype.hasOwnProperty.call(usage, 'costUsd'), false)
   assert.deepEqual(usage, { inputTokens: 100, outputTokens: 40, cacheReadTokens: 900, cacheCreationTokens: 50 })
+})
+
+test('StreamJsonParser announces the session id once, re-announcing only a change (#1322)', () => {
+  const p = new StreamJsonParser()
+  assert.deepEqual(p.push(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'a' })), [{ type: 'session', sessionId: 'a' }])
+  // Every subsequent line repeats the id; repeating the announcement would be noise.
+  assert.deepEqual(p.push(JSON.stringify({ type: 'system', subtype: 'other', session_id: 'a' })), [])
+  assert.deepEqual(p.push(JSON.stringify({ type: 'system', subtype: 'other', session_id: 'b' })), [{ type: 'session', sessionId: 'b' }])
 })
 
 test('StreamJsonParser ignores non-JSON noise and falls back to assistant text', () => {
@@ -302,7 +314,9 @@ test('StreamJsonParser surfaces the rate-limit telemetry the agent emits per tur
     }),
   )
   assert.deepEqual(events, [
-    // Seconds in, millis out.
+    // The first sighting of the id announces it (#1322)…
+    { type: 'session', sessionId: 'sess-1' },
+    // …and the telemetry converts, seconds in, millis out.
     { type: 'rate-limit', limit: { status: 'allowed', window: 'five_hour', resetsAt: 1784079000_000 } },
   ])
   // Telemetry must not disturb the turn itself.

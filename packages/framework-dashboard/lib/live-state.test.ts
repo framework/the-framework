@@ -71,6 +71,18 @@ describe('isRunActive', () => {
     expect(isRunActive([{ kind: 'log', message: 'go' }])).toBe(true)
     expect(isRunActive([{ kind: 'log', message: 'go' }, { kind: 'end', ok: true }])).toBe(false)
   })
+
+  test('a resumed session is active again: the stopped segment\'s end does not count (#762)', () => {
+    // A resume appends a second `session` boundary to the SAME journal. "Was there ever an end"
+    // read the resumed-live run as inactive — hiding Stop while the agent worked.
+    const resumed = [
+      { kind: 'session' },
+      { kind: 'end', ok: false, stopped: true },
+      { kind: 'session' },
+      { kind: 'log', message: 'back at it' },
+    ] as FrameworkEvent[]
+    expect(isRunActive(resumed)).toBe(true)
+  })
 })
 
 describe('currentRunEvents', () => {
@@ -134,6 +146,16 @@ describe('runOutcome', () => {
 
   test('a user stop is a stop, not a failure', () => {
     expect(runOutcome([{ kind: 'end', ok: false, stopped: true }])).toEqual({ ok: false, stopped: true })
+  })
+
+  test('a resumed session has no outcome until ITS segment ends (#762)', () => {
+    // First-end-wins kept a resumed run "stopped" for ever: while it was live again, and even
+    // after it later finished clean. The ending is the current segment's, or nothing yet.
+    const stopped = { kind: 'end', ok: false, stopped: true }
+    const midResume = [{ kind: 'session' }, stopped, { kind: 'session' }, { kind: 'log', message: 'go' }] as FrameworkEvent[]
+    expect(runOutcome(midResume)).toBeUndefined()
+    const finishedClean = [...midResume, { kind: 'end', ok: true }] as FrameworkEvent[]
+    expect(runOutcome(finishedClean)).toEqual({ ok: true, stopped: false })
   })
 })
 

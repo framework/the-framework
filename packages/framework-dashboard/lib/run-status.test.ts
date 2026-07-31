@@ -33,4 +33,12 @@ describe('runStatusPill', () => {
       label: 'failed — exit 1',
     })
   })
+
+  test('a resumed session builds again — the stopped segment does not hold the pill (#762)', () => {
+    // A resume appends a second `session` boundary to the same journal; the yellow "stopped"
+    // stuck to a live run because first-end-wins outranked everything that followed.
+    const resumed = [named, ended({ ok: false, stopped: true }), { kind: 'session' } as FrameworkEvent]
+    expect(runStatusPill(resumed)).toMatchObject({ label: 'building…' })
+    expect(runStatusPill([...resumed, ended({ ok: true })])).toMatchObject({ label: 'finished' })
+  })
 })

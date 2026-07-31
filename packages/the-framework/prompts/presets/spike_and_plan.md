@@ -1,10 +1,4 @@
-Spike & plan every ticket that has no spike or plan yet, most important first.
+For every ticket `tickets/<TICKET>.md` without `<TICKET>.plan.md`, add the following to TODO_AGENTS.md
+- "Create tickets/<TICKET>.plan.md"
 
-A `.spike.md` or `.plan.md` that already exists counts even when it only reads `PENDING:<agent>` — that placeholder is another agent's claim on the ticket, so leave both files alone and skip the ticket.
-
-End each plan with its verdict, written as two keys in the plan file's header (the block above the title, beside `Status:`):
-
-- `Effort: quick-win` when implementing it is a small, contained change, `Effort: significant` otherwise.
-- `Consensus: consensual` when there is a single fairly obvious plan (zero open questions, zero variability), `Consensus: open-questions` otherwise.
-
-A plan marked `Effort: quick-win` and `Consensus: consensual` is queued and implemented unattended, without anyone reading it first. So write that pair only when you would be comfortable with that happening. Anything you would want a human to look at first is `Consensus: open-questions`, and a plan carrying a `## Hard problems` or `## Variability` section is never a quick-win.
+Put the entries in the right `## Priority` following a mix of sensible criteria after reading `tickets/<TICKET>.md` (e.g. if ticket seems low effort => higher priority).

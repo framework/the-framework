@@ -23,6 +23,18 @@ async function resolveEventsPath(projectId: string, runId?: string): Promise<str
 }
 
 /**
+ * The end-of-replay marker (#1383). A subscribe replays the whole log before following live,
+ * and without a boundary a reconnecting client cannot tell "replay still streaming" from "the
+ * log is genuinely this short" — so it blanked a populated feed and refilled it line by line.
+ * Sent once per subscription, after the on-disk replay is delivered. Wire-only: it is not a
+ * {@link FrameworkEvent}, is never written to any journal, and the client swallows it.
+ */
+export type StreamSync = { kind: 'stream-sync' }
+
+/** What `onEvents` streams: the run's events, plus the wire-only end-of-replay marker. */
+export type LiveFeedEvent = FrameworkEvent | StreamSync
+
+/**
  * `onEvents(projectId, runId?)` returns a Channel that streams one live run: the client
  * `.listen()`s for `FrameworkEvent`s and `.close()`s to unsubscribe, which stops the tail.
  * An unknown project yields a channel that closes immediately (mirrors the read model's
@@ -37,14 +49,18 @@ async function resolveEventsPath(projectId: string, runId?: string): Promise<str
  * (#426), or a run the daemon is relaying from a device (#1067). Otherwise the on-disk log. The
  * daemon sets a source that answers only for relayed runs, so an ordinary local run yields undefined
  * here and falls through to tailing the log, exactly as before.
+ *
+ * Only the on-disk tail sends the {@link StreamSync} marker: the in-memory sources have no
+ * replay boundary to report, so a reconnecting client falls back to a grace deadline before
+ * swapping its feed (see use-live-events in the dashboard).
  */
-export async function onEvents(projectId: string, runId?: string): Promise<ClientChannel<never, FrameworkEvent>> {
+export async function onEvents(projectId: string, runId?: string): Promise<ClientChannel<never, LiveFeedEvent>> {
   const stream = contextEventsSource()?.(projectId, runId)
   if (stream) {
     // An in-memory run: replay + follow it, mirroring how serveSSE consumes it.
-    return streamChannel<FrameworkEvent>(send => forwardStream(stream, send))
+    return streamChannel<LiveFeedEvent>(send => forwardStream(stream, send))
   }
   // Everywhere else: tail the run's on-disk events.jsonl (undefined path -> closed channel).
   const path = await resolveEventsPath(projectId, runId)
-  return streamChannel<FrameworkEvent>(send => (path ? tailEvents(path, send) : undefined))
+  return streamChannel<LiveFeedEvent>(send => (path ? tailEvents(path, send, () => send({ kind: 'stream-sync' })) : undefined))
 }

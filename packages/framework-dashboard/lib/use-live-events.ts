@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FrameworkEvent } from '@gemstack/the-framework'
+import type { LiveFeedEvent } from '@gemstack/the-framework/dashboard-rpc'
 import type { ClientChannel } from 'telefunc'
 import { onEvents } from '../server/events.telefunc.js'
 import { currentRunEvents } from './live-state.js'
@@ -32,6 +33,14 @@ function retryDelay(attempt: number): number {
   return RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)] as number
 }
 
+/**
+ * How long a reconnect waits for the server's end-of-replay marker before swapping anyway
+ * (#1383). The on-disk tail sends `stream-sync` the moment its replay is delivered, so this
+ * deadline only fires for the in-memory sources (relay #426, relayed device runs #1067),
+ * which have no replay boundary to report — their buffered history streams in well under it.
+ */
+const SYNC_GRACE_MS = 1500
+
 export function useLiveEvents(projectId: string | null, runId?: string | null, resetKey?: unknown): LiveEvents {
   const [events, setEvents] = useState<FrameworkEvent[]>([])
   const [lost, setLost] = useState(false)
@@ -52,10 +61,12 @@ export function useLiveEvents(projectId: string | null, runId?: string | null, r
     setLost(false)
     setDone(false)
     if (!projectId) return
-    let channel: ClientChannel<never, FrameworkEvent> | undefined
+    let channel: ClientChannel<never, LiveFeedEvent> | undefined
     let cancelled = false
     let attempt = 0
+    let first = true
     let timer: ReturnType<typeof setTimeout> | undefined
+    let graceTimer: ReturnType<typeof setTimeout> | undefined
 
     // A dead stream used to be silent: the daemon restarts, events just stop, and "the agent
     // went quiet" is indistinguishable from "the feed died" (#948). Now an errored close (or a
@@ -69,6 +80,15 @@ export function useLiveEvents(projectId: string | null, runId?: string | null, r
     }
 
     const subscribe = () => {
+      // Every subscribe replays the whole log before following live. The FIRST one streams into
+      // a pane this effect just cleared, so it renders as it arrives. A RECONNECT has a populated
+      // feed on screen, and blanking it while history re-streamed was #1383's mid-run flicker:
+      // the lost banner cleared on resubscribe, then the feed sat empty until the replay caught
+      // up. So a reconnect buffers the replay and swaps atomically — on the server's stream-sync
+      // marker, or at a grace deadline for the in-memory sources that send none. The feed never
+      // shows less than it already showed (#1402's rule, applied to the live channel).
+      const reconnect = !first
+      first = false
       void onEvents(projectId, runId ?? undefined).then(ch => {
         if (cancelled) {
           void ch.close()
@@ -77,14 +97,29 @@ export function useLiveEvents(projectId: string | null, runId?: string | null, r
         channel = ch
         attempt = 0
         setLost(false)
-        // The tail replays the whole log on subscribe, so a reconnect starts from an empty
-        // buffer rather than appending a duplicate history.
-        setEvents([])
+        let buffer: FrameworkEvent[] | undefined = reconnect ? [] : undefined
+        const swap = () => {
+          if (cancelled || buffer === undefined) return
+          const replay = buffer
+          buffer = undefined
+          setEvents(replay)
+        }
+        if (reconnect) graceTimer = setTimeout(swap, SYNC_GRACE_MS)
+        else setEvents([]) // fresh subscribe: start clean so the replay is not appended twice
         ch.listen(event => {
+          if (event.kind === 'stream-sync') {
+            swap()
+            return
+          }
           stampReceived(event)
-          setEvents(prev => [...prev, event])
+          if (buffer) buffer.push(event)
+          else setEvents(prev => [...prev, event])
         })
         ch.onClose(err => {
+          // A close mid-replay drops the partial buffer: swapping it in would be exactly the
+          // collapse this exists to prevent, and the next attempt replays from the top anyway.
+          buffer = undefined
+          if (graceTimer) clearTimeout(graceTimer)
           if (err) retry()
           else if (!cancelled) setDone(true)
         })
@@ -95,6 +130,7 @@ export function useLiveEvents(projectId: string | null, runId?: string | null, r
     return () => {
       cancelled = true
       if (timer) clearTimeout(timer)
+      if (graceTimer) clearTimeout(graceTimer)
       void channel?.close()
     }
     // runId is a dependency: selecting another run must resubscribe to that run's log (#749).

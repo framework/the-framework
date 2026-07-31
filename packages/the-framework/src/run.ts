@@ -217,12 +217,19 @@ export interface RunFrameworkOptions {
   /** Per-run cap on backlog entries worked (#323). Default 25. */
   todoMaxItems?: number
   /**
-   * Live chat (#714): once the build settles, stay running and take the user's own
-   * messages, each resuming the build session for full context. Ends when the source
-   * resolves `undefined` (Stop / budget cap). Wired only for an interactive run — a
-   * headless run leaves it unset and ends when the build is done, exactly as before.
+   * Live chat (#714): once the build settles, take the user's own messages, each
+   * resuming the build session for full context. The session then ends itself when
+   * the queue is idle (#1390) unless {@link stayOpenChat} parks it. Wired only for
+   * an interactive run — a headless run leaves it unset and ends when the build is
+   * done, exactly as before.
    */
   messages?: RunMessages
+  /**
+   * Keep the chat parked for the next message instead of ending on an idle queue (#1390).
+   * Only for a run whose own terminal dashboard is the single surface — it has no daemon
+   * to resume the session through, so ending would leave its composer a dead end.
+   */
+  stayOpenChat?: boolean
   /** Record each chat turn to the committed conversation (#908). Best-effort; unset = not recorded. */
   recordMessage?: RecordMessage
   /** Observe the unified event stream. */
@@ -457,8 +464,9 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     // to boot is non-fatal. Default off, so a programmatic run never leaks a
     // process a caller that ignores `preview` would never stop.
     if (runner && s?.keepAlive) preview = await startAppPreview(runner, s, emit)
-    // Live chat (#714): with the build settled, stay open for the user's own messages,
-    // each continuing the same session. Ends on Stop / budget cap (next -> undefined).
+    // Live chat (#714): with the build settled, take the user's own messages, each continuing
+    // the same session — draining what queued and ending on idle (#1390), or parked until Stop
+    // for a terminal-dashboard run (stayOpenChat).
     // A hand-off run has no session here to continue: the CLI can start a cloud session and
     // pull one back, but it cannot send a second message to one, so staying open would offer
     // a composer whose every message answers itself. The run ends instead, with the link.
@@ -469,7 +477,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
         emitTurnSignals: createTurnSignalEmitter(emit),
         signal: runSignal,
         ...(opts.recordMessage ? { recordMessage: opts.recordMessage } : {}),
-      })
+      }, opts.stayOpenChat === true)
     }
     // Say why the run stops here, so a finished hand-off does not read as a run that gave up
     // one phase in. The link itself is already on the driver's `cloud <url>` action.

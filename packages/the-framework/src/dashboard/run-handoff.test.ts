@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { readRunHandoff, resolveRunPr, runBranchFor, pushRunBranch, openRunPullRequest, gitReason, runAutoHandoff, isSessionBranch, prBaseName, commitSessionWork, withheldMerge } from './run-handoff.js'
+import { readRunHandoff, resolveRunPr, mergeSessionPr, runBranchFor, pushRunBranch, openRunPullRequest, gitReason, runAutoHandoff, isSessionBranch, prBaseName, commitSessionWork, withheldMerge } from './run-handoff.js'
 import { pickRunPr } from './gh.js'
 import { nodeGitRunner, GIT_SLOW_TIMEOUT_MS, type GitRunner } from '../project.js'
 import { CliTimeoutError, isCliTimeout } from '../cli-exec.js'
@@ -750,4 +750,52 @@ test("a run implementing a ticket carries its issue as `(fix #42)` in the PR tit
   )
   const title = gh[0]?.[gh[0].indexOf('--title') + 1]
   assert.equal(title, 'fix-login (fix #42)')
+})
+
+test("the Merge action merges the session's open PR, marking a draft ready on the way (#1391)", async () => {
+  const gh: string[][] = []
+  const result = await mergeSessionPr(
+    '/repo',
+    { id: 'r1', branch: 'the-framework/x' },
+    {
+      prs: async () => ({ value: [{ number: 7, url: 'https://github.com/o/r/pull/7', state: 'OPEN', title: 'x' }], pending: false }),
+      gh: async args => (gh.push(args), ''),
+    },
+  )
+  // ghMergePr's ladder: auto-merge first, so the PR lands when its checks pass. The draft case
+  // (gh refuses, `pr ready`, retry) is ghMergePr's own tested behavior and rides along here.
+  assert.deepEqual(gh[0], ['pr', 'merge', '7', '--squash', '--auto'])
+  assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/7' })
+})
+
+test('the Merge action refuses a session with no PR, or one already landed (#1391)', async () => {
+  const none = await mergeSessionPr('/repo', { id: 'r1' }, { prs: async () => ({ value: [], pending: false }) })
+  assert.deepEqual(none, { ok: false, error: 'this session has no pull request to merge' })
+  // A closed/merged PR is an answer, not an action: nothing to press twice.
+  const landed = await mergeSessionPr(
+    '/repo',
+    { id: 'r1', branch: 'the-framework/x', startedAt: '2020-01-01T00:00:00Z' },
+    {
+      prs: async () => ({
+        value: [{ number: 7, url: 'u', state: 'MERGED', title: 'x', createdAt: '2020-01-02T00:00:00Z' }],
+        pending: false,
+      }),
+    },
+  )
+  assert.deepEqual(landed, { ok: false, error: "this session's PR is already merged" })
+})
+
+test('a Merge the remote refuses comes back as the error, not a success (#1391)', async () => {
+  const result = await mergeSessionPr(
+    '/repo',
+    { id: 'r1', branch: 'the-framework/x' },
+    {
+      prs: async () => ({ value: [{ number: 7, url: 'u', state: 'OPEN', title: 'x' }], pending: false }),
+      gh: async () => {
+        throw new Error('Pull request is not mergeable: the base branch requires review')
+      },
+    },
+  )
+  assert.equal(result.ok, false)
+  assert.match((result as { error: string }).error, /not mergeable/)
 })

@@ -5,8 +5,9 @@ const onRunHandoff = vi.fn(async () => null as unknown)
 const sendPushBranch = vi.fn(async () => ({ ok: true }) as unknown)
 const sendOpenPullRequest = vi.fn(async () => ({ ok: true }) as unknown)
 const sendSetHandoff = vi.fn(async () => undefined as unknown)
+const sendMerge = vi.fn(async () => ({ ok: true }) as unknown)
 vi.mock('../server/reads.telefunc.js', () => ({ onRunHandoff }))
-vi.mock('../server/control.telefunc.js', () => ({ sendPushBranch, sendOpenPullRequest, sendSetHandoff }))
+vi.mock('../server/control.telefunc.js', () => ({ sendPushBranch, sendOpenPullRequest, sendSetHandoff, sendMerge }))
 
 const { HandoffActions, HandoffArm, HandoffSummary, RunHandoffDetails, handoffExpandable } = await import('./RunHandoff.js')
 const { useRunHandoff } = await import('../lib/use-run-handoff.js')
@@ -47,6 +48,8 @@ beforeEach(() => {
   sendOpenPullRequest.mockResolvedValue({ ok: true })
   sendSetHandoff.mockClear()
   sendSetHandoff.mockResolvedValue(undefined)
+  sendMerge.mockClear()
+  sendMerge.mockResolvedValue({ ok: true })
 })
 afterEach(cleanup)
 
@@ -153,7 +156,7 @@ describe('run handoff (#799)', () => {
     await waitFor(() => expect(screen.getByText('gh: not logged in')).toBeTruthy())
   })
 
-  test('an existing PR withdraws the offer — the bar links it instead (#632)', async () => {
+  test('an existing open PR withdraws the offer and becomes the Merge (#632/#1391)', async () => {
     onRunHandoff.mockResolvedValue({
       ...worked,
       pushed: true,
@@ -163,6 +166,23 @@ describe('run handoff (#799)', () => {
     await waitFor(() => expect(screen.getByText('1 commit')).toBeTruthy())
     expect(screen.queryByText('Open PR')).toBeNull()
     expect(screen.queryByText('Push branch')).toBeNull()
+    // The one step left for an open, unmerged PR is the human's Merge — the withheld-merge
+    // ending (#1363) leaves exactly this behind when the agent never signalled.
+    fireEvent.click(screen.getByText('Merge PR'))
+    await waitFor(() => expect(sendMerge).toHaveBeenCalledWith('p1', 'run-1'))
+  })
+
+  test('a merged or closed PR offers nothing — landed is an answer, not an action (#1391)', async () => {
+    onRunHandoff.mockResolvedValue({
+      ...worked,
+      pushed: true,
+      merged: true,
+      pr: { number: 42, url: 'https://example.test/42', state: 'MERGED', title: 'Add dark mode' },
+    })
+    render(<Harness />)
+    await waitFor(() => expect(screen.getByText('1 commit')).toBeTruthy())
+    expect(screen.queryByText('Merge PR')).toBeNull()
+    expect(screen.queryByText('Open PR')).toBeNull()
   })
 
   test('a repo with no remote says why instead of offering a dead button', async () => {

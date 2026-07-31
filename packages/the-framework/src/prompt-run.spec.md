@@ -19,7 +19,7 @@ The direct prompt path (#331): `runPrompt` runs one fully rendered prompt throug
 - The run signal composes the caller's abort with the budget/consumption aborts (`createRunControls`, same wiring as a build run #322/#529).
 - `endStopDetail` classifies the failure (user stop, budget, consumption, decline) into the `end` event's `stopped`/`detail`, and leaves a resume note in the workspace (`leaveResumeNote`) on stop.
 - Turn signals (markdown views #441, session name, ready-for-merge — the #326 lifecycle signals) are non-blocking: none stop the turn.
-- `messages` (live chat) keeps the run open after the prompt settles, each user message resuming the same session; unset means the run ends when the agent stops asking.
+- `messages` (live chat): once the prompt settles, queued user messages are drained as turns (each resuming the same session) and the run ends itself on an idle queue (#1390); `stayOpenChat` keeps the old park for a terminal-dashboard run. Unset means the run ends when the agent stops asking.
 
 ## Flows
 

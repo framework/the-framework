@@ -12,8 +12,8 @@ export type RunHandoffState = {
   busy: boolean
   error: string | null
   /** Which button is in flight, so it can say "Pushing…" rather than silently greying (#948). */
-  pending: 'push' | 'pr' | null
-  act: (which: 'push' | 'pr', fn: () => Promise<unknown>, fallback: string) => void
+  pending: 'push' | 'pr' | 'merge' | null
+  act: (which: 'push' | 'pr' | 'merge', fn: () => Promise<unknown>, fallback: string) => void
 }
 
 // The handoff read lifted out of its panel: the same answer now feeds two places — the summary and
@@ -34,9 +34,9 @@ export function useRunHandoff(projectId: string, runId: string | null | undefine
   )
   useEffect(() => setEveryMs(handoff?.prPending ? 1_000 : 15_000), [handoff?.prPending])
   const { busy, error, run } = useAction()
-  const [pending, setPending] = useState<'push' | 'pr' | null>(null)
+  const [pending, setPending] = useState<'push' | 'pr' | 'merge' | null>(null)
 
-  const act = (which: 'push' | 'pr', fn: () => Promise<unknown>, fallback: string): void => {
+  const act = (which: 'push' | 'pr' | 'merge', fn: () => Promise<unknown>, fallback: string): void => {
     setPending(which)
     void run(fn, fallback).then(result => {
       setPending(null)

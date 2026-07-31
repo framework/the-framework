@@ -4,7 +4,7 @@ The shared await/choice/chat machinery (#304/#337/#339/#714): resolves the gates
 
 - `resolveAwaitGate()` — one parsed gate → the user's answer text: emits `choice`, parks for the pick, maps picked id(s) back to label(s). Kinds: choices, multi, confirm (#358), browser (#796), bind-project / create-project (#1121).
 - `drainGates()` — resolve → continue → re-parse, up to `MAX_AWAIT_ROUNDS`; a declined confirmation stops the exchange. `continueWith` is injected: raw `session.prompt` or a supervisor pass.
-- `runChatPhase()` — live chat (#714): emit `settled`, wait for a message, resume the same session, drain its gates, record both turns (#908); repeats until the source resolves `undefined` (Stop / budget cap).
+- `runChatPhase()` — live chat (#714): take the user's next message, resume the same session, drain its gates, record both turns (#908). By default it only drains — an idle queue is the session's natural end (#1390), no `settled` limbo; `stayOpen` keeps the old park (emit `settled`, wait) for a terminal-dashboard run, ending on `undefined` (Stop / budget cap).
 - `runAwaitRounds()` — opening prompt + drain + optional chat phase; `resume: true` makes the first message `--resume` a finished run's conversation (#720).
 - `requestChoices()` / `requestMultiSelect()` — the gate primitives: emit `choice`, await the pick or fall back, emit `choice-resolved`.
 
@@ -34,5 +34,5 @@ The shared await/choice/chat machinery (#304/#337/#339/#714): resolves the gates
 
 - opening: `runAwaitRounds()` → record user turn → `session.prompt(opening, {resume?})` → `emitTurnSignals` → `drainGates()` → record agent turn → chat phase or done.
 - drain round: `parseAwaitGate(turn.text)` → `resolveAwaitGate()` → declined? stop : log choice → `continueWith(question, answer)` → `emitTurnSignals` → re-parse.
-- chat turn: emit `settled` → `messages.next(signal)` → record user → `session.prompt(text, {resume: true})` → `drainGates()` → record agent → repeat, or end on `undefined`/decline.
+- chat turn: `messages.takeQueued()` (or, stayOpen: emit `settled` → `messages.next(signal)`) → record user → `session.prompt(text, {resume: true})` → `drainGates()` → record agent → repeat, or end on `undefined`/decline.
 - gate resolve: emit `choice` → race `requestChoice(req)` vs abort → coerce pick → emit `choice-resolved` → answer text.

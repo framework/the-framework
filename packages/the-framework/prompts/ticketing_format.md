@@ -26,6 +26,16 @@ GitHub: [#42](https://github.com/org/repo/issues/42) [optional]
 ```
 
 
+## tickets/<DATE>_<SLUG>.lock.md
+
+Body:
+```md
+CLAIMED: <SESSION_ID> (<SESSION_NAME>)
+```
+
+Whenever an agent is working/planning a ticket, a `.lock.md` file must be created to avoid two agents working/planning the same ticket.
+
+
 ## tickets/<DATE>_<SLUG>.plan.md
 
 For an existing ticket (e.g. `tickets/2042-01-01_some-ticket.md`), a plan can be created (`tickets/2042-01-01_some-ticket.plan.md`).

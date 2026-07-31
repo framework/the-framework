@@ -274,7 +274,7 @@ export function pinnedSpikeJob(job: AutoPmJob, assignment: SpikeAssignment): Aut
       '',
       `You are one agent of a concurrent batch, so the scope above narrows: spike & plan exactly one ticket, \`tickets/${ticket}\`, and no other.`,
       '',
-      `Your claim on it is already in place: \`tickets/${stem}.lock.md\` holds \`CLAIMED: ${agentId}\`. Write the real \`tickets/${stem}.plan.md\`, and delete \`tickets/${stem}.lock.md\` in the same commit — the lock lifts when your work lands. If the lock file is missing, names a different agent, or a plan already exists, the ticket is not yours — stop and do nothing.`,
+      `Your claim on it is already in place: \`tickets/${stem}.lock.md\` holds \`CLAIMED: ${agentId}\`. Write the real \`tickets/${stem}.plan.md\`, and delete \`tickets/${stem}.lock.md\` in the same commit — the lock lifts when your work lands. If the plan concludes the ticket is an unambiguous quick win (low Effort, Uncertainty 0), also add "Implement tickets/${ticket}" to TODO_AGENTS.md in that commit. If the lock file is missing, names a different agent, or a plan already exists, the ticket is not yours — stop and do nothing.`,
     ].join('\n'),
     describe: `spiking & planning "${entryPreview(ticket)}"`,
   }

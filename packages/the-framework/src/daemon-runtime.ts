@@ -284,6 +284,9 @@ export function startOptionFlags(options: StartRunOptions): string[] {
   // The ticket this run implements (#1117): only ever a `tickets/<file>.md` the daemon read off
   // the queue entry, and re-checked on the other side before it reaches the run's meta.
   if (typeof options.ticket === 'string' && isTicketPath(options.ticket)) flags.push('--ticket', options.ticket)
+  // A planning run (#1327): the ticket above is being planned, not implemented, so the PR title
+  // must not inherit its issue as `(fix #42)` — the plan's merge would close it (#1334).
+  if (options.planRun) flags.push('--plan-run')
   // The pinned queue entry (#1253): one line of agent-written queue text, passed verbatim (argv,
   // never a shell) so the meta's claim matches the queue read byte for byte.
   if (typeof options.queueEntry === 'string' && options.queueEntry.trim()) flags.push('--queue-entry', options.queueEntry)

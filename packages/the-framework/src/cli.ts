@@ -323,6 +323,8 @@ export interface CliOptions {
   via?: string | undefined
   /** `--ticket <path>` (#1117): the `tickets/<file>.md` this run is implementing. Set by the daemon when it starts a drain run, from the ticket its queue entry links to; recorded on the run's meta. */
   ticket?: string | undefined
+  /** `--plan-run` (#1327): the `--ticket` is being planned, not implemented, so the PR title must not inherit its issue as `(fix #42)` (#1334) — the plan's merge would close the issue with the work still undone. */
+  planRun?: boolean
   /** `--queue-entry <text>` (#1253): the one queue entry a routine drain pinned this run to; recorded on the run's meta so the sweep's claim outlives the daemon and the local process. */
   queueEntry?: string | undefined
   /** `--unattended`: no human is watching, so choice gates take the recommended option (#846). */
@@ -597,6 +599,9 @@ export function parseArgs(argv: string[]): CliOptions {
         break
       case '--ticket':
         opts.ticket = argv[++i]
+        break
+      case '--plan-run':
+        opts.planRun = true
         break
       case '--queue-entry':
         opts.queueEntry = argv[++i]
@@ -1740,8 +1745,10 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     const sessionName = journal.sessionName()
     // The ticket's GitHub issue rides the PR title as `(fix #42)` (#1334): the squash-merge
     // subject inherits the title, so the merge closes the issue — without it, an auto-merged
-    // quick-win leaves its ticket open. Best-effort: a ticket that cannot be read fixes nothing.
-    const fixes = opts.ticket && isTicketPath(opts.ticket)
+    // quick-win leaves its ticket open. Not on a plan run (#1327): its PR lands the plan, not
+    // the work, so the merge must not close the issue. Best-effort: a ticket that cannot be
+    // read fixes nothing.
+    const fixes = opts.ticket && isTicketPath(opts.ticket) && !opts.planRun
       ? ticketIssueRef(await readFile(join(cwd, opts.ticket), 'utf8').catch(() => ''))
       : undefined
     const run = {

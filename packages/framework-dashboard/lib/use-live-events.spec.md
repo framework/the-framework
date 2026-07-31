@@ -15,7 +15,7 @@ The shared live run feed (#405): `useLiveEvents(projectId, runId?, resetKey?)` s
 ## Decisions
 
 - The feed is per RUN, not per project (#749): each run tails its own worktree's log since #736, so `runId` is an effect dependency — selecting run A vs B resubscribes to different logs. Omitted (relay, or a Start whose id isn't adopted yet) falls back to the project root.
-- Events are additionally scoped through `currentRunEvents()` so a second run never shows the previous run's lines even within one long-lived buffer.
+- Events are scoped through `currentRunEvents()` ONLY for the project-root fallback (no `runId`), so a second run never shows the previous run's lines within that long-lived buffer. A run's own tail holds nothing but that run — including the second `session` boundary a resumed session (#762) appends to the same journal, where slicing hid the whole pre-resume transcript while the run was live — so a run-scoped feed is returned whole.
 
 ## Flows
 

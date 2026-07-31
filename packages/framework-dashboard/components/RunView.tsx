@@ -13,6 +13,7 @@ import { CloudMirrorRow, CloudRunNotice } from './CloudRunNotice.js'
 import { RemoteRunNotice } from './RemoteRunNotice.js'
 import { ChangesSummary, RunChanges } from './RunChanges.js'
 import { HandoffActions, HandoffArm, HandoffSummary, RunHandoffDetails } from './RunHandoff.js'
+import { ResumeButton } from './ResumeButton.js'
 import { SessionDetails } from './SessionDetails.js'
 
 // One session's view, whether it is running or finished (#1026).
@@ -124,6 +125,8 @@ export function RunView({
   const shown = live ? events : (archived?.length ? archived : events)
   const session = sessionInfo(shown)
   const progress = runProgress(shown)
+  // How the run ended (#948) — read once for the composer's note and the Resume offer below.
+  const outcome = live ? undefined : runOutcome(shown)
   // What the session hands back when it ends (#1102), folded from its own events, seeded from the
   // run record's mirror (#1376): the opening `handoff-armed` event is written before the live
   // channel attaches, so a live tab misses it and the fold alone re-arms what the launcher
@@ -178,7 +181,21 @@ export function RunView({
             working ? (
               <HandoffArm projectId={projectId} runId={runId} state={armed} />
             ) : (
-              <HandoffActions projectId={projectId} runId={runId} state={handoff} />
+              <>
+                {/* Resume-on-demand (#1391): Stop is pause semantics, so a stopped session's next
+                    step is offered as a button, not just a composer hint. Only once the run has
+                    reported a session id — without one there is nothing any agent could resume. */}
+                {outcome?.stopped && session?.sessionId && (
+                  <ResumeButton
+                    projectId={projectId}
+                    runId={runId}
+                    sessionId={session.sessionId}
+                    driver={session.driver}
+                    onRunStarted={onRunStarted}
+                  />
+                )}
+                <HandoffActions projectId={projectId} runId={runId} state={handoff} />
+              </>
             )
           ) : undefined
         }
@@ -233,7 +250,7 @@ export function RunView({
         removeContext={removeContext}
         sessionName={progress.sessionName}
         onRunStarted={onRunStarted}
-        outcome={live ? undefined : runOutcome(shown)}
+        outcome={outcome}
       />
     </>
   )

@@ -226,22 +226,29 @@ export class StreamJsonParser {
       return [] // Non-JSON noise (banners etc.); ignore.
     }
 
-    if (typeof obj['session_id'] === 'string') this.sessionId = obj['session_id']
+    // Announced on the very first stream line, so it must not wait for `result`: a turn that is
+    // stopped or dies mid-flight would take the id — the run's `claude --resume` handle — with
+    // it (#1322). Emitted only when it changes; every subsequent line repeats the same id.
+    const announced: DriverEvent[] = []
+    if (typeof obj['session_id'] === 'string' && obj['session_id'] !== this.sessionId) {
+      this.sessionId = obj['session_id']
+      announced.push({ type: 'session', sessionId: this.sessionId })
+    }
     const type = obj['type']
 
-    if (type === 'assistant') return this.handleAssistant(obj)
+    if (type === 'assistant') return [...announced, ...this.handleAssistant(obj)]
     if (type === 'rate_limit_event') {
       const limit = parseRateLimit(obj)
-      return limit ? [{ type: 'rate-limit', limit }] : []
+      return limit ? [...announced, { type: 'rate-limit', limit }] : announced
     }
     if (type === 'result') {
       const result = obj['result']
       if (typeof result === 'string') this.finalText = result
       const usage = parseUsage(obj)
       if (usage) this.usage = usage
-      return [] // The `result` event is emitted by the runner after `close`.
+      return announced // The `result` event is emitted by the runner after `close`.
     }
-    return []
+    return announced
   }
 
   private handleAssistant(obj: Record<string, unknown>): DriverEvent[] {

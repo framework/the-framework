@@ -174,6 +174,10 @@ function formatDriverEvent(event: DriverEvent): string {
   switch (event.type) {
     case 'start':
       return `  › prompt: ${truncate(event.prompt, 140)}`
+    // Normally consumed by telemetry before it reaches a stream (#1322); rendered anyway so a
+    // stray one reads as what it is rather than crashing the formatter.
+    case 'session':
+      return `  session ${event.sessionId}`
     case 'text':
       return `    ${truncate(event.text)}`
     case 'action':

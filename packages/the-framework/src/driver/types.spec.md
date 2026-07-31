@@ -8,7 +8,7 @@ The driver seam's contract: the one abstraction The Framework wraps a coding-age
 - `DriverPromptOptions` — per-call `system`, `signal`, `resume` (#714: continue the previous turn, best-effort).
 - `DriverTurn` — final `text`, agent's own `sessionId` (the MVP persistence shortcut: forward the agent's transcript, #165), optional `usage`.
 - Telemetry types: `DriverUsage` (#322 per-turn tokens + optional cost), `DriverRateLimit` (#517 per-turn traffic light), `DriverQuota`/`DriverQuotaWindow` (#521 proportion of window consumed — the only one that can fill a progress bar), `DriverQuotaUnavailableReason` + `isTransientQuotaReason`.
-- `DriverEvent` — `start` / `text` / `action` (tool name only, never arguments) / `result` (with optional `sessionLink`, #1317) / `rate-limit` / `error` / `notice` (#778).
+- `DriverEvent` — `start` / `session` (the id announced at turn start, #1322; telemetry consumes it rather than forwarding) / `text` / `action` (tool name only, never arguments) / `result` (with optional `sessionLink`, #1317) / `rate-limit` / `error` / `notice` (#778).
 
 ## Decisions
 

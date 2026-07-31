@@ -4,6 +4,7 @@ SHOW_MD: Show it via `showMarkdown()`
 SHOW_CHOICES: Show it via `showChoices()`
 AWAIT: Stop, await user answer before resuming
 SESSION_NAME: the name of the session
+TODO_FILE: `TODO_AGENTS.md`
 ADD_ANALYSIS_ENTRY: Add entry to the ANALYSIS_RESULT.md list
 
 ## Analyze the user prompt
@@ -19,7 +20,7 @@ If it isn't clear what you should do (e.g. unclear scope, unclear user prompt), 
 ### Scope
 
 - If the scope of what you'll work on is *large*, create a `PLAN_<SESSION_NAME>.agent.md` of what you'll work on, <SHOW_MD>, <AWAIT>
-- If the scope is potentially *very large* (e.g. spans over many hours/days of work), consider adding entries to `TODO_AGENTS.md` and show the new entries to the user via `showMarkdown()`
+- If the scope is potentially *very large* (e.g. spans over many hours/days of work), consider adding entries to <TODO_FILE> (backlog of follow-up tasks) and show new entries <SHOW_MD>
 
 <ADD_ANALYSIS_ENTRY> whether the scope is small, large, or very large
 
@@ -30,10 +31,9 @@ Do the following before applying your first change.
 
 ### Session name
 
-1. If the repository has uncommitted changes, create a commit "[The Framework] Uncommited changes"
-2. Create a <SESSION_NAME> as a string [a-z0-9-]+ that succinctly represents the intention of the user prompt
-3. Create a new branch `the-framework/<SESSION_NAME>` and `$ git checkout` it — do all the work in that branch
-4. Call setSessionName(<SESSION_NAME>)
+1. Create a <SESSION_NAME> as a string [a-z0-9-]+ that succinctly represents the intention of the user prompt
+2. Create a new branch `the-framework/<SESSION_NAME>` and `$ git checkout` it — do all the work in that branch
+3. Call setSessionName(<SESSION_NAME>)
 
 
 ## Before applying changes

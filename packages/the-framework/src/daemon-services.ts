@@ -15,7 +15,7 @@ import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './m
 import { claimedQueueEntries, promoteQueue } from './queue-promote.js'
 import { promotePlannedQuickWins } from './planned-quick-wins.js'
 import { FLAT_TODO_FILE, TICKETS_DIR } from './tickets.js'
-import { acquireSpikeLocks, releaseStaleSpikeLocks } from './spike-locks.js'
+import { acquireTicketLocks } from './ticket-locks.js'
 import { readTickets } from './dashboard/tickets.js'
 import { cachedOpenPrFilePatches } from './dashboard/gh.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
@@ -160,11 +160,11 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     recordMaintenance: async project => mergeMaintenanceState(project.path, { sweptAt: new Date().toISOString() }),
     // A pinned routine branch left behind by a closed PR blocks every later firing (#1293).
     releasePinned: (project, branch) => releaseStalePinnedBranch(project.path, branch),
-    // The tickets a [Spike & plan] fan-out may claim (#1327): open, with no sibling at all —
-    // real or PENDING — most important first. Stale locks are released first, so a crashed
-    // agent's ticket comes back on the market in the same read that offers it.
+    // The tickets a [Spike & plan] fan-out may claim (#1327/#1420): open, unplanned, and not
+    // claimed by a `.lock.md` — most important first. No stale-lock sweep runs here: #1420
+    // removed the timer, so a lock stands until the agent's PR deletes it or a human releases
+    // it from the dashboard.
     spikeCandidates: async project => {
-      await releaseStaleSpikeLocks(project.path, { log })
       const rank = (priority?: string) => {
         const n = Number(priority)
         return Number.isFinite(n) ? n : -1
@@ -174,9 +174,10 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         .sort((a, b) => rank(b.priority) - rank(a.priority))
         .map(ticket => ticket.file)
     },
-    // The daemon writes and pushes the locks, never the agent (#1327/#1320): a cloud session has
-    // no push access, and a claim that stayed local would not reach the machines it exists for.
-    lockSpikes: (project, assignments) => acquireSpikeLocks(project.path, assignments, { log }),
+    // The daemon writes and pushes the locks, never the agent (#1327/#1320): an agent only
+    // pushes at the end of its session onto its own branch, and a claim that stayed local would
+    // not reach the machines it exists for.
+    lockSpikes: (project, assignments) => acquireTicketLocks(project.path, assignments, { log }),
     start: async (project, job) => {
       // A draining run works one open queue entry, and since #1164 that entry links back to the
       // ticket it was queued from — so this is the one moment the framework knows what a run is

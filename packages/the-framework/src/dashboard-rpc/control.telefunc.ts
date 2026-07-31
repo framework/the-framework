@@ -7,6 +7,8 @@ import { resolveProjectPath, resolveRunPath, contextPreferences, contextPreview 
 import { relayOr } from './relay-run.js'
 import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
+import { isTicketFile } from '../dashboard/tickets.js'
+import { releaseTicketLock } from '../ticket-locks.js'
 import { findRun, isSafeRunId, type RunMeta } from '../store/index.js'
 import { removeProjectWorktree, deleteProjectRun } from '../worktrees.js'
 import { commitSessionWork, mergeSessionPr, openSessionPullRequest, pushRunBranch, runBranchFor, type HandoffResult } from '../dashboard/run-handoff.js'
@@ -384,6 +386,21 @@ export interface QueuedTicket {
  * #1164: the entry used to land last in a file the drain preset works front to back, and it
  * carried nothing but a title, so the ticket it came from was lost the moment it was queued.
  */
+/**
+ * Release a ticket's `.lock.md` claim by hand (#1420): the dashboard's answer to a dead agent,
+ * since no timer frees locks anymore. Deletes the lock in the project checkout, commits, and
+ * pushes best-effort ({@link releaseTicketLock}) — a release only this machine can see would
+ * leave the ticket claimed everywhere the claim matters.
+ */
+export async function sendReleaseTicketLock(projectId: string, ticket: string): Promise<{ ok: boolean; error?: string }> {
+  if (!isTicketFile(ticket)) return { ok: false, error: 'not a ticket filename' }
+  const cwd = await resolveProjectPath(projectId)
+  if (!cwd) return { ok: false, error: 'no such project' }
+  const outcome = await releaseTicketLock(cwd, ticket)
+  if (outcome === 'released') return { ok: true }
+  return { ok: false, error: outcome === 'no-lock' ? 'this ticket holds no lock' : 'the release could not be committed' }
+}
+
 export async function sendQueueTicket(
   projectId: string,
   entry: string,

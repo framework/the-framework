@@ -178,6 +178,15 @@ export function TicketsPanel({
                 {/* What the agent has already done to this ticket, so it is clear what is left. */}
                 {ticket.spiked && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">spiked</Badge>}
                 {ticket.planned && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">planned</Badge>}
+                {/* An agent holds this ticket's `.lock.md` (#1420); the detail page releases it. */}
+                {ticket.locked && (
+                  <Badge
+                    title={ticket.lockedBy ? `Claimed by ${ticket.lockedBy}` : undefined}
+                    className="shrink-0 border-transparent px-1 text-[10px] uppercase text-warning"
+                  >
+                    claimed
+                  </Badge>
+                )}
                 {ticket.effort && (
                   <Badge className="shrink-0 border-transparent px-1 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>
                 )}

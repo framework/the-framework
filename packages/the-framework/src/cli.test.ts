@@ -998,6 +998,11 @@ test('parseArgs reads --queue-entry, the queue entry a drain pinned this run to 
   assert.equal(parseArgs(['--queue-entry', 'Fix the flaky teardown test', 'x']).queueEntry, 'Fix the flaky teardown test')
 })
 
+test('parseArgs reads --plan-run, the flag marking the ticket as planned rather than implemented (#1327)', () => {
+  assert.equal(parseArgs(['--plan-run', 'x']).planRun, true)
+  assert.equal(parseArgs(['x']).planRun, undefined)
+})
+
 test('naming the session renames the run-id branch and records it as a branch event (#1277)', async t => {
   const { execFileSync } = await import('node:child_process')
   const repo = await mkdtemp(join(tmpdir(), 'fw-journal-'))

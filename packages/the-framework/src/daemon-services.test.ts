@@ -154,6 +154,9 @@ test('the concurrency setting on disk is the number of agents the routine spins 
       // The drain job lands its own PRs (#1216): the flag rides the start so it reaches the run
       // as --auto-merge.
       assert.equal(start.options.autoMerge, true)
+      // A drain implements its ticket, so its PR title may close the issue — planRun is only
+      // for the fanned-out planners (#1327), whose merge must not.
+      assert.equal(start.options.planRun, undefined)
       assert.equal(start.projectId, 'proj-1')
     }
     // The ticket the entry links to rides along, so the four agents land in four lanes (#1117).

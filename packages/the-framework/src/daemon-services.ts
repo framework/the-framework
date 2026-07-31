@@ -197,6 +197,10 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // meta and outlives both this process's memory and the run's local process.
       const result = await startUnattended(project.id, job.prompt, {
         ...(ticket ? { ticket } : {}),
+        // A fanned-out spike plans its ticket rather than implementing it (#1327), so its PR
+        // title must not inherit the issue as `(fix #42)` — the plan's merge would close the
+        // issue with the work still undone (#1334).
+        ...(ticket && !job.drains ? { planRun: true } : {}),
         ...(job.entry !== undefined ? { queueEntry: job.entry } : {}),
         // The job says its PRs may land themselves (#1216): the drain implements work whose
         // review already happened on the queue. Rides to the run as `--auto-merge`.

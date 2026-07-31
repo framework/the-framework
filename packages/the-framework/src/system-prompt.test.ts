@@ -49,7 +49,7 @@ test('CONTEXT_DOCS is the #683 fragment: business knowledge plus the roadmap/que
   // The two format-bearing bullets name a section of this same channel (#1163), not a file to go
   // and open: the spec they point at has to be something the agent has already been handed.
   const tickets = CONTEXT_DOCS.find(d => d.path === 'tickets/**.md')
-  assert.match(tickets?.comment ?? '', /format: the "Ticket format" section below/)
+  assert.match(tickets?.comment ?? '', /format: the "Ticketing format" section below/)
   const todo = CONTEXT_DOCS.find(d => d.path === FLAT_TODO_FILE)
   assert.match(todo?.comment ?? '', /format: the "TODO_AGENTS.md" section below/)
   // Nothing here may point into node_modules: that path resolves only when the framework is a root
@@ -99,8 +99,9 @@ test('SYSTEM_PROMPT_TEMPLATE carries the #326 sections verbatim', () => {
   }
   // Derived from the constant, not a literal (#885): the prompt tells the agent where to write
   // its backlog, and `promoteQueue` only carries FLAT_TODO_FILE off a run's branch. When the two
-  // disagree, an unattended run's queue is written to a name nothing ever promotes.
-  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes(`TODO_FILE: \`${FLAT_TODO_FILE}\``))
+  // disagree, an unattended run's queue is written to a name nothing ever promotes. #1420 dropped
+  // the `TODO_FILE:` glossary line and names the file inline instead — the invariant is the name.
+  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes(`\`${FLAT_TODO_FILE}\``))
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('ADD_ANALYSIS_ENTRY: Add entry to the ANALYSIS_RESULT.md list'))
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('${{tf.prompt}}'))
   // The whole block is the branch-free doc now: #326 moved the one `tf.params.autopilot`
@@ -140,7 +141,7 @@ test('the channel carries the ticket and backlog format specs, so a spec can be 
   // format it could not open, and `TODO_AGENTS.md` and `tickets/` both drifted from it.
   const block = systemPromptBlock()
   for (const [heading, spec] of [
-    ['Ticket format', TICKETING_FORMAT],
+    ['Ticketing format', TICKETING_FORMAT],
     ['TODO_AGENTS.md', TODO_FORMAT],
   ] as const) {
     assert.ok(block.includes(spec), `expected the ${heading} spec in the channel`)

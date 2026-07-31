@@ -74,3 +74,46 @@ test('tailEvents stops pulling once stopped, and skips malformed lines', async (
     await rm(cwd, { recursive: true, force: true })
   }
 })
+
+test('tailEvents reports the replay boundary after the backlog, before any follow-append (#1383)', async () => {
+  const cwd = await tmpWorkspace()
+  const path = join(cwd, 'events.jsonl')
+  await writeFile(path, line('first') + line('second'))
+  const order: string[] = []
+  const stop = tailEvents<FrameworkEvent>(
+    path,
+    e => void (e.kind === 'log' && order.push(e.message)),
+    () => order.push('<sync>'),
+  )
+  try {
+    await sleep(150)
+    // The marker lands exactly between the replay and anything the follower delivers.
+    assert.deepEqual(order, ['first', 'second', '<sync>'])
+    await appendFile(path, line('third'))
+    await sleep(1400) // fs.watch is unreliable on CI; wait out the poll backstop behind it
+    assert.deepEqual(order, ['first', 'second', '<sync>', 'third'])
+  } finally {
+    stop()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('tailEvents reports the replay boundary even when the log does not exist yet (#1383)', async () => {
+  const cwd = await tmpWorkspace()
+  const path = join(cwd, 'events.jsonl')
+  const order: string[] = []
+  const stop = tailEvents<FrameworkEvent>(
+    path,
+    e => void (e.kind === 'log' && order.push(e.message)),
+    () => order.push('<sync>'),
+  )
+  try {
+    await sleep(150)
+    // An absent log is an empty replay, not a marker withheld: a client waiting on it
+    // forever would freeze its feed.
+    assert.deepEqual(order, ['<sync>'])
+  } finally {
+    stop()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})

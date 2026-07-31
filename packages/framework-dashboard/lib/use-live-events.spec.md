@@ -10,7 +10,7 @@ The shared live run feed (#405): `useLiveEvents(projectId, runId?, resetKey?)` s
 
 - A dead stream used to be silent (#948): daemon restarts, events just stop, and "agent went quiet" was indistinguishable from "feed died". Now an errored close or failed subscribe flips `lost` and retries with backoff (1s/2s/4s then settling at 8s); a clean close is deliberate and neither alarms nor retries.
 - Run boundary vs. buffer: the subscription survives run boundaries (resets only on project/run-id change), so a new Start would keep showing the finished run until events.jsonl is truncated. `resetKey` (bumped by a fresh Start) clears the buffer WITHOUT tearing down the subscription; the pane waits empty and JsonlTailer's rewrite detection re-reads the truncated file (#705 jump-to-live would otherwise show the old run).
-- Reconnect duplicates: the tail replays the whole log on subscribe, so each (re)subscribe clears the buffer first rather than appending duplicate history.
+- Reconnect duplicates vs. the mid-run blank (#1383): the tail replays the whole log on subscribe. Clearing the buffer on every (re)subscribe avoided duplicate history but blanked a populated feed while the replay re-streamed — the lost banner cleared on resubscribe, then the feed sat empty until the replay caught up. Now only the FIRST subscribe of an effect starts clean (the pane was just cleared anyway); a RECONNECT buffers the replay and swaps atomically on the server's `stream-sync` marker, or at `SYNC_GRACE_MS` (1.5 s) for in-memory sources that send none (relay #426, relayed device #1067). The feed never shows less than it already showed (#1402's rule applied to the live channel). A close mid-replay drops the partial buffer — swapping it in would be the collapse this prevents.
 
 ## Decisions
 
@@ -19,5 +19,6 @@ The shared live run feed (#405): `useLiveEvents(projectId, runId?, resetKey?)` s
 
 ## Flows
 
-- subscribe: `onEvents(projectId, runId)` → clear buffer, `attempt = 0`, `lost = false` → `listen`: stamp + append each event → `onClose(err)`: err → `retry()` (backoff, `lost = true`); clean → `done = true`.
+- subscribe (first): `onEvents(projectId, runId)` → clear buffer, `attempt = 0`, `lost = false` → `listen`: swallow `stream-sync`, stamp + append each event → `onClose(err)`: err → `retry()` (backoff, `lost = true`); clean → `done = true`.
+- subscribe (reconnect): keep the shown feed → buffer replayed events → swap wholesale on `stream-sync` or at the grace deadline → append live after; a close mid-replay discards the buffer.
 - teardown/switch: effect cleanup sets `cancelled`, clears the retry timer, closes the channel.

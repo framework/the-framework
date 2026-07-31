@@ -7,6 +7,7 @@ The Overview's "Routine work" card (#1159): lists the auto-PM jobs the idle swee
 - Run now on the drain job (`job.drains`): `sendAutoPmSweep({ drainOnly: true })` instead — only the sweep can fan out one agent per queue entry up to the concurrency (#1204); no navigation, the batch lands in the Agents card.
 - Two checkbox tiers (#1209): the foot box is the global `autoPm` preference (#685, schedule on/off); each row's box is that routine's membership, stored as `autoPmOptOut`.
 - "Trigger routine now" (#1210) fires `sendAutoPmSweep()` on demand, live even with auto-run off (the click is the consent); failure note when the host isn't running the sweep (the relay serves this same dashboard).
+- The sweep's own answer lands in the note slot (#1433): the RPC awaits the tick and returns per-project outcomes — one project speaks its message plainly, several are prefixed by folder name (` · `-joined); "Triggering…"/"Starting…" holds until the tick resolves. Outcomes missing on an ok answer reads "The sweep ran."; an empty list "…considered no projects." Applies to both the trigger button and the drain's Run now.
 - `autoPmConcurrency` number input (#1204), clamped 1..`MAX_AUTO_PM_CONCURRENCY`; project picker only when >1 project.
 
 ## Decisions

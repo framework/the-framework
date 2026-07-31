@@ -78,11 +78,10 @@ export interface DashboardContext {
   autoPm?: AutoPmReporter
   /**
    * Run an auto PM sweep now rather than at the next interval (#1210). Same reason `autoPm` is
-   * daemon-only: the loop lives in that process, so nowhere else has one to fire. Returns
-   * immediately — a sweep can start runs and take a while, and the caller only needs to know it
-   * was asked for.
+   * daemon-only: the loop lives in that process, so nowhere else has one to fire. Resolves when
+   * the sweep does (#1433), so the trigger RPC can await it and return what it decided.
    */
-  autoPmSweep?: (opts?: { drainOnly?: boolean }) => void
+  autoPmSweep?: (opts?: { drainOnly?: boolean }) => void | Promise<void>
 }
 
 let instance: Telefunc | undefined

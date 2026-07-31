@@ -664,8 +664,10 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           continue
         }
         // A drain-only sweep (#1204) works the queue or says why not — it never borrows the
-        // click for a rotation job the user did not ask for.
+        // click for a rotation job the user did not ask for. Logged like every other stand-down
+        // (#855/#1433): these two used to be the only silent ones.
         if (opts?.drainOnly && decision.mode !== 'drain') {
+          deps.log(`[framework] auto PM: standing down for ${project.path} — the queue is empty, so there is nothing to drain`)
           note(project, false, 'the queue is empty, so there is nothing to drain')
           continue
         }
@@ -674,6 +676,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // automatically" by inventing more work is the opposite of what was asked.
         const drainJob = wanted(deps.drainJob ?? AUTO_PM_DRAIN_JOB)
         if (decision.mode === 'drain' && !drainJob) {
+          deps.log(`[framework] auto PM: standing down for ${project.path} — the queue has work waiting and its routine is switched off`)
           note(project, false, 'the queue has work waiting and its routine is switched off')
           continue
         }

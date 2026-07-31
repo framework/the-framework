@@ -220,12 +220,16 @@ export interface RepoAutoMerge {
  * launcher warns with the fix instead of leaving the degradation silent. `known: false` (gh
  * missing, unauthenticated, not a GitHub repo) is "could not say", which renders nothing: no
  * crying wolf, same stance as the #1318 trust read.
+ *
+ * The probe is the REST endpoint, not `gh repo view --json autoMergeAllowed`: `repo view` has no
+ * such field (any gh version), so that spelling always errored into "could not say". REST omits
+ * `allow_auto_merge` for viewers without push access — absent lands in the same "could not say".
  */
 export async function ghRepoAutoMerge(cwd: string, gh: GhRunner = readGh): Promise<RepoAutoMerge> {
   try {
-    const parsed = JSON.parse(await gh(['repo', 'view', '--json', 'autoMergeAllowed'], cwd)) as { autoMergeAllowed?: unknown }
-    if (typeof parsed.autoMergeAllowed !== 'boolean') return { known: false, allowed: false }
-    return { known: true, allowed: parsed.autoMergeAllowed }
+    const parsed = JSON.parse(await gh(['api', 'repos/{owner}/{repo}'], cwd)) as { allow_auto_merge?: unknown }
+    if (typeof parsed.allow_auto_merge !== 'boolean') return { known: false, allowed: false }
+    return { known: true, allowed: parsed.allow_auto_merge }
   } catch {
     return { known: false, allowed: false }
   }

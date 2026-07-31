@@ -20,7 +20,7 @@ If it isn't clear what you should do (e.g. unclear scope, unclear user prompt), 
 ### Scope
 
 - If the scope of what you'll work on is *large*, create a `PLAN_<SESSION_NAME>.agent.md` of what you'll work on, <SHOW_MD>, <AWAIT>
-- If the scope is potentially *very large* (e.g. spans over many hours/days of work), also create a <TODO_FILE> (backlog of follow-up tasks) and <SHOW_MD>
+- If the scope is potentially *very large* (e.g. spans over many hours/days of work), consider adding entries to <TODO_FILE> (backlog of follow-up tasks) and show new entries <SHOW_MD>
 
 <ADD_ANALYSIS_ENTRY> whether the scope is small, large, or very large
 

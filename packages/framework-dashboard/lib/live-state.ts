@@ -71,7 +71,11 @@ export function agentViews(events: readonly FrameworkEvent[]): AgentView[] {
  * single `end` event; until one arrives (and once anything has streamed) it is live.
  */
 export function isRunActive(events: readonly FrameworkEvent[]): boolean {
-  return events.length > 0 && !events.some(event => event.kind === 'end')
+  // Asked of the CURRENT segment, not the whole feed: a resumed session (#762) appends a second
+  // `session` boundary after its `end` to the same journal, and "was there ever an end" read a
+  // resumed-live run as inactive — hiding Stop and settling the pill while the agent worked.
+  const current = currentRunEvents(events)
+  return current.length > 0 && !current.some(event => event.kind === 'end')
 }
 
 /**
@@ -110,7 +114,11 @@ export interface RunOutcome {
  * pill said "finished" for a crash and a clean pass alike.
  */
 export function runOutcome(events: readonly FrameworkEvent[]): RunOutcome | undefined {
-  const end = events.find(event => event.kind === 'end')
+  // The ending of the CURRENT segment: a resumed session (#762) carries its stopped segment's
+  // `end` in the same journal, and the first-end-wins read kept a resumed run "stopped" for
+  // ever — while it was live again, and even after it later finished clean. Mid-resume there is
+  // no end in the newest segment yet, and "undefined while it is still going" is the truth.
+  const end = currentRunEvents(events).find(event => event.kind === 'end')
   if (!end || end.kind !== 'end') return undefined
   return { ok: end.ok, stopped: end.stopped === true, ...(end.detail !== undefined ? { detail: end.detail } : {}) }
 }

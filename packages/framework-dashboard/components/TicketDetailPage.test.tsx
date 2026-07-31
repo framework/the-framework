@@ -116,9 +116,10 @@ describe('TicketDetailPage (#1144)', () => {
   test('a claimed ticket shows its badge, holder, and a release button (#1420)', async () => {
     onTicket.mockResolvedValue(ticket({ locked: true, lockedBy: 'spike-1-0' }))
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
-    const badge = await screen.findByText('claimed')
-    // The holder rides as a tooltip so a human knows whose claim they are about to lift.
-    expect(badge.getAttribute('title')).toBe('Claimed by spike-1-0')
+    await screen.findByText('claimed')
+    // The holder reads inline so a human knows whose claim they are about to lift — the detail
+    // page has the room, no tooltip hunt needed.
+    expect(screen.getByText(/· spike-1-0/)).toBeTruthy()
     expect(screen.getByRole('button', { name: /release lock/i })).toBeTruthy()
   })
 

@@ -175,12 +175,28 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
     const first = render(<StartRunForm {...props} />)
-    await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('claude'))
+    await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('claude', true))
     first.unmount()
 
     prefs.current = { agent: 'codex' }
     render(<StartRunForm {...props} />)
-    await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('codex'))
+    await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('codex', true))
+  })
+
+  // #1419: the handoff opens and merges PRs through `gh`, so a launcher with those rungs armed
+  // asks the preflight for the gh half too — and only then, so a push-only or publish-nothing
+  // launcher cannot warn about a CLI its session will never call.
+  test('the gh half is requested only while a PR or merge rung is armed (#1419)', async () => {
+    onProjects.mockResolvedValue([])
+    onSystemPromptUser.mockResolvedValue(null)
+    prefs.current = { autoPushBranch: true, autoOpenPr: false }
+    const pushOnly = render(<StartRunForm {...props} />)
+    await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('claude', false))
+    pushOnly.unmount()
+
+    prefs.current = { autoOpenPr: true }
+    render(<StartRunForm {...props} />)
+    await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('claude', true))
   })
 
   test('an actions run is not gated on a local CLI it never uses', async () => {

@@ -179,3 +179,58 @@ test('preflightProblems lists only the failures, each with its fix (#1326)', asy
   // The warning is not a problem, and must not be reported as one.
   assert.equal(problems.some(p => p.startsWith('root')), false)
 })
+
+// #1419: an armed PR/merge rung publishes through `gh` at the finish, hours after the Start that
+// could have said it will not work. Warnings only — the run itself needs no gh to do its work.
+
+/** A probe that answers for `gh` separately from the agent CLI, which always passes here. */
+function withGh(gh: { version: { ok: boolean; output: string }; auth?: { ok: boolean; output: string } }): CliProbe {
+  return (bin, args) =>
+    Promise.resolve(
+      bin === 'gh'
+        ? args[0] === '--version'
+          ? gh.version
+          : (gh.auth ?? { ok: true, output: '' })
+        : { ok: true, output: '1.2.3' },
+    )
+}
+
+test('publish warns when gh is missing, naming install and login, without blocking (#1419)', async () => {
+  const result = await preflight({ ...notRoot, publish: true, probe: withGh({ version: { ok: false, output: '' } }) })
+  assert.equal(result.ok, true)
+  const gh = result.checks.find(c => c.name === 'gh')
+  assert.equal(gh?.warn, true)
+  assert.match(gh!.detail, /`gh` not found/)
+  assert.match(gh!.detail, /brew install gh/)
+  assert.match(gh!.detail, /gh auth login/)
+})
+
+test('publish warns when gh is logged out, naming the fix, without blocking (#1419)', async () => {
+  const result = await preflight({
+    ...notRoot,
+    publish: true,
+    probe: withGh({ version: { ok: true, output: 'gh version 2.93.0' }, auth: { ok: false, output: 'You are not logged into any GitHub hosts.' } }),
+  })
+  assert.equal(result.ok, true)
+  const auth = result.checks.find(c => c.name === 'gh auth')
+  assert.equal(auth?.warn, true)
+  assert.match(auth!.detail, /not logged in/)
+  assert.match(auth!.detail, /gh auth login/)
+})
+
+test('publish adds nothing when gh is installed and logged in (#1419)', async () => {
+  const result = await preflight({ ...notRoot, publish: true, probe: withGh({ version: { ok: true, output: 'gh version 2.93.0' } }) })
+  assert.equal(result.checks.some(c => c.name.startsWith('gh')), false)
+})
+
+test('gh is not probed at all when no publish rung asks for it (#1419)', async () => {
+  const probed: string[] = []
+  await preflight({
+    ...notRoot,
+    probe: (bin, _args) => {
+      probed.push(bin)
+      return Promise.resolve({ ok: true, output: '1.2.3' })
+    },
+  })
+  assert.equal(probed.includes('gh'), false)
+})

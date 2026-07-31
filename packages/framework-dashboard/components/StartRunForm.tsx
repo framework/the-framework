@@ -102,12 +102,15 @@ export function StartRunForm({
   // Can the picked agent's CLI start a run at all (#1326)? An `actions` run needs nothing local,
   // and a remote run executes on its own device, so neither is probed here. Re-read when the agent
   // changes, since the answer is per CLI: `claude` being logged in says nothing about `codex`.
+  // An armed PR/merge rung adds the `gh` half (#1419): the handoff publishes through the GitHub
+  // CLI, so a missing or logged-out `gh` is said now, not hours later as a silently unopened PR.
   const localAgent = options.target !== 'actions' && !remoteDevice
   const agent = options.agent ?? 'claude'
+  const publishArmed = localAgent && (options.autoOpenPr === true || options.autoMerge === true)
   const ready = useLoaded<Awaited<ReturnType<typeof onAgentReady>> | null>(
-    () => (localAgent ? onAgentReady(agent) : Promise.resolve(null)),
+    () => (localAgent ? onAgentReady(agent, publishArmed) : Promise.resolve(null)),
     null,
-    [agent, localAgent],
+    [agent, localAgent, publishArmed],
   )
 
   // An armed merge on a repo with GitHub auto-merge disabled silently degrades to an immediate

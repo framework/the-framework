@@ -1,4 +1,4 @@
-Tails a `.the-framework/events.jsonl` — replays what is logged, then follows appends, handing each parsed JSONL line to `onEvent` (malformed lines skipped) and returning a stop function.
+Tails a `.the-framework/events.jsonl` — replays what is logged, then follows appends, handing each parsed JSONL line to `onEvent` (malformed lines skipped) and returning a stop function. `onReplayed` fires once, between the replay and the first follow-append (#1383) — the boundary a reconnecting client swaps its feed on.
 
 ## Decisions
 
@@ -8,3 +8,4 @@ Tails a `.the-framework/events.jsonl` — replays what is logged, then follows a
 ## Facts
 
 - `fs.watch` is backstopped by a 1 s poll (`POLL_MS`).
+- `onReplayed` fires even when the first read fails or the log does not exist yet (an empty replay, not a marker withheld): a client waiting forever would freeze its feed; the follower's poll retries the read.

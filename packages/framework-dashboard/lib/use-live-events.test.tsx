@@ -13,15 +13,17 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-/** A channel stub that records its onClose callback so a test can drop the stream. */
+/** A channel stub that records its callbacks so a test can push events and drop the stream. */
 function fakeChannel() {
   const callbacks: Array<(err?: Error) => void> = []
+  const listeners: Array<(event: unknown) => void> = []
   return {
     channel: {
-      listen: () => {},
+      listen: (cb: (event: unknown) => void) => listeners.push(cb),
       close: () => {},
       onClose: (cb: (err?: Error) => void) => callbacks.push(cb),
     },
+    push: (event: unknown) => listeners.forEach(cb => cb(event)),
     dropWith: (err?: Error) => callbacks.forEach(cb => cb(err)),
   }
 }
@@ -90,5 +92,99 @@ describe('useLiveEvents stream loss (#948)', () => {
     render(<Probe projectId="p1" runId="run-a" />)
     await waitFor(() => expect(screen.getByText('lost')).toBeTruthy())
     await waitFor(() => expect(screen.getByText('live')).toBeTruthy(), { timeout: 3000 })
+  })
+})
+
+// #1383: every subscribe replays the whole log before following live. Blanking the feed while
+// that replay re-streamed was the mid-run flicker — the lost banner cleared on resubscribe, then
+// the feed sat empty until the replay caught up. A reconnect now buffers the replay and swaps
+// atomically on the server's stream-sync marker (or a grace deadline for sources that send none).
+describe('useLiveEvents reconnect keeps the feed (#1383)', () => {
+  const log = (message: string) => ({ kind: 'log', message })
+
+  function FeedProbe({ projectId, runId }: { projectId: string | null; runId?: string | null }) {
+    const { events } = useLiveEvents(projectId, runId)
+    return <span data-testid="feed">{events.map(e => (e.kind === 'log' ? e.message : e.kind)).join(',')}</span>
+  }
+  const feed = () => screen.getByTestId('feed').textContent
+
+  test('the first subscribe streams straight in, and the sync marker is swallowed', async () => {
+    const ch = fakeChannel()
+    onEvents.mockResolvedValue(ch.channel)
+    render(<FeedProbe projectId="p1" runId="run-a" />)
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
+    ch.push(log('a'))
+    ch.push({ kind: 'stream-sync' })
+    ch.push(log('b'))
+    await waitFor(() => expect(feed()).toBe('a,b'))
+  })
+
+  test('a reconnect never shows less than it already showed: the replay swaps in atomically', async () => {
+    const first = fakeChannel()
+    const second = fakeChannel()
+    onEvents.mockResolvedValueOnce(first.channel).mockResolvedValue(second.channel)
+    render(<FeedProbe projectId="p1" runId="run-a" />)
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
+    first.push(log('a'))
+    first.push({ kind: 'stream-sync' })
+    first.push(log('b'))
+    await waitFor(() => expect(feed()).toBe('a,b'))
+
+    first.dropWith(new Error('connection reset'))
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(2), { timeout: 3000 })
+    // The replay is streaming again — but the populated feed stays put until the marker.
+    second.push(log('a'))
+    second.push(log('b'))
+    expect(feed()).toBe('a,b')
+    second.push(log('c'))
+    second.push({ kind: 'stream-sync' })
+    // The swap is atomic: the whole replayed log at once, never a shorter prefix.
+    await waitFor(() => expect(feed()).toBe('a,b,c'))
+    second.push(log('d'))
+    await waitFor(() => expect(feed()).toBe('a,b,c,d'))
+  })
+
+  test('a source that sends no marker still swaps at the grace deadline (relay/remote)', async () => {
+    const first = fakeChannel()
+    const second = fakeChannel()
+    onEvents.mockResolvedValueOnce(first.channel).mockResolvedValue(second.channel)
+    render(<FeedProbe projectId="p1" runId="run-a" />)
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
+    first.push(log('a'))
+    await waitFor(() => expect(feed()).toBe('a'))
+
+    first.dropWith(new Error('connection reset'))
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(2), { timeout: 3000 })
+    second.push(log('a'))
+    second.push(log('b'))
+    expect(feed()).toBe('a')
+    // No stream-sync ever arrives: the deadline swap keeps the feed from freezing.
+    await waitFor(() => expect(feed()).toBe('a,b'), { timeout: 3000 })
+  })
+
+  test('a reconnect that dies mid-replay drops the partial buffer rather than swapping it in', async () => {
+    const first = fakeChannel()
+    const second = fakeChannel()
+    const third = fakeChannel()
+    onEvents.mockResolvedValueOnce(first.channel).mockResolvedValueOnce(second.channel).mockResolvedValue(third.channel)
+    render(<FeedProbe projectId="p1" runId="run-a" />)
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
+    first.push(log('a'))
+    first.push(log('b'))
+    first.push({ kind: 'stream-sync' })
+    await waitFor(() => expect(feed()).toBe('a,b'))
+
+    first.dropWith(new Error('connection reset'))
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(2), { timeout: 3000 })
+    second.push(log('a')) // replay cut short
+    second.dropWith(new Error('gone again'))
+    // The populated feed survives both drops; the third attempt replays and syncs in full.
+    expect(feed()).toBe('a,b')
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(3), { timeout: 4000 })
+    third.push(log('a'))
+    third.push(log('b'))
+    third.push(log('c'))
+    third.push({ kind: 'stream-sync' })
+    await waitFor(() => expect(feed()).toBe('a,b,c'))
   })
 })

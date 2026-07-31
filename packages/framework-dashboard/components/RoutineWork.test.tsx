@@ -251,6 +251,49 @@ describe('RoutineWork (#1159)', () => {
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/not running the sweep/i))
   })
 
+  // #1433: two presses used to show literally nothing — the RPC was fire-and-forget and the
+  // card only ever spoke on failure. The sweep's own answer now lands in the note slot.
+  test('the triggered sweep says what it decided, plainly for a single project (#1433)', async () => {
+    prefs = { autoPm: true }
+    sendAutoPmSweep.mockResolvedValue({
+      ok: true,
+      outcomes: [{ projectId: 'p1', path: '/home/me/repo', started: false, message: 'the queue has work waiting and its routine is switched off' }],
+    })
+    render(<RoutineWork onRunStarted={() => {}} />)
+    fireEvent.click(await screen.findByText('Trigger routine now'))
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('the queue has work waiting and its routine is switched off'),
+    )
+  })
+
+  test('several projects each get their line, named by folder (#1433)', async () => {
+    prefs = { autoPm: true }
+    sendAutoPmSweep.mockResolvedValue({
+      ok: true,
+      outcomes: [
+        { projectId: 'p1', path: '/home/me/alpha', started: true, message: 'started a drain' },
+        { projectId: 'p2', path: '/home/me/beta', started: false, message: 'a run is already active' },
+      ],
+    })
+    render(<RoutineWork onRunStarted={() => {}} />)
+    fireEvent.click(await screen.findByText('Trigger routine now'))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/alpha: started a drain/))
+    expect(screen.getByRole('status').textContent).toMatch(/beta: a run is already active/)
+  })
+
+  test("the drain's Run now reports its sweep's outcome the same way (#1433)", async () => {
+    sendAutoPmSweep.mockResolvedValue({
+      ok: true,
+      outcomes: [{ projectId: 'p1', path: '/home/me/repo', started: false, message: 'the queue is empty, so there is nothing to drain' }],
+    })
+    render(<RoutineWork onRunStarted={() => {}} />)
+    await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
+    fireEvent.click(screen.getAllByText('Run now')[0]!)
+    await waitFor(() =>
+      expect(screen.getByRole('status').textContent).toBe('the queue is empty, so there is nothing to drain'),
+    )
+  })
+
   test('one project needs no picker', async () => {
     render(<RoutineWork onRunStarted={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))

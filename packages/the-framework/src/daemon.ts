@@ -426,7 +426,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     // minutes and reads as broken. Only on the write that switches it *on* — an unrelated setting
     // saved while it happens to be on is not a reason to go spend quota.
     preferences: registryPreferencesStore(nodeRegistryFs(), env, written => {
-      if (written.autoPm === true) services?.wakeAutoPm()
+      if (written.autoPm === true) void services?.wakeAutoPm()
     }),
     // Only the daemon runs the sweep, so only it can say what the sweep decided.
     autoPm: () => services?.autoPmReport(),

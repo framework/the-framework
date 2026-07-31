@@ -40,8 +40,7 @@ export function Features() {
         <div style={{ ...featureCardStyle, gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: 19, fontWeight: 600 }}>Bring your own prompts</h3>
           <FeatureText>
-            Save and quickly re-use your favorite prompts. Share some per-project with your
-            teammates, while keeping others as personal prompts.
+            Save and quickly re-use your favorite prompts. Share them with your teammates or keep them personal.
           </FeatureText>
         </div>
         <div style={{ ...featureCardStyle, gap: 14 }}>

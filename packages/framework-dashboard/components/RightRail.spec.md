@@ -10,7 +10,7 @@ The right sidebar (#314 third rail): a tabbed panel column offering Files, Choic
 
 ## Decisions
 
-- Fixed `w-[27rem]` width for every tab — the per-tab wide mode from #862 was dropped so the rail reads as one stable column.
+- Fixed `w-[22rem]` width for every tab — the per-tab wide mode from #862 was dropped so the rail reads as one stable column.
 - Browser tab requires `hasBrowser && target !== 'actions'` (#1053: no browser on a GitHub Actions runner) plus a `runId`; a dead tab "teaches people the preview is broken".
 - If the remembered tab loses its content (last doc deleted, gate resolved), fall back to the first tab that still exists rather than render an empty panel.
 - Tickets was a rail read (#697) but moved to its own full page (#1144).

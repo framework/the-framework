@@ -95,6 +95,42 @@ describe('useLiveEvents stream loss (#948)', () => {
   })
 })
 
+// A resumed session (#762) appends a second `session` boundary to the SAME journal. A run's own
+// tail (#749) holds nothing but that run, so its feed must keep everything — slicing at the last
+// `session` hid the whole pre-resume transcript for as long as the run was live. The project-root
+// fallback still slices: that subscription genuinely spans run boundaries.
+describe('useLiveEvents run scoping', () => {
+  const log = (message: string) => ({ kind: 'log', message })
+
+  function FeedProbe({ projectId, runId }: { projectId: string | null; runId?: string | null }) {
+    const { events } = useLiveEvents(projectId, runId)
+    return <span data-testid="feed">{events.map(e => (e.kind === 'log' ? e.message : e.kind)).join(',')}</span>
+  }
+  const feed = () => screen.getByTestId('feed').textContent
+
+  test("a run's own feed keeps the transcript from before a resume's session boundary", async () => {
+    const ch = fakeChannel()
+    onEvents.mockResolvedValue(ch.channel)
+    render(<FeedProbe projectId="p1" runId="run-a" />)
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
+    ch.push(log('a'))
+    ch.push({ kind: 'session' })
+    ch.push(log('b'))
+    await waitFor(() => expect(feed()).toBe('a,session,b'))
+  })
+
+  test('the project-root fallback still scopes to the newest session', async () => {
+    const ch = fakeChannel()
+    onEvents.mockResolvedValue(ch.channel)
+    render(<FeedProbe projectId="p1" />)
+    await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
+    ch.push(log('a'))
+    ch.push({ kind: 'session' })
+    ch.push(log('b'))
+    await waitFor(() => expect(feed()).toBe('session,b'))
+  })
+})
+
 // #1383: every subscribe replays the whole log before following live. Blanking the feed while
 // that replay re-streamed was the mid-run flicker — the lost banner cleared on resubscribe, then
 // the feed sat empty until the replay caught up. A reconnect now buffers the replay and swaps

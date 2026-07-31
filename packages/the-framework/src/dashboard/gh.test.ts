@@ -143,11 +143,11 @@ test('a direct merge that also fails reports the second refusal (#1216)', async 
 })
 
 test('ghRepoAutoMerge reads the repo setting, and an unreadable answer is unknown, not "off" (#1417)', async () => {
-  const { gh, calls } = fakeGh('{"autoMergeAllowed":false}')
+  const { gh, calls } = fakeGh('{"allow_auto_merge":false}')
   assert.deepEqual(await ghRepoAutoMerge('/repo', gh), { known: true, allowed: false })
-  assert.deepEqual(calls, [['repo', 'view', '--json', 'autoMergeAllowed']])
+  assert.deepEqual(calls, [['api', 'repos/{owner}/{repo}']])
 
-  const { gh: allowed } = fakeGh('{"autoMergeAllowed":true}')
+  const { gh: allowed } = fakeGh('{"allow_auto_merge":true}')
   assert.deepEqual(await ghRepoAutoMerge('/repo', allowed), { known: true, allowed: true })
 
   // gh missing / unauthenticated / not a GitHub repo: "could not say" renders nothing on the
@@ -156,4 +156,7 @@ test('ghRepoAutoMerge reads the repo setting, and an unreadable answer is unknow
   assert.deepEqual(await ghRepoAutoMerge('/repo', broken), { known: false, allowed: false })
   const { gh: junk } = fakeGh('not json')
   assert.deepEqual(await ghRepoAutoMerge('/repo', junk), { known: false, allowed: false })
+  // REST omits allow_auto_merge for viewers without push access — absent is unknown too.
+  const { gh: noField } = fakeGh('{"full_name":"acme/repo"}')
+  assert.deepEqual(await ghRepoAutoMerge('/repo', noField), { known: false, allowed: false })
 })

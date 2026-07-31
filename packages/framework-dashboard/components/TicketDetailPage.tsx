@@ -132,12 +132,12 @@ export function TicketDetailPage({
                 ))}
                 {ticket.spiked && <Badge className="border-transparent px-0 text-[10px] uppercase">spiked</Badge>}
                 {ticket.planned && <Badge className="border-transparent px-0 text-[10px] uppercase">planned</Badge>}
+                {/* The holder inline (#1420): the detail page has the room, so the full id is
+                    plainly readable instead of hiding behind a native tooltip. */}
                 {claimed && (
-                  <Badge
-                    title={ticket.lockedBy ? `Claimed by ${ticket.lockedBy}` : undefined}
-                    className="border-transparent px-0 text-[10px] uppercase text-warning"
-                  >
-                    claimed
+                  <Badge className="border-transparent px-0 text-[10px] text-warning">
+                    <span className="uppercase">claimed</span>
+                    {ticket.lockedBy && <>&nbsp;· {ticket.lockedBy}</>}
                   </Badge>
                 )}
                 {ticket.effort && <Badge className="border-transparent px-0 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>}

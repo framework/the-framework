@@ -124,6 +124,33 @@ export function runOutcome(events: readonly FrameworkEvent[]): RunOutcome | unde
 }
 
 /**
+ * Whether the run has ended clean and its armed handoff has not reported back yet (#1431):
+ * the seconds after `end` while the epilogue is still pushing the branch, opening the PR,
+ * merging. The pill said "finished" through that window, which reads as done-with-nothing-
+ * coming while the PR link is moments away.
+ *
+ * The window is the CURRENT segment's: open after its clean `end`, closed by its `handoff`
+ * event (every handoff reports — done, skipped, or failed). A resumed session's earlier
+ * segment carries its own `handoff`, which must not hide the new window (#1450), so the
+ * closing check does not look past the segment boundary. Arming, though, is run-level
+ * config, not segment state — the latest `handoff-armed` wins wherever it sits in the feed.
+ * And it must be a real arming event with the push rung on: treating the absent-means-armed
+ * default as armed would leave archives from before the handoff mechanism "publishing…"
+ * for ever.
+ */
+export function isPublishing(events: readonly FrameworkEvent[]): boolean {
+  const current = currentRunEvents(events)
+  const end = current.find(event => event.kind === 'end')
+  if (end?.kind !== 'end' || !end.ok) return false
+  if (current.some(event => event.kind === 'handoff')) return false
+  let armedPush: boolean | undefined
+  for (const event of events) {
+    if (event.kind === 'handoff-armed') armedPush = event.push
+  }
+  return armedPush === true
+}
+
+/**
  * The GitHub Actions run's live URL, from the `action` event the ActionsDriver emits once it
  * finds its workflow run (#1053): its label is `run <html_url>`. Lets the run view link through
  * to the live Actions run while the transcript is still burst-replaying at the end. The last

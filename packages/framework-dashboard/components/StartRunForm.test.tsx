@@ -190,3 +190,25 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
     expect(onAgentReady).not.toHaveBeenCalled()
   })
 })
+
+describe('StartRunForm Haiku warning (#1439)', () => {
+  test('picking Haiku warns — never blocks — and teaches the stronger default', async () => {
+    onProjects.mockResolvedValue([])
+    onSystemPromptUser.mockResolvedValue(null)
+    prefs.current = { model: 'haiku' }
+    render(<StartRunForm {...props} />)
+    const alert = await screen.findByText(/Haiku consistently skips the session-finish protocol/)
+    expect(alert.getAttribute('role')).toBe('alert')
+    // The submit path is untouched: the warning teaches, it does not gate.
+    expect(screen.getByText('submit-typed')).toBeTruthy()
+  })
+
+  test('any other model shows no Haiku warning', async () => {
+    onProjects.mockResolvedValue([])
+    onSystemPromptUser.mockResolvedValue(null)
+    prefs.current = { model: 'fable' }
+    render(<StartRunForm {...props} />)
+    await waitFor(() => expect(onProjects).toHaveBeenCalled())
+    expect(screen.queryByText(/session-finish protocol/)).toBeNull()
+  })
+})

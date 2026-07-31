@@ -933,6 +933,13 @@ test('startOptionFlags passes the ticket a run implements, and only a real one (
   for (const bad of ['tickets/../etc/passwd', '/etc/passwd', 'TODO_AGENTS.md', '']) {
     assert.deepEqual(startOptionFlags({ ticket: bad }), [], `expected ${bad} to be dropped`)
   }
+  // A planning run says so (#1327): the flag is what keeps its PR title from inheriting the
+  // ticket's issue as `(fix #42)` and closing it with the work still undone.
+  assert.deepEqual(startOptionFlags({ ticket: 'tickets/2026-07-25_login.md', planRun: true }), [
+    '--ticket',
+    'tickets/2026-07-25_login.md',
+    '--plan-run',
+  ])
 })
 
 test('startOptionFlags forwards the pinned queue entry verbatim, and drops a blank one (#1253)', () => {

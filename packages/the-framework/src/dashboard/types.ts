@@ -101,6 +101,13 @@ export interface StartRunOptions {
    */
   ticket?: string
   /**
+   * This run plans its {@link ticket} rather than implementing it; maps to `--plan-run`. Set by
+   * the daemon on a fanned-out [Spike & plan] run (#1327), whose PR lands only the plan: the
+   * ticket still rides for the run's meta, but the PR title must not inherit the issue as
+   * `(fix #42)` (#1334) — a plan's merge would close the issue with the work still undone.
+   */
+  planRun?: boolean
+  /**
    * The one queue entry a routine drain pinned this run to (#1253), verbatim; maps to
    * `--queue-entry`. Recorded on the run's meta so the sweep's claim on the entry outlives both
    * the daemon (a restart forgets its in-memory pins) and the run's local process (a hands-off

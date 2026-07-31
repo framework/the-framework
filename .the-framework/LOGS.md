@@ -25,3 +25,10 @@
 - run: 2026-07-27T23-05-13-126Z
 - session: 019fa5d3-49f3-7132-a9cf-58c14b74643b
 - branch: the-framework/run-2026-07-27T23-05-13-126Z
+
+## 2026-07-31T21:15:47.992Z · prompt · Analyze entire codebase and look for opportunities to refactor code.\n\nFor each codebase subset that needs it, add following entries to TODO_AGENTS.md (usually as low priority) and replace <CODEBASE_SUBSET> with a clear designation.\n\n- "Apply .the-framework/presets/maintainability.md with tf.params.what set to <CODEBASE_SUBSET>"\n- "Apply .the-framework/presets/security_audit.md with tf.params.what set to <CODEBASE_SUBSET>"
+
+- status: stopped
+- run: 2026-07-31T21-15-20-028Z
+- session: [9f16ec27-43ce-4cb1-acf1-cfdce79dab06](https://claude.ai/code)
+- branch: the-framework/refactor-preset-todos

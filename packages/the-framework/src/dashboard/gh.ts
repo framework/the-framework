@@ -206,6 +206,36 @@ async function directMerge(cwd: string, number: number, gh: GhRunner): Promise<A
   }
 }
 
+/** Whether the repo lets PRs use GitHub auto-merge (#1417); `known: false` when `gh` could not say. */
+export interface RepoAutoMerge {
+  known: boolean
+  allowed: boolean
+}
+
+/**
+ * Whether this repo allows GitHub auto-merge (#1417).
+ *
+ * An armed merge on a repo that does not silently degrades to an immediate direct merge (the
+ * {@link DIRECT_MERGE_FALLBACK} half of #1216) — the PR lands before CI has run (#1406) — so the
+ * launcher warns with the fix instead of leaving the degradation silent. `known: false` (gh
+ * missing, unauthenticated, not a GitHub repo) is "could not say", which renders nothing: no
+ * crying wolf, same stance as the #1318 trust read.
+ */
+export async function ghRepoAutoMerge(cwd: string, gh: GhRunner = readGh): Promise<RepoAutoMerge> {
+  try {
+    const parsed = JSON.parse(await gh(['repo', 'view', '--json', 'autoMergeAllowed'], cwd)) as { autoMergeAllowed?: unknown }
+    if (typeof parsed.autoMergeAllowed !== 'boolean') return { known: false, allowed: false }
+    return { known: true, allowed: parsed.autoMergeAllowed }
+  } catch {
+    return { known: false, allowed: false }
+  }
+}
+
+/** The cached form of {@link ghRepoAutoMerge} (#1028): the launcher polls, the setting barely changes. */
+export async function cachedRepoAutoMerge(cwd: string): Promise<Cached<RepoAutoMerge>> {
+  return cachedRead(['auto-merge-allowed', cwd].join(KEY_SEP), () => ghRepoAutoMerge(cwd), { ttlMs: 5 * 60_000 })
+}
+
 /** The cached form of {@link ghPrsForBranch}, shared through the same read-through cache (#1028). */
 export async function cachedPrsForBranch(cwd: string, branch: string): Promise<Cached<LinkedPr[]>> {
   return cachedRead(branchPrsCacheKey(cwd, branch), () => ghPrsForBranch(cwd, branch))

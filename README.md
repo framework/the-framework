@@ -3,7 +3,7 @@
 ### The Framework
 
 **Autonomous AI programming.**  
-Stop babysitting your coding agents. You make the important decisions; AI does the rest.
+Stop babysitting your coding agents. Make the important decisions, let AI do the rest.
 
 [![npm](https://img.shields.io/npm/v/@gemstack/the-framework)](https://www.npmjs.com/package/@gemstack/the-framework) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE) [![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/qc8zvdzWNR)
 
@@ -11,7 +11,7 @@ Stop babysitting your coding agents. You make the important decisions; AI does t
 
 ## What is this?
 
-See: [the-framework.ai](https://the-framework.ai)
+[the-framework.ai](https://the-framework.ai)
 
 ## Quickstart
 

@@ -75,6 +75,12 @@ export interface PreflightOptions {
   isRoot?: () => boolean
   /** The invoking user `sudo` recorded, named in the root warning. Default read from the environment. */
   sudoUser?: string | undefined
+  /**
+   * Also check `gh` (#1419): the run's PR/merge rung is armed, and the handoff opens and merges
+   * PRs through the GitHub CLI. Missing or logged-out `gh` warns without blocking — the run
+   * itself starts fine and the push rung is plain git; only the PR onward would silently degrade.
+   */
+  publish?: boolean
 }
 
 /**
@@ -111,6 +117,32 @@ export async function preflight(opts: PreflightOptions = {}): Promise<PreflightR
       })
     } else if (loggedIn === true) {
       checks.push({ name: `${agent} auth`, ok: true, detail: 'logged in' })
+    }
+  }
+
+  // The publish half (#1419): an armed PR/merge fires `gh` at the finish, hours after the Start
+  // that could have said it will not work. Warnings, not failures — the session's own work needs
+  // no gh, and the push rung is plain git, so the run is worth starting either way.
+  if (opts.publish) {
+    const ghCli = await probe('gh', ['--version'])
+    if (!ghCli.ok) {
+      checks.push({
+        name: 'gh',
+        ok: true,
+        warn: true,
+        detail:
+          '`gh` not found — the armed PR cannot be opened, so publishing stops at the pushed branch. Install the GitHub CLI (`brew install gh`, or https://cli.github.com) and run `gh auth login`.',
+      })
+    } else if (!(await probe('gh', ['auth', 'status'])).ok) {
+      // `gh auth status` exits non-zero when no host is logged in, and says so on stderr —
+      // which the probe folds into `output`, though the exit code alone decides here.
+      checks.push({
+        name: 'gh auth',
+        ok: true,
+        warn: true,
+        detail:
+          '`gh` is not logged in — the armed PR cannot be opened, so publishing stops at the pushed branch. Run `gh auth login`, then start the session.',
+      })
     }
   }
 

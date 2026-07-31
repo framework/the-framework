@@ -283,7 +283,8 @@ test('replayTranscript reads the action execution file with the existing stream 
   assert.equal(turn.sessionId, 'sess-abc')
   assert.deepEqual(
     events.map(e => e.type),
-    ['text', 'action'],
+    // The parser announces the session id up front (#1322) before the conversation replays.
+    ['session', 'text', 'action'],
   )
 })
 

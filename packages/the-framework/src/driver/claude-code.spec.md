@@ -4,7 +4,7 @@ The first real `Driver`: wraps the Claude Code CLI in print mode (`claude -p --o
 
 - `ClaudeCodeDriver.start` boots a `ClaudeCodeSession`; `readQuota` delegates to `readClaudeQuota` (account-wide, no session).
 - `ClaudeCodeSession.prompt` builds argv, runs it through `runAgentCli` with a `StreamJsonParser`, and tracks the agent's own session id so `resume: true` prompts pass `--resume <id>` (#714) and a finished run can be revived via `resumeSessionId` (#720).
-- `StreamJsonParser` folds the NDJSON dialect: assistant text → `text` events, `tool_use` → `action` (name only), `rate_limit_event` → `rate-limit` (#517), `result` line → final text + usage (#322).
+- `StreamJsonParser` folds the NDJSON dialect: assistant text → `text` events, `tool_use` → `action` (name only), `rate_limit_event` → `rate-limit` (#517), `result` line → final text + usage (#322). The first `session_id` sighted (any line — in practice the opening `system: init`) → a `session` event, re-emitted only on change (#1322): surfaced at turn start rather than held for `result`, so a stopped or dying turn keeps the run's `claude --resume` handle.
 - Optional per-session MCP servers (#452) are written to a lazily-created temp `--mcp-config` file (merged with the user's own servers — no `--strict-mcp-config`), removed on `dispose`.
 
 ## Problems

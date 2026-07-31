@@ -266,6 +266,13 @@ export type DriverQuota =
 export type DriverEvent =
   /** A prompt was sent; the agent's loop is starting. */
   | { type: 'start'; prompt: string }
+  /**
+   * The agent announced its session id, at the start of the turn (#1322). `result` repeats it,
+   * but a turn that never settles — a manual Stop, an error, a kill — used to take the id down
+   * with it, and with it the run's `claude --resume` handle. Telemetry consumes this one rather
+   * than forwarding it: the id is plumbing, not conversation.
+   */
+  | { type: 'session'; sessionId: string }
   /** An assistant text chunk streamed out. */
   | { type: 'text'; text: string }
   /** The agent used a tool. We surface the name only, not the arguments. */

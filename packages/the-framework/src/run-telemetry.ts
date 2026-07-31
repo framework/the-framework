@@ -82,6 +82,17 @@ export function createDriverEventHandler(opts: DriverEventHandlerOptions): Drive
   const usage = new UsageMeter()
 
   const onDriverEvent = (event: DriverEvent): void => {
+    // The turn-start id announcement (#1322) is consumed here, not forwarded: it exists so the
+    // `session-update` below lands before a Stop or a crash can lose the turn, and a transcript
+    // row repeating an id the very next event also carries would only be noise.
+    if (event.type === 'session') {
+      if (event.sessionId !== lastSessionId) {
+        lastSessionId = event.sessionId
+        const link = opts.sessionLink ? resolveSessionLink(opts.sessionLink, event.sessionId) : undefined
+        emit({ kind: 'session-update', sessionId: event.sessionId, ...(link ? { sessionLink: link } : {}) })
+      }
+      return
+    }
     emit({ kind: 'driver', event })
     if (event.type !== 'result') return
     if (event.sessionId && event.sessionId !== lastSessionId) {

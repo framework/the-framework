@@ -74,6 +74,7 @@ Notes:
 - Covers both spiking (e.g. high-level research without implementation plan) and planning (e.g. concrete implementation proposal)
 - The `.plan.md` file can be modified multiple times over an extended period (e.g. a ticket requiring repeated human intervention, transitioning from spiking to concrete plan)
 - All sections are just proposals and optional: you can use any headings with any format
+- If the plan concludes the ticket is an unambiguous quick win (low `Effort`, `Uncertainty: 0`), add `- "Implement tickets/<TICKET>.md"` to `TODO_AGENTS.md` in the same commit as the plan, under the right `## Priority` — a consensual quick win should not wait for another agent to re-read the plan and reach the same conclusion
 - The uncertainty value:
   - Gauges whether there are *significant* alternatives, minor variability such as syntax should be ignored
   - Is used for evaluating whether human intervention is needed (0 => clearly no human intervention needed)

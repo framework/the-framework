@@ -121,6 +121,6 @@ export function contextAutoPm(): AutoPmReporter | undefined {
  * How a sweep is fired on demand (#1210), or undefined on a host that runs none. Same rule as
  * {@link contextAutoPm}: only the daemon holds the loop, so only it can be asked to sweep.
  */
-export function contextAutoPmSweep(): ((opts?: { drainOnly?: boolean }) => void) | undefined {
+export function contextAutoPmSweep(): ((opts?: { drainOnly?: boolean }) => void | Promise<void>) | undefined {
   return fromContext(ctx => ctx.autoPmSweep)
 }

@@ -4,7 +4,7 @@ The usage panel's telefunctions (#533): subscription quota standing, auto PM's l
 
 - `onQuota`: the daemon-polled `QuotaView` (#533/#879); unwired or failing sources return `{ windows: [], unavailable: 'fetch-failed' }`.
 - `onAutoPm` (#1161): what the auto-PM loop last decided, for the line under the panel's toggle; `undefined` on a host with no sweep so the panel says "nothing to say" rather than "idle".
-- `sendAutoPmSweep` (#1210): trigger a sweep now instead of waiting for the interval; `drainOnly` narrows it to working the queue (#1204). Returns whether a sweep was asked for, not what it decided — `onAutoPm` is how the answer arrives.
+- `sendAutoPmSweep` (#1210): trigger a sweep now instead of waiting for the interval; `drainOnly` narrows it to working the queue (#1204). Awaits the tick and returns the report's per-project `outcomes` (#1433) — the click used to be fire-and-forget, so the card had nothing to show and the stand-down reason was recoverable only from the source. `ok: false` = no loop on this host (the relay) or the sweep threw; `ok` without `outcomes` = the sweep ran but its report was unreadable.
 
 ## Decisions
 

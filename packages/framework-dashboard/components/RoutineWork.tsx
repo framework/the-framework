@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AutoPmJob, ProjectSummary } from '@gemstack/the-framework'
+import type { AutoPmJob, AutoPmOutcome, ProjectSummary } from '@gemstack/the-framework'
 import {
   AUTO_PM_ROUTINES,
   DEFAULT_AUTO_PM_CONCURRENCY,
@@ -37,6 +37,21 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 /** Captured once: `useLoaded` treats a fresh `[]` literal as a new value on every render. */
 const NO_PROJECTS: ProjectSummary[] = []
+
+/**
+ * The triggered sweep's answer as one card line (#1433): a single project speaks its message
+ * plainly, several are prefixed with the folder name so the reader can tell whose line is whose.
+ * An empty report is said too — the sweep genuinely considered nothing (no projects registered) —
+ * because "ran and found nothing to say" and "never ran" must not look alike, which is the very
+ * hole this fills.
+ */
+function describeOutcomes(outcomes: AutoPmOutcome[] | undefined): string {
+  // The sweep ran but its report was unreadable: say the true part rather than guessing at more.
+  if (!outcomes) return 'The sweep ran.'
+  if (!outcomes.length) return 'The sweep ran and considered no projects.'
+  if (outcomes.length === 1) return outcomes[0]!.message
+  return outcomes.map(o => `${o.path.split('/').pop() || o.path}: ${o.message}`).join(' · ')
+}
 
 export function RoutineWork({
   onRunStarted,
@@ -79,18 +94,20 @@ export function RoutineWork({
   const autoRunLabel =
     autoRun && report?.nextSweepAt !== undefined ? `Auto-runs ${formatUntil(report.nextSweepAt)}` : 'Auto-run'
 
-  // Firing the sweep on demand (#1210). The answer is not the click's to report: a sweep decides
-  // per project and can start runs, and `report` (polled) is where that shows up. So this only
-  // says whether the daemon took the request, and gets out of the way once it has.
+  // Firing the sweep on demand (#1210). The RPC awaits the sweep and returns its per-project
+  // outcomes (#1433), so the click's own answer lands on the card the moment the tick resolves —
+  // two presses used to show literally nothing, with the stand-down reason recoverable only from
+  // the source. "Triggering…" holds until then, which is the loading state the flash never was.
   const sweepNow = async () => {
     if (sweeping) return
     setSweeping(true)
     setSweepNote(null)
-    const result = await sendAutoPmSweep().catch(() => ({ ok: false }))
+    const result = await sendAutoPmSweep().catch(() => ({ ok: false as const }))
     setSweeping(false)
     // A host with no loop is the honest failure here, and the only one: the relay serves this
     // same dashboard, and there the button has nothing to fire.
     if (!result.ok) setSweepNote('This dashboard is not running the sweep, so there is nothing to trigger here.')
+    else setSweepNote(describeOutcomes('outcomes' in result ? result.outcomes : undefined))
   }
 
   const runNow = async (job: AutoPmJob) => {
@@ -103,9 +120,10 @@ export function RoutineWork({
     if (job.drains) {
       setStarting(job.name)
       setSweepNote(null)
-      const result = await sendAutoPmSweep({ drainOnly: true }).catch(() => ({ ok: false }))
+      const result = await sendAutoPmSweep({ drainOnly: true }).catch(() => ({ ok: false as const }))
       setStarting(null)
       if (!result.ok) setSweepNote('This dashboard is not running the sweep, so there is nothing to trigger here.')
+      else setSweepNote(describeOutcomes('outcomes' in result ? result.outcomes : undefined))
       return
     }
     setStarting(job.name)

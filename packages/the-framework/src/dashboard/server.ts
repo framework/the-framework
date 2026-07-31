@@ -87,8 +87,9 @@ export interface DashboardOptions {
   /**
    * Fire an auto PM sweep now instead of waiting out the interval (#1210). Daemon-only for the
    * same reason as {@link autoPm}: the loop runs in that process, so nowhere else has one.
+   * Resolves when the sweep does (#1433), so the trigger RPC can await it.
    */
-  autoPmSweep?: (opts?: { drainOnly?: boolean }) => void
+  autoPmSweep?: (opts?: { drainOnly?: boolean }) => void | Promise<void>
   /**
    * Serve the new dashboard bundle (#405) from this directory — the prerendered Vike SPA
    * (`index.html` + `assets/**`). The daemon also mounts the dashboard's Telefunc surface

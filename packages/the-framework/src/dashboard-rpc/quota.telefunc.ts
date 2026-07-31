@@ -1,5 +1,5 @@
 import { contextAutoPm, contextAutoPmSweep, contextQuota } from './context.js'
-import type { AutoPmReport } from '../auto-pm.js'
+import type { AutoPmOutcome, AutoPmReport } from '../auto-pm.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
 // The usage panel's read surface (#533): where the account's subscription quota stands,
@@ -49,21 +49,31 @@ export async function onAutoPm(): Promise<AutoPmReport | undefined> {
  * and this call is asking. So with auto-run off the daemon still sweeps once — every other
  * stand-down reason in force — and the schedule stays wherever the box says.
  *
- * Returns whether a sweep was asked for, not what it decided: a sweep can start runs and take a
- * while, and `onAutoPm` is how the answer arrives. `false` on a host with no loop (the relay),
- * which the button reads as "nothing here to trigger".
+ * Awaits the sweep and returns what it decided, one line per project (#1433): the click used to
+ * be fire-and-forget, so two presses could show literally nothing — no loading state, no
+ * outcome, and the stand-down reason recoverable only from the source. The outcomes are read
+ * off the loop's own report once the tick resolves, so the card can say them without a poll
+ * having to race the sweep. `false` still means a host with no loop (the relay), which the
+ * button reads as "nothing here to trigger".
  *
  * `drainOnly` narrows the sweep to working the queue (#1204): the drain routine's Run now spins
  * agents up on the queue's entries — the fan-out only the sweep can do — and an empty queue is
  * reported rather than borrowed for a rotation job.
  */
-export async function sendAutoPmSweep(opts?: { drainOnly?: boolean }): Promise<{ ok: boolean }> {
+export async function sendAutoPmSweep(opts?: { drainOnly?: boolean }): Promise<{ ok: boolean; outcomes?: AutoPmOutcome[] }> {
   const sweep = contextAutoPmSweep()
   if (!sweep) return { ok: false }
   try {
-    sweep(opts?.drainOnly ? { drainOnly: true } : undefined)
-    return { ok: true }
+    await sweep(opts?.drainOnly ? { drainOnly: true } : undefined)
   } catch {
     return { ok: false }
+  }
+  // The outcomes live on the loop's report — the same lines `onAutoPm` polls — read here once
+  // the tick has resolved, so they describe the sweep this click fired.
+  try {
+    const report = contextAutoPm()?.()
+    return { ok: true, ...(report ? { outcomes: report.outcomes } : {}) }
+  } catch {
+    return { ok: true }
   }
 }

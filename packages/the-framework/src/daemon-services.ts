@@ -70,8 +70,11 @@ export interface BackgroundServices {
    *
    * `onDemand` is the dashboard's trigger button (#1210): that sweep runs even while the
    * preference is off, because the click itself is the ask the preference would otherwise record.
+   *
+   * Resolves when the tick does (#1433), so the trigger button can await the sweep and say what
+   * it decided; the switched-on-preference wake simply does not await it.
    */
-  wakeAutoPm: (opts?: { onDemand?: boolean; drainOnly?: boolean }) => void
+  wakeAutoPm: (opts?: { onDemand?: boolean; drainOnly?: boolean }) => Promise<void>
   /** What the last auto-PM sweep decided, for the usage panel to show (#1161). */
   autoPmReport: () => AutoPmReport
 }
@@ -415,10 +418,11 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     },
     flushConversations: () => conversationCommitter.flush().catch(() => 0),
     reloadDiscord,
-    // Not awaited. The plain wake is safe to call when the preference went the other way — the
-    // sweep re-reads the box, records "off", and starts nothing — while an on-demand one (#1210)
-    // runs regardless, because the click is the ask.
-    wakeAutoPm: opts => void autoPm.tick(opts).catch(() => {}),
+    // Awaitable (#1433) so the trigger button can wait for the sweep's answer; a caller that
+    // does not care simply drops the promise. The plain wake is safe to call when the preference
+    // went the other way — the sweep re-reads the box, records "off", and starts nothing — while
+    // an on-demand one (#1210) runs regardless, because the click is the ask.
+    wakeAutoPm: opts => autoPm.tick(opts).catch(() => {}),
     autoPmReport: () => autoPm.report(),
   }
 }

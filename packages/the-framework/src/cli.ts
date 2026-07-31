@@ -1483,8 +1483,12 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // pre-commitments rather than buttons. Opening a PR implies pushing, so the pair is normalised
   // wherever it is set.
   // Merge is carried alongside but has no checkbox (#1216): it is a per-run/per-repo setting, not
-  // an action-bar pre-commitment, so nothing mutates it after this line.
+  // an action-bar pre-commitment. The one thing that mutates it after this line is the user's own
+  // Merge action (#1391), which also records the human authorization below.
   const armedHandoff = { push: config.autoPushBranch || config.autoOpenPr, pr: config.autoOpenPr, merge: config.autoMerge }
+  // The user pressed Merge (#1391): a human authorized the merge, so the #1363 gate must not also
+  // demand the agent's ready-for-merge signal — a human's word outranks it.
+  let mergeAuthorized = false
   // Assigned once the journal exists, which is after the control watcher is wired: a change that
   // arrives before then still lands on `armedHandoff`, it just has no event to announce it yet.
   let announceHandoff: ((push: boolean, pr: boolean) => void) | undefined
@@ -1516,6 +1520,25 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
         if (entry.kind === 'bind') {
           // Fold the bind onto meta + the event log; the daemon watches for it and re-homes (#1122).
           recordBind?.(entry.projectId)
+          return
+        }
+        if (entry.kind === 'merge') {
+          // The user's Merge action (#1391): arm the full ladder and record the human
+          // authorization. Not an abort — the session still ends at its own natural end (#1390)
+          // and the merge fires there; announcing re-arms keeps the meta a mid-run tab reads true.
+          armedHandoff.push = true
+          armedHandoff.pr = true
+          armedHandoff.merge = true
+          mergeAuthorized = true
+          announceHandoff?.(true, true)
+          // A session parked on the backlog offer (#323) is waiting to know whether to take more
+          // work. Merge answers that: wrap up now. Other gates keep waiting — they are questions
+          // about the work itself, which merging does not answer.
+          for (const [id, resolve] of pendingChoices) {
+            if (!/^todo-next(-\d+)?$/.test(id)) continue
+            pendingChoices.delete(id)
+            resolve({ picked: 'stop', by: 'user' })
+          }
           return
         }
         const resolve = pendingChoices.get(entry.id)
@@ -1563,9 +1586,20 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // nobody is waiting in it, and it used to park forever on a message that never came.
   // The parked message wait is the same empty-event-loop hazard as a parked gate (#1359), so it
   // is held the same way; a Stop closes the queue, which releases the hold.
+  //
+  // Who parks and who ends is #1390: a daemon-spawned run (--run-id) drains what queued and then
+  // ends itself — its dashboard reopens the conversation via --resume (#762), so nothing needs to
+  // stay alive for the composer. A run serving its own terminal dashboard has no daemon to resume
+  // through, so it keeps the stay-open park; Ctrl+C / Stop is still its way out.
   const chatQueue =
     isInteractive(opts, newDashboard) && requestChoice
-      ? { messages: { next: (signal?: AbortSignal) => gateKeepalive.hold(messages.next(signal)) } }
+      ? {
+          messages: {
+            next: (signal?: AbortSignal) => gateKeepalive.hold(messages.next(signal)),
+            takeQueued: () => messages.takeQueued(),
+          },
+          ...(opts.runId === undefined ? { stayOpenChat: true } : {}),
+        }
       : {}
 
   // Persist the chat into the committed conversation (#908/#857), so a clone carries what was
@@ -1687,8 +1721,10 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     // Withheld is not skipped — push and PR go ahead, and with `armed.merge` off the PR opens
     // as a draft for a human. Said on the handoff event (#835), or "auto-merge was on and
     // nothing merged" has no answer.
+    // A human's Merge action (#1391) bypasses the gate: the authorization the gate exists to
+    // collect has been given directly, by someone who outranks the signal.
     let mergeGate: MergeWithheldReason | undefined
-    if (armed.merge) {
+    if (armed.merge && !mergeAuthorized) {
       const ready = journal.sawReadyForMerge()
       mergeGate = withheldMerge({
         readyForMerge: ready,

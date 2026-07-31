@@ -6,7 +6,7 @@ The build-run orchestrator: `runFramework()` drives ai-autopilot's `Bootstrap` (
 - Wires `createRunControls` (caller signal + budget #322 + consumption #529 + plan-decline #358 self-stops) and `agentAwaitGate` — the turn-boundary gate that shows an agent's `await-*` question, waits for the answer, and re-prompts via `continueAfterChoice` (bounded by `MAX_AWAIT_ROUNDS`).
 - Review policy (#252/#1372): a domain preset's loop is the *only* agent review, wired via `buildReview`; the build event kind (`bug-fix` vs default `major-change`, #265) picks which preset loop fires. No preset and no serve config → no checklist step at all, so Bootstrap skips its whole loop and the build turn is the run (the agent is a black box; the old always-on production-grade checklist is gone).
 - Serve gate (#229): provisions a `LocalRunner` (adopts cwd) or `DockerRunner` (throwaway container, source re-seeded via `snapshotWorkspace` before each check) so the checklist gates on the app actually booting; `keepAlive` leaves an `AppPreview` running for the caller to stop.
-- After the build settles: the backlog loop (#323, default on for real drivers) and then the live-chat phase (#714, only when `messages` is wired).
+- After the build settles: the backlog loop (#323, default on for real drivers) and then the live-chat phase (#714, only when `messages` is wired) — which drains what queued and ends the session on an idle queue (#1390), unless `stayOpenChat` keeps the terminal-dashboard park.
 - Detection only narrates ("Detected Vike") — nothing about it reaches the agent's prompt (#547).
 
 ## Problems

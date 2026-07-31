@@ -909,9 +909,11 @@ test('runAwaitRounds gives up after MAX_AWAIT_ROUNDS and reports it exhausted', 
   assert.equal(prompts.length, MAX_AWAIT_ROUNDS + 1) // the opener, then one per round
 })
 
-test('the run says it is parked each time it waits for the user (#785)', async () => {
-  // The build settles, chat opens: that is the moment the agent stops working and the run is
-  // waiting on you. Before #785 nothing said so, and the dashboard kept animating "running".
+test('a stay-open run says it is parked each time it waits for the user (#785/#1390)', async () => {
+  // The stay-open park is now only for a run whose own terminal dashboard is the single surface
+  // (#1390) — everything else ends itself on an idle queue. In that mode, the build settles and
+  // chat parks: that is the moment the agent stops working and the run is waiting on you. Before
+  // #785 nothing said so, and the dashboard kept animating "running".
   const prompts: string[] = []
   const driver = new FakeDriver({ respond: prompt => (prompts.push(prompt), 'built it') })
   const session = await driver.start({ cwd: '/tmp/ws' })
@@ -924,6 +926,7 @@ test('the run says it is parked each time it waits for the user (#785)', async (
     emitTurnSignals: () => {},
     emit: e => events.push(e),
     messages,
+    stayOpenChat: true,
   })
   // One message, then close: parked -> working -> parked again -> end.
   messages.push('now add dark mode')

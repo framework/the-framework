@@ -161,13 +161,7 @@ export async function resolveRunPr(
   prs: BranchPrsLookup = cachedPrsForBranch,
 ): Promise<Cached<LinkedPr | undefined>> {
   const since = run.startedAt ?? startedAtFromRunId(run.id)
-  const candidates = [
-    ...new Set([
-      ...(run.branch ? [run.branch] : []),
-      ...(run.sessionName ? [`${SESSION_BRANCH_PREFIX}${run.sessionName}`] : []),
-      `${SESSION_BRANCH_PREFIX}run-${run.id}`,
-    ]),
-  ]
+  const candidates = runBranchCandidates(run)
   let pending = false
   for (const branch of candidates) {
     const read = await prs(cwd, branch).catch((): Cached<LinkedPr[]> => ({ value: undefined, pending: false }))
@@ -176,6 +170,44 @@ export async function resolveRunPr(
     if (pr) return { value: pr, pending: false }
   }
   return { value: undefined, pending }
+}
+
+/** Every branch name a run may have worked under, in trust order — {@link resolveRunPr}'s ladder. */
+function runBranchCandidates(run: RunPrRun): string[] {
+  return [
+    ...new Set([
+      ...(run.branch ? [run.branch] : []),
+      ...(run.sessionName ? [`${SESSION_BRANCH_PREFIX}${run.sessionName}`] : []),
+      `${SESSION_BRANCH_PREFIX}run-${run.id}`,
+    ]),
+  ]
+}
+
+/**
+ * Merge a finished session's open PR (#1391): the Merge action, pressed by a human.
+ *
+ * The direct answer to the withheld-merge ending (#1363): a session whose agent never signalled
+ * ready-for-merge leaves a draft PR behind, and this is the human saying "it's good, land it".
+ * `ghMergePr` marks a draft ready on the way, for exactly that case. Refuses when the run has no
+ * PR or it is no longer open — "already merged" is an answer, not an action.
+ */
+export async function mergeSessionPr(
+  cwd: string,
+  run: RunPrRun,
+  deps: { gh?: GhRunner; prs?: BranchPrsLookup } = {},
+): Promise<HandoffResult> {
+  const pr = (await resolveRunPr(cwd, run, deps.prs)).value
+  if (!pr) return { ok: false, error: 'this session has no pull request to merge' }
+  if (pr.state !== 'OPEN') return { ok: false, error: `this session's PR is already ${pr.state.toLowerCase()}` }
+  const merged = await ghMergePr(cwd, pr.number, deps.gh)
+  if (merged.outcome === 'failed') return { ok: false, error: merged.error }
+  // The PR's cached state just changed under every branch name the lookup tries: forget them all,
+  // or the bar keeps offering a merge for a PR that landed (#1028).
+  for (const branch of runBranchCandidates(run)) {
+    forgetPr(cwd, branch)
+    forgetBranchPrs(cwd, branch)
+  }
+  return { ok: true, url: pr.url }
 }
 
 /**

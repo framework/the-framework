@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FrameworkEvent, ServeTarget } from '@gemstack/the-framework'
 import { sessionInfo } from '@gemstack/the-framework/client'
-import { MoreVertical, Github, FolderOpen, Code, Check, Play, ExternalLink, Square, FolderX, Trash2, Copy } from 'lucide-react'
+import { MoreVertical, Github, FolderOpen, Code, Check, Play, ExternalLink, Square, FolderX, Trash2, Copy, GitMerge } from 'lucide-react'
 import { onGithubUrl } from '../server/reads.telefunc.js'
 import {
   sendOpenInApp,
   sendStop,
+  sendMerge,
   sendRemoveWorktree,
   sendDeleteSession,
   sendPreview,
@@ -125,6 +126,11 @@ export function SessionActionsMenu({
   useEffect(() => setStopRequested(false), [runId])
   const stopping = busy || (stopRequested && active)
 
+  // A landed Merge stays "Merge armed" (#1391): the authorization is a pre-commitment the session
+  // honors when it ends, so there is nothing to press twice.
+  const [mergeRequested, setMergeRequested] = useState(false)
+  useEffect(() => setMergeRequested(false), [runId])
+
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const openApp = (target: 'files' | 'editor') => run(() => sendOpenInApp(projectId, target, runId ?? undefined), 'Failed to open.')
@@ -143,6 +149,12 @@ export function SessionActionsMenu({
     void run(() => sendStop(projectId, runId ?? undefined).then(() => true), 'Could not stop the session.').then(result => {
       if (result) setStopRequested(true)
     })
+  const mergeSession = () => {
+    if (!runId) return
+    void run(() => sendMerge(projectId, runId), 'Could not arm the merge.').then(result => {
+      if (result?.ok) setMergeRequested(true)
+    })
+  }
   const removeWorktree = () => {
     if (!runId) return
     void run(() => sendRemoveWorktree(projectId, runId), 'Could not remove the worktree.').then(result => {
@@ -285,6 +297,14 @@ export function SessionActionsMenu({
           {active && (
             <DropdownMenuItem disabled={stopping} onClick={() => void stopSession()}>
               <Square className="h-3 w-3 shrink-0 fill-current" /> {stopping ? 'Stopping…' : 'Stop session'}
+            </DropdownMenuItem>
+          )}
+          {/* The user's Merge (#1391): the human authorization the merge gate (#1363) otherwise
+              collects from the agent's signal. A pre-commitment, not an abort — the session still
+              ends at its own natural end (#1390) and merges there. */}
+          {active && runId && (
+            <DropdownMenuItem disabled={mergeRequested || busy} onClick={() => mergeSession()}>
+              <GitMerge className="h-3.5 w-3.5 shrink-0" /> {mergeRequested ? 'Merge armed' : 'Merge when finished'}
             </DropdownMenuItem>
           )}
 

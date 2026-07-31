@@ -31,10 +31,9 @@ Do the following before applying your first change.
 
 ### Session name
 
-1. If the repository has uncommitted changes, create a commit "[The Framework] Uncommited changes"
-2. Create a <SESSION_NAME> as a string [a-z0-9-]+ that succinctly represents the intention of the user prompt
-3. Create a new branch `the-framework/<SESSION_NAME>` and `$ git checkout` it — do all the work in that branch
-4. Call setSessionName(<SESSION_NAME>)
+1. Create a <SESSION_NAME> as a string [a-z0-9-]+ that succinctly represents the intention of the user prompt
+2. Create a new branch `the-framework/<SESSION_NAME>` and `$ git checkout` it — do all the work in that branch
+3. Call setSessionName(<SESSION_NAME>)
 
 
 ## Before applying changes
@@ -52,7 +51,9 @@ Measure "variability":
 
 ## After applying changes
 
-After you're done, consider whether <SESSION_NAME> is finished and there isn't any work left to do — if that's the case then call setReadyForMerge()
+After you're done, decide: is <SESSION_NAME> finished, with no work left to do?
+- Yes: call setReadyForMerge() — required, the work is never merged without it
+- No: don't call it; say what's left instead
 
 
 

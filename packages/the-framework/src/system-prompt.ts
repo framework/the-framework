@@ -175,8 +175,10 @@ export const BUSINESS_KNOWLEDGE_DOCS: readonly ContextDoc[] = [DECISIONS_DOC, FA
  */
 const CONTEXT_FORMATS: readonly string[] = [TICKETING_FORMAT, TODO_FORMAT]
 
-/** The heading each spec opens with, so a bullet can name the section that answers it. */
-const TICKET_FORMAT_HEADING = 'Ticket format'
+/** The heading each spec opens with, so a bullet can name the section that answers it.
+ * Must track the spec's own H1 — #1420 renamed it "Ticketing format", and a bullet naming a
+ * section that does not exist sends the agent to follow a format it cannot find. */
+const TICKET_FORMAT_HEADING = 'Ticketing format'
 const TODO_FORMAT_HEADING = 'TODO_AGENTS.md'
 
 /**
@@ -184,7 +186,7 @@ const TODO_FORMAT_HEADING = 'TODO_AGENTS.md'
  * {@link systemPromptBlock} renders as the `Context:` bullets. A superset of
  * {@link BUSINESS_KNOWLEDGE_DOCS}: it adds `GOAL.md`, `BUSINESS_LOGIC.md`, and the
  * roadmap/queue/history pointers the agent reads but does *not* fold knowledge back into —
- * `tickets/**.md` (the potential work, whose file shape is the `Ticket format` spec, #684/#674),
+ * `tickets/**.md` (the potential work, whose file shape is the `Ticketing format` spec, #684/#674),
  * the `TODO_AGENTS.md` task queue (whose
  * shape is the `TODO_AGENTS.md` spec, #880), and the committed conversations (#683/#908). Repo-root
  * paths, because that is the agent's cwd. README is left out: a repo's own `README.md` already

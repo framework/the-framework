@@ -2,7 +2,7 @@ The dashboard's write-side telefunctions (#405): steering live runs via their co
 
 ## TLDR
 
-- Steering writes append one entry to the addressed run's `.the-framework/control.jsonl` (which the run tails): `sendStop`, `sendSetHandoff` (#1102 arm/disarm end-of-session push+PR), `sendChoice` (#304/#332 resolve a parked gate, `by` records who picked), `sendMessage` (#714 live chat drained between turns via `--resume`; `via` names the surface, #917).
+- Steering writes append one entry to the addressed run's `.the-framework/control.jsonl` (which the run tails): `sendStop`, `sendSetHandoff` (#1102 arm/disarm end-of-session push+PR), `sendChoice` (#304/#332 resolve a parked gate, `by` records who picked), `sendMessage` (#714 live chat drained between turns via `--resume`; `via` names the surface, #917), `sendMerge` (#1391: a live run gets a `merge` control entry — human-authorized merge at the session's own end; a finished run's open PR is merged directly via `mergeSessionPr`).
 - Bridge answers (#1237): `sendBridgeAnswer`/`sendBridgeAnswerCancel` queue/withdraw a pick for a Claude-web session in the bridge store — the browser extension types it into the session's composer; only a label of the currently parked question is accepted; local only, no relay.
 - Worktree lifecycle: `sendRemoveWorktree` (#737/#982) and `sendDeleteSession` (#1032, the one destructive-of-history action) share `withWorktreeRemoval`, which stops a preview serving the tree (#797) before removal; checks live in `worktrees.ts`, shared with the CLI verb.
 - `sendStart` / `sendStartTopic` (#1120): call the daemon's `startRun` closure off the context (one-run-per-project busy guard); topic runs spawn in a neutral scratch dir with no repo.

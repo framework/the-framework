@@ -46,6 +46,13 @@ export type ControlEntry =
    * worktree re-home this implies is #1122.
    */
   | { kind: 'bind'; projectId: string }
+  /**
+   * The user's Merge action on a live session (#1391): arm the full publish ladder and record that
+   * a human authorized the merge, so the merge gate (#1363) does not also demand the agent's
+   * ready-for-merge signal — a human's word outranks it. The session still merges at its own end
+   * (it ends itself once nothing needs a human, #1390); this is a pre-commitment, not an abort.
+   */
+  | { kind: 'merge' }
 
 /** The control log path for a workspace. */
 export function controlPath(cwd: string): string {
@@ -96,6 +103,7 @@ function isControlEntry(value: unknown): value is ControlEntry {
   if (!value || typeof value !== 'object') return false
   const v = value as Record<string, unknown>
   if (v['kind'] === 'stop') return true
+  if (v['kind'] === 'merge') return true
   // Both halves must be real booleans: a half-written entry would otherwise disarm by accident,
   // and this decides whether the session's work reaches the remote at all.
   if (v['kind'] === 'handoff') return typeof v['push'] === 'boolean' && typeof v['pr'] === 'boolean'

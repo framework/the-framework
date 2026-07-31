@@ -9,7 +9,7 @@ import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
 import { findRun, isSafeRunId, type RunMeta } from '../store/index.js'
 import { removeProjectWorktree, deleteProjectRun } from '../worktrees.js'
-import { commitSessionWork, openSessionPullRequest, pushRunBranch, runBranchFor, type HandoffResult } from '../dashboard/run-handoff.js'
+import { commitSessionWork, mergeSessionPr, openSessionPullRequest, pushRunBranch, runBranchFor, type HandoffResult } from '../dashboard/run-handoff.js'
 import type { ChoiceBy } from '../events.js'
 import type {
   DeleteSessionResult,
@@ -330,6 +330,28 @@ export async function sendOpenPullRequest(projectId: string, runId: string): Pro
       return { ok: false, error: 'could not commit the work this session left uncommitted' }
     }
     return openSessionPullRequest(target.cwd, target.run)
+  }, { ok: false, error: 'could not reach the device' })
+}
+
+/**
+ * The user's Merge action (#1391): one button, two states of the session it addresses.
+ *
+ * A live run gets a `merge` control entry — the run arms the full publish ladder, records the
+ * human authorization (which the #1363 gate honors instead of demanding the agent's signal), and
+ * merges at its own natural end (#1390). A finished run has no process to steer, so its open PR
+ * is merged directly — the answer to the withheld-merge ending, where an agent that never
+ * signalled left a draft behind. If the run ends between the check and the write, the entry lands
+ * unread; the ended view then offers the direct merge, so the second click still gets there.
+ */
+export async function sendMerge(projectId: string, runId: string): Promise<HandoffResult> {
+  return relayOr(runId, 'sendMerge', [projectId, runId], async () => {
+    const target = await handoffTargetFor(projectId, runId)
+    if (!target) return { ok: false, error: 'unknown session' }
+    if (target.run.status === 'running') {
+      await appendControlFor(projectId, { kind: 'merge' }, runId)
+      return { ok: true }
+    }
+    return mergeSessionPr(target.cwd, target.run)
   }, { ok: false, error: 'could not reach the device' })
 }
 

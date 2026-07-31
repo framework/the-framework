@@ -2,7 +2,7 @@ The dashboard-to-run steering channel (#344): the daemon appends `ControlEntry` 
 
 ## TLDR
 
-- Entry kinds: `stop` (Stop button), `choice` (resolve a parked gate by id/pick/by), `message` (live chat to the run, #714, with optional `via` surface name, #917), `handoff` (arm/disarm end-of-session push/PR, #1102), `bind` (bind a project-less topic run to a project, #1121).
+- Entry kinds: `stop` (Stop button), `choice` (resolve a parked gate by id/pick/by), `message` (live chat to the run, #714, with optional `via` surface name, #917), `handoff` (arm/disarm end-of-session push/PR, #1102), `bind` (bind a project-less topic run to a project, #1121), `merge` (the user's Merge action, #1391: arm the full ladder + record the human authorization the #1363 gate honors instead of the agent's signal).
 - `appendControl` / `resetControl` / `controlPath`; `watchControl` tails via `JsonlTailer` + `followFile` (`fs.watch` on `.the-framework/` plus a poll backstop, since `fs.watch` is unreliable across platforms), unref'd so steering never keeps the process alive.
 - `isControlEntry` shape-checks every parsed line; malformed or unknown lines are skipped so a bad write can never crash a run.
 

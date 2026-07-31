@@ -192,3 +192,17 @@ test('no runtime state under .the-framework is tracked in git (#1298/#1311)', as
 
   assert.deepEqual(tracked, [], `runtime state is tracked:\n${tracked.join('\n')}`)
 })
+
+test('a merge entry round-trips the control log (#1391)', async () => {
+  const cwd = await tmpWorkspace()
+  const seen: ControlEntry[] = []
+  const watcher = watchControl(cwd, e => seen.push(e), 20)
+  try {
+    await appendControl(cwd, { kind: 'merge' })
+    assert.ok(await until(() => seen.length === 1), `saw ${seen.length} of 1 entries`)
+    assert.deepEqual(seen[0], { kind: 'merge' })
+  } finally {
+    watcher.close()
+    await rm(cwd, { recursive: true, force: true })
+  }
+})

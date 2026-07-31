@@ -68,11 +68,18 @@ export interface RunPromptOptions {
   /** Session link template for the dashboard, `{sessionId}` resolved when known. */
   sessionLink?: string
   /**
-   * Live chat (#714): stay open after the prompt settles and take the user's own
-   * messages, each resuming the same session. Unset for a headless run, which ends
-   * when the agent stops asking — exactly as before.
+   * Live chat (#714): once the prompt settles, take the user's own messages, each
+   * resuming the same session. The session then ends itself when the queue is idle
+   * (#1390) unless {@link stayOpenChat} parks it. Unset for a headless run, which
+   * ends when the agent stops asking — exactly as before.
    */
   messages?: RunMessages
+  /**
+   * Keep the chat parked for the next message instead of ending on an idle queue (#1390).
+   * Only for a run whose own terminal dashboard is the single surface — it has no daemon
+   * to resume the session through, so ending would leave its composer a dead end.
+   */
+  stayOpenChat?: boolean
   /** Record each chat turn to the committed conversation (#908). Best-effort; unset = not recorded. */
   recordMessage?: RecordMessage
   /**
@@ -178,6 +185,7 @@ export async function runPrompt(opts: RunPromptOptions): Promise<RunPromptResult
       ...(opts.bind ? { bind: opts.bind } : {}),
       ...(resuming ? { resume: true } : {}),
       ...(opts.messages ? { messages: opts.messages } : {}),
+      ...(opts.stayOpenChat ? { stayOpenChat: true } : {}),
       ...(opts.recordMessage ? { recordMessage: opts.recordMessage } : {}),
     })
     // The agent kept asking past the limit: finish with the latest turn rather than loop.

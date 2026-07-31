@@ -90,13 +90,12 @@ test('runPrompt seeds the driver and resumes the opening prompt for a finished-r
   assert.equal(openingText, 'keep going') // sent raw: the resumed transcript already carries its framing
 })
 
-test('runPrompt stays open for a live-chat message and delivers it as a turn (#714)', async () => {
+test('runPrompt drains a queued live-chat message as a turn, then ends itself (#714/#1390)', async () => {
   const events: FrameworkEvent[] = []
-  // Queue a message and close: the opening prompt settles, the chat phase drains the message
-  // (one more turn), then next() -> undefined ends the run. Deterministic, no timing race.
+  // Queue a message: the opening prompt settles, the chat phase drains the message (one more
+  // turn), then the idle queue ends the run — the session's natural end, no Stop needed.
   const messages = new RunMessageQueue()
   messages.push('also add dark mode')
-  messages.close()
   const driver = new FakeDriver({ turns: [{ text: 'built the base' }, { text: 'added dark mode' }] })
   const { text } = await runPrompt({
     prompt: 'build it',
@@ -112,6 +111,18 @@ test('runPrompt stays open for a live-chat message and delivers it as a turn (#7
     events.some(e => e.kind === 'driver' && e.event.type === 'start' && e.event.prompt === 'also add dark mode'),
     'the chat message was delivered as a driver turn',
   )
+  assert.deepEqual(events.at(-1), { kind: 'end', ok: true })
+})
+
+test('runPrompt ends itself when the chat queue is idle — no settled limbo (#1390)', async () => {
+  const events: FrameworkEvent[] = []
+  // Chat is wired but nothing queued: the session ends at its natural end instead of parking on
+  // the user. No `settled` event either — there is no waiting state to announce.
+  const messages = new RunMessageQueue()
+  const driver = new FakeDriver({ turns: [{ text: 'built the base' }] })
+  const { text } = await runPrompt({ prompt: 'build it', driver, cwd: '/ws', messages, onEvent: e => events.push(e) })
+  assert.equal(text, 'built the base')
+  assert.ok(!events.some(e => e.kind === 'settled'), 'an ending session never says it is parked')
   assert.deepEqual(events.at(-1), { kind: 'end', ok: true })
 })
 

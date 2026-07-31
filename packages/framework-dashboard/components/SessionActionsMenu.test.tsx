@@ -10,6 +10,7 @@ const onServeTargets = vi.fn(async () => [] as unknown[])
 const onPreviewStatus = vi.fn(async () => ({ running: false }))
 const sendStopPreview = vi.fn(async () => {})
 const sendStop = vi.fn(async () => {})
+const sendMerge = vi.fn(async () => ({ ok: true as const }))
 const sendRemoveWorktree = vi.fn(async () => ({ ok: true as const }))
 const sendDeleteSession = vi.fn(async () => ({ ok: true as const }))
 vi.mock('../server/reads.telefunc.js', () => ({ onGithubUrl }))
@@ -20,6 +21,7 @@ vi.mock('../server/control.telefunc.js', () => ({
   onPreviewStatus,
   sendStopPreview,
   sendStop,
+  sendMerge,
   sendRemoveWorktree,
   sendDeleteSession,
 }))
@@ -129,5 +131,33 @@ describe('the Serve submenu on a multi-app repo (#toolbar-menu)', () => {
     await waitFor(() => expect(screen.getByText('Serve which app')).toBeTruthy())
     expect(screen.getByText('docs')).toBeTruthy()
     onServeTargets.mockResolvedValue([])
+  })
+})
+
+describe('the two live-session actions: Stop and Merge (#1391)', () => {
+  const liveEvents = [{ kind: 'log', message: 'working' }] as never
+
+  test('a live session offers Stop and Merge side by side', async () => {
+    render(<SessionActionsMenu projectId="p1" runId="run-1" events={liveEvents} onDeleted={vi.fn()} />)
+    openMenu()
+    await waitFor(() => expect(screen.getByText('Stop session')).toBeTruthy())
+    expect(screen.getByText('Merge when finished')).toBeTruthy()
+  })
+
+  test('Merge sends the control and stays armed — a pre-commitment, nothing to press twice', async () => {
+    sendMerge.mockClear()
+    render(<SessionActionsMenu projectId="p1" runId="run-1" events={liveEvents} onDeleted={vi.fn()} />)
+    openMenu()
+    fireEvent.click(await screen.findByText('Merge when finished'))
+    await waitFor(() => expect(sendMerge).toHaveBeenCalledWith('p1', 'run-1'))
+  })
+
+  test('an ended session offers neither — its bar owns the Merge PR button by then', async () => {
+    const ended = [{ kind: 'log', message: 'working' }, { kind: 'end', ok: true }] as never
+    render(<SessionActionsMenu projectId="p1" runId="run-1" events={ended} onDeleted={vi.fn()} />)
+    openMenu()
+    await waitFor(() => expect(screen.getByText('Open in editor')).toBeTruthy())
+    expect(screen.queryByText('Stop session')).toBeNull()
+    expect(screen.queryByText('Merge when finished')).toBeNull()
   })
 })

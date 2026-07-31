@@ -15,7 +15,7 @@ import {
 } from './turn-gate.js'
 import { pickedIds, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import type { DriverSession, DriverTurn } from './driver/index.js'
-import type { RunMessages } from './run-messages.js'
+import type { ChatMessage, RunMessages } from './run-messages.js'
 
 // The shared await/choice/chat machinery (#304/#337/#339/#714), lifted out of the run
 // lifecycle so the build path (run.ts), the direct prompt path (prompt-run.ts), and the
@@ -214,11 +214,17 @@ export interface AwaitRoundsOptions {
   emit: (event: FrameworkEvent) => void
   signal?: AbortSignal | undefined
   /**
-   * Live chat (#714): once the agent stops asking, stay open for the user's own
-   * messages, each resuming the same session. Unset for a headless run, which then
+   * Live chat (#714): once the agent stops asking, take the user's own messages,
+   * each resuming the same session. Unset for a headless run, which then
    * ends when the agent stops asking — byte-identical to before this existed.
    */
   messages?: RunMessages | undefined
+  /**
+   * Keep the chat parked for the next message instead of ending on an idle queue (#1390).
+   * Only for a run whose own terminal dashboard is the single surface — everything else
+   * ends itself and is reopened via `--resume`. Default off.
+   */
+  stayOpenChat?: boolean | undefined
   /**
    * Resume a prior session on the OPENING prompt (#720): when the driver session was
    * seeded with a finished run's id, this makes the first message `--resume` that
@@ -292,26 +298,39 @@ function promptContinuation(session: DriverSession, deps: AwaitTurnDeps): (quest
 }
 
 /**
- * The live-chat loop (#714): wait for the user's next message, deliver it by resuming the
- * same session (full conversational context), then honor any await gate it produced —
- * repeat until the source resolves `undefined` (Stop / budget cap). This is the "stay-open"
- * lifecycle: a run keeps running as a conversation until the user ends it. Shared by the
- * direct prompt path and the build path, which both reach it once their work has settled.
+ * The live-chat loop (#714): deliver each of the user's messages by resuming the same
+ * session (full conversational context), then honor any await gate it produced. Shared by
+ * the direct prompt path and the build path, which both reach it once their work has settled.
+ *
+ * How it ends is the session-lifecycle rule of #1390. By default the loop only *drains*: a
+ * message that already arrived is processed, and once the queue is idle the session ends
+ * itself rather than parking on the user — merge fires at that natural end (armed + gated),
+ * and a follow-up reopens the conversation via `--resume` (#762), like Claude Code web.
+ * `stayOpen` keeps the old park-for-the-next-message lifecycle, for a run whose own terminal
+ * dashboard is the only surface — it has no daemon to resume through, so ending would leave
+ * its composer a dead end; that run still ends on Stop / budget cap (next -> undefined).
  *
  * Reports the settled `exhausted` of the *last* chat turn (#742): entering chat means the
  * opening prompt's await-round cap is no longer the run's end reason, and a phase that ends
  * on Stop / close is not exhausted at all.
  */
-export async function runChatPhase(session: DriverSession, messages: RunMessages, seed: DriverTurn, deps: AwaitTurnDeps): Promise<{ turn: DriverTurn; exhausted: boolean }> {
+export async function runChatPhase(session: DriverSession, messages: RunMessages, seed: DriverTurn, deps: AwaitTurnDeps, stayOpen = false): Promise<{ turn: DriverTurn; exhausted: boolean }> {
   const signalOpt = deps.signal ? { signal: deps.signal } : {}
   let turn = seed
   let exhausted = false
   for (;;) {
-    // Parked on the user (#785): the work is settled and nothing is running until a message
-    // arrives. Said out loud each time round, so a reader can tell waiting from working.
-    deps.emit({ kind: 'settled' })
-    const message = await messages.next(deps.signal)
-    if (message === undefined) return { turn, exhausted } // Stop / budget cap: end the conversation.
+    let message: ChatMessage | undefined
+    if (stayOpen) {
+      // Parked on the user (#785): the work is settled and nothing is running until a message
+      // arrives. Said out loud each time round, so a reader can tell waiting from working.
+      deps.emit({ kind: 'settled' })
+      message = await messages.next(deps.signal)
+    } else {
+      // Nothing needs a human (#1390): no park, no `settled` limbo — an idle queue is the
+      // session's natural end, and the run's `end` event follows right behind it.
+      message = deps.signal?.aborted ? undefined : messages.takeQueued()
+    }
+    if (message === undefined) return { turn, exhausted } // idle queue / Stop / budget cap: end the conversation.
     // The message shows in the feed as the driver's own `start` event (the YOU row), so it is not
     // echoed as a separate log line — that only duplicated it.
     deps.recordMessage?.('user', message.text, message.via)
@@ -361,12 +380,13 @@ export async function runAwaitRounds(opts: AwaitRoundsOptions): Promise<AwaitRou
   opts.recordMessage?.('agent', drained.turn.text)
   if (drained.declined) return { text: drained.turn.text, declined: true, exhausted: false }
 
-  // Live chat (#714): stay open for the user's messages until Stop. Headless leaves it unset,
+  // Live chat (#714): take the user's messages — draining what queued and ending on idle, or
+  // parked until Stop for a terminal-dashboard run (#1390). Headless leaves it unset,
   // so the run ends here exactly as before. Once chat runs, its settled state is the run's end
   // reason, not the opening drain's (#742) — otherwise a chat closed by Stop would still be
   // reported "exhausted" and log a spurious await-limit notice.
   if (messages) {
-    const chat = await runChatPhase(session, messages, drained.turn, deps)
+    const chat = await runChatPhase(session, messages, drained.turn, deps, opts.stayOpenChat === true)
     return { text: chat.turn.text, declined: false, exhausted: chat.exhausted }
   }
   return { text: drained.turn.text, declined: false, exhausted: drained.exhausted }

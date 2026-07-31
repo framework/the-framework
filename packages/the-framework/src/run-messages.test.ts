@@ -68,3 +68,19 @@ test('RunMessageQueue hands the surface to a parked waiter too (#917)', async ()
   q.push('later', 'discord')
   assert.deepEqual(await pending, { text: 'later', via: 'discord' })
 })
+
+test('RunMessageQueue takeQueued() drains without waiting — the end-of-run check (#1390)', () => {
+  const q = new RunMessageQueue()
+  q.push('follow-up')
+  assert.deepEqual(q.takeQueued(), { text: 'follow-up' })
+  // Idle queue: undefined, immediately — this is what lets the session end itself.
+  assert.equal(q.takeQueued(), undefined)
+})
+
+test('RunMessageQueue takeQueued() is undefined once closed, pending or not (#1390)', () => {
+  const q = new RunMessageQueue()
+  q.push('stale')
+  q.close()
+  // A closed queue is an aborted run: a stale message must not start a new turn.
+  assert.equal(q.takeQueued(), undefined)
+})

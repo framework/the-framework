@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { HandoffState, RunHandoff } from '@gemstack/the-framework'
-import { GitPullRequest } from 'lucide-react'
-import { sendOpenPullRequest, sendSetHandoff } from '../server/control.telefunc.js'
+import { GitMerge, GitPullRequest } from 'lucide-react'
+import { sendMerge, sendOpenPullRequest, sendSetHandoff } from '../server/control.telefunc.js'
 import type { RunHandoffState } from '../lib/use-run-handoff.js'
 import { cn } from '../lib/utils.js'
 import { DiffStat } from './DiffView.js'
@@ -169,9 +169,26 @@ export function HandoffActions({
 }) {
   const { handoff, busy, pending, act } = state
   if (!handoff) return null
+  // While the PR lookup is still out (#1028), nothing is offered: acting on "not known yet" is
+  // how a second PR gets opened.
+  if (handoff.prPending) return null
   // Once a PR exists the bar links it and the needs-you queue (#632) has it: offering to open one
-  // again is the single mistake this must not make. Same while the lookup is still out (#1028).
-  if (handoff.pr || handoff.prPending) return null
+  // again is the single mistake this must not make. What is still worth offering is the Merge
+  // (#1391): an open, unmerged PR — the withheld-merge ending (#1363) leaves exactly this behind
+  // when the agent never signalled — takes one human click to land.
+  if (handoff.pr) {
+    if (handoff.pr.state !== 'OPEN' || handoff.merged) return null
+    return (
+      <Button
+        size="xs"
+        disabled={busy}
+        onClick={() => act('merge', () => sendMerge(projectId, runId), 'Could not merge the pull request.')}
+      >
+        <GitMerge className="h-3.5 w-3.5" />
+        {pending === 'merge' ? 'Merging…' : 'Merge PR'}
+      </Button>
+    )
+  }
   // From here every branch says something. A session that has finished and shows no control at all
   // is #1173: the reason there is nothing to press is exactly what the reader came for.
   if (!handoff.exists) return <Reason>Branch gone — nothing to open a PR from.</Reason>

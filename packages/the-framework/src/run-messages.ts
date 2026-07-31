@@ -4,9 +4,11 @@
  * A run's await gates (#337) are the agent asking the user; this is the reverse —
  * the user speaking to the agent unprompted. Each message continues the *same*
  * agent session (`claude --resume <id>`), so the conversation keeps its full
- * context. The run loop drains this between turns and, when the agent goes idle,
- * waits here for the next message (the "stay-open" chat lifecycle): the run stays
- * running until the user stops it or a budget / await cap trips.
+ * context. The run loop drains this once the work settles; a daemon-spawned
+ * session then ends itself when the queue is idle (#1390) — a follow-up message
+ * reopens the conversation via `--resume`, like Claude Code web — while a run
+ * with its own terminal dashboard keeps the old stay-open wait, since that
+ * surface has no daemon to resume through.
  *
  * Wired only when an interactive channel can deliver messages (a live dashboard /
  * daemon over `control.jsonl`). A headless run gets no {@link RunMessages}, so its
@@ -35,6 +37,12 @@ export interface RunMessages {
    * source was closed — so the loop ends cleanly rather than hanging.
    */
   next(signal?: AbortSignal): Promise<ChatMessage | undefined>
+  /**
+   * The next user message only if one has already arrived — never waits (#1390). What the
+   * end-of-run drain asks: a queued follow-up is processed, an idle queue ends the session.
+   * `undefined` once closed, so an aborted run never starts a new turn off a stale message.
+   */
+  takeQueued(): ChatMessage | undefined
 }
 
 /**
@@ -64,6 +72,11 @@ export class RunMessageQueue implements RunMessages {
     this.closed = true
     let waiter: ((message: ChatMessage | undefined) => void) | undefined
     while ((waiter = this.waiters.shift())) waiter(undefined)
+  }
+
+  takeQueued(): ChatMessage | undefined {
+    if (this.closed) return undefined
+    return this.pending.shift()
   }
 
   next(signal?: AbortSignal): Promise<ChatMessage | undefined> {

@@ -4,6 +4,7 @@ SHOW_MD: Show it via `showMarkdown()`
 SHOW_CHOICES: Show it via `showChoices()`
 AWAIT: Stop, await user answer before resuming
 SESSION_NAME: the name of the session
+TODO_FILE: `TODO_AGENTS.md`
 ADD_ANALYSIS_ENTRY: Add entry to the ANALYSIS_RESULT.md list
 
 ## Analyze the user prompt
@@ -19,7 +20,7 @@ If it isn't clear what you should do (e.g. unclear scope, unclear user prompt), 
 ### Scope
 
 - If the scope of what you'll work on is *large*, create a `PLAN_<SESSION_NAME>.agent.md` of what you'll work on, <SHOW_MD>, <AWAIT>
-- If the scope is potentially *very large* (e.g. spans over many hours/days of work), consider adding entries to `TODO_AGENTS.md` and show the new entries to the user via `showMarkdown()`
+- If the scope is potentially *very large* (e.g. spans over many hours/days of work), also create a <TODO_FILE> (backlog of follow-up tasks) and <SHOW_MD>
 
 <ADD_ANALYSIS_ENTRY> whether the scope is small, large, or very large
 
@@ -51,9 +52,7 @@ Measure "variability":
 
 ## After applying changes
 
-After you're done, decide: is <SESSION_NAME> finished, with no work left to do?
-- Yes: call setReadyForMerge() — required, the work is never merged without it
-- No: don't call it; say what's left instead
+After you're done, consider whether <SESSION_NAME> is finished and there isn't any work left to do — if that's the case then call setReadyForMerge()
 
 
 

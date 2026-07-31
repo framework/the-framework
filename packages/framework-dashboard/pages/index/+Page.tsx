@@ -22,7 +22,7 @@ import { useRoute } from '../../lib/use-route.js'
 import { useContextSet } from '../../lib/use-context-set.js'
 import { useActivityNotifications, useInterventionNotifications } from '../../lib/use-notifications.js'
 import { usePreferences, notificationsEnabled, newActivityEnabled, humanInterventionEnabled } from '../../lib/preferences.js'
-import { pendingChoices, agentViews } from '../../lib/live-state.js'
+import { pendingChoices, agentViews, currentRunEvents } from '../../lib/live-state.js'
 import { useDocumentTitle } from '../../lib/document-title.js'
 import { useWorking } from '../../lib/use-working.js'
 import { useFavicon } from '../../lib/favicon.js'
@@ -142,7 +142,11 @@ export default function Page() {
   // A run just started in `inProject`, which is not always the selected one: the onboarding
   // checklist starts one from the Overview and the settings page, where nothing is selected (#1169).
   const runStarted = (inProject: string | null, intent: string, startedId?: string, runsOn?: string) => {
-    setRunStart(prev => ({ tick: prev.tick + 1, intent, id: startedId ?? null, ...(runsOn ? { runsOn } : {}) }))
+    // Continuing the run already on screen (#762) appends to its journal — nothing truncates, so
+    // nothing would re-replay after a reset. Bumping the tick here is what blanked the transcript
+    // the moment a message resumed an ended session; a continuation keeps the feed instead.
+    const continued = startedId !== undefined && startedId === runId && inProject === projectId
+    setRunStart(prev => ({ tick: continued ? prev.tick : prev.tick + 1, intent, id: startedId ?? null, ...(runsOn ? { runsOn } : {}) }))
     setAdopting(startedId === undefined)
     // The picked context went with that run; the next launch starts from a clean focus (#948).
     resetContext()
@@ -233,8 +237,13 @@ export default function Page() {
   // The run whose feed and controls are in play is simply the one in the URL; in the no-id
   // fallback there is none yet, and a null id resolves to the project root, as before.
   const { events, lost } = useLiveEvents(projectId, runId, runStart.tick)
-  const choices = projectId ? pendingChoices(events) : []
-  const views = projectId ? agentViews(events) : []
+  // The rail's gates and views stay scoped to the newest `session` segment even though a run's
+  // feed no longer is (a resumed session appends a second segment to the same journal): a gate
+  // the stopped segment left unanswered belongs to a process that is gone, and resurrecting it
+  // beside the resumed run would offer a dead control.
+  const current = currentRunEvents(events)
+  const choices = projectId ? pendingChoices(current) : []
+  const views = projectId ? agentViews(current) : []
   // The selected session's loop verdict, for the rail's pinned block under the tabs. It comes up
   // from RunView rather than being folded here: a finished run's events live in its archived log,
   // which that view is the one to read.

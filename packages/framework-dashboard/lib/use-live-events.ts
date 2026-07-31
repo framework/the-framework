@@ -136,9 +136,12 @@ export function useLiveEvents(projectId: string | null, runId?: string | null, r
     // runId is a dependency: selecting another run must resubscribe to that run's log (#749).
   }, [projectId, runId])
 
-  // Scope the accumulated feed to the run in progress. The subscription lives across run
-  // boundaries (it only resets on a project switch), so without this a second run would show
-  // the previous run's log until it finished. See {@link currentRunEvents}.
-  const scoped = useMemo(() => currentRunEvents(events), [events])
+  // Scope the accumulated feed to the run in progress — but only for the project-root fallback:
+  // that subscription lives across run boundaries (it only resets on a project switch), so
+  // without the slice a second run would show the previous run's log until it finished. A run's
+  // own tail (#749) holds nothing but that run — including the second `session` boundary a
+  // resumed session (#762) appends to the SAME journal, where slicing is exactly wrong: it hid
+  // everything before the resume for as long as the run was live. See {@link currentRunEvents}.
+  const scoped = useMemo(() => (runId ? events : currentRunEvents(events)), [events, runId])
   return { events: scoped, lost, done }
 }

@@ -43,10 +43,13 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(screen.queryByText('The thing is not done.')).toBeNull()
   })
 
-  test('a claimed ticket wears its badge, with the holder as the tooltip (#1420)', async () => {
+  test('a claimed ticket names its holder inline on the badge, full id in the tooltip (#1420)', async () => {
     render(<TicketsPanel projectId="p1" tickets={[ticket({ locked: true, lockedBy: 'spike-1-0' })]} loaded onOpen={() => {}} />)
     const badge = await screen.findByText('claimed')
-    expect(badge.getAttribute('title')).toBe('Claimed by spike-1-0')
+    // Inline, not tooltip-only: a still 1-2s hover is how nobody discovers anything. The row
+    // truncates a long id, so the tooltip keeps the full one.
+    expect(screen.getByText(/· spike-1-0/)).toBeTruthy()
+    expect(badge.closest('[title="Claimed by spike-1-0"]')).toBeTruthy()
   })
 
   test('shows meta on the row: priority spelled out, topics, and a human-readable date (#1144/#1265)', async () => {

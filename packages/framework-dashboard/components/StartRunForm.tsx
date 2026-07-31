@@ -224,6 +224,16 @@ export function StartRunForm({
           {warning}
         </p>
       ))}
+      {/* The Haiku warning (#1439): never block, always teach. Haiku skips the session-finish
+          protocol so reliably (0/5 in the #1334 tier test, every stronger tier 1/1) that a
+          merge-armed run ends withheld as a draft PR — say so before the session is spent. */}
+      {options.model === 'haiku' && (
+        <p role="alert" className="mt-2 text-xs text-warning">
+          Haiku consistently skips the session-finish protocol, so a publishing run ends as an
+          unmerged draft PR and needs hand-holding. Pick Fable for real work — Haiku is best kept
+          for throwaway experiments.
+        </p>
+      )}
       {/* The armed merge will not wait for CI (#1417): this repo refuses GitHub auto-merge, so
           the merge degrades to an immediate direct merge (#1216/#1406). Never a block — the
           direct merge may be exactly what a solo prototyper wants — but say so, with the fix. */}

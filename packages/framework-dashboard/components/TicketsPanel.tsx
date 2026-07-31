@@ -178,13 +178,17 @@ export function TicketsPanel({
                 {/* What the agent has already done to this ticket, so it is clear what is left. */}
                 {ticket.spiked && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">spiked</Badge>}
                 {ticket.planned && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">planned</Badge>}
-                {/* An agent holds this ticket's `.lock.md` (#1420); the detail page releases it. */}
+                {/* An agent holds this ticket's `.lock.md` (#1420); the detail page releases it.
+                    The holder is named inline, not only in the native tooltip — a still 1-2s
+                    hover is how nobody discovers anything. Truncated to keep the dense row
+                    aligned; the tooltip keeps the full id. */}
                 {ticket.locked && (
                   <Badge
                     title={ticket.lockedBy ? `Claimed by ${ticket.lockedBy}` : undefined}
-                    className="shrink-0 border-transparent px-1 text-[10px] uppercase text-warning"
+                    className="shrink-0 border-transparent px-1 text-[10px] text-warning"
                   >
-                    claimed
+                    <span className="uppercase">claimed</span>
+                    {ticket.lockedBy && <span className="inline-block max-w-[8rem] truncate">&nbsp;· {ticket.lockedBy}</span>}
                   </Badge>
                 )}
                 {ticket.effort && (

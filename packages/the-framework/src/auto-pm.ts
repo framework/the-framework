@@ -463,16 +463,6 @@ export interface AutoPmDeps {
    */
   promote(project: AutoPmProject, run: { runId: string; entry?: string }): Promise<PromoteOutcome>
   /**
-   * Put every ticket its plan calls a consensual quick-win on the queue (#1334), asked once per
-   * project per tick, just before the queue is read.
-   *
-   * Here rather than as a rotation job because no agent turn is involved: the plan already made
-   * the call, and this only carries it onto the queue the drain reads. Injected like the rest, so
-   * the loop keeps testing off disk. Omitted (or throwing) means nothing is promoted, which is
-   * the behaviour that existed before the seam.
-   */
-  promotePlans?(project: AutoPmProject): Promise<readonly string[]>
-  /**
    * The tickets open for a spike (#1327): no spike, plan, or `.lock.md` claim yet (#1420) — most
    * important first, as filenames inside `tickets/`. Asked only when the tick lands on a
    * {@link AutoPmJob.fansOut} job. Unreadable means none, and no seam at all means the stock
@@ -654,14 +644,6 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
             note(project, false, `landed the queue from ${landed} finished run${landed === 1 ? '' : 's'}`)
             continue
           }
-        }
-        // Before the queue is read, so a plan that landed since the last tick is drained this
-        // tick rather than after one more cooldown (#1334).
-        const planned = (await deps.promotePlans?.(project).catch(() => [])) ?? []
-        if (planned.length) {
-          deps.log(
-            `[framework] auto PM: queued ${planned.length} planned quick-win${planned.length === 1 ? '' : 's'} in ${project.path}`,
-          )
         }
         const entries = await deps.queue(project).catch(() => undefined)
         const activeRuns = deps.activeRuns(project)

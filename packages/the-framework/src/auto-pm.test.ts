@@ -252,41 +252,6 @@ test('AUTO_PM_JOBS imports, triages, then plans (#773/#891/#892/#1334)', () => {
   ])
 })
 
-test('a plan promoted this tick is drained this tick, not the next one (#1334)', async () => {
-  // The promotion has to happen before the queue is read, or a plan landing between two ticks
-  // waits out a whole cooldown while the sweep invents work instead.
-  const order: string[] = []
-  let promoted = false
-  const { loop, ran } = harness({
-    cooldownMs: 0,
-    promotePlans: async () => {
-      order.push('promote')
-      promoted = true
-      return ['[A](tickets/a.md)']
-    },
-    queue: async () => {
-      order.push('read')
-      return promoted ? ['[A](tickets/a.md)'] : []
-    },
-  })
-  await loop.tick()
-  loop.stop()
-  assert.deepEqual(order, ['promote', 'read'])
-  // A queue with work in it drains rather than running a rotation job (#855).
-  assert.deepEqual(ran, [AUTO_PM_DRAIN_JOB.name])
-})
-
-test('a sweep with nothing planned behaves exactly as before the seam (#1334)', async () => {
-  // Omitted, and throwing, must both leave the rotation running: this promotion is an addition,
-  // never a gate on the tick.
-  for (const promotePlans of [undefined, async () => { throw new Error('gh is down') }]) {
-    const { loop, ran } = harness({ cooldownMs: 0, ...(promotePlans ? { promotePlans } : {}) })
-    await loop.tick()
-    loop.stop()
-    assert.deepEqual(ran, ['first'])
-  }
-})
-
 test('the rotation is the schedule the triage presets asked for (#891/#892)', () => {
   // #891/#892 both say "with a cron job regularly firing this preset". The rotation already
   // fires on every idle tick where the queue is dry, so no separate scheduler exists — unlike

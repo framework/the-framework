@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { FrameworkEvent } from '@gemstack/the-framework'
-import { agentSettled, agentViews, pendingChoices, isRunActive, currentRunEvents, runOutcome, actionsRunUrl } from './live-state.js'
+import { agentSettled, agentViews, pendingChoices, isPublishing, isRunActive, currentRunEvents, runOutcome, actionsRunUrl } from './live-state.js'
 
 const view = (id: string, title: string, markdown: string): FrameworkEvent => ({ kind: 'view', id, title, markdown })
 const choice = (id: string, title: string): FrameworkEvent => ({
@@ -82,6 +82,43 @@ describe('isRunActive', () => {
       { kind: 'log', message: 'back at it' },
     ] as FrameworkEvent[]
     expect(isRunActive(resumed)).toBe(true)
+  })
+})
+
+describe('isPublishing', () => {
+  const armed = (push: boolean): FrameworkEvent => ({ kind: 'handoff-armed', push, pr: push }) as FrameworkEvent
+  const handoff = (outcome: string): FrameworkEvent => ({ kind: 'handoff', outcome }) as FrameworkEvent
+
+  test('the window opens on a clean armed end and every handoff report closes it (#1431)', () => {
+    const running = [armed(true), { kind: 'log', message: 'go' }] as FrameworkEvent[]
+    expect(isPublishing(running)).toBe(false)
+    const endedClean = [...running, { kind: 'end', ok: true }] as FrameworkEvent[]
+    expect(isPublishing(endedClean)).toBe(true)
+    // Done, skipped, and failed all report — any of them means the epilogue has spoken.
+    for (const outcome of ['done', 'skipped', 'failed']) {
+      expect(isPublishing([...endedClean, handoff(outcome)])).toBe(false)
+    }
+  })
+
+  test('no window without a real arming event, with the push rung off, or on an unclean end', () => {
+    // Absent-means-armed defaults must not count: archives from before the handoff mechanism
+    // have no `handoff-armed` event and would otherwise read "publishing…" for ever.
+    expect(isPublishing([{ kind: 'end', ok: true }] as FrameworkEvent[])).toBe(false)
+    expect(isPublishing([armed(false), { kind: 'end', ok: true }] as FrameworkEvent[])).toBe(false)
+    expect(isPublishing([armed(true), { kind: 'end', ok: false, stopped: true }] as FrameworkEvent[])).toBe(false)
+    expect(isPublishing([armed(true), { kind: 'end', ok: false, detail: 'exit 1' }] as FrameworkEvent[])).toBe(false)
+  })
+
+  test("a resumed run's window is its own — the old segment's handoff does not close it, the old arming still counts (#1450)", () => {
+    const firstSegment = [
+      { kind: 'session' },
+      armed(true),
+      { kind: 'end', ok: true },
+      handoff('done'),
+    ] as FrameworkEvent[]
+    const resumedEnded = [...firstSegment, { kind: 'session' }, { kind: 'end', ok: true }] as FrameworkEvent[]
+    expect(isPublishing(resumedEnded)).toBe(true)
+    expect(isPublishing([...resumedEnded, handoff('done')])).toBe(false)
   })
 })
 

@@ -1,7 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { TICKETS_DIR } from '../tickets.js'
-import { isSpikeLock } from '../spike-locks.js'
+import { ticketLockHolder } from '../ticket-locks.js'
 
 /**
  * One ticket in `tickets/` (#697). The dashboard lists these so the backlog the agent plans
@@ -31,19 +31,22 @@ export interface WorkspaceTicket {
    * #1208); a filename-dated one keeps the date it was created on, same as the file itself does.
    */
   date: string
-  /** Whether a real `<name>.spike.md` sits beside it — a `PENDING:` placeholder (#1327) does not
-   *  count: that marks a spike in flight, not one done. */
+  /** Whether a `<name>.spike.md` sits beside it (a pre-#1420 artifact: the format has since
+   *  folded the spike into the plan, but existing spikes still mark their tickets). */
   spiked: boolean
-  /** Whether a real `<name>.plan.md` sits beside it, i.e. #685 already planned it. A `PENDING:`
-   *  placeholder does not count, same as {@link WorkspaceTicket.spiked}. */
+  /** Whether a `<name>.plan.md` sits beside it, i.e. #685 already planned it. */
   planned: boolean
   /**
-   * Whether a concurrent spike agent holds this ticket (#1327): a sibling exists whose content is
-   * still the `PENDING:<agent>` placeholder the daemon locked it with. Mutually informative with
-   * the two flags above rather than exclusive — a ticket whose real spike landed while its plan
-   * stayed PENDING is `spiked` and `locked` at once.
+   * Whether an agent holds this ticket (#1420): a `<name>.lock.md` claim exists. Mutually
+   * informative with the two flags above rather than exclusive — the lock covers the ticket's
+   * whole life, so a locked ticket may also be spiked or planned while its agent keeps working.
    */
   locked?: boolean
+  /**
+   * Who the `.lock.md` names, from its `CLAIMED: <holder>` line (#1420) — shown so a human can
+   * tell whose claim they are about to release. Absent when the lock is missing or unreadable.
+   */
+  lockedBy?: string
   /**
    * The effort estimate a spike or plan recorded (#1144/#1265), e.g. `low` or `2h`. The spike
    * format asks for one ("Human intervention effort: trivial/low/…"), so the first `…effort…: value`
@@ -82,7 +85,7 @@ const MAX_META_BYTES = 10_000
 const MAX_TICKET_BYTES = 4_000
 
 /** A ticket's siblings, which are not tickets of their own. */
-const SIBLING = /\.(plan|spike)\.md$/
+const SIBLING = /\.(plan|spike|lock)\.md$/
 
 /**
  * Whether the project has any ticket at all (#958).
@@ -244,8 +247,7 @@ const MAX_EFFORT_CHARS = 60
  * The effort estimate recorded against a ticket (#1144/#1265): the first effort-naming line in
  * its `.spike.md`, else its `.plan.md` — the spike is where the format asks for the estimate, so
  * it wins when both name one. Undefined when neither sibling names one. Takes the contents in
- * that order rather than re-reading the files: the caller has already read them to tell a real
- * sibling from a `PENDING:` placeholder (#1327), and a placeholder names no effort anyway.
+ * that order rather than re-reading the files: the caller has already read them for exactly this.
  */
 function effortFrom(sources: readonly (string | undefined)[]): string | undefined {
   for (const md of sources) {
@@ -259,16 +261,26 @@ function effortFrom(sources: readonly (string | undefined)[]): string | undefine
 }
 
 /**
- * One sibling's state (#1327): absent, a `PENDING:` lock, or a real document whose content the
- * effort scan can use. Read whole rather than stat'd, because existence stopped being the answer
- * the moment a placeholder could exist — and the effort scan wanted the content anyway.
+ * One sibling's state: absent, or present with its content for the effort scan. Existence is the
+ * answer again since #1420 — a claim is its own `.lock.md` file, never placeholder content
+ * inside a spike or plan.
  */
-async function readSibling(dir: string, name: string, siblings: Set<string>): Promise<{ real: boolean; pending: boolean; md?: string }> {
-  if (!siblings.has(name)) return { real: false, pending: false }
+async function readSibling(dir: string, name: string, siblings: Set<string>): Promise<{ real: boolean; md?: string }> {
+  if (!siblings.has(name)) return { real: false }
   const md = await readFile(join(dir, name), 'utf8').catch(() => undefined)
-  // An unreadable sibling keeps the pre-#1327 answer its existence gave: spiked, not locked.
-  if (md === undefined) return { real: true, pending: false }
-  return isSpikeLock(md) ? { real: false, pending: true } : { real: true, pending: false, md }
+  return { real: true, ...(md === undefined ? {} : { md }) }
+}
+
+/**
+ * A ticket's `.lock.md` claim (#1420): whether it exists, and who its `CLAIMED:` line names. An
+ * unreadable or malformed lock still locks — the file's existence is the claim; the holder is
+ * display sugar.
+ */
+async function readLock(dir: string, name: string, siblings: Set<string>): Promise<{ locked: boolean; lockedBy?: string }> {
+  if (!siblings.has(name)) return { locked: false }
+  const md = await readFile(join(dir, name), 'utf8').catch(() => undefined)
+  const lockedBy = md === undefined ? undefined : ticketLockHolder(md)
+  return { locked: true, ...(lockedBy === undefined ? {} : { lockedBy }) }
 }
 
 /**
@@ -294,11 +306,11 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
     if (content === undefined) continue
     const stem = file.replace(/\.md$/, '')
     const { title, summary, status, priority, topics, github } = describe(content.slice(0, MAX_TICKET_BYTES))
-    const [spike, plan] = await Promise.all([
+    const [spike, plan, lock] = await Promise.all([
       readSibling(dir, `${stem}.spike.md`, siblings),
       readSibling(dir, `${stem}.plan.md`, siblings),
+      readLock(dir, `${stem}.lock.md`, siblings),
     ])
-    const locked = spike.pending || plan.pending
     const effort = effortFrom([spike.md, plan.md])
     tickets.push({
       file,
@@ -311,7 +323,8 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
       date,
       spiked: spike.real,
       planned: plan.real,
-      ...(locked ? { locked } : {}),
+      ...(lock.locked ? { locked: true } : {}),
+      ...(lock.lockedBy !== undefined ? { lockedBy: lock.lockedBy } : {}),
       ...(effort ? { effort } : {}),
     })
   }
@@ -329,10 +342,11 @@ export interface WorkspaceTicketDetail extends WorkspaceTicket {
 
 /**
  * A bare filename inside `tickets/`: no path segments (so it cannot address another directory)
- * and not one of a ticket's own siblings (a `.plan.md`/`.spike.md` is written about a ticket,
- * not one itself, same as {@link readTickets}).
+ * and not one of a ticket's own siblings (a `.plan.md`/`.spike.md`/`.lock.md` is written about a
+ * ticket, not one itself, same as {@link readTickets}). Exported for the RPCs that take a ticket
+ * filename from the browser (#1420's release).
  */
-function isTicketFile(file: string): boolean {
+export function isTicketFile(file: string): boolean {
   return /^[^/\\]+\.md$/.test(file) && !SIBLING.test(file)
 }
 
@@ -353,11 +367,11 @@ export async function readTicket(cwd: string, file: string): Promise<WorkspaceTi
   const stem = file.replace(/\.md$/, '')
   const { title, summary, status, priority, topics, github } = describe(content)
   const present = new Set(names)
-  const [spike, plan] = await Promise.all([
+  const [spike, plan, lock] = await Promise.all([
     readSibling(dir, `${stem}.spike.md`, present),
     readSibling(dir, `${stem}.plan.md`, present),
+    readLock(dir, `${stem}.lock.md`, present),
   ])
-  const locked = spike.pending || plan.pending
   const effort = effortFrom([spike.md, plan.md])
   return {
     file,
@@ -370,7 +384,8 @@ export async function readTicket(cwd: string, file: string): Promise<WorkspaceTi
     date,
     spiked: spike.real,
     planned: plan.real,
-    ...(locked ? { locked } : {}),
+    ...(lock.locked ? { locked: true } : {}),
+    ...(lock.lockedBy !== undefined ? { lockedBy: lock.lockedBy } : {}),
     ...(effort ? { effort } : {}),
     content,
   }

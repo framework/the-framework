@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { WorkspaceTicketDetail } from '@gemstack/the-framework'
-import { ArrowLeft, Check, ListPlus, Github } from 'lucide-react'
+import { ArrowLeft, Check, ListPlus, Github, LockOpen } from 'lucide-react'
 import { onTicket } from '../server/reads.telefunc.js'
-import { sendQueueTicket } from '../server/control.telefunc.js'
+import { sendQueueTicket, sendReleaseTicketLock } from '../server/control.telefunc.js'
 import { usePolled } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
 import { Button } from './ui/button.js'
@@ -47,6 +47,16 @@ export function TicketDetailPage({
     if (result?.ok) setQueued(true)
   }
 
+  // The manual lock release (#1420): nothing times a `.lock.md` out anymore, so a dead agent's
+  // claim stands until a human lifts it here. `released` bridges the gap until the next poll.
+  const [released, setReleased] = useState(false)
+  const claimed = Boolean(ticket?.locked) && !released
+  const release = async () => {
+    if (!ticket) return
+    const result = await run(() => sendReleaseTicketLock(projectId, ticket.file), 'The lock could not be released.')
+    if (result?.ok) setReleased(true)
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="border-b border-border px-4 py-2">
@@ -65,17 +75,31 @@ export function TicketDetailPage({
             <>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <h1 className="text-lg font-semibold">{ticket.title}</h1>
-                <Button size="sm" variant="outline" disabled={busy || queued} onClick={() => void queue()} className="shrink-0 gap-1.5">
-                  {queued ? (
-                    <>
-                      <Check className="h-3.5 w-3.5" /> Queued
-                    </>
-                  ) : (
-                    <>
-                      <ListPlus className="h-3.5 w-3.5" /> Queue
-                    </>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {claimed && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => void release()}
+                      title={ticket.lockedBy ? `Claimed by ${ticket.lockedBy}` : undefined}
+                      className="gap-1.5"
+                    >
+                      <LockOpen className="h-3.5 w-3.5" /> Release lock
+                    </Button>
                   )}
-                </Button>
+                  <Button size="sm" variant="outline" disabled={busy || queued} onClick={() => void queue()} className="gap-1.5">
+                    {queued ? (
+                      <>
+                        <Check className="h-3.5 w-3.5" /> Queued
+                      </>
+                    ) : (
+                      <>
+                        <ListPlus className="h-3.5 w-3.5" /> Queue
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
               {ticket.summary && <p className="mt-2 text-sm text-muted-foreground">{ticket.summary}</p>}
               {/* All meta below the description (#1144/#1265): date, priority, then the GitHub
@@ -108,6 +132,14 @@ export function TicketDetailPage({
                 ))}
                 {ticket.spiked && <Badge className="border-transparent px-0 text-[10px] uppercase">spiked</Badge>}
                 {ticket.planned && <Badge className="border-transparent px-0 text-[10px] uppercase">planned</Badge>}
+                {claimed && (
+                  <Badge
+                    title={ticket.lockedBy ? `Claimed by ${ticket.lockedBy}` : undefined}
+                    className="border-transparent px-0 text-[10px] uppercase text-warning"
+                  >
+                    claimed
+                  </Badge>
+                )}
                 {ticket.effort && <Badge className="border-transparent px-0 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>}
                 <span className="text-[10px] text-muted-foreground/70">{ticket.file}</span>
               </div>

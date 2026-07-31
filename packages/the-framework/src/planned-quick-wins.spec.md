@@ -17,7 +17,7 @@ Carries a plan's own verdict onto the agent queue (#1334): a ticket whose `.plan
 
 - No agent runs this. The plan already made the judgement; re-deriving it would spend a subscription turn to reproduce an answer written down in the repo, which is what #879 exists to avoid.
 - The daemon writes, never the agent — the same rule `queue-promote.ts` states: runs stay sandboxed in their worktrees with no write access to the checkout.
-- Fails closed, and demands both keys explicitly (the `quotaHeadroom` polarity, #879). A plan that forgot to say, or said something this version does not recognise, means a human decides rather than an agent starting. A `PENDING:<agent>` lock placeholder (#1327) is such a plan by construction — no verdict keys — so a ticket being planned right now promotes nothing.
+- Fails closed, and demands both keys explicitly (the `quotaHeadroom` polarity, #879). A plan that forgot to say, or said something this version does not recognise, means a human decides rather than an agent starting. A ticket being planned right now has no `.plan.md` at all since #1420 (its claim is a separate `.lock.md`), so it never even reaches this check.
 - Only the header is parsed — everything above the first `##` — so a plan that *discusses* quick wins in its prose cannot declare itself one.
 - The queue line is the ticket link and nothing else: the plan sitting beside the ticket is where the detail lives, and copying it into the queue would be a second thing to keep true.
 - `blocked` separates an obstacle from an empty repo, because "no plan called its ticket a quick-win" is the ordinary state of a healthy project and would otherwise print on every tick forever.

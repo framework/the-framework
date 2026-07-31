@@ -1,6 +1,6 @@
 import type { FrameworkEvent } from '@gemstack/the-framework'
 import { runProgress } from '@gemstack/the-framework/client'
-import { isRunActive, runOutcome } from './live-state.js'
+import { isPublishing, isRunActive, runOutcome } from './live-state.js'
 
 /** How a run's one status pill is drawn: its dot colour, its word, and the word's tone. */
 export type RunStatusPill = { dot: string; label: string; tone: string }
@@ -27,6 +27,13 @@ export function runStatusPill(events: FrameworkEvent[]): RunStatusPill | null {
     return { dot: 'bg-danger', label: outcome?.detail ? `failed — ${outcome.detail}` : 'failed', tone: 'text-danger' }
   }
   if (stopped) return { dot: 'bg-warning', label: 'stopped', tone: 'text-warning' }
+  // Ended clean, handoff armed, no `handoff` report yet (#1431): the epilogue is still
+  // pushing/opening the PR/merging. An ending-side state like failed/stopped, so it sits above
+  // the on-the-way "ready for merge" (#948) — during this window the publishing, the merge
+  // itself included, is what is actually happening.
+  if (isPublishing(events)) {
+    return { dot: 'animate-pulse bg-success', label: 'publishing…', tone: 'text-muted-foreground' }
+  }
   if (progress.readyForMerge) return { dot: 'bg-success', label: 'ready for merge', tone: 'text-muted-foreground' }
   // A run only pulses "building…" while it is live (#695/U20): once `end` lands the pill settles.
   if (isRunActive(events)) return { dot: 'animate-pulse bg-warning', label: 'building…', tone: 'text-muted-foreground' }

@@ -6,7 +6,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 const onProjects = vi.hoisted(() => vi.fn())
 const onClaudeTrust = vi.hoisted(() => vi.fn())
 const onAgentReady = vi.hoisted(() => vi.fn())
-vi.mock('../server/projects.telefunc.js', () => ({ onProjects, onClaudeTrust, onAgentReady }))
+const onRepoAutoMerge = vi.hoisted(() => vi.fn())
+vi.mock('../server/projects.telefunc.js', () => ({ onProjects, onClaudeTrust, onAgentReady, onRepoAutoMerge }))
 
 const onSystemPromptUser = vi.hoisted(() => vi.fn())
 vi.mock('../server/reads.telefunc.js', () => ({ onSystemPromptUser }))
@@ -58,6 +59,7 @@ afterEach(() => {
   start.mockReset()
   onClaudeTrust.mockReset()
   onAgentReady.mockReset()
+  onRepoAutoMerge.mockReset()
   prefs.current = {}
 })
 
@@ -188,5 +190,45 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
     render(<StartRunForm {...props} />)
     await waitFor(() => expect(onProjects).toHaveBeenCalled())
     expect(onAgentReady).not.toHaveBeenCalled()
+  })
+})
+
+describe('StartRunForm auto-merge-disabled warning (#1417)', () => {
+  test('an armed merge on a repo that refuses auto-merge warns, with the fix, without blocking', async () => {
+    onProjects.mockResolvedValue([])
+    onSystemPromptUser.mockResolvedValue(null)
+    prefs.current = { autoMerge: true }
+    onRepoAutoMerge.mockResolvedValue({ known: true, allowed: false })
+    render(<StartRunForm {...props} />)
+    expect(await screen.findByText(/auto-merge disabled/)).toBeTruthy()
+    expect(screen.getByText(/Allow auto-merge/)).toBeTruthy()
+    // Never a block: the submit path stays untouched.
+    expect(screen.getByText('submit-typed')).toBeTruthy()
+  })
+
+  test('a repo that allows auto-merge, or one gh cannot speak for, shows no warning', async () => {
+    onProjects.mockResolvedValue([])
+    onSystemPromptUser.mockResolvedValue(null)
+
+    prefs.current = { autoMerge: true }
+    onRepoAutoMerge.mockResolvedValue({ known: true, allowed: true })
+    const allowed = render(<StartRunForm {...props} />)
+    await waitFor(() => expect(onRepoAutoMerge).toHaveBeenCalled())
+    expect(screen.queryByText(/auto-merge disabled/)).toBeNull()
+    allowed.unmount()
+
+    // "Could not say" is not "off" — no crying wolf (#1318 stance).
+    onRepoAutoMerge.mockResolvedValue({ known: false, allowed: false })
+    render(<StartRunForm {...props} />)
+    await waitFor(() => expect(onRepoAutoMerge).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText(/auto-merge disabled/)).toBeNull()
+  })
+
+  test('an unarmed merge never asks the question at all', async () => {
+    onProjects.mockResolvedValue([])
+    onSystemPromptUser.mockResolvedValue(null)
+    render(<StartRunForm {...props} />)
+    await waitFor(() => expect(onProjects).toHaveBeenCalled())
+    expect(onRepoAutoMerge).not.toHaveBeenCalled()
   })
 })

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ghMergePr, githubToken } from './gh.js'
+import { ghMergePr, ghRepoAutoMerge, githubToken } from './gh.js'
 import type { GhRunner } from './gh.js'
 
 /** A `gh` that answers with `stdout`, or rejects, and records what it was asked. */
@@ -140,4 +140,20 @@ test('a direct merge that also fails reports the second refusal (#1216)', async 
     outcome: 'failed',
     error: 'GraphQL: Base branch was modified',
   })
+})
+
+test('ghRepoAutoMerge reads the repo setting, and an unreadable answer is unknown, not "off" (#1417)', async () => {
+  const { gh, calls } = fakeGh('{"autoMergeAllowed":false}')
+  assert.deepEqual(await ghRepoAutoMerge('/repo', gh), { known: true, allowed: false })
+  assert.deepEqual(calls, [['repo', 'view', '--json', 'autoMergeAllowed']])
+
+  const { gh: allowed } = fakeGh('{"autoMergeAllowed":true}')
+  assert.deepEqual(await ghRepoAutoMerge('/repo', allowed), { known: true, allowed: true })
+
+  // gh missing / unauthenticated / not a GitHub repo: "could not say" renders nothing on the
+  // launcher — the #1318 no-crying-wolf stance — so it must never masquerade as a real "off".
+  const { gh: broken } = fakeGh(new Error('gh: command not found'))
+  assert.deepEqual(await ghRepoAutoMerge('/repo', broken), { known: false, allowed: false })
+  const { gh: junk } = fakeGh('not json')
+  assert.deepEqual(await ghRepoAutoMerge('/repo', junk), { known: false, allowed: false })
 })

@@ -1,8 +1,8 @@
-One project's tickets list (#697/#1144): `tickets/*.md` as scannable one-liner rows (title, topics, spiked/planned/effort, priority, age, GitHub link) plus the Import/Update-from-GitHub bar.
+One project's tickets list (#697/#1144): `tickets/*.md` as scannable one-liner rows (title, topics, spiked/planned/claimed/effort, priority, age, GitHub link) plus the Import/Update-from-GitHub bar.
 
 ## TLDR
 
-- Rows: click opens the detail page via `onOpen(file)` — the file IS the route slug; only `closed` gets a status badge (open is the default assumption, like spiked/planned only showing when true, #1230); "Priority: N" is spelled out (a bare number is cryptic, #1265); age with full-datetime tooltip; the summary moved to the detail page.
+- Rows: click opens the detail page via `onOpen(file)` — the file IS the route slug; only `closed` gets a status badge (open is the default assumption, like spiked/planned/claimed only showing when true, #1230); a `locked` ticket wears "claimed" with the holder as tooltip (#1420 — the release lives on the detail page); "Priority: N" is spelled out (a bare number is cryptic, #1265); age with full-datetime tooltip; the summary moved to the detail page.
 - Empty `tickets/` → "Import tickets from GitHub"; filled → "Update from GitHub" bar with the last-import stamp from `onTicketsMeta` (#1208) — "update" would be a strange word for filling a never-filled directory.
 - Both buttons `sendStart(projectId, prompt, 'prompt', {unattended: true})` (#1279 — routine work, ends at settle, armed handoff fires) then `onRunStarted(prompt, runId)` so the shell jumps to the working session instead of leaving stale rows (#948/#1169).
 - `hiddenByFilter > 0` with zero visible tickets renders "N hidden by the current filter" instead of the import offer — importing would ask for work already done (#1230).

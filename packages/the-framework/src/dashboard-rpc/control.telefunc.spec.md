@@ -10,6 +10,7 @@ The dashboard's write-side telefunctions (#405): steering live runs via their co
 - `sendOpenInApp` (#490): spawn a local file manager/editor; `runId` opens the session's own checkout (#798); honours the stored editor preference, then `$FRAMEWORK_EDITOR`, then `code` (#727).
 - Handoff: `sendPushBranch`/`sendOpenPullRequest` (#799) commit the session's uncommitted work from its checkout onto its branch first, then push / open the PR from the project repo.
 - `sendQueueTicket` (#697): append an entry to the project checkout's flat backlog; with a `ticket` it lands in the matching `## Priority N` section and links back via markdown link (#1164).
+- `sendReleaseTicketLock` (#1420): delete a ticket's `.lock.md` claim in the project checkout, commit, push best-effort — the manual release, since no timer frees locks. Validates the filename with the same bare-ticket rule the readers use.
 
 ## Problems
 

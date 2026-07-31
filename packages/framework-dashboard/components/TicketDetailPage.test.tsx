@@ -4,7 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 const onTicket = vi.hoisted(() => vi.fn())
 vi.mock('../server/reads.telefunc.js', () => ({ onTicket }))
 const sendQueueTicket = vi.hoisted(() => vi.fn())
-vi.mock('../server/control.telefunc.js', () => ({ sendQueueTicket }))
+const sendReleaseTicketLock = vi.hoisted(() => vi.fn())
+vi.mock('../server/control.telefunc.js', () => ({ sendQueueTicket, sendReleaseTicketLock }))
 
 const { TicketDetailPage } = await import('./TicketDetailPage.js')
 
@@ -24,6 +25,7 @@ afterEach(() => {
   cleanup()
   onTicket.mockReset()
   sendQueueTicket.mockReset()
+  sendReleaseTicketLock.mockReset()
 })
 
 // One ticket's own page (#1144): the entire file, read by the same slug the list row and the
@@ -109,6 +111,42 @@ describe('TicketDetailPage (#1144)', () => {
     onTicket.mockResolvedValue(null)
     render(<TicketDetailPage projectId="p1" slug="gone.md" onBack={() => {}} />)
     expect(await screen.findByText(/does not exist/i)).toBeTruthy()
+  })
+
+  test('a claimed ticket shows its badge, holder, and a release button (#1420)', async () => {
+    onTicket.mockResolvedValue(ticket({ locked: true, lockedBy: 'spike-1-0' }))
+    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
+    const badge = await screen.findByText('claimed')
+    // The holder rides as a tooltip so a human knows whose claim they are about to lift.
+    expect(badge.getAttribute('title')).toBe('Claimed by spike-1-0')
+    expect(screen.getByRole('button', { name: /release lock/i })).toBeTruthy()
+  })
+
+  test('an unclaimed ticket offers no release (#1420)', async () => {
+    onTicket.mockResolvedValue(ticket())
+    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
+    await screen.findByRole('heading', { name: 'Do the thing' })
+    expect(screen.queryByText('claimed')).toBeNull()
+    expect(screen.queryByRole('button', { name: /release lock/i })).toBeNull()
+  })
+
+  test('releasing calls the RPC and withdraws the claim without waiting for the next poll (#1420)', async () => {
+    onTicket.mockResolvedValue(ticket({ locked: true, lockedBy: 'spike-1-0' }))
+    sendReleaseTicketLock.mockResolvedValue({ ok: true })
+    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: /release lock/i }))
+    await waitFor(() => expect(sendReleaseTicketLock).toHaveBeenCalledWith('p1', '2026-07-20_do-the-thing.md'))
+    await waitFor(() => expect(screen.queryByText('claimed')).toBeNull())
+    expect(screen.queryByRole('button', { name: /release lock/i })).toBeNull()
+  })
+
+  test('a failed release surfaces and keeps the claim visible (#1420)', async () => {
+    onTicket.mockResolvedValue(ticket({ locked: true }))
+    sendReleaseTicketLock.mockResolvedValue({ ok: false, error: 'the release could not be committed' })
+    render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
+    fireEvent.click(await screen.findByRole('button', { name: /release lock/i }))
+    expect(await screen.findByText(/could not be committed/i)).toBeTruthy()
+    expect(screen.getByText('claimed')).toBeTruthy()
   })
 
   test('Back returns to the list', async () => {

@@ -825,7 +825,7 @@ test('a fansOut job fans out to the concurrency, one locked ticket per agent (#1
   assert.equal(lockCalls.length, 1)
   assert.equal(lockCalls[0]!.length, 3)
   assert.equal(new Set(lockCalls[0]!.map(a => a.agentId)).size, 3)
-  assert.match(prompts[0]!, new RegExp(`PENDING:${lockCalls[0]![0]!.agentId}`))
+  assert.match(prompts[0]!, new RegExp(`CLAIMED: ${lockCalls[0]![0]!.agentId}`))
 })
 
 test('only the tickets the lock actually claimed go out (#1327)', async () => {
@@ -929,8 +929,10 @@ test('pinnedSpikeJob appends the pin, so the preset keeps its own rules verbatim
   // able to silently lose the pin.
   assert.ok(pinned.prompt.startsWith(SPIKE_JOB.prompt))
   assert.match(pinned.prompt, /exactly one ticket, `tickets\/2026-07-25_x\.md`/)
-  assert.match(pinned.prompt, /tickets\/2026-07-25_x\.spike\.md/)
-  assert.match(pinned.prompt, /PENDING:spike-7-0/)
+  assert.match(pinned.prompt, /tickets\/2026-07-25_x\.lock\.md/)
+  assert.match(pinned.prompt, /CLAIMED: spike-7-0/)
+  // The lock has no timer since #1420, so the agent is told to lift it with its own work.
+  assert.match(pinned.prompt, /delete `tickets\/2026-07-25_x\.lock\.md` in the same commit/)
   assert.equal(pinned.ticket, '2026-07-25_x.md')
 })
 

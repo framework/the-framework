@@ -43,6 +43,12 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(screen.queryByText('The thing is not done.')).toBeNull()
   })
 
+  test('a claimed ticket wears its badge, with the holder as the tooltip (#1420)', async () => {
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ locked: true, lockedBy: 'spike-1-0' })]} loaded onOpen={() => {}} />)
+    const badge = await screen.findByText('claimed')
+    expect(badge.getAttribute('title')).toBe('Claimed by spike-1-0')
+  })
+
   test('shows meta on the row: priority spelled out, topics, and a human-readable date (#1144/#1265)', async () => {
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
     render(

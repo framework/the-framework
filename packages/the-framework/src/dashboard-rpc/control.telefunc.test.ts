@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { provideTelefuncContext } from 'telefunc'
-import { sendStart } from './control.telefunc.js'
+import { sendStart, sendReleaseTicketLock } from './control.telefunc.js'
 import { presets } from '../preset-catalog.js'
 import type { StartRunOptions } from '../dashboard/types.js'
 
@@ -62,5 +62,68 @@ test('a ticket named by the caller is not replaced by the guess (#1117)', async 
     assert.equal(started()?.ticket, 'tickets/2026-07-20_chosen.md')
   } finally {
     await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+// The manual `.lock.md` release (#1420): the only way a claim lifts besides the agent's own PR
+// deleting it, so the RPC has to hold the same line the file readers do about what a ticket
+// filename is, and actually land the release as a commit.
+
+/** A real git checkout holding one ticket, optionally locked, registered as project `p1`. */
+async function lockedProject(files: Record<string, string>): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), 'framework-release-'))
+  const git = async (...args: string[]) => {
+    const { execFile } = await import('node:child_process')
+    await new Promise<void>((resolve, reject) =>
+      execFile('git', args, { cwd }, error => (error ? reject(error) : resolve())),
+    )
+  }
+  await git('init', '-q', '-b', 'main')
+  await git('config', 'user.email', 'test@test')
+  await git('config', 'user.name', 'test')
+  const { mkdir } = await import('node:fs/promises')
+  await mkdir(join(cwd, 'tickets'), { recursive: true })
+  for (const [file, md] of Object.entries(files)) await writeFile(join(cwd, file), md)
+  await git('add', '-A')
+  await git('commit', '-q', '-m', 'seed')
+  provideTelefuncContext({
+    projects: { list: async () => [], resolvePath: async () => cwd },
+  } as never)
+  return cwd
+}
+
+test('sendReleaseTicketLock deletes the lock and commits the release (#1420)', async () => {
+  const cwd = await lockedProject({
+    'tickets/2026-07-20_thing.md': '# Thing\n',
+    'tickets/2026-07-20_thing.lock.md': 'CLAIMED: spike-1-0\n',
+  })
+  try {
+    const result = await sendReleaseTicketLock('p1', '2026-07-20_thing.md')
+    // The push fails (no origin) but the release stands: the commit is the local half, and the
+    // push is best-effort exactly like the acquisition's.
+    assert.deepEqual(result, { ok: true })
+    const { access } = await import('node:fs/promises')
+    await assert.rejects(access(join(cwd, 'tickets/2026-07-20_thing.lock.md')), 'the lock file is gone')
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('sendReleaseTicketLock answers honestly when there is no lock (#1420)', async () => {
+  const cwd = await lockedProject({ 'tickets/2026-07-20_thing.md': '# Thing\n' })
+  try {
+    const result = await sendReleaseTicketLock('p1', '2026-07-20_thing.md')
+    assert.deepEqual(result, { ok: false, error: 'this ticket holds no lock' })
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('sendReleaseTicketLock rejects anything but a bare ticket filename (#1420)', async () => {
+  // The filename comes from the browser: a path segment could address another directory, and a
+  // sibling name could delete a plan instead of a lock.
+  for (const bad of ['../escape.md', 'a/b.md', '2026-07-20_thing.lock.md', '2026-07-20_thing.plan.md', 'thing.txt']) {
+    const result = await sendReleaseTicketLock('p1', bad)
+    assert.deepEqual(result, { ok: false, error: 'not a ticket filename' }, bad)
   }
 })

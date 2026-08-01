@@ -44,6 +44,7 @@ import { createPreviewRuntime } from './preview-runtime.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId, topicScratchPath } from './registry.js'
 import { isTicketPath } from './tickets.js'
+import { resolveProjectRunOptions } from './daemon-services.js'
 import { installProject, enumerateGitRepos } from './install.js'
 import { isGitRepo } from './project.js'
 import { isCliTimeout } from './cli-exec.js'
@@ -831,6 +832,17 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
       realBin = resolveSpawnBin(binPath)
     } catch (err) {
       return { ok: false, error: errorMessage(err) }
+    }
+
+    // A continuation start carries only its seed (#1467): the composer's Resume sends
+    // `{resumeSession, continueRunId, agent}` and nothing else, so the run's armed handoff fell
+    // back to bare defaults — a session that ran its first leg merge-armed resumed with the merge
+    // silently disarmed and ended in a draft PR. The project's resolved options are the base and
+    // the caller's explicit ones stay on top: the same overlay the daemon-restart resume path
+    // (resumeSuspendedRuns) has always done. A fresh start is untouched — the launcher resolves
+    // its options client-side and sends them whole.
+    if (options.continueRunId) {
+      options = { ...(await resolveProjectRunOptions(projectKey, env)), ...options }
     }
 
     // A run must not spend a branch and a worktree on an agent that can never start (#1326).

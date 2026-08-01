@@ -113,12 +113,15 @@ export type MergeWithheldReason =
  *
  * `auto-armed` is the preferred outcome: GitHub's own auto-merge takes the PR, so it lands when
  * its checks pass rather than before them. `merged` is the fallback where the repo does not allow
- * auto-merge and the PR was merged directly. `failed` never fails the handoff — the PR exists
- * either way, a human can still merge it by hand. `withheld` means the merge never ran at all
- * (#1363): it was armed but not authorized, and the PR opened as a draft for a human instead.
+ * auto-merge and the PR was merged directly. `watched` (#1418) is the auto path's answer where
+ * GitHub cannot arm the merge and the PR's checks have not passed yet: merging directly there is
+ * exactly the lands-before-CI hazard (#1406), so the daemon's CI watch takes the PR instead and
+ * merges it once its checks go green. `failed` never fails the handoff — the PR exists either
+ * way, a human can still merge it by hand. `withheld` means the merge never ran at all (#1363):
+ * it was armed but not authorized, and the PR opened as a draft for a human instead.
  */
 export type AutoMergeOutcome =
-  | { outcome: 'auto-armed' | 'merged' }
+  | { outcome: 'auto-armed' | 'merged' | 'watched' }
   | { outcome: 'withheld'; reason: MergeWithheldReason }
   | { outcome: 'failed'; error: string }
 

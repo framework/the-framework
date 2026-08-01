@@ -5,6 +5,7 @@ The single `FrameworkEvent` union the whole run streams over — bootstrap narra
 - Event kinds: `session`, `session-update`, `system-prompt` (#343), `bootstrap`, `driver` (forwarded verbatim, never gated on), `preview`, `browser-stream` (#813), `log`, `view` (#441), `session-name` (#326), `ready-for-merge`, `on-before-mergeable` (#835), `handoff-armed` (#1102), `ticket` (#1117), `queue-entry` (#1253), `branch` (#1277), `handoff` (#1102), `settled` (#785), `bind` (#1121), `usage` (#322), `modes` (#272), `choice` (#304), `choice-resolved`, `end`.
 - `ChoiceRequest` (#304): an interactive gate the run parks on until a pick arrives; variants: multi-select checklist (#332, pick resolves to a subset of ids), Approve/Decline confirm (#358), `autoAcceptMs` default 10s under autopilot, optional `file` for the doc sidebar.
 - Skip-reason unions `OnBeforeMergeableSkip` (#835) and `AutoHandoffSkip` (#1102): every decline carries one, so "it was on and nothing happened" has an answer in the log.
+- `AutoMergeOutcome` (#1216/#1363/#1418): `auto-armed` (GitHub holds the merge), `merged` (direct), `watched` (#1418: GitHub could not arm it and the checks have not passed — the daemon's CI watch merges on green; merging directly there is the lands-before-CI hazard, #1406), `withheld`+reason (#1363: armed but not authorized), `failed`+error.
 - `ChoiceBy` = `user` | `autopilot` | `auto`; `pickedIds` normalizes single-id/subset picks; `OPEN_LOOP_MODES` = `['autopilot', 'technical']` is the single source for the mode checkboxes.
 
 ## Decisions

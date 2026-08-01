@@ -619,7 +619,9 @@ export async function runAutoHandoff(
   // predecessor opened, and the merge is the half that has not happened yet.
   if (state.pr) {
     if (intent.merge && state.pr.state === 'OPEN') {
-      return { outcome: 'skipped', reason: 'already-open', merge: await ghMergePr(cwd, state.pr.number, gh) }
+      // `watch` mode (#1418), like the freshly-opened path below: an auto merge must wait for the
+      // PR's checks rather than land on the direct fallback before they run (#1406).
+      return { outcome: 'skipped', reason: 'already-open', merge: await ghMergePr(cwd, state.pr.number, gh, { whenUnarmed: 'watch' }) }
     }
     return { outcome: 'skipped', reason: 'already-open' }
   }
@@ -648,8 +650,11 @@ export async function runAutoHandoff(
       ? await (async (): Promise<AutoMergeOutcome> => {
           const lookup = readDeps.pr ?? runPr
           const number = prNumberFromUrl(opened.url) ?? (await lookup(cwd, branch).catch(() => undefined))?.number
+          // `watch` mode (#1418): where GitHub cannot arm the merge, a just-opened PR defers to
+          // the daemon's CI watch instead of the direct fallback that landed it before its first
+          // check ran (#1406).
           return number !== undefined
-            ? ghMergePr(cwd, number, gh)
+            ? ghMergePr(cwd, number, gh, { whenUnarmed: 'watch' })
             : { outcome: 'failed', error: 'could not resolve the PR number to merge' }
         })()
       : undefined

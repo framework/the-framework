@@ -77,6 +77,21 @@ describe('RunComposer slot control (#1455)', () => {
     await waitFor(() => expect((screen.getByRole('button', { name: 'Stop session' }) as HTMLButtonElement).disabled).toBe(true))
   })
 
+  test('the Stopping… latch releases when the stop lands, so a resumed run gets a working Stop again', async () => {
+    // A Resume continues the SAME run (#762) — same id — so a latch keyed to the run id alone
+    // re-engaged on the resumed session and froze its Stop as a disabled spinner.
+    sendStop.mockResolvedValue(undefined)
+    const ui = (live: boolean) => (
+      <RunComposer projectId="p1" runId="run-1" live={live} files={[]} addContext={vi.fn()} />
+    )
+    const { rerender } = render(ui(true))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop session' }))
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Stop session' }) as HTMLButtonElement).disabled).toBe(true))
+    rerender(ui(false)) // the end lands: the run is no longer live
+    rerender(ui(true)) // the resume brings the same run back
+    expect((screen.getByRole('button', { name: 'Stop session' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
   test('a stopped session offers Resume, sending the stock continuation of this run (#1391)', async () => {
     sendStart.mockResolvedValue({ ok: true, runId: 'run-1' })
     const { onRunStarted } = renderComposer({ live: false, sessionId: 'sess-1', outcome: { ok: false, stopped: true } })

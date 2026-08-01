@@ -73,10 +73,15 @@ export function RunComposer({
   const { busy: starting, error: startError, start } = useStartRun()
   // The slot's Stop (#1455), its own action so a message send's busy beat cannot read as
   // "stopping". A landed Stop stays "Stopping…" until the end event flips `live`, so it cannot
-  // be re-fired — the same latch the ⋮ menu's Stop keeps.
+  // be re-fired — the same latch the ⋮ menu's Stop keeps. Released the moment `live` drops, not
+  // only on a run switch: a Resume continues the SAME run (#762), so a latch keyed to the run id
+  // alone re-engaged on the resumed session and froze its Stop as a disabled spinner.
   const { busy: stopBusy, error: stopError, run: runStop } = useAction()
   const [stopRequested, setStopRequested] = useState(false)
   useEffect(() => setStopRequested(false), [runId])
+  useEffect(() => {
+    if (!live) setStopRequested(false)
+  }, [live])
   const stopping = stopBusy || (stopRequested && live)
   // The last message that went through: a queued control entry is invisible until the agent
   // drains it between turns, so without this the send looked like nothing happened (#948).

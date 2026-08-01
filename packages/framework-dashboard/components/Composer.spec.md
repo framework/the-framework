@@ -17,6 +17,7 @@ The shared run composer (#721): the Tiptap prompt editor plus the control row (p
 ## Decisions
 
 - The submit arrow only exists once the prompt has text (#721); it animates in via negative margin (`-2.375rem` = its `w-8` + the row's `gap-1.5`) rather than width so the neighboring control slides smoothly and a hidden submit leaves the gear flush with the box edge; `aria-hidden` while empty keeps it out of role queries.
+- `idleControl` (#1455): an optional node that occupies the submit slot while the box is empty — the session page's Stop/Resume, so Start/Stop/Resume and the send ↑ are one slot (like Claude Code's composer). Typing swaps it for the arrow; without one, the empty slot keeps its collapse behavior for the launcher.
 - Run-option rows come from `lib/run-option-rows.ts` because the settings page renders the same options — a second copy would let a rule hold in one place and not the other (#958).
 - Current connection is read once from `window.location` (not state): a device switch reloads the page, so the origin is fixed for the page's life.
 - "New preset…" appears in the `/` menu only in the full composer — the compact row has no create panel to open.

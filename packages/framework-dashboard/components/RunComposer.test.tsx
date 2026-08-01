@@ -3,10 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { Preferences } from '@gemstack/the-framework'
 
 // The two writes this component chooses between: a control-log message into the open session, or
-// a run of its own.
+// a run of its own — plus the slot's Stop (#1455).
 const sendMessage = vi.hoisted(() => vi.fn())
 const sendStart = vi.hoisted(() => vi.fn())
-vi.mock('../server/control.telefunc.js', () => ({ sendMessage, sendStart }))
+const sendStop = vi.hoisted(() => vi.fn())
+vi.mock('../server/control.telefunc.js', () => ({ sendMessage, sendStart, sendStop }))
 
 // The agent pref, to prove a continuation ignores it (#831).
 let prefs: Preferences = {}
@@ -34,12 +35,14 @@ vi.mock('./Composer.js', async () => {
       <span data-testid="composer-props">
         {JSON.stringify({ showAgentModel: props.showAgentModel, busyLabel: props.submitBusyLabel, placeholder: props.placeholder })}
       </span>
+      {/* The empty-box slot control (#1455), rendered so the Stop/Resume tests can press it. */}
+      {props.idleControl}
     </div>
   ))
   return { Composer }
 })
 
-const { RunComposer } = await import('./RunComposer.js')
+const { RunComposer, RESUME_MESSAGE } = await import('./RunComposer.js')
 
 function renderComposer(over: Partial<Parameters<typeof RunComposer>[0]> = {}) {
   const onRunStarted = vi.fn()
@@ -56,8 +59,57 @@ beforeEach(() => {
   prefs = {}
   sendMessage.mockReset()
   sendStart.mockReset()
+  sendStop.mockReset()
 })
 afterEach(cleanup)
+
+// One slot, three states (#1455): the empty box's submit slot holds Stop while the run is live,
+// Resume once it was stopped with a session id, and nothing (the launcher collapse) otherwise.
+describe('RunComposer slot control (#1455)', () => {
+  test('a live session offers Stop in the slot, and pressing it stops this run', async () => {
+    sendStop.mockResolvedValue(undefined)
+    renderComposer()
+    const stop = screen.getByRole('button', { name: 'Stop session' })
+    fireEvent.click(stop)
+    await waitFor(() => expect(sendStop).toHaveBeenCalledWith('p1', 'run-1'))
+    // A landed Stop must not be re-fireable while the end event is still in flight: the button
+    // stays disabled ("Stopping…") until `live` flips — the ⋮ menu's own latch.
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Stop session' }) as HTMLButtonElement).disabled).toBe(true))
+  })
+
+  test('a stopped session offers Resume, sending the stock continuation of this run (#1391)', async () => {
+    sendStart.mockResolvedValue({ ok: true, runId: 'run-1' })
+    const { onRunStarted } = renderComposer({ live: false, sessionId: 'sess-1', outcome: { ok: false, stopped: true } })
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(1))
+    const [projectId, text, kind, options] = sendStart.mock.calls[0]!
+    expect(projectId).toBe('p1')
+    expect(text).toBe(RESUME_MESSAGE)
+    expect(kind).toBe('prompt')
+    expect(options.resumeSession).toBe('sess-1')
+    expect(options.continueRunId).toBe('run-1')
+    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith(RESUME_MESSAGE, 'run-1'))
+  })
+
+  test('a refused Resume surfaces its error instead of pretending to resume (#1391)', async () => {
+    sendStart.mockResolvedValue({ ok: false, busy: true })
+    const { onRunStarted } = renderComposer({ live: false, sessionId: 'sess-1', outcome: { ok: false, stopped: true } })
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    await waitFor(() => expect(screen.getByText(/session is already active/i)).toBeTruthy())
+    expect(onRunStarted).not.toHaveBeenCalled()
+  })
+
+  test('a run that finished on its own offers neither — there is nothing to pick back up', () => {
+    renderComposer({ live: false, sessionId: 'sess-1', outcome: { ok: true, stopped: false } })
+    expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Stop session' })).toBeNull()
+  })
+
+  test('a stopped run that never reported a session id cannot offer Resume (#1322)', () => {
+    renderComposer({ live: false, outcome: { ok: false, stopped: true } })
+    expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
+  })
+})
 
 describe('RunComposer, live (#714)', () => {
   test('an ordinary submit goes into the open session as a message', async () => {

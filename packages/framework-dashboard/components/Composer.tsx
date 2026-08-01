@@ -118,8 +118,13 @@ export const Composer = forwardRef<ComposerHandle, {
    *  disclosure, so it shares that row with the resolved-options strip. Its own expandable panel
    *  drops full-width below. Only the launcher passes one. */
   resolvedRowStart?: ReactNode
+  /** Occupies the submit slot while the box is empty (#1455): the session page's Stop while the
+   *  run is live, its Resume once stopped — so Start/Stop/Resume and the send ↑ are one slot,
+   *  like Claude Code's composer. Typing swaps it for the arrow (a live send still queues), and
+   *  without one the slot keeps its collapse-when-empty behavior for the launcher. */
+  idleControl?: ReactNode
 }>(function Composer(
-  { files, addContext, removeContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showAgentModel = true, inSession = false, sessionName, contextControl, resolvedRowStart },
+  { files, addContext, removeContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showAgentModel = true, inSession = false, sessionName, contextControl, resolvedRowStart, idleControl },
   ref,
 ) {
   const [prompt, setPrompt] = useState('')
@@ -379,6 +384,10 @@ export const Composer = forwardRef<ComposerHandle, {
     </Tooltip>
   )
 
+  // One slot, three states (#1455): with an idleControl, the empty box shows it (Stop / Resume)
+  // and typing swaps in the send arrow — instead of the launcher's collapse-to-nothing.
+  const slotEl = !hasPrompt && idleControl ? idleControl : submitButton
+
   // #1073: an offline target blocks Start; say so and point back to the "Run on" gear. No auto-fallback.
   const offlineNote = targetOffline && (
     <p role="alert" className="mt-2 text-xs text-danger">
@@ -398,7 +407,7 @@ export const Composer = forwardRef<ComposerHandle, {
         <div className="min-w-0 flex-1">{editorEl}</div>
         {agentModelEl}
         {optionsGearEl}
-        {submitButton}
+        {slotEl}
         {deviceDialog}
       </div>
     )
@@ -419,7 +428,7 @@ export const Composer = forwardRef<ComposerHandle, {
           <div className="ml-auto flex items-center gap-1.5">
             {agentModelEl}
             {optionsGearEl}
-            {submitButton}
+            {slotEl}
           </div>
         </div>
       </div>

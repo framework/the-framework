@@ -188,6 +188,18 @@ test('applyEventToMeta folds the handoff report onto the meta, so list surfaces 
   assert.equal(failed.handoffReport, 'failed')
 })
 
+test('applyEventToMeta folds the merge outcome onto the meta, so the CI watch can find its PRs (#1418)', () => {
+  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  assert.equal(base.mergeOutcome, undefined)
+  const watched = applyEventToMeta(base, { kind: 'handoff', outcome: 'done', pushed: true, merge: { outcome: 'watched' } }, AT)
+  assert.equal(watched.mergeOutcome, 'watched')
+  // The already-open skip carries a merge too (#1216): a rerun finding its predecessor's PR.
+  const armed = applyEventToMeta(base, { kind: 'handoff', outcome: 'skipped', reason: 'already-open', merge: { outcome: 'auto-armed' } }, AT)
+  assert.equal(armed.mergeOutcome, 'auto-armed')
+  const noMerge = applyEventToMeta(base, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
+  assert.equal(noMerge.mergeOutcome, undefined, 'a handoff without a merge half folds nothing')
+})
+
 test('applyEventToMeta marks a thrown run as failed', () => {
   const base = metaFromEvents(RUN.slice(0, 4), AT)
   const failed = applyEventToMeta(base, { kind: 'end', ok: false, detail: 'boom' }, AT)

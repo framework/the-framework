@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ghMergePr, ghRepoAutoMerge, githubToken } from './gh.js'
+import { ghMergePr, ghPrCiStatus, ghRepoAutoMerge, githubToken } from './gh.js'
 import type { GhRunner } from './gh.js'
 
 /** A `gh` that answers with `stdout`, or rejects, and records what it was asked. */
@@ -140,6 +140,73 @@ test('a direct merge that also fails reports the second refusal (#1216)', async 
     outcome: 'failed',
     error: 'GraphQL: Base branch was modified',
   })
+})
+
+/** A `gh` whose `pr view` answers with the given rollup, and refuses `--auto` like a repo without auto-merge. */
+function watchModeGh(rollup: unknown[], calls: string[][] = []): GhRunner {
+  return async args => {
+    calls.push(args)
+    if (args.includes('--auto')) throw new Error('Pull request Auto merge is not allowed for this repository')
+    if (args[1] === 'view') return JSON.stringify({ statusCheckRollup: rollup, headRefOid: 'abc1234', headRefName: 'the-framework/x' })
+    return ''
+  }
+}
+
+test('ghPrCiStatus summarises check runs: all green is passing, one failure names itself (#1418)', async () => {
+  const green = watchModeGh([
+    { name: 'build', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    { name: 'lint', status: 'COMPLETED', conclusion: 'SKIPPED' },
+  ])
+  assert.deepEqual(await ghPrCiStatus('/repo', 9, green), {
+    checks: 'passing',
+    failed: [],
+    headSha: 'abc1234',
+    branch: 'the-framework/x',
+  })
+
+  const red = watchModeGh([
+    { name: 'build', status: 'COMPLETED', conclusion: 'FAILURE' },
+    { name: 'test', status: 'IN_PROGRESS', conclusion: null },
+  ])
+  // A concluded failure is failing even while other checks still run: more green cannot unsay it.
+  assert.equal((await ghPrCiStatus('/repo', 9, red)).checks, 'failing')
+  assert.deepEqual((await ghPrCiStatus('/repo', 9, red)).failed, ['build'])
+})
+
+test('ghPrCiStatus: still-running checks are pending, classic commit statuses count too (#1418)', async () => {
+  const pending = watchModeGh([{ name: 'build', status: 'IN_PROGRESS', conclusion: null }])
+  assert.equal((await ghPrCiStatus('/repo', 9, pending)).checks, 'pending')
+  // A classic status has no `status` field: its `state` is both progress and verdict.
+  const classicPending = watchModeGh([{ context: 'ci/legacy', state: 'PENDING' }])
+  assert.equal((await ghPrCiStatus('/repo', 9, classicPending)).checks, 'pending')
+  const classicRed = watchModeGh([{ context: 'ci/legacy', state: 'FAILURE' }])
+  assert.deepEqual((await ghPrCiStatus('/repo', 9, classicRed)).failed, ['ci/legacy'])
+})
+
+test('ghPrCiStatus: an empty rollup is none, and an unreadable gh is none too — never a green (#1418)', async () => {
+  assert.equal((await ghPrCiStatus('/repo', 9, watchModeGh([]))).checks, 'none')
+  const { gh } = fakeGh(new Error('gh: command not found'))
+  assert.deepEqual(await ghPrCiStatus('/repo', 9, gh), { checks: 'none', failed: [] })
+})
+
+test('watch mode: a refusal with checks still running answers watched, and merges nothing (#1418)', async () => {
+  // The #1406 hazard this exists for: the direct fallback used to land the PR before its first
+  // check ran. In watch mode the daemon's CI sweep merges it once the checks pass.
+  const calls: string[][] = []
+  const gh = watchModeGh([{ name: 'build', status: 'IN_PROGRESS', conclusion: null }], calls)
+  assert.deepEqual(await ghMergePr('/repo', 9, gh, { whenUnarmed: 'watch' }), { outcome: 'watched' })
+  assert.ok(!calls.some(args => args[1] === 'merge' && !args.includes('--auto')))
+})
+
+test('watch mode: a refusal with checks already green merges directly — nothing to wait for (#1418)', async () => {
+  const calls: string[][] = []
+  const gh = watchModeGh([{ name: 'build', status: 'COMPLETED', conclusion: 'SUCCESS' }], calls)
+  assert.deepEqual(await ghMergePr('/repo', 9, gh, { whenUnarmed: 'watch' }), { outcome: 'merged' })
+  assert.deepEqual(calls.at(-1), ['pr', 'merge', '9', '--squash'])
+})
+
+test('watch mode: no checks reported defers to the watch — a suite takes seconds to attach (#1418)', async () => {
+  assert.deepEqual(await ghMergePr('/repo', 9, watchModeGh([]), { whenUnarmed: 'watch' }), { outcome: 'watched' })
 })
 
 test('ghRepoAutoMerge reads the repo setting, and an unreadable answer is unknown, not "off" (#1417)', async () => {

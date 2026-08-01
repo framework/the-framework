@@ -9,7 +9,8 @@ import { readSuspendedRuns, writeSuspendedRuns, resumableRuns, readLiveMetas, li
 import { startKeyedWatcher, type KeyedWatcher } from './dashboard/keyed-watcher.js'
 import { buildInterventions, interventionKey, postInterventionsDiscord } from './dashboard/interventions.js'
 import { buildActivity, activityKey, postActivityDiscord } from './dashboard/activity.js'
-import { startAutoPm, AUTO_PM_JOBS, type AutoPmReport } from './auto-pm.js'
+import { startAutoPm, AUTO_PM_JOBS, quotaHeadroom, type AutoPmReport } from './auto-pm.js'
+import { ciFixPrompt, startCiWatch } from './ci-watch.js'
 import { releaseStalePinnedBranch } from './stale-branch.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
 import { claimedQueueEntries, promoteQueue } from './queue-promote.js'
@@ -251,6 +252,34 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   // skips a repo that is mid-rebase or index-locked rather than committing into someone's work.
   const conversationCommitter = startConversationCommitter({ projects, log })
 
+  // Watch the PRs the framework is waiting to land (#1418): merge a `watched` PR once its checks
+  // pass (the #1417/#1406 answer for repos without GitHub auto-merge), and put an agent on a
+  // watched PR whose checks fail. The merge half runs ungated — it finishes a merge the run was
+  // already armed and authorized for. The fix half starts runs on its own, so it takes the same
+  // consent the other self-starting work does: the `autoPm` preference (read per attempt, like
+  // every other per-tick gate here) and quota headroom.
+  const ciWatch = startCiWatch({
+    projects,
+    log,
+    deps: {
+      fix: async (cwd, request) => {
+        if ((await prefs()).autoPm !== true) return undefined
+        const boundary = (await deps.quota.read().catch(() => undefined))?.boundary
+        if (!quotaHeadroom(boundary).start) return undefined
+        const project = (await projects()).find(p => p.path === cwd)
+        if (!project) return undefined
+        // The fix lands on the red PR's own branch, so this run's handoff must not push or open
+        // anything of its own.
+        const result = await startUnattended(project.id, ciFixPrompt(request), {
+          autoPushBranch: false,
+          autoOpenPr: false,
+          autoMerge: false,
+        })
+        return result.ok ? result.runId : undefined
+      },
+    },
+  })
+
   // Reclaim the checkout of a session whose work has landed (#1036). A failed or stopped run keeps
   // its worktree so you can read what it was holding (#752), and nothing ever took those back — so
   // they accumulated one full checkout at a time. Once the branch is merged the checkout is the
@@ -411,6 +440,8 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       stopped = true
       stopDiscord()
       autoPm.stop()
+      // The CI watch can start fix runs, so it stops with the other run-starters.
+      ciWatch.stop()
       mergedWorktrees.stop()
       // Stop the timer here, so `flushConversations` below is a single flush past the idle window
       // rather than a wait for a poll that is no longer coming.

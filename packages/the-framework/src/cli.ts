@@ -1771,6 +1771,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     // could not happen must not read as a failed handoff, the PR is there either way.
     const merge = outcome.outcome !== 'failed' ? outcome.merge : undefined
     if (merge?.outcome === 'auto-armed') io.out('◆ Auto-merge armed: the PR lands when its checks pass.')
+    else if (merge?.outcome === 'watched') io.out('◆ Merge on green: the daemon merges the PR when its checks pass.')
     else if (merge?.outcome === 'merged') io.out('◆ Merged the PR.')
     else if (merge?.outcome === 'withheld') io.out(`◆ Merge withheld: ${mergeWithheldWhy(merge.reason)}.`)
     else if (merge?.outcome === 'failed') io.err(`✗ could not merge the PR: ${merge.error}`)

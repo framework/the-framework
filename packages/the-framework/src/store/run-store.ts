@@ -172,6 +172,16 @@ export interface RunMeta {
    */
   handoffReport?: 'done' | 'skipped' | 'failed'
   /**
+   * How the handoff's merge half went (#1418), folded from the `handoff` event's `merge` field.
+   *
+   * What the daemon's CI watch scans for: `watched` is a PR waiting for green that *this* side
+   * must merge (the repo could not arm GitHub auto-merge), `auto-armed` one GitHub will land by
+   * itself but whose checks going red is still ours to notice. On the meta because the watch
+   * reads metas, not event logs, and must survive both the run's process and the daemon's.
+   * Absent on runs from before this field, and on every run whose handoff had no merge to report.
+   */
+  mergeOutcome?: 'auto-armed' | 'merged' | 'watched' | 'withheld' | 'failed'
+  /**
    * The choice gate the run is currently parked on (#636): set when a `choice` event fires and
    * cleared when its `choice-resolved` (or the run's `end`) arrives. Present means the run is
    * paused waiting for the user's answer — the second "needs you" source after open PRs (#624).
@@ -333,6 +343,7 @@ export function applyEventToMeta(meta: RunMeta, event: FrameworkEvent, at: strin
       break
     case 'handoff':
       next.handoffReport = event.outcome
+      if (event.outcome !== 'failed' && event.merge) next.mergeOutcome = event.merge.outcome
       break
     case 'ticket':
       next.ticket = event.path

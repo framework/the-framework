@@ -136,7 +136,7 @@ export function RightRail({
   return (
     <aside
       className={cn(
-        'flex w-[27rem] shrink-0 flex-col border-l border-border',
+        'flex w-[22rem] shrink-0 flex-col border-l border-border',
       )}
     >
       {/* flex-wrap: up to 7 tabs share a w-80 rail, and without it the tail clipped (#948).

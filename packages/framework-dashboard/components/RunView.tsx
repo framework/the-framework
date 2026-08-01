@@ -13,7 +13,6 @@ import { CloudMirrorRow, CloudRunNotice } from './CloudRunNotice.js'
 import { RemoteRunNotice } from './RemoteRunNotice.js'
 import { ChangesSummary, RunChanges } from './RunChanges.js'
 import { HandoffActions, HandoffArm, HandoffSummary, RunHandoffDetails } from './RunHandoff.js'
-import { ResumeButton } from './ResumeButton.js'
 import { SessionDetails } from './SessionDetails.js'
 
 // One session's view, whether it is running or finished (#1026).
@@ -181,21 +180,9 @@ export function RunView({
             working ? (
               <HandoffArm projectId={projectId} runId={runId} state={armed} />
             ) : (
-              <>
-                {/* Resume-on-demand (#1391): Stop is pause semantics, so a stopped session's next
-                    step is offered as a button, not just a composer hint. Only once the run has
-                    reported a session id — without one there is nothing any agent could resume. */}
-                {outcome?.stopped && session?.sessionId && (
-                  <ResumeButton
-                    projectId={projectId}
-                    runId={runId}
-                    sessionId={session.sessionId}
-                    driver={session.driver}
-                    onRunStarted={onRunStarted}
-                  />
-                )}
-                <HandoffActions projectId={projectId} runId={runId} state={handoff} />
-              </>
+              // Resume-on-demand (#1391) used to lead this cluster; it now lives in the
+              // composer's submit slot (#1455), one slot with Stop and the send arrow.
+              <HandoffActions projectId={projectId} runId={runId} state={handoff} />
             )
           ) : undefined
         }

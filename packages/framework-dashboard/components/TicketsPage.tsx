@@ -37,7 +37,7 @@ function sortTickets(tickets: WorkspaceTicket[], sortBy: SortBy): WorkspaceTicke
 }
 
 // The Tickets view (#1144): every registered project's `tickets/*.md`, one section per project —
-// its own full page rather than a tab squeezed into the 27rem right rail, and cross-project rather
+// its own full page rather than a tab squeezed into the 22rem right rail, and cross-project rather
 // than scoped to whichever project happened to be selected, since the backlog is worth seeing
 // whole. Each section is its own poll-independent TicketsPanel (list, priority/topics/date, its own
 // Update-from-GitHub bar), so one project's slow read never blanks another's.

@@ -218,7 +218,7 @@ export default function Page() {
   }
 
   // Tickets (#1144): every registered project's backlog, one section each — required reading for a
-  // demo, so it gets the full width rather than the 27rem right rail. A cross-project destination
+  // demo, so it gets the full width rather than the 22rem right rail. A cross-project destination
   // like the Overview, not scoped to whichever project happened to be selected.
   const showTickets = () => {
     setAdopting(false)

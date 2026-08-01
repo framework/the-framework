@@ -1,7 +1,6 @@
-import { join } from 'node:path'
 import type { ClientChannel } from 'telefunc'
-import { FRAMEWORK_DIR, EVENTS_FILE } from '../store/index.js'
-import { contextEventsSource, resolveRunPath } from './context.js'
+import { resolveRunEventsPath } from '../store/index.js'
+import { contextEventsSource, resolveProjectPath } from './context.js'
 import type { FrameworkEvent } from '../events.js'
 import { tailEvents } from './events-tail.js'
 import { forwardStream, streamChannel } from './stream-channel.js'
@@ -15,11 +14,13 @@ import { forwardStream, streamChannel } from './stream-channel.js'
 /**
  * The events file to tail, or undefined when the project is unknown. With a `runId` this is
  * that run's own log inside its worktree (#749): since #736 a run appends there, not to the
- * project root, so streaming the project path would follow a file nothing writes to.
+ * project root, so streaming the project path would follow a file nothing writes to. Once the
+ * run has ended and its worktree is gone, the run's archived `<id>.jsonl` is that log (#1472) —
+ * tailing the project root there would stream a foreign run's journal.
  */
 async function resolveEventsPath(projectId: string, runId?: string): Promise<string | undefined> {
-  const path = await resolveRunPath(projectId, runId)
-  return path ? join(path, FRAMEWORK_DIR, EVENTS_FILE) : undefined
+  const cwd = await resolveProjectPath(projectId)
+  return cwd ? resolveRunEventsPath(cwd, runId) : undefined
 }
 
 /**

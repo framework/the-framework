@@ -149,8 +149,13 @@ export function pickedIds(picked: string | readonly string[]): string[] {
  * (guardrail #2, #165) rather than surfacing the agent's transport directly.
  */
 export type FrameworkEvent =
-  /** Emitted once at start: which agent is wrapped, the workspace, and a link. */
-  | { kind: 'session'; driver: string; workspace: string; fake: boolean; sessionLink?: string }
+  /**
+   * Emitted once at start: which agent is wrapped, the workspace, and a link. `model` is the
+   * model id the driver was started with (#1438), recorded per leg — a continuation (#762) emits
+   * its own `session` event and may run a different model, so readers fold the latest rather
+   * than pinning the first. Absent when the run left the agent on its own default.
+   */
+  | { kind: 'session'; driver: string; workspace: string; fake: boolean; sessionLink?: string; model?: string }
   /**
    * Emitted once the wrapped agent reports its real session id (not known at
    * start). Carries the live id and, when a link template was supplied, the

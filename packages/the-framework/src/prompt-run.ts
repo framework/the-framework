@@ -143,7 +143,7 @@ export async function runPrompt(opts: RunPromptOptions): Promise<RunPromptResult
   const resuming = typeof opts.resumeSessionId === 'string' && opts.resumeSessionId.length > 0
   const firstPrompt = resuming || opts.transparent || opts.antiLazyPill === false ? opts.prompt : renderSystemPrompt(tf).user
 
-  emitSessionStart({ emit, driver: opts.driver, cwd: opts.cwd, sessionLink: opts.sessionLink })
+  emitSessionStart({ emit, driver: opts.driver, cwd: opts.cwd, sessionLink: opts.sessionLink, model: opts.model })
   // Surface the exact system prompt the agent runs under (#343). The user prompts
   // ride along as `driver` `start` events, so the dashboard can show them all.
   emit({ kind: 'system-prompt', text: system })

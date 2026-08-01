@@ -23,5 +23,6 @@ The single `FrameworkEvent` union the whole run streams over — bootstrap narra
 - `usage.costUsd` is absent when the agent reports tokens but no price (#540) — which is also when no budget cap can fire.
 - `end` distinguishes `stopped` (user interrupt: Stop button / Ctrl+C) from failure, so surfaces show "stopped" rather than "failed".
 - `session-update` re-emits when the id changes — each Claude Code prompt is a fresh session — keeping the session link current.
+- `session` records the model the driver was started with (#1438), per leg: a continuation (#762) emits its own `session` event and may run a different model, so readers fold the latest rather than pinning the first; absent when the run left the agent on its own default.
 - `view.id` is stable per title so re-showing a view updates in place instead of stacking duplicates.
 - `AutoHandoffSkip.already-open` guards the one mistake the handoff must not make: opening a second PR for a branch that has one.

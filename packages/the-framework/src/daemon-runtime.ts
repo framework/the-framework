@@ -21,7 +21,7 @@ import {
   pruneWorktrees,
   readLiveMetas,
   readLiveMeta,
-  resolveRunCheckout,
+  resolveRunEventsPath,
   FRAMEWORK_DIR,
   EVENTS_FILE,
   META_FILE,
@@ -1011,14 +1011,14 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
   const remoteEventsSource: EventsSource = (_projectId, runId) => relayedRuns.get(runId)
 
   // Tail a relay-started run's own log (#1067) for the `/_relay/events` endpoint. Resolving the run's
-  // worktree is async, so a stop is returned immediately and the tail attaches once the path is known.
+  // journal is async, so a stop is returned immediately and the tail attaches once the path is known.
   const tailRelayEvents = (runId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => {
     let stop = (): void => {}
     let cancelled = false
-    void resolveRunCheckout(cwd, runId)
-      .then(checkout => {
+    void resolveRunEventsPath(cwd, runId)
+      .then(path => {
         if (cancelled) return
-        stop = tailEvents(join(checkout, FRAMEWORK_DIR, EVENTS_FILE), onEvent)
+        stop = tailEvents(path, onEvent)
       })
       .catch(() => {})
     return () => {

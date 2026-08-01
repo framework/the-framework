@@ -32,7 +32,7 @@ export {
   type RunStatus,
   type OpenStoreOptions,
 } from './run-store.js'
-export { resolveRunCheckout } from './run-checkout.js'
+export { resolveRunCheckout, resolveRunEventsPath } from './run-checkout.js'
 export {
   addWorktree,
   attachWorktree,

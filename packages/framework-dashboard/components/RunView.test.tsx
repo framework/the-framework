@@ -81,6 +81,21 @@ describe('RunView event source (#1026/#1383)', () => {
     await waitFor(() => expect(screen.getByText(/the resumed leg streamed this line/)).toBeTruthy())
   })
 
+  test("a foreign journal's events never beat this run's archive, however long (#1460)", async () => {
+    // The live channel is not guaranteed to be this run's journal: an ended run whose worktree is
+    // gone resolves to the project ROOT journal server-side, which holds whatever root run wrote
+    // it last. "The channel knows more" must not let that longer foreign feed replace the archive.
+    onRun.mockResolvedValue(ARCHIVED)
+    const foreign = [
+      { kind: 'log', message: 'a different run wrote this line' },
+      { kind: 'session', driver: 'claude-code', workspace: '/w' },
+      { kind: 'log', message: 'and its newest segment never ended' },
+    ] as FrameworkEvent[]
+    render(view({ events: foreign }))
+    await waitFor(() => expect(screen.getByText(/the archive delivered this line/)).toBeTruthy())
+    expect(screen.queryByText(/a different run wrote this line/)).toBeNull()
+  })
+
   test('an archive that catches up takes back over, bringing the epilogue events with it (#1460)', async () => {
     // A clean run's `handoff` only ever lands in the archive — the worktree journal dies with the
     // teardown — so once the feed outgrows the copy on screen the archive is re-read, and the

@@ -7,6 +7,7 @@ import { readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type Wo
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
 import { buildOverview, buildRecentRuns, buildHotTickets, collectAllTickets, type Overview, type RecentRun, type HotTicket, type ProjectTickets } from '../dashboard/overview.js'
 import { buildInterventions, type Intervention } from '../dashboard/interventions.js'
+import { buildOpenQuestions, type OpenQuestion } from '../dashboard/open-questions.js'
 import { buildActivity, type Activity } from '../dashboard/activity.js'
 import { buildDashboard, type DashboardData } from '../dashboard/dashboard.js'
 import { githubUrlFor } from '../dashboard/github.js'
@@ -222,6 +223,11 @@ export async function onHotTickets(): Promise<HotTicket[]> {
 /** The cross-project interventions queue (#632, Queue #624): open PRs that need review, newest first. */
 export async function onInterventions(): Promise<Intervention[]> {
   return withProjects(buildInterventions)
+}
+
+/** Every session's open question with its full gate (#1455), longest-waiting first: the launcher's hub. */
+export async function onOpenQuestions(): Promise<OpenQuestion[]> {
+  return withProjects(buildOpenQuestions)
 }
 
 /** The cross-project "New activity" feed (#627): recent run started/finished transitions, newest first. */

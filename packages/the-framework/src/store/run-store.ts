@@ -218,6 +218,15 @@ export interface RunMeta {
    */
   topic?: true
   /**
+   * The flow this run started under (#1467): `build` for the scope→build orchestration, `prompt`
+   * for the direct-prompt path (research and transparent runs record `prompt` too). Persisted so a
+   * continuation (#762) can re-enter the flow its first leg ran — the composer's Resume always
+   * arrives as a `prompt` start, and without this record a resumed build run ended as a bare
+   * prompt session (no synthesize framing, no backlog offer). Absent on records from before this
+   * field, which a reader treats as unknown (the continuation then keeps the prompt path).
+   */
+  kind?: 'build' | 'prompt'
+  /**
    * The project a topic run (#1120) bound itself to (#1121): set from a `bind` event when the
    * agent resolves an `await-bind-project` / `await-create-project` gate. Present means the run is
    * no longer project-less; the worktree re-home it implies is #1122.
@@ -293,6 +302,8 @@ export interface OpenStoreOptions {
   target?: 'local' | 'actions' | 'web'
   /** A project-less topic run (#1120): recorded on the meta so a reader can tell it from a project run. */
   topic?: boolean
+  /** The flow this run started under (#1467): recorded on the meta so a continuation can re-enter it. */
+  kind?: 'build' | 'prompt'
 }
 
 /**
@@ -392,6 +403,7 @@ function freshMeta(
   id?: string,
   target?: 'local' | 'actions' | 'web',
   topic?: boolean,
+  kind?: 'build' | 'prompt',
 ): RunMeta {
   return {
     version: RUN_META_VERSION,
@@ -406,6 +418,7 @@ function freshMeta(
     ...(target && target !== 'local' ? { target } : {}),
     // Only the topic flag travels; a project run is the default (absent).
     ...(topic ? { topic: true } : {}),
+    ...(kind ? { kind } : {}),
   }
 }
 
@@ -498,6 +511,13 @@ export function metaFromEvents(events: readonly FrameworkEvent[], startedAt: str
 export class RunStore {
   private tail: Promise<void> = Promise.resolve()
   private meta: RunMeta
+  /**
+   * The intent a continuation must keep (#762/#1467): a reopened run keeps its original label,
+   * but a build continuation re-runs the bootstrap, whose `scope` event carries the resume
+   * message and would relabel the row through {@link applyEventToMeta}'s normal refinement.
+   * Unset for a fresh run, where the scope event's refinement stands.
+   */
+  private pinnedIntent: string | undefined
 
   private constructor(
     private readonly fs: StoreFs,
@@ -530,13 +550,14 @@ export class RunStore {
     await fs.mkdir(dir)
     const owner = opts.owner ?? { pid: process.pid, host: hostname() }
     const clock = opts.clock ?? (() => new Date().toISOString())
-    const store = new RunStore(fs, dir, clock, freshMeta(now, opts.intent, owner, opts.id, opts.target, opts.topic))
+    const store = new RunStore(fs, dir, clock, freshMeta(now, opts.intent, owner, opts.id, opts.target, opts.topic, opts.kind))
     if (opts.continueRun) {
       // Reopen: the log stays, the row keeps its original intent, and this process takes ownership
       // so a liveness probe (#716) reads the run as alive rather than as an orphan.
       const prior = await readMetaFile(fs, store.metaPath)
       if (prior) {
         store.meta = { ...prior, status: 'running', pid: owner.pid, host: owner.host, updatedAt: now }
+        store.pinnedIntent = prior.intent
         await store.writeMeta()
         return store
       }
@@ -558,6 +579,9 @@ export class RunStore {
    */
   append(event: FrameworkEvent): Promise<void> {
     this.meta = applyEventToMeta(this.meta, event, this.clock())
+    // A continuation keeps the run's original label (#762) even through a re-entered
+    // bootstrap's scope event, which carries the resume message rather than a name (#1467).
+    if (this.pinnedIntent) this.meta = { ...this.meta, intent: this.pinnedIntent }
     this.tail = this.tail
       .then(() => this.fs.append(this.eventsPath, JSON.stringify(event) + '\n'))
       .then(() => this.writeMeta())

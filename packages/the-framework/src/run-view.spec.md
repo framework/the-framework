@@ -6,7 +6,7 @@ Pure projections of the `FrameworkEvent` stream into the dashboard's overview-ca
 - `deployPlan()`: the chosen deploy plan from the latest `deploy` bootstrap event, or null.
 - `runProgress()` (#326): latest `session-name` and whether `ready-for-merge` fired — drives the status label + dot (orange building, green ready).
 - `handoffState()` (#1102): what the session is armed to push/PR from `handoff-armed` events (latest wins; checkboxes re-emit on change) and how the handoff ended (`handoff` event: done/skipped/failed). Takes an optional seed (#1376): the opening `handoff-armed` predates the live channel's attach, so a live tab must seed from `RunRecord.handoff` or a push-only run reads as armed for a PR.
-- `sessionInfo()` (#431): driver + workspace from the opening `session` event, then id and deep link from the latest `session-update`.
+- `sessionInfo()` (#431): driver + workspace from the opening `session` event, then id and deep link from the latest `session-update`. Also the model (#1438), per leg: the latest `session` event wins, and a leg that recorded none clears it.
 
 ## Decisions
 

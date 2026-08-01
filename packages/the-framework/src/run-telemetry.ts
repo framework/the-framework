@@ -18,6 +18,8 @@ export interface SessionStartOptions {
   cwd: string
   /** The session link, literal or templated with `{sessionId}`. */
   sessionLink?: string | undefined
+  /** The model id the driver was started with (#1438), recorded on the event per leg. */
+  model?: string | undefined
 }
 
 /**
@@ -33,6 +35,7 @@ export function emitSessionStart(opts: SessionStartOptions): void {
     workspace: opts.cwd,
     fake: opts.driver.name === 'fake',
     ...(literal ? { sessionLink: literal } : {}),
+    ...(opts.model ? { model: opts.model } : {}),
   })
 }
 

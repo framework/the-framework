@@ -82,6 +82,15 @@ export function RunComposer({
   useEffect(() => {
     if (!live) setStopRequested(false)
   }, [live])
+  // The mirror latch for Resume (#1460): between the resume RPC resolving and the resumed leg's
+  // first event flipping `live`, `outcome` momentarily stops reading `stopped` — without this the
+  // slot flickered Resume → collapsed → Stop. Released when the run reads live (the normal exit)
+  // or when the row changes under the composer.
+  const [resuming, setResuming] = useState(false)
+  useEffect(() => setResuming(false), [runId])
+  useEffect(() => {
+    if (live) setResuming(false)
+  }, [live])
   const stopping = stopBusy || (stopRequested && live)
   // The last message that went through: a queued control entry is invisible until the agent
   // drains it between turns, so without this the send looked like nothing happened (#948).
@@ -161,7 +170,10 @@ export function RunComposer({
       },
       'Failed to resume the session.',
     )
-    if (result) onRunStarted?.(RESUME_MESSAGE, result.runId)
+    if (result) {
+      setResuming(true)
+      onRunStarted?.(RESUME_MESSAGE, result.runId)
+    }
   }
 
   // The empty box's slot control (#1455): Stop while live, Resume once stopped-with-an-id (#1322:
@@ -185,7 +197,7 @@ export function RunComposer({
       </TooltipTrigger>
       <TooltipContent>{stopping ? 'Stopping…' : 'Stop session'}</TooltipContent>
     </Tooltip>
-  ) : resumable && outcome?.stopped ? (
+  ) : resumable && (outcome?.stopped || resuming) ? (
     <Tooltip>
       <TooltipTrigger
         render={
@@ -193,15 +205,15 @@ export function RunComposer({
             type="button"
             size="icon-sm"
             onClick={() => void resume()}
-            disabled={starting}
+            disabled={starting || resuming}
             aria-label="Resume"
             className="h-8 w-8 shrink-0 disabled:opacity-100"
           />
         }
       >
-        {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+        {starting || resuming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-3.5 w-3.5 fill-current" />}
       </TooltipTrigger>
-      <TooltipContent>{starting ? 'Resuming…' : 'Resume the session'}</TooltipContent>
+      <TooltipContent>{starting || resuming ? 'Resuming…' : 'Resume the session'}</TooltipContent>
     </Tooltip>
   ) : undefined
 

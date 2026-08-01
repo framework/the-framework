@@ -4,7 +4,7 @@ import { handoffState, loopStatus, runProgress, sessionInfo, type LoopStatus } f
 import { onRun, onRetainedWorktrees } from '../server/reads.telefunc.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useRunHandoff } from '../lib/use-run-handoff.js'
-import { agentSettled, runOutcome } from '../lib/live-state.js'
+import { agentSettled, isRunActive, runOutcome } from '../lib/live-state.js'
 import { RunActionBar } from './RunActionBar.js'
 import { RunComposer } from './RunComposer.js'
 import { RunFeed } from './RunFeed.js'
@@ -83,10 +83,15 @@ export function RunView({
   onLoopStatus?: ((loop: LoopStatus | null) => void) | undefined
 }) {
   // The archived log, read only once the run has ended: while it runs, the channel is the truth.
+  // `archiveBehind` re-reads it whenever the live channel has outgrown the copy on screen (#1460):
+  // a resumed session streams new events while `live` is still false for a poll round-trip, and a
+  // clean run's `handoff` event only ever lands in the archive — its worktree journal is torn down
+  // with the worktree — so without this the PR line waited for a manual refresh.
+  const [archiveBehind, setArchiveBehind] = useState(0)
   const archived = useLoaded<FrameworkEvent[] | null>(
     !live && runId ? () => onRun(projectId, runId) : null,
     null,
-    [projectId, runId, live],
+    [projectId, runId, live, archiveBehind],
   )
   // Whether this run kept its worktree (#737): a failed/stopped run does, a clean one had it
   // removed when it finished. Drives the Remove button, and is cleared locally once removed so
@@ -121,7 +126,23 @@ export function RunView({
   // either (#1383): `onRun` answers `[]` both for "gone" and for "not archived yet", and a Stop
   // races the archive write — swapping the live feed for that `[]` blanked the view to "This
   // session has no events." until a manual refresh.
-  const shown = live ? events : (archived?.length ? archived : events)
+  //
+  // A STALE archive never wins either (#1460): on Resume the channel streams the new leg while
+  // `live` waits on the 2s runs poll, and serving the frozen archive for that window is what made
+  // the whole continuation land in one jolting commit — or, when the poll lost the race entirely,
+  // not render at all until a refresh. The channel is preferred the moment it knows more; the
+  // archive is re-read behind it (`archiveBehind` above) and takes back over once it has caught
+  // up, which is also how the epilogue's archive-only events reach the screen.
+  const feedAhead = events.length > (archived?.length ?? 0)
+  const shown = live ? events : archived?.length && !feedAhead ? archived : events
+  useEffect(() => {
+    if (!live && archived !== null && feedAhead) setArchiveBehind(events.length)
+  }, [live, archived, feedAhead, events.length])
+  // Live as the FEED knows it (#1460): the runs poll takes up to 2s to notice a resumed session,
+  // but its events are already streaming. The feed's own verdict drives the scroll contract and
+  // the composer slot, so the continuation renders (and Stop takes over from Resume) the moment
+  // the first event lands rather than when the poll does.
+  const feedLive = live || (feedAhead && isRunActive(events))
   const session = sessionInfo(shown)
   const progress = runProgress(shown)
   // How the run ended (#948) — read once for the composer's note and the Resume offer below.
@@ -212,7 +233,11 @@ export function RunView({
         <div className="grid flex-1 place-items-center text-sm text-muted-foreground">Loading session…</div>
       ) : (
         // A finished log is static, so it does not follow new output; it opens at the end, where
-        // the outcome, the final spend and the last changes are (#948).
+        // the outcome, the final spend and the last changes are (#948). "Live" for the scroll
+        // contract is the feed's own state, not the runs poll (#1460): a resumed session streams
+        // its new leg up to two seconds before `live` flips, and entering follow mode with the
+        // first streamed row absorbs the continuation one event at a time instead of jolting the
+        // scroller when the poll lands.
         <RunFeed
           events={shown}
           showSessionLink={false}
@@ -220,7 +245,7 @@ export function RunView({
           showStatus={false}
           showLoop={false}
           lost={lost}
-          {...(live ? {} : { stick: false, openAt: 'end' as const, emptyLabel: 'This session has no events.' })}
+          {...(feedLive ? {} : { stick: false, openAt: 'end' as const, emptyLabel: 'This session has no events.' })}
           // A web run's log dead-ends at the hand-off (#1265): the mirror box rides the tail of
           // the scroller, where "and then…" belongs. Self-nulling for every other target.
           tail={<CloudMirrorRow target={target} events={shown} />}
@@ -229,7 +254,7 @@ export function RunView({
       <RunComposer
         projectId={projectId}
         runId={runId}
-        live={live}
+        live={feedLive}
         sessionId={session?.sessionId}
         driver={session?.driver}
         files={files}

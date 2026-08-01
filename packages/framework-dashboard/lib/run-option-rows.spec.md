@@ -5,6 +5,7 @@ The Global run options as one pure-data table (#314) — `runOptionRows(preferen
 - `OptionRow`: `key` (a `Preferences` key), `label`, `title` (tooltip), `description` (#654), `checked`, optional `disabled` + `disabledReason`.
 - Main rows: Transparent, Autopilot, Technical control, Disable system prompt (vanilla), Eco, Post-merge cleanup (`onBeforeMergeableQuality`), then the publish ladder — Push branch (`autoPushBranch`, default on), Open PR (`autoOpenPr`, default on, disabled while Push branch is off — nothing to open), Auto-merge (`autoMerge`, #1216: default off, disabled while Open PR is off — nothing to merge) — then Browser. Eco sub-drops: `ecoPlanning`, `ecoResearch`, `ecoMaintenance`.
 - Rules: Transparent (#625) is the master off-switch overriding everything below it; Eco is inert under Vanilla/Transparent (no system prompt left to trim); eco sub-drops need Eco in force; `ecoMaintenance` additionally needs Post-merge cleanup (#556 moved Maintenance into the on-before-mergeable prompt); Browser needs `agent === 'claude'` (#801, rides Claude Code's MCP config).
+- `resumeOptionRows(preferences)` (#1172): the main table filtered to what a Resume continuation arms (#1467/#1469) — Autopilot, the publish ladder, Browser. The prompt-shaping rows are omitted (the resumed transcript carries its framing); same rows and rules, so the ladder gating and effective values ride along.
 
 ## Decisions
 

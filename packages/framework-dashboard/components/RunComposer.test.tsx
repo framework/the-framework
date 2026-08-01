@@ -33,7 +33,7 @@ vi.mock('./Composer.js', async () => {
         submit-new-session
       </button>
       <span data-testid="composer-props">
-        {JSON.stringify({ showAgentModel: props.showAgentModel, busyLabel: props.submitBusyLabel, placeholder: props.placeholder })}
+        {JSON.stringify({ showAgentModel: props.showAgentModel, busyLabel: props.submitBusyLabel, placeholder: props.placeholder, sessionEnded: props.sessionEnded })}
       </span>
       {/* The empty-box slot control (#1455), rendered so the Stop/Resume tests can press it. */}
       {props.idleControl}
@@ -263,5 +263,17 @@ describe('RunComposer, finished with no session id (#1026)', () => {
     expect(options.continueRunId).toBeUndefined()
     expect(sendMessage).not.toHaveBeenCalled()
     await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('hello', 'run-9'))
+  })
+})
+
+describe('the options gear follows the run state (#1172)', () => {
+  test('a live run tells the composer the session has not ended (gear hidden)', () => {
+    renderComposer({ live: true })
+    expect(JSON.parse(screen.getByTestId('composer-props').textContent ?? '{}').sessionEnded).toBe(false)
+  })
+
+  test('an ended run tells the composer so, bringing the Resume-options gear back', () => {
+    renderComposer({ live: false, sessionId: 'sess-1' })
+    expect(JSON.parse(screen.getByTestId('composer-props').textContent ?? '{}').sessionEnded).toBe(true)
   })
 })

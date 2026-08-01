@@ -56,7 +56,8 @@
 ## Features
 
 - `Auto`-model chooser (use cheap model to analyze prompt and select the right model)
-- Great maintenance
+- 10x better better PR descriptions: one-sentence description, TLDR, problems, solutions, flows (business logic), details
+- Maintenance
   - Root `MAINTENANCE.md`: lists all files (the file structure)
   - A `.maintenance.md` per file: lists all functions
   - Three ratings: maintainability, human readability, security
@@ -87,8 +88,6 @@
   - Complex implementation?
     - Not sure how secrets (e.g. production env vars) can sandboxed from AI
     - Ideally sandboxing happens on a directory-level (spanning over multiple repositories), so that AI can access multiple repos at once.
-- Improve PR overview
-  - Nice three-level PR overview: TLDR, summary, and details
 - TLDR thinking out loud
   - VALUE-MEDIUM
   - Show TLDR of the model's thinking (=> nice overview of all the thinking done during this session)

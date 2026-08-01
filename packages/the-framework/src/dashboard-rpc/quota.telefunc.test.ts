@@ -30,6 +30,22 @@ test('sendAutoPmSweep awaits the sweep, then answers with the outcomes it decide
   assert.deepEqual(result, { ok: true, outcomes: [OUTCOME] })
 })
 
+test('the outcomes survive the await — the request context does not, so the reporter is captured first (#1433)', async () => {
+  // In production the Telefunc context is request-scoped and gone after the first await, so a
+  // post-await `contextAutoPm()` read found nothing and every real click fell back to a bare
+  // `{ok:true}` — while this suite's provideTelefuncContext global happily outlived the await
+  // and hid it. Model the loss: the fake sweep yanks the context mid-flight, the way resolving
+  // the tick does for a real request.
+  provideTelefuncContext({
+    autoPmSweep: async () => {
+      await Promise.resolve()
+      provideTelefuncContext({} as never)
+    },
+    autoPm: () => ({ nextSweepAt: 0, outcomes: [OUTCOME] }),
+  } as never)
+  assert.deepEqual(await sendAutoPmSweep(), { ok: true, outcomes: [OUTCOME] })
+})
+
 test('a host with no loop still answers ok:false — the relay has nothing to trigger (#1210)', async () => {
   provideTelefuncContext({} as never)
   assert.deepEqual(await sendAutoPmSweep(), { ok: false })

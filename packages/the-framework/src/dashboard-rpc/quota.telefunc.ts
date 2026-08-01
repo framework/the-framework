@@ -62,16 +62,21 @@ export async function onAutoPm(): Promise<AutoPmReport | undefined> {
  */
 export async function sendAutoPmSweep(opts?: { drainOnly?: boolean }): Promise<{ ok: boolean; outcomes?: AutoPmOutcome[] }> {
   const sweep = contextAutoPmSweep()
+  // The reporter is captured BEFORE the sweep is awaited: the Telefunc request context does not
+  // survive an await, so a post-await `contextAutoPm()` found nothing on every real request and
+  // the card fell back to "The sweep ran." — the very fallback this RPC exists to avoid. The
+  // captured closure needs no context to be called later.
+  const reporter = contextAutoPm()
   if (!sweep) return { ok: false }
   try {
     await sweep(opts?.drainOnly ? { drainOnly: true } : undefined)
   } catch {
     return { ok: false }
   }
-  // The outcomes live on the loop's report — the same lines `onAutoPm` polls — read here once
-  // the tick has resolved, so they describe the sweep this click fired.
+  // The outcomes live on the loop's report — the same lines `onAutoPm` polls — read once the
+  // tick has resolved, so they describe the sweep this click fired.
   try {
-    const report = contextAutoPm()?.()
+    const report = reporter?.()
     return { ok: true, ...(report ? { outcomes: report.outcomes } : {}) }
   } catch {
     return { ok: true }

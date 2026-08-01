@@ -124,6 +124,23 @@ describe('RunComposer slot control (#1455)', () => {
     renderComposer({ live: false, outcome: { ok: false, stopped: true } })
     expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
   })
+
+  test('after a pressed Resume the slot holds a busy Resume until the run reads live — no flicker (#1460)', async () => {
+    sendStart.mockResolvedValue({ ok: true, runId: 'run-1' })
+    const base = { projectId: 'p1', runId: 'run-1', files: [], addContext: vi.fn(), sessionId: 'sess-1' }
+    const { rerender } = render(<RunComposer {...base} live={false} outcome={{ ok: false, stopped: true }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(1))
+    // The resumed leg's first events momentarily stop `outcome` reading `stopped` while the runs
+    // poll still says not-live: the slot used to flicker Resume → collapsed → Stop through here.
+    rerender(<RunComposer {...base} live={false} outcome={undefined} />)
+    const held = screen.getByRole('button', { name: 'Resume' })
+    expect((held as HTMLButtonElement).disabled).toBe(true)
+    // The run reads live: the latch releases and the slot hands over to Stop.
+    rerender(<RunComposer {...base} live outcome={undefined} />)
+    expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Stop session' })).toBeTruthy()
+  })
 })
 
 describe('RunComposer, live (#714)', () => {

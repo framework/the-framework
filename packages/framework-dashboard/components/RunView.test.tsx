@@ -66,6 +66,32 @@ describe('RunView event source (#1026/#1383)', () => {
     await waitFor(() => expect(onRun).toHaveBeenCalledWith('p1', 'run-1'))
     await waitFor(() => expect(screen.getByText('This session has no events.')).toBeTruthy())
   })
+
+  test('a stale archive never hides a resumed leg: the channel wins the moment it knows more (#1460)', async () => {
+    // On Resume the new leg streams over the channel while `live` waits on the 2s runs poll.
+    // Serving the frozen archive for that window rendered nothing of the continuation — or, when
+    // the poll lost the race outright, nothing until a manual refresh.
+    onRun.mockResolvedValue(ARCHIVED)
+    const resumed = [
+      ...ARCHIVED,
+      { kind: 'session', driver: 'claude-code', workspace: '/w' },
+      { kind: 'log', message: 'the resumed leg streamed this line' },
+    ] as FrameworkEvent[]
+    render(view({ events: resumed }))
+    await waitFor(() => expect(screen.getByText(/the resumed leg streamed this line/)).toBeTruthy())
+  })
+
+  test('an archive that catches up takes back over, bringing the epilogue events with it (#1460)', async () => {
+    // A clean run's `handoff` only ever lands in the archive — the worktree journal dies with the
+    // teardown — so once the feed outgrows the copy on screen the archive is re-read, and the
+    // re-read is how the PR line reaches the screen without a manual refresh.
+    const ahead = [...ARCHIVED, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'end', ok: true }] as FrameworkEvent[]
+    const full = [...ahead, { kind: 'handoff', outcome: 'done', pushed: true }] as FrameworkEvent[]
+    onRun.mockResolvedValueOnce(ARCHIVED).mockResolvedValue(full)
+    render(view({ events: ahead }))
+    await waitFor(() => expect(onRun.mock.calls.length).toBeGreaterThanOrEqual(2))
+    await waitFor(() => expect(screen.getByText(/branch pushed/)).toBeTruthy())
+  })
 })
 
 // The Resume offer (#1391) moved into the composer's submit slot (#1455): its when-offered rules

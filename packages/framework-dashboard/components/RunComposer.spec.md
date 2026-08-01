@@ -8,6 +8,7 @@ One composer for a session, live or finished (#1026): the editor stays mounted a
 - `Note` says what a send will do; a successful live send shows "Queued — the session reads it between turns: …" since a queued control entry is otherwise invisible (#948); ended notes distinguish failed/stopped/ended via `outcome`.
 - Wraps `Composer` with `showAgentModel={false}`, `inSession`, per-state busy label (Sending…/Resuming…/Starting…) and placeholder.
 - The empty box's submit slot is the session's control (#1455), via `Composer`'s `idleControl`: **Stop** (square icon → `sendStop`, with the ⋮ menu's stays-"Stopping…"-until-`live`-flips latch) while the run is live; **Resume** (play icon) once the run ended stopped AND reported a session id (#1322) — the action-bar ResumeButton (#1391) relocated, sending the same stock `RESUME_MESSAGE` continuation (`resumeSession` + `continueRunId`, run's own agent). Typing swaps the slot back to the send ↑; ended any other way, the slot collapses as at the launcher.
+- The Resume latch (#1460), Stopping's mirror: a pressed Resume holds the slot as a disabled busy Resume until `live` flips (or the row changes) — between the RPC resolving and the resumed leg's first event, `outcome` momentarily stops reading `stopped` and the slot used to flicker Resume → collapsed → Stop.
 
 ## Decisions
 

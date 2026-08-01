@@ -1051,3 +1051,46 @@ test('a hand-off run does not stay open for messages (#1225)', async () => {
   const timer = new Promise<'waited'>(resolve => setTimeout(() => resolve('waited'), 2000).unref())
   assert.notEqual(await Promise.race([run.then(() => 'ended' as const), timer]), 'waited')
 })
+
+test('runFramework resumes a stopped leg: session resumed, message sent verbatim (#1467)', async () => {
+  const fd = fakeDriver()
+  let startedWith: { resumeSessionId?: string } | undefined
+  const prompts: string[] = []
+  const driver: Driver = {
+    name: 'fake',
+    start: async opts => {
+      startedWith = opts
+      const session = await fd.start(opts)
+      // Explicit delegation rather than a spread: the fake session's methods live on its
+      // prototype, so a spread would silently drop `dispose`.
+      const wrapped: DriverSession = {
+        id: session.id,
+        cwd: session.cwd,
+        prompt: (text, promptOpts) => {
+          prompts.push(text)
+          return session.prompt(text, promptOpts)
+        },
+        dispose: () => session.dispose(),
+      }
+      return wrapped
+    },
+  }
+  const events: FrameworkEvent[] = []
+  const RESUME = 'Resume: continue where the previous leg stopped.'
+  await runFramework({
+    intent: RESUME,
+    driver,
+    cwd: '/tmp/ws',
+    signals: FAKE_SIGNALS,
+    resumeSessionId: 'sess-42',
+    onEvent: e => events.push(e),
+  })
+  // The driver resumed the prior conversation rather than starting a new one.
+  assert.equal(startedWith?.resumeSessionId, 'sess-42')
+  // The continuation message went out verbatim — no build/extend prompt re-framing (#782).
+  assert.equal(prompts[0], RESUME)
+  // The flow still ran as a build: the bootstrap narration (synthesize included) rode along.
+  assert.ok(
+    events.some(e => e.kind === 'bootstrap' && e.event.type === 'build' && e.event.event.type === 'synthesize'),
+  )
+})

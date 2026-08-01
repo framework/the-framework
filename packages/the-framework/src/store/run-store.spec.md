@@ -30,6 +30,7 @@ Persisted orchestration state (#211): an append-only JSONL log of `FrameworkEven
 ## Flows
 
 - fresh run: `open(fresh)` → archivePriorRun (crash rescue) → truncate log → writeMeta → `append(event)`* (fold + chained JSONL append + meta rewrite) → `close()` → archiveRun.
-- continue run (#762): `open(continueRun)` → read prior meta → flip to `running` under this pid/host → same append/close cycle into the same log.
+- continue run (#762): `open(continueRun)` → read prior meta → flip to `running` under this pid/host → same append/close cycle into the same log. The prior intent is pinned for the reopened store's lifetime (#1467): a build continuation re-runs the bootstrap, whose `scope` event carries the resume message, and the normal refinement fold would relabel the row — fresh runs keep the refinement.
+- `RunMeta.kind` (#1467): the flow the run started under (`build` | `prompt`), seeded at `open` and preserved through a continuation — what lets the CLI route a continuation back into the flow its first leg ran. Absent on older records (reads as unknown → continuation keeps the prompt path).
 - boot reconcile: `reconcileOrphanedRuns` → flip dead-`running` archived metas → stop+archive dead live run → flip+archive dead worktree runs → count.
 - dashboard list: `readAllRuns` = readLiveMetas (root + worktrees, self-healing) ⊕ listRuns (archives), live wins.

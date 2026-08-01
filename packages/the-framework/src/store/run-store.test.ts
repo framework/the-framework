@@ -782,3 +782,23 @@ test('reconcileOrphanedRuns ends a dead worktree run in place and in the archive
   assert.equal(lastEvent(fs.files.get(join(worktreeAt('wt1'), '.the-framework', 'events.jsonl'))!)['kind'], 'end')
   assert.equal(lastEvent(fs.files.get(join(CWD, '.the-framework', 'runs', 'wt1.jsonl'))!)['kind'], 'end')
 })
+
+test('open records the run flow, and a continuation preserves the first leg\'s (#1467)', async () => {
+  const fs = memFs()
+  const store = await RunStore.open(CWD, { fs, fresh: true, now: AT, kind: 'build' })
+  assert.equal(store.snapshot().kind, 'build')
+  // The composer's Resume arrives as a prompt start; the reopened meta keeps the build record.
+  const reopened = await RunStore.open(CWD, { fs, fresh: true, continueRun: true, now: AT, kind: 'prompt' })
+  assert.equal(reopened.snapshot().kind, 'build')
+})
+
+test('a continuation keeps its original label through a re-entered scope event (#1467)', async () => {
+  const fs = memFs()
+  const first = await RunStore.open(CWD, { fs, fresh: true, now: AT, intent: 'build a thing', kind: 'build' })
+  await first.append({ kind: 'end', ok: false, stopped: true })
+  // The build continuation re-runs the bootstrap, whose scope event carries the resume message —
+  // the reopened run keeps its original intent (#762), not the message that woke it.
+  const resumed = await RunStore.open(CWD, { fs, fresh: true, continueRun: true, now: AT })
+  await resumed.append({ kind: 'bootstrap', event: { type: 'scope', scope: 'full', intent: 'Resume: keep going.' } })
+  assert.equal(resumed.snapshot().intent, 'build a thing')
+})

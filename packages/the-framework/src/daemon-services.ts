@@ -113,8 +113,11 @@ function readPrefs(env: NodeJS.ProcessEnv): Promise<Preferences> {
  * the same layer order the launcher uses, so a run started by the daemon and a run started by hand
  * differ only in who asked for it. An unreadable tier falls back to empty rather than failing the
  * start: the defaults are what the run would have used anyway.
+ *
+ * Exported for the daemon's continuation starts (#1467): a dashboard Resume sends only its seed
+ * (`resumeSession` + `continueRunId`), so these are the base its options overlay.
  */
-async function resolveProjectRunOptions(id: string, env: NodeJS.ProcessEnv): Promise<StartRunOptions> {
+export async function resolveProjectRunOptions(id: string, env: NodeJS.ProcessEnv): Promise<StartRunOptions> {
   const global = await readPrefs(env)
   const project = await readProjectPreferences(id, undefined, env).catch(() => undefined)
   const path = (await listProjects(undefined, env).catch(() => [])).find(p => p.id === id)?.path
@@ -511,4 +514,5 @@ export async function resumeSuspendedRuns(
  * the whole conversation: the only thing it is missing is why it suddenly stopped mid-task.
  */
 export const RESUME_PROMPT =
-  'This session was interrupted when The Framework restarted, not by anyone asking you to stop. Look at what you had already done, then carry on from there.'
+  'This session was interrupted when The Framework restarted, not by anyone asking you to stop. Look at what you had already done, then carry on from there. ' +
+  'The session lifecycle still applies: once the work is genuinely finished with nothing left to do, call setReadyForMerge() — without it the finished work is never merged.'

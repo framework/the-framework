@@ -16,7 +16,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
  * the restart framing that does not apply here.
  */
 export const RESUME_MESSAGE =
-  'This session was stopped before it finished, not because the work was done. Look at what you had already done, then carry on from there.'
+  'This session was stopped before it finished, not because the work was done. Look at what you had already done, then carry on from there. ' +
+  'The session lifecycle still applies: once the work is genuinely finished with nothing left to do, call setReadyForMerge() — without it the finished work is never merged.'
 
 // One composer for a session, live or finished (#1026).
 //

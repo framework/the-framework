@@ -26,7 +26,8 @@ Everything the daemon runs in the background beside serving the dashboard: Disco
 - Chat has no project picker: a Discord message with no bound run starts a run in the daemon's home project, with `via: DISCORD_VIA` so even the opening turn is filed under Discord (#917).
 - A bot token with the `discordBot` preference off logs a one-line notice — otherwise the bot connects and ignores everything, which reads as broken rather than off.
 - Auto PM opt-outs and concurrency are global, like the master switch: the rotation is one schedule for the machine, not one per repo.
-- `RESUME_PROMPT` tells the resumed agent (which has its whole session) the one thing it is missing: why it suddenly stopped.
+- `RESUME_PROMPT` tells the resumed agent (which has its whole session) the one thing it is missing: why it suddenly stopped — and reminds it the lifecycle still applies (#1467): finished work still takes `setReadyForMerge()`, or the armed merge is withheld and the PR opens as a draft. The composer's `RESUME_MESSAGE` carries the same reminder.
+- `resolveProjectRunOptions` is exported (#1467) as the base a continuation start overlays under its explicit options (daemon-runtime's `onStart`).
 
 ## Flows
 

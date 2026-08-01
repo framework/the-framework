@@ -133,7 +133,16 @@ export function RunView({
   // not render at all until a refresh. The channel is preferred the moment it knows more; the
   // archive is re-read behind it (`archiveBehind` above) and takes back over once it has caught
   // up, which is also how the epilogue's archive-only events reach the screen.
-  const feedAhead = events.length > (archived?.length ?? 0)
+  //
+  // "Knows more" is only trustworthy when the channel is this run's OWN journal. It is not
+  // guaranteed to be: an ended run whose worktree is gone resolves to the project ROOT journal
+  // server-side (resolveRunCheckout's fallback), and that file holds whatever root run wrote it
+  // last — a longer foreign feed must never beat the run's archive. The archive is the run's own
+  // record, so its opening event is the fingerprint the channel has to match; an unloaded or
+  // empty archive can't be checked and keeps the pre-existing show-the-feed fallback.
+  const sameJournal =
+    !archived?.length || events.length === 0 || JSON.stringify(events[0]) === JSON.stringify(archived[0])
+  const feedAhead = sameJournal && events.length > (archived?.length ?? 0)
   const shown = live ? events : archived?.length && !feedAhead ? archived : events
   useEffect(() => {
     if (!live && archived !== null && feedAhead) setArchiveBehind(events.length)

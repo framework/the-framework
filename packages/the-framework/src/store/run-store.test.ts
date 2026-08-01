@@ -168,6 +168,18 @@ test('metaFromEvents reconstructs the same snapshot as live appends', async () =
   assert.equal(meta.startedAt, AT)
 })
 
+test('applyEventToMeta records the model per leg — the latest session event wins, an unrecorded one clears it (#1438)', () => {
+  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const first = applyEventToMeta(base, { kind: 'session', driver: 'claude', workspace: '/w', fake: false, model: 'fable' }, AT)
+  assert.equal(first.model, 'fable')
+  // A continuation leg may run a different model: fold, don't pin.
+  const second = applyEventToMeta(first, { kind: 'session', driver: 'claude', workspace: '/w', fake: false, model: 'sonnet' }, AT)
+  assert.equal(second.model, 'sonnet')
+  // A leg that left the agent on its own default is unknown, not the prior leg's model.
+  const bare = applyEventToMeta(second, { kind: 'session', driver: 'claude', workspace: '/w', fake: false }, AT)
+  assert.equal(bare.model, undefined)
+})
+
 test('applyEventToMeta mirrors the merge arming onto the meta, so a mid-run tab can read it (#1382)', () => {
   const base = metaFromEvents(RUN.slice(0, 4), AT)
   const armed = applyEventToMeta(base, { kind: 'handoff-armed', push: true, pr: true, merge: true }, AT)

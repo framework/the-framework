@@ -227,6 +227,13 @@ export interface RunMeta {
    */
   kind?: 'build' | 'prompt'
   /**
+   * The model id the current leg's agent was started with (#1438), folded from each leg's
+   * `session` event — a continuation (#762) may run a different model than the first leg, so
+   * the latest leg wins rather than the first pinning it. Absent when the leg left the agent
+   * on its own default (and on records from before this field).
+   */
+  model?: string
+  /**
    * The project a topic run (#1120) bound itself to (#1121): set from a `bind` event when the
    * agent resolves an `await-bind-project` / `await-create-project` gate. Present means the run is
    * no longer project-less; the worktree re-home it implies is #1122.
@@ -317,6 +324,10 @@ export function applyEventToMeta(meta: RunMeta, event: FrameworkEvent, at: strin
       next.driver = event.driver
       next.workspace = event.workspace
       if (event.sessionLink) next.sessionLink = event.sessionLink
+      // Per-leg (#1438): a leg that recorded no model leaves it unknown rather than
+      // inheriting the prior leg's — the agent may have resolved a different default.
+      if (event.model) next.model = event.model
+      else delete next.model
       break
     case 'session-update':
       next.sessionId = event.sessionId

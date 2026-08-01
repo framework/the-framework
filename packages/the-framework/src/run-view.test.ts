@@ -56,6 +56,16 @@ test('sessionInfo keeps the workspace the run used, so a removed worktree is sti
   assert.equal(sessionInfo(events)?.sessionId, 'sess-1')
 })
 
+test('sessionInfo carries the model per leg — the latest session event wins, an unrecorded one clears it (#1438)', () => {
+  const one: FrameworkEvent[] = [{ kind: 'session', driver: 'claude', workspace: '/w', fake: false, model: 'fable' }]
+  assert.equal(sessionInfo(one)?.model, 'fable')
+  // A continuation leg re-emits session and may run a different model: the reader folds, not pins.
+  const two: FrameworkEvent[] = [...one, { kind: 'session', driver: 'claude', workspace: '/w', fake: false, model: 'sonnet' }]
+  assert.equal(sessionInfo(two)?.model, 'sonnet')
+  const bare: FrameworkEvent[] = [...two, { kind: 'session', driver: 'claude', workspace: '/w', fake: false }]
+  assert.equal(sessionInfo(bare)?.model, undefined)
+})
+
 test('deployPlan returns the chosen deploy target from the deploy event; latest wins (#433)', () => {
   const boot = (event: Record<string, unknown>): FrameworkEvent => ({ kind: 'bootstrap', event: event as never })
   assert.equal(deployPlan([{ kind: 'log', message: 'x' }]), null) // no deploy yet

@@ -20,7 +20,7 @@ vi.mock('../server/control.telefunc.js', () => ({
 
 // The frame around the feed is not under test: the bar and composer reach for git and session
 // state of their own, and the swap decision this file cares about is visible in the feed alone.
-// The bar's `actions` slot IS rendered — the Resume offer (#1391) lives there.
+// The bar's `actions` slot IS rendered, so the handoff cluster stays reachable.
 vi.mock('./RunActionBar.js', () => ({ RunActionBar: ({ actions }: { actions?: unknown }) => <>{actions}</> }))
 vi.mock('./RunComposer.js', () => ({ RunComposer: () => null }))
 
@@ -68,30 +68,5 @@ describe('RunView event source (#1026/#1383)', () => {
   })
 })
 
-// Resume-on-demand (#1391): Stop is pause semantics, so a stopped session's next step is a
-// Resume button in the bar — offered exactly when an agent could act on it (a session id was
-// reported, #1322) and the ending was a Stop, not a finish.
-describe('RunView resume offer (#1391)', () => {
-  const SESSION = { kind: 'session', driver: 'claude', fake: false, workspace: '/w' }
-  const SESSION_ID = { kind: 'session-update', sessionId: 'sess-1' }
-
-  test('a stopped run with a session id offers Resume', async () => {
-    onRun.mockResolvedValue([SESSION, SESSION_ID, { kind: 'end', ok: false, stopped: true }] as FrameworkEvent[])
-    render(view({ events: [] }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Resume' })).toBeTruthy())
-  })
-
-  test('a run that finished on its own does not — there is nothing to pick back up', async () => {
-    onRun.mockResolvedValue([SESSION, SESSION_ID, { kind: 'end', ok: true, stopped: false }] as FrameworkEvent[])
-    render(view({ events: [] }))
-    await waitFor(() => expect(onRun).toHaveBeenCalledWith('p1', 'run-1'))
-    expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
-  })
-
-  test('a stopped run that never reported a session id cannot offer it', async () => {
-    onRun.mockResolvedValue([SESSION, { kind: 'end', ok: false, stopped: true }] as FrameworkEvent[])
-    render(view({ events: [] }))
-    await waitFor(() => expect(onRun).toHaveBeenCalledWith('p1', 'run-1'))
-    expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
-  })
-})
+// The Resume offer (#1391) moved into the composer's submit slot (#1455): its when-offered rules
+// are RunComposer's now, tested there — RunView only hands `outcome` + `sessionId` down.

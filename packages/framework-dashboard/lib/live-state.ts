@@ -1,4 +1,4 @@
-import type { FrameworkEvent, ChoiceRequest } from '@gemstack/the-framework'
+import type { FrameworkEvent, ChoiceRequest, RunMeta } from '@gemstack/the-framework'
 
 // Live-run state derived from the event stream — kept pure so it can be driven and
 // tested on its own, away from React. The dashboard is a projection of the same
@@ -148,6 +148,23 @@ export function isPublishing(events: readonly FrameworkEvent[]): boolean {
     if (event.kind === 'handoff-armed') armedPush = event.push
   }
   return armedPush === true
+}
+
+/**
+ * {@link isPublishing}, but off a run's meta snapshot instead of its event log — for the list
+ * surfaces (the Recent-sessions rail) that only ever hold a {@link RunMeta} (#1455). The rail
+ * said "done" while the session's own pill still said "publishing…": `status` flips to `done`
+ * the moment `end` lands, and until the `handoff` fold (meta version 2) the report never
+ * reached the meta, so a list could not know the epilogue was still pushing.
+ *
+ * The version gate is the old-records guard: a meta from before the fold has no
+ * `handoffReport` even though its handoff reported long ago, so only a version ≥ 2 record —
+ * one whose writer folds the event — may read the field's absence as "still in flight".
+ * `handoff.push` must be affirmatively on, the same rule as the event-side check: nothing to
+ * wait for when the epilogue was never armed to push.
+ */
+export function isMetaPublishing(meta: RunMeta): boolean {
+  return meta.version >= 2 && meta.status === 'done' && meta.handoff?.push === true && meta.handoffReport === undefined
 }
 
 /**

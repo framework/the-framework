@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import type { FrameworkEvent } from '@gemstack/the-framework'
-import { agentSettled, agentViews, pendingChoices, isPublishing, isRunActive, currentRunEvents, runOutcome, actionsRunUrl } from './live-state.js'
+import type { FrameworkEvent, RunMeta } from '@gemstack/the-framework'
+import { agentSettled, agentViews, pendingChoices, isPublishing, isMetaPublishing, isRunActive, currentRunEvents, runOutcome, actionsRunUrl } from './live-state.js'
 
 const view = (id: string, title: string, markdown: string): FrameworkEvent => ({ kind: 'view', id, title, markdown })
 const choice = (id: string, title: string): FrameworkEvent => ({
@@ -119,6 +119,39 @@ describe('isPublishing', () => {
     const resumedEnded = [...firstSegment, { kind: 'session' }, { kind: 'end', ok: true }] as FrameworkEvent[]
     expect(isPublishing(resumedEnded)).toBe(true)
     expect(isPublishing([...resumedEnded, handoff('done')])).toBe(false)
+  })
+})
+
+describe('isMetaPublishing', () => {
+  const meta = (over: Partial<RunMeta>): RunMeta => ({
+    version: 2,
+    status: 'done',
+    id: 'r1',
+    startedAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    passes: 1,
+    handoff: { push: true, pr: true },
+    ...over,
+  })
+
+  test('open between a clean end and the folded handoff report (#1455)', () => {
+    expect(isMetaPublishing(meta({}))).toBe(true)
+    for (const report of ['done', 'skipped', 'failed'] as const) {
+      expect(isMetaPublishing(meta({ handoffReport: report }))).toBe(false)
+    }
+  })
+
+  test('no window while running, on an unclean end, or with the push rung off', () => {
+    expect(isMetaPublishing(meta({ status: 'running' }))).toBe(false)
+    expect(isMetaPublishing(meta({ status: 'stopped' }))).toBe(false)
+    expect(isMetaPublishing(meta({ status: 'failed' }))).toBe(false)
+    expect(isMetaPublishing(meta({ handoff: { push: false, pr: false } }))).toBe(false)
+    const { handoff: _handoff, ...unarmed } = meta({})
+    expect(isMetaPublishing(unarmed as RunMeta)).toBe(false)
+  })
+
+  test('a pre-fold record (version 1) never reads as publishing — its report just never landed', () => {
+    expect(isMetaPublishing(meta({ version: 1 }))).toBe(false)
   })
 })
 

@@ -55,6 +55,34 @@ describe('RunHistory (#785)', () => {
     expect(container.querySelector('.animate-pulse')).toBeNull()
   })
 
+  test('an ended run armed to publish reads as publishing… until the handoff report folds in (#1455)', () => {
+    const publishing = run({ version: 2, status: 'done', handoff: { push: true, pr: true } })
+    const { container } = renderRail(
+      <RunHistory projectId="p1" runs={[publishing]} selectedRunId={null} onSelect={() => {}} />,
+    )
+    expect(screen.getByText('publishing…')).toBeTruthy()
+    expect(screen.queryByText('done')).toBeNull()
+    expect(container.querySelector('.animate-pulse')).toBeTruthy()
+  })
+
+  test('a run whose handoff reported — and a pre-fold record — read as plain done (#1455)', () => {
+    // The reported run's window is closed; the version-1 record predates the fold, so its
+    // missing report says nothing and must not read as forever-publishing.
+    renderRail(
+      <RunHistory
+        projectId="p1"
+        runs={[
+          run({ id: 'run-1', version: 2, status: 'done', handoff: { push: true, pr: true }, handoffReport: 'done' }),
+          run({ id: 'run-2', version: 1, status: 'done', handoff: { push: true, pr: true } }),
+        ]}
+        selectedRunId={null}
+        onSelect={() => {}}
+      />,
+    )
+    expect(screen.queryByText('publishing…')).toBeNull()
+    expect(screen.getAllByText('done').length).toBe(2)
+  })
+
   test('a session selected before its row lands highlights the starting row (#784)', () => {
     // Start navigates to the run's id right away; its run.json, and so its row, arrives a beat
     // later. The highlight belongs on the optimistic row standing in for it, not on the home row.

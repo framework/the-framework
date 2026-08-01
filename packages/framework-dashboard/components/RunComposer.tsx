@@ -1,10 +1,22 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Loader2, Play, Square } from 'lucide-react'
 import { agentForDriver } from '@gemstack/the-framework/client'
 import { Composer, type ComposerHandle } from './Composer.js'
-import { sendMessage } from '../server/control.telefunc.js'
+import { sendMessage, sendStop } from '../server/control.telefunc.js'
 import { useAction } from '../lib/use-action.js'
 import { useStartRun } from '../lib/use-start-run.js'
 import type { RunOutcome } from '../lib/live-state.js'
+import { Button } from './ui/button.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
+
+/**
+ * What a Resume press asks the agent to do (#1391). The resumed agent has its whole conversation
+ * back — the only thing it is missing is why it stopped, and "the user pressed Stop" must not
+ * read as "the work was done". The wording mirrors the daemon's own RESUME_PROMPT (#923), minus
+ * the restart framing that does not apply here.
+ */
+export const RESUME_MESSAGE =
+  'This session was stopped before it finished, not because the work was done. Look at what you had already done, then carry on from there.'
 
 // One composer for a session, live or finished (#1026).
 //
@@ -19,6 +31,11 @@ import type { RunOutcome } from '../lib/live-state.js'
 //   - ended, resumable → a fresh run seeded with `--resume <sessionId>`, continuing this run (#720)
 //   - ended, no id     → a new session carrying the text, which is all that is left to offer
 // A new-session preset (#959) always starts its own run, in every one of those states.
+//
+// The empty box's submit slot is the session's control (#1455): Stop while the run is live (the
+// pause that used to hide in the ⋮ menu), Resume once it was stopped (the offer that used to sit
+// in the action bar, #1391). Typing swaps the slot back to the send ↑ — one slot, three states,
+// like Claude Code's composer.
 export function RunComposer({
   projectId,
   runId,
@@ -54,6 +71,18 @@ export function RunComposer({
   const composerRef = useRef<ComposerHandle>(null)
   const { busy, error, run } = useAction()
   const { busy: starting, error: startError, start } = useStartRun()
+  // The slot's Stop (#1455), its own action so a message send's busy beat cannot read as
+  // "stopping". A landed Stop stays "Stopping…" until the end event flips `live`, so it cannot
+  // be re-fired — the same latch the ⋮ menu's Stop keeps. Released the moment `live` drops, not
+  // only on a run switch: a Resume continues the SAME run (#762), so a latch keyed to the run id
+  // alone re-engaged on the resumed session and froze its Stop as a disabled spinner.
+  const { busy: stopBusy, error: stopError, run: runStop } = useAction()
+  const [stopRequested, setStopRequested] = useState(false)
+  useEffect(() => setStopRequested(false), [runId])
+  useEffect(() => {
+    if (!live) setStopRequested(false)
+  }, [live])
+  const stopping = stopBusy || (stopRequested && live)
   // The last message that went through: a queued control entry is invisible until the agent
   // drains it between turns, so without this the send looked like nothing happened (#948).
   const [queued, setQueued] = useState<string | null>(null)
@@ -110,10 +139,78 @@ export function RunComposer({
     }
   }
 
+  const stopSession = () =>
+    void runStop(() => sendStop(projectId, runId ?? undefined).then(() => true), 'Could not stop the session.').then(result => {
+      if (result) setStopRequested(true)
+    })
+
+  // The action-bar ResumeButton's continuation (#1391), moved into the slot: the same `prompt`
+  // run seeded with the session id — same row, same branch, same agent conversation — carrying
+  // the stock RESUME_MESSAGE instead of typed text.
+  const resume = async () => {
+    if (starting || !sessionId) return
+    const agent = agentForDriver(driver)
+    const result = await start(
+      projectId,
+      RESUME_MESSAGE,
+      'prompt',
+      {
+        resumeSession: sessionId,
+        ...(runId ? { continueRunId: runId } : {}),
+        ...(agent && agent !== 'claude' ? { agent } : {}),
+      },
+      'Failed to resume the session.',
+    )
+    if (result) onRunStarted?.(RESUME_MESSAGE, result.runId)
+  }
+
+  // The empty box's slot control (#1455): Stop while live, Resume once stopped-with-an-id (#1322:
+  // without a session id there is nothing any agent could resume). Ended any other way, the slot
+  // keeps the launcher's collapse-when-empty.
+  const idleControl = live ? (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            size="icon-sm"
+            onClick={stopSession}
+            disabled={stopping}
+            aria-label="Stop session"
+            className="h-8 w-8 shrink-0 disabled:opacity-100"
+          />
+        }
+      >
+        {stopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-3 w-3 fill-current" />}
+      </TooltipTrigger>
+      <TooltipContent>{stopping ? 'Stopping…' : 'Stop session'}</TooltipContent>
+    </Tooltip>
+  ) : resumable && outcome?.stopped ? (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            size="icon-sm"
+            onClick={() => void resume()}
+            disabled={starting}
+            aria-label="Resume"
+            className="h-8 w-8 shrink-0 disabled:opacity-100"
+          />
+        }
+      >
+        {starting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+      </TooltipTrigger>
+      <TooltipContent>{starting ? 'Resuming…' : 'Resume the session'}</TooltipContent>
+    </Tooltip>
+  ) : undefined
+
+  const surfacedError = error ?? startError ?? stopError
+
   return (
     <div className="p-2">
-      <Note live={live} resumable={resumable} outcome={outcome} queued={queued} muted={Boolean(error ?? startError)} />
-      {(error ?? startError) && <p role="alert" className="mb-1 px-2 text-xs text-danger">{error ?? startError}</p>}
+      <Note live={live} resumable={resumable} outcome={outcome} queued={queued} muted={Boolean(surfacedError)} />
+      {surfacedError && <p role="alert" className="mb-1 px-2 text-xs text-danger">{surfacedError}</p>}
       <Composer
         ref={composerRef}
         files={files}
@@ -126,6 +223,7 @@ export function RunComposer({
         showAgentModel={false}
         inSession
         sessionName={sessionName}
+        idleControl={idleControl}
         placeholder={
           live
             ? 'Message the session…  ( / commands · < tags · @ projects · # files )'

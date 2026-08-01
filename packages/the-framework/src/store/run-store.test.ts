@@ -177,6 +177,17 @@ test('applyEventToMeta mirrors the merge arming onto the meta, so a mid-run tab 
   assert.deepEqual(old.handoff, { push: true, pr: false })
 })
 
+test('applyEventToMeta folds the handoff report onto the meta, so list surfaces can tell publishing from done (#1455)', () => {
+  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  assert.equal(base.handoffReport, undefined, 'no report until the epilogue speaks')
+  const done = applyEventToMeta(base, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
+  assert.equal(done.handoffReport, 'done')
+  const skipped = applyEventToMeta(base, { kind: 'handoff', outcome: 'skipped', reason: 'not-armed' }, AT)
+  assert.equal(skipped.handoffReport, 'skipped')
+  const failed = applyEventToMeta(base, { kind: 'handoff', outcome: 'failed', step: 'push', error: 'boom' }, AT)
+  assert.equal(failed.handoffReport, 'failed')
+})
+
 test('applyEventToMeta marks a thrown run as failed', () => {
   const base = metaFromEvents(RUN.slice(0, 4), AT)
   const failed = applyEventToMeta(base, { kind: 'end', ok: false, detail: 'boom' }, AT)

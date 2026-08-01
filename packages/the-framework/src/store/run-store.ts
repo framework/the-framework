@@ -79,7 +79,7 @@ export function startedAtFromRunId(id: string): string | undefined {
 }
 
 /** Bumped when the on-disk shape changes, so a reader can detect an old file. */
-export const RUN_META_VERSION = 1
+export const RUN_META_VERSION = 2
 
 /** How a run ended (or that it is still going). */
 export type RunStatus = 'running' | 'done' | 'stopped' | 'failed'
@@ -161,6 +161,16 @@ export interface RunMeta {
    * #1382, which the reader treats as off.
    */
   handoff?: { push: boolean; pr: boolean; merge?: boolean }
+  /**
+   * How the end-of-session handoff reported back (#1455), folded from the `handoff` event.
+   *
+   * What lets a list surface — which reads meta, not the event log — tell "ended, still
+   * publishing" from "ended, published": between a clean `end` and this field, an armed run's
+   * epilogue is still pushing / opening the PR, exactly the window the session pill calls
+   * "publishing…" (#1431). Only trustworthy at {@link RunMeta.version} ≥ 2: older records never
+   * folded the event, so its absence there says nothing and must not read as forever-publishing.
+   */
+  handoffReport?: 'done' | 'skipped' | 'failed'
   /**
    * The choice gate the run is currently parked on (#636): set when a `choice` event fires and
    * cleared when its `choice-resolved` (or the run's `end`) arrives. Present means the run is
@@ -320,6 +330,9 @@ export function applyEventToMeta(meta: RunMeta, event: FrameworkEvent, at: strin
       break
     case 'handoff-armed':
       next.handoff = { push: event.push, pr: event.pr, ...(event.merge !== undefined ? { merge: event.merge } : {}) }
+      break
+    case 'handoff':
+      next.handoffReport = event.outcome
       break
     case 'ticket':
       next.ticket = event.path

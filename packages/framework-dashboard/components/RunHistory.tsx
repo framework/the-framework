@@ -5,6 +5,7 @@ import { AGENT_LABELS, agentForDriver } from '@gemstack/the-framework/client'
 import { Button, buttonVariants } from './ui/button.js'
 import { Badge } from './ui/badge.js'
 import { cn } from '../lib/utils.js'
+import { isMetaPublishing } from '../lib/live-state.js'
 import { formatRelative } from '../lib/format-date.js'
 import { STATUS_TONE } from '../lib/status-tone.js'
 import { runLabel } from '../lib/run-label.js'
@@ -245,6 +246,7 @@ export function RunHistory({
                   <SidebarMenuItem key={row.key}>
                     <RunRow
                       status={row.run.status}
+                      publishing={isMetaPublishing(row.run)}
                       intent={runLabel(row.run)}
                       driver={row.run.driver}
                       // On the Overview the project is what tells the rows apart, so it leads the meta
@@ -511,6 +513,7 @@ function RunRow({
   driver,
   dim = false,
   waiting = false,
+  publishing = false,
   remote = false,
   cloud = false,
   remoteLabel,
@@ -525,6 +528,9 @@ function RunRow({
   dim?: boolean
   /** Live, but parked on the user rather than working (#785). */
   waiting?: boolean
+  /** Ended clean, armed handoff not reported yet (#1455): the row must not say "done" while the
+   *  session's own pill says "publishing…" — the epilogue is still pushing / opening the PR. */
+  publishing?: boolean
   /** Runs on a connected device (#1067): the row gets a device glyph next to the agent logo. */
   remote?: boolean
   /** A Claude Code cloud session (#1263): the row gets a cloud glyph beside the agent logo. */
@@ -539,6 +545,9 @@ function RunRow({
   // machine, not the session (#1264): the cloud side keeps working and opens its own PR. Saying
   // "done" under ten working cloud agents is the lie the demo would put on camera.
   const inCloud = cloud && status === 'done'
+  // "In cloud" outranks "publishing…": a web run's local half is over either way, and the cloud
+  // side owns its own push/PR, so the cloud word is the truer one for that row.
+  const publishingNow = publishing && !inCloud
   // The title only fades + marquees when it actually overflows the fixed-width rail; a short one
   // shows plainly. Measured here since CSS cannot tell. The rail width is fixed, so intent is the
   // only thing that changes the answer.
@@ -563,11 +572,14 @@ function RunRow({
       <span className="flex w-full items-center gap-2 px-2">
         {/* The dot means "the agent is working", so a run parked on you gets a still one (#785):
             it used to pulse identically whether it was mid-edit or had been idle for an hour. */}
+        {/* The publishing dot pulses green like the session pill's (#1431), so the two surfaces
+            describe the same window the same way. */}
         {status === 'running' && (
           <span className={cn('inline-block h-2 w-2 shrink-0 rounded-full', parked ? 'bg-muted-foreground' : 'animate-pulse bg-primary')} />
         )}
-        <Badge className={cn('shrink-0 border-transparent px-0 text-[10px] uppercase', parked ? 'text-muted-foreground' : inCloud ? 'text-primary' : STATUS_TONE[status])}>
-          {parked ? 'waiting' : inCloud ? 'in cloud' : status}
+        {publishingNow && <span className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-success" />}
+        <Badge className={cn('shrink-0 border-transparent px-0 text-[10px] uppercase', parked || publishingNow ? 'text-muted-foreground' : inCloud ? 'text-primary' : STATUS_TONE[status])}>
+          {parked ? 'waiting' : inCloud ? 'in cloud' : publishingNow ? 'publishing…' : status}
         </Badge>
         <span className="truncate text-xs font-normal text-muted-foreground">{subtitle}</span>
         {/* Right cluster: a device glyph when the run is relayed to a connected device (#1067),

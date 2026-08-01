@@ -20,12 +20,20 @@ export function ChoicePanel({
   runId,
   choice,
   active = false,
+  countdown = true,
 }: {
   projectId: string
   /** Which run the pick resolves (#749); absent falls back to the project's control log. */
   runId?: string | null | undefined
   choice: ChoiceRequest
   active?: boolean
+  /**
+   * Whether autopilot's auto-accept countdown may run here (#1455). The launcher's questions hub
+   * turns it off: it renders every parked session's gate at once, and a page that answers all of
+   * them ten seconds after being opened is not a hub, it is a mass auto-accept. The session's own
+   * rail keeps the countdown — there the user chose to look at that one run.
+   */
+  countdown?: boolean
 }) {
   const { busy, error, run } = useAction()
   // Posted and accepted by the daemon; the panel stays parked (buttons off, status shown)
@@ -93,7 +101,7 @@ export function ChoicePanel({
   // The countdown: tick down once a second while autopilot is on and uncancelled, then
   // auto-accept. Restarts if autopilot is toggled back on before a pick is made.
   useEffect(() => {
-    if (!autopilot || cancelled || parked) {
+    if (!countdown || !autopilot || cancelled || parked) {
       setSecondsLeft(null)
       return
     }

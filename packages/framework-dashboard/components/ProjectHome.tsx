@@ -2,11 +2,19 @@ import type { FrameworkEvent } from '@gemstack/the-framework'
 import { StartRunForm } from './StartRunForm.js'
 import { ProjectActions } from './ProjectActions.js'
 import { RunOverview } from './RunOverview.js'
+import { OpenQuestions } from './OpenQuestions.js'
+import { ProjectTickets } from './ProjectTickets.js'
+import { ScrollArea } from './ui/scroll-area.js'
 
 // The project home / launcher — what "Live" selects. Always the Start form + preset cards +
 // the current stack overview; it is never consumed by a run. Starting one appends a run to
 // the rail and adds that run's own view (RunView) alongside — this page stays put, so you can
 // launch again. (Actually running several at once lands with git worktrees, #453.)
+//
+// Below the form, the two #1455 sections: every session's open questions in one answerable
+// place (item 4, cross-project — the badge only counted them), and the active project's
+// tickets in the /tickets presentation (item 5). Both can be tall, which is why the whole
+// column scrolls (the form alone never needed to).
 export function ProjectHome({
   projectId,
   events,
@@ -16,6 +24,9 @@ export function ProjectHome({
   addContext,
   removeContext,
   toggleContext,
+  onOpenSession,
+  onOpenTicket,
+  onShowAllTickets,
 }: {
   projectId: string
   events: FrameworkEvent[]
@@ -26,9 +37,15 @@ export function ProjectHome({
   addContext: (path: string) => void
   removeContext: (path: string) => void
   toggleContext: (path: string) => void
+  /** Jump into a parked session (#1455 item 4) — possibly another project's. */
+  onOpenSession: (projectId: string, runId: string) => void
+  /** Open one of this project's tickets (#1455 item 5). */
+  onOpenTicket: (file: string) => void
+  /** Jump to the full cross-project /tickets page. */
+  onShowAllTickets: () => void
 }) {
   return (
-    <>
+    <ScrollArea className="min-h-0 flex-1">
       <ProjectActions projectId={projectId} />
       <StartRunForm
         projectId={projectId}
@@ -40,6 +57,13 @@ export function ProjectHome({
         toggleContext={toggleContext}
       />
       {events.length > 0 && <RunOverview events={events} />}
-    </>
+      <OpenQuestions onOpenSession={onOpenSession} />
+      <ProjectTickets
+        projectId={projectId}
+        onOpenTicket={onOpenTicket}
+        onShowAllTickets={onShowAllTickets}
+        onRunStarted={onRunStarted}
+      />
+    </ScrollArea>
   )
 }

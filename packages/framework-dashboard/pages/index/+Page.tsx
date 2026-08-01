@@ -313,6 +313,9 @@ export default function Page() {
           addContext={addContext}
           removeContext={removeContext}
           toggleContext={toggleContext}
+          onOpenSession={selectRunInProject}
+          onOpenTicket={file => openTicket(projectId, file)}
+          onShowAllTickets={showTickets}
         />
       )
     }

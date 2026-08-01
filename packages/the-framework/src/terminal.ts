@@ -108,6 +108,8 @@ function mergeLine(merge: AutoMergeOutcome): string {
   switch (merge.outcome) {
     case 'auto-armed':
       return '✓ auto-merge armed: the PR lands when its checks pass'
+    case 'watched':
+      return '✓ merge on green: the daemon merges the PR when its checks pass'
     case 'merged':
       return '✓ merged the PR'
     case 'withheld':

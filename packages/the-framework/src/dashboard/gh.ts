@@ -164,14 +164,32 @@ export async function ghPrsForBranch(cwd: string, branch: string): Promise<Linke
 const DIRECT_MERGE_FALLBACK = /auto[- ]?merge is not allowed|clean status|enablePullRequestAutoMerge|protected branch/i
 
 /**
+ * How {@link ghMergePr} answers GitHub refusing to arm auto-merge. `merge-now` (the default, and
+ * everything before #1418) merges directly: right where a human just said "land it". `watch`
+ * merges directly only when the PR's checks have already passed, and otherwise answers `watched`
+ * — the daemon's CI watch merges it on green. That is the auto path's mode, because the direct
+ * fallback there is precisely the lands-before-CI hazard (#1406): a repo without GitHub
+ * auto-merge saw every armed PR merged seconds after opening, before its first check ran.
+ */
+export interface MergePrOptions {
+  whenUnarmed?: 'merge-now' | 'watch'
+}
+
+/**
  * Merge a PR the handoff just opened (#1216): GitHub auto-merge first, so the PR lands when its
- * checks pass rather than before them; merged directly where the repo does not allow auto-merge.
- * Squash in both forms — a session's branch is working history, not a story worth preserving.
+ * checks pass rather than before them; where the repo does not allow auto-merge, merged directly
+ * or handed to the daemon's CI watch, per {@link MergePrOptions.whenUnarmed} (#1418). Squash in
+ * all forms — a session's branch is working history, not a story worth preserving.
  *
  * Never throws: the caller reports the outcome alongside the handoff's, and a merge that could
  * not happen must not turn a successful handoff into a failed one.
  */
-export async function ghMergePr(cwd: string, number: number, gh: GhRunner = nodeGhRunner()): Promise<AutoMergeOutcome> {
+export async function ghMergePr(
+  cwd: string,
+  number: number,
+  gh: GhRunner = nodeGhRunner(),
+  opts: MergePrOptions = {},
+): Promise<AutoMergeOutcome> {
   try {
     await gh(['pr', 'merge', String(number), '--squash', '--auto'], cwd)
     return { outcome: 'auto-armed' }
@@ -188,12 +206,29 @@ export async function ghMergePr(cwd: string, number: number, gh: GhRunner = node
       } catch (retry) {
         const readyRefusal = errorMessage(retry)
         if (!DIRECT_MERGE_FALLBACK.test(readyRefusal)) return { outcome: 'failed', error: readyRefusal }
-        return directMerge(cwd, number, gh)
+        return fallbackMerge(cwd, number, gh, opts)
       }
     }
     if (!DIRECT_MERGE_FALLBACK.test(refusal)) return { outcome: 'failed', error: refusal }
-    return directMerge(cwd, number, gh)
+    return fallbackMerge(cwd, number, gh, opts)
   }
+}
+
+/**
+ * What happens once GitHub has refused to arm the merge: directly, or — in `watch` mode with
+ * checks still outstanding — deferred to the daemon's CI watch (#1418).
+ *
+ * The checks read decides, not the refusal text: `clean status` sounds like "nothing blocks this
+ * PR" but GitHub says it for a PR whose *non-required* checks are still running, which is the
+ * #1406 window. Only `passing` merges now; `none` does not, because a check suite takes a few
+ * seconds to attach after the push and a just-opened PR reads as check-less exactly then — the
+ * watch merges a genuinely check-less PR after its grace period instead.
+ */
+async function fallbackMerge(cwd: string, number: number, gh: GhRunner, opts: MergePrOptions): Promise<AutoMergeOutcome> {
+  if (opts.whenUnarmed !== 'watch') return directMerge(cwd, number, gh)
+  const ci = await ghPrCiStatus(cwd, number, gh)
+  if (ci.checks === 'passing') return directMerge(cwd, number, gh)
+  return { outcome: 'watched' }
 }
 
 /** The direct-merge half of {@link ghMergePr}, shared by its two ways of getting there. */
@@ -204,6 +239,71 @@ async function directMerge(cwd: string, number: number, gh: GhRunner): Promise<A
   } catch (direct) {
     return { outcome: 'failed', error: errorMessage(direct) }
   }
+}
+
+/** Where a PR's CI stands (#1418), summarised to the one question the merge path asks. */
+export interface PrCiStatus {
+  /**
+   * `passing`: every check has concluded and none failed — the PR may land. `failing`: at least
+   * one concluded check failed, whatever the rest are doing — red now, and more green later will
+   * not unsay it. `pending`: something is still running and nothing has failed yet. `none`: no
+   * checks reported — either the repo has no CI, or the suite has not attached yet (they take a
+   * few seconds after a push), which is why callers treat it with a grace period rather than as
+   * green. Also the answer when `gh` itself could not say: acting on an unreadable status must
+   * never merge anything.
+   */
+  checks: 'passing' | 'failing' | 'pending' | 'none'
+  /** The names of the failed checks, for the CI-fix agent's prompt. */
+  failed: string[]
+  /** The PR's head commit, so a fix attempt can be recorded against the state it saw. */
+  headSha?: string
+  /** The PR's head branch, where a CI fix must land. Rides this read because it is the same `gh` call. */
+  branch?: string
+}
+
+/**
+ * A PR's combined check state (#1418): GitHub Actions check runs and classic commit statuses,
+ * both of which `statusCheckRollup` carries.
+ *
+ * Skipped and neutral conclusions count as passing, matching how GitHub's own merge box treats
+ * them; everything else that concluded non-successfully counts as failed — a cancelled or
+ * timed-out check is not evidence the work is good, and the merge this feeds exists to stop
+ * unverified work landing (#1406).
+ */
+export async function ghPrCiStatus(cwd: string, number: number, gh: GhRunner = readGh): Promise<PrCiStatus> {
+  interface RollupEntry {
+    // Check runs carry name/status/conclusion; classic commit statuses carry context/state.
+    name?: string
+    status?: string
+    conclusion?: string
+    context?: string
+    state?: string
+  }
+  let parsed: { statusCheckRollup?: RollupEntry[]; headRefOid?: string; headRefName?: string }
+  try {
+    parsed = JSON.parse(
+      await gh(['pr', 'view', String(number), '--json', 'statusCheckRollup,headRefOid,headRefName'], cwd),
+    ) as typeof parsed
+  } catch {
+    return { checks: 'none', failed: [] }
+  }
+  const rollup = Array.isArray(parsed.statusCheckRollup) ? parsed.statusCheckRollup : []
+  const headSha = typeof parsed.headRefOid === 'string' ? parsed.headRefOid : undefined
+  const branch = typeof parsed.headRefName === 'string' ? parsed.headRefName : undefined
+  const head = { ...(headSha ? { headSha } : {}), ...(branch ? { branch } : {}) }
+  if (rollup.length === 0) return { checks: 'none', failed: [], ...head }
+  const passing = /^(SUCCESS|NEUTRAL|SKIPPED)$/
+  let pending = false
+  const failed: string[] = []
+  for (const entry of rollup) {
+    // A classic status has no `status` field: its `state` is both progress and verdict.
+    const verdict = entry.conclusion ?? entry.state ?? ''
+    const done = entry.status ? entry.status === 'COMPLETED' : verdict !== 'PENDING'
+    if (!done) pending = true
+    else if (!passing.test(verdict)) failed.push(entry.name ?? entry.context ?? 'unnamed check')
+  }
+  const checks = failed.length > 0 ? 'failing' : pending ? 'pending' : 'passing'
+  return { checks, failed, ...head }
 }
 
 /** Whether the repo lets PRs use GitHub auto-merge (#1417); `known: false` when `gh` could not say. */

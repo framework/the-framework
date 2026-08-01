@@ -235,6 +235,9 @@ export function RunComposer({
         submitBusyLabel={live ? 'Sending…' : resumable ? 'Resuming…' : 'Starting…'}
         showAgentModel={false}
         inSession
+        // Ended → the next message starts a new leg, whose options the gear can shape (#1172);
+        // live → nothing is adjustable and the gear is dropped rather than opening empty.
+        sessionEnded={!live}
         sessionName={sessionName}
         idleControl={idleControl}
         placeholder={

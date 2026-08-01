@@ -218,3 +218,27 @@ export function runOptionRows(preferences: Preferences): RunOptionRows {
 function overriddenByTransparent(transparent: boolean): Pick<OptionRow, 'disabled' | 'disabledReason'> {
   return transparent ? { disabled: true, disabledReason: 'off while Transparent is on' } : {}
 }
+
+/**
+ * The option keys that shape a continuation leg (#1467/#1469): the publish ladder, the gates'
+ * autopilot, and the browser. The prompt-shaping rows (Transparent, Technical, Disable system
+ * prompt, Eco, Post-merge cleanup) are omitted — the resumed transcript already carries its
+ * framing — and Run on / agent / model are pinned by the conversation being continued.
+ */
+const RESUME_OPTION_KEYS: ReadonlySet<keyof Preferences> = new Set([
+  'autopilot',
+  'autoPushBranch',
+  'autoOpenPr',
+  'autoMerge',
+  'browser',
+])
+
+/**
+ * The subset of the main table a finished session's composer offers (#1172): the options the next
+ * Resume leg will actually arm. They write the same shared preferences the launcher's gear writes;
+ * the continuation start resolves them at resume time (#1469), which is what makes showing them
+ * here truthful. Same rows, same rules (ladder gating, effective values) — just filtered.
+ */
+export function resumeOptionRows(preferences: Preferences): OptionRow[] {
+  return runOptionRows(preferences).main.filter(row => RESUME_OPTION_KEYS.has(row.key))
+}

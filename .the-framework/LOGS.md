@@ -25,3 +25,10 @@
 - run: 2026-07-27T23-05-13-126Z
 - session: 019fa5d3-49f3-7132-a9cf-58c14b74643b
 - branch: the-framework/run-2026-07-27T23-05-13-126Z
+
+## 2026-08-01T19:38:25.924Z · build · Create a file test005.md containing the single line "resume flow test, delete me". Nothing else.
+
+- status: stopped
+- run: 2026-08-01T19-38-04-409Z
+- session: [50b8cfa2-1504-418a-ba5c-a302fb261ec4](https://claude.ai/code)
+- branch: the-framework/resume-flow-test-file

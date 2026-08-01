@@ -217,6 +217,16 @@ export interface RunFrameworkOptions {
   /** Per-run cap on backlog entries worked (#323). Default 25. */
   todoMaxItems?: number
   /**
+   * Continue a stopped build run's conversation (#1467): the captured agent session id to
+   * `--resume`. When set, the build turn sends {@link RunFrameworkOptions.intent} verbatim as a
+   * continuation message instead of rendering the build/extend prompt — the resumed transcript
+   * already carries the scope→build framing, which is exactly why #782 refused to bolt
+   * `--resume-session` onto a fresh build run. Everything around the turn still runs: the
+   * bootstrap narration with its synthesize framing, the review checklist where configured, the
+   * backlog loop and live chat — the flow resumes, not just the conversation.
+   */
+  resumeSessionId?: string
+  /**
    * Live chat (#714): once the build settles, take the user's own messages, each
    * resuming the build session for full context. The session then ends itself when
    * the queue is idle (#1390) unless {@link stayOpenChat} parks it. Wired only for
@@ -358,10 +368,13 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     })
 
   // 2. One driver session for the whole run; each prompt is a fresh invocation.
+  // A continuation (#1467) resumes the stopped leg's conversation instead of starting anew.
+  const resuming = typeof opts.resumeSessionId === 'string' && opts.resumeSessionId.length > 0
   const session: DriverSession = await opts.driver.start({
     cwd: opts.cwd,
     system,
     ...(opts.model ? { model: opts.model } : {}),
+    ...(resuming ? { resumeSessionId: opts.resumeSessionId } : {}),
     signal: runSignal,
     onEvent: onDriverEvent,
   })
@@ -423,7 +436,14 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
       onEvent: (event: BootstrapEvent) => emit({ kind: 'bootstrap', event }),
       steps: {
         scope: () => ({ scope: opts.scope ?? 'full', intent: opts.intent }),
-        build: agentAwaitGate(driverBuild(session, workspaceOpt), session, gateDeps),
+        // Resuming (#1467): the intent IS the continuation message and goes out verbatim — the
+        // resumed transcript already carries the build framing, so re-rendering it would stack
+        // a second scope→build preamble onto a conversation that lived through the first.
+        build: agentAwaitGate(
+          driverBuild(session, { ...workspaceOpt, ...(resuming ? { prompt: (intent: string) => intent } : {}) }),
+          session,
+          gateDeps,
+        ),
         ...(handsOff || !checklist ? {} : { checklist, improve: driverImprove(session, workspaceOpt) }),
         ...(opts.deploy
           ? {

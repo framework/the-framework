@@ -1354,8 +1354,9 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // scope/build framing a resumed transcript already carries, so it takes no session id and
   // used to drop the flag on the floor. Silently losing the context you asked to continue
   // from is the worst outcome, so say so and stop rather than run a fresh session that looks
-  // like a resumed one.
-  if (opts.resumeSession && !(opts.research || opts.directPrompt || transparent)) {
+  // like a resumed one. The exception is a continuation (#1467): `--continue-run` re-enters an
+  // existing run, whose recorded flow decides the path — there the session id is the point.
+  if (opts.resumeSession && !(opts.research || opts.directPrompt || transparent || opts.continueRun)) {
     io.err('--resume-session only applies to a prompt run, e.g. `framework prompt "keep going" --resume-session <id>`.')
     io.err('Run `framework --help` for usage.')
     return 2
@@ -1461,6 +1462,9 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
         ...(opts.runId ? { id: opts.runId } : {}),
         // Continuing (#762): keep the existing log rather than starting this run's history over.
         ...(opts.continueRun ? { continueRun: true } : {}),
+        // The flow this run starts under (#1467), so a later continuation can re-enter it. A
+        // continuation itself keeps the prior meta's record — this seed only lands on a fresh run.
+        kind: runLogKind(opts, transparent) === 'build' ? 'build' : 'prompt',
         // Where the run executes (#1053): the run view reads it to switch to the Actions affordance.
         ...(opts.target ? { target: opts.target } : {}),
         // A project-less topic run (#1120): recorded so a reader can tell it from a project run.
@@ -1470,6 +1474,15 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
       io.err(`could not persist session state (${errorMessage(err)}); continuing without it`)
     }
   }
+
+  // Continuing a build run (#1467): the composer's Resume always arrives as a `prompt` start,
+  // but the reopened meta remembers the flow the first leg ran. When it was a build run and the
+  // conversation is resumable, re-enter the build flow (synthesize framing, backlog loop, the
+  // build ending) with the message sent verbatim — not the bare prompt ending that used to
+  // downgrade a resumed build run. Runs from before the meta recorded a kind stay on the prompt
+  // path, exactly as they did.
+  const continueBuild =
+    opts.continueRun === true && !!opts.resumeSession && !transparent && store?.snapshot().kind === 'build'
 
   // Steer this run through .the-framework/control.jsonl (#344): a Stop button or choice
   // pick appends an entry, we tail the file and abort / resolve the parked gate. Reset
@@ -1633,7 +1646,9 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     store,
     publisher,
     runId: opts.runId,
-    kind: runLogKind(opts, transparent),
+    // A build continuation (#1467) logs as the build run it re-enters, not as the prompt
+    // start that carried it here.
+    kind: continueBuild ? 'build' : runLogKind(opts, transparent),
     title: intent || (opts.research ? defaultWhat() : ''),
     beforeLog: conversation.flush,
   })
@@ -1983,8 +1998,10 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // around the "what" (only when it isn't transparent); prompt/transparent run the text
   // verbatim (it may already BE an edited preset, so it must not be re-rendered).
   // Shares all the wiring above (dashboard, store, control channel, budget).
+  // A build continuation (#1467) falls through to runFramework below despite arriving as a
+  // `prompt` start: the flow it re-enters is the build run recorded on its own meta.
   const isResearch = opts.research && !transparent
-  if (opts.research || opts.directPrompt || transparent) {
+  if ((opts.research || opts.directPrompt || transparent) && !continueBuild) {
     return settleRun(epilogue(isResearch ? 'research' : 'prompt session'), async () => {
       await runPrompt({
         ...sharedRunOptions,
@@ -2040,6 +2057,9 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     intent,
     scope: opts.scope,
     signals,
+    // A build continuation (#1467): resume the stopped leg's conversation; the intent above is
+    // the continuation message and runFramework sends it verbatim.
+    ...(continueBuild && opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
     ...(opts.maxPasses ? { maxPasses: opts.maxPasses } : {}),
     ...(opts.todoLoop && !transparent ? {} : { todoLoop: false }),
     ...(opts.todoMaxItems ? { todoMaxItems: opts.todoMaxItems } : {}),

@@ -1107,3 +1107,56 @@ test('a --run-on actions run with no token anywhere ends failed instead of hangi
   assert.match(end.detail ?? '', /GH_TOKEN/)
   assert.match(end.detail ?? '', /gh auth login/)
 })
+
+test('runCli continues a build run through the build flow, not the prompt path (#1467)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'framework-continue-build-'))
+  try {
+    const first = capture()
+    assert.equal(await runCli(['build a thing', '--fake', '--no-dashboard', '--cwd', dir], first.io), 0)
+    const metaPath = join(dir, FRAMEWORK_DIR, 'run.json')
+    assert.equal((JSON.parse(await readFile(metaPath, 'utf8')) as { kind?: string }).kind, 'build')
+
+    const second = capture()
+    const code = await runCli(
+      ['prompt', 'keep going', '--fake', '--no-dashboard', '--cwd', dir, '--continue-run', '--resume-session', 'sess-42'],
+      second.io,
+    )
+    assert.equal(code, 0)
+    // The continuation re-entered the build flow: bootstrap framing landed after the first end.
+    const lines = (await readFile(join(dir, FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
+      .trim()
+      .split('\n')
+      .map(l => JSON.parse(l) as { kind: string })
+    const firstEnd = lines.findIndex(e => e.kind === 'end')
+    assert.ok(firstEnd >= 0)
+    assert.ok(lines.slice(firstEnd + 1).some(e => e.kind === 'bootstrap'))
+    // The meta still says build, and the row keeps its original label, not the resume message.
+    const meta = JSON.parse(await readFile(metaPath, 'utf8')) as { kind?: string; intent?: string }
+    assert.equal(meta.kind, 'build')
+    assert.equal(meta.intent, 'build a thing')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('runCli keeps a prompt run continuation on the prompt path (#1467)', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'framework-continue-prompt-'))
+  try {
+    const first = capture()
+    assert.equal(await runCli(['prompt', 'say hi', '--fake', '--no-dashboard', '--cwd', dir], first.io), 0)
+    const second = capture()
+    const code = await runCli(
+      ['prompt', 'keep going', '--fake', '--no-dashboard', '--cwd', dir, '--continue-run', '--resume-session', 'sess-42'],
+      second.io,
+    )
+    assert.equal(code, 0)
+    const lines = (await readFile(join(dir, FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
+      .trim()
+      .split('\n')
+      .map(l => JSON.parse(l) as { kind: string })
+    // No bootstrap framing anywhere: both legs ran the direct prompt path.
+    assert.ok(!lines.some(e => e.kind === 'bootstrap'))
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})

@@ -19,7 +19,7 @@ import { PresetCreatePanel } from './PresetCreatePanel.js'
 import { PresetsMenu } from './PresetsMenu.js'
 import { AgentModelMenu, type AgentOption } from './AgentModelMenu.js'
 import { OptionsMenu, type RunTarget } from './OptionsMenu.js'
-import { runOptionRows } from '../lib/run-option-rows.js'
+import { resumeOptionRows, runOptionRows } from '../lib/run-option-rows.js'
 import { AddDeviceDialog } from './AddDeviceDialog.js'
 import { useConnectionProfiles, connectLocal, isLoopbackHost, removeProfile, type ConnectionProfile } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId, selectRemoteDevice } from '../lib/remote-target.js'
@@ -107,6 +107,11 @@ export const Composer = forwardRef<ComposerHandle, {
    *  gear drops them (keeping the genuinely global editor pick) and the "In play" strip goes —
    *  both would otherwise read as controls over *this* session that only rewrite the next one. */
   inSession?: boolean | undefined
+  /** The session has ended (#1172): the next message is a Resume, i.e. a NEW leg that resolves
+   *  the current preferences at start (#1469) — so the gear returns, offering just the options
+   *  that shape that leg (publish ladder, Autopilot, Browser). While the run is live nothing is
+   *  adjustable, and the gear is dropped entirely instead of opening empty. Only read in-session. */
+  sessionEnded?: boolean | undefined
   /** The session this composer sits in, if any (#874): a preset launched from a run page targets
    *  that session by default, instead of the whole codebase. Absent at the launcher, where no
    *  session exists yet. */
@@ -124,7 +129,7 @@ export const Composer = forwardRef<ComposerHandle, {
    *  without one the slot keeps its collapse-when-empty behavior for the launcher. */
   idleControl?: ReactNode
 }>(function Composer(
-  { files, addContext, removeContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showAgentModel = true, inSession = false, sessionName, contextControl, resolvedRowStart, idleControl },
+  { files, addContext, removeContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showAgentModel = true, inSession = false, sessionEnded = false, sessionName, contextControl, resolvedRowStart, idleControl },
   ref,
 ) {
   const [prompt, setPrompt] = useState('')
@@ -308,15 +313,19 @@ export const Composer = forwardRef<ComposerHandle, {
   )
   // The options gear sits with the agent/model select and submit at the end of the row (#1046), so
   // the three run controls read as one cluster.
-  const optionsGearEl = (
+  //
+  // In-session it follows what the next action arms (#1172): while the run is LIVE nothing is
+  // adjustable (options were baked in at spawn, #833) and the gear is dropped entirely — it used
+  // to render with an empty dropdown. Once the run has ENDED, the next message is a Resume — a new
+  // leg that resolves the current preferences at start (#1469) — so the gear returns with just the
+  // rows that shape that leg (`resumeOptionRows`).
+  const optionsGearEl = inSession && !sessionEnded ? null : (
     <OptionsMenu
-      // In-session (#833): the run options were baked into the session at spawn, so offering
-      // them here only rewrote the next session's defaults while reading as session state.
-      options={inSession ? [] : mainOptions}
+      options={inSession ? resumeOptionRows(preferences) : mainOptions}
       ecoOptions={inSession ? [] : ecoOptions}
       showEco={!inSession && eco && !ecoDisabled}
       busy={busy}
-      {...(inSession ? { label: 'Preferences' } : {})}
+      {...(inSession ? { label: 'Resume options' } : {})}
       // The "Run on" driver axis (#1050) is baked in at spawn, so it is offered only at the launcher —
       // same reasoning as the agent select being hidden in-session.
       {...(inSession ? {} : { runTarget: { value: target, onChange: (t: RunTarget) => updatePreferences({ target: t }) } })}

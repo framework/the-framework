@@ -303,3 +303,36 @@ describe('Composer (#721)', () => {
     expect(onSubmit).toHaveBeenCalledWith('ship it', 'build', { newSession: false })
   })
 })
+
+describe('the in-session options gear (#1172)', () => {
+  test('a live session drops the gear entirely instead of opening an empty dropdown', () => {
+    renderComposer({ inSession: true })
+    expect(screen.queryByRole('button', { name: 'Session options' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Resume options' })).toBeNull()
+    // The old half-measure: a "Preferences" trigger whose menu had zero rows.
+    expect(screen.queryByRole('button', { name: 'Preferences' })).toBeNull()
+  })
+
+  test('an ended session offers exactly the options the Resume leg will arm (#1469)', () => {
+    renderComposer({ inSession: true, sessionEnded: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Resume options' }))
+    const menu = screen.getByRole('menu')
+    for (const label of ['Autopilot', 'Push branch', 'Open PR', 'Auto-merge', 'Browser']) {
+      expect(within(menu).getByText(label)).toBeTruthy()
+    }
+    // The prompt-shaping rows stay out — the resumed transcript already carries its framing —
+    // and "Run on" stays out too: the continuation is pinned to its conversation.
+    for (const label of ['Transparent', 'Technical control', 'Disable system prompt', 'Eco', 'Post-merge cleanup']) {
+      expect(within(menu).queryByText(label)).toBeNull()
+    }
+    expect(within(menu).queryByText('Run on')).toBeNull()
+  })
+
+  test('the resume gear writes the shared preference the continuation resolves at start (#1469)', () => {
+    renderComposer({ inSession: true, sessionEnded: true })
+    fireEvent.click(screen.getByRole('button', { name: 'Resume options' }))
+    const menu = screen.getByRole('menu')
+    fireEvent.click(within(menu).getByText('Browser').closest('[role="menuitemcheckbox"]')!)
+    expect(updatePreferences).toHaveBeenCalledWith({ browser: true })
+  })
+})

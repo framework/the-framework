@@ -48,6 +48,7 @@ export function RightRail({
   hasBrowser = false,
   target,
   loop,
+  docsInMain = false,
 }: {
   projectId: string | null
   /** The selected run: resolves a choice pick's gate (#749) and scopes the tree to its worktree (#815). */
@@ -68,17 +69,24 @@ export function RightRail({
    *  of its own: it is a standing fact about the run, not a panel you browse, so it stays readable
    *  whichever tab is open. Null for a run that never looped (a prototype scope, or a plain prompt). */
   loop?: LoopStatus | null | undefined
+  /**
+   * The launcher renders Docs and History in its main column (#1455 items 2/3), so while it is
+   * the main view the rail must not repeat them: their tabs are withheld and their polls skipped.
+   * A session view passes false (or nothing) and keeps the full rail.
+   */
+  docsInMain?: boolean
 }) {
   // The two content panels are read here rather than each polling for itself: the rail has to
   // know whether they have anything before it can decide which tabs to offer, and whether to be
   // there at all (#1146). One read each, passed down; the panels render what they are given.
   // Tickets used to be a third one (#697) — now its own full page (#1144), not a rail read.
-  const { value: docs, loaded: docsLoaded } = usePolled<WorkspaceDoc[]>(projectId ? () => onDocs(projectId) : null, [], 4000, [projectId])
-  const { value: logs, loaded: logsLoaded } = usePolled<LogEntry[]>(projectId ? () => onProjectLog(projectId) : null, [], 10_000, [projectId])
+  const { value: docs, loaded: docsLoaded } = usePolled<WorkspaceDoc[]>(projectId && !docsInMain ? () => onDocs(projectId) : null, [], 4000, [projectId, docsInMain])
+  const { value: logs, loaded: logsLoaded } = usePolled<LogEntry[]>(projectId && !docsInMain ? () => onProjectLog(projectId) : null, [], 10_000, [projectId, docsInMain])
   // Hidden only once we KNOW it is empty: while the first read is out, the tab stays, so switching
-  // projects does not blink the rail out and back in.
-  const hasDocs = !docsLoaded || docs.length > 0
-  const hasLog = !logsLoaded || logs.length > 0
+  // projects does not blink the rail out and back in. While the launcher owns these panels
+  // (#1455 items 2/3), both tabs are withheld outright.
+  const hasDocs = !docsInMain && (!docsLoaded || docs.length > 0)
+  const hasLog = !docsInMain && (!logsLoaded || logs.length > 0)
 
   const [tab, setTab] = useState<Tab>('docs')
   // Once the user picks a tab, stop auto-defaulting (#695/U22) — only a genuinely new choice

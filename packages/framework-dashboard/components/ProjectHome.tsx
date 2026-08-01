@@ -4,6 +4,8 @@ import { ProjectActions } from './ProjectActions.js'
 import { RunOverview } from './RunOverview.js'
 import { OpenQuestions } from './OpenQuestions.js'
 import { ProjectTickets } from './ProjectTickets.js'
+import { ProjectDocs } from './ProjectDocs.js'
+import { ProjectHistory } from './ProjectHistory.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
 // The project home / launcher — what "Live" selects. Always the Start form + preset cards +
@@ -11,10 +13,12 @@ import { ScrollArea } from './ui/scroll-area.js'
 // the rail and adds that run's own view (RunView) alongside — this page stays put, so you can
 // launch again. (Actually running several at once lands with git worktrees, #453.)
 //
-// Below the form, the two #1455 sections: every session's open questions in one answerable
-// place (item 4, cross-project — the badge only counted them), and the active project's
-// tickets in the /tickets presentation (item 5). Both can be tall, which is why the whole
-// column scrolls (the form alone never needed to).
+// Below the form, the #1455 sections: every session's open questions in one answerable
+// place (item 4, cross-project — the badge only counted them), the active project's
+// tickets in the /tickets presentation (item 5), and the Docs + History panels moved out
+// of the right rail into this column (items 2/3 — the rail hides them while this page
+// shows, see RightRail's docsInMain). All can be tall, which is why the whole column
+// scrolls (the form alone never needed to).
 export function ProjectHome({
   projectId,
   events,
@@ -64,6 +68,8 @@ export function ProjectHome({
         onShowAllTickets={onShowAllTickets}
         onRunStarted={onRunStarted}
       />
+      <ProjectDocs projectId={projectId} />
+      <ProjectHistory projectId={projectId} />
     </ScrollArea>
   )
 }

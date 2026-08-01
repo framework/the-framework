@@ -123,6 +123,38 @@ describe('RightRail tab labels (#1145)', () => {
 
 // Every tab is earned by its content (#1146): a panel that can only say "nothing yet" costs a tab
 // nobody wants, and when none of them has anything the rail itself is noise.
+describe('RightRail docsInMain (#1455 items 2/3)', () => {
+  const settle = () => act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+
+  test('the launcher owning Docs/History withholds both tabs and skips their reads', async () => {
+    render(<RightRail {...baseProps} files={['a.ts']} docsInMain />)
+    await settle()
+    expect(screen.queryByRole('tab', { name: /docs/i })).toBeNull()
+    expect(screen.queryByRole('tab', { name: /history/i })).toBeNull()
+    // Withheld means not even asked for: the main column polls these itself.
+    expect(onDocs).not.toHaveBeenCalled()
+    expect(onProjectLog).not.toHaveBeenCalled()
+    // The rest of the rail is untouched.
+    expect(screen.getByRole('tab', { name: /files/i })).toBeTruthy()
+  })
+
+  test('with only Docs/History to offer, the launcher shows no rail at all', async () => {
+    const { container } = render(<RightRail {...baseProps} docsInMain />)
+    await settle()
+    expect(container.querySelector('aside')).toBeNull()
+  })
+
+  test('a session view (docsInMain off) keeps both tabs, as before', async () => {
+    render(<RightRail {...baseProps} />)
+    await settle()
+    expect(screen.getByRole('tab', { name: /docs/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /history/i })).toBeTruthy()
+  })
+})
+
 describe('RightRail empty panels (#1146)', () => {
   const settle = () => act(async () => {
     await Promise.resolve()

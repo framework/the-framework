@@ -4,6 +4,7 @@ The right sidebar (#314 third rail): a tabbed panel column offering Files, Choic
 
 - Tabs: Files (project file tree, #492), Choices (interactive gates, #440), Views (agent-pushed markdown, #441), Browser (preview proxy, #813), Docs (PLAN/TODO), Log (committed project log).
 - Choices/views arrive via props from the shell's live event stream; docs/log are polled here via Telefunc (`onDocs` 4s, `onProjectLog` 10s) — read in the rail, not in the panels, because the rail must know emptiness to decide which tabs exist (#1146).
+- `docsInMain` (#1455 items 2/3): while the launcher is the main view it renders Docs/History in its own column (`ProjectDocs`/`ProjectHistory`), so the rail withholds both tabs and skips both polls; session views pass nothing and keep the full rail.
 - Every tab is earned by content (#1146): an empty panel gets no tab, and a rail with no tabs renders nothing (`null`). Not-yet-loaded counts as "has content" so project switches don't blink the rail.
 - Auto-focus rules (#695/U22): only a genuinely fresh choice gate (unseen id) or the *first* view pulls the active tab; after the user picks a tab manually (`touched` ref), no auto-defaulting.
 - `LoopStatusCard` is pinned under the panel, not a tab: a standing fact about the run, visible whichever tab is open, with its own scroller capped at 33% height.

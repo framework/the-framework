@@ -423,6 +423,10 @@ export default function Page() {
             hasBrowser={selectedRun?.status === 'running' && selectedRun.browserStreamPort !== undefined}
             target={selectedRun?.target}
             loop={loop}
+            // The launcher shows Docs/History in its main column (#1455 items 2/3): exactly when
+            // renderMain resolves to ProjectHome — a project selected, no run (and not adopting
+            // one), on the default view. Session views keep the full rail.
+            docsInMain={view !== 'settings' && !!projectId && !unknownProject && runId === null && !adopting}
           />
         )}
       </div>

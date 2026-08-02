@@ -32,3 +32,17 @@
 - run: 2026-08-01T19-38-04-409Z
 - session: [50b8cfa2-1504-418a-ba5c-a302fb261ec4](https://claude.ai/code)
 - branch: the-framework/resume-flow-test-file
+
+## 2026-08-01T22:13:15.387Z · build · Create test27.md containing a four-line haiku about resumable sessions, then create test28.md containing the same haiku with the lines in reverse order.
+
+- status: stopped
+- run: 2026-08-01T22-12-40-791Z
+- session: [ada2e10b-1529-4f42-b1f9-2c1d49a3e65e](https://claude.ai/code)
+- branch: the-framework/haiku-test-files
+
+## 2026-08-01T22:14:02.402Z · build · This session was stopped before it finished, not because the work was done. Look at what you had already done, then carry on from there. The session lifecycle still applies: once the work is genuinely finished with nothing left to do, call setReadyForMerge() — without it the finished work is never merged.
+
+- status: stopped
+- run: 2026-08-01T22-12-40-791Z
+- session: [407241f9-4ce4-47e2-b39e-b617562dcd64](https://claude.ai/code)
+- branch: the-framework/haiku-test-files

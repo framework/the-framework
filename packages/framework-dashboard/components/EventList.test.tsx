@@ -230,3 +230,44 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
     expect(screen.getAllByText('Work on it')).toHaveLength(1)
   })
 })
+
+// The latest `browser` row hosts the live inline preview (#1455 item 6b); earlier rows and the
+// read-only relay watch keep the formatter's text, and an ended run's pane degrades (#1359).
+describe('EventList inline browser rows (#1455 item 6b)', () => {
+  const browser = (url = 'https://app.test/'): FrameworkEvent => ({ kind: 'browser', url })
+
+  test('the latest browser row hosts the pane; an earlier one keeps its one-liner', () => {
+    render(
+      <EventList events={[browser('https://a.test/'), browser('https://b.test/')]} stick={false} projectId="p1" runId="r1" />,
+    )
+    expect(screen.getAllByAltText("The session's browser")).toHaveLength(1)
+    expect(screen.getByText(/browser: https:\/\/a\.test\//)).toBeTruthy()
+  })
+
+  test('a re-said URL replaces its earlier row instead of stacking (the view re-show rule)', () => {
+    render(
+      <EventList events={[browser('https://a.test/'), browser('https://a.test/')]} stick={false} projectId="p1" runId="r1" />,
+    )
+    expect(screen.getAllByAltText("The session's browser")).toHaveLength(1)
+    expect(screen.queryByText(/browser: https:\/\/a\.test\//)).toBeNull()
+  })
+
+  test('after end, a pane with no captured frame degrades to the one-liner (#1359)', () => {
+    render(
+      <EventList events={[browser('https://a.test/'), { kind: 'end', ok: true }]} stick={false} projectId="p1" runId="r1" />,
+    )
+    expect(screen.queryByAltText("The session's browser")).toBeNull()
+    expect(screen.getByText(/browser · https:\/\/a\.test\//)).toBeTruthy()
+  })
+
+  test('without a runId the row keeps the formatter text (the read-only relay watch)', () => {
+    render(<EventList events={[browser()]} stick={false} projectId="p1" />)
+    expect(screen.queryByAltText("The session's browser")).toBeNull()
+    expect(screen.getByText(/browser: https:\/\/app\.test\//)).toBeTruthy()
+  })
+
+  test('a browser badge is primary — a pushed surface', () => {
+    render(<EventList events={[browser()]} stick={false} />)
+    expect(screen.getByText('browser').className).toContain('text-primary')
+  })
+})

@@ -1132,6 +1132,10 @@ export interface RunJournal {
   stoppedCleanly: () => boolean
   /** Hold the browser preview's port until the session opens (#829/#813). */
   announceBrowserPort: (port: number) => void
+  /** The page the browser preview is on (#1455 item 6b): emitted as a `browser` event once a
+   *  session is open, held until then, and re-said after every later `session` so the row
+   *  survives the dashboard's last-session slice. */
+  announceBrowserUrl: (url: string) => void
   /** Write the run's `.the-framework/LOGS.md` entry (#898). Idempotent; every exit path calls it. */
   finishLog: () => Promise<void>
 }
@@ -1170,6 +1174,13 @@ export function createRunJournal(deps: {
   // bridge opens (#829): the dashboard renders only the tail from the last `session` event, so
   // anything emitted ahead of it is dropped from the run's view.
   let pendingBrowserPort: number | undefined
+  // The page the browser preview is on (#1455 item 6b). Held the same way the port is until a
+  // session opens; after that a navigation emits straight away. Re-emitted after EVERY `session`
+  // (not just the first, unlike the port whose meta fold survives the slice): a continuation
+  // starts a fresh rendered slice, and without the re-say its transcript would have no browser
+  // row to host the pane.
+  let latestBrowserUrl: string | undefined
+  let sessionOpen = false
 
   const onEvent = (event: FrameworkEvent) => {
     if (event.kind === 'session' && event.sessionLink) logSessionLink = event.sessionLink
@@ -1203,10 +1214,14 @@ export function createRunJournal(deps: {
     publisher?.publish(event)
 
     // Right after the session opens, so it lands inside the slice the dashboard renders.
-    if (event.kind === 'session' && pendingBrowserPort !== undefined) {
-      const port = pendingBrowserPort
-      pendingBrowserPort = undefined
-      onEvent({ kind: 'browser-stream', port })
+    if (event.kind === 'session') {
+      sessionOpen = true
+      if (pendingBrowserPort !== undefined) {
+        const port = pendingBrowserPort
+        pendingBrowserPort = undefined
+        onEvent({ kind: 'browser-stream', port })
+      }
+      if (latestBrowserUrl !== undefined) onEvent({ kind: 'browser', url: latestBrowserUrl })
     }
   }
 
@@ -1242,6 +1257,10 @@ export function createRunJournal(deps: {
     stoppedCleanly: () => stoppedCleanly,
     announceBrowserPort: port => {
       pendingBrowserPort = port
+    },
+    announceBrowserUrl: url => {
+      latestBrowserUrl = url
+      if (sessionOpen) onEvent({ kind: 'browser', url })
     },
     finishLog,
   }
@@ -1898,7 +1917,13 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // `await-browser` gate (#796) there is nothing for a human to click. This serves it. Opening
   // the stream costs nothing while the page is still — Chrome only emits a frame on a change.
   const browserStream = sharedBrowser
-    ? await startBrowserStream({ browserUrl: sharedBrowser.browserUrl, connect: connectCdp }).catch(() => undefined)
+    ? await startBrowserStream({
+        browserUrl: sharedBrowser.browserUrl,
+        connect: connectCdp,
+        // Every real page the preview shows lands in the transcript (#1455 item 6b), so the
+        // inline pane appears at the point of use rather than only in the rail.
+        onPage: url => journal.announceBrowserUrl(url),
+      }).catch(() => undefined)
     : undefined
   // The port travels as an event — persisted and published live — because a dashboard-started
   // run is spawned with its stdout discarded, so a printed URL reaches nobody (#813). The

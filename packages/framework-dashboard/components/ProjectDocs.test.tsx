@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 
-// The section polls onDocs itself (the ProjectTickets pattern); DocsPanel renders what it is given.
+// The section polls onDocs itself (the launcher-section pattern); DocsPanel renders what it is given.
 const onDocs = vi.hoisted(() => vi.fn())
 vi.mock('../server/reads.telefunc.js', () => ({ onDocs }))
 

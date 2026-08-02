@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 
-// The section polls onProjectLog itself (the ProjectTickets pattern); ProjectLogPanel renders
+// The section polls onProjectLog itself (the launcher-section pattern); ProjectLogPanel renders
 // what it is given.
 const onProjectLog = vi.hoisted(() => vi.fn())
 vi.mock('../server/reads.telefunc.js', () => ({ onProjectLog }))

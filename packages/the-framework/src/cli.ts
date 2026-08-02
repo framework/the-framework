@@ -66,6 +66,7 @@ import { createGateKeepalive } from './gate-keepalive.js'
 import { nodeGitRunner } from './project.js'
 import { addProject, ensureDaemonToken, listProjects, readDaemonToken, readPreferences, resolveProjectPath } from './registry.js'
 import { startConsumptionGuard } from './consumption-guard.js'
+import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 import {
   planMaintenanceSweep,
   maintainSweep,
@@ -1913,7 +1914,15 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // leaves the run ungated — the fail-open Rom confirmed.
   // Transparent mode (#625) leaves the run fully raw, so the guard is off with it — the run is
   // `claude -p` with no framework behavior, spend included.
-  const guard = transparent ? undefined : startConsumptionGuard({ driver, ...(opts.model ? { model: opts.model } : {}) })
+  const guard = transparent
+    ? undefined
+    : startConsumptionGuard({
+        driver,
+        // The #960 slider joins the per-run gate (#1490), read from the registry the same way
+        // the daemon's quota source reads it — so the Usage bar and this gate cannot disagree.
+        limitOffset: async () => (await readPreferences()).autoSpendOffset ?? DEFAULT_SPEND_OFFSET,
+        ...(opts.model ? { model: opts.model } : {}),
+      })
   if (transparent) io.out(`◆ transparent: on — raw ${AGENT_SPECS[opts.agent].label}, no framework prompt, guard, dashboard, or TODO loop`)
   else if (guard) io.out('◆ quota boundary: on')
   else if (!fake) {

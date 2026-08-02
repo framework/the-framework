@@ -84,6 +84,43 @@ test('startConsumptionGuard keeps a half-day cushion, so a fresh week is not pau
   guard.stop()
 })
 
+test('startConsumptionGuard honors the slider when it loosens the gate (#1490)', async () => {
+  // T0 sits ~31.5% into the week; the default line is ~38.6%. A window at 45% pauses under the
+  // default policy, but the user dragged the slider to boundary+20 (~51.5%) — the Usage bar
+  // shows room, so the gate must agree.
+  const guard = startConsumptionGuard({ driver: quotaDriver(week(45)), limitOffset: () => 20, now: () => T0 })
+  assert.ok(guard)
+  await guard.poller.poll()
+  guard.gate() // first check kicks off the offset refresh…
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(guard.gate(), null) // …and the next one sees it
+  guard.stop()
+})
+
+test('startConsumptionGuard never lets the slider tighten the gate on work the user asked for (#1490)', async () => {
+  // The slider pulled hard left (disabling unattended work) must not pause the user's own run:
+  // a window just past the boundary but inside the default half-day cushion stays ungated.
+  const guard = startConsumptionGuard({ driver: quotaDriver(week(35)), limitOffset: () => -50, now: () => T0 })
+  assert.ok(guard)
+  await guard.poller.poll()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(guard.gate(), null)
+  guard.stop()
+})
+
+test('startConsumptionGuard picks up a slider drag between checks, without a restart (#1490)', async () => {
+  let offset = 0
+  const guard = startConsumptionGuard({ driver: quotaDriver(week(45)), limitOffset: () => offset, now: () => T0 })
+  assert.ok(guard)
+  await guard.poller.poll()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(guard.gate(), 'Current week (all models)') // 45% is past boundary+default
+  offset = 20 // the user drags the handle right while the run is parked…
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(guard.gate(), null) // …and the next boundary check lets the run carry on
+  guard.stop()
+})
+
 test('startConsumptionGuard gate carries on when the quota cannot be read (#531)', async () => {
   const guard = startConsumptionGuard({ driver: quotaDriver({ available: false, reason: 'fetch-failed' }), now: () => T0 })
   assert.ok(guard)

@@ -102,6 +102,36 @@ describe('EventList row colour', () => {
   })
 })
 
+// The kind badge is tinted for scanning (#1455 follow-up): decisions amber, milestones green,
+// pushed surfaces primary — the marker is coloured, not the body text.
+describe('EventList badge tones', () => {
+  const gate: FrameworkEvent = { kind: 'choice', id: 'g1', title: 'Proceed?', options: [{ id: 'a', label: 'Yes' }] }
+
+  test('a choice badge is amber, and its body is not recoloured', () => {
+    render(<EventList events={[gate]} stick={false} />)
+    expect(screen.getByText('choice').className).toContain('text-warning')
+    expect(screen.getByText(/Proceed\?/).className).not.toContain('text-warning')
+  })
+
+  test('a clean end badge is green; a stopped one stays muted', () => {
+    render(<EventList events={[{ kind: 'end', ok: true }]} stick={false} />)
+    expect(screen.getByText('end').className).toContain('text-success')
+    cleanup()
+    render(<EventList events={[{ kind: 'end', ok: false, stopped: true }]} stick={false} />)
+    expect(screen.getByText('end').className).not.toContain('text-success')
+  })
+
+  test('a failed end keeps the failure red — semantics beat the kind map', () => {
+    render(<EventList events={[{ kind: 'end', ok: false, detail: 'exited 1' }]} stick={false} />)
+    expect(screen.getByText('end').className).toContain('text-danger')
+  })
+
+  test('a pushed view badge is primary', () => {
+    render(<EventList events={[{ kind: 'view', id: 'v1', title: 'Plan', markdown: '# p' }]} stick={false} />)
+    expect(screen.getByText('view').className).toContain('text-primary')
+  })
+})
+
 // The prompt opens the log (#1170): it is emitted after `session` and `system-prompt`, so the one
 // line the reader wrote used to sit under a char-count summary of a prompt they did not write.
 describe('EventList prompt placement', () => {

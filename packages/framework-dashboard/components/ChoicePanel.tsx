@@ -21,6 +21,7 @@ export function ChoicePanel({
   choice,
   active = false,
   countdown = true,
+  inline = false,
   onAnswered,
 }: {
   projectId: string
@@ -28,6 +29,9 @@ export function ChoicePanel({
   runId?: string | null | undefined
   choice: ChoiceRequest
   active?: boolean
+  /** Inline in the transcript (#1455 item 6): a rounded card in the flow rather than a
+   *  full-bleed rail section. Behaviour is identical — only the container changes. */
+  inline?: boolean
   /**
    * Whether autopilot's auto-accept countdown may run here (#1455). The launcher's questions hub
    * turns it off: it renders every parked session's gate at once, and a page that answers all of
@@ -134,7 +138,11 @@ export function ChoicePanel({
   const toggleAutopilot = (on: boolean) => updatePreferences({ autopilot: on }) // shared with the Start form (#410)
 
   return (
-    <section role="region" aria-label={choice.title} className="border-b border-border bg-accent/40 p-4">
+    <section
+      role="region"
+      aria-label={choice.title}
+      className={inline ? 'rounded-md border border-border bg-accent/40 p-3' : 'border-b border-border bg-accent/40 p-4'}
+    >
       <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your call</div>
       <h2 className="mb-3 text-sm font-medium">{choice.title}</h2>
 

@@ -22,7 +22,7 @@ import { useRoute } from '../../lib/use-route.js'
 import { useContextSet } from '../../lib/use-context-set.js'
 import { useActivityNotifications, useInterventionNotifications } from '../../lib/use-notifications.js'
 import { usePreferences, notificationsEnabled, newActivityEnabled, humanInterventionEnabled } from '../../lib/preferences.js'
-import { pendingChoices, agentViews, currentRunEvents } from '../../lib/live-state.js'
+import { agentViews, currentRunEvents } from '../../lib/live-state.js'
 import { useDocumentTitle } from '../../lib/document-title.js'
 import { useWorking } from '../../lib/use-working.js'
 import { useFavicon } from '../../lib/favicon.js'
@@ -232,17 +232,16 @@ export default function Page() {
     go({ view: 'tickets', projectId: id, runId: null, ticketSlug: slug })
   }
 
-  // The live run feed is owned here so both the main view and the right rail's choice gates
-  // (#440) read one shared Telefunc Channel. Hooks run before the relay early return below.
+  // The live run feed is owned here so both the main view and the right rail's views tab read
+  // one shared Telefunc Channel. Hooks run before the relay early return below.
   // The run whose feed and controls are in play is simply the one in the URL; in the no-id
   // fallback there is none yet, and a null id resolves to the project root, as before.
   const { events, lost } = useLiveEvents(projectId, runId, runStart.tick)
-  // The rail's gates and views stay scoped to the newest `session` segment even though a run's
-  // feed no longer is (a resumed session appends a second segment to the same journal): a gate
-  // the stopped segment left unanswered belongs to a process that is gone, and resurrecting it
-  // beside the resumed run would offer a dead control.
+  // The rail's views stay scoped to the newest `session` segment even though a run's feed no
+  // longer is (a resumed session appends a second segment to the same journal). Choice gates
+  // are no longer folded here: they live inline in the transcript (#1455 items 6/7), where
+  // EventList derives open/answered state from the same events it renders.
   const current = currentRunEvents(events)
-  const choices = projectId ? pendingChoices(current) : []
   const views = projectId ? agentViews(current) : []
   // The selected session's loop verdict, for the rail's pinned block under the tabs. It comes up
   // from RunView rather than being folded here: a finished run's events live in its archived log,
@@ -413,7 +412,6 @@ export default function Page() {
           <RightRail
             projectId={projectId}
             runId={runId}
-            choices={choices}
             views={views}
             files={files}
             context={context}

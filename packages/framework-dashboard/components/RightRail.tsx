@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ChoiceRequest, LogEntry, WorkspaceDoc } from '@gemstack/the-framework'
+import type { LogEntry, WorkspaceDoc } from '@gemstack/the-framework'
 import type { LoopStatus } from '@gemstack/the-framework/client'
 import { LoopStatusCard } from './LoopStatusCard.js'
 import { DocsPanel } from './DocsPanel.js'
 import { ProjectLogPanel } from './ProjectLogPanel.js'
-import { ChoicesRail } from './ChoicesRail.js'
 import { ViewsRail } from './ViewsRail.js'
 import { FileTree } from './FileTree.js'
 import { BrowserPanel } from './BrowserPanel.js'
@@ -16,13 +15,14 @@ import { cn } from '../lib/utils.js'
 import { usePolled } from '../lib/use-async.js'
 import { onDocs, onProjectLog } from '../server/reads.telefunc.js'
 
-type Tab = 'files' | 'choices' | 'views' | 'browser' | 'docs' | 'history'
+type Tab = 'files' | 'views' | 'browser' | 'docs' | 'history'
 
 // A one-word tab only works when the reader already knows the system. The former "Log" was
 // read as agent output or a console stream, not the durable project history it actually is.
+// Choices had a tab here (#440) until the gates moved inline into the transcript (#1455
+// items 6/7) — a question is answered where it was asked, so the rail has no panel for them.
 const TABS: Record<Tab, { label: string; help: string }> = {
   files: { label: 'Files', help: 'The project’s files — click one to add it to the next session’s context.' },
-  choices: { label: 'Choices', help: 'Questions this session is parked on, waiting for your answer.' },
   views: { label: 'Views', help: 'Documents the agent pushed up during the session — a plan, a summary, a writeup.' },
   browser: { label: 'Browser', help: 'Live view of the browser this session is driving.' },
   docs: { label: 'Docs', help: 'The PLAN/TODO markdown files at the root of the workspace.' },
@@ -32,15 +32,14 @@ const TABS: Record<Tab, { label: string; help: string }> = {
   },
 }
 
-// The right sidebar (#314 third rail): the interactive choice gates the run parks on
-// (#440), the ad-hoc markdown views the agent pushes (#441), the surfaced docs (PLAN/TODO),
-// and the committed project log. Choices/views come from the live event stream, passed
-// down from the shell; docs/log are Telefunc-backed reads of the selected project. The rail
-// jumps to whatever the run most wants seen: a choice gate first, else a fresh view.
+// The right sidebar (#314 third rail): the ad-hoc markdown views the agent pushes (#441),
+// the surfaced docs (PLAN/TODO), and the committed project log. Views come from the live
+// event stream, passed down from the shell; docs/log are Telefunc-backed reads of the
+// selected project. The rail jumps to a fresh first view; choice gates live inline in the
+// transcript now (#1455 items 6/7), so nothing here pulls focus for them.
 export function RightRail({
   projectId,
   runId,
-  choices,
   views,
   files,
   context,
@@ -51,9 +50,8 @@ export function RightRail({
   docsInMain = false,
 }: {
   projectId: string | null
-  /** The selected run: resolves a choice pick's gate (#749) and scopes the tree to its worktree (#815). */
+  /** The selected run: scopes the file tree to its worktree (#815) and keys the browser preview. */
   runId?: string | null | undefined
-  choices: ChoiceRequest[]
   views: AgentView[]
   /** The project's files for the Files tab tree (#492); empty on the relay. */
   files: string[]
@@ -96,27 +94,23 @@ export function RightRail({
     touched.current = true
     setTab(t)
   }
-  const hasChoices = choices.length > 0
   const hasViews = views.length > 0
   const hasFiles = files.length > 0
   // No browser on a GitHub Actions runner (#1053), so no screencast to proxy — never offer the tab.
   const showBrowser = hasBrowser && target !== 'actions'
 
-  // Only pull the rail for something genuinely new (#695/U22): a fresh choice gate (an id we
-  // haven't shown) or the first view. A resolving gate, a second view, or a Files flip no longer
-  // yanks the tab you're reading, and an explicit pick is never overridden by the browse default.
-  const seenChoiceIds = useRef<Set<string>>(new Set())
+  // Only pull the rail for something genuinely new (#695/U22): the first view. A second view or
+  // a Files flip no longer yanks the tab you're reading, and an explicit pick is never overridden
+  // by the browse default. (A fresh choice gate used to pull focus too — the gates are inline in
+  // the transcript now, #1455 items 6/7.)
   const sawView = useRef(false)
   useEffect(() => {
-    const freshChoice = choices.some(c => !seenChoiceIds.current.has(c.id))
-    for (const c of choices) seenChoiceIds.current.add(c.id)
     const firstView = hasViews && !sawView.current
     sawView.current = sawView.current || hasViews
 
-    if (freshChoice) setTab('choices')
-    else if (firstView) setTab('views')
-    else if (!touched.current && !hasChoices && !hasViews) setTab(hasFiles ? 'files' : 'docs')
-  }, [choices, hasChoices, hasViews, hasFiles])
+    if (firstView) setTab('views')
+    else if (!touched.current && !hasViews) setTab(hasFiles ? 'files' : 'docs')
+  }, [hasViews, hasFiles])
 
   if (!projectId) return null
 
@@ -125,7 +119,6 @@ export function RightRail({
   // does not offer, and a rail with no tabs left is not shown at all.
   const tabs: Tab[] = [
     ...(hasFiles ? ['files' as const] : []),
-    ...(hasChoices ? ['choices' as const] : []),
     ...(hasViews ? ['views' as const] : []),
     // Only when the run actually has one (#813) — a dead tab teaches people the preview is broken.
     ...(showBrowser && runId ? ['browser' as const] : []),
@@ -139,7 +132,7 @@ export function RightRail({
   // The Files badge counts only selected files, not whole-repo entries (#661): the shared context
   // set also holds project paths (from the Start form's repo checkboxes), which aren't in `files`.
   const selectedFiles = files.filter(f => context.has(f)).length
-  const count = (t: Tab) => (t === 'choices' ? choices.length : t === 'views' ? views.length : t === 'files' ? selectedFiles : 0)
+  const count = (t: Tab) => (t === 'views' ? views.length : t === 'files' ? selectedFiles : 0)
 
   return (
     <aside
@@ -178,8 +171,6 @@ export function RightRail({
       <div className="flex min-h-0 flex-col overflow-hidden">
         {active === 'files' && hasFiles ? (
           <FileTree projectId={projectId} runId={runId} files={files} selected={context} onToggle={toggleContext} />
-        ) : active === 'choices' && hasChoices ? (
-          <ChoicesRail projectId={projectId} runId={runId} choices={choices} />
         ) : active === 'views' && hasViews ? (
           <ViewsRail views={views} />
         ) : active === 'browser' && showBrowser && runId ? (

@@ -16,6 +16,14 @@ vi.mock('../server/control.telefunc.js', () => ({
   sendBridgeAnswer: vi.fn(async () => null),
   sendBridgeAnswerCancel: vi.fn(async () => null),
   sendStart: vi.fn(async () => null),
+  sendChoice: vi.fn(async () => null),
+}))
+// The feed's inline choice rows (#1455 item 6) pull ChoicePanel — and with it the preferences
+// module, whose telefunc reads must not load into jsdom.
+vi.mock('../lib/preferences.js', () => ({
+  usePreferences: () => ({}),
+  updatePreferences: vi.fn(),
+  autopilotEnabled: () => false,
 }))
 
 // The frame around the feed is not under test: the bar and composer reach for git and session

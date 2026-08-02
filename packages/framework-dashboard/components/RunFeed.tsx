@@ -21,8 +21,14 @@ export function RunFeed({
   openAt,
   emptyLabel = 'Waiting for the session to start…',
   tail,
+  projectId,
+  runId,
 }: {
   events: FrameworkEvent[]
+  /** The feed's own project/run (#1455 item 6): with a projectId the log's `choice` rows become
+   *  the interaction (inline panels/answered cards). The relay watch passes nothing — read-only. */
+  projectId?: string | undefined
+  runId?: string | null | undefined
   showSessionLink?: boolean
   /** The run's own view sets this false: its action bar's breadcrumb already names the session. */
   showName?: boolean
@@ -57,7 +63,13 @@ export function RunFeed({
     <>
       {lostBanner}
       <RunOverview events={events} showSessionLink={showSessionLink} showName={showName} showStatus={showStatus} showLoop={showLoop} />
-      <EventList events={events} stick={stick} {...(openAt ? { openAt } : {})} {...(tail ? { tail } : {})} />
+      <EventList
+        events={events}
+        stick={stick}
+        {...(openAt ? { openAt } : {})}
+        {...(tail ? { tail } : {})}
+        {...(projectId ? { projectId, runId } : {})}
+      />
     </>
   )
 }

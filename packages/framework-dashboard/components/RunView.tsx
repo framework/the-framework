@@ -249,6 +249,8 @@ export function RunView({
         // scroller when the poll lands.
         <RunFeed
           events={shown}
+          projectId={projectId}
+          runId={runId}
           showSessionLink={false}
           showName={false}
           showStatus={false}

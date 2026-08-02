@@ -1,7 +1,22 @@
 import type { FrameworkEvent } from '@gemstack/the-framework'
-import { afterEach, describe, expect, test } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
-import { EventList } from './EventList.js'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+
+// The inline choice rows (#1455 item 6) mount real ChoicePanels, which post over the control
+// shim; stub it (and the preferences plumbing) so the telefunc client never loads into jsdom.
+const sendChoice = vi.hoisted(() => vi.fn())
+vi.mock('../server/control.telefunc.js', () => ({ sendChoice }))
+vi.mock('../lib/preferences.js', () => ({
+  usePreferences: () => ({}),
+  updatePreferences: vi.fn(),
+  autopilotEnabled: () => false,
+}))
+
+const { EventList } = await import('./EventList.js')
+
+beforeEach(() => {
+  sendChoice.mockReset().mockResolvedValue(undefined)
+})
 
 afterEach(cleanup)
 
@@ -124,5 +139,64 @@ describe('EventList prompt placement', () => {
     ]
     render(<EventList events={events} stick={false} />)
     expect(rowText()[0]).toContain('system prompt sent')
+  })
+})
+
+// A transcript entry that represents an interaction IS the interaction (#1455 item 6): with a
+// projectId, an open `choice` row renders the same ChoicePanel the rail used to hold, and a
+// resolved one collapses to the AnsweredChoice ✓ card.
+describe('EventList inline choice rows (#1455 item 6)', () => {
+  const gate = (id = 'gate-1'): FrameworkEvent => ({
+    kind: 'choice',
+    id,
+    title: 'Start the next backlog item?',
+    options: [
+      { id: 'work', label: 'Work on it' },
+      { id: 'stop', label: 'Stop the loop' },
+    ],
+    recommended: 'work',
+  })
+  const resolved = (id = 'gate-1'): FrameworkEvent => ({ kind: 'choice-resolved', id, picked: 'work', by: 'user' })
+
+  test('an open gate renders the interactive panel, and a pick posts against the run', () => {
+    render(<EventList events={[gate()]} stick={false} projectId="p1" runId="r1" />)
+    fireEvent.click(screen.getByText('Work on it'))
+    expect(sendChoice).toHaveBeenCalledWith('p1', 'gate-1', 'work', 'user', 'r1')
+  })
+
+  test('without a projectId the row keeps the formatter text (the read-only relay watch)', () => {
+    render(<EventList events={[gate()]} stick={false} />)
+    expect(screen.queryByRole('button', { name: /Work on it/ })).toBeNull()
+    expect(screen.getByText(/Start the next backlog item\?/)).toBeTruthy()
+  })
+
+  test('a resolved gate collapses to a ✓ line and hides its "chose" row', () => {
+    render(<EventList events={[gate(), resolved()]} stick={false} projectId="p1" runId="r1" />)
+    const line = screen.getByRole('button', { name: /Start the next backlog item\?/ })
+    expect(line.getAttribute('aria-expanded')).toBe('false')
+    // The card says it better than the "✓ chose" formatter line, which is hidden with it there.
+    expect(screen.queryByText(/chose/)).toBeNull()
+    // And the gate is no longer answerable.
+    expect(screen.queryByRole('region', { name: 'Start the next backlog item?' })).toBeNull()
+  })
+
+  test('the collapsed line expands to what was picked', () => {
+    render(<EventList events={[gate(), resolved()]} stick={false} projectId="p1" runId="r1" />)
+    fireEvent.click(screen.getByRole('button', { name: /Start the next backlog item\?/ }))
+    expect(screen.getByText('Work on it')).toBeTruthy()
+    expect(screen.getByText('Stop the loop')).toBeTruthy()
+  })
+
+  test('a gate closed by end without an answer stays text — its audience is gone (#1359)', () => {
+    render(
+      <EventList events={[gate(), { kind: 'end', ok: false, stopped: true }]} stick={false} projectId="p1" runId="r1" />,
+    )
+    expect(screen.queryByRole('button', { name: /Work on it/ })).toBeNull()
+    expect(screen.getByText(/Start the next backlog item\?/)).toBeTruthy()
+  })
+
+  test('only the latest firing of a re-fired gate is interactive', () => {
+    render(<EventList events={[gate(), gate()]} stick={false} projectId="p1" runId="r1" />)
+    expect(screen.getAllByText('Work on it')).toHaveLength(1)
   })
 })

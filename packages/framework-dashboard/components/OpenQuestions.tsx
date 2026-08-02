@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { OpenQuestion } from '@gemstack/the-framework'
 import { onOpenQuestions } from '../server/reads.telefunc.js'
 import { usePolled } from '../lib/use-async.js'
+import { AnsweredChoice } from './AnsweredChoice.js'
 import { ChoicePanel } from './ChoicePanel.js'
 import { ScrollArea } from './ui/scroll-area.js'
 import { cn } from '../lib/utils.js'
@@ -78,7 +79,22 @@ export function OpenQuestions({
                 }}
               >
                 {done ? (
-                  <AnsweredCard question={question} pick={done.pick} onOpenSession={onOpenSession} />
+                  // The shared answered card (#1455 bonus 2), with the hub's extras: which
+                  // session asked on the collapsed line, and the way into it when expanded.
+                  <AnsweredChoice
+                    choice={question.choice}
+                    pick={done.pick}
+                    meta={<span className="truncate">{sessionLabel(question)}</span>}
+                    footer={
+                      <button
+                        type="button"
+                        onClick={() => onOpenSession(question.projectId, question.runId)}
+                        className="mt-3 text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Open session →
+                      </button>
+                    }
+                  />
                 ) : (
                   <div className="overflow-hidden rounded-md border border-border">
                     <button
@@ -128,58 +144,6 @@ export function OpenQuestions({
         )}
       </div>
     </section>
-  )
-}
-
-/**
- * An answered gate, collapsed to one line (#1455 bonus 2): what was decided stays visible and
- * expandable instead of vanishing under the cursor, but takes no more of the page than a row.
- */
-function AnsweredCard({
-  question,
-  pick,
-  onOpenSession,
-}: {
-  question: OpenQuestion
-  pick: string | string[]
-  onOpenSession: (projectId: string, runId: string) => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const picked = new Set(Array.isArray(pick) ? pick : [pick])
-  return (
-    <div className="overflow-hidden rounded-md border border-border">
-      <button
-        type="button"
-        onClick={() => setExpanded(e => !e)}
-        className="flex w-full items-baseline gap-2 px-4 py-2 text-left text-xs text-muted-foreground hover:bg-accent/40"
-        aria-expanded={expanded}
-      >
-        <span className="shrink-0 text-success">✓</span>
-        <span className="truncate font-medium text-foreground">{question.choice.title}</span>
-        <span className="truncate">{sessionLabel(question)}</span>
-        <span className="ml-auto shrink-0">{expanded ? 'Collapse' : 'Expand'}</span>
-      </button>
-      {expanded && (
-        <div className="border-t border-border p-4">
-          <ul className="space-y-1 text-sm">
-            {question.choice.options.map(o => (
-              <li key={o.id} className={cn('flex items-baseline gap-2', picked.has(o.id) ? '' : 'text-muted-foreground')}>
-                <span className={cn('w-4 shrink-0', picked.has(o.id) ? 'text-success' : '')}>{picked.has(o.id) ? '✓' : ''}</span>
-                <span>{o.label}</span>
-              </li>
-            ))}
-            {picked.size === 0 && <li className="text-muted-foreground">Accepted none</li>}
-          </ul>
-          <button
-            type="button"
-            onClick={() => onOpenSession(question.projectId, question.runId)}
-            className="mt-3 text-xs text-muted-foreground hover:text-foreground"
-          >
-            Open session →
-          </button>
-        </div>
-      )}
-    </div>
   )
 }
 

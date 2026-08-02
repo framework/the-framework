@@ -8,7 +8,8 @@
 - Autopilot (#433): while the preference is on, counts down `choice.autoAcceptMs` (default 10s) then auto-accepts the recommended pick; ANY mouse movement cancels (the human is here, let them pick). The Autopilot checkbox writes the shared preference (same one the Start form uses, #410).
 - `active` (only the first gate in the rail, #440) binds window-level Ctrl/Cmd+Enter to Accept, so the shortcut is unambiguous with several gates open.
 - `countdown={false}` (#1455) turns the autopilot auto-accept off for this mount: the launcher's questions hub renders every parked session's gate at once, and a page that answers them all ten seconds after opening is a mass auto-accept, not a hub. Default true — the session's own rail keeps today's behaviour.
-- `onAnswered(pick)` (#1455 bonus 2) fires once a pick is posted and accepted (same condition as `sent`), with what was picked — the hub collapses the answered card on it. Optional; the rail passes nothing.
+- `onAnswered(pick)` (#1455 bonus 2) fires once a pick is posted and accepted (same condition as `sent`), with what was picked — the hub collapses the answered card on it. Optional.
+- `inline` (#1455 item 6): the transcript's choice rows mount the panel as a rounded card in the flow rather than a full-bleed rail section — container styles only, behaviour identical.
 
 ## Decisions
 

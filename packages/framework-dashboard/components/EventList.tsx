@@ -1,8 +1,11 @@
-import type { FrameworkEvent } from '@gemstack/the-framework'
+import type { ChoiceRequest, FrameworkEvent } from '@gemstack/the-framework'
 import { formatFrameworkEvent } from '@gemstack/the-framework/client'
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { eventKindLabel } from '../lib/event-labels.js'
 import { receivedAt } from '../lib/event-times.js'
+import { pendingChoices } from '../lib/live-state.js'
+import { AnsweredChoice } from './AnsweredChoice.js'
+import { ChoicePanel } from './ChoicePanel.js'
 import { Markdown } from './Markdown.js'
 import { Badge } from './ui/badge.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -22,6 +25,9 @@ import {
 //     render their raw text inline, truncated to one line when long and expanding in place on click
 //     (#476/#520). The prompt carries its own YOU badge so the log reads like a conversation.
 //   - The system prompt keeps a char-count summary with the full text behind a click.
+//   - Choice gates, when the log knows its project (#1455 item 6): an open gate renders the same
+//     interactive ChoicePanel the rail used to hold, so the question is answered from the flow;
+//     a resolved one collapses to the AnsweredChoice ✓ card and hides its "✓ chose" line.
 // The kind badge shows once per run of same-group rows — a 200-line driver turn used to be 200
 // identical badges (#948). A driver `start` breaks out of the AGENT group so the user's turn gets
 // its own YOU badge. Live rows carry their arrival time at each group boundary; replayed events were
@@ -107,6 +113,54 @@ function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString()
 }
 
+/** How a special `choice` row renders (#1455 item 6): the still-open gate is the interactive
+ *  panel, a resolved one the collapsed ✓ card. Rows not in the map keep the formatter's text. */
+type ChoiceRow =
+  | { render: 'open'; choice: ChoiceRequest; active: boolean }
+  | { render: 'answered'; choice: ChoiceRequest; pick: string | readonly string[] }
+
+/**
+ * A transcript entry that represents an interaction should BE the interaction (#1455 item 6):
+ * fold the log's choice traffic into per-row render states.
+ *
+ * Only the LAST firing of a gate id is special — `pendingChoices` replaces a re-fired gate in
+ * place, so an earlier firing is history and keeps its text. An open gate (no resolution, no
+ * `end` after it) renders the same ChoicePanel the rail rendered; a resolved one collapses to
+ * the ✓ card, and the `choice-resolved` line that told its story is hidden — the card says it
+ * better. A gate closed by `end` without an answer (#1359: its audience is gone) stays text —
+ * a control nobody reads must not look answerable. Earlier firings' "✓ chose" lines stay put:
+ * they are the only record of a superseded decision.
+ */
+function foldChoiceRows(events: FrameworkEvent[]): {
+  rows: Map<FrameworkEvent, ChoiceRow>
+  hidden: Set<FrameworkEvent>
+} {
+  const rows = new Map<FrameworkEvent, ChoiceRow>()
+  const hidden = new Set<FrameworkEvent>()
+  const lastFiring = new Map<string, { e: FrameworkEvent; at: number }>()
+  const lastResolved = new Map<string, { e: Extract<FrameworkEvent, { kind: 'choice-resolved' }>; at: number }>()
+  events.forEach((e, at) => {
+    if (e.kind === 'choice') lastFiring.set(e.id, { e, at })
+    else if (e.kind === 'choice-resolved') lastResolved.set(e.id, { e, at })
+  })
+  const open = new Set(pendingChoices(events).map(c => c.id))
+  let newestOpen: FrameworkEvent | undefined
+  for (const [id, firing] of lastFiring) if (open.has(id)) newestOpen = firing.e
+  for (const [id, firing] of lastFiring) {
+    const { kind: _kind, ...choice } = firing.e as { kind: 'choice' } & ChoiceRequest
+    const resolved = lastResolved.get(id)
+    if (open.has(id)) {
+      rows.set(firing.e, { render: 'open', choice, active: firing.e === newestOpen })
+    } else if (resolved && resolved.at > firing.at) {
+      // A resolution from BEFORE this firing answered an earlier gate, not this one — a gate
+      // re-fired and then closed by `end` must not wear a pick it never received.
+      rows.set(firing.e, { render: 'answered', choice, pick: resolved.e.picked })
+      hidden.add(resolved.e)
+    }
+  }
+  return { rows, hidden }
+}
+
 // A conversation message (a prompt or a reply), rendered as compact Markdown. A short one renders
 // as-is. A long one clamps to its first line with a chevron beside it and expands in place on click —
 // the chevron stays on that first line (never a lone chevron on its own row), and the same rendered
@@ -146,6 +200,8 @@ export function EventList({
   stick = true,
   openAt,
   tail,
+  projectId,
+  runId,
 }: {
   events: FrameworkEvent[]
   stick?: boolean
@@ -154,15 +210,24 @@ export function EventList({
   /** Pinned after the last row, inside the scroller (#1265): the log's "and then…" — a web run's
    *  live mirror box — that must scroll (and stick) with the log rather than float over it. */
   tail?: ReactNode
+  /** The log's own project (#1455 item 6): with it, a `choice` row IS the interaction — an open
+   *  gate renders the inline ChoicePanel, a resolved one the collapsed ✓ card. Absent (the
+   *  read-only relay watch), every row keeps the formatter's text. */
+  projectId?: string | undefined
+  /** Which run an inline pick resolves (#749), forwarded to the panel with projectId. */
+  runId?: string | null | undefined
 }) {
+  const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
+  const shown = choiceRows ? promptFirst(events).filter(e => !choiceRows.hidden.has(e)) : promptFirst(events)
   return (
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>
       <MessageScroller className="flex-1">
         <MessageScrollerViewport aria-label="Session output">
           <MessageScrollerContent className="gap-1 p-4 font-mono text-xs">
-            {promptFirst(events).map((e, i, rows) => {
+            {shown.map((e, i, rows) => {
               const disclosable = disclosableText(e)
               const message = messageText(e)
+              const choiceRow = choiceRows?.rows.get(e)
               const prev = i > 0 ? rows[i - 1] : undefined
               const chunkHead = !prev || rowGroup(prev) !== rowGroup(e)
               const at = receivedAt(e)
@@ -184,6 +249,23 @@ export function EventList({
                   ) : message !== null ? (
                     // A prompt (YOU) or a reply (AGENT): compact Markdown, collapsed to its first line when long.
                     <Message text={message} />
+                  ) : choiceRow && projectId ? (
+                    // The interaction itself, in the flow (#1455 item 6). font-sans: these are
+                    // controls, not log text, so they drop the log's mono.
+                    <div className="min-w-0 flex-1 font-sans">
+                      {choiceRow.render === 'open' ? (
+                        <ChoicePanel
+                          key={choiceRow.choice.id}
+                          inline
+                          projectId={projectId}
+                          runId={runId}
+                          choice={choiceRow.choice}
+                          active={choiceRow.active}
+                        />
+                      ) : (
+                        <AnsweredChoice choice={choiceRow.choice} pick={choiceRow.pick} />
+                      )}
+                    </div>
                   ) : (
                     <span className={`min-w-0 flex-1 whitespace-pre-wrap break-words ${rowTone(e) || 'text-foreground'}`}>
                       {(formatFrameworkEvent(e) ?? '').trim()}

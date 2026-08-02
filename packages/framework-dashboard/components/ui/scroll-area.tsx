@@ -25,7 +25,7 @@ export function ScrollArea({
   viewportClassName,
   ...props
 }: ScrollAreaPrimitive.Root.Props & {
-  /** The scrolled element, for a rail that scrolls itself (ViewsRail, ChoicesRail). */
+  /** The scrolled element, for a rail that scrolls itself (ViewsRail). */
   viewportRef?: Ref<HTMLDivElement>
   /** Extra classes on the viewport — where the height cap belongs when the Root has no definite
    *  height. A `max-h-*` on the Root only caps the box; the viewport's `h-full` cannot resolve

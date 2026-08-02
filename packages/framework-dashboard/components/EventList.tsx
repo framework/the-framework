@@ -94,6 +94,27 @@ function rowTone(e: FrameworkEvent): string {
 }
 
 /**
+ * The BADGE's colour: a navigation aid for scanning the log by kind (#1455 follow-up), on top of
+ * {@link rowTone}'s semantics (failure red, the reader's own turn blue — those win). Only the
+ * high-signal kinds get a colour; the bulk of the log stays muted, or every row shouting means
+ * none do. The body keeps rowTone: colour the *marker*, not the text.
+ *
+ *   - your decisions (`choice`/`choice-resolved`) — amber, the rows the log most wants found
+ *   - milestones (a CLEAN `end`, `ready-for-merge`) — green, how far the run got; a stopped or
+ *     failed end is not a milestone (failure is already red, stopped stays neutral), and
+ *     `handoff` stays muted because its body reports per-rung outcomes that may be mixed
+ *   - pushed surfaces (`view`, `browser-stream`, `preview`) — primary, the agent showing you something
+ */
+function badgeTone(e: FrameworkEvent): string {
+  const semantic = rowTone(e)
+  if (semantic) return semantic
+  if (e.kind === 'choice' || e.kind === 'choice-resolved') return 'text-warning'
+  if ((e.kind === 'end' && e.ok) || e.kind === 'ready-for-merge') return 'text-success'
+  if (e.kind === 'view' || e.kind === 'browser-stream' || e.kind === 'preview') return 'text-primary'
+  return ''
+}
+
+/**
  * Hoist the run's first prompt to the top of the log (#1170).
  *
  * It is emitted after the `session` and `system-prompt` events, so the one line the reader wrote
@@ -236,7 +257,7 @@ export function EventList({
                   {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("system prompt") to sit on one line. */}
                   <span className="w-28 shrink-0">
                     {chunkHead && (
-                      <Badge className={`mt-0.5 text-[10px] uppercase ${rowTone(e) || 'text-muted-foreground'}`}>{rowLabel(e)}</Badge>
+                      <Badge className={`mt-0.5 text-[10px] uppercase ${badgeTone(e) || 'text-muted-foreground'}`}>{rowLabel(e)}</Badge>
                     )}
                   </span>
                   {disclosable ? (

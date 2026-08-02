@@ -127,9 +127,13 @@ export interface CiSweepDeps {
    */
   fix?: (cwd: string, request: CiFixRequest) => Promise<string | undefined>
   /**
-   * PRs whose merge already failed (`<cwd>\0<number>`), fed and consulted by the sweep so a
-   * persistently refused merge (branch protection demanding a review, say) costs one `gh` write,
-   * not one per tick for a week. In-memory on purpose: a daemon restart retries once.
+   * Merge attempts that already failed (`<cwd>\0<number>\0<headSha>`), fed and consulted by the
+   * sweep so a persistently refused merge (branch protection demanding a review, say) costs one
+   * `gh` write per head, not one per tick for a week. The head sha is part of the key (#1484):
+   * a push that changes the head — a conflict resolved, say — re-arms exactly one more attempt,
+   * the same re-arm rule the CI-fix half applies. Before, a PR that arrived unmergeable was
+   * skipped for the daemon's lifetime even after its branch was fixed and its checks went green.
+   * In-memory on purpose: a daemon restart retries once.
    */
   attemptedMerges?: Set<string>
   now?: () => number
@@ -193,7 +197,7 @@ export async function sweepProjectCi(cwd: string, deps: CiSweepDeps = {}): Promi
     // PR lands by GitHub's own hand, and a check-less one must outlive the attach window first.
     if (meta.mergeOutcome !== 'watched') continue
     if (status.checks === 'none' && !pastNoChecksGrace(linked, now())) continue
-    const attemptKey = `${cwd}\u0000${linked.number}`
+    const attemptKey = `${cwd}\u0000${linked.number}\u0000${status.headSha ?? ''}`
     if (deps.attemptedMerges?.has(attemptKey)) continue
     const outcome = await merge(cwd, meta)
     if (outcome.ok) result.merged.push({ runId: meta.id, number: linked.number, ...(outcome.url ? { url: outcome.url } : {}) })

@@ -145,6 +145,21 @@ test('a failed merge is recorded and not retried while the daemon remembers it',
   assert.deepEqual(merges, ['run-1'])
 })
 
+test('a failed merge re-arms when the PR head changes — a resolved conflict retries (#1484)', async () => {
+  const status: PrCiStatus = { checks: 'passing', failed: [], headSha: 'aaa1111' }
+  const { deps, merges } = sweepDeps(openPr(), status, { merge: { ok: false, error: 'not mergeable' } })
+  deps.attemptedMerges = new Set<string>()
+  await sweepProjectCi('/p', deps)
+  assert.deepEqual(merges, ['run-1'])
+  // Same head: remembered, not retried — the guard still holds against per-tick gh spend.
+  await sweepProjectCi('/p', deps)
+  assert.deepEqual(merges, ['run-1'])
+  // A push changed the head (the conflict was fixed, checks reran green): one more attempt.
+  status.headSha = 'bbb2222'
+  await sweepProjectCi('/p', deps)
+  assert.deepEqual(merges, ['run-1', 'run-1'])
+})
+
 const RED: PrCiStatus = { checks: 'failing', failed: ['build'], headSha: 'abc1234', branch: 'the-framework/change' }
 
 test('failing checks start one fix session, told the branch, head sha and failed checks (#1418)', async () => {

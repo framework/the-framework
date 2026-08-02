@@ -96,3 +96,76 @@ describe('OpenQuestions (#1455 item 4)', () => {
     expect(screen.queryByText(/Auto accept in/)).toBeNull()
   })
 })
+
+describe('OpenQuestions jump-nav (#1455 bonus 1)', () => {
+  const second = () =>
+    question({ projectId: 'p2', projectName: 'beta', runId: 'run-9', sessionName: 'fix-ci', choice: { id: 'gate-2', title: 'Approve the fix?', options: [{ id: 'ok', label: 'Approve it' }], recommended: 'ok' } })
+
+  test('one question needs no map to it: no nav', async () => {
+    onOpenQuestions.mockResolvedValue([question()])
+    render(<OpenQuestions onOpenSession={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('Start the next backlog item?')).toBeTruthy())
+    expect(screen.queryByRole('navigation', { name: 'Jump to a question' })).toBeNull()
+  })
+
+  test('several questions get the right-hand nav, and a row scrolls its card into view', async () => {
+    onOpenQuestions.mockResolvedValue([question(), second()])
+    const scrolled = vi.fn()
+    Element.prototype.scrollIntoView = scrolled
+    render(<OpenQuestions onOpenSession={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('navigation', { name: 'Jump to a question' })).toBeTruthy())
+    const nav = screen.getByRole('navigation', { name: 'Jump to a question' })
+    // One row per card, labelled by session.
+    expect(nav.textContent).toContain('triage-queue')
+    expect(nav.textContent).toContain('fix-ci')
+    fireEvent.click(screen.getAllByText('fix-ci').find(el => nav.contains(el))!)
+    expect(scrolled).toHaveBeenCalled()
+  })
+})
+
+describe('OpenQuestions answered collapse (#1455 bonus 2)', () => {
+  test('answering collapses the card to a ✓ line in place, and the header counts only open ones', async () => {
+    // A defined result is the ChoicePanel's "posted and accepted" condition, which is what
+    // fires onAnswered — the default undefined models a failed post and must not collapse.
+    sendChoice.mockResolvedValue(null)
+    onOpenQuestions.mockResolvedValue([question()])
+    render(<OpenQuestions onOpenSession={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('Work on it')).toBeTruthy())
+    fireEvent.click(screen.getByText('Work on it'))
+    // The live panel is gone, the single-line card is there, the count dropped to zero.
+    await waitFor(() => expect(screen.getByText('Expand')).toBeTruthy())
+    expect(screen.queryByText('Work on it')).toBeNull()
+    expect(screen.getByText('Waiting on you · 0')).toBeTruthy()
+    expect(screen.getByText('Start the next backlog item?')).toBeTruthy()
+  })
+
+  test('expanding an answered card shows the options with the pick marked, and still opens the session', async () => {
+    sendChoice.mockResolvedValue(null)
+    onOpenQuestions.mockResolvedValue([question()])
+    const onOpenSession = vi.fn()
+    render(<OpenQuestions onOpenSession={onOpenSession} />)
+    await waitFor(() => expect(screen.getByText('Work on it')).toBeTruthy())
+    fireEvent.click(screen.getByText('Work on it'))
+    await waitFor(() => expect(screen.getByText('Expand')).toBeTruthy())
+    fireEvent.click(screen.getByText('Expand'))
+    // The picked option is back, inert, alongside the rest; the session link still works.
+    expect(screen.getByText('Work on it')).toBeTruthy()
+    expect(screen.getByText('Stop the loop')).toBeTruthy()
+    fireEvent.click(screen.getByText('Open session →'))
+    expect(onOpenSession).toHaveBeenCalledWith('p1', 'run-1')
+    fireEvent.click(screen.getByText('Collapse'))
+    expect(screen.queryByText('Stop the loop')).toBeNull()
+  })
+
+  test('a failed post does not collapse: the gate is still open', async () => {
+    sendChoice.mockRejectedValue(new Error('boom'))
+    onOpenQuestions.mockResolvedValue([question()])
+    render(<OpenQuestions onOpenSession={vi.fn()} />)
+    await waitFor(() => expect(screen.getByText('Work on it')).toBeTruthy())
+    fireEvent.click(screen.getByText('Work on it'))
+    // useAction surfaces the thrown Error's own message.
+    await waitFor(() => expect(screen.getByText('boom')).toBeTruthy())
+    expect(screen.queryByText('Expand')).toBeNull()
+    expect(screen.getByText('Waiting on you · 1')).toBeTruthy()
+  })
+})

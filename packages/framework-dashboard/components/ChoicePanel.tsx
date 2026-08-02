@@ -21,6 +21,7 @@ export function ChoicePanel({
   choice,
   active = false,
   countdown = true,
+  onAnswered,
 }: {
   projectId: string
   /** Which run the pick resolves (#749); absent falls back to the project's control log. */
@@ -34,6 +35,12 @@ export function ChoicePanel({
    * rail keeps the countdown — there the user chose to look at that one run.
    */
   countdown?: boolean
+  /**
+   * Told once the pick is posted and accepted, with what was picked. The launcher's hub uses it
+   * to collapse the answered card to a single line (#1455 bonus 2); the rail passes nothing —
+   * there the `choice-resolved` event unmounts the panel and that is the whole story.
+   */
+  onAnswered?: ((pick: string | string[]) => void) | undefined
 }) {
   const { busy, error, run } = useAction()
   // Posted and accepted by the daemon; the panel stays parked (buttons off, status shown)
@@ -56,7 +63,10 @@ export function ChoicePanel({
   const post = (pick: string | string[], by: 'user' | 'autopilot' = 'user') => {
     void run(() => sendChoice(projectId, choice.id, pick, by, runId ?? undefined), 'Could not send your choice — try again.').then(
       result => {
-        if (result !== undefined) setSent(true)
+        if (result !== undefined) {
+          setSent(true)
+          onAnswered?.(pick)
+        }
       },
     )
   }

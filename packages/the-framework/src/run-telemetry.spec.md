@@ -2,7 +2,7 @@ The run telemetry both entry paths share: session naming, driver-event accountin
 
 ## TLDR
 
-- `emitSessionStart()`: the opening `session` event; a literal `--session-link` shows right away, a `{sessionId}` template waits for the driver's real id.
+- `emitSessionStart()`: the opening `session` event; a literal `--session-link` shows right away, a `{sessionId}` template waits for the driver's real id. Records the model the driver was started with (#1438) when one was configured — per leg, since a continuation's leg emits its own `session` event and may run a different model.
 - `createDriverEventHandler()`: wires the driver's black-box event stream (#165) into the run stream — re-emits `session-update` when the session id changes (it changes per prompt), folds each turn's usage into a `UsageMeter` total, and trips the budget (#322) and consumption (#529) self-stops.
 - The driver's `session` announcement (#1322) is consumed here, never forwarded as a `driver` event: it emits the `session-update` at turn *start*, so a turn stopped or dying mid-flight keeps the run's `claude --resume` handle (the update used to wait for `result`, and the resume button vanished with the turn). Same id-change dedup as the result path; the template link applies, and a later result repeating the id does not re-emit (a cloud result's own deep link still wins on first sighting, as before).
 - `createRunControls()`: composes the run's `AbortSignal.any` of the caller's signal + budget + consumption + plan-decline (#358) controllers, so everything downstream stops the same way whichever fired.

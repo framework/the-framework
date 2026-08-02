@@ -336,7 +336,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     context: opts.context,
   })
 
-  emitSessionStart({ emit, driver: opts.driver, cwd: opts.cwd, sessionLink: opts.sessionLink })
+  emitSessionStart({ emit, driver: opts.driver, cwd: opts.cwd, sessionLink: opts.sessionLink, model: opts.model })
   // Surface the exact system prompt the agent runs under (#343). Nothing is read
   // off disk and appended after this, so the text is the whole of it (#547). The
   // per-turn user prompts ride along as `driver` `start` events, so the dashboard

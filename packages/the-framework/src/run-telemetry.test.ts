@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { createDriverEventHandler } from './run-telemetry.js'
+import { createDriverEventHandler, emitSessionStart } from './run-telemetry.js'
+import type { Driver } from './driver/index.js'
 import type { FrameworkEvent } from './events.js'
 
 // #1322: the resume button needed a `session-update`, which only fired at `result` — a turn
@@ -15,6 +16,17 @@ function handler(events: FrameworkEvent[], sessionLink?: string) {
     consumptionController: new AbortController(),
   })
 }
+
+test('the opening session event records the model the driver was started with (#1438)', () => {
+  const events: FrameworkEvent[] = []
+  const driver = { name: 'claude' } as Driver
+  emitSessionStart({ emit: e => events.push(e), driver, cwd: '/w', model: 'fable' })
+  assert.deepEqual(events, [{ kind: 'session', driver: 'claude', workspace: '/w', fake: false, model: 'fable' }])
+  // No model configured -> none recorded: the agent's own default is not knowable here.
+  const bare: FrameworkEvent[] = []
+  emitSessionStart({ emit: e => bare.push(e), driver, cwd: '/w' })
+  assert.deepEqual(bare, [{ kind: 'session', driver: 'claude', workspace: '/w', fake: false }])
+})
 
 test('a session announcement emits session-update at turn start and is consumed, not forwarded (#1322)', () => {
   const events: FrameworkEvent[] = []

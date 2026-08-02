@@ -155,6 +155,11 @@ export interface SessionInfo {
    * the session lived — and that path is exactly what `claude --resume` needs to find it again.
    */
   workspace?: string
+  /**
+   * The model id the current leg's agent was started with (#1438). Folded per leg like the
+   * driver/workspace: the latest `session` event wins, and a leg that recorded none clears it.
+   */
+  model?: string
 }
 
 /**
@@ -171,6 +176,7 @@ export function sessionInfo(events: readonly FrameworkEvent[]): SessionInfo | nu
         fake: event.fake,
         workspace: event.workspace,
         ...(event.sessionLink ? { sessionLink: event.sessionLink } : {}),
+        ...(event.model ? { model: event.model } : {}),
       }
     } else if (event.kind === 'session-update') {
       info = { ...(info ?? {}), sessionId: event.sessionId, ...(event.sessionLink ? { sessionLink: event.sessionLink } : {}) }

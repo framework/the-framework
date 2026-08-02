@@ -11,7 +11,7 @@ import { pickedIds, type AutoHandoffSkip, type AutoMergeOutcome, type ChoiceOpti
 export function formatFrameworkEvent(event: FrameworkEvent): string {
   switch (event.kind) {
     case 'session':
-      return `◆ ${event.fake ? 'fake' : event.driver} in ${event.workspace}${
+      return `◆ ${event.fake ? 'fake' : event.driver}${event.model ? ` (${event.model})` : ''} in ${event.workspace}${
         event.sessionLink ? ` — ${event.sessionLink}` : ''
       }`
     case 'session-update':

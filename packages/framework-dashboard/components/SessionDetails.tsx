@@ -43,6 +43,7 @@ export function SessionDetails({ events }: { events: FrameworkEvent[] }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-4 py-2 text-xs">
       <Fact label="Agent" value={agentLabel} />
+      {session?.model && <Fact label="Model" value={session.model} />}
       {usage ? (
         <>
           {usage.costUsd !== undefined && <Fact label="Spent" value={`$${usage.costUsd.toFixed(2)}`} />}

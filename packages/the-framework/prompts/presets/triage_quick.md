@@ -1,6 +1,7 @@
-1. Look at all tickets and choose tickets to work on next
-   - Only pick tickets that are quick-wins (quick to implement) and consensual (zero open questions, zero variability, e.g. a single fairly obvious plan)
-2. Add tickets to TODO_AGENTS.md
+Look at `tickets/*` and choose tickets to work on next:
+- Pick a ticket if it has a `.plan.md` that shows it's a quick-win (low `effort` value) with `uncertainty: 0`
+- Add tickets to TODO_AGENTS.md
+  - With sensible prioritization, and consider bumpimg the priority of lowest effort tickets (e.g. to make `effort: 0` the next tasks agents work on)
 
 Always set <SESSION_NAME> to triage-quick
-- If branch the-framework/<SESSION_NAME> already exists, abort and tell user that the branch already exists and that triage is already pending.
+- If branch the-framework/<SESSION_NAME> already exists, abort and tell user the branch already exists and triage is already pending.

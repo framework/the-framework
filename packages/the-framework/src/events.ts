@@ -190,6 +190,15 @@ export type FrameworkEvent =
    * Frames themselves never enter the log: someone will type a password into that pane.
    */
   | { kind: 'browser-stream'; port: number }
+  /**
+   * The agent's browser is showing this page (#1455 item 6b): emitted for the first real
+   * (http/https) page and again on every change of page, so the transcript can host the live
+   * preview at its point of use rather than only in the rail. Only the URL travels — frames
+   * never enter the log, same rule as `browser-stream`. Re-emitted after each `session` so the
+   * row survives the dashboard's last-session slice (#829); readers fold repeats of the same
+   * URL in place rather than stacking duplicates, like `view` re-shows.
+   */
+  | { kind: 'browser'; url: string }
   /** A framework-level log line. */
   | { kind: 'log'; message: string }
   /**

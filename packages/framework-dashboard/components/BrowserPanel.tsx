@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from './ui/button.js'
 
 /**
- * The session's browser, live in the right rail (#813).
+ * The session's browser, live in the right rail (#813) and inline in the transcript (#1455 6b).
  *
  * The session serves its headless Chrome as MJPEG (#802) and takes clicks and keys back over
  * POST; the daemon proxies both so this stays same-origin. An `<img>` renders
@@ -11,7 +11,26 @@ import { Button } from './ui/button.js'
  * This is the half that makes the `await-browser` gate (#796) actionable: the session parks
  * asking a human to get past a login wall, and until now that human had no way to reach the page.
  */
-export function BrowserPanel({ projectId, runId }: { projectId: string; runId: string }) {
+export function BrowserPanel({
+  projectId,
+  runId,
+  inline,
+  onFrame,
+}: {
+  projectId: string
+  runId: string
+  /** Transcript-row variant (#1455 item 6b): fill and letterbox into the box the row provides
+   *  instead of the rail's scroll column, and drop the footer help text — container styles
+   *  only, the same split ChoicePanel's `inline` makes. */
+  inline?: boolean
+  /**
+   * Called with a data-URL still of the newest frame every couple of seconds while streaming
+   * (#1455 item 6b). The caller keeps it so a pane whose run ends can degrade to that still
+   * instead of a dead stream (#1359). The frame lives only in this viewer's memory — never in
+   * the log or on disk, the same rule the stream itself follows.
+   */
+  onFrame?: (dataUrl: string) => void
+}) {
   const img = useRef<HTMLImageElement>(null)
   const [attempt, setAttempt] = useState(0)
   // The failure is keyed to the exact stream it happened on, so a different run or a Retry
@@ -30,6 +49,26 @@ export function BrowserPanel({ projectId, runId }: { projectId: string; runId: s
   }
   const streamKey = `${base}#${attempt}`
   const failed = failedKey === streamKey
+
+  useEffect(() => {
+    if (!onFrame) return
+    const timer = setInterval(() => {
+      const el = img.current
+      if (!el || !el.naturalWidth) return
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = el.naturalWidth
+        canvas.height = el.naturalHeight
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+        ctx.drawImage(el, 0, 0)
+        onFrame(canvas.toDataURL('image/jpeg', 0.7))
+      } catch {
+        // A half-decoded frame throws; skip it and take the next tick's.
+      }
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [onFrame])
 
   /**
    * Where the click landed on the real page. The frame is capped at 1280x720 by the screencast
@@ -68,8 +107,12 @@ export function BrowserPanel({ projectId, runId }: { projectId: string; runId: s
   }
 
   return (
-    <div className="flex min-h-0 flex-auto flex-col">
-      <div className="min-h-0 flex-auto overflow-auto p-2">
+    <div className={inline ? 'flex h-full min-h-0 w-full flex-col' : 'flex min-h-0 flex-auto flex-col'}>
+      <div
+        className={
+          inline ? 'flex min-h-0 flex-1 items-center justify-center overflow-hidden' : 'min-h-0 flex-auto overflow-auto p-2'
+        }
+      >
         {/* tabIndex makes the frame focusable so keystrokes have somewhere to land; the ring
             shows where they will land. */}
         <img
@@ -77,7 +120,9 @@ export function BrowserPanel({ projectId, runId }: { projectId: string; runId: s
           src={`${base}/stream?r=${attempt}`}
           alt="The session's browser"
           tabIndex={0}
-          className="w-full cursor-crosshair rounded border border-border bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+          className={`cursor-crosshair focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+            inline ? 'max-h-full max-w-full' : 'w-full rounded border border-border bg-muted'
+          }`}
           onError={() => setFailedKey(streamKey)}
           onClick={event => send({ type: 'click', ...toPageCoords(event) })}
           onWheel={event => send({ type: 'scroll', ...toPageCoords(event), deltaY: event.deltaY })}
@@ -90,10 +135,12 @@ export function BrowserPanel({ projectId, runId }: { projectId: string; runId: s
           }}
         />
       </div>
-      <p className="border-t border-border p-2 text-xs text-muted-foreground">
-        Click the frame, then type. Chrome only sends a frame when the page changes, so this stays blank until the
-        agent opens something.
-      </p>
+      {!inline && (
+        <p className="border-t border-border p-2 text-xs text-muted-foreground">
+          Click the frame, then type. Chrome only sends a frame when the page changes, so this stays blank until the
+          agent opens something.
+        </p>
+      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-The session's live headless-Chrome view in the right rail (#813): an MJPEG `<img>` plus click/scroll/key input posted back.
+The session's live headless-Chrome view in the right rail (#813) and inline in the transcript (#1455 item 6b): an MJPEG `<img>` plus click/scroll/key input posted back.
 
 ## TLDR
 
@@ -6,6 +6,8 @@ The session's live headless-Chrome view in the right rail (#813): an MJPEG `<img
 - Input goes as JSON POSTs to `…/input`: `{type:'click', x, y}`, `{type:'scroll', x, y, deltaY}`, `{type:'key', text}`; the frame has `tabIndex={0}` so keystrokes have somewhere to land.
 - This makes the `await-browser` gate (#796) actionable: the session parks asking a human to get past a login wall, and this is how they reach the page.
 - On `<img>` error shows a "not reachable" card with Retry; the footer notes Chrome only sends a frame when the page changes.
+- `inline` (#1455 item 6b) is the transcript-row variant, container styles only (the ChoicePanel split): fill and letterbox into the box the row provides, drop the footer help text. The Retry card and all input wiring are shared.
+- `onFrame` hands the caller a data-URL still of the newest frame every ~2s while streaming, so a pane whose run ends can degrade to that still (#1359). The still lives only in the viewer's memory — frames never enter the log or disk, the stream's own rule. Canvas capture is best-effort: no 2d context (jsdom) or a half-decoded frame just skips the tick.
 
 ## Problems
 

@@ -168,6 +168,55 @@ test('a browser that cannot be listed is survivable', async () => {
   assert.equal(stream, undefined)
 })
 
+test('onPage announces the first real page and every change after, deduped (#1455 item 6b)', async () => {
+  const pages: string[] = []
+  let targets = [page({ id: 'p1', url: 'https://first.test/' })]
+  const stream = await startBrowserStream({
+    browserUrl: 'http://127.0.0.1:9333',
+    connect: async () => fakeCdp().session,
+    listTargets: async () => targets,
+    followIntervalMs: 20,
+    onPage: url => pages.push(url),
+  })
+  assert.ok(stream)
+  try {
+    assert.deepEqual(pages, ['https://first.test/'], 'the page the stream attached to is announced')
+
+    // The agent navigates in place: same tab, new URL. The follow loop must say so even
+    // though there is nothing to re-attach.
+    targets = [page({ id: 'p1', url: 'https://second.test/' })]
+    await new Promise(r => setTimeout(r, 120))
+    assert.deepEqual(pages, ['https://first.test/', 'https://second.test/'])
+
+    // Polling the same page again announces nothing new.
+    await new Promise(r => setTimeout(r, 120))
+    assert.deepEqual(pages, ['https://first.test/', 'https://second.test/'])
+
+    // A tab switch announces the new tab's page.
+    targets = [page({ id: 'p2', url: 'https://third.test/' }), ...targets]
+    await new Promise(r => setTimeout(r, 120))
+    assert.deepEqual(pages, ['https://first.test/', 'https://second.test/', 'https://third.test/'])
+  } finally {
+    await stream?.close()
+  }
+})
+
+test('onPage stays silent for a browser idling on about:blank — idling is not showing (#1455 item 6b)', async () => {
+  const pages: string[] = []
+  const stream = await startBrowserStream({
+    browserUrl: 'http://127.0.0.1:9333',
+    connect: async () => fakeCdp().session,
+    listTargets: async () => [page({ id: 'p1', url: 'about:blank' })],
+    onPage: url => pages.push(url),
+  })
+  assert.ok(stream, 'about:blank still streams — only the announcement is held')
+  try {
+    assert.deepEqual(pages, [])
+  } finally {
+    await stream?.close()
+  }
+})
+
 test('the stream follows the agent when it opens another tab (#802)', async () => {
   const sessions: ReturnType<typeof fakeCdp>[] = []
   let targets = [page({ id: 'first', url: 'https://first.test/' })]

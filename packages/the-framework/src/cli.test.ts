@@ -1037,6 +1037,36 @@ test('naming the session renames the run-id branch and records it as a branch ev
   assert.equal(git('rev-parse', '--abbrev-ref', 'HEAD').trim(), 'the-framework/cool-name')
 })
 
+test('a browser URL is held until the session opens, then re-said after every later session (#1455 item 6b)', () => {
+  const { io, out } = capture()
+  const journal = createRunJournal({
+    io,
+    cwd: '/tmp',
+    store: undefined,
+    publisher: undefined,
+    runId: undefined,
+    kind: 'prompt',
+    title: 'a run',
+    beforeLog: async () => {},
+  })
+  journal.announceBrowserUrl('https://early.test/')
+  assert.ok(
+    !out.some(l => l.includes('browser: https://early.test/')),
+    'held: an event ahead of `session` never reaches the dashboard (#829)',
+  )
+  journal.onEvent({ kind: 'session', driver: 'claude-code', workspace: '/repo', fake: true })
+  assert.ok(out.some(l => l.includes('browser: https://early.test/')))
+
+  journal.announceBrowserUrl('https://nav.test/')
+  assert.ok(out.some(l => l.includes('browser: https://nav.test/')), 'after the session a navigation emits straight away')
+
+  // A continuation starts a fresh rendered slice; the latest URL is re-said so its transcript
+  // still has a browser row to host the pane.
+  const before = out.filter(l => l.includes('browser: https://nav.test/')).length
+  journal.onEvent({ kind: 'session', driver: 'claude-code', workspace: '/repo', fake: true })
+  assert.equal(out.filter(l => l.includes('browser: https://nav.test/')).length, before + 1)
+})
+
 /**
  * A `--run-on actions` run with no token must end as `failed`, and must end at all.
  *

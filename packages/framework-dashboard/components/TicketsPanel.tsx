@@ -1,6 +1,6 @@
 import type { TicketsMeta, WorkspaceTicket } from '@gemstack/the-framework'
 import { presets } from '@gemstack/the-framework/client'
-import { RefreshCw, Github } from 'lucide-react'
+import { RefreshCw, Github, Zap, FileText } from 'lucide-react'
 import { sendStart } from '../server/control.telefunc.js'
 import { onTicketsMeta } from '../server/reads.telefunc.js'
 import { Button } from './ui/button.js'
@@ -36,6 +36,17 @@ const UPDATE_PROMPT = presets.updateTickets.render()
 /** Captured once: `useLoaded` treats a fresh `{}` literal as a new value on every render. */
 const NO_META: TicketsMeta = {}
 
+/**
+ * The prompt the plan column's spike button starts a session with (#685): write this ticket's plan.
+ * The `<TICKET>` is the ticket's stem — its `.md` name without the extension — so
+ * `2026-07-20_do-the-thing.md` asks for `tickets/2026-07-20_do-the-thing.plan.md`, the sibling the
+ * plan link then reads. Plain text, not a preset, and exported so the test asserts the exact ask:
+ * a hidden second copy of the prompt is what #1187 was about.
+ */
+export function planPrompt(file: string): string {
+  return `Create tickets/${file.replace(/\.md$/, '')}.plan.md`
+}
+
 // The tickets list (#697/#1144): the project's `tickets/*.md` as one-liners — priority, topics,
 // what the agent already did to it, and how recently, all on the row — so the backlog is scannable
 // without opening one. A row's only action is opening its detail page (#1144), which is where
@@ -48,6 +59,7 @@ export function TicketsPanel({
   loaded,
   hiddenByFilter = 0,
   onOpen,
+  onOpenPlan,
   onRunStarted,
 }: {
   projectId: string | null
@@ -59,6 +71,9 @@ export function TicketsPanel({
   hiddenByFilter?: number
   /** Open one ticket's detail page (#1144), by its file — the same slug the route uses. */
   onOpen: (file: string) => void
+  /** Open one ticket's plan view (#685), by its file — the plan column's link when a `.plan.md`
+   *  already exists. Absent when the caller has no plan route to send the reader to. */
+  onOpenPlan?: ((file: string) => void) | undefined
   /** Told when the import session starts, so the shell can show it (#948) — the button used
    *  to flip "Starting…" and leave you staring at the still-empty panel. */
   onRunStarted?: ((intent: string, runId?: string) => void) | undefined
@@ -71,17 +86,21 @@ export function TicketsPanel({
   if (!projectId) return null
   if (!loaded) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>
 
-  const startImport = async (prompt: string, failure: string) => {
-    // Unattended (#1279): an import fired by a button is routine work, not a conversation — it
-    // ends at settle and its armed handoff fires, as when the sweep starts the same routine.
-    const result = await run(() => sendStart(projectId, prompt, 'prompt', { unattended: true }), failure)
+  const startSession = async (prompt: string, failure: string, options: { unattended?: boolean } = {}) => {
+    const result = await run(() => sendStart(projectId, prompt, 'prompt', options), failure)
     // Jump to the session doing the work, so its progress is watchable instead of the panel
     // sitting on stale rows until files land.
     if (result?.ok) onRunStarted?.(prompt, result.runId)
   }
 
-  const importFromGithub = () => startImport(IMPORT_PROMPT, 'The import could not be started.')
-  const updateFromGithub = () => startImport(UPDATE_PROMPT, 'The update could not be started.')
+  // Unattended (#1279): an import/update fired by a button is routine work, not a conversation — it
+  // ends at settle and its armed handoff fires, as when the sweep starts the same routine.
+  const importFromGithub = () => startSession(IMPORT_PROMPT, 'The import could not be started.', { unattended: true })
+  const updateFromGithub = () => startSession(UPDATE_PROMPT, 'The update could not be started.', { unattended: true })
+  // Attended, unlike the imports above: a plan is written per-ticket for a human to read and act
+  // on, so the session stays a conversation you land in and steer rather than one that settles and
+  // hands itself off. The reader reviews the result through the plan column's link.
+  const startPlan = (file: string) => startSession(planPrompt(file), 'The planning session could not be started.')
 
   if (tickets.length === 0 && hiddenByFilter > 0) {
     // Filtered to nothing, not genuinely empty (#1144/#1230): offering an import here would ask
@@ -158,7 +177,7 @@ export function TicketsPanel({
               className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm"
             >
               {/* Only closed is called out (#1144/#1230): open is the row's default assumption,
-                  same as spiked/planned only showing when true. */}
+                  same as spiked/claimed only showing when true. */}
               {ticket.status === 'closed' && (
                 <Badge className="shrink-0 border-transparent px-1.5 text-[10px] uppercase text-muted-foreground">closed</Badge>
               )}
@@ -175,9 +194,10 @@ export function TicketsPanel({
                     {topic}
                   </Badge>
                 ))}
-                {/* What the agent has already done to this ticket, so it is clear what is left. */}
+                {/* What the agent has already done to this ticket, so it is clear what is left.
+                    "planned" is not a badge here anymore: the plan column past the date says it,
+                    and gives the reader somewhere to go with it (open the plan, or start one). */}
                 {ticket.spiked && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">spiked</Badge>}
-                {ticket.planned && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">planned</Badge>}
                 {/* An agent holds this ticket's `.lock.md` (#1420); the detail page releases it.
                     The holder is named inline, not only in the native tooltip — a still 1-2s
                     hover is how nobody discovers anything. Truncated to keep the dense row
@@ -205,6 +225,48 @@ export function TicketsPanel({
                 {formatAge(ticket.date)}
               </span>
             </button>
+            {/* The plan column (#685): a `.plan.md` is either there to read or waiting to be
+                written. Planned → a link to the rendered plan; not planned → a spike button that
+                starts a session to write one. A sibling of the row's button, not a child, for the
+                same reason the GitHub link is: an interactive control nested in a button is invalid
+                HTML, and the two go different places. */}
+            <div className="flex w-10 shrink-0 items-center justify-center">
+              {ticket.planned ? (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        onClick={() => onOpenPlan?.(ticket.file)}
+                        disabled={!onOpenPlan}
+                        aria-label={`View the plan for ${ticket.title}`}
+                        className="text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                      />
+                    }
+                  >
+                    <FileText className="h-4 w-4" aria-hidden />
+                  </TooltipTrigger>
+                  <TooltipContent>View the plan</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        onClick={() => void startPlan(ticket.file)}
+                        disabled={busy}
+                        aria-label={`Create a plan for ${ticket.title}`}
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                      />
+                    }
+                  >
+                    <Zap className="h-4 w-4" aria-hidden />
+                  </TooltipTrigger>
+                  <TooltipContent>Plan this ticket — starts a session to write its plan</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
             {ticket.github ? (
               <a
                 href={ticket.github.url}

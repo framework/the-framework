@@ -81,6 +81,24 @@ describe('parseRoute', () => {
       ticketSlug: '2026-07-20_do-the-thing.md',
     })
   })
+
+  it('reads a ticket\'s plan view off the fourth segment', () => {
+    expect(parseRoute('/my-repo-a1b2/tickets/2026-07-20_do-the-thing.md/plan')).toEqual({
+      view: 'tickets',
+      projectId: 'my-repo-a1b2',
+      runId: null,
+      ticketSlug: '2026-07-20_do-the-thing.md',
+      plan: true,
+    })
+    // As the third segment, `plan` is just the ticket slug — it only turns on the plan view when
+    // it is the fourth, sitting past a real slug.
+    expect(parseRoute('/my-repo-a1b2/tickets/plan')).toEqual({
+      view: 'tickets',
+      projectId: 'my-repo-a1b2',
+      runId: null,
+      ticketSlug: 'plan',
+    })
+  })
 })
 
 describe('formatRoute', () => {
@@ -119,6 +137,14 @@ describe('formatRoute', () => {
     expect(formatRoute({ view: 'tickets', projectId: 'my-repo', runId: null, ticketSlug: 'a b.md' })).toBe('/my-repo/tickets/a%20b.md')
   })
 
+  it('writes a ticket\'s plan view, slug encoded, past its detail path', () => {
+    expect(formatRoute({ view: 'tickets', projectId: 'my-repo', runId: null, ticketSlug: '2026-07-20_do-the-thing.md', plan: true })).toBe(
+      '/my-repo/tickets/2026-07-20_do-the-thing.md/plan',
+    )
+    // No slug, nothing to plan against — the flag is dropped rather than writing a dangling `/plan`.
+    expect(formatRoute({ view: 'tickets', projectId: 'my-repo', runId: null, ticketSlug: null, plan: true })).toBe('/my-repo/tickets')
+  })
+
   it('round-trips', () => {
     for (const route of [
       { projectId: null, runId: null },
@@ -129,6 +155,7 @@ describe('formatRoute', () => {
       { view: 'tickets' as const, projectId: null, runId: null },
       { view: 'tickets' as const, projectId: 'my-repo', runId: null, ticketSlug: null },
       { view: 'tickets' as const, projectId: 'my-repo', runId: null, ticketSlug: '2026-07-20_thing.md' },
+      { view: 'tickets' as const, projectId: 'my-repo', runId: null, ticketSlug: '2026-07-20_thing.md', plan: true },
     ]) {
       expect(parseRoute(formatRoute(route))).toEqual(route)
     }

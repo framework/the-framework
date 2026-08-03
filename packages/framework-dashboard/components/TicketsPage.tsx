@@ -43,10 +43,13 @@ function sortTickets(tickets: WorkspaceTicket[], sortBy: SortBy): WorkspaceTicke
 // Update-from-GitHub bar), so one project's slow read never blanks another's.
 export function TicketsPage({
   onOpenTicket,
+  onOpenTicketPlan,
   onRunStarted,
 }: {
   /** Open one ticket's detail page (#1144), by its project and file. */
   onOpenTicket: (projectId: string, file: string) => void
+  /** Open one ticket's plan view (#685), by its project and file — the plan column's link. */
+  onOpenTicketPlan?: ((projectId: string, file: string) => void) | undefined
   /** Told when an import/update session starts, so the shell can show it (#948) — which project
    *  started it is not implied the way it is for a single-project page, so each section binds
    *  its own id below rather than this prop guessing. */
@@ -108,6 +111,7 @@ export function TicketsPage({
                       loaded
                       hiddenByFilter={g.tickets.length - visible.length}
                       onOpen={file => onOpenTicket(g.projectId, file)}
+                      onOpenPlan={onOpenTicketPlan ? file => onOpenTicketPlan(g.projectId, file) : undefined}
                       onRunStarted={(intent, runId) => onRunStarted?.(g.projectId, intent, runId)}
                     />
                   </section>

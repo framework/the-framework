@@ -260,10 +260,11 @@ export function TicketsPanel({
                         onClick={() => void startPlan(ticket.file)}
                         disabled={busy}
                         aria-label={`Create a plan for ${ticket.title}`}
-                        // Muted grey, the absence of colour against the view button's blue: a plan
-                        // yet to be written is the recessive state, an available action rather than
-                        // something already there.
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                        // Light grey — the same recessive tone as the row's "4d ago" date
+                        // (`muted-foreground/70`) — against the view button's blue: a plan yet to
+                        // be written is the quiet state, an available action rather than something
+                        // already there.
+                        className="text-muted-foreground/70 hover:text-foreground disabled:opacity-50"
                       />
                     }
                   >

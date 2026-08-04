@@ -83,6 +83,33 @@ defensively — an absolute-form target used to throw synchronously and take the
 
 ## 3. Starting and running a session
 
+The run lifecycle end to end — one session, from trigger to teardown:
+
+```mermaid
+flowchart TD
+    Trigger["Composer / routine / AI-queue play / CLI"] --> F8
+    F8["F8 Start a session"] --> F9["F9 Workspace allocation<br/>(git worktree per run)"]
+    F9 --> F10["F10 Run process<br/>(runBuild)"]
+    F10 --> F11["F11 Driver seam<br/>(Claude Code / Codex / Cloud / Actions / Fake)"]
+    F11 --> Branch{Build or<br/>direct prompt?}
+    Branch -->|build| F12["F12 Build flow<br/>scope → build → checklist → improve"]
+    Branch -->|research/review| F13["F13 Direct prompt flow"]
+    F12 --> F14["F14 Turn-boundary protocol<br/>(parse the turn's final message)"]
+    F13 --> F14
+    F14 --> F15["F15 Await gates & steering"]
+    F15 -->|answer resolves gate| F14
+    F14 --> F16["F16 Backlog loop<br/>(drain TODO_AGENTS.md)"]
+    F16 --> F17["F17 Live chat<br/>(stay-open, --resume)"]
+    F17 --> F18["F18 Settle"]
+    F18 --> F19["F19 On-before-mergeable<br/>(queue quality presets)"]
+    F19 --> F20["F20 Git handoff<br/>commit → push → gh pr create"]
+    F20 --> F21["F21 Worktree teardown<br/>& retention"]
+
+    style F8 fill:#2563eb,color:#fff
+    style F20 fill:#16a34a,color:#fff
+    style F21 fill:#6b7280,color:#fff
+```
+
 ### F8. Start a session
 **Trigger:** the composer (launcher or in-session), a routine's `Run now`, an AI-queue row's play
 button, the onboarding checklist, or the CLI.

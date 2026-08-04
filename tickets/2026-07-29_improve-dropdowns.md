@@ -1,4 +1,3 @@
-Status: open
 GitHub: [#1368](https://github.com/gemstack-land/the-framework/issues/1368)
 
 # Improve dowdowns

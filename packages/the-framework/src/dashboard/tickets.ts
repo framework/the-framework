@@ -14,9 +14,6 @@ export interface WorkspaceTicket {
   title: string
   /** The `## TLDR` line, else the first prose line. Empty when the ticket has neither. */
   summary: string
-  /** The `status:` key (#1144/#1230). Defaults to `'open'` — a ticket written before the field
-   *  existed is still open work, not one this silently drops from the default view. */
-  status: 'open' | 'closed'
   /** The optional `priority:` key, verbatim (a `0`-`10` string; `10` acts immediately). */
   priority?: string
   /** The optional `topics:` key (`topics: [dx, ui]`), as bare tags. */
@@ -31,15 +28,13 @@ export interface WorkspaceTicket {
    * #1208); a filename-dated one keeps the date it was created on, same as the file itself does.
    */
   date: string
-  /** Whether a `<name>.spike.md` sits beside it (a pre-#1420 artifact: the format has since
-   *  folded the spike into the plan, but existing spikes still mark their tickets). */
-  spiked: boolean
   /** Whether a `<name>.plan.md` sits beside it, i.e. #685 already planned it. */
   planned: boolean
   /**
-   * Whether an agent holds this ticket (#1420): a `<name>.lock.md` claim exists. Mutually
-   * informative with the two flags above rather than exclusive — the lock covers the ticket's
-   * whole life, so a locked ticket may also be spiked or planned while its agent keeps working.
+   * Whether an agent holds this ticket (#1420): a `<name>.lock.md` claim exists — it is planning
+   * the ticket or implementing it directly. Mutually informative with `planned` rather than
+   * exclusive: the lock covers the ticket's whole life, so a locked ticket may also be planned
+   * while its agent keeps working.
    */
   locked?: boolean
   /**
@@ -48,11 +43,15 @@ export interface WorkspaceTicket {
    */
   lockedBy?: string
   /**
-   * The effort estimate a spike or plan recorded (#1144/#1265), e.g. `low` or `2h`. The spike
-   * format asks for one ("Human intervention effort: trivial/low/…"), so the first `…effort…: value`
-   * line in the `.spike.md` (else the `.plan.md`) is it. Absent when no sibling names one.
+   * The `Effort:` its `.plan.md` preamble records (`ticketing_format.md`: `0`-`10`, 0 trivial,
+   * 10 takes months). Absent when unplanned or the plan names none.
    */
-  effort?: string
+  effort?: number
+  /**
+   * The `Uncertainty:` its `.plan.md` preamble records (`0`-`10`, 0 an obvious implementation,
+   * 10 highly uncertain how). Absent when unplanned or the plan names none.
+   */
+  uncertainty?: number
 }
 
 /** A ticket's `GitHub:` link, split into what a reader clicks and where it goes. */
@@ -85,7 +84,7 @@ const MAX_META_BYTES = 10_000
 const MAX_TICKET_BYTES = 4_000
 
 /** A ticket's siblings, which are not tickets of their own. */
-const SIBLING = /\.(plan|spike|lock)\.md$/
+const SIBLING = /\.(plan|lock)\.md$/
 
 /**
  * Whether the project has any ticket at all (#958).
@@ -140,9 +139,8 @@ function titleFromFile(file: string): string {
 }
 
 /**
- * Read the head of a ticket: the `key: value` block above the title (`status:`, `priority:`,
- * `topics:`, and whatever else is agreed later — all but `status:` optional), the `# ` heading,
- * and the `## TLDR`.
+ * Read the head of a ticket: the `key: value` block above the title (`priority:`, `topics:`, and
+ * whatever else is agreed later — all optional), the `# ` heading, and the `## TLDR`.
  *
  * Deliberately tolerant. The tickets already in a repo predate the format (they are GitHub
  * imports: a heading, prose, and a trailing `Source:` line), so anything missing falls back
@@ -151,7 +149,6 @@ function titleFromFile(file: string): string {
 function describe(md: string): {
   title?: string
   summary: string
-  status: 'open' | 'closed'
   priority?: string
   topics?: string[]
   github?: TicketGithubLink
@@ -162,14 +159,6 @@ function describe(md: string): {
   // The key block is above the title, so stop there rather than reading keys out of the body.
   const headingAt = lines.findIndex(line => line.startsWith('# '))
   const preamble = headingAt === -1 ? [] : lines.slice(0, headingAt)
-  const statusValue = preamble
-    .find(line => line.toLowerCase().startsWith('status:'))
-    ?.slice('status:'.length)
-    .trim()
-    .toLowerCase()
-  // Anything other than an explicit `closed` reads as open: a ticket written before this key
-  // existed, or with a malformed value, is still open work rather than one this silently drops.
-  const status = statusValue === 'closed' ? 'closed' : 'open'
   const priority = preamble
     .find(line => line.toLowerCase().startsWith('priority:'))
     ?.slice('priority:'.length)
@@ -199,7 +188,6 @@ function describe(md: string): {
 
   return {
     ...(heading ? { title: heading } : {}),
-    status,
     ...(priority ? { priority } : {}),
     ...(topics && topics.length > 0 ? { topics } : {}),
     ...(github ? { github } : {}),
@@ -234,36 +222,39 @@ async function ticketDate(dir: string, file: string): Promise<string> {
 }
 
 /**
- * A line naming an effort, e.g. `Human intervention effort: low` or `Estimated effort: 2h` —
- * anything before the colon that ends in "effort", and a non-empty value after it. The spike
- * format asks for these in prose rather than as a preamble key, so this scans whole lines.
+ * A plan preamble's `0`-`10` value, or `undefined` when the key is missing or does not name one.
+ * Out-of-range and fractional values are not clamped into something plausible, same as
+ * `todoPriorityForTicket`: they are not a value on this scale, and inventing one hides the typo.
  */
-const EFFORT_LINE = /(?:^|[-*\s])[^:]*effort[^:]*:\s*(\S.*)/i
-
-/** Long enough for "trivial (option A) / high (option B)"; short enough to stay a badge. */
-const MAX_EFFORT_CHARS = 60
-
-/**
- * The effort estimate recorded against a ticket (#1144/#1265): the first effort-naming line in
- * its `.spike.md`, else its `.plan.md` — the spike is where the format asks for the estimate, so
- * it wins when both name one. Undefined when neither sibling names one. Takes the contents in
- * that order rather than re-reading the files: the caller has already read them for exactly this.
- */
-function effortFrom(sources: readonly (string | undefined)[]): string | undefined {
-  for (const md of sources) {
-    if (md === undefined) continue
-    for (const line of md.slice(0, MAX_TICKET_BYTES).split('\n')) {
-      const match = EFFORT_LINE.exec(line)
-      if (match) return match[1]!.trim().slice(0, MAX_EFFORT_CHARS)
-    }
-  }
-  return undefined
+function planScale(preamble: readonly string[], key: string): number | undefined {
+  const written = preamble
+    .find(line => line.toLowerCase().startsWith(`${key}:`))
+    ?.slice(key.length + 1)
+    .trim()
+  if (written === undefined || !/^\d+$/.test(written)) return undefined
+  const value = Number(written)
+  return value >= 0 && value <= 10 ? value : undefined
 }
 
 /**
- * One sibling's state: absent, or present with its content for the effort scan. Existence is the
+ * What a `.plan.md`'s preamble records (`ticketing_format.md`): `Effort: 0-10` and
+ * `Uncertainty: 0-10`, the keys above the `# [Plan]` heading. Reads only up to the heading, like
+ * a ticket's own preamble — the body is the plan, not metadata.
+ */
+function planMeta(md: string | undefined): { effort?: number; uncertainty?: number } {
+  if (md === undefined) return {}
+  const lines = md.slice(0, MAX_TICKET_BYTES).split('\n')
+  const headingAt = lines.findIndex(line => line.startsWith('# '))
+  const preamble = headingAt === -1 ? lines : lines.slice(0, headingAt)
+  const effort = planScale(preamble, 'effort')
+  const uncertainty = planScale(preamble, 'uncertainty')
+  return { ...(effort === undefined ? {} : { effort }), ...(uncertainty === undefined ? {} : { uncertainty }) }
+}
+
+/**
+ * One sibling's state: absent, or present with its content for the preamble read. Existence is the
  * answer again since #1420 — a claim is its own `.lock.md` file, never placeholder content
- * inside a spike or plan.
+ * inside a plan.
  */
 async function readSibling(dir: string, name: string, siblings: Set<string>): Promise<{ real: boolean; md?: string }> {
   if (!siblings.has(name)) return { real: false }
@@ -287,7 +278,7 @@ async function readLock(dir: string, name: string, siblings: Set<string>): Promi
  * The project's tickets, by filename, newest first (#1144). `[]` when the repo has no `tickets/`
  * directory at all, which is the state the view offers to import into.
  *
- * A `.spike.md` or `.plan.md` is written *about* a ticket rather than being one, so it never
+ * A `.plan.md` or `.lock.md` is written *about* a ticket rather than being one, so it never
  * becomes a row of its own: it marks its ticket instead.
  */
 export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
@@ -305,27 +296,23 @@ export async function readTickets(cwd: string): Promise<WorkspaceTicket[]> {
     ])
     if (content === undefined) continue
     const stem = file.replace(/\.md$/, '')
-    const { title, summary, status, priority, topics, github } = describe(content.slice(0, MAX_TICKET_BYTES))
-    const [spike, plan, lock] = await Promise.all([
-      readSibling(dir, `${stem}.spike.md`, siblings),
+    const { title, summary, priority, topics, github } = describe(content.slice(0, MAX_TICKET_BYTES))
+    const [plan, lock] = await Promise.all([
       readSibling(dir, `${stem}.plan.md`, siblings),
       readLock(dir, `${stem}.lock.md`, siblings),
     ])
-    const effort = effortFrom([spike.md, plan.md])
     tickets.push({
       file,
       title: title ?? titleFromFile(file),
       summary,
-      status,
       ...(priority ? { priority } : {}),
       ...(topics ? { topics } : {}),
       ...(github ? { github } : {}),
       date,
-      spiked: spike.real,
       planned: plan.real,
       ...(lock.locked ? { locked: true } : {}),
       ...(lock.lockedBy !== undefined ? { lockedBy: lock.lockedBy } : {}),
-      ...(effort ? { effort } : {}),
+      ...planMeta(plan.md),
     })
   }
   // Newest first: what changed most recently is what the list is for (#1144), and it is the only
@@ -342,9 +329,9 @@ export interface WorkspaceTicketDetail extends WorkspaceTicket {
 
 /**
  * A bare filename inside `tickets/`: no path segments (so it cannot address another directory)
- * and not one of a ticket's own siblings (a `.plan.md`/`.spike.md`/`.lock.md` is written about a
- * ticket, not one itself, same as {@link readTickets}). Exported for the RPCs that take a ticket
- * filename from the browser (#1420's release).
+ * and not one of a ticket's own siblings (a `.plan.md`/`.lock.md` is written about a ticket, not
+ * one itself, same as {@link readTickets}). Exported for the RPCs that take a ticket filename
+ * from the browser (#1420's release).
  */
 export function isTicketFile(file: string): boolean {
   return /^[^/\\]+\.md$/.test(file) && !SIBLING.test(file)
@@ -365,28 +352,24 @@ export async function readTicket(cwd: string, file: string): Promise<WorkspaceTi
   ])
   if (content === undefined) return null
   const stem = file.replace(/\.md$/, '')
-  const { title, summary, status, priority, topics, github } = describe(content)
+  const { title, summary, priority, topics, github } = describe(content)
   const present = new Set(names)
-  const [spike, plan, lock] = await Promise.all([
-    readSibling(dir, `${stem}.spike.md`, present),
+  const [plan, lock] = await Promise.all([
     readSibling(dir, `${stem}.plan.md`, present),
     readLock(dir, `${stem}.lock.md`, present),
   ])
-  const effort = effortFrom([spike.md, plan.md])
   return {
     file,
     title: title ?? titleFromFile(file),
     summary,
-    status,
     ...(priority ? { priority } : {}),
     ...(topics ? { topics } : {}),
     ...(github ? { github } : {}),
     date,
-    spiked: spike.real,
     planned: plan.real,
     ...(lock.locked ? { locked: true } : {}),
     ...(lock.lockedBy !== undefined ? { lockedBy: lock.lockedBy } : {}),
-    ...(effort ? { effort } : {}),
+    ...planMeta(plan.md),
     content,
   }
 }

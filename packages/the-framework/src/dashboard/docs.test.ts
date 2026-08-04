@@ -9,10 +9,10 @@ test('readDocs returns the surfaced docs present at the workspace root, PLAN bef
   const cwd = await mkdtemp(join(tmpdir(), 'framework-docs-'))
   try {
     // Write TODO first to prove the result follows category order, not write order.
-    await writeFile(join(cwd, 'TODO.md'), '- [ ] later\n')
+    await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] later\n')
     await writeFile(join(cwd, 'PLAN.md'), '# Plan\n')
     const docs = await readDocs(cwd)
-    assert.deepEqual(docs.map(d => d.name), ['PLAN.md', 'TODO.md'])
+    assert.deepEqual(docs.map(d => d.name), ['PLAN.md', 'TODO_AGENTS.md'])
     assert.equal(docs[0]!.content, '# Plan\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })

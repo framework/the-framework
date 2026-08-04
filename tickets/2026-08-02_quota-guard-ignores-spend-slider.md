@@ -1,4 +1,3 @@
-Status: open
 GitHub: [#1490](https://github.com/gemstack-land/the-framework/issues/1490)
 
 # Per-run quota guard ignores the Usage slider (autoSpendOffset): runs pause while the bar shows room

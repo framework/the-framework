@@ -1,4 +1,3 @@
-Status: open
 GitHub: [#1455](https://github.com/gemstack-land/the-framework/issues/1455)
 
 # Dashboard UX notes: rail width, Docs/History placement, inline choices, composer Stop/Resume

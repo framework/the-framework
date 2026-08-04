@@ -7,7 +7,7 @@ import { FLAT_TODO_FILE, findFlatTodo, ticketFromQueueEntry } from './tickets.js
 import { drainsQueue } from './preset-catalog.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
 
-export { FLAT_TODO_FILE, LEGACY_HYPHEN_TODO_FILE, LEGACY_TICKETS_TODO_FILE, LEGACY_TODO_FILE, TICKETS_DIR, ticketFromQueueEntry, todoPriorityForTicket } from './tickets.js'
+export { FLAT_TODO_FILE, TICKETS_DIR, ticketFromQueueEntry, todoPriorityForTicket } from './tickets.js'
 
 /**
  * The backlog loop (#323): once the main work settles, consume the agent's own

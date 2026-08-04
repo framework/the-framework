@@ -5,9 +5,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   FLAT_TODO_FILE,
-  LEGACY_HYPHEN_TODO_FILE,
-  LEGACY_TICKETS_TODO_FILE,
-  LEGACY_TODO_FILE,
   TICKETS_DIR,
   findFlatTodo,
   isTicketPath,
@@ -17,12 +14,9 @@ import {
 } from './tickets.js'
 import { TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 
-test('the flat backlog lives at the root TODO_AGENTS.md, with the legacy locations named (#674/#682)', () => {
+test('the flat backlog lives at the root TODO_AGENTS.md (#674/#682)', () => {
   assert.equal(TICKETS_DIR, 'tickets')
   assert.equal(FLAT_TODO_FILE, 'TODO_AGENTS.md')
-  assert.equal(LEGACY_HYPHEN_TODO_FILE, 'TODO-AGENTS.md')
-  assert.equal(LEGACY_TICKETS_TODO_FILE, 'tickets/TODO.md')
-  assert.equal(LEGACY_TODO_FILE, 'TODO.md')
 })
 
 test('the ticket-format spec ships in the package (not materialized), with priority/topics (#684/#674)', () => {
@@ -50,25 +44,18 @@ test('the backlog-format spec ships in the package and teaches the priority sect
   assert.ok(TODO_FORMAT.includes('sorted by priority'))
 })
 
-test('findFlatTodo prefers TODO_AGENTS.md, then legacy tickets/TODO.md, then root TODO.md, else undefined (#682)', async () => {
+test('findFlatTodo reads the root TODO_AGENTS.md and nothing else (#682)', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-tickets-'))
   try {
     assert.equal(await findFlatTodo(cwd), undefined)
 
-    // Only a pre-#629 root TODO.md -> that is returned (oldest repos keep their backlog).
+    // The pre-#682 spellings are no longer read: one convention, one location.
     await writeFile(join(cwd, 'TODO.md'), '- [ ] oldest\n')
-    assert.equal(await findFlatTodo(cwd), 'TODO.md')
-
-    // A #629 tickets/TODO.md wins over the pre-#629 root file.
+    await writeFile(join(cwd, 'TODO-AGENTS.md'), '- [ ] hyphen\n')
     await mkdir(join(cwd, TICKETS_DIR))
-    await writeFile(join(cwd, LEGACY_TICKETS_TODO_FILE), '- [ ] newer\n')
-    assert.equal(await findFlatTodo(cwd), 'tickets/TODO.md')
+    await writeFile(join(cwd, TICKETS_DIR, 'TODO.md'), '- [ ] newer\n')
+    assert.equal(await findFlatTodo(cwd), undefined)
 
-    // The brief #682 hyphen spelling wins over the older locations.
-    await writeFile(join(cwd, LEGACY_HYPHEN_TODO_FILE), '- [ ] hyphen\n')
-    assert.equal(await findFlatTodo(cwd), 'TODO-AGENTS.md')
-
-    // The #674 root TODO_AGENTS.md (underscore) wins over every legacy location.
     await writeFile(join(cwd, FLAT_TODO_FILE), '- [ ] current\n')
     assert.equal(await findFlatTodo(cwd), 'TODO_AGENTS.md')
   } finally {
@@ -76,11 +63,11 @@ test('findFlatTodo prefers TODO_AGENTS.md, then legacy tickets/TODO.md, then roo
   }
 })
 
-test('findFlatTodo ignores a tickets/ directory that is not a file', async () => {
+test('findFlatTodo ignores a directory that is not a file', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-tickets-'))
   try {
-    // A directory named exactly TODO.md must not be mistaken for the backlog file.
-    await mkdir(join(cwd, 'TODO.md'))
+    // A directory named exactly TODO_AGENTS.md must not be mistaken for the backlog file.
+    await mkdir(join(cwd, FLAT_TODO_FILE))
     assert.equal(await findFlatTodo(cwd), undefined)
   } finally {
     await rm(cwd, { recursive: true, force: true })
@@ -88,16 +75,18 @@ test('findFlatTodo ignores a tickets/ directory that is not a file', async () =>
 })
 
 test('a ticket priority maps onto the backlog format\'s numbered sections (#1164)', () => {
-  assert.equal(todoPriorityForTicket('urgent'), 9)
-  assert.equal(todoPriorityForTicket('high'), 7)
-  assert.equal(todoPriorityForTicket('medium'), 5)
-  assert.equal(todoPriorityForTicket('low'), 2)
+  // The format's own scale, taken at its word.
+  assert.equal(todoPriorityForTicket('8'), 8)
+  assert.equal(todoPriorityForTicket(' 2 '), 2, 'the key is read verbatim off the ticket, so it may be padded')
   // The ticket format says `priority:` is optional, so an unmarked ticket has to mean something.
   assert.equal(todoPriorityForTicket(undefined), 5)
-  assert.equal(todoPriorityForTicket('  HIGH  '), 7, 'the key is read verbatim off the ticket, so it may be shouted or padded')
-  // 10 is reserved for critical production bugs and 0 for "only if capacity"; neither is
-  // something a click on Queue should be able to claim.
-  assert.equal(todoPriorityForTicket('critical'), 5)
+  // The word spellings were never the format and are no longer read; like anything else that is
+  // not a 0-10 number, they land in the middle rather than being guessed at.
+  assert.equal(todoPriorityForTicket('high'), 5)
+  assert.equal(todoPriorityForTicket('urgent'), 5)
+  // Out-of-range and fractional values are not a priority on this scale.
+  assert.equal(todoPriorityForTicket('11'), 5)
+  assert.equal(todoPriorityForTicket('2.5'), 5)
 })
 
 test('ticketFromQueueEntry reads the ticket a queued entry links back to (#1117/#1164)', () => {
@@ -129,7 +118,7 @@ test('only a plain file inside tickets/ counts as a ticket path (#1117)', () => 
 })
 
 test('ticketIssueRef reads the issue off the GitHub header line, URL first (#1334)', () => {
-  const md = 'Status: open\nGitHub: [#42](https://github.com/org/repo/issues/42)\n\n# T\n'
+  const md = 'Priority: 5\nGitHub: [#42](https://github.com/org/repo/issues/42)\n\n# T\n'
   assert.equal(ticketIssueRef(md), '#42')
   // The URL is the identity: a label that disagrees with it loses.
   assert.equal(ticketIssueRef('GitHub: [gh-7](https://github.com/o/r/issues/99)\n'), '#99')

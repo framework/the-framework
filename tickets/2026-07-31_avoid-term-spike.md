@@ -1,4 +1,3 @@
-Status: open
 GitHub: [#1422](https://github.com/gemstack-land/the-framework/issues/1422)
 
 # Avoid term "Spike"

@@ -240,7 +240,9 @@ export function TicketsPanel({
                         onClick={() => onOpenPlan?.(ticket.file)}
                         disabled={!onOpenPlan}
                         aria-label={`View the plan for ${ticket.title}`}
-                        className="text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                        // Green for a plan that exists (ready to read); the create button below is
+                        // the accent — colour is what tells the two near-identical clipboards apart.
+                        className="text-success hover:text-success/80 disabled:pointer-events-none disabled:opacity-50"
                       />
                     }
                   >
@@ -257,7 +259,9 @@ export function TicketsPanel({
                         onClick={() => void startPlan(ticket.file)}
                         disabled={busy}
                         aria-label={`Create a plan for ${ticket.title}`}
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                        // The accent, against the view button's green: an action to take, not a
+                        // state that already holds.
+                        className="text-primary hover:text-primary/80 disabled:opacity-50"
                       />
                     }
                   >

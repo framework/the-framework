@@ -1,1 +1,0 @@
-Catch-all Route Function returning `true` (#784): every path (`/`, `/{projectId}`, `/{projectId}/{sessionId}`) resolves to this one page, since the address carries the selection. The return value is deliberately not used for route params — the shell is prerendered for `/`, which freezes any params baked into it, so the page reads `urlPathname` itself (`lib/use-route.ts`).

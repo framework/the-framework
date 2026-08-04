@@ -1,1 +1,0 @@
-Re-export shim (#1072) pinning the baked RPC key `/server/devices.telefunc.ts` for `checkDevices` (saved-devices health), implemented in `@gemstack/the-framework/dashboard-rpc` so the daemon does the cookie'd cross-origin ping in-process. Imported-then-exported, not `export ... from` (#1014, see `server/.spec.md`).

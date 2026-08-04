@@ -1,1 +1,0 @@
-Barrel for the decisions layer — re-exports `defineDecision`, `DecisionLedger`/`createLedger`, the `DECISIONS.md` parse/serialize pair, `loadLedger`/`saveLedger`/`nodeLedgerFs`, the agent-facing `decisionTools`/`decisionBriefing`, and the decision types.

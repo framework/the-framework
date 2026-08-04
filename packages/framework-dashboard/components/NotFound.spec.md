@@ -1,1 +1,0 @@
-Full-pane "this link no longer resolves" state (#784) — title, detail, and one way-back action button — shown when a bookmarkable session/project URL outlives its target (removed worktree, dropped project), instead of silently redirecting, which would look like the link worked and you clicked the wrong one.

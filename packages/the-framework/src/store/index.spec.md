@@ -1,1 +1,0 @@
-Barrel re-exporting the store's public surface: `RunStore` + run/archive readers and constants from `run-store.js`, `resolveRunCheckout`, the worktree lifecycle helpers, dependency linking, and the suspend file API.

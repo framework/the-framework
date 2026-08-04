@@ -1,1 +1,0 @@
-Auth layer for MCP web endpoints — a single module, `oauth2.ts`: framework-agnostic OAuth 2.1 bearer-token middleware (bring-your-own `verifyToken`) plus the RFC 9728 protected-resource metadata endpoint, hardened against forwarded-header steering and `WWW-Authenticate` quoted-string injection.

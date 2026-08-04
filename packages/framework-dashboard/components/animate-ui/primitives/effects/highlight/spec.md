@@ -1,1 +1,0 @@
-The vendored motion-highlight effect (`index.tsx`): `Highlight`/`HighlightItem` render one animated background rectangle that glides (parent mode, measured bounds) or morphs (children mode, shared `layoutId`) between rows on hover/click.

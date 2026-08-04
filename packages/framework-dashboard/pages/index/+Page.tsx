@@ -10,6 +10,7 @@ import { DashboardPage } from '../../components/DashboardPage.js'
 import { SettingsPage } from '../../components/SettingsPage.js'
 import { TicketsPage } from '../../components/TicketsPage.js'
 import { TicketDetailPage } from '../../components/TicketDetailPage.js'
+import { TicketPlanPage } from '../../components/TicketPlanPage.js'
 import { RunView } from '../../components/RunView.js'
 import { runLabel } from '../../lib/run-label.js'
 import { RightRail } from '../../components/RightRail.js'
@@ -60,7 +61,7 @@ const EMPTY_RECENT: RecentRun[] = []
 // what the remembered-project state (#475) was for.
 export default function Page() {
   const { route, go } = useRoute()
-  const { view, projectId, runId, ticketSlug } = route
+  const { view, projectId, runId, ticketSlug, plan } = route
 
   // A just-started run: bump the tick so the Sessions rail shows an optimistic "starting…" row
   // with the typed prompt at once, before the spawned process writes its run.json. `id` is the
@@ -232,6 +233,13 @@ export default function Page() {
     go({ view: 'tickets', projectId: id, runId: null, ticketSlug: slug })
   }
 
+  // One ticket's plan view (#685), the plan column's link: the ticket's `.plan.md` rendered on its
+  // own page, addressed by the same slug as the ticket it belongs to.
+  const openTicketPlan = (id: string, slug: string) => {
+    setAdopting(false)
+    go({ view: 'tickets', projectId: id, runId: null, ticketSlug: slug, plan: true })
+  }
+
   // The live run feed is owned here so both the main view and the right rail's views tab read
   // one shared Telefunc Channel. Hooks run before the relay early return below.
   // The run whose feed and controls are in play is simply the one in the URL; in the no-id
@@ -274,11 +282,15 @@ export default function Page() {
   const selectedRun = runId ? runs.find(run => run.id === runId) : undefined
   const renderMain = () => {
     if (view === 'settings') return <SettingsPage onRunStarted={runStarted} onDone={showDashboard} />
+    // A ticket's plan view is the same shape plus the `plan` flag (#685): its `.plan.md` on its own
+    // page, checked before the detail page since the flag only rides alongside a slug.
+    if (view === 'tickets' && projectId && ticketSlug && plan)
+      return <TicketPlanPage projectId={projectId} slug={ticketSlug} onBack={showTickets} />
     // A ticket's own page needs both a project and a slug; anything short of that (including the
     // bare cross-project route) is the list — every registered project, one section each.
     if (view === 'tickets' && projectId && ticketSlug)
       return <TicketDetailPage projectId={projectId} slug={ticketSlug} onBack={showTickets} />
-    if (view === 'tickets') return <TicketsPage onOpenTicket={openTicket} onRunStarted={runStarted} />
+    if (view === 'tickets') return <TicketsPage onOpenTicket={openTicket} onOpenTicketPlan={openTicketPlan} onRunStarted={runStarted} />
     if (!projectId)
       return (
         <DashboardPage

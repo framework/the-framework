@@ -12,7 +12,7 @@ const row = (file: string, over: Partial<WorkspaceTicket> = {}, projectId = 'p1'
 
 const renderBar = (rows: TicketRow[], view: TicketsView = defaultView(), projects = [{ id: 'p1', name: 'Alpha' }]) => {
   const onChange = vi.fn()
-  render(<TicketFilterBar view={view} rows={rows} projects={projects} shown={rows.length} onChange={onChange} />)
+  render(<TicketFilterBar view={view} rows={rows} projects={projects} onChange={onChange} />)
   return { onChange }
 }
 
@@ -87,33 +87,44 @@ describe('TicketFilterBar (#1144)', () => {
     expect(next.sort).toEqual({ key: 'priority', dir: 'desc' })
   })
 
-  test('picking the active sort key again flips its direction', async () => {
+  test('picking a new sort key starts at its natural direction; the active key is a no-op', async () => {
     const { onChange } = renderBar([row('a.md')])
     fireEvent.click(screen.getByRole('button', { name: /sort: date/i }))
-    fireEvent.click(await screen.findByText('Date'))
-    const next = onChange.mock.calls[0]![0] as TicketsView
-    expect(next.sort).toEqual({ key: 'date', dir: 'asc' })
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Priority' }))
+    expect((onChange.mock.calls[0]![0] as TicketsView).sort).toEqual({ key: 'priority', dir: 'desc' })
+    onChange.mockClear()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Date' }))
+    expect(onChange).not.toHaveBeenCalled()
   })
 
-  test('the direction is its own one-click toggle, labeled by meaning rather than asc/desc', () => {
+  test('the asc/desc pair sits in the menu, labeled by meaning, the applied one highlighted', async () => {
     const { onChange } = renderBar([row('a.md')])
-    fireEvent.click(screen.getByRole('button', { name: /newest first/i }))
-    const next = onChange.mock.calls[0]![0] as TicketsView
-    expect(next.sort).toEqual({ key: 'date', dir: 'asc' })
+    fireEvent.click(screen.getByRole('button', { name: /sort: date/i }))
+    const desc = await screen.findByRole('button', { name: 'Newest first' })
+    expect(desc.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'Oldest first' }))
+    expect((onChange.mock.calls[0]![0] as TicketsView).sort).toEqual({ key: 'date', dir: 'asc' })
   })
 
-  test('the x/n tally is always shown, not only while filtered', () => {
-    renderBar([row('a.md'), row('b.md')])
-    expect(screen.getByText('2/2')).toBeTruthy()
-  })
-
-  test('selecting a bucket dims the slider — it still works, but is not the active clause', async () => {
+  test('a contiguous bucket selection mirrors onto the slider instead of dimming it', async () => {
     const view = defaultView()
-    view.filters.priority = { buckets: ['critical'], range: null, none: false }
+    view.filters.priority = { buckets: ['critical', 'medium'], range: null, none: false }
+    renderBar([row('a.md', { priority: '9' })], view)
+    fireEvent.click(screen.getByRole('button', { name: /priority/i }))
+    await screen.findByLabelText('Critical (8–10)')
+    expect(document.querySelector('[data-dimmed]')).toBeNull()
+    // Adjacent buckets are one span, so the readout (and the thumbs) sit on the union.
+    expect(screen.getByText(/range: 5–10/i)).toBeTruthy()
+  })
+
+  test('only a selection no single range can express dims the slider', async () => {
+    const view = defaultView()
+    view.filters.priority = { buckets: ['critical', 'low'], range: null, none: false }
     renderBar([row('a.md', { priority: '9' })], view)
     fireEvent.click(screen.getByRole('button', { name: /priority/i }))
     await screen.findByLabelText('Critical (8–10)')
     expect(document.querySelector('[data-dimmed]')).toBeTruthy()
+    expect(screen.getByText(/range: not one span/i)).toBeTruthy()
   })
 
   test('the "/" keycap chip steps aside once the search field is focused', () => {

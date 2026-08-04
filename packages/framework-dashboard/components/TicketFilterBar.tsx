@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, Check, ChevronDown, Search, X } from 'lucide-react'
+import { ArrowDown, ArrowDownWideNarrow, ArrowUp, ArrowUpNarrowWide, Check, ChevronDown, Search, X } from 'lucide-react'
 import {
   EFFORT_BUCKETS,
   PRIORITY_BUCKETS,
   STAGES,
   UNCERTAINTY_BUCKETS,
+  bucketUnionRange,
   defaultView,
   hasAnyFilter,
   projectFacetCounts,
   rangeFacetCounts,
+  sortByKey,
   stageFacetCounts,
-  toggleSort,
   toggled,
   topicFacetCounts,
   unlinkedCount,
@@ -31,7 +32,6 @@ import { Input } from './ui/input.js'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover.js'
 import { RangeSlider } from './ui/slider.js'
 import { Separator } from './ui/separator.js'
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip.js'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -121,36 +121,42 @@ function RangeFacet({
           ))}
         </div>
         <Separator className="my-2" />
-        {/* Dimmed while buckets are selected: the two drive the same selection, and one range
-            cannot show a non-adjacent bucket union. Still live, not disabled — dragging it takes
-            over (withRange clears the buckets), so the gray reads as "not currently applied"
-            rather than a dead end. */}
-        <div
-          className={cn('px-1', filter.buckets.length > 0 && 'opacity-40')}
-          data-dimmed={filter.buckets.length > 0 || undefined}
-          title={filter.buckets.length > 0 ? 'Buckets are selecting — dragging the range replaces them' : undefined}
-        >
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              Range: {filter.range ? `${filter.range[0]}–${filter.range[1]}` : 'any'}
-            </span>
-            {filter.range && (
-              <button
-                type="button"
-                aria-label={`Clear the ${label.toLowerCase()} range`}
-                onClick={() => onChange(withRange(filter, null))}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-3 w-3" aria-hidden />
-              </button>
-            )}
-          </div>
-          <RangeSlider
-            aria-label={`${label} range`}
-            value={filter.range ?? [0, 10]}
-            onValueChange={next => onChange(withRange(filter, next))}
-          />
-        </div>
+        {(() => {
+          // The slider mirrors the bucket selection whenever it can: a contiguous union (one
+          // bucket, or adjacent ones) IS a range, so the thumbs sit on it and dragging refines
+          // from there (withRange takes over and clears the buckets). Only a selection that skips
+          // a middle bucket — which no [min,max] pair can express — dims the slider; still live,
+          // not disabled, so the gray reads as "not currently applied" rather than a dead end.
+          const union = bucketUnionRange(filter, buckets)
+          const dimmed = filter.buckets.length > 0 && union === null
+          const displayed = filter.range ?? union
+          return (
+            <div
+              className={cn('px-1', dimmed && 'opacity-40')}
+              data-dimmed={dimmed || undefined}
+              title={dimmed ? 'The selected buckets skip a middle span — dragging the range replaces them' : undefined}
+            >
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Range: {displayed ? `${displayed[0]}–${displayed[1]}` : dimmed ? 'not one span' : 'any'}</span>
+                {filter.range && (
+                  <button
+                    type="button"
+                    aria-label={`Clear the ${label.toLowerCase()} range`}
+                    onClick={() => onChange(withRange(filter, null))}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" aria-hidden />
+                  </button>
+                )}
+              </div>
+              <RangeSlider
+                aria-label={`${label} range`}
+                value={displayed ?? [0, 10]}
+                onValueChange={next => onChange(withRange(filter, next))}
+              />
+            </div>
+          )
+        })()}
         {(counts.none > 0 || filter.none) && (
           <>
             <Separator className="my-2" />
@@ -196,7 +202,6 @@ export function TicketFilterBar({
   view,
   rows,
   projects,
-  shown,
   onChange,
 }: {
   /** The page's viewing state; every control edits a copy and hands it back. */
@@ -205,8 +210,6 @@ export function TicketFilterBar({
   rows: TicketRow[]
   /** The registered projects, for the Project facet (rendered only when there are two or more). */
   projects: { id: string; name: string }[]
-  /** How many rows the current filters leave visible. */
-  shown: number
   onChange: (next: TicketsView) => void
 }) {
   const f = view.filters
@@ -353,33 +356,61 @@ export function TicketFilterBar({
         </Button>
       )}
 
-      {/* Right side: what the filters leave, and how it is ordered. */}
+      {/* Right side: how the list is ordered (the x/n tally lives beside the page title). */}
       <div className="ml-auto flex items-center gap-2">
-        {/* Always shown, not only while filtered: unfiltered it doubles as the backlog's total,
-            which the page otherwise says nowhere. */}
-        <span className="text-xs text-muted-foreground">
-          {shown}/{rows.length}
-        </span>
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
               <Button variant="outline" size="xs" className="gap-1">
                 Sort: {SORT_LABELS[view.sort.key]}
+                {view.sort.dir === 'desc' ? <ArrowDown className="h-3 w-3" aria-hidden /> : <ArrowUp className="h-3 w-3" aria-hidden />}
                 <ChevronDown className="h-3 w-3 opacity-60" aria-hidden />
               </Button>
             }
           />
           <DropdownMenuContent>
             {(Object.keys(SORT_LABELS) as SortKey[]).map(key => (
-              // Picking the active key again flips its direction — a bonus shortcut; the visible
-              // direction button beside the menu is the discoverable path.
-              <DropdownMenuItem key={key} onClick={() => onChange({ ...view, sort: toggleSort(view.sort, key) })}>
+              // Picking a key starts it at its natural direction; direction changes are the
+              // explicit pair below, not a hidden re-click.
+              <DropdownMenuItem
+                key={key}
+                closeOnClick={false}
+                onClick={() => {
+                  if (view.sort.key !== key) onChange({ ...view, sort: sortByKey(key) })
+                }}
+              >
                 <span className="flex h-3.5 w-3.5 items-center justify-center">
                   {view.sort.key === key && <Check className="h-3.5 w-3.5" aria-hidden />}
                 </span>
                 {SORT_LABELS[key]}
               </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator />
+            {/* The asc/desc pair (#1144 follow-up): two icon buttons, the applied one carrying
+                the menu's own highlight tokens, with the current meaning spelled out beside them
+                — "descending" says nothing until you know the key. */}
+            <div className="flex items-center gap-1 px-2 py-1.5">
+              {(['asc', 'desc'] as const).map(dir => (
+                <button
+                  key={dir}
+                  type="button"
+                  aria-label={DIR_LABELS[view.sort.key][dir]}
+                  aria-pressed={view.sort.dir === dir}
+                  onClick={() => onChange({ ...view, sort: { ...view.sort, dir } })}
+                  className={cn(
+                    'flex h-6 w-7 items-center justify-center rounded-sm hover:bg-[var(--color-accent)] hover:text-[var(--color-accent-foreground)]',
+                    view.sort.dir === dir && 'bg-[var(--color-accent)] text-[var(--color-accent-foreground)]',
+                  )}
+                >
+                  {dir === 'asc' ? (
+                    <ArrowUpNarrowWide className="h-3.5 w-3.5" aria-hidden />
+                  ) : (
+                    <ArrowDownWideNarrow className="h-3.5 w-3.5" aria-hidden />
+                  )}
+                </button>
+              ))}
+              <span className="ml-1 text-xs text-muted-foreground">{DIR_LABELS[view.sort.key][view.sort.dir]}</span>
+            </div>
             <DropdownMenuSeparator />
             <DropdownMenuCheckboxItem
               checked={view.group === 'project'}
@@ -389,25 +420,6 @@ export function TicketFilterBar({
             </DropdownMenuCheckboxItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        {/* The direction as its own one-click toggle (#1144 follow-up): flipping asc/desc must
-            not require knowing the menu's re-click trick. Labeled by meaning, not asc/desc. */}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="outline"
-                size="icon-sm"
-                aria-label={`Sort direction: ${DIR_LABELS[view.sort.key][view.sort.dir]} — click to reverse`}
-                onClick={() => onChange({ ...view, sort: { ...view.sort, dir: view.sort.dir === 'desc' ? 'asc' : 'desc' } })}
-              />
-            }
-          >
-            {view.sort.dir === 'desc' ? <ArrowDown className="h-3.5 w-3.5" aria-hidden /> : <ArrowUp className="h-3.5 w-3.5" aria-hidden />}
-          </TooltipTrigger>
-          <TooltipContent>
-            {DIR_LABELS[view.sort.key][view.sort.dir]} — click for {DIR_LABELS[view.sort.key][view.sort.dir === 'desc' ? 'asc' : 'desc'].toLowerCase()}
-          </TooltipContent>
-        </Tooltip>
       </div>
     </div>
   )

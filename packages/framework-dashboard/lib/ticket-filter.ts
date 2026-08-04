@@ -225,15 +225,28 @@ export function sortRows(rows: TicketRow[], sort: TicketSort): TicketRow[] {
   })
 }
 
-/** How a key sorts when first picked: newest/highest/hardest-question-first for date and priority,
- *  A-Z and easiest-first for title and effort. */
+/** How a key sorts when first picked: newest/highest-first for date and priority, A-Z and
+ *  easiest-first for title and effort. */
 const DEFAULT_DIR: Record<SortKey, SortDir> = { date: 'desc', priority: 'desc', title: 'asc', effort: 'asc' }
 
-/** Picking the active key again flips its direction (table-header muscle memory); a new key starts
- *  at its own natural direction. */
-export function toggleSort(sort: TicketSort, key: SortKey): TicketSort {
-  if (sort.key === key) return { key, dir: sort.dir === 'asc' ? 'desc' : 'asc' }
+/** The sort a freshly picked key starts at — its own natural direction. Direction changes are the
+ *  menu's explicit asc/desc pair, not a hidden re-click. */
+export function sortByKey(key: SortKey): TicketSort {
   return { key, dir: DEFAULT_DIR[key] }
+}
+
+/**
+ * The single contiguous span a bucket selection covers, or null when it covers none — or when the
+ * selection skips a middle bucket, which no one [min,max] pair can express. The slider mirrors the
+ * union when this returns one, and dims when it cannot (#1144 follow-up).
+ */
+export function bucketUnionRange(filter: RangeFilter, buckets: readonly RangeBucket[]): [number, number] | null {
+  const spans = buckets.filter(b => filter.buckets.includes(b.id)).sort((a, b) => a.min - b.min)
+  if (spans.length === 0) return null
+  for (let i = 1; i < spans.length; i++) {
+    if (spans[i]!.min > spans[i - 1]!.max + 1) return null
+  }
+  return [spans[0]!.min, spans[spans.length - 1]!.max]
 }
 
 // Bucket and slider drive the same selection, so engaging one clears the other — two half-active

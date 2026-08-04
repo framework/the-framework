@@ -151,9 +151,12 @@ describe('TicketsPage filters (#1144)', () => {
     fixture()
     render(<TicketsPage onOpenTicket={() => {}} />)
     await screen.findByText('Improve the lock')
+    // The shown/total tally sits beside the page title, full pool while unfiltered.
+    expect(screen.getByText('2/2')).toBeTruthy()
     fireEvent.change(screen.getByRole('textbox', { name: /search tickets/i }), { target: { value: 'lock' } })
     await waitFor(() => expect(screen.queryByText('Something else')).toBeNull())
     expect(screen.getByText('Improve the lock')).toBeTruthy()
+    expect(screen.getByText('1/2')).toBeTruthy()
     expect(window.location.search).toBe('?q=lock')
   })
 

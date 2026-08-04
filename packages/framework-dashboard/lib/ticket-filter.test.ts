@@ -3,6 +3,7 @@ import type { WorkspaceTicket } from '@gemstack/the-framework'
 import {
   EFFORT_BUCKETS,
   PRIORITY_BUCKETS,
+  bucketUnionRange,
   defaultView,
   filterRows,
   flattenTickets,
@@ -10,9 +11,9 @@ import {
   hasAnyFilter,
   parseTicketsView,
   rangeFacetCounts,
+  sortByKey,
   sortRows,
   stageFacetCounts,
-  toggleSort,
   topicFacetCounts,
   unlinkedCount,
   withBucketToggled,
@@ -149,10 +150,24 @@ describe('sortRows', () => {
     expect(sortRows(tied, { key: 'priority', dir: 'desc' }).map(r => r.ticket.file)).toEqual(['newer.md', 'older.md'])
   })
 
-  test('toggleSort flips the active key and starts a new key at its natural direction', () => {
-    expect(toggleSort({ key: 'date', dir: 'desc' }, 'date')).toEqual({ key: 'date', dir: 'asc' })
-    expect(toggleSort({ key: 'date', dir: 'desc' }, 'priority')).toEqual({ key: 'priority', dir: 'desc' })
-    expect(toggleSort({ key: 'priority', dir: 'desc' }, 'title')).toEqual({ key: 'title', dir: 'asc' })
+  test('sortByKey starts each key at its natural direction', () => {
+    expect(sortByKey('date')).toEqual({ key: 'date', dir: 'desc' })
+    expect(sortByKey('priority')).toEqual({ key: 'priority', dir: 'desc' })
+    expect(sortByKey('title')).toEqual({ key: 'title', dir: 'asc' })
+    expect(sortByKey('effort')).toEqual({ key: 'effort', dir: 'asc' })
+  })
+})
+
+describe('bucketUnionRange', () => {
+  const f = (buckets: string[]) => ({ buckets, range: null, none: false })
+
+  test('a single bucket or an adjacent pair is one span; skipping the middle is not', () => {
+    expect(bucketUnionRange(f(['critical']), PRIORITY_BUCKETS)).toEqual([8, 10])
+    expect(bucketUnionRange(f(['medium', 'critical']), PRIORITY_BUCKETS)).toEqual([5, 10])
+    expect(bucketUnionRange(f(['low', 'medium', 'critical']), PRIORITY_BUCKETS)).toEqual([0, 10])
+    // Critical ∪ Low skips Medium — no [min,max] pair can say that.
+    expect(bucketUnionRange(f(['critical', 'low']), PRIORITY_BUCKETS)).toBeNull()
+    expect(bucketUnionRange(f([]), PRIORITY_BUCKETS)).toBeNull()
   })
 })
 

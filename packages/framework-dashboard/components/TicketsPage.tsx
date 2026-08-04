@@ -95,7 +95,17 @@ export function TicketsPage({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="space-y-2 border-b border-border px-6 py-3">
         <div>
-          <h1 className="text-base font-semibold">Tickets</h1>
+          <h1 className="text-base font-semibold">
+            Tickets
+            {/* Shown/total beside the name it counts (#1144 follow-up) — it describes the page's
+                content, not the toolbar's controls. Unfiltered it reads n/n, doubling as the
+                backlog's total, which the page otherwise says nowhere. */}
+            {loaded && rows.length > 0 && (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                {visible.length}/{rows.length}
+              </span>
+            )}
+          </h1>
           <p className="text-xs text-muted-foreground">
             Every project&apos;s <code className="rounded bg-muted px-1">tickets/</code> backlog — what the agent plans from.
           </p>
@@ -104,7 +114,6 @@ export function TicketsPage({
           view={view}
           rows={rows}
           projects={groups.map(g => ({ id: g.projectId, name: g.projectName }))}
-          shown={visible.length}
           onChange={setView}
         />
       </div>

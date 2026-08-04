@@ -259,9 +259,10 @@ export function TicketsPanel({
                         onClick={() => void startPlan(ticket.file)}
                         disabled={busy}
                         aria-label={`Create a plan for ${ticket.title}`}
-                        // The accent, against the view button's green: an action to take, not a
-                        // state that already holds.
-                        className="text-primary hover:text-primary/80 disabled:opacity-50"
+                        // Blue against the view button's green — a genuinely different hue in both
+                        // themes (unlike `primary`, which the theme defines as the same colour as
+                        // `success`), so the two near-identical clipboards read apart at a glance.
+                        className="text-info hover:text-info/80 disabled:opacity-50"
                       />
                     }
                   >

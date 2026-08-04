@@ -45,6 +45,7 @@ Body:
 ```md
 Effort: 0-10 [0: implementation is trivial, 10: implementation takes months]
 Uncertainty: 0-10 [0: implementation without meaningful alternatives, 10: highly uncertain how to implement]
+Outdated: yes [optional, only if the ticket was updated in a way that makes the plan outdated]
 
 # [Plan] Ticket title
 

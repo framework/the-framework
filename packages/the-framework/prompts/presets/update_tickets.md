@@ -4,14 +4,15 @@ Note the current UTC time before you fetch anything, in ISO 8601. That is the ti
 
 Read `tickets/meta.json` for `lastImportedAt`.
 
-- If `lastImportedAt` is set, fetch only what changed since it: `gh issue list --state all --limit 500 --json number,title,body,state,labels,updatedAt --search "updated:>=<lastImportedAt>"`, and the discussion with `gh api --paginate "repos/{owner}/{repo}/issues/comments?since=<lastImportedAt>"`.
-- Otherwise, treat it as a first import and bring every open issue across.
+Do one of the following:
+- [Error] If there are existing `tickets/*.md` but `lastImportedAt` is missing, or `gh` is missing or logged out, show an error to the user and abort
+- [Empty] If `tickets/` is empty (or doesn't exist), treat it as a first import and bring every open issue across
+- [Upate] Fetch only what changed: `gh issue list --state all --limit 500 --json number,title,body,state,labels,updatedAt --search "updated:>=<lastImportedAt>"`, and the discussion with `gh api --paginate "repos/{owner}/{repo}/issues/comments?since=<lastImportedAt>"`
 
-Then reconcile, one ticket file per issue, following the ticket format:
-
-- An issue with no ticket yet gets one.
-- An issue that already has a ticket has that ticket updated in place. Keep its filename, and keep any `.spike.md` or `.plan.md` written against it: those are our work, not GitHub's, and re-importing must not discard them.
+Then reconcile, one ticket file per issue:
+- An issue with no ticket yet gets one
+- An issue that already has a ticket has that ticket updated in place. Keep its filename, and keep its `.plan.md` but consider setting `outdated: yes`.
 - New comments are worth folding into the ticket only where they change what the work is. Do not paste the thread.
-- An issue that is now closed has its ticket removed, along with its spike and plan.
+- If an issue is now closed, remove its ticket, `.plan.md`, and `.lock.md`
 
 Finish by writing `tickets/meta.json` as `{"lastImportedAt": "<the UTC time you noted at the start>"}`, and say in one line how many tickets you added, updated and removed.

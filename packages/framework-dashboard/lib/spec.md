@@ -9,7 +9,7 @@ The dashboard's client-side library: pure logic modules plus thin React hooks th
 - Multi-device (#1052/#1066/#1067/#1072): `profiles.ts` (saved daemon connections in localStorage), `remote-target.ts` (selected run-target device, in-memory), `draft-handoff.ts` (composer draft carried across a device hop), `use-device-status.ts` (online/offline dots).
 - Notifications & attention: `use-notifications.ts` (browser notifications for the needs-you and activity feeds, #627), `notification-permission.ts`, `notify-channels.ts` (what the daemon can deliver on), `document-title.ts` (needs-you count in the tab title), `favicon.ts` (animated mark while working).
 - Health: `use-daemon-health.ts` (5s liveness probe, #948).
-- Presentation helpers: `format-date.ts` (all timestamp display, "Invalid Date"-proof #759), `ticket-priority.ts`, `session-link.ts`, `resume-command.ts` (#1195 terminal resume one-liner).
+- Presentation helpers: `format-date.ts` (all timestamp display, "Invalid Date"-proof #759), `ticket-priority.ts`, `ticket-filter.ts` (the /tickets filter/sort/group model + URL codec, #1144), `session-link.ts`, `resume-command.ts` (#1195 terminal resume one-liner).
 - Generic React utils: `get-strict-context.tsx`, `use-mobile.ts`, `utils.ts` (`cn`).
 - Tests colocated as `*.test.ts(x)` (vitest + @testing-library/react); telefunc modules mocked via `vi.hoisted` + dynamic import.
 

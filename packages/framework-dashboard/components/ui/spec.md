@@ -17,6 +17,7 @@ The dashboard's shadcn-style primitive library: hand-ported, trimmed shadcn comp
 - `scroll-area.tsx` (+ `.test.tsx`) — themed always-visible scrollbar component (#913); test pins viewport structure and token-toned thumb.
 - `separator.tsx` — thin divider.
 - `sheet.tsx` — edge-anchored drawer on Base UI Dialog; the sidebar's mobile presentation.
+- `slider.tsx` — two-thumb `RangeSlider` on Base UI Slider ([min, max] pairs; the tickets filter's 0-10 ranges).
 - `sidebar.tsx` — the full shadcn Sidebar kit (provider/context, desktop+mobile+icon-collapse shell, menu parts) — the directory's one big orchestrator.
 - `skeleton.tsx` — pulsing placeholder block.
 - `tooltip.tsx` — instant-open (delay 0, #1149) tooltip; Portal/Positioner inside TooltipContent.

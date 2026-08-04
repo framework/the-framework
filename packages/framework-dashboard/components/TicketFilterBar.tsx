@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowUp, Check, ChevronDown, Search, X } from 'lucide-react'
 import {
   EFFORT_BUCKETS,
@@ -31,6 +31,7 @@ import { Input } from './ui/input.js'
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover.js'
 import { RangeSlider } from './ui/slider.js'
 import { Separator } from './ui/separator.js'
+import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip.js'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -120,7 +121,15 @@ function RangeFacet({
           ))}
         </div>
         <Separator className="my-2" />
-        <div className="px-1">
+        {/* Dimmed while buckets are selected: the two drive the same selection, and one range
+            cannot show a non-adjacent bucket union. Still live, not disabled — dragging it takes
+            over (withRange clears the buckets), so the gray reads as "not currently applied"
+            rather than a dead end. */}
+        <div
+          className={cn('px-1', filter.buckets.length > 0 && 'opacity-40')}
+          data-dimmed={filter.buckets.length > 0 || undefined}
+          title={filter.buckets.length > 0 ? 'Buckets are selecting — dragging the range replaces them' : undefined}
+        >
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
               Range: {filter.range ? `${filter.range[0]}–${filter.range[1]}` : 'any'}
@@ -175,6 +184,14 @@ function CheckFacet({
 
 const SORT_LABELS: Record<SortKey, string> = { date: 'Date', priority: 'Priority', title: 'Title', effort: 'Effort' }
 
+/** What each direction *means* per key — "descending" says nothing until you know the key. */
+const DIR_LABELS: Record<SortKey, Record<'asc' | 'desc', string>> = {
+  date: { desc: 'Newest first', asc: 'Oldest first' },
+  priority: { desc: 'Highest first', asc: 'Lowest first' },
+  title: { asc: 'A to Z', desc: 'Z to A' },
+  effort: { asc: 'Easiest first', desc: 'Hardest first' },
+}
+
 export function TicketFilterBar({
   view,
   rows,
@@ -196,8 +213,10 @@ export function TicketFilterBar({
   const set = (patch: Partial<TicketFilters>) => onChange({ ...view, filters: { ...f, ...patch } })
 
   // `/` focuses the search from anywhere on the page (unless something is already being typed
-  // into) — the shortcut every issue tracker has taught.
+  // into) — the shortcut every issue tracker has taught. A keycap chip on the field advertises
+  // it, and steps aside once the field is focused or filled.
   const searchRef = useRef<HTMLInputElement>(null)
+  const [searchFocused, setSearchFocused] = useState(false)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return
@@ -226,10 +245,17 @@ export function TicketFilterBar({
           ref={searchRef}
           value={f.q}
           onChange={e => set({ q: e.target.value })}
-          placeholder="Search tickets…  /"
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          placeholder="Search tickets…"
           aria-label="Search tickets"
-          className="h-7 w-56 pl-7 text-xs"
+          className="h-7 w-56 pl-7 pr-6 text-xs"
         />
+        {!searchFocused && f.q === '' && (
+          <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border bg-muted/60 px-1 font-mono text-[10px] text-muted-foreground">
+            /
+          </kbd>
+        )}
       </div>
 
       <RangeFacet
@@ -329,28 +355,24 @@ export function TicketFilterBar({
 
       {/* Right side: what the filters leave, and how it is ordered. */}
       <div className="ml-auto flex items-center gap-2">
-        {filtered && (
-          <span className="text-xs text-muted-foreground">
-            {shown} of {rows.length}
-          </span>
-        )}
+        {/* Always shown, not only while filtered: unfiltered it doubles as the backlog's total,
+            which the page otherwise says nowhere. */}
+        <span className="text-xs text-muted-foreground">
+          {shown}/{rows.length}
+        </span>
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
               <Button variant="outline" size="xs" className="gap-1">
                 Sort: {SORT_LABELS[view.sort.key]}
-                {view.sort.dir === 'desc' ? (
-                  <ArrowDown className="h-3 w-3" aria-hidden />
-                ) : (
-                  <ArrowUp className="h-3 w-3" aria-hidden />
-                )}
+                <ChevronDown className="h-3 w-3 opacity-60" aria-hidden />
               </Button>
             }
           />
           <DropdownMenuContent>
             {(Object.keys(SORT_LABELS) as SortKey[]).map(key => (
-              // Picking the active key again flips its direction, so the menu stays open-and-close
-              // simple instead of growing per-direction entries.
+              // Picking the active key again flips its direction — a bonus shortcut; the visible
+              // direction button beside the menu is the discoverable path.
               <DropdownMenuItem key={key} onClick={() => onChange({ ...view, sort: toggleSort(view.sort, key) })}>
                 <span className="flex h-3.5 w-3.5 items-center justify-center">
                   {view.sort.key === key && <Check className="h-3.5 w-3.5" aria-hidden />}
@@ -367,6 +389,25 @@ export function TicketFilterBar({
             </DropdownMenuCheckboxItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        {/* The direction as its own one-click toggle (#1144 follow-up): flipping asc/desc must
+            not require knowing the menu's re-click trick. Labeled by meaning, not asc/desc. */}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label={`Sort direction: ${DIR_LABELS[view.sort.key][view.sort.dir]} — click to reverse`}
+                onClick={() => onChange({ ...view, sort: { ...view.sort, dir: view.sort.dir === 'desc' ? 'asc' : 'desc' } })}
+              />
+            }
+          >
+            {view.sort.dir === 'desc' ? <ArrowDown className="h-3.5 w-3.5" aria-hidden /> : <ArrowUp className="h-3.5 w-3.5" aria-hidden />}
+          </TooltipTrigger>
+          <TooltipContent>
+            {DIR_LABELS[view.sort.key][view.sort.dir]} — click for {DIR_LABELS[view.sort.key][view.sort.dir === 'desc' ? 'asc' : 'desc'].toLowerCase()}
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
   )

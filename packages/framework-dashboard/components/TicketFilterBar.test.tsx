@@ -95,6 +95,34 @@ describe('TicketFilterBar (#1144)', () => {
     expect(next.sort).toEqual({ key: 'date', dir: 'asc' })
   })
 
+  test('the direction is its own one-click toggle, labeled by meaning rather than asc/desc', () => {
+    const { onChange } = renderBar([row('a.md')])
+    fireEvent.click(screen.getByRole('button', { name: /newest first/i }))
+    const next = onChange.mock.calls[0]![0] as TicketsView
+    expect(next.sort).toEqual({ key: 'date', dir: 'asc' })
+  })
+
+  test('the x/n tally is always shown, not only while filtered', () => {
+    renderBar([row('a.md'), row('b.md')])
+    expect(screen.getByText('2/2')).toBeTruthy()
+  })
+
+  test('selecting a bucket dims the slider — it still works, but is not the active clause', async () => {
+    const view = defaultView()
+    view.filters.priority = { buckets: ['critical'], range: null, none: false }
+    renderBar([row('a.md', { priority: '9' })], view)
+    fireEvent.click(screen.getByRole('button', { name: /priority/i }))
+    await screen.findByLabelText('Critical (8–10)')
+    expect(document.querySelector('[data-dimmed]')).toBeTruthy()
+  })
+
+  test('the "/" keycap chip steps aside once the search field is focused', () => {
+    renderBar([row('a.md')])
+    expect(screen.getByText('/')).toBeTruthy()
+    fireEvent.focus(screen.getByRole('textbox', { name: /search tickets/i }))
+    expect(screen.queryByText('/')).toBeNull()
+  })
+
   test('"Group by project" unticks into the flat list', async () => {
     const { onChange } = renderBar([row('a.md')])
     fireEvent.click(screen.getByRole('button', { name: /sort: date/i }))

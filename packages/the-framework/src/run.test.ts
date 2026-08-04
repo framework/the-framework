@@ -711,7 +711,7 @@ test('runFramework runs the backlog loop after the build when opted in (#323)', 
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
   const cwd = await mkdtemp(join(tmpdir(), 'framework-run-todo-'))
-  await writeFile(join(cwd, 'TODO.md'), '- [ ] leftover task\n')
+  await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] leftover task\n')
   try {
     const events: FrameworkEvent[] = []
     // The fake script never edits the backlog, so the loop stall-stops after two
@@ -724,8 +724,8 @@ test('runFramework runs the backlog loop after the build when opted in (#323)', 
       todoLoop: true,
       onEvent: e => events.push(e),
     })
-    assert.deepEqual(result.todo, { completed: 2, reason: 'stalled', file: 'TODO.md' })
-    assert.ok(events.some(e => e.kind === 'log' && /Backlog: TODO\.md has 1 open item\(s\)/.test(e.message)))
+    assert.deepEqual(result.todo, { completed: 2, reason: 'stalled', file: 'TODO_AGENTS.md' })
+    assert.ok(events.some(e => e.kind === 'log' && /Backlog: TODO_AGENTS\.md has 1 open item\(s\)/.test(e.message)))
     // The loop runs before the run's end event.
     const endIndex = events.findIndex(e => e.kind === 'end')
     const stallIndex = events.findIndex(e => e.kind === 'log' && /no progress/.test(e.message))
@@ -782,11 +782,11 @@ test('runFramework leaves a resume note on the backlog when it pauses (#529)', a
 test('runFramework appends the resume note to an existing backlog (#529)', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-pause-'))
   try {
-    await writeFile(join(cwd, 'TODO.md'), '- [ ] Something already open') // no trailing newline
+    await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] Something already open') // no trailing newline
     await assert.rejects(
       runFramework({ intent: FAKE_INTENT, driver: fakeDriver(), cwd, signals: FAKE_SIGNALS, consumptionGate: () => 'Current session' }),
     )
-    const todo = await readFile(join(cwd, 'TODO.md'), 'utf8')
+    const todo = await readFile(join(cwd, 'TODO_AGENTS.md'), 'utf8')
     // The existing entry survives and the note lands on its own line.
     assert.match(todo, /- \[ \] Something already open\n- \[ \] Resume /)
   } finally {
@@ -981,7 +981,7 @@ function handsOffDriver(): { driver: Driver; prompts: () => readonly string[] } 
 
 test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1225)', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-handsoff-'))
-  await writeFile(join(cwd, 'TODO.md'), '- [ ] leftover task\n')
+  await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] leftover task\n')
   try {
     const events: FrameworkEvent[] = []
     const asked: ChoiceRequest[] = []
@@ -1012,7 +1012,7 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
     assert.equal(todo, undefined)
     assert.deepEqual(asked, [])
     assert.ok(!events.some(e => e.kind === 'choice'))
-    assert.match(await readFile(join(cwd, 'TODO.md'), 'utf8'), /leftover task/)
+    assert.match(await readFile(join(cwd, 'TODO_AGENTS.md'), 'utf8'), /leftover task/)
     // And it says why it stopped, before the end.
     const handed = events.findIndex(e => e.kind === 'log' && /^Handed off:/.test(e.message))
     assert.ok(handed !== -1 && handed < events.findIndex(e => e.kind === 'end'))

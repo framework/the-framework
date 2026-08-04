@@ -1,4 +1,3 @@
-Status: open
 GitHub: [#1432](https://github.com/gemstack-land/the-framework/issues/1432)
 
 # Spike & plan can never fire while the AI queue has entries

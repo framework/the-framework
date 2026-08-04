@@ -1,4 +1,3 @@
-Status: open
 Priority: 7
 Topics: [bug, the-framework]
 GitHub: [#1320](https://github.com/gemstack-land/the-framework/issues/1320)

@@ -7,7 +7,7 @@ Read `tickets/meta.json` for `lastImportedAt`.
 Do one of the following:
 - [Error] If there are existing `tickets/*.md` but `lastImportedAt` is missing, or `gh` is missing or logged out, show an error to the user and abort
 - [Empty] If `tickets/` is empty (or doesn't exist), treat it as a first import and bring every open issue across
-- [Upate] Fetch only what changed: `gh issue list --state all --limit 500 --json number,title,body,state,labels,updatedAt --search "updated:>=<lastImportedAt>"`, and the discussion with `gh api --paginate "repos/{owner}/{repo}/issues/comments?since=<lastImportedAt>"`
+- [Update] Fetch only what changed: `gh issue list --state all --limit 500 --json number,title,body,state,labels,updatedAt --search "updated:>=<lastImportedAt>"`, and the discussion with `gh api --paginate "repos/{owner}/{repo}/issues/comments?since=<lastImportedAt>"`
 
 Then reconcile, one ticket file per issue:
 - An issue with no ticket yet gets one

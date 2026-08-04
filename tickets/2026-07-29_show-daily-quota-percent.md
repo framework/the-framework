@@ -1,4 +1,3 @@
-Status: open
 GitHub: [#1367](https://github.com/gemstack-land/the-framework/issues/1367)
 
 # Idea: also show daily `%` used

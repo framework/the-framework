@@ -1,4 +1,3 @@
-Status: open
 Priority: 2
 Topics: [enhancement]
 GitHub: [#13](https://github.com/gemstack-land/the-framework/issues/13)

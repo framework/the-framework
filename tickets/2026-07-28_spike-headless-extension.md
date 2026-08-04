@@ -1,4 +1,3 @@
-Status: open
 Priority: 8
 Topics: [UX]
 GitHub: [#1332](https://github.com/gemstack-land/the-framework/issues/1332)

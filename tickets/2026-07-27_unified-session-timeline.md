@@ -1,4 +1,3 @@
-Status: open
 Topics: [enhancement, ux]
 GitHub: [#1266](https://github.com/gemstack-land/the-framework/issues/1266)
 

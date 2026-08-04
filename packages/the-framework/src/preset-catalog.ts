@@ -89,7 +89,7 @@ export const presets = {
   /**
    * [Update from GitHub] (#1208): the second and every later import. It resumes from the
    * `lastImportedAt` in `tickets/meta.json` and reconciles rather than refilling — an existing
-   * ticket is edited in place, keeping the `.spike.md` and `.plan.md` written against it, and a
+   * ticket is edited in place, keeping the `.plan.md` written against it, and a
    * closed issue's ticket goes.
    *
    * The timestamp is read by the agent out of the repo rather than rendered into the prompt: the

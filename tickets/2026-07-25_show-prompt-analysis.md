@@ -1,4 +1,3 @@
-Status: open
 GitHub: [#1180](https://github.com/gemstack-land/the-framework/issues/1180)
 
 # Show prompt analysis to user

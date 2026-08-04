@@ -1,4 +1,3 @@
-Status: open
 GitHub: [#1396](https://github.com/gemstack-land/the-framework/issues/1396)
 
 # SDD extension: @the-framework-ai/sdd (post-MVP)

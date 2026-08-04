@@ -1,4 +1,3 @@
-Status: open
 Priority: 7
 Topics: [enhancement, the-framework]
 GitHub: [#1328](https://github.com/gemstack-land/the-framework/issues/1328)

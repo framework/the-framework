@@ -1,6 +1,6 @@
 import type { TicketsMeta, WorkspaceTicket } from '@gemstack/the-framework'
 import { presets } from '@gemstack/the-framework/client'
-import { RefreshCw, Github, ClipboardPlus, ClipboardList } from 'lucide-react'
+import { RefreshCw, Github, ClipboardPlus, ListTodo } from 'lucide-react'
 import { sendStart } from '../server/control.telefunc.js'
 import { onTicketsMeta } from '../server/reads.telefunc.js'
 import { Button } from './ui/button.js'
@@ -244,7 +244,7 @@ export function TicketsPanel({
                       />
                     }
                   >
-                    <ClipboardList className="h-4 w-4" aria-hidden />
+                    <ListTodo className="h-4 w-4" aria-hidden />
                   </TooltipTrigger>
                   <TooltipContent>View the plan</TooltipContent>
                 </Tooltip>

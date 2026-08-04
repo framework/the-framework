@@ -1,1 +1,0 @@
-Normalizes an unknown caught value to its message (`err instanceof Error ? err.message : String(err)`) — the one home for an idiom previously spelled out at 20+ call sites; node-free and exported through `/client` for the dashboard.

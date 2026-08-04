@@ -1,1 +1,0 @@
-Lazy accessor reading the MCP observer registry off `globalThis.__gemstack_mcp_observers__` — avoids an eager import so the runtime always sees the one true singleton, even across Vite SSR module re-evaluation; returns (and memoizes) `null` when the observers module was never loaded.

@@ -1,1 +1,0 @@
-Public entry for `@gemstack/ai-sdk/react` — exports the `useAgentRun` hook plus the framework-free core (`appendAgentOutput`, `executeClientTools`, `driveAgentRun`) so apps can drive runs outside React; keeps React out of the main entry (peer `react@>=19.2.0`).

@@ -1,1 +1,0 @@
-Emits the Google Fonts links for IBM Plex Sans (UI) and IBM Plex Mono (code) into the prerendered shell's `<head>` (#1118) — the same links as `packages/the-framework.ai/pages/+Head.tsx`, so the dashboard reads as the same product as the landing page.

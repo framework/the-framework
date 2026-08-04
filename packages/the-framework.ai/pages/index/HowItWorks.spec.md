@@ -1,1 +1,0 @@
-Layout for the "How it works" section (`#how-it-works`): the two introduced building blocks — `EnhancedSystemPrompt` and `Queues` — side by side in the subtext's enumeration order, with the demoted `Prompts` band beneath.

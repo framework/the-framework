@@ -1,1 +1,0 @@
-Shared chevron-plus-label toggle for collapsible sections under the run controls (#659) — one component so "See actual prompt sent"/"Context" disclosures cannot drift apart in style; sets `aria-expanded`, rotates the chevron when open.

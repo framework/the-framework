@@ -1,1 +1,0 @@
-Public-surface barrel of the OpenAI provider: `OpenAIConfig`, `OpenAIProvider`, chat exports (`OpenAIAdapter`, `normalizeToolTranscript`, `toOpenAIMessages`, `toOpenAITools`, `mapOpenAIFinishReason`), and `buildPromptCacheKey`.

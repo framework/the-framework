@@ -1,1 +1,0 @@
-Names `/` as the one URL to prerender — a page with a Route Function has no URLs to derive, so without this the build emits no `index.html` at all; the resulting shell is what the daemon serves for every path (`dashboard/static.ts`).

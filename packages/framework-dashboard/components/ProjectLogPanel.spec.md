@@ -1,1 +1,0 @@
-Rail panel rendering the committed project log (#378/#379: `.the-framework/LOGS.md`, read over Telefunc by the caller) — every finished loop/prompt/build run newest-first with kind/status badges — distinguishing "Loading…" from a genuinely empty log (#948, same guard as the Tickets panel); lives in the rail (#1146) so a freshly appended entry shows without a project switch.

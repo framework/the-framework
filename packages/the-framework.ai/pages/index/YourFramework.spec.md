@@ -1,1 +1,0 @@
-"*Your* framework" section (`#your-framework`): three static cards — Flexible (pick only what you need; customization flagged `WipBadge` "Coming soon"), 100% Local (runs like a desktop app, no tracking, memory in `knowledge-base/*.md` in your Git repo), 100% Open Source (agentic contributions welcome) — with a fixed-width list marker column so wrapped lines align.

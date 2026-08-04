@@ -28,6 +28,13 @@ export const SETTINGS_SEGMENT = 'settings'
  */
 export const TICKETS_SEGMENT = 'tickets'
 
+/**
+ * The word that names a ticket's plan view (its `.plan.md`), the fourth segment of
+ * `/{projectId}/tickets/{slug}/plan`. Reserved past a ticket slug, where it can never collide: a
+ * slug is a `.md` filename, so the bare word `plan` is never one.
+ */
+export const PLAN_SEGMENT = 'plan'
+
 /** What the dashboard is looking at, as carried by the URL. */
 export interface Route {
   /** A top-level view belonging to no project (#958), or the Tickets view (#1144). */
@@ -40,27 +47,41 @@ export interface Route {
    *  meaningful with `view: 'tickets'` and a `projectId`; a ticket belongs to one project, so the
    *  cross-project list (no `projectId`) never carries one. */
   ticketSlug?: string | null
+  /** One ticket's plan view: its `<slug-stem>.plan.md` rendered as markdown. Only meaningful
+   *  alongside a `ticketSlug`, since a plan belongs to a ticket. */
+  plan?: boolean
 }
 
 /** Read the route out of a path. Anything unparseable is the Overview, and extra segments are ignored. */
 export function parseRoute(pathname: string): Route {
-  const [first, second, third] = pathname.split('/').filter(Boolean).map(decodeSegment)
+  const [first, second, third, fourth] = pathname.split('/').filter(Boolean).map(decodeSegment)
   if (first === SETTINGS_SEGMENT) return { view: 'settings', projectId: null, runId: null }
   if (first === TICKETS_SEGMENT) return { view: 'tickets', projectId: null, runId: null }
   if (!first) return { projectId: null, runId: null }
-  if (second === TICKETS_SEGMENT) return { view: 'tickets', projectId: first, runId: null, ticketSlug: third ?? null }
+  if (second === TICKETS_SEGMENT)
+    return {
+      view: 'tickets',
+      projectId: first,
+      runId: null,
+      ticketSlug: third ?? null,
+      // The plan flag rides only on a real slug: `/tickets/plan` with no ticket names nothing.
+      ...(third && fourth === PLAN_SEGMENT ? { plan: true } : {}),
+    }
   return { projectId: first, runId: second ?? null }
 }
 
 /** The path for a route — the inverse of {@link parseRoute}. */
-export function formatRoute({ view, projectId, runId, ticketSlug }: Route): string {
+export function formatRoute({ view, projectId, runId, ticketSlug, plan }: Route): string {
   if (view === 'settings') return `/${SETTINGS_SEGMENT}`
   if (view === 'tickets' && !projectId) return `/${TICKETS_SEGMENT}`
   if (!projectId) return '/'
   const project = encodeURIComponent(projectId)
   if (view === 'tickets') {
     const base = `/${project}/${TICKETS_SEGMENT}`
-    return ticketSlug ? `${base}/${encodeURIComponent(ticketSlug)}` : base
+    if (!ticketSlug) return base
+    const detail = `${base}/${encodeURIComponent(ticketSlug)}`
+    // The plan hangs off its ticket's detail path; without a slug there is no plan to point at.
+    return plan ? `${detail}/${PLAN_SEGMENT}` : detail
   }
   return runId ? `/${project}/${encodeURIComponent(runId)}` : `/${project}`
 }

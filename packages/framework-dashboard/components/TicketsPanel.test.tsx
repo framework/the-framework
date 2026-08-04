@@ -12,7 +12,7 @@ vi.mock('../server/control.telefunc.js', () => ({ sendStart }))
 const onTicketsMeta = vi.hoisted(() => vi.fn())
 vi.mock('../server/reads.telefunc.js', () => ({ onTicketsMeta }))
 
-const { TicketsPanel } = await import('./TicketsPanel.js')
+const { TicketsPanel, planPrompt } = await import('./TicketsPanel.js')
 
 const ticket = (over: Partial<WorkspaceTicket> = {}): WorkspaceTicket => ({
   file: '2026-07-20_do-the-thing.md',
@@ -36,11 +36,36 @@ afterEach(() => {
 
 describe('TicketsPanel (#697/#1144)', () => {
   test('lists the tickets as one-liners, with what has already been done to them', async () => {
-    render(<TicketsPanel projectId="p1" tickets={[ticket({ priority: '8', planned: true })]} loaded onOpen={() => {}} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ priority: '8', spiked: true })]} loaded onOpen={() => {}} />)
     expect(await screen.findByText('Do the thing')).toBeTruthy()
-    expect(screen.getByText('planned')).toBeTruthy()
+    expect(screen.getByText('spiked')).toBeTruthy()
     // The summary moved to the detail page (#1144); the list row is a one-liner.
     expect(screen.queryByText('The thing is not done.')).toBeNull()
+  })
+
+  test('the plan column links a planned ticket to its plan, by the same slug the plan route uses (#685)', async () => {
+    const onOpenPlan = vi.fn()
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ planned: true })]} loaded onOpen={() => {}} onOpenPlan={onOpenPlan} />)
+    // "planned" is no longer a badge — the column says it, and gives somewhere to go with it.
+    expect(screen.queryByText('planned')).toBeNull()
+    fireEvent.click(await screen.findByRole('button', { name: /view the plan for do the thing/i }))
+    expect(onOpenPlan).toHaveBeenCalledWith('2026-07-20_do-the-thing.md')
+  })
+
+  test('the plan column starts a session to write the plan when the ticket has none (#685)', async () => {
+    sendStart.mockResolvedValue({ ok: true, runId: 'r3' })
+    const onRunStarted = vi.fn()
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ planned: false })]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
+    fireEvent.click(await screen.findByRole('button', { name: /create a plan for do the thing/i }))
+    await waitFor(() => expect(sendStart).toHaveBeenCalled())
+    // A fixed prompt, so it takes the verbatim-text path rather than a build, and it is exactly the
+    // exported ask — no second, hidden copy to drift from the button (#1187).
+    expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
+    expect(sendStart.mock.calls[0]?.[1]).toBe(planPrompt('2026-07-20_do-the-thing.md'))
+    expect(sendStart.mock.calls[0]?.[1]).toBe('Create tickets/2026-07-20_do-the-thing.plan.md')
+    // Attended, unlike the import/update buttons: a per-ticket plan is a session you land in.
+    expect(sendStart.mock.calls[0]?.[3]).toEqual({})
+    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith(expect.any(String), 'r3'))
   })
 
   test('a claimed ticket names its holder inline on the badge, full id in the tooltip (#1420)', async () => {

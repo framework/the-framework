@@ -240,14 +240,16 @@ export function TicketsPanel({
                         onClick={() => onOpenPlan?.(ticket.file)}
                         disabled={!onOpenPlan}
                         aria-label={`View the plan for ${ticket.title}`}
-                        // Strong blue for a plan that exists, so it pops against the muted-grey
-                        // create button below — colour (chromatic vs grey) is what tells the two
-                        // near-identical clipboards apart, and makes the planned rows scannable.
+                        // Strong blue for a plan that exists, thicker-stroked (2.5) so it reads
+                        // bolder still against the light-grey create button below — colour and
+                        // weight together tell the two near-identical clipboards apart and make the
+                        // planned rows scannable. `info` is the theme's only blue (`primary` is
+                        // defined as `success`'s green), and it renders at full strength here.
                         className="text-info hover:text-info/80 disabled:pointer-events-none disabled:opacity-50"
                       />
                     }
                   >
-                    <ClipboardList className="h-4 w-4" aria-hidden />
+                    <ClipboardList className="h-4 w-4" strokeWidth={2.5} aria-hidden />
                   </TooltipTrigger>
                   <TooltipContent>View the plan</TooltipContent>
                 </Tooltip>
@@ -260,11 +262,10 @@ export function TicketsPanel({
                         onClick={() => void startPlan(ticket.file)}
                         disabled={busy}
                         aria-label={`Create a plan for ${ticket.title}`}
-                        // Light grey — the same recessive tone as the row's "4d ago" date
-                        // (`muted-foreground/70`) — against the view button's blue: a plan yet to
-                        // be written is the quiet state, an available action rather than something
-                        // already there.
-                        className="text-muted-foreground/70 hover:text-foreground disabled:opacity-50"
+                        // Light grey, lighter than the row's "4d ago" date, against the view
+                        // button's bold blue: a plan yet to be written is the quiet state, an
+                        // available action rather than something already there.
+                        className="text-muted-foreground/50 hover:text-foreground disabled:opacity-50"
                       />
                     }
                   >

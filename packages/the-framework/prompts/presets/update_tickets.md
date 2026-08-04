@@ -4,8 +4,8 @@ Note the current UTC time before you fetch anything, in ISO 8601. That is the ti
 
 Read `tickets/meta.json` for `lastImportedAt`.
 
-- With a timestamp, fetch only what changed since it: `gh issue list --state all --limit 500 --json number,title,body,state,labels,updatedAt --search "updated:>=<lastImportedAt>"`, and the discussion with `gh api --paginate "repos/{owner}/{repo}/issues/comments?since=<lastImportedAt>"`.
-- With no timestamp (or no file), treat it as a first import and bring every open issue across.
+- If `lastImportedAt` is set, fetch only what changed since it: `gh issue list --state all --limit 500 --json number,title,body,state,labels,updatedAt --search "updated:>=<lastImportedAt>"`, and the discussion with `gh api --paginate "repos/{owner}/{repo}/issues/comments?since=<lastImportedAt>"`.
+- Otherwise, treat it as a first import and bring every open issue across.
 
 Then reconcile, one ticket file per issue, following the ticket format:
 

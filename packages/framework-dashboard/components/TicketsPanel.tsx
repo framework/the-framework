@@ -240,9 +240,10 @@ export function TicketsPanel({
                         onClick={() => onOpenPlan?.(ticket.file)}
                         disabled={!onOpenPlan}
                         aria-label={`View the plan for ${ticket.title}`}
-                        // Green for a plan that exists (ready to read); the create button below is
-                        // the accent — colour is what tells the two near-identical clipboards apart.
-                        className="text-success hover:text-success/80 disabled:pointer-events-none disabled:opacity-50"
+                        // Strong blue for a plan that exists, so it pops against the muted-grey
+                        // create button below — colour (chromatic vs grey) is what tells the two
+                        // near-identical clipboards apart, and makes the planned rows scannable.
+                        className="text-info hover:text-info/80 disabled:pointer-events-none disabled:opacity-50"
                       />
                     }
                   >
@@ -259,10 +260,10 @@ export function TicketsPanel({
                         onClick={() => void startPlan(ticket.file)}
                         disabled={busy}
                         aria-label={`Create a plan for ${ticket.title}`}
-                        // Blue against the view button's green — a genuinely different hue in both
-                        // themes (unlike `primary`, which the theme defines as the same colour as
-                        // `success`), so the two near-identical clipboards read apart at a glance.
-                        className="text-info hover:text-info/80 disabled:opacity-50"
+                        // Muted grey, the absence of colour against the view button's blue: a plan
+                        // yet to be written is the recessive state, an available action rather than
+                        // something already there.
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-50"
                       />
                     }
                   >

@@ -1,1 +1,0 @@
-Note-styled band (`#prompts`) listing the open-source prompt packs (Security audit, Code quality, Research, Product Management, plus a dashed "Add yours" chip) — deliberately a demoted band, not a third pillar, and a `<div>` in the `Note` dress because the chip row cannot live inside `Note`'s `<p>`.

@@ -1,1 +1,0 @@
-Types for the framework-detection seam (#115): `FrameworkPreset` (a pure detector: kebab-case `name`, human `framework` label, `signals`), its spec and signal shapes, the project-side `FrameworkSignals` input (deps as map or name list, file path list), and the `FrameworkDetection`/`FrameworkPresetScore` outputs.

@@ -1,1 +1,0 @@
-Thin wrapper over Zod 4's native `z.toJSONSchema` for tool/output schemas — strips the `$schema` dialect key, falls back to `{type:'object'}` when a schema can't be represented, and takes an `io` param (`'input'` = tool parameters projection, `'output'` = structured-output projection, the default).

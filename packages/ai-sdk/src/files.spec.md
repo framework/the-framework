@@ -1,1 +1,0 @@
-`FileManager` — thin per-provider facade over `AiRegistry.resolveFiles()` for upload/list/delete/retrieve of provider-platform files; `retrieve` throws a clear error when the provider's `FileAdapter` doesn't implement it.

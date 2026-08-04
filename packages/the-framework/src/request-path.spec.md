@@ -1,1 +1,0 @@
-Defensively parses an HTTP request's pathname (#938): `new URL` throws synchronously on absolute-form proxy targets Node hands through verbatim, which would take the whole daemon down; `requestPathname()` returns `undefined` instead so handlers answer 400 (or serve a fallback), never throw.

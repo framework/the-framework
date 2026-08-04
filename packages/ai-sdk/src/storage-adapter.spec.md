@@ -1,1 +1,0 @@
-One-method neutral storage contract (`StorageAdapter.put(path, bytes)`) that callers implement over S3/GCS/fs/etc. and pass to `ImageGenerator.store` / `AudioGenerator.store` — the package bundles no storage implementation.

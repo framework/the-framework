@@ -1,1 +1,0 @@
-Barrel for the runner seam — re-exports the `Runner` contract types and `RunnerError` from `types.ts`, the four adapters (`FakeRunner`, `LocalRunner`, `DockerRunner`, `WebContainerRunner` plus the `dockerAvailable`/`webContainerAvailable` guards), and `runnerTools`.

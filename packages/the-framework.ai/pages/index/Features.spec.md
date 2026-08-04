@@ -1,1 +1,0 @@
-"Features" section (`#features`): a static auto-fit grid of eight feature cards — bring your own subscription (orchestrates via your Claude Code / Codex install), optimal quota usage (#1217), bring your own prompts (#1219), dashboard, notifications (browser/Discord), Claude Code Web (0% local CPU), swarm of local computers, Discord bot.

@@ -1,1 +1,0 @@
-Neutral `CacheAdapter` contract (`get`/`set` with optional TTL seconds/`forget`) that the suspendable run stores persist through — the SDK bundles no cache implementation; callers pass their own (Redis, Map, framework cache) to `CachedAgentRunStore`/`CachedSubAgentRunStore`.

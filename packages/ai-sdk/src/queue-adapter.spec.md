@@ -1,1 +1,0 @@
-Types-only neutral contracts behind queued prompts: `QueueDispatch` (enqueue a job fn with optional `queue`/`delay`) and `QueueBroadcast` (push a `chunk`/`done`/`error` event to a named channel) — the package bundles no queue implementation; hosts register both via `configureAiQueue`.

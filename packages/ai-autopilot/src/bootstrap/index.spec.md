@@ -1,1 +1,0 @@
-Barrel for bootstrap mode: re-exports the `Bootstrap` orchestrator, the default step builders (`supervisorBuild`, `loopChecklist`, `loopImprove`, `agentDeploy`, `serveCheck`/`mergeChecklists`), the deploy targets (`planOnlyTarget`, `FakeDeployTarget`, `cloudflareTarget`, `dokployTarget`), and all bootstrap types.

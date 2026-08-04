@@ -1,1 +1,0 @@
-Reads the user's `SYSTEM.md` from the workspace root (`loadUserSystemPrompt`; absent/empty → `undefined`) — the one Node-bound half of the system prompt, split from the pure composition in `system-prompt.ts` so the dashboard can render the prompt in the browser without `node:fs` reaching the bundle (#520).

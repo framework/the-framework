@@ -1,1 +1,0 @@
-Barrel re-exporting the driver seam's public surface: the types, `isTransientQuotaReason`, the quota reader, and the five drivers (Fake, Codex, ClaudeCode, Actions, Cloud) plus the shared `runAgentCli` / `readZip` plumbing.

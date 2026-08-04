@@ -1,41 +1,38 @@
-GemStack monorepo: **The Framework** — an autonomous AI programming product — together with the framework-agnostic AI and MCP engine packages it is built on.
+The Framework turns coding agents into autonomous workers: you queue work and make the important decisions; agents do the rest and hand you finished pull requests.
 
 ## TLDR
 
-- The product turns coding agents (Claude Code, Codex, …) into autonomous workers: queue work, let agents run unattended in isolated git worktrees, surface the few decisions that need a human, and hand finished work off as branches and pull requests.
-- Four layers, top to bottom:
-  - **Product** — `packages/the-framework` (CLI + daemon + run lifecycle) with `packages/framework-dashboard` (the localhost UI it serves).
-  - **Orchestration engines** — `packages/ai-autopilot` (multi-agent orchestration) on `packages/ai-sdk` (the agent runtime), plus `packages/ai-skills` (capability bundles) and `packages/ai-mcp` (agent ↔ MCP bridge).
-  - **MCP** — `packages/mcp` (author MCP servers) and `packages/mcp-connectors` + `packages/mcp-connector-*` (wire external services in as MCP tools).
-  - **Site** — `packages/the-framework.ai` (marketing site).
-- Each `packages/*/spec.md` describes its package; this file only says how they fit together.
+How the product works, end to end:
+
+- You describe work — a typed prompt, a ticket, a queue entry. A per-machine daemon picks it up: immediately when you ask, or on its own while you're away.
+- Each task runs a coding agent (Claude Code, Codex, …) as a **black box** in its own git worktree and branch: the framework prompts it, lets the agent's own loop run to completion, reads the code it produced, and judges **outcomes** (does it build, does it serve, does a review pass) — never the agent's inner steps.
+- The agent's final message is the conversation protocol: it names the session, asks blocking questions (pick an option, confirm, "take over the browser for this login"), and signals when the work is ready to merge. A question parks the run; your answer — a dashboard click or a Discord reply — resumes it.
+- When work settles, quality passes are queued, the branch is pushed, and a draft PR opens. If you armed it, the PR merges once CI is green. Runs that produced nothing are never published.
+- Autonomy is a loop over a durable backlog: agents write their own queue (`TODO_AGENTS.md`) and drain it one entry per turn; when it runs empty and nobody is at the keyboard, an idle sweep refills it (triage tickets, plan work, maintenance). All unattended work is paced by a spending boundary — it may only spend the share of the weekly quota that has already elapsed, so it can never starve you.
+- Everything you watch is a projection of files the runs write (the dashboard, Discord notifications, the shared watch-a-run relay); steering flows back through files too. There is no direct wiring between a run and the daemon.
+
+The product is the top of a stack of reusable engines — each package's own `spec.md` tells its story; this file only says how they relate:
 
 ```mermaid
 graph TD
-    dash["framework-dashboard<br/>localhost UI"] --> tf["the-framework<br/>the product: CLI + daemon + runs"]
-    tf --> ap["ai-autopilot<br/>orchestration"] --> sdk["ai-sdk<br/>agent runtime"]
-    skills["ai-skills"] --> sdk
-    aimcp["ai-mcp"] --> sdk
-    conn["mcp-connector-*"] --> conns["mcp-connectors"] --> mcp["mcp<br/>MCP server framework"]
+    dash["framework-dashboard<br/>the localhost UI"] --> tf["the-framework<br/>the product: daemon, runs, autonomy"]
+    tf --> ap["ai-autopilot<br/>orchestrate many agents"] --> sdk["ai-sdk<br/>run one agent"]
+    skills["ai-skills<br/>capability bundles"] --> sdk
+    aimcp["ai-mcp<br/>agent ↔ MCP bridge"] --> sdk
+    conn["mcp-connector-*<br/>GitHub, Drive, …"] --> conns["mcp-connectors<br/>connector contract"] --> mcp["mcp<br/>author MCP servers"]
 ```
 
 ## Problems
 
-- Coding-agent CLIs offer no stable API into their loop — the product can only prompt them and read back code and final messages. Everything is designed around that black-box constraint.
-- Many agents working one repository at once would trample each other and the user's own checkout — solved by giving every run its own git worktree and branch.
-- Unattended agents spend a real (weekly, subscription) quota — solved by a spending boundary that rises with the clock, so autonomy never starves the human.
+- Coding agents are capable but cannot be left alone naively: they stall on decisions they shouldn't make, and they never come back to ask. The product's whole shape is the answer — let them run, and surface the *few* decisions that matter (questions, merge authorization) to a human who is mostly away.
+- Agents offer no API into their loop: prompts go in, code and a final message come out. So trust is built on outcomes, and "talking to a running agent" has to be reconstructed on top of that seam (parked questions, resumable sessions).
+- Many agents on one repository would trample each other and the user's own checkout — every run is isolated in its own worktree, and only the daemon writes shared state back.
+- Unattended agents spend a real, shared, weekly quota — autonomy is throttled so the human's own work always has headroom.
 
 ## Decisions
 
-- **Engines, not bindings.** GemStack hosts framework-agnostic engines only; framework-specific bindings live with their framework. The `ai-` prefix means "depends on the agent runtime"; dependencies point one way (`ai-skills`/`ai-autopilot`/`ai-mcp` → `ai-sdk`; connectors → `mcp`; never up).
-- **Files are the seam.** A run appends events to a log file; the daemon tails it; steering flows back through another file. No process-to-process IPC, and the dashboard is a pure projection of what is on disk.
-- The repo dogfoods its own product: `.the-framework/` (session logs and archives), `TODO_AGENTS.md` (the AI work queue), and `tickets/` (the human roadmap, imported from GitHub issues) are live product data, not documentation.
-
-## Facts
-
-- Two root documents complement the `spec.md` tree: `Architecture.md` (why the package boundaries are where they are, and the design record of the AI family) and `FEATURES.md` (per-feature behavior with test recipes).
-- Monorepo mechanics: pnpm workspaces (`packages/*`, `examples/*`) + Turborepo; releases via changesets (merge to `main` → version PR → publish). `.github/workflows/` carries CI, release, website deploy, a prompt-drift guard, and the agent workflow that GitHub-Actions-target runs dispatch.
-- `examples/` holds five runnable offline quickstarts (one per engine seam) and `experiments/` holds a benchmark artifact — no specs there. `spike/cc-web-extension` (the claude.ai ↔ daemon bridge extension) is real product surface kept outside the workspace globs; it has its own spec.
+- **Engines, not bindings.** The layers under the product are framework-agnostic and useful standalone; dependencies point strictly downward (`the-framework` → `ai-autopilot` → `ai-sdk`; connectors → `mcp`; never up or across).
+- **The repo runs itself.** `TODO_AGENTS.md`, `tickets/`, and `.the-framework/` here are the product's own live data: the queue, roadmap, and session history of the agents that develop this codebase.
 
 ## Before modifying this file
 

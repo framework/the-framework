@@ -3,7 +3,7 @@ The backlog loop (#323): once the main work settles, consume the agent's own TOD
 ## TLDR
 
 - `parseTodoEntries()`: open entries = markdown list items (`-`, `*`, `1.`) whose checkbox is absent or unchecked; checked `[x]` = done; headings/prose/blanks are not entries.
-- `findTodoBacklog()`: the flat file via `findFlatTodo` (`TODO_AGENTS.md`, or a legacy `tickets/TODO.md` / root `TODO.md`); a leftover session-scoped `TODO_<slug>.agent.md` is ignored (#1369).
+- `findTodoBacklog()`: the flat file via `findFlatTodo` (the root `TODO_AGENTS.md` only — the legacy locations are no longer read); a leftover session-scoped `TODO_<slug>.agent.md` is ignored (#1369).
 - `appendTodoEntry()` (plain append — resume notes and agent follow-ups) vs `appendFlatTodoEntry()` (priority placement for dashboard picks, #697/#1164). Both write the flat queue — the durable one `promoteQueue` carries between branches (#624/#852).
 - `insertTodoEntry()` (#1164): pure priority placement into the `## Priority N` sections — join an existing section's end, create before the first lower-priority section, or land above the first heading; a plain append had put a just-queued ticket at the *end* of the file, worked last.
 - `nextQueuedTicket()` / `ticketForPrompt()` (#1117): the ticket the next drain run will pick up (first open entry of the flat backlog, same read as the sweep's) — a best guess that only labels an Overview lane, never starts or steers a run.
@@ -13,7 +13,7 @@ The backlog loop (#323): once the main work settles, consume the agent's own TOD
 ## Problems
 
 - Unattended safety: the run signal (Stop / budget cap #322) ends any turn, `DEFAULT_MAX_TODO_ITEMS` (25) bounds the run, and two consecutive items that leave the *next* entry untouched stop the loop instead of spinning (`MAX_STALLS` = 2). New entries appended by the work (e.g. Maintenance follow-ups) are fine — only the next entry standing still counts as a stall.
-- The write helpers never throw (they run while a run is already unwinding, and must not mask the reason it stopped); a legacy `tickets/TODO.md` still needs its dir mkdir'd.
+- The write helpers never throw (they run while a run is already unwinding, and must not mask the reason it stopped).
 
 ## Decisions
 

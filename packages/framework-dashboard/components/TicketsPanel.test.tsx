@@ -18,9 +18,7 @@ const ticket = (over: Partial<WorkspaceTicket> = {}): WorkspaceTicket => ({
   file: '2026-07-20_do-the-thing.md',
   title: 'Do the thing',
   summary: 'The thing is not done.',
-  status: 'open',
   date: '2026-01-01T00:00:00.000Z',
-  spiked: false,
   planned: false,
   ...over,
 })
@@ -36,9 +34,9 @@ afterEach(() => {
 
 describe('TicketsPanel (#697/#1144)', () => {
   test('lists the tickets as one-liners, with what has already been done to them', async () => {
-    render(<TicketsPanel projectId="p1" tickets={[ticket({ priority: '8', spiked: true })]} loaded onOpen={() => {}} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ priority: '8', locked: true })]} loaded onOpen={() => {}} />)
     expect(await screen.findByText('Do the thing')).toBeTruthy()
-    expect(screen.getByText('spiked')).toBeTruthy()
+    expect(screen.getByText('claimed')).toBeTruthy()
     // The summary moved to the detail page (#1144); the list row is a one-liner.
     expect(screen.queryByText('The thing is not done.')).toBeNull()
   })
@@ -127,15 +125,15 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(onOpen).toHaveBeenCalledWith('2026-07-20_do-the-thing.md')
   })
 
-  test('shows the effort a spike recorded, and keeps the row meta in priority/date/GitHub order (#1144/#1265)', async () => {
+  test('shows the effort the plan recorded, and keeps the row meta in priority/date/GitHub order (#1144/#1265)', async () => {
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
     render(
       <TicketsPanel
         projectId="p1"
         tickets={[
           ticket({
-            spiked: true,
-            effort: 'low',
+            planned: true,
+            effort: 2,
             priority: '7',
             date: twoDaysAgo,
             github: { label: '#42', url: 'https://github.com/org/repo/issues/42' },
@@ -145,27 +143,13 @@ describe('TicketsPanel (#697/#1144)', () => {
         onOpen={() => {}}
       />,
     )
-    expect(await screen.findByText('Effort: low')).toBeTruthy()
+    expect(await screen.findByText('Effort: 2')).toBeTruthy()
     // Priority sits left of the date (#1265), the date left of the issue link.
     const row = screen.getByText('Do the thing').closest('li')!
     const order = [row.textContent!.indexOf('Priority'), row.textContent!.indexOf('ago'), row.textContent!.indexOf('#42')]
     expect(order.every(i => i !== -1)).toBe(true)
     expect(order[0]).toBeLessThan(order[1]!)
     expect(order[1]).toBeLessThan(order[2]!)
-  })
-
-  test('calls out a closed ticket on its row; open carries no badge (#1144/#1230)', async () => {
-    render(
-      <TicketsPanel
-        projectId="p1"
-        tickets={[ticket({ file: 'closed.md', title: 'Closed one', status: 'closed' }), ticket({ file: 'open.md', title: 'Open one' })]}
-        loaded
-        onOpen={() => {}}
-      />,
-    )
-    expect(await screen.findByText('closed')).toBeTruthy()
-    // "open" is the default assumption, same as spiked/planned only showing when true — no badge for it.
-    expect(screen.queryByText('open')).toBeNull()
   })
 
   test('opening a row hands back its file, the slug the detail route uses (#1144)', async () => {

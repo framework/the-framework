@@ -1,4 +1,3 @@
-Status: open
 Priority: 2
 Topics: [the-framework]
 GitHub: [#806](https://github.com/gemstack-land/the-framework/issues/806)

@@ -1,4 +1,3 @@
-Status: open
 Topics: [bug]
 GitHub: [#1262](https://github.com/gemstack-land/the-framework/issues/1262)
 

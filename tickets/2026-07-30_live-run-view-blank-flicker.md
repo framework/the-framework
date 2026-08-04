@@ -1,4 +1,3 @@
-Status: open
 GitHub: [#1383](https://github.com/gemstack-land/the-framework/issues/1383)
 
 # Dashboard: live run view flickers blank mid-run; white screen for a while after closing a run

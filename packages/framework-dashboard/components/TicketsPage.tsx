@@ -4,23 +4,12 @@ import { onAllTickets } from '../server/reads.telefunc.js'
 import { usePolled } from '../lib/use-async.js'
 import { parsePriority } from '../lib/ticket-priority.js'
 import { ScrollArea } from './ui/scroll-area.js'
-import { Checkbox } from './ui/checkbox.js'
 import { TicketsPanel } from './TicketsPanel.js'
 
 /** Stable initial for the cross-project tickets poll, so it does not churn on every render. */
 const EMPTY_GROUPS: ProjectTickets[] = []
 
 type SortBy = 'date' | 'priority'
-
-/** A status filter checkbox row (#1144/#1230): label, checked state, and what flips it. */
-function StatusFilter({ label, checked, onChange }: { label: string; checked: boolean; onChange: (next: boolean) => void }) {
-  return (
-    <label className="flex items-center gap-1.5 text-sm text-foreground">
-      <Checkbox checked={checked} onCheckedChange={next => onChange(next === true)} aria-label={label} />
-      {label}
-    </label>
-  )
-}
 
 /**
  * Orders a project's (already filtered) tickets for display (#1144/#1265). `readTickets` hands
@@ -56,12 +45,7 @@ export function TicketsPage({
   onRunStarted?: ((projectId: string, intent: string, runId?: string) => void) | undefined
 }) {
   const { value: groups, loaded } = usePolled<ProjectTickets[]>(onAllTickets, EMPTY_GROUPS, 10_000, [])
-  // Open by default, closed hidden (#1144/#1230): the backlog is what needs doing, and a finished
-  // ticket is the one thing this view does not have to keep showing.
-  const [showOpen, setShowOpen] = useState(true)
-  const [showClosed, setShowClosed] = useState(false)
   const [sortBy, setSortBy] = useState<SortBy>('date')
-  const matchesFilter = (t: WorkspaceTicket) => (t.status === 'open' && showOpen) || (t.status === 'closed' && showClosed)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -72,21 +56,17 @@ export function TicketsPage({
             Every project&apos;s <code className="rounded bg-muted px-1">tickets/</code> backlog — what the agent plans from.
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          <StatusFilter label="Open" checked={showOpen} onChange={setShowOpen} />
-          <StatusFilter label="Closed" checked={showClosed} onChange={setShowClosed} />
-          <div className="flex items-center gap-1.5 text-sm text-foreground">
-            <label htmlFor="tickets-sort-by">Sort by:</label>
-            <select
-              id="tickets-sort-by"
-              value={sortBy}
-              onChange={e => setSortBy(e.target.value as SortBy)}
-              className="rounded-md border border-border bg-transparent px-2 py-1 text-sm"
-            >
-              <option value="date">Date</option>
-              <option value="priority">Priority</option>
-            </select>
-          </div>
+        <div className="flex items-center gap-1.5 text-sm text-foreground">
+          <label htmlFor="tickets-sort-by">Sort by:</label>
+          <select
+            id="tickets-sort-by"
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as SortBy)}
+            className="rounded-md border border-border bg-transparent px-2 py-1 text-sm"
+          >
+            <option value="date">Date</option>
+            <option value="priority">Priority</option>
+          </select>
         </div>
       </div>
       <ScrollArea className="min-h-0 flex-1">
@@ -100,23 +80,19 @@ export function TicketsPage({
             <p className="text-sm text-muted-foreground">No projects registered yet.</p>
           ) : (
             <div className="space-y-8">
-              {groups.map(g => {
-                const visible = sortTickets(g.tickets.filter(matchesFilter), sortBy)
-                return (
-                  <section key={g.projectId} className="min-w-0 space-y-2">
-                    <h2 className="truncate text-sm font-semibold">{g.projectName}</h2>
-                    <TicketsPanel
-                      projectId={g.projectId}
-                      tickets={visible}
-                      loaded
-                      hiddenByFilter={g.tickets.length - visible.length}
-                      onOpen={file => onOpenTicket(g.projectId, file)}
-                      onOpenPlan={onOpenTicketPlan ? file => onOpenTicketPlan(g.projectId, file) : undefined}
-                      onRunStarted={(intent, runId) => onRunStarted?.(g.projectId, intent, runId)}
-                    />
-                  </section>
-                )
-              })}
+              {groups.map(g => (
+                <section key={g.projectId} className="min-w-0 space-y-2">
+                  <h2 className="truncate text-sm font-semibold">{g.projectName}</h2>
+                  <TicketsPanel
+                    projectId={g.projectId}
+                    tickets={sortTickets(g.tickets, sortBy)}
+                    loaded
+                    onOpen={file => onOpenTicket(g.projectId, file)}
+                    onOpenPlan={onOpenTicketPlan ? file => onOpenTicketPlan(g.projectId, file) : undefined}
+                    onRunStarted={(intent, runId) => onRunStarted?.(g.projectId, intent, runId)}
+                  />
+                </section>
+              ))}
             </div>
           )}
         </div>

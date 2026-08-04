@@ -14,9 +14,7 @@ const ticket = (over: Record<string, unknown> = {}) => ({
   file: 't.md',
   title: 'Do the thing',
   summary: '',
-  status: 'open',
   date: '2026-01-01T00:00:00.000Z',
-  spiked: false,
   planned: false,
   ...over,
 })
@@ -72,40 +70,6 @@ describe('TicketsPage (#1144)', () => {
     render(<TicketsPage onOpenTicket={() => {}} onRunStarted={onRunStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
     await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('p1', expect.any(String), 'r1'))
-  })
-})
-
-// The status filter (#1144/#1230): Open checked, Closed unchecked, by default.
-describe('TicketsPage status filter (#1144/#1230)', () => {
-  test('shows only open tickets by default, hiding closed ones', async () => {
-    onAllTickets.mockResolvedValue([
-      { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ title: 'Open one' }), ticket({ file: 'c.md', title: 'Closed one', status: 'closed' })] },
-    ])
-    render(<TicketsPage onOpenTicket={() => {}} />)
-    expect(await screen.findByText('Open one')).toBeTruthy()
-    expect(screen.queryByText('Closed one')).toBeNull()
-    expect(screen.getByRole('checkbox', { name: /open/i }).getAttribute('data-checked')).not.toBeNull()
-    expect(screen.getByRole('checkbox', { name: /closed/i }).getAttribute('data-checked')).toBeNull()
-  })
-
-  test('ticking Closed reveals closed tickets alongside open ones', async () => {
-    onAllTickets.mockResolvedValue([
-      { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ title: 'Open one' }), ticket({ file: 'c.md', title: 'Closed one', status: 'closed' })] },
-    ])
-    render(<TicketsPage onOpenTicket={() => {}} />)
-    await screen.findByText('Open one')
-    fireEvent.click(screen.getByRole('checkbox', { name: /closed/i }))
-    expect(await screen.findByText('Closed one')).toBeTruthy()
-    expect(screen.getByText('Open one')).toBeTruthy()
-  })
-
-  test('unticking Open with Closed off leaves a project with tickets reading as filtered, not empty', async () => {
-    onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ title: 'Open one' })] }])
-    render(<TicketsPage onOpenTicket={() => {}} />)
-    await screen.findByText('Open one')
-    fireEvent.click(screen.getByRole('checkbox', { name: /open/i }))
-    expect(await screen.findByText(/hidden by the current filter/i)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /import tickets from github/i })).toBeNull()
   })
 })
 

@@ -1,4 +1,3 @@
-Status: open
 Topics: [the-framework]
 GitHub: [#538](https://github.com/gemstack-land/the-framework/issues/538)
 

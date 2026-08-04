@@ -1,4 +1,3 @@
-Status: open
 GitHub: [#1223](https://github.com/gemstack-land/the-framework/issues/1223)
 
 # Landing page: New feature "Headless browser"

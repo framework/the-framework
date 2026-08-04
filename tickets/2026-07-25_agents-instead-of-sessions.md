@@ -1,4 +1,3 @@
-Status: open
 GitHub: [#1206](https://github.com/gemstack-land/the-framework/issues/1206)
 
 # "Agents" instead of "Sessions"?

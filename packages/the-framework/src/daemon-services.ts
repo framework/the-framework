@@ -166,8 +166,8 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     recordMaintenance: async project => mergeMaintenanceState(project.path, { sweptAt: new Date().toISOString() }),
     // A pinned routine branch left behind by a closed PR blocks every later firing (#1293).
     releasePinned: (project, branch) => releaseStalePinnedBranch(project.path, branch),
-    // The tickets a [Spike & plan] fan-out may claim (#1327/#1420): open, unplanned, and not
-    // claimed by a `.lock.md` — most important first. No stale-lock sweep runs here: #1420
+    // The tickets a [Spike & plan] fan-out may claim (#1327/#1420): unplanned and not claimed
+    // by a `.lock.md` — most important first. No stale-lock sweep runs here: #1420
     // removed the timer, so a lock stands until the agent's PR deletes it or a human releases
     // it from the dashboard.
     spikeCandidates: async project => {
@@ -176,7 +176,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         return Number.isFinite(n) ? n : -1
       }
       return (await readTickets(project.path))
-        .filter(ticket => ticket.status === 'open' && !ticket.spiked && !ticket.planned && !ticket.locked)
+        .filter(ticket => !ticket.planned && !ticket.locked)
         .sort((a, b) => rank(b.priority) - rank(a.priority))
         .map(ticket => ticket.file)
     },

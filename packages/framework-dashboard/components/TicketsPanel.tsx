@@ -65,7 +65,7 @@ export function TicketsPanel({
   projectId: string | null
   tickets: WorkspaceTicket[]
   loaded: boolean
-  /** How many of this project's tickets the caller's status filter hid (#1144/#1230). An empty
+  /** How many of this project's tickets the caller's filters hid (#1144/#1230). An empty
    *  `tickets` with some hidden reads as "filtered", not as "nothing here" — the import prompt
    *  offers work that has already been done. */
   hiddenByFilter?: number
@@ -176,11 +176,6 @@ export function TicketsPanel({
               onClick={() => onOpen(ticket.file)}
               className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm"
             >
-              {/* Only closed is called out (#1144/#1230): open is the row's default assumption,
-                  same as spiked/claimed only showing when true. */}
-              {ticket.status === 'closed' && (
-                <Badge className="shrink-0 border-transparent px-1.5 text-[10px] uppercase text-muted-foreground">closed</Badge>
-              )}
               {/* The title is the row's one flexible column: it truncates when long and stretches
                   when short, so the whole of a row's slack lands here — the way a table's wide
                   first column carries the blank — instead of pooling mid-row between columns. */}
@@ -194,10 +189,6 @@ export function TicketsPanel({
                     {topic}
                   </Badge>
                 ))}
-                {/* What the agent has already done to this ticket, so it is clear what is left.
-                    "planned" is not a badge here anymore: the plan column past the date says it,
-                    and gives the reader somewhere to go with it (open the plan, or start one). */}
-                {ticket.spiked && <Badge className="shrink-0 border-transparent px-1 text-[10px] uppercase">spiked</Badge>}
                 {/* An agent holds this ticket's `.lock.md` (#1420); the detail page releases it.
                     The holder is named inline, not only in the native tooltip — a still 1-2s
                     hover is how nobody discovers anything. Truncated to keep the dense row
@@ -211,7 +202,7 @@ export function TicketsPanel({
                     {ticket.lockedBy && <span className="inline-block max-w-[8rem] truncate">&nbsp;· {ticket.lockedBy}</span>}
                   </Badge>
                 )}
-                {ticket.effort && (
+                {ticket.effort !== undefined && (
                   <Badge className="shrink-0 border-transparent px-1 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>
                 )}
               </span>

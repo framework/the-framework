@@ -1,4 +1,3 @@
-Status: open
 Priority: 8
 Topics: [bug]
 GitHub: [#1164](https://github.com/gemstack-land/the-framework/issues/1164)

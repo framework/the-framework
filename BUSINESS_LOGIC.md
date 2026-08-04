@@ -388,10 +388,11 @@ already configured) so two people on one repo sit side by side instead of confli
 
 ### F43. Tickets
 `tickets/<DATE>_<SLUG>.md` — a plain repo convention, not a proprietary directory: the human-facing
-roadmap. Optional `.spike.md` (how hard, which ways, estimated effort) and `.plan.md` (the detailed
-plan, hard problems, variability) siblings. Parsing is deliberately tolerant, because tickets predating
-the format (GitHub imports) must still list. `tickets/meta.json` records the last GitHub import.
-`tickets.ts`, `dashboard/tickets.ts`, `prompts/ticketing_format.md`.
+roadmap. Optional `.plan.md` (the detailed plan with `Effort:`/`Uncertainty:` 0-10 keys, hard
+problems, variability) and `.lock.md` (an agent's claim) siblings. A closed ticket is removed from
+the repo, so `tickets/` only holds open work. Parsing is deliberately tolerant, because tickets
+predating the format (GitHub imports) must still list. `tickets/meta.json` records the last GitHub
+import. `tickets.ts`, `dashboard/tickets.ts`, `prompts/ticketing_format.md`.
 
 ### F44. The event store
 Persisting *is* durably logging the event stream: the dashboard is a pure projection of it, so a

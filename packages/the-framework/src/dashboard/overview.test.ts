@@ -97,50 +97,42 @@ const ticket = (file: string, over: Partial<WorkspaceTicket> = {}): WorkspaceTic
   file,
   title: file,
   summary: '',
-  status: 'open',
   date: '2026-01-01T00:00:00.000Z',
-  spiked: false,
   planned: false,
   ...over,
 })
 
 test('ticketBucket: in-progress > ai-queue > high-priority, else null (#1139)', () => {
   assert.equal(ticketBucket(ticket('a', { planned: true })), 'in-progress')
-  assert.equal(ticketBucket(ticket('b', { spiked: true })), 'in-progress')
-  assert.equal(ticketBucket(ticket('c', { priority: 'high' })), 'high-priority')
-  assert.equal(ticketBucket(ticket('d', { priority: 'p1' })), 'high-priority')
+  assert.equal(ticketBucket(ticket('c', { priority: '8' })), 'high-priority')
   // Not in any of the three shown lanes: dropped from the card.
   assert.equal(ticketBucket(ticket('e')), null)
-  assert.equal(ticketBucket(ticket('f', { priority: 'low' })), null)
+  assert.equal(ticketBucket(ticket('f', { priority: '2' })), null)
   // A queued ticket lands in the AI Queue, and that outranks a bare priority flag.
   assert.equal(ticketBucket(ticket('g'), { queued: true }), 'ai-queue')
-  assert.equal(ticketBucket(ticket('h', { priority: 'high' }), { queued: true }), 'ai-queue')
+  assert.equal(ticketBucket(ticket('h', { priority: '8' }), { queued: true }), 'ai-queue')
   // Work already under way outranks both: a planned (or queued-and-planned) ticket stays in-progress.
-  assert.equal(ticketBucket(ticket('i', { planned: true, priority: 'high' })), 'in-progress')
+  assert.equal(ticketBucket(ticket('i', { planned: true, priority: '8' })), 'in-progress')
   assert.equal(ticketBucket(ticket('j', { planned: true }), { queued: true }), 'in-progress')
 })
 
-test('ticketBucket: a bare number is the ticket format\'s 10-0 scale, high from 7 up', () => {
+test('ticketBucket: the ticket format\'s 10-0 scale, high from 7 up', () => {
   // ticketing_format.md: `Priority: 10-0 … 10: critical — act immediately, 0: only if capacity`.
   for (const high of ['10', '9', '8', '7']) {
     assert.equal(ticketBucket(ticket(high, { priority: high })), 'high-priority', `priority ${high}`)
   }
-  // 0 and 1 are that scale's LOWEST rungs — the inverse P0/P1 reading only applies written `p0`/`p1`.
   for (const low of ['6', '5', '2', '1', '0']) {
     assert.equal(ticketBucket(ticket(low, { priority: low })), null, `priority ${low}`)
   }
-})
-
-test('ticketBucket: a closed ticket is in no lane, whatever marks it left behind', () => {
-  assert.equal(ticketBucket(ticket('a', { status: 'closed', planned: true })), null)
-  assert.equal(ticketBucket(ticket('b', { status: 'closed', priority: '10' })), null)
-  assert.equal(ticketBucket(ticket('c', { status: 'closed' }), { queued: true }), null)
-  assert.equal(ticketBucket(ticket('d', { status: 'closed' }), { implementing: true }), null)
+  // The word spellings are no longer read — the format says 0-10, and a word is not on the scale.
+  for (const word of ['high', 'urgent', 'p0', 'p1']) {
+    assert.equal(ticketBucket(ticket(word, { priority: word })), null, `priority ${word}`)
+  }
 })
 
 test('buildHotTickets pools every project, buckets each, drops the rest, and orders lane-first', async () => {
   const tickets: Record<string, WorkspaceTicket[]> = {
-    '/a': [ticket('a1.md', { planned: true }), ticket('a2.md', { priority: 'high' })],
+    '/a': [ticket('a1.md', { planned: true }), ticket('a2.md', { priority: '8' })],
     '/b': [ticket('b1.md'), ticket('b2.md')],
   }
   const hot = await buildHotTickets([project('alpha', '/a'), project('beta', '/b')], {
@@ -198,7 +190,7 @@ test('buildHotTickets tolerates a project whose tickets cannot be read', async (
   const hot = await buildHotTickets([project('ok', '/ok'), project('bad', '/bad')], {
     tickets: async cwd => {
       if (cwd === '/bad') throw new Error('unreadable')
-      return [ticket('x.md', { priority: 'high' })]
+      return [ticket('x.md', { priority: '8' })]
     },
     queue: async () => [],
   })
@@ -209,11 +201,11 @@ test('buildHotTickets tolerates a project whose tickets cannot be read', async (
 const runOn = (id: string, ticket: string, status: RunMeta['status'] = 'running') =>
   ({ version: 1, status, id, startedAt: 't', updatedAt: 't', passes: 0, ticket, cwd: '/w' }) as never
 
-test('ticketBucket: a run implementing it is in-progress, whatever the plan/spike says (#1117)', () => {
+test('ticketBucket: a run implementing it is in-progress, whatever the plan says (#1117)', () => {
   // The whole point of the link: a ticket nobody has planned yet, being coded right now, would
-  // otherwise fall through to a non-shown lane on the strength of a plan/spike file alone.
+  // otherwise fall through to a non-shown lane on the strength of a plan file alone.
   assert.equal(ticketBucket(ticket('a'), { implementing: true }), 'in-progress')
-  assert.equal(ticketBucket(ticket('b', { priority: 'high' }), { implementing: true }), 'in-progress')
+  assert.equal(ticketBucket(ticket('b', { priority: '8' }), { implementing: true }), 'in-progress')
   // Absent evidence, the #1112 inference is untouched.
   assert.equal(ticketBucket(ticket('c', { planned: true }), { implementing: false }), 'in-progress')
   assert.equal(ticketBucket(ticket('d'), { implementing: false }), null)

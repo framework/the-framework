@@ -1,4 +1,3 @@
-Status: open
 GitHub: [#1406](https://github.com/gemstack-land/the-framework/issues/1406)
 
 # Auto-merge lands before CI runs: repo lacks native auto-merge + a required build check

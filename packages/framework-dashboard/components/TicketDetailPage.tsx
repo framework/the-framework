@@ -13,12 +13,6 @@ import { cn } from '../lib/utils.js'
 import { formatAge, formatDateTime } from '../lib/format-date.js'
 import { priorityTone } from '../lib/ticket-priority.js'
 
-/** How a status reads (#1144/#1230): open is the active, expected state; closed fades back. */
-const STATUS_TONE: Record<'open' | 'closed', string> = {
-  open: 'text-success',
-  closed: 'text-muted-foreground',
-}
-
 // One ticket's own page (#1144): its entire markdown, not just the head the list row reads —
 // and where Queue lives now that the list is one-liners. `slug` is the same filename the list
 // row and the route carry, so this is a direct read by identity rather than a search through
@@ -124,13 +118,11 @@ export function TicketDetailPage({
                     {ticket.github.label}
                   </a>
                 )}
-                <Badge className={cn('border-transparent px-0 text-[10px] uppercase', STATUS_TONE[ticket.status])}>{ticket.status}</Badge>
                 {ticket.topics?.map(topic => (
                   <Badge key={topic} className="border-border px-1.5 text-[10px] text-muted-foreground">
                     {topic}
                   </Badge>
                 ))}
-                {ticket.spiked && <Badge className="border-transparent px-0 text-[10px] uppercase">spiked</Badge>}
                 {ticket.planned && <Badge className="border-transparent px-0 text-[10px] uppercase">planned</Badge>}
                 {/* The holder inline (#1420): the detail page has the room, so the full id is
                     plainly readable instead of hiding behind a native tooltip. */}
@@ -140,7 +132,12 @@ export function TicketDetailPage({
                     {ticket.lockedBy && <>&nbsp;· {ticket.lockedBy}</>}
                   </Badge>
                 )}
-                {ticket.effort && <Badge className="border-transparent px-0 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>}
+                {ticket.effort !== undefined && (
+                  <Badge className="border-transparent px-0 text-[10px] text-muted-foreground">Effort: {ticket.effort}</Badge>
+                )}
+                {ticket.uncertainty !== undefined && (
+                  <Badge className="border-transparent px-0 text-[10px] text-muted-foreground">Uncertainty: {ticket.uncertainty}</Badge>
+                )}
                 <span className="text-[10px] text-muted-foreground/70">{ticket.file}</span>
               </div>
               {error && <p className="mt-2 text-xs text-danger">{error}</p>}

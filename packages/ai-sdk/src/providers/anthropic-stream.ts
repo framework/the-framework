@@ -45,7 +45,16 @@ export function* mapAnthropicStreamEvent(
     const completionTokens = event['usage']?.output_tokens ?? 0
     yield {
       type: 'finish',
-      finishReason: event['delta']?.stop_reason === 'tool_use' ? 'tool_calls' : 'stop',
+      // A truncation (`max_tokens`) or refusal must not report a clean `stop`, or a caller
+      // cannot tell a complete answer from a cut-off one.
+      finishReason:
+        event['delta']?.stop_reason === 'tool_use'
+          ? 'tool_calls'
+          : event['delta']?.stop_reason === 'max_tokens'
+            ? 'length'
+            : event['delta']?.stop_reason === 'refusal'
+              ? 'content_filter'
+              : 'stop',
       usage: {
         promptTokens: state.lastPromptTokens,
         completionTokens,

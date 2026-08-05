@@ -41,7 +41,9 @@ export function serializeDecisions(decisions: readonly Decision[]): string {
   return `${HEADER}\n\n${INTRO}\n\n${blocks.join('\n\n')}\n`.replace(/\n{3,}/g, '\n\n')
 }
 
-const HEADING_RE = /^##\s+(?:\[(\w+)\]\s*)?(.+?)\s*$/
+// Only a real status counts as the bracket prefix: a hand-written tag like `## [Frontend] …`
+// keeps its bracket in the title (and takes the default status) instead of being eaten.
+const HEADING_RE = /^##\s+(?:\[(rejected|accepted|superseded)\]\s*)?(.+?)\s*$/i
 const META_RE = /^-\s+([a-z-]+)\s*:\s*(.*)$/i
 
 /** Parse `DECISIONS.md` contents into decisions. Malformed sections are skipped. */

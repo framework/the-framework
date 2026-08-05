@@ -929,7 +929,10 @@ function buildSubAgentSnapshotMessages(userPrompt: string, response: AgentRespon
  * server-side tool results so the next resume sees the full history.
  */
 function buildResumeSnapshotMessages(priorMessages: AiMessage[], response: AgentResponse): AiMessage[] {
-  const out: AiMessage[] = [...priorMessages]
+  // The resumed tool results answer a `tool_use` already in `priorMessages` (the just-approved
+  // call), so they come first — omitting them leaves that `tool_use` unpaired, which the next
+  // resume replays into a provider 400 (or an OpenAI "tool result missing" stub).
+  const out: AiMessage[] = [...priorMessages, ...(response.resumedToolMessages ?? [])]
   for (const step of response.steps) {
     out.push(step.message)
     for (const tr of step.toolResults) {
@@ -1390,6 +1393,13 @@ export interface LoopContext {
    */
   pendingHandoff?:                   PendingHandoff
   stopForHandoff:                    boolean
+  /**
+   * Set by the tool phase when `onBeforeToolCall` middleware returned
+   * `{ type: 'abort' }`. Stops the loop instead of letting it make another
+   * provider call with the aborted tool's `tool_use` left unanswered — an
+   * abort from a guard middleware has to actually halt the run.
+   */
+  stopForAbort:                      boolean
 }
 
 export type { PendingHandoff } from './handoffs-driver.js'
@@ -1646,6 +1656,7 @@ async function initializeLoop(
     resumedToolMessages:     [],
     failoverAttempts:        0,
     stopForHandoff:          false,
+    stopForAbort:            false,
   }
 
   // Resume server tools left pending by a previous approval round-trip.
@@ -1865,7 +1876,7 @@ async function runAgentLoopOnce(a: Agent, input: string, options?: AgentPromptOp
       steps.push(step)
       emitObserverStepCompleted(loopCtx, iteration, false)
 
-      if (loopCtx.stopForClientTools || loopCtx.stopForApproval || loopCtx.stopForHandoff) break
+      if (loopCtx.stopForClientTools || loopCtx.stopForApproval || loopCtx.stopForHandoff || loopCtx.stopForAbort) break
 
       const shouldStop = stopConditions.some(cond =>
         cond({ steps, iteration, lastMessage: response.message }),
@@ -2016,7 +2027,7 @@ function runAgentLoopStreamingOnce(a: Agent, input: string, options?: AgentPromp
         steps.push(step)
         emitObserverStepCompleted(loopCtx, iteration, true)
 
-        if (loopCtx.stopForClientTools || loopCtx.stopForApproval || loopCtx.stopForHandoff) break
+        if (loopCtx.stopForClientTools || loopCtx.stopForApproval || loopCtx.stopForHandoff || loopCtx.stopForAbort) break
 
         const shouldStop = stopConditions.some(cond =>
           cond({ steps, iteration, lastMessage: step.message }),

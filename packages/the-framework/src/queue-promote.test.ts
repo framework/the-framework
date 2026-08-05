@@ -76,6 +76,15 @@ test('landPinnedEntry leaves prose and an already-retired entry untouched (#1204
   assert.equal(landPinnedEntry(checkout, checkout, 'never queued', checkout), checkout)
 })
 
+test('landPinnedEntry retires a no-checkbox open entry, not only a [ ] one (#1164/#1297)', () => {
+  // Agents write plain bullets without a box; the rest of the sweep counts those as open, so
+  // the pin must retire them too — otherwise the entry stays open and is re-drained forever.
+  const checkout = ['## Priority 7', '', '- entry a', '- [ ] entry b', ''].join('\n')
+  const out = landPinnedEntry(checkout, checkout, 'entry a', checkout)
+  assert.match(out, /- \[x\] entry a/)
+  assert.match(out, /- \[ \] entry b/)
+})
+
 test('a pinned run lands only its entry, and commits just the queue file (#1204)', async () => {
   const calls: string[][] = []
   const written: string[] = []

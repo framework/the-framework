@@ -6,7 +6,10 @@ export const PMS = {
   npm: { try: 'npx @gemstack/the-framework', install: 'npm i -g @gemstack/the-framework' },
   pnpm: { try: 'pnpm dlx @gemstack/the-framework', install: 'pnpm add -g @gemstack/the-framework' },
   bun: { try: 'bunx @gemstack/the-framework', install: 'bun add -g @gemstack/the-framework' },
-  yarn: { try: 'yarn dlx @gemstack/the-framework', install: 'yarn global add @gemstack/the-framework' },
+  // `yarn dlx` is Yarn 2+ (Berry), which removed `yarn global add` — so the install line
+  // falls back to npm, which every yarn user has, rather than pairing two commands no
+  // single yarn generation can both run.
+  yarn: { try: 'yarn dlx @gemstack/the-framework', install: 'npm i -g @gemstack/the-framework' },
 } as const
 export type Pm = keyof typeof PMS
 

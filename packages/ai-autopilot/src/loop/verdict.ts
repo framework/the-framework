@@ -42,16 +42,18 @@ export function parseVerdict(text: string): Verdict | undefined {
 
   const candidates: string[] = []
   for (const m of text.matchAll(FENCE)) candidates.push(m[1]!)
-  // Fallback: a bare object somewhere in the text (take the last `{`-to-`}` run).
-  const lastOpen = text.lastIndexOf('{')
-  const lastClose = text.lastIndexOf('}')
-  if (lastOpen !== -1 && lastClose > lastOpen) candidates.push(text.slice(lastOpen, lastClose + 1))
 
-  // Later candidates win, so scan from the end.
+  // Later fences win, so scan from the end.
   for (let i = candidates.length - 1; i >= 0; i--) {
     const verdict = coerce(candidates[i]!)
     if (verdict) return verdict
   }
+  // Fallback — only when no fence parsed: a bare object somewhere in the text (the last
+  // `{`-to-`}` run). Tried after the fences so brace-shaped prose trailing the real fenced
+  // verdict can never outrank it.
+  const lastOpen = text.lastIndexOf('{')
+  const lastClose = text.lastIndexOf('}')
+  if (lastOpen !== -1 && lastClose > lastOpen) return coerce(text.slice(lastOpen, lastClose + 1))
   return undefined
 }
 

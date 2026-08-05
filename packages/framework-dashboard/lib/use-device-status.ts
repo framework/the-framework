@@ -21,8 +21,10 @@ const POLL_MS = 10_000
  */
 export function useDeviceStatus(profiles: ConnectionProfile[]): Record<string, DeviceStatus> {
   const targets = profiles.filter(p => p.token).map(p => ({ id: p.id, url: p.url, token: p.token }))
-  // Re-poll only when the device set itself changes, not on every render (targets is a fresh array).
-  const key = targets.map(t => t.id).join('|')
+  // Re-poll when the device set OR any device's token changes, not on every render (targets is a
+  // fresh array). The token is in the key because a re-paste refreshes it without changing the id
+  // (the id is the URL) — keying on ids alone kept pinging with the dead token and showed offline.
+  const key = targets.map(t => `${t.id} ${t.token}`).join('|')
   const load = useMemo(
     () => (targets.length ? () => checkDevices(targets) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps

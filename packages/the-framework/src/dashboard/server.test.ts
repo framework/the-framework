@@ -457,6 +457,7 @@ test('isSameOriginRequest: absent Origin passes; same host + loopback pass; evil
   assert.equal(isSameOriginRequest(req({ origin: 'http://127.0.0.1:9999' })), true)
   assert.equal(isSameOriginRequest(req({ origin: 'http://[::1]' })), true)
   assert.equal(isSameOriginRequest(req({ host: 'localhost:4200', origin: 'http://evil.com' })), false)
+  assert.equal(isSameOriginRequest(req({ origin: 'http://127.evil.com' })), false) // rebound name, not a loopback address
   assert.equal(isSameOriginRequest(req({ origin: 'not-a-url' })), false)
 })
 
@@ -468,6 +469,10 @@ test('isExpectedHost: on a loopback bind only a loopback Host passes (DNS rebind
   assert.equal(isExpectedHost(req({ host: '[::1]:4200' }), bound), true) // the port split must not eat the IPv6 colons
   assert.equal(isExpectedHost(req({ host: 'evil.com' }), bound), false) // rebound: resolves here, names someone else
   assert.equal(isExpectedHost(req({ host: 'evil.com:4200' }), bound), false)
+  // A registrable name that merely starts with `127.` is a rebound name, not a loopback address:
+  // it can resolve to 127.0.0.1, so it must be rejected like any other rebound Host.
+  assert.equal(isExpectedHost(req({ host: '127.evil.com' }), bound), false)
+  assert.equal(isExpectedHost(req({ host: '127.0.0.1.evil.com:4200' }), bound), false)
   assert.equal(isExpectedHost(req({}), bound), false) // HTTP/1.1 requires Host; every browser sends it
 
   // A non-loopback bind is reached by a name we cannot predict, so there is nothing to check

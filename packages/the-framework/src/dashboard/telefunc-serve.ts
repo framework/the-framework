@@ -118,7 +118,7 @@ export function isSameOriginRequest(req: IncomingMessage): boolean {
   } catch {
     return false // malformed Origin: treat as cross-origin
   }
-  return hostname === 'localhost' || hostname === '::1' || hostname === '[::1]' || hostname.startsWith('127.')
+  return isLoopbackHost(hostname)
 }
 
 /**

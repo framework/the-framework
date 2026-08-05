@@ -5,7 +5,7 @@ import { PresetsMenu } from './PresetsMenu.js'
 afterEach(cleanup)
 
 const presets = [
-  { id: 'research', label: '[Research]', render: () => 'RESEARCH PROMPT', tooltip: 'Spike it' },
+  { id: 'research', label: '[Research]', render: () => 'RESEARCH PROMPT', tooltip: 'Plan it' },
   { id: 'maintenance', label: '[Maintenance]', render: () => 'MAINTENANCE PROMPT' },
 ]
 const custom = [{ id: 'c1', label: 'My sweep', prompt: 'sweep it' }]

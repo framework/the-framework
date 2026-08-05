@@ -1,6 +1,6 @@
-# @gemstack/framework-dashboard (spike)
+# @gemstack/framework-dashboard (prototype)
 
-De-risking spike for the dashboard rebuild (#405 / #406). Rebuilds The Framework's
+De-risking prototype for the dashboard rebuild (#405 / #406). Rebuilds The Framework's
 localhost dashboard on **Vike (SPA) + React + Tailwind v4 + shadcn/ui + Telefunc**,
 side-by-side with the current `page.ts` MVP page (which is untouched).
 

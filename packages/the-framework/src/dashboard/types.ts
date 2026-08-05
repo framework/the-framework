@@ -97,12 +97,12 @@ export interface StartRunOptions {
   /**
    * The `tickets/<file>.md` this run implements (#1117); maps to `--ticket`. Set by the daemon
    * when it starts a drain run and the queue entry it will work links back to a ticket, so the
-   * Overview can show that ticket as being implemented rather than guessing from its plan/spike.
+   * Overview can show that ticket as being implemented rather than guessing from its plan.
    */
   ticket?: string
   /**
    * This run plans its {@link ticket} rather than implementing it; maps to `--plan-run`. Set by
-   * the daemon on a fanned-out [Spike & plan] run (#1327), whose PR lands only the plan: the
+   * the daemon on a fanned-out [Plan tickets] run (#1327), whose PR lands only the plan: the
    * ticket still rides for the run's meta, but the PR title must not inherit the issue as
    * `(fix #42)` (#1334) — a plan's merge would close the issue with the work still undone.
    */

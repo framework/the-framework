@@ -493,7 +493,7 @@ test('ticketForPrompt names a ticket for a hand-fired drain, and for nothing els
     // Every other prompt implements whatever it likes; naming the queue's next entry for it would
     // put a ticket in the in-progress lane on the strength of an unrelated run.
     assert.equal(await ticketForPrompt('Work on the queue please', cwd), undefined)
-    assert.equal(await ticketForPrompt(presets.spikeAndPlan.render(), cwd), undefined)
+    assert.equal(await ticketForPrompt(presets.planTickets.render(), cwd), undefined)
     assert.equal(await ticketForPrompt('', cwd), undefined)
 
     // A read that throws is a lane label, not a run: it must never take the start down with it.

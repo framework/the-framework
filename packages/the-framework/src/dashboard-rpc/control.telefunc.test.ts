@@ -95,7 +95,7 @@ async function lockedProject(files: Record<string, string>): Promise<string> {
 test('sendReleaseTicketLock deletes the lock and commits the release (#1420)', async () => {
   const cwd = await lockedProject({
     'tickets/2026-07-20_thing.md': '# Thing\n',
-    'tickets/2026-07-20_thing.lock.md': 'CLAIMED: spike-1-0\n',
+    'tickets/2026-07-20_thing.lock.md': 'CLAIMED: plan-1-0\n',
   })
   try {
     const result = await sendReleaseTicketLock('p1', '2026-07-20_thing.md')

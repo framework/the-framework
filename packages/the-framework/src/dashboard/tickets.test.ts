@@ -163,19 +163,19 @@ test('a .lock.md claim reads as a lock, never as a ticket row of its own (#1420)
   // ticket locked — and name its holder — without becoming a row or counting as work done.
   const cwd = await repo({
     '2026-07-20_thing.md': '# Thing\n\nprose\n',
-    '2026-07-20_thing.lock.md': 'CLAIMED: spike-1-0\n',
+    '2026-07-20_thing.lock.md': 'CLAIMED: plan-1-0\n',
   })
   const tickets = await readTickets(cwd)
   assert.equal(tickets.length, 1, 'the lock file is a sibling, not a ticket')
   const [ticket] = tickets
   assert.equal(ticket?.planned, false)
   assert.equal(ticket?.locked, true)
-  assert.equal(ticket?.lockedBy, 'spike-1-0')
+  assert.equal(ticket?.lockedBy, 'plan-1-0')
   assert.equal(ticket?.effort, undefined)
   // The detail page answers the same way the list does.
   const detail = await readTicket(cwd, '2026-07-20_thing.md')
   assert.equal(detail?.locked, true)
-  assert.equal(detail?.lockedBy, 'spike-1-0')
+  assert.equal(detail?.lockedBy, 'plan-1-0')
 })
 
 test('a locked ticket with a real plan is planned and locked at once (#1420)', async () => {
@@ -184,7 +184,7 @@ test('a locked ticket with a real plan is planned and locked at once (#1420)', a
   const cwd = await repo({
     '2026-07-20_thing.md': '# Thing\n\nprose\n',
     '2026-07-20_thing.plan.md': 'Effort: 2\n\n# [Plan] Thing\n',
-    '2026-07-20_thing.lock.md': 'CLAIMED: spike-1-0\n',
+    '2026-07-20_thing.lock.md': 'CLAIMED: plan-1-0\n',
   })
   const [ticket] = await readTickets(cwd)
   assert.equal(ticket?.planned, true)

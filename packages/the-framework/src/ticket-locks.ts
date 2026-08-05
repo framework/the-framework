@@ -2,7 +2,7 @@ import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from './project.js'
 import { TICKETS_DIR } from './tickets.js'
-import type { SpikeAssignment } from './auto-pm.js'
+import type { PlanAssignment } from './auto-pm.js'
 
 // The `.lock.md` claim on a ticket (#1420, replacing #1327's PENDING placeholders).
 //
@@ -105,16 +105,16 @@ async function pushLockCommit(git: GitRunner, cwd: string): Promise<boolean> {
  */
 export async function acquireTicketLocks(
   cwd: string,
-  assignments: readonly SpikeAssignment[],
+  assignments: readonly PlanAssignment[],
   deps: TicketLockDeps = {},
-): Promise<SpikeAssignment[]> {
+): Promise<PlanAssignment[]> {
   const git = deps.git ?? nodeGitRunner()
   const write = deps.write ?? ((path, content) => writeFile(path, content, 'utf8'))
   const read = deps.read ?? (path => readFile(path, 'utf8'))
   const remove = deps.remove ?? (path => rm(path))
   const log = deps.log ?? (() => {})
 
-  const locked: SpikeAssignment[] = []
+  const locked: PlanAssignment[] = []
   const files: string[] = []
   try {
     for (const assignment of assignments) {

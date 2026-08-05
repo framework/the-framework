@@ -372,7 +372,9 @@ export class AiFake {
     if (this.calls.length === 0) throw new Error('[ai-sdk] Expected at least one prompt, but none were sent.')
     if (predicate) {
       const match = this.calls.some(c => {
-        const userMsg = c.messages.find(m => m.role === 'user')
+        // The last user message is this call's actual prompt; the first is stale history
+        // when the call carried any (an approval round-trip, a loaded conversation).
+        const userMsg = [...c.messages].reverse().find(m => m.role === 'user')
         if (!userMsg) return false
         const text = typeof userMsg.content === 'string' ? userMsg.content : userMsg.content.filter(p => p.type === 'text').map(p => (p as { text: string }).text).join('')
         return predicate(text)

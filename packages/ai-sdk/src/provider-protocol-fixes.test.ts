@@ -56,7 +56,8 @@ describe('google prompt cache — only the regions actually cached are dropped',
     const payload = payloads[0]!
     const cfg = payload['config'] as Record<string, unknown>
     assert.ok(cfg['cachedContent'], 'the cached path must be the one under test')
-    assert.ok(payload['systemInstruction'], 'system instruction must be sent when it was not cached')
+    // The SDK only reads `config.systemInstruction`; a top-level sibling is silently dropped.
+    assert.ok(cfg['systemInstruction'], 'system instruction must be sent when it was not cached')
     assert.ok(cfg['tools'], 'tools must be sent when they were not cached')
   })
 })

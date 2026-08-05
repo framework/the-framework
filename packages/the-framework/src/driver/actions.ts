@@ -138,7 +138,7 @@ export class ActionsSession implements DriverSession {
     await this.dispatch(prompt, correlationId, resume)
     emit({ type: 'notice', message: `Dispatched ${correlationId} to ${this.config.owner}/${this.config.repo}; waiting for the runner.` })
 
-    const run = await this.awaitRun(correlationId, emit)
+    const run = await this.awaitRun(correlationId, emit, opts.signal)
     const artifact = await this.readRunArtifact(run.id, correlationId)
     if (artifact.branch) this.branch = artifact.branch
 
@@ -181,7 +181,11 @@ export class ActionsSession implements DriverSession {
   }
 
   /** Poll until our run appears and finishes. Identified by the correlation id in its `run-name`. */
-  private async awaitRun(correlationId: string, emit: (event: DriverEvent) => void): Promise<WorkflowRun> {
+  private async awaitRun(
+    correlationId: string,
+    emit: (event: DriverEvent) => void,
+    promptSignal?: AbortSignal,
+  ): Promise<WorkflowRun> {
     const now = this.config.now ?? Date.now
     const sleep = this.config.sleep ?? (ms => new Promise<void>(r => setTimeout(r, ms)))
     const interval = this.config.pollIntervalMs ?? 5000
@@ -201,9 +205,9 @@ export class ActionsSession implements DriverSession {
         }
       }
       if (now() >= deadline) throw new Error(`Timed out waiting for the GitHub Actions run (${correlationId}).`)
-      this.throwIfAborted()
+      this.throwIfAborted(promptSignal)
       await sleep(interval)
-      this.throwIfAborted()
+      this.throwIfAborted(promptSignal)
     }
   }
 
@@ -233,8 +237,10 @@ export class ActionsSession implements DriverSession {
     return `${this.config.owner}/${this.config.repo}`
   }
 
-  private throwIfAborted(): void {
-    if (this.startOpts.signal?.aborted) throw new Error('Session aborted while waiting for the GitHub Actions run.')
+  /** The session-wide signal or the per-prompt one (`DriverPromptOptions.signal`) both stop the poll. */
+  private throwIfAborted(promptSignal?: AbortSignal): void {
+    if (this.startOpts.signal?.aborted || promptSignal?.aborted)
+      throw new Error('Session aborted while waiting for the GitHub Actions run.')
   }
 
   /** A REST call that expects JSON back. */

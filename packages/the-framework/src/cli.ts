@@ -1402,6 +1402,31 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     domainPreset = resolved.preset
   }
 
+  // The fake demo defaults to a Cloudflare deploy decision so the flow ends with
+  // a deploy phase; a live run only narrates deploy when asked.
+  const deploy: DeployDecision | undefined = opts.deploy
+    ? { render: 'ssr', target: opts.deploy, reason: `deploy to ${opts.deploy}` }
+    : fake
+      ? FAKE_DEPLOY
+      : undefined
+
+  // A real deploy target actually ships the app. Only for live runs against a
+  // known target; --fake stays plan-only and deterministic. An unknown target
+  // just narrates the decision. Real targets never throw on missing creds.
+  // Validated up front like --preset: a bad flag combination is a usage error, and it must
+  // fail before the dashboard / store / control channel are wired — a raw return after them
+  // leaked every handle and left the run recorded as `running` forever.
+  let deployTarget: DeployTarget | undefined
+  if (!fake && opts.deploy) {
+    const built = buildDeployTarget(opts.deploy, opts, cwd)
+    if (built.error) {
+      io.err(built.error)
+      io.err('Run `framework --help` for usage.')
+      return 2
+    }
+    deployTarget = built.target
+  }
+
   // Fail early and clearly if a live run's prerequisites are missing — before the
   // run, which needs the wrapped agent.
   if (!fake && !opts.skipPreflight) {
@@ -1741,6 +1766,11 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     // opposite of what stopping meant. Same call the on-before-mergeable step makes.
     if (journal.stoppedCleanly()) return skip('run-stopped')
     if (fake) return skip('fake-run')
+    // A topic run (#1120) lives in a project-less scratch dir: no repo, no branch, nothing to
+    // publish. Without this, the commit attempt below burns its retries against a non-repo and
+    // labels the end `commit-failed` — alarming copy about work that never existed. It never
+    // had a branch, which is what branch-gone says.
+    if (opts.topic) return skip('branch-gone')
 
     // The daemon commits whatever the agent left uncommitted, but only after this process exits
     // (`tearDownWorktree`), so at this point the tree can still hold real work. Pushing first
@@ -1831,8 +1861,14 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // The run owns the browser (#793): launching it here, rather than letting chrome-devtools-mcp
   // launch its own, is what lets the #609 preview attach to the same page. Undefined when the
   // machine has no Chrome, which leaves `--browser` on its old path rather than failing the run.
-  const sharedBrowser = opts.browser && !fake ? await launchSharedBrowser() : undefined
-  if (opts.browser && !fake && !sharedBrowser) {
+  // Local runs only: the browser tools are wired on this machine, so a `--run-on web`/`actions`
+  // session could never reach them — launching Chrome here would leak a headless browser per
+  // run, and the system channel must only claim a browser the run really has (#824).
+  const localRun = opts.target === undefined || opts.target === 'local'
+  const sharedBrowser = opts.browser && !fake && localRun ? await launchSharedBrowser() : undefined
+  if (opts.browser && !fake && !localRun) {
+    io.err(`note: --browser has no effect with --run-on ${opts.target}: the browser tools are wired on this machine, and the session runs elsewhere.`)
+  } else if (opts.browser && !fake && !sharedBrowser) {
     io.err('note: no Chrome found, so --browser falls back to its own browser (no preview).')
   }
 
@@ -1851,14 +1887,20 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
    */
   const abortBeforeDriver = async (reason: string): Promise<number> => {
     io.err(reason)
+    // Release every handle settleRun would: the armed interrupt trap, the run's own dashboard
+    // server, and the LOGS.md entry — leaving any of them behind kept the process alive with a
+    // swallowed first Ctrl+C, exactly the hang this helper exists to prevent.
+    clearInterrupt()
     try {
       await store?.append({ kind: 'end', ok: false, detail: reason })
       await store?.close()
     } catch {
       // Persistence is never allowed to be the thing that keeps a failing run alive.
     }
+    await journal.finishLog().catch(() => {})
     control?.close()
     await sharedBrowser?.close().catch(() => {})
+    await dashboard?.close().catch(() => {})
     return 2
   }
 
@@ -1910,9 +1952,9 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
 
   // Whether the agent actually ends up with browser tools, which is narrower than the flag: they
   // ride Claude Code's MCP config, so `--browser` on another agent wires nothing (see
-  // `unguardedNotices`), and the fake driver has no tools at all. The system channel must only
-  // claim a browser the run really has (#824).
-  const browserAttached = opts.browser && !fake && opts.agent === 'claude'
+  // `unguardedNotices`), the fake driver has no tools at all, and a remote target never sees
+  // this machine's MCP config. The system channel must only claim a browser the run really has (#824).
+  const browserAttached = opts.browser && !fake && opts.agent === 'claude' && localRun
 
   // The preview of that browser (#802): the agent's Chrome is headless, so when it parks on an
   // `await-browser` gate (#796) there is nothing for a human to click. This serves it. Opening
@@ -2049,28 +2091,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
           : '\n✓ prompt session done.',
       }
     })
-  }
-
-  // The fake demo defaults to a Cloudflare deploy decision so the flow ends with
-  // a deploy phase; a live run only narrates deploy when asked.
-  const deploy: DeployDecision | undefined = opts.deploy
-    ? { render: 'ssr', target: opts.deploy, reason: `deploy to ${opts.deploy}` }
-    : fake
-      ? FAKE_DEPLOY
-      : undefined
-
-  // A real deploy target actually ships the app. Only for live runs against a
-  // known target; --fake stays plan-only and deterministic. An unknown target
-  // just narrates the decision. Real targets never throw on missing creds.
-  let deployTarget: DeployTarget | undefined
-  if (!fake && opts.deploy) {
-    const built = buildDeployTarget(opts.deploy, opts, cwd)
-    if (built.error) {
-      io.err(built.error)
-      io.err('Run `framework --help` for usage.')
-      return 2
-    }
-    deployTarget = built.target
   }
 
   const serve: ServeConfig | undefined = opts.serve

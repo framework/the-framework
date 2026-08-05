@@ -89,7 +89,9 @@ export function runAgentCli(opts: RunAgentCliOptions): Promise<DriverTurn> {
     const agent = opts.agent ?? 'claude-code'
     let settled = false
     let hardKillTimer: ReturnType<typeof setTimeout> | undefined
-    const stderrChunks: string[] = []
+    // Raw bytes, decoded once at close: a per-chunk `String(chunk)` corrupts a multibyte
+    // UTF-8 codepoint split across two chunks, and this text becomes the turn's error detail.
+    const stderrChunks: Buffer[] = []
 
     // Kill the agent's whole process group: SIGTERM to let it flush, then a
     // SIGKILL after a grace window in case it ignores the term (mid tool-call).
@@ -139,7 +141,7 @@ export function runAgentCli(opts: RunAgentCliOptions): Promise<DriverTurn> {
       })
     }
     if (child.stderr) {
-      child.stderr.on('data', (chunk: Buffer | string) => stderrChunks.push(String(chunk)))
+      child.stderr.on('data', (chunk: Buffer | string) => stderrChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
     }
 
     child.on('close', code => {
@@ -152,7 +154,7 @@ export function runAgentCli(opts: RunAgentCliOptions): Promise<DriverTurn> {
       // first: the loop gates on the outcome, so a crash mid-build must not pass
       // as a result. Surface stderr, else the partial text, as context.
       if (code !== 0) {
-        const detail = stderrChunks.join('').trim() || turn.text.trim() || `exit code ${code ?? 'null'}`
+        const detail = Buffer.concat(stderrChunks).toString('utf8').trim() || turn.text.trim() || `exit code ${code ?? 'null'}`
         opts.emit({ type: 'error', message: detail })
         finish(() => rejectPromise(new Error(`[framework] ${agent} exited (${code ?? 'null'}): ${detail}`)))
         return

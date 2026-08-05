@@ -105,7 +105,7 @@ export class ClaudeCodeSession implements DriverSession {
     const resumeId = opts.resume ? this.lastSessionId : undefined
     const emit = makeEmit(this.startOpts.onEvent, 'claude-code')
     const signals = combineSignals(this.startOpts.signal, opts.signal)
-    const run = (id: string | undefined): Promise<DriverTurn> =>
+    const run = (id: string | undefined, emitFn: (event: DriverEvent) => void): Promise<DriverTurn> =>
       runClaude({
         bin: this.config.bin ?? 'claude',
         args: this.buildArgs(system, id),
@@ -113,22 +113,38 @@ export class ClaudeCodeSession implements DriverSession {
         env: this.config.env ?? process.env,
         prompt: text,
         spawn: this.config.spawn ?? (nodeSpawn as unknown as SpawnLike),
-        emit,
+        emit: emitFn,
         signals,
       })
 
     let turn: DriverTurn
+    // On a resume attempt, hold the failure's `error` event back until the conversation-gone
+    // case (#778) is ruled out: a turn that recovers on the retry must not show a failed row.
+    // Safe to hold — runAgentCli emits `error` exactly once, right before it rejects.
+    let heldError: DriverEvent | undefined
     try {
-      turn = await run(resumeId)
+      turn = await run(resumeId, resumeId === undefined ? emit : event => {
+        if (event.type === 'error') heldError = event
+        else emit(event)
+      })
     } catch (err) {
       // The id we captured outlives what the CLI will resume (#778) — its retention, a
       // cleared history, another machine. There is no way to ask first, so let it fail
       // once and continue as a fresh conversation (which gets the system framing back)
       // rather than losing the message the user already typed.
-      if (resumeId === undefined || !isConversationGone(err) || signals.some(s => s.aborted)) throw err
+      if (resumeId === undefined || !isConversationGone(err) || signals.some(s => s.aborted)) {
+        if (heldError) emit(heldError)
+        throw err
+      }
       this.lastSessionId = undefined
       emit({ type: 'notice', message: 'That conversation is no longer available; continuing without its history.' })
-      turn = await run(undefined)
+      // The retry re-sends the same prompt; swallow its duplicate `start` so the user's
+      // message appears once in the transcript, not twice.
+      let startSeen = false
+      turn = await run(undefined, event => {
+        if (event.type === 'start' && !startSeen) startSeen = true
+        else emit(event)
+      })
     }
     // Track the agent's session so a later resume continues this exact conversation.
     if (turn.sessionId) this.lastSessionId = turn.sessionId

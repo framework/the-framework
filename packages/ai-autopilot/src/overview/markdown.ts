@@ -54,7 +54,10 @@ export function parseOverview(markdown: string): CodeOverview {
       current = { title: heading[1]!.trim(), body: [] }
       continue
     }
-    if (/^#\s+/.test(line)) continue // the top-level `# Code Overview` title
+    // The top-level `# Code Overview` title — only before any real content, so a `# `-prefixed
+    // line inside a body or summary (a shell comment in a fenced block, a hand-written h1)
+    // survives the round-trip instead of being dropped as a second title.
+    if (/^#\s+/.test(line) && !current && sections.length === 0 && summaryLines.every(l => !l.trim())) continue
     if (current) current.body.push(line)
     else summaryLines.push(line)
   }

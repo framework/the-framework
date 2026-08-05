@@ -148,7 +148,10 @@ export function landPinnedEntry(
 ): string {
   const lines = inCheckout.split('\n').map(line => {
     const item = ENTRY_LINE.exec(line)
-    if (!item || item[3]?.trim() !== entry || item[2] === undefined || item[2] !== ' ') return line
+    // Retire any *open* entry that matches — an empty `[ ]` box or a no-checkbox bullet alike,
+    // the same "open" grammar `entriesRetiredByPatch` and `parseTodoEntries` use (#1164/#1297).
+    // Skipping the no-checkbox form left it open, so the sweep re-drained it after the PR closed.
+    if (!item || item[3]?.trim() !== entry || item[2] === 'x' || item[2] === 'X') return line
     return `${item[1]}[x] ${item[3]!.trim()}`
   })
 

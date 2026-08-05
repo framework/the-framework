@@ -90,6 +90,12 @@ async function writeWebResponse(res: ServerResponse, response: Response): Promis
   }
 
   const reader = response.body.getReader()
+  // A client that vanishes mid-stream (an SSE channel especially) never ends the source, so
+  // the read below would stay parked forever and the session it feeds would never release.
+  // Cancelling the body is what lets the web handler's release-on-cancel run.
+  res.on('close', () => {
+    void reader.cancel().catch(() => {})
+  })
   try {
     for (;;) {
       const { done, value } = await reader.read()
@@ -101,6 +107,8 @@ async function writeWebResponse(res: ServerResponse, response: Response): Promis
   }
 }
 
+/** A chain of proxies appends to `X-Forwarded-*` (comma-joined by Node); the client-facing hop is first. */
 function firstHeader(v: string | string[] | undefined): string | undefined {
-  return Array.isArray(v) ? v[0] : v
+  const raw = Array.isArray(v) ? v[0] : v
+  return raw?.split(',')[0]?.trim() || undefined
 }

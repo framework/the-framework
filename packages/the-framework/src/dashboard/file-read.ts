@@ -26,7 +26,8 @@ export function safeRepoPath(path: string): boolean {
   if (!path || path.length > 1024 || path.includes('\0')) return false
   if (path.startsWith('/') || path.startsWith('-') || /^[a-zA-Z]:/.test(path)) return false
   const parts = path.split(/[\\/]/)
-  if (parts[0] === '.git') return false
+  // Any `.git` segment, not just a leading one: a nested repo's `.git/config` holds credentials too.
+  if (parts.includes('.git')) return false
   return parts.every(part => part !== '' && part !== '.' && part !== '..')
 }
 

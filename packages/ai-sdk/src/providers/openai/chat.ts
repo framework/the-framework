@@ -149,9 +149,14 @@ function contentToOpenAIParts(content: string | import('../../types.js').Content
   return content.map(p => {
     if (p.type === 'text') return { type: 'text', text: p.text }
     if (p.type === 'image') return { type: 'image_url', image_url: { url: `data:${p.mimeType};base64,${p.data}` } }
-    // document — for text-based docs, decode to text; for PDFs, send as image_url (GPT-4o supports)
+    // document — for text-based docs, decode to text; for PDFs, use the file part, whose
+    // fields are `file_data` (a data URI) / `file_id` / `filename` — a bare `data`/`mime_type`
+    // is rejected, and the PDF never reaches the model.
     if (p.mimeType === 'application/pdf') {
-      return { type: 'file', file: { data: p.data, mime_type: p.mimeType } }
+      return {
+        type: 'file',
+        file: { filename: p.name ?? 'document.pdf', file_data: `data:${p.mimeType};base64,${p.data}` },
+      }
     }
     return { type: 'text', text: base64ToUtf8(p.data) }
   })

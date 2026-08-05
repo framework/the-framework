@@ -61,7 +61,8 @@ export class OpenAIVectorStoreAdapter implements VectorStoreAdapter {
 
   async delete(id: string): Promise<void> {
     const client = await this.getClient()
-    await client.vectorStores.del(id)
+    // `del` was the v4 name; v5+ (and the version this package resolves) is `delete`.
+    await client.vectorStores.delete(id)
   }
 
   async addFile(storeId: string, opts: VectorStoreAddOptions): Promise<VectorStoreFileInfo> {
@@ -104,13 +105,15 @@ export class OpenAIVectorStoreAdapter implements VectorStoreAdapter {
         )
       }
       await sleep(pollInterval)
-      current = await client.vectorStores.files.retrieve(storeId, fileId)
+      // v5+ signature: the file id is first, the store id rides in the params object.
+      current = await client.vectorStores.files.retrieve(fileId, { vector_store_id: storeId })
     }
   }
 
   async removeFile(storeId: string, fileId: string): Promise<void> {
     const client = await this.getClient()
-    await client.vectorStores.files.del(storeId, fileId)
+    // `del(storeId, fileId)` was the v4 shape; v5+ is `delete(fileId, { vector_store_id })`.
+    await client.vectorStores.files.delete(fileId, { vector_store_id: storeId })
   }
 
   async listFiles(storeId: string, opts?: VectorStoreListOptions): Promise<VectorStoreFileList> {

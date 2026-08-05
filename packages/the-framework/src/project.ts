@@ -91,7 +91,7 @@ const GIT_READ_OPS = new Set([
 ])
 
 /** Subcommands bounded by the network rather than by this machine. */
-const GIT_SLOW_OPS = new Set(['clone', 'fetch', 'pull', 'push'])
+const GIT_SLOW_OPS = new Set(['clone', 'fetch', 'pull', 'push', 'ls-remote'])
 
 /** Global options whose value is the next word, so that word is not the subcommand. */
 const GIT_GLOBAL_VALUE_OPTIONS = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--exec-path'])

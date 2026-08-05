@@ -4,12 +4,19 @@
  * `daemon.ts` imports the dashboard, so the mount cannot import these back out of it.
  */
 
+/** The `127.0.0.0/8` loopback range, in dotted-quad form. */
+const LOOPBACK_V4 = /^127(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/
+
 /**
  * True when `host` is a loopback address the browser reaches without leaving the machine (#1051).
  * A bind-all (`0.0.0.0`, `::`) or a routable address is not, and gates behind the shared token.
+ *
+ * The IPv4 check matches the whole `127.0.0.0/8` range but only as an address: a bare
+ * `startsWith('127.')` also accepts a *registrable name* like `127.evil.com`, which is exactly the
+ * rebound `Host` the DNS-rebinding guard exists to reject (it can resolve to `127.0.0.1`).
  */
 export function isLoopbackHost(host: string): boolean {
-  return host === 'localhost' || host === '::1' || host === '[::1]' || host.startsWith('127.')
+  return host === 'localhost' || host === '::1' || host === '[::1]' || LOOPBACK_V4.test(host)
 }
 
 /**

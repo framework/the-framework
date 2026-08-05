@@ -56,8 +56,9 @@ export function formatAge(value: string | undefined, fallback = '—'): string {
   if (hours < 24) return `${hours}h ago`
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days}d ago`
-  const weeks = Math.floor(days / 7)
-  if (weeks < 52) return `${weeks}w ago`
+  // Gate on days, not weeks: at 364 days `weeks` is 52 but `days/365` floors to 0, which would
+  // read "0y ago" for a full day before the year rolls over.
+  if (days < 365) return `${Math.floor(days / 7)}w ago`
   return `${Math.floor(days / 365)}y ago`
 }
 

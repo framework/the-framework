@@ -63,7 +63,8 @@ class CohereRerankingAdapter implements RerankingAdapter {
     const response = await client.rerank({
       model: this.model,
       query: options.query,
-      documents: options.documents.map(d => ({ text: d })),
+      // v2 takes plain strings; the `{ text }` object shape is the v1 request the v2 client rejects.
+      documents: options.documents,
       ...(options.topK !== undefined ? { topN: options.topK } : {}),
     })
 

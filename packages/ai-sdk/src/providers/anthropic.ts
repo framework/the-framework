@@ -13,6 +13,7 @@ import type {
   AiMessage,
   ToolCall,
   ToolChoice,
+  FinishReason,
 } from '../types.js'
 import { base64ToUtf8 } from '../base64.js'
 import { contentToString } from '../util/content.js'
@@ -315,7 +316,21 @@ export function fromAnthropicResponse(response: any): ProviderResponse {
       completionTokens: response.usage?.output_tokens ?? 0,
       totalTokens: (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0),
     },
-    finishReason: response.stop_reason === 'tool_use' ? 'tool_calls' : 'stop',
+    finishReason: mapAnthropicStopReason(response.stop_reason),
+  }
+}
+
+/**
+ * Map a Claude `stop_reason` onto the neutral {@link FinishReason}. Without the
+ * `max_tokens`/`refusal` cases a truncated or refused answer reports a clean
+ * `stop`, so a caller cannot tell a complete answer from a cut-off one.
+ */
+export function mapAnthropicStopReason(reason: string | null | undefined): FinishReason {
+  switch (reason) {
+    case 'tool_use':   return 'tool_calls'
+    case 'max_tokens': return 'length'
+    case 'refusal':    return 'content_filter'
+    default:           return 'stop'
   }
 }
 
@@ -333,9 +348,11 @@ class AnthropicFileAdapter implements FileAdapter {
     const data = await readFile(options.filePath)
     const filename = basename(options.filePath)
 
-    const response = await client.files.upload({
-      file: new Blob([data]),
-      purpose: options.purpose ?? 'assistants',
+    // The Files API lives under `client.beta.files` (there is no `client.files`), takes a named
+    // uploadable rather than a bare Blob, and has no `purpose` param — that is an OpenAI concept.
+    const sdk = await import(/* @vite-ignore */ '@anthropic-ai/sdk')
+    const response = await client.beta.files.upload({
+      file: await sdk.toFile(data, filename),
     })
 
     return {
@@ -348,14 +365,13 @@ class AnthropicFileAdapter implements FileAdapter {
 
   async list(): Promise<FileListResult> {
     const client = await this.getClient()
-    const response = await client.files.list()
+    const response = await client.beta.files.list()
     const files: FileUploadResult[] = []
     for await (const f of response) {
       files.push({
         id: f.id,
         filename: f.filename ?? f.id,
-        bytes: f.size ?? 0,
-        purpose: f.purpose,
+        bytes: f.size_bytes ?? 0,
       })
     }
     return { files }
@@ -363,12 +379,12 @@ class AnthropicFileAdapter implements FileAdapter {
 
   async delete(fileId: string): Promise<void> {
     const client = await this.getClient()
-    await client.files.delete(fileId)
+    await client.beta.files.delete(fileId)
   }
 
   async retrieve(fileId: string): Promise<FileContent> {
     const client = await this.getClient()
-    const response = await client.files.content(fileId)
+    const response = await client.beta.files.download(fileId)
     const buffer = Buffer.from(await response.arrayBuffer())
     return { data: buffer, mimeType: 'application/octet-stream' }
   }

@@ -150,7 +150,7 @@ describe('GoogleAdapter — google_search hint via tools array', () => {
     return { adapter: a, captured: () => captured }
   }
 
-  it('emits { google_search: {} } as a separate top-level tools entry', async () => {
+  it('emits { googleSearch: {} } as a separate top-level tools entry', async () => {
     const { adapter: a, captured } = adapter()
     const def    = WebSearch.make().toTool()
     const schema = toolToSchema(def)
@@ -163,7 +163,8 @@ describe('GoogleAdapter — google_search hint via tools array', () => {
     assert.ok(Array.isArray(tools), 'tools array set on config')
     // No functionDeclarations entry when the only tool is a native one.
     assert.equal(tools.length, 1)
-    assert.deepEqual(tools[0], { google_search: {} })
+    // camelCase: the SDK strips an unknown `google_search` key to an empty tool.
+    assert.deepEqual(tools[0], { googleSearch: {} })
   })
 
   it('mixes function declarations + native blocks (decls first)', async () => {
@@ -186,7 +187,7 @@ describe('GoogleAdapter — google_search hint via tools array', () => {
     const decls = tools[0]['functionDeclarations'] as Array<Record<string, unknown>>
     assert.equal(decls.length, 1)
     assert.equal(decls[0]?.['name'], 'lookup_user')
-    assert.deepEqual(tools[1], { google_search: {} })
+    assert.deepEqual(tools[1], { googleSearch: {} })
   })
 
   it('plain function-call tool still wraps into one functionDeclarations entry', async () => {

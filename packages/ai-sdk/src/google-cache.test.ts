@@ -302,7 +302,7 @@ describe('GoogleAdapter cache wiring', () => {
     const cfg = payload['config'] as Record<string, unknown>
     assert.ok(cfg['cachedContent'], 'request should carry cachedContent')
     assert.equal(cfg['tools'], undefined, 'tools should be omitted when cached')
-    assert.equal(payload['systemInstruction'], undefined, 'systemInstruction should be omitted when cached')
+    assert.equal(cfg['systemInstruction'], undefined, 'systemInstruction should be omitted when cached')
     assert.deepStrictEqual(
       (payload['contents'] as unknown[]).length, 1, 'only the fresh tail of the message list goes on the request',
     )
@@ -328,7 +328,8 @@ describe('GoogleAdapter cache wiring', () => {
     const payload = counters.generatePayloads[0]!
     const cfg = payload['config'] as Record<string, unknown>
     assert.equal(cfg['cachedContent'], undefined, 'cachedContent must NOT be set when registry returned null')
-    assert.ok(payload['systemInstruction'], 'systemInstruction is still sent on the uncached fallback')
+    // The SDK reads `config.systemInstruction`; a top-level sibling would be dropped.
+    assert.ok(cfg['systemInstruction'], 'systemInstruction is still sent on the uncached fallback')
   })
 
   it('recreates and retries once on a 404 stale-cache error', async () => {

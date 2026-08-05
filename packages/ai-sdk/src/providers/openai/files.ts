@@ -49,7 +49,8 @@ export class OpenAIFileAdapter implements FileAdapter {
 
   async delete(fileId: string): Promise<void> {
     const client = await this.getClient()
-    await client.files.del(fileId)
+    // `del` was the v4 name; v5+ (and the version this package resolves) is `delete`.
+    await client.files.delete(fileId)
   }
 
   async retrieve(fileId: string): Promise<FileContent> {

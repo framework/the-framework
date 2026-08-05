@@ -20,13 +20,15 @@ export class GoogleEmbeddingAdapter implements EmbeddingAdapter {
     const results = await Promise.all(
       inputs.map(text =>
         client.models.embedContent({
+          // The SDK takes `contents` (a list) and answers with `embeddings`,
+          // one per content — the singular forms are silently unknown to it.
           model: this.model,
-          content: { parts: [{ text }] },
+          contents: [{ parts: [{ text }] }],
         }),
       ),
     )
 
-    const embeddings = results.map((r: any) => r.embedding?.values ?? [])
+    const embeddings = results.map((r: any) => r.embeddings?.[0]?.values ?? [])
 
     return {
       embeddings,

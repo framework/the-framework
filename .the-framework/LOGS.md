@@ -52,3 +52,10 @@
 - run: 2026-08-01T22-19-39-640Z
 - session: [3b80ea10-83f8-4bfc-81d5-39445ade48d1](https://claude.ai/code)
 - branch: the-framework/run-2026-08-01T22-19-39-640Z
+
+## 2026-08-05T10:16:59.053Z · prompt · Create tickets/2026-07-31_avoid-term-spike.plan.md
+
+- status: stopped
+- run: 2026-08-05T10-08-25-082Z
+- session: [e07cdeaa-f9af-4e38-be1c-8078076df402](https://claude.ai/code)
+- branch: the-framework/plan-avoid-term-spike

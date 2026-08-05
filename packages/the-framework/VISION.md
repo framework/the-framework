@@ -9,7 +9,7 @@
 - Autonomous
   - Quick-win
   - Consensual
-  - Spike & Plan
+  - Plan tickets (aka spike)
     - GitHub integration
   - Refactoring
     - Maintenance

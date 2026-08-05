@@ -43,14 +43,14 @@ test('acquireTicketLocks writes one .lock.md per ticket, commits once, and pushe
   const locked = await acquireTicketLocks(
     CWD,
     [
-      { ticket: 'a.md', agentId: 'spike-1-0' },
-      { ticket: 'b.md', agentId: 'spike-1-1' },
+      { ticket: 'a.md', agentId: 'plan-1-0' },
+      { ticket: 'b.md', agentId: 'plan-1-1' },
     ],
     deps,
   )
   assert.deepEqual(locked.map(a => a.ticket), ['a.md', 'b.md'])
-  assert.equal(disk.get(join(CWD, 'tickets/a.lock.md')), 'CLAIMED: spike-1-0\n')
-  assert.equal(disk.get(join(CWD, 'tickets/b.lock.md')), 'CLAIMED: spike-1-1\n')
+  assert.equal(disk.get(join(CWD, 'tickets/a.lock.md')), 'CLAIMED: plan-1-0\n')
+  assert.equal(disk.get(join(CWD, 'tickets/b.lock.md')), 'CLAIMED: plan-1-1\n')
   // One batch commit, pathspec-scoped so nothing else staged in the checkout rides along, then
   // one push to the branch the checkout is on.
   const commits = gitCalls.filter(args => args[0] === 'commit')
@@ -119,7 +119,7 @@ test('acquireTicketLocks keeps the batch when only the push fails, and says so (
 })
 
 test('ticketLockHolder reads the claim and rejects non-claims (#1420)', () => {
-  assert.equal(ticketLockHolder(ticketLockContent('spike-1-0')), 'spike-1-0')
+  assert.equal(ticketLockHolder(ticketLockContent('plan-1-0')), 'plan-1-0')
   assert.equal(ticketLockHolder('  \nCLAIMED: run-42 (my session)'), 'run-42 (my session)')
   assert.equal(ticketLockHolder('# A real plan\n\nCLAIMED elsewhere…'), undefined)
   assert.equal(ticketLockHolder('CLAIMED:'), undefined)
@@ -133,7 +133,7 @@ test('ticketLockName maps a ticket to its lock sibling', () => {
 test('releaseTicketLock deletes the lock, commits, and pushes (#1420)', async () => {
   const { disk, gitCalls, deps } = checkout({
     'tickets/a.md': '# a',
-    'tickets/a.lock.md': ticketLockContent('spike-1-0'),
+    'tickets/a.lock.md': ticketLockContent('plan-1-0'),
   })
   assert.equal(await releaseTicketLock(CWD, 'a.md', deps), 'released')
   assert.equal(disk.has(join(CWD, 'tickets/a.lock.md')), false)
@@ -154,7 +154,7 @@ test('releaseTicketLock puts the file back when the commit fails (#1420)', async
   // checkout lie about who holds the ticket.
   const { disk, deps } = checkout({
     'tickets/a.md': '# a',
-    'tickets/a.lock.md': ticketLockContent('spike-1-0'),
+    'tickets/a.lock.md': ticketLockContent('plan-1-0'),
   })
   const failing: TicketLockDeps = {
     ...deps,
@@ -164,13 +164,13 @@ test('releaseTicketLock puts the file back when the commit fails (#1420)', async
     },
   }
   assert.equal(await releaseTicketLock(CWD, 'a.md', failing), 'error')
-  assert.equal(disk.get(join(CWD, 'tickets/a.lock.md')), ticketLockContent('spike-1-0'))
+  assert.equal(disk.get(join(CWD, 'tickets/a.lock.md')), ticketLockContent('plan-1-0'))
 })
 
 test('releaseTicketLock keeps the release when only the push fails, and says so (#1420)', async () => {
   const { disk, logs, deps } = checkout({
     'tickets/a.md': '# a',
-    'tickets/a.lock.md': ticketLockContent('spike-1-0'),
+    'tickets/a.lock.md': ticketLockContent('plan-1-0'),
   })
   const pushless: TicketLockDeps = {
     ...deps,

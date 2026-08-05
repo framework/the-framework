@@ -29,7 +29,7 @@ const IMPORT_PROMPT = presets.importTickets.render()
  *
  * A separate preset rather than a flag on the import, because the two ask for different work. The
  * import fills an empty directory; this one reconciles a full one against what changed, and has to
- * be told to leave the spikes and plans already written against a ticket alone.
+ * be told to leave the plans already written against a ticket alone.
  */
 const UPDATE_PROMPT = presets.updateTickets.render()
 
@@ -37,7 +37,7 @@ const UPDATE_PROMPT = presets.updateTickets.render()
 const NO_META: TicketsMeta = {}
 
 /**
- * The prompt the plan column's spike button starts a session with (#685): write this ticket's plan.
+ * The prompt the plan column's create button starts a session with (#685): write this ticket's plan.
  * The `<TICKET>` is the ticket's stem — its `.md` name without the extension — so
  * `2026-07-20_do-the-thing.md` asks for `tickets/2026-07-20_do-the-thing.plan.md`, the sibling the
  * plan link then reads. Plain text, not a preset, and exported so the test asserts the exact ask:

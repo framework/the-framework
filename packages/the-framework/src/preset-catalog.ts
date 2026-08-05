@@ -5,10 +5,10 @@ import {
   PRESETS_MAINTAINABILITY,
   PRESETS_MAINTENANCE,
   PRESETS_MARKET_RESEARCH,
+  PRESETS_PLAN_TICKETS,
   PRESETS_READABILITY,
   PRESETS_RESEARCH,
   PRESETS_SECURITY_AUDIT,
-  PRESETS_SPIKE_AND_PLAN,
   PRESETS_SUGGEST_NEW_FEATURES,
   PRESETS_SUGGEST_NEW_TICKETS,
   PRESETS_SUGGEST_TICKETS_TO_WORK_ON,
@@ -98,8 +98,8 @@ export const presets = {
    */
   updateTickets: definePreset({ name: 'update-tickets', template: PRESETS_UPDATE_TICKETS, label: 'Update from GitHub', newSession: true, tooltip: 'Bring `tickets/` up to date with the issues and comments changed since the last import.' }),
 
-  /** [Spike & plan] (#685): turn tickets into costed plans. */
-  spikeAndPlan: definePreset({ name: 'spike-and-plan', template: PRESETS_SPIKE_AND_PLAN, label: 'Spike & plan tickets' }),
+  /** [Plan tickets] (#685): turn tickets into costed plans. */
+  planTickets: definePreset({ name: 'plan-tickets', template: PRESETS_PLAN_TICKETS, label: 'Plan tickets (aka spike)' }),
 
   /** [Suggest new tickets] (#462/#683): the dashboard prefills this one line and the user edits it freely. */
   suggestNewTickets: definePreset({ name: 'suggest-new-tickets', template: PRESETS_SUGGEST_NEW_TICKETS, label: 'Suggest new tickets' }),
@@ -140,7 +140,7 @@ export const presets = {
   triageConsensual: definePreset({ name: 'triage-consensual', template: PRESETS_TRIAGE_CONSENSUAL, label: 'Add consensual work to AI Queue', tooltip: 'Add `tickets/*.md` to queue (TODO_AGENTS.md), only significant (no quick-wins) and consensual tickets' }),
 } as const satisfies Record<string, PresetDef>
 
-/** The presets by key, e.g. `spikeAndPlan`. */
+/** The presets by key, e.g. `planTickets`. */
 export type PresetKey = keyof typeof presets
 
 /**
@@ -176,7 +176,7 @@ export const LAUNCHER_PRESETS: readonly PresetDef[] = [
   presets.suggestNewTickets,
   presets.suggestNewFeatures,
   presets.suggestTicketsToWorkOn,
-  presets.spikeAndPlan,
+  presets.planTickets,
   presets.marketResearch,
   presets.importTickets,
   presets.updateTickets,

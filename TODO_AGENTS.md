@@ -10,7 +10,6 @@
 
 ## Priority 3
 
-- [Stop using the term "Spike" in user-facing wording](tickets/2026-07-31_avoid-term-spike.md) — e.g. rename the routine task to "Plan tickets (aka spike)". Trivial; maintainer explicitly wants this done by autonomous AI.
 - [readZip leaks onto the public API](tickets/2026-07-21_readzip-leaks-onto-public-api.md) — mark `readZip`/`ZipEntry` `@internal` in `packages/the-framework/src/driver/actions-zip.ts` (unconditional), and drop the `driver/index.ts` re-export if the first npm publish (#746) hasn't shipped yet.
 - [Remove the useless 'Default' option from the model picker](tickets/2026-07-25_bug-cannot-select-fable.md) — the original "can't select Fable" bug is fixed; only the Default-entry removal remains. Handle existing configs storing "Default" with a sensible fallback.
 

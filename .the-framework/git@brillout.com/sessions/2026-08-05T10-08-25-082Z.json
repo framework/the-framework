@@ -3,9 +3,9 @@
   "status": "done",
   "id": "2026-08-05T10-08-25-082Z",
   "startedAt": "2026-08-05T10:08:26.863Z",
-  "updatedAt": "2026-08-05T10:25:52.364Z",
+  "updatedAt": "2026-08-05T13:46:59.234Z",
   "passes": 0,
-  "pid": 698827,
+  "pid": 719737,
   "host": "rom-thinkpad-x280",
   "intent": "Create tickets/2026-07-31_avoid-term-spike.plan.md",
   "kind": "prompt",
@@ -17,8 +17,8 @@
   "branch": "the-framework/plan-avoid-term-spike",
   "driver": "claude-web",
   "workspace": "/home/rom/code/the-framework/.the-framework/worktrees/2026-08-05T10-08-25-082Z",
-  "sessionLink": "https://claude.ai/code/session_01BVPL648y873rXcUc38pWhu?from=cli&m=0",
-  "sessionId": "session_01BVPL648y873rXcUc38pWhu",
+  "sessionLink": "https://claude.ai/code/session_01Czm2w8HWZ9J6GLLuUvgo3j?from=cli&m=0",
+  "sessionId": "session_01Czm2w8HWZ9J6GLLuUvgo3j",
   "model": "fable",
-  "handoffReport": "done"
+  "handoffReport": "skipped"
 }

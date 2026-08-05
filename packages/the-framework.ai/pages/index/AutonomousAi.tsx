@@ -56,7 +56,7 @@ export function AutonomousAi() {
       >
         <Card title="Autonomous Product Management" lead="Let AI autonomously:">
           <Item>Test &amp; review</Item>
-          <Item>Spike, plan, and prioritize your tickets</Item>
+          <Item>Research, plan, and prioritize your tickets</Item>
           <Item>Turn your team conversations into tickets</Item>
           <Item>
             <span>

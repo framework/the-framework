@@ -112,12 +112,12 @@ describe('TicketDetailPage (#1144)', () => {
   })
 
   test('a claimed ticket shows its badge, holder, and a release button (#1420)', async () => {
-    onTicket.mockResolvedValue(ticket({ locked: true, lockedBy: 'spike-1-0' }))
+    onTicket.mockResolvedValue(ticket({ locked: true, lockedBy: 'plan-1-0' }))
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
     await screen.findByText('claimed')
     // The holder reads inline so a human knows whose claim they are about to lift — the detail
     // page has the room, no tooltip hunt needed.
-    expect(screen.getByText(/· spike-1-0/)).toBeTruthy()
+    expect(screen.getByText(/· plan-1-0/)).toBeTruthy()
     expect(screen.getByRole('button', { name: /release lock/i })).toBeTruthy()
   })
 
@@ -130,7 +130,7 @@ describe('TicketDetailPage (#1144)', () => {
   })
 
   test('releasing calls the RPC and withdraws the claim without waiting for the next poll (#1420)', async () => {
-    onTicket.mockResolvedValue(ticket({ locked: true, lockedBy: 'spike-1-0' }))
+    onTicket.mockResolvedValue(ticket({ locked: true, lockedBy: 'plan-1-0' }))
     sendReleaseTicketLock.mockResolvedValue({ ok: true })
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: /release lock/i }))

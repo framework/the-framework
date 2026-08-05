@@ -137,8 +137,8 @@ export function autoPmDecision(input: AutoPmInputs): AutoPmDecision {
 /**
  * One thing auto PM knows how to do while the machine is idle (#773).
  *
- * The jobs form a cycle, and the order matters: triage turns tickets into queued work, [Spike &
- * plan] turns the rest into plans. Once a job queues something the sweep switches to draining it
+ * The jobs form a cycle, and the order matters: triage turns tickets into queued work, [Plan
+ * tickets] turns the rest into plans. Once a job queues something the sweep switches to draining it
  * (#855), and the rotation resumes where it left off once the queue is empty again.
  */
 export interface AutoPmJob {
@@ -191,7 +191,7 @@ export interface AutoPmJob {
   autoMerge?: boolean
   /**
    * This rotation job may fan out to several agents pinned one ticket each (#1327). Only
-   * [Spike & plan] declares it: unlike the other rotation jobs it writes per-ticket sibling files
+   * [Plan tickets] declares it: unlike the other rotation jobs it writes per-ticket sibling files
    * rather than rewriting the shared queue document, so concurrent copies do disjoint work and
    * land disjoint edits — the exact property that already lets draining fan out. Declared as data
    * on the job for the same no-name-matching reason as {@link AutoPmJob.drains}.
@@ -199,14 +199,14 @@ export interface AutoPmJob {
   fansOut?: boolean
   /**
    * The one ticket a fanned-out job is pinned to (#1327), as its filename inside `tickets/`. Set
-   * only on the per-start variants {@link pinnedSpikeJob} builds, like {@link AutoPmJob.entry} is
+   * only on the per-start variants {@link pinnedPlanJob} builds, like {@link AutoPmJob.entry} is
    * for drains: which tickets are open is known only at the moment the sweep locks them.
    */
   ticket?: string
 }
 
 /** One fanned-out agent's claim (#1327): the ticket it is pinned to, and the id its lock names. */
-export interface SpikeAssignment {
+export interface PlanAssignment {
   /** The ticket's filename inside `tickets/`. */
   ticket: string
   /** What the `.lock.md`'s `CLAIMED: <AGENT_ID>` line carries (#1420), so an agent can tell its
@@ -251,7 +251,7 @@ function entryPreview(entry: string): string {
 /**
  * A fan-out job pinned to one locked ticket (#1327).
  *
- * The stock prompt says "every ticket that has no spike or plan yet", and with a batch going out
+ * The stock prompt covers every ticket that has no plan or claim yet, and with a batch going out
  * that instruction is the same collision {@link pinnedDrainJob} exists for: every agent forks the
  * same checkout and would pick the same most-important ticket. The pin is *appended* to the stock
  * prompt rather than spliced into it, so the verdict rules the preset carries keep riding along
@@ -263,7 +263,7 @@ function entryPreview(entry: string): string {
  * is told to delete the lock in the same commit as the plan, because nothing else releases it:
  * #1420 removed the staleness timer, so a forgotten lock stands until a human clicks it away.
  */
-export function pinnedSpikeJob(job: AutoPmJob, assignment: SpikeAssignment): AutoPmJob {
+export function pinnedPlanJob(job: AutoPmJob, assignment: PlanAssignment): AutoPmJob {
   const { ticket, agentId } = assignment
   const stem = ticket.replace(/\.md$/, '')
   return {
@@ -272,11 +272,11 @@ export function pinnedSpikeJob(job: AutoPmJob, assignment: SpikeAssignment): Aut
     prompt: [
       job.prompt.trimEnd(),
       '',
-      `You are one agent of a concurrent batch, so the scope above narrows: spike & plan exactly one ticket, \`tickets/${ticket}\`, and no other.`,
+      `You are one agent of a concurrent batch, so the scope above narrows: plan exactly one ticket, \`tickets/${ticket}\`, and no other.`,
       '',
       `Your claim on it is already in place: \`tickets/${stem}.lock.md\` holds \`CLAIMED: ${agentId}\`. Write the real \`tickets/${stem}.plan.md\`, and delete \`tickets/${stem}.lock.md\` in the same commit — the lock lifts when your work lands. If the lock file is missing, names a different agent, or a plan already exists, the ticket is not yours — stop and do nothing.`,
     ].join('\n'),
-    describe: `spiking & planning "${entryPreview(ticket)}"`,
+    describe: `planning "${entryPreview(ticket)}"`,
   }
 }
 
@@ -324,9 +324,9 @@ export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
     pinnedBranch: `the-framework/${presets.triageConsensual.name}`,
   },
   {
-    name: presets.spikeAndPlan.name,
-    prompt: presets.spikeAndPlan.render(),
-    label: presets.spikeAndPlan.label,
+    name: presets.planTickets.name,
+    prompt: presets.planTickets.render(),
+    label: presets.planTickets.label,
     fansOut: true,
   },
 ]
@@ -463,13 +463,13 @@ export interface AutoPmDeps {
    */
   promote(project: AutoPmProject, run: { runId: string; entry?: string }): Promise<PromoteOutcome>
   /**
-   * The tickets open for a spike (#1327): no spike, plan, or `.lock.md` claim yet (#1420) — most
+   * The tickets open for planning (#1327): no plan or `.lock.md` claim yet (#1420) — most
    * important first, as filenames inside `tickets/`. Asked only when the tick lands on a
    * {@link AutoPmJob.fansOut} job. Unreadable means none, and no seam at all means the stock
    * single agent: the fan-out is an addition, not a precondition, and a loop wired without it
    * behaves exactly as before #1327.
    */
-  spikeCandidates?(project: AutoPmProject): Promise<readonly string[]>
+  planCandidates?(project: AutoPmProject): Promise<readonly string[]>
   /**
    * Claim `assignments`' tickets before their agents start (#1327/#1420): one `.lock.md` sibling
    * per ticket reading `CLAIMED: <AGENT_ID>`, committed as one batch and pushed to the default
@@ -479,10 +479,10 @@ export interface AutoPmDeps {
    * Failing (or absent) resolves nothing locked, and the sweep falls back to the stock single
    * agent — one unpinned agent is what ran before #1327 and needs no lock to be safe.
    */
-  lockSpikes?(
+  lockPlans?(
     project: AutoPmProject,
-    assignments: readonly SpikeAssignment[],
-  ): Promise<readonly SpikeAssignment[]>
+    assignments: readonly PlanAssignment[],
+  ): Promise<readonly PlanAssignment[]>
   /**
    * Which of `candidates` are claimed by a run outside this loop's memory (#1253): pinned to a
    * run that is still live, or to a finished one whose PR is still open. The in-memory pin dies
@@ -579,7 +579,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   let lastSweep: { enabled: boolean; sweptAt: number; outcomes: AutoPmOutcome[] } | undefined
   const lastStart = new Map<string, number>()
   // Runs this loop started whose queue has not reached the checkout yet, oldest first. A drain
-  // remembers the entry it was pinned to (#1204), and a fanned-out spike its ticket (#1327), so
+  // remembers the entry it was pinned to (#1204), and a fanned-out plan agent its ticket (#1327), so
   // while either is still in flight a later tick does not hand the same work to a second agent.
   const pending = new Map<string, { runId: string; entry?: string; ticket?: string }[]>()
   // Where each project is in the job cycle. Per project, not global: two repos idle at once
@@ -706,7 +706,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         }
         // What to start this tick (#1204/#1327). Draining fans out, and so does a rotation job
         // that declares {@link AutoPmJob.fansOut} — the property both share is what each agent
-        // does to shared files: a drain takes one entry *off* the queue, a pinned spike writes
+        // does to shared files: a drain takes one entry *off* the queue, a pinned plan agent writes
         // one ticket's *own* sibling files, so several agents do disjoint work and land disjoint
         // edits. Every other rotation job rewrites the whole queue document from the same fork
         // point, so two at once would revert each other's promotion; those stay one per tick.
@@ -730,7 +730,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           }
           batch.length = 0
           batch.push(...open.slice(0, concurrency - activeRuns).map(entry => pinnedDrainJob(job, entry)))
-        } else if (job.fansOut && deps.spikeCandidates && deps.lockSpikes) {
+        } else if (job.fansOut && deps.planCandidates && deps.lockPlans) {
           // The fan-out for a rotation job that writes per-ticket files (#1327). Both seams or
           // neither: candidates without locks would fan out unguarded, which is exactly the
           // double-work the locks exist to prevent — so a loop wired without them keeps the
@@ -742,14 +742,14 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           const pinned = new Set(
             (pending.get(project.id) ?? []).flatMap(run => (run.ticket !== undefined ? [run.ticket] : [])),
           )
-          const candidates = ((await deps.spikeCandidates(project).catch(() => [])) ?? []).filter(
+          const candidates = ((await deps.planCandidates(project).catch(() => [])) ?? []).filter(
             ticket => !pinned.has(ticket),
           )
           if (!candidates.length) {
-            // Nothing left to spike is this job's work being done, not a refusal: the rotation
+            // Nothing left to plan is this job's work being done, not a refusal: the rotation
             // advances, so the next tick tries the next job instead of re-asking forever.
             nextJob.set(project.id, index + 1)
-            note(project, false, 'every open ticket already has a spike or plan, or an agent on the way to one')
+            note(project, false, 'every open ticket already has a plan, or an agent on the way to one')
             continue
           }
           // Ids are generated here rather than by the lock writer, because the id has to reach
@@ -758,11 +758,11 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           // test with an injected clock can predict them.
           const assignments = candidates
             .slice(0, concurrency - activeRuns)
-            .map((ticket, i) => ({ ticket, agentId: `spike-${now()}-${i}` }))
-          const locked = await deps.lockSpikes(project, assignments).catch(() => [])
+            .map((ticket, i) => ({ ticket, agentId: `plan-${now()}-${i}` }))
+          const locked = await deps.lockPlans(project, assignments).catch(() => [])
           if (locked.length) {
             batch.length = 0
-            batch.push(...locked.map(assignment => pinnedSpikeJob(job, assignment)))
+            batch.push(...locked.map(assignment => pinnedPlanJob(job, assignment)))
           }
           // Nothing locked falls through with the stock single job: one unpinned agent is the
           // pre-#1327 behavior, and safe without a lock.

@@ -89,10 +89,10 @@ describe('TicketsPanel (#697/#1144)', () => {
   })
 
   test('a claimed ticket shows the hammer marker with its holder inline (#1420/#1144)', async () => {
-    render(<TicketsPanel projectId="p1" tickets={[ticket({ locked: true, lockedBy: 'spike-1-0' })]} loaded onOpen={() => {}} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ locked: true, lockedBy: 'plan-1-0' })]} loaded onOpen={() => {}} />)
     // Inline, not tooltip-only: a still 1-2s hover is how nobody discovers anything. The tooltip
     // adds what the icon cannot say — that the agent may be planning OR implementing.
-    expect(await screen.findByText('spike-1-0')).toBeTruthy()
+    expect(await screen.findByText('plan-1-0')).toBeTruthy()
   })
 
   test('topic badges filter on click when the page passes a handler, without opening the row (#1144)', async () => {

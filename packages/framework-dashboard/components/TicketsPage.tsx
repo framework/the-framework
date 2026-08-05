@@ -17,7 +17,7 @@ import {
 import { ScrollArea } from './ui/scroll-area.js'
 import { Button } from './ui/button.js'
 import { TicketFilterBar } from './TicketFilterBar.js'
-import { TicketsPanel, TicketRow, planPrompt } from './TicketsPanel.js'
+import { TicketsPanel, TicketRow, planPrompt, workOnTicketPrompt } from './TicketsPanel.js'
 
 /** Stable initial for the cross-project tickets poll, so it does not churn on every render. */
 const EMPTY_GROUPS: ProjectTickets[] = []
@@ -77,12 +77,21 @@ export function TicketsPage({
   const visible = filterRows(rows, view.filters)
   const filtered = hasAnyFilter(view.filters)
 
-  // Flat mode renders rows outside any TicketsPanel, so plan starts need their own action with
-  // the row's own project (a panel binds one projectId; the flat list has one per row).
+  // Flat mode renders rows outside any TicketsPanel, so the plan and start columns need their own
+  // actions with the row's own project (a panel binds one projectId; the flat list has one per row).
   const { busy, error, run } = useAction()
   const startPlan = async (projectId: string, file: string) => {
     const prompt = planPrompt(file)
     const result = await run(() => sendStart(projectId, prompt, 'prompt'), 'The planning session could not be started.')
+    if (result?.ok) onRunStarted?.(projectId, prompt, result.runId)
+  }
+  // Unattended with the ticket named on the options, exactly as the panel's own start column does.
+  const startWork = async (projectId: string, file: string) => {
+    const prompt = workOnTicketPrompt(file)
+    const result = await run(
+      () => sendStart(projectId, prompt, 'prompt', { unattended: true, ticket: `tickets/${file}` }),
+      'The work session could not be started.',
+    )
     if (result?.ok) onRunStarted?.(projectId, prompt, result.runId)
   }
 
@@ -156,6 +165,7 @@ export function TicketsPage({
                         projectName={r.projectName}
                         busy={busy}
                         onOpen={() => onOpenTicket(r.projectId, r.ticket.file)}
+                        onStartWork={() => void startWork(r.projectId, r.ticket.file)}
                         onOpenPlan={onOpenTicketPlan ? () => onOpenTicketPlan(r.projectId, r.ticket.file) : undefined}
                         onStartPlan={() => void startPlan(r.projectId, r.ticket.file)}
                         onTopicClick={addTopic}

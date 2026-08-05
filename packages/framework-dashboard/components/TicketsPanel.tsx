@@ -1,6 +1,6 @@
 import type { TicketsMeta, WorkspaceTicket } from '@gemstack/the-framework'
 import { presets } from '@gemstack/the-framework/client'
-import { RefreshCw, Github, ClipboardPlus, ClipboardList, Hammer } from 'lucide-react'
+import { RefreshCw, Github, ClipboardPlus, ClipboardList, Hammer, Play } from 'lucide-react'
 import { sendStart } from '../server/control.telefunc.js'
 import { onTicketsMeta } from '../server/reads.telefunc.js'
 import { Button } from './ui/button.js'
@@ -48,10 +48,20 @@ export function planPrompt(file: string): string {
 }
 
 /**
- * One ticket as a one-liner row (#697/#1144): title, project (flat mode only), topics, claim,
- * effort/uncertainty, priority, age, the plan column, and the GitHub link. Extracted from the
- * panel so the flat cross-project list (#1144's Group: none) renders the same row with per-row
- * project context.
+ * The prompt the start column fires a session with: work on this one ticket, nothing else. The
+ * same sentence `workOnTicketDraft` (HotTickets) drafts into the launcher — the drain preset's
+ * vocabulary narrowed to the one ticket the row names — but sent directly: the button is a start,
+ * not a draft. Exported so the test asserts the exact ask rather than a copy (#1187).
+ */
+export function workOnTicketPrompt(file: string): string {
+  return `Work on tickets/${file}. Do not start any other ticket.`
+}
+
+/**
+ * One ticket as a one-liner row (#697/#1144): the start column, title, project (flat mode only),
+ * topics, claim, effort/uncertainty, priority, age, the plan column, and the GitHub link.
+ * Extracted from the panel so the flat cross-project list (#1144's Group: none) renders the same
+ * row with per-row project context.
  *
  * The metadata cluster is a *sibling* of the row's open button, not a child — same rule as the
  * plan cell and the GitHub link (an interactive control nested in a button is invalid HTML), and
@@ -62,6 +72,7 @@ export function TicketRow({
   projectName,
   busy,
   onOpen,
+  onStartWork,
   onOpenPlan,
   onStartPlan,
   onTopicClick,
@@ -70,9 +81,11 @@ export function TicketRow({
   ticket: WorkspaceTicket
   /** Shown on the row in the flat cross-project list, where the section heading no longer says it. */
   projectName?: string | undefined
-  /** Disables the plan-creating button while a session start is in flight. */
+  /** Disables the session-starting buttons while a session start is in flight. */
   busy: boolean
   onOpen: () => void
+  /** The start column: spin up an agent implementing this one ticket. */
+  onStartWork: () => void
   onOpenPlan?: (() => void) | undefined
   onStartPlan: () => void
   /** Click-to-filter (#1144): a topic badge adds its topic to the page's filter. Without a
@@ -83,7 +96,30 @@ export function TicketRow({
 }) {
   return (
     <li className="flex items-stretch transition-colors hover:bg-accent/60">
-      <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm">
+      {/* The start column, the row's left edge: one click spins up an agent implementing this
+          ticket — the AI Queue card's play button (#855), offered where the backlog is read
+          instead of only after queueing. A sibling of the open button like every control on the
+          row (an interactive control nested in a button is invalid HTML): starting is not opening. */}
+      <div className="flex w-10 shrink-0 items-center justify-center">
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                onClick={onStartWork}
+                disabled={busy}
+                aria-label={`Start work on ${ticket.title}`}
+                // Quiet like the plan column's create button: an available action, not a state.
+                className="text-muted-foreground/50 hover:text-foreground disabled:opacity-50"
+              />
+            }
+          >
+            <Play className="h-4 w-4" aria-hidden />
+          </TooltipTrigger>
+          <TooltipContent>Spin up an agent working on this ticket</TooltipContent>
+        </Tooltip>
+      </div>
+      <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-2 py-2 pl-0 pr-3 text-left text-sm">
         {/* The title is the row's one flexible column: it truncates when long and stretches
             when short, so the whole of a row's slack lands here — the way a table's wide
             first column carries the blank — instead of pooling mid-row between columns. */}
@@ -228,10 +264,11 @@ export function TicketRow({
 
 // The tickets list (#697/#1144): the project's `tickets/*.md` as one-liners — priority, topics,
 // what the agent already did to it, and how recently, all on the row — so the backlog is scannable
-// without opening one. A row's only action is opening its detail page (#1144), which is where
-// Queue and the summary live. An empty `tickets/` offers to import the repo's GitHub issues instead
-// of just saying "nothing here"; a filled one offers to update it (#1208) instead of a re-import
-// re-walking the whole backlog.
+// without opening one. A row opens its detail page (#1144), which is where Queue and the summary
+// live, and carries two direct starts: the start column (an agent implementing the ticket) and the
+// plan column (an agent writing its plan, #685). An empty `tickets/` offers to import the repo's
+// GitHub issues instead of just saying "nothing here"; a filled one offers to update it (#1208)
+// instead of a re-import re-walking the whole backlog.
 export function TicketsPanel({
   projectId,
   tickets,
@@ -274,7 +311,7 @@ export function TicketsPanel({
   if (!projectId) return null
   if (!loaded) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>
 
-  const startSession = async (prompt: string, failure: string, options: { unattended?: boolean } = {}) => {
+  const startSession = async (prompt: string, failure: string, options: { unattended?: boolean; ticket?: string } = {}) => {
     const result = await run(() => sendStart(projectId, prompt, 'prompt', options), failure)
     // Jump to the session doing the work, so its progress is watchable instead of the panel
     // sitting on stale rows until files land.
@@ -289,6 +326,12 @@ export function TicketsPanel({
   // on, so the session stays a conversation you land in and steer rather than one that settles and
   // hands itself off. The reader reviews the result through the plan column's link.
   const startPlan = (file: string) => startSession(planPrompt(file), 'The planning session could not be started.')
+  // The start column (#855's play button, on the backlog): one agent on this one ticket is the
+  // same work the drain sweep starts, so it runs the same way — unattended (#1279), ending at
+  // settle with its armed handoff. `ticket` rides on the options so the run's meta names what it
+  // implements (#1117) — the prompt is not the drain preset, so the daemon would not infer it.
+  const startWork = (file: string) =>
+    startSession(workOnTicketPrompt(file), 'The work session could not be started.', { unattended: true, ticket: `tickets/${file}` })
 
   if (tickets.length === 0 && hiddenByFilter > 0) {
     // Filtered to nothing, not genuinely empty (#1144/#1230): offering an import here would ask
@@ -365,6 +408,7 @@ export function TicketsPanel({
             ticket={ticket}
             busy={busy}
             onOpen={() => onOpen(ticket.file)}
+            onStartWork={() => void startWork(ticket.file)}
             onOpenPlan={onOpenPlan ? () => onOpenPlan(ticket.file) : undefined}
             onStartPlan={() => void startPlan(ticket.file)}
             onTopicClick={onTopicClick}

@@ -1,22 +1,24 @@
 {
   "version": 2,
-  "status": "stopped",
+  "status": "done",
   "id": "2026-08-05T10-08-25-082Z",
   "startedAt": "2026-08-05T10:08:26.863Z",
-  "updatedAt": "2026-08-05T10:16:59.053Z",
+  "updatedAt": "2026-08-05T10:25:52.364Z",
   "passes": 0,
-  "pid": 683322,
+  "pid": 698827,
   "host": "rom-thinkpad-x280",
   "intent": "Create tickets/2026-07-31_avoid-term-spike.plan.md",
   "kind": "prompt",
   "handoff": {
     "push": true,
     "pr": true,
-    "merge": true
+    "merge": false
   },
   "branch": "the-framework/plan-avoid-term-spike",
-  "driver": "claude-code",
+  "driver": "claude-web",
   "workspace": "/home/rom/code/the-framework/.the-framework/worktrees/2026-08-05T10-08-25-082Z",
-  "sessionLink": "https://claude.ai/code",
-  "sessionId": "e07cdeaa-f9af-4e38-be1c-8078076df402"
+  "sessionLink": "https://claude.ai/code/session_01BVPL648y873rXcUc38pWhu?from=cli&m=0",
+  "sessionId": "session_01BVPL648y873rXcUc38pWhu",
+  "model": "fable",
+  "handoffReport": "done"
 }

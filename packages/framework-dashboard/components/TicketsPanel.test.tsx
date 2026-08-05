@@ -12,7 +12,7 @@ vi.mock('../server/control.telefunc.js', () => ({ sendStart }))
 const onTicketsMeta = vi.hoisted(() => vi.fn())
 vi.mock('../server/reads.telefunc.js', () => ({ onTicketsMeta }))
 
-const { TicketsPanel, planPrompt } = await import('./TicketsPanel.js')
+const { TicketsPanel, planPrompt, workOnTicketPrompt } = await import('./TicketsPanel.js')
 
 const ticket = (over: Partial<WorkspaceTicket> = {}): WorkspaceTicket => ({
   file: '2026-07-20_do-the-thing.md',
@@ -65,6 +65,27 @@ describe('TicketsPanel (#697/#1144)', () => {
     // Attended, unlike the import/update buttons: a per-ticket plan is a session you land in.
     expect(sendStart.mock.calls[0]?.[3]).toEqual({})
     await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith(expect.any(String), 'r3'))
+  })
+
+  test('the start column spins up an agent working on the ticket, unattended and with the ticket named (#1117/#1279)', async () => {
+    sendStart.mockResolvedValue({ ok: true, runId: 'r4' })
+    const onRunStarted = vi.fn()
+    const onOpen = vi.fn()
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={onOpen} onRunStarted={onRunStarted} />)
+    fireEvent.click(await screen.findByRole('button', { name: /start work on do the thing/i }))
+    await waitFor(() => expect(sendStart).toHaveBeenCalled())
+    // A fixed prompt on the verbatim-text path, and exactly the exported ask — no second, hidden
+    // copy to drift from the button (#1187).
+    expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
+    expect(sendStart.mock.calls[0]?.[1]).toBe(workOnTicketPrompt('2026-07-20_do-the-thing.md'))
+    expect(sendStart.mock.calls[0]?.[1]).toBe('Work on tickets/2026-07-20_do-the-thing.md. Do not start any other ticket.')
+    // Unattended like the AI Queue card's play button (#1279), with the ticket on the options so
+    // the run's meta names what it implements (#1117) — the prompt is not the drain preset, so
+    // the daemon would not infer it.
+    expect(sendStart.mock.calls[0]?.[3]).toEqual({ unattended: true, ticket: 'tickets/2026-07-20_do-the-thing.md' })
+    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith(expect.any(String), 'r4'))
+    // A sibling of the row's open button, like the plan cell: starting must not also navigate.
+    expect(onOpen).not.toHaveBeenCalled()
   })
 
   test('a claimed ticket shows the hammer marker with its holder inline (#1420/#1144)', async () => {

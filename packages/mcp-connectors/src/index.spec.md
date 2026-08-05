@@ -1,1 +1,0 @@
-Package entry — re-exports `defineConnector`, `mountConnectors`, all connector types, and (deliberately) `McpResponse` + `McpToolResult` from `@gemstack/mcp` so a connector's `handle` can return `McpResponse.error(...)` (an `isError: true` result) without depending on `@gemstack/mcp` directly.

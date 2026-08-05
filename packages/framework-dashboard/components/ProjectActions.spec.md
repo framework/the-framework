@@ -1,1 +1,0 @@
-The project home's action bar (#488): inline `GitStatusBar` (#491) on the left, `WorkspaceActions` on the right — both halves shared with a session's bar (#809) and passed no `runId`, so this page reports and acts on the project's own checkout and the two pages cannot drift.

@@ -43,11 +43,9 @@ test('readTickets reads the format: keys above the title, then the TLDR (#697)',
     file: '2026-07-20_do-the-thing.md',
     title: 'Do the thing',
     summary: 'The thing is not done.',
-    status: 'open',
     priority: 'high',
     topics: ['dx'],
     date: '2026-07-20T00:00:00.000Z',
-    spiked: false,
     planned: false,
   })
 })
@@ -82,22 +80,14 @@ test('readTickets falls back to mtime when the filename carries no date (#1144/#
   assert.notEqual(ticket?.date, undefined)
 })
 
-test('readTickets reads Status: closed, and defaults to open when the key is absent (#1144/#1230)', async () => {
-  const cwd = await repo({
-    'a-closed.md': 'Status: closed\n\n# Closed one\n',
-    'b-open.md': 'Status: open\n\n# Open one\n',
-    'c-unspecified.md': '# Unspecified one\n',
-  })
-  const byTitle = new Map((await readTickets(cwd)).map(t => [t.title, t.status]))
-  assert.equal(byTitle.get('Closed one'), 'closed')
-  assert.equal(byTitle.get('Open one'), 'open')
-  assert.equal(byTitle.get('Unspecified one'), 'open')
-})
-
-test('readTickets treats an unrecognised Status: value as open, not a throw (#1144/#1230)', async () => {
-  const cwd = await repo({ 'a.md': 'Status: archived\n\n# Thing\n' })
+test('a leftover Status: line is preamble noise, not a field (#1230 retired)', async () => {
+  // The format has no status key — a closed ticket is removed from the repo, so everything in
+  // `tickets/` is open work by construction. A file still carrying the retired line lists
+  // normally; the line is simply not read.
+  const cwd = await repo({ 'a.md': 'Status: closed\n\n# Thing\n' })
   const [ticket] = await readTickets(cwd)
-  assert.equal(ticket?.status, 'open')
+  assert.equal(ticket?.title, 'Thing')
+  assert.ok(ticket && !('status' in ticket))
 })
 
 test('readTickets parses a multi-topic list, brackets and all (#1144)', async () => {
@@ -148,12 +138,11 @@ test('readTickets decodes an escaped filename rather than throwing on a stray % 
   assert.deepEqual(titles, ['1-100% sure', '2-a b'])
 })
 
-// A spike or a plan is written *about* a ticket, so it marks that ticket instead of becoming
-// a row of its own -- otherwise planning a ticket would appear to duplicate it.
-test('readTickets folds .spike.md and .plan.md into their ticket (#697)', async () => {
+// A plan is written *about* a ticket, so it marks that ticket instead of becoming a row of its
+// own -- otherwise planning a ticket would appear to duplicate it.
+test('readTickets folds .plan.md into its ticket (#697)', async () => {
   const cwd = await repo({
     '2026-07-20_thing.md': '# Thing\n\nprose\n',
-    '2026-07-20_thing.spike.md': '# [Spike] Thing\n',
     '2026-07-20_thing.plan.md': '# [Plan] Thing\n',
     '2026-07-21_other.md': '# Other\n\nprose\n',
   })
@@ -161,10 +150,10 @@ test('readTickets folds .spike.md and .plan.md into their ticket (#697)', async 
   // Sorted before comparing: the list itself is newest-first by mtime (#1144), and these two are
   // written close enough together that which one lands "newest" is not this test's concern.
   assert.deepEqual(
-    tickets.map(t => [t.file, t.spiked, t.planned]).sort(),
+    tickets.map(t => [t.file, t.planned]).sort(),
     [
-      ['2026-07-20_thing.md', true, true],
-      ['2026-07-21_other.md', false, false],
+      ['2026-07-20_thing.md', true],
+      ['2026-07-21_other.md', false],
     ],
   )
 })
@@ -174,21 +163,19 @@ test('a .lock.md claim reads as a lock, never as a ticket row of its own (#1420)
   // ticket locked — and name its holder — without becoming a row or counting as work done.
   const cwd = await repo({
     '2026-07-20_thing.md': '# Thing\n\nprose\n',
-    '2026-07-20_thing.lock.md': 'CLAIMED: spike-1-0\n',
+    '2026-07-20_thing.lock.md': 'CLAIMED: plan-1-0\n',
   })
   const tickets = await readTickets(cwd)
   assert.equal(tickets.length, 1, 'the lock file is a sibling, not a ticket')
   const [ticket] = tickets
-  assert.equal(ticket?.spiked, false)
   assert.equal(ticket?.planned, false)
   assert.equal(ticket?.locked, true)
-  assert.equal(ticket?.lockedBy, 'spike-1-0')
+  assert.equal(ticket?.lockedBy, 'plan-1-0')
   assert.equal(ticket?.effort, undefined)
   // The detail page answers the same way the list does.
   const detail = await readTicket(cwd, '2026-07-20_thing.md')
   assert.equal(detail?.locked, true)
-  assert.equal(detail?.lockedBy, 'spike-1-0')
-  assert.equal(detail?.spiked, false)
+  assert.equal(detail?.lockedBy, 'plan-1-0')
 })
 
 test('a locked ticket with a real plan is planned and locked at once (#1420)', async () => {
@@ -196,14 +183,13 @@ test('a locked ticket with a real plan is planned and locked at once (#1420)', a
   // only deleting the lock file does.
   const cwd = await repo({
     '2026-07-20_thing.md': '# Thing\n\nprose\n',
-    '2026-07-20_thing.plan.md': '# [Plan] Thing\n\n- Human intervention effort: low\n',
-    '2026-07-20_thing.lock.md': 'CLAIMED: spike-1-0\n',
+    '2026-07-20_thing.plan.md': 'Effort: 2\n\n# [Plan] Thing\n',
+    '2026-07-20_thing.lock.md': 'CLAIMED: plan-1-0\n',
   })
   const [ticket] = await readTickets(cwd)
-  assert.equal(ticket?.spiked, false)
   assert.equal(ticket?.planned, true)
   assert.equal(ticket?.locked, true)
-  assert.equal(ticket?.effort, 'low')
+  assert.equal(ticket?.effort, 2)
 })
 
 test('a malformed lock file still locks, just without a holder (#1420)', async () => {
@@ -217,44 +203,51 @@ test('a malformed lock file still locks, just without a holder (#1420)', async (
   assert.equal(ticket?.lockedBy, undefined)
 })
 
-test('readTickets surfaces the effort a spike recorded (#1144/#1265)', async () => {
+test('readTickets reads the plan preamble\'s Effort: and Uncertainty: keys (#1144/#1265)', async () => {
+  // The plan format's two 0-10 keys (`ticketing_format.md`), above the `# [Plan]` heading.
   const cwd = await repo({
     '2026-07-20_thing.md': '# Thing\n',
-    '2026-07-20_thing.spike.md': '# [Spike] Thing\n\n- Human intervention effort: low\n- Token consumption: 2h\n',
+    '2026-07-20_thing.plan.md': 'Effort: 3\nUncertainty: 4\n\n# [Plan] Thing\n',
   })
   const [ticket] = await readTickets(cwd)
-  assert.equal(ticket?.effort, 'low')
+  assert.equal(ticket?.effort, 3)
+  assert.equal(ticket?.uncertainty, 4)
 })
 
-test('readTickets falls back to the plan\'s effort when the spike names none (#1144/#1265)', async () => {
-  const cwd = await repo({
-    '2026-07-20_thing.md': '# Thing\n',
-    '2026-07-20_thing.spike.md': '# [Spike] Thing\n\nNo estimate here.\n',
-    '2026-07-20_thing.plan.md': '# [Plan] Thing\n\nEstimated effort: medium\n',
-  })
-  const [ticket] = await readTickets(cwd)
-  assert.equal(ticket?.effort, 'medium')
-})
-
-test('readTickets leaves effort off when no sibling names one (#1144/#1265)', async () => {
+test('readTickets leaves effort and uncertainty off when the plan names none (#1144/#1265)', async () => {
   const cwd = await repo({
     '2026-07-20_a.md': '# A\n',
     '2026-07-20_b.md': '# B\n',
-    // The format doc's own section header ends in a bare colon — not a value.
-    '2026-07-20_b.spike.md': '# [Spike] B\n\nEstimated effort (for each way to implement it):\n',
+    '2026-07-20_b.plan.md': '# [Plan] B\n\nNo estimate here.\n',
   })
   const byFile = new Map((await readTickets(cwd)).map(t => [t.file, t.effort]))
   assert.equal(byFile.get('2026-07-20_a.md'), undefined)
   assert.equal(byFile.get('2026-07-20_b.md'), undefined)
 })
 
-test('readTicket surfaces the spike\'s effort too, like readTickets (#1144/#1265)', async () => {
+test('a plan value off the 0-10 scale is not an effort, and prose is not a preamble (#1144/#1265)', async () => {
+  const cwd = await repo({
+    '2026-07-20_a.md': '# A\n',
+    // Out-of-range/fractional values are not clamped into something plausible (see planScale).
+    '2026-07-20_a.plan.md': 'Effort: 15\nUncertainty: 2.5\n\n# [Plan] A\n',
+    '2026-07-20_b.md': '# B\n',
+    // A key-looking line below the heading is the plan's body, not its metadata.
+    '2026-07-20_b.plan.md': '# [Plan] B\n\nEffort: 3\n',
+  })
+  const byFile = new Map((await readTickets(cwd)).map(t => [t.file, t]))
+  assert.equal(byFile.get('2026-07-20_a.md')?.effort, undefined)
+  assert.equal(byFile.get('2026-07-20_a.md')?.uncertainty, undefined)
+  assert.equal(byFile.get('2026-07-20_b.md')?.effort, undefined)
+})
+
+test('readTicket reads the plan preamble too, like readTickets (#1144/#1265)', async () => {
   const cwd = await repo({
     '2026-07-20_thing.md': '# Thing\n',
-    '2026-07-20_thing.spike.md': '# [Spike] Thing\n\nHuman intervention effort: trivial\n',
+    '2026-07-20_thing.plan.md': 'Effort: 0\nUncertainty: 10\n\n# [Plan] Thing\n',
   })
   const ticket = await readTicket(cwd, '2026-07-20_thing.md')
-  assert.equal(ticket?.effort, 'trivial')
+  assert.equal(ticket?.effort, 0, 'a 0 is a value, not a missing key')
+  assert.equal(ticket?.uncertainty, 10)
 })
 
 test('readTickets ignores non-markdown files (#697)', async () => {
@@ -267,10 +260,10 @@ test('hasTickets is false with no tickets directory, true with a ticket (#958)',
   assert.equal(await hasTickets(await repo({ '2026-07-20_thing.md': '# Thing\n' })), true)
 })
 
-test('hasTickets agrees with readTickets: a lone spike or plan is not a ticket (#958)', async () => {
+test('hasTickets agrees with readTickets: a lone plan or lock is not a ticket (#958)', async () => {
   // The onboarding step asks whether `tickets/` is populated; a `.plan.md` with no ticket beside
   // it is written *about* a ticket, so answering yes there would tick the step off nothing.
-  const cwd = await repo({ '2026-07-20_thing.plan.md': '# Plan\n', '2026-07-20_thing.spike.md': '# Spike\n' })
+  const cwd = await repo({ '2026-07-20_thing.plan.md': '# Plan\n', '2026-07-20_thing.lock.md': 'CLAIMED: x\n' })
   assert.equal(await hasTickets(cwd), false)
   assert.deepEqual(await readTickets(cwd), [])
 })
@@ -291,11 +284,9 @@ test('readTicket reads the whole file, metadata included (#1144)', async () => {
     file: '2026-07-20_do-the-thing.md',
     title: 'Do the thing',
     summary: 'The thing is not done.',
-    status: 'open',
     priority: 'high',
     topics: ['dx'],
     date: '2026-07-20T00:00:00.000Z',
-    spiked: false,
     planned: false,
     content: body,
   })
@@ -309,20 +300,12 @@ test('readTicket reads the GitHub: link too, like readTickets (#1144/#1265)', as
   assert.deepEqual(ticket?.github, { label: '#42', url: 'https://github.com/org/repo/issues/42' })
 })
 
-test('readTicket reads Status: closed too, like readTickets (#1144/#1230)', async () => {
-  const cwd = await repo({ 'a.md': 'Status: closed\n\n# Thing\n' })
-  const ticket = await readTicket(cwd, 'a.md')
-  assert.equal(ticket?.status, 'closed')
-})
-
-test('readTicket folds in its .spike.md/.plan.md siblings, like readTickets (#1144)', async () => {
+test('readTicket folds in its .plan.md sibling, like readTickets (#1144)', async () => {
   const cwd = await repo({
     '2026-07-20_thing.md': '# Thing\n',
-    '2026-07-20_thing.spike.md': '# [Spike] Thing\n',
     '2026-07-20_thing.plan.md': '# [Plan] Thing\n',
   })
   const ticket = await readTicket(cwd, '2026-07-20_thing.md')
-  assert.equal(ticket?.spiked, true)
   assert.equal(ticket?.planned, true)
 })
 
@@ -331,8 +314,8 @@ test('readTicket is null for a missing file (#1144)', async () => {
 })
 
 test('readTicket is null for a sibling file, which is not a ticket of its own (#1144)', async () => {
-  const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n', '2026-07-20_thing.spike.md': '# [Spike] Thing\n' })
-  assert.equal(await readTicket(cwd, '2026-07-20_thing.spike.md'), null)
+  const cwd = await repo({ '2026-07-20_thing.md': '# Thing\n', '2026-07-20_thing.plan.md': '# [Plan] Thing\n' })
+  assert.equal(await readTicket(cwd, '2026-07-20_thing.plan.md'), null)
 })
 
 test('readTicket refuses a path that escapes tickets/ (#1144)', async () => {

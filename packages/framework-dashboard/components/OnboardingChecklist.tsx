@@ -143,7 +143,7 @@ export function OnboardingChecklist({
       key: 'tickets',
       label: 'Populate tickets/',
       description:
-        'tickets/ holds the bigger things to work on, in the repo. The agent plans and spikes from them, and they are the input the queue is filled from.',
+        'tickets/ holds the bigger things to work on, in the repo. The agent researches and plans them, and they are the input the queue is filled from.',
       done: hasTickets,
       optional: true,
       action: (

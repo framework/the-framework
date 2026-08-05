@@ -66,6 +66,7 @@ import { createGateKeepalive } from './gate-keepalive.js'
 import { nodeGitRunner } from './project.js'
 import { addProject, ensureDaemonToken, listProjects, readDaemonToken, readPreferences, resolveProjectPath } from './registry.js'
 import { startConsumptionGuard } from './consumption-guard.js'
+import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 import {
   planMaintenanceSweep,
   maintainSweep,
@@ -1132,6 +1133,10 @@ export interface RunJournal {
   stoppedCleanly: () => boolean
   /** Hold the browser preview's port until the session opens (#829/#813). */
   announceBrowserPort: (port: number) => void
+  /** The page the browser preview is on (#1455 item 6b): emitted as a `browser` event once a
+   *  session is open, held until then, and re-said after every later `session` so the row
+   *  survives the dashboard's last-session slice. */
+  announceBrowserUrl: (url: string) => void
   /** Write the run's `.the-framework/LOGS.md` entry (#898). Idempotent; every exit path calls it. */
   finishLog: () => Promise<void>
 }
@@ -1170,6 +1175,13 @@ export function createRunJournal(deps: {
   // bridge opens (#829): the dashboard renders only the tail from the last `session` event, so
   // anything emitted ahead of it is dropped from the run's view.
   let pendingBrowserPort: number | undefined
+  // The page the browser preview is on (#1455 item 6b). Held the same way the port is until a
+  // session opens; after that a navigation emits straight away. Re-emitted after EVERY `session`
+  // (not just the first, unlike the port whose meta fold survives the slice): a continuation
+  // starts a fresh rendered slice, and without the re-say its transcript would have no browser
+  // row to host the pane.
+  let latestBrowserUrl: string | undefined
+  let sessionOpen = false
 
   const onEvent = (event: FrameworkEvent) => {
     if (event.kind === 'session' && event.sessionLink) logSessionLink = event.sessionLink
@@ -1203,10 +1215,14 @@ export function createRunJournal(deps: {
     publisher?.publish(event)
 
     // Right after the session opens, so it lands inside the slice the dashboard renders.
-    if (event.kind === 'session' && pendingBrowserPort !== undefined) {
-      const port = pendingBrowserPort
-      pendingBrowserPort = undefined
-      onEvent({ kind: 'browser-stream', port })
+    if (event.kind === 'session') {
+      sessionOpen = true
+      if (pendingBrowserPort !== undefined) {
+        const port = pendingBrowserPort
+        pendingBrowserPort = undefined
+        onEvent({ kind: 'browser-stream', port })
+      }
+      if (latestBrowserUrl !== undefined) onEvent({ kind: 'browser', url: latestBrowserUrl })
     }
   }
 
@@ -1242,6 +1258,10 @@ export function createRunJournal(deps: {
     stoppedCleanly: () => stoppedCleanly,
     announceBrowserPort: port => {
       pendingBrowserPort = port
+    },
+    announceBrowserUrl: url => {
+      latestBrowserUrl = url
+      if (sessionOpen) onEvent({ kind: 'browser', url })
     },
     finishLog,
   }
@@ -1380,6 +1400,31 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
       return 2
     }
     domainPreset = resolved.preset
+  }
+
+  // The fake demo defaults to a Cloudflare deploy decision so the flow ends with
+  // a deploy phase; a live run only narrates deploy when asked.
+  const deploy: DeployDecision | undefined = opts.deploy
+    ? { render: 'ssr', target: opts.deploy, reason: `deploy to ${opts.deploy}` }
+    : fake
+      ? FAKE_DEPLOY
+      : undefined
+
+  // A real deploy target actually ships the app. Only for live runs against a
+  // known target; --fake stays plan-only and deterministic. An unknown target
+  // just narrates the decision. Real targets never throw on missing creds.
+  // Validated up front like --preset: a bad flag combination is a usage error, and it must
+  // fail before the dashboard / store / control channel are wired — a raw return after them
+  // leaked every handle and left the run recorded as `running` forever.
+  let deployTarget: DeployTarget | undefined
+  if (!fake && opts.deploy) {
+    const built = buildDeployTarget(opts.deploy, opts, cwd)
+    if (built.error) {
+      io.err(built.error)
+      io.err('Run `framework --help` for usage.')
+      return 2
+    }
+    deployTarget = built.target
   }
 
   // Fail early and clearly if a live run's prerequisites are missing — before the
@@ -1721,6 +1766,11 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     // opposite of what stopping meant. Same call the on-before-mergeable step makes.
     if (journal.stoppedCleanly()) return skip('run-stopped')
     if (fake) return skip('fake-run')
+    // A topic run (#1120) lives in a project-less scratch dir: no repo, no branch, nothing to
+    // publish. Without this, the commit attempt below burns its retries against a non-repo and
+    // labels the end `commit-failed` — alarming copy about work that never existed. It never
+    // had a branch, which is what branch-gone says.
+    if (opts.topic) return skip('branch-gone')
 
     // The daemon commits whatever the agent left uncommitted, but only after this process exits
     // (`tearDownWorktree`), so at this point the tree can still hold real work. Pushing first
@@ -1811,8 +1861,14 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // The run owns the browser (#793): launching it here, rather than letting chrome-devtools-mcp
   // launch its own, is what lets the #609 preview attach to the same page. Undefined when the
   // machine has no Chrome, which leaves `--browser` on its old path rather than failing the run.
-  const sharedBrowser = opts.browser && !fake ? await launchSharedBrowser() : undefined
-  if (opts.browser && !fake && !sharedBrowser) {
+  // Local runs only: the browser tools are wired on this machine, so a `--run-on web`/`actions`
+  // session could never reach them — launching Chrome here would leak a headless browser per
+  // run, and the system channel must only claim a browser the run really has (#824).
+  const localRun = opts.target === undefined || opts.target === 'local'
+  const sharedBrowser = opts.browser && !fake && localRun ? await launchSharedBrowser() : undefined
+  if (opts.browser && !fake && !localRun) {
+    io.err(`note: --browser has no effect with --run-on ${opts.target}: the browser tools are wired on this machine, and the session runs elsewhere.`)
+  } else if (opts.browser && !fake && !sharedBrowser) {
     io.err('note: no Chrome found, so --browser falls back to its own browser (no preview).')
   }
 
@@ -1831,14 +1887,20 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
    */
   const abortBeforeDriver = async (reason: string): Promise<number> => {
     io.err(reason)
+    // Release every handle settleRun would: the armed interrupt trap, the run's own dashboard
+    // server, and the LOGS.md entry — leaving any of them behind kept the process alive with a
+    // swallowed first Ctrl+C, exactly the hang this helper exists to prevent.
+    clearInterrupt()
     try {
       await store?.append({ kind: 'end', ok: false, detail: reason })
       await store?.close()
     } catch {
       // Persistence is never allowed to be the thing that keeps a failing run alive.
     }
+    await journal.finishLog().catch(() => {})
     control?.close()
     await sharedBrowser?.close().catch(() => {})
+    await dashboard?.close().catch(() => {})
     return 2
   }
 
@@ -1890,15 +1952,21 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
 
   // Whether the agent actually ends up with browser tools, which is narrower than the flag: they
   // ride Claude Code's MCP config, so `--browser` on another agent wires nothing (see
-  // `unguardedNotices`), and the fake driver has no tools at all. The system channel must only
-  // claim a browser the run really has (#824).
-  const browserAttached = opts.browser && !fake && opts.agent === 'claude'
+  // `unguardedNotices`), the fake driver has no tools at all, and a remote target never sees
+  // this machine's MCP config. The system channel must only claim a browser the run really has (#824).
+  const browserAttached = opts.browser && !fake && opts.agent === 'claude' && localRun
 
   // The preview of that browser (#802): the agent's Chrome is headless, so when it parks on an
   // `await-browser` gate (#796) there is nothing for a human to click. This serves it. Opening
   // the stream costs nothing while the page is still — Chrome only emits a frame on a change.
   const browserStream = sharedBrowser
-    ? await startBrowserStream({ browserUrl: sharedBrowser.browserUrl, connect: connectCdp }).catch(() => undefined)
+    ? await startBrowserStream({
+        browserUrl: sharedBrowser.browserUrl,
+        connect: connectCdp,
+        // Every real page the preview shows lands in the transcript (#1455 item 6b), so the
+        // inline pane appears at the point of use rather than only in the rail.
+        onPage: url => journal.announceBrowserUrl(url),
+      }).catch(() => undefined)
     : undefined
   // The port travels as an event — persisted and published live — because a dashboard-started
   // run is spawned with its stdout discarded, so a printed URL reaches nobody (#813). The
@@ -1913,7 +1981,15 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // leaves the run ungated — the fail-open Rom confirmed.
   // Transparent mode (#625) leaves the run fully raw, so the guard is off with it — the run is
   // `claude -p` with no framework behavior, spend included.
-  const guard = transparent ? undefined : startConsumptionGuard({ driver, ...(opts.model ? { model: opts.model } : {}) })
+  const guard = transparent
+    ? undefined
+    : startConsumptionGuard({
+        driver,
+        // The #960 slider joins the per-run gate (#1490), read from the registry the same way
+        // the daemon's quota source reads it — so the Usage bar and this gate cannot disagree.
+        limitOffset: async () => (await readPreferences()).autoSpendOffset ?? DEFAULT_SPEND_OFFSET,
+        ...(opts.model ? { model: opts.model } : {}),
+      })
   if (transparent) io.out(`◆ transparent: on — raw ${AGENT_SPECS[opts.agent].label}, no framework prompt, guard, dashboard, or TODO loop`)
   else if (guard) io.out('◆ quota boundary: on')
   else if (!fake) {
@@ -2015,28 +2091,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
           : '\n✓ prompt session done.',
       }
     })
-  }
-
-  // The fake demo defaults to a Cloudflare deploy decision so the flow ends with
-  // a deploy phase; a live run only narrates deploy when asked.
-  const deploy: DeployDecision | undefined = opts.deploy
-    ? { render: 'ssr', target: opts.deploy, reason: `deploy to ${opts.deploy}` }
-    : fake
-      ? FAKE_DEPLOY
-      : undefined
-
-  // A real deploy target actually ships the app. Only for live runs against a
-  // known target; --fake stays plan-only and deterministic. An unknown target
-  // just narrates the decision. Real targets never throw on missing creds.
-  let deployTarget: DeployTarget | undefined
-  if (!fake && opts.deploy) {
-    const built = buildDeployTarget(opts.deploy, opts, cwd)
-    if (built.error) {
-      io.err(built.error)
-      io.err('Run `framework --help` for usage.')
-      return 2
-    }
-    deployTarget = built.target
   }
 
   const serve: ServeConfig | undefined = opts.serve

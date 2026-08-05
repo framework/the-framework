@@ -39,11 +39,11 @@ export const FLAT_TODO_FILE = 'TODO_AGENTS.md'
  * translation of it. An unmarked ticket sits in the middle, which is what the ticket format
  * saying `priority:` is optional has to mean.
  *
- * A number is taken at its word, because that is what the ticket format actually specifies
- * (`Priority: 10-0`) and what every ticket in this repo writes. Only the words were mapped when
- * this was written for #1164, so a numeric priority fell through to the middle and every ticket
- * queued at 5 regardless of what it said. Out-of-range and fractional values are not clamped into
- * something plausible: they are not a priority on this scale, and inventing one hides the typo.
+ * A number is taken at its word, because that is what the ticket format specifies
+ * (`Priority: 10-0`) and what every ticket writes — the word spellings (`urgent`/`high`/`low`)
+ * once mapped here were never part of the format and are no longer read. Out-of-range and
+ * fractional values are not clamped into something plausible: they are not a priority on this
+ * scale, and inventing one hides the typo.
  */
 export function todoPriorityForTicket(priority?: string): number {
   const written = priority?.trim()
@@ -51,16 +51,7 @@ export function todoPriorityForTicket(priority?: string): number {
     const value = Number(written)
     if (value >= 0 && value <= 10) return value
   }
-  switch (written?.toLowerCase()) {
-    case 'urgent':
-      return 9
-    case 'high':
-      return 7
-    case 'low':
-      return 2
-    default:
-      return 5
-  }
+  return 5
 }
 
 /**
@@ -110,15 +101,6 @@ export function ticketIssueRef(md: string): string | undefined {
   return match ? `#${match[1]}` : undefined
 }
 
-/** The brief hyphen spelling from #682, read as a fallback after #674 settled on the underscore. */
-export const LEGACY_HYPHEN_TODO_FILE = 'TODO-AGENTS.md'
-
-/** The #629 backlog location (under `tickets/`), read as a fallback after #682 moved it to the root. */
-export const LEGACY_TICKETS_TODO_FILE = `${TICKETS_DIR}/TODO.md`
-
-/** The pre-#629 root location, still read so an older repo keeps its backlog. */
-export const LEGACY_TODO_FILE = 'TODO.md'
-
 /** Whether a workspace-relative path is an existing file. Never throws. */
 async function isFile(cwd: string, rel: string): Promise<boolean> {
   return stat(join(cwd, rel))
@@ -127,14 +109,10 @@ async function isFile(cwd: string, rel: string): Promise<boolean> {
 }
 
 /**
- * The workspace's flat backlog file, newest convention first: the root `TODO_AGENTS.md`,
- * else the brief hyphen spelling, else the #629 `tickets/TODO.md`, else the pre-#629 root
- * `TODO.md`. Returns the workspace-relative path, or `undefined` when none exists. New
- * backlogs are created at {@link FLAT_TODO_FILE}.
+ * The workspace's flat backlog file: the root `TODO_AGENTS.md`, or `undefined` when it does not
+ * exist. The pre-#682 spellings (`TODO-AGENTS.md`, `tickets/TODO.md`, root `TODO.md`) are no
+ * longer read — one convention, one location.
  */
 export async function findFlatTodo(cwd: string): Promise<string | undefined> {
-  for (const rel of [FLAT_TODO_FILE, LEGACY_HYPHEN_TODO_FILE, LEGACY_TICKETS_TODO_FILE, LEGACY_TODO_FILE]) {
-    if (await isFile(cwd, rel)) return rel
-  }
-  return undefined
+  return (await isFile(cwd, FLAT_TODO_FILE)) ? FLAT_TODO_FILE : undefined
 }

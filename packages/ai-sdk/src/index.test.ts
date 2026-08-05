@@ -2019,6 +2019,38 @@ describe('client tool execution', () => {
     assert.ok(chunkTypes.includes('pending-client-tools'), `expected pending-client-tools, got: ${chunkTypes.join(',')}`)
   })
 
+  it('an onBeforeToolCall abort stops the loop and pairs the tool call', async () => {
+    // A guard middleware that "blocks" a dangerous tool must actually halt the run: without
+    // stopping the loop it made a second provider call with the aborted tool_use unanswered.
+    let executed = false
+    const dangerous = toolDefinition({
+      name: 'delete_everything',
+      description: 'destructive',
+      inputSchema: z.object({}),
+    }).server(async () => { executed = true; return 'done' })
+
+    const guard: AiMiddleware = {
+      name: 'guard',
+      async onBeforeToolCall(_ctx, toolName) {
+        if (toolName === 'delete_everything') return { type: 'abort', reason: 'Blocked by guard' }
+      },
+    }
+
+    _script = [
+      { toolCalls: [{ id: 'd1', name: 'delete_everything', arguments: {} }] },
+      { text: 'should not be reached' },
+    ]
+
+    const result = await agent({ instructions: 'sys', tools: [dangerous], middleware: [guard] }).prompt('go')
+
+    assert.strictEqual(executed, false, 'the aborted tool must not run')
+    assert.strictEqual(_calls.length, 1, 'the loop must not make a second provider call after an abort')
+    assert.strictEqual(result.finishReason, 'stop')
+    // The aborted tool_use is answered, so a resumed / persisted thread stays valid.
+    assert.strictEqual(result.steps.at(-1)!.toolResults.length, 1)
+    assert.match(String(result.steps.at(-1)!.toolResults[0]!.result), /Blocked by guard/)
+  })
+
   it('dynamicTool() builds a Tool whose input is unknown', () => {
     const t = dynamicTool({
       name: 'runtime_built',

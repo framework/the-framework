@@ -1,4 +1,3 @@
-Status: open
 Topics: [the-framework]
 GitHub: [#326](https://github.com/gemstack-land/the-framework/issues/326)
 
@@ -6,7 +5,7 @@ GitHub: [#326](https://github.com/gemstack-land/the-framework/issues/326)
 
 ## TLDR
 
-The living spec of the framework's built-in system prompt: analyze the user prompt (ambiguous → interpretations + choices; large scope → `PLAN_*.agent.md` / `TODO_AGENTS.md`), session naming + `the-framework/<name>` branch, variability/alternatives gates (`showChoices()` + AWAIT), `setReadyForMerge()` — plus a second "on-before-mergeable" prompt that queues maintainability/readability/security-audit TODO entries after a session is ready. The issue OP is the canonical text; the code carries it as a verbatim template.
+The living spec of the framework's built-in system prompt: analyze the user prompt (ambiguous → interpretations + choices; large scope → `PLAN_*.agent.md` / `TODO_AGENTS.md`), session naming + `the-framework/<name>` branch, variability/alternatives gates (`showChoices()` + AWAIT), `setReadyForMerge()` (now explicitly required — the work is never merged without it) — plus a second "on-before-mergeable" prompt that queues maintainability/readability/security-audit TODO entries after a session is ready. The issue OP is the canonical text; the code carries it as a verbatim template.
 
 ## Why it matters
 
@@ -43,7 +42,7 @@ If it isn't clear what you should do (e.g. unclear scope, unclear user prompt), 
 ### Scope
 
 - If the scope of what you'll work on is *large*, create a `PLAN_<SESSION_NAME>.agent.md` of what you'll work on, <SHOW_MD>, <AWAIT>
-- If the scope is potentially *very large* (e.g. spans over many hours/days of work), also create a <TODO_FILE> (backlog of follow-up tasks) and <SHOW_MD>
+- If the scope is potentially *very large* (e.g. spans over many hours/days of work), consider adding entries to <TODO_FILE> (backlog of follow-up tasks) and show new entries <SHOW_MD>
 
 <ADD_ANALYSIS_ENTRY> whether the scope is small, large, or very large
 
@@ -54,10 +53,9 @@ Do the following before applying your first change.
 
 ### Session name
 
-1. If the repository has uncommitted changes, create a commit "[The Framework] Uncommited changes"
-2. Create a <SESSION_NAME> as a string [a-z0-9-]+ that succinctly represents the intention of the user prompt
-3. Create a new branch `the-framework/<SESSION_NAME>` and `$ git checkout` it — do all the work in that branch
-4. Call setSessionName(<SESSION_NAME>)
+1. Create a <SESSION_NAME> as a string [a-z0-9-]+ that succinctly represents the intention of the user prompt
+2. Create a new branch `the-framework/<SESSION_NAME>` and `$ git checkout` it — do all the work in that branch
+3. Call setSessionName(<SESSION_NAME>)
 
 
 ## Before applying changes
@@ -75,7 +73,9 @@ Measure "variability":
 
 ## After applying changes
 
-After you're done, consider whether <SESSION_NAME> is finished and there isn't any work left to do — if that's the case then call setReadyForMerge()
+After you're done, decide: is <SESSION_NAME> finished, with no work left to do?
+- Yes: call setReadyForMerge() — required, the work is never merged without it
+- No: don't call it; say what's left instead
 
 
 
@@ -135,3 +135,4 @@ If the changes introduced by ${{ tf.session_name }} can potentially lead to secu
 - PR #547 reality check: the shipped every-run prompt is 3,874 chars — 47% from this OP, the rest being `AWAIT_PROTOCOL` (1,415) + `SIGNAL_PROTOCOL` (623); the bootstrap preamble was removed. Personas/skills/memory framing gone (down from 8,852).
 - Sync failure mode: the code template (last synced 11 Jul, #355) drifted from the OP (rewritten 13 Jul) despite a "keep byte-identical, change it there first" comment; #551 moves the text into `prompts/*.md` verbatim. `tf.settings.technical_control` didn't exist yet and must be added before the post-merge block can render. `tf.session_name` is set before changes begin, early enough for the post-merge block.
 - Dogfooding gap: the prompt told the agent to commit before starting but never at the end, so finished sessions left work uncommitted; an "After you're done, commit your changes" line was agreed (the framework also commits leftovers itself before retiring a worktree, #786).
+- OP edits through 2026-07-31 tightened the template: the uncommitted-changes pre-commit step was dropped, very-large scope now *adds entries* to `TODO_AGENTS.md` (rather than creating the file), and `setReadyForMerge()` became explicitly required ("the work is never merged without it"), with "say what's left instead" as the not-finished path.

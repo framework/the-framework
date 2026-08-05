@@ -133,49 +133,40 @@ export interface HotTicket {
   runId?: string
 }
 
-/** Priority labels that read as "do this soon" — the "high priority" lane (#1139). */
-const HIGH_PRIORITY_LABELS = new Set(['high', 'urgent', 'critical', 'p0', 'p1'])
-
 /** Where the ticket format's 10-0 scale starts reading as high. */
 const HIGH_PRIORITY_FLOOR = 7
 
 /**
- * Whether a `priority:` value reads as "do this soon". A bare number is the ticket format's own
- * scale (`ticketing_format.md`: `10-0 … 10: critical — act immediately, 0: only if capacity`), so
- * 7 and up qualify — NOT the P0/P1 convention, whose low-numbers-first reading only applies when
- * written `p0`/`p1`. Getting that backwards is what kept a backlog full of `Priority: 8` tickets
- * off the card entirely.
+ * Whether a `priority:` value reads as "do this soon". The ticket format's own scale
+ * (`ticketing_format.md`: `10-0 … 10: critical — act immediately, 0: only if capacity`), so 7 and
+ * up qualify — NOT the P0/P1 convention, whose low-numbers-first reading is not this format.
+ * Getting that backwards is what kept a backlog full of `Priority: 8` tickets off the card
+ * entirely. Word spellings (`high`/`urgent`/…) are no longer read: the format says 0-10.
  */
 function isHighPriority(priority: string): boolean {
-  if (HIGH_PRIORITY_LABELS.has(priority)) return true
   const n = Number.parseInt(priority, 10)
   return !Number.isNaN(n) && n >= HIGH_PRIORITY_FLOOR
 }
 
 /**
  * A ticket's lane (#1139), or null when it is in none of the three the card shows:
- * - in-progress: a run is implementing it right now (#1117), or failing that the agent has planned
- *   or spiked it, so work is under way in the older, inferred sense.
+ * - in-progress: a run is implementing it right now (#1117), or failing that the agent has
+ *   planned it, so work is under way in the older, inferred sense.
  * - ai-queue: it sits in the AI Queue — an open `TODO_AGENTS.md` entry links to it — so the
  *   framework will pick it up on its own.
  * - high-priority: none of the above, but flagged high priority; what a human would likely queue next.
  *
  * Precedence follows that order: work already under way outranks a queued ticket, which outranks a
- * bare priority flag. Everything else is dropped — the card is a shortlist, not the whole backlog —
- * and a closed ticket is dropped before any of it, since finished work is not hot however marked.
+ * bare priority flag. Everything else is dropped — the card is a shortlist, not the whole backlog.
  *
- * `implementing` is the only hard evidence and exists for a drain run only, so the plan/spike proxy
+ * `implementing` is the only hard evidence and exists for a drain run only, so the plan proxy
  * still carries every ticket someone is working by hand.
  */
 export function ticketBucket(
   ticket: WorkspaceTicket,
   opts: { implementing?: boolean; queued?: boolean } = {},
 ): HotBucket | null {
-  // A closed ticket is finished work: in no lane, whatever marks (plan/spike/priority/queue entry)
-  // it left behind — those say how it was worked, not that it still is. A run that is somehow
-  // still implementing one shows in "Working now" on the strength of the run itself.
-  if (ticket.status === 'closed') return null
-  if (opts.implementing || ticket.planned || ticket.spiked) return 'in-progress'
+  if (opts.implementing || ticket.planned) return 'in-progress'
   if (opts.queued) return 'ai-queue'
   if (ticket.priority && isHighPriority(ticket.priority)) return 'high-priority'
   return null
@@ -211,7 +202,7 @@ export interface HotTicketsDeps {
 
 /**
  * Every project's tickets pooled and bucketed for the Overview's "hot tickets" card (#1139): what is
- * being worked on (implementing/planned/spiked), what sits in the AI Queue (an open `TODO_AGENTS.md`
+ * being worked on (implementing/planned), what sits in the AI Queue (an open `TODO_AGENTS.md`
  * entry links to it), and what is merely flagged high priority. Ordered lane-first (in-progress,
  * ai-queue, high-priority), file order within a lane; a ticket in none of the three is dropped.
  * Forgiving — a project whose tickets cannot be read simply contributes nothing.

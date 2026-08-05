@@ -31,6 +31,9 @@ export function useRunHandoff(projectId: string, runId: string | null | undefine
     null,
     everyMs,
     [projectId, runId, enabled, everyMs],
+    // Keep the last answer while the cadence flips (prPending 15s↔1s), or the summary blanks and
+    // the action bar falls back to the live counts for a beat — the same reason GitStatusBar does.
+    true,
   )
   useEffect(() => setEveryMs(handoff?.prPending ? 1_000 : 15_000), [handoff?.prPending])
   const { busy, error, run } = useAction()

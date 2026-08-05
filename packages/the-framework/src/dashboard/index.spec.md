@@ -1,1 +1,0 @@
-Barrel re-exporting the dashboard module's public surface: the server (`startDashboard`), the projections (overview/dashboard/queue/tickets/docs/git-status/handoff/interventions/activity), the gh/file readers, the notification watcher, and the bridge (endpoints, sessions, store).

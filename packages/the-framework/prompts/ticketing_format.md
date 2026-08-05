@@ -7,7 +7,6 @@ DATE: yyyy-mm-dd
 SLUG: succinct kebab-case slug of the ticket title
 Body:
 ```md
-Status: open/closed
 Priority: 0-10 [optional, 10: critical — act immediately, 0: only if capacity]
 Topics: [list-of-topics] [optional]
 GitHub: [#42](https://github.com/org/repo/issues/42) [optional]
@@ -24,6 +23,8 @@ GitHub: [#42](https://github.com/org/repo/issues/42) [optional]
 
 [optional: more info (any heading and format you want)]
 ```
+
+When a ticket is closed, it should be removed from the repository (also its `.plan.md` and `.lock.md`), so that `tickets/*` only contains open tickets.
 
 
 ## tickets/<DATE>_<SLUG>.lock.md
@@ -44,6 +45,7 @@ Body:
 ```md
 Effort: 0-10 [0: implementation is trivial, 10: implementation takes months]
 Uncertainty: 0-10 [0: implementation without meaningful alternatives, 10: highly uncertain how to implement]
+Outdated: yes [optional, only if the ticket was updated in a way that makes the plan outdated]
 
 # [Plan] Ticket title
 

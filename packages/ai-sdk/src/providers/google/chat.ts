@@ -87,22 +87,24 @@ export class GoogleAdapter implements ProviderAdapter {
       if (options.cache?.tools) delete configForCachedRequest['tools']
       configForCachedRequest['cachedContent'] = cacheName
       const systemIsCached = Boolean(options.cache?.instructions && system)
+      // The SDK only reads `config.systemInstruction` — a top-level sibling of
+      // `contents` is silently dropped, which loses the whole system prompt.
+      if (system && !systemIsCached) configForCachedRequest['systemInstruction'] = { parts: [{ text: system }] }
       return {
         payload: {
           model: this.model,
           contents: fresh,
-          ...(system && !systemIsCached ? { systemInstruction: { parts: [{ text: system }] } } : {}),
           config: configForCachedRequest,
         },
         cacheKey,
       }
     }
 
+    if (system) config['systemInstruction'] = { parts: [{ text: system }] }
     return {
       payload: {
         model: this.model,
         contents,
-        ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
         config,
       },
       cacheKey,
@@ -296,11 +298,13 @@ function toGeminiTools(tools: ToolDefinitionSchema[]): unknown[] {
   const blocks:  unknown[] = []
   for (const t of tools) {
     if (t.providerHint?.type === 'web-search') {
-      // Gemini's native search tool. The block's `google_search: {}` form is
-      // intentional — Gemini doesn't accept allowed_domains / max_uses on
-      // this block, so the WebSearch.domains() / .maxResults() opts are
-      // ignored on this provider (documented on WebSearch).
-      blocks.push({ google_search: {} })
+      // Gemini's native search tool. The empty block is intentional — Gemini
+      // doesn't accept allowed_domains / max_uses on it, so the
+      // WebSearch.domains() / .maxResults() opts are ignored on this provider
+      // (documented on WebSearch). Must be camelCase: the SDK's tool mapper
+      // only knows `googleSearch`, and strips an unknown `google_search` key
+      // to an empty tool entry.
+      blocks.push({ googleSearch: {} })
       continue
     }
     if (t.providerHint?.type === 'file-search') {
@@ -370,6 +374,8 @@ function fromGeminiResponse(response: any): ProviderResponse {
       completionTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
       totalTokens: response.usageMetadata?.totalTokenCount ?? 0,
     },
-    finishReason: toolCalls.length > 0 ? 'tool_calls' : 'stop',
+    // Same mapping as the stream path: a truncation or safety stop must not
+    // report a clean `stop`.
+    finishReason: mapGeminiFinishReason(candidate?.finishReason ?? '', toolCalls.length > 0),
   }
 }

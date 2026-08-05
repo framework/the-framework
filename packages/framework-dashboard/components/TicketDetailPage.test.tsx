@@ -13,9 +13,7 @@ const ticket = (over: Record<string, unknown> = {}) => ({
   file: '2026-07-20_do-the-thing.md',
   title: 'Do the thing',
   summary: 'The thing is not done.',
-  status: 'open',
   date: '2026-01-01T00:00:00.000Z',
-  spiked: false,
   planned: false,
   content: '# Do the thing\n\n## TLDR\n\nThe thing is not done.\n\nMore detail below the fold.',
   ...over,
@@ -59,32 +57,32 @@ describe('TicketDetailPage (#1144)', () => {
     expect(link.getAttribute('href')).toBe('https://github.com/org/repo/issues/42')
   })
 
-  test('shows the date and status in the meta below the description (#1144/#1230/#1265)', async () => {
+  test('shows the date in the meta below the description (#1144/#1265)', async () => {
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000).toISOString()
-    onTicket.mockResolvedValue(ticket({ status: 'closed', date: twoDaysAgo, summary: 'A short description.' }))
+    onTicket.mockResolvedValue(ticket({ date: twoDaysAgo, summary: 'A short description.' }))
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
     const description = await screen.findByText('A short description.')
     // All meta, date included, moved below the description (#1265) — no longer beside it.
     const meta = description.nextElementSibling as HTMLElement
     expect(meta.textContent?.startsWith('2d ago')).toBe(true)
-    expect(screen.getByText('closed')).toBeTruthy()
   })
 
-  test('shows the effort a spike recorded, with the rest of the meta (#1144/#1265)', async () => {
-    onTicket.mockResolvedValue(ticket({ spiked: true, effort: 'low' }))
+  test('shows the effort and uncertainty the plan recorded, with the rest of the meta (#1144/#1265)', async () => {
+    onTicket.mockResolvedValue(ticket({ planned: true, effort: 2, uncertainty: 0 }))
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
-    expect(await screen.findByText('Effort: low')).toBeTruthy()
+    expect(await screen.findByText('Effort: 2')).toBeTruthy()
+    expect(screen.getByText('Uncertainty: 0')).toBeTruthy()
   })
 
   test('queueing writes it to the queue, with the ticket it came from (#1164)', async () => {
-    onTicket.mockResolvedValue(ticket({ priority: 'high' }))
+    onTicket.mockResolvedValue(ticket({ priority: '8' }))
     sendQueueTicket.mockResolvedValue({ ok: true, file: 'TODO_AGENTS.md' })
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: /queue/i }))
     await waitFor(() =>
       expect(sendQueueTicket).toHaveBeenCalledWith('p1', 'Do the thing', {
         file: '2026-07-20_do-the-thing.md',
-        priority: 'high',
+        priority: '8',
       }),
     )
   })
@@ -114,12 +112,12 @@ describe('TicketDetailPage (#1144)', () => {
   })
 
   test('a claimed ticket shows its badge, holder, and a release button (#1420)', async () => {
-    onTicket.mockResolvedValue(ticket({ locked: true, lockedBy: 'spike-1-0' }))
+    onTicket.mockResolvedValue(ticket({ locked: true, lockedBy: 'plan-1-0' }))
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
     await screen.findByText('claimed')
     // The holder reads inline so a human knows whose claim they are about to lift — the detail
     // page has the room, no tooltip hunt needed.
-    expect(screen.getByText(/· spike-1-0/)).toBeTruthy()
+    expect(screen.getByText(/· plan-1-0/)).toBeTruthy()
     expect(screen.getByRole('button', { name: /release lock/i })).toBeTruthy()
   })
 
@@ -132,7 +130,7 @@ describe('TicketDetailPage (#1144)', () => {
   })
 
   test('releasing calls the RPC and withdraws the claim without waiting for the next poll (#1420)', async () => {
-    onTicket.mockResolvedValue(ticket({ locked: true, lockedBy: 'spike-1-0' }))
+    onTicket.mockResolvedValue(ticket({ locked: true, lockedBy: 'plan-1-0' }))
     sendReleaseTicketLock.mockResolvedValue({ ok: true })
     render(<TicketDetailPage projectId="p1" slug="2026-07-20_do-the-thing.md" onBack={() => {}} />)
     fireEvent.click(await screen.findByRole('button', { name: /release lock/i }))

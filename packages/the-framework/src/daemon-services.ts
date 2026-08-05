@@ -142,7 +142,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   }
 
   // Auto PM (#685/#773): while the queue is dry and there is quota to spare, triage and
-  // spike & plan tickets rather than let the day's allowance expire unused.
+  // plan tickets rather than let the day's allowance expire unused.
   const autoPm = startAutoPm({
     projects,
     jobs: AUTO_PM_JOBS,
@@ -166,24 +166,24 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     recordMaintenance: async project => mergeMaintenanceState(project.path, { sweptAt: new Date().toISOString() }),
     // A pinned routine branch left behind by a closed PR blocks every later firing (#1293).
     releasePinned: (project, branch) => releaseStalePinnedBranch(project.path, branch),
-    // The tickets a [Spike & plan] fan-out may claim (#1327/#1420): open, unplanned, and not
-    // claimed by a `.lock.md` — most important first. No stale-lock sweep runs here: #1420
+    // The tickets a [Plan tickets] fan-out may claim (#1327/#1420): unplanned and not claimed
+    // by a `.lock.md` — most important first. No stale-lock sweep runs here: #1420
     // removed the timer, so a lock stands until the agent's PR deletes it or a human releases
     // it from the dashboard.
-    spikeCandidates: async project => {
+    planCandidates: async project => {
       const rank = (priority?: string) => {
         const n = Number(priority)
         return Number.isFinite(n) ? n : -1
       }
       return (await readTickets(project.path))
-        .filter(ticket => ticket.status === 'open' && !ticket.spiked && !ticket.planned && !ticket.locked)
+        .filter(ticket => !ticket.planned && !ticket.locked)
         .sort((a, b) => rank(b.priority) - rank(a.priority))
         .map(ticket => ticket.file)
     },
     // The daemon writes and pushes the locks, never the agent (#1327/#1320): an agent only
     // pushes at the end of its session onto its own branch, and a claim that stayed local would
     // not reach the machines it exists for.
-    lockSpikes: (project, assignments) => acquireTicketLocks(project.path, assignments, { log }),
+    lockPlans: (project, assignments) => acquireTicketLocks(project.path, assignments, { log }),
     start: async (project, job) => {
       // A draining run works one open queue entry, and since #1164 that entry links back to the
       // ticket it was queued from — so this is the one moment the framework knows what a run is
@@ -195,7 +195,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         ? job.entry !== undefined
           ? ticketFromQueueEntry(job.entry)
           : await nextQueuedTicket(project.path).catch(() => undefined)
-        : // A fanned-out spike is pinned to one ticket too (#1327), so its meta names it the
+        : // A fanned-out plan agent is pinned to one ticket too (#1327), so its meta names it the
           // same way a pinned drain's does.
           job.ticket !== undefined
           ? `${TICKETS_DIR}/${job.ticket}`
@@ -204,7 +204,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // meta and outlives both this process's memory and the run's local process.
       const result = await startUnattended(project.id, job.prompt, {
         ...(ticket ? { ticket } : {}),
-        // A fanned-out spike plans its ticket rather than implementing it (#1327), so its PR
+        // A fanned-out plan agent plans its ticket rather than implementing it (#1327), so its PR
         // title must not inherit the issue as `(fix #42)` — the plan's merge would close the
         // issue with the work still undone (#1334).
         ...(ticket && !job.drains ? { planRun: true } : {}),

@@ -185,7 +185,7 @@ type NonReadyDecision =
   | { kind: 'rejected';                 tc: ToolCall; result: { rejected: true; reason: string } }
   | { kind: 'pending-approval';         tc: ToolCall }
   | { kind: 'mw-skip';                  tc: ToolCall; toolArgs: Record<string, unknown>; result: unknown }
-  | { kind: 'mw-abort';                 tc: ToolCall }
+  | { kind: 'mw-abort';                 tc: ToolCall; reason: string }
   | { kind: 'validation-error';         tc: ToolCall; toolArgs: Record<string, unknown>; error: InvalidToolArgumentsError }
 
 type ToolCallDecision = NonReadyDecision | ReadyDecision
@@ -288,7 +288,12 @@ async function decideToolCall(loopCtx: LoopContext, tc: ToolCall): Promise<ToolC
       }
       if (beforeResult.type === 'abort') {
         await runOnAbort(middlewares, ctx, beforeResult.reason)
-        return { kind: 'mw-abort', tc }
+        // Stop the whole loop, not just this tool phase: without this the loop makes
+        // another provider call with the aborted tool's `tool_use` unanswered, so a guard
+        // middleware that "blocks" a dangerous tool doesn't actually halt the agent.
+        loopCtx.stopForAbort = true
+        loopCtx.loopFinishReason = 'stop'
+        return { kind: 'mw-abort', tc, reason: beforeResult.reason }
       }
       if (beforeResult.type === 'transformArgs') {
         toolArgs = beforeResult.args
@@ -377,8 +382,15 @@ async function* emitDecision(
       return
     }
     case 'mw-abort': {
-      // `onAbort` already ran in decideToolCall; the aborted call emits
-      // nothing and the caller halts the phase.
+      // `onAbort` already ran in decideToolCall, and `stopForAbort` halts the loop.
+      // Still pair the tool_use with a result: the assistant message carrying it is
+      // already in `messages`, so an unanswered `tool_use` would 400 the provider on
+      // the next call (or on a persisted-then-resumed thread).
+      const aborted = `Aborted: ${decision.reason}`
+      toolResults.push({ toolCallId: tc.id, result: aborted })
+      messages.push({ role: 'tool', content: aborted, toolCallId: tc.id })
+      yield { type: 'tool-call' as const, toolCall: tc }
+      yield { type: 'tool-result' as const, toolCall: tc, result: aborted }
       return
     }
     case 'validation-error': {

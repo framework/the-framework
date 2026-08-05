@@ -1,1 +1,0 @@
-Landing page (`/`) assembly — renders, in order: `TopNav`, `Hero`, `SectionNav`, `StopBabysitting`, `AutonomousAi`, `HowItWorks`, `Features`, `YourFramework`, `Cta`, `Footer` (and imports the global `styles.css`).

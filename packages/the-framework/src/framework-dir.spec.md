@@ -1,1 +1,0 @@
-Exports the `THE_FRAMEWORK_DIR = '.the-framework'` constant as its own module because it is the one piece of `logs.ts` the browser needs (preset `filePath`s, #874; dashboard preset rendering, #520) and `logs.ts` imports `node:path` so it cannot go there.

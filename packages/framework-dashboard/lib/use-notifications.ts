@@ -49,8 +49,15 @@ function fire<T>(items: T[], spec: NotificationSpec<T>): void {
 function useNewItemNotifications<T>(items: T[], enabled: boolean, spec: NotificationSpec<T>): void {
   const seen = useRef<Set<string>>(new Set())
   const observations = useRef(0)
+  const lastItems = useRef<T[] | undefined>(undefined)
 
   useEffect(() => {
+    // A toggle flip re-runs this effect with the SAME feed. Counting that as an observation
+    // burns a warmup slot, so the first real fetch after enabling is treated as post-baseline
+    // and notifies for the whole backlog — the exact thing the warmup exists to prevent. Only a
+    // genuine feed change advances the baseline; an `enabled` flip with unchanged items is a no-op.
+    if (items === lastItems.current) return
+    lastItems.current = items
     const fresh = spec.pickNew(seen.current, items)
     if (observations.current < WARMUP) {
       observations.current += 1 // still warming up: fold these into the baseline, don't notify

@@ -1,4 +1,3 @@
-Status: open
 Topics: [ux]
 GitHub: [#772](https://github.com/gemstack-land/the-framework/issues/772)
 

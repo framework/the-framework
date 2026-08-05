@@ -1,1 +1,0 @@
-Thin barrel re-exporting the `runtime/` sibling modules (SDK wiring, web + node HTTP handlers, DI helpers, tool-return consumption) — intentionally logic-free so external consumers' `from './runtime.js'` imports stay stable.

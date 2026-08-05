@@ -52,3 +52,24 @@
 - run: 2026-08-01T22-19-39-640Z
 - session: [3b80ea10-83f8-4bfc-81d5-39445ade48d1](https://claude.ai/code)
 - branch: the-framework/run-2026-08-01T22-19-39-640Z
+
+## 2026-08-05T10:16:59.053Z · prompt · Create tickets/2026-07-31_avoid-term-spike.plan.md
+
+- status: stopped
+- run: 2026-08-05T10-08-25-082Z
+- session: [e07cdeaa-f9af-4e38-be1c-8078076df402](https://claude.ai/code)
+- branch: the-framework/plan-avoid-term-spike
+
+## 2026-08-05T10:25:52.364Z · prompt · According https://claude.ai/new#settings/usage the usage limit isn't reached?
+
+- status: done
+- run: 2026-08-05T10-08-25-082Z
+- session: [session_01BVPL648y873rXcUc38pWhu](https://claude.ai/code/session_01BVPL648y873rXcUc38pWhu?from=cli&m=0)
+- branch: the-framework/plan-avoid-term-spike
+
+## 2026-08-05T13:46:59.234Z · prompt · see git show origin/main
+
+- status: done
+- run: 2026-08-05T10-08-25-082Z
+- session: [session_01Czm2w8HWZ9J6GLLuUvgo3j](https://claude.ai/code/session_01Czm2w8HWZ9J6GLLuUvgo3j?from=cli&m=0)
+- branch: the-framework/plan-avoid-term-spike

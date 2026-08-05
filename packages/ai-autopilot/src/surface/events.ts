@@ -74,8 +74,13 @@ export class EventStream<E = SupervisorEvent> {
         return new Promise(resolve => {
           const wake = (): void => {
             pending = undefined
-            if (done || index >= stream.buffer.length) resolve({ value: undefined, done: true })
-            else resolve({ value: stream.buffer[index++]!, done: false })
+            if (done) return resolve({ value: undefined, done: true })
+            if (index < stream.buffer.length) return resolve({ value: stream.buffer[index++]!, done: false })
+            if (stream.closed) return resolve({ value: undefined, done: true })
+            // Woken with nothing left for us (a concurrent next() on this iterator took the
+            // event): the stream is still open, so wait again rather than resolve a false done.
+            pending = wake
+            stream.waiters.push(wake)
           }
           pending = wake
           stream.waiters.push(wake)

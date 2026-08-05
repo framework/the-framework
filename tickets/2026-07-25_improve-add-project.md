@@ -1,5 +1,4 @@
-Status: open
-Priority: 8
+Topics: [UX]
 GitHub: [#1150](https://github.com/gemstack-land/the-framework/issues/1150)
 
 # Improve "Add project"
@@ -14,7 +13,7 @@ Adding a project is the very first thing a new user does (onboarding step 1, #95
 
 ## Source
 
-Imported from GitHub issue [gemstack-land/the-framework#1150](https://github.com/gemstack-land/the-framework/issues/1150), created 2026-07-25, label: `priority: high`.
+Imported from GitHub issue [gemstack-land/the-framework#1150](https://github.com/gemstack-land/the-framework/issues/1150), created 2026-07-25, label: `UX ✨` (the `priority: high` label was dropped on 2026-07-29).
 
 ### Original description
 
@@ -26,3 +25,10 @@ Remove this modal:
 Instead show the usual system file picker.
 
 "It's a folder of repos" => unclear to user what it means => let's remove it for now. Let's do the proper directory of repos thing post-MVP.
+
+Also:
+- https://github.com/gemstack-land/the-framework/issues/958#issuecomment-5078541328
+
+### Notes from the GitHub thread
+
+- The OP now also points at a comment on #958 (Onboarding); that issue has since been closed ("mostly done") in favor of follow-ups, so the add-project onboarding context referenced there is carried by this ticket.

@@ -22,6 +22,8 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `▶ your app is running at ${event.url}`
     case 'browser-stream':
       return `◆ browser preview: http://127.0.0.1:${event.port}/stream`
+    case 'browser':
+      return `◆ browser: ${event.url}`
     case 'log':
       return `  ${event.message}`
     case 'view':

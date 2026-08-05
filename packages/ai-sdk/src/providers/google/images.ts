@@ -13,6 +13,25 @@ const GOOGLE_IMAGE_SIZE_MAP: Record<string, string> = {
   portrait: '1024x1792',
 }
 
+/**
+ * Imagen's `aspectRatio` takes an enumerated ratio (`1:1`, `16:9`, …), not a pixel
+ * pair — `1024:1024` is rejected. Map a width/height to the nearest supported ratio.
+ */
+function toImagenAspectRatio(width: number, height: number): string | undefined {
+  if (!width || !height) return undefined
+  const ratio = width / height
+  const options: Array<[string, number]> = [
+    ['1:1', 1],
+    ['16:9', 16 / 9],
+    ['9:16', 9 / 16],
+    ['4:3', 4 / 3],
+    ['3:4', 3 / 4],
+  ]
+  return options.reduce((best, cur) =>
+    Math.abs(cur[1] - ratio) < Math.abs(best[1] - ratio) ? cur : best,
+  )[0]
+}
+
 export class GoogleImageAdapter implements ImageGenerationAdapter {
   constructor(
     private readonly config: GoogleConfig,
@@ -25,12 +44,13 @@ export class GoogleImageAdapter implements ImageGenerationAdapter {
       : '1024x1024'
 
     const [width, height] = size.split('x').map(Number)
+    const aspectRatio = toImagenAspectRatio(width ?? 0, height ?? 0)
 
     const body: Record<string, unknown> = {
       instances: [{ prompt: options.prompt }],
       parameters: {
         sampleCount: options.n ?? 1,
-        ...(width && height ? { aspectRatio: `${width}:${height}` } : {}),
+        ...(aspectRatio ? { aspectRatio } : {}),
       },
     }
 

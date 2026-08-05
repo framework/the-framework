@@ -1,1 +1,0 @@
-The run view's banner for a session executing on a connected device (#1067 slice 2): flags where the run executes and that the browser preview is not available remotely yet (slice 3); renders nothing without a `device` label so callers can mount it unconditionally.

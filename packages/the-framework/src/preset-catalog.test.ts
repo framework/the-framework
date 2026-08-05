@@ -21,7 +21,7 @@ const PARAMETERIZED = [
 const PARAMLESS = [
   presets.marketResearch,
   presets.importTickets,
-  presets.spikeAndPlan,
+  presets.planTickets,
   presets.suggestNewTickets,
   presets.suggestNewFeatures,
   presets.suggestTicketsToWorkOn,
@@ -38,7 +38,7 @@ test('every preset keeps its exact run-kind name', () => {
     Object.values(presets).map(p => p.name).sort(),
     [
       'drain-queue', 'import-tickets', 'maintainability', 'maintenance', 'market-research',
-      'readability', 'research', 'security-audit', 'spike-and-plan',
+      'plan-tickets', 'readability', 'research', 'security-audit',
       'suggest-new-features', 'suggest-new-tickets', 'suggest-tickets-to-work-on',
       'triage-consensual', 'triage-quick', 'update-tickets', 'ux',
     ],
@@ -179,7 +179,9 @@ test('Suggest tickets to work on gates on a human, unlike the triage pair (#698)
 })
 
 test('the triage pair splits on cost and both append to the queue (#891/#892)', () => {
-  assert.match(presets.triageQuick.template, /Only pick tickets that are quick-wins \(quick to implement\) and consensual/)
+  // Quick triage picks by the plan's own numbers: a low `effort` with `uncertainty: 0` is what
+  // "quick-win" means now that every plan carries the two 0-10 keys.
+  assert.match(presets.triageQuick.template, /quick-win \(low `effort` value\) with `uncertainty: 0`/)
   assert.match(presets.triageQuick.template, /Add tickets to TODO_AGENTS\.md/)
   assert.match(presets.triageConsensual.template, /Only pick tickets that are significant \(no quick-wins\) and consensual/)
   assert.match(presets.triageConsensual.template, /Add tickets to TODO_AGENTS\.md/)
@@ -191,7 +193,9 @@ test('each triage preset pins its own session name and aborts on a taken branch 
   for (const preset of [presets.triageQuick, presets.triageConsensual]) {
     const out = preset.render()
     assert.match(out, new RegExp(`Always set <SESSION_NAME> to ${preset.name}`))
-    assert.match(out, /If branch the-framework\/<SESSION_NAME> already exists, abort and tell user that the branch already exists and that triage is already pending/)
+    // The guard is the invariant, not its phrasing — the two templates word the sentence
+    // slightly differently, and pinning one wording is how this assertion went stale.
+    assert.match(out, /If branch the-framework\/<SESSION_NAME> already exists, abort and tell user/)
   }
   // Distinct session names, or the two would collide with each other rather than with their own
   // in-flight run.
@@ -246,9 +250,8 @@ test('the update preset resumes from the stamp and keeps our own work (#1208)', 
   // The timestamp is taken before the fetch, so an issue edited mid-run comes across next time
   // rather than falling into the gap between the fetch and the stamp.
   assert.match(prompt, /before you fetch anything/)
-  // The reconcile half. Clobbering the spikes and plans written against a ticket would throw away
-  // the agent's own work every time someone pressed the button.
-  assert.match(prompt, /\.spike\.md/)
+  // The reconcile half. Clobbering the plans written against a ticket would throw away the
+  // agent's own work every time someone pressed the button.
   assert.match(prompt, /\.plan\.md/)
   assert.match(prompt, /closed/)
   // And it must not read as the first import: that is the other preset, under the other button.

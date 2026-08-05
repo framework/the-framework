@@ -136,6 +136,13 @@ export async function startBrowserStream(opts: {
   followIntervalMs?: number
   /** How often to re-send the newest frame so a still page still paints (#818). */
   repeatIntervalMs?: number
+  /**
+   * The page the human would be looking at changed (#1455 item 6b): fired for the first real
+   * (http/https) page and on every change after — a navigation in place or a followed tab
+   * switch. Never fired for about:blank or chrome:// (the browser idling is not the agent
+   * showing something), and never twice for the same URL in a row.
+   */
+  onPage?: (url: string) => void
 }): Promise<BrowserStream | undefined> {
   const listTargets = opts.listTargets ?? defaultListTargets
   const targets = await listTargets(opts.browserUrl).catch(() => [])
@@ -144,6 +151,14 @@ export async function startBrowserStream(opts: {
 
   let latest: Buffer | undefined
   const viewers = new Set<import('node:http').ServerResponse>()
+
+  // What onPage last said, so a poll that sees the same page again stays silent.
+  let announcedUrl: string | undefined
+  const announce = (url: string) => {
+    if (!/^https?:\/\//i.test(url) || url === announcedUrl) return
+    announcedUrl = url
+    opts.onPage?.(url)
+  }
 
   /** Attach the screencast to one page. Frames land in `latest` and go straight to viewers. */
   const attach = async (target: CdpPageTarget): Promise<CdpSession> => {
@@ -159,6 +174,7 @@ export async function startBrowserStream(opts: {
 
   let current = page
   let session = await attach(page)
+  announce(page.url)
 
   /**
    * Follow the agent when it opens or switches tabs. Without this the pane shows whichever
@@ -186,11 +202,19 @@ export async function startBrowserStream(opts: {
     ? setInterval(() => {
         void (async () => {
           const next = pickActivePage(await listTargets(opts.browserUrl).catch(() => []))
-          if (!next?.webSocketDebuggerUrl || next.id === current.id) return
+          if (!next?.webSocketDebuggerUrl) return
+          if (next.id === current.id) {
+            // Same tab, possibly a new page: the screencast keeps itself current, but the
+            // navigation is still worth announcing (#1455 item 6b).
+            current = next
+            announce(next.url)
+            return
+          }
           const previous = session
           try {
             session = await attach(next)
             current = next
+            announce(next.url)
             await previous.send('Page.stopScreencast').catch(() => {})
             previous.close()
           } catch {

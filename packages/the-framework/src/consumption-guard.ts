@@ -24,6 +24,13 @@ export interface StartConsumptionGuardOptions {
   driver: Driver
   /** The model the run is on. Brings that model's own weekly window into the gate (#879). */
   model?: string
+  /**
+   * The user's spend-limit offset — the #960 slider — read fresh around each gate check so
+   * dragging it unblocks a parked run's next boundary check without a restart (#1490). It only
+   * ever LOOSENS the gate (see the gate's comment); absent or unreadable means the default
+   * policy, the same fallback the daemon's quota source uses.
+   */
+  limitOffset?: () => number | Promise<number>
   /** Clock, injectable for tests. */
   now?: () => number
 }
@@ -55,19 +62,39 @@ export function startConsumptionGuard(opts: StartConsumptionGuardOptions): Consu
   const poller = new QuotaPoller({ read: () => readQuota(), now })
   poller.start()
 
+  // The slider's latest resolved value. The gate stays synchronous — it answers from cached
+  // readings — so the offset is refreshed in the background around each check and the check
+  // uses the last value that landed: one turn behind at worst, which is also how fresh the
+  // quota reading itself is.
+  let userOffset = DEFAULT_SPEND_OFFSET
+  const refreshOffset = () => {
+    if (!opts.limitOffset) return
+    void Promise.resolve()
+      .then(opts.limitOffset)
+      .then(value => {
+        if (Number.isFinite(value)) userOffset = value
+      })
+      .catch(() => {}) // an unreadable registry means the default policy
+  }
+  refreshOffset()
+
   return {
     poller,
     stop: () => poller.stop(),
     gate: () => {
+      refreshOffset()
       const windows = poller.current().lastGood?.windows
       if (!windows) return null
       // The same half-day cushion unattended work gets by default (#960 Edit). The continuous
       // boundary starts the week at zero, so without one the first integer percent the agent
       // reports outruns it and the user's own first run of the week is paused over ordinary
       // rounding — the stepped line this replaces always kept the current day's seventh in hand.
-      // Deliberately not the user's slider: that sets where *unattended* work stands down, and
+      // The user's slider joins the gate only when it LOOSENS it (#1490): raising the limit must
+      // unblock the runs the Usage bar says have room — the bar and this gate disagreeing is the
+      // exact thing #960 forbids — but lowering it sets where *unattended* work stands down, and
       // holding it back must never tighten the gate on work the user asked for.
-      const status = quotaBoundaryStatus({ windows, now: now(), limitOffset: DEFAULT_SPEND_OFFSET, ...(opts.model ? { model: opts.model } : {}) })
+      const limitOffset = Math.max(DEFAULT_SPEND_OFFSET, userOffset)
+      const status = quotaBoundaryStatus({ windows, now: now(), limitOffset, ...(opts.model ? { model: opts.model } : {}) })
       return status?.reached?.label ?? null
     },
   }

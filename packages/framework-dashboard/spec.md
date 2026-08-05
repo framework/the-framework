@@ -1,26 +1,24 @@
-The Framework's web dashboard: a Vike SPA (React + Tailwind v4 + shadcn + Telefunc) that is a pure projection of the same `.the-framework` files the daemon writes — prerendered to a static shell the daemon serves, with all wire traffic (read-model RPCs + the live-event SSE Channel) going through Telefunc.
+The dashboard UI: a browser app served by the daemon that renders everything the daemon knows and steers sessions through it — holding no authoritative state of its own.
 
 ## TLDR
 
-- `pages/` — Vike tree: global config (`ssr:false`, `prerender:true`, `/logo.svg` favicon), IBM Plex fonts head, and the single catch-all page whose `+Page.tsx` is the entire app shell (the URL is the selection, #784).
-- `components/` — the React component library: shell rails, run/session views, settings, tickets, charts, and the shadcn-style `ui/` primitives (covered by its own specs).
-- `lib/` — client-side hooks and pure helpers: routing, live-event channel state, polling, preferences, notifications, run/status/labels formatting (covered by its own specs).
-- `server/` — telefunc shim files whose paths bake the RPC keys (`/server/<name>.telefunc.ts`); implementations live in `@gemstack/the-framework/dashboard-rpc` and the daemon serves them in-process.
-- `layouts/` — root layout (theme `.dark` toggling, ErrorBoundary) + `tailwind.css`, the Everforest token stylesheet shared in identity with the-framework.ai (#1118).
-- `hooks/` — `useControlledState`, the controlled/uncontrolled prop pattern.
-- `design/` — static design-gallery build (`pnpm design:build` → `design/out/**`, uploaded by DesignSync); real components rendered in both themes.
-- `public/` — `logo.svg` (favicon carrying its own dark ramp, #757) and `logo-animated.svg`.
-- Root: `vite.config.ts` (dev-daemon proxy + telefunc dev URL fix), `vitest.config.ts`/`vitest.setup.ts`/`test-utils.ts` (jsdom unit testing), `tsconfig.json` (`@/*` → package root).
+- Every read is a projection of state the daemon assembles (session logs, tickets, the queue, git and GitHub state, preferences); every write is a call into the daemon. The one exception is saved remote devices: their access tokens stay in this browser only, handed to the daemon per call.
+- The URL is the selection: the overview at `/`, a project at `/{projectId}`, one session at `/{projectId}/{sessionId}`, plus cross-project tickets, a per-ticket page and its plan page, and settings. A session is a link you can paste, reload, and bookmark — there is no selection state to disagree with the address bar.
+- A session's events stream live over one channel bound to that session's own log; everything else polls. A finished session reads from the archive instead, catching up whenever the live channel outgrew it.
+- Watch mode: opened against a shared relay link, the same app renders one session read-only.
 
-## Decisions
+## Flows
 
-- No custom HTTP endpoints: reads are Telefunc RPCs, the live feed is a Telefunc Channel tailing the selected project's `.the-framework/events.jsonl` — serialization, validation, and reconnect come from Telefunc.
-- Dashboard logic that needs the daemon lives in the framework package, not here; this package is UI plus key-pinning shims, which is why it builds to static files the daemon can serve with no Vike runtime.
-- Started as the #405/#406 de-risking spike side-by-side with the old `page.ts` MVP dashboard; the README still frames it that way.
+**The overview** is ordered by what governs what: the quota bar first (a week-track with pace and projection — the one figure that decides what agents may do next), then everything that needs *you* — the open-questions hub, every session's unanswered question across all projects, answerable right there in one scrolling view — then the agents working now, the full AI queue of every project (uncollapsed: a plan you cannot read is not a plan), routine work, and the hottest tickets. An onboarding checklist sits on top until dismissed; each step's "done" is derived from a real fact (a registered project, a ticket on disk, a granted permission, stored credentials), so a step cannot be ticked by clicking it and work done outside the dashboard shows up ticked anyway.
 
-## Facts
+**The composer** starts and steers sessions. Typing a prompt starts an attended build session; picking a preset starts an unattended one. In-editor triggers pull in presets and actions, files, projects, and macro tags; option menus write straight to the user's or project's preferences. Pre-flight checks warn before the session is spent — a missing or logged-out GitHub CLI, a repo that can't auto-merge. Inside a session, the composer is the session control: a live session takes messages (options are baked at spawn and hidden), a stopped one offers to resume with reduced options, and the submit slot doubles as Stop while the agent works.
 
-- Package `@gemstack/framework-dashboard`, private, ESM, Node >= 22.12; depends on `@gemstack/the-framework` (workspace) for types, the registry, and `dashboard-rpc`.
-- Scripts: `dev` (pure UI harness on port 4300 — starting runs is disabled, prefs unpersisted), `dev:daemon` (`FRAMEWORK_DEV_DAEMON=1`: boots/reuses the real daemon and proxies `/_telefunc` to it), `build` (prerendered static bundle), `design:build`, `test` (vitest), `typecheck`.
-- Theming is the `.dark` class toggled by the layout from a Telefunc-loaded preference — not the OS media query; the token vocabulary (incl. exactly four status colors) lives in `layouts/tailwind.css`.
-- Notable stack pieces: Base UI + shadcn-style primitives, tiptap (prompt editor, #470), lucide icons, motion.
+**The session view** is a transcript with the controls inline: the agent's questions render as answerable cards exactly where they happened (resolved ones collapse to a checkmark), and the session's live browser screencast renders inline too, degrading to a last still when the session ends. Around the transcript: changed files with diffs, git status, the handoff panel (push, open PR, merge), agent-authored views, docs, and history rails, and an actions menu (stop, serve/preview, open in editor or on GitHub, remove worktree, delete session, copy a resume command, copy a shareable watch link).
+
+**Tickets** are the roadmap surface: a cross-project list with client-side faceted filtering (text, priority/effort/uncertainty buckets or ranges, topics, planning stage, project), sorting, and a group-by-project toggle — the whole view mirrored to the URL so it can be shared. Each ticket row leads with a start button that spins up an unattended agent implementing that one ticket, and shows whether a plan exists: a link to a page rendering the plan when it does, a button that starts a session to write one when it doesn't. Queueing a ticket into the AI queue happens from the ticket's own page.
+
+**Settings** covers appearance, agent and model defaults, run options, saved devices, eco mode, notification channels, automation (the idle sweep and the spend slider), and the cloud-session bridge token.
+
+## Before modifying this file
+
+Read this file's format at https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

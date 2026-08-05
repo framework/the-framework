@@ -1,14 +1,11 @@
-`@gemstack/ai-mcp` — the bridge between `@gemstack/ai-sdk` Agents and Model Context Protocol servers, in both directions: consume a remote MCP server's tools as Agent tools, or expose an Agent as an MCP server.
+The bridge between agents and the Model Context Protocol, in both directions: consume a remote MCP server's tools as agent tools, or expose an agent as an MCP server.
 
 ## TLDR
 
-- `src/` — the whole implementation: `mcpClientTools` (client direction), `mcpServerFromAgent` (server direction), shared types, tests.
-- `package.json` — v0.1.4, single `.` export from `dist/`; depends on `@gemstack/ai-sdk` + `zod`; `@modelcontextprotocol/sdk` is an *optional* peer (devDep for tests); Node >= 22.12.
-- `README.md` — usage, options tables, and the "which MCP package do I use?" disambiguation (this = agent bridge; authoring servers from scratch = a standalone MCP framework).
-- `CHANGELOG.md` — history incl. the live-streaming fix, connect-leak fix, and sync-return fix (mined into the src specs).
-- `tsconfig.json` / `tsconfig.build.json` / `tsconfig.test.json` — typecheck / build-to-`dist` / compile-tests-to-`dist-test` configs; `npm test` compiles then runs `node --test` inside `dist-test`.
+- Consuming: point it at a server — a URL, a command to spawn, or a client you already hold — and its tools become agent tools, schemas passed through untouched. It owns the connection's lifecycle only when it created it. A remote tool's progress streams into the agent's own update channel by default, so long tool calls narrate instead of going quiet.
+- Exposing: an agent becomes an MCP server as one tool per agent tool, as one tool that runs the whole agent per call, or both. A tool that can only be resolved by a human in a browser cannot be exposed — a remote MCP caller has no browser to hand it to.
+- The whole package exists so that agent applications that never touch MCP never pay for it: the protocol dependency is optional and loaded only on use. Authoring a full MCP server from scratch is the sibling `mcp` package's job — this one is only the bridge to and from an agent.
 
-## Decisions
+## Before modifying this file
 
-- Carved out of `@gemstack/ai-sdk`'s former `./mcp` subpath so the optional `@modelcontextprotocol/sdk` dependency is declared only by the package that actually needs it; the SDK is only ever loaded via dynamic `import()`.
-- This package is the *agent bridge* axis only — it depends on `@gemstack/ai-sdk` and is useless without an Agent; hand-authored MCP servers belong to `@gemstack/mcp` instead. Both "produce an MCP server", from different inputs, by design.
+Read this file's format at https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -1,24 +1,22 @@
-The driver seam: the one abstraction The Framework wraps a coding-agent CLI behind (prompt it, let its own loop run, read the code, gate on the outcome), plus its five implementations.
+The driver seam: the one abstraction a coding agent is wrapped behind, so the whole product works the same whether the work happens in a local Claude Code or Codex process, a Claude cloud session, a GitHub Actions job, or a deterministic fake.
 
 ## TLDR
 
-- `types.ts` — the contract: `Driver` / `DriverSession` / options, `DriverTurn`, `DriverEvent`, usage/rate-limit/quota telemetry types.
-- `claude-code.ts` — the first real driver (`claude -p --output-format stream-json`), with resume (#714/#720/#778), per-session MCP config (#452), and the `StreamJsonParser`.
-- `codex.ts` — the second real driver (#539): `codex exec --json` on the user's ChatGPT subscription; `CodexJsonParser` + usage mapping.
-- `actions.ts` — runs turns as GitHub Actions workflow dispatches (#610), replaying the uploaded transcript; `actions-zip.ts` is its minimal artifact-zip reader.
-- `cloud.ts` — one-shot hand-off to Claude Code on the web via `claude --cloud` under a pty (`handsOff: true`, #1225).
-- `fake.ts` — deterministic in-memory driver for `--fake` and tests.
-- `agent-cli.ts` — shared process core (detached spawn, stdin prompt, line-parser, kill/abort/exit handling); `child-registry.ts` — process-group kill registry against orphaned agent subtrees; `session-support.ts` — shared emit/signal/framing/readCode helpers; `claude-code-quota.ts` — `/usage` quota read + parse (#521).
-- `index.ts` — barrel.
+- A driver can start a session, prompt it turn by turn, read the resulting code, report the account's quota, and dispose. That is the entire contract — deliberately *the code and the outcome*, never the agent's inner workings. Tool calls surface only as named actions for the watching human; their arguments are never seen and never branched on.
+- Each turn runs to completion as a black box. A turn whose process exits abnormally fails, even if it streamed plausible text first — the product gates on outcomes, so a crash mid-work must not pass as a result.
+- The agent's session id is captured from the first thing it says, not from the end of the turn, so a stopped or killed turn cannot take the resume handle with it. A resume that fails because the agent forgot the session silently reruns as a fresh conversation, with a notice, rather than losing the message the user already sent.
+- Every child process is its own process group and a registry kills whole groups, so an interrupted session cannot orphan a tree of helpers; a graceful stop escalates to a hard kill only after a grace period.
 
-## Decisions
+## Flows
 
-- Black box guardrail (#165): the seam is the code and the outcome, never the agent's tool calls; events are forwarded for dashboard visibility only. Single execution path (#166 option A): personas are prompt-framing, each loop pass a fresh `prompt`.
-- Every driver keeps the user's own subscription auth (#495) — no API keys of ours anywhere.
-- Local CLIs get the prompt over stdin; remote targets (Actions, cloud) get framing prepended to the prompt and pass values through inputs/env vars vetted to safe charsets, so user text never reaches a shell as syntax.
-- Optional capabilities (`readQuota`, `readCode`, `handsOff`, resume) are omitted rather than stubbed by drivers that can't provide them.
+**Local agents.** Claude Code runs with edits auto-accepted by default; skipping its permission system entirely is an explicit opt-in. Codex runs inside its own workspace-write sandbox and the bypass flag is never passed. Extra MCP servers (e.g. the browser tools) are merged alongside the user's own, never replacing them.
 
-## Facts
+**Hands-off targets.** A cloud session is handed the task once — exactly once per session, so one run can never fan out into several cloud sessions racing on one repo — and the run ends with the link: there is nothing to read back, and the driver flags itself hands-off so later phases don't mistake its own summary for the agent's answer. A GitHub Actions run is dispatched, polled, and read back from the transcript the workflow uploads; continuity between turns is the branch the previous turn pushed plus the carried session id. It requires a real user's token — the action refuses bot-triggered agent runs.
 
-- All real drivers reuse `runAgentCli`/`session-support` rather than copying process plumbing; parsers are separate classes so the dialects are unit-testable without processes.
-- Session ids mix a per-process counter with a random tag where cross-process uniqueness is load-bearing (actions, cloud), since the daemon spawns a fresh process per run.
+**Quota and cost.** Drivers that can, report the account's quota window (read via the agent's own usage command, and cheaply between turns from the rate-limit telemetry the stream already carries). A failed read is classified: a transient failure (network, timeout) leaves the last good reading in force, while "the agent isn't installed / has no subscription" invalidates it. A driver that cannot price turns reports cost as unknown — never zero — so the budget cap simply cannot fire rather than counting everything as free.
+
+**The fake.** A scripted, offline driver that exercises every path deterministically — the product's whole lifecycle is testable without spending a token.
+
+## Before modifying this file
+
+Read this file's format at https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

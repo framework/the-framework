@@ -1,5 +1,4 @@
-Status: open
-Priority: 5
+Priority: 7
 Topics: [enhancement, the-framework]
 GitHub: [#1132](https://github.com/gemstack-land/the-framework/issues/1132)
 
@@ -15,7 +14,7 @@ Interrupt-and-steer is a core agent-control affordance: redirecting an agent mid
 
 ## Source
 
-Imported from GitHub issue [gemstack-land/the-framework#1132](https://github.com/gemstack-land/the-framework/issues/1132), created 2026-07-24, labels: `enhancement`, `priority: medium`, `the-framework ♻️`, 2 comments.
+Imported from GitHub issue [gemstack-land/the-framework#1132](https://github.com/gemstack-land/the-framework/issues/1132), created 2026-07-24, labels: `enhancement`, `priority: high`, `priority: medium`, `the-framework ♻️`, 5 comments.
 
 ### Original description
 
@@ -53,4 +52,5 @@ Each turn runs as a one-shot `claude -p --output-format stream-json` invocation,
 ### Notes from the GitHub thread
 
 - Spike result: the installed CLI already supports everything asked (verified on 2.1.219, no Agent SDK needed). One persistent `claude -p --input-format stream-json --output-format stream-json --replay-user-messages` process: a long task was sent, interrupted mid-turn (`{"type":"control_request","request":{"subtype":"interrupt"}}` on stdin, acknowledged with `{"subtype":"success","still_queued":[]}`), and a second message was answered on the same process — steer-in-place works; the interrupted turn ends with `subtype=error_during_execution`.
-- Maintainer (2026-07-28): "How does Traycer do it?" — open research question: study how Traycer implements interrupt/steer before settling the driver design.
+- Traycer research (2026-07-30): it doesn't interrupt — it avoids needing to. Traycer is an orchestration layer that splits an objective into phases handed to existing agents (spawned as subprocesses, like our `claude -p`), steers at phase boundaries, and runs a verify pass per phase; any mid-turn interrupt behaviour is inherited from the underlying agent. That phase-plus-verify strategy is the opposite of our black-box stance (#1373), so this issue stays on the first strategy: genuinely interrupt the turn (the spike showed the installed CLI already supports it).
+- Maintainer direction (2026-07-30): ideally TF behaves like CC CLI/web — you can send messages while the agent is working (nice but post-MVP-able); in general keep TF as much as possible a "transparent"/thin layer on top of CC CLI/web. Also worth borrowing as much as possible from Traycer's implementations — they have lots of experience.

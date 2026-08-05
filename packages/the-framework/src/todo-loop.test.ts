@@ -58,42 +58,35 @@ test('the #880 priority sections need no parser support: headings are skipped, s
   ])
 })
 
-test('findTodoBacklog reads the flat backlog and falls back to a flat TODO.md', async () => {
+test('findTodoBacklog reads the flat backlog from the root TODO_AGENTS.md (#682)', async () => {
   const cwd = await tmpWorkspace()
   try {
     assert.equal(await findTodoBacklog(cwd), undefined) // nothing yet
 
-    await writeFile(join(cwd, 'TODO.md'), '- flat entry\n')
-    assert.equal((await findTodoBacklog(cwd))?.name, 'TODO.md')
-
-    // A fully checked-off backlog is no backlog.
-    await writeFile(join(cwd, 'TODO.md'), '- [x] all done\n')
-    assert.equal(await findTodoBacklog(cwd), undefined)
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('findTodoBacklog reads the flat backlog from the root TODO_AGENTS.md (#682)', async () => {
-  const cwd = await tmpWorkspace()
-  try {
     await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] roadmap entry\n')
     assert.deepEqual(await findTodoBacklog(cwd), { name: 'TODO_AGENTS.md', entries: ['roadmap entry'] })
 
     // The retired session-scoped backlog (#1369) is ignored, even when it has open entries.
     await writeFile(join(cwd, 'TODO_feat-x.agent.md'), '- [ ] scoped entry\n')
     assert.equal((await findTodoBacklog(cwd))?.name, 'TODO_AGENTS.md')
+
+    // A fully checked-off backlog is no backlog.
+    await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [x] all done\n')
+    assert.equal(await findTodoBacklog(cwd), undefined)
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
 })
 
-test('findTodoBacklog still reads a legacy tickets/TODO.md backlog (#682 fallback)', async () => {
+test('findTodoBacklog no longer reads the retired backlog locations', async () => {
+  // One convention, one location: the pre-#682 spellings went with the 0-users compat cut.
   const cwd = await tmpWorkspace()
   try {
+    await writeFile(join(cwd, 'TODO.md'), '- [ ] old root entry\n')
+    await writeFile(join(cwd, 'TODO-AGENTS.md'), '- [ ] hyphen entry\n')
     await mkdir(join(cwd, 'tickets'))
-    await writeFile(join(cwd, 'tickets/TODO.md'), '- [ ] roadmap entry\n')
-    assert.deepEqual(await findTodoBacklog(cwd), { name: 'tickets/TODO.md', entries: ['roadmap entry'] })
+    await writeFile(join(cwd, 'tickets/TODO.md'), '- [ ] tickets entry\n')
+    assert.equal(await findTodoBacklog(cwd), undefined)
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
@@ -164,7 +157,7 @@ test('runTodoLoop returns empty without a backlog and emits nothing', async () =
 
 test('an interactive loop gates before each entry; picking stop ends it (#323)', async () => {
   const cwd = await tmpWorkspace()
-  const file = join(cwd, 'TODO.md')
+  const file = join(cwd, 'TODO_AGENTS.md')
   await writeFile(file, '- [ ] task a\n- [ ] task b\n')
   try {
     const events: FrameworkEvent[] = []
@@ -183,7 +176,7 @@ test('an interactive loop gates before each entry; picking stop ends it (#323)',
     const session = await driver.start({ cwd })
     const result = await runTodoLoop({ session, cwd, emit: e => events.push(e), requestChoice })
 
-    assert.deepEqual(result, { completed: 1, reason: 'stopped', file: 'TODO.md' })
+    assert.deepEqual(result, { completed: 1, reason: 'stopped', file: 'TODO_AGENTS.md' })
     assert.equal(gates.length, 2)
     assert.equal(gates[0]!.id, 'todo-next')
     assert.equal(gates[1]!.id, 'todo-next-1')
@@ -197,13 +190,13 @@ test('an interactive loop gates before each entry; picking stop ends it (#323)',
 
 test('runTodoLoop stops after two items with no progress instead of spinning', async () => {
   const cwd = await tmpWorkspace()
-  await writeFile(join(cwd, 'TODO.md'), '- [ ] stubborn task\n')
+  await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] stubborn task\n')
   try {
     const events: FrameworkEvent[] = []
     // The agent never touches the file, so the next entry never changes.
     const session = await new FakeDriver({ respond: () => 'did nothing' }).start({ cwd })
     const result = await runTodoLoop({ session, cwd, emit: e => events.push(e) })
-    assert.deepEqual(result, { completed: 2, reason: 'stalled', file: 'TODO.md' })
+    assert.deepEqual(result, { completed: 2, reason: 'stalled', file: 'TODO_AGENTS.md' })
     assert.ok(events.some(e => e.kind === 'log' && /no progress on "stubborn task"/.test(e.message)))
   } finally {
     await rm(cwd, { recursive: true, force: true })
@@ -212,7 +205,7 @@ test('runTodoLoop stops after two items with no progress instead of spinning', a
 
 test('appended follow-up entries do not count as a stall (Maintenance pattern)', async () => {
   const cwd = await tmpWorkspace()
-  const file = join(cwd, 'TODO.md')
+  const file = join(cwd, 'TODO_AGENTS.md')
   await writeFile(file, '- [ ] task a\n')
   try {
     let turn = 0
@@ -225,7 +218,7 @@ test('appended follow-up entries do not count as a stall (Maintenance pattern)',
       },
     }).start({ cwd })
     const result = await runTodoLoop({ session, cwd, emit: () => {} })
-    assert.deepEqual(result, { completed: 2, reason: 'empty', file: 'TODO.md' })
+    assert.deepEqual(result, { completed: 2, reason: 'empty', file: 'TODO_AGENTS.md' })
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
@@ -233,7 +226,7 @@ test('appended follow-up entries do not count as a stall (Maintenance pattern)',
 
 test('runTodoLoop honors the item cap and reports what is left', async () => {
   const cwd = await tmpWorkspace()
-  const file = join(cwd, 'TODO.md')
+  const file = join(cwd, 'TODO_AGENTS.md')
   await writeFile(file, '- [ ] a\n- [ ] b\n- [ ] c\n')
   try {
     let turn = 0
@@ -246,7 +239,7 @@ test('runTodoLoop honors the item cap and reports what is left', async () => {
       },
     }).start({ cwd })
     const result = await runTodoLoop({ session, cwd, emit: e => events.push(e), maxItems: 2 })
-    assert.deepEqual(result, { completed: 2, reason: 'max-items', file: 'TODO.md' })
+    assert.deepEqual(result, { completed: 2, reason: 'max-items', file: 'TODO_AGENTS.md' })
     assert.ok(events.some(e => e.kind === 'log' && /2-item cap.*1 item\(s\) left/.test(e.message)))
   } finally {
     await rm(cwd, { recursive: true, force: true })
@@ -255,7 +248,7 @@ test('runTodoLoop honors the item cap and reports what is left', async () => {
 
 test('an item turn that stops to ask is gated and resumed like any await gate (#337)', async () => {
   const cwd = await tmpWorkspace()
-  const file = join(cwd, 'TODO.md')
+  const file = join(cwd, 'TODO_AGENTS.md')
   await writeFile(file, '- [ ] pick a database\n')
   const gateTurn = [
     'Which database?',
@@ -278,7 +271,7 @@ test('an item turn that stops to ask is gated and resumed like any await gate (#
       Promise.resolve({ picked: req.id.startsWith('todo-next') ? 'proceed' : 'opt:1', by: 'user' })
     const result = await runTodoLoop({ session, cwd, emit: e => events.push(e), requestChoice })
 
-    assert.deepEqual(result, { completed: 1, reason: 'empty', file: 'TODO.md' })
+    assert.deepEqual(result, { completed: 1, reason: 'empty', file: 'TODO_AGENTS.md' })
     assert.equal(prompts.length, 2)
     assert.match(prompts[1]!, /The user chose: Postgres/)
     const ids = events.filter(e => e.kind === 'choice').map(e => (e as { id: string }).id)
@@ -290,7 +283,7 @@ test('an item turn that stops to ask is gated and resumed like any await gate (#
 
 test('an aborted signal ends the loop before starting another entry', async () => {
   const cwd = await tmpWorkspace()
-  await writeFile(join(cwd, 'TODO.md'), '- [ ] a\n')
+  await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] a\n')
   try {
     const controller = new AbortController()
     controller.abort()
@@ -500,7 +493,7 @@ test('ticketForPrompt names a ticket for a hand-fired drain, and for nothing els
     // Every other prompt implements whatever it likes; naming the queue's next entry for it would
     // put a ticket in the in-progress lane on the strength of an unrelated run.
     assert.equal(await ticketForPrompt('Work on the queue please', cwd), undefined)
-    assert.equal(await ticketForPrompt(presets.spikeAndPlan.render(), cwd), undefined)
+    assert.equal(await ticketForPrompt(presets.planTickets.render(), cwd), undefined)
     assert.equal(await ticketForPrompt('', cwd), undefined)
 
     // A read that throws is a lane label, not a run: it must never take the start down with it.

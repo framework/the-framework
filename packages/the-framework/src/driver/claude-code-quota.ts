@@ -107,7 +107,10 @@ export function readClaudeQuota(opts: ReadClaudeQuotaOptions = {}): Promise<Driv
     })
 
     let settled = false
-    const chunks: string[] = []
+    // Raw bytes, decoded once at the end: a per-chunk `String(chunk)` corrupts a multibyte
+    // UTF-8 codepoint split across two chunks (the readout's `·` is one), and a corrupted
+    // readout parses as 'unrecognized' instead of the real quota.
+    const chunks: Buffer[] = []
     const settle = (quota: DriverQuota) => {
       if (settled) return
       settled = true
@@ -130,7 +133,7 @@ export function readClaudeQuota(opts: ReadClaudeQuotaOptions = {}): Promise<Driv
       settle({ available: false, reason: 'timeout' })
     }, opts.timeoutMs ?? READ_TIMEOUT_MS)
 
-    child.stdout?.on('data', (chunk: Buffer | string) => chunks.push(String(chunk)))
+    child.stdout?.on('data', (chunk: Buffer | string) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)))
     // ENOENT lands here rather than as a non-zero exit.
     child.on('error', () => settle({ available: false, reason: 'agent-not-found' }))
     child.on('close', code => {
@@ -138,7 +141,7 @@ export function readClaudeQuota(opts: ReadClaudeQuotaOptions = {}): Promise<Driv
         settle({ available: false, reason: 'fetch-failed' })
         return
       }
-      settle(parseQuotaResponse(chunks.join('')))
+      settle(parseQuotaResponse(Buffer.concat(chunks).toString('utf8')))
     })
   })
 }

@@ -1,25 +1,25 @@
-The daemon-side dashboard backend: the HTTP server that hosts the prerendered SPA + Telefunc RPC surface, the read-only projections it serves (projects, runs, queue, tickets, git/PR state), the handoff and notification machinery, and the relay/bridge endpoints for remote runs and cloud sessions.
+The daemon's serving and projection layer: the HTTP host behind the dashboard, the read models it assembles from disk and git, the git handoff (push → PR → merge), and the notification watchers.
 
 ## TLDR
 
-- **Server & transport**: `server.ts` (HTTP host, routing, #1051 token guard), `telefunc-serve.ts` (Telefunc mount, `DashboardContext` seam, CSRF guard), `static.ts` + `content-type.ts` + `bundle.ts` (SPA bundle serving/locating), `types.ts` (the Start/Add/Preview RPC vocabulary leaf).
-- **Project & run projections**: `projects.ts` (registry → summaries, the `ProjectsProvider` seam per host), `overview.ts` (working-now/recents/hot-tickets), `dashboard.ts` (#471 landing-page rollup), `queue.ts` (cross-project TODO parse), `docs.ts` (surfaced PLAN/TODO docs), `tickets.ts` (the `tickets/` backlog reader), `quota.ts` (usage-panel view).
-- **Git/GitHub reads**: `gh.ts` (the one `gh` adapter + PR caches + run-PR attribution), `cache.ts` (stale-while-revalidate read-through cache, #1028), `git-status.ts`, `github.ts` (origin → github.com URL), `file-status.ts`, `file-diff.ts`, `file-read.ts` (confined per-file reads for hover cards).
-- **Handoff**: `run-handoff.ts` — what a finished session left on its branch, push/open-PR actions, and the #1102 armed auto-handoff.
-- **Notifications**: `keyed-watcher.ts` (baseline-diff poll engine), `interventions.ts` ("needs you": PRs / parked gates / unpushed work), `activity.ts` (started/finished feed), `keys.ts` (pure item identities shared with the browser), `discord-webhook.ts` (the one webhook transport).
-- **Remote & bridge**: `relay-endpoints.ts` + `remote-run.ts` (device-to-device run relay, #1067), `browser-proxy.ts` (run's MJPEG browser preview, #813), `bridge-endpoints.ts` + `bridge-store.ts` + `bridge-sessions.ts` (Claude-web extension bridge for cloud-session questions, #1237).
-- **Actions**: `open-in-app.ts` (reveal in file manager / open in editor, editor detection).
+- Everything the dashboard shows is assembled here from what is already on disk — session logs, tickets, the queue, git state, GitHub state. Reads are forgiving: whatever fails yields an empty result, never a crash at the view.
+- Serving is guarded by where the daemon is bound: on localhost, browser calls must come from the dashboard's own origin; on a reachable address, everything demands a shared token, because a daemon that spawns processes on an open port is remote code execution.
+- Expensive questions (GitHub ones cost hundreds of times a git read) go through a cache that asks once for all concurrent callers, serves the last good answer while refreshing, and answers "pending" — not "failed" — when a cold ask exceeds its time budget, so a caller that must not act on a half-answer can hold off. A failure never overwrites the last good value.
 
-## Decisions
+## Flows
 
-- Everything the UI shows is a pure projection of on-disk files (`run.json`, `runs/`, `LOGS.md`, `TODO_AGENTS.md`, `tickets/`) or of git/gh reads — the server holds no run state of its own; live events stream over the Telefunc Channel from `events.jsonl`, steering goes through `control.jsonl`.
-- One `DashboardOptions`/`DashboardContext` seam, three hosts: the daemon wires everything; the per-run foreground dashboard wires a single-project provider; the public relay wires an empty provider + in-memory events source so file/registry RPCs return nothing unauthenticated.
-- Readers are forgiving throughout: a project that is missing, not a repo, without remote, or without `gh` contributes nothing or degrades — never a throw into a panel or watcher.
-- Slow `gh` reads (~600ms) go through `cache.ts` and are allowed to arrive late (`pending`/`prPending`, #1028), so polls repaint on ~10ms git reads; write actions invalidate the relevant keys.
-- Auth is layered by route class: the #1051 cookie guard on non-loopback binds, same-origin CSRF on `/_telefunc`, the bridge's own bearer token (the one deliberately cross-origin route), and the relay riding the #1051 cookie daemon-to-daemon.
-- Handlers dispatched void must never throw (#938): an unhandled rejection kills the daemon, so parsers and static serving swallow malformed input into fallbacks.
+**The handoff.** When a session settles cleanly, decide whether it is empty (no commits, or only bookkeeping changes) — empty sessions are never published. Otherwise commit what the agent left uncommitted, push the branch, open the PR. No PR number is ever stored: every surface re-resolves the PR live from the session's recorded branch (falling back to the session-name and run-id branches), preferring an open PR and accepting a closed one only if it was created after the session started — so a reused routine branch can't wear an old merged PR.
 
-## Facts
+**Merging.** Arming and authorizing are separate: configuration arms auto-merge, and only the agent's ready-for-merge signal plus an empty session backlog authorizes it — an armed-but-unauthorized merge is recorded as withheld, with the reason. On a repo without native auto-merge the PR is handed to the CI watch to merge once checks pass, and the merge outcome lands on the session so every surface can say what happened.
 
-- Cross-file contracts: `keys.ts` item identities are the daemon's dedupe keys AND the browser's (shared via client.ts); `queue.ts`'s list-item rule must match the sweep's `parseTodoEntries` (#1296); `parseNumstat` in `file-diff.ts` is the one numstat parser (run-handoff.ts imports it); session branches live under `the-framework/` (`SESSION_BRANCH_PREFIX`).
-- `RunMeta.sessionId` joins cloud runs to bridge questions; `RunMeta.ticket` joins live runs to hot tickets (#1117).
+**Watchers.** Two Discord notification watchers — activity (sessions started and finished) and interventions (an open PR to review, a session parked on a question, a finished session whose commits were never pushed) — each remembering what it already announced, so only new items post. The first look only takes a baseline, and the cursor keeps advancing while notifications are off: turning them on starts from now instead of flushing a backlog. The open-questions hub gathers every parked question across all sessions, with its full options read back from each session's own log.
+
+**Remote devices.** The local daemon — never the browser — talks to a saved device's daemon: it starts the session there and streams the events back over the browser's normal same-origin channel; session-scoped calls are forwarded the same way, with the device side accepting only an allowlisted set (reads and steering — starting and deleting are deliberately not remotable this way). An unreachable device answers like any failed local read: empty.
+
+**The cloud-session bridge.** A browser extension inside the user's own claude.ai tab posts parked questions in; picked answers queue back out for the extension to type into the cloud composer. The payload is tiny and fully validated — no paths, no commands, no free text — so the worst a stolen token buys is a bogus question card.
+
+**The live browser.** The dashboard cannot reach a session's Chrome directly (wrong origin), so the daemon proxies the screencast and the clicks — and the session's port comes from the session's own record, never from the client, which is what keeps the proxy from being an open relay into anything else on the machine.
+
+## Before modifying this file
+
+Read this file's format at https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -232,6 +232,11 @@ export class CloudSession implements DriverSession {
       this.controllers.delete(controller)
     }
 
+    // A user abort (Stop, the run signal) also lands here with `found` unset — the pty run
+    // resolves once the controller aborts. Name it what it was, not "no cloud session was
+    // created", which is the CLI-failure message.
+    if (!found && (this.startOpts.signal?.aborted || opts.signal?.aborted))
+      throw new Error('[framework] claude-web prompt aborted')
     // The trust dialog is a one-time, per-root fix, so fail with that instead of the raw
     // dialog text — three identical "no cloud session was created" runs in a row is what
     // this looked like before the failure named its own cure.

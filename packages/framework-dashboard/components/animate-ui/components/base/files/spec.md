@@ -1,1 +1,0 @@
-The styled animate-ui file tree (`index.tsx`): Files/FolderItem/FolderTrigger/FolderPanel/FileItem with lucide icons, indent rules and a local `gitStatus` (untracked/modified/deleted) tint — the layer `FileTree.tsx` imports.

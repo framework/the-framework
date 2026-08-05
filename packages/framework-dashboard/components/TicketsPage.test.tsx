@@ -14,15 +14,16 @@ const ticket = (over: Record<string, unknown> = {}) => ({
   file: 't.md',
   title: 'Do the thing',
   summary: '',
-  status: 'open',
   date: '2026-01-01T00:00:00.000Z',
-  spiked: false,
   planned: false,
   ...over,
 })
 
 beforeEach(() => {
   onTicketsMeta.mockReset().mockResolvedValue({})
+  // The page reads its view from the URL on mount and mirrors changes back via replaceState, so
+  // every test starts from a clean address.
+  window.history.replaceState(null, '', '/tickets')
 })
 
 afterEach(cleanup)
@@ -75,44 +76,10 @@ describe('TicketsPage (#1144)', () => {
   })
 })
 
-// The status filter (#1144/#1230): Open checked, Closed unchecked, by default.
-describe('TicketsPage status filter (#1144/#1230)', () => {
-  test('shows only open tickets by default, hiding closed ones', async () => {
-    onAllTickets.mockResolvedValue([
-      { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ title: 'Open one' }), ticket({ file: 'c.md', title: 'Closed one', status: 'closed' })] },
-    ])
-    render(<TicketsPage onOpenTicket={() => {}} />)
-    expect(await screen.findByText('Open one')).toBeTruthy()
-    expect(screen.queryByText('Closed one')).toBeNull()
-    expect(screen.getByRole('checkbox', { name: /open/i }).getAttribute('data-checked')).not.toBeNull()
-    expect(screen.getByRole('checkbox', { name: /closed/i }).getAttribute('data-checked')).toBeNull()
-  })
-
-  test('ticking Closed reveals closed tickets alongside open ones', async () => {
-    onAllTickets.mockResolvedValue([
-      { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ title: 'Open one' }), ticket({ file: 'c.md', title: 'Closed one', status: 'closed' })] },
-    ])
-    render(<TicketsPage onOpenTicket={() => {}} />)
-    await screen.findByText('Open one')
-    fireEvent.click(screen.getByRole('checkbox', { name: /closed/i }))
-    expect(await screen.findByText('Closed one')).toBeTruthy()
-    expect(screen.getByText('Open one')).toBeTruthy()
-  })
-
-  test('unticking Open with Closed off leaves a project with tickets reading as filtered, not empty', async () => {
-    onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ title: 'Open one' })] }])
-    render(<TicketsPage onOpenTicket={() => {}} />)
-    await screen.findByText('Open one')
-    fireEvent.click(screen.getByRole('checkbox', { name: /open/i }))
-    expect(await screen.findByText(/hidden by the current filter/i)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /import tickets from github/i })).toBeNull()
-  })
-})
-
-// The sort dropdown (#1144/#1265): the server already hands back newest-first, so "Date" is a
-// no-op; "Priority" re-sorts client-side, ties falling back to that same newest-first order.
+// The sort menu (#1144/#1265): the server already hands back newest-first, so the default Date ↓
+// keeps its order; "Priority" re-sorts client-side, ties falling back to newest-first.
 describe('TicketsPage sort (#1144/#1265)', () => {
-  test('defaults to the server\'s date order', async () => {
+  const twoByPriority = () =>
     onAllTickets.mockResolvedValue([
       {
         projectId: 'p1',
@@ -123,29 +90,26 @@ describe('TicketsPage sort (#1144/#1265)', () => {
         ],
       },
     ])
+
+  test('defaults to the server\'s date order', async () => {
+    twoByPriority()
     render(<TicketsPage onOpenTicket={() => {}} />)
-    const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
+    await screen.findByText('Low priority')
+    const titles = screen.getAllByRole('button').map(b => b.textContent)
     // 'low.md' is first in the fixture, standing in for "whatever order the server sent" — the
     // default sort must not have reordered it.
     expect(titles.findIndex(t => t?.includes('Low priority'))).toBeLessThan(titles.findIndex(t => t?.includes('High priority')))
   })
 
-  test('sorting by priority puts the highest first, regardless of the server\'s order', async () => {
-    onAllTickets.mockResolvedValue([
-      {
-        projectId: 'p1',
-        projectName: 'Alpha',
-        tickets: [
-          ticket({ file: 'low.md', title: 'Low priority', priority: '2' }),
-          ticket({ file: 'high.md', title: 'High priority', priority: '9' }),
-        ],
-      },
-    ])
+  test('sorting by priority puts the highest first, and lands in the URL', async () => {
+    twoByPriority()
     render(<TicketsPage onOpenTicket={() => {}} />)
     await screen.findByText('Low priority')
-    fireEvent.change(screen.getByRole('combobox', { name: /sort by/i }), { target: { value: 'priority' } })
+    fireEvent.click(screen.getByRole('button', { name: /sort: date/i }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Priority' }))
     const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
     expect(titles.findIndex(t => t?.includes('High priority'))).toBeLessThan(titles.findIndex(t => t?.includes('Low priority')))
+    expect(window.location.search).toBe('?sort=priority')
   })
 
   test('a priority tie falls back to newest first, not an arbitrary order', async () => {
@@ -162,8 +126,129 @@ describe('TicketsPage sort (#1144/#1265)', () => {
     ])
     render(<TicketsPage onOpenTicket={() => {}} />)
     await screen.findByText('Newer')
-    fireEvent.change(screen.getByRole('combobox', { name: /sort by/i }), { target: { value: 'priority' } })
+    fireEvent.click(screen.getByRole('button', { name: /sort: date/i }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Priority' }))
     const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
     expect(titles.findIndex(t => t?.includes('Newer'))).toBeLessThan(titles.findIndex(t => t?.includes('Older')))
+  })
+})
+
+// The filters (#1144): search + facets, state mirrored to the URL so a filtered view is a link.
+describe('TicketsPage filters (#1144)', () => {
+  const fixture = () =>
+    onAllTickets.mockResolvedValue([
+      {
+        projectId: 'p1',
+        projectName: 'Alpha',
+        tickets: [
+          ticket({ file: 'lock.md', title: 'Improve the lock', topics: ['dx'], priority: '9' }),
+          ticket({ file: 'other.md', title: 'Something else', locked: true, lockedBy: 'agent-1' }),
+        ],
+      },
+    ])
+
+  test('searching narrows the rows and writes q= to the URL', async () => {
+    fixture()
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('Improve the lock')
+    // The shown/total tally sits beside the page title, full pool while unfiltered.
+    expect(screen.getByText('2/2')).toBeTruthy()
+    fireEvent.change(screen.getByRole('textbox', { name: /search tickets/i }), { target: { value: 'lock' } })
+    await waitFor(() => expect(screen.queryByText('Something else')).toBeNull())
+    expect(screen.getByText('Improve the lock')).toBeTruthy()
+    expect(screen.getByText('1/2')).toBeTruthy()
+    expect(window.location.search).toBe('?q=lock')
+  })
+
+  test('the URL is the initial state: mounting under ?q= starts filtered', async () => {
+    fixture()
+    window.history.replaceState(null, '', '/tickets?q=lock')
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    expect(await screen.findByText('Improve the lock')).toBeTruthy()
+    expect(screen.queryByText('Something else')).toBeNull()
+  })
+
+  test('clicking a row\'s topic badge adds that topic filter (#1144)', async () => {
+    fixture()
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('Improve the lock')
+    fireEvent.click(screen.getByRole('button', { name: 'dx' }))
+    await waitFor(() => expect(screen.queryByText('Something else')).toBeNull())
+    expect(window.location.search).toBe('?topics=dx')
+  })
+
+  test('clicking the claim marker narrows to claimed tickets', async () => {
+    fixture()
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('Something else')
+    fireEvent.click(screen.getByText('agent-1'))
+    await waitFor(() => expect(screen.queryByText('Improve the lock')).toBeNull())
+    expect(screen.getByText('Something else')).toBeTruthy()
+    expect(window.location.search).toBe('?stage=claimed')
+  })
+
+  test('a project filtered to nothing says so and clears from right there', async () => {
+    fixture()
+    window.history.replaceState(null, '', '/tickets?q=zzz-no-match')
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    expect(await screen.findByText(/2 tickets hidden by the current filters/i)).toBeTruthy()
+    // Not the import offer — these tickets exist, they are filtered (#1230's rule, kept).
+    expect(screen.queryByRole('button', { name: /import tickets from github/i })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /clear filters/i }))
+    expect(await screen.findByText('Improve the lock')).toBeTruthy()
+    expect(window.location.search).toBe('')
+  })
+})
+
+// Group by (#1144): project sections by default; a flat cross-project list on demand — the one
+// view that can answer "what is the single highest-priority ticket anywhere".
+describe('TicketsPage grouping (#1144)', () => {
+  test('group=none renders one flat list, rows tagged with their project, sorted across projects', async () => {
+    onAllTickets.mockResolvedValue([
+      { projectId: 'p1', projectName: 'Alpha', tickets: [ticket({ file: 'a.md', title: 'Alpha ticket', priority: '2' })] },
+      { projectId: 'p2', projectName: 'Beta', tickets: [ticket({ file: 'b.md', title: 'Beta ticket', priority: '9' })] },
+    ])
+    window.history.replaceState(null, '', '/tickets?sort=priority&group=none')
+    render(<TicketsPage onOpenTicket={() => {}} />)
+    await screen.findByText('Beta ticket')
+    // Project names ride the rows now — there are no section headings to say them.
+    expect(screen.getByText('Alpha')).toBeTruthy()
+    expect(screen.getByText('Beta')).toBeTruthy()
+    // Cross-project priority order: Beta's 9 above Alpha's 2.
+    const titles = (await screen.findAllByRole('button')).map(b => b.textContent)
+    expect(titles.findIndex(t => t?.includes('Beta ticket'))).toBeLessThan(titles.findIndex(t => t?.includes('Alpha ticket')))
+    // No per-project Update bars in the flat list.
+    expect(screen.queryByRole('button', { name: /update from github/i })).toBeNull()
+  })
+
+  test('opening a flat row still hands back its own project and file', async () => {
+    onAllTickets.mockResolvedValue([
+      { projectId: 'p2', projectName: 'Beta', tickets: [ticket({ file: 'b.md', title: 'Beta ticket' })] },
+    ])
+    window.history.replaceState(null, '', '/tickets?group=none')
+    const onOpenTicket = vi.fn()
+    render(<TicketsPage onOpenTicket={onOpenTicket} />)
+    fireEvent.click(await screen.findByText('Beta ticket'))
+    expect(onOpenTicket).toHaveBeenCalledWith('p2', 'b.md')
+  })
+
+  test("a flat row's start button spins up an agent in that row's own project (#1117)", async () => {
+    onAllTickets.mockResolvedValue([
+      { projectId: 'p2', projectName: 'Beta', tickets: [ticket({ file: 'b.md', title: 'Beta ticket' })] },
+    ])
+    window.history.replaceState(null, '', '/tickets?group=none')
+    const { sendStart } = await import('../server/control.telefunc.js')
+    vi.mocked(sendStart).mockResolvedValue({ ok: true, runId: 'r9' })
+    const onRunStarted = vi.fn()
+    render(<TicketsPage onOpenTicket={() => {}} onRunStarted={onRunStarted} />)
+    fireEvent.click(await screen.findByRole('button', { name: /start work on beta ticket/i }))
+    // The row's own project, not a panel-bound one — the flat list carries one per row.
+    await waitFor(() =>
+      expect(sendStart).toHaveBeenCalledWith('p2', expect.stringContaining('tickets/b.md'), 'prompt', {
+        unattended: true,
+        ticket: 'tickets/b.md',
+      }),
+    )
+    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('p2', expect.any(String), 'r9'))
   })
 })

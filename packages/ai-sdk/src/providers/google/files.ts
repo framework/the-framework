@@ -37,9 +37,11 @@ export class GoogleFileAdapter implements FileAdapter {
 
   async list(): Promise<FileListResult> {
     const client = await this.getClient()
+    // The SDK answers with a Pager — async-iterable only; it has no `.files`
+    // array and no sync iterator.
     const response = await client.files.list()
     const files: FileUploadResult[] = []
-    for (const f of response.files ?? response ?? []) {
+    for await (const f of response) {
       files.push({
         id: f.name ?? f.uri,
         filename: f.displayName ?? f.name ?? '',

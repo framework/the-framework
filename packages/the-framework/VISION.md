@@ -20,7 +20,7 @@
     - Maintenance
     - Human readability
     - Security
-- Improved system prompt
+- Enhanced system prompt
   - No implicit decisions
   - No laziness
 

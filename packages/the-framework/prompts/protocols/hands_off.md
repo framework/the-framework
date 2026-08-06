@@ -14,7 +14,7 @@ The machine that started this run cannot publish for you either: nothing local s
 session's workspace, so work you do not land yourself does not exist to anyone. Before ending:
 - commit your work on your session branch and open a pull request for it
 - if the deliverable is analysis, a plan, or a decision, write it into committed files — a
-  result that lives only in this conversation, or in a gitignored file
+  result that lives only in this conversation, or in a gitignored file,
   reaches nobody
 - end without a pull request only when the task genuinely required no repository change, and
   say so explicitly in your final message

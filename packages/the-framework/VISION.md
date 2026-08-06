@@ -15,13 +15,15 @@
 - Improved system prompt
   - No implicit decisions
   - No laziness
+- Integrations
+  - GitHub tickets => agents can access tickets
+  - GitHub CI red => trigger agent
+  - Sentry red => trigger agent
+  - Cloudflare logs, prod error => triggers agent
+  - ...
 
 ## Features
 
-- Deployment integration
-  - GitHub CI red => trigger agent
-  - Sentry red => trigger agent
-  - Cloudflare logs
 - High-quality prompts & loops
   - Advanced planning
   - Market research

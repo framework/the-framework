@@ -3,10 +3,18 @@
 ## Foundational features
 
 - SDD
+  - SPEC.md
 - Memory
+  - MEM.md
 - Autonomous AI
-  - Quick-win & low-uncertainty
+  - Quick-win & low-uncertainty tickets
+  - Automatic bug fixing
+    - GitHub CI red
+    - Sentry red
+    - Production errors (e.g. Cloudflare logs)
   - Plan tickets (aka spike)
+    - Agents can access tickets
+    - Bonus: tickets dashboard
   - Refactoring
     - Bug fixing?
     - Maintenance
@@ -15,14 +23,8 @@
 - Improved system prompt
   - No implicit decisions
   - No laziness
-- Integrations
-  - GitHub tickets => agents can access tickets
-  - GitHub CI red => trigger agent
-  - Sentry red => trigger agent
-  - Cloudflare logs, prod error => triggers agent
-  - ...
 
-## Features
+## Niceties
 
 - High-quality prompts & loops
   - Advanced planning
@@ -35,8 +37,7 @@
   - Auto record team conversations
   - Auto create tickets from conversations
   - Directives
-- Niceties
-  - Swarm of local machines
+- Swarm of local machines
 
 # MVP
 
@@ -54,7 +55,20 @@
 
 # Candidates
 
-## Features
+## Foundational features
+
+- "Programs" => mix of skills/loops/on-going-work
+  - Codebase health
+    - Show a "health progress bar"?
+    - Dogfood on TF?
+    - Checks
+      - Code quality?
+        - Architecural split?
+        - Dead code elmination?
+        - Simplicity?
+      - Proper tests?
+
+## Niceties
 
 - `Auto`-model chooser (use cheap model to analyze prompt and select the right model)
 - 10x better better PR descriptions: one-sentence description, TLDR, problems, solutions, flows (business logic), details

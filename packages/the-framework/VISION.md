@@ -39,19 +39,6 @@
   - Directives
 - Swarm of local machines
 
-# MVP
-
-## MVP - YC
-
-- Fix blocking bugs
-- Dogfood TF
-- Showcase 20 quick-wins being worked concurrently (CC web) and autonomously
-
-## MVP - users
-
-- Fix major UX paper cuts
-- Make each feature opt-outable
-
 
 # Candidates
 
@@ -81,6 +68,20 @@
       - Let's break this prompt in two: one for maintainability (e.g. DRY), and a second one for readability (so that humans can easily read the code)
         - Try the readability prompt on brand-the-framework (it has lots of potential for top-down code structure refactoring)
     - Security audit (TODO: develop scurity audit prompt)
+
+
+# MVP
+
+## MVP - YC
+
+- Fix blocking bugs
+- Dogfood TF
+- Showcase 20 quick-wins being worked concurrently (CC web) and autonomously
+
+## MVP - users
+
+- Fix major UX paper cuts
+- Make each feature opt-outable
 
 
 # Postponed

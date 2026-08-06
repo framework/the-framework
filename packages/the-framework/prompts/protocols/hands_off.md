@@ -15,6 +15,6 @@ session's workspace, so work you do not land yourself does not exist to anyone. 
 - commit your work on your session branch and open a pull request for it
 - if the deliverable is analysis, a plan, or a decision, write it into committed files — a
   result that lives only in this conversation, or in a gitignored file
-  ANALYSIS_RESULT.md, reaches nobody
+  reaches nobody
 - end without a pull request only when the task genuinely required no repository change, and
   say so explicitly in your final message

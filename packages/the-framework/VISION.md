@@ -3,20 +3,21 @@
 ## Foundational features
 
 - SDD
-  - Replace BUSINESS_LOGIC.md with spec.md
-  - Mermaid
 - Memory
-- Autonomous
-  - Quick-win
-  - Consensual
+- Autonomous AI
+  - Quick-win & low-uncertainty
   - Plan tickets (aka spike)
-    - GitHub integration
   - Refactoring
+    - Bug fixing?
     - Maintenance
+    - Human readability
     - Security
 - Improved system prompt
   - No implicit decisions
   - No laziness
+
+## Features
+
 - Deployment integration
   - GitHub CI red => trigger agent
   - Sentry red => trigger agent
@@ -26,16 +27,14 @@
   - Market research
   - Bootstrap
   - ...
-
-## Features
-
 - Notifications
-- Swarm of local machines
 - Bring your own prompts
 - Discord bot
   - Auto record team conversations
   - Auto create tickets from conversations
   - Directives
+- Niceties
+  - Swarm of local machines
 
 # MVP
 

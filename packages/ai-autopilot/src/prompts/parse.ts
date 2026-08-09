@@ -1,4 +1,4 @@
-import { parseSkillManifest } from '@gemstack/ai-skills'
+import { parseSkillManifest } from '../util/skill-manifest.js'
 import type { Prompt } from './types.js'
 
 /** Thrown when a prompt bundle's metadata is malformed. */
@@ -19,7 +19,7 @@ function str(meta: Record<string, unknown>, key: string): string | undefined {
 /**
  * Parse a prompt bundle (a `SKILL.md`-shaped markdown file) into a {@link Prompt}.
  *
- * Reuses `@gemstack/ai-skills`' frontmatter parser, then reads the prompt-specific
+ * Reuses the shared `SKILL.md` frontmatter parser, then reads the prompt-specific
  * fields out of `metadata`: `title`, `loopId` (the dispatch id; defaults to the
  * manifest name), `passes` (positive integer, default 1), and `event`.
  */

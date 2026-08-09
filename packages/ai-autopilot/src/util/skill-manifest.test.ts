@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseSkillManifest, SkillManifestError } from './manifest.js'
+import { parseSkillManifest, SkillManifestError } from './skill-manifest.js'
 
 const VALID = `---
 name: refunds

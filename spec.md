@@ -5,7 +5,7 @@ Autonomous AI programming: humans make the important decisions while The Framewo
 - The product is a local daemon plus a dashboard. You register your repos, and from then on coding agents (Claude Code today, others behind the same seam) work on them in sessions: each session gets a throwaway copy of the repo, does its work, and hands the result off as a pull request. Your own checkout is never touched.
 - The human's job shrinks to decisions: answer the questions a session parks on, accept or reject proposed tickets, review PRs. Everything else — picking the next task, triaging, planning, fixing red CI, merging on green — the daemon does by itself when nobody is at the keyboard, as long as the account's quota allows it.
 - The coding agent is a black box: The Framework prompts it, lets it run a full turn, then reads the code and the turn's final message. It never micro-manages individual tool calls, and the agent keeps its own subscription login — The Framework adds orchestration, not another AI bill.
-- The product sits on a stack of engines that are also published on their own: an orchestration layer (scope → build → review loops until production-grade), an agent runtime (providers, tools, streaming), and skills.
+- The product sits on a stack of engines that are also published on their own: an orchestration layer (scope → build → review loops until production-grade) and an agent runtime (providers, tools, streaming).
 - The Framework develops itself: this repo's `tickets/` and `TODO_AGENTS.md` are its own roadmap and queue, worked by the very loops described here.
 
 ## How the pieces relate
@@ -16,17 +16,15 @@ graph TD
     dash["<b>framework-dashboard</b><br/>the UI — a pure projection of<br/>the files the daemon writes"]
     autopilot["<b>ai-autopilot</b><br/>orchestration: bootstrap spine,<br/>review loops, supervisor"]
     sdk["<b>ai-sdk</b><br/>agent runtime: providers,<br/>tools, streaming"]
-    skills["<b>ai-skills</b><br/>capability bundles"]
 
     dash --> product
     product --> autopilot
     autopilot --> sdk
-    skills --> sdk
 ```
 
-One family, one rule: the `ai-*` family depends on the agent runtime (`ai-sdk`); the arrows point one way and nothing depends "up".
+One family, one rule: `ai-autopilot` depends on the agent runtime (`ai-sdk`); the arrows point one way and nothing depends "up".
 
-The MCP layer (`mcp`, `ai-mcp`, `mcp-connectors` + connector-\*) was removed for now — it had no callers outside itself and was pure token overhead to keep around. It can come back as a package once something in the `ai-*` family actually needs it; see git history for the prior implementation.
+`ai-skills` and the MCP layer (`mcp`, `ai-mcp`, `mcp-connectors` + connector-\*) were removed for now — they had no callers outside themselves and were pure token overhead to keep around. `ai-autopilot`'s one real use of `ai-skills` (its `SKILL.md` frontmatter parser, for domain presets and prompt bundles) was inlined into `ai-autopilot/src/util/skill-manifest.ts` rather than kept as a whole extra package. Either can come back as a package once something actually needs the rest of its API; see git history for the prior implementation.
 
 ## Rules that shape everything
 

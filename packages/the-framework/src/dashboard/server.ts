@@ -302,7 +302,7 @@ const DAEMON_COOKIE = 'fw_daemon'
  * Channel, and the MJPEG `<img>` screencast alike (all same-origin), which a bearer header cannot
  * reach. Returns true to admit the request, false once it has answered (401 or the redirect).
  */
-export function authorizeDaemonRequest(req: IncomingMessage, res: ServerResponse, token: string): boolean {
+function authorizeDaemonRequest(req: IncomingMessage, res: ServerResponse, token: string): boolean {
   // Safe to re-parse: requestPathname already parsed this same url without throwing (#938).
   const url = new URL(req.url ?? '/', 'http://localhost')
   const queryToken = url.searchParams.get('token')

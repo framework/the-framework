@@ -475,7 +475,7 @@ function writeMetaFile(fs: StoreFs, path: string, meta: RunMeta): Promise<void> 
  * off a single `end` event, so a death that skipped it left the run's last question rendering
  * as answerable forever while its picks were read by nobody.
  */
-export function orphanEndEvent(): FrameworkEvent {
+function orphanEndEvent(): FrameworkEvent {
   return { kind: 'end', ok: false, stopped: true, detail: 'its process died without reporting an end' }
 }
 

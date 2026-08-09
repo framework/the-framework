@@ -121,7 +121,7 @@ export function runBranchFor(run: { id: string; branch?: string; sessionName?: s
 }
 
 /** What every branch a session creates for itself is named under. */
-export const SESSION_BRANCH_PREFIX = 'the-framework/'
+const SESSION_BRANCH_PREFIX = 'the-framework/'
 
 /**
  * The branch's PR as it applies to *this* run: the injected seam when the caller gave one, else
@@ -547,7 +547,7 @@ export interface HandoffIntent {
 }
 
 /** Both halves armed — the default a session starts from. */
-export const ARMED_HANDOFF: HandoffIntent = { push: true, pr: true }
+const ARMED_HANDOFF: HandoffIntent = { push: true, pr: true }
 
 /**
  * Whether an armed merge may actually run (#1363), and if not, why.

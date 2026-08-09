@@ -235,10 +235,10 @@ export function lastRunFailureDetail(eventsJsonl: string): string | undefined {
 export const MAX_TRANSIENT_RETRIES = 2
 
 /** The pause before a retry (#1281): long enough for a dropped connection to be worth re-trying. */
-export const TRANSIENT_RETRY_DELAY_MS = 15_000
+const TRANSIENT_RETRY_DELAY_MS = 15_000
 
 /** What the continued session is told (#1281), in the #923 resume prompt's shape. */
-export const RETRY_PROMPT =
+const RETRY_PROMPT =
   'This session died to a transient connection error, not because anyone asked it to stop. Look at what you had already done, then carry on from there and finish the work.'
 
 /**

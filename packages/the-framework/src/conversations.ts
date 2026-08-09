@@ -82,7 +82,7 @@ export function unescapeBody(text: string): string {
 }
 
 /** The one-time first line of a conversation file. */
-export function conversationHeader(runId: string): string {
+function conversationHeader(runId: string): string {
   return `# Conversation ${runId}\n`
 }
 

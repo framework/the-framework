@@ -39,7 +39,7 @@ export const INTENTS = {
 export const CHAT_INTENTS = INTENTS.guildMessages | INTENTS.directMessages | INTENTS.messageContent
 
 /** The default gateway endpoint. v10, JSON encoding (no `zlib-stream`, no `etf`). */
-export const GATEWAY_URL = 'wss://gateway.discord.gg/?v=10&encoding=json'
+const GATEWAY_URL = 'wss://gateway.discord.gg/?v=10&encoding=json'
 
 /**
  * The socket seam. Mirrors the slice of `WebSocket` this uses, so a test drives the protocol
@@ -68,8 +68,8 @@ export type IntervalFactory = (fn: () => void, ms: number) => Timer
 export type DelayFactory = (fn: () => void, ms: number) => Timer
 
 /** Reconnect backoff bounds. A failed connect must not become a tight loop against Discord. */
-export const RECONNECT_MS = 1_000
-export const RECONNECT_MAX_MS = 60_000
+const RECONNECT_MS = 1_000
+const RECONNECT_MAX_MS = 60_000
 
 /** One inbound chat message, narrowed to what routing needs. */
 export interface DiscordMessage {
@@ -103,7 +103,7 @@ export interface GatewayDeps {
 }
 
 /** A {@link SocketFactory} over the global `WebSocket` (node >= 22 ships one). */
-export function nodeSocketFactory(): SocketFactory {
+function nodeSocketFactory(): SocketFactory {
   return url => {
     const ws = new WebSocket(url)
     return {
@@ -117,7 +117,7 @@ export function nodeSocketFactory(): SocketFactory {
 }
 
 /** The default {@link IntervalFactory}: unref'd, so a heartbeat never keeps the daemon alive. */
-export function nodeIntervalFactory(): IntervalFactory {
+function nodeIntervalFactory(): IntervalFactory {
   return (fn, ms) => {
     const timer = setInterval(fn, ms)
     timer.unref?.()
@@ -126,7 +126,7 @@ export function nodeIntervalFactory(): IntervalFactory {
 }
 
 /** The default {@link DelayFactory}: unref'd, so a pending reconnect never keeps the daemon alive. */
-export function nodeDelayFactory(): DelayFactory {
+function nodeDelayFactory(): DelayFactory {
   return (fn, ms) => {
     const timer = setTimeout(fn, ms)
     timer.unref?.()

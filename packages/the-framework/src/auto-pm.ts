@@ -227,7 +227,7 @@ export interface PlanAssignment {
  * assignment is a snapshot, and a human may retire the entry between the sweep's read and the
  * run's own.
  */
-export function pinnedDrainJob(job: AutoPmJob, entry: string): AutoPmJob {
+function pinnedDrainJob(job: AutoPmJob, entry: string): AutoPmJob {
   return {
     ...job,
     entry,

@@ -69,7 +69,7 @@ export interface InterventionsDeps {
 }
 
 /** How many recent finished runs are inspected per project by default. */
-export const HANDOFF_LIMIT = 5
+const HANDOFF_LIMIT = 5
 
 /**
  * Build the cross-project interventions queue: every registered project's open PRs, plus any run

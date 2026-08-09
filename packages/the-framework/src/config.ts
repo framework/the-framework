@@ -47,7 +47,7 @@ export interface FrameworkFileConfig {
 export const FRAMEWORK_CONFIG_FILES = ['the-framework.yml', 'the-framework.yaml'] as const
 
 /** The string-valued config keys, parsed and copied across layers as-is. */
-export const STRING_CONFIG_KEYS = ['preset', 'event'] as const
+const STRING_CONFIG_KEYS = ['preset', 'event'] as const
 /**
  * The boolean-valued mode keys. This is the canonical mode list: parsing, the config-layer copy,
  * resolution, and the resolved-config summary all iterate it, so a new mode is added here once and

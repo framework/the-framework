@@ -221,7 +221,7 @@ async function runValidation(
  * agent loop produced. Mirrors the old `ConversableAgent.prompt`
  * persistence shape exactly so downstream stores see no behavioral change.
  */
-export function newMessagesFromTurn(input: string, response: AgentResponse): AiMessage[] {
+function newMessagesFromTurn(input: string, response: AgentResponse): AiMessage[] {
   const out: AiMessage[] = [{ role: 'user', content: input }]
   for (const step of response.steps) {
     out.push(step.message)

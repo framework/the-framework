@@ -18,69 +18,6 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
 
-  examples/autopilot-quickstart:
-    dependencies:
-      '@gemstack/ai-autopilot':
-        specifier: workspace:^
-        version: link:../../packages/ai-autopilot
-      '@gemstack/ai-sdk':
-        specifier: workspace:^
-        version: link:../../packages/ai-sdk
-      zod:
-        specifier: ^4.0.0
-        version: 4.4.3
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.43
-      tsx:
-        specifier: ^4.19.0
-        version: 4.22.4
-      typescript:
-        specifier: ^5.4.0
-        version: 5.9.3
-
-  examples/bootstrap-quickstart:
-    dependencies:
-      '@gemstack/ai-autopilot':
-        specifier: workspace:^
-        version: link:../../packages/ai-autopilot
-      '@gemstack/ai-sdk':
-        specifier: workspace:^
-        version: link:../../packages/ai-sdk
-      zod:
-        specifier: ^4.0.0
-        version: 4.4.3
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.43
-      tsx:
-        specifier: ^4.19.0
-        version: 4.22.4
-      typescript:
-        specifier: ^5.4.0
-        version: 5.9.3
-
-  examples/framework-demo:
-    dependencies:
-      '@gemstack/ai-autopilot':
-        specifier: workspace:^
-        version: link:../../packages/ai-autopilot
-      '@gemstack/the-framework':
-        specifier: workspace:^
-        version: link:../../packages/the-framework
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.43
-      tsx:
-        specifier: ^4.19.0
-        version: 4.22.4
-      typescript:
-        specifier: ^5.4.0
-        version: 5.9.3
-
   packages/ai-autopilot:
     dependencies:
       '@gemstack/ai-sdk':
@@ -99,9 +36,6 @@ importers:
       '@webcontainer/api':
         specifier: ^1.6.4
         version: 1.6.4
-      playwright-core:
-        specifier: ^1.49.0
-        version: 1.61.1
       typescript:
         specifier: ^5.4.0
         version: 5.9.3
@@ -2517,11 +2451,6 @@ packages:
   pkce-challenge@5.0.1:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
     engines: {node: '>=16.20.0'}
-
-  playwright-core@1.61.1:
-    resolution: {integrity: sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==}
-    engines: {node: '>=18'}
-    hasBin: true
 
   postcss@8.5.16:
     resolution: {integrity: sha512-vuwillviilfKZsg0VGj5R/YwwcHx4SLsIOI/7K6mQkWx+l5cUHTjj5g0AasTBcyXsbfTgrwsUNmVUb5xVwyPwg==}
@@ -5570,8 +5499,6 @@ snapshots:
 
   pkce-challenge@5.0.1:
     optional: true
-
-  playwright-core@1.61.1: {}
 
   postcss@8.5.16:
     dependencies:

@@ -18,7 +18,7 @@ export interface BridgeAnswer {
 }
 
 /** Most transcript entries kept per session, oldest dropped first. */
-export const MAX_SESSION_EVENTS = 300
+const MAX_SESSION_EVENTS = 300
 
 /**
  * The questions a Claude web session is parked on, keyed by its cloud session id (#1237).

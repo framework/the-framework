@@ -25,7 +25,7 @@ import type { PlanAssignment } from './auto-pm.js'
 // watching for dead agents is the user's job, with the dashboard button as the tool.
 
 /** The first line of a lock file: the claim, naming the agent that holds it. */
-export const TICKET_LOCK_PREFIX = 'CLAIMED:'
+const TICKET_LOCK_PREFIX = 'CLAIMED:'
 
 /** A ticket filename's lock sibling, e.g. `a.md` → `a.lock.md`, without the directory. */
 export function ticketLockName(ticket: string): string {

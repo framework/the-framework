@@ -93,7 +93,7 @@ export function validateToolArgs(
  * tool has no `toModelOutput` transform: pass through strings, JSON-encode
  * everything else.
  */
-export function defaultStringify(value: unknown): string {
+function defaultStringify(value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value)
 }
 

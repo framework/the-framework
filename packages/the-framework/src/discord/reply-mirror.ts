@@ -86,7 +86,7 @@ interface Mirrored extends RunBinding {
 }
 
 /** How often answers are checked for. A chat reply has to feel like a reply. */
-export const REPLY_POLL_MS = 3_000
+const REPLY_POLL_MS = 3_000
 
 /**
  * How many consecutive unresolvable polls release a binding (#941). Generous on purpose: a

@@ -325,7 +325,7 @@ export function fromAnthropicResponse(response: any): ProviderResponse {
  * `max_tokens`/`refusal` cases a truncated or refused answer reports a clean
  * `stop`, so a caller cannot tell a complete answer from a cut-off one.
  */
-export function mapAnthropicStopReason(reason: string | null | undefined): FinishReason {
+function mapAnthropicStopReason(reason: string | null | undefined): FinishReason {
   switch (reason) {
     case 'tool_use':   return 'tool_calls'
     case 'max_tokens': return 'length'

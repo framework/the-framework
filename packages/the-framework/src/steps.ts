@@ -76,7 +76,7 @@ export function extendPrompt(intent: string): string {
  * {@link improvePrompt} ("smallest changes / no unrelated features") would
  * wrongly discourage scaffolding (#182).
  */
-export function scaffoldPrompt(intent: string): string {
+function scaffoldPrompt(intent: string): string {
   return [
     `The workspace is empty — no app exists here yet. You must create the entire app now from scratch: ${intent}`,
     'This is a from-scratch build, not an edit: do not wait for existing code, and do',

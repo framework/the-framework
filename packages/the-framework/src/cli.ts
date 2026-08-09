@@ -835,7 +835,7 @@ export function runLogEntry(input: {
 }
 
 /** This run's own flags as the nearest config layer (#841). A flag left off says nothing. */
-export function flagConfigLayer(opts: RunConfigFlags): ConfigLayer {
+function flagConfigLayer(opts: RunConfigFlags): ConfigLayer {
   return {
     name: 'flag',
     values: {

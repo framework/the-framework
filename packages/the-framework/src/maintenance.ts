@@ -67,7 +67,7 @@ export interface MaintenanceFs {
 }
 
 /** A {@link MaintenanceFs} backed by `node:fs/promises`. See {@link nodeFs}. */
-export function nodeMaintenanceFs(): MaintenanceFs {
+function nodeMaintenanceFs(): MaintenanceFs {
   const { read, write, mkdir } = nodeFs()
   return { read, write, mkdir }
 }

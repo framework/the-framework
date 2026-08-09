@@ -1,6 +1,33 @@
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
-import type { ParsedSkill, SkillManifest } from './types.js'
+
+/**
+ * The parsed YAML frontmatter of a `SKILL.md`-shaped bundle (used here for
+ * domain presets, loops, and prompts — all share the same `SKILL.md` shape).
+ */
+export interface SkillManifest {
+  /** Unique name (kebab-case by convention). */
+  name: string
+  /** One-line summary. */
+  description: string
+  /** SPDX license id, optional. */
+  license?: string
+  /** Hints (package names / globs) the bundle applies to; free-form. */
+  appliesTo?: string[]
+  /** When to load this bundle (natural-language cue). */
+  trigger?: string
+  /** When NOT to load it (points at a sibling instead). */
+  skip?: string
+  /** Arbitrary author metadata; passed through untouched. */
+  metadata?: Record<string, unknown>
+}
+
+/** A `SKILL.md`-shaped document split into its validated manifest and its markdown body. */
+export interface ParsedSkill {
+  manifest: SkillManifest
+  /** The markdown instructions body (everything after the frontmatter). */
+  instructions: string
+}
 
 /**
  * Zod schema for `SKILL.md` frontmatter. Unknown keys are allowed and dropped
@@ -21,7 +48,7 @@ const manifestSchema = z.object({
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/
 
-/** Raised when a `SKILL.md` is missing frontmatter or fails validation. */
+/** Raised when a `SKILL.md`-shaped document is missing frontmatter or fails validation. */
 export class SkillManifestError extends Error {
   constructor(message: string, readonly source?: string) {
     super(message)
@@ -30,10 +57,11 @@ export class SkillManifestError extends Error {
 }
 
 /**
- * Parse a `SKILL.md` document into a validated {@link SkillManifest} and its
- * markdown instructions body.
+ * Parse a `SKILL.md`-shaped document into a validated {@link SkillManifest} and
+ * its markdown instructions body. Shared by domain presets, loops, and prompt
+ * bundles — they all reuse this same frontmatter format.
  *
- * @param markdown - the full `SKILL.md` file contents
+ * @param markdown - the full document contents
  * @param source - optional label (file path) used in error messages
  */
 export function parseSkillManifest(markdown: string, source?: string): ParsedSkill {

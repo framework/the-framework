@@ -49,7 +49,7 @@ export interface CustomPreset {
 
 /** The cap on saved custom presets, and the per-field lengths — enough for real prompts, bounded
  * so a hand-edited or hostile registry can't bloat the home file. */
-export const CUSTOM_PRESET_LIMITS = { count: 30, label: 80, prompt: 20_000 } as const
+const CUSTOM_PRESET_LIMITS = { count: 30, label: 80, prompt: 20_000 } as const
 
 export interface Preferences {
   autopilot?: boolean

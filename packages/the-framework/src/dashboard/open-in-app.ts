@@ -41,7 +41,7 @@ export type EditorProbe = (bin: string) => Promise<boolean>
  * An {@link EditorProbe} that looks each launcher up on the real PATH: an executable match in any
  * PATH dir (trying PATHEXT suffixes on Windows). Pure lookup, nothing is spawned.
  */
-export function nodeEditorProbe(env: NodeJS.ProcessEnv = process.env, os: NodeJS.Platform = platform()): EditorProbe {
+function nodeEditorProbe(env: NodeJS.ProcessEnv = process.env, os: NodeJS.Platform = platform()): EditorProbe {
   const dirs = (env.PATH ?? '').split(delimiter).filter(Boolean)
   const exts = os === 'win32' ? (env.PATHEXT ?? '.EXE;.CMD;.BAT;.COM').split(';').filter(Boolean) : ['']
   return async bin => {
@@ -78,7 +78,7 @@ export type SpawnRunner = (command: string, args: string[]) => Promise<void>
  * long-lived editor (or `explorer`, which exits non-zero even on success) does not block or
  * error; rejects on the `error` event (e.g. ENOENT when the command is not on PATH).
  */
-export function nodeSpawnRunner(): SpawnRunner {
+function nodeSpawnRunner(): SpawnRunner {
   return (command, args) =>
     new Promise((resolve, reject) => {
       void import('node:child_process').then(({ spawn }) => {

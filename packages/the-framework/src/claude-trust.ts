@@ -17,7 +17,7 @@ import { join } from 'node:path'
  */
 
 /** Where the Claude Code CLI records per-directory trust. */
-export function claudeConfigPath(home: string = homedir()): string {
+function claudeConfigPath(home: string = homedir()): string {
   return join(home, '.claude.json')
 }
 

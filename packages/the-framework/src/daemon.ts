@@ -69,7 +69,7 @@ export interface DaemonState {
 }
 
 /** The `.the-framework/` directory for a workspace. */
-export function daemonDir(cwd: string): string {
+function daemonDir(cwd: string): string {
   return join(cwd, FRAMEWORK_DIR)
 }
 

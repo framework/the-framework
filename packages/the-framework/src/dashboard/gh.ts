@@ -416,7 +416,7 @@ export interface OpenPrFilePatch {
  * queue file deeper than that simply contributes no claim, which is today's behavior anyway.
  * Resolves `[]` when gh is missing/unauthed.
  */
-export async function ghOpenPrFilePatches(cwd: string, file: string, prs?: OpenPr[]): Promise<OpenPrFilePatch[]> {
+async function ghOpenPrFilePatches(cwd: string, file: string, prs?: OpenPr[]): Promise<OpenPrFilePatch[]> {
   const open = prs ?? (await ghPrList(cwd))
   const patches: OpenPrFilePatch[] = []
   for (const pr of open) {

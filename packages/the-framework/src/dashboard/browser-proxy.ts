@@ -60,7 +60,7 @@ export type BrowserPortLookup = (projectId: string, runId: string) => Promise<nu
  * The real lookup: the port the run recorded on its own meta. A run with no browser, a finished
  * run, or an unknown id all read as undefined, which the caller turns into a 404.
  */
-export const defaultBrowserPortLookup: BrowserPortLookup = async (projectId, runId) => {
+const defaultBrowserPortLookup: BrowserPortLookup = async (projectId, runId) => {
   const cwd = await defaultProjectsProvider().resolvePath(projectId)
   if (!cwd) return undefined
   const live = await readLiveMetas(cwd).catch(() => [])

@@ -43,7 +43,7 @@ export type QueuePromotion =
     }
 
 /** The commit message a promotion writes. Names the run so the history says where it came from. */
-export function promotionMessage(runId: string): string {
+function promotionMessage(runId: string): string {
   return `[The Framework] queue updates from ${runId}`
 }
 

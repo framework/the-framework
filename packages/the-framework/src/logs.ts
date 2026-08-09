@@ -69,13 +69,13 @@ const SEP = ' · '
  * newline spills the rest of the prompt into the file, where a `## ` line forges an entry and a
  * `- status: ` line rewrites one. Reversed by {@link decodeField}.
  */
-export function encodeField(value: string): string {
+function encodeField(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/\r\n|\r|\n/g, '\\n')
 }
 
 /** Reverse {@link encodeField}. Entries written before #897 are unescaped, so a literal `\n` in
  * one of them decodes to a newline; harmless next to reading the rest of the prompt as entries. */
-export function decodeField(value: string): string {
+function decodeField(value: string): string {
   return value.replace(/\\(\\|n)/g, (_, char) => (char === 'n' ? '\n' : '\\'))
 }
 

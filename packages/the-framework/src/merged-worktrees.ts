@@ -147,7 +147,7 @@ export async function removeMergedWorktrees(cwd: string, deps: MergedSweepDeps =
  * the sweep costs — a `gh pr view` per retained worktree, behind a 60s cache — so a minute-poll
  * would spend an order of magnitude more `gh` on an answer that changes a few times a day.
  */
-export const DEFAULT_MERGED_SWEEP_INTERVAL_MS = 10 * 60 * 1000
+const DEFAULT_MERGED_SWEEP_INTERVAL_MS = 10 * 60 * 1000
 
 /** A running sweep, in the shape the daemon's other background services use. */
 export interface MergedWorktreeSweep {

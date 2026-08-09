@@ -21,7 +21,7 @@ import type { Cached } from './dashboard/cache.js'
 // feed the same handlers from a webhook receiver and only the trigger changes.
 
 /** How long between sweeps: the ~1 min CI latency agreed on #1418. */
-export const DEFAULT_CI_WATCH_INTERVAL_MS = 60 * 1000
+const DEFAULT_CI_WATCH_INTERVAL_MS = 60 * 1000
 
 /**
  * How long a run's watched PR stays on the sweep's list: long enough to survive a weekend of the
@@ -42,7 +42,7 @@ export const NO_CHECKS_GRACE_MS = 3 * 60 * 1000
  * re-arms on a new head commit, so two attempts means: the original failure, and one more after
  * a fix that did not take. Past that the failure is evidently not agent-shaped.
  */
-export const MAX_CI_FIX_ATTEMPTS = 2
+const MAX_CI_FIX_ATTEMPTS = 2
 
 /**
  * The marker a CI-fix run's prompt opens with, so attempts are discoverable from run metas. The

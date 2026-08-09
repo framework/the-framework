@@ -99,9 +99,6 @@ importers:
       '@webcontainer/api':
         specifier: ^1.6.4
         version: 1.6.4
-      playwright-core:
-        specifier: ^1.49.0
-        version: 1.61.1
       typescript:
         specifier: ^5.4.0
         version: 5.9.3
@@ -2517,11 +2514,6 @@ packages:
   pkce-challenge@5.0.1:
     resolution: {integrity: sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==}
     engines: {node: '>=16.20.0'}
-
-  playwright-core@1.61.1:
-    resolution: {integrity: sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==}
-    engines: {node: '>=18'}
-    hasBin: true
 
   postcss@8.5.16:
     resolution: {integrity: sha512-vuwillviilfKZsg0VGj5R/YwwcHx4SLsIOI/7K6mQkWx+l5cUHTjj5g0AasTBcyXsbfTgrwsUNmVUb5xVwyPwg==}
@@ -5570,8 +5562,6 @@ snapshots:
 
   pkce-challenge@5.0.1:
     optional: true
-
-  playwright-core@1.61.1: {}
 
   postcss@8.5.16:
     dependencies:

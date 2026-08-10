@@ -68,7 +68,13 @@ function makeRender(config: TriggerConfig) {
     // stray `<`/`@` in prose is not a trap. The plugin stays active — the menu reappears if
     // a later key matches.
     const note = items.length === 0 && !props.query ? config.emptyNote : undefined
-    if (el) el.style.display = items.length === 0 && !note ? 'none' : ''
+    const visible = items.length > 0 || !!note
+    if (el) el.style.display = visible ? '' : 'none'
+    // aria-expanded tracks what the user actually sees, not the plugin's active range: a
+    // mistyped query hides the menu while the plugin stays armed, and both the a11y tree and
+    // the editor's Enter-to-send guard (#1510) read this attribute as "a menu is open".
+    editorDom?.setAttribute('aria-expanded', visible ? 'true' : 'false')
+    if (!visible) setActive(null)
     root?.render(
       createElement(SuggestionList, {
         items,
@@ -95,7 +101,6 @@ function makeRender(config: TriggerConfig) {
       root = createRoot(el)
       getRect = props.clientRect ?? null
       editorDom = props.editor?.view.dom ?? null
-      editorDom?.setAttribute('aria-expanded', 'true')
       reposition()
       draw(props)
       // Capture-phase scroll catches the editor's own scroll container, not just the window.

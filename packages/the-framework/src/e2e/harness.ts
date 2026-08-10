@@ -1,0 +1,285 @@
+// The world behind the backend E2E story tests (see spec.md): the daemon's business logic wired
+// exactly as `runDaemon` wires it, against throwaway state, with runs spawned through
+// `fake-agent-bin.js` so the full production lifecycle executes offline.
+import { existsSync, mkdtempSync } from 'node:fs'
+import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
+import { provideTelefuncContext } from 'telefunc'
+import { createProjectRuntime, type ProjectRuntime } from '../daemon-runtime.js'
+import { registryPreferencesStore, projectId } from '../registry.js'
+import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
+import { loadRunEvents, resolveRunEventsPath, type RunMeta, type RunStatus } from '../store/index.js'
+import { tailEvents } from '../dashboard-rpc/events-tail.js'
+import { sendAddProject } from '../dashboard-rpc/projects.telefunc.js'
+import { sendStart } from '../dashboard-rpc/control.telefunc.js'
+import { onRuns } from '../dashboard-rpc/reads.telefunc.js'
+import type { FrameworkEvent } from '../events.js'
+import type { StartRunKind, StartRunOptions } from '../dashboard/types.js'
+import type { QuotaView } from '../dashboard/quota.js'
+import type { AutoPmReport } from '../auto-pm.js'
+
+// Re-home the process-global config home FIRST: the registry, preferences, and daemon state all
+// resolve through $XDG_CONFIG_HOME at call time, and run-tests.mjs gives the whole suite ONE
+// shared throwaway home — so without this, story files running as sibling processes would see
+// each other's registered projects in every cross-project rollup (onProjects, onQueue, onOverview).
+process.env.XDG_CONFIG_HOME = mkdtempSync(join(tmpdir(), 'framework-e2e-config-'))
+
+const exec = promisify(execFile)
+
+/** Run `git <args>` in `cwd`, failing the story loudly on error (a broken fixture is a test bug). */
+export async function git(cwd: string, ...args: string[]): Promise<string> {
+  const { stdout } = await exec('git', args, { cwd })
+  return stdout
+}
+
+/** One registered project inside a {@link StoryWorld}: a real git repo the stories act on. */
+export interface StoryProject {
+  /** The registry id every dashboard RPC keys by. */
+  id: string
+  /** The repo's checkout path on disk. */
+  cwd: string
+}
+
+/** A live tail of one run's event log — the same source `onEvents` streams to the browser. */
+export interface RunTail {
+  /** Every event seen so far, in arrival order. Poll with {@link waitFor}. */
+  events: FrameworkEvent[]
+  stop(): void
+}
+
+/**
+ * Everything one story test stands up: the daemon runtime on a temp home, the Telefunc request
+ * context the daemon would provide, and factories for registered projects. `close()` is the
+ * whole teardown — it stops spawned runs the way daemon shutdown does, then removes the state.
+ */
+export interface StoryWorld {
+  /** The daemon's home workspace (a plain temp dir, not a registered project). */
+  home: string
+  runtime: ProjectRuntime
+  /** The usage panel's reading (mutable): what `onQuota` serves. */
+  quota: { view: QuotaView }
+  /** The auto-PM panel's stubs (mutable): what `onAutoPm` reports and what a sweep records. */
+  autoPm: { report?: AutoPmReport; sweeps: Array<{ drainOnly?: boolean }> }
+  /**
+   * Bind one dashboard RPC to this world's request context. The real mount provides the context
+   * per request; sync-mode telefunc drops a provided context at the next macrotask, so a story
+   * spanning real IO must re-provide it before every call — which is exactly what this does.
+   * Every telefunction reads its context synchronously at its top, so provide-then-call holds.
+   */
+  rpc<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R
+  /** Argv of every run child this world spawned, one entry per spawn, oldest first. */
+  spawnedArgv(): Promise<string[][]>
+  /**
+   * Create a real git repo (initial commit included) and register it through the same
+   * `sendAddProject` RPC the dashboard's Add-project dialog calls.
+   */
+  addProject(files?: Record<string, string>): Promise<StoryProject>
+  /** Start a run through the same `sendStart` RPC the launcher calls; returns the run id. */
+  startRun(project: StoryProject, prompt: string, options?: StartRunOptions, kind?: StartRunKind): Promise<string>
+  /** Poll `onRuns` until the run reports one of `until`, failing after `timeoutMs`. */
+  waitRun(project: StoryProject, runId: string, until: RunStatus | RunStatus[], timeoutMs?: number): Promise<RunMeta>
+  /**
+   * Wait until the daemon's teardown has retired the run's worktree. A run's meta flips to
+   * `done` before teardown archives the checkout, and acting on the session in that window
+   * (push, resume) races teardown's own git commits — the same window a user hits by clicking
+   * Push the instant a session finishes. The stories that act on a finished session wait here
+   * first, which is also the honest reading of "finished".
+   */
+  waitRetired(project: StoryProject, runId: string, timeoutMs?: number): Promise<void>
+  /** Follow a run's event log live (replays what is already on disk first). */
+  tailRun(project: StoryProject, runId: string): Promise<RunTail>
+  close(): Promise<void>
+}
+
+/** Poll `read` until it yields a non-undefined value; the failure names `what` went unmet. */
+export async function waitFor<T>(
+  read: () => T | undefined | Promise<T | undefined>,
+  what: string,
+  timeoutMs = 30_000,
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const value = await read()
+    if (value !== undefined) return value
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`)
+    await new Promise(r => setTimeout(r, 100))
+  }
+}
+
+/**
+ * Set `FRAMEWORK_FAKE_AWAIT` for the Starts inside `fn`, so their fake agent's first turn parks
+ * on that gate. Env-scoped rather than per-call because the spawned child reads it at boot; the
+ * finally puts it back before the next story's Starts inherit it.
+ */
+export async function withFakeAwait<T>(mode: 'choices' | 'multiselect' | 'confirmation', fn: () => Promise<T>): Promise<T> {
+  process.env.FRAMEWORK_FAKE_AWAIT = mode
+  try {
+    return await fn()
+  } finally {
+    delete process.env.FRAMEWORK_FAKE_AWAIT
+  }
+}
+
+/** A minimal passing preflight: E2E runs never probe the real agent CLI (there is none here). */
+const agentReady = async () => ({ ok: true, checks: [] })
+
+/**
+ * Stand up one story world. The Telefunc context mirrors `runDaemon`'s `startDashboard` wiring
+ * piece for piece — same closures, same registry-backed stores — except where the daemon holds a
+ * live poller/loop (quota, auto PM), which a story controls through mutable stubs instead.
+ */
+export async function makeWorld(): Promise<StoryWorld> {
+  const home = mkdtempSync(join(tmpdir(), 'framework-e2e-home-'))
+  const argvFile = join(home, 'spawned-argv.jsonl')
+  process.env.FRAMEWORK_E2E_ARGV_FILE = argvFile
+
+  const runtime = createProjectRuntime({
+    cwd: home,
+    env: process.env,
+    binPath: fileURLToPath(new URL('./fake-agent-bin.js', import.meta.url)),
+    agentPreflight: agentReady,
+  })
+
+  const quota = { view: { windows: [] } as QuotaView }
+  const autoPm: StoryWorld['autoPm'] = { sweeps: [] }
+  const context = {
+    startRun: runtime.onStart,
+    addProject: runtime.onAddProject,
+    preview: runtime.preview,
+    eventsSource: runtime.remoteEventsSource,
+    remote: runtime.remoteRuns,
+    preferences: registryPreferencesStore(),
+    discord: registryDiscordCredentialsStore(),
+    quota: { read: async () => quota.view, stop: () => {} },
+    autoPm: () => autoPm.report,
+    autoPmSweep: async (opts?: { drainOnly?: boolean }) => {
+      autoPm.sweeps.push(opts ?? {})
+    },
+  }
+
+  const repos: string[] = []
+  const tails: RunTail[] = []
+
+  const rpc: StoryWorld['rpc'] = fn => {
+    return (...args) => {
+      provideTelefuncContext(context as never)
+      return fn(...args)
+    }
+  }
+
+  const world: StoryWorld = {
+    home,
+    runtime,
+    quota,
+    autoPm,
+    rpc,
+
+    async spawnedArgv() {
+      const raw = await readFile(argvFile, 'utf8').catch(() => '')
+      return raw
+        .split('\n')
+        .filter(line => line.trim())
+        .map(line => JSON.parse(line) as string[])
+    },
+
+    async addProject(files = {}) {
+      const cwd = mkdtempSync(join(tmpdir(), 'framework-e2e-repo-'))
+      repos.push(cwd)
+      await git(cwd, 'init', '-q', '-b', 'main')
+      await git(cwd, 'config', 'user.email', 'e2e@test')
+      await git(cwd, 'config', 'user.name', 'e2e')
+      const seeded = Object.keys(files).length ? files : { 'README.md': '# story fixture\n' }
+      for (const [file, text] of Object.entries(seeded)) {
+        await mkdir(dirname(join(cwd, file)), { recursive: true })
+        await writeFile(join(cwd, file), text)
+      }
+      await git(cwd, 'add', '-A')
+      await git(cwd, 'commit', '-q', '-m', 'seed')
+      const added = await rpc(sendAddProject)(cwd, false)
+      if (!added.ok) throw new Error(`could not register the fixture repo: ${added.error}`)
+      return { id: projectId(resolve(cwd)), cwd }
+    },
+
+    async startRun(project, prompt, options = {}, kind: StartRunKind = 'prompt') {
+      const result = await rpc(sendStart)(project.id, prompt, kind, options)
+      if (!result.ok) throw new Error(`sendStart refused: ${result.error}`)
+      if (!result.runId) throw new Error('sendStart returned no run id for a worktree project')
+      return result.runId
+    },
+
+    async waitRun(project, runId, until, timeoutMs = 30_000) {
+      const wanted = Array.isArray(until) ? until : [until]
+      let last: RunMeta | undefined
+      return waitFor(
+        async () => {
+          const runs = await rpc(onRuns)(project.id)
+          last = runs.find(run => run.id === runId)
+          return last && wanted.includes(last.status) ? last : undefined
+        },
+        `run ${runId} to be ${wanted.join('/')} (last seen: ${JSON.stringify(last?.status)})`,
+        timeoutMs,
+      )
+    },
+
+    async waitRetired(project, runId, timeoutMs = 30_000) {
+      const worktree = join(project.cwd, '.the-framework', 'worktrees', runId)
+      await waitFor(
+        async () => ((await stat(worktree).catch(() => undefined)) ? undefined : true),
+        `run ${runId}'s worktree to be retired`,
+        timeoutMs,
+      )
+    },
+
+    async tailRun(project, runId) {
+      const path = await resolveRunEventsPath(project.cwd, runId)
+      const events: FrameworkEvent[] = []
+      const stopLive = tailEvents<FrameworkEvent>(path, event => events.push(event))
+      // Teardown MOVES the live log into the archive and removes the worktree ~100ms after a
+      // fast run ends, and a tail whose file vanished delivers nothing ever again — the 1s poll
+      // backstop can lose the final lines to that window when the fs.watch event goes missing.
+      // The dashboard heals the same way this does: the session view swaps to the archived
+      // replay once the row settles. So when the live file disappears, finish the feed from the
+      // run's archived journal (a superset of everything the live tail saw).
+      let sawFile = false
+      const finalize = setInterval(() => {
+        if (existsSync(path)) {
+          sawFile = true
+          return
+        }
+        if (!sawFile) return // not written yet — the run is still booting, nothing was moved
+        clearInterval(finalize)
+        stopLive()
+        void loadRunEvents(project.cwd, runId)
+          .then(archived => {
+            if (archived && archived.length >= events.length) events.splice(0, events.length, ...archived)
+          })
+          .catch(() => {})
+      }, 100)
+      finalize.unref?.()
+      const tail = {
+        events,
+        stop: () => {
+          clearInterval(finalize)
+          stopLive()
+        },
+      }
+      tails.push(tail)
+      return tail
+    },
+
+    async close() {
+      for (const tail of tails) tail.stop()
+      // Same order as daemon shutdown: stop the runs this world spawned, then the previews.
+      await runtime.suspendRuns(2000).catch(() => 0)
+      await runtime.dispose().catch(() => {})
+      delete process.env.FRAMEWORK_E2E_ARGV_FILE
+      await rm(home, { recursive: true, force: true }).catch(() => {})
+      for (const repo of repos) await rm(repo, { recursive: true, force: true }).catch(() => {})
+    },
+  }
+  return world
+}

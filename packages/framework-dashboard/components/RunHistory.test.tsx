@@ -3,6 +3,7 @@ import type { RunMeta, ProjectSummary } from '@gemstack/the-framework'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SidebarProvider } from './ui/sidebar.js'
+import { hoverTooltip } from '../test-utils.js'
 
 // RunHistory pulls in AddProjectPanel, which imports the projects telefunc shim; stub it so the
 // import graph does not drag telefunc into jsdom. Import RunHistory after the mock is in place.
@@ -337,5 +338,33 @@ describe('cloud sessions on the rail (#1263/#1264)', () => {
     )
     expect(screen.getByText('done')).toBeTruthy()
     expect(screen.queryByLabelText('Runs as a Claude Code cloud session')).toBeNull()
+  })
+})
+
+describe('RunHistory title tooltip (#1494)', () => {
+  // jsdom gives every element zero widths, so the overflow measure needs stubbed getters to see
+  // a title wider than its rail slot.
+  test('a title that overflows the rail shows its full prompt in a tooltip', async () => {
+    const long = 'refactor the queue promotion sweep so drains claim tickets through lock files'
+    const scrollSpy = vi.spyOn(Element.prototype, 'scrollWidth', 'get').mockReturnValue(240)
+    const clientSpy = vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(120)
+    try {
+      renderRail(<RunHistory projectId="p1" runs={[run({ intent: long })]} selectedRunId={null} onSelect={() => {}} />)
+      const title = await screen.findByText(long)
+      const tip = await hoverTooltip(title)
+      expect(tip.textContent).toContain(long)
+    } finally {
+      scrollSpy.mockRestore()
+      clientSpy.mockRestore()
+    }
+  })
+
+  test('a title that fits is a plain span — no tooltip wiring at all', () => {
+    renderRail(<RunHistory projectId="p1" runs={[run()]} selectedRunId={null} onSelect={() => {}} />)
+    const title = screen.getByText("replace 'Hello, world!' with 'Welcome!'")
+    // Not overflowing (zero widths measure as fitting): hovering has no listeners to open anything.
+    fireEvent.mouseEnter(title)
+    fireEvent.mouseMove(title)
+    expect(screen.queryByRole('tooltip')).toBeNull()
   })
 })

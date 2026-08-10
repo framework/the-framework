@@ -85,9 +85,10 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
 
     // The composer's Resume sends only its seed (#1467); the daemon overlays the project's
     // resolved options, so the model chosen in Settings reaches the continued session's argv.
-    // Fired the instant the row flips done — deliberately inside teardown's window: the run
-    // lock makes the continuation wait out the archive it is about to reopen, where it used to
-    // reuse a checkout mid-retirement.
+    // Fired the instant the row flips done — deliberately inside teardown's window: the busy
+    // guard waits out the still-exiting first leg instead of refusing (#1529), and the run
+    // lock makes the continuation wait out the archive it is about to reopen, where it used
+    // to reuse a checkout mid-retirement.
     const resumed = await rpc(sendStart)(project.id, 'Keep going', 'prompt', { continueRunId: runId })
     assert.equal(resumed.ok, true)
     await world.waitRun(project, runId, 'done')

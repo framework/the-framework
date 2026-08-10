@@ -13,11 +13,29 @@ export class JsonlTailer<T> {
   private offset = 0
   private partial = ''
   private lastMtimeMs = 0
+  private adoptMtime = false
 
   constructor(
-    private readonly path: string,
+    private path: string,
     private readonly onLine: (value: T) => void,
   ) {}
+
+  /**
+   * Point the tailer at the journal's new home, keeping the read offset. For a log that is
+   * *relocated with its content intact* — a run's `events.jsonl` is copied verbatim into the
+   * archive at teardown (and restored on a continuation) — the bytes already consumed are a
+   * prefix of the new file, so the next {@link pull} delivers exactly the lines the move would
+   * otherwise have swallowed, without replaying what was already delivered.
+   *
+   * The first pull after a retarget adopts the new home's mtime instead of running the
+   * same-length-rewrite check: the copy is younger than the original by construction, and a
+   * fully-consumed journal would otherwise read as "rewritten to the same length" and replay
+   * every line it already delivered.
+   */
+  retarget(path: string): void {
+    this.path = path
+    this.adoptMtime = true
+  }
 
   /** Read and dispatch any lines appended since the previous call. */
   async pull(): Promise<void> {
@@ -32,12 +50,14 @@ export class JsonlTailer<T> {
       // A fresh run truncates the log in place (same inode). Detect it two ways: the
       // file shrank below what we consumed, or it was rewritten to the same length
       // (size unchanged but mtime advanced). Either way, re-read from the top.
-      const rewritten = size === this.offset && this.offset > 0 && mtimeMs > this.lastMtimeMs
+      // Suspended for the first read after a retarget, whose newer mtime is the copy's, not a rewrite's.
+      const rewritten = !this.adoptMtime && size === this.offset && this.offset > 0 && mtimeMs > this.lastMtimeMs
       if (size < this.offset || rewritten) {
         this.offset = 0
         this.partial = ''
       }
       this.lastMtimeMs = mtimeMs
+      this.adoptMtime = false
       if (size === this.offset) return
       const buf = Buffer.alloc(size - this.offset)
       await fd.read(buf, 0, buf.length, this.offset)

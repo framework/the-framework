@@ -79,14 +79,15 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
     assert.equal(projectPatched.ok, true)
     assert.equal((await rpc(onProjectPreferences)(project.id)).model, 'fable-e2e')
 
-    // First leg: a plain run, finished and fully retired (resuming mid-teardown would race the
-    // archive of the very history the continuation reopens).
+    // First leg: a plain run, finished.
     const runId = await world.startRun(project, 'Build the settings page')
     await world.waitRun(project, runId, 'done')
-    await world.waitRetired(project, runId)
 
     // The composer's Resume sends only its seed (#1467); the daemon overlays the project's
     // resolved options, so the model chosen in Settings reaches the continued session's argv.
+    // Fired the instant the row flips done — deliberately inside teardown's window: the run
+    // lock makes the continuation wait out the archive it is about to reopen, where it used to
+    // reuse a checkout mid-retirement.
     const resumed = await rpc(sendStart)(project.id, 'Keep going', 'prompt', { continueRunId: runId })
     assert.equal(resumed.ok, true)
     await world.waitRun(project, runId, 'done')

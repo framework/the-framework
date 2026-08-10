@@ -37,7 +37,7 @@ import type { EventsSource, PreviewHandlers, RemoteRuns } from './dashboard/tele
 import { RelayedRuns, startRemoteRun } from './dashboard/remote-run.js'
 import { runBranchFor } from './dashboard/run-handoff.js'
 import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
-import { tailEvents } from './dashboard-rpc/events-tail.js'
+import { tailEvents, tailRunEvents } from './dashboard-rpc/events-tail.js'
 import { isSafeVia } from './conversations.js'
 import { ensureSessionsIgnored, resolveUserDir } from './sessions.js'
 import { createPreviewRuntime } from './preview-runtime.js'
@@ -48,6 +48,7 @@ import { resolveProjectRunOptions } from './daemon-services.js'
 import { installProject, enumerateGitRepos } from './install.js'
 import { isGitRepo } from './project.js'
 import { isCliTimeout } from './cli-exec.js'
+import { withRunLock } from './run-locks.js'
 import { errorMessage } from './error-message.js'
 import { preflight, preflightProblems, type PreflightResult } from './preflight.js'
 import { isAgentName, type AgentName } from './agent-names.js'
@@ -433,26 +434,31 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
    * The branch is the session's if the agent named one, else the run-id branch it started on.
    * Returns undefined when none of that is possible, so the caller can fall back to a new run.
    */
-  const continueWorkspace = async (projectCwd: string, runId: string): Promise<{ cwd: string; runId: string } | undefined> => {
-    try {
-      const path = worktreePath(projectCwd, runId)
-      const existing = await stat(path).then(s => s.isDirectory()).catch(() => false)
-      if (!existing) {
-        const archived = (await listRuns(projectCwd).catch(() => [])).find(run => run.id === runId)
-        // The recorded branch first (#1277): an agent that branched itself (#326 allows it) has
-        // its work there, and re-attaching by the session-name guess would continue the run on a
-        // branch without its previous commits.
-        const branch = runBranchFor(archived ?? { id: runId })
-        await attachWorktree(projectCwd, { runId, branch })
-        await linkDependencies(projectCwd, path).catch(() => [])
+  const continueWorkspace = (projectCwd: string, runId: string): Promise<{ cwd: string; runId: string } | undefined> =>
+    // Under the same run lock as teardown: a Resume clicked off a freshly-`done` run lands here
+    // while teardown is still archiving the very history this restores — reusing the checkout
+    // mid-retirement spawned the continuation into a tree about to be removed. Waiting the
+    // teardown out costs the click a beat and makes the reuse read a settled archive.
+    withRunLock(worktreePath(projectCwd, runId), async () => {
+      try {
+        const path = worktreePath(projectCwd, runId)
+        const existing = await stat(path).then(s => s.isDirectory()).catch(() => false)
+        if (!existing) {
+          const archived = (await listRuns(projectCwd).catch(() => [])).find(run => run.id === runId)
+          // The recorded branch first (#1277): an agent that branched itself (#326 allows it) has
+          // its work there, and re-attaching by the session-name guess would continue the run on a
+          // branch without its previous commits.
+          const branch = runBranchFor(archived ?? { id: runId })
+          await attachWorktree(projectCwd, { runId, branch })
+          await linkDependencies(projectCwd, path).catch(() => [])
+        }
+        await restoreArchivedRun(projectCwd, path, runId).catch(() => false)
+        return { cwd: path, runId }
+      } catch (err) {
+        console.log(`[framework] could not continue session ${runId} (${errorMessage(err)}); starting a new one`)
+        return undefined
       }
-      await restoreArchivedRun(projectCwd, path, runId).catch(() => false)
-      return { cwd: path, runId }
-    } catch (err) {
-      console.log(`[framework] could not continue session ${runId} (${errorMessage(err)}); starting a new one`)
-      return undefined
-    }
-  }
+    })
 
   /**
    * Whether the agent this run picked can actually start (#1326), as one line to show when it
@@ -535,34 +541,40 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
    */
   /** The project half of a preview key from a checkout: the registry id every preview RPC keys by. */
   const projectKeyFor = (projectCwd: string): string => projectId(resolve(projectCwd))
-  const tearDownWorktree = async (projectCwd: string, worktree: string, runId?: string): Promise<void> => {
-    try {
-      // A session can be serving its own checkout (#797), and that dev server holds the directory
-      // it is about to lose. Stop it first, whether or not the worktree ends up removed: the run
-      // is over, so the preview is serving a tree nothing is working on.
-      await previews.preview.stop(projectKeyFor(projectCwd), runId)
-      // Where the work ended up, recorded before the checkout can go (#799). The branch outlives
-      // the worktree and is the only handle the dashboard has left on a finished session.
-      const branch = await currentBranch(worktree)
-      // Filed under the identity this repo commits as, and the ignore rules taught to keep it, so
-      // the session survives the repo being cleaned (#1179).
-      const user = await resolveUserDir(projectCwd)
-      await ensureSessionsIgnored(projectCwd, user).catch(() => false)
-      const meta = await archiveWorktreeRun(worktree, projectCwd, undefined, branch, user)
-      if (meta?.status !== 'done') return // failed / stopped / unreadable: keep it for inspection
-      // A finished run can still be holding an uncommitted edit (#786), and removing the
-      // checkout would destroy it. Commit it to the run's branch, which outlives the
-      // worktree; if that cannot be done, keep the checkout rather than take the diff with it.
-      if (!(await commitPendingWork(worktree))) {
-        console.log(`[framework] keeping worktree ${worktree}: its uncommitted work could not be committed`)
-        return
+  // Under the run lock: a Push/Remove/Resume fired off a freshly-`done` meta lands in the daemon
+  // while this is mid-archive, and both sides commit in the same checkout. The loser used to
+  // report "could not commit the work this session left uncommitted" — or worse, this side lost
+  // and kept a worktree it should have removed. Serialized, whoever runs first commits the whole
+  // pending state (`add -A`) and the other side finds a clean tree and carries on.
+  const tearDownWorktree = (projectCwd: string, worktree: string, runId?: string): Promise<void> =>
+    withRunLock(worktree, async () => {
+      try {
+        // A session can be serving its own checkout (#797), and that dev server holds the directory
+        // it is about to lose. Stop it first, whether or not the worktree ends up removed: the run
+        // is over, so the preview is serving a tree nothing is working on.
+        await previews.preview.stop(projectKeyFor(projectCwd), runId)
+        // Where the work ended up, recorded before the checkout can go (#799). The branch outlives
+        // the worktree and is the only handle the dashboard has left on a finished session.
+        const branch = await currentBranch(worktree)
+        // Filed under the identity this repo commits as, and the ignore rules taught to keep it, so
+        // the session survives the repo being cleaned (#1179).
+        const user = await resolveUserDir(projectCwd)
+        await ensureSessionsIgnored(projectCwd, user).catch(() => false)
+        const meta = await archiveWorktreeRun(worktree, projectCwd, undefined, branch, user)
+        if (meta?.status !== 'done') return // failed / stopped / unreadable: keep it for inspection
+        // A finished run can still be holding an uncommitted edit (#786), and removing the
+        // checkout would destroy it. Commit it to the run's branch, which outlives the
+        // worktree; if that cannot be done, keep the checkout rather than take the diff with it.
+        if (!(await commitPendingWork(worktree))) {
+          console.log(`[framework] keeping worktree ${worktree}: its uncommitted work could not be committed`)
+          return
+        }
+        await removeWorktree(projectCwd, worktree)
+        await pruneWorktrees(projectCwd)
+      } catch {
+        // A worktree we could not retire is a worktree left on disk, which is the safe direction.
       }
-      await removeWorktree(projectCwd, worktree)
-      await pruneWorktrees(projectCwd)
-    } catch {
-      // A worktree we could not retire is a worktree left on disk, which is the safe direction.
-    }
-  }
+    })
 
   // One more try for a run the API dropped mid-work (#1281): the failure is about the transport,
   // not the work, and the continue-run machinery (#762/#923) reopens the retained checkout on its
@@ -1010,21 +1022,22 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
   // else undefined so `onEvents` tails the on-disk log as usual for an ordinary local run.
   const remoteEventsSource: EventsSource = (_projectId, runId) => relayedRuns.get(runId)
 
-  // Tail a relay-started run's own log (#1067) for the `/_relay/events` endpoint. Resolving the run's
-  // journal is async, so a stop is returned immediately and the tail attaches once the path is known.
+  // Tail a relay-started run's own log (#1067) for the `/_relay/events` endpoint. The relocating
+  // tail, for the same reason as the dashboard's onEvents: teardown moves the journal into the
+  // archive, and the device's fixed-path tail went silent without the run's final events. The
+  // initial attach takes whatever the resolver answers (a non-git fallback run's journal IS the
+  // root one); a relocation refuses the root fallback — there it is another run's feed.
+  const rootJournal = join(cwd, FRAMEWORK_DIR, EVENTS_FILE)
   const tailRelayEvents = (runId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => {
-    let stop = (): void => {}
-    let cancelled = false
-    void resolveRunEventsPath(cwd, runId)
-      .then(path => {
-        if (cancelled) return
-        stop = tailEvents(path, onEvent)
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-      stop()
-    }
+    let initial = true
+    return tailRunEvents<FrameworkEvent>(async () => {
+      const next = await resolveRunEventsPath(cwd, runId)
+      if (initial) {
+        initial = false
+        return next
+      }
+      return next === rootJournal ? undefined : next
+    }, onEvent)
   }
 
   const dispose = async (): Promise<void> => {

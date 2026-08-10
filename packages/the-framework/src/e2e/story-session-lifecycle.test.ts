@@ -153,24 +153,26 @@ test("publish a finished session: push its branch from the handoff panel (#799)"
 
     const runId = await world.startRun(project, 'Ship the settings page', { autoPushBranch: false, autoOpenPr: false })
     await world.waitRun(project, runId, 'done')
-    // Fully finished, not merely `done`: acting before teardown retires the checkout races
-    // teardown's own commits — the same race a user hits clicking Push the moment a run ends.
-    await world.waitRetired(project, runId)
 
-    // Before the click: the panel reports the branch, the remote, and that nothing is pushed yet.
-    const before = await waitFor(async () => (await rpc(onRunHandoff)(project.id, runId)) ?? undefined, 'the handoff read')
-    assert.equal(before.branch, `the-framework/run-${runId}`)
-    assert.equal(before.exists, true)
-    assert.equal(before.hasRemote, true)
-    assert.equal(before.pushed, false)
-
-    // The user's Push click publishes the branch; the remote now has it and the panel says so.
+    // Pushed the instant the row flips done — deliberately INSIDE teardown's window. This used
+    // to race teardown's own commits in the same checkout: the click failed with "could not
+    // commit the work this session left uncommitted" and teardown stranded the worktree. The
+    // run lock serializes the two, so the first click works and teardown still retires cleanly.
     const pushed = await rpc(sendPushBranch)(project.id, runId)
     assert.equal(pushed.ok, true, `push failed: ${'error' in pushed ? pushed.error : ''}`)
     const remoteBranches = await git(project.cwd, 'ls-remote', '--heads', 'origin')
     assert.ok(remoteBranches.includes(`the-framework/run-${runId}`), 'the run branch is on origin')
-    const after = await rpc(onRunHandoff)(project.id, runId)
-    assert.equal(after?.pushed, true)
+    await world.waitRetired(project, runId)
+    assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [], 'the concurrent push must not strand the worktree')
+
+    // The handoff panel agrees: branch on the remote, session record included.
+    const after = await waitFor(async () => {
+      const handoff = await rpc(onRunHandoff)(project.id, runId)
+      return handoff?.pushed ? handoff : undefined
+    }, 'the panel to report the branch pushed')
+    assert.equal(after.branch, `the-framework/run-${runId}`)
+    assert.equal(after.exists, true)
+    assert.equal(after.hasRemote, true)
   } finally {
     await world.close()
   }

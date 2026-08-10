@@ -1,7 +1,7 @@
 // The world behind the backend E2E story tests (see spec.md): the daemon's business logic wired
 // exactly as `runDaemon` wires it, against throwaway state, with runs spawned through
 // `fake-agent-bin.js` so the full production lifecycle executes offline.
-import { existsSync, mkdtempSync } from 'node:fs'
+import { mkdtempSync } from 'node:fs'
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
@@ -12,8 +12,9 @@ import { provideTelefuncContext } from 'telefunc'
 import { createProjectRuntime, type ProjectRuntime } from '../daemon-runtime.js'
 import { registryPreferencesStore, projectId } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
-import { loadRunEvents, resolveRunEventsPath, type RunMeta, type RunStatus } from '../store/index.js'
-import { tailEvents } from '../dashboard-rpc/events-tail.js'
+import { resolveRunEventsPath, type RunMeta, type RunStatus } from '../store/index.js'
+import { withRunLock } from '../run-locks.js'
+import { tailRunEvents } from '../dashboard-rpc/events-tail.js'
 import { sendAddProject } from '../dashboard-rpc/projects.telefunc.js'
 import { sendStart } from '../dashboard-rpc/control.telefunc.js'
 import { onRuns } from '../dashboard-rpc/reads.telefunc.js'
@@ -163,6 +164,7 @@ export async function makeWorld(): Promise<StoryWorld> {
 
   const repos: string[] = []
   const tails: RunTail[] = []
+  const started: Array<{ cwd: string; runId: string }> = []
 
   const rpc: StoryWorld['rpc'] = fn => {
     return (...args) => {
@@ -208,6 +210,7 @@ export async function makeWorld(): Promise<StoryWorld> {
       const result = await rpc(sendStart)(project.id, prompt, kind, options)
       if (!result.ok) throw new Error(`sendStart refused: ${result.error}`)
       if (!result.runId) throw new Error('sendStart returned no run id for a worktree project')
+      started.push({ cwd: project.cwd, runId: result.runId })
       return result.runId
     },
 
@@ -235,38 +238,15 @@ export async function makeWorld(): Promise<StoryWorld> {
     },
 
     async tailRun(project, runId) {
-      const path = await resolveRunEventsPath(project.cwd, runId)
       const events: FrameworkEvent[] = []
-      const stopLive = tailEvents<FrameworkEvent>(path, event => events.push(event))
-      // Teardown MOVES the live log into the archive and removes the worktree ~100ms after a
-      // fast run ends, and a tail whose file vanished delivers nothing ever again — the 1s poll
-      // backstop can lose the final lines to that window when the fs.watch event goes missing.
-      // The dashboard heals the same way this does: the session view swaps to the archived
-      // replay once the row settles. So when the live file disappears, finish the feed from the
-      // run's archived journal (a superset of everything the live tail saw).
-      let sawFile = false
-      const finalize = setInterval(() => {
-        if (existsSync(path)) {
-          sawFile = true
-          return
-        }
-        if (!sawFile) return // not written yet — the run is still booting, nothing was moved
-        clearInterval(finalize)
-        stopLive()
-        void loadRunEvents(project.cwd, runId)
-          .then(archived => {
-            if (archived && archived.length >= events.length) events.splice(0, events.length, ...archived)
-          })
-          .catch(() => {})
-      }, 100)
-      finalize.unref?.()
-      const tail = {
-        events,
-        stop: () => {
-          clearInterval(finalize)
-          stopLive()
-        },
-      }
+      // The relocating tail — the same seam the dashboard's onEvents rides: when teardown moves
+      // the journal into the archive, the tail re-resolves the run's journal and carries its
+      // offset, so the feed keeps the final events even when their fs.watch signal was lost.
+      const stop = tailRunEvents<FrameworkEvent>(
+        () => resolveRunEventsPath(project.cwd, runId),
+        event => events.push(event),
+      )
+      const tail = { events, stop }
       tails.push(tail)
       return tail
     },
@@ -275,6 +255,15 @@ export async function makeWorld(): Promise<StoryWorld> {
       for (const tail of tails) tail.stop()
       // Same order as daemon shutdown: stop the runs this world spawned, then the previews.
       await runtime.suspendRuns(2000).catch(() => 0)
+      // Teardowns fire off child-exit events and outlive the assertions — deleting the repos
+      // under a mid-flight archive-commit-retire kills its git ("cannot lock ref 'HEAD'") and
+      // litters the output with stranded-worktree warnings. Acquiring each run's lock is the
+      // daemon's own way of waiting a teardown out.
+      await Promise.all(
+        started.map(({ cwd, runId }) =>
+          withRunLock(join(cwd, '.the-framework', 'worktrees', runId), async () => {}),
+        ),
+      )
       await runtime.dispose().catch(() => {})
       delete process.env.FRAMEWORK_E2E_ARGV_FILE
       await rm(home, { recursive: true, force: true }).catch(() => {})

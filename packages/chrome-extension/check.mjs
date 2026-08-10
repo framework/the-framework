@@ -12,10 +12,10 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 
 const here = dirname(fileURLToPath(import.meta.url))
-// jsdom belongs to the dashboard package; this directory is outside the workspace globs on
-// purpose, so resolve through the package that actually depends on it.
+// jsdom belongs to the dashboard package; this directory deliberately has no package.json of its
+// own, so resolve through the package that actually depends on it.
 const require_ = createRequire(import.meta.url)
-const { JSDOM } = require_(require_.resolve('jsdom', { paths: [join(here, '../../packages/framework-dashboard')] }))
+const { JSDOM } = require_(require_.resolve('jsdom', { paths: [join(here, '../framework-dashboard')] }))
 
 const block = JSON.stringify(
   {

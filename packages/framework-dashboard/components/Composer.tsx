@@ -389,7 +389,7 @@ export const Composer = forwardRef<ComposerHandle, {
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
       </TooltipTrigger>
-      <TooltipContent>{busy ? submitBusyLabel : `${submitLabel}  (⌘↵ / Ctrl+Enter)`}</TooltipContent>
+      <TooltipContent>{busy ? submitBusyLabel : `${submitLabel}  (Enter · Shift+Enter for a new line)`}</TooltipContent>
     </Tooltip>
   )
 

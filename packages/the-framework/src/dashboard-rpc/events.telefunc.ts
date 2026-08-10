@@ -2,7 +2,7 @@ import type { ClientChannel } from 'telefunc'
 import { resolveRunEventsPath } from '../store/index.js'
 import { contextEventsSource, resolveProjectPath } from './context.js'
 import type { FrameworkEvent } from '../events.js'
-import { tailEvents } from './events-tail.js'
+import { tailRunEvents } from './events-tail.js'
 import { forwardStream, streamChannel } from './stream-channel.js'
 
 // The live event stream behind the new dashboard (#405): the selected project's run,
@@ -62,6 +62,31 @@ export async function onEvents(projectId: string, runId?: string): Promise<Clien
     return streamChannel<LiveFeedEvent>(send => forwardStream(stream, send))
   }
   // Everywhere else: tail the run's on-disk events.jsonl (undefined path -> closed channel).
+  // The relocating tail, because the journal moves mid-subscription: teardown copies it into the
+  // archive and removes the worktree, and a fixed-path tail whose fs.watch missed the final
+  // appends went silent without the run's `end`. On the move it re-resolves (the archive, #1472)
+  // and carries its offset, so the feed gets exactly the lines the move would have swallowed.
   const path = await resolveEventsPath(projectId, runId)
-  return streamChannel<LiveFeedEvent>(send => (path ? tailEvents(path, send, () => send({ kind: 'stream-sync' })) : undefined))
+  // The one place a run-scoped feed must NOT relocate to: the project-root journal, which is
+  // resolveRunEventsPath's last-resort fallback once a Delete has removed worktree and archive
+  // alike — it is another run's feed (#1472). A deleted session's tab goes quiet instead. The
+  // initial attach stays permissive: a fallback run (non-git project) legitimately lives there.
+  const rootJournal = runId === undefined ? undefined : await resolveEventsPath(projectId, undefined)
+  let initial = true
+  return streamChannel<LiveFeedEvent>(send =>
+    path
+      ? tailRunEvents(
+          async () => {
+            const next = await resolveEventsPath(projectId, runId)
+            if (initial) {
+              initial = false
+              return next
+            }
+            return rootJournal !== undefined && next === rootJournal ? undefined : next
+          },
+          send,
+          () => send({ kind: 'stream-sync' }),
+        )
+      : undefined,
+  )
 }

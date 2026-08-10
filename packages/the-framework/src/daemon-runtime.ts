@@ -14,6 +14,7 @@ import {
   attachWorktree,
   worktreePath,
   listRuns,
+  findRun,
   archivedRunPaths,
   commitPendingWork,
   currentBranch,
@@ -238,6 +239,9 @@ export const MAX_TRANSIENT_RETRIES = 2
 /** The pause before a retry (#1281): long enough for a dropped connection to be worth re-trying. */
 const TRANSIENT_RETRY_DELAY_MS = 15_000
 
+/** How long a continuation waits for its finished previous leg to exit and retire (#1529). */
+const FINISHED_LEG_EXIT_GRACE_MS = 15_000
+
 /** What the continued session is told (#1281), in the #923 resume prompt's shape. */
 const RETRY_PROMPT =
   'This session died to a transient connection error, not because anyone asked it to stop. Look at what you had already done, then carry on from there and finish the work.'
@@ -344,6 +348,30 @@ async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
   return !isPidAlive(pid)
 }
 
+/**
+ * Wait out the previous leg of the run a continuation is aimed at (#1529). A Resume clicked the
+ * instant a run's row flips `done` can land while the child that wrote that ending is still
+ * mid-exit: the run's slot then still holds a live pid, and the busy guard read "already active"
+ * off a session that is over by its own account — a spurious refusal the E2E settings story
+ * caught on a slow runner. A finished child's exit is imminent and its retirement is queued
+ * right behind it (see `retiring` in {@link createProjectRuntime}), so wait for both, bounded by
+ * `graceMs`, and let the reuse read a settled archive. A leg still calling itself `running` is a
+ * genuine collision: not waited on, so the guard's refusal stands.
+ */
+export async function waitOutFinishedLeg(
+  key: string,
+  slots: { starting: Set<string>; activeRuns: Map<string, number>; retiring: Map<string, Promise<void>> },
+  legHasEnded: () => Promise<boolean>,
+  graceMs: number,
+): Promise<void> {
+  const occupied = (): boolean => slots.starting.has(key) || slots.activeRuns.has(key)
+  if (!occupied() && !slots.retiring.has(key)) return
+  if (!(await legHasEnded())) return
+  const deadline = Date.now() + graceMs
+  while (occupied() && Date.now() < deadline) await delay(25)
+  await slots.retiring.get(key)?.catch(() => {})
+}
+
 /** Inputs to {@link createProjectRuntime}. */
 export interface ProjectRuntimeOptions {
   /** The daemon's home workspace; a run/preview with no project id targets it. */
@@ -402,6 +430,15 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
   // Live run pids, keyed per run rather than per project (#736) — see onStart for the key.
   const activeRuns = new Map<string, number>()
   const starting = new Set<string>() // reserved keys mid-spawn, to close the async gap
+  // A finished leg's exit → retirement chain, parked per run slot so a continuation that raced
+  // the exit (#1529) can await the retirement instead of reusing a checkout mid-removal.
+  const retiring = new Map<string, Promise<void>>()
+  const parkRetirement = (key: string, retired: Promise<void>): void => {
+    retiring.set(key, retired)
+    void retired.finally(() => {
+      if (retiring.get(key) === retired) retiring.delete(key)
+    })
+  }
   // Runs this daemon is relaying to/from a connected device (#1067): the local half of a remote run.
   const relayedRuns = new RelayedRuns()
   // The relayed-run lookup the dashboard's read RPCs consult (#1067 slice 2): is this runId remote, and
@@ -693,7 +730,12 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
       if (!movedRunId) return
       // The moved meta is normally already there, so the marker no-ops; it only writes when the
       // copy was torn AND the resumed child died at boot (#1261) — the same hang either way.
-      void markFailedStart(checkout, movedRunId, '', detail).finally(() => void tearDownWorktree(projectCwd, checkout, movedRunId))
+      parkRetirement(
+        key,
+        markFailedStart(checkout, movedRunId, '', detail)
+          .catch(() => {})
+          .then(() => tearDownWorktree(projectCwd, checkout, movedRunId)),
+      )
     }
     continued.once('error', err => settle(`its process could not be spawned (${errorMessage(err)})`))
     continued.once('exit', (code, signal) => settle(exitDetail(code, signal)))
@@ -855,6 +897,23 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
     // its options client-side and sends them whole.
     if (options.continueRunId) {
       options = { ...(await resolveProjectRunOptions(projectKey, env)), ...options }
+      // A Resume fired the instant its run flips `done` can also land while the child that wrote
+      // that ending is still mid-exit (#1529): the slot then still holds a live pid, and the busy
+      // guard below refused a continuation of a session that is over by its own account. Wait the
+      // exit and its queued retirement out, so the guard judges only real collisions and the
+      // checkout reuse reads a settled archive.
+      const { continueRunId } = options
+      await waitOutFinishedLeg(
+        scopedKey(projectKey, continueRunId),
+        { starting, activeRuns, retiring },
+        async () => {
+          // The composed read (live meta wins over archive): the leg just wrote `done` into its
+          // worktree and teardown has not archived it yet, so the archive-only list cannot see it.
+          const meta = continueRunId ? await findRun(projectCwd, continueRunId).catch(() => undefined) : undefined
+          return meta !== undefined && meta.status !== 'running'
+        },
+        FINISHED_LEG_EXIT_GRACE_MS,
+      )
     }
 
     // A run must not spend a branch and a worktree on an agent that can never start (#1326).
@@ -918,10 +977,13 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
         // The failed marker lands before the teardown reads the meta (#1261), so a boot death is
         // archived as `failed` and the worktree is then kept for inspection, not removed. After
         // teardown the archive is readable, which is when a transient death earns a retry (#1281).
-        void markFailedStart(checkout, runId, prompt, detail).finally(() =>
-          void tearDownWorktree(projectCwd, checkout, runId).finally(() =>
-            void retryTransientDeath(projectCwd, targetProjectId, runId, options),
-          ),
+        parkRetirement(
+          key,
+          markFailedStart(checkout, runId, prompt, detail)
+            .catch(() => {})
+            .then(() => tearDownWorktree(projectCwd, checkout, runId))
+            .then(() => retryTransientDeath(projectCwd, targetProjectId, runId, options))
+            .catch(() => {}),
         )
       }
       child.once('error', err => settle(`its process could not be spawned (${errorMessage(err)})`))

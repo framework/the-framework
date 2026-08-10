@@ -1,0 +1,75 @@
+import { strict as assert } from 'node:assert'
+import { test } from 'node:test'
+import { waitOutFinishedLeg } from './daemon-runtime.js'
+
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
+
+const emptySlots = (): { starting: Set<string>; activeRuns: Map<string, number>; retiring: Map<string, Promise<void>> } => ({
+  starting: new Set<string>(),
+  activeRuns: new Map<string, number>(),
+  retiring: new Map<string, Promise<void>>(),
+})
+
+// The seam behind #1529: a Resume fired the instant a run flips `done` used to reach the busy
+// guard while the child that wrote that ending was still mid-exit, and the guard refused a
+// session that was over by its own account. These pin the wait's decision table; the settings
+// story exercises the full daemon path.
+
+test('a free slot returns immediately, without even asking whether the leg ended', async () => {
+  let asked = 0
+  await waitOutFinishedLeg(
+    'p::r1',
+    emptySlots(),
+    async () => {
+      asked += 1
+      return true
+    },
+    5_000,
+  )
+  assert.equal(asked, 0)
+})
+
+test('a leg still calling itself running is a real collision: no wait, the refusal stands', async () => {
+  const slots = emptySlots()
+  slots.activeRuns.set('p::r1', process.pid)
+  const before = Date.now()
+  await waitOutFinishedLeg('p::r1', slots, async () => false, 5_000)
+  assert.ok(Date.now() - before < 1_000, 'must not sit out the grace period')
+  assert.ok(slots.activeRuns.has('p::r1'), 'the slot is left for the busy guard to judge')
+})
+
+test('a finished leg is waited out: the wait ends once the exit clears the slot', async () => {
+  const slots = emptySlots()
+  slots.activeRuns.set('p::r1', process.pid)
+  setTimeout(() => slots.activeRuns.delete('p::r1'), 60)
+  await waitOutFinishedLeg('p::r1', slots, async () => true, 5_000)
+  assert.equal(slots.activeRuns.has('p::r1'), false)
+})
+
+test('the wait is bounded: a finished leg whose process never exits falls back to the guard', async () => {
+  const slots = emptySlots()
+  slots.activeRuns.set('p::r1', process.pid)
+  const before = Date.now()
+  await waitOutFinishedLeg('p::r1', slots, async () => true, 120)
+  assert.ok(Date.now() - before >= 120, 'the grace period was sat out')
+  assert.ok(slots.activeRuns.has('p::r1'), 'the still-occupied slot reaches the busy guard')
+})
+
+test('a retirement already in flight is awaited even after the exit cleared the slot', async () => {
+  const slots = emptySlots()
+  let retired = false
+  slots.retiring.set(
+    'p::r1',
+    sleep(60).then(() => {
+      retired = true
+    }),
+  )
+  await waitOutFinishedLeg('p::r1', slots, async () => true, 5_000)
+  assert.equal(retired, true)
+})
+
+test('a retirement that failed does not fail the continuation waiting on it', async () => {
+  const slots = emptySlots()
+  slots.retiring.set('p::r1', Promise.reject(new Error('archive on a full disk')))
+  await waitOutFinishedLeg('p::r1', slots, async () => true, 5_000)
+})

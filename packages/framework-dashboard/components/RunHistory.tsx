@@ -548,15 +548,17 @@ function RunRow({
   // "In cloud" outranks "publishing…": a web run's local half is over either way, and the cloud
   // side owns its own push/PR, so the cloud word is the truer one for that row.
   const publishingNow = publishing && !inCloud
-  // The title only fades + marquees when it actually overflows the fixed-width rail; a short one
-  // shows plainly. Measured here since CSS cannot tell. The rail width is fixed, so intent is the
-  // only thing that changes the answer.
+  // The title only fades + carries a tooltip when it actually overflows the fixed-width rail; a
+  // short one shows plainly. Measured here since CSS cannot tell. The rail width is fixed, so
+  // intent is the only thing that changes the answer.
   const titleRef = useRef<HTMLSpanElement>(null)
   const [overflowing, setOverflowing] = useState(false)
   useEffect(() => {
     const el = titleRef.current
     if (el) setOverflowing(el.scrollWidth > el.clientWidth + 1)
   }, [intent])
+  const titleText = intent || 'New session'
+  const titleClass = cn('rail-title w-full px-2 text-sm font-normal', overflowing && 'is-overflowing')
   return (
     <Button
       variant="ghost"
@@ -617,9 +619,21 @@ function RunRow({
           </span>
         )}
       </span>
-      <span ref={titleRef} className={cn('rail-title w-full px-2 text-sm font-normal', overflowing && 'is-overflowing')}>
-        <span className="rail-title-inner">{intent || 'New session'}</span>
-      </span>
+      {/* A truncated title shows its full prompt in a tooltip (#1494) — the hover marquee it
+          replaces forced reading at the animation's pace and moved the text under the cursor.
+          The end-fade stays as the truncation cue; a title that fits gets no tooltip at all. */}
+      {overflowing ? (
+        <Tooltip>
+          <TooltipTrigger render={<span ref={titleRef} className={titleClass} />}>{titleText}</TooltipTrigger>
+          <TooltipContent side="right" className="max-w-96 whitespace-pre-wrap break-words">
+            {titleText}
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        <span ref={titleRef} className={titleClass}>
+          {titleText}
+        </span>
+      )}
     </Button>
   )
 }

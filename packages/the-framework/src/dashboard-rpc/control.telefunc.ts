@@ -9,7 +9,8 @@ import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
 import { isTicketFile } from '../dashboard/tickets.js'
 import { releaseTicketLock } from '../ticket-locks.js'
-import { findRun, isSafeRunId, type RunMeta } from '../store/index.js'
+import { findRun, isSafeRunId, worktreePath, type RunMeta } from '../store/index.js'
+import { withRunLock } from '../run-locks.js'
 import { removeProjectWorktree, deleteProjectRun } from '../worktrees.js'
 import { commitSessionWork, mergeSessionPr, openSessionPullRequest, pushRunBranch, runBranchFor, type HandoffResult } from '../dashboard/run-handoff.js'
 import type { ChoiceBy } from '../events.js'
@@ -161,7 +162,12 @@ async function withWorktreeRemoval<T>(
   const preview = contextPreview()
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
-  return remove(cwd, { beforeRemove: async id => { await preview?.stop(projectId, id) } })
+  // Under the run lock: a Remove/Delete clicked the moment a run ends races teardown's own
+  // archive-commit-remove of the same checkout; serialized, whichever runs second finds the
+  // state the first one left and acts on that.
+  return withRunLock(worktreePath(cwd, runId), () =>
+    remove(cwd, { beforeRemove: async id => { await preview?.stop(projectId, id) } }),
+  )
 }
 
 /**
@@ -310,7 +316,11 @@ export async function sendPushBranch(projectId: string, runId: string): Promise<
     const target = await handoffTargetFor(projectId, runId)
     if (!target) return { ok: false, error: 'unknown session' }
     const branch = runBranchFor(target.run)
-    if (!(await commitSessionWork(target.checkout, target.cwd, branch))) {
+    // The commit step holds the run lock: clicked the moment a session flips `done`, this used
+    // to commit against the checkout teardown was committing in and lose. Serialized, whichever
+    // side runs first commits everything pending; the other finds a clean tree — or no checkout
+    // at all, which commitSessionWork already reads as "the branch is authoritative".
+    if (!(await withRunLock(target.checkout, () => commitSessionWork(target.checkout, target.cwd, branch)))) {
       return { ok: false, error: 'could not commit the work this session left uncommitted' }
     }
     return pushRunBranch(target.cwd, branch)
@@ -328,7 +338,11 @@ export async function sendOpenPullRequest(projectId: string, runId: string): Pro
   return relayOr(runId, 'sendOpenPullRequest', [projectId, runId], async () => {
     const target = await handoffTargetFor(projectId, runId)
     if (!target) return { ok: false, error: 'unknown session' }
-    if (!(await commitSessionWork(target.checkout, target.cwd, runBranchFor(target.run)))) {
+    // Same run lock as sendPushBranch, for the same click-at-`done` race.
+    const committed = await withRunLock(target.checkout, () =>
+      commitSessionWork(target.checkout, target.cwd, runBranchFor(target.run)),
+    )
+    if (!committed) {
       return { ok: false, error: 'could not commit the work this session left uncommitted' }
     }
     return openSessionPullRequest(target.cwd, target.run)

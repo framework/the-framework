@@ -30,7 +30,7 @@ export interface PromptEditorHandle {
 
 interface PromptEditorProps {
   onChange: (markdown: string) => void
-  /** Cmd/Ctrl+Enter. */
+  /** Enter (and Cmd/Ctrl+Enter); Shift+Enter stays a line break (#1510). */
   onSubmit: () => void
   /** A preset picked from the `/` menu (so the form can flip to a `prompt` run). `replaced` says
    *  whether a typed draft was overwritten — undo brings it back, and the form's note says so. */
@@ -310,8 +310,19 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
         'aria-label': 'Prompt',
         'aria-placeholder': placeholder,
       },
-      handleKeyDown: (_view, event) => {
+      handleKeyDown: (view, event) => {
         if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+          event.preventDefault()
+          onSubmitRef.current()
+          return true
+        }
+        // Enter sends, Shift+Enter breaks the line (#1510) — Claude Code web's bindings. This
+        // direct prop outranks the plugins' handlers, so it must step aside where Enter already
+        // means something: picking from an open suggestion menu (aria-expanded mirrors its
+        // visibility), typing a newline in a code block, or confirming an IME composition.
+        if (event.key === 'Enter' && !event.shiftKey && !event.altKey && !event.isComposing) {
+          if (view.dom.getAttribute('aria-expanded') === 'true') return false
+          if (view.state.selection.$from.parent.type.name === 'codeBlock') return false
           event.preventDefault()
           onSubmitRef.current()
           return true

@@ -12,7 +12,7 @@ import {
 import { sendChoice, sendQueueTicket } from '../dashboard-rpc/control.telefunc.js'
 import { presets } from '../preset-catalog.js'
 
-// The roadmap stories (spec.md): tickets are proposals, the flat TODO queue holds confirmed
+// The roadmap stories (README.md): tickets are proposals, the flat TODO queue holds confirmed
 // work, and a drain run claims the queue's next entry — the propose -> decide -> work loop the
 // Tickets and Queue pages drive.
 

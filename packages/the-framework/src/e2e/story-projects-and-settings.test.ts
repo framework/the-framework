@@ -14,7 +14,7 @@ import {
 import { onQuota, onAutoPm, sendAutoPmSweep } from '../dashboard-rpc/quota.telefunc.js'
 import { sendStart } from '../dashboard-rpc/control.telefunc.js'
 
-// The projects & settings stories (spec.md): registering a repo, what the sidebar then shows,
+// The projects & settings stories (README.md): registering a repo, what the sidebar then shows,
 // how settings written in the dashboard reach the runs the daemon starts, and the usage panel.
 
 test('add a project: it is installed, registered, and readable like the sidebar reads it (#396)', async () => {

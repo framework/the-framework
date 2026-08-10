@@ -11,7 +11,7 @@ import {
   sendDeleteSession,
 } from '../dashboard-rpc/control.telefunc.js'
 
-// The steering stories (spec.md): everything the user does TO a live session — answer its
+// The steering stories (README.md): everything the user does TO a live session — answer its
 // question, chat with it, change its handoff, stop it — flows browser -> RPC -> control.jsonl ->
 // the run process, and the observable answer comes back through the run's own event log.
 

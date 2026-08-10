@@ -1,4 +1,4 @@
-// The world behind the backend E2E story tests (see spec.md): the daemon's business logic wired
+// The world behind the backend E2E story tests (see README.md): the daemon's business logic wired
 // exactly as `runDaemon` wires it, against throwaway state, with runs spawned through
 // `fake-agent-bin.js` so the full production lifecycle executes offline.
 import { mkdtempSync } from 'node:fs'

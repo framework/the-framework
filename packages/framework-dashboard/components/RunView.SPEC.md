@@ -2,11 +2,11 @@ One session's view, live or finished, in a stable frame — bar, details, change
 
 ## TLDR
 
-- The transcript is one log with two sources: the live channel while running, the archive once ended — swapped behind the events already on screen, so a session ending never blanks what you are reading.
-- An empty archive never replaces shown events, a stale one never hides a resumed session's new leg, a foreign journal never beats the run's own record; the archive is re-read once the feed outgrows it, which is how the epilogue's push/PR lines arrive without a refresh.
+- The transcript is one log with two sources — the live channel while running, the archive once ended — swapped behind the events on screen, so an ending never blanks what you are reading.
+- An empty archive never replaces shown events, a stale one never hides a resumed leg, a foreign journal never beats the run's own record; the archive is re-read once the feed outgrows it, which is how the epilogue's PR line arrives without a refresh.
 - "Done" means the agent settled, not that the process died: a parked session stays alive for your next message, so the handoff keys off settling.
 - While working, the bar summarizes the worktree's changes; after settle it swaps, once loaded, to what the branch holds.
-- Runs executing elsewhere say where the work really is: an Actions run's burst-at-the-end replay, a web run's cloud session, a device run keeping only the preview local.
+- Runs executing elsewhere say so: the Actions burst-at-the-end replay, the web run's cloud session, the device run keeping only its preview local.
 
 ## Before writing SPEC.md files
 

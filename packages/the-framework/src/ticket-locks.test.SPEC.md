@@ -1,0 +1,5 @@
+Covers ticket claiming: one lock per ticket committed as a single batch and pushed to the default branch, already-claimed or already-planned tickets skipped rather than overwritten, rollback when the commit fails, the batch kept (and said out loud) when only the push fails, no push from a feature branch, and manual release restoring the lock when its commit fails.
+
+## Before writing SPEC.md files
+
+Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

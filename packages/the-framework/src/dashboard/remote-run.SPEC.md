@@ -1,0 +1,12 @@
+The local half of running a session on a saved device: this daemon — never the browser — drives the remote daemon and streams the session back so it looks and behaves like a local one.
+
+## TLDR
+
+- The device's token stays between the two daemons and only ever in memory; the browser watches the run over its normal same-origin channel, so nothing crosses origins in the browser and the token never reaches a page.
+- Short health pings are how the device list's online/offline dots know what is reachable.
+- A relayed run keeps a local stand-in record, updated from the device's events, so it shows in the session list and survives a dashboard reload; the device address outlives the event stream because post-run reads, push, and PR still have to reach the device.
+- Failures answer like local ones: an unreachable device is a plain error result or an empty read, and a rotated token ends the stream as a normal finish, not a lost connection.
+
+## Before writing SPEC.md files
+
+Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -1,0 +1,5 @@
+Covers the editor's send seam: plain Enter and Cmd/Ctrl+Enter submit, while Shift+Enter, Alt+Enter, an open suggestion menu, and IME composition keep Enter as an editing key.
+
+## Before writing SPEC.md files
+
+Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

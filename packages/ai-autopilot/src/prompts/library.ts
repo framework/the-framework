@@ -52,9 +52,9 @@ export function builtinPromptsDir(): string {
   return fileURLToPath(new URL('../../prompts/', import.meta.url))
 }
 
-/** Load every `*.md` prompt bundle in a directory, in filename order. */
+/** Load every `*.md` prompt bundle in a directory, in filename order. SPEC.md documents the directory (SDD), it is not a prompt bundle. */
 export async function loadPromptsFrom(dir: string): Promise<Prompt[]> {
-  const files = (await readdir(dir)).filter(f => f.endsWith('.md')).sort()
+  const files = (await readdir(dir)).filter(f => f.endsWith('.md') && f !== 'SPEC.md').sort()
   return Promise.all(
     files.map(async f => {
       const path = join(dir, f)

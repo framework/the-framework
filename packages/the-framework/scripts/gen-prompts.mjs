@@ -20,14 +20,14 @@ const outFile = join(here, '..', 'src', 'prompts.generated.ts')
 
 /**
  * Every prompt .md under prompts/, as absolute paths, sorted so the output is stable.
- * README.md is documentation for humans, not a prompt.
+ * README.md and SPEC.md are documentation for humans, not prompts.
  */
 async function findMarkdown(dir) {
   const found = []
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name)
     if (entry.isDirectory()) found.push(...(await findMarkdown(path)))
-    else if (entry.name.endsWith('.md') && entry.name !== 'README.md') found.push(path)
+    else if (entry.name.endsWith('.md') && entry.name !== 'README.md' && entry.name !== 'SPEC.md') found.push(path)
   }
   return found.sort()
 }

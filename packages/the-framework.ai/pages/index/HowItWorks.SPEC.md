@@ -1,0 +1,5 @@
+The "How it works" section: lays out the product's two major building blocks — the enhanced system prompt and the queues — side by side, with the prompts note beneath them.
+
+## Before writing SPEC.md files
+
+Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

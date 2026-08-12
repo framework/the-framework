@@ -69,7 +69,7 @@ pointer to the proposal in Part 3. Nothing is omitted: features I propose deleti
 beside the ones that survive, so the cost of each proposal is visible in user terms rather than in
 lines of code.
 
-**Tally: 160 user-facing features — 91 Keep, 26 Simplify, 43 Remove.**
+**Tally: 165 user-facing features — 94 Keep, 22 Simplify, 49 Remove.**
 
 The product a user actually came for — *register a repo, describe work, watch an agent do it,
 get a PR, and let it keep working while you sleep* — is entirely inside the Keep column.
@@ -98,206 +98,211 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 13 | Start a session from a ticket row | Keep | |
 | 14 | Start a session from a queue entry's play button | Simplify — merges into #13 | B1 |
 | 15 | "Run now" on a routine | Keep | |
-| 16 | CLI `the-framework [intent...]` — build an app from scratch | **Remove** | A4 |
-| 17 | CLI `the-framework prompt <text>` — one verbatim prompt | Simplify — becomes the only run path | D2 |
-| 18 | CLI `the-framework research [what]` | Simplify — it is a preset, not a verb | D4 |
-| 19 | CLI `the-framework maintain` — sweep repos for un-reviewed commits | Simplify — folds into the daemon tick | E3, E4 |
-| 20 | CLI `the-framework worktrees [rm\|prune\|sweep]` | Simplify — one retention rule, one verb | E5 |
-| 21 | CLI `the-framework stop` | Keep | |
-| 22 | CLI `the-framework relay` — host a watch relay | **Remove** | A6 |
-| 23 | CLI `the-framework --fake` — deterministic offline demo | Keep — it is what CI runs | |
-| 24 | CLI `--resume` — reopen the last session's dashboard read-only | **Remove** — it is a URL in the dashboard | D3 |
-| 25 | Topic sessions: start with no project, bind to one mid-run | **Remove** — costs the user one click up front | D7 |
-| 26 | Custom presets saved to the user tier (private) or project tier (shared) | Simplify — one tier | B5 |
+| 16 | CLI `the-framework` — start/find the daemon and open the dashboard | Keep | |
+| 17 | CLI `the-framework stop` | Keep | |
+| 18 | CLI `the-framework doctor` | Keep | |
+| 19 | CLI `the-framework --fake` — deterministic offline demo | Keep — it is what CI runs | |
+| 20 | CLI bootstrap arguments: `--port`, `--host`, `--daemon`, `--cwd` | Keep — the dashboard cannot configure itself into existence | D4 |
+| 21 | **Every other CLI setting — 60 of the 67 flags**, each mirroring a dashboard control or encoding what the daemon passes its own child | **Remove** — the dashboard is the only interface | D4 |
+| 22 | CLI `the-framework [intent...]` — build an app from scratch | **Remove** | A4 |
+| 23 | CLI `the-framework prompt <text>` — one verbatim prompt | **Remove** as a verb — the *path* survives as the only run path | D2, D4 |
+| 24 | CLI `the-framework research [what]` | **Remove** as a verb — it is a preset in the composer | D4 |
+| 25 | CLI `the-framework maintain` — sweep repos for un-reviewed commits | **Remove** as a verb — folds into the daemon tick | E3, E4 |
+| 26 | CLI `the-framework worktrees [rm\|prune\|sweep]` | **Remove** as a verb — it is the session actions menu | D4, E5 |
+| 27 | CLI `the-framework relay` — host a watch relay | **Remove** | A6 |
+| 28 | CLI `--resume` — reopen the last session's dashboard read-only | **Remove** — it is a URL in the dashboard | D3 |
+| 29 | Start a session by typing a prompt in a terminal | **Remove** — the one real loss; see D4 | D4 |
+| 30 | Topic sessions: start with no project, bind to one mid-run | **Remove** — costs the user one click up front | D7 |
+| 31 | Custom presets saved to the user tier (private) or project tier (shared) | Simplify — one tier | B5 |
 
 ### The preset catalog (16 user-visible entries)
 
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
-| 27 | Research (rate problem variability, then pick what to deep-dive) | Keep | |
-| 28 | Maintainability | Keep | |
-| 29 | Readability | Keep | |
-| 30 | Security audit | Keep | |
-| 31 | UX (auto) | Keep | |
-| 32 | Maintenance (periodic codebase sweep) | Keep | |
-| 33 | Market research | Keep | |
-| 34 | Import tickets from GitHub | Keep | |
-| 35 | Update from GitHub | Simplify — one of six ticket-shaped presets | E3 |
-| 36 | Plan tickets (aka spike) | Keep | |
-| 37 | Suggest new tickets | Simplify — collapse with #35, #38, #39 | E3 |
-| 38 | Suggest new features | Simplify — collapse | E3 |
-| 39 | Suggest tickets to work on | Simplify — collapse | E3 |
-| 40 | Spin up agents working on the AI queue | Keep | |
-| 41 | Add quick-win work to AI Queue (triage-quick) | Simplify — one triage preset, not two | E3 |
-| 42 | Add consensual work to AI Queue (triage-consensual) | Simplify — collapse with #41 | E3 |
+| 32 | Research (rate problem variability, then pick what to deep-dive) | Keep | |
+| 33 | Maintainability | Keep | |
+| 34 | Readability | Keep | |
+| 35 | Security audit | Keep | |
+| 36 | UX (auto) | Keep | |
+| 37 | Maintenance (periodic codebase sweep) | Keep | |
+| 38 | Market research | Keep | |
+| 39 | Import tickets from GitHub | Keep | |
+| 40 | Update from GitHub | Simplify — one of six ticket-shaped presets | E3 |
+| 41 | Plan tickets (aka spike) | Keep | |
+| 42 | Suggest new tickets | Simplify — collapse with #40, #43, #44 | E3 |
+| 43 | Suggest new features | Simplify — collapse | E3 |
+| 44 | Suggest tickets to work on | Simplify — collapse | E3 |
+| 45 | Spin up agents working on the AI queue | Keep | |
+| 46 | Add quick-win work to AI Queue (triage-quick) | Simplify — one triage preset, not two | E3 |
+| 47 | Add consensual work to AI Queue (triage-consensual) | Simplify — collapse with #46 | E3 |
 
 ### Watching and steering a session
 
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
-| 43 | Live event stream rendered as a transcript | Keep | |
-| 44 | The agent's questions render as answerable cards inline, where they happened | Keep | |
-| 45 | A large scope becomes a `PLAN_<session>.agent.md` with a live Approve/Decline gate; declining stops the session and hands control back | Keep — as a section of the ticket | B1 |
-| 46 | An ambiguous prompt becomes a ranked list of interpretations to pick from | Keep | |
-| 47 | A settled session reads as "waiting for you", not as a status that only changes when it ends | Keep | |
-| 48 | `ANALYSIS_RESULT.md` written into the repo every run (scope, ambiguity, plan yes/no) | **Remove** — nothing reads it | B2 |
-| 49 | Three gate shapes: pick-one, pick-many, approve/decline | Simplify — one shape covers all three | D6 |
-| 50 | Chat with a live session; each message continues the same agent conversation | Keep | |
-| 51 | Stop button (aborts the same signal Ctrl+C does) | Keep | |
-| 52 | Resume a stopped session with reduced options | Keep | |
-| 53 | Reopen a finished session — history restored, same conversation | Keep | |
-| 54 | Changed files with diffs | Keep | |
-| 55 | Git status bar | Keep | |
-| 56 | Agent-authored markdown views pushed to the right rail | Keep | |
-| 57 | Docs rail (surfaced PLAN / TODO files) | Simplify — one work-item format to surface | B1 |
-| 58 | History rail (past sessions), with full-prompt tooltips | Keep | |
-| 59 | Session actions: stop, open in editor, open folder, open on GitHub, remove worktree, delete session, copy session id, copy resume command | Keep | |
-| 60 | Session action: Serve / preview the app | **Remove** | A6 |
-| 61 | Session action: copy a shareable watch link | **Remove** | A6 |
-| 62 | Session action: Merge when finished (arm auto-merge mid-session) | Keep | |
-| 63 | Live browser screencast inline, degrading to a last still | **Remove** | A6 |
-| 64 | Hand the browser to the human on a login wall / captcha / 2FA | **Remove** | A6 |
-| 65 | A session is a URL you can paste, reload and bookmark | Keep | |
-| 66 | The agent names the session; the branch is renamed to match | Keep | |
-| 67 | Ready-for-merge status flips the session badge | Keep | |
-| 68 | Live spend readout per session | Keep | |
-| 69 | See the exact system prompt the agent ran under | Keep | |
+| 48 | Live event stream rendered as a transcript | Keep | |
+| 49 | The agent's questions render as answerable cards inline, where they happened | Keep | |
+| 50 | A large scope becomes a `PLAN_<session>.agent.md` with a live Approve/Decline gate; declining stops the session and hands control back | Keep — as a section of the ticket | B1 |
+| 51 | An ambiguous prompt becomes a ranked list of interpretations to pick from | Keep | |
+| 52 | A settled session reads as "waiting for you", not as a status that only changes when it ends | Keep | |
+| 53 | `ANALYSIS_RESULT.md` written into the repo every run (scope, ambiguity, plan yes/no) | **Remove** — nothing reads it | B2 |
+| 54 | Three gate shapes: pick-one, pick-many, approve/decline | Simplify — one shape covers all three | D6 |
+| 55 | Chat with a live session; each message continues the same agent conversation | Keep | |
+| 56 | Stop button (aborts the same signal Ctrl+C does) | Keep | |
+| 57 | Resume a stopped session with reduced options | Keep | |
+| 58 | Reopen a finished session — history restored, same conversation | Keep | |
+| 59 | Changed files with diffs | Keep | |
+| 60 | Git status bar | Keep | |
+| 61 | Agent-authored markdown views pushed to the right rail | Keep | |
+| 62 | Docs rail (surfaced PLAN / TODO files) | Simplify — one work-item format to surface | B1 |
+| 63 | History rail (past sessions), with full-prompt tooltips | Keep | |
+| 64 | Session actions: stop, open in editor, open folder, open on GitHub, remove worktree, delete session, copy session id, copy resume command | Keep | |
+| 65 | Session action: Serve / preview the app | **Remove** | A6 |
+| 66 | Session action: copy a shareable watch link | **Remove** | A6 |
+| 67 | Session action: Merge when finished (arm auto-merge mid-session) | Keep | |
+| 68 | Live browser screencast inline, degrading to a last still | **Remove** | A6 |
+| 69 | Hand the browser to the human on a login wall / captcha / 2FA | **Remove** | A6 |
+| 70 | A session is a URL you can paste, reload and bookmark | Keep | |
+| 71 | The agent names the session; the branch is renamed to match | Keep | |
+| 72 | Ready-for-merge status flips the session badge | Keep | |
+| 73 | Live spend readout per session | Keep | |
+| 74 | See the exact system prompt the agent ran under | Keep | |
 
 ### Overview page
 
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
-| 70 | Quota bar first — week track with pace and projection | Keep | |
-| 71 | Open-questions hub: every session's unanswered question, across all projects, answerable in place | Keep | |
-| 72 | Agents working now | Keep | |
-| 73 | The full AI queue of every project, uncollapsed | Keep — as the ticket list | B1 |
-| 74 | Routine work panel | Keep | |
-| 75 | Hottest tickets | Keep | |
-| 76 | Projects sidebar | Keep | |
+| 75 | Quota bar first — week track with pace and projection | Keep | |
+| 76 | Open-questions hub: every session's unanswered question, across all projects, answerable in place | Keep | |
+| 77 | Agents working now | Keep | |
+| 78 | The full AI queue of every project, uncollapsed | Keep — as the ticket list | B1 |
+| 79 | Routine work panel | Keep | |
+| 80 | Hottest tickets | Keep | |
+| 81 | Projects sidebar | Keep | |
 
 ### Tickets
 
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
-| 77 | Cross-project ticket list | Keep | |
-| 78 | Faceted filtering: text, priority/effort/uncertainty as buckets *or* ranges, topics, planning stage, project | Simplify — text search + priority sort | F5 |
-| 79 | Sorting and group-by-project toggle | Simplify | F5 |
-| 80 | The whole filter view mirrored to the URL so it can be shared | Simplify | F5 |
-| 81 | Ticket detail page | Keep | |
-| 82 | A plan page when a plan exists; a button to start a session writing one when it doesn't | Keep — as a section of the ticket | B1 |
-| 83 | Queue a ticket into the AI queue | Keep — becomes a status change | B1 |
-| 84 | Tickets carry a GitHub issue link, so merging closes the issue | Keep | |
+| 82 | Cross-project ticket list | Keep | |
+| 83 | Faceted filtering: text, priority/effort/uncertainty as buckets *or* ranges, topics, planning stage, project | Simplify — text search + priority sort | F5 |
+| 84 | Sorting and group-by-project toggle | Simplify | F5 |
+| 85 | The whole filter view mirrored to the URL so it can be shared | Simplify | F5 |
+| 86 | Ticket detail page | Keep | |
+| 87 | A plan page when a plan exists; a button to start a session writing one when it doesn't | Keep — as a section of the ticket | B1 |
+| 88 | Queue a ticket into the AI queue | Keep — becomes a status change | B1 |
+| 89 | Tickets carry a GitHub issue link, so merging closes the issue | Keep | |
 
 ### Handoff and what lands in git
 
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
-| 85 | Every session gets its own git worktree and branch; your checkout is never touched | Keep | |
-| 86 | Dependency directories shared from the parent checkout instead of reinstalled | Keep | |
-| 87 | A failed or stopped session keeps its checkout for inspection | Keep | |
-| 88 | Commit what the agent left uncommitted | Keep | |
-| 89 | Push the branch (on by default) | Keep | |
-| 90 | Open a PR (on by default) | Keep | |
-| 91 | Auto-merge — armed by config, authorized by the agent's ready signal | Keep | |
-| 92 | Empty sessions publish nothing | Keep | |
-| 93 | Handoff panel: push / open PR / merge, as buttons | Keep | |
-| 94 | A withheld merge is reported with its reason | Keep | |
-| 95 | Conversations committed to the repo (readable chat, not the tool-call transcript) | Keep | |
-| 96 | `LOGS.md` — a committed human-readable project log, one entry per session | **Remove** — derivable from the event log | B3 |
-| 97 | Session history archived in the repo under per-user directories | Keep — merged with #95 | B3 |
-| 98 | Post-merge quality follow-ups queued (maintainability / security / readability) | Keep | |
-| 99 | Knowledge folded back into `DECISIONS.md` / `FACTS.md` / `INSIGHTS.md` at merge | Simplify — one knowledge directory | B4 |
+| 90 | Every session gets its own git worktree and branch; your checkout is never touched | Keep | |
+| 91 | Dependency directories shared from the parent checkout instead of reinstalled | Keep | |
+| 92 | A failed or stopped session keeps its checkout for inspection | Keep | |
+| 93 | Commit what the agent left uncommitted | Keep | |
+| 94 | Push the branch (on by default) | Keep | |
+| 95 | Open a PR (on by default) | Keep | |
+| 96 | Auto-merge — armed by config, authorized by the agent's ready signal | Keep | |
+| 97 | Empty sessions publish nothing | Keep | |
+| 98 | Handoff panel: push / open PR / merge, as buttons | Keep | |
+| 99 | A withheld merge is reported with its reason | Keep | |
+| 100 | Conversations committed to the repo (readable chat, not the tool-call transcript) | Keep | |
+| 101 | `LOGS.md` — a committed human-readable project log, one entry per session | **Remove** — derivable from the event log | B3 |
+| 102 | Session history archived in the repo under per-user directories | Keep — merged with #100 | B3 |
+| 103 | Post-merge quality follow-ups queued (maintainability / security / readability) | Keep | |
+| 104 | Knowledge folded back into `DECISIONS.md` / `FACTS.md` / `INSIGHTS.md` at merge | Simplify — one knowledge directory | B4 |
 
 ### Autonomy — what happens when nobody is at the keyboard
 
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
-| 100 | Auto PM: drain the confirmed queue, refill it when empty | Keep | |
-| 101 | Five routines (update-tickets, triage-quick, triage-consensual, plan-tickets, maintenance) | Simplify — two jobs | E3 |
-| 102 | Each routine individually switchable off | **Remove** | E3 |
-| 103 | Every stand-down reported with its reason ("it is a setting, not a bug") | Keep | |
-| 104 | Concurrency cap: how many unattended agents per project | Keep | |
-| 105 | Fan-out planning: several agents, one ticket each | Keep | |
-| 106 | Cross-machine ticket claims so two agents never double-work | Simplify — one claim mechanism | E2 |
-| 107 | CI watch: merge a PR once its checks pass | Keep | |
-| 108 | CI watch: one fix session per red head commit, max two attempts | Keep | |
-| 109 | Reclaim the checkout of a session whose branch has landed | Simplify | E5 |
-| 110 | Release a pinned routine branch left behind by a closed PR | **Remove** — goes with pinned branches | E3 |
-| 111 | The session drains its own TODO backlog, one entry per turn | **Remove** — merges into the ticket model | B1 |
+| 105 | Auto PM: drain the confirmed queue, refill it when empty | Keep | |
+| 106 | Five routines (update-tickets, triage-quick, triage-consensual, plan-tickets, maintenance) | Simplify — two jobs | E3 |
+| 107 | Each routine individually switchable off | **Remove** | E3 |
+| 108 | Every stand-down reported with its reason ("it is a setting, not a bug") | Keep | |
+| 109 | Concurrency cap: how many unattended agents per project | Keep | |
+| 110 | Fan-out planning: several agents, one ticket each | Keep | |
+| 111 | Cross-machine ticket claims so two agents never double-work | Simplify — one claim mechanism | E2 |
+| 112 | CI watch: merge a PR once its checks pass | Keep | |
+| 113 | CI watch: one fix session per red head commit, max two attempts | Keep | |
+| 114 | Reclaim the checkout of a session whose branch has landed | Simplify | E5 |
+| 115 | Release a pinned routine branch left behind by a closed PR | **Remove** — goes with pinned branches | E3 |
+| 116 | The session drains its own TODO backlog, one entry per turn | **Remove** — merges into the ticket model | B1 |
 
 ### Spending
 
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
-| 112 | Usage panel: quota consumed, pace, projection | Keep | |
-| 113 | Unattended work stands down past the pro-rated share of the week | Keep | |
-| 114 | Work you asked for is never starved | Keep | |
-| 115 | Spend-offset slider | **Remove** — its asymmetric semantics are the complexity | E1 |
-| 116 | Per-session USD cost cap (`--max-cost`) | **Remove** — wrong unit for a subscription | E1 |
-| 117 | In-run consumption guard that pauses a session mid-flight | Simplify — merge into #113 | E1 |
-| 118 | Eco mode: trim prompt sections to save tokens | **Remove** — contradicts "spend the whole week" | C1 |
+| 117 | Usage panel: quota consumed, pace, projection | Keep | |
+| 118 | Unattended work stands down past the pro-rated share of the week | Keep | |
+| 119 | Work you asked for is never starved | Keep | |
+| 120 | Spend-offset slider | **Remove** — its asymmetric semantics are the complexity | E1 |
+| 121 | Per-session USD cost cap (`--max-cost`) | **Remove** — wrong unit for a subscription | E1 |
+| 122 | In-run consumption guard that pauses a session mid-flight | Simplify — merge into #118 | E1 |
+| 123 | Eco mode: trim prompt sections to save tokens | **Remove** — contradicts "spend the whole week" | C1 |
 
 ### Configuration
 
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
-| 119 | `the-framework.yml` — per-repo defaults that travel with the code | Keep | |
-| 120 | `SYSTEM.md` — your own instructions on top of the built-in prompt | Keep | |
-| 121 | Global user preferences | Simplify — 35 keys is too many | B5 |
-| 122 | Per-project preference overrides (a third tier) | **Remove** — the repo file already does this | B5 |
-| 123 | The run narrates which layer decided each setting | **Remove** — goes with the tier | B5 |
-| 124 | Theme (system / light / dark) | Keep | |
-| 125 | Preferred editor | Keep | |
-| 126 | Model picker | Keep | |
-| 127 | Agent picker (Claude Code / Codex) | Keep | |
-| 128 | Claude Code permission mode passthrough | Keep | |
-| 129 | `--context <dir>` — narrow the agent's focus | Keep | |
-| 130 | Vanilla mode (drop the built-in prompt, keep the emit protocols) | **Remove** — one off-switch is enough | C1 |
-| 131 | Transparent mode (raw `claude -p`, nothing framework-authored) | Keep — as the *only* off-switch | C1 |
-| 132 | Autopilot mode | Simplify — it is an auto-accept timeout, not a mode | C1 |
-| 133 | Technical mode | **Remove** — only selects preset variants | C1, A5 |
+| 124 | `the-framework.yml` — per-repo defaults that travel with the code | Keep | |
+| 125 | `SYSTEM.md` — your own instructions on top of the built-in prompt | Keep | |
+| 126 | Global user preferences | Simplify — 35 keys is too many | B5 |
+| 127 | Per-project preference overrides (a third tier) | **Remove** — the repo file already does this | B5 |
+| 128 | The run narrates which layer decided each setting | **Remove** — goes with the tier | B5 |
+| 129 | Theme (system / light / dark) | Keep | |
+| 130 | Preferred editor | Keep | |
+| 131 | Model picker | Keep | |
+| 132 | Agent picker (Claude Code / Codex) | Keep | |
+| 133 | Claude Code permission mode passthrough | Keep | |
+| 134 | `--context <dir>` — narrow the agent's focus | Keep | |
+| 135 | Vanilla mode (drop the built-in prompt, keep the emit protocols) | **Remove** — one off-switch is enough | C1 |
+| 136 | Transparent mode (raw `claude -p`, nothing framework-authored) | Keep — as the *only* off-switch | C1 |
+| 137 | Autopilot mode | Simplify — it is an auto-accept timeout, not a mode | C1 |
+| 138 | Technical mode | **Remove** — only selects preset variants | C1, A5 |
 
 ### Remote execution and sharing
 
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
-| 134 | Bind the daemon to the network behind a generated shared token | Keep | |
-| 135 | Relay: publish a session so teammates watch it live, read-only | **Remove** | A6 |
-| 136 | Watch mode (the same app rendering one session read-only) | **Remove** — goes with the relay | A6 |
-| 137 | Saved remote devices: run a session on another machine's daemon | **Remove** | A6 |
-| 138 | Run on a GitHub Actions runner (`--run-on actions`) | **Remove** | A6, D1 |
-| 139 | Run on a Claude Code cloud session (`--run-on web`) | **Remove** | A6, D1 |
-| 140 | Chrome extension bridging claude.ai questions back to the dashboard | **Remove** | A6 |
-| 141 | Answer a cloud session's question from the dashboard (typed back into claude.ai) | **Remove** — goes with #140 | A6 |
-| 142 | Browser-bridge token setting | **Remove** — goes with #140 | A6 |
+| 139 | Bind the daemon to the network behind a generated shared token | Keep | |
+| 140 | Relay: publish a session so teammates watch it live, read-only | **Remove** | A6 |
+| 141 | Watch mode (the same app rendering one session read-only) | **Remove** — goes with the relay | A6 |
+| 142 | Saved remote devices: run a session on another machine's daemon | **Remove** | A6 |
+| 143 | Run on a GitHub Actions runner (`--run-on actions`) | **Remove** | A6, D1 |
+| 144 | Run on a Claude Code cloud session (`--run-on web`) | **Remove** | A6, D1 |
+| 145 | Chrome extension bridging claude.ai questions back to the dashboard | **Remove** | A6 |
+| 146 | Answer a cloud session's question from the dashboard (typed back into claude.ai) | **Remove** — goes with #145 | A6 |
+| 147 | Browser-bridge token setting | **Remove** — goes with #145 | A6 |
 
 ### Notifications and chat
 
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
-| 143 | Browser notifications | Keep | |
-| 144 | Discord notifications: sessions started and finished | Keep | |
-| 145 | Discord notifications: what needs a human (open PR, parked question, unpushed commits) | Keep | |
-| 146 | Discord chatbot: answer a parked question, steer a live session, start one | **Remove** | A6 |
-| 147 | Discord reply mirror: the session's answers posted back to the channel | **Remove** — goes with #146 | A6 |
+| 148 | Browser notifications | Keep | |
+| 149 | Discord notifications: sessions started and finished | Keep | |
+| 150 | Discord notifications: what needs a human (open PR, parked question, unpushed commits) | Keep | |
+| 151 | Discord chatbot: answer a parked question, steer a live session, start one | **Remove** | A6 |
+| 152 | Discord reply mirror: the session's answers posted back to the channel | **Remove** — goes with #151 | A6 |
 
 ### The from-scratch build product
 
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
-| 148 | Point at an empty directory and the agent scaffolds a whole app | **Remove** | A4 |
-| 149 | `--scope prototype\|full` | **Remove** | A4 |
-| 150 | `--serve` — gate the loop on the app actually booting and answering | **Remove** | A4 |
-| 151 | `--sandbox docker` — run the serve check in a throwaway container | **Remove** | A4 |
-| 152 | A live preview link to the built app on the dashboard | **Remove** | A4 |
-| 153 | One-click "show me the app" preview, no agent involved | **Remove** | A6 |
-| 154 | `--deploy cloudflare\|dokploy` | **Remove** | A4 |
-| 155 | Five domain presets (software / web / data-science / product / biological-science) | **Remove** — off by default already | A5 |
-| 156 | `--kind bug-fix\|major-change` selecting which review chain gates the build | **Remove** | A5 |
-| 157 | Framework detection ("Detected Vike, confidence 0.8") | **Remove** — the output is a log line | A5 |
-| 158 | `--max-passes` review-loop budget | **Remove** — the loop is off by default | A3, A5 |
-| 159 | Read-only mode checkboxes showing the review policy in effect | **Remove** — goes with #155 | A5 |
-| 160 | `--browser` — give the agent a real browser (navigate, console, network, DOM, screenshots) | **Remove** | A6 |
+| 153 | Point at an empty directory and the agent scaffolds a whole app | **Remove** | A4 |
+| 154 | `--scope prototype\|full` | **Remove** | A4 |
+| 155 | `--serve` — gate the loop on the app actually booting and answering | **Remove** | A4 |
+| 156 | `--sandbox docker` — run the serve check in a throwaway container | **Remove** | A4 |
+| 157 | A live preview link to the built app on the dashboard | **Remove** | A4 |
+| 158 | One-click "show me the app" preview, no agent involved | **Remove** | A6 |
+| 159 | `--deploy cloudflare\|dokploy` | **Remove** | A4 |
+| 160 | Five domain presets (software / web / data-science / product / biological-science) | **Remove** — off by default already | A5 |
+| 161 | `--kind bug-fix\|major-change` selecting which review chain gates the build | **Remove** | A5 |
+| 162 | Framework detection ("Detected Vike, confidence 0.8") | **Remove** — the output is a log line | A5 |
+| 163 | `--max-passes` review-loop budget | **Remove** — the loop is off by default | A3, A5 |
+| 164 | Read-only mode checkboxes showing the review policy in effect | **Remove** — goes with #160 | A5 |
+| 165 | `--browser` — give the agent a real browser (navigate, console, network, DOM, screenshots) | **Remove** | A6 |
 
 ### What a user loses, stated plainly
 
@@ -313,6 +318,10 @@ Worth being honest about, rather than hiding behind the LOC counts:
 - **Chatting with sessions from Discord.** Notifications stay; two-way chat goes.
 - **Deploying.** Never really shipped (`cloudflare` and `dokploy` adapters, plan-only for
   everything else).
+- **Doing anything from a terminal except opening the dashboard.** No `the-framework "fix the
+  login bug"`, no `research` / `prompt` / `maintain` / `worktrees` verbs, and no settings flags —
+  the CLI keeps four bootstrap arguments and three verbs (D4). This is the one loss that is not a
+  channel but a *habit*, and the one most likely to be missed.
 
 Every one of these is a *distribution or execution channel*, not the core loop. None of them is
 load-bearing for "make the important decisions, let AI do the rest" — and each is currently paying
@@ -657,20 +666,67 @@ Given "one daemon per machine" is the stated architecture, the foreground dashbo
 implementation of the product's front door. **Do:** the CLI starts (or finds) the daemon and opens
 the browser. One host, no capability probing, no graceful degradation matrix.
 
-### D4. The CLI is the daemon↔session RPC, with 67 flags
-The daemon spawns sessions by `spawn`ing the CLI with flags (`--run-id`, `--queue-entry`,
-`--ticket`, `--unattended`, `--continue-run`, `--plan-run`, `--via`, `--run-on`, `--daemon-serve`,
-…). `cli.ts` is 2,589 lines and is simultaneously: an argument parser, the session runtime's
-wiring harness, the handoff orchestrator, and the daemon's process API.
+### D4. The CLI has no settings — only bootstrap arguments
+**67 flags → 7. 10 verbs → 3. And `cli.ts` (2,589 lines) stops being four things at once.**
 
-**Do:** split the *session entry point* from the *user CLI*. The daemon should hand its child a
-JSON options blob on a fd or a temp file — not 67 flags that also have to be human-facing, mutually
-validated, and documented. That alone removes most of the flag-combination validation ("flags that
-cannot apply say so before the spending") because the daemon never constructs an invalid
-combination.
+The dashboard is the product's user interface. Every *setting* on the CLI is therefore either a
+duplicate of a dashboard control or an encoding of something the user never types. Sorting all 67
+flags by who actually supplies them:
 
-Then the *user-facing* CLI is roughly: `the-framework` (open dashboard), `the-framework doctor`,
-`the-framework stop`. Everything else is a dashboard action.
+**(1) The daemon's process API — 27 flags, zero human users.**
+`--agent --auto-merge --auto-open-pr --auto-push-branch --autopilot --browser --context
+--continue-run --cwd --eco-auto-planning --eco-auto-research --eco-auto-maintenance --model
+--no-dashboard --on-before-mergeable --plan-run --queue-entry --resume-session --run-id --run-on
+--technical --ticket --topic --transparent --unattended --vanilla --via`
+
+These are `StartRunOptions` serialized onto a command line: `daemon-runtime.ts:155` spawns
+`bin.js` with them, and every field of `StartRunOptions` carries a "maps to `--x`" comment. It is
+an IPC format wearing a CLI's clothes — which is why it must *also* be human-facing, mutually
+validated, tri-stated (`--auto-open-pr` / `--no-auto-open-pr` exist so an explicit off can survive
+a repo file that says on), and documented in a 140-line help text.
+
+**Do:** hand the child a JSON blob on a temp file or fd. These 27 stop existing as flags. The
+tri-state dance goes with them: JSON has a real `false`, so `--no-*` pairs (7 flags) are
+unnecessary. So does most of the "flags that cannot apply say so before the spending" validation,
+because the daemon never constructs an invalid combination.
+
+**(2) Duplicates of a dashboard control — the same 27, seen from the human side.**
+Every one is already settable in Settings or the composer's options gear. Keeping both is what
+forces `config-layers.ts` to exist: its entire job is reconciling *run flags* > project prefs >
+repo file > user prefs, with each settled key remembering which tier decided it so the run can
+narrate its provenance. **Delete the flag tier and that collapses to three; with B5 (drop the
+per-project tier) it is two — repo file and user prefs — which is small enough not to need a
+resolver at all.**
+
+**(3) Flags belonging to features proposed for removal — ~23.**
+`--deploy --cf-project --dokploy-url --dokploy-app --serve --serve-install --serve-build
+--serve-port --serve-path --sandbox --scope` (A4); `--preset --kind --max-passes` (A5);
+`--share --session-link` (A6); `--vanilla --technical --eco-*` (C1); `--max-cost` (E1);
+`--resume` (D3); `--topic` (D7). They go with their features.
+
+**(4) What genuinely survives — 7 flags, 3 verbs.**
+The chicken-and-egg set: you cannot configure the dashboard from the dashboard before it exists,
+and you cannot ask a browser where to bind a socket.
+
+| Kept | Why it cannot be a dashboard setting |
+|---|---|
+| `--port` | The dashboard is not reachable yet |
+| `--host` | Binding to the network is a security decision made before anything is served |
+| `--daemon` | Foreground vs background is a property of *this* invocation |
+| `--cwd` | Which project — the one thing typed before a project is registered |
+| `--fake` | The offline/CI path; there is no human to click anything |
+| `-h`, `-v` | Table stakes |
+
+Verbs: `the-framework` (start/find the daemon, open the dashboard), `the-framework stop`,
+`the-framework doctor`. Everything else — `research`, `prompt`, `maintain`, `worktrees`, `relay`,
+`[intent...]` — is a dashboard action, or goes with its feature.
+
+**The one real loss:** you can no longer start a session by typing `the-framework "fix the login
+bug"` in a terminal. That is a genuine cost for a developer tool and should be a decision, not an
+accident. It is consistent with the product's own pitch — *"stop babysitting your coding agents"*
+describes someone watching a dashboard, not someone in a terminal — and if it is ever missed, one
+verb (`the-framework "<prompt>"` → POST to the daemon, open the browser at the new session) brings
+it back without reintroducing a single *setting*.
 
 ### D5. "run" vs "session" — pick one word
 The SPECs say **session** throughout ("A session is one agent working one task…"). The code says
@@ -935,10 +991,13 @@ Every contradiction found, with the resolution that favours subtraction.
    and loops. These three unlock each other; after them `run.ts` is a prompt loop.
 3. **D2** merge the two run paths, **D1**/**A6** cut surfaces, **D3** one dashboard host. The
    conditional complexity in `dashboard-rpc`, `telefunc-serve` and `system-prompt` collapses.
-4. **B1** one work-item format, **B3** one record, **E2** one claim. This is the deepest change
+4. **D4** strip the CLI to bootstrap arguments (do it *after* step 2–3, which delete ~23 flags
+   outright, so it is mostly deletion rather than migration) → then **B5**, because removing the
+   flag tier is what lets `config-layers.ts` go entirely.
+5. **B1** one work-item format, **B3** one record, **E2** one claim. This is the deepest change
    and the one that most improves "simple to reason about" — do it once the surface is smaller.
-5. **C1**/**C2**/**C4** prompt modes and source of truth. Cheap, independent, do any time.
-6. **D5** rename run→session, **G1**/**G3** docs. Mechanical; do last so it renames less code.
+6. **C1**/**C2**/**C4** prompt modes and source of truth. Cheap, independent, do any time.
+7. **D5** rename run→session, **G1**/**G3** docs. Mechanical; do last so it renames less code.
 
 **Rough scale:** A1–A6 alone remove on the order of **45,000–55,000 LOC of ~132,000** — about a
 third to 40% of the repo — without touching anything the stated business goal needs.

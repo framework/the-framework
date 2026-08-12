@@ -679,7 +679,6 @@ export interface HasTools {
 }
 
 export interface HasMemory {
-  conversationId?: string
   messages(): AiMessage[] | Promise<AiMessage[]>
 }
 
@@ -718,7 +717,6 @@ export interface AgentResponse {
   text: string
   steps: AgentStep[]
   usage: TokenUsage
-  conversationId?: string
   /** When the loop stopped early, why. */
   finishReason?: FinishReason
   /** Client tool calls awaiting browser-side execution. */
@@ -767,10 +765,6 @@ export interface AiConfig {
   providers: Record<string, AiProviderConfig>
   failover?: string[]
   models?: AiModelConfig[]
-  /** Conversation store for persisting agent conversations */
-  conversations?: ConversationStore
-  /** User memory store for persisting per-user facts beyond conversation history (#A4) */
-  memory?: UserMemory
   /** Eval framework knobs (#A5). Optional; the CLI applies sensible defaults. */
   eval?: {
     /**
@@ -849,40 +843,12 @@ export interface AgentPromptOptions {
    */
   cache?: false | CacheableConfig
   /**
-   * Per-call override for the agent's `conversational()` declaration.
-   *
-   * - `false` — disable auto-persist for this call (overrides any agent default).
-   * - {@link ConversationalSpec} — replace the agent's declaration for this call.
-   * - omitted — use the agent's declaration unchanged.
-   *
-   * Explicit `agent.forUser(id)` / `agent.continue(id)` chains shadow this
-   * override (and the class declaration) — see the docs for the precedence
-   * chain.
-   */
-  conversation?: ConversationalOverride
-  /**
-   * Per-call override for the agent's `remembers()` declaration.
-   *
-   * - `false` — disable user-memory for this call (overrides any agent default).
-   * - {@link RemembersSpec} — replace the agent's declaration for this call.
-   * - omitted — use the agent's declaration unchanged.
-   *
-   * Auto-inject and auto-extract behaviors land in later phases (#A4 Phase 2/3);
-   * Phase 1 only wires the declaration + per-call precedence chain so manual
-   * `app().make<UserMemory>('ai.memory')` callers and downstream phases can
-   * read a consistent spec.
-   */
-  memory?: RemembersOverride
-  /**
-   * Continuation-validation hook for the auto-persist / continuation path.
-   *
-   * When set and the call runs through conversation persistence
-   * (`Agent.conversational()`, `forUser()`, or `continue()`), the hook is
-   * invoked with the server-persisted history and the caller's incoming
-   * messages just before the agent loop runs. Throw to reject the request
-   * (forged tool result, rewritten history, cross-user continuation); the
-   * rejection propagates out of `prompt()` / the stream. Stateless calls
-   * (no persistence) never invoke it.
+   * Continuation-validation hook. When the caller passes explicit
+   * `messages` to resume a prior turn (e.g. an approval or client-tool
+   * round-trip), set this to validate the incoming messages against a
+   * trusted baseline before the agent loop runs. Throw to reject the
+   * request (forged tool result, rewritten history); the rejection
+   * propagates out of `prompt()` / the stream.
    *
    * Use {@link ContinuationValidator} directly, or
    * `defaultContinuationValidator()` from `@gemstack/ai-sdk` for the built-in
@@ -900,10 +866,9 @@ export interface ValidateContinuationOptions {
 }
 
 /**
- * Hook shape consumed by {@link AgentPromptOptions.validate}. Called by
- * `runWithPersistence` (and the streaming variant) with the server-persisted
- * history and the caller's incoming messages. Throw to reject the
- * continuation. See `@gemstack/ai-sdk`'s `validateContinuation` /
+ * Hook shape consumed by {@link AgentPromptOptions.validate}. Called with
+ * a trusted baseline history and the caller's incoming messages. Throw to
+ * reject the continuation. See `@gemstack/ai-sdk`'s `validateContinuation` /
  * `defaultContinuationValidator` for the reference implementation.
  */
 export type ContinuationValidator = (
@@ -919,191 +884,6 @@ export interface Attachment {
   mimeType: string
   name?: string
 }
-
-// ─── Conversation ─────────────────��───────────────────────
-
-export interface ConversationStoreMeta {
-  userId?: string
-  resourceSlug?: string
-  recordId?: string
-  /**
-   * Optional thread-segregation key — set by the auto-persist machinery so
-   * one user can talk to multiple agent classes without their threads
-   * cross-contaminating. Defaults to the agent class's name; overridable
-   * via the `agent` field returned by `Agent.conversational()`.
-   */
-  agent?: string
-}
-
-export interface ConversationStoreListEntry {
-  id: string
-  title: string
-  createdAt: Date
-  updatedAt?: Date
-  /** Mirrors {@link ConversationStoreMeta.agent} on the source row. */
-  agent?: string
-  /**
-   * Mirrors {@link ConversationStoreMeta.userId} on the source row — the only
-   * owner-aware read in the contract, so it is what the resume-by-id owner
-   * check reads (#984). A store that reports it gets threads only their owner
-   * can resume; a store that omits it stays as permissive as it was before,
-   * i.e. whoever holds the id can resume.
-   */
-  userId?: string
-}
-
-/**
- * Backend for persisted conversation threads.
- *
- * Implementing `list` correctly is what makes the resume-by-id owner check
- * (#984) enforceable, so it carries a contract beyond its signature:
- *
- * - `list(userId)` must return only that user's threads.
- * - `list()` with no argument must return every thread in the store, and each
- *   entry must mirror the row's `meta.userId` into
- *   {@link ConversationStoreListEntry.userId}. That field is the only
- *   owner-aware read in the contract.
- * - Omitting `userId` from entries leaves the store as permissive as it was
- *   before #984: whoever holds a thread id can resume it, because there is no
- *   owner to compare the run's user against.
- * - A `list()` that reports nothing while the store demonstrably holds rows
- *   cannot be reasoned about at all, so a resume by id is refused with
- *   `ConversationOwnershipError` rather than allowed.
- */
-export interface ConversationStore {
-  create(title?: string, meta?: ConversationStoreMeta): Promise<string>
-  load(conversationId: string): Promise<AiMessage[]>
-  append(conversationId: string, messages: AiMessage[]): Promise<void>
-  setTitle(conversationId: string, title: string): Promise<void>
-  /** Threads for `userId`, or every thread in the store when omitted. See the interface docs. */
-  list(userId?: string): Promise<ConversationStoreListEntry[]>
-  delete?(conversationId: string): Promise<void>
-}
-
-// ─── Conversational (auto-persist) ────────────────────────
-
-/**
- * Return shape of {@link Agent.conversational} when an agent opts into the
- * auto-persist behavior. Inspired by Laravel's `RemembersConversations` —
- * declare once on the class, then `agent.prompt(input)` auto-loads the user's
- * thread, runs, and appends without each caller threading a userId through.
- */
-export interface ConversationalSpec {
-  /** Identity of the user owning the conversation thread. */
-  user: string
-  /**
-   * Specific thread id to resume. When omitted, the auto-persist machinery
-   * resumes the user's most-recent thread for this `agent` key, or creates
-   * a new one if none exists.
-   */
-  id?: string
-  /**
-   * Override the thread-segregation key. Defaults to the agent class's
-   * name. Set this when you rename the class but want existing threads to
-   * keep flowing into the same agent (`agent: 'chat-v2'`), or when two
-   * different classes should share threads (rare).
-   */
-  agent?: string
-  /**
-   * Cap loaded history to the last N messages. Default unbounded. Use this
-   * for chat agents whose threads can grow long; for token-aware trimming,
-   * write a middleware instead.
-   */
-  historyLimit?: number
-}
-
-/**
- * Per-call override for `AgentPromptOptions.conversation`. `false` disables
- * auto-persist for this call; a partial spec replaces the agent's
- * declaration; omitted falls through to `Agent.conversational()`.
- */
-export type ConversationalOverride = false | ConversationalSpec
-
-// ─── User memory (#A4) ───────────────────────────────────
-
-/**
- * A single user-memory entry — a fact about a user, persisted across
- * conversations. Backends may add their own internal columns but the
- * framework only consumes this shape.
- */
-export interface MemoryEntry {
-  id:        string
-  userId:    string
-  fact:      string
-  tags?:     string[]
-  /**
-   * Optional confidence score in `[0, 1]`. Auto-extract sets this from
-   * the small model's self-rating; manual `remember()` calls may omit
-   * it. `recall()` ranking is implementation-defined when scores are
-   * absent.
-   */
-  score?:    number
-  createdAt: Date
-  updatedAt?: Date
-}
-
-/**
- * Per-user fact storage. Drop-in alongside `ConversationStore`. Backends
- * range from in-process (`MemoryUserMemory`) to ORM-backed (Phase 4) to
- * embedding-backed (Phase 5). The interface is intentionally narrow so
- * substring-match, full-text, and vector backends all satisfy it.
- */
-export interface UserMemory {
-  remember(userId: string, fact: string,  opts?: { tags?: string[]; score?: number }): Promise<MemoryEntry>
-  recall  (userId: string, query: string, opts?: { limit?: number;  tags?: string[] }): Promise<MemoryEntry[]>
-  forget  (userId: string, factId: string                                            ): Promise<void>
-  list    (userId: string,                opts?: { tags?: string[]; limit?: number  }): Promise<MemoryEntry[]>
-  /**
-   * Optional bulk-erase for GDPR right-to-be-forgotten. Backends that
-   * don't implement it leave the cascade to the app.
-   */
-  forgetAll?(userId: string): Promise<void>
-}
-
-/**
- * Return shape of {@link Agent.remembers} when an agent opts into user
- * memory. Phase 1 wires the declaration + per-call precedence chain;
- * the `inject` and `extract` knobs come live in Phase 2/3.
- */
-export interface RemembersSpec {
-  /** Identity of the user whose memory this agent reads/writes. */
-  user: string
-  /**
-   * Auto-injection policy:
-   * - `'auto'` (Phase 2) — `recall()` runs before each turn and matches
-   *   are prepended to the system message.
-   * - `'manual'` — agent code calls `recall()` itself.
-   * - `false` (default) — no injection.
-   */
-  inject?:  'auto' | 'manual' | false
-  /**
-   * Auto-extraction policy:
-   * - `'auto'` (Phase 3) — a small model distills facts from each turn
-   *   and writes them via `remember()`.
-   * - `'manual'` — agent code calls `remember()` itself.
-   * - `false` (default) — no extraction.
-   */
-  extract?: 'auto' | 'manual' | false
-  /**
-   * Small-model id for `extract: 'auto'`. Required when extraction is
-   * enabled. Format: `'<provider>/<model>'`, e.g.
-   * `'anthropic/claude-haiku-4-5'`.
-   */
-  extractWith?: string
-  /** Tag scope for both inject and extract. */
-  tags?: string[]
-  /** Cap injected facts per turn. Default unbounded (Phase 2). */
-  injectLimit?: number
-  /** Hard token cap on the rendered injected block (Phase 2). */
-  injectTokenBudget?: number
-}
-
-/**
- * Per-call override for `AgentPromptOptions.memory`. `false` disables
- * memory for this call; a spec replaces the agent's declaration;
- * omitted falls through to `Agent.remembers()`.
- */
-export type RemembersOverride = false | RemembersSpec
 
 // ─── Sub-agent updates (asTool streaming projection) ──────
 

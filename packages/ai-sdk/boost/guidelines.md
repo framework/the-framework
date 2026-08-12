@@ -2,7 +2,7 @@
 
 ## Overview
 
-AI engine for Rudder providing a provider-agnostic agent framework with tool calling, streaming, middleware, attachments, conversation persistence, structured output, and queued execution. Supports Anthropic, OpenAI, Google, Ollama, DeepSeek, xAI, Groq, Mistral, and Azure OpenAI out of the box. Models are addressed via `provider/model` strings (e.g. `anthropic/claude-sonnet-4-5`), and the `AiRegistry` handles provider resolution and failover.
+AI engine for Rudder providing a provider-agnostic agent framework with tool calling, streaming, middleware, attachments, structured output, and queued execution. Supports Anthropic, OpenAI, Google, Ollama, DeepSeek, xAI, Groq, Mistral, and Azure OpenAI out of the box. Models are addressed via `provider/model` strings (e.g. `anthropic/claude-sonnet-4-5`), and the `AiRegistry` handles provider resolution and failover.
 
 ## Key Patterns
 
@@ -125,30 +125,6 @@ await myAgent.prompt('Describe this image and summarize the doc', {
 })
 ```
 
-### Conversations
-
-Persist multi-turn conversations with `ConversationStore`. Register via `setConversationStore()` or pass `conversations` in AI config:
-
-```ts
-setConversationStore(new MemoryConversationStore())
-const response = await myAgent.forUser('user-123').prompt('Hello')  // creates conversation
-const follow = await myAgent.forUser('user-123').continue(response.conversationId).prompt('Follow up')
-```
-
-Keep `forUser()` on the resume: a thread may only be resumed by the user it was created for, and a mismatch (including a bare `continue()` with no user) throws `ConversationOwnershipError`. Threads stored without a `userId` stay open to whoever holds the id.
-
-For chat agents that should always auto-persist for the active user, override `conversational()` on the class — `agent.prompt(input)` then auto-loads + auto-saves without each caller passing the user id:
-
-```ts
-class ChatAgent extends Agent {
-  conversational() { return { user: Auth.user()?.id } }   // null user → opt-out
-}
-await new ChatAgent().prompt('Hi')          // auto-loads thread
-await new ChatAgent().prompt('still you?')  // resumes per (user, class)
-```
-
-Returning `false` (default) keeps the agent stateless. Optional `historyLimit: N` caps loaded messages. Per-call `{ conversation: false }` opts out; `forUser`/`continue` always win.
-
 ### Streaming
 
 Use `.stream()` for real-time token delivery:
@@ -239,7 +215,6 @@ const items = Output.array({ element: z.object({ title: z.string() }) })
 
 - **Model string format**: Always use `provider/model` (e.g. `anthropic/claude-sonnet-4-5`). A bare model name throws.
 - **Optional SDK deps**: Provider SDKs (`@anthropic-ai/sdk`, `openai`, `@google/genai`) are optional dependencies. Install the ones you need.
-- **ConversationStore required for `.forUser()`/`.continue()`**: Call `setConversationStore()` or pass `conversations` in the AI config. Without it, conversation methods throw.
 - **Tool loop limits**: `maxSteps()` defaults to 20. If the agent hits the limit it stops silently. Increase it for complex multi-tool workflows.
 - **Parallel tool execution**: when the model emits multiple tool calls in a single step, their `execute()` functions run concurrently by default. Streamed chunks still emit in tool-call order. Opt out via `prompt(..., { parallelTools: false })` or override `parallelTools()` on the agent class for tools with non-idempotent shared state.
 - **Streaming response access**: `await response` only resolves after the stream is fully consumed. Always iterate the stream first.
@@ -249,11 +224,10 @@ const items = Output.array({ element: z.object({ title: z.string() }) })
 
 ```ts
 import { AiProvider } from '@rudderjs/ai/server'           // service provider (Node only)
-import { Agent, agent, ConversableAgent } from '@rudderjs/ai'  // agents
+import { Agent, agent } from '@rudderjs/ai'                // agents
 import { AI } from '@rudderjs/ai'                          // facade (AI.prompt, AI.agent, AI.embed)
 import { toolDefinition } from '@rudderjs/ai'              // tool builder
 import { Image, Document } from '@rudderjs/ai'             // attachments
-import { MemoryConversationStore, setConversationStore } from '@rudderjs/ai'
 import { Output } from '@rudderjs/ai'                      // structured output
 import { AiRegistry } from '@rudderjs/ai'                  // provider registry
 import { mcpClientTools, mcpServerFromAgent } from '@rudderjs/ai/mcp'  // MCP bridge (Node)

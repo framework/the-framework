@@ -2,7 +2,7 @@ Documentation written for AI coding assistants — shipped with the package so a
 
 ## TLDR
 
-- The guidelines give the whole tour in one file — agents, providers, tools, streaming, conversations, caching, attachments, MCP, queued runs — plus the pitfalls that trip newcomers.
+- The guidelines give the whole tour in one file — agents, providers, tools, streaming, caching, attachments, MCP, queued runs — plus the pitfalls that trip newcomers.
 - Two loadable skills go deeper on the two everyday jobs: building an agent class, and defining tools (server vs. client tools, approval gates, streaming progress); each declares when it should be loaded and when its sibling applies instead.
 
 ## Before writing SPEC.md files

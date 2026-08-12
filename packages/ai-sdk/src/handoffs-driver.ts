@@ -134,7 +134,6 @@ export function stripInternal(r: AgentResponse & { _pendingHandoff?: PendingHand
     steps: r.steps,
     usage: r.usage,
   }
-  if (r.conversationId !== undefined) out.conversationId = r.conversationId
   if (r.finishReason !== undefined) out.finishReason = r.finishReason
   if (r.pendingClientToolCalls !== undefined) out.pendingClientToolCalls = r.pendingClientToolCalls
   if (r.pendingApprovalToolCall !== undefined) out.pendingApprovalToolCall = r.pendingApprovalToolCall

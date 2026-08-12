@@ -1,0 +1,11 @@
+The steering channel from the dashboard to a live run — the reverse of the event stream: the daemon appends an instruction to a file in the workspace and the run tails it, with no direct connection between the two.
+
+## TLDR
+
+- The instructions: stop the run, answer a parked gate, send a live chat message (carrying which surface it came from), re-arm or disarm the end-of-session handoff, bind a project-less run to a project, and a human's Merge — a pre-commitment that outranks the agent's own ready signal.
+- The file is emptied when a run starts, so a previous run's answers can never fire into this one — gate names repeat across runs.
+- Every line is shape-checked and a bad one is skipped: a half-written handoff entry must not silently stop a session publishing its work, and a forged surface name must not be able to fake a conversation heading.
+
+## Before writing SPEC.md files
+
+Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

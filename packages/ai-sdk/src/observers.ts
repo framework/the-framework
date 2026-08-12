@@ -42,7 +42,6 @@ export type AiEvent =
       duration:         number
       finishReason:     string
       streaming:        boolean
-      conversationId:   string | null
       failoverAttempts: number
     }
   | {
@@ -57,7 +56,6 @@ export type AiEvent =
       duration:         number
       finishReason:     string
       streaming:        boolean
-      conversationId:   string | null
       failoverAttempts: number
       error:            string
     }
@@ -80,7 +78,6 @@ export type AiEvent =
       /** Cumulative wall-clock ms since the loop started. */
       duration:       number
       streaming:      boolean
-      conversationId: string | null
     }
   | {
       /**

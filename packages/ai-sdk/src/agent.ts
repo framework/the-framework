@@ -5,14 +5,6 @@ import type { PauseForApprovalChunk, PauseForClientToolsChunk, ServerToolBuilder
 import type { HandoffSpec } from './handoff.js'
 import { attachmentsToContentParts, getMessageText } from './attachment.js'
 import { QueuedPromptBuilder } from './queue-job.js'
-import {
-  resolveAutoPersistSpec,
-  runWithPersistence,
-  runWithPersistenceStreaming,
-} from './conversation-persistence.js'
-import { resolveRemembersSpec } from './memory.js'
-import { withMemoryInject } from './memory-inject.js'
-import { withMemoryExtract } from './memory-extract.js'
 import type { SubAgentPauseKind, SubAgentRunSnapshot, SubAgentRunStore } from './sub-agent-run-store.js'
 import {
   runOnConfig,
@@ -46,9 +38,6 @@ import type {
   CacheableConfig,
   CacheableMarkers,
   ContentPart,
-  ConversationalOverride,
-  ConversationalSpec,
-  ConversationStore,
   SubAgentUpdate,
   FinishReason,
   HasMiddleware,
@@ -56,7 +45,6 @@ import type {
   MiddlewareContext,
   PrepareStepResult,
   ProviderRequestOptions,
-  RemembersSpec,
   StopCondition,
   StreamChunk,
   Tool,
@@ -65,7 +53,6 @@ import type {
   ToolResult,
   TokenUsage,
   ToolChoice,
-  UserMemory,
 } from './types.js'
 
 // ─── AI Observer (lazy accessor) ─────────────────────────
@@ -302,65 +289,6 @@ export abstract class Agent {
   cacheable(): CacheableConfig | undefined { return undefined }
 
   /**
-   * Opt into auto-persisted conversation behavior. Override on a subclass
-   * to declare *which* user owns the thread and (optionally) which
-   * specific thread, and the framework will load history before each
-   * `prompt()`/`stream()` call and append the new turn after it — without
-   * any caller having to remember `forUser()` / `continue()`.
-   *
-   * Returning `false` (the default) disables auto-persist; the agent runs
-   * stateless. Returning a {@link ConversationalSpec} opts in:
-   *
-   * @example
-   * class ChatAgent extends Agent {
-   *   conversational() {
-   *     return { user: Auth.user()?.id }   // null user → falsy → opt-out
-   *   }
-   * }
-   *
-   * await new ChatAgent().prompt('Hi')          // auto-loads + auto-saves
-   *
-   * **Precedence (high → low):**
-   * 1. Explicit `agent.forUser(id).prompt()` / `agent.continue(id).prompt()`
-   * 2. Per-call `prompt(input, { conversation: false | {...} })`
-   * 3. This method's return value
-   *
-   * Async returns are supported — useful when the user identity is fetched
-   * from an async DI binding.
-   */
-  conversational(): false | ConversationalSpec | Promise<false | ConversationalSpec> {
-    return false
-  }
-
-  /**
-   * Opt this agent class into per-user memory beyond conversation history
-   * (#A4). Returns a {@link RemembersSpec} naming the user whose memory
-   * the agent reads/writes, and how injection / extraction should behave.
-   * Returning `false` (the default) leaves the agent memory-stateless.
-   *
-   * Phase 1 wires the declaration + the per-call precedence chain so
-   * apps and downstream phases (auto-inject middleware in Phase 2,
-   * auto-extract middleware in Phase 3) can read a consistent spec.
-   * Calling this method directly today produces no runtime behavior
-   * unless application code reads it via `resolveRemembersSpec()`.
-   *
-   * **Precedence (high → low):**
-   * 1. Per-call `prompt(input, { memory: false | {...} })`
-   * 2. This method's return value
-   *
-   * Async returns are supported — useful when the user identity is fetched
-   * from an async DI binding.
-   *
-   * @example
-   * class SupportAgent extends Agent {
-   *   remembers() { return { user: ctx.user.id, inject: 'auto', tags: ['support'] } }
-   * }
-   */
-  remembers(): false | RemembersSpec | Promise<false | RemembersSpec> {
-    return false
-  }
-
-  /**
    * Default for `AgentPromptOptions.parallelTools`. When `true` (default),
    * multiple tool calls within a single step run their `execute()` functions
    * concurrently. Override on a subclass to flip the default for an agent
@@ -370,48 +298,17 @@ export abstract class Agent {
 
   /** Run the agent with a prompt (non-streaming) */
   async prompt(input: string, options?: AgentPromptOptions): Promise<AgentResponse> {
-    // Memory auto-cascade — appends inject (Phase 2) + extract (Phase 3)
-    // middlewares when `Agent.remembers()` opts in. Runs BEFORE
-    // conversation persistence so the persisted history flows in
-    // unchanged: inject only grows the system message; extract only
-    // fires onFinish.
-    const effOptions = await prepareOptionsWithMemoryAutoCascade(this, options)
-
-    const spec = await resolveAutoPersistSpec(() => this.conversational(), effOptions?.conversation)
-    if (spec) {
-      return runWithPersistence(
-        spec,
-        this.constructor.name,
-        resolveConversationStore,
-        input,
-        effOptions,
-        (innerOptions) => runAgentLoop(this, input, innerOptions),
-      )
-    }
-    return runAgentLoop(this, input, effOptions)
+    return runAgentLoop(this, input, options)
   }
 
   /** Run the agent with a prompt (streaming) */
   stream(input: string, options?: AgentPromptOptions): AgentStreamResponse {
-    return runStreamWithMaybeAutoPersist(this, input, options)
+    return runAgentLoopStreaming(this, input, options)
   }
 
   /** Queue the prompt for background execution */
   queue(input: string, options?: AgentPromptOptions): QueuedPromptBuilder {
     return new QueuedPromptBuilder(this, input, options)
-  }
-
-  /** Set the user scope for conversation persistence */
-  forUser(userId: string): ConversableAgent {
-    return new ConversableAgent(this).forUser(userId)
-  }
-
-  /**
-   * Continue an existing conversation. Chain it after `forUser()` when the
-   * thread has an owner — resuming one as another user is refused (#984).
-   */
-  continue(conversationId: string): ConversableAgent {
-    return new ConversableAgent(this).continue(conversationId)
   }
 
   /**
@@ -948,80 +845,6 @@ function generateSubRunId(): string {
   return `sub-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 }
 
-// ─── Conversable Agent (conversation persistence) ───────
-
-/**
- * Wraps an Agent to add conversation memory.
- * Created via `agent.forUser(id)` or `agent.continue(id)`.
- */
-export class ConversableAgent {
-  private _userId: string | undefined
-  private _conversationId: string | undefined
-
-  constructor(private readonly agent: Agent) {}
-
-  forUser(userId: string): this {
-    this._userId = userId
-    return this
-  }
-
-  continue(conversationId: string): this {
-    this._conversationId = conversationId
-    return this
-  }
-
-  async prompt(input: string, options?: AgentPromptOptions): Promise<AgentResponse> {
-    const spec = this.toSpec()
-    return runWithPersistence(
-      spec,
-      this.agent.constructor.name,
-      resolveConversationStore,
-      input,
-      options,
-      (effOptions) => runAgentLoop(this.agent, input, effOptions),
-    ).then((r) => {
-      // Track the resolved id back on the wrapper so a subsequent
-      // `wrapper.prompt()` call resumes the same thread.
-      if (r.conversationId) this._conversationId = r.conversationId
-      return r
-    })
-  }
-
-  stream(input: string, options?: AgentPromptOptions): AgentStreamResponse {
-    const spec = this.toSpec()
-    const persisted = runWithPersistenceStreaming(
-      spec,
-      this.agent.constructor.name,
-      resolveConversationStore,
-      input,
-      options,
-      (effOptions) => runAgentLoopStreaming(this.agent, input, effOptions),
-    )
-    // Update the wrapper's id once the run completes.
-    persisted.response.then(
-      (r) => { if (r.conversationId) this._conversationId = r.conversationId },
-      () => {},
-    )
-    return persisted
-  }
-
-  /**
-   * Translate the wrapper's explicit-form state (`forUser` / `continue`)
-   * into a {@link ConversationalSpec}. The explicit chain bypasses the
-   * agent's `conversational()` declaration entirely — `forUser` always
-   * wins over class defaults.
-   *
-   * A bare `continue()` still yields an empty user rather than throwing: it
-   * is a legal call for threads that have no owner, and one whose owner
-   * check refuses it for every thread that does (#984).
-   */
-  private toSpec(): ConversationalSpec {
-    if (this._conversationId) return { user: this._userId ?? '', id: this._conversationId }
-    if (this._userId)         return { user: this._userId }
-    throw new Error('[ai-sdk] ConversableAgent requires forUser() or continue() to be called before prompt().')
-  }
-}
-
 // ─── Anonymous Agent ─────────────────────────────────────
 
 class AnonymousAgent extends Agent {
@@ -1078,135 +901,6 @@ export function agent(
 
 // ─── Helpers ─────────────────────────────────────────────
 
-// ─── Conversation Store Registry ────────────────────────
-
-let _conversationStore: ConversationStore | undefined
-
-/** Set the global conversation store (called by service provider or manually) */
-export function setConversationStore(store: ConversationStore): void {
-  _conversationStore = store
-}
-
-function resolveConversationStore(): ConversationStore | undefined {
-  return _conversationStore
-}
-
-// ─── User Memory Registry (#A4) ──────────────────────────
-
-let _userMemory: UserMemory | undefined
-
-/**
- * Set the global {@link UserMemory} (called by `AiProvider` from
- * `AiConfig.memory`, or manually for tests / standalone setups).
- * Phase 2/3 middleware reads it via `resolveUserMemory()` —
- * imported by the persistence layer the same way
- * `resolveConversationStore` is wired today.
- */
-export function setUserMemory(memory: UserMemory): void {
-  _userMemory = memory
-}
-
-export function resolveUserMemory(): UserMemory | undefined {
-  return _userMemory
-}
-
-/**
- * Streaming counterpart of `Agent.prompt`'s auto-persist branch. The spec
- * resolution is async (since `conversational()` may return a Promise), so
- * we defer the decision into the outer wrapper that handles the inner
- * stream's setup the same way `runWithPersistenceStreaming` does for the
- * persisted path.
- */
-function runStreamWithMaybeAutoPersist(
-  a:       Agent,
-  input:   string,
-  options: AgentPromptOptions | undefined,
-): AgentStreamResponse {
-  // Synchronous fast path — most agents override neither `conversational()`
-  // nor `remembers()`. Skip the async outer entirely when we can prove
-  // both are no-ops, sparing a microtask boundary per streaming call.
-  //
-  // Both are invoked exactly once and the values threaded into the async path
-  // below: calling them again there would repeat the override's side effects
-  // (a DI or DB lookup) and leave this first promise unhandled if it rejects.
-  const declaredConv = a.conversational()
-  const declaredMem  = a.remembers()
-  const isFast = (
-    (options?.conversation === false ||
-      (declaredConv === false && options?.conversation === undefined))
-    && (options?.memory === false ||
-      (declaredMem === false && options?.memory === undefined) ||
-      options?.messages !== undefined)
-  )
-  if (isFast) {
-    return runAgentLoopStreaming(a, input, options)
-  }
-
-  // Async path — resolve memory + conversation specs, then dispatch.
-  let resolveResp: (r: AgentResponse) => void
-  let rejectResp:  (e: unknown) => void
-  const responsePromise = new Promise<AgentResponse>((res, rej) => { resolveResp = res; rejectResp = rej })
-
-  async function* outer(): AsyncIterable<StreamChunk> {
-    let effOptions: AgentPromptOptions | undefined
-    let spec: ConversationalSpec | null
-    try {
-      // Memory auto-cascade BEFORE conversation persistence — same
-      // ordering as the non-streaming `Agent.prompt` path.
-      effOptions = await prepareOptionsWithMemoryAutoCascade(a, options, () => declaredMem)
-      spec = await resolveAutoPersistSpec(() => declaredConv, effOptions?.conversation)
-    } catch (err) {
-      rejectResp!(err)
-      throw err
-    }
-
-    if (!spec) {
-      const inner = runAgentLoopStreaming(a, input, effOptions)
-      try {
-        for await (const chunk of inner.stream) yield chunk
-      } catch (err) {
-        rejectResp!(err)
-        throw err
-      }
-      try {
-        const r = await inner.response
-        resolveResp!(r)
-      } catch (err) {
-        rejectResp!(err)
-        throw err
-      }
-      return
-    }
-
-    const persisted = runWithPersistenceStreaming(
-      spec,
-      a.constructor.name,
-      resolveConversationStore,
-      input,
-      effOptions,
-      (innerOptions) => runAgentLoopStreaming(a, input, innerOptions),
-    )
-
-    try {
-      for await (const chunk of persisted.stream) yield chunk
-    } catch (err) {
-      rejectResp!(err)
-      throw err
-    }
-    try {
-      const r = await persisted.response
-      resolveResp!(r)
-    } catch (err) {
-      rejectResp!(err)
-      throw err
-    }
-  }
-
-  return { stream: outer(), response: responsePromise }
-}
-
-// ─── Helpers ─────────────────────────────────────────────
-
 function hasToolsMethod(a: Agent): a is Agent & HasTools {
   return 'tools' in a && typeof (a as { tools?: unknown }).tools === 'function'
 }
@@ -1215,64 +909,12 @@ function getTools(a: Agent): AnyTool[] {
   return hasToolsMethod(a) ? a.tools() : []
 }
 
-/**
- * Internal symbol used to plumb auto-installed middlewares (today:
- * memory-inject; future: budget-tracker, etc.) through the public
- * `AgentPromptOptions` without polluting its surface. Resolution
- * happens at the `Agent.prompt` / `Agent.stream` boundary; the loop
- * just appends them to the user's `agent.middleware()` array.
- */
-const EXTRA_MIDDLEWARES = Symbol.for('rudderjs.ai.extraMiddlewares')
-
-interface ExtraMiddlewareOptions {
-  [EXTRA_MIDDLEWARES]?: AiMiddleware[]
-}
-
 function hasMiddlewareMethod(a: Agent): a is Agent & HasMiddleware {
   return 'middleware' in a && typeof (a as { middleware?: unknown }).middleware === 'function'
 }
 
-function getMiddleware(a: Agent, options?: AgentPromptOptions): AiMiddleware[] {
-  const own = hasMiddlewareMethod(a) ? a.middleware() : []
-  const extras = (options as (AgentPromptOptions & ExtraMiddlewareOptions) | undefined)?.[EXTRA_MIDDLEWARES] ?? []
-  return extras.length > 0 ? [...own, ...extras] : own
-}
-
-/**
- * Resolve the effective `remembers()` spec and append the appropriate
- * memory middlewares (inject for Phase 2, extract for Phase 3) to the
- * options' hidden extras list. Skips entirely on:
- * - continuation calls (`options.messages` set) — the system message
- *   was already augmented on the original `prompt()`, re-injecting
- *   would duplicate the block on every tool round-trip; re-extracting
- *   would also double-write the same facts on every round-trip.
- * - specs where neither `inject === 'auto'` nor `extract === 'auto'`
- *   apply.
- *
- * Returns options unchanged when no auto-cascade is needed so the
- * downstream conversational/loop path sees the original reference.
- */
-async function prepareOptionsWithMemoryAutoCascade(
-  a:        Agent,
-  options?: AgentPromptOptions,
-  /** Reuse an already-obtained `remembers()` result instead of calling it again. */
-  declared?: () => ReturnType<Agent['remembers']>,
-): Promise<AgentPromptOptions | undefined> {
-  if (options?.messages) return options
-
-  const spec = await resolveRemembersSpec(declared ?? (() => a.remembers()), options?.memory)
-  if (!spec) return options
-
-  const installed: AiMiddleware[] = []
-  if (spec.inject === 'auto')                      installed.push(withMemoryInject(spec))
-  if (spec.extract === 'auto' && spec.extractWith) installed.push(withMemoryExtract(spec))
-  if (installed.length === 0) return options
-
-  const current = (options as (AgentPromptOptions & ExtraMiddlewareOptions) | undefined)?.[EXTRA_MIDDLEWARES] ?? []
-  return {
-    ...options,
-    [EXTRA_MIDDLEWARES]: [...current, ...installed],
-  } as AgentPromptOptions
+function getMiddleware(a: Agent): AiMiddleware[] {
+  return hasMiddlewareMethod(a) ? a.middleware() : []
 }
 
 function createMiddlewareContext(
@@ -1496,7 +1138,6 @@ function emitObserverFailed(loopCtx: LoopContext, err: unknown, streaming: boole
     duration:         Math.round(performance.now() - loopCtx.loopStart),
     finishReason:     'error',
     streaming,
-    conversationId:   null,
     failoverAttempts: loopCtx.failoverAttempts,
     error:            err instanceof Error ? err.message : String(err),
   })
@@ -1541,7 +1182,6 @@ function emitObserverStepCompleted(
     },
     duration:       Math.round(performance.now() - loopCtx.loopStart),
     streaming,
-    conversationId: null,
   })
 }
 
@@ -1567,7 +1207,6 @@ function emitObserverCompleted(loopCtx: LoopContext, result: AgentResponse, stre
     duration:         Math.round(performance.now() - loopCtx.loopStart),
     finishReason:     result.finishReason ?? lastStep?.finishReason ?? 'stop',
     streaming,
-    conversationId:   null,
     failoverAttempts: loopCtx.failoverAttempts,
   })
 }
@@ -1613,7 +1252,7 @@ async function initializeLoop(
   const modelString = a.model() ?? AiRegistry.getDefault()
   const [providerName] = AiRegistry.parseModelString(modelString)
   const tools = getTools(a)
-  const middlewares = getMiddleware(a, options)
+  const middlewares = getMiddleware(a)
   const toolSchemas = buildToolSchemas(tools)
   const toolMap = buildToolMap(tools)
 

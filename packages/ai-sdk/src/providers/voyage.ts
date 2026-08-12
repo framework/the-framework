@@ -42,10 +42,9 @@
  * Voyage embeddings perform measurably better when the API knows whether
  * a string is a search **query** or an indexed **document**. We default
  * `input_type` to `'document'` because that's the most common case for
- * RAG pipelines (matches `@gemstack/ai-sdk`'s `similaritySearch` and
- * `EmbeddingUserMemory` ingestion paths). Apps building query-side
- * pipelines should override via `inputType: 'query'` on the embed call
- * — see {@link VoyageEmbedExtras}.
+ * RAG pipelines (matches `@gemstack/ai-sdk`'s `similaritySearch` ingestion
+ * paths). Apps building query-side pipelines should override via
+ * `inputType: 'query'` on the embed call — see {@link VoyageEmbedExtras}.
  */
 
 import type {

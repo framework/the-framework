@@ -1,10 +1,10 @@
 ---
 name: ai-agents
-description: Building AI agents with tools, streaming, conversation memory, approval flows, and middleware in Rudder
+description: Building AI agents with tools, streaming, approval flows, and middleware in Rudder
 license: MIT
 appliesTo:
   - '@rudderjs/ai'
-trigger: building an `Agent` class, calling `Agent.prompt()`/`.stream()`, defining `tools()` or `middleware()`, or wiring conversations / failover
+trigger: building an `Agent` class, calling `Agent.prompt()`/`.stream()`, defining `tools()` or `middleware()`, or wiring failover
 skip: writing a tool definition by itself — load `ai-tools` instead
 metadata:
   author: rudderjs
@@ -14,7 +14,7 @@ metadata:
 
 ## When to use this skill
 
-Load this skill when you need to build an AI agent, run prompts with tool loops, stream responses, persist conversations, use approval gates, or queue agent work for background execution.
+Load this skill when you need to build an AI agent, run prompts with tool loops, stream responses, use approval gates, or queue agent work for background execution.
 
 ## Key concepts
 
@@ -22,7 +22,6 @@ Load this skill when you need to build an AI agent, run prompts with tool loops,
 - **Anonymous agents**: Use the `agent()` function for inline, one-off agents without a class.
 - **Tool loop**: The agent runs a loop: prompt model -> execute tool calls -> feed results back -> repeat until stop condition.
 - **Streaming**: `agent.stream()` returns `{ stream: AsyncIterable<StreamChunk>, response: Promise<AgentResponse> }`.
-- **Conversations**: `agent.forUser(id).prompt()` or `agent.continue(conversationId).prompt()` for persistent memory.
 - **Provider/model string**: Format is `'provider/model'` (e.g. `'anthropic/claude-sonnet-4-5'`, `'openai/gpt-4o'`).
 - **Finish reasons**: `'stop'`, `'tool_calls'`, `'length'`, `'client_tool_calls'`, `'tool_approval_required'`.
 
@@ -110,27 +109,7 @@ const response = await agent({
 }).prompt('Find users named John')
 ```
 
-### 5. Conversation persistence
-
-```ts
-const myAgent = new ResearchAgent()
-
-// Start a new conversation for a user
-const response1 = await myAgent.forUser('user-123').prompt('What is TypeScript?')
-const convId = response1.conversationId!
-
-// Continue the same conversation. Keep forUser(): a thread is owned by the
-// user it was created for, and resuming it as anyone else throws.
-const response2 = await myAgent.forUser('user-123').continue(convId).prompt('Tell me more about generics')
-// The agent sees the full conversation history
-
-// Streaming with conversations
-const { stream, response } = myAgent.forUser('user-123').stream('Explain async/await')
-```
-
-A `ConversationStore` must be registered. The built-in `MemoryConversationStore` works for dev; implement the `ConversationStore` interface for production (database-backed).
-
-### 6. Stop conditions
+### 5. Stop conditions
 
 ```ts
 import { Agent, stepCountIs, hasToolCall } from '@rudderjs/ai'
@@ -148,7 +127,7 @@ class MyAgent extends Agent {
 }
 ```
 
-### 7. Per-step control (prepareStep)
+### 6. Per-step control (prepareStep)
 
 ```ts
 class AdaptiveAgent extends Agent {
@@ -163,7 +142,7 @@ class AdaptiveAgent extends Agent {
 }
 ```
 
-### 8. Middleware
+### 7. Middleware
 
 ```ts
 import type { AiMiddleware } from '@rudderjs/ai'
@@ -197,7 +176,7 @@ class MyAgent extends Agent implements HasMiddleware {
 }
 ```
 
-### 9. Queue for background execution
+### 8. Queue for background execution
 
 ```ts
 const myAgent = new ResearchAgent()
@@ -206,7 +185,7 @@ const myAgent = new ResearchAgent()
 myAgent.queue('Analyze this dataset').dispatch()
 ```
 
-### 10. Failover providers
+### 9. Failover providers
 
 ```ts
 class ResilientAgent extends Agent {
@@ -216,7 +195,7 @@ class ResilientAgent extends Agent {
 }
 ```
 
-### 11. Attachments (images/documents)
+### 10. Attachments (images/documents)
 
 ```ts
 const response = await agent('Describe this image.').prompt('What do you see?', {
@@ -235,7 +214,6 @@ See `playground/app/Agents/ResearchAgent.ts` for a working agent class.
 
 - **Provider SDK not installed**: Each provider's SDK is an optional peer dependency. Install only what you use: `@anthropic-ai/sdk`, `openai`, `@google/genai`.
 - **No default model**: If `model()` returns `undefined`, the agent uses the registry default from `config/ai.ts`. Make sure one is configured.
-- **ConversationStore missing**: `forUser()` / `continue()` throw if no `ConversationStore` is registered. Register one via `setConversationStore()` or through the AI service provider.
 - **maxSteps exhaustion**: Default is 20 iterations. If the agent hits `maxSteps`, it stops with whatever text it has. Override `maxSteps()` for agents that need more iterations.
 - **Streaming vs non-streaming tool updates**: `yield` from an `async function*` tool execute emits `tool-update` chunks during streaming. In non-streaming `prompt()`, yields are silently drained.
 - **Client tools**: Tools without an `execute` function are client tools. The loop pauses with `finishReason: 'client_tool_calls'` and returns `pendingClientToolCalls` for browser-side execution.

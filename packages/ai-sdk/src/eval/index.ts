@@ -233,9 +233,9 @@ export function regex(pattern: RegExp): Metric {
  * natural-language criterion. Returns the judge's reasoning in
  * `reason` so failures are debuggable.
  *
- * Design: the judge runs as a one-shot anonymous agent (no recursion
- * concern — default `remembers()` is `false`). Output is shaped via
- * `Output.object({ schema })` for deterministic parsing. Failures
+ * Design: the judge runs as a one-shot, stateless anonymous agent (no
+ * recursion concern). Output is shaped via `Output.object({ schema })`
+ * for deterministic parsing. Failures
  * (network, parse, unhandled judge error) bubble as `pass: false`
  * with the error in `reason` — a broken judge is not a passing case.
  *
@@ -334,9 +334,8 @@ export function jsonShape<T>(schema: z.ZodType<T>): Metric {
 /**
  * Embedding-based fuzzy match. Embeds both `reference` and
  * `response.text` via `AI.embed()`, computes cosine similarity,
- * passes when >= `threshold` (default `0.85` — tighter than
- * `EmbeddingUserMemory`'s 0.5 retrieval-rank floor since this is
- * an assertion, not a ranking).
+ * passes when >= `threshold` (default `0.85`, tighter than a typical
+ * retrieval-rank floor since this is an assertion, not a ranking).
  *
  * Uses ≤ 2 embedding calls per case; embed tokens roll into the
  * case's cost rollup via the same side-channel `llmJudge` uses.

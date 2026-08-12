@@ -21,15 +21,6 @@ export type {
   CacheableConfig,
   CacheableMarkers,
   ClientTool,
-  ConversationStore,
-  ConversationStoreMeta,
-  ConversationStoreListEntry,
-  ConversationalSpec,
-  ConversationalOverride,
-  MemoryEntry,
-  RemembersOverride,
-  RemembersSpec,
-  UserMemory,
   FinishReason,
   HasMiddleware,
   HasMemory,
@@ -128,7 +119,7 @@ export { handoff, isHandoffTool } from './handoff.js'
 export type { HandoffTool, HandoffOptions, HandoffSpec } from './handoff.js'
 
 // Agent
-export { Agent, ConversableAgent, agent, stepCountIs, hasToolCall, setConversationStore, setUserMemory, resolveUserMemory } from './agent.js'
+export { Agent, agent, stepCountIs, hasToolCall } from './agent.js'
 export type {
   InvalidToolArgumentsError,
   SubAgentResumeOptions,
@@ -148,10 +139,7 @@ export { runOnConfig, runOnChunk, runOnBeforeToolCall, runOnAfterToolCall, runSe
 // Structured Output
 export { Output, type OutputWrapper } from './output.js'
 
-// Conversation
-export { MemoryConversationStore } from './conversation.js'
-export { ConversationOwnershipError } from './conversation-persistence.js'
-export { sanitizeConversation } from './sanitize-conversation.js'
+// Continuation validation
 export {
   validateContinuation,
   assertValidContinuation,
@@ -164,14 +152,6 @@ export type {
   ContinuationValidator,
   ValidateContinuationOptions,
 } from './continuation-validation.js'
-
-// User Memory (#A4)
-export { MemoryUserMemory, resolveRemembersSpec } from './memory.js'
-export type { UserMemoryLookup } from './memory.js'
-export { withMemoryInject } from './memory-inject.js'
-export type { MemoryInjectOptions } from './memory-inject.js'
-export { withMemoryExtract } from './memory-extract.js'
-export type { MemoryExtractOptions } from './memory-extract.js'
 
 // Neutral cache contract for the cache-backed run stores (bring your own)
 export type { CacheAdapter } from './cache-adapter.js'

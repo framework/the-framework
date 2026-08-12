@@ -1,0 +1,5 @@
+Tests the preference-to-run-options mapping: the defaults (autopilot on, publishing armed, auto-merge off), settled answers travelling explicitly in both directions, the push-under-pull-request ladder, the repo file's layer position between global and project settings, and meaningless options being dropped.
+
+## Before writing SPEC.md files
+
+Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

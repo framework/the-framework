@@ -1,0 +1,5 @@
+Runs the test suite against a throwaway home for the machine's global state, so a test can never find — or hang on — the developer's live daemon.
+
+## Before writing SPEC.md files
+
+Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

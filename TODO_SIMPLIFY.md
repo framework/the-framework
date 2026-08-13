@@ -69,7 +69,7 @@ pointer to the proposal in Part 3. Nothing is omitted: features I propose deleti
 beside the ones that survive, so the cost of each proposal is visible in user terms rather than in
 lines of code.
 
-**Tally: 173 user-facing features — 93 Keep, 22 Simplify, 58 Remove.**
+**Tally: 173 user-facing features — 105 Keep, 20 Simplify, 48 Remove.**
 
 The product a user actually came for — *register a repo, describe work, watch an agent do it,
 get a PR, and let it keep working while you sleep* — is entirely inside the Keep column.
@@ -80,8 +80,8 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 |---|---|---|---|
 | 1 | Install globally or run via `npx` | Keep | |
 | 2 | `the-framework` spins up the dashboard and finds/starts the daemon | Keep | |
-| 3 | Activate a repo (commits dirty state, creates `.the-framework/`, teaches `.gitignore`, registers it) | Keep | |
-| 4 | Auto-register every repo under a configured "repos directory" | Keep | |
+| 3 | Activate a repo (commits dirty state, creates `.the-framework/`, teaches `.gitignore`, registers it) | Keep — via the dashboard only (the CLI path goes) |  |
+| 4 | Auto-register every repo under a configured "repos directory" | **Remove** — adding a project is a UI action; the directory scan is a second path to the same thing |  |
 | 5 | Onboarding checklist (6 steps, each derived from a real fact, not a click) | Simplify — steps for removed features go with them | A6 |
 | 6 | `the-framework doctor` prerequisite check | Keep | |
 | 7 | Per-session preflight (probe the agent CLI before spending a branch) | Keep | |
@@ -96,7 +96,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 11 | Options gear writing straight to user/project preferences | Simplify — one preference tier | B5 |
 | 12 | Pre-flight warnings before spending (no `gh`, logged out, repo can't auto-merge) | Keep | |
 | 13 | Start a session from a ticket row | Keep | |
-| 14 | Start a session from a queue entry's play button | Simplify — merges into #13 | B1 |
+| 14 | Start a session from a queue entry's play button | Keep |  |
 | 15 | "Run now" on a routine | Keep | |
 | 16 | CLI `the-framework` — serve the dashboard | Keep — **the entire CLI** | D4 |
 | 17 | CLI `--host` / `--port` | Keep (settled) — the two things a browser cannot be asked | D4 |
@@ -113,7 +113,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 28 | CLI `the-framework doctor` | **Remove** as a verb — already a dashboard read (`AgentReady`, the onboarding checklist, the per-session preflight) | D4 |
 | 29 | CLI `--fake` — deterministic offline demo | **Remove** from the user surface — the e2e harness appends it to its own child's argv | D4 |
 | 30 | CLI `the-framework [intent...]` — build an app from scratch | **Remove** | A4 |
-| 31 | CLI `the-framework prompt <text>` — one verbatim prompt | **Remove** as a verb — the *path* survives as the only run path | D2, D4 |
+| 31 | CLI `the-framework prompt <text>` — one verbatim prompt | **Remove** as a verb — the *path* survives as the only run path; the e2e harness moves to an internal test interface, not this one | D2, D4 |
 | 32 | CLI `the-framework research [what]` | **Remove** as a verb — it is a preset in the composer | D4 |
 | 33 | CLI `the-framework maintain` — sweep repos for un-reviewed commits | **Remove** as a verb — folds into the daemon tick | E3, E4 |
 | 34 | CLI `the-framework worktrees [rm\|prune\|sweep]` | **Remove** as a verb — it is the session actions menu | D4, E5 |
@@ -168,8 +168,8 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 73 | Session action: Serve / preview the app | **Remove** | A6 |
 | 74 | Session action: copy a shareable watch link | **Remove** | A6 |
 | 75 | Session action: Merge when finished (arm auto-merge mid-session) | Keep | |
-| 76 | Live browser screencast inline, degrading to a last still | **Remove** | A6 |
-| 77 | Hand the browser to the human on a login wall / captcha / 2FA | **Remove** | A6 |
+| 76 | Live browser screencast inline, degrading to a last still | Keep | A6 |
+| 77 | Hand the browser to the human on a login wall / captcha / 2FA | Keep — the reason a screencast is watched | A6 |
 | 78 | A session is a URL you can paste, reload and bookmark | Keep | |
 | 79 | The agent names the session; the branch is renamed to match | Keep | |
 | 80 | Ready-for-merge status flips the session badge | Keep | |
@@ -215,7 +215,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 105 | Empty sessions publish nothing | Keep | |
 | 106 | Handoff panel: push / open PR / merge, as buttons | Keep | |
 | 107 | A withheld merge is reported with its reason | Keep | |
-| 108 | Conversations committed to the repo (readable chat, not the tool-call transcript) | Keep | |
+| 108 | Conversations committed to the repo (readable chat, not the tool-call transcript) | **Remove** — with it the whole `conversations/` feature | B3 |
 | 109 | `LOGS.md` — a committed human-readable project log, one entry per session | **Remove** — derivable from the event log | B3 |
 | 110 | Session history archived in the repo under per-user directories | Keep — merged with #108 | B3 |
 | 111 | Post-merge quality follow-ups queued (maintainability / security / readability) | Keep | |
@@ -227,7 +227,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 |---|---|---|---|
 | 113 | Auto PM: drain the confirmed queue, refill it when empty | Keep | |
 | 114 | Five routines (update-tickets, triage-quick, triage-consensual, plan-tickets, maintenance) | Simplify — two jobs | E3 |
-| 115 | Each routine individually switchable off | **Remove** | E3 |
+| 115 | Each routine individually switchable off | Keep | E3 |
 | 116 | Every stand-down reported with its reason ("it is a setting, not a bug") | Keep | |
 | 117 | Concurrency cap: how many unattended agents per project | Keep | |
 | 118 | Fan-out planning: several agents, one ticket each | Keep | |
@@ -243,12 +243,12 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
 | 125 | Usage panel: quota consumed, pace, projection | Keep | |
-| 126 | Unattended work stands down past the pro-rated share of the week | Keep | |
+| 126 | Unattended work stands down past the pro-rated share of the week | Keep — it gates *starting* work, never a session already running | E1 |
 | 127 | Work you asked for is never starved | Keep | |
-| 128 | Spend-offset slider | **Remove** — its asymmetric semantics are the complexity | E1 |
+| 128 | Spend-offset slider | Keep — the one budget control for autonomous work | E1 |
 | 129 | Per-session USD cost cap (`--max-cost`) | **Remove** — wrong unit for a subscription | E1 |
-| 130 | In-run consumption guard that pauses a session mid-flight | Simplify — merge into #126 | E1 |
-| 131 | Eco mode: trim prompt sections to save tokens | **Remove** — contradicts "spend the whole week" | C1 |
+| 130 | In-run consumption guard that pauses a session mid-flight | **Remove** — a running session is never interrupted for quota | E1 |
+| 131 | Eco mode: trim prompt sections to save tokens | **Remove** — the whole eco setting | C1 |
 
 ### Configuration
 
@@ -265,7 +265,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 140 | Agent picker (Claude Code / Codex) | Keep | |
 | 141 | Claude Code permission mode passthrough | Keep | |
 | 142 | `--context <dir>` — narrow the agent's focus | Keep | |
-| 143 | Vanilla mode (drop the built-in prompt, keep the emit protocols) | **Remove** — one off-switch is enough | C1 |
+| 143 | Vanilla mode (drop the built-in prompt, keep the emit protocols) | Keep | C1 |
 | 144 | Transparent mode (raw `claude -p`, nothing framework-authored) | Keep — as the *only* off-switch | C1 |
 | 145 | Autopilot mode | Simplify — it is an auto-accept timeout, not a mode | C1 |
 | 146 | Technical mode | **Remove** — only selects preset variants | C1, A5 |
@@ -277,12 +277,12 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 147 | Bind the daemon to the network behind a generated shared token | Keep | |
 | 148 | Relay: publish a session so teammates watch it live, read-only | **Remove** | A6 |
 | 149 | Watch mode (the same app rendering one session read-only) | **Remove** — goes with the relay | A6 |
-| 150 | Saved remote devices: run a session on another machine's daemon | **Remove** | A6 |
-| 151 | Run on a GitHub Actions runner (`--run-on actions`) | **Remove** | A6, D1 |
-| 152 | Run on a Claude Code cloud session (`--run-on web`) | **Remove** | A6, D1 |
-| 153 | Chrome extension bridging claude.ai questions back to the dashboard | **Remove** | A6 |
-| 154 | Answer a cloud session's question from the dashboard (typed back into claude.ai) | **Remove** — goes with #153 | A6 |
-| 155 | Browser-bridge token setting | **Remove** — goes with #153 | A6 |
+| 150 | Saved remote devices: run a session on another machine's daemon | Keep — dashboard here, agents there | A6 |
+| 151 | Run on a GitHub Actions runner (`--run-on actions`) | Keep | A6 |
+| 152 | Run on a Claude Code cloud session (`--run-on web`) | Keep | A6 |
+| 153 | Chrome extension bridging claude.ai questions back to the dashboard | Keep | A6 |
+| 154 | Answer a cloud session's question from the dashboard (typed back into claude.ai) | Keep | A6 |
+| 155 | Browser-bridge token setting | Keep — the price of #153 | A6 |
 
 ### Notifications and chat
 
@@ -291,8 +291,8 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 156 | Browser notifications | Keep | |
 | 157 | Discord notifications: sessions started and finished | Keep | |
 | 158 | Discord notifications: what needs a human (open PR, parked question, unpushed commits) | Keep | |
-| 159 | Discord chatbot: answer a parked question, steer a live session, start one | **Remove** | A6 |
-| 160 | Discord reply mirror: the session's answers posted back to the channel | **Remove** — goes with #159 | A6 |
+| 159 | Discord chatbot: answer a parked question, steer a live session, start one | Keep | A6 |
+| 160 | Discord reply mirror: the session's answers posted back to the channel | **Remove** — the chatbot stays, the mirror goes | A6 |
 
 ### The from-scratch build product
 
@@ -310,7 +310,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 170 | Framework detection ("Detected Vike, confidence 0.8") | **Remove** — the output is a log line | A5 |
 | 171 | `--max-passes` review-loop budget | **Remove** — the loop is off by default | A3, A5 |
 | 172 | Read-only mode checkboxes showing the review policy in effect | **Remove** — goes with #168 | A5 |
-| 173 | `--browser` — give the agent a real browser (navigate, console, network, DOM, screenshots) | **Remove** | A6 |
+| 173 | `--browser` — give the agent a real browser (navigate, console, network, DOM, screenshots) | Keep | A6 |
 
 ### What a user loses, stated plainly
 
@@ -318,12 +318,17 @@ Worth being honest about, rather than hiding behind the LOC counts:
 
 - **Building an app from nothing.** After A4 the product only works on repos that exist. That is
   what the root SPEC already describes; the from-scratch path is the older product.
-- **Running work anywhere but this machine.** No Actions runner, no cloud session, no second
-  device. Sessions run on the daemon's own machine.
 - **Sharing a live session with a teammate.** No relay, no watch links. A PR is the sharing
-  mechanism.
-- **Driving the agent's browser.** No screencast, no captcha handoff, no `--browser` tools.
-- **Chatting with sessions from Discord.** Notifications stay; two-way chat goes.
+  mechanism. (Remote *execution* stays — Actions runners, cloud sessions and second devices are
+  the product, not a channel; see A6.)
+- **Mirroring session replies into a Discord channel.** The chatbot stays — parked questions,
+  steering, starting a session — but answers are not echoed to the channel as a second transport.
+- **A readable markdown conversation committed beside the code.** The exact session log is the
+  record; the prose rendering of it goes, and `conversations/` with it (B3).
+- **Trimming prompts to save tokens.** The whole eco setting goes — it contradicts a product whose
+  headline rule is to spend the week's quota rather than leave it on the floor (C1).
+- **A session being paused when quota runs low.** Quota now gates only whether work *starts*
+  (E1).
 - **Deploying.** Never really shipped (`cloudflare` and `dokploy` adapters, plan-only for
   everything else).
 - **Doing anything from a terminal except serving the dashboard.** The CLI keeps `--host`,
@@ -465,30 +470,39 @@ composition.
 Removes with it: `--preset`, `--kind`, `--technical`, `OPEN_LOOP_MODES`, the `modes` event, the
 read-only mode checkboxes in the dashboard, `project-presets.ts`, `preset-registry.ts`.
 
-### A6. Cut the surface count from ~10 to 2
-**~4,500 src LOC + their tests, and a large share of the conditional complexity everywhere else.**
+### A6. Cut two surfaces, not eight — *mostly withdrawn*
+**~980 src LOC, down from the ~4,500 this proposal originally claimed.**
 
-The product currently ships: localhost dashboard, terminal narration, a hosted **relay**,
-**remote devices** (daemon→daemon), **Discord notifications**, **Discord chatbot**, **Discord
-reply mirror**, a **Chrome extension** bridging claude.ai, a **CDP browser screencast proxy**, and
-an **app preview server**. For a product with zero users.
+The original proposal cut the surface count from ~10 to 2, on the reasoning that a product with
+zero users has not earned distribution channels. **That reasoning is rejected: remote execution is
+the product, not a channel.** Running agents on another device, on a Claude Code cloud session, or
+on a GitHub Actions runner is how work happens when the laptop is closed — which is the *point* of
+a tool that spends idle subscription quota. Cutting it would have cut the thing the dashboard
+exists to watch.
 
-| Surface | LOC | Argument for removal |
+| Surface | LOC | Verdict |
 |---|---|---|
-| Relay (`relay.ts`, `relay-endpoints.ts`, `relay-dispatch.ts`, `relay-run.ts`, `dashboard-rpc` relay branches) | ~510 | Unauthenticated read-only sharing, "a keystone for shared sessions, not the final product". It is the *third* host the RPC layer must degrade for. |
-| Remote devices (`remote-run.ts` + forwarding allowlist in `dashboard-rpc`) | ~350 | Daemon-to-daemon session forwarding with a browser-held token. This is the one documented exception to "the dashboard holds no authoritative state" — it exists to break its own rule. |
-| Chrome extension + cloud driver + bridge endpoints/store/sessions | ~1,900 | An entire browser extension, a cross-origin daemon route, a token, an answer queue, and a DOM scraper — to recover questions from a fire-and-forget target that, by its own design, "opens its own PR" and needs nothing read back. |
-| Browser + screencast + proxy (`browser.ts`, `browser-stream.ts`, `browser-proxy.ts`) | ~680 | Launching Chrome with a shared CDP port and proxying frames so a human can solve a captcha. Real feature, enormous surface, orthogonal to the goal. |
-| Preview (`preview.ts`, `preview-runtime.ts`) | ~470 | "One click boots the project's app to show it." A link to `npm run dev` in the README does this. |
-| Discord ×3 (bot, reply mirror, notification watchers, credentials, webhook) | ~1,160 | Three subsystems with two independent transports (bot token *and* webhook) so each works without the other. Notifications are the only part with a clear job. |
+| Remote devices (`remote-run.ts` + forwarding allowlist) | ~350 | **Keep** — dashboard here, agents there |
+| Chrome extension + cloud driver + bridge endpoints/store/sessions | ~1,900 | **Keep** — the way Claude Code Web is driven |
+| Browser + screencast + proxy (`browser.ts`, `browser-stream.ts`, `browser-proxy.ts`) | ~680 | **Keep** — watching the agent navigate, and taking the wheel at a login wall |
+| GitHub Actions runner | — | **Keep** |
+| Discord bot + notifications | ~900 | **Keep** — the chatbot answers parked questions and starts sessions |
+| Relay (`relay.ts`, `relay-endpoints.ts`, `relay-dispatch.ts`, `relay-run.ts`, `dashboard-rpc` relay branches) | ~510 | **Remove** — unauthenticated read-only sharing, "a keystone for shared sessions, not the final product"; the *third* host the RPC layer must degrade for, and the only one nothing depends on |
+| Discord reply mirror | ~260 | **Remove** — the chatbot stays; mirroring every answer back to a channel is a second transport for the same content |
+| Preview (`preview.ts`, `preview-runtime.ts`) | ~470 | **Remove** — "one click boots the project's app". A link to `npm run dev` in the README does this. |
 
-**Do:** keep the localhost dashboard and (at most) Discord *notifications*. Everything else is a
-distribution channel for a product that has not yet proven its core loop.
+**Keeping remote execution costs nothing in capability probing — the relay was paying that bill
+alone.** Reading `dashboard-rpc/context.ts` seam by seam: `eventsSource` is set *only* by the relay
+("it has no `events.jsonl` on disk"); `preferences` and the Discord credentials store are unset
+*only* on "a public host (the relay)"; `preview` goes with the preview server. Every one of those
+optional seams exists to describe the relay, and dies with it.
 
-The compounding win is larger than the LOC: the relay and remote-device hosts are why
-`dashboard-rpc/context.ts` exists (capability probing, graceful degradation per RPC), why
-`telefunc-serve.ts` carries a `DashboardContext` with six optional seams, and why every read has
-a "degrades where a capability is absent" branch.
+`remote` is the opposite case — *"only the daemon wires it"*, to tell a local run from one running
+on a connected device. A remote device is not a dashboard host: the dashboard is always served by
+the local daemon, which forwards. So once the relay and the foreground per-run dashboard are gone
+there is exactly one host, and `contextRemote()` stops being an optional capability and becomes an
+ordinary always-present dependency. **D3 keeps its full win** — one host, no probing, no
+degradation matrix — with remote execution intact.
 
 ---
 
@@ -544,9 +558,16 @@ ticket `2026-07-28_discord-mirror-read-events.md` (P5, top of the queue) is abou
 mirror currently *polls and diffs the conversation markdown* instead of reading the event log,
 because the two exist in parallel.
 
-**Do:** the event log is the record. Commit **one** rendered projection of it per session (call it
-the conversation) at teardown. Delete `LOGS.md` (`logs.ts`, 267 LOC + its escaping rules against
-prompt-forged entries), and fold the per-user archive directory into it.
+**Do (settled): keep the exact session log, delete the fuzzy markdown rendering.** The event log
+is the record, committed as the session archive at teardown. Delete the whole `conversations/`
+feature — the directory, the committer, the debounced writer, and the polling that reads it — and
+delete `LOGS.md` (`logs.ts`, 267 LOC + its escaping rules against prompt-forged entries).
+
+A prose re-narration of a verbatim transcript is a second, lossier copy of something already
+exact: it drifts, it needs its own escaping, and anything reading it is reading a summary when the
+source is right there. The `2026-07-28_discord-mirror-read-events.md` ticket dissolves rather than
+gets fixed — the mirror it was about is removed under A6, and the markdown it polls no longer
+exists.
 
 ### B4. Knowledge-base sprawl → one file
 `GOAL.md`, `BUSINESS_LOGIC.md`, `knowledge-base/DECISIONS.md`, `FACTS.md`, `INSIGHTS.md`,
@@ -582,16 +603,19 @@ outright under A5/A6/C1: `technical`, `vanilla`, `transparent`, `eco*` ×4, `bro
 
 ## C. Prompting — the mode matrix and the source of truth
 
-### C1. Five prompt "modes" → one switch
+### C1. Five prompt "modes" → two switches and a countdown
 Today, orthogonally combinable: `antiLazyPill` (aka `--vanilla`), `--transparent`, `eco`
 (`autoPlanning`, `autoResearch`, `autoMaintenance`), `--autopilot`, `--technical`. That is a
 2×2×2×2×2×2 space of system channels, of which the tests can only pin a few.
 
 Specific findings:
-- **`--vanilla` and `--transparent` are two off-switches for the same thing.** Vanilla drops the
-  built-in prompt and context docs but keeps the emit protocols; transparent drops everything.
-  One boolean with the transparent semantics is enough — "vanilla" leaves the agent able to signal
-  gates that no longer have prompt content telling it to.
+- **`--vanilla` and `--transparent` both stay (settled).** They are two different questions, not
+  one asked twice: vanilla drops the built-in prompt and context docs while keeping the emit
+  protocols, so the dashboard still sees gates, questions and completion; transparent drops
+  everything and gives you raw `claude -p`. The first is "run my prompt, keep the instrumentation",
+  the second is "get out of the way entirely" — and a debugging switch that cannot distinguish
+  *my prompt misbehaves* from *the framework misbehaves* is not much of a debugging switch. The
+  cost is one genuinely orthogonal boolean, not a mode.
 - **`eco.autoMaintenance` acts on a different prompt than the one it lives in.** Its own doc says
   *"Nothing to drop here"* — the section moved out in #556 and the flag now reaches into
   `on-before-mergeable-prompt.ts`. A flag in the wrong home is a flag to delete.
@@ -604,9 +628,11 @@ Specific findings:
   (#556 moved the maintenance section out, #801). It is not a mode; it is
   `autoAcceptChoicesAfterMs`.
 
-**Do:** keep one `--raw` (no framework prompt, no protocols) for debugging, and one
-`autoAcceptGates` boolean. Delete the rest, plus `dropSection`, `ECO_SECTION_HEADINGS`,
-`applyEco`, and the tests pinning heading names against the template.
+**Do:** keep `--vanilla` and `--transparent` as the two off-switches, plus one `autoAcceptGates`
+boolean. Delete **the whole eco setting** (settled) — `dropSection`, `ECO_SECTION_HEADINGS`,
+`applyEco`, the three `auto*` sub-flags and the tests pinning heading names against the template —
+and `--technical` with the presets it selects (A5). Five combinable modes become two booleans and
+a countdown: a 2×2 space the tests can actually cover, instead of 2⁶.
 
 ### C2. The system prompt's source of truth is a GitHub issue — invert it
 `scripts/check-prompt-drift.mjs` (124 LOC) fetches **issue #326** daily in CI and fails when
@@ -674,9 +700,10 @@ dashboard on its own port with a `singleProjectProvider`; the relay is a third h
 `dashboard-rpc/context.ts` probes six optional capabilities on every call and every RPC has an
 "absent capability" branch.
 
-Given "one daemon per machine" is the stated architecture, the foreground dashboard is a second
-implementation of the product's front door. **Do:** the CLI starts (or finds) the daemon and opens
-the browser. One host, no capability probing, no graceful degradation matrix.
+Given the daemon is the stated architecture, the foreground dashboard is a second implementation
+of the product's front door. **Do:** the CLI serves the dashboard, full stop. One host, no
+capability probing, no graceful degradation matrix — see A6 for the seam-by-seam check that
+keeping remote execution does not preserve any of it.
 
 ### D4. The CLI keeps four options and no verbs
 **67 flags → 4. 10 verbs → 1. And `cli.ts` (2,589 lines) stops being four things at once.**
@@ -836,11 +863,21 @@ Four mechanisms answering "may this keep spending?", with two deliberately oppos
 modes, and a slider that applies asymmetrically depending on who asked. The SPEC needs a paragraph
 to explain that asymmetry, which is the tell.
 
-**Do:** one gate, one policy, one failure mode: *unattended work stops when quota is unreadable or
-past the boundary; user-requested work never stops.* That is already the intent — it just needs to
-be one function instead of three modules plus a slider with conditional semantics. Delete
-`budgetUsd` (a per-run USD cap is a different unit from the quota-week percentage everything else
-speaks, and Claude Code subscriptions do not bill in USD).
+**Do (settled): one gate that decides whether a session may *start*, and nothing that stops one
+already running.** A running session is never interrupted for quota — not paused, not degraded,
+not cut short. Interrupting mid-flight is the worst possible moment to economise: the tokens are
+already spent, the work is half-done, and what you save is the cheap part while what you lose is
+the expensive part. That deletes `consumption-guard.ts` and its fails-open polling outright, which
+is also the one mechanism whose failure mode had to be argued for in the SPEC.
+
+The **slider stays** (settled) as the single control over how much of the week's quota autonomous
+work may consume, and `quota-boundary.ts` stays as the gate it feeds. What goes with the guard is
+the asymmetry: with nothing to interrupt, the slider no longer needs "only ever *loosens* for
+user-requested work" semantics — it is just the budget for unattended work, which is the only
+thing it was ever really setting.
+
+Delete `budgetUsd` too (a per-run USD cap is a different unit from the quota-week percentage
+everything else speaks, and Claude Code subscriptions do not bill in USD).
 
 ### E2. Three claim mechanisms → one
 An entry/ticket can be claimed by: (a) a **queue-entry pin** recorded as a run event and
@@ -848,9 +885,33 @@ re-derived from live runs + open PRs + *PR diffs on other machines*; (b) a **loc
 and pushed beside the ticket on the default branch; (c) a **pinned branch** (`pinnedBranch` on a
 routine job, with `stale-branch.ts` to release one left behind by a closed PR).
 
-Three answers to "is someone already on this?", each with its own staleness story. Under B1
-(status + assignee on the ticket, on the default branch) there is exactly one, and it is the one
-that already works cross-machine.
+Three answers to "is someone already on this?", each with its own staleness story.
+
+**Do (settled): keep (b) and (c), delete (a).** The queue-entry pin is the one that has to
+*re-derive* a claim — from live runs, plus open PRs, plus PR diffs fetched from other machines —
+which is a guess assembled from three sources at read time. The other two are claims someone
+actually wrote down.
+
+**And no, a `.lock.md` cannot do the triage job — the branch is doing something a file cannot.**
+Two reasons, both structural:
+
+1. **A `.lock.md` needs a ticket to sit beside.** The mechanism is a *sibling*:
+   `tickets/<STEM>.lock.md` holding `CLAIMED: <AGENT_ID>`, and it works precisely because it is
+   the file the ticketing format already defines, so stock prompts skip a locked ticket "with no
+   cooperation from anyone who has not heard of this module". Triage has no such stem — its job is
+   to *create and reshape the ticket set*, so at the moment it starts there is nothing to name the
+   lock after. What needs claiming is the routine ("a triage is in flight"), not a row in
+   `tickets/`.
+2. **Creating a branch ref is atomic; writing a file is not.** `the-framework/triage-quick` either
+   exists or it does not, and git's ref creation settles the race for free. Two daemons writing a
+   lock file both read "absent", both write, both push — and the loser's push is rejected only if
+   the branch tip moved, which is exactly the reconciliation the branch already does natively.
+
+The cost of keeping it is honest and small: `stale-branch.ts` exists because a closed PR leaves the
+branch behind and jams the routine forever, so the sweep asks the branch's PR history and releases
+it only when *some PR existed and none is open*. That is one sweep, with a correct answer, guarding
+a lock that cannot otherwise be released — cheaper than the cross-machine PR-diff derivation being
+deleted.
 
 ### E3. The routine rotation is a scheduler in disguise
 Five routines (`update-tickets`, `triage-quick`, `triage-consensual`, `plan-tickets`, plus a
@@ -865,8 +926,14 @@ are five more ticket-shaped presets.
 
 **Do:** two jobs. *"If there is confirmed work, do the next piece."* *"Otherwise, spend one
 session improving the backlog."* The second one is a prompt, not five. That deletes the rotation
-cursor, the precedence rules, the per-routine opt-outs, the "which routine is jammed" reporting,
-and the P4 ticket along with them.
+cursor, the precedence rules, the "which routine is jammed" reporting, and the P4 ticket along
+with them.
+
+**Per-routine off-switches stay (settled).** They are the one part of this that is a user-facing
+control rather than scheduler bookkeeping: "stop doing consensual triage, keep doing the rest" is
+a thing a person wants to say, and the rotation is not what makes it expressible. With the cursor
+and precedence rules gone they cost a boolean per job instead of participating in the scheduling
+logic being deleted.
 
 ### E4. Four background sweeps on four timers → one tick
 `ci-watch` (~1 min), `merged-worktrees` (10 min), `auto-pm` (10 min), `maintenance` (calendar),
@@ -883,10 +950,17 @@ branch reclaims it later (via two different "landed" signals because squash-merg
 one); deleting a session keeps the branch but drops the archive. Plus a prune verb, plus a manual
 Remove button that shares the implementation.
 
-The keep-on-failure rule is the only one earning its keep (it holds the uncommitted diff). The
-rest is disk management on a developer machine. **Do:** remove the worktree on any terminal state
-after committing outstanding work to the branch; keep a single `--keep` escape hatch. Everything
-is reconstructable from the branch, which the SPEC already guarantees.
+**Do (settled): one rule — only remove what has been pushed to the git remote.** Every deletion
+becomes recoverable, because the remote holds a copy; nothing local is ever the last copy of work.
+That replaces all of it: no clean-vs-failed distinction (a failed session's uncommitted diff is
+committed and pushed to its branch, then the worktree goes), no two "landed" signals, no retention
+policy, no age-based prune. The question stops being *what state did this session end in* and
+becomes *is it on the remote yet* — one predicate, checkable at any moment, with a single failure
+mode (the push failed, so the worktree stays and you can see why).
+
+It also subsumes the manual Remove button and the prune verb into the same check, and removes the
+need for a `--keep` escape hatch: the reason to keep a worktree was fear of losing the diff, and a
+pushed branch is not lost.
 
 ### E6. `no PR number is ever stored` — store the PR number
 Every surface re-resolves the PR live from the session's branch, "falling back to the session-name
@@ -1018,8 +1092,8 @@ Every contradiction found, with the resolution that favours subtraction.
 | 1 | Root SPEC: *"The Framework never runs its own model calls"* — yet the stack's bottom two layers are a 15-provider AI SDK and an agent-orchestration engine | Delete `ai-sdk`, absorb the used slice of `ai-autopilot` (**A1, A2**) |
 | 2 | `ai-autopilot` SPEC: *"don't trust a single pass… only an empty list counts as done"* — vs #1372: without a preset *nothing* reviews the build, and no preset is the default | The default won. Delete the loop/verdict/preset engine (**A5**) |
 | 3 | `the-framework` README: *"takes you from an idea to a running app"* + deploy targets + serve gates — vs root SPEC: *"takes an idea, a ticket, or a queue entry to a reviewed pull request"* | Two products. Keep the second; delete the first (**A4**) |
-| 4 | Root SPEC: *"Files are the seam… There is no direct process-to-process channel"* — vs relay HTTP, daemon→daemon HTTP, bridge HTTP, CDP proxy, Discord WebSocket | Files are the seam *locally*. Cut the remote surfaces and the rationale becomes true again (**A6**) |
-| 5 | Root SPEC: *"The dashboard never holds authoritative state"* — vs *"The one exception is saved remote devices: their access tokens stay in this browser only"* | Delete remote devices; the exception disappears (**A6**) |
+| 4 | Root SPEC: *"Files are the seam… There is no direct process-to-process channel"* — vs relay HTTP, daemon→daemon HTTP, bridge HTTP, CDP proxy, Discord WebSocket | **The SPEC sentence is the wrong one.** Remote execution is core, so process-to-process channels are load-bearing: scope the claim to *"files are the seam within a machine"* (**G3**) |
+| 5 | Root SPEC: *"The dashboard never holds authoritative state"* — vs *"The one exception is saved remote devices: their access tokens stay in this browser only"* | **Keep the exception, state it as a rule.** Remote devices stay, so an absolute that needs a carve-out in its own next sentence should not be written as an absolute (**G3**) |
 | 6 | Driver SPEC: *"the seam is the code and the outcome, never the agent's individual tool calls"* — vs branching control flow on fenced blocks the agent emits, and draining its backlog one entry per turn | Honest framing: the seam is the agent's *final message*, which is a contract, not black-box treatment. Shrink the contract to one gate shape (**D6**) |
 | 7 | *"Spend the whole week's quota, never starve the user"* — vs eco mode trimming prompt sections to save tokens, and a per-run USD cap | Delete eco (**C1**) and `budgetUsd` (**E1**) |
 | 8 | Two off-switches for the built-in prompt (`--vanilla` / `--transparent`) with subtly different semantics | One switch (**C1**) |
@@ -1050,8 +1124,10 @@ Every contradiction found, with the resolution that favours subtraction.
    (nothing imports what is removed).
 2. **A4** delete deploy/serve/sandbox/runner → **A3** delete `Bootstrap` → **A5** delete presets
    and loops. These three unlock each other; after them `run.ts` is a prompt loop.
-3. **D2** merge the two run paths, **D1**/**A6** cut surfaces, **D3** one dashboard host. The
-   conditional complexity in `dashboard-rpc`, `telefunc-serve` and `system-prompt` collapses.
+3. **D2** merge the two run paths, **D1** split the `Driver` axes, **A6** cut the relay, the
+   preview server and the Discord reply mirror, **D3** two dashboard hosts instead of three. The
+   conditional complexity in `dashboard-rpc`, `telefunc-serve` and `system-prompt` shrinks —
+   though it does not vanish, since remote execution keeps a genuine second host (A6).
 4. **D4b** foreground-only (settled) → **D4** strip the CLI to its four options → then **B5**.
    In that order: foreground-only deletes the daemon's discovery, heartbeat and detached-spawn
    machinery, which is what most of the remaining flags and verbs exist to steer; doing D4 after

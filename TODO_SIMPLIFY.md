@@ -2,7 +2,7 @@
 
 A clean-slate simplification review of the whole repo, at the goal / system / high / mid levels.
 
-**Every proposal has been ruled on: 35 approved, 5 rejected.** Nothing is applied to the code yet —
+**Every proposal has been ruled on: 36 approved, 5 rejected.** Nothing is applied to the code yet —
 this is the decision record and the plan, not an open question. A rejected section is kept as a
 recorded observation; see the decision status and work list at the top of Part 3.
 
@@ -366,14 +366,14 @@ Ordered by impact. Each item states the subtraction, the argument, and what repl
 
 ### Decision status
 
-**All 40 proposals are ruled on: five rejected, the other 35 approved.** A **rejected** proposal
+**All 41 proposals are ruled on: five rejected, the other 36 approved.** A **rejected** proposal
 means *today's behaviour stays* — its section is kept as a recorded observation, not a queued
 action, and nothing else in this document should assume it lands.
 
 | | Proposals |
 |---|---|
 | **Rejected — today's behaviour stays** | **B1** the five work-item files stay · **B4** the knowledge base stays · **F5** the dashboard's filtering and sorting stay · **E3** the rotation and every preset stay, *for now* · **G1** SDD stays exactly as practised, every `SPEC.md` included |
-| **Approved individually** | **A7** one package — merge the dashboard in · **G2** delete the whole release history — changesets, changelogs, migration notes, semver · **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco, technical and autopilot · **A6** *partly* — cut the relay, the preview server and Discord's inbound half; keep remote devices, the Chrome extension, the browser + screencast, Actions runners and Discord *notifications* |
+| **Approved individually** | **A7** one package — merge the dashboard in · **A8** remove turbo · **G2** delete the whole release history — changesets, changelogs, migration notes, semver · **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco, technical and autopilot · **A6** *partly* — cut the relay, the preview server and Discord's inbound half; keep remote devices, the Chrome extension, the browser + screencast, Actions runners and Discord *notifications* |
 | **Approved as a batch** | A1–A5 · B2 · B5 · C2–C4 · D1–D3 · D5–D7 · E4 · E6 · F1–F4 · G3–G5 |
 
 The last row was approved wholesale rather than argued point by point, so these are the ones that
@@ -413,6 +413,7 @@ reference material for implementing, not an argument to be read start to finish.
 | **A5** | Delete the domain-preset / review-loop engine and `framework-detection`. |
 | **A6** | Cut the relay, the preview server, Discord's inbound half. Keep all remote execution. |
 | **A7** | Merge `framework-dashboard` into `the-framework`. One package total. |
+| **A8** | Delete `turbo.json` and the turbo dependency; root scripts call the package directly. |
 | **B2** | Delete `ANALYSIS_RESULT.md`. |
 | **B3** | Keep the exact session log; delete `conversations/` and `LOGS.md`. |
 | **B5** | One config file, two tiers; handoff ladder → one ordinal; named notification axes. |
@@ -677,6 +678,49 @@ run both (`node scripts/run-tests.mjs && vitest run`). This is the only place th
 awkwardness rather than removing it. Mixed browser/node code is *not* an added risk — Vite already
 builds the dashboard against `@gemstack/the-framework` today, so the bundler is already what
 enforces "node-free", and merging does not change that mechanism.
+
+---
+
+### A8. Remove turbo — there is no graph left to orchestrate
+**TL;DR —** Follows from A7. Turbo exists to sequence tasks across packages; one package means no dependency graph and no cache worth keeping.
+**Settled.** Every task in `turbo.json` is declared `dependsOn: ["^build"]` — *upstream packages'*
+build. Once A7 makes the product a single package, `^build` resolves to nothing, and turbo is
+sequencing a graph with one node.
+
+**What turbo actually contributes today, checked:**
+
+| | |
+|---|---|
+| Cross-package ordering (`^build`, `@gemstack/framework-dashboard#build`, `bundle:dashboard`) | Gone with **A7** — one package, and Vite writes `dist/dashboard-client` directly |
+| Remote caching | **Never configured.** No `TURBO_TOKEN`, no `TURBO_TEAM`, no `remoteCache` in `turbo.json`, so CI starts cold on every run |
+| Local caching | Only ever helps *within* one CI job (`build` → `typecheck` → `test`), and `typecheck` runs `tsc --noEmit` while `test` runs its own `tsc -p tsconfig.test.json` — neither consumes the build output once `bundle:dashboard` is gone |
+| `dev` (`persistent: true`) | One package: `vite` and `tsc --watch`, which is two scripts, not an orchestrator |
+| `release --filter=./packages/*` | Gone with **G2** |
+
+**Do:** delete `turbo.json` and the `turbo` dev dependency; the root scripts become direct calls
+(`pnpm -C packages/the-framework <task>`), which is what the website's scripts already do — see
+below.
+
+**The website is the tell.** `packages/the-framework.ai` (`__private__website`) is a workspace
+member, but the root scripts already bypass turbo for it: `website`, `website:build` and
+`website:test` are all `cd packages/the-framework.ai/ && pnpm run …`. Only `typecheck` reaches it
+through turbo. Half the repo's second package is already run without the orchestrator, and nobody
+noticed a loss.
+
+**Two packages the four-package framing misses**, worth stating so "one package" is not read too
+literally:
+
+- **`packages/the-framework.ai`** — the marketing site. It shares no code with the product and is
+  built by plain Vite. It stays a separate package (or moves to its own repo); the product being
+  one package does not absorb it.
+- **`packages/chrome-extension`** — kept by A6, and **not a workspace member at all**: it has no
+  `package.json`, just `manifest.json` and plain JS. Turbo never touched it, and nothing here
+  changes it.
+
+So the end state is: one product package, one unrelated website package, one extension directory
+that is not a package — and no orchestrator, because a two-node forest does not need one. Whether
+`pnpm-workspace.yaml` survives is then a coin-flip; it currently globs `examples/*`, **which does
+not exist**.
 
 ---
 
@@ -1418,7 +1462,8 @@ Every contradiction found, with the resolution that favours subtraction.
    `--technical` selects.
 8. **D6** one gate mechanism, **D7** `topic` runs. D6 wants C1 done first: with autopilot gone,
    auto-accept is no longer a mode competing with the gate shapes being consolidated.
-9. **A7** merge the dashboard into `the-framework`, then **F1** Vike → plain Vite, **F3** Telefunc
+9. **A7** merge the dashboard into `the-framework` → **A8** delete turbo (nothing left to
+   orchestrate), then **F1** Vike → plain Vite, **F3** Telefunc
    → plain HTTP handlers, **F4** the vendored `animate-ui`. A7 goes first in this step because it
    dissolves **F2** outright and makes F3 a type-sharing change rather than a boundary change; F3
    is cheaper still after step 3, which leaves no capability-probing context to port.
@@ -1432,6 +1477,6 @@ Every contradiction found, with the resolution that favours subtraction.
     everything above; cutting them earlier would remove the evidence that steps 1–10 landed
     correctly. Trim once the shape is final.
 
-**Rough scale:** A1–A7 alone remove on the order of **43,000–53,000 LOC of ~132,000** — about a
+**Rough scale:** A1–A8 alone remove on the order of **43,000–53,000 LOC of ~132,000** — about a
 third of the repo — without touching anything the stated business goal needs. (A6 now contributes
 ~2,800 rather than the ~4,500 it was originally scoped at, since remote execution stays.)

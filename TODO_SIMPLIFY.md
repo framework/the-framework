@@ -69,7 +69,7 @@ pointer to the proposal in Part 3. Nothing is omitted: features I propose deleti
 beside the ones that survive, so the cost of each proposal is visible in user terms rather than in
 lines of code.
 
-**Tally: 173 user-facing features — 114 Keep, 13 Simplify, 46 Remove.**
+**Tally: 173 user-facing features — 120 Keep, 8 Simplify, 45 Remove.**
 
 The product a user actually came for — *register a repo, describe work, watch an agent do it,
 get a PR, and let it keep working while you sleep* — is entirely inside the Keep column.
@@ -150,7 +150,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 |---|---|---|---|
 | 56 | Live event stream rendered as a transcript | Keep | |
 | 57 | The agent's questions render as answerable cards inline, where they happened | Keep | |
-| 58 | A large scope becomes a `PLAN_<session>.agent.md` with a live Approve/Decline gate; declining stops the session and hands control back | Keep — as a section of the ticket | B1 |
+| 58 | A large scope becomes a `PLAN_<session>.agent.md` with a live Approve/Decline gate; declining stops the session and hands control back | Keep | B1 |
 | 59 | An ambiguous prompt becomes a ranked list of interpretations to pick from | Keep | |
 | 60 | A settled session reads as "waiting for you", not as a status that only changes when it ends | Keep | |
 | 61 | `ANALYSIS_RESULT.md` written into the repo every run (scope, ambiguity, plan yes/no) | **Remove** — nothing reads it | B2 |
@@ -162,7 +162,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 67 | Changed files with diffs | Keep | |
 | 68 | Git status bar | Keep | |
 | 69 | Agent-authored markdown views pushed to the right rail | Keep | |
-| 70 | Docs rail (surfaced PLAN / TODO files) | Simplify — one work-item format to surface | B1 |
+| 70 | Docs rail (surfaced PLAN / TODO files) | Keep | B1 |
 | 71 | History rail (past sessions), with full-prompt tooltips | Keep | |
 | 72 | Session actions: stop, open in editor, open folder, open on GitHub, remove worktree, delete session, copy session id, copy resume command | Keep | |
 | 73 | Session action: Serve / preview the app | **Remove** | A6 |
@@ -183,7 +183,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 83 | Quota bar first — week track with pace and projection | Keep | |
 | 84 | Open-questions hub: every session's unanswered question, across all projects, answerable in place | Keep | |
 | 85 | Agents working now | Keep | |
-| 86 | The full AI queue of every project, uncollapsed | Keep — as the ticket list | B1 |
+| 86 | The full AI queue of every project, uncollapsed | Keep | B1 |
 | 87 | Routine work panel | Keep | |
 | 88 | Hottest tickets | Keep | |
 | 89 | Projects sidebar | Keep | |
@@ -193,12 +193,12 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
 | 90 | Cross-project ticket list | Keep | |
-| 91 | Faceted filtering: text, priority/effort/uncertainty as buckets *or* ranges, topics, planning stage, project | Simplify — text search + priority sort | F5 |
-| 92 | Sorting and group-by-project toggle | Simplify | F5 |
-| 93 | The whole filter view mirrored to the URL so it can be shared | Simplify | F5 |
+| 91 | Faceted filtering: text, priority/effort/uncertainty as buckets *or* ranges, topics, planning stage, project | Keep | F5 |
+| 92 | Sorting and group-by-project toggle | Keep | F5 |
+| 93 | The whole filter view mirrored to the URL so it can be shared | Keep | F5 |
 | 94 | Ticket detail page | Keep | |
-| 95 | A plan page when a plan exists; a button to start a session writing one when it doesn't | Keep — as a section of the ticket | B1 |
-| 96 | Queue a ticket into the AI queue | Keep — becomes a status change | B1 |
+| 95 | A plan page when a plan exists; a button to start a session writing one when it doesn't | Keep | B1 |
+| 96 | Queue a ticket into the AI queue | Keep | B1 |
 | 97 | Tickets carry a GitHub issue link, so merging closes the issue | Keep | |
 
 ### Handoff and what lands in git
@@ -219,7 +219,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 109 | `LOGS.md` — a committed human-readable project log, one entry per session | **Remove** — derivable from the event log | B3 |
 | 110 | Session history archived in the repo under per-user directories | Keep — merged with #108 | B3 |
 | 111 | Post-merge quality follow-ups queued (maintainability / security / readability) | Keep | |
-| 112 | Knowledge folded back into `DECISIONS.md` / `FACTS.md` / `INSIGHTS.md` at merge | Simplify — one knowledge directory | B4 |
+| 112 | Knowledge folded back into `DECISIONS.md` / `FACTS.md` / `INSIGHTS.md` at merge | Keep | B4 |
 
 ### Autonomy — what happens when nobody is at the keyboard
 
@@ -236,7 +236,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 121 | CI watch: one fix session per red head commit, max two attempts | Keep | |
 | 122 | Reclaim the checkout of a session whose branch has landed | Simplify | E5 |
 | 123 | Release a pinned routine branch left behind by a closed PR | Keep — the release sweep the branch lock needs | E2 |
-| 124 | The session drains its own TODO backlog, one entry per turn | **Remove** — merges into the ticket model | B1 |
+| 124 | The session drains its own TODO backlog, one entry per turn | Keep | B1 |
 
 ### Spending
 
@@ -349,6 +349,24 @@ rent across the whole codebase in conditional branches, capability probing, and 
 ## Part 3 — Suggestions
 
 Ordered by impact. Each item states the subtraction, the argument, and what replaces it.
+
+### Decision status
+
+Twelve of the 39 proposals have been ruled on. A **rejected** proposal means *today's behaviour
+stays* — its section is kept as a recorded observation, not a queued action, and nothing else in
+this document should assume it lands.
+
+| | Proposals |
+|---|---|
+| **Settled — do it** | **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco and technical |
+| **Settled — partly** | **A6** cut the relay, the preview server and the Discord reply mirror; keep remote devices, the Chrome extension, the browser + screencast, Actions runners and the Discord chatbot |
+| **Rejected** | **B1** the five work-item files stay · **B4** the knowledge base stays · **F5** the dashboard's filtering and sorting stay · **E3** the rotation and every preset stay, *for now* |
+| **Still open** | A1–A5 · B2 · B5 · C2–C4 · D1–D3 · D5–D7 · E4 · E6 · F1–F4 · G1–G5 |
+
+The rejections change what the settled items mean. B1 staying rejected is why **E2** and **B3** are
+now contained changes rather than the deep ones they were written as: the ticket format is
+untouched, so E2 deletes one derivation and B3 deletes one rendering. It is also why contradiction
+**#14** below has no resolution — the ambiguity `queue-promote.ts` documents in its own SPEC stays.
 
 ---
 
@@ -508,7 +526,13 @@ degradation matrix — with remote execution intact.
 
 ## B. Data model — one concept, many files
 
-### B1. Five representations of "work to do" → one
+### B1. Five representations of "work to do" → one — *rejected*
+
+**Settled: the current model stays as it is.** The five files, the promotion mechanism, the lock
+and the claim derivation all remain. What follows is the argument as originally made, kept on the
+record because the observations about `queue-promote.ts` are still accurate about live code — but
+it is not a queued action, and nothing else in this document should assume it lands.
+
 Today:
 
 | File | Meaning |
@@ -569,7 +593,10 @@ source is right there. The `2026-07-28_discord-mirror-read-events.md` ticket dis
 gets fixed — the mirror it was about is removed under A6, and the markdown it polls no longer
 exists.
 
-### B4. Knowledge-base sprawl → one file
+### B4. Knowledge-base sprawl → one file — *rejected*
+
+**Settled: the knowledge base stays as it is.** Recorded below as an observation only.
+
 `GOAL.md`, `BUSINESS_LOGIC.md`, `knowledge-base/DECISIONS.md`, `FACTS.md`, `INSIGHTS.md`,
 `MARKET_RESEARCH.md`, `knowledge-base/**.md` (catch-all), plus repo-root `MEMORY.md` (a *different*
 external convention), plus `AGENTS.md`, plus `SYSTEM.md`, plus 898 `SPEC.md` files.
@@ -913,7 +940,7 @@ it only when *some PR existed and none is open*. That is one sweep, with a corre
 a lock that cannot otherwise be released — cheaper than the cross-machine PR-diff derivation being
 deleted.
 
-### E3. The routine rotation is a scheduler in disguise — *deferred*
+### E3. The routine rotation is a scheduler in disguise — *rejected for now*
 Five routines (`update-tickets`, `triage-quick`, `triage-consensual`, `plan-tickets`, plus a
 calendar-paced `maintenance` outside the rotation), a drain job outside the rotation, per-routine
 opt-out preferences, a rotation cursor, a cooldown, a concurrency cap, a fan-out flag, and a
@@ -924,7 +951,7 @@ Also: `triage-quick` and `triage-consensual` are two triage routines, and `updat
 `suggest-new-tickets`, `suggest-tickets-to-work-on`, `suggest-new-features` and `import-tickets`
 are five more ticket-shaped presets.
 
-**Deferred (settled): no preset or routine changes for now.** All five routines, the drain job, the
+**Settled: the rotation and every preset stay as they are, for now.** All five routines, the drain job, the
 six ticket-shaped presets and the per-routine off-switches stay exactly as they are. The analysis
 above stays on the record as an observation, not a queued action — nothing in this section is to
 be acted on until that decision is revisited.
@@ -1023,7 +1050,11 @@ A vendored animation primitive library (641 LOC in one highlight effect) inside 
 directory, alongside vendored shadcn `ui/` (1,562 LOC). The shadcn vendoring is idiomatic;
 `animate-ui` is a dependency that was copied in. **Do:** depend on it, or delete the animations.
 
-### F5. Dashboard feature surface vs. the goal
+### F5. Dashboard feature surface vs. the goal — *rejected*
+
+**Settled: the dashboard's feature surface stays as it is** — faceted filtering, sorting and
+group-by, and the shareable filter URL all remain. Recorded below as an observation only.
+
 The overview page renders: quota bar, open-questions hub, active agents, the full AI queue,
 routine work, hot tickets, an onboarding checklist. Plus pages for tickets (with client-side
 faceted filtering across text/priority/effort/uncertainty/topics/planning-stage/project, sorting,
@@ -1113,7 +1144,7 @@ Every contradiction found, with the resolution that favours subtraction.
 | 11 | SPECs say **session**; code says **run**; a ticket proposes **agent** | Pick one, rename (**D5**) |
 | 12 | *"One daemon per machine"* — vs a second, foreground, per-run dashboard host, plus a third relay host | One host (**D3**) |
 | 13 | `Driver` models "which agent", but `cloud`/`actions` are the same agent elsewhere — forcing `handsOff` to disable half the run | Separate the axes, or delete the remote drivers (**D1**, **A6**) |
-| 14 | Five representations of "work to do", with a promotion mechanism whose own SPEC says the state is *ambiguous* and needs a fork point | One ticket file with status + assignee (**B1**) |
+| 14 | Five representations of "work to do", with a promotion mechanism whose own SPEC says the state is *ambiguous* and needs a fork point | **Unresolved.** B1 (one ticket file with status + assignee) is rejected, so the ambiguity stays; `queue-promote.ts`'s fork-point diffing remains the way it is disambiguated |
 | 15 | Three claim mechanisms (queue pin / lock file / pinned branch) for one question | One (**E2**) |
 | 16 | Four committed records of one session (LOGS.md, conversation, archive, event log) — and the top-priority ticket is about the Discord mirror reading the wrong one | Event log is the record; one committed projection (**B3**) |
 | 17 | `ANALYSIS_RESULT.md` written by every run, read by nothing; a backlog ticket exists to start reading it | Delete (**B2**) |
@@ -1144,8 +1175,9 @@ Every contradiction found, with the resolution that favours subtraction.
    machinery, which is what most of the remaining flags and verbs exist to steer; doing D4 after
    steps 2–3 (which delete ~23 flags outright) makes it deletion rather than migration; and
    removing the flag tier is what lets `config-layers.ts` go entirely.
-5. **B1** one work-item format, **B3** one record, **E2** one claim. This is the deepest change
-   and the one that most improves "simple to reason about" — do it once the surface is smaller.
+5. **B3** one record (delete `conversations/` and `LOGS.md`), **E2** one claim (delete the
+   queue-entry pin). Both are contained now that B1 is rejected — the five work-item files stay,
+   so neither touches the ticket format itself.
 6. **C1**/**C2**/**C4** prompt modes and source of truth. Cheap, independent, do any time.
 7. **D5** rename run→session, **G1**/**G3** docs. Mechanical; do last so it renames less code.
 

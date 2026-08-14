@@ -395,9 +395,8 @@ each step in it.
 
 Three sub-questions were flagged inside sections rather than as proposals, and are settled the same
 way — by the recommendation each section already made: **D4b** deletes `store/suspend.ts` (a
-deliberate Ctrl-C should not have work resume behind it); **C1** resolves the system prompt's
-maintenance stance to the **relaxed** branch (it is what nearly every run gets today, so it changes
-nothing); **#77** keeps the browser hand-off at a login wall, following the screencast it belongs to.
+deliberate Ctrl-C should not have work resume behind it); **C1**'s flagged prompt-stance question turned out not to exist (the branch was
+removed by #556 — see C1); **#77** keeps the browser hand-off at a login wall, following the screencast it belongs to.
 
 ### The work list
 
@@ -870,13 +869,23 @@ Specific findings:
 with the presets it selects (A5), and `--autopilot` outright (settled). Five combinable modes
 become **two booleans**: a 2×2 the tests can cover exhaustively, instead of 2⁶.
 
-**The prompt-content half is settled with it: keep the relaxed stance.** The system-prompt
-template branches on `tf.params.autopilot` — per the changelog it *"relaxes the maintenance stance
-on autopilot runs"* — and with the mode gone that branch has to resolve to one stance for
-everybody. It resolves to the **relaxed** one, because `autopilotEnabled` is
-`preferences.autopilot ?? true`: autopilot is on by default, so the relaxed stance is already what
-nearly every run gets and collapsing to it changes nothing. Taking the strict branch would have
-quietly changed behaviour for everyone while looking like a deletion.
+**There is no prompt-content decision to make — corrected after checking the prompts.** An earlier
+draft of this document claimed the template branches on `tf.params.autopilot` to relax the
+maintenance stance, and flagged "which stance wins?" as an open question. **It is not a question:
+that branch does not exist.** Grepping every prompt file, the only `${{ }}` fragments are
+`tf.params.what`, `tf.presets.*.filePath`, `tf.session_name`, `tf.prompt`, and two
+`tf.settings.technical_control` ternaries. The claim came from a *superseded* changelog entry; a
+later one records that **#556 moved that section out of the system prompt**, leaving "the
+choice-gate countdown is its whole effect" — which is what this section said in the first place.
+
+**Two concrete deletions this leaves instead:**
+- `run.ts:319` still passes `params: { autopilot: … }` into the template context, and nothing
+  consumes it. Dead data — it goes with the mode.
+- `--technical` **does** have prompt content, which autopilot never had:
+  `on_before_mergeable_prompt.md:7` and `presets/maintenance.md:6` each carry a
+  `${{ tf.settings.technical_control ? … : '' }}` ternary adding the `readability` preset. Deleting
+  technical mode means resolving both to the empty branch and removing `technical_control` from
+  `TfContext`.
 
 ### C2. The system prompt's source of truth is a GitHub issue — invert it
 **TL;DR —** The repo file becomes the source of truth; delete `check-prompt-drift.mjs`, its workflow and the snapshot.
@@ -1359,17 +1368,20 @@ migration notes in `ai-sdk/README.md` telling users how to update imports for a 
 Two of the four changelogs leave anyway: A1 deletes `ai-sdk` with its 160 lines and its migration
 note, A2 absorbs `ai-autopilot` with its 433.
 
-**One thing to do first, and this review is the evidence for it.** The changelog is currently the
-*only* written explanation of some live behaviour. C1's prompt-stance decision in this document is
-sourced from `CHANGELOG.md:1339` — that `tf.params.autopilot` *"relaxes the maintenance stance on
-autopilot runs"* is recorded there and nowhere else. Deleting the file without moving that first
-turns a documented decision into unexplained code.
+**A sweep before deleting — though the first example turned out to argue the other way.** An
+earlier draft claimed the changelog was the only written explanation of live behaviour, citing
+`CHANGELOG.md:1339` on `tf.params.autopilot` relaxing the maintenance stance. Checking the prompts
+showed that entry describes behaviour **#556 already removed**, and a later changelog entry says so.
+The changelog was not preserving an explanation; it was preserving a *contradiction* between two of
+its own entries, which is exactly the failure mode of keeping 2,861 lines of history nobody reads
+in order.
 
-This is the same defect **G4** describes from the other side: explanations living in issue numbers
-rather than in the source. So do the two together — sweep the changelogs for anything that explains
-*why* live code behaves as it does, move it into the code or its `SPEC.md` (which, with **G1**
-rejected, is staying and is the natural home), and only then delete. Everything else in those 2,861
-lines is a record of how the code got here, which git already holds.
+Still sweep before deleting — but expect to find little, and treat what you do find with suspicion:
+a changelog entry is a claim about the past, not a description of the present, and the two drift.
+Anything that genuinely explains *why live code behaves as it does* moves into the code or its
+`SPEC.md` (which, with **G1** rejected, is staying and is the natural home). This pairs with **G4**,
+the same defect from the other side. Everything else is a record of how the code got here, which
+git already holds.
 
 ### G3. Stale docs contradicting the code
 **TL;DR —** Fix the docs that describe a different product. With G1 rejected, this runs through every step rather than last.

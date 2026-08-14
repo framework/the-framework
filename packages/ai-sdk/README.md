@@ -43,7 +43,6 @@ The engine is now fully framework-agnostic: it has **no `@rudderjs/*` peer depen
 | `./gateway` | Gateway helpers |
 | `./react` | React bindings |
 
-> **Moved in `0.3.0`:** the MCP bridge (`mcpClientTools` / `mcpServerFromAgent`), previously the `./mcp` subpath, is now its own package, [`@gemstack/ai-mcp`](https://github.com/gemstack-land/the-framework/tree/main/packages/ai-mcp). Update `@gemstack/ai-sdk/mcp` imports to `@gemstack/ai-mcp` and move the `@modelcontextprotocol/sdk` peer there.
 >
 > **Moved to `@rudderjs/ai`:** the ORM-backed store (`./budget-orm`) coupled the engine to `@rudderjs/orm`, so it now lives in [`@rudderjs/ai`](https://www.npmjs.com/package/@rudderjs/ai) under the same subpath name. Update `@gemstack/ai-sdk/budget-orm` imports to `@rudderjs/ai/budget-orm`. It implements the same `BudgetStorage` contract, still exported from here.
 >

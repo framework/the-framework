@@ -358,10 +358,13 @@ test('parseArgs reads the prompt subcommand with its verbatim text (#353)', () =
   assert.equal(parseArgs(['build', 'a', 'blog']).directPrompt, false)
 })
 
-test('frameworkVersion reports the real package version, not the 0.0.0 placeholder (#312)', async () => {
+test('frameworkVersion reports the real package version, not the failed-read placeholder (#312)', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }
   assert.equal(frameworkVersion(), pkg.version)
-  assert.notEqual(frameworkVersion(), '0.0.0')
+  // The guard this test exists for: a failed read must not look like a plausible version. The
+  // sentinel is `unknown` rather than `0.0.0` because the packages are unreleased and genuinely
+  // versioned `0.0.0`, so a numeric fallback would be indistinguishable from a correct read.
+  assert.notEqual(frameworkVersion(), 'unknown')
 })
 
 test('runCli --version prints the real version (#312)', async () => {

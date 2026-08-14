@@ -126,7 +126,7 @@ const defaultIO: CliIO = {
  * The CLI version, read from the package's own `package.json` at runtime (#312).
  * The compiled entry lives one level under the package root (`dist/` or
  * `dist-test/`), so its `package.json` is always `../package.json`. Cached after
- * the first read; falls back to `0.0.0` if the file is somehow unreadable.
+ * the first read; falls back to `unknown` if the file is somehow unreadable.
  */
 let cachedVersion: string | undefined
 export function frameworkVersion(): string {
@@ -134,9 +134,11 @@ export function frameworkVersion(): string {
   try {
     const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json')
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string }
-    cachedVersion = pkg.version ?? '0.0.0'
+    // `unknown`, not `0.0.0`: the packages are unreleased and legitimately versioned `0.0.0`, so a
+    // numeric fallback would make a failed read indistinguishable from a correct one (#312).
+    cachedVersion = pkg.version ?? 'unknown'
   } catch {
-    cachedVersion = '0.0.0'
+    cachedVersion = 'unknown'
   }
   return cachedVersion
 }

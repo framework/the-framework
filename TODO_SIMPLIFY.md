@@ -2,7 +2,7 @@
 
 A clean-slate simplification review of the whole repo, at the goal / system / high / mid levels.
 
-**Every proposal has been ruled on: 34 approved, 5 rejected.** Nothing is applied to the code yet —
+**Every proposal has been ruled on: 35 approved, 5 rejected.** Nothing is applied to the code yet —
 this is the decision record and the plan, not an open question. A rejected section is kept as a
 recorded observation; see the decision status and work list at the top of Part 3.
 
@@ -366,14 +366,14 @@ Ordered by impact. Each item states the subtraction, the argument, and what repl
 
 ### Decision status
 
-**All 39 proposals are ruled on: five rejected, the other 34 approved.** A **rejected** proposal
+**All 40 proposals are ruled on: five rejected, the other 35 approved.** A **rejected** proposal
 means *today's behaviour stays* — its section is kept as a recorded observation, not a queued
 action, and nothing else in this document should assume it lands.
 
 | | Proposals |
 |---|---|
 | **Rejected — today's behaviour stays** | **B1** the five work-item files stay · **B4** the knowledge base stays · **F5** the dashboard's filtering and sorting stay · **E3** the rotation and every preset stay, *for now* · **G1** SDD stays exactly as practised, every `SPEC.md` included |
-| **Approved individually** | **G2** delete the whole release history — changesets, changelogs, migration notes, semver · **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco, technical and autopilot · **A6** *partly* — cut the relay, the preview server and Discord's inbound half; keep remote devices, the Chrome extension, the browser + screencast, Actions runners and Discord *notifications* |
+| **Approved individually** | **A7** one package — merge the dashboard in · **G2** delete the whole release history — changesets, changelogs, migration notes, semver · **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco, technical and autopilot · **A6** *partly* — cut the relay, the preview server and Discord's inbound half; keep remote devices, the Chrome extension, the browser + screencast, Actions runners and Discord *notifications* |
 | **Approved as a batch** | A1–A5 · B2 · B5 · C2–C4 · D1–D3 · D5–D7 · E4 · E6 · F1–F4 · G3–G5 |
 
 The last row was approved wholesale rather than argued point by point, so these are the ones that
@@ -412,6 +412,7 @@ reference material for implementing, not an argument to be read start to finish.
 | **A4** | Delete the from-scratch product: deploy adapters, serve gates, sandbox, scaffolding. |
 | **A5** | Delete the domain-preset / review-loop engine and `framework-detection`. |
 | **A6** | Cut the relay, the preview server, Discord's inbound half. Keep all remote execution. |
+| **A7** | Merge `framework-dashboard` into `the-framework`. One package total. |
 | **B2** | Delete `ANALYSIS_RESULT.md`. |
 | **B3** | Keep the exact session log; delete `conversations/` and `LOGS.md`. |
 | **B5** | One config file, two tiers; handoff ladder → one ordinal; named notification axes. |
@@ -433,7 +434,7 @@ reference material for implementing, not an argument to be read start to finish.
 | **E5** | Only remove what has been pushed to the remote. |
 | **E6** | Store the PR number. |
 | **F1** | Vike → plain Vite. |
-| **F2** | Export only what the dashboard imports. |
+| **F2** | Nothing — A7 removes the package boundary, so the export surface stops existing. |
 | **F3** | Telefunc → plain HTTP handlers (after D3). |
 | **F4** | Depend on `animate-ui` or delete the animations. |
 | **G2** | Delete the release history: changesets, changelogs, migration notes, semver. |
@@ -633,6 +634,49 @@ the local daemon, which forwards. So once the relay and the foreground per-run d
 there is exactly one host, and `contextRemote()` stops being an optional capability and becomes an
 ordinary always-present dependency. **D3 keeps its full win** — one host, no probing, no
 degradation matrix — with remote execution intact.
+
+---
+
+### A7. One package — merge `framework-dashboard` into `the-framework`
+**TL;DR —** End state is a single package. The dashboard merges in; the other two leave rather than merge.
+**Settled.** The four packages become one, but by three different routes — only one of them is a
+merge:
+
+| Package | How it gets there | |
+|---|---|---|
+| `ai-sdk` | **Deleted, not merged.** The product never imports it; the chain is `dashboard → the-framework → ai-autopilot → ai-sdk`. | A1 |
+| `ai-autopilot` | **Reduced, then absorbed.** A3/A4/A5 delete almost everything the product used from it; the remainder moves into `src/`. | A2 |
+| `framework-dashboard` | **Merged.** | A7 |
+| `the-framework` | The survivor. | — |
+
+**A1 is cleaner than it was written.** Every *runtime* coupling to `ai-sdk` lives in ai-autopilot
+modules that A2 already discards (`overview/agent.ts`, `supervisor.ts`, `planner.ts`,
+`synthesizer.ts`, `runner/tools.ts`, `decisions/tools.ts`) or that A4 deletes
+(`bootstrap/deploy.ts`). The only residue touching the surviving slice is two **type-only**
+imports — `import type { Agent }` in `prompts/bridge.ts` and `import type { Agent, TokenUsage }`
+in `types.ts` — which vanish at runtime and are replaced by a local type. Nothing has to be
+rewritten to delete `ai-sdk`.
+
+**Merging the dashboard dissolves F2 rather than solving it.** F2 exists because `the-framework`
+exports 406 symbols to exactly one consumer. Remove the package boundary and there is no public
+export surface to trim — the problem stops existing. **F3 also gets cheaper**: its own argument is
+that most of Telefunc's value here is type-safety across a boundary "that could just share types
+directly", and one package makes that literal.
+
+The merge is mostly mechanical: the dashboard's imports from `@gemstack/the-framework` are **94
+type-only against 31 value imports**, so the boundary is largely a type boundary already.
+
+**And the build loses a step.** `scripts/bundle-dashboard.mjs` copies
+`framework-dashboard/dist/client` into `the-framework/dist/dashboard-client`; merged, Vite writes
+there directly. The `bundle:dashboard` turbo task and the `@gemstack/framework-dashboard#build`
+dependency go with it.
+
+**The one real cost: two test runners in one package.** `the-framework` runs `node --test` over a
+compiled `dist-test`; the dashboard runs `vitest` with a browser environment. One package has to
+run both (`node scripts/run-tests.mjs && vitest run`). This is the only place the merge adds
+awkwardness rather than removing it. Mixed browser/node code is *not* an added risk — Vite already
+builds the dashboard against `@gemstack/the-framework` today, so the bundler is already what
+enforces "node-free", and merging does not change that mechanism.
 
 ---
 
@@ -1188,8 +1232,8 @@ Net contribution of Vike + vike-react: one prerendered `index.html`. **Do:** pla
 `index.html`. Deletes `vike`, `vike-react`, the `pages/`+`layouts/` scaffolding, and the
 `+config`/`+route`/`+onBeforePrerenderStart` indirection.
 
-### F2. `the-framework` exports 406 symbols to one consumer
-**TL;DR —** Export only what the dashboard imports — 406 symbols down to a handful.
+### F2. `the-framework` exports 406 symbols to one consumer — *dissolved by A7*
+**TL;DR —** No action: A7 merges the only consumer into the package, so there is no export surface left to trim.
 `src/index.ts` is 390 lines exporting ~406 named symbols. Its only consumers are the dashboard
 (via `.`, `./client`, `./dashboard-rpc`) and its own CLI. Everything exported is public API that
 must stay coherent, be re-exported through the right subpath, and stay browser-safe (there is a
@@ -1206,9 +1250,9 @@ Telefunc requires a build-time transform, a `telefunc-serve.ts` shim (192 LOC), 
 D3 (one host) the context collapses to nothing, and the RPC layer is ~40 read functions and ~15
 commands — which is a `POST /rpc/<name>` handler and a typed client.
 
-Not urgent, but worth reconsidering once D3 lands, because most of Telefunc's value here is
-type-safety across a boundary that could just share types directly (the dashboard already imports
-`@gemstack/the-framework` types).
+Not urgent, but worth reconsidering once D3 and **A7** land: most of Telefunc's value here is
+type-safety across a boundary that could just share types directly, and A7 removes the boundary
+entirely — the dashboard's 94 type-only imports become relative ones inside a single package.
 
 ### F4. Vendored `animate-ui` (1,225 LOC)
 **TL;DR —** Depend on `animate-ui` or delete the animations. 1,225 vendored LOC.
@@ -1348,7 +1392,8 @@ Every contradiction found, with the resolution that favours subtraction.
 ## Suggested order of work
 
 1. **A1** delete `ai-sdk` → **A2** absorb `ai-autopilot`. Biggest subtraction, zero product risk
-   (nothing imports what is removed).
+   (nothing imports what is removed; every runtime coupling to `ai-sdk` is inside modules A2 or A4
+   delete, and the two survivors are type-only imports).
 2. **A4** delete deploy/serve/sandbox/runner → **A3** delete `Bootstrap` → **A5** delete presets
    and loops. These three unlock each other; after them `run.ts` is a prompt loop.
 3. **D2** merge the two run paths, **D1** split the `Driver` axes, **A6** cut the relay, the
@@ -1373,9 +1418,10 @@ Every contradiction found, with the resolution that favours subtraction.
    `--technical` selects.
 8. **D6** one gate mechanism, **D7** `topic` runs. D6 wants C1 done first: with autopilot gone,
    auto-accept is no longer a mode competing with the gate shapes being consolidated.
-9. **F1** Vike → plain Vite, **F3** Telefunc → plain HTTP handlers, **F2** trim the 406 exports,
-   **F4** the vendored `animate-ui`. F3 is much cheaper after step 3, because one host means there
-   is no capability-probing context left to port.
+9. **A7** merge the dashboard into `the-framework`, then **F1** Vike → plain Vite, **F3** Telefunc
+   → plain HTTP handlers, **F4** the vendored `animate-ui`. A7 goes first in this step because it
+   dissolves **F2** outright and makes F3 a type-sharing change rather than a boundary change; F3
+   is cheaper still after step 3, which leaves no capability-probing context to port.
 10. **D5** rename run→session, **G2** delete the release history, **G4** the issue-number
     citations — G2 and G4 together, since both are about explanations that live outside the code.
     Mechanical; last, so they rename and rewrite as little as possible. **G3** is the exception —
@@ -1386,6 +1432,6 @@ Every contradiction found, with the resolution that favours subtraction.
     everything above; cutting them earlier would remove the evidence that steps 1–10 landed
     correctly. Trim once the shape is final.
 
-**Rough scale:** A1–A6 alone remove on the order of **43,000–53,000 LOC of ~132,000** — about a
+**Rough scale:** A1–A7 alone remove on the order of **43,000–53,000 LOC of ~132,000** — about a
 third of the repo — without touching anything the stated business goal needs. (A6 now contributes
 ~2,800 rather than the ~4,500 it was originally scoped at, since remote execution stays.)

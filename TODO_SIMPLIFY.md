@@ -1,7 +1,10 @@
 # TODO_SIMPLIFY
 
 A clean-slate simplification review of the whole repo, at the goal / system / high / mid levels.
-Nothing here is applied — this is the proposal list.
+
+**Every proposal has been ruled on: 34 approved, 5 rejected.** Nothing is applied to the code yet —
+this is the decision record and the plan, not an open question. A rejected section is kept as a
+recorded observation; see the decision status and work list at the top of Part 3.
 
 The test applied to everything: **can this be removed?** Not "is it good code", not "is it
 well-documented" — most of it is both. The question is whether the *concept* earns a place in a
@@ -330,6 +333,14 @@ Worth being honest about, rather than hiding behind the LOC counts:
   headline rule is to spend the week's quota rather than leave it on the floor (C1).
 - **A session being paused when quota runs low.** Quota now gates only whether work *starts*
   (E1).
+- **One click that boots the project's app.** The preview server goes; `npm run dev` replaces it
+  (A6).
+- **Starting a session without picking a project first.** `topic` runs go — the bind protocol and
+  the mid-run checkout move cost far more than the click they save (D7).
+- **Gates auto-accepting while you watch.** With autopilot removed, a human at the dashboard is
+  always asked; only a run with nobody watching takes the recommended option by itself (C1).
+- **Work resuming by itself after a restart.** A deliberate Ctrl-C stops work and it stays
+  stopped; restart a session from the dashboard, where the choice is visible (D4b).
 - **Deploying.** Never really shipped (`cloudflare` and `dokploy` adapters, plan-only for
   everything else).
 - **Doing anything from a terminal except serving the dashboard.** The CLI keeps `--host`,
@@ -341,8 +352,10 @@ Worth being honest about, rather than hiding behind the LOC counts:
   and killable rather than invisible and persistent, which for a tool that spends your subscription
   is arguably the better trade.
 
-Every one of these is a *distribution or execution channel*, not the core loop. None of them is
-load-bearing for "make the important decisions, let AI do the rest" — and each is currently paying
+Most of these are channels or conveniences rather than the core loop, and none is load-bearing for
+"make the important decisions, let AI do the rest". Two are worth naming as genuine behaviour
+changes rather than removals: quota no longer interrupts a running session, and gates no longer
+auto-accept while someone is watching. Each of these is currently paying
 rent across the whole codebase in conditional branches, capability probing, and extra hosts.
 
 ---
@@ -503,7 +516,8 @@ governs a loop that does not exist. The class, its event union (re-wrapped as
 shim in `steps.ts:196` all exist to make `await build(ctx)` look like a pipeline.
 
 **Do:** call the build turn directly. Keep the review chain as an explicit, optional
-`await review(...)` after it if A5 is rejected. One fewer event union, one fewer result type,
+`await review(...)` after it — though A5 is approved, so there is no review chain left to keep.
+One fewer event union, one fewer result type,
 one fewer phase vocabulary in the dashboard.
 
 ### A4. Delete the "scaffold an app from scratch and deploy it" product
@@ -826,10 +840,11 @@ disables half the run's phases** (`run.ts:430`, and again in the todo loop, the 
 checklist, the system prompt's `HANDS_OFF_PROTOCOL`). A property of *where* leaked into the
 abstraction for *what*.
 
-**Do:** if remote execution survives A6 at all, model it as a separate `location` with its own
-lifecycle, and keep `Driver` to "which CLI do I spawn". Better: drop `cloud` and `actions`
-entirely (A6) and the whole `handsOff` axis disappears with them — six conditionals across
-`run.ts`, `steps.ts`, `system-prompt.ts` and `cli.ts`.
+**Do:** model *where* as a separate `location` with its own lifecycle, and keep `Driver` to
+"which CLI do I spawn". A6 keeps `cloud` and `actions`, so deleting the axis is not available —
+`handsOff` has to become a property of the location instead of a driver property that disables
+half the run. The six conditionals across `run.ts`, `steps.ts`, `system-prompt.ts` and `cli.ts`
+stay, but they branch on something that honestly means "this runs elsewhere".
 
 ### D2. Two run paths that must not drift → one
 **TL;DR —** One run path. Deletes `prompt-run.ts` (211 LOC) and the drift risk `composeRunSystem` exists to manage.
@@ -1277,20 +1292,20 @@ Every contradiction found, with the resolution that favours subtraction.
 | 5 | Root SPEC: *"The dashboard never holds authoritative state"* — vs *"The one exception is saved remote devices: their access tokens stay in this browser only"* | **Keep the exception, state it as a rule.** Remote devices stay, so an absolute that needs a carve-out in its own next sentence should not be written as an absolute (**G3**) |
 | 6 | Driver SPEC: *"the seam is the code and the outcome, never the agent's individual tool calls"* — vs branching control flow on fenced blocks the agent emits, and draining its backlog one entry per turn | Honest framing: the seam is the agent's *final message*, which is a contract, not black-box treatment. Shrink the contract to one gate shape (**D6**) |
 | 7 | *"Spend the whole week's quota, never starve the user"* — vs eco mode trimming prompt sections to save tokens, and a per-run USD cap | Delete eco (**C1**) and `budgetUsd` (**E1**) |
-| 8 | Two off-switches for the built-in prompt (`--vanilla` / `--transparent`) with subtly different semantics | One switch (**C1**) |
+| 8 | Two off-switches for the built-in prompt (`--vanilla` / `--transparent`) with subtly different semantics | **Not a contradiction — both stay (**C1**).** They answer different questions: *keep the instrumentation* vs. *get out of the way entirely* |
 | 9 | Config key `antiLazyPill` vs flag `--vanilla` vs concept "built-in prompt"; three comments apologise for the mismatch | Rename or delete (**C3**) |
 | 10 | `eco.autoMaintenance` documented as *"Nothing to drop here"* — the flag acts on a different prompt | Delete (**C1**) |
 | 11 | SPECs say **session**; code says **run**; a ticket proposes **agent** | Pick one, rename (**D5**) |
 | 12 | *"One daemon per machine"* — vs a second, foreground, per-run dashboard host, plus a third relay host | One host (**D3**) |
-| 13 | `Driver` models "which agent", but `cloud`/`actions` are the same agent elsewhere — forcing `handsOff` to disable half the run | Separate the axes, or delete the remote drivers (**D1**, **A6**) |
+| 13 | `Driver` models "which agent", but `cloud`/`actions` are the same agent elsewhere — forcing `handsOff` to disable half the run | Separate the axes (**D1**). The remote drivers stay — A6 keeps remote execution, so `handsOff` must be modelled properly rather than deleted |
 | 14 | Five representations of "work to do", with a promotion mechanism whose own SPEC says the state is *ambiguous* and needs a fork point | **Unresolved.** B1 (one ticket file with status + assignee) is rejected, so the ambiguity stays; `queue-promote.ts`'s fork-point diffing remains the way it is disambiguated |
-| 15 | Three claim mechanisms (queue pin / lock file / pinned branch) for one question | One (**E2**) |
-| 16 | Four committed records of one session (LOGS.md, conversation, archive, event log) — and the top-priority ticket is about the Discord mirror reading the wrong one | Event log is the record; one committed projection (**B3**) |
+| 15 | Three claim mechanisms (queue pin / lock file / pinned branch) for one question | **Two, deliberately (**E2**):** `.lock.md` claims a ticket, a pinned branch claims a triage run — a lock file cannot do the second. The queue-entry pin goes |
+| 16 | Four committed records of one session (LOGS.md, conversation, archive, event log) — and the top-priority ticket is about the Discord mirror reading the wrong one | The event log is the record, committed as the session archive. `conversations/` and `LOGS.md` are deleted outright (**B3**); the mirror ticket dissolves with the mirror (**A6**) |
 | 17 | `ANALYSIS_RESULT.md` written by every run, read by nothing; a backlog ticket exists to start reading it | Delete (**B2**) |
-| 18 | Two spending gates that *"fail in opposite directions on purpose"*, plus a slider that applies asymmetrically | One gate, one policy (**E1**) |
+| 18 | Two spending gates that *"fail in opposite directions on purpose"*, plus a slider that applies asymmetrically | One gate, on *starting* only (**E1**). The slider stays as the budget for unattended work; its asymmetry goes because nothing interrupts a running session |
 | 19 | *"No PR number is ever stored"* — costing a three-way branch-name guess, a timestamp heuristic and a stale-while-revalidate cache | Store the PR number (**E6**) |
 | 20 | System prompt's source of truth is GitHub issue #326; a daily CI job detects the repo drifting from it; one block can only be approximately synced; the drift-checker's own path filter is already stale | Repo is the source of truth (**C2**) |
-| 21 | `AGENTS.md`: *"zero users, breaking changes aren't a problem"* — vs 76 changesets, semver, publish workflow, and 0.3.0 migration guidance | Drop the release machinery, or move `ai-sdk` out (**G2**) |
+| 21 | `AGENTS.md`: *"zero users, breaking changes aren't a problem"* — vs 76 changesets, semver, publish workflow, and 0.3.0 migration guidance | Delete the whole release history — changesets, changelogs, migration notes, semver → `0.0.0` (**G2**) |
 | 22 | Root `package.json`: *"GemStack: a collection of framework-agnostic tools. Home of @gemstack/ai-sdk"* — vs a repo named `the-framework` shipping a product | One identity (**G3**) |
 | 23 | `framework-dashboard` README calls itself a prototype running beside a `page.ts` MVP that no longer exists | Rewrite or delete (**G3**) |
 | 24 | SDD applied to test files and Vite configs — specs describing implementation | **Accepted, not resolved.** G1 is rejected: SDD stays as practised, specs for tests and configs included |

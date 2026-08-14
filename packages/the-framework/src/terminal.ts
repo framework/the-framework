@@ -165,6 +165,8 @@ function handoffSkipReason(reason: AutoHandoffSkip): string {
       return 'this repo has no remote to push to'
     case 'already-open':
       return 'the branch already has a pull request'
+    case 'already-landed':
+      return "the branch's pull request already landed everything the session did"
     case 'already-pushed':
       return 'the branch is already on the remote'
     case 'run-stopped':

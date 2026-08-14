@@ -386,6 +386,48 @@ deliberate Ctrl-C should not have work resume behind it); **C1** resolves the sy
 maintenance stance to the **relaxed** branch (it is what nearly every run gets today, so it changes
 nothing); **#77** keeps the browser hand-off at a login wall, following the screencast it belongs to.
 
+### The work list
+
+Every approved item, one line each. Full reasoning is in the section it names; the sections are
+reference material for implementing, not an argument to be read start to finish.
+
+| | Do |
+|---|---|
+| **A1** | Delete `@gemstack/ai-sdk`. Nothing in the product imports it. |
+| **A2** | Move the two surviving pieces of `ai-autopilot` into `the-framework/src/`; delete the package. |
+| **A3** | Call the build turn directly; delete the `Bootstrap` spine. |
+| **A4** | Delete the from-scratch product: deploy adapters, serve gates, sandbox, scaffolding. |
+| **A5** | Delete the domain-preset / review-loop engine and `framework-detection`. |
+| **A6** | Cut the relay, the preview server, Discord's inbound half. Keep all remote execution. |
+| **B2** | Delete `ANALYSIS_RESULT.md`. |
+| **B3** | Keep the exact session log; delete `conversations/` and `LOGS.md`. |
+| **B5** | One config file, two tiers; handoff ladder → one ordinal; named notification axes. |
+| **C1** | Keep `--vanilla` + `--transparent`; delete eco, `--technical`, autopilot. |
+| **C2** | Repo file becomes the prompt's source of truth; delete the drift checker. |
+| **C3** | Delete `antiLazyPill`. |
+| **C4** | `${{ }}` templating → plain string interpolation. |
+| **D1** | Split `Driver`'s two axes: which CLI vs. where it runs. |
+| **D2** | One run path; delete `prompt-run.ts`. |
+| **D3** | One dashboard host; delete the capability-probing context. |
+| **D4** | Four CLI options, no verbs; the daemon passes its child JSON, not flags. |
+| **D4b** | Foreground only; delete the daemon's discovery, heartbeat, detached spawn and suspend/resume. |
+| **D5** | Rename run→session (or the reverse) everywhere. |
+| **D6** | One gate shape, one protocol block, one card. |
+| **D7** | Delete `topic` runs. |
+| **E1** | One gate on starting; delete `consumption-guard.ts` and `budgetUsd`. |
+| **E2** | Keep `.lock.md` + the branch lock; delete the queue-entry pin. |
+| **E4** | One daemon tick running a list of jobs. |
+| **E5** | Only remove what has been pushed to the remote. |
+| **E6** | Store the PR number. |
+| **F1** | Vike → plain Vite. |
+| **F2** | Export only what the dashboard imports. |
+| **F3** | Telefunc → plain HTTP handlers (after D3). |
+| **F4** | Depend on `animate-ui` or delete the animations. |
+| **G2** | Delete the release history: changesets, changelogs, migration notes, semver. |
+| **G3** | Fix the docs describing a different product — continuously, not last. |
+| **G4** | Issue numbers as a suffix, never as the explanation. |
+| **G5** | Nothing separate: tests leave with their features. Trim the remainder last. |
+
 The rejections change what some approved items mean. B1 staying rejected is why **E2** and **B3**
 are contained changes rather than the deep ones they were written as: the ticket format is
 untouched, so E2 deletes one derivation and B3 deletes one rendering. It is also why contradiction
@@ -397,6 +439,7 @@ And with **E3** rejected, its P4 ticket has to be *fixed* rather than dissolved.
 ## A. System level — the package stack (largest wins)
 
 ### A1. Delete `@gemstack/ai-sdk` entirely — the product does not use it
+**TL;DR —** Delete the package. Nothing in the product imports it.
 **~30,800 LOC + ~120 SPEC files.**
 
 `packages/the-framework` and `packages/framework-dashboard` import **zero symbols** from
@@ -418,6 +461,7 @@ repo with a different release cadence — it does not belong in the monorepo who
 `the-framework`.
 
 ### A2. Absorb what survives of `@gemstack/ai-autopilot` into the product
+**TL;DR —** Move the two surviving pieces into `the-framework/src/`, delete the package. Four layers become two.
 **~4,900 of 6,151 src LOC + ~4,000 test LOC + 1,118 lines of preset data removable.**
 
 Traced symbol by symbol, the product uses: `Bootstrap`, `LoopEngine`, `definePrompt`,
@@ -442,6 +486,7 @@ four-layer stack (`dashboard → the-framework → ai-autopilot → ai-sdk`) int
 > intent, not the system. Two of its four boxes are ballast.
 
 ### A3. Drop the `Bootstrap` spine — it degenerates to a single function call
+**TL;DR —** Call the build turn directly; delete the `Bootstrap` spine, its event union, result type and phase vocabulary.
 **~965 LOC + the four-phase vocabulary.**
 
 `Bootstrap` sequences **scope → build → loop → deploy**. In the product:
@@ -462,6 +507,7 @@ shim in `steps.ts:196` all exist to make `await build(ctx)` look like a pipeline
 one fewer phase vocabulary in the dashboard.
 
 ### A4. Delete the "scaffold an app from scratch and deploy it" product
+**TL;DR —** Delete the from-scratch product: deploy adapters, serve gates, sandbox, scaffolding.
 **~2,500 LOC across both packages + 12 CLI flags.**
 
 Still fully wired: `--deploy cloudflare|dokploy`, `--cf-project`, `--dokploy-url`,
@@ -484,6 +530,7 @@ the product, and `--sandbox docker` is the only reason `snapshotWorkspace` exist
 "pluggable execution workspace" seam is downstream of one flag.
 
 ### A5. Delete the domain-preset / review-loop system
+**TL;DR —** Delete the domain-preset and review-loop engine, and `framework-detection` with it.
 **~1,700 LOC + 1,118 lines of preset markdown + 5 shipped "domains".**
 
 `LoopEngine`, `Verdict`, `defineLoop`/`definePrompt`, `loop/policy.ts`, `loop/verdict.ts`,
@@ -512,26 +559,23 @@ composition.
 Removes with it: `--preset`, `--kind`, `--technical`, `OPEN_LOOP_MODES`, the `modes` event, the
 read-only mode checkboxes in the dashboard, `project-presets.ts`, `preset-registry.ts`.
 
-### A6. Cut two surfaces, not eight — *mostly withdrawn*
-**~980 src LOC, down from the ~4,500 this proposal originally claimed.**
+### A6. Cut the relay, the preview server and Discord's inbound half
+**TL;DR —** Cut the relay, the preview server and Discord's inbound half (~2,800 LOC). Keep every remote-execution surface.
+**~2,800 LOC.** Remote execution is the product, not a distribution channel, so it stays — this
+proposal was originally scoped at ~4,500 LOC across eight surfaces and was cut back to three.
 
-The original proposal cut the surface count from ~10 to 2, on the reasoning that a product with
-zero users has not earned distribution channels. **That reasoning is rejected: remote execution is
-the product, not a channel.** Running agents on another device, on a Claude Code cloud session, or
-on a GitHub Actions runner is how work happens when the laptop is closed — which is the *point* of
-a tool that spends idle subscription quota. Cutting it would have cut the thing the dashboard
-exists to watch.
+**Delete:**
 
-| Surface | LOC | Verdict |
-|---|---|---|
-| Remote devices (`remote-run.ts` + forwarding allowlist) | ~350 | **Keep** — dashboard here, agents there |
-| Chrome extension + cloud driver + bridge endpoints/store/sessions | ~1,900 | **Keep** — the way Claude Code Web is driven |
-| Browser + screencast + proxy (`browser.ts`, `browser-stream.ts`, `browser-proxy.ts`) | ~680 | **Keep** — watching the agent navigate, and taking the wheel at a login wall |
-| GitHub Actions runner | — | **Keep** |
-| Discord *notifications* | — | **Keep** — outbound webhook posts, and they live outside `discord/` entirely |
-| Relay (`relay.ts`, `relay-endpoints.ts`, `relay-dispatch.ts`, `relay-run.ts`, `dashboard-rpc` relay branches) | ~510 | **Remove** — unauthenticated read-only sharing, "a keystone for shared sessions, not the final product"; the *third* host the RPC layer must degrade for, and the only one nothing depends on |
-| Discord chatbot + reply mirror | ~1,840 | **Remove** — effectively the whole `discord/` directory; see below |
-| Preview (`preview.ts`, `preview-runtime.ts`) | ~470 | **Remove** — "one click boots the project's app". A link to `npm run dev` in the README does this. |
+| Surface | LOC |
+|---|---|
+| Relay — `relay.ts`, `relay-endpoints.ts`, `relay-dispatch.ts`, `relay-run.ts`, and the relay branches in `dashboard-rpc` | ~510 |
+| Discord's inbound half — effectively all of `discord/` (see below) | ~1,840 |
+| Preview — `preview.ts`, `preview-runtime.ts` | ~470 |
+
+**Keep:** remote devices (`remote-run.ts` + the forwarding allowlist), the Chrome extension +
+cloud driver + bridge endpoints/store/sessions, the browser + screencast + proxy (`browser.ts`,
+`browser-stream.ts`, `browser-proxy.ts`), the GitHub Actions runner, and Discord *notifications*
+(outbound webhook posts, which live outside `discord/` entirely).
 
 **Removing the chatbot takes the whole `discord/` directory with it, and notifications do not
 notice.** The split is already clean in the code: Discord's *outbound* half is webhook posts living
@@ -581,50 +625,26 @@ degradation matrix — with remote execution intact.
 ## B. Data model — one concept, many files
 
 ### B1. Five representations of "work to do" → one — *rejected*
+**TL;DR —** **Rejected.** The five work-item files, the promotion mechanism and the lock all stay.
 
-**Settled: the current model stays as it is.** The five files, the promotion mechanism, the lock
-and the claim derivation all remain. What follows is the argument as originally made, kept on the
-record because the observations about `queue-promote.ts` are still accurate about live code — but
-it is not a queued action, and nothing else in this document should assume it lands.
+The five files (`tickets/<slug>.md`, `.plan.md`, `.lock.md`, `TODO_AGENTS.md`,
+`TODO_<SESSION>.agent.md`, `PLAN_<SESSION>.agent.md`), `queue-promote.ts` (268 LOC),
+`ticket-locks.ts` (187 LOC) and the claim derivation all stay.
 
-Today:
-
-| File | Meaning |
-|---|---|
-| `tickets/<date>_<slug>.md` | a proposal a human may accept |
-| `tickets/<slug>.plan.md` | that ticket's plan |
-| `tickets/<slug>.lock` | who is working it (committed + pushed to the default branch) |
-| `TODO_AGENTS.md` | confirmed queue, priority-sectioned, promoted between branches |
-| `TODO_<SESSION>.agent.md` | the session's own backlog, drained one entry per turn |
-| `PLAN_<SESSION>.agent.md` | the session's plan, gated for approval |
-
-Six file formats, three parsers, one promotion mechanism (`queue-promote.ts`, 268 LOC, with
-fork-point diffing to distinguish "the run added this" from "a human removed this"), one lock
-mechanism (`ticket-locks.ts`, 187 LOC), and one claim-derivation that reads *PR diffs* to see if
-an entry is claimed elsewhere.
-
-**A ticket file with a `Status:` and an `Assignee:` header is the whole model.** "Queued" is a
-status. "Claimed" is an assignee. "Plan" is a section. The queue's *order* is the priority header
-that already exists on every ticket.
-
-That single change deletes: `TODO_AGENTS.md` and its format spec, `queue-promote.ts` and the
-whole branch-promotion problem (tickets live on the default branch already, which is exactly why
-locks had to go there), `ticket-locks.ts` as a separate mechanism, `todo_format.md`, the queue
-parser, `findTodoBacklog`/`nextQueuedTicket`/`ticketFromQueueEntry`, the `queue-entry` event, and
-the `session-todo-open` merge-withhold reason.
-
-> The strongest evidence this is one concept wearing five hats: `queue-promote.ts`'s SPEC has to
-> explain that "on the run's branch but absent in the checkout" is *ambiguous* and needs a fork
-> point to disambiguate. That ambiguity is manufactured by putting mutable shared state in a file
-> that per-session branches also edit.
+**The one consequence to carry forward:** `queue-promote.ts`'s SPEC says "on the run's branch but
+absent in the checkout" is *ambiguous* and needs a fork point to disambiguate. That ambiguity is
+now permanent — it is contradiction #14, and the fork-point diffing is the answer to it, not a
+workaround to be removed later.
 
 ### B2. `ANALYSIS_RESULT.md` is write-only — delete it
+**TL;DR —** Delete `ANALYSIS_RESULT.md` — every run writes it, nothing reads it.
 The system prompt instructs the agent to create it and add three entries (ambiguous yes/no,
 scope size, …). Nothing reads it. There is a P2 ticket to *start* reading it
 (`2026-07-25_show-prompt-analysis.md`). An artifact that has existed long enough to earn a
 backlog item for being read is an artifact to delete, not to wire up.
 
 ### B3. Four records of "what happened" → one
+**TL;DR —** Keep the exact session log. Delete the whole `conversations/` feature and `LOGS.md`.
 `LOGS.md` (one entry per run, committed), `.the-framework/conversations/<runId>.md` (the readable
 chat, committed), `.the-framework/<user>/sessions/*` (archived session history, committed),
 `.the-framework/{events.jsonl,run.json,runs/*}` (the live/archived event log, gitignored) — plus
@@ -648,23 +668,13 @@ gets fixed — the mirror it was about is removed under A6, and the markdown it 
 exists.
 
 ### B4. Knowledge-base sprawl → one file — *rejected*
+**TL;DR —** **Rejected.** The knowledge base stays as it is.
 
-**Settled: the knowledge base stays as it is.** Recorded below as an observation only.
-
-`GOAL.md`, `BUSINESS_LOGIC.md`, `knowledge-base/DECISIONS.md`, `FACTS.md`, `INSIGHTS.md`,
-`MARKET_RESEARCH.md`, `knowledge-base/**.md` (catch-all), plus repo-root `MEMORY.md` (a *different*
-external convention), plus `AGENTS.md`, plus `SYSTEM.md`, plus 898 `SPEC.md` files.
-
-The agent is asked to sort each learning into the right one of these. The distinction between a
-"fact", an "insight" and a "decision" is not one an agent will apply consistently, and no consumer
-branches on it — `BUSINESS_KNOWLEDGE_DOCS` is just a list read at start and written at merge.
-
-**Do:** one `knowledge-base/` directory, free-form, listed as one context bullet. Delete
-`GOAL.md`/`BUSINESS_LOGIC.md` as separate concepts (they are knowledge). Reconcile `MEMORY.md`
-with it — right now the repo carries two competing "what agents should remember" conventions from
-two different external specs.
+`knowledge-base/{DECISIONS,FACTS,INSIGHTS,MARKET_RESEARCH}.md`, `GOAL.md` and `BUSINESS_LOGIC.md`
+all stay as separate concepts, and `MEMORY.md` continues alongside them.
 
 ### B5. Two config files + four preference tiers → one file, two tiers
+**TL;DR —** One config file, two tiers. Plus the handoff ladder → one ordinal, and named notification axes. 32 → 23 keys.
 `the-framework.yml` (repo), `~/.the-framework` registry (user globals + per-project overrides +
 secrets + token), plus per-run flags. `config-layers.ts` exists solely to resolve
 run > project > repo-file > user with "the nearest tier that *set* something wins", and each
@@ -717,6 +727,7 @@ may not remove a single key but removes the class of bug.
 ## C. Prompting — the mode matrix and the source of truth
 
 ### C1. Five prompt "modes" → two switches
+**TL;DR —** Keep `--vanilla` and `--transparent`. Delete eco, `--technical` and autopilot. Five modes → two booleans.
 Today, orthogonally combinable: `antiLazyPill` (aka `--vanilla`), `--transparent`, `eco`
 (`autoPlanning`, `autoResearch`, `autoMaintenance`), `--autopilot`, `--technical`. That is a
 2×2×2×2×2×2 space of system channels, of which the tests can only pin a few.
@@ -767,6 +778,7 @@ nearly every run gets and collapsing to it changes nothing. Taking the strict br
 quietly changed behaviour for everyone while looking like a deletion.
 
 ### C2. The system prompt's source of truth is a GitHub issue — invert it
+**TL;DR —** The repo file becomes the source of truth; delete `check-prompt-drift.mjs`, its workflow and the snapshot.
 `scripts/check-prompt-drift.mjs` (124 LOC) fetches **issue #326** daily in CI and fails when
 `prompts/system_prompt.md` no longer matches the markdown blocks in the issue body. A second block
 "cannot ship verbatim" (it nests `${{ }}` fragments the renderer cannot parse), so it is
@@ -783,12 +795,14 @@ Delete `check-prompt-drift.mjs`, its workflow, the snapshot file, and the `${{ }
 limitation that forced the flattening.
 
 ### C3. `antiLazyPill` — rename or delete
+**TL;DR —** Delete `antiLazyPill` — three comments apologise for the name, and C1 removes it anyway.
 The config key is `antiLazyPill`, the flag is `--vanilla`, the concept is "include the built-in
 system prompt", and the code comments apologise for this in three separate places ("the name is
 the historical config key"). With zero users, breaking changes cost nothing (`AGENTS.md` says so
 explicitly). Under C1 it disappears anyway.
 
 ### C4. `${{ }}` JS-in-markdown templating → plain string interpolation
+**TL;DR —** Replace `${{ }}` JS-in-markdown with plain string interpolation.
 `prompt-template.ts` evaluates JS fragments inside prompt markdown, against a `TfContext` whose
 shape (`tf.params`, `tf.settings.technical_control`, `tf.presets.*.filePath`, `tf.session_name`)
 is a mini-language. The scanner cannot nest (stops at the first `}}`), which is what forced the
@@ -800,6 +814,7 @@ placeholders substituted by the caller would cover every real use.
 ## D. Session runtime and control flow
 
 ### D1. The `Driver` seam conflates two orthogonal axes
+**TL;DR —** Split the `Driver` seam's two axes: which CLI to spawn vs. where the run executes.
 Five "drivers": `claude-code`, `codex`, `cloud`, `actions`, `fake`. But `cloud` and `actions` are
 **the same agent in a different place** — Claude Code on claude.ai and Claude Code in a GitHub
 Actions runner. The seam models *"which agent"* and *"where it runs"* as one dimension, and the
@@ -817,6 +832,7 @@ entirely (A6) and the whole `handsOff` axis disappears with them — six conditi
 `run.ts`, `steps.ts`, `system-prompt.ts` and `cli.ts`.
 
 ### D2. Two run paths that must not drift → one
+**TL;DR —** One run path. Deletes `prompt-run.ts` (211 LOC) and the drift risk `composeRunSystem` exists to manage.
 `runFramework` (the build path) and `runPrompt` (the direct-prompt path). `composeRunSystem`
 exists specifically because the two "each inlined the composition and one nested the protocols
 inside the built-in-prompt branch" (#500/#501). Once `Bootstrap` is gone (A3) and presets are gone
@@ -827,6 +843,7 @@ inside the built-in-prompt branch" (#500/#501). Once `Bootstrap` is gone (A3) an
 flow diagram.
 
 ### D3. Two dashboard hosts + one relay host → one
+**TL;DR —** One dashboard host. Deletes the capability probing and the whole degradation matrix.
 The daemon serves the dashboard; `the-framework "prompt"` *also* starts a foreground per-run
 dashboard on its own port with a `singleProjectProvider`; the relay is a third host. This is why
 `dashboard-rpc/context.ts` probes six optional capabilities on every call and every RPC has an
@@ -838,6 +855,7 @@ capability probing, no graceful degradation matrix — see A6 for the seam-by-se
 keeping remote execution does not preserve any of it.
 
 ### D4. The CLI keeps four options and no verbs
+**TL;DR —** Four options, no verbs. The daemon hands its child a JSON blob instead of 27 flags.
 **67 flags → 4. 10 verbs → 1. And `cli.ts` (2,589 lines) stops being four things at once.**
 
 The dashboard is the product's user interface. Every *setting* on the CLI is therefore either a
@@ -903,6 +921,7 @@ so the guard has to be there as long as the bind can be. Worth knowing that this
 feature holding ~200 LOC of security machinery upright, so it never reads as unexplained weight.
 
 ### D4b. The CLI always runs in the foreground; Ctrl-C closes everything
+**TL;DR —** Foreground only. Deletes the global state file, the heartbeat, `ensureDaemon`, detached spawning and suspend/resume.
 
 **Settled decision (`MEMORY.md`). It deletes more than the flag cleanup does.**
 
@@ -948,6 +967,7 @@ verb (`the-framework "<prompt>"` → POST to the daemon, open the browser at the
 it back without reintroducing a single *setting*.
 
 ### D5. "run" vs "session" — pick one word
+**TL;DR —** Pick one word — run or session — and rename. The cheapest large legibility win in the repo.
 The SPECs say **session** throughout ("A session is one agent working one task…"). The code says
 **run** throughout: `runId`, `run.json`, `runs/`, `RunStore`, `RunMeta`, `runFramework`,
 `daemon-runtime`, `run-handoff`, `resolveRunCheckout`, `--run-id`. The dashboard mixes both
@@ -957,6 +977,7 @@ The SPECs say **session** throughout ("A session is one agent working one task�
 Pick one and rename. This is the cheapest large legibility win in the repo.
 
 ### D6. Four gate/choice mechanisms → one
+**TL;DR —** One gate shape, one protocol block, one card. Deletes ~3 of 4 branches across 1,006 LOC.
 `await-choices` (pick one), `await-multiselect` (pick any), `await-confirmation`
 (approve/decline), plus the framework-emitted plan-approval gate (#304) that predates them, plus
 `await-bind-project`/`await-create-project` for topic runs, plus the todo-loop's per-entry gate.
@@ -972,6 +993,7 @@ a question whose options are the registered projects.
 `ChoiceRequest`.
 
 ### D7. `topic` runs — question whether they earn their weight
+**TL;DR —** Delete `topic` runs: a bind protocol, two gate kinds, a `bind` event and a mid-run checkout move, to save one click.
 A project-less run starts in a scratch directory, advertises a bind protocol, resolves an
 `await-bind-project` gate by registering a project, then **re-homes its checkout into that
 project** mid-run. That is: a special system-prompt block, a project list injected as context, two
@@ -985,6 +1007,7 @@ The alternative it argues against — *"pick a project first"* — costs the use
 ## E. Autonomy — the loop that spends the quota
 
 ### E1. Three spending gates → one
+**TL;DR —** One gate on *starting*. Delete `consumption-guard.ts` and `budgetUsd`; never interrupt a running session.
 - `quota-boundary.ts` — the pro-rated week boundary, for unattended work (fails **closed**)
 - `consumption-guard.ts` — polls quota during a run and pauses it (fails **open**)
 - `budgetUsd` / `--max-cost` — a per-run USD cap
@@ -1011,6 +1034,7 @@ Delete `budgetUsd` too (a per-run USD cap is a different unit from the quota-wee
 everything else speaks, and Claude Code subscriptions do not bill in USD).
 
 ### E2. Three claim mechanisms → one
+**TL;DR —** Keep `.lock.md` and the pinned branch. Delete the queue-entry pin that re-derives claims from PR diffs.
 An entry/ticket can be claimed by: (a) a **queue-entry pin** recorded as a run event and
 re-derived from live runs + open PRs + *PR diffs on other machines*; (b) a **lock file** committed
 and pushed beside the ticket on the default branch; (c) a **pinned branch** (`pinnedBranch` on a
@@ -1045,34 +1069,20 @@ a lock that cannot otherwise be released — cheaper than the cross-machine PR-d
 deleted.
 
 ### E3. The routine rotation is a scheduler in disguise — *rejected for now*
-Five routines (`update-tickets`, `triage-quick`, `triage-consensual`, `plan-tickets`, plus a
-calendar-paced `maintenance` outside the rotation), a drain job outside the rotation, per-routine
-opt-out preferences, a rotation cursor, a cooldown, a concurrency cap, a fan-out flag, and a
-documented failure mode where *"the rotation is unreachable with a standing backlog"* (P4 ticket,
-`2026-07-31_spike-plan-blocked-by-queue.md`).
+**TL;DR —** **Rejected for now.** The rotation, all five routines and every preset stay.
 
-Also: `triage-quick` and `triage-consensual` are two triage routines, and `update-tickets`,
-`suggest-new-tickets`, `suggest-tickets-to-work-on`, `suggest-new-features` and `import-tickets`
-are five more ticket-shaped presets.
+All five routines (`update-tickets`, `triage-quick`, `triage-consensual`, `plan-tickets`,
+`maintenance`), the drain job, the rotation cursor, the cooldown, the concurrency cap, the
+per-routine off-switches and the six ticket-shaped presets stay exactly as they are.
 
-**Settled: the rotation and every preset stay as they are, for now.** All five routines, the drain job, the
-six ticket-shaped presets and the per-routine off-switches stay exactly as they are. The analysis
-above stays on the record as an observation, not a queued action — nothing in this section is to
-be acted on until that decision is revisited.
-
-Two things follow from deferring it. The P4 ticket (`2026-07-31_spike-plan-blocked-by-queue.md`,
-*"the rotation is unreachable with a standing backlog"*) has to be **fixed rather than dissolved** —
-it was going to disappear along with the rotation, and with the rotation staying it is a live bug
-against live code. And `stale-branch.ts` was listed here as collateral; it is not. It belongs to
-E2, where the pinned-branch lock is kept deliberately, and the sweep is what makes that lock
-releasable.
-
-**What would still be worth doing whenever this is revisited:** *"If there is confirmed work, do
-the next piece. Otherwise, spend one session improving the backlog."* The second job is a prompt,
-not five presets — and that shape is what deletes the rotation cursor, the precedence rules and
-the "which routine is jammed" reporting.
+**Two consequences to carry forward.** The P4 ticket
+(`2026-07-31_spike-plan-blocked-by-queue.md`, *"the rotation is unreachable with a standing
+backlog"*) must be **fixed** — it was going to dissolve with the rotation, and now it is a live bug
+against live code. And `stale-branch.ts` belongs to **E2**, not here: it is what makes the pinned
+branch lock releasable, and E2 keeps it.
 
 ### E4. Four background sweeps on four timers → one tick
+**TL;DR —** One daemon tick running a list of jobs; intervals become "every Nth tick".
 `ci-watch` (~1 min), `merged-worktrees` (10 min), `auto-pm` (10 min), `maintenance` (calendar),
 `conversation-committer` (debounced), `stale-branch` (inside ci-watch), plus the quota poller and
 the daemon heartbeat. Each with its own interval, its own preference re-read, and its own
@@ -1087,6 +1097,7 @@ this proposal is smaller than the list above suggests — but `stale-branch` sta
 keeps the lock it releases.
 
 ### E5. `merged-worktrees` + `worktrees` + retention policy
+**TL;DR —** One rule: only remove what has been pushed to the remote. Replaces every retention rule.
 Three interacting rules: a clean finish removes the worktree; a failure/stop keeps it; a merged
 branch reclaims it later (via two different "landed" signals because squash-merge hides the local
 one); deleting a session keeps the branch but drops the archive. Plus a prune verb, plus a manual
@@ -1105,6 +1116,7 @@ need for a `--keep` escape hatch: the reason to keep a worktree was fear of losi
 pushed branch is not lost.
 
 ### E6. `no PR number is ever stored` — store the PR number
+**TL;DR —** Store the PR number, instead of a three-way name guess plus a timestamp heuristic plus a 117-LOC cache.
 Every surface re-resolves the PR live from the session's branch, "falling back to the session-name
 and run-id branches", preferring an open PR and accepting a closed one only if created after the
 session started. That is a three-way branch-name guess plus a timestamp heuristic plus a cache
@@ -1120,6 +1132,7 @@ only at teardown, so any read before that guessed between three naming schemes."
 ## F. Dashboard
 
 ### F1. Vike is doing nothing — use plain Vite
+**TL;DR —** Plain Vite with an `index.html`. Vike's whole net contribution is one prerendered file.
 `+config.ts` sets `ssr: false`, `prerender: true`; `+route.ts` returns `true` for every path with a
 comment saying its return value "is deliberately not read"; `+onBeforePrerenderStart.ts` exists
 only to name `/` so an `index.html` gets emitted at all; the app then routes client-side in
@@ -1130,6 +1143,7 @@ Net contribution of Vike + vike-react: one prerendered `index.html`. **Do:** pla
 `+config`/`+route`/`+onBeforePrerenderStart` indirection.
 
 ### F2. `the-framework` exports 406 symbols to one consumer
+**TL;DR —** Export only what the dashboard imports — 406 symbols down to a handful.
 `src/index.ts` is 390 lines exporting ~406 named symbols. Its only consumers are the dashboard
 (via `.`, `./client`, `./dashboard-rpc`) and its own CLI. Everything exported is public API that
 must stay coherent, be re-exported through the right subpath, and stay browser-safe (there is a
@@ -1140,6 +1154,7 @@ exactly what that is. Then the "must stay node-free" constraint applies to a han
 instead of being a repo-wide hazard.
 
 ### F3. Telefunc + a capability-probing context → plain HTTP handlers
+**TL;DR —** Plain `POST /rpc/<name>` handlers. Cheap only after D3, which collapses the context to nothing.
 Telefunc requires a build-time transform, a `telefunc-serve.ts` shim (192 LOC), a `register.ts`, a
 `stream-channel.ts`, and `getContext()`-based capability probing in `context.ts` (126 LOC). Under
 D3 (one host) the context collapses to nothing, and the RPC layer is ~40 read functions and ~15
@@ -1150,70 +1165,41 @@ type-safety across a boundary that could just share types directly (the dashboar
 `@gemstack/the-framework` types).
 
 ### F4. Vendored `animate-ui` (1,225 LOC)
+**TL;DR —** Depend on `animate-ui` or delete the animations. 1,225 vendored LOC.
 A vendored animation primitive library (641 LOC in one highlight effect) inside the components
 directory, alongside vendored shadcn `ui/` (1,562 LOC). The shadcn vendoring is idiomatic;
 `animate-ui` is a dependency that was copied in. **Do:** depend on it, or delete the animations.
 
 ### F5. Dashboard feature surface vs. the goal — *rejected*
+**TL;DR —** **Rejected.** Faceted filtering, sorting and the shareable filter URL all stay.
 
-**Settled: the dashboard's feature surface stays as it is** — faceted filtering, sorting and
-group-by, and the shareable filter URL all remain. Recorded below as an observation only.
-
-The overview page renders: quota bar, open-questions hub, active agents, the full AI queue,
-routine work, hot tickets, an onboarding checklist. Plus pages for tickets (with client-side
-faceted filtering across text/priority/effort/uncertainty/topics/planning-stage/project, sorting,
-group-by, and URL mirroring — `ticket-filter.ts` is 418 LOC), per-ticket, per-plan, settings, and
-a session view with transcript, diffs, git status, handoff panel, agent-authored views, docs,
-history rails, and a 347-line actions menu.
-
-For 77 tickets, a faceted filter bar with range/bucket modes on four numeric dimensions is
-strictly more machinery than the data. **Do:** text search + sort by priority. Revisit at 1,000
-tickets.
-
----
+Faceted filtering (text, priority/effort/uncertainty as buckets *or* ranges, topics, planning
+stage, project), sorting, group-by-project, and the filter view mirrored to the URL all stay.
 
 ## G. Process and repo hygiene
 
 ### G1. SDD: 898 `SPEC.md` files for 818 source files — *rejected*
+**TL;DR —** **Rejected.** SDD stays as practised — which taxes every other item here. See the note below.
 
-**Settled: SDD stays exactly as practised.** Every `SPEC.md` remains, including the per-file,
-per-test and per-config ones. Recorded below as an observation only — and see the note after it,
-because keeping SDD attaches a cost to every other approved item in this document.
+All 898 `SPEC.md` files stay, including the per-file, per-test and per-config ones
+(`vite.config.SPEC.md`, `define.test.SPEC.md`, …).
 
-7,012 lines of spec, one file per source file *and per directory* — **including per test file**
-(`story-session-lifecycle.test.SPEC.md`, `client-construction.test.SPEC.md`,
-`define.test.SPEC.md`, `vite.config.SPEC.md`). A spec for a Vite config and a spec for a test
-file are specs describing implementation.
+**This taxes every other item in this document, which is the part to plan for.** At roughly one
+spec per source file:
 
-Every one of these must be kept in sync by hand or by an agent, forever, and they are the reason
-the repo has 992 markdown files. The high-level ones (package, subsystem, subdirectory) are
-genuinely excellent and are how this review was possible. The per-file ones are a second copy of
-the doc comments already in the source.
+- **Deletions take their specs with them** — `discord/` is six modules plus siblings (A6), and the
+  same holds for `relay.ts`, `preview.ts`, `consumption-guard.ts`, `store/suspend.ts`,
+  `conversations.ts`, `logs.ts` and the `ai-sdk` package (A1).
+- **Behaviour changes rewrite specs.** `daemon.SPEC.md` states *"one daemon per machine, recorded
+  in a single global state file"* — D4b makes that false. The root SPEC's *"files are the seam"*
+  and *"the dashboard never holds authoritative state"* are already contradicted by shipped
+  features (#4, #5); with G1 rejected the fix is to correct the prose, not delete the file.
+- **New code needs new specs** — B5's handoff ordinal and notification axes each arrive with one.
 
-~~**Do:** keep `SPEC.md` at the package and directory level (~70 files, and they carry almost all
-of the 7,012 lines' value). Delete the per-file ones, and never write one for a test or a
-config.~~ **Rejected — the practice stays.**
-
-**What that means for the rest of this document, which is the part worth planning for.** At roughly
-one spec per source file, every approved deletion carries a spec obligation and every approved
-behaviour change carries a spec rewrite:
-
-- **Deletions** must take their specs with them — `discord/` alone is six modules plus their spec
-  siblings (A6), and the same applies to `relay.ts`, `preview.ts`, `consumption-guard.ts`,
-  `store/suspend.ts`, `conversations.ts`, `logs.ts` and the `ai-sdk` package (A1).
-- **Behaviour changes must rewrite specs, not just code.** `daemon.SPEC.md` states *"one daemon per
-  machine, recorded in a single global state file"* — D4b makes that sentence false. The root SPEC's
-  *"files are the seam"* and *"the dashboard never holds authoritative state"* are already
-  contradicted by shipped features (contradictions #4 and #5), and with G1 rejected the fix is to
-  correct the prose rather than delete the file.
-- **New code needs new specs.** B5's handoff ordinal and the notification axes are new shapes, and
-  under SDD each arrives with a spec.
-
-None of this changes what was approved. It changes the size of the work: the SPEC files are not
-overhead sitting beside the plan, they are part of every step in it. **G3** (fix the stale docs)
-stops being a tidy-up at the end and becomes the discipline running through the whole sequence.
+So **G3** is not a tidy-up at the end; it is a requirement of every step.
 
 ### G2. Delete the whole release history — changesets, changelogs, migration notes
+**TL;DR —** Delete the release history: 77 changesets, 4 changelogs (2,861 lines), migration notes, semver → `0.0.0`.
 `AGENTS.md`: *"The project isn't released, it has zero users. Thus, breaking changes aren't a
 problem, so prefer clean code over breaking changes."* Alongside: 76 changesets, semver'd packages
 (`ai-sdk@0.6.1`, `ai-autopilot@0.12.0`, `the-framework@1.4.2`), a `release.yml` workflow, and
@@ -1245,6 +1231,7 @@ rejected, is staying and is the natural home), and only then delete. Everything 
 lines is a record of how the code got here, which git already holds.
 
 ### G3. Stale docs contradicting the code
+**TL;DR —** Fix the docs that describe a different product. With G1 rejected, this runs through every step rather than last.
 - `packages/framework-dashboard/README.md`: *"De-risking prototype… side-by-side with the current
   `page.ts` MVP page (which is untouched)"* — it is the production dashboard; `page.ts` is gone.
 - `packages/the-framework/README.md`: *"Status: MVP (#166)"*, and the entire document describes the
@@ -1259,6 +1246,7 @@ lines is a record of how the code got here, which git already holds.
 of them describes a *different product* than `SPEC.md` does.
 
 ### G4. Issue-number citations as the primary explanation
+**TL;DR —** Keep issue numbers as a suffix, never as the explanation.
 Nearly every doc comment cites issue numbers (`#326`, `#1372`, `#1467`, …) — often *only* issue
 numbers, as in "the #1372 rule" or "Rom's call on #519". The repo has 50 commits; the issues live
 elsewhere and some (like #326) are load-bearing artifacts (C2).
@@ -1267,6 +1255,7 @@ The comments that explain *what and why* in prose are excellent. The ones that d
 a number are a dangling pointer. **Do:** keep the number as a suffix, never as the explanation.
 
 ### G5. Test volume
+**TL;DR —** No separate action — ~20k test LOC leave with the features above. Trim what remains last.
 26,387 test LOC against ~31,441 source LOC in `the-framework`; 14,379 against 16,453 in `ai-sdk`.
 Under A1/A4/A5/A6 roughly 20k of those tests are deleted along with what they test — which is the
 point: **the fastest way to reduce test burden is to delete features, not tests.** No action item

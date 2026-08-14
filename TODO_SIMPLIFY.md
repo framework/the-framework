@@ -69,7 +69,7 @@ pointer to the proposal in Part 3. Nothing is omitted: features I propose deleti
 beside the ones that survive, so the cost of each proposal is visible in user terms rather than in
 lines of code.
 
-**Tally: 173 user-facing features — 120 Keep, 8 Simplify, 45 Remove.**
+**Tally: 173 user-facing features — 120 Keep, 7 Simplify, 46 Remove.**
 
 The product a user actually came for — *register a repo, describe work, watch an agent do it,
 get a PR, and let it keep working while you sleep* — is entirely inside the Keep column.
@@ -256,7 +256,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 |---|---|---|---|
 | 132 | `the-framework.yml` — per-repo defaults that travel with the code | Keep | |
 | 133 | `SYSTEM.md` — your own instructions on top of the built-in prompt | Keep | |
-| 134 | Global user preferences | Simplify — 32 keys; 5 go with eco/technical, and the 3-boolean handoff ladder is one ordinal | B5 |
+| 134 | Global user preferences | Simplify — 32 keys; 6 go with eco/technical/autopilot, and the 3-boolean handoff ladder is one ordinal | B5 |
 | 135 | Per-project preference overrides (a third tier) | **Remove** — the repo file already does this | B5 |
 | 136 | The run narrates which layer decided each setting | **Remove** — goes with the tier | B5 |
 | 137 | Theme (system / light / dark) | Keep | |
@@ -267,7 +267,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 142 | `--context <dir>` — narrow the agent's focus | Keep | |
 | 143 | Vanilla mode (drop the built-in prompt, keep the emit protocols) | Keep | C1 |
 | 144 | Transparent mode (raw `claude -p`, nothing framework-authored) | Keep — as the *only* off-switch | C1 |
-| 145 | Autopilot mode | Simplify — it is an auto-accept timeout, not a mode | C1 |
+| 145 | Autopilot mode | **Remove** | C1 |
 | 146 | Technical mode | **Remove** — only selects preset variants | C1, A5 |
 
 ### Remote execution and sharing
@@ -358,7 +358,7 @@ this document should assume it lands.
 
 | | Proposals |
 |---|---|
-| **Settled — do it** | **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco and technical |
+| **Settled — do it** | **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco, technical and autopilot |
 | **Settled — partly** | **A6** cut the relay, the preview server and the Discord reply mirror; keep remote devices, the Chrome extension, the browser + screencast, Actions runners and the Discord chatbot |
 | **Rejected** | **B1** the five work-item files stay · **B4** the knowledge base stays · **F5** the dashboard's filtering and sorting stay · **E3** the rotation and every preset stay, *for now* |
 | **Still open** | A1–A5 · B2 · B5 · C2–C4 · D1–D3 · D5–D7 · E4 · E6 · F1–F4 · G1–G5 |
@@ -631,11 +631,10 @@ what actually goes is small:
 
 | | Keys | Why |
 |---|---|---|
-| **Removed outright** | `technical`, `eco`, `ecoPlanning`, `ecoResearch`, `ecoMaintenance` | C1 deletes the whole eco setting and `--technical` with the presets it selects (A5) |
-| **Renamed, not removed** | `autopilot` → `autoAcceptGates` | C1 — its only remaining effect is the choice-gate countdown |
+| **Removed outright** | `technical`, `eco`, `ecoPlanning`, `ecoResearch`, `ecoMaintenance`, `autopilot` | C1 deletes the whole eco setting, `--technical` with the presets it selects (A5), and autopilot mode (#145) — nothing replaces the last one, because a headless gate already falls back without it |
 | **Protected by settled decisions** | `vanilla`, `transparent` (C1) · `browser` (#173) · `target` (#151/#152) · `bridge` (#155) · `discordBot` (#159) · `autoSpendOffset` (#128) · `autoPmOptOut` (#115) · `autoPmConcurrency` (E3 rejected) · `reposDirectory`, `reposDirectoryAutoGrant` (#4) | Each is a feature that was reviewed and kept |
 
-That is **five keys deleted**, not a purge. The remaining ~27 are, with two exceptions, genuinely
+That is **six keys deleted**, not a purge. The remaining 26 are, with two exceptions, genuinely
 distinct settings — `model`, `agent`, `editor`, `theme` and the rest are not duplicates of each
 other. **The two exceptions are worth more than the count:**
 
@@ -657,13 +656,13 @@ its sibling."* That is a defect that already happened, caused by the shape rathe
 The fix is to name the axes (methods × categories, each cell defaulting on its own merits), which
 may not remove a single key but removes the class of bug.
 
-**Net: 32 → 25 keys**, and the two clusters above are where the actual complexity lives.
+**Net: 32 → 24 keys**, and the two clusters above are where the actual complexity lives.
 
 ---
 
 ## C. Prompting — the mode matrix and the source of truth
 
-### C1. Five prompt "modes" → two switches and a countdown
+### C1. Five prompt "modes" → two switches
 Today, orthogonally combinable: `antiLazyPill` (aka `--vanilla`), `--transparent`, `eco`
 (`autoPlanning`, `autoResearch`, `autoMaintenance`), `--autopilot`, `--technical`. That is a
 2×2×2×2×2×2 space of system channels, of which the tests can only pin a few.
@@ -684,15 +683,34 @@ Specific findings:
   floor."* Trimming a ~60-line system prompt to save tokens, in a system that deliberately spends
   its entire weekly allowance on unattended work, is not a real economy.
 - **`--technical` only selects preset variants**, and presets go under A5.
-- **`autopilot`'s whole remaining effect is the choice-gate countdown** — its own doc says so
-  (#556 moved the maintenance section out, #801). It is not a mode; it is
-  `autoAcceptChoicesAfterMs`.
+- **`autopilot` is removed outright (settled), and it turns out nothing needs replacing.** The
+  earlier draft proposed keeping it as an `autoAcceptGates` boolean, on the reasoning that its
+  remaining effect was the choice-gate countdown. Checking `await-gate.ts` first: a headless run
+  *already* resolves gates without it. There is a recommended fallback (`PROCEED`) applied
+  whenever a gate "cannot get a real answer", the interactive handler is explicitly *"omit for a
+  headless run"*, and the code is explicit that it will "approve so a headless (or aborted) run
+  proceeds". A gate parked for input **never hangs**, autopilot or not.
 
-**Do:** keep `--vanilla` and `--transparent` as the two off-switches, plus one `autoAcceptGates`
-boolean. Delete **the whole eco setting** (settled) — `dropSection`, `ECO_SECTION_HEADINGS`,
-`applyEco`, the three `auto*` sub-flags and the tests pinning heading names against the template —
-and `--technical` with the presets it selects (A5). Five combinable modes become two booleans and
-a countdown: a 2×2 space the tests can actually cover, instead of 2⁶.
+  So unattended work does not depend on this mode, and removing it does not deadlock Auto PM. What
+  it actually deletes is auto-accept at an *interactive* gate — the case where a human is sitting
+  at the dashboard and the mode decided not to ask them. **The gate's audience is the real signal,
+  and it is already available structurally:** somebody is watching, so ask; nobody is, so take the
+  recommended option. That is a property of the run, not a setting, which is why no boolean has to
+  survive. (Interacts with **D6**, still open, which consolidates the gate mechanisms.)
+
+**Do:** keep `--vanilla` and `--transparent` as the two off-switches, and nothing else. Delete
+**the whole eco setting** (settled) — `dropSection`, `ECO_SECTION_HEADINGS`, `applyEco`, the three
+`auto*` sub-flags and the tests pinning heading names against the template — plus `--technical`
+with the presets it selects (A5), and `--autopilot` outright (settled). Five combinable modes
+become **two booleans**: a 2×2 the tests can cover exhaustively, instead of 2⁶.
+
+**One decision this leaves open, and it is about prompt content, not code.** The system-prompt
+template branches on `tf.params.autopilot` — per the changelog, it *"relaxes the maintenance
+stance on autopilot runs"*. With the mode gone that branch has to resolve to one stance for
+everybody. **Recommend the relaxed one**, because `autopilotEnabled` is `preferences.autopilot ??
+true` — autopilot is *on* by default today, so the relaxed stance is already what nearly every run
+gets. Taking the strict branch instead would quietly change behaviour for everyone while looking
+like a deletion.
 
 ### C2. The system prompt's source of truth is a GitHub issue — invert it
 `scripts/check-prompt-drift.mjs` (124 LOC) fetches **issue #326** daily in CI and fails when

@@ -69,7 +69,7 @@ pointer to the proposal in Part 3. Nothing is omitted: features I propose deleti
 beside the ones that survive, so the cost of each proposal is visible in user terms rather than in
 lines of code.
 
-**Tally: 173 user-facing features — 105 Keep, 20 Simplify, 48 Remove.**
+**Tally: 173 user-facing features — 114 Keep, 13 Simplify, 46 Remove.**
 
 The product a user actually came for — *register a repo, describe work, watch an agent do it,
 get a PR, and let it keep working while you sleep* — is entirely inside the Keep column.
@@ -81,7 +81,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 1 | Install globally or run via `npx` | Keep | |
 | 2 | `the-framework` spins up the dashboard and finds/starts the daemon | Keep | |
 | 3 | Activate a repo (commits dirty state, creates `.the-framework/`, teaches `.gitignore`, registers it) | Keep — via the dashboard only (the CLI path goes) |  |
-| 4 | Auto-register every repo under a configured "repos directory" | **Remove** — adding a project is a UI action; the directory scan is a second path to the same thing |  |
+| 4 | Auto-register every repo under a configured "repos directory" | Keep — via the dashboard only (the CLI path goes) |  |
 | 5 | Onboarding checklist (6 steps, each derived from a real fact, not a click) | Simplify — steps for removed features go with them | A6 |
 | 6 | `the-framework doctor` prerequisite check | Keep | |
 | 7 | Per-session preflight (probe the agent CLI before spending a branch) | Keep | |
@@ -115,7 +115,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 30 | CLI `the-framework [intent...]` — build an app from scratch | **Remove** | A4 |
 | 31 | CLI `the-framework prompt <text>` — one verbatim prompt | **Remove** as a verb — the *path* survives as the only run path; the e2e harness moves to an internal test interface, not this one | D2, D4 |
 | 32 | CLI `the-framework research [what]` | **Remove** as a verb — it is a preset in the composer | D4 |
-| 33 | CLI `the-framework maintain` — sweep repos for un-reviewed commits | **Remove** as a verb — folds into the daemon tick | E3, E4 |
+| 33 | CLI `the-framework maintain` — sweep repos for un-reviewed commits | **Remove** as a verb — folds into the daemon tick | D4, E4 |
 | 34 | CLI `the-framework worktrees [rm\|prune\|sweep]` | **Remove** as a verb — it is the session actions menu | D4, E5 |
 | 35 | CLI `the-framework relay` — host a watch relay | **Remove** | A6 |
 | 36 | CLI `--resume` — reopen the last session's dashboard read-only | **Remove** — it is a URL in the dashboard | D3 |
@@ -135,14 +135,14 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 45 | Maintenance (periodic codebase sweep) | Keep | |
 | 46 | Market research | Keep | |
 | 47 | Import tickets from GitHub | Keep | |
-| 48 | Update from GitHub | Simplify — one of six ticket-shaped presets | E3 |
+| 48 | Update from GitHub | Keep — unchanged for now | E3 |
 | 49 | Plan tickets (aka spike) | Keep | |
-| 50 | Suggest new tickets | Simplify — collapse with #52, #51, #48 | E3 |
-| 51 | Suggest new features | Simplify — collapse | E3 |
-| 52 | Suggest tickets to work on | Simplify — collapse | E3 |
+| 50 | Suggest new tickets | Keep — unchanged for now | E3 |
+| 51 | Suggest new features | Keep — unchanged for now | E3 |
+| 52 | Suggest tickets to work on | Keep — unchanged for now | E3 |
 | 53 | Spin up agents working on the AI queue | Keep | |
-| 54 | Add quick-win work to AI Queue (triage-quick) | Simplify — one triage preset, not two | E3 |
-| 55 | Add consensual work to AI Queue (triage-consensual) | Simplify — collapse with #54 | E3 |
+| 54 | Add quick-win work to AI Queue (triage-quick) | Keep — unchanged for now | E3 |
+| 55 | Add consensual work to AI Queue (triage-consensual) | Keep — unchanged for now | E3 |
 
 ### Watching and steering a session
 
@@ -226,7 +226,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | # | Feature | Verdict | Ref |
 |---|---|---|---|
 | 113 | Auto PM: drain the confirmed queue, refill it when empty | Keep | |
-| 114 | Five routines (update-tickets, triage-quick, triage-consensual, plan-tickets, maintenance) | Simplify — two jobs | E3 |
+| 114 | Five routines (update-tickets, triage-quick, triage-consensual, plan-tickets, maintenance) | Keep — unchanged for now | E3 |
 | 115 | Each routine individually switchable off | Keep | E3 |
 | 116 | Every stand-down reported with its reason ("it is a setting, not a bug") | Keep | |
 | 117 | Concurrency cap: how many unattended agents per project | Keep | |
@@ -235,7 +235,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 120 | CI watch: merge a PR once its checks pass | Keep | |
 | 121 | CI watch: one fix session per red head commit, max two attempts | Keep | |
 | 122 | Reclaim the checkout of a session whose branch has landed | Simplify | E5 |
-| 123 | Release a pinned routine branch left behind by a closed PR | **Remove** — goes with pinned branches | E3 |
+| 123 | Release a pinned routine branch left behind by a closed PR | Keep — the release sweep the branch lock needs | E2 |
 | 124 | The session drains its own TODO backlog, one entry per turn | **Remove** — merges into the ticket model | B1 |
 
 ### Spending
@@ -913,7 +913,7 @@ it only when *some PR existed and none is open*. That is one sweep, with a corre
 a lock that cannot otherwise be released — cheaper than the cross-machine PR-diff derivation being
 deleted.
 
-### E3. The routine rotation is a scheduler in disguise
+### E3. The routine rotation is a scheduler in disguise — *deferred*
 Five routines (`update-tickets`, `triage-quick`, `triage-consensual`, `plan-tickets`, plus a
 calendar-paced `maintenance` outside the rotation), a drain job outside the rotation, per-routine
 opt-out preferences, a rotation cursor, a cooldown, a concurrency cap, a fan-out flag, and a
@@ -924,16 +924,22 @@ Also: `triage-quick` and `triage-consensual` are two triage routines, and `updat
 `suggest-new-tickets`, `suggest-tickets-to-work-on`, `suggest-new-features` and `import-tickets`
 are five more ticket-shaped presets.
 
-**Do:** two jobs. *"If there is confirmed work, do the next piece."* *"Otherwise, spend one
-session improving the backlog."* The second one is a prompt, not five. That deletes the rotation
-cursor, the precedence rules, the "which routine is jammed" reporting, and the P4 ticket along
-with them.
+**Deferred (settled): no preset or routine changes for now.** All five routines, the drain job, the
+six ticket-shaped presets and the per-routine off-switches stay exactly as they are. The analysis
+above stays on the record as an observation, not a queued action — nothing in this section is to
+be acted on until that decision is revisited.
 
-**Per-routine off-switches stay (settled).** They are the one part of this that is a user-facing
-control rather than scheduler bookkeeping: "stop doing consensual triage, keep doing the rest" is
-a thing a person wants to say, and the rotation is not what makes it expressible. With the cursor
-and precedence rules gone they cost a boolean per job instead of participating in the scheduling
-logic being deleted.
+Two things follow from deferring it. The P4 ticket (`2026-07-31_spike-plan-blocked-by-queue.md`,
+*"the rotation is unreachable with a standing backlog"*) has to be **fixed rather than dissolved** —
+it was going to disappear along with the rotation, and with the rotation staying it is a live bug
+against live code. And `stale-branch.ts` was listed here as collateral; it is not. It belongs to
+E2, where the pinned-branch lock is kept deliberately, and the sweep is what makes that lock
+releasable.
+
+**What would still be worth doing whenever this is revisited:** *"If there is confirmed work, do
+the next piece. Otherwise, spend one session improving the backlog."* The second job is a prompt,
+not five presets — and that shape is what deletes the rotation cursor, the precedence rules and
+the "which routine is jammed" reporting.
 
 ### E4. Four background sweeps on four timers → one tick
 `ci-watch` (~1 min), `merged-worktrees` (10 min), `auto-pm` (10 min), `maintenance` (calendar),
@@ -943,6 +949,11 @@ stand-down reporting.
 
 **Do:** one daemon tick that runs a list of jobs. Intervals become "every Nth tick". One place to
 look when "nothing is happening".
+
+Two of those timers are already gone by the time this is reached: `conversation-committer` dies
+with `conversations/` (B3), and the daemon heartbeat dies with the background daemon (D4b). So
+this proposal is smaller than the list above suggests — but `stale-branch` stays on it, since E2
+keeps the lock it releases.
 
 ### E5. `merged-worktrees` + `worktrees` + retention policy
 Three interacting rules: a clean finish removes the worktree; a failure/stop keeps it; a merged

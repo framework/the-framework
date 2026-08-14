@@ -1031,8 +1031,8 @@ test('a hand-off run is told the await gates are unavailable, a local one is not
     const prompt = events.find(e => e.kind === 'system-prompt')
     return prompt?.kind === 'system-prompt' ? prompt.text : ''
   }
-  assert.ok((await systemOf(handsOffDriver().driver)).includes('Await gates are not available'))
-  assert.ok(!(await systemOf(new FakeDriver())).includes('Await gates are not available'))
+  assert.ok((await systemOf(handsOffDriver().driver)).includes('This session runs detached'))
+  assert.ok(!(await systemOf(new FakeDriver())).includes('This session runs detached'))
 })
 
 test('a hand-off run does not stay open for messages (#1225)', async () => {

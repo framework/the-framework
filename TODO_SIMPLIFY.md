@@ -69,7 +69,7 @@ pointer to the proposal in Part 3. Nothing is omitted: features I propose deleti
 beside the ones that survive, so the cost of each proposal is visible in user terms rather than in
 lines of code.
 
-**Tally: 173 user-facing features — 120 Keep, 7 Simplify, 46 Remove.**
+**Tally: 173 user-facing features — 119 Keep, 7 Simplify, 47 Remove.**
 
 The product a user actually came for — *register a repo, describe work, watch an agent do it,
 get a PR, and let it keep working while you sleep* — is entirely inside the Keep column.
@@ -256,7 +256,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 |---|---|---|---|
 | 132 | `the-framework.yml` — per-repo defaults that travel with the code | Keep | |
 | 133 | `SYSTEM.md` — your own instructions on top of the built-in prompt | Keep | |
-| 134 | Global user preferences | Simplify — 32 keys; 6 go with eco/technical/autopilot, and the 3-boolean handoff ladder is one ordinal | B5 |
+| 134 | Global user preferences | Simplify — 32 keys; 7 go with eco/technical/autopilot/discordBot, and the 3-boolean handoff ladder is one ordinal | B5 |
 | 135 | Per-project preference overrides (a third tier) | **Remove** — the repo file already does this | B5 |
 | 136 | The run narrates which layer decided each setting | **Remove** — goes with the tier | B5 |
 | 137 | Theme (system / light / dark) | Keep | |
@@ -291,8 +291,8 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 156 | Browser notifications | Keep | |
 | 157 | Discord notifications: sessions started and finished | Keep | |
 | 158 | Discord notifications: what needs a human (open PR, parked question, unpushed commits) | Keep | |
-| 159 | Discord chatbot: answer a parked question, steer a live session, start one | Keep | A6 |
-| 160 | Discord reply mirror: the session's answers posted back to the channel | **Remove** — the chatbot stays, the mirror goes | A6 |
+| 159 | Discord chatbot: answer a parked question, steer a live session, start one | **Remove** | A6 |
+| 160 | Discord reply mirror: the session's answers posted back to the channel | **Remove** — goes with #159 | A6 |
 
 ### The from-scratch build product
 
@@ -321,8 +321,9 @@ Worth being honest about, rather than hiding behind the LOC counts:
 - **Sharing a live session with a teammate.** No relay, no watch links. A PR is the sharing
   mechanism. (Remote *execution* stays — Actions runners, cloud sessions and second devices are
   the product, not a channel; see A6.)
-- **Mirroring session replies into a Discord channel.** The chatbot stays — parked questions,
-  steering, starting a session — but answers are not echoed to the channel as a second transport.
+- **Talking to The Framework from Discord.** No chatbot answering a parked question, steering a
+  live session or starting one, and no reply mirror. Discord becomes outbound-only: it tells you
+  something needs you, and you go to the dashboard.
 - **A readable markdown conversation committed beside the code.** The exact session log is the
   record; the prose rendering of it goes, and `conversations/` with it (B3).
 - **Trimming prompts to save tokens.** The whole eco setting goes — it contradicts a product whose
@@ -359,7 +360,7 @@ this document should assume it lands.
 | | Proposals |
 |---|---|
 | **Settled — do it** | **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco, technical and autopilot |
-| **Settled — partly** | **A6** cut the relay, the preview server and the Discord reply mirror; keep remote devices, the Chrome extension, the browser + screencast, Actions runners and the Discord chatbot |
+| **Settled — partly** | **A6** cut the relay, the preview server and all of Discord's inbound half (chatbot + reply mirror); keep remote devices, the Chrome extension, the browser + screencast, Actions runners and Discord *notifications* |
 | **Rejected** | **B1** the five work-item files stay · **B4** the knowledge base stays · **F5** the dashboard's filtering and sorting stay · **E3** the rotation and every preset stay, *for now* |
 | **Still open** | A1–A5 · B2 · B5 · C2–C4 · D1–D3 · D5–D7 · E4 · E6 · F1–F4 · G1–G5 |
 
@@ -504,10 +505,40 @@ exists to watch.
 | Chrome extension + cloud driver + bridge endpoints/store/sessions | ~1,900 | **Keep** — the way Claude Code Web is driven |
 | Browser + screencast + proxy (`browser.ts`, `browser-stream.ts`, `browser-proxy.ts`) | ~680 | **Keep** — watching the agent navigate, and taking the wheel at a login wall |
 | GitHub Actions runner | — | **Keep** |
-| Discord bot + notifications | ~900 | **Keep** — the chatbot answers parked questions and starts sessions |
+| Discord *notifications* | — | **Keep** — outbound webhook posts, and they live outside `discord/` entirely |
 | Relay (`relay.ts`, `relay-endpoints.ts`, `relay-dispatch.ts`, `relay-run.ts`, `dashboard-rpc` relay branches) | ~510 | **Remove** — unauthenticated read-only sharing, "a keystone for shared sessions, not the final product"; the *third* host the RPC layer must degrade for, and the only one nothing depends on |
-| Discord reply mirror | ~260 | **Remove** — the chatbot stays; mirroring every answer back to a channel is a second transport for the same content |
+| Discord chatbot + reply mirror | ~1,840 | **Remove** — effectively the whole `discord/` directory; see below |
 | Preview (`preview.ts`, `preview-runtime.ts`) | ~470 | **Remove** — "one click boots the project's app". A link to `npm run dev` in the README does this. |
+
+**Removing the chatbot takes the whole `discord/` directory with it, and notifications do not
+notice.** The split is already clean in the code: Discord's *outbound* half is webhook posts living
+in `dashboard/{discord-webhook,activity,interventions}.ts` and `ci-watch.ts` — nothing under
+`discord/` — while everything in `discord/` exists for the inbound half. `rest.ts` says why in its
+own header: *"a webhook can only speak into one channel and cannot reply, so a bot that answers
+where it was asked has to go through the API with its token."*
+
+| Deleted | LOC |
+|---|---|
+| `discord/gateway.ts` + test — the WebSocket gateway | 697 |
+| `discord/reply-mirror.ts` + test | 448 |
+| `discord/bot.ts` + test | 289 |
+| `discord/routing.ts` + test | 251 |
+| `discord/live-run.ts` + test | 108 |
+| `discord/rest.ts` | 47 |
+
+Plus the `discordBot` preference, the `discordBotToken` secret and `DISCORD_BOT_TOKEN`,
+`DISCORD_CHANNEL_ID`, the bot's wiring in `daemon-services.ts`, and the "token is set but the
+preference is off" warning that exists because a connected-but-ignoring bot reads as broken rather
+than as off. `discord-credentials.ts` shrinks to the webhook alone.
+
+**One thread to unpick, not a blocker:** `dashboard/discord-webhook.ts` imports `clampContent`
+from `discord/rest.ts` — the helper enforcing Discord's 2,000-character limit. It is ~6 lines and
+belongs to the webhook path anyway; move it there and `discord/` deletes cleanly.
+
+**And A6's original complaint dissolves rather than being managed.** The section opened by calling
+Discord *"three subsystems with two independent transports (bot token* and *webhook) so each works
+without the other"*. With the inbound half gone there is one transport, one credential, and one
+direction — which is the shape notifications wanted in the first place.
 
 **Keeping remote execution costs nothing in capability probing — the relay was paying that bill
 alone.** Reading `dashboard-rpc/context.ts` seam by seam: `eventsSource` is set *only* by the relay
@@ -631,10 +662,10 @@ what actually goes is small:
 
 | | Keys | Why |
 |---|---|---|
-| **Removed outright** | `technical`, `eco`, `ecoPlanning`, `ecoResearch`, `ecoMaintenance`, `autopilot` | C1 deletes the whole eco setting, `--technical` with the presets it selects (A5), and autopilot mode (#145) — nothing replaces the last one, because a headless gate already falls back without it |
-| **Protected by settled decisions** | `vanilla`, `transparent` (C1) · `browser` (#173) · `target` (#151/#152) · `bridge` (#155) · `discordBot` (#159) · `autoSpendOffset` (#128) · `autoPmOptOut` (#115) · `autoPmConcurrency` (E3 rejected) · `reposDirectory`, `reposDirectoryAutoGrant` (#4) | Each is a feature that was reviewed and kept |
+| **Removed outright** | `technical`, `eco`, `ecoPlanning`, `ecoResearch`, `ecoMaintenance`, `autopilot`, `discordBot` | C1 deletes the whole eco setting, `--technical` with the presets it selects (A5), and autopilot mode (#145) — nothing replaces the last one, because a headless gate already falls back without it. `discordBot` goes with the chatbot (#159) |
+| **Protected by settled decisions** | `vanilla`, `transparent` (C1) · `browser` (#173) · `target` (#151/#152) · `bridge` (#155) · `notifyDiscord` (#157/#158) · `autoSpendOffset` (#128) · `autoPmOptOut` (#115) · `autoPmConcurrency` (E3 rejected) · `reposDirectory`, `reposDirectoryAutoGrant` (#4) | Each is a feature that was reviewed and kept |
 
-That is **six keys deleted**, not a purge. The remaining 26 are, with two exceptions, genuinely
+That is **seven keys deleted**, not a purge. The remaining 25 are, with two exceptions, genuinely
 distinct settings — `model`, `agent`, `editor`, `theme` and the rest are not duplicates of each
 other. **The two exceptions are worth more than the count:**
 
@@ -656,7 +687,7 @@ its sibling."* That is a defect that already happened, caused by the shape rathe
 The fix is to name the axes (methods × categories, each cell defaulting on its own merits), which
 may not remove a single key but removes the class of bug.
 
-**Net: 32 → 24 keys**, and the two clusters above are where the actual complexity lives.
+**Net: 32 → 23 keys**, and the two clusters above are where the actual complexity lives.
 
 ---
 

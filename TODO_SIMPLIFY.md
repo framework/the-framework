@@ -58,7 +58,7 @@ product whose stated goal is one sentence long.
 `knowledge-base/{DECISIONS,FACTS,INSIGHTS,MARKET_RESEARCH}.md`, `GOAL.md`, `BUSINESS_LOGIC.md`,
 `SYSTEM.md`, `AGENTS.md`, `MEMORY.md`, per-file `SPEC.md`, `the-framework.yml`,
 `.the-framework/{events.jsonl,run.json,runs/,control.jsonl,LOGS.md,conversations/,<user>/sessions/}`,
-`~/.the-framework` registry (35 preference keys + secrets).
+`~/.the-framework` registry (32 preference keys + secrets).
 
 ---
 
@@ -256,7 +256,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 |---|---|---|---|
 | 132 | `the-framework.yml` — per-repo defaults that travel with the code | Keep | |
 | 133 | `SYSTEM.md` — your own instructions on top of the built-in prompt | Keep | |
-| 134 | Global user preferences | Simplify — 35 keys is too many | B5 |
+| 134 | Global user preferences | Simplify — 32 keys; 5 go with eco/technical, and the 3-boolean handoff ladder is one ordinal | B5 |
 | 135 | Per-project preference overrides (a third tier) | **Remove** — the repo file already does this | B5 |
 | 136 | The run narrates which layer decided each setting | **Remove** — goes with the tier | B5 |
 | 137 | Theme (system / light / dark) | Keep | |
@@ -622,9 +622,42 @@ user file duplicate what the repo file already does, and the repo file is the on
 for repo-shaped settings. Dropping one tier deletes the provenance tracking and the narration
 that goes with it.
 
-Also: 35 preference keys is too many for a product with no users. At least these are removable
-outright under A5/A6/C1: `technical`, `vanilla`, `transparent`, `eco*` ×4, `browser`, `bridge`,
-`target`, `notifyBrowser`.
+#### The key count is not the problem — two *shapes* are
+
+There are **32 keys**, not the 35 claimed in an earlier draft of this document, and the earlier
+list of "removable outright" keys named six that settled decisions have since protected
+(`vanilla`, `transparent`, `browser`, `bridge`, `target`, `notifyBrowser`). Checked key by key,
+what actually goes is small:
+
+| | Keys | Why |
+|---|---|---|
+| **Removed outright** | `technical`, `eco`, `ecoPlanning`, `ecoResearch`, `ecoMaintenance` | C1 deletes the whole eco setting and `--technical` with the presets it selects (A5) |
+| **Renamed, not removed** | `autopilot` → `autoAcceptGates` | C1 — its only remaining effect is the choice-gate countdown |
+| **Protected by settled decisions** | `vanilla`, `transparent` (C1) · `browser` (#173) · `target` (#151/#152) · `bridge` (#155) · `discordBot` (#159) · `autoSpendOffset` (#128) · `autoPmOptOut` (#115) · `autoPmConcurrency` (E3 rejected) · `reposDirectory`, `reposDirectoryAutoGrant` (#4) | Each is a feature that was reviewed and kept |
+
+That is **five keys deleted**, not a purge. The remaining ~27 are, with two exceptions, genuinely
+distinct settings — `model`, `agent`, `editor`, `theme` and the rest are not duplicates of each
+other. **The two exceptions are worth more than the count:**
+
+**1. The handoff ladder is one ordinal wearing three booleans.** `autoPushBranch` (absent = on) →
+`autoOpenPr` (absent = on, and its own doc says it *"implies `autoPushBranch`"*) → `autoMerge`
+(absent = off). These are strictly nested stages of one pipeline: push, then open a PR, then merge
+it. Three independent booleans describe eight states of which four are reachable, and the
+implication has to be written in a doc comment because the type cannot express it. One ordinal —
+`handoff: 'local' | 'push' | 'pr' | 'merge'` — has exactly the four real states and makes the
+implication structural. **3 keys → 1**, and the impossible combinations stop being representable.
+
+**2. The notification matrix is a 2×2 flattened into four booleans with four different defaults.**
+`notifyBrowser` (default **on**) and `notifyDiscord` (default **off**) are *methods*;
+`notifyHumanIntervention` (default **on**) and `notifyNewActivity` (default **off**) are
+*categories*. Nothing in the names says which axis a key belongs to, so
+`discordNotificationEnabled` has to AND them back together — and its own comment records the cost:
+the composition *"was open-coded per call site and got the category's polarity wrong by copying
+its sibling."* That is a defect that already happened, caused by the shape rather than the count.
+The fix is to name the axes (methods × categories, each cell defaulting on its own merits), which
+may not remove a single key but removes the class of bug.
+
+**Net: 32 → 25 keys**, and the two clusters above are where the actual complexity lives.
 
 ---
 

@@ -501,6 +501,18 @@ export async function openRunPullRequest(
 }
 
 /**
+ * Whether the session kept committing after its PR merged or closed (#1512): the PR carries a
+ * head, the branch has a tip, and they disagree. False for an open PR (pushed commits still land
+ * on it), for a headless read (an older cache or injected lookup — never risk a duplicate PR on
+ * a guess), and for a gone branch (no tip to compare; the PR stays the best answer, #1255).
+ */
+function movedPastPr(state: Pick<RunHandoff, 'pr' | 'commits'>): boolean {
+  if (!state.pr || state.pr.state === 'OPEN') return false
+  const tip = state.commits[0]?.sha
+  return Boolean(state.pr.headRefOid && tip && state.pr.headRefOid !== tip)
+}
+
+/**
  * Open a PR for a finished session, deciding from what the run recorded which cases should not
  * open one. Reads the branch's handoff first: a branch that no longer exists, or a session that
  * changed nothing, is a clear error rather than an empty PR, and a branch that already has a PR
@@ -517,7 +529,9 @@ export async function openSessionPullRequest(
   const handoff = await readRunHandoff(cwd, branch, { since: run.startedAt }).catch(() => undefined)
   // The run's PR first, even when its branch is gone locally: a hands-off web run's branch only
   // ever existed on the remote, and its PR is the answer the button exists to give (#1255).
-  if (handoff?.pr) return { ok: true, url: handoff.pr.url }
+  // Unless the session demonstrably kept committing after that PR merged or closed (#1512) —
+  // then the old PR is not the answer, the new work needs its own.
+  if (handoff?.pr && !movedPastPr(handoff)) return { ok: true, url: handoff.pr.url }
   if (handoff && !handoff.exists) return { ok: false, error: `branch ${branch} no longer exists` }
   // Refuse rather than open an empty PR: a session that changed nothing has nothing to hand off.
   if (handoff?.empty) return { ok: false, error: 'this session produced no commits to open a PR for' }
@@ -585,8 +599,10 @@ export type AutoHandoffOutcome =
  * draft PR for it, or both.
  *
  * Reads the branch first and refuses on everything that is not a clean hand-off — a branch that is
- * gone, a session that committed nothing, a repo with no remote, a branch that already has a PR.
- * Those are the cases where doing it anyway would produce a confusing artefact rather than help.
+ * gone, a session that committed nothing, a repo with no remote, a branch whose PR already covers
+ * everything on it. Those are the cases where doing it anyway would produce a confusing artefact
+ * rather than help. A merged PR the session kept working past is NOT one of them (#1512): the
+ * work after the merge gets a fresh PR, or it reaches nobody.
  *
  * The PR is a draft on purpose. Opening one by itself at the end of every session must not put a
  * review request in anyone's inbox, and the interventions queue keeps listing a session's draft
@@ -608,22 +624,32 @@ export async function runAutoHandoff(
   // only `gh` refusing the duplicate stopped it. This runs once, at the end of a session, so it
   // can afford to wait for a real answer. Filtered by the run's start time (#1251): a merged PR
   // from an earlier run on the same branch name must not stop this run from opening its own.
-  const runPr: BranchPrLookup = async (c, b) => pickRunPr(await ghPrsForBranch(c, b), since)
+  // `latest` order (#1512): the decision below compares the branch tip against the PR's head, and
+  // only the last PR that saw the branch answers that — against the first, work a second PR
+  // already landed would read as unlanded and reopen.
+  const runPr: BranchPrLookup = async (c, b) => pickRunPr(await ghPrsForBranch(c, b), since, 'latest')
   const state = await readRunHandoff(cwd, branch, { pr: runPr, ...readDeps }).catch(() => undefined)
   if (!state || !state.exists) return { outcome: 'skipped', reason: 'branch-gone' }
   if (state.empty) return { outcome: 'skipped', reason: 'no-commits' }
   if (!state.hasRemote) return { outcome: 'skipped', reason: 'no-remote' }
-  // A PR already covers both halves: it means the branch is published and the human has a place
+  // An OPEN PR covers both halves: it means the branch is published and the human has a place
   // to answer. Opening a second one is the one mistake this must never make. An armed merge
   // (#1216) still applies to the open PR — this is a rerun or a restart finding the PR its
   // predecessor opened, and the merge is the half that has not happened yet.
-  if (state.pr) {
-    if (intent.merge && state.pr.state === 'OPEN') {
+  if (state.pr?.state === 'OPEN') {
+    if (intent.merge) {
       // `watch` mode (#1418), like the freshly-opened path below: an auto merge must wait for the
       // PR's checks rather than land on the direct fallback before they run (#1406).
       return { outcome: 'skipped', reason: 'already-open', merge: await ghMergePr(cwd, state.pr.number, gh, { whenUnarmed: 'watch' }) }
     }
     return { outcome: 'skipped', reason: 'already-open' }
+  }
+  // A merged or closed PR only covers the branch up to the head it carried (#1512). A tip it
+  // already landed means everything reached the human — done, not blocked. A tip past it means
+  // the session kept working after the PR closed, and refusing here is how that work reached
+  // nobody: fall through and open a fresh PR for it.
+  if (state.pr && !movedPastPr(state)) {
+    return { outcome: 'skipped', reason: 'already-landed' }
   }
 
   if (intent.pr) {

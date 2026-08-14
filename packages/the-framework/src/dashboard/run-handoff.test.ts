@@ -375,6 +375,57 @@ test('a branch that already has a PR is never given a second one (#1102)', async
   assert.deepEqual(outcome, { outcome: 'skipped', reason: 'already-open' })
 })
 
+test('a session that kept working after its PR merged gets a fresh PR (#1512)', async () => {
+  // The #1512 session: its PR merged mid-run, the user asked for more, the branch tip moved past
+  // the merged head. "The branch already has a pull request" was how that work reached nobody.
+  const gh: string[][] = []
+  const { git } = fakeGit({ ...READY, push: '' })
+  const outcome = await runAutoHandoff(
+    '/repo',
+    { id: 'r1', branch: 'the-framework/x' },
+    { push: true, pr: true },
+    {
+      git,
+      pr: async () => ({ number: 1509, url: 'u1509', state: 'MERGED', title: 'landed', headRefOid: 'ffff00' }),
+      gh: async args => (gh.push(args), 'https://github.com/o/r/pull/1513\n'),
+    },
+  )
+  assert.equal(gh[0]?.[1], 'create')
+  assert.deepEqual(outcome, { outcome: 'done', pushed: true, url: 'https://github.com/o/r/pull/1513' })
+})
+
+test('a merged PR whose head is still the branch tip means everything landed (#1512)', async () => {
+  // READY's branch tip is abc123: a merged PR carrying that head covered all of the session's
+  // work, so there is nothing left to publish — and the skip says landed, not "already has a PR".
+  const { git } = fakeGit(READY)
+  const outcome = await runAutoHandoff(
+    '/repo',
+    { id: 'r1', branch: 'the-framework/x' },
+    { push: true, pr: true },
+    {
+      git,
+      pr: async () => ({ number: 1509, url: 'u1509', state: 'MERGED', title: 'landed', headRefOid: 'abc123' }),
+      gh: async () => assert.fail('everything already landed: nothing to open'),
+    },
+  )
+  assert.deepEqual(outcome, { outcome: 'skipped', reason: 'already-landed' })
+})
+
+test('a merged PR without a head to compare never risks a duplicate (#1512)', async () => {
+  const { git } = fakeGit(READY)
+  const outcome = await runAutoHandoff(
+    '/repo',
+    { id: 'r1', branch: 'the-framework/x' },
+    { push: true, pr: true },
+    {
+      git,
+      pr: async () => ({ number: 1509, url: 'u1509', state: 'MERGED', title: 'landed' }),
+      gh: async () => assert.fail('without the head the safe answer is to skip'),
+    },
+  )
+  assert.deepEqual(outcome, { outcome: 'skipped', reason: 'already-landed' })
+})
+
 test('an armed merge follows the PR it just opened (#1216)', async () => {
   const gh: string[][] = []
   const { git } = fakeGit({ ...READY, push: '' })
@@ -672,6 +723,10 @@ test('pickRunPr trusts an open PR, and otherwise only one created after the run 
   // Without a start time only an open PR is trusted.
   assert.equal(pickRunPr([stale, own, later]), undefined)
   assert.equal(pickRunPr([stale, open])?.number, 1301)
+  // `latest` order (#1512): the handoff decision wants the PR that last saw the branch, so a
+  // second PR's landed head is not mistaken for work the first PR never carried.
+  assert.equal(pickRunPr([later, own, stale], since, 'latest')?.number, 1300)
+  assert.equal(pickRunPr([stale, open], since, 'latest')?.number, 1301)
 })
 
 test('a gone branch still reports its PR: it is a remote question (#1255)', async () => {

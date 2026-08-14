@@ -88,6 +88,12 @@ export type AutoHandoffSkip =
   | 'no-remote'
   /** The branch already has a PR: opening a second one is the one mistake this must not make. */
   | 'already-open'
+  /**
+   * The branch's PR is merged or closed and its head is still the branch tip (#1512): everything
+   * the session did already reached the human, so there is nothing left to publish. Only that
+   * exact case — a session that kept committing after its PR merged gets a fresh PR instead.
+   */
+  | 'already-landed'
   /** The branch is already on the remote at this commit, and only the push was asked for. */
   | 'already-pushed'
   /** The run was stopped (Stop button, Ctrl+C, budget cap) rather than finished. */

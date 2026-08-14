@@ -76,6 +76,11 @@ export interface LinkedPr {
   title: string
   /** ISO creation time, when the read included it: what tells one run's PR from a predecessor's. */
   createdAt?: string
+  /**
+   * The head commit the PR covers, when the read included it (#1512): what tells "the branch's
+   * PR already landed everything" from "the session kept working after its PR merged".
+   */
+  headRefOid?: string
 }
 
 /**
@@ -139,7 +144,7 @@ function prCacheKey(cwd: string, branch?: string): string {
  * indistinguishable from "no PRs", which is what every caller would do with a failure anyway.
  */
 export async function ghPrsForBranch(cwd: string, branch: string): Promise<LinkedPr[]> {
-  const fields = 'number,url,state,title,createdAt'
+  const fields = 'number,url,state,title,createdAt,headRefOid'
   const args = ['pr', 'list', '--head', branch, '--state', 'all', '--limit', '20', '--json', fields]
   const prs = await ghJson<LinkedPr[]>(args, cwd, [])
   return prs.map(pr => ({
@@ -148,6 +153,7 @@ export async function ghPrsForBranch(cwd: string, branch: string): Promise<Linke
     state: pr.state,
     title: pr.title,
     ...(pr.createdAt ? { createdAt: pr.createdAt } : {}),
+    ...(pr.headRefOid ? { headRefOid: pr.headRefOid } : {}),
   }))
 }
 
@@ -366,14 +372,21 @@ function branchPrsCacheKey(cwd: string, branch: string): string {
  * this run's handoff opened. Anything older is a previous run's PR wearing the same branch name,
  * which is exactly what showed a merged two-day-old PR as a fresh session's own. Without `since`
  * only an open PR is trusted.
+ *
+ * `order` exists for the one caller asking a different question (#1512). `'first'` answers
+ * identity — which PR did *this run* open, so a later run's must not be the answer. `'latest'`
+ * answers the handoff decision — which PR last saw the branch, so "did the session keep working
+ * past it" is readable off that PR's `headRefOid`; there the oldest entry would call work that a
+ * second PR already landed unlanded.
  */
-export function pickRunPr(prs: LinkedPr[], since?: string): LinkedPr | undefined {
+export function pickRunPr(prs: LinkedPr[], since?: string, order: 'first' | 'latest' = 'first'): LinkedPr | undefined {
   const open = prs.find(pr => pr.state === 'OPEN')
   if (open) return open
   if (!since) return undefined
-  return prs
+  const closed = prs
     .filter(pr => pr.createdAt && pr.createdAt >= since)
-    .sort((a, b) => ((a.createdAt ?? '') < (b.createdAt ?? '') ? -1 : 1))[0]
+    .sort((a, b) => ((a.createdAt ?? '') < (b.createdAt ?? '') ? -1 : 1))
+  return order === 'latest' ? closed.at(-1) : closed[0]
 }
 
 /** An open PR on the interventions queue (#632). */

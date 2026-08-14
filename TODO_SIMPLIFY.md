@@ -424,7 +424,7 @@ reference material for implementing, not an argument to be read start to finish.
 | **D3** | One dashboard host; delete the capability-probing context. |
 | **D4** | Four CLI options, no verbs; the daemon passes its child JSON, not flags. |
 | **D4b** | Foreground only; delete the daemon's discovery, heartbeat, detached spawn and suspend/resume. |
-| **D5** | Rename run→session (or the reverse) everywhere. |
+| **D5** | Rename run/session → **agent**; rename the CLI axis to **driver** to free the word. |
 | **D6** | One gate shape, one protocol block, one card. |
 | **D7** | Delete `topic` runs. |
 | **E1** | One gate on starting; delete `consumption-guard.ts` and `budgetUsd`. |
@@ -841,7 +841,7 @@ checklist, the system prompt's `HANDS_OFF_PROTOCOL`). A property of *where* leak
 abstraction for *what*.
 
 **Do:** model *where* as a separate `location` with its own lifecycle, and keep `Driver` to
-"which CLI do I spawn". A6 keeps `cloud` and `actions`, so deleting the axis is not available —
+"which CLI do I spawn" — D5 settles the vocabulary for all three axes (agent / driver / location). A6 keeps `cloud` and `actions`, so deleting the axis is not available —
 `handsOff` has to become a property of the location instead of a driver property that disables
 half the run. The six conditionals across `run.ts`, `steps.ts`, `system-prompt.ts` and `cli.ts`
 stay, but they branch on something that honestly means "this runs elsewhere".
@@ -981,15 +981,46 @@ describes someone watching a dashboard, not someone in a terminal — and if it 
 verb (`the-framework "<prompt>"` → POST to the daemon, open the browser at the new session) brings
 it back without reintroducing a single *setting*.
 
-### D5. "run" vs "session" — pick one word
-**TL;DR —** Pick one word — run or session — and rename. The cheapest large legibility win in the repo.
-The SPECs say **session** throughout ("A session is one agent working one task…"). The code says
-**run** throughout: `runId`, `run.json`, `runs/`, `RunStore`, `RunMeta`, `runFramework`,
-`daemon-runtime`, `run-handoff`, `resolveRunCheckout`, `--run-id`. The dashboard mixes both
-(`RunView.tsx`, `SessionActionsMenu.tsx`, `RunHistory.tsx`). There is even a ticket for it
-(`2026-07-25_agents-instead-of-sessions.md` proposes a *third* word).
+### D5. Three words for one thing — the unit of work is an **agent**
+**TL;DR —** Rename run/session → **agent**. Free the word by renaming the CLI axis to **driver**, which the code already calls it.
+The SPECs say **session** ("A session is one agent working one task…"). The code says **run**:
+`runId`, `run.json`, `runs/`, `RunStore`, `RunMeta`, `runFramework`, `daemon-runtime`,
+`run-handoff`, `resolveRunCheckout`, `--run-id`. The dashboard mixes both (`RunView.tsx`,
+`SessionActionsMenu.tsx`, `RunHistory.tsx`).
 
-Pick one and rename. This is the cheapest large legibility win in the repo.
+**Settled: the unit of work is an *agent*.** "New agent", "Recent agents", `agentId`, `agent.json`,
+`agents/`, `AgentStore`. It is what the product sells — *"stop babysitting your coding agents"* —
+and "agents" describes autonomous workers where "sessions" describes chat transcripts.
+
+**One blocker, and clearing it is the reason this rename is worth more than run→session.** `agent`
+is already taken, for a different concept: `--agent <claude|codex>` selects *which CLI drives the
+work* (`agent-names.ts`, `AGENTS`, `isAgentName`, `preferences.agent`, `dashboard/types.ts`,
+`driver/agent-cli.ts` — ~156 lines tie the word to the CLI choice). `cli.ts:170` reads
+*"Which agent CLI drives the session"* — both words in one line, meaning different things.
+
+**So rename that axis to `driver`**, which is what the code already calls it: the type is `Driver`
+and the directory is `driver/`. `--agent` → `--driver`, `preferences.agent` → `preferences.driver`,
+`agent-names.ts` → `driver-names.ts`. D4 deletes `--agent` as a flag anyway, so the CLI cost is
+nil; what remains is the preference key and the dashboard label.
+
+That leaves three concepts with three distinct names, which is exactly what **D1** is trying to
+achieve:
+
+| Concept | Name | Example |
+|---|---|---|
+| One unit of work | **agent** | `agentId`, "Recent agents" |
+| Which CLI drives it | **driver** | `--driver claude`, `Driver` |
+| Where it executes | **location** | `local` / `actions` / `web` |
+
+**The cost, stated:** it diverges from claude.ai/code, which says "session" and which the dashboard
+otherwise imitates (the counter-argument recorded in `2026-07-25_agents-instead-of-sessions.md`
+via #772). That is a deliberate product choice, not an oversight — this tool is *about* the agents
+being autonomous, and the word is the pitch.
+
+**The rest of this document deliberately still says "session" and "run".** It describes the code as
+it exists, and the rename is step 10 of the order of work — deliberately late, so it renames as
+little code as possible. Reading "session" elsewhere here is not an inconsistency with this
+decision; it is the state the rename starts from.
 
 ### D6. Four gate/choice mechanisms → one
 **TL;DR —** One gate shape, one protocol block, one card. Deletes ~3 of 4 branches across 1,006 LOC.
@@ -1295,7 +1326,7 @@ Every contradiction found, with the resolution that favours subtraction.
 | 8 | Two off-switches for the built-in prompt (`--vanilla` / `--transparent`) with subtly different semantics | **Not a contradiction — both stay (**C1**).** They answer different questions: *keep the instrumentation* vs. *get out of the way entirely* |
 | 9 | Config key `antiLazyPill` vs flag `--vanilla` vs concept "built-in prompt"; three comments apologise for the mismatch | Rename or delete (**C3**) |
 | 10 | `eco.autoMaintenance` documented as *"Nothing to drop here"* — the flag acts on a different prompt | Delete (**C1**) |
-| 11 | SPECs say **session**; code says **run**; a ticket proposes **agent** | Pick one, rename (**D5**) |
+| 11 | SPECs say **session**; code says **run**; a ticket proposes **agent** | **agent** wins (**D5**) — and the CLI axis becomes **driver**, since `--agent <claude\|codex>` currently holds the word |
 | 12 | *"One daemon per machine"* — vs a second, foreground, per-run dashboard host, plus a third relay host | One host (**D3**) |
 | 13 | `Driver` models "which agent", but `cloud`/`actions` are the same agent elsewhere — forcing `handsOff` to disable half the run | Separate the axes (**D1**). The remote drivers stay — A6 keeps remote execution, so `handsOff` must be modelled properly rather than deleted |
 | 14 | Five representations of "work to do", with a promotion mechanism whose own SPEC says the state is *ambiguous* and needs a fork point | **Unresolved.** B1 (one ticket file with status + assignee) is rejected, so the ambiguity stays; `queue-promote.ts`'s fork-point diffing remains the way it is disambiguated |

@@ -4,6 +4,7 @@
 - **The CLI options are minimal.** Every other setting belongs to the dashboard, which is the product's only user interface.
 - **Only remove what has been pushed to the git remote.** Worktrees, branches, archives — anything deleted must already exist on the remote, so every removal is recoverable from it.
 - **Never interrupt a running session because of low quota.** Quota gates whether a session may *start*; a session already running is never paused, degraded or cut short.
+- **The unit of work is an *agent*** — not a run or a session. The CLI that drives it (`claude`, `codex`) is the *driver*.
 
 ## Before modifying this file
 

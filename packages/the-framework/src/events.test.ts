@@ -206,4 +206,10 @@ test('formatFrameworkEvent gives the merge half of a handoff its own line, withh
   )
   // No merge half: the line stays exactly what it was.
   assert.equal(formatFrameworkEvent({ kind: 'handoff', outcome: 'done', pushed: true }), '✓ branch pushed')
+  // A landed PR is not "the branch already has a pull request" (#1512): the reader was told their
+  // work was blocked when it had in fact arrived.
+  assert.match(
+    formatFrameworkEvent({ kind: 'handoff', outcome: 'skipped', reason: 'already-landed' })!,
+    /handoff skipped: the branch's pull request already landed everything the session did/,
+  )
 })

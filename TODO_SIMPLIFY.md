@@ -109,7 +109,7 @@ get a PR, and let it keep working while you sleep* — is entirely inside the Ke
 | 24 | CLI `the-framework stop` | **Remove** — Ctrl-C is stop | D4b |
 | 25 | A later invocation from any repo finds the machine's running daemon | **Remove** — deletes the global state file, the heartbeat, and `ensureDaemon` | D4b |
 | 26 | Sessions survive the CLI that started them | **Remove** — same process group, so Ctrl-C reaches them | D4b |
-| 27 | Mid-flight sessions resume after a restart (within a day) | **Remove** — Ctrl-C is a deliberate "close everything"; open question, see D4b | D4b |
+| 27 | Mid-flight sessions resume after a restart (within a day) | **Remove** — Ctrl-C is a deliberate "close everything" | D4b |
 | 28 | CLI `the-framework doctor` | **Remove** as a verb — already a dashboard read (`AgentReady`, the onboarding checklist, the per-session preflight) | D4 |
 | 29 | CLI `--fake` — deterministic offline demo | **Remove** from the user surface — the e2e harness appends it to its own child's argv | D4 |
 | 30 | CLI `the-framework [intent...]` — build an app from scratch | **Remove** | A4 |
@@ -353,21 +353,40 @@ Ordered by impact. Each item states the subtraction, the argument, and what repl
 
 ### Decision status
 
-Twelve of the 39 proposals have been ruled on. A **rejected** proposal means *today's behaviour
-stays* — its section is kept as a recorded observation, not a queued action, and nothing else in
-this document should assume it lands.
+**All 39 proposals are ruled on: four rejected, the other 35 approved.** A **rejected** proposal
+means *today's behaviour stays* — its section is kept as a recorded observation, not a queued
+action, and nothing else in this document should assume it lands.
 
 | | Proposals |
 |---|---|
-| **Settled — do it** | **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco, technical and autopilot |
-| **Settled — partly** | **A6** cut the relay, the preview server and all of Discord's inbound half (chatbot + reply mirror); keep remote devices, the Chrome extension, the browser + screencast, Actions runners and Discord *notifications* |
-| **Rejected** | **B1** the five work-item files stay · **B4** the knowledge base stays · **F5** the dashboard's filtering and sorting stay · **E3** the rotation and every preset stay, *for now* |
-| **Still open** | A1–A5 · B2 · B5 · C2–C4 · D1–D3 · D5–D7 · E4 · E6 · F1–F4 · G1–G5 |
+| **Rejected — today's behaviour stays** | **B1** the five work-item files stay · **B4** the knowledge base stays · **F5** the dashboard's filtering and sorting stay · **E3** the rotation and every preset stay, *for now* |
+| **Approved individually** | **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco, technical and autopilot · **A6** *partly* — cut the relay, the preview server and Discord's inbound half; keep remote devices, the Chrome extension, the browser + screencast, Actions runners and Discord *notifications* |
+| **Approved as a batch** | A1–A5 · B2 · B5 · C2–C4 · D1–D3 · D5–D7 · E4 · E6 · F1–F4 · G1–G5 |
 
-The rejections change what the settled items mean. B1 staying rejected is why **E2** and **B3** are
-now contained changes rather than the deep ones they were written as: the ticket format is
+The last row was approved wholesale rather than argued point by point, so it is worth naming the
+five that change the most and are the hardest to walk back. Each is a deliberate decision, not an
+oversight — but if any of them is going to be pulled back, it is cheaper to do it before the work
+starts than after:
+
+| | What it commits to |
+|---|---|
+| **A4** | Deletes the "idea → running app" product outright: deploy adapters, serve gates, sandbox, scaffolding. The README still advertises it. |
+| **G1** | Retires SDD as practised here — 898 `SPEC.md` files for 818 source files. A working method, not just files. |
+| **G5** | Cuts test volume deliberately, in a repo whose tests are currently its main safety net for everything else on this list. |
+| **F1** / **F3** | Replaces Vike with plain Vite and Telefunc with plain HTTP handlers — two framework swaps touching every route and every RPC. |
+| **A1** / **A2** | Deletes `@gemstack/ai-sdk` and absorbs `@gemstack/ai-autopilot`, removing two packages the rest of the code still imports from today. |
+
+Three sub-questions were flagged inside sections rather than as proposals, and are settled the same
+way — by the recommendation each section already made: **D4b** deletes `store/suspend.ts` (a
+deliberate Ctrl-C should not have work resume behind it); **C1** resolves the system prompt's
+maintenance stance to the **relaxed** branch (it is what nearly every run gets today, so it changes
+nothing); **#77** keeps the browser hand-off at a login wall, following the screencast it belongs to.
+
+The rejections change what some approved items mean. B1 staying rejected is why **E2** and **B3**
+are contained changes rather than the deep ones they were written as: the ticket format is
 untouched, so E2 deletes one derivation and B3 deletes one rendering. It is also why contradiction
 **#14** below has no resolution — the ambiguity `queue-promote.ts` documents in its own SPEC stays.
+And with **E3** rejected, its P4 ticket has to be *fixed* rather than dissolved.
 
 ---
 
@@ -727,7 +746,7 @@ Specific findings:
   at the dashboard and the mode decided not to ask them. **The gate's audience is the real signal,
   and it is already available structurally:** somebody is watching, so ask; nobody is, so take the
   recommended option. That is a property of the run, not a setting, which is why no boolean has to
-  survive. (Interacts with **D6**, still open, which consolidates the gate mechanisms.)
+  survive. (Interacts with **D6**, which consolidates the gate mechanisms — do C1 first, so auto-accept is no longer a mode competing with the shapes being merged.)
 
 **Do:** keep `--vanilla` and `--transparent` as the two off-switches, and nothing else. Delete
 **the whole eco setting** (settled) — `dropSection`, `ECO_SECTION_HEADINGS`, `applyEco`, the three
@@ -735,13 +754,13 @@ Specific findings:
 with the presets it selects (A5), and `--autopilot` outright (settled). Five combinable modes
 become **two booleans**: a 2×2 the tests can cover exhaustively, instead of 2⁶.
 
-**One decision this leaves open, and it is about prompt content, not code.** The system-prompt
-template branches on `tf.params.autopilot` — per the changelog, it *"relaxes the maintenance
-stance on autopilot runs"*. With the mode gone that branch has to resolve to one stance for
-everybody. **Recommend the relaxed one**, because `autopilotEnabled` is `preferences.autopilot ??
-true` — autopilot is *on* by default today, so the relaxed stance is already what nearly every run
-gets. Taking the strict branch instead would quietly change behaviour for everyone while looking
-like a deletion.
+**The prompt-content half is settled with it: keep the relaxed stance.** The system-prompt
+template branches on `tf.params.autopilot` — per the changelog it *"relaxes the maintenance stance
+on autopilot runs"* — and with the mode gone that branch has to resolve to one stance for
+everybody. It resolves to the **relaxed** one, because `autopilotEnabled` is
+`preferences.autopilot ?? true`: autopilot is on by default, so the relaxed stance is already what
+nearly every run gets and collapsing to it changes nothing. Taking the strict branch would have
+quietly changed behaviour for everyone while looking like a deletion.
 
 ### C2. The system prompt's source of truth is a GitHub issue — invert it
 `scripts/check-prompt-drift.mjs` (124 LOC) fetches **issue #326** daily in CI and fails when
@@ -904,13 +923,12 @@ on a dead parent's pipe"*) and the crash-went-nowhere problem it was papering ov
 (`daemon-runtime.ts:178`). It also shrinks the orphan-reconciliation story in the store, which
 exists to heal sessions whose daemon died without them.
 
-**One question this leaves genuinely open: suspend/resume.** `store/suspend.ts` records mid-flight
-sessions at shutdown so the next boot resumes them, for up to a day. Under the old model shutdown
-was often incidental (a reboot, a crash). Under this one, Ctrl-C is a deliberate *"close
-everything"* — so resuming that work on the next start arguably contradicts what the user just
-said. Crash recovery is the separate case that might still justify it. Worth deciding explicitly
-rather than inheriting; the simplifying answer is to delete it and let a session be restarted from
-the dashboard.
+**Suspend/resume goes with it (settled).** `store/suspend.ts` records mid-flight sessions at
+shutdown so the next boot resumes them, for up to a day. That made sense when shutdown was usually
+incidental — a reboot, a crash. Under this decision Ctrl-C is a deliberate *"close everything"*,
+and silently restarting the work it stopped contradicts what the user just said. Delete the module,
+the `suspended.json` file, `resumableRuns` and the day-long staleness window; a session that should
+continue is restarted from the dashboard, where the choice is visible.
 
 **The consequence to be deliberate about: unattended work now needs a terminal left open.** The
 product's headline is spending idle quota on the roadmap *"when nobody is at the keyboard"*. That
@@ -1249,19 +1267,37 @@ Every contradiction found, with the resolution that favours subtraction.
 2. **A4** delete deploy/serve/sandbox/runner → **A3** delete `Bootstrap` → **A5** delete presets
    and loops. These three unlock each other; after them `run.ts` is a prompt loop.
 3. **D2** merge the two run paths, **D1** split the `Driver` axes, **A6** cut the relay, the
-   preview server and the Discord reply mirror, **D3** two dashboard hosts instead of three. The
-   conditional complexity in `dashboard-rpc`, `telefunc-serve` and `system-prompt` shrinks —
-   though it does not vanish, since remote execution keeps a genuine second host (A6).
-4. **D4b** foreground-only (settled) → **D4** strip the CLI to its four options → then **B5**.
-   In that order: foreground-only deletes the daemon's discovery, heartbeat and detached-spawn
-   machinery, which is what most of the remaining flags and verbs exist to steer; doing D4 after
-   steps 2–3 (which delete ~23 flags outright) makes it deletion rather than migration; and
-   removing the flag tier is what lets `config-layers.ts` go entirely.
+   preview server and Discord's inbound half, **D3** one dashboard host. The conditional
+   complexity in `dashboard-rpc`, `telefunc-serve` and `system-prompt` collapses — A6's
+   seam-by-seam check shows the relay was paying for all of it.
+4. **D4b** foreground-only → **D4** strip the CLI to its four options → then **B5** one config
+   file, two tiers. In that order: foreground-only deletes the daemon's discovery, heartbeat and
+   detached-spawn machinery, which is what most of the remaining flags and verbs exist to steer;
+   doing D4 after steps 2–3 (which delete ~23 flags outright) makes it deletion rather than
+   migration; and removing the flag tier is what lets `config-layers.ts` go entirely. B5 also
+   carries the two preference *shapes* — the handoff ladder becoming one ordinal, and the
+   notification matrix getting named axes.
 5. **B3** one record (delete `conversations/` and `LOGS.md`), **E2** one claim (delete the
-   queue-entry pin). Both are contained now that B1 is rejected — the five work-item files stay,
-   so neither touches the ticket format itself.
-6. **C1**/**C2**/**C4** prompt modes and source of truth. Cheap, independent, do any time.
-7. **D5** rename run→session, **G1**/**G3** docs. Mechanical; do last so it renames less code.
+   queue-entry pin), **B2** delete `ANALYSIS_RESULT.md`. All three are contained now that B1 is
+   rejected — the five work-item files stay, so none of them touches the ticket format itself.
+6. **E1** one spending gate (delete `consumption-guard.ts`), **E5** the pushed-to-remote rule for
+   worktrees, **E4** one daemon tick, **E6** store the PR number. The autonomy loop, in dependency
+   order: E4 is smaller once D4b has deleted the heartbeat and B3 the conversation committer.
+7. **C1**/**C2**/**C3**/**C4** prompt modes, the source of truth, `antiLazyPill`, and the
+   `${{ }}` templating. Cheap and independent — do any time after A5 removes the presets C1's
+   `--technical` selects.
+8. **D6** one gate mechanism, **D7** `topic` runs. D6 wants C1 done first: with autopilot gone,
+   auto-accept is no longer a mode competing with the gate shapes being consolidated.
+9. **F1** Vike → plain Vite, **F3** Telefunc → plain HTTP handlers, **F2** trim the 406 exports,
+   **F4** the vendored `animate-ui`. F3 is much cheaper after step 3, because one host means there
+   is no capability-probing context left to port.
+10. **D5** rename run→session, **G3** fix the stale docs, **G1** retire the SPEC sprawl, **G2** the
+    changesets, **G4** the issue-number citations. Mechanical; last, so they rename and rewrite as
+    little as possible.
+11. **G5** test volume — **last, and deliberately so.** The tests are the safety net for
+    everything above; cutting them earlier would remove the evidence that steps 1–10 landed
+    correctly. Trim once the shape is final.
 
-**Rough scale:** A1–A6 alone remove on the order of **45,000–55,000 LOC of ~132,000** — about a
-third to 40% of the repo — without touching anything the stated business goal needs.
+**Rough scale:** A1–A6 alone remove on the order of **43,000–53,000 LOC of ~132,000** — about a
+third of the repo — without touching anything the stated business goal needs. (A6 now contributes
+~2,800 rather than the ~4,500 it was originally scoped at, since remote execution stays.)

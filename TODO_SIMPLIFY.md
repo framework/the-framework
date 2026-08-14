@@ -2,7 +2,7 @@
 
 A clean-slate simplification review of the whole repo, at the goal / system / high / mid levels.
 
-**Every proposal has been ruled on: 36 approved, 5 rejected.** Nothing is applied to the code yet —
+**Every proposal has been ruled on: 35 approved, 6 rejected.** Nothing is applied to the code yet —
 this is the decision record and the plan, not an open question. A rejected section is kept as a
 recorded observation; see the decision status and work list at the top of Part 3.
 
@@ -366,15 +366,15 @@ Ordered by impact. Each item states the subtraction, the argument, and what repl
 
 ### Decision status
 
-**All 41 proposals are ruled on: five rejected, the other 36 approved.** A **rejected** proposal
+**All 41 proposals are ruled on: six rejected, the other 35 approved.** A **rejected** proposal
 means *today's behaviour stays* — its section is kept as a recorded observation, not a queued
 action, and nothing else in this document should assume it lands.
 
 | | Proposals |
 |---|---|
-| **Rejected — today's behaviour stays** | **B1** the five work-item files stay · **B4** the knowledge base stays · **F5** the dashboard's filtering and sorting stay · **E3** the rotation and every preset stay, *for now* · **G1** SDD stays exactly as practised, every `SPEC.md` included |
+| **Rejected — today's behaviour stays** | **B1** the five work-item files stay · **B4** the knowledge base stays · **F5** the dashboard's filtering and sorting stay · **E3** the rotation and every preset stay, *for now* · **G1** SDD stays exactly as practised, every `SPEC.md` included · **C4** the `${{ }}` template language stays |
 | **Approved individually** | **A7** one package — merge the dashboard in · **A8** remove turbo · **G2** delete the whole release history — changesets, changelogs, migration notes, semver · **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco, technical and autopilot · **A6** *partly* — cut the relay, the preview server and Discord's inbound half; keep remote devices, the Chrome extension, the browser + screencast, Actions runners and Discord *notifications* |
-| **Approved as a batch** | A1–A5 · B2 · B5 · C2–C4 · D1–D3 · D5–D7 · E4 · E6 · F1–F4 · G3–G5 |
+| **Approved as a batch** | A1–A5 · B2 · B5 · C2 · C3 · D1–D3 · D5–D7 · E4 · E6 · F1–F4 · G3–G5 |
 
 The last row was approved wholesale rather than argued point by point, so these are the ones that
 change the most and are hardest to walk back. Each is a deliberate decision, not an oversight — but
@@ -420,7 +420,6 @@ reference material for implementing, not an argument to be read start to finish.
 | **C1** | Keep `--vanilla` + `--transparent`; delete eco, `--technical`, autopilot. |
 | **C2** | Repo file becomes the prompt's source of truth; delete the drift checker. |
 | **C3** | Delete `antiLazyPill`. |
-| **C4** | `${{ }}` templating → plain string interpolation. |
 | **D1** | Split `Driver`'s two axes: which CLI vs. where it runs. |
 | **D2** | One run path; delete `prompt-run.ts`. |
 | **D3** | One dashboard host; delete the capability-probing context. |
@@ -893,8 +892,13 @@ approximately synced. (The workflow's `paths:` filter already points at
 `op-326-on-before-mergeable.snapshot.md` — the drift-checker has drifted.)
 
 **Do:** the repo file is the source of truth. Review prompt changes in PRs, like everything else.
-Delete `check-prompt-drift.mjs`, its workflow, the snapshot file, and the `${{ }}` nesting
-limitation that forced the flattening.
+Delete `check-prompt-drift.mjs`, its workflow and the snapshot file — the snapshot exists only to
+compare against issue #326, so it goes once the issue stops being canonical.
+
+**The `${{ }}` nesting limitation does *not* go with it (C4 rejected).** The flattening was forced
+by a renderer that cannot parse nested fragments, and that renderer stays. What changes is that
+nothing has to be *re-flattened by hand to match an issue* any more; the block simply lives in the
+repo in whatever form the renderer accepts. Document the no-nesting rule (see C4).
 
 ### C3. `antiLazyPill` — rename or delete
 **TL;DR —** Delete `antiLazyPill` — three comments apologise for the name, and C1 removes it anyway.
@@ -903,13 +907,16 @@ system prompt", and the code comments apologise for this in three separate place
 the historical config key"). With zero users, breaking changes cost nothing (`AGENTS.md` says so
 explicitly). Under C1 it disappears anyway.
 
-### C4. `${{ }}` JS-in-markdown templating → plain string interpolation
-**TL;DR —** Replace `${{ }}` JS-in-markdown with plain string interpolation.
-`prompt-template.ts` evaluates JS fragments inside prompt markdown, against a `TfContext` whose
-shape (`tf.params`, `tf.settings.technical_control`, `tf.presets.*.filePath`, `tf.session_name`)
-is a mini-language. The scanner cannot nest (stops at the first `}}`), which is what forced the
-flattening in C2 and what the `maintenance` preset comment works around. Two or three named
-placeholders substituted by the caller would cover every real use.
+### C4. `${{ }}` JS-in-markdown templating → plain string interpolation — *rejected*
+**TL;DR —** **Rejected.** The template language stays; its no-nesting limit becomes a documented constraint rather than a bug to fix.
+`prompt-template.ts` keeps evaluating JS fragments inside prompt markdown against `TfContext`
+(`tf.params`, `tf.settings.technical_control`, `tf.presets.*.filePath`, `tf.session_name`).
+
+**One consequence to carry forward.** The scanner cannot nest — it stops at the first `}}`. C2 was
+going to retire that limitation as a side-effect of making the repo the source of truth; with C4
+kept, **the limitation is permanent**. It should be written down as a rule of the template language
+rather than left as a trap, because two places already bend around it: the block that "cannot ship
+verbatim" in C2, and the `maintenance` preset's workaround comment.
 
 ---
 
@@ -1457,9 +1464,9 @@ Every contradiction found, with the resolution that favours subtraction.
 6. **E1** one spending gate (delete `consumption-guard.ts`), **E5** the pushed-to-remote rule for
    worktrees, **E4** one daemon tick, **E6** store the PR number. The autonomy loop, in dependency
    order: E4 is smaller once D4b has deleted the heartbeat and B3 the conversation committer.
-7. **C1**/**C2**/**C3**/**C4** prompt modes, the source of truth, `antiLazyPill`, and the
-   `${{ }}` templating. Cheap and independent — do any time after A5 removes the presets C1's
-   `--technical` selects.
+7. **C1**/**C2**/**C3** prompt modes, the source of truth, and `antiLazyPill`. Cheap and
+   independent — do any time after A5 removes the presets C1's `--technical` selects. (C4 is
+   rejected; the template language stays.)
 8. **D6** one gate mechanism, **D7** `topic` runs. D6 wants C1 done first: with autopilot gone,
    auto-accept is no longer a mode competing with the gate shapes being consolidated.
 9. **A7** merge the dashboard into `the-framework` → **A8** delete turbo (nothing left to

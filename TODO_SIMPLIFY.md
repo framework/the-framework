@@ -353,28 +353,32 @@ Ordered by impact. Each item states the subtraction, the argument, and what repl
 
 ### Decision status
 
-**All 39 proposals are ruled on: four rejected, the other 35 approved.** A **rejected** proposal
+**All 39 proposals are ruled on: five rejected, the other 34 approved.** A **rejected** proposal
 means *today's behaviour stays* — its section is kept as a recorded observation, not a queued
 action, and nothing else in this document should assume it lands.
 
 | | Proposals |
 |---|---|
-| **Rejected — today's behaviour stays** | **B1** the five work-item files stay · **B4** the knowledge base stays · **F5** the dashboard's filtering and sorting stay · **E3** the rotation and every preset stay, *for now* |
-| **Approved individually** | **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco, technical and autopilot · **A6** *partly* — cut the relay, the preview server and Discord's inbound half; keep remote devices, the Chrome extension, the browser + screencast, Actions runners and Discord *notifications* |
-| **Approved as a batch** | A1–A5 · B2 · B5 · C2–C4 · D1–D3 · D5–D7 · E4 · E6 · F1–F4 · G1–G5 |
+| **Rejected — today's behaviour stays** | **B1** the five work-item files stay · **B4** the knowledge base stays · **F5** the dashboard's filtering and sorting stay · **E3** the rotation and every preset stay, *for now* · **G1** SDD stays exactly as practised, every `SPEC.md` included |
+| **Approved individually** | **G2** delete the whole release history — changesets, changelogs, migration notes, semver · **D4** four CLI options, no verbs · **D4b** foreground only, Ctrl-C closes everything · **E5** only remove what is pushed to the remote · **B3** keep the exact session log, delete `conversations/` + `LOGS.md` · **E1** quota gates starting, never interrupts a running session (slider stays) · **E2** keep `.lock.md` + the branch lock, delete the queue-entry pin · **C1** keep `--vanilla` and `--transparent`, delete eco, technical and autopilot · **A6** *partly* — cut the relay, the preview server and Discord's inbound half; keep remote devices, the Chrome extension, the browser + screencast, Actions runners and Discord *notifications* |
+| **Approved as a batch** | A1–A5 · B2 · B5 · C2–C4 · D1–D3 · D5–D7 · E4 · E6 · F1–F4 · G3–G5 |
 
-The last row was approved wholesale rather than argued point by point, so it is worth naming the
-five that change the most and are the hardest to walk back. Each is a deliberate decision, not an
-oversight — but if any of them is going to be pulled back, it is cheaper to do it before the work
-starts than after:
+The last row was approved wholesale rather than argued point by point, so these are the ones that
+change the most and are hardest to walk back. Each is a deliberate decision, not an oversight — but
+if one is going to be pulled back, it is cheaper before the work starts than after (**G1** already
+was, on exactly this basis):
 
 | | What it commits to |
 |---|---|
 | **A4** | Deletes the "idea → running app" product outright: deploy adapters, serve gates, sandbox, scaffolding. The README still advertises it. |
-| **G1** | Retires SDD as practised here — 898 `SPEC.md` files for 818 source files. A working method, not just files. |
 | **G5** | Cuts test volume deliberately, in a repo whose tests are currently its main safety net for everything else on this list. |
 | **F1** / **F3** | Replaces Vike with plain Vite and Telefunc with plain HTTP handlers — two framework swaps touching every route and every RPC. |
 | **A1** / **A2** | Deletes `@gemstack/ai-sdk` and absorbs `@gemstack/ai-autopilot`, removing two packages the rest of the code still imports from today. |
+
+**G1's rejection is the one that changes the shape of the work rather than its scope.** With SDD
+kept, every deletion below takes its `SPEC.md` files with it and every behaviour change rewrites
+them — see G1 for what that touches. The specs are not overhead beside this plan; they are part of
+each step in it.
 
 Three sub-questions were flagged inside sections rather than as proposals, and are settled the same
 way — by the recommendation each section already made: **D4b** deletes `store/suspend.ts` (a
@@ -1170,7 +1174,12 @@ tickets.
 
 ## G. Process and repo hygiene
 
-### G1. SDD: 898 `SPEC.md` files for 818 source files
+### G1. SDD: 898 `SPEC.md` files for 818 source files — *rejected*
+
+**Settled: SDD stays exactly as practised.** Every `SPEC.md` remains, including the per-file,
+per-test and per-config ones. Recorded below as an observation only — and see the note after it,
+because keeping SDD attaches a cost to every other approved item in this document.
+
 7,012 lines of spec, one file per source file *and per directory* — **including per test file**
 (`story-session-lifecycle.test.SPEC.md`, `client-construction.test.SPEC.md`,
 `define.test.SPEC.md`, `vite.config.SPEC.md`). A spec for a Vite config and a spec for a test
@@ -1181,18 +1190,59 @@ the repo has 992 markdown files. The high-level ones (package, subsystem, subdir
 genuinely excellent and are how this review was possible. The per-file ones are a second copy of
 the doc comments already in the source.
 
-**Do:** keep `SPEC.md` at the package and directory level (~70 files, and they carry almost all of
-the 7,012 lines' value). Delete the per-file ones, and never write one for a test or a config.
+~~**Do:** keep `SPEC.md` at the package and directory level (~70 files, and they carry almost all
+of the 7,012 lines' value). Delete the per-file ones, and never write one for a test or a
+config.~~ **Rejected — the practice stays.**
 
-### G2. 76 pending changesets for a product with zero users
+**What that means for the rest of this document, which is the part worth planning for.** At roughly
+one spec per source file, every approved deletion carries a spec obligation and every approved
+behaviour change carries a spec rewrite:
+
+- **Deletions** must take their specs with them — `discord/` alone is six modules plus their spec
+  siblings (A6), and the same applies to `relay.ts`, `preview.ts`, `consumption-guard.ts`,
+  `store/suspend.ts`, `conversations.ts`, `logs.ts` and the `ai-sdk` package (A1).
+- **Behaviour changes must rewrite specs, not just code.** `daemon.SPEC.md` states *"one daemon per
+  machine, recorded in a single global state file"* — D4b makes that sentence false. The root SPEC's
+  *"files are the seam"* and *"the dashboard never holds authoritative state"* are already
+  contradicted by shipped features (contradictions #4 and #5), and with G1 rejected the fix is to
+  correct the prose rather than delete the file.
+- **New code needs new specs.** B5's handoff ordinal and the notification axes are new shapes, and
+  under SDD each arrives with a spec.
+
+None of this changes what was approved. It changes the size of the work: the SPEC files are not
+overhead sitting beside the plan, they are part of every step in it. **G3** (fix the stale docs)
+stops being a tidy-up at the end and becomes the discipline running through the whole sequence.
+
+### G2. Delete the whole release history — changesets, changelogs, migration notes
 `AGENTS.md`: *"The project isn't released, it has zero users. Thus, breaking changes aren't a
 problem, so prefer clean code over breaking changes."* Alongside: 76 changesets, semver'd packages
 (`ai-sdk@0.6.1`, `ai-autopilot@0.12.0`, `the-framework@1.4.2`), a `release.yml` workflow, and
 migration notes in `ai-sdk/README.md` telling users how to update imports for a 0.3.0 move.
 
-**Do:** pick one. If there are no users, drop changesets and version from `0.0.0` until there are.
-If `ai-sdk` has users, it belongs in its own repo (A1) — which resolves the contradiction from the
-other side.
+**Do (settled): remove all of it**, not just the pending changesets:
+
+| | Size |
+|---|---|
+| Pending changesets (`.changeset/*.md`) | 77 files |
+| Changesets tooling — `.changeset/config.json`, the `@changesets/cli` dev dependency, `release.yml` | — |
+| `CHANGELOG.md` ×4 (`the-framework` 1,731 · `framework-dashboard` 537 · `ai-autopilot` 433 · `ai-sdk` 160) | 2,861 lines |
+| Migration notes — `ai-sdk/README.md`'s *"Moved in `0.3.0`: … update `@gemstack/ai-sdk/mcp` imports"* | — |
+| Semver versions (`1.4.2`, `0.12.0`, `0.6.1`, `0.4.1`) → `0.0.0` | — |
+
+Two of the four changelogs leave anyway: A1 deletes `ai-sdk` with its 160 lines and its migration
+note, A2 absorbs `ai-autopilot` with its 433.
+
+**One thing to do first, and this review is the evidence for it.** The changelog is currently the
+*only* written explanation of some live behaviour. C1's prompt-stance decision in this document is
+sourced from `CHANGELOG.md:1339` — that `tf.params.autopilot` *"relaxes the maintenance stance on
+autopilot runs"* is recorded there and nowhere else. Deleting the file without moving that first
+turns a documented decision into unexplained code.
+
+This is the same defect **G4** describes from the other side: explanations living in issue numbers
+rather than in the source. So do the two together — sweep the changelogs for anything that explains
+*why* live code behaves as it does, move it into the code or its `SPEC.md` (which, with **G1**
+rejected, is staying and is the natural home), and only then delete. Everything else in those 2,861
+lines is a record of how the code got here, which git already holds.
 
 ### G3. Stale docs contradicting the code
 - `packages/framework-dashboard/README.md`: *"De-risking prototype… side-by-side with the current
@@ -1254,7 +1304,7 @@ Every contradiction found, with the resolution that favours subtraction.
 | 21 | `AGENTS.md`: *"zero users, breaking changes aren't a problem"* — vs 76 changesets, semver, publish workflow, and 0.3.0 migration guidance | Drop the release machinery, or move `ai-sdk` out (**G2**) |
 | 22 | Root `package.json`: *"GemStack: a collection of framework-agnostic tools. Home of @gemstack/ai-sdk"* — vs a repo named `the-framework` shipping a product | One identity (**G3**) |
 | 23 | `framework-dashboard` README calls itself a prototype running beside a `page.ts` MVP that no longer exists | Rewrite or delete (**G3**) |
-| 24 | SDD applied to test files and Vite configs — specs describing implementation | Directory-level specs only (**G1**) |
+| 24 | SDD applied to test files and Vite configs — specs describing implementation | **Accepted, not resolved.** G1 is rejected: SDD stays as practised, specs for tests and configs included |
 | 25 | `framework-detection` scores dependencies to pick a preset, and `run.ts` notes *"nothing about it reaches the agent's prompt"* — a detector whose only output is a log line | Delete (**A5**) |
 | 26 | `Bootstrap`'s `scope` phase — *"the one and only interrogation"* — is a constant function in the product | Delete the spine (**A3**) |
 
@@ -1291,9 +1341,12 @@ Every contradiction found, with the resolution that favours subtraction.
 9. **F1** Vike → plain Vite, **F3** Telefunc → plain HTTP handlers, **F2** trim the 406 exports,
    **F4** the vendored `animate-ui`. F3 is much cheaper after step 3, because one host means there
    is no capability-probing context left to port.
-10. **D5** rename run→session, **G3** fix the stale docs, **G1** retire the SPEC sprawl, **G2** the
-    changesets, **G4** the issue-number citations. Mechanical; last, so they rename and rewrite as
-    little as possible.
+10. **D5** rename run→session, **G2** delete the release history, **G4** the issue-number
+    citations — G2 and G4 together, since both are about explanations that live outside the code.
+    Mechanical; last, so they rename and rewrite as little as possible. **G3** is the exception —
+    with G1 rejected, keeping the specs true is not a step at the end but a requirement of every
+    step above, since each deletion takes its `SPEC.md` files with it and each behaviour change
+    rewrites them.
 11. **G5** test volume — **last, and deliberately so.** The tests are the safety net for
     everything above; cutting them earlier would remove the evidence that steps 1–10 landed
     correctly. Trim once the shape is final.

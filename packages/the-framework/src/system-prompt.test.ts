@@ -102,7 +102,9 @@ test('SYSTEM_PROMPT_TEMPLATE carries the #326 sections verbatim', () => {
   // disagree, an unattended run's queue is written to a name nothing ever promotes. #1420 dropped
   // the `TODO_FILE:` glossary line and names the file inline instead — the invariant is the name.
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes(`\`${FLAT_TODO_FILE}\``))
-  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('ADD_ANALYSIS_ENTRY: Add entry to the ANALYSIS_RESULT.md list'))
+  // The analysis artifact is gone (B2): every run wrote `ANALYSIS_RESULT.md` into the repo and
+  // nothing ever read it back, so the prompt no longer asks for one.
+  assert.equal(SYSTEM_PROMPT_TEMPLATE.includes('ANALYSIS_RESULT'), false)
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('${{tf.prompt}}'))
   // The whole block is the branch-free doc now: #326 moved the one `tf.params.autopilot`
   // ternary out with the maintenance section, so `tf.prompt` is the only fragment left.

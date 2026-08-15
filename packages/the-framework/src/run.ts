@@ -1,13 +1,12 @@
 import {
-  Bootstrap,
   builtinFrameworkPresetRegistry,
   type BootstrapEvent,
+  type BuildContext,
   type BootstrapResult,
   type BootstrapScope,
-  type BootstrapSteps,
-  type BuildContext,
   type FrameworkDetection,
   type FrameworkSignals,
+  type SupervisorEvent,
   type SupervisorRun,
   type Verdict,
 } from '@gemstack/ai-autopilot'
@@ -17,7 +16,7 @@ import { createRunControls, emitSessionStart, endStopDetail } from './run-teleme
 import { AWAIT_PROTOCOL, createTurnSignalEmitter } from './turn-gate.js'
 import { drainGates, runChatPhase, type BindProjectDeps, type RecordMessage } from './await-gate.js'
 import { leaveResumeNote, runTodoLoop, type TodoLoopResult } from './todo-loop.js'
-import { continueAfterChoice, driverBuild, driverImprove } from './steps.js'
+import { continueAfterChoice, driverBuild } from './steps.js'
 import { OPEN_LOOP_MODES, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import type { RunMessages } from './run-messages.js'
 import { errorMessage } from './error-message.js'
@@ -27,8 +26,6 @@ import { errorMessage } from './error-message.js'
  * base of 3 because a from-scratch build spends its first pass or two just
  * bootstrapping an empty workspace before there is anything to polish (#182).
  */
-export const DEFAULT_MAX_PASSES = 5
-
 /** Options for {@link runFramework}. */
 export interface RunFrameworkOptions {
   /** What the user wants built (the one scope question's answer). */
@@ -70,8 +67,6 @@ export interface RunFrameworkOptions {
   eco?: EcoOptions
   /** In-context directories (#439): added as one `Context:` line to the system prompt. */
   context?: readonly string[]
-  /** Max full-fledged passes. Default {@link DEFAULT_MAX_PASSES} (5). */
-  maxPasses?: number
   /**
    * A link to the live agent session, shown on the dashboard. Either a literal
    * URL, or a template with `{sessionId}` (see {@link SESSION_ID_PLACEHOLDER})
@@ -241,9 +236,6 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     onEvent: onDriverEvent,
   })
 
-  // #1372: with the domain-preset review policy gone, nothing reviews the build — the agent is
-  // a black box and the build turn is the whole run.
-  const checklist = undefined
 
   // A real driver writes files to the workspace, so the build/improve steps can
   // detect an empty workspace and hard-scaffold it (#182). The fake driver writes
@@ -262,38 +254,48 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     ...(opts.bind ? { bind: opts.bind } : {}),
   }
   // A hand-off driver (#1225): the prompt leaves this machine and the reply never comes back,
-  // so the build prompt is the entire run. Every phase after it — the review checklist,
-  // improving against its blockers, the backlog gate, live chat — would be reading
+  // so the build prompt is the entire run. Every phase after it — the backlog gate and
+  // live chat — would be reading
   // the driver's own "handed off to <url>" summary as if the agent had written it. That is
   // what put a verdict-is-missing complaint and an unanswerable "Start the next
   // backlog item?" call on a dashboard whose agent was somewhere else entirely. So the phases
-  // are dropped rather than fed: Bootstrap skips its whole loop when no `checklist` step is
-  // given, which leaves scope -> build and nothing after it. A run with no preset has no
-  // checklist either (#1372), and skips the loop the same way.
+  // are dropped rather than fed: the run is scope -> build and nothing after it.
   const handsOff = opts.driver.handsOff === true
   try {
-    const bootstrap = new Bootstrap({
-      maxPasses: opts.maxPasses ?? DEFAULT_MAX_PASSES,
+    // A3: the Bootstrap spine degenerated to two steps once the review loop went (A5) — scope is
+    // a constant function and build is one driver turn — so the phases are called directly. The
+    // `bootstrap` events are still emitted, because the dashboard, the store and the terminal all
+    // read the run's intent, scope and completion from them.
+    const scope = opts.scope ?? 'full'
+    emit({ kind: 'bootstrap', event: { type: 'scope', scope, intent: opts.intent } })
+    // Resuming (#1467): the intent IS the continuation message and goes out verbatim — the
+    // resumed transcript already carries the build framing, so re-rendering it would stack
+    // a second scope→build preamble onto a conversation that lived through the first.
+    const build = agentAwaitGate(
+      driverBuild(session, { ...workspaceOpt, ...(resuming ? { prompt: (intent: string) => intent } : {}) }),
+      session,
+      gateDeps,
+    )
+    const supervised = await build({
+      scope,
+      intent: opts.intent,
+      onEvent: (event: SupervisorEvent) => emit({ kind: 'bootstrap', event: { type: 'build', event } }),
       signal: runSignal,
-      onEvent: (event: BootstrapEvent) => emit({ kind: 'bootstrap', event }),
-      steps: {
-        scope: () => ({ scope: opts.scope ?? 'full', intent: opts.intent }),
-        // Resuming (#1467): the intent IS the continuation message and goes out verbatim — the
-        // resumed transcript already carries the build framing, so re-rendering it would stack
-        // a second scope→build preamble onto a conversation that lived through the first.
-        build: agentAwaitGate(
-          driverBuild(session, { ...workspaceOpt, ...(resuming ? { prompt: (intent: string) => intent } : {}) }),
-          session,
-          gateDeps,
-        ),
-        ...(handsOff || !checklist ? {} : { checklist, improve: driverImprove(session, workspaceOpt) }),
-      },
     })
-    const result = await bootstrap.run()
-    // The run controls (budget #322, decline #358, quota #529) abort between phases.
-    // The review loop used to be the phase after the build and observed the abort for
-    // free; with no checklist step the bootstrap can settle without ever re-checking
-    // (#1372), so the run must look for itself before treating the result as a success.
+    // No review ran, so the review-shaped fields are constant: nothing gated the build (#1372).
+    const result: BootstrapResult = {
+      scope,
+      intent: opts.intent,
+      run: supervised,
+      passes: 0,
+      blockers: [],
+      productionGrade: false,
+      stoppedEarly: false,
+    }
+    emit({ kind: 'bootstrap', event: { type: 'done', result } })
+    // The run controls (budget #322, decline #358, quota #529) abort between phases. The review
+    // loop used to observe the abort for free; with it gone the run must look for itself before
+    // treating the build as a success.
     if (runSignal.aborted) {
       throw runSignal.reason instanceof Error ? runSignal.reason : new Error('[framework] run stopped')
     }

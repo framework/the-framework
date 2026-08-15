@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { defineDomainPreset, defineLoop } from '@gemstack/ai-autopilot'
 import type { Prompt } from '@gemstack/ai-autopilot'
-import { DEFAULT_MAX_PASSES, runFramework } from './run.js'
+import { runFramework } from './run.js'
 import { requestChoices, requestMultiSelect, runAwaitRounds, type ChoicesOption, type MultiSelectOption } from './await-gate.js'
 import { FAKE_INTENT, FAKE_SIGNALS, fakeDriver } from './fake-script.js'
 import { RunMessageQueue } from './run-messages.js'
@@ -262,11 +262,6 @@ function promptRecordingDriver(): { driver: Driver; prompts: () => string[] } {
   }
   return { driver, prompts: () => sent }
 }
-
-test('the default pass budget is raised for from-scratch builds (#182)', () => {
-  // 3 was too low: the first passes go to bootstrapping an empty workspace.
-  assert.equal(DEFAULT_MAX_PASSES, 5)
-})
 
 const MS_OPTS: MultiSelectOption[] = [
   { id: 'p0', label: 'auth flow', default: true },

@@ -54,21 +54,6 @@ test('RunMessageQueue next() returns a queued message even if the signal is abor
   assert.deepEqual(await q.next(ac.signal), { text: 'queued' })
 })
 
-test('RunMessageQueue carries the originating surface with the message (#917)', async () => {
-  const q = new RunMessageQueue()
-  q.push('from discord', 'discord')
-  q.push('from here')
-  assert.deepEqual(await q.next(), { text: 'from discord', via: 'discord' })
-  assert.deepEqual(await q.next(), { text: 'from here' }, 'no via means the run attributes it locally')
-})
-
-test('RunMessageQueue hands the surface to a parked waiter too (#917)', async () => {
-  const q = new RunMessageQueue()
-  const pending = q.next()
-  q.push('later', 'discord')
-  assert.deepEqual(await pending, { text: 'later', via: 'discord' })
-})
-
 test('RunMessageQueue takeQueued() drains without waiting — the end-of-run check (#1390)', () => {
   const q = new RunMessageQueue()
   q.push('follow-up')

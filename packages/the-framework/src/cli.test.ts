@@ -18,7 +18,6 @@ import {
   printStartupFooter,
   promptRunSpec,
   runCli,
-  runLogEntry,
   runLogKind,
   runOnBeforeMergeable,
   sessionOptions,
@@ -29,7 +28,6 @@ import {
   isInteractive,
 } from './cli.js'
 import { writeSessionSpec, type SessionSpec } from './session-spec.js'
-import { readLogs } from './logs.js'
 import { createDriver } from './agent.js'
 import { FakeDriver } from './driver/index.js'
 import type { FrameworkEvent } from './events.js'
@@ -259,92 +257,12 @@ test('the built-in prompt is off for a vanilla session or the-framework.yml vani
   assert.equal(mergeRunConfig(opts({ options: { vanilla: false } }), { vanilla: true }).vanilla, false)
 })
 
-test('runLogKind maps the run path to a project-log kind (#379)', () => {
+test('runLogKind maps the run path to the flow recorded on the meta (#379/#1467)', () => {
   assert.equal(runLogKind({ directPrompt: false, research: false }), 'build')
   assert.equal(runLogKind({ directPrompt: true, research: false }), 'prompt')
   assert.equal(runLogKind({ directPrompt: false, research: true }), 'prompt')
-  // Transparent (#625) routes a build-kind run through the raw prompt path, so it logs as a prompt.
+  // Transparent (#625) routes a build-kind run through the raw prompt path, so it records as one.
   assert.equal(runLogKind({ directPrompt: false, research: false }, true), 'prompt')
-})
-
-test('runLogEntry maps the end event to a status and carries the session (#379)', () => {
-  const base = { at: '2026-07-11T00:00:00.000Z', kind: 'build' as const, title: 'a blog' }
-  assert.equal(runLogEntry({ ...base, end: { kind: 'end', ok: true } }).status, 'done')
-  assert.equal(runLogEntry({ ...base, end: { kind: 'end', ok: false, stopped: true } }).status, 'stopped')
-  assert.equal(runLogEntry({ ...base, end: { kind: 'end', ok: false } }).status, 'failed')
-  const withSession = runLogEntry({ ...base, end: { kind: 'end', ok: true }, sessionId: 's1', sessionLink: 'http://x/s1' })
-  assert.equal(withSession.sessionId, 's1')
-  assert.equal(withSession.sessionLink, 'http://x/s1')
-  // No session captured -> the fields are omitted, not set to undefined.
-  assert.equal('sessionId' in runLogEntry({ ...base, end: { kind: 'end', ok: true } }), false)
-})
-
-test('runLogEntry records a run that never reached its end event (#898)', () => {
-  const base = { at: '2026-07-11T00:00:00.000Z', kind: 'build' as const, title: 'a blog' }
-  // No `end` to read the outcome from: the run was stopped, or it died.
-  assert.equal(runLogEntry({ ...base, stopped: true }).status, 'stopped')
-  assert.equal(runLogEntry({ ...base }).status, 'failed')
-  // An `end` still wins over the fallback, so a stopped-then-ended run is not double-guessed.
-  assert.equal(runLogEntry({ ...base, end: { kind: 'end', ok: true }, stopped: true }).status, 'done')
-})
-
-test('runLogEntry carries the run id, session name and branch (#898)', () => {
-  const entry = runLogEntry({
-    at: '2026-07-11T00:00:00.000Z',
-    kind: 'build',
-    title: 'a blog',
-    end: { kind: 'end', ok: true },
-    id: '2026-07-11T00-00-00-000Z',
-    sessionName: 'a-blog',
-    branch: 'the-framework/a-blog',
-  })
-  assert.equal(entry.id, '2026-07-11T00-00-00-000Z')
-  assert.equal(entry.sessionName, 'a-blog')
-  assert.equal(entry.branch, 'the-framework/a-blog')
-  // Absent -> omitted, not set to undefined.
-  const bare = runLogEntry({ at: entry.at, kind: 'build', title: 'a blog', end: { kind: 'end', ok: true } })
-  assert.deepEqual(Object.keys(bare).sort(), ['at', 'kind', 'status', 'title'])
-})
-
-test('a run in a git repo records the branch its work landed on (#898)', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'framework-logs-branch-'))
-  const git = nodeGitRunner()
-  try {
-    await git(['init'], dir)
-    await git(['config', 'user.email', 'test@example.com'], dir)
-    await git(['config', 'user.name', 'Test'], dir)
-    await writeFile(join(dir, 'README.md'), '# app\n')
-    await git(['add', '-A'], dir)
-    await git(['commit', '-m', 'init'], dir)
-    await git(['checkout', '-b', 'the-framework/auth-flow'], dir)
-
-    // --unattended so the run settles and exits: inside a git repo it otherwise stays open for
-    // live chat (#714), which has nothing to do with what this asserts.
-    const { io } = capture()
-    const started = { prompt: 'review the auth flow', kind: 'prompt' as const, cwd: dir, options: { unattended: true } }
-    assert.equal(await runSessionCli(started, io), 0)
-    const logs = await readLogs(dir)
-    assert.equal(logs[0]!.branch, 'the-framework/auth-flow')
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
-})
-
-test('a finished run records itself in .the-framework/LOGS.md (#379)', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'framework-logs-'))
-  try {
-    const { io } = capture()
-    const code = await runSessionCli({ prompt: 'review the auth flow', kind: 'prompt', cwd: dir }, io)
-    assert.equal(code, 0)
-    const logs = await readLogs(dir)
-    assert.equal(logs.length, 1)
-    assert.equal(logs[0]!.kind, 'prompt')
-    assert.equal(logs[0]!.title, 'review the auth flow')
-    assert.equal(logs[0]!.status, 'done')
-    assert.match(logs[0]!.at, /^\d{4}-\d{2}-\d{2}T/) // a real ISO timestamp
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
 })
 
 test('the spec kind picks the path: research, verbatim prompt, or build (#331/#353)', () => {
@@ -592,9 +510,6 @@ test('runCli --transparent runs a bare prompt raw, skipping the build flow + wra
     assert.doesNotMatch(text, /Build this app end to end/) // no buildPrompt wrapping
     assert.doesNotMatch(text, /Work within the existing codebase/) // no extendPrompt wrapping
     assert.doesNotMatch(text, /production-grade/) // no synthesize / production-grade pass
-    // And it records as a prompt run, not a build.
-    const logs = await readLogs(dir)
-    assert.equal(logs[0]!.kind, 'prompt')
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -794,9 +709,6 @@ test('naming the session renames the run-id branch and records it as a branch ev
     cwd: repo,
     store: undefined,
     runId: 'r1',
-    kind: 'prompt',
-    title: 'a run',
-    beforeLog: async () => {},
   })
   journal.onEvent({ kind: 'session-name', name: 'cool-name' })
   // The rename runs off the event asynchronously; wait for the recorded branch to come through.
@@ -817,9 +729,6 @@ test('a browser URL is held until the session opens, then re-said after every la
     cwd: '/tmp',
     store: undefined,
     runId: undefined,
-    kind: 'prompt',
-    title: 'a run',
-    beforeLog: async () => {},
   })
   journal.announceBrowserUrl('https://early.test/')
   assert.ok(

@@ -14,7 +14,6 @@ import {
 import { FLAT_TODO_FILE } from './tickets.js'
 import { TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
-import { CONVERSATIONS_DIR } from './conversations.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 /** The context docs as the commented bullets they render to (#559/#683). */
@@ -35,15 +34,14 @@ test('CONTEXT_DOCS is the #683 fragment: business knowledge plus the roadmap/que
     'knowledge-base/MARKET_RESEARCH.md',
     'knowledge-base/**.md',
     'tickets/**.md',
-    '.the-framework/conversations/**.md',
     'TODO_AGENTS.md',
   ])
   // The business-knowledge docs are a subset the agent also updates at merge.
   for (const doc of BUSINESS_KNOWLEDGE_DOCS) assert.ok(paths.includes(doc.path), `missing ${doc.path}`)
-  // GOAL / business logic / market research / tickets / conversations / TODO_AGENTS are read-only
-  // context, so they are not in the merge-update set.
+  // GOAL / business logic / market research / tickets / TODO_AGENTS are read-only context, so they
+  // are not in the merge-update set.
   const businessPaths = BUSINESS_KNOWLEDGE_DOCS.map(d => d.path)
-  for (const p of ['GOAL.md', 'BUSINESS_LOGIC.md', 'knowledge-base/MARKET_RESEARCH.md', 'knowledge-base/**.md', 'tickets/**.md', '.the-framework/conversations/**.md', 'TODO_AGENTS.md']) {
+  for (const p of ['GOAL.md', 'BUSINESS_LOGIC.md', 'knowledge-base/MARKET_RESEARCH.md', 'knowledge-base/**.md', 'tickets/**.md', 'TODO_AGENTS.md']) {
     assert.ok(!businessPaths.includes(p))
   }
   // The two format-bearing bullets name a section of this same channel (#1163), not a file to go
@@ -55,10 +53,6 @@ test('CONTEXT_DOCS is the #683 fragment: business knowledge plus the roadmap/que
   // Nothing here may point into node_modules: that path resolves only when the framework is a root
   // dependency of the repo it works on, which is what left both specs unopenable (#1163).
   for (const doc of CONTEXT_DOCS) assert.ok(!doc.comment.includes('node_modules/'), `${doc.path} points into node_modules`)
-  // The conversations pointer (#683/#908) is inlined too, so pin its dir to the canonical
-  // constants rather than a bare literal that could drift from where runs actually commit.
-  const conversations = CONTEXT_DOCS.find(d => d.path.startsWith(`${THE_FRAMEWORK_DIR}/${CONVERSATIONS_DIR}/`))
-  assert.ok(conversations, `expected the ${THE_FRAMEWORK_DIR}/${CONVERSATIONS_DIR}/ pointer`)
 })
 import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 

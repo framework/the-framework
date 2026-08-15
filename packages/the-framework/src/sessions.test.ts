@@ -6,15 +6,13 @@ import type { StoreFs } from './store/index.js'
 import {
   userDirName,
   sessionsDir,
-  sessionsGitignore,
-  withoutPerUserRules,
   ensureSessionsIgnored,
   resolveUserDir,
   forgetUserDirs,
   ANONYMOUS_USER_DIR,
 } from './sessions.js'
-import { LOGS_GITIGNORE } from './logs.js'
-import { SESSIONS_PATHSPEC } from './conversation-commit.js'
+import { frameworkGitignore, sessionsGitignore } from './framework-gitignore.js'
+import { SESSIONS_PATHSPEC } from './session-commit.js'
 
 /** A minimal in-memory {@link StoreFs}: this module only reads and writes one file. */
 function memFs(seed: Record<string, string> = {}): StoreFs & { files: Map<string, string> } {
@@ -79,16 +77,16 @@ test('the ignore rules re-include every directory on the way down (#1179)', () =
   assert.equal(rules, '!*/\n!*/sessions/\n!*/sessions/**\n')
 })
 
-test('a repo with no ignore file gets the full allow-list plus its rules (#1179)', async () => {
+test('a repo with no ignore file gets the whole file, transient state and all (#1179)', async () => {
   const fs = memFs()
   assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), true)
-  const written = fs.files.get(IGNORE)!
-  assert.ok(written.startsWith(LOGS_GITIGNORE), 'the transient run state stays ignored')
-  assert.ok(written.includes('!*/sessions/**'))
+  assert.equal(fs.files.get(IGNORE), frameworkGitignore())
 })
 
-test('an existing ignore file is appended to, once (#1179)', async () => {
-  const fs = memFs({ [IGNORE]: LOGS_GITIGNORE })
+test('a repo that predates the rules is repaired, once (#1179)', async () => {
+  // Install writes the whole file, so this only fires for a repo activated before the archive
+  // existed. Idempotent after that: the rule is already there, so nothing is written again.
+  const fs = memFs({ [IGNORE]: '# The Framework\n*\n!.gitignore\n' })
   assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), true)
   assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), false, 'already there, so nothing written')
   const written = fs.files.get(IGNORE)!
@@ -98,46 +96,20 @@ test('an existing ignore file is appended to, once (#1179)', async () => {
 test('a second user writes nothing: the rules already cover them (#1312)', async () => {
   // The whole point of the glob. Under the per-user form this was two writes to a tracked file,
   // one per person, each dirtying its own checkout.
-  const fs = memFs({ [IGNORE]: LOGS_GITIGNORE })
+  const fs = memFs()
   assert.equal(await ensureSessionsIgnored('/repo', 'a@example.com', fs), true)
   assert.equal(await ensureSessionsIgnored('/repo', 'b@example.com', fs), false, 'the glob already covers them')
+  assert.ok(!fs.files.get(IGNORE)!.includes('@example.com'), 'no user is named')
+})
+
+test('a hand-edited file keeps every line it has (#1179)', async () => {
+  // Repairing means adding what is missing, never rewriting what is there.
+  const fs = memFs({ [IGNORE]: '# mine\n*\n!keep-me/\n' })
+  assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), true)
   const written = fs.files.get(IGNORE)!
-  assert.equal(written.match(/!\*\/sessions\/\*\*/g)?.length, 1)
-  assert.ok(!written.includes('@example.com'), 'no user is named')
-})
-
-test('a file still naming users is upgraded to the glob form, once (#1312)', async () => {
-  const legacy = LOGS_GITIGNORE + '!a@example.com/\n!a@example.com/sessions/\n!a@example.com/sessions/**\n'
-  const fs = memFs({ [IGNORE]: legacy })
-  assert.equal(await ensureSessionsIgnored('/repo', 'b@example.com', fs), true)
-  const written = fs.files.get(IGNORE)!
-  assert.ok(written.includes('!*/sessions/**'), 'the glob is in')
-  assert.ok(!written.includes('a@example.com'), 'the per-user lines came out in the same write')
-  assert.equal(await ensureSessionsIgnored('/repo', 'c@example.com', fs), false, 'and it never writes again')
-})
-
-test('the upgrade keeps every line it does not recognize (#1312)', () => {
-  // The conversations rules (#908) sit in the same file and are a literal directory, not a user.
-  const before = LOGS_GITIGNORE + '!conversations/\n!conversations/**\n!a@x.com/\n!a@x.com/sessions/\n!a@x.com/sessions/**\n# mine\n!keep-me/\n'
-  const after = withoutPerUserRules(before)
-  assert.ok(after.includes('!conversations/'), 'conversations survive')
-  assert.ok(after.includes('!conversations/**'))
-  assert.ok(after.includes('# mine'), 'comments survive')
-  assert.ok(after.includes('!keep-me/'), 'an unrelated rule survives')
-  assert.ok(!after.includes('a@x.com'), 'only the named user goes')
-})
-
-test('a file with no per-user rules is returned untouched (#1312)', () => {
-  const md = LOGS_GITIGNORE + '!conversations/\n!conversations/**\n'
-  assert.equal(withoutPerUserRules(md), md)
-})
-
-test('an unrecognized ignore file is left alone (#1179)', async () => {
-  // Hand-edited beyond recognition: appending our rules to a file whose allow-list we do not
-  // understand could make it mean something its author did not write.
-  const fs = memFs({ [IGNORE]: '# mine\n*\n' })
-  assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), false)
-  assert.equal(fs.files.get(IGNORE), '# mine\n*\n')
+  assert.ok(written.includes('# mine'), 'comments survive')
+  assert.ok(written.includes('!keep-me/'), 'an unrelated rule survives')
+  assert.ok(written.includes('!*/sessions/**'), 'and the archive is un-ignored')
 })
 
 test('the identity comes from git, and is read once per repo (#1179)', async () => {
@@ -180,8 +152,7 @@ test('against real git: a committed session survives git clean -fdx, and nothing
     await mkdir(join(fw, 'git@example.com', 'sessions'), { recursive: true })
     await mkdir(join(fw, 'runs'), { recursive: true })
     await mkdir(join(fw, 'worktrees', 'r9'), { recursive: true })
-    await writeFile(join(fw, '.gitignore'), LOGS_GITIGNORE)
-    await writeFile(join(fw, 'LOGS.md'), '# logs\n')
+    await writeFile(join(fw, '.gitignore'), '# The Framework\n*\n!.gitignore\n')
     await writeFile(join(fw, 'git@example.com', 'sessions', 'r1.json'), '{"id":"r1"}\n')
     await writeFile(join(fw, 'runs', 'old.json'), '{}\n')
     await writeFile(join(fw, 'events.jsonl'), '\n')
@@ -193,7 +164,7 @@ test('against real git: a committed session survives git clean -fdx, and nothing
     assert.ok(!status.includes('.the-framework/runs/'), 'the transient archive stays ignored')
     assert.ok(!status.includes('.the-framework/events.jsonl'), 'the live log stays ignored')
     assert.ok(!status.includes('.the-framework/worktrees/'), 'a run checkout stays ignored')
-    assert.ok((await readFile(join(fw, '.gitignore'), 'utf8')).startsWith(LOGS_GITIGNORE), 'the allow-list is kept')
+    assert.ok((await readFile(join(fw, '.gitignore'), 'utf8')).includes('# The Framework'), 'the allow-list is kept')
 
     git('add', '--', SESSIONS_PATHSPEC)
     git('commit', '-q', '-m', 'sessions')

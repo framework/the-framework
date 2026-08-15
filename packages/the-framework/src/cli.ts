@@ -38,9 +38,7 @@ import {
 } from './config-layers.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
-import { appendLog, type LogEntry } from './logs.js'
-import { appendMessage, isSafeVia } from './conversations.js'
-import type { BindProjectDeps, RecordMessage } from './await-gate.js'
+import type { BindProjectDeps } from './await-gate.js'
 import { RunStore, commitPendingWork, currentBranch, nodeStoreFs, renameRunBranch, runBranchName, type StoreFs } from './store/index.js'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
@@ -190,8 +188,6 @@ export interface SessionOptions {
   model?: string | undefined
   /** `--resume-session <id>` (#720): continue a finished run's agent session — the prompt resumes that conversation (full prior context). Set by the dashboard when you message a run that has ended. */
   resumeSession?: string | undefined
-  /** `--via <surface>` (#917): the surface this run was started from, recorded on its conversation turns. Set by the daemon when a non-local surface (e.g. Discord) asked for the run. */
-  via?: string | undefined
   /** `--ticket <path>` (#1117): the `tickets/<file>.md` this run is implementing. Set by the daemon when it starts a drain run, from the ticket its queue entry links to; recorded on the run's meta. */
   ticket?: string | undefined
   /** `--plan-run` (#1327): the `--ticket` is being planned, not implemented, so the PR title must not inherit its issue as `(fix #42)` (#1334) — the plan's merge would close the issue with the work still undone. */
@@ -340,7 +336,6 @@ export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = proce
     ...(isRunLocation(o.target) ? { target: o.target } : {}),
     ...(o.model?.trim() ? { model: o.model.trim() } : {}),
     ...(o.resumeSession?.trim() ? { resumeSession: o.resumeSession.trim() } : {}),
-    ...(o.via?.trim() ? { via: o.via.trim() } : {}),
     // The ticket comes off a queue file an agent writes, so it is re-checked here rather than
     // trusted: a path that is not a ticket never reaches the run (#1117).
     ...(o.ticket && isTicketPath(o.ticket) ? { ticket: o.ticket } : {}),
@@ -393,54 +388,11 @@ export function unguardedNotices(opts: Pick<SessionOptions, 'agent' | 'maxCost' 
   return notices
 }
 
-/** The log kind a run records in `.the-framework/LOGS.md` (#379): the direct paths are prompts, a
+/** Which flow a run starts under (#1467), recorded on its meta: the direct paths are prompts, a
  * build run is a build. Transparent (#625) routes a build-kind run through the raw prompt path too,
- * so it logs as a prompt. */
-export function runLogKind(opts: Pick<SessionOptions, 'directPrompt' | 'research'>, transparent = false): LogEntry['kind'] {
+ * so it records as a prompt. */
+export function runLogKind(opts: Pick<SessionOptions, 'directPrompt' | 'research'>, transparent = false): SessionKind {
   return opts.directPrompt || opts.research || transparent ? 'prompt' : 'build'
-}
-
-/**
- * Build the project-log entry (#379) for a finished run from its `end` event and
- * the session captured along the way. Pure, so the status mapping is unit-testable
- * without a live run.
- *
- * A run that never emitted `end` still gets an entry (#898) — it was stopped, or it died
- * mid-flight, and either way it happened and belongs in the committed log. `stopped` then
- * decides between the two, since there is no event left to ask.
- */
-export function runLogEntry(input: {
-  at: string
-  kind: LogEntry['kind']
-  title: string
-  end?: Extract<FrameworkEvent, { kind: 'end' }> | undefined
-  stopped?: boolean | undefined
-  id?: string | undefined
-  sessionId?: string | undefined
-  sessionLink?: string | undefined
-  sessionName?: string | undefined
-  branch?: string | undefined
-}): LogEntry {
-  const status: LogEntry['status'] = input.end
-    ? input.end.ok
-      ? 'done'
-      : input.end.stopped
-        ? 'stopped'
-        : 'failed'
-    : input.stopped
-      ? 'stopped'
-      : 'failed'
-  return {
-    at: input.at,
-    kind: input.kind,
-    title: input.title,
-    status,
-    ...(input.id ? { id: input.id } : {}),
-    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
-    ...(input.sessionLink ? { sessionLink: input.sessionLink } : {}),
-    ...(input.sessionName ? { sessionName: input.sessionName } : {}),
-    ...(input.branch ? { branch: input.branch } : {}),
-  }
 }
 
 /** This run's own flags as the nearest config layer (#841). A flag left off says nothing. */
@@ -481,8 +433,6 @@ interface RunEpilogue {
   maybeFireOnBeforeMergeable: () => Promise<void>
   /** Hand the session's work back (#1102): push its branch and open a draft PR, if still armed. */
   maybeAutoHandoff: () => Promise<void>
-  /** Write the run's `.the-framework/LOGS.md` entry (#898). Idempotent: called on every exit path. */
-  finishLog: () => Promise<void>
   /** True once the run stopped cleanly (interrupt / budget cap) rather than failed. */
   isStopped: () => boolean
   /** How a real failure is labelled: "run", "research", or "prompt run". */
@@ -509,14 +459,10 @@ async function settleRun(ctx: RunEpilogue, run: () => Promise<{ successLine: str
     // for the same reason as above — `close()` archives the log, and an outcome appended after it
     // would miss the copy the dashboard's history reads (#835).
     await ctx.maybeAutoHandoff()
-    await ctx.finishLog()
     await ctx.store?.close() // flush the event log; best-effort
     return 0
   } catch (err) {
     ctx.clearInterrupt()
-    // Before the close, like the success path: a run that stopped or blew up is still a session,
-    // and this is the only place the failing path can record it (#898).
-    await ctx.finishLog()
     await ctx.store?.close()
     // A clean stop (Stop button, Ctrl+C, or a budget cap #322) is not a failure: report it and
     // exit 0. The dashboard that spawned this session shows the stopped state from its event log.
@@ -620,31 +566,6 @@ function armInterrupt(controller: AbortController, io: CliIO): () => void {
   }
 }
 
-/**
- * Record chat turns into the committed conversation (#908). Fire-and-forget at the call
- * site — a failed write must never stall or fail a run — but appends are chained rather
- * than fired in parallel: each one creates the dir/header before it writes, so two
- * overlapping turns would race and could land the reply above the message it answers.
- * `flush()` is awaited before the run's log entry, or the last reply is lost (#908).
- */
-function conversationRecorder(deps: {
-  cwd: string
-  enabled: boolean
-  conversationId: string | undefined
-  localVia: string
-}): { recordMessage?: RecordMessage; flush: () => Promise<void> } {
-  const { cwd, conversationId } = deps
-  if (!deps.enabled || !conversationId) return { flush: () => Promise.resolve() }
-  let tail: Promise<void> = Promise.resolve()
-  const recordMessage: RecordMessage = (role, text, via) => {
-    // A per-turn origin wins, but only a safe one: it arrives from a chat surface over the
-    // control channel, and the heading it lands in is line-parsed (#897's threat model).
-    const message = { at: new Date().toISOString(), role, via: isSafeVia(via) ? via : deps.localVia, text }
-    tail = tail.then(() => appendMessage(cwd, conversationId, message)).catch(() => {})
-  }
-  return { recordMessage, flush: () => tail }
-}
-
 /** What the run journal exposes to the epilogue. See {@link createRunJournal}. */
 export interface RunJournal {
   onEvent: (event: FrameworkEvent) => void
@@ -660,28 +581,21 @@ export interface RunJournal {
    *  session is open, held until then, and re-said after every later `session` so the row
    *  survives the dashboard's last-session slice. */
   announceBrowserUrl: (url: string) => void
-  /** Write the run's `.the-framework/LOGS.md` entry (#898). Idempotent; every exit path calls it. */
-  finishLog: () => Promise<void>
 }
 
 /**
  * The run's event sink and the state its epilogue reads. One event arrives and this prints it,
- * persists it, folds the fields the LOGS.md entry needs (session
- * id/link, the end event), tracks the settle flags (#322/#326), renames the framework-owned
- * branch once the agent names its session (#736), and re-emits a held browser-stream port
- * right after `session` so it lands in the slice the dashboard renders (#829). These jobs sat
- * inline in runCli across six mutable locals; the journal is their one owner, and runCli reads
- * the getters. Exported for the rename-records-the-branch test (#1277).
+ * persists it, tracks the settle flags (#322/#326), renames the framework-owned branch once the
+ * agent names its session (#736), and re-emits a held browser-stream port right after `session` so
+ * it lands in the slice the dashboard renders (#829). These jobs sat inline in runCli across six
+ * mutable locals; the journal is their one owner, and runCli reads the getters. Exported for the
+ * rename-records-the-branch test (#1277).
  */
 export function createRunJournal(deps: {
   io: CliIO
   cwd: string
   store: RunStore | undefined
   runId: string | undefined
-  kind: LogEntry['kind']
-  title: string
-  /** Awaited before the log entry is written: the queued conversation appends (#908). */
-  beforeLog: () => Promise<void>
 }): RunJournal {
   const { io, cwd, store } = deps
   // The framework's own verdict that the run stopped cleanly rather than failed — set by a
@@ -690,9 +604,6 @@ export function createRunJournal(deps: {
   let stoppedCleanly = false
   let sawReadyForMerge = false
   let sessionName: string | undefined
-  let logSessionId: string | undefined
-  let logSessionLink: string | undefined
-  let logEnd: Extract<FrameworkEvent, { kind: 'end' }> | undefined
   // The browser preview's port, announced on the first `session` event rather than when the
   // bridge opens (#829): the dashboard renders only the tail from the last `session` event, so
   // anything emitted ahead of it is dropped from the run's view.
@@ -706,11 +617,6 @@ export function createRunJournal(deps: {
   let sessionOpen = false
 
   const onEvent = (event: FrameworkEvent) => {
-    if (event.kind === 'session' && event.sessionLink) logSessionLink = event.sessionLink
-    else if (event.kind === 'session-update') {
-      logSessionId = event.sessionId
-      if (event.sessionLink) logSessionLink = event.sessionLink
-    }
     if (event.kind === 'ready-for-merge') sawReadyForMerge = true
     if (event.kind === 'session-name') {
       sessionName = event.name
@@ -725,13 +631,7 @@ export function createRunJournal(deps: {
         })
       }
     }
-    if (event.kind === 'end') {
-      if (event.stopped) stoppedCleanly = true
-      // Held, not logged here (#898): the entry is written as the run settles, which is both
-      // after every run reaches it (an `end` is not guaranteed) and the last moment the branch
-      // can still be read off the checkout.
-      logEnd = event
-    }
+    if (event.kind === 'end' && event.stopped) stoppedCleanly = true
     io.out(formatFrameworkEvent(event))
     void store?.append(event)
 
@@ -747,31 +647,6 @@ export function createRunJournal(deps: {
     }
   }
 
-  // Once per run, and on every path out — a stopped or crashed run is still a session that
-  // happened, and leaving it out is what made the committed log an incomplete record (#898).
-  let logged = false
-  const finishLog = async (): Promise<void> => {
-    if (logged) return
-    logged = true
-    // Let the queued conversation appends land before we exit, or the last reply is lost (#908).
-    await deps.beforeLog()
-    const entry = runLogEntry({
-      at: new Date().toISOString(),
-      kind: deps.kind,
-      title: deps.title,
-      end: logEnd,
-      stopped: stoppedCleanly,
-      id: deps.runId,
-      sessionId: logSessionId,
-      sessionLink: logSessionLink,
-      sessionName,
-      // The last moment it can be observed (#799): a run worktree is torn down after this
-      // process exits, and the agent may have branched itself, so neither name is derivable later.
-      branch: await currentBranch(cwd),
-    })
-    await appendLog(cwd, entry).catch(() => {})
-  }
-
   return {
     onEvent,
     sessionName: () => sessionName,
@@ -784,7 +659,6 @@ export function createRunJournal(deps: {
       latestBrowserUrl = url
       if (sessionOpen) onEvent({ kind: 'browser', url })
     },
-    finishLog,
   }
 }
 
@@ -990,8 +864,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
           return
         }
         if (entry.kind === 'message') {
-          // Carry the origin the sender named (#917), so the turn is recorded where it happened.
-          messages.push(entry.text, entry.via)
+          messages.push(entry.text)
           return
         }
         if (entry.kind === 'handoff') {
@@ -1071,37 +944,14 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
         }
       : {}
 
-  // Persist the chat into the committed conversation (#908/#857), so a clone carries what was
-  // said and not just the fact a run happened. Keyed by the same run id LOGS.md records, which
-  // is what joins the committed session list to the committed chat. `--via` names the surface
-  // for a run the daemon started on another surface's behalf (#917); otherwise it is whichever
-  // local surface is here.
-  const conversation = conversationRecorder({
-    cwd,
-    enabled: opts.persist,
-    conversationId: opts.runId ?? store?.snapshot().id,
-    localVia: isSafeVia(opts.via) ? opts.via : requestChoice ? 'dashboard' : 'cli',
-  })
-  const recordMessage = conversation.recordMessage
-
   // The session link shown on the dashboard: --session-link, else Claude Code's own entry for
   // a live Claude run, else nothing (#212/#542). Same for both run paths.
   const sessionLink = chooseSessionLink(opts, fake)
 
-  // Everything the run reports that its epilogue needs — the settle flags, the LOGS.md
-  // fields, the deferred browser-port announcement — plus the fan-out of every event to the
-  // terminal, the store and the relay, lives in the journal. runCli reads its getters below.
-  const journal = createRunJournal({
-    io,
-    cwd,
-    store,
-    runId: opts.runId,
-    // A build continuation (#1467) logs as the build run it re-enters, not as the prompt
-    // start that carried it here.
-    kind: continueBuild ? 'build' : runLogKind(opts, transparent),
-    title: intent || (opts.research ? defaultWhat() : ''),
-    beforeLog: conversation.flush,
-  })
+  // Everything the run reports that its epilogue needs — the settle flags, the deferred
+  // browser-port announcement — plus the fan-out of every event to the terminal and the store,
+  // lives in the journal. runCli reads its getters below.
+  const journal = createRunJournal({ io, cwd, store, runId: opts.runId })
   const onEvent = journal.onEvent
 
   // Put the armed state on the run's meta (#1102), and keep it there as the checkboxes change it.
@@ -1285,7 +1135,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     } catch {
       // Persistence is never allowed to be the thing that keeps a failing run alive.
     }
-    await journal.finishLog().catch(() => {})
     control?.close()
     await sharedBrowser?.close().catch(() => {})
     return 2
@@ -1399,7 +1248,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     clearInterrupt,
     maybeFireOnBeforeMergeable,
     maybeAutoHandoff,
-    finishLog: journal.finishLog,
     isStopped: () => controller.signal.aborted || journal.stoppedCleanly(),
     failLabel,
   })
@@ -1436,7 +1284,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     ...(bindDeps ? { bind: bindDeps } : {}),
     ...(requestChoice ? { requestChoice } : {}),
     ...chatQueue,
-    ...(recordMessage ? { recordMessage } : {}),
     ...(opts.model ? { model: opts.model } : {}),
     ...(opts.maxCost ? { budgetUsd: opts.maxCost } : {}),
     ...(guard ? { consumptionGate: guard.gate } : {}),

@@ -122,9 +122,10 @@ from another workspace. Pass `--no-persist` to skip writing state. We do not
 persist the agent's transcript; Claude Code owns that.
 
 The `.the-framework/` directory holds both the transient run state (`events.jsonl`,
-`run.json`, `runs/`) and the committed project log `LOGS.md`. `install` seeds a
-`.the-framework/.gitignore` that keeps the run state out of git so only `LOGS.md`
-is tracked.
+`run.json`, `runs/`) and the committed session archive (`<user>/sessions/`).
+`install` seeds a `.the-framework/.gitignore` that keeps the run state out of git
+so only the archive is tracked — an ordinary `git clean -fdx` would otherwise take
+every session a project had ever run.
 
 ### Run history
 

@@ -1,6 +1,8 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { git, makeWorld, waitFor, withFakeAwait } from './harness.js'
+import { readFile } from 'node:fs/promises'
+import { makeWorld, waitFor, withFakeAwait } from './harness.js'
+import { archivedRunPaths } from '../store/index.js'
 import { onOpenQuestions, onRuns, onRetainedWorktrees, onRunWorktree } from '../dashboard-rpc/reads.telefunc.js'
 import {
   sendChoice,
@@ -78,14 +80,16 @@ test('chat with a live session: a message becomes the next agent turn (#714)', a
     await world.waitRun(project, runId, 'done')
     await world.waitRetired(project, runId)
 
-    // What was said survives the session (#908): teardown committed the conversation record to
-    // the run's branch, so a clone carries the chat and not just the fact a run happened.
-    const conversation = await git(
-      project.cwd,
-      'show',
-      `the-framework/run-${runId}:.the-framework/conversations/${runId}.md`,
-    )
-    assert.ok(conversation.includes('Also add a logout button'), 'the committed conversation carries the message')
+    // What was said survives the session (#1179): teardown archives the run's event log into the
+    // project checkout, where the daemon's committer picks it up, so a clone carries the exchange
+    // and not just the fact a run happened. The event log *is* that record (B3) — a second, prose
+    // re-narration used to be committed beside it, which is what the Discord mirror then polled and
+    // diffed instead of reading this.
+    const archived = await archivedRunPaths(project.cwd, runId)
+    const events = archived.find(path => path.endsWith('.jsonl'))
+    assert.ok(events, `expected an archived event log, got: ${JSON.stringify(archived)}`)
+    const log = await readFile(events, 'utf8')
+    assert.ok(log.includes('Also add a logout button'), 'the archived event log carries the message')
   } finally {
     await world.close()
   }

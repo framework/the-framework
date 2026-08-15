@@ -7,12 +7,10 @@ import type { AgentView } from '../lib/live-state.js'
 // tests below are about what the rail does with them. Tickets moved to its own page (#1144) and
 // is no longer one of the rail's reads.
 const onDocs = vi.hoisted(() => vi.fn())
-const onProjectLog = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onDocs, onProjectLog }))
+vi.mock('../server/reads.telefunc.js', () => ({ onDocs }))
 
 // The panels themselves are rendered elsewhere; here they are stand-ins.
 vi.mock('./DocsPanel.js', () => ({ DocsPanel: () => <div>docs</div> }))
-vi.mock('./ProjectLogPanel.js', () => ({ ProjectLogPanel: () => <div>log</div> }))
 vi.mock('./FileTree.js', () => ({ FileTree: () => <div>files</div> }))
 vi.mock('./BrowserPanel.js', () => ({ BrowserPanel: () => <div>browser</div> }))
 
@@ -20,7 +18,6 @@ const { RightRail } = await import('./RightRail.js')
 
 beforeEach(() => {
   onDocs.mockReset().mockResolvedValue([{ name: 'PLAN.md', content: '# plan' }])
-  onProjectLog.mockReset().mockResolvedValue([{ kind: 'prompt', status: 'done', at: '2026-07-25T00:00:00.000Z', intent: 'x' }])
 })
 
 afterEach(cleanup)
@@ -81,18 +78,12 @@ describe('RightRail browser tab (#1053)', () => {
 // The loop's verdict is pinned under the tabs rather than being one of them: it is a standing fact
 // about the run, so it stays put while you move between panels.
 describe('RightRail tab labels (#1145)', () => {
-  test('the committed session history is History, not Log', () => {
-    render(<RightRail {...baseProps} />)
-    expect(screen.getByRole('tab', { name: /history/i })).toBeTruthy()
-    expect(screen.queryByRole('tab', { name: /^log$/i })).toBeNull()
-  })
-
   test('a tab says what it holds when hovered', async () => {
     render(<RightRail {...baseProps} />)
-    const tab = screen.getByRole('tab', { name: /history/i })
+    const tab = screen.getByRole('tab', { name: /docs/i })
     fireEvent.mouseEnter(tab)
     fireEvent.pointerEnter(tab, { pointerType: 'mouse' })
-    await waitFor(() => expect(screen.getByRole('tooltip').textContent).toContain('LOGS.md'))
+    await waitFor(() => expect(screen.getByRole('tooltip').textContent).toContain('PLAN/TODO'))
   })
 })
 
@@ -104,29 +95,26 @@ describe('RightRail docsInMain (#1455 items 2/3)', () => {
     await Promise.resolve()
   })
 
-  test('the launcher owning Docs/History withholds both tabs and skips their reads', async () => {
+  test('the launcher owning Docs withholds its tab and skips its read', async () => {
     render(<RightRail {...baseProps} files={['a.ts']} docsInMain />)
     await settle()
     expect(screen.queryByRole('tab', { name: /docs/i })).toBeNull()
-    expect(screen.queryByRole('tab', { name: /history/i })).toBeNull()
-    // Withheld means not even asked for: the main column polls these itself.
+    // Withheld means not even asked for: the main column polls it itself.
     expect(onDocs).not.toHaveBeenCalled()
-    expect(onProjectLog).not.toHaveBeenCalled()
     // The rest of the rail is untouched.
     expect(screen.getByRole('tab', { name: /files/i })).toBeTruthy()
   })
 
-  test('with only Docs/History to offer, the launcher shows no rail at all', async () => {
+  test('with only Docs to offer, the launcher shows no rail at all', async () => {
     const { container } = render(<RightRail {...baseProps} docsInMain />)
     await settle()
     expect(container.querySelector('aside')).toBeNull()
   })
 
-  test('a session view (docsInMain off) keeps both tabs, as before', async () => {
+  test('a session view (docsInMain off) keeps the tab, as before', async () => {
     render(<RightRail {...baseProps} />)
     await settle()
     expect(screen.getByRole('tab', { name: /docs/i })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: /history/i })).toBeTruthy()
   })
 })
 
@@ -136,26 +124,16 @@ describe('RightRail empty panels (#1146)', () => {
     await Promise.resolve()
   })
 
-  test('no docs, no Docs tab', async () => {
+  test('no docs, no Docs tab — and with nothing else, no rail at all', async () => {
     onDocs.mockResolvedValue([])
-    render(<RightRail {...baseProps} />)
-    await settle()
-    expect(screen.queryByRole('tab', { name: /docs/i })).toBeNull()
-    // The panel that does have something is untouched.
-    expect(screen.getByRole('tab', { name: /history/i })).toBeTruthy()
-  })
-
-  test('nothing anywhere means no rail at all', async () => {
-    onDocs.mockResolvedValue([])
-    onProjectLog.mockResolvedValue([])
     const { container } = render(<RightRail {...baseProps} />)
     await settle()
+    expect(screen.queryByRole('tab', { name: /docs/i })).toBeNull()
     expect(container.querySelector('aside')).toBeNull()
   })
 
   test('a live surface keeps the rail even when every read comes back empty', async () => {
     onDocs.mockResolvedValue([])
-    onProjectLog.mockResolvedValue([])
     const { container } = render(<RightRail {...baseProps} views={[view]} />)
     await settle()
     expect(container.querySelector('aside')).toBeTruthy()
@@ -164,7 +142,6 @@ describe('RightRail empty panels (#1146)', () => {
 
   test('the tabs hold while the first read is still out, so switching projects does not blink', () => {
     onDocs.mockReturnValue(new Promise(() => {}))
-    onProjectLog.mockReturnValue(new Promise(() => {}))
     render(<RightRail {...baseProps} />)
     // Not yet known to be empty is not the same as known to be empty.
     expect(screen.getByRole('tab', { name: /docs/i })).toBeTruthy()

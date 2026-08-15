@@ -1,7 +1,6 @@
 import { findRun, readLiveMetas, readAllRuns, loadRunEvents, worktreeSize, isSafeRunId, startedAtFromRunId, type RunMeta } from '../store/index.js'
 import { loadUserSystemPrompt } from '../system-prompt-file.js'
 import { listProjectWorktrees } from '../worktrees.js'
-import { readLogs, type LogEntry } from '../logs.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
 import { readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta } from '../dashboard/tickets.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
@@ -192,11 +191,6 @@ export async function onTicketsMeta(projectId: string): Promise<TicketsMeta> {
 /** Every registered project's tickets, one list per project (#1144): the cross-project Tickets page. */
 export async function onAllTickets(): Promise<ProjectTickets[]> {
   return withProjects(collectAllTickets)
-}
-
-/** The committed `.the-framework/LOGS.md` entries, newest-first (or `[]`). */
-export async function onProjectLog(projectId: string): Promise<LogEntry[]> {
-  return withProject(projectId, readLogs, [])
 }
 
 /** The aggregated open TODO queue across every registered project (#438), most-open first. */

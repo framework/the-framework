@@ -2,7 +2,6 @@
 
 ## Priority 5
 
-- [Discord mirror: read agent replies from events.jsonl](tickets/2026-07-28_discord-mirror-read-events.md) — change `discord/reply-mirror.ts` to read `driver` `text` events from `events.jsonl` instead of polling/diffing `conversations/<runId>.md`. Zero open questions; unblocks the #1344/#1345 chain.
 
 ## Priority 4
 

@@ -147,16 +147,13 @@ const TODO_FORMAT_HEADING = 'TODO_AGENTS.md'
  * {@link systemPromptBlock} renders as the `Context:` bullets. A superset of
  * {@link BUSINESS_KNOWLEDGE_DOCS}: it adds `GOAL.md`, `BUSINESS_LOGIC.md`, and the
  * roadmap/queue/history pointers the agent reads but does *not* fold knowledge back into —
- * `tickets/**.md` (the potential work, whose file shape is the `Ticketing format` spec, #684/#674),
- * the `TODO_AGENTS.md` task queue (whose
- * shape is the `TODO_AGENTS.md` spec, #880), and the committed conversations (#683/#908). Repo-root
+ * `tickets/**.md` (the potential work, whose file shape is the `Ticketing format` spec, #684/#674)
+ * and the `TODO_AGENTS.md` task queue (whose shape is the `TODO_AGENTS.md` spec, #880). Repo-root
  * paths, because that is the agent's cwd. README is left out: a repo's own `README.md` already
  * covers the overview.
  *
  * The two format-bearing bullets point at {@link CONTEXT_FORMATS}, which travels in the same
- * channel, rather than at a file the agent has to go and open (#1163). The
- * `.the-framework/conversations/` path is spelled out rather than imported so this module stays
- * free of `node:fs` (it renders in the browser, #520); a test pins it to the canonical constants.
+ * channel, rather than at a file the agent has to go and open (#1163).
  */
 export const CONTEXT_DOCS: readonly ContextDoc[] = [
   DECISIONS_DOC,
@@ -174,10 +171,6 @@ export const CONTEXT_DOCS: readonly ContextDoc[] = [
   // The catch-all (#683): any other file the agent parks under knowledge-base/.
   { path: 'knowledge-base/**.md', comment: 'more files holding knowledge related to the project' },
   { path: 'tickets/**.md', comment: `things to potentially work on; format: the "${TICKET_FORMAT_HEADING}" section below` },
-  // Recorded human conversations (#683/#908): the run committed each Discord/chat turn here, so a
-  // future agent can read what was said. A read-only pointer, so it stays out of BUSINESS_KNOWLEDGE_DOCS.
-  // Path inlined to keep this module node-free; pinned to THE_FRAMEWORK_DIR/CONVERSATIONS_DIR by a test.
-  { path: '.the-framework/conversations/**.md', comment: 'conversations between humans, recorded by agents (e.g. the agent Discord bot)' },
   { path: 'TODO_AGENTS.md', comment: `the AI task queue; format: the "${TODO_FORMAT_HEADING}" section below` },
 ]
 

@@ -2,7 +2,6 @@ import { basename } from 'node:path'
 import { listProjects, type ProjectRecord } from '../registry.js'
 import { isActivated } from '../project.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from '../config.js'
-import { readLogs, type LogEntry } from '../logs.js'
 import { readAllRuns, type RunMeta } from '../store/index.js'
 
 /**
@@ -23,7 +22,7 @@ export interface ProjectSummary {
   name: string
   /** True when the repo still has its `.the-framework/` marker. */
   activated: boolean
-  /** ISO timestamp of the project's newest activity: the latest `LOGS.md` entry or run, whichever is newer. */
+  /** ISO timestamp of the project's newest activity: its most recent session. */
   lastActivityAt?: string
   /**
    * The repo's committed run defaults from `the-framework.yml` (#842), so the launcher can show
@@ -37,7 +36,6 @@ export interface ProjectSummary {
 /** Injectable readers so {@link summarizeProject} is unit-testable off disk. */
 export interface SummarizeDeps {
   isActivated?: (path: string) => Promise<boolean>
-  readLogs?: (path: string) => Promise<LogEntry[]>
   /** The project's runs (live + archived), newest-first. Defaults to {@link readAllRuns}. */
   readRuns?: (path: string) => Promise<RunMeta[]>
   /** The repo's `the-framework.yml` (#842). Defaults to {@link loadFrameworkConfig}. */
@@ -47,25 +45,25 @@ export interface SummarizeDeps {
 /** A project's runs, live prepended to the archived history. Forgiving: a failed read is `[]`. */
 /**
  * Derive a {@link ProjectSummary} from a registry record: its display name, whether
- * it is still activated, and its last activity (the newest `LOGS.md` entry, since
- * {@link readLogs} returns newest-first). Forgiving: a failed read reads as an
+ * it is still activated, and its last activity. Forgiving: a failed read reads as an
  * inactive project with no activity, never a throw.
+ *
+ * Activity is the sessions themselves (B3). It used to be the newest of those and the latest
+ * `LOGS.md` entry — a committed markdown re-narration of the same sessions, which could only ever
+ * be older than the run it described.
  */
 export async function summarizeProject(record: ProjectRecord, deps: SummarizeDeps = {}): Promise<ProjectSummary> {
   const checkActivated = deps.isActivated ?? isActivated
-  const loadLogs = deps.readLogs ?? readLogs
   const loadRuns = deps.readRuns ?? readAllRuns
   const loadFileConfig = deps.readFileConfig ?? (path => loadFrameworkConfig(path))
   const activated = await checkActivated(record.path).catch(() => false)
-  const [logs, runs, fileConfig] = await Promise.all([
-    loadLogs(record.path).catch(() => [] as LogEntry[]),
+  const [runs, fileConfig] = await Promise.all([
     loadRuns(record.path).catch(() => [] as RunMeta[]),
     loadFileConfig(record.path).catch(() => ({}) as FrameworkFileConfig),
   ])
-  // Newest of the latest LOGS.md entry and the latest run: a run is activity even
-  // when it stopped before writing to LOGS.md. ISO timestamps sort chronologically.
+  // ISO timestamps sort chronologically.
   const runActivity = runs.map(r => r.updatedAt || r.startedAt).filter(Boolean)
-  const lastActivityAt = [logs[0]?.at, ...runActivity].filter((a): a is string => !!a).sort().at(-1)
+  const lastActivityAt = runActivity.filter((a): a is string => !!a).sort().at(-1)
   const summary: ProjectSummary = {
     id: record.id,
     path: record.path,

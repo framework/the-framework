@@ -3,8 +3,7 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { enumerateGitRepos, installProject, type DirLister } from './install.js'
 import { PRESETS, PRESET_DIR } from './presets.js'
-import { logsPath, readLogs, LOGS_HEADER, gitignorePath, LOGS_GITIGNORE } from './logs.js'
-import { CONVERSATIONS_GITIGNORE } from './conversations.js'
+import { frameworkGitignore, gitignorePath } from './framework-gitignore.js'
 import type { GitRunner } from './project.js'
 import type { StoreFs } from './store/index.js'
 
@@ -55,12 +54,12 @@ function fakeGit(script: (args: string[], cwd: string) => Promise<string> | stri
 
 const CWD = '/proj'
 
-test('installProject on a clean repo seeds the log and makes exactly one install commit', async () => {
+test('installProject on a clean repo seeds the ignore file and makes exactly one install commit', async () => {
   const fs = memFs()
   const { git, calls } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : ''))
 
   assert.deepEqual(await installProject(CWD, { git, fs }), { ok: true })
-  assert.equal(fs.files.get(logsPath(CWD)), LOGS_HEADER)
+  assert.equal(fs.files.get(gitignorePath(CWD)), frameworkGitignore())
 
   const commits = calls.filter(args => args[0] === 'commit')
   assert.deepEqual(commits, [['commit', '-m', '[The Framework] install The Framework']])
@@ -75,27 +74,20 @@ test('installProject materializes the quality presets so an on-before-mergeable 
   }
 })
 
-test('installProject seeds .the-framework/.gitignore so only the DB is committed (#313)', async () => {
-  const fs = memFs()
-  const { git } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : ''))
-
-  await installProject(CWD, { git, fs })
-  assert.equal(fs.files.get(gitignorePath(CWD)), LOGS_GITIGNORE + CONVERSATIONS_GITIGNORE)
-  // The ignore keeps run state (events.jsonl / run.json / runs/) untracked while committing LOGS.md.
-  assert.match(LOGS_GITIGNORE, /^\*$/m)
-  assert.match(LOGS_GITIGNORE, /^!LOGS\.md$/m)
-})
-
-test('a fresh install already un-ignores the conversations dir (#908)', async () => {
+test('installProject seeds .the-framework/.gitignore so only the archive is committed (#313/#1179)', async () => {
   const fs = memFs()
   const { git } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : ''))
 
   await installProject(CWD, { git, fs })
   const ignore = fs.files.get(gitignorePath(CWD)) ?? ''
-  // Both rules: `*` makes git skip the dir without descending, so un-ignoring the files alone
-  // would never be reached.
-  assert.match(ignore, /^!conversations\/$/m)
-  assert.match(ignore, /^!conversations\/\*\*$/m)
+  // Run state (events.jsonl / run.json / runs/) stays untracked...
+  assert.match(ignore, /^\*$/m)
+  // ...and the session archive is un-ignored all the way down, since git never descends into an
+  // ignored directory. Written whole at install (B3): with one record there is one content, so
+  // nothing has to be appended to it later.
+  assert.match(ignore, /^!\*\/$/m)
+  assert.match(ignore, /^!\*\/sessions\/$/m)
+  assert.match(ignore, /^!\*\/sessions\/\*\*$/m)
 })
 
 test('installProject on a dirty repo commits the pre-existing changes first', async () => {
@@ -112,7 +104,7 @@ test('installProject on a dirty repo commits the pre-existing changes first', as
 })
 
 test('installProject on an already-activated repo is a no-op that never calls git', async () => {
-  const fs = memFs({ [logsPath(CWD)]: LOGS_HEADER })
+  const fs = memFs({ [gitignorePath(CWD)]: frameworkGitignore() })
   const { git, calls } = fakeGit(() => '')
 
   assert.deepEqual(await installProject(CWD, { git, fs }), { ok: true, alreadyActivated: true })
@@ -142,15 +134,6 @@ test('installProject initializes a git repo when the folder is not one yet, then
   assert.ok(calls.some(args => args[0] === 'init'), 'ran git init')
   const commits = calls.filter(args => args[0] === 'commit').map(args => args[2])
   assert.deepEqual(commits, ['[The Framework] install The Framework'])
-})
-
-test('the seeded LOGS.md is a valid empty log', async () => {
-  const fs = memFs()
-  const { git } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : ''))
-
-  await installProject(CWD, { git, fs })
-  assert.equal(fs.files.get(logsPath(CWD)), LOGS_HEADER)
-  assert.deepEqual(await readLogs(CWD, fs), [])
 })
 
 test('enumerateGitRepos keeps only children that are their own repo roots, sorted', async () => {

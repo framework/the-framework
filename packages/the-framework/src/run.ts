@@ -2,7 +2,7 @@ import type { Driver, DriverSession } from './driver/index.js'
 import { composeRunSystem, renderSystemPrompt, type TfContext } from './system-prompt.js'
 import { createRunControls, emitSessionStart, endStopDetail } from './run-telemetry.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
-import { runAwaitRounds, type BindProjectDeps, type RecordMessage } from './await-gate.js'
+import { runAwaitRounds, type BindProjectDeps } from './await-gate.js'
 import { leaveResumeNote, runTodoLoop, type TodoLoopResult } from './todo-loop.js'
 import { buildPrompt, extendPrompt, isWorkspaceEmpty, scaffoldPrompt } from './steps.js'
 import { type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
@@ -132,8 +132,6 @@ export interface RunSessionOptions {
    * through, so ending would leave its composer a dead end.
    */
   stayOpenChat?: boolean
-  /** Record each chat turn to the committed conversation (#908). Best-effort; unset = not recorded. */
-  recordMessage?: RecordMessage
   /** Observe the unified event stream. */
   onEvent?: (event: FrameworkEvent) => void
 }
@@ -243,7 +241,6 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
       // Chat comes after the backlog for a build, so it is wired below rather than here.
       ...(opts.messages && (kind === 'prompt' || handsOff) ? { messages: opts.messages } : {}),
       ...(opts.stayOpenChat ? { stayOpenChat: true } : {}),
-      ...(opts.recordMessage ? { recordMessage: opts.recordMessage } : {}),
     })
     // The agent kept asking past the limit: finish with the latest turn rather than loop.
     if (rounds.exhausted) emit({ kind: 'log', message: 'Finishing the session (await limit reached).' })
@@ -355,7 +352,6 @@ async function runChatAfterBacklog(
       emit,
       emitTurnSignals,
       signal,
-      ...(opts.recordMessage ? { recordMessage: opts.recordMessage } : {}),
     },
     opts.stayOpenChat === true,
   )

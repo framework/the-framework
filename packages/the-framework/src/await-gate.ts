@@ -231,22 +231,9 @@ export interface AwaitRoundsOptions {
    * conversation (full prior context) instead of starting fresh. Default off.
    */
   resume?: boolean | undefined
-  /**
-   * Record a chat turn to the committed conversation (#908). Best-effort and fire-and-forget:
-   * persisting must never stall or fail a run. Unset for a headless run, which has no chat.
-   */
-  recordMessage?: RecordMessage | undefined
   /** The bind seams for a project-less topic run (#1121); absent for every other run. */
   bind?: BindProjectDeps | undefined
 }
-
-/**
- * Persist one chat turn. See {@link AwaitRoundsOptions.recordMessage}.
- *
- * `via` names the surface the turn happened on (#917). Omitted, the recorder falls back to the
- * run's own surface, which is what every turn did before a message could arrive from elsewhere.
- */
-export type RecordMessage = (role: 'user' | 'agent', text: string, via?: string) => void
 
 /** The shared deps of a turn that may hit an await gate or a chat message. */
 export interface AwaitTurnDeps {
@@ -254,7 +241,6 @@ export interface AwaitTurnDeps {
   emit: (event: FrameworkEvent) => void
   emitTurnSignals: (text: string) => void
   signal?: AbortSignal | undefined
-  recordMessage?: RecordMessage | undefined
   /** The bind seams for a project-less topic run (#1121); absent for every other run. */
   bind?: BindProjectDeps | undefined
 }
@@ -333,16 +319,11 @@ export async function runChatPhase(session: DriverSession, messages: RunMessages
     if (message === undefined) return { turn, exhausted } // idle queue / Stop / budget cap: end the conversation.
     // The message shows in the feed as the driver's own `start` event (the YOU row), so it is not
     // echoed as a separate log line — that only duplicated it.
-    deps.recordMessage?.('user', message.text, message.via)
     turn = await session.prompt(message.text, { ...signalOpt, resume: true })
     deps.emitTurnSignals(turn.text)
     const drained = await drainGates(turn, deps, promptContinuation(session, deps))
     turn = drained.turn
     exhausted = drained.exhausted
-    // The settled text, so the recorded reply is what the user actually read (#908). Attributed to
-    // the surface that asked (#917): a reply belongs to the conversation it answers, so a Discord
-    // question and its answer read as one exchange rather than two different places.
-    deps.recordMessage?.('agent', turn.text, message.via)
     if (drained.declined) return { turn, exhausted }
   }
 }
@@ -365,19 +346,15 @@ export async function runAwaitRounds(opts: AwaitRoundsOptions): Promise<AwaitRou
     emit,
     emitTurnSignals,
     signal: opts.signal,
-    recordMessage: opts.recordMessage,
     bind: opts.bind,
   }
   const signalOpt = opts.signal ? { signal: opts.signal } : {}
 
   // Resuming a finished run (#720): the opening message continues the seeded session, so the
   // agent replies with full prior context. A fresh run leaves `resume` unset — unchanged.
-  // The opening exchange opens the conversation too, so it is recorded like any other turn (#908).
-  opts.recordMessage?.('user', opts.prompt)
   const opening = await session.prompt(opts.prompt, { ...signalOpt, ...(opts.resume ? { resume: true } : {}) })
   emitTurnSignals(opening.text)
   const drained = await drainGates(opening, deps, promptContinuation(session, deps))
-  opts.recordMessage?.('agent', drained.turn.text)
   if (drained.declined) return { text: drained.turn.text, declined: true, exhausted: false }
 
   // Live chat (#714): take the user's messages — draining what queued and ending on idle, or

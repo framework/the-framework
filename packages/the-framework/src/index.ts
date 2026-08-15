@@ -112,48 +112,23 @@ export {
   type RunStatus,
   type OpenStoreOptions,
 } from './store/index.js'
+export { THE_FRAMEWORK_DIR } from './framework-dir.js'
+export { gitignorePath, frameworkGitignore, sessionsGitignore, SESSIONS_RULE } from './framework-gitignore.js'
 export {
-  logsPath,
-  gitignorePath,
-  renderLogEntry,
-  parseLogs,
-  appendLog,
-  readLogs,
-  THE_FRAMEWORK_DIR,
-  LOGS_FILE,
-  LOGS_GITIGNORE,
-  type LogEntry,
-} from './logs.js'
-export {
-  conversationPath,
-  conversationsDir,
-  renderMessage,
-  parseConversation,
-  appendMessage,
-  readConversation,
-  listConversations,
-  ensureConversationsIgnored,
-  CONVERSATIONS_DIR,
-  CONVERSATIONS_GITIGNORE,
-  type ConversationMessage,
-  type ConversationRole,
-} from './conversations.js'
-export {
-  startConversationCommitter,
-  commitConversations,
-  pendingConversations,
+  startSessionCommitter,
+  commitSessions,
+  pendingSessions,
   gitBusy,
   commitMessage,
   nodePathProbe,
-  pathspecsFor,
-  CONVERSATIONS_PATHSPEC,
+  SESSIONS_PATHSPEC,
   COMMIT_POLL_MS,
   COMMIT_MAX_WAIT_MS,
-  type ConversationCommitter,
-  type ConversationCommitterOptions,
+  type SessionCommitter,
+  type SessionCommitterOptions,
   type CommitOutcome,
   type PathProbe,
-} from './conversation-commit.js'
+} from './session-commit.js'
 export {
   theFrameworkDir,
   isActivated,

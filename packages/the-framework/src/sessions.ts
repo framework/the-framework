@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
-import { gitignorePath, LOGS_GITIGNORE } from './logs.js'
+import { frameworkGitignore, gitignorePath, sessionsGitignore, SESSIONS_RULE } from './framework-gitignore.js'
 import { nodeStoreFs, SESSIONS_DIR, type StoreFs } from './store/index.js'
 import { nodeGitRunner, type GitRunner } from './project.js'
 
@@ -57,76 +57,24 @@ export function sessionsDir(cwd: string, user: string): string {
 }
 
 /**
- * The `.the-framework/.gitignore` rules that make every user's sessions tracked. Three lines, not
- * one: the seeded allow-list ignores everything with `*`, and git never descends into an ignored
- * directory, so each directory on the way down has to be re-included before the files under it can
- * be. Same shape as the conversations rules (#908), which this sits beside.
- *
- * User-agnostic on purpose (#1312). Naming each user meant every person who ever ran a session in
- * the repo appended their own three lines to a *tracked* file: their checkout went dirty, the next
- * safety commit swept the edit into a branch, and two machines doing it near each other conflicted.
- * A glob covers everyone, including people who have not run anything yet, so the file is written
- * once and then never again.
- *
- * A star matches one path segment and never a slash, so the sessions rule reaches exactly
- * `<user>/sessions/` and not `worktrees/<run>/sessions/`. The transient siblings stay ignored
- * either way: un-ignoring a directory only lets git descend into it, and the bare `*` still
- * ignores every file it finds there.
- */
-export function sessionsGitignore(): string {
-  return `!*/\n!*/${SESSIONS_DIR}/\n!*/${SESSIONS_DIR}/**\n`
-}
-
-/** The glob rule whose presence means a file is already on the #1312 form. */
-const GLOB_RULE = `!*/${SESSIONS_DIR}/**`
-
-/** `!<user>/`, `!<user>/sessions/` and `!<user>/sessions/**` for one named user. */
-function perUserRules(user: string): readonly string[] {
-  return [`!${user}/`, `!${user}/${SESSIONS_DIR}/`, `!${user}/${SESSIONS_DIR}/**`]
-}
-
-/**
- * Drop the per-user session rules, keeping every other line.
- *
- * Only users the file actually names a `sessions` rule for are stripped, and only those three
- * exact lines. The conversations rules (#908) are a literal directory name rather than a user, so
- * they never match, and a hand-written rule this does not recognize is left where it is.
- */
-export function withoutPerUserRules(md: string): string {
-  const lines = md.split('\n')
-  const users = lines
-    .map(line => /^!(.+)\/sessions\/\*\*$/.exec(line.trim())?.[1])
-    .filter((user): user is string => user !== undefined && user !== '*')
-  if (!users.length) return md
-  const drop = new Set(users.flatMap(perUserRules))
-  return lines.filter(line => !drop.has(line.trim())).join('\n')
-}
-
-/**
  * Make sure `.the-framework/.gitignore` un-ignores archived sessions, returning whether it wrote.
- * Done lazily on archive rather than at install time: the ignore file is seeded once and only when
- * absent, so every repo activated before this feature carries the old allow-list.
  *
- * Writes at most twice in a repo's life, and usually once: a file already on the glob form is left
- * alone, and a file still naming users is upgraded to the glob form in place — the per-user lines
- * come out in the same write that puts the glob in, so the churn (#1312) ends rather than being
- * added to. `user` no longer selects the rules; it stays because the caller has it and a future
- * rule may need it again.
+ * Install writes the whole file, so this is the repair for a repo that predates the rules: it
+ * writes when the file is missing entirely, and otherwise only when the sessions rule is absent —
+ * a file that already has it is left exactly as it is, hand edits and all.
  *
- * Only a file we recognize is touched; anything hand-edited beyond recognition is left alone.
+ * `user` no longer selects the rules (#1312) — the glob covers everyone — but it stays because the
+ * caller has it and a future rule may need it again.
  */
 export async function ensureSessionsIgnored(cwd: string, _user: string, fs: StoreFs = nodeStoreFs()): Promise<boolean> {
   const path = gitignorePath(cwd)
-  const rules = sessionsGitignore()
   if (!(await fs.exists(path))) {
-    await fs.write(path, LOGS_GITIGNORE + rules)
+    await fs.write(path, frameworkGitignore())
     return true
   }
   const current = await fs.read(path)
-  if (current.includes(GLOB_RULE)) return false
-  if (!current.includes('!LOGS.md')) return false
-  const pruned = withoutPerUserRules(current)
-  await fs.write(path, pruned.endsWith('\n') ? pruned + rules : pruned + '\n' + rules)
+  if (current.includes(SESSIONS_RULE)) return false
+  await fs.write(path, current.endsWith('\n') ? current + sessionsGitignore() : current + '\n' + sessionsGitignore())
   return true
 }
 

@@ -2,7 +2,6 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { summarizeProject, type SummarizeDeps } from './projects.js'
 import type { ProjectRecord } from '../registry.js'
-import type { LogEntry } from '../logs.js'
 import { RUN_META_VERSION, type RunMeta } from '../store/index.js'
 
 const RECORD: ProjectRecord = { id: 'app-a-1', path: '/repos/app-a', addedAt: '2026-07-11T00:00:00.000Z' }
@@ -10,7 +9,6 @@ const RECORD: ProjectRecord = { id: 'app-a-1', path: '/repos/app-a', addedAt: '2
 function deps(over: SummarizeDeps): SummarizeDeps {
   return {
     isActivated: async () => true,
-    readLogs: async () => [],
     readRuns: async () => [],
     readFileConfig: async () => ({}),
     ...over,
@@ -32,21 +30,9 @@ test('summarizeProject derives name from the path basename', async () => {
   assert.equal(summary.path, '/repos/app-a')
 })
 
-test('lastActivityAt is the newest LOGS.md entry (readLogs is newest-first)', async () => {
-  const logs: LogEntry[] = [
-    { at: '2026-07-11T10:00:00.000Z', kind: 'build', title: 'newest', status: 'done' },
-    { at: '2026-07-10T09:00:00.000Z', kind: 'prompt', title: 'older', status: 'done' },
-  ]
-  const summary = await summarizeProject(RECORD, deps({ readLogs: async () => logs }))
-  assert.equal(summary.lastActivityAt, '2026-07-11T10:00:00.000Z')
-})
-
-test('no log entries means no lastActivityAt key at all', async () => {
-  const summary = await summarizeProject(RECORD, deps({ readLogs: async () => [] }))
-  assert.equal('lastActivityAt' in summary, false)
-})
-
-test('lastActivityAt falls back to the newest run when there are no LOGS.md entries (#645)', async () => {
+test('lastActivityAt is the newest run (#645)', async () => {
+  // The sessions are the history (B3). It used to be the newest of these and the latest LOGS.md
+  // entry — a committed markdown re-narration of the same sessions, always the older of the two.
   const summary = await summarizeProject(
     RECORD,
     deps({ readRuns: async () => [run('b', '2026-07-12T00:00:00.000Z'), run('a', '2026-07-10T00:00:00.000Z')] }),
@@ -54,18 +40,9 @@ test('lastActivityAt falls back to the newest run when there are no LOGS.md entr
   assert.equal(summary.lastActivityAt, '2026-07-12T00:00:00.000Z')
 })
 
-test('lastActivityAt is the newest of LOGS.md and runs, either way (#645)', async () => {
-  const newerRun = deps({
-    readLogs: async () => [{ at: '2026-07-11T00:00:00.000Z', kind: 'build', title: 'log', status: 'done' }],
-    readRuns: async () => [run('x', '2026-07-14T00:00:00.000Z')],
-  })
-  assert.equal((await summarizeProject(RECORD, newerRun)).lastActivityAt, '2026-07-14T00:00:00.000Z')
-
-  const newerLog = deps({
-    readLogs: async () => [{ at: '2026-07-20T00:00:00.000Z', kind: 'build', title: 'log', status: 'done' }],
-    readRuns: async () => [run('x', '2026-07-14T00:00:00.000Z')],
-  })
-  assert.equal((await summarizeProject(RECORD, newerLog)).lastActivityAt, '2026-07-20T00:00:00.000Z')
+test('no runs means no lastActivityAt key at all', async () => {
+  const summary = await summarizeProject(RECORD, deps({ readRuns: async () => [] }))
+  assert.equal('lastActivityAt' in summary, false)
 })
 
 test('activation reflects the injected check', async () => {
@@ -80,7 +57,7 @@ test('a throwing reader is forgiving: inactive, no activity, never throws', asyn
       isActivated: async () => {
         throw new Error('stat failed')
       },
-      readLogs: async () => {
+      readRuns: async () => {
         throw new Error('read failed')
       },
     }),

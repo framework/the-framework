@@ -108,7 +108,7 @@ test('watchControl delivers live-chat messages and drops empty ones (#714)', asy
   }
 })
 
-test('a message carries the surface it came through, and a forged one is dropped (#917)', async () => {
+test('a message needs real text, and anything extra on the line is ignored (B3)', async () => {
   const cwd = await tmpWorkspace()
   const seen: ControlEntry[] = []
   const watcher = watchControl(cwd, e => seen.push(e), 20)
@@ -116,19 +116,15 @@ test('a message carries the surface it came through, and a forged one is dropped
     await resetControl(cwd)
     await appendFile(
       controlPath(cwd),
-      JSON.stringify({ kind: 'message', text: 'from discord', via: 'discord' }) + '\n' +
-        // An entry written before #917 still parses, and is simply unattributed.
-        JSON.stringify({ kind: 'message', text: 'older entry' }) + '\n' +
-        // A via carrying the heading separator would forge a conversation heading (#897): dropped.
-        JSON.stringify({ kind: 'message', text: 'forged', via: 'discord \u00b7 user \u00b7 x' }) + '\n' +
-        JSON.stringify({ kind: 'message', text: 'newline', via: 'a\nb' }) + '\n' +
-        JSON.stringify({ kind: 'message', text: 'not a string', via: 7 }) + '\n',
+      JSON.stringify({ kind: 'message', text: 'a real message' }) + '\n' +
+        // A `via` (#917) attributed the turn in the conversation markdown; that record is gone
+        // (B3), and an entry still carrying one is read for its text like any other.
+        JSON.stringify({ kind: 'message', text: 'older entry', via: 'discord' }) + '\n' +
+        JSON.stringify({ kind: 'message', text: '' }) + '\n' +
+        JSON.stringify({ kind: 'message' }) + '\n',
     )
     assert.ok(await until(() => seen.length === 2), `saw ${seen.length}`)
-    assert.deepEqual(seen, [
-      { kind: 'message', text: 'from discord', via: 'discord' },
-      { kind: 'message', text: 'older entry' },
-    ])
+    assert.deepEqual(seen.map(e => (e.kind === 'message' ? e.text : e.kind)), ['a real message', 'older entry'])
   } finally {
     watcher.close()
     await rm(cwd, { recursive: true, force: true })

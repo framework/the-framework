@@ -2,7 +2,7 @@ import { cliRunner, type CliRunner } from './cli-exec.js'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { nodeFs } from './node-fs.js'
-import { THE_FRAMEWORK_DIR } from './logs.js'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 /**
  * Project-level repo helpers (#380): the `.the-framework/` activation marker

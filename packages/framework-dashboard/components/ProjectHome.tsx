@@ -4,7 +4,6 @@ import { ProjectActions } from './ProjectActions.js'
 import { RunOverview } from './RunOverview.js'
 import { OpenQuestions } from './OpenQuestions.js'
 import { ProjectDocs } from './ProjectDocs.js'
-import { ProjectHistory } from './ProjectHistory.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
 // The project home / launcher — what "Live" selects. Always the Start form + preset cards +
@@ -57,7 +56,6 @@ export function ProjectHome({
       {events.length > 0 && <RunOverview events={events} />}
       <OpenQuestions onOpenSession={onOpenSession} />
       <ProjectDocs projectId={projectId} />
-      <ProjectHistory projectId={projectId} />
     </ScrollArea>
   )
 }

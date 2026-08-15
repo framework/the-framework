@@ -1,6 +1,5 @@
 import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { isSafeVia } from './conversations.js'
 import type { ChoiceBy } from './events.js'
 import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { FRAMEWORK_DIR } from './store/index.js'
@@ -24,14 +23,8 @@ export type ControlEntry =
   | { kind: 'stop' }
   /** Resolve a parked choice gate: the pick for the pending {@link ChoiceRequest} id. */
   | { kind: 'choice'; id: string; pick: string | string[]; by: ChoiceBy }
-  /**
-   * A live-chat message the user sent to the running run (#714).
-   *
-   * `via` names the surface it came through (#917), so the conversation records where it happened
-   * rather than assuming the local one. Optional: entries written before this existed still parse,
-   * and a run reading one falls back to its own surface exactly as before.
-   */
-  | { kind: 'message'; text: string; via?: string }
+  /** A live-chat message the user sent to the running run (#714). */
+  | { kind: 'message'; text: string }
   /**
    * Move the end-of-session handoff (#1102): how far this session publishes itself when it
    * finishes — keep it local, push the branch, open a PR, merge it.
@@ -114,12 +107,7 @@ function isControlEntry(value: unknown): value is ControlEntry {
   if (v['kind'] === 'handoff') return isHandoffLevel(v['level'])
   // A bind needs a non-empty projectId; it decides which project the run re-homes into (#1121).
   if (v['kind'] === 'bind') return typeof v['projectId'] === 'string' && v['projectId'].length > 0
-  // `via` is optional (older entries have none), but a present one must be a safe transport name:
-  // it is written into a line-parsed conversation heading, and a surface names itself (#917).
-  if (v['kind'] === 'message') {
-    if (typeof v['text'] !== 'string' || v['text'].length === 0) return false
-    return v['via'] === undefined || isSafeVia(v['via'])
-  }
+  if (v['kind'] === 'message') return typeof v['text'] === 'string' && v['text'].length > 0
   if (v['kind'] !== 'choice') return false
   if (typeof v['id'] !== 'string' || !v['id']) return false
   const pick = v['pick']

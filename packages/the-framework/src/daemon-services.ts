@@ -19,10 +19,9 @@ import { acquireTicketLocks } from './ticket-locks.js'
 import { readTickets } from './dashboard/tickets.js'
 import { cachedOpenPrFilePatches } from './dashboard/gh.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
-import { startConversationCommitter } from './conversation-commit.js'
+import { startSessionCommitter } from './session-commit.js'
 import { startMergedWorktreeSweep } from './merged-worktrees.js'
 import { resolveRunPr } from './dashboard/run-handoff.js'
-import { readConversation } from './conversations.js'
 import { sendChoice, sendMessage, sendStop } from './dashboard-rpc/control.telefunc.js'
 import type { ProjectSummary } from './dashboard/projects.js'
 import type { QuotaSource } from './dashboard/quota.js'
@@ -48,10 +47,10 @@ export interface BackgroundServices {
    */
   quiesce: () => void
   /**
-   * Commit whatever conversation the shutdown just ended (#912), after the runs have been stopped
-   * so their last turns are on disk. Returns how many projects were committed.
+   * Commit whatever the shutdown just archived (#912/#1179), after the runs have been stopped so
+   * their last events are on disk. Returns how many projects were committed.
    */
-  flushConversations: () => Promise<number>
+  flushSessions: () => Promise<number>
   /**
    * Rebuild the Discord services against freshly-read credentials (#1095), so a token pasted into
    * the dashboard takes effect now rather than at the next daemon start. Idempotent and safe to
@@ -243,11 +242,11 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   // when it should be spending. Cheap and silent when the setting is off — it reads it and stops.
   void autoPm.tick().catch(() => {})
 
-  // Commit the conversations recorded on the main checkout (#912). A run's own worktree already
-  // sweeps its transcript on teardown; nothing did the same for a chat held in the checkout itself,
-  // so it sat as an uncommitted change until a human noticed. Path-scoped and debounced, and it
-  // skips a repo that is mid-rebase or index-locked rather than committing into someone's work.
-  const conversationCommitter = startConversationCommitter({ projects, log })
+  // Commit the session archives written into the main checkout (#912/#1179). A run's own worktree
+  // sweeps its archive on teardown; nothing did the same for one held in the checkout itself, so it
+  // sat as an uncommitted change until a human noticed. Path-scoped and debounced, and it skips a
+  // repo that is mid-rebase or index-locked rather than committing into someone's work.
+  const sessionCommitter = startSessionCommitter({ projects, log })
 
   // Watch the PRs the framework is waiting to land (#1418): merge a `watched` PR once its checks
   // pass (the #1417/#1406 answer for repos without GitHub auto-merge), and put an agent on a
@@ -363,11 +362,11 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // The CI watch can start fix runs, so it stops with the other run-starters.
       ciWatch.stop()
       mergedWorktrees.stop()
-      // Stop the timer here, so `flushConversations` below is a single flush past the idle window
+      // Stop the timer here, so `flushSessions` below is a single flush past the idle window
       // rather than a wait for a poll that is no longer coming.
-      conversationCommitter.stop()
+      sessionCommitter.stop()
     },
-    flushConversations: () => conversationCommitter.flush().catch(() => 0),
+    flushSessions: () => sessionCommitter.flush().catch(() => 0),
     reloadDiscord,
     // Awaitable (#1433) so the trigger button can wait for the sweep's answer; a caller that
     // does not care simply drops the promise. The plain wake is safe to call when the preference

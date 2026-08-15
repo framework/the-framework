@@ -17,15 +17,9 @@
 
 /**
  * One user chat message, plus the surface it arrived through (#917).
- *
- * The origin travels with the text rather than being read off the run, because one run can be
- * spoken to from more than one surface: a session started in the dashboard and then answered from
- * Discord is a single conversation whose turns have different origins.
  */
 export interface ChatMessage {
   text: string
-  /** The originating surface, when the sender named one. Absent means "the run's own surface". */
-  via?: string
 }
 
 /** A source of user chat messages for a running run. */
@@ -55,13 +49,10 @@ export class RunMessageQueue implements RunMessages {
   private readonly waiters: Array<(message: ChatMessage | undefined) => void> = []
   private closed = false
 
-  /**
-   * Enqueue a user message (or hand it to a parked waiter). No-op once closed. `via` names the
-   * surface it came through (#917); omitted, the run attributes it to its own.
-   */
-  push(text: string, via?: string): void {
+  /** Enqueue a user message (or hand it to a parked waiter). No-op once closed. */
+  push(text: string): void {
     if (this.closed) return
-    const message: ChatMessage = via === undefined ? { text } : { text, via }
+    const message: ChatMessage = { text }
     const waiter = this.waiters.shift()
     if (waiter) waiter(message)
     else this.pending.push(message)

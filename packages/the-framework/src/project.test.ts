@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { THE_FRAMEWORK_DIR } from './logs.js'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import {
   crawlRepoFiles,
   gitTimeoutMs,

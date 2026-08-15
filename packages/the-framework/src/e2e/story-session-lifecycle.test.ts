@@ -8,7 +8,6 @@ import {
   onRunHandoff,
   onRunWorktree,
   onRetainedWorktrees,
-  onProjectLog,
   onActivity,
   onRecentRuns,
 } from '../dashboard-rpc/reads.telefunc.js'
@@ -76,14 +75,12 @@ test('start a session, watch it live, and read the archived row when it ends', a
     const recent = await rpc(onRecentRuns)()
     assert.ok(recent.some(r => r.projectId === project.id && r.run.id === runId))
 
-    // The session's record rides its branch, not main: teardown commits the LOGS.md line and the
-    // conversation to the run branch, so the handoff panel sees a branch of pure bookkeeping
-    // (#1291 calls that `empty` — nothing publishable) while the committed project log stays a
-    // projection of main and shows the line only once the branch merges.
+    // The session's record rides its branch, not main: teardown commits the archive to the run
+    // branch, so the handoff panel sees a branch of pure bookkeeping — #1291 calls that `empty`,
+    // meaning nothing publishable.
     const handoff = await rpc(onRunHandoff)(project.id, runId)
     assert.equal(handoff?.exists, true)
     assert.equal(handoff?.empty, true)
-    assert.deepEqual(await rpc(onProjectLog)(project.id), [])
   } finally {
     await world.close()
   }

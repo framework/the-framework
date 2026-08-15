@@ -1,6 +1,5 @@
 import { join } from 'node:path'
 import type { ProjectSummary } from './dashboard/projects.js'
-import { CONVERSATIONS_DIR } from './conversations.js'
 import { SESSIONS_DIR } from './store/index.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { GitRunner } from './project.js'
@@ -8,37 +7,36 @@ import { nodeGitRunner } from './project.js'
 import { errorMessage } from './error-message.js'
 
 /**
- * Committing the conversations the daemon records (#912) into the project checkout.
+ * Committing the session archives the daemon writes (#912/#1179) into the project checkout.
  *
- * #908 made `.the-framework/conversations/<runId>.md` tracked files, and the paths that already
- * commit pick them up: a run's worktree sweeps its own on teardown (`store/worktree.ts`). The main
- * checkout has no such path — `install.ts` commits once at activation and nothing after — so a
- * conversation held there sat as a working-tree change until a human happened to commit it. That
- * is the one gap between "the chat is in Git" (#857) and "the chat reaches Git by itself".
+ * A run's own worktree sweeps its archive on teardown (`store/worktree.ts`). The main checkout has
+ * no such path — `install.ts` commits once at activation and nothing after — so an archive written
+ * there sat as a working-tree change until a human happened to commit it. That is the gap between
+ * "the history is in Git" and "the history reaches Git by itself".
+ *
+ * It used to carry a second pathspec, the per-run conversation markdown, and the machinery for
+ * choosing between them: a pathspec matching no file aborts the whole `git add`, so every project
+ * that had sessions but had never recorded a chat needed the other pattern dropped. With one
+ * record (B3) there is one pathspec and nothing to choose.
  *
  * Two rules shape the whole module, both about writing into a repo somebody else is using.
  *
- * Path-scoped, never `git add -A`. The pathspec names the conversations directory and nothing
- * else, the way `queue-promote.ts` names the queue file, so whatever the user has in progress
- * cannot ride along in our commit. A pathspec commit also leaves their index alone: what they had
- * staged is still staged afterwards. Scoped down further at commit time to the pathspecs that
- * actually have something pending — see {@link pathspecsFor}.
+ * Path-scoped, never `git add -A`. The pathspec names the archives and nothing else, the way
+ * `queue-promote.ts` names the queue file, so whatever the user has in progress cannot ride along
+ * in our commit. A pathspec commit also leaves their index alone: what they had staged is still
+ * staged afterwards.
  *
- * Debounced on an idle window rather than committed per turn. A chat turn is seconds apart, and a
- * commit each would bury the project's real history under transcript noise. A poll that sees the
- * same pending set twice running treats the conversation as settled and commits the batch; a burst
- * keeps resetting it. {@link ConversationCommitterOptions.maxWaitMs} caps that, so a conversation
- * that never goes idle still lands instead of being starved forever.
+ * Debounced on an idle window rather than committed per write. Archives land seconds apart, and a
+ * commit each would bury the project's real history under noise. A poll that sees the same pending
+ * set twice running treats it as settled and commits the batch; a burst keeps resetting it.
+ * {@link SessionCommitterOptions.maxWaitMs} caps that, so a project that never goes idle still
+ * lands instead of being starved forever.
  *
  * Tolerates not being alone (the #605 question this waited on). One daemon per machine is the rule
  * today (#393), but the committer never assumes it: a locked index or a rebase/merge in progress
  * means somebody else is mid-operation, so it skips rather than commits into their work, and a
- * failed commit is swallowed and retried on the next window. That way #605's eventual answer about
- * who owns the chat bot does not invalidate any of this.
+ * failed commit is swallowed and retried on the next window.
  */
-
-/** The pathspec the conversations live under. Posix separators: it is a git pathspec, not a path. */
-export const CONVERSATIONS_PATHSPEC = `${THE_FRAMEWORK_DIR}/${CONVERSATIONS_DIR}`
 
 /**
  * The committed session archives (#1179), under every user's own directory.
@@ -53,46 +51,10 @@ export const CONVERSATIONS_PATHSPEC = `${THE_FRAMEWORK_DIR}/${CONVERSATIONS_DIR}
  */
 export const SESSIONS_PATHSPEC = `:(glob)${THE_FRAMEWORK_DIR}/*/${SESSIONS_DIR}/**`
 
-/**
- * Everything this committer is scoped to. Both are records the daemon writes into the repo and
- * nobody would think to commit by hand: the chat of a run (#908) and the run's own archived history
- * (#1179). They share one debounce because they are written by the same events and a commit each
- * would double the noise in the project's log.
- */
-export const COMMITTED_PATHSPECS: readonly string[] = [CONVERSATIONS_PATHSPEC, SESSIONS_PATHSPEC]
-
-/**
- * Which pending file belongs to which pathspec, so a pathspec with nothing under it can be left out
- * of `add`/`commit` (see {@link pathspecsFor}). Kept beside the pathspecs themselves: a predicate
- * that drifts from the pattern it mirrors would silently drop a file from every commit.
- */
-const PATHSPEC_MEMBERSHIP: ReadonlyArray<readonly [pathspec: string, holds: (file: string) => boolean]> = [
-  [CONVERSATIONS_PATHSPEC, file => file.startsWith(`${CONVERSATIONS_PATHSPEC}/`)],
-  [SESSIONS_PATHSPEC, file => file.startsWith(`${THE_FRAMEWORK_DIR}/`) && file.includes(`/${SESSIONS_DIR}/`)],
-]
-
-/**
- * The subset of {@link COMMITTED_PATHSPECS} that `files` actually has something under.
- *
- * `git add` and `git commit` are all-or-nothing about their pathspecs: one that matches no file
- * aborts the whole command with "pathspec ... did not match any files", so passing both patterns
- * unconditionally means a project that has sessions but has never recorded a conversation — every
- * project, until its first chat — fails to commit and puts that failure in the daemon log on every
- * poll. Nothing to commit under a pattern is the ordinary state, not an error, so the pattern is
- * dropped instead.
- *
- * This covers the empty directory as well as the missing one, and the two fail in different places:
- * `git add` tolerates an existing-but-empty directory, and then `git commit` rejects it, because by
- * then the pathspec has to match a file git knows about.
- */
-export function pathspecsFor(files: readonly string[]): string[] {
-  return PATHSPEC_MEMBERSHIP.filter(([, holds]) => files.some(holds)).map(([pathspec]) => pathspec)
-}
-
-/** How often the committer looks for settled conversations. */
+/** How often the committer looks for settled archives. */
 export const COMMIT_POLL_MS = 30_000
 
-/** How long a conversation may keep changing before it is committed anyway. */
+/** How long writes may keep arriving before the batch is committed anyway. */
 export const COMMIT_MAX_WAIT_MS = 5 * 60_000
 
 /** What one attempt did, or why it did nothing. */
@@ -117,21 +79,16 @@ export function nodePathProbe(): PathProbe {
 /**
  * The commit message a batch writes. Names what moved, so the log line stands alone.
  *
- * Sessions are counted by run, not by file: one archived run is a `<id>.json` and a `<id>.jsonl`,
- * and "2 sessions" for a single session would be a lie told by the batch's own commit message.
+ * Counted by run, not by file: one archived run is a `<id>.json` and a `<id>.jsonl`, and
+ * "2 sessions" for a single session would be a lie told by the batch's own commit message.
  */
 export function commitMessage(files: string[]): string {
-  const sessionFiles = files.filter(file => file.includes(`/${SESSIONS_DIR}/`))
-  const runs = new Set(sessionFiles.map(file => file.replace(/\.[^./]+$/, ''))).size
-  const conversations = files.length - sessionFiles.length
-  const parts: string[] = []
-  if (conversations > 0) parts.push(conversations === 1 ? 'a conversation' : `${conversations} conversations`)
-  if (runs > 0) parts.push(runs === 1 ? 'a session' : `${runs} sessions`)
-  return `[The Framework] ${parts.join(' and ')}`
+  const runs = new Set(files.map(file => file.replace(/\.[^./]+$/, ''))).size
+  return `[The Framework] ${runs === 1 ? 'a session' : `${runs} sessions`}`
 }
 
 /**
- * The conversation files with uncommitted changes, as repo-relative paths, sorted so the result is
+ * The archive files with uncommitted changes, as repo-relative paths, sorted so the result is
  * a stable fingerprint the debounce can compare across polls.
  *
  * `--porcelain` v1 is parsed rather than `--short` because its two status columns are fixed-width
@@ -139,13 +96,13 @@ export function commitMessage(files: string[]): string {
  * is the path we would commit. Anything unreadable — not a repo, no git — reads as no changes.
  *
  * `-uall` is load-bearing, not a detail. By default git collapses a wholly-untracked directory into
- * one entry (`?? .the-framework/conversations/`) instead of naming the files under it, which makes
- * the fingerprint identical whether one conversation is being written or ten. The debounce compares
- * fingerprints, so without this the idle window could never see a burst and would commit straight
- * through the middle of one. Only a real repo shows this; a per-file fake does not.
+ * one entry instead of naming the files under it, which makes the fingerprint identical whether one
+ * archive is being written or ten. The debounce compares fingerprints, so without this the idle
+ * window could never see a burst and would commit straight through the middle of one. Only a real
+ * repo shows this; a per-file fake does not.
  */
-export async function pendingConversations(cwd: string, git: GitRunner = nodeGitRunner()): Promise<string[]> {
-  const out = await git(['status', '--porcelain', '-uall', '--', ...COMMITTED_PATHSPECS], cwd).catch(() => '')
+export async function pendingSessions(cwd: string, git: GitRunner = nodeGitRunner()): Promise<string[]> {
+  const out = await git(['status', '--porcelain', '-uall', '--', SESSIONS_PATHSPEC], cwd).catch(() => '')
   const files = new Set<string>()
   for (const line of out.split('\n')) {
     if (line.length < 4) continue
@@ -204,20 +161,20 @@ export async function gitBusy(
 }
 
 /** The everyday no-op outcome. Named so the poller can tell it apart from a real failure. */
-const NOTHING_PENDING = 'no conversation changes'
+const NOTHING_PENDING = 'no session changes'
 
 /**
- * Stage and commit the pending conversations under `cwd`, scoped to {@link COMMITTED_PATHSPECS}.
+ * Stage and commit the pending session archives under `cwd`, scoped to {@link SESSIONS_PATHSPEC}.
  *
- * `add` before `commit` because a brand-new conversation is untracked, and `git commit -- <path>`
- * only knows paths git already knows. Both are pathspec-scoped, so the staging is as narrow as the
- * commit and the user's own staged work is neither swept in nor disturbed, and both are narrowed to
- * the pathspecs that have something pending ({@link pathspecsFor}) — a pathspec matching nothing is
- * a hard error to git, and "no conversation has been recorded here yet" is not an error at all.
+ * `add` before `commit` because a brand-new archive is untracked, and `git commit -- <path>` only
+ * knows paths git already knows. Both are pathspec-scoped, so the staging is as narrow as the
+ * commit and the user's own staged work is neither swept in nor disturbed. Nothing pending returns
+ * early: a pathspec matching no file is a hard error to git, and "no session has been archived here
+ * yet" is not an error at all.
  *
  * Never throws: this runs on a background tick with nothing to catch it.
  */
-export async function commitConversations(
+export async function commitSessions(
   cwd: string,
   git: GitRunner = nodeGitRunner(),
   exists: PathProbe = nodePathProbe(),
@@ -225,40 +182,33 @@ export async function commitConversations(
   const busy = await gitBusy(cwd, git, exists)
   if (busy) return { committed: false, reason: busy }
 
-  const files = await pendingConversations(cwd, git)
+  const files = await pendingSessions(cwd, git)
   if (files.length === 0) return { committed: false, reason: NOTHING_PENDING }
 
-  // Only the pathspecs that have something pending, or git aborts on the one that matches nothing.
-  // An empty result should be unreachable — `status` was scoped to these same pathspecs — but an
-  // empty pathspec list means "everything", which would sweep the user's whole checkout into our
-  // commit, so it reads as nothing pending rather than as a commit.
-  const pathspecs = pathspecsFor(files)
-  if (pathspecs.length === 0) return { committed: false, reason: NOTHING_PENDING }
-
   try {
-    await git(['add', '--', ...pathspecs], cwd)
-    await git(['commit', '-m', commitMessage(files), '--', ...pathspecs], cwd)
+    await git(['add', '--', SESSIONS_PATHSPEC], cwd)
+    await git(['commit', '-m', commitMessage(files), '--', SESSIONS_PATHSPEC], cwd)
     return { committed: true, files }
   } catch (err) {
     return { committed: false, reason: errorMessage(err) }
   }
 }
 
-/** A running committer; call {@link ConversationCommitter.stop} to end it. */
-export interface ConversationCommitter {
+/** A running committer; call {@link SessionCommitter.stop} to end it. */
+export interface SessionCommitter {
   stop: () => void
   /** Run one poll now. Exposed so the daemon and tests can drive it deterministically. */
   poll: () => Promise<void>
   /**
-   * Commit every project's pending conversations now, skipping the idle window. For shutdown: the
+   * Commit every project's pending session archives now, skipping the idle window. For shutdown: the
    * daemon is going away, so waiting for quiet would just defer the work to the next boot. Returns
    * how many projects committed.
    */
   flush: () => Promise<number>
 }
 
-/** Options for {@link startConversationCommitter}. */
-export interface ConversationCommitterOptions {
+/** Options for {@link startSessionCommitter}. */
+export interface SessionCommitterOptions {
   /** The projects to sweep each poll (the daemon passes the registry, mapped to summaries). */
   projects: () => Promise<ProjectSummary[]>
   /** Poll cadence and idle window, ms. Default {@link COMMIT_POLL_MS}. */
@@ -278,8 +228,8 @@ export interface ConversationCommitterOptions {
 /**
  * One project's debounce state: the pending set the last poll saw, and when the project first went
  * dirty. `since` deliberately survives a changing fingerprint — it is what makes the max-wait cap
- * reachable, since a conversation being written to every poll would otherwise reset its own clock
- * forever and never commit.
+ * reachable, since a project written to on every poll would otherwise reset its own clock forever
+ * and never commit.
  */
 interface Pending {
   fingerprint: string
@@ -289,7 +239,7 @@ interface Pending {
 }
 
 /**
- * Start committing settled conversations, and return the handle that stops it.
+ * Start committing settled session archives, and return the handle that stops it.
  *
  * The idle window is the poll itself: a project whose pending set is byte-identical to the previous
  * poll's has stopped being written to, so its batch is committed. Anything still moving is recorded
@@ -299,7 +249,7 @@ interface Pending {
  * and is retried, never a throw. Runs immediately, then every `intervalMs`; the timer is unref'd so
  * it never keeps the daemon alive past shutdown.
  */
-export function startConversationCommitter(opts: ConversationCommitterOptions): ConversationCommitter {
+export function startSessionCommitter(opts: SessionCommitterOptions): SessionCommitter {
   const git = opts.git ?? nodeGitRunner()
   const exists = opts.exists ?? nodePathProbe()
   const now = opts.now ?? Date.now
@@ -318,7 +268,7 @@ export function startConversationCommitter(opts: ConversationCommitterOptions): 
       for (const project of projects) {
         if (stopped) break
         seen.add(project.path)
-        const files = await pendingConversations(project.path, git).catch((): string[] => [])
+        const files = await pendingSessions(project.path, git).catch((): string[] => [])
         if (files.length === 0) {
           pending.delete(project.path)
           continue
@@ -334,10 +284,10 @@ export function startConversationCommitter(opts: ConversationCommitterOptions): 
           pending.set(project.path, { fingerprint, since, loggedReason })
           continue
         }
-        const outcome = await commitConversations(project.path, git, exists)
+        const outcome = await commitSessions(project.path, git, exists)
         if (outcome.committed) {
           pending.delete(project.path)
-          opts.log?.(`[framework] committed ${outcome.files.length} conversation(s) in ${project.name}`)
+          opts.log?.(`[framework] committed ${outcome.files.length} session file(s) in ${project.name}`)
         } else {
           // A busy repo or a rejected commit keeps its place, so the next window retries it
           // rather than starting the idle count over.
@@ -345,7 +295,7 @@ export function startConversationCommitter(opts: ConversationCommitterOptions): 
           // Announced on change only: this is a poll, so logging every failure would repeat the
           // same line forever while a project stays stuck.
           if (reason !== undefined && reason !== loggedReason) {
-            opts.log?.(`[framework] conversation commit failed in ${project.name}: ${reason}`)
+            opts.log?.(`[framework] session commit failed in ${project.name}: ${reason}`)
           }
           pending.set(project.path, { fingerprint, since, loggedReason: reason })
         }
@@ -360,7 +310,7 @@ export function startConversationCommitter(opts: ConversationCommitterOptions): 
   const flush = async (): Promise<number> => {
     let committed = 0
     for (const project of await opts.projects().catch(() => [])) {
-      const outcome = await commitConversations(project.path, git, exists)
+      const outcome = await commitSessions(project.path, git, exists)
       if (outcome.committed) {
         pending.delete(project.path)
         committed++

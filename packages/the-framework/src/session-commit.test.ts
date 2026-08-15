@@ -4,17 +4,14 @@ import { test } from 'node:test'
 import type { ProjectSummary } from './dashboard/projects.js'
 import { nodeGitRunner, type GitRunner } from './project.js'
 import {
-  commitConversations,
+  commitSessions,
   commitMessage,
   gitBusy,
-  pathspecsFor,
-  pendingConversations,
-  startConversationCommitter,
-  CONVERSATIONS_PATHSPEC,
+  pendingSessions,
+  startSessionCommitter,
   SESSIONS_PATHSPEC,
-  COMMITTED_PATHSPECS,
   type PathProbe,
-} from './conversation-commit.js'
+} from './session-commit.js'
 
 const project = (path: string): ProjectSummary => ({ id: path, path, name: path, activated: true })
 
@@ -36,16 +33,11 @@ const noLocks: PathProbe = async () => false
 /** Let the constructor's immediate baseline poll finish, the way the watcher tests do. */
 const settle = () => new Promise(resolve => setTimeout(resolve, 0))
 
-test('the pathspec names only the conversations directory (#912)', () => {
-  assert.equal(CONVERSATIONS_PATHSPEC, '.the-framework/conversations')
-})
-
 test('the sessions pathspec is glob-magic and reaches the files, not just the directory (#1179)', () => {
   // Two properties, and the second one failed silently: glob magic stops `*` at a separator, but it
   // also matches whole file paths instead of treating a directory as a prefix — so without the
   // trailing `/**` this names no file and `git add` commits nothing at all.
   assert.equal(SESSIONS_PATHSPEC, ':(glob).the-framework/*/sessions/**')
-  assert.deepEqual(COMMITTED_PATHSPECS, [CONVERSATIONS_PATHSPEC, SESSIONS_PATHSPEC])
 })
 
 test('the commit message counts sessions by run, not by file (#1179)', () => {
@@ -53,23 +45,19 @@ test('the commit message counts sessions by run, not by file (#1179)', () => {
   const run = ['.the-framework/git@example.com/sessions/r1.json', '.the-framework/git@example.com/sessions/r1.jsonl']
   assert.equal(commitMessage(run), '[The Framework] a session')
   assert.equal(commitMessage([...run, '.the-framework/git@example.com/sessions/r2.json']), '[The Framework] 2 sessions')
-  assert.equal(
-    commitMessage(['.the-framework/conversations/a.md', ...run]),
-    '[The Framework] a conversation and a session',
-  )
 })
 
-test('pending conversations are parsed from porcelain and sorted (#912)', async () => {
+test('pending archives are parsed from porcelain and sorted (#912)', async () => {
   const { git, calls } = fakeGit({
-    status: ['?? .the-framework/conversations/b.md', ' M .the-framework/conversations/a.md', ''].join('\n'),
+    status: ['?? .the-framework/u/sessions/b.json', ' M .the-framework/u/sessions/a.json', ''].join('\n'),
   })
-  assert.deepEqual(await pendingConversations('/repo', git), [
-    '.the-framework/conversations/a.md',
-    '.the-framework/conversations/b.md',
+  assert.deepEqual(await pendingSessions('/repo', git), [
+    '.the-framework/u/sessions/a.json',
+    '.the-framework/u/sessions/b.json',
   ])
   assert.deepEqual(
     calls[0],
-    ['status', '--porcelain', '-uall', '--', ...COMMITTED_PATHSPECS],
+    ['status', '--porcelain', '-uall', '--', SESSIONS_PATHSPEC],
     'the status read is path-scoped, and -uall names each untracked file',
   )
 })
@@ -78,20 +66,20 @@ test('-uall is passed, or an untracked dir collapses to one unchanging entry (#9
   // Real git reports a wholly-untracked directory as a single `?? dir/` entry unless -uall is
   // given, which would make every burst look identical to the debounce and commit mid-write.
   const { git, calls } = fakeGit({ status: '' })
-  await pendingConversations('/repo', git)
+  await pendingSessions('/repo', git)
   assert.ok(calls[0]?.includes('-uall'), `status must ask for every untracked file, got ${JSON.stringify(calls[0])}`)
 })
 
 test('a rename reports the destination, and a quoted path is unquoted (#912)', async () => {
   const { git } = fakeGit({
     status: [
-      'R  .the-framework/conversations/old.md -> .the-framework/conversations/new.md',
-      '?? ".the-framework/conversations/sp ace.md"',
+      'R  .the-framework/u/sessions/old.json -> .the-framework/u/sessions/new.json',
+      '?? ".the-framework/u/sessions/sp ace.json"',
     ].join('\n'),
   })
-  assert.deepEqual(await pendingConversations('/repo', git), [
-    '.the-framework/conversations/new.md',
-    '.the-framework/conversations/sp ace.md',
+  assert.deepEqual(await pendingSessions('/repo', git), [
+    '.the-framework/u/sessions/new.json',
+    '.the-framework/u/sessions/sp ace.json',
   ])
 })
 
@@ -99,7 +87,7 @@ test('an unreadable repo reads as no changes rather than throwing (#912)', async
   const git: GitRunner = async () => {
     throw new Error('not a git repository')
   }
-  assert.deepEqual(await pendingConversations('/repo', git), [])
+  assert.deepEqual(await pendingSessions('/repo', git), [])
 })
 
 test('a locked index or an in-flight rebase means busy, so nothing is committed (#912)', async () => {
@@ -139,57 +127,15 @@ test('a non-repo is busy rather than committed into (#912)', async () => {
 test('a commit stages and commits the pathspec, and never add -A (#912)', async () => {
   const { git, calls } = fakeGit({
     'rev-parse': '/repo/.git\n',
-    status: ['?? .the-framework/conversations/a.md', '?? .the-framework/git@example.com/sessions/r1.json'].join('\n'),
-  })
-  const outcome = await commitConversations('/repo', git, noLocks)
-  assert.deepEqual(outcome, {
-    committed: true,
-    files: ['.the-framework/conversations/a.md', '.the-framework/git@example.com/sessions/r1.json'],
-  })
-
-  assert.deepEqual(
-    calls.find(args => args[0] === 'add'),
-    ['add', '--', ...COMMITTED_PATHSPECS],
-    'staging is scoped to the pathspecs',
-  )
-  assert.deepEqual(calls.find(args => args[0] === 'commit'), [
-    'commit',
-    '-m',
-    '[The Framework] a conversation and a session',
-    '--',
-    ...COMMITTED_PATHSPECS,
-  ])
-  assert.ok(
-    !calls.some(args => args.includes('-A') || args.includes('--all')),
-    'the user checkout is never swept wholesale',
-  )
-})
-
-test('a pathspec with nothing under it is left out rather than failing the commit', async () => {
-  // git aborts the whole `add`/`commit` on a pathspec that matches no file, so a project that has
-  // sessions but has never recorded a conversation — every project, until its first chat — used to
-  // fail on every poll and put "pathspec ... did not match any files" in the daemon log each time.
-  assert.deepEqual(pathspecsFor(['.the-framework/conversations/a.md']), [CONVERSATIONS_PATHSPEC])
-  assert.deepEqual(pathspecsFor(['.the-framework/git@example.com/sessions/r1.json']), [SESSIONS_PATHSPEC])
-  assert.deepEqual(
-    pathspecsFor(['.the-framework/conversations/a.md', '.the-framework/git@example.com/sessions/r1.json']),
-    [...COMMITTED_PATHSPECS],
-    'both are passed when both have something pending',
-  )
-  assert.deepEqual(pathspecsFor([]), [], 'and nothing pending names no pathspec at all')
-})
-
-test('a project with no conversations directory commits its sessions without a pathspec error', async () => {
-  const { git, calls } = fakeGit({
-    'rev-parse': '/repo/.git\n',
     status: '?? .the-framework/git@example.com/sessions/r1.json',
   })
-  const outcome = await commitConversations('/repo', git, noLocks)
+  const outcome = await commitSessions('/repo', git, noLocks)
   assert.deepEqual(outcome, { committed: true, files: ['.the-framework/git@example.com/sessions/r1.json'] })
+
   assert.deepEqual(
     calls.find(args => args[0] === 'add'),
     ['add', '--', SESSIONS_PATHSPEC],
-    'the conversations pathspec, which would match nothing, is not passed',
+    'staging is scoped to the pathspec',
   )
   assert.deepEqual(calls.find(args => args[0] === 'commit'), [
     'commit',
@@ -198,59 +144,33 @@ test('a project with no conversations directory commits its sessions without a p
     '--',
     SESSIONS_PATHSPEC,
   ])
-})
+  assert.ok(
+    !calls.some(args => args.includes('-A') || args.includes('--all')),
+    'the user checkout is never swept wholesale',
+  )
 
-test('a pending file under neither pathspec is skipped, never committed with an empty pathspec', async () => {
-  // Unreachable in practice — `status` is scoped to the same pathspecs — but an empty pathspec list
-  // means "everything" to git, so the fallback has to be a skip and not a wide-open commit.
-  const { git, calls } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? src/app.ts' })
-  assert.deepEqual(await commitConversations('/repo', git, noLocks), {
-    committed: false,
-    reason: 'no conversation changes',
-  })
-  assert.ok(!calls.some(args => args[0] === 'add' || args[0] === 'commit'), 'nothing touched the index')
-})
-
-test('against real git: a missing or empty conversations directory is quietly skipped, not an error', async () => {
-  // Real git because the fake one never rejects a pathspec, and the rejection is the whole bug. It
-  // also shows the two failures land in different commands: `add` tolerates an existing-but-empty
-  // directory and `commit` is the one that rejects it, once the pathspec must match a known file.
+  // Real git, because the fake one never rejects a pathspec: a project with no archive yet must be
+  // a quiet skip and not "pathspec ... did not match any files" in the daemon log on every poll.
   const { mkdtemp, mkdir, writeFile, rm } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
-
   const repo = await mkdtemp(join(tmpdir(), 'fw-commit-'))
-  const git = nodeGitRunner()
+  const real = nodeGitRunner()
   try {
-    await git(['init', '-q'], repo)
-    await git(['config', 'user.email', 'git@example.com'], repo)
-    await git(['config', 'user.name', 'Test'], repo)
+    await real(['init', '-q'], repo)
+    await real(['config', 'user.email', 'git@example.com'], repo)
+    await real(['config', 'user.name', 'Test'], repo)
     const fw = join(repo, '.the-framework')
+    await mkdir(fw, { recursive: true })
+    assert.deepEqual(await commitSessions(repo, real), { committed: false, reason: 'no session changes' })
+
     await mkdir(join(fw, 'git@example.com', 'sessions'), { recursive: true })
     await writeFile(join(fw, 'git@example.com', 'sessions', 'r1.json'), '{"id":"r1"}\n')
-
-    // No `.the-framework/conversations` at all: the state of every project before its first chat.
-    const first = await commitConversations(repo, git)
-    assert.deepEqual(first, { committed: true, files: ['.the-framework/git@example.com/sessions/r1.json'] })
-
-    // And an existing directory holding nothing git can see, which `add` lets through.
-    await mkdir(join(fw, 'conversations'), { recursive: true })
-    await writeFile(join(fw, 'git@example.com', 'sessions', 'r2.json'), '{"id":"r2"}\n')
-    const second = await commitConversations(repo, git)
-    assert.deepEqual(second, { committed: true, files: ['.the-framework/git@example.com/sessions/r2.json'] })
-
-    // The real conversation still commits once there is one, and nothing else rode along.
-    await writeFile(join(fw, 'conversations', 'a.md'), '# chat\n')
     await writeFile(join(repo, 'user-work.txt'), 'not ours\n')
-    const third = await commitConversations(repo, git)
-    assert.deepEqual(third, { committed: true, files: ['.the-framework/conversations/a.md'] })
-
-    const log = await git(['log', '--format=%s'], repo)
-    assert.deepEqual(log.trim().split('\n'), [
-      '[The Framework] a conversation',
-      '[The Framework] a session',
-      '[The Framework] a session',
-    ])
-    const status = await git(['status', '--porcelain', '-uall'], repo)
+    assert.deepEqual(await commitSessions(repo, real), {
+      committed: true,
+      files: ['.the-framework/git@example.com/sessions/r1.json'],
+    })
+    const status = await real(['status', '--porcelain', '-uall'], repo)
     assert.equal(status.trim(), '?? user-work.txt', "the user's own work is left where it was")
   } finally {
     await rm(repo, { recursive: true, force: true })
@@ -258,18 +178,18 @@ test('against real git: a missing or empty conversations directory is quietly sk
 })
 
 test('a busy repo is skipped without staging anything (#912)', async () => {
-  const { git, calls } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/conversations/a.md' })
+  const { git, calls } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/sessions/a.json' })
   const locked: PathProbe = async path => path.endsWith('index.lock')
-  const outcome = await commitConversations('/repo', git, locked)
+  const outcome = await commitSessions('/repo', git, locked)
   assert.deepEqual(outcome, { committed: false, reason: 'another git process holds the index lock' })
   assert.ok(!calls.some(args => args[0] === 'add' || args[0] === 'commit'), 'nothing touched the index')
 })
 
 test('a clean checkout commits nothing (#912)', async () => {
   const { git, calls } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '' })
-  assert.deepEqual(await commitConversations('/repo', git, noLocks), {
+  assert.deepEqual(await commitSessions('/repo', git, noLocks), {
     committed: false,
-    reason: 'no conversation changes',
+    reason: 'no session changes',
   })
   assert.ok(!calls.some(args => args[0] === 'commit'))
 })
@@ -277,25 +197,25 @@ test('a clean checkout commits nothing (#912)', async () => {
 test('a failed commit is swallowed and reported, not thrown (#912)', async () => {
   const git: GitRunner = async args => {
     if (args[0] === 'rev-parse') return '/repo/.git\n'
-    if (args[0] === 'status') return '?? .the-framework/conversations/a.md'
+    if (args[0] === 'status') return '?? .the-framework/u/sessions/a.json'
     if (args[0] === 'commit') throw new Error('nothing to commit')
     return ''
   }
-  assert.deepEqual(await commitConversations('/repo', git, noLocks), {
+  assert.deepEqual(await commitSessions('/repo', git, noLocks), {
     committed: false,
     reason: 'nothing to commit',
   })
 })
 
 test('the commit message counts the batch (#912)', () => {
-  assert.equal(commitMessage(['a']), '[The Framework] a conversation')
-  assert.equal(commitMessage(['a', 'b']), '[The Framework] 2 conversations')
+  assert.equal(commitMessage(['a.json']), '[The Framework] a session')
+  assert.equal(commitMessage(['a.json', 'b.json']), '[The Framework] 2 sessions')
 })
 
-test('a conversation still being written is not committed until it settles (#912)', async () => {
-  let listing = '?? .the-framework/conversations/a.md'
+test('an archive still being written is not committed until it settles (#912)', async () => {
+  let listing = '?? .the-framework/u/sessions/a.json'
   const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: () => listing })
-  const committer = startConversationCommitter({
+  const committer = startSessionCommitter({
     projects: async () => [project('/repo')],
     git,
     exists: noLocks,
@@ -305,7 +225,7 @@ test('a conversation still being written is not committed until it settles (#912
     await settle() // the constructor's baseline poll opens the idle window on {a}
     assert.equal(commits(), 0, 'the first sighting only starts the idle window')
 
-    listing = ['?? .the-framework/conversations/a.md', '?? .the-framework/conversations/b.md'].join('\n')
+    listing = ['?? .the-framework/u/sessions/a.json', '?? .the-framework/u/sessions/b.json'].join('\n')
     await committer.poll()
     assert.equal(commits(), 0, 'a changed pending set restarts the window rather than committing mid-burst')
 
@@ -320,7 +240,7 @@ test('a conversation still being written is not committed until it settles (#912
   }
 })
 
-test('a conversation that never goes idle still commits once max wait lapses (#912)', async () => {
+test('a project that never goes idle still commits once max wait lapses (#912)', async () => {
   let n = 0
   let clock = 0
   const { git, commits } = fakeGit({
@@ -328,7 +248,7 @@ test('a conversation that never goes idle still commits once max wait lapses (#9
     // Every poll sees a different pending set, so the idle window alone would never fire.
     status: () => `?? .the-framework/conversations/${n++}.md`,
   })
-  const committer = startConversationCommitter({
+  const committer = startSessionCommitter({
     projects: async () => [project('/repo')],
     git,
     exists: noLocks,
@@ -352,9 +272,9 @@ test('a conversation that never goes idle still commits once max wait lapses (#9
 
 test('a busy repo keeps its place, so the next window retries it (#912)', async () => {
   let locked = true
-  const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/conversations/a.md' })
+  const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/sessions/a.json' })
   const exists: PathProbe = async path => locked && path.endsWith('index.lock')
-  const committer = startConversationCommitter({
+  const committer = startSessionCommitter({
     projects: async () => [project('/repo')],
     git,
     exists,
@@ -376,13 +296,13 @@ test('a busy repo keeps its place, so the next window retries it (#912)', async 
 test('a failing commit logs its reason once, not once per poll', async () => {
   const { git } = fakeGit({
     'rev-parse': '/repo/.git\n',
-    status: '?? .the-framework/conversations/a.md',
+    status: '?? .the-framework/u/sessions/a.json',
     commit: () => {
       throw new Error('nothing added to commit')
     },
   })
   const logs: string[] = []
-  const committer = startConversationCommitter({
+  const committer = startSessionCommitter({
     projects: async () => [project('/repo')],
     git,
     exists: noLocks,
@@ -410,13 +330,13 @@ test('a changed failure reason is announced again', async () => {
   let reason = 'first failure'
   const { git } = fakeGit({
     'rev-parse': '/repo/.git\n',
-    status: '?? .the-framework/conversations/a.md',
+    status: '?? .the-framework/u/sessions/a.json',
     commit: () => {
       throw new Error(reason)
     },
   })
   const logs: string[] = []
-  const committer = startConversationCommitter({
+  const committer = startSessionCommitter({
     projects: async () => [project('/repo')],
     git,
     exists: noLocks,
@@ -441,7 +361,7 @@ test('a changed failure reason is announced again', async () => {
 test('the ordinary idle case is not announced as a failure', async () => {
   // The poll sees a pending file, but the commit's own re-read finds it already gone: an
   // everyday race, not something to log.
-  const file = '?? .the-framework/conversations/a.md'
+  const file = '?? .the-framework/u/sessions/a.json'
   let reads = 0
   const { git, commits } = fakeGit({
     'rev-parse': '/repo/.git\n',
@@ -449,7 +369,7 @@ test('the ordinary idle case is not announced as a failure', async () => {
     status: () => (++reads <= 2 ? file : reads % 2 === 1 ? '' : file),
   })
   const logs: string[] = []
-  const committer = startConversationCommitter({
+  const committer = startSessionCommitter({
     projects: async () => [project('/repo')],
     git,
     exists: noLocks,
@@ -468,8 +388,8 @@ test('the ordinary idle case is not announced as a failure', async () => {
 })
 
 test('a project scan that throws costs one window rather than the committer (#912)', async () => {
-  const { git } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/conversations/a.md' })
-  const committer = startConversationCommitter({
+  const { git } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/sessions/a.json' })
+  const committer = startSessionCommitter({
     projects: async () => {
       throw new Error('registry unreadable')
     },
@@ -486,8 +406,8 @@ test('a project scan that throws costs one window rather than the committer (#91
 })
 
 test('flush commits immediately, skipping the idle window, and counts projects (#912)', async () => {
-  const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/conversations/a.md' })
-  const committer = startConversationCommitter({
+  const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/sessions/a.json' })
+  const committer = startSessionCommitter({
     projects: async () => [project('/a'), project('/b')],
     git,
     exists: noLocks,
@@ -504,8 +424,8 @@ test('flush commits immediately, skipping the idle window, and counts projects (
 })
 
 test('a stopped committer does not poll again (#912)', async () => {
-  const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/conversations/a.md' })
-  const committer = startConversationCommitter({
+  const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/sessions/a.json' })
+  const committer = startSessionCommitter({
     projects: async () => [project('/repo')],
     git,
     exists: noLocks,

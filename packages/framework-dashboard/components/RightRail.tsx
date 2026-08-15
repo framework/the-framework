@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { LogEntry, WorkspaceDoc } from '@gemstack/the-framework'
+import type { WorkspaceDoc } from '@gemstack/the-framework'
 import { DocsPanel } from './DocsPanel.js'
-import { ProjectLogPanel } from './ProjectLogPanel.js'
 import { ViewsRail } from './ViewsRail.js'
 import { FileTree } from './FileTree.js'
 import { BrowserPanel } from './BrowserPanel.js'
@@ -11,29 +10,24 @@ import { Button } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
 import { usePolled } from '../lib/use-async.js'
-import { onDocs, onProjectLog } from '../server/reads.telefunc.js'
+import { onDocs } from '../server/reads.telefunc.js'
 
-type Tab = 'files' | 'views' | 'browser' | 'docs' | 'history'
+type Tab = 'files' | 'views' | 'browser' | 'docs'
 
-// A one-word tab only works when the reader already knows the system. The former "Log" was
-// read as agent output or a console stream, not the durable project history it actually is.
 // Choices had a tab here (#440) until the gates moved inline into the transcript (#1455
 // items 6/7) — a question is answered where it was asked, so the rail has no panel for them.
+// History had one too, rendering a committed markdown re-narration of what the event log already
+// holds exactly (B3); the sessions themselves are the history now.
 const TABS: Record<Tab, { label: string; help: string }> = {
   files: { label: 'Files', help: 'The project’s files — click one to add it to the next session’s context.' },
   views: { label: 'Views', help: 'Documents the agent pushed up during the session — a plan, a summary, a writeup.' },
   browser: { label: 'Browser', help: 'Live view of the browser this session is driving.' },
   docs: { label: 'Docs', help: 'The PLAN/TODO markdown files at the root of the workspace.' },
-  history: {
-    label: 'History',
-    help: 'Every finished session in this project, from the committed .the-framework/LOGS.md — it outlives the sidebar’s recent sessions, which are local and untracked.',
-  },
 }
 
-// The right sidebar (#314 third rail): the ad-hoc markdown views the agent pushes (#441),
-// the surfaced docs (PLAN/TODO), and the committed project log. Views come from the live
-// event stream, passed down from the shell; docs/log are Telefunc-backed reads of the
-// selected project. The rail jumps to a fresh first view; choice gates live inline in the
+// The right sidebar (#314 third rail): the ad-hoc markdown views the agent pushes (#441) and
+// the surfaced docs (PLAN/TODO). Views come from the live event stream, passed down from the
+// shell; docs are a Telefunc-backed read of the selected project. The rail jumps to a fresh first view; choice gates live inline in the
 // transcript now (#1455 items 6/7), so nothing here pulls focus for them.
 export function RightRail({
   projectId,
@@ -61,9 +55,9 @@ export function RightRail({
   /** Where the selected run executes (#1053/#610): an `actions` run has no browser on the runner, so no pane; `remote` (#1067) has none locally either, and neither does a `web` cloud session. */
   target?: 'local' | 'actions' | 'remote' | 'web' | undefined
   /**
-   * The launcher renders Docs and History in its main column (#1455 items 2/3), so while it is
-   * the main view the rail must not repeat them: their tabs are withheld and their polls skipped.
-   * A session view passes false (or nothing) and keeps the full rail.
+   * The launcher renders Docs in its main column (#1455 item 2), so while it is the main view the
+   * rail must not repeat it: the tab is withheld and the poll skipped. A session view passes false
+   * (or nothing) and keeps the full rail.
    */
   docsInMain?: boolean
 }) {
@@ -72,12 +66,10 @@ export function RightRail({
   // there at all (#1146). One read each, passed down; the panels render what they are given.
   // Tickets used to be a third one (#697) — now its own full page (#1144), not a rail read.
   const { value: docs, loaded: docsLoaded } = usePolled<WorkspaceDoc[]>(projectId && !docsInMain ? () => onDocs(projectId) : null, [], 4000, [projectId, docsInMain])
-  const { value: logs, loaded: logsLoaded } = usePolled<LogEntry[]>(projectId && !docsInMain ? () => onProjectLog(projectId) : null, [], 10_000, [projectId, docsInMain])
   // Hidden only once we KNOW it is empty: while the first read is out, the tab stays, so switching
-  // projects does not blink the rail out and back in. While the launcher owns these panels
-  // (#1455 items 2/3), both tabs are withheld outright.
+  // projects does not blink the rail out and back in. While the launcher owns this panel
+  // (#1455 item 2), the tab is withheld outright.
   const hasDocs = !docsInMain && (!docsLoaded || docs.length > 0)
-  const hasLog = !docsInMain && (!logsLoaded || logs.length > 0)
 
   const [tab, setTab] = useState<Tab>('docs')
   // Once the user picks a tab, stop auto-defaulting (#695/U22) — only a genuinely new choice
@@ -116,7 +108,6 @@ export function RightRail({
     // Only when the run actually has one (#813) — a dead tab teaches people the preview is broken.
     ...(showBrowser && runId ? ['browser' as const] : []),
     ...(hasDocs ? ['docs' as const] : []),
-    ...(hasLog ? ['history' as const] : []),
   ]
   if (tabs.length === 0) return null
   // The remembered tab may have just lost its content (the last doc deleted, a gate resolved), so
@@ -168,8 +159,6 @@ export function RightRail({
           <ViewsRail views={views} />
         ) : active === 'browser' && showBrowser && runId ? (
           <BrowserPanel projectId={projectId} runId={runId} />
-        ) : active === 'history' ? (
-          <ProjectLogPanel logs={logs} loaded={logsLoaded} />
         ) : (
           <DocsPanel docs={docs} loaded={docsLoaded} />
         )}

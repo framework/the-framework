@@ -29,7 +29,6 @@ export {
   type SystemPromptOptions,
   type RunSystemOptions,
   type TfContext,
-  type EcoOptions,
   type RenderedSystemPrompt,
 } from './system-prompt.js'
 // What a preset can read beyond its params (#874), so the dashboard can render a preset against
@@ -46,7 +45,7 @@ export { interventionKey, pickNewInterventions, activityKey, pickNewActivity } f
 export { PROJECT_PREFERENCE_KEYS, NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, DEFAULT_AUTO_PM_CONCURRENCY, MAX_AUTO_PM_CONCURRENCY, notificationEnabled, discordNotificationEnabled, type ProjectPreferences } from './preference-defaults.js'
 // The preferences -> run options mapping (#858), shared with the daemon so an unattended run
 // starts with the same settings a launcher-started one would. Pure field logic, no Node imports.
-export { runOptionsFromPreferences, autopilotEnabled, handoffFromPreferences, preferencesFromFileConfig } from './run-options.js'
+export { runOptionsFromPreferences, handoffFromPreferences, preferencesFromFileConfig } from './run-options.js'
 // The Discord credential rules (#1095): the same precedence and validation the daemon enforces,
 // so the setup dialog rejects a malformed token before the round trip instead of guessing at it.
 export {

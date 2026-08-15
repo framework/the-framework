@@ -12,7 +12,6 @@ import {
   claudeDriverOptions,
   CLAUDE_CODE_SESSION_LIST,
   createRunJournal,
-  ecoOptions,
   frameworkVersion,
   mergeRunConfig,
   parseArgs,
@@ -203,7 +202,7 @@ test('runOnBeforeMergeable queues the follow-ups in ONE run instead of running t
     seen.push(prompt)
     return Promise.resolve(true)
   }
-  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, undefined, undefined, run, memFs())
+  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, undefined, run, memFs())
   // One child run, not three: it asks for TODO entries rather than doing the passes.
   assert.equal(seen.length, 1)
   const prompt = seen[0]!
@@ -215,32 +214,9 @@ test('runOnBeforeMergeable queues the follow-ups in ONE run instead of running t
   assert.ok(!prompt.includes('${{'), 'fully rendered')
 })
 
-test('runOnBeforeMergeable gates the readability entry on technical_control (#326)', async () => {
-  const { io } = capture()
-  const render = async (technical_control: boolean) => {
-    const seen: string[] = []
-    await runOnBeforeMergeable(
-      '/work/app',
-      '/bin/framework',
-      io,
-      { session_name: 'add-oauth', settings: { technical_control } },
-      undefined,
-      undefined,
-      p => {
-        seen.push(p)
-        return Promise.resolve(true)
-      },
-      memFs(),
-    )
-    return seen[0]!
-  }
-  assert.match(await render(true), /Apply \.the-framework\/presets\/readability\.md with tf\.params\.what set to "changes introduced by add-oauth"/)
-  assert.doesNotMatch(await render(false), /readability/)
-})
-
 test('runOnBeforeMergeable is best-effort: a failed queueing run is reported, never thrown (#326)', async () => {
   const { io, out } = capture()
-  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, undefined, undefined, () =>
+  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, undefined, () =>
     Promise.resolve(false), memFs(),
   )
   assert.ok(out.some(l => /on-before-mergeable queueing did not complete/.test(l)))
@@ -249,7 +225,7 @@ test('runOnBeforeMergeable is best-effort: a failed queueing run is reported, ne
 test('runOnBeforeMergeable materializes the presets so the queued filePaths resolve (#598)', async () => {
   const { io } = capture()
   const fs = memFs()
-  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, undefined, undefined, () => Promise.resolve(true), fs)
+  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, undefined, () => Promise.resolve(true), fs)
   // The entry points at .the-framework/presets/maintainability.md; that file must now exist.
   assert.ok(fs.files.has(join('/work/app', '.the-framework/presets/maintainability.md')))
   assert.ok(fs.files.has(join('/work/app', '.the-framework/presets/security_audit.md')))
@@ -269,28 +245,11 @@ test('the ticket a session implements is re-checked, since it comes off a file a
   assert.equal(opts({ options: { queueEntry: '   ' } }).queueEntry, undefined)
 })
 
-test('the Global options travel on the spec: vanilla + eco (#314)', () => {
-  assert.equal(opts().vanilla, undefined) // unset, so the repo file decides (#841)
-  assert.deepEqual(opts().eco, { autoPlanning: false, autoResearch: false, autoMaintenance: false })
-  const on = opts({ options: { vanilla: true, eco: { autoPlanning: true, autoMaintenance: true } } })
-  assert.equal(on.vanilla, true)
-  assert.deepEqual(on.eco, { autoPlanning: true, autoResearch: false, autoMaintenance: true })
-})
-
 test('transparent is unset by default (#625)', () => {
   assert.equal(opts().transparent, undefined) // unset, so the repo file decides (#841)
   assert.equal(opts({ options: { transparent: true } }).transparent, true)
   // Unset resolves to off, so a session with nothing said and no file is still a normal one.
   assert.equal(mergeRunConfig(opts(), {}).transparent, false)
-})
-
-test('ecoOptions returns undefined when nothing is set, else only the enabled drops (#314)', () => {
-  assert.equal(ecoOptions(opts()), undefined)
-  assert.deepEqual(ecoOptions(opts({ options: { eco: { autoResearch: true } } })), {
-    autoPlanning: false,
-    autoResearch: true,
-    autoMaintenance: false,
-  })
 })
 
 test('the built-in prompt is off for a vanilla session or the-framework.yml antiLazyPill:false (#314)', () => {
@@ -502,26 +461,26 @@ test('claudeDriverOptions runs the headless agent at bypassPermissions (#225)', 
 
 test('a session persists itself, and the modes stay unset until the spec names them (#211/#841)', () => {
   assert.equal(opts().persist, true)
-  assert.equal(opts().autopilot, undefined)
-  assert.equal(opts().technical, undefined)
-  const on = opts({ options: { autopilot: true, technical: true } })
-  assert.equal(on.autopilot, true)
-  assert.equal(on.technical, true)
+  assert.equal(opts().vanilla, undefined)
+  assert.equal(opts().transparent, undefined)
+  const on = opts({ options: { vanilla: true, transparent: true } })
+  assert.equal(on.vanilla, true)
+  assert.equal(on.transparent, true)
 })
 
 test('mergeRunConfig: the-framework.yml supplies defaults, flags override (#258)', () => {
   const flags = {}
-  const modes = (config: { autopilot: boolean; technical: boolean }) => [config.autopilot, config.technical]
+  const modes = (config: { antiLazyPill: boolean; transparent: boolean }) => [config.antiLazyPill, config.transparent]
   // file-only: the repo config drives the run
-  const fromFile = mergeRunConfig(flags, { preset: 'software-development', autopilot: true })
+  const fromFile = mergeRunConfig(flags, { preset: 'software-development', transparent: true })
   assert.equal(fromFile.presetName, 'software-development')
-  assert.deepEqual(modes(fromFile), [true, false])
+  assert.deepEqual(modes(fromFile), [true, true])
   // a --preset flag wins over the file's preset
   assert.equal(mergeRunConfig({ preset: 'web-dev' }, { preset: 'software-development' }).presetName, 'web-dev')
   // a mode set by either layer is on; the flag layer says nothing about the mode it did not set
-  assert.deepEqual(modes(mergeRunConfig({ technical: true }, { autopilot: true })), [true, true])
+  assert.deepEqual(modes(mergeRunConfig({ vanilla: true }, { transparent: true })), [false, true])
   // nothing set anywhere: no preset, no modes
-  assert.deepEqual(modes(mergeRunConfig(flags, {})), [false, false])
+  assert.deepEqual(modes(mergeRunConfig(flags, {})), [true, false])
   assert.equal(mergeRunConfig(flags, {}).presetName, undefined)
   // build event: the file's `event` supplies a default, --kind overrides it (#265)
   assert.equal(mergeRunConfig(flags, { event: 'bug-fix' }).buildEvent, 'bug-fix')
@@ -532,19 +491,17 @@ test('mergeRunConfig: the-framework.yml supplies defaults, flags override (#258)
 test('mergeRunConfig: a nearer layer can turn a mode off, not just on (#841)', () => {
   // The bug: with OR, a session could only ever enable. Now an explicit off beats a file that
   // enabled it — and with the spec that is a plain `false`, not a second `--no-*` spelling.
-  assert.equal(mergeRunConfig(opts({ options: { autopilot: false } }), { autopilot: true }).autopilot, false)
-  assert.equal(mergeRunConfig(opts({ options: { technical: false } }), { technical: true }).technical, false)
   assert.equal(mergeRunConfig(opts({ options: { transparent: false } }), { transparent: true }).transparent, false)
+  assert.equal(mergeRunConfig(opts({ options: { vanilla: false } }), { antiLazyPill: false }).antiLazyPill, true)
   // And the file still supplies the value when this session says nothing.
-  assert.equal(mergeRunConfig(opts(), { autopilot: true }).autopilot, true)
   assert.equal(mergeRunConfig(opts(), { transparent: true }).transparent, true)
   // The session still wins when it says "on" over a file that says "off".
-  assert.equal(mergeRunConfig(opts({ options: { autopilot: true } }), { autopilot: false }).autopilot, true)
+  assert.equal(mergeRunConfig(opts({ options: { transparent: true } }), { transparent: false }).transparent, true)
   // A layer that set nothing does not participate: absent stays absent, defaults hold.
   const bare = mergeRunConfig(opts(), {})
   assert.deepEqual(
-    { autopilot: bare.autopilot, technical: bare.technical, transparent: bare.transparent, antiLazyPill: bare.antiLazyPill },
-    { autopilot: false, technical: false, transparent: false, antiLazyPill: true },
+    { transparent: bare.transparent, antiLazyPill: bare.antiLazyPill },
+    { transparent: false, antiLazyPill: true },
   )
   assert.deepEqual(bare.sources, {})
 })
@@ -562,13 +519,6 @@ test('runCli honors a resumed agent session on the prompt path it belongs to (#7
   const code = await runSessionCli({ prompt: 'keep going', kind: 'prompt', options: { resumeSession: 'sess-42' } }, io)
   assert.notEqual(code, 2)
   assert.ok(!err.some(l => /only applies to a prompt session/.test(l)))
-})
-
-test('runCli does not note --autopilot without a preset (it auto-answers choice gates)', async () => {
-  const { io, err } = capture()
-  const code = await runSessionCli({ options: { autopilot: true } }, io)
-  assert.equal(code, 0)
-  assert.ok(!err.some(l => /have no effect without a preset/.test(l)))
 })
 
 test('chooseSessionLink defaults a live run to the claude.ai/code session list (#212)', () => {
@@ -723,7 +673,7 @@ test('the dashboard steers a dashboard-less run through its gates via control.js
 test('runOnBeforeMergeable reports how it went, so the caller can emit it (#835)', async () => {
   const { io } = capture()
   const fire = (ok: boolean) =>
-    runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, undefined, undefined, () =>
+    runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, undefined, () =>
       Promise.resolve(ok), memFs(),
     )
   assert.equal(await fire(true), 'queued')

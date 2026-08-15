@@ -163,7 +163,7 @@ test('the run system channel is exactly composeRunSystem, with nothing appended 
   const { driver, system } = recordingDriver()
   await runSession({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: () => {} })
   // runSession composes no framing of its own.
-  assert.equal(system(), composeRunSystem({ tf: { prompt: FAKE_INTENT, params: {} } }))
+  assert.equal(system(), composeRunSystem({ tf: { prompt: FAKE_INTENT } }))
 })
 
 test('transparent empties the build-path system channel (#625)', async () => {

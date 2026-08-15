@@ -49,35 +49,35 @@ describe('preferences', () => {
   test('an optimistic update made during the initial load survives the load resolving', async () => {
     let resolveLoad: (p: unknown) => void = () => {}
     onPreferences.mockReturnValue(new Promise(r => (resolveLoad = r)))
-    const { usePreferences, updatePreferences, autopilotEnabled } = await import('./preferences.js')
+    const { usePreferences, updatePreferences } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
-    // The load is in flight; the user toggles autopilot off before it resolves.
-    act(() => updatePreferences({ autopilot: false }))
-    expect(autopilotEnabled(result.current)).toBe(false)
+    // The load is in flight; the user toggles the browser off before it resolves.
+    act(() => updatePreferences({ browser: false }))
+    expect(result.current.browser).toBe(false)
 
     // The load now resolves with the server's pre-toggle value; the toggle must win.
     await act(async () => {
-      resolveLoad({ autopilot: true })
+      resolveLoad({ browser: true })
       await Promise.resolve()
     })
-    expect(autopilotEnabled(result.current)).toBe(false)
+    expect(result.current.browser).toBe(false)
   })
 
   test('the initial load populates the cache when no optimistic write raced it', async () => {
-    onPreferences.mockResolvedValue({ autopilot: false, technical: true })
+    onPreferences.mockResolvedValue({ browser: false, vanilla: true })
     const { usePreferences } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
     await flush()
-    expect(result.current).toEqual({ autopilot: false, technical: true })
+    expect(result.current).toEqual({ browser: false, vanilla: true })
   })
 
   // Per-project run options (#840).
 
   test('a project layers its own run options over the global ones', async () => {
     openProject('app-a-14csz1v')
-    onPreferences.mockResolvedValue({ autopilot: true, model: 'sonnet', theme: 'dark' })
+    onPreferences.mockResolvedValue({ browser: true, model: 'sonnet', theme: 'dark' })
     onProjectPreferences.mockResolvedValue({ model: 'opus' })
     const { usePreferences } = await import('./preferences.js')
 
@@ -85,7 +85,7 @@ describe('preferences', () => {
     await flush()
     expect(onProjectPreferences).toHaveBeenCalledWith('app-a-14csz1v')
     // The project's model wins; everything it did not set falls through.
-    expect(result.current).toEqual({ autopilot: true, model: 'opus', theme: 'dark' })
+    expect(result.current).toEqual({ browser: true, model: 'opus', theme: 'dark' })
   })
 
   test('a run option written on a project page lands on the project, not the globals', async () => {
@@ -162,54 +162,54 @@ describe('preferences', () => {
   })
 
   test("the repo's the-framework.yml resolves over the global tier (#842)", async () => {
-    onPreferences.mockResolvedValue({ autopilot: true, technical: false })
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { technical: true, antiLazyPill: false } }])
+    onPreferences.mockResolvedValue({ browser: true, transparent: false })
+    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true, antiLazyPill: false } }])
     openProject('app-a-1')
     const { usePreferences } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
     await flush()
-    expect(result.current.technical).toBe(true) // the repo turned it on over the global off
+    expect(result.current.transparent).toBe(true) // the repo turned it on over the global off
     expect(result.current.vanilla).toBe(true) // antiLazyPill: false is the file's Vanilla
-    expect(result.current.autopilot).toBe(true) // the repo said nothing, so global stands
+    expect(result.current.browser).toBe(true) // the repo said nothing, so global stands
   })
 
   test("a project's own option beats the repo file (#842)", async () => {
     onPreferences.mockResolvedValue({})
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { technical: true } }])
-    onProjectPreferences.mockResolvedValue({ technical: false })
+    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true } }])
+    onProjectPreferences.mockResolvedValue({ transparent: false })
     openProject('app-a-1')
     const { usePreferences } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
     await flush()
-    expect(result.current.technical).toBe(false)
+    expect(result.current.transparent).toBe(false)
   })
 
   test('a repo that sets nothing changes nothing (#842)', async () => {
-    onPreferences.mockResolvedValue({ technical: true })
+    onPreferences.mockResolvedValue({ vanilla: true })
     onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true }])
     openProject('app-a-1')
     const { usePreferences } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
     await flush()
-    expect(result.current).toEqual({ technical: true })
+    expect(result.current).toEqual({ vanilla: true })
   })
 
   test('usePreferenceSources names the layer that won each key (#842)', async () => {
-    onPreferences.mockResolvedValue({ autopilot: true, model: 'sonnet' })
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { technical: true, autopilot: false } }])
+    onPreferences.mockResolvedValue({ browser: true, model: 'sonnet' })
+    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true, antiLazyPill: false } }])
     onProjectPreferences.mockResolvedValue({ model: 'opus' })
     openProject('app-a-1')
     const { usePreferenceSources } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferenceSources())
     await flush()
-    expect(result.current.technical).toBe('repo')
-    expect(result.current.autopilot).toBe('repo') // the repo's false beats the global true
+    expect(result.current.transparent).toBe('repo')
+    expect(result.current.vanilla).toBe('repo') // the repo's antiLazyPill:false is Vanilla on
     expect(result.current.model).toBe('project')
-    expect(result.current.vanilla).toBe(undefined) // nobody set it
+    expect(result.current.browser).toBe('global')
   })
 
   test('useProjectFileConfig exposes the keys the gear cannot set (#842)', async () => {
@@ -225,38 +225,38 @@ describe('preferences', () => {
 
   test('refreshFileConfigs re-reads the repo tier after an edit on disk (#842)', async () => {
     onPreferences.mockResolvedValue({})
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { technical: true } }])
+    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true } }])
     openProject('app-a-1')
     const { usePreferences, refreshFileConfigs } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
     await flush()
-    expect(result.current.technical).toBe(true)
+    expect(result.current.transparent).toBe(true)
 
     // Someone edits the yml; the launcher must not keep showing the old answer.
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { technical: false } }])
+    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: false } }])
     refreshFileConfigs()
     await flush()
-    expect(result.current.technical).toBe(false)
+    expect(result.current.transparent).toBe(false)
 
     // And a yml deleted outright stops contributing at all, rather than lingering in the cache.
     onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true }])
     refreshFileConfigs()
     await flush()
-    expect('technical' in result.current).toBe(false)
+    expect('vanilla' in result.current).toBe(false)
   })
 
   test('a failed project read leaves the other tiers intact (#842)', async () => {
     const unhandled = vi.fn()
     process.on('unhandledRejection', unhandled)
-    onPreferences.mockResolvedValue({ autopilot: false })
+    onPreferences.mockResolvedValue({ browser: false })
     onProjects.mockRejectedValue(new Error('offline'))
     openProject('app-a-1')
     const { usePreferences, refreshFileConfigs } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
     await flush()
-    expect(result.current.autopilot).toBe(false)
+    expect(result.current.browser).toBe(false)
 
     // The read is best-effort like every other tier: it must be swallowed, not left to surface as
     // an unhandled rejection, and the next refresh must still be able to run.
@@ -264,10 +264,10 @@ describe('preferences', () => {
     expect(unhandled).not.toHaveBeenCalled()
     process.off('unhandledRejection', unhandled)
 
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { technical: true } }])
+    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true } }])
     refreshFileConfigs()
     await flush()
-    expect(result.current.technical).toBe(true)
+    expect(result.current.transparent).toBe(true)
   })
 
   // A stale tab reverting settings it never touched (#1148).

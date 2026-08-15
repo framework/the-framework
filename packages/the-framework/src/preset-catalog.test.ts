@@ -135,17 +135,6 @@ test('Maintenance points at the other presets by their real file paths (#881)', 
   assert.equal(out.includes('${{'), false)
 })
 
-test('Maintenance queues readability only under technical_control (#881)', () => {
-  const off = presets.maintenance.render(undefined, { settings: { technical_control: false } })
-  assert.equal(off.includes(presetFilePath('readability')), false)
-  // Absent settings behave like off, and must not throw.
-  assert.equal(presets.maintenance.render().includes(presetFilePath('readability')), false)
-
-  const on = presets.maintenance.render(undefined, { settings: { technical_control: true } })
-  assert.ok(on.includes(presetFilePath('readability')), 'expected the readability path')
-  assert.equal(on.includes('${{'), false)
-})
-
 test('a parameterized preset targets the launching session when there is one (#874)', () => {
   assert.match(presets.maintenance.render(undefined, { session_name: 'fix-login' }), /^Analyze fix-login and/)
 })

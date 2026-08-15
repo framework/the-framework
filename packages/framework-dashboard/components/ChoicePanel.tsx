@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import type { ChoiceRequest } from '@gemstack/the-framework'
 import { sendChoice } from '../server/control.telefunc.js'
 import { useAction } from '../lib/use-action.js'
-import { usePreferences, updatePreferences, autopilotEnabled } from '../lib/preferences.js'
 import { Button } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'
 import { cn } from '../lib/utils.js'
@@ -10,9 +9,10 @@ import { cn } from '../lib/utils.js'
 // "Your call" — the interactive gate the run parks on (#304/#332), rendered from the
 // live event stream and posted back over Telefunc (server/control.telefunc.ts) to the
 // project's control.jsonl. Three shapes: an Approve/Decline confirm (#358), a
-// multi-select checklist (#332), and the single-select list (#304). When Autopilot is on
-// it auto-accepts the recommended pick after a countdown (#433), which any mouse movement
-// cancels. The panel clears itself when the resulting `choice-resolved` event streams in
+// multi-select checklist (#332), and the single-select list (#304). It always asks: a gate
+// only reaches a panel when somebody is watching, and a session nobody is watching resolves
+// its gates to the recommended option without one. The panel clears itself when the resulting
+// `choice-resolved` event streams in
 // (pendingChoices drops it); mount it with `key={choice.id}` so a re-fired gate resets state.
 // `active` (the first gate in the right rail, #440) binds Ctrl+Enter to Accept.
 export function ChoicePanel({
@@ -58,7 +58,6 @@ export function ChoicePanel({
   // the ref keeps it reading the boxes as they are at fire time (#948).
   const checkedRef = useRef(checked)
   checkedRef.current = checked
-  const autopilot = autopilotEnabled(usePreferences())
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
   const [cancelled, setCancelled] = useState(false)
 
@@ -112,30 +111,6 @@ export function ChoicePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, parked])
 
-  // The countdown: tick down once a second while autopilot is on and uncancelled, then
-  // auto-accept. Restarts if autopilot is toggled back on before a pick is made.
-  useEffect(() => {
-    if (!countdown || !autopilot || cancelled || parked) {
-      setSecondsLeft(null)
-      return
-    }
-    let left = Math.ceil((choice.autoAcceptMs ?? 10000) / 1000)
-    setSecondsLeft(left)
-    const timer = setInterval(() => {
-      left -= 1
-      if (left <= 0) {
-        clearInterval(timer)
-        setSecondsLeft(null)
-        accept('autopilot')
-      } else {
-        setSecondsLeft(left)
-      }
-    }, 1000)
-    return () => clearInterval(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autopilot, cancelled, parked])
-
-  const toggleAutopilot = (on: boolean) => updatePreferences({ autopilot: on }) // shared with the Start form (#410)
 
   return (
     <section
@@ -212,19 +187,7 @@ export function ChoicePanel({
         {parked ? (
           <span role="status">{busy ? 'Sending your choice…' : 'Choice sent — waiting for the session to pick it up…'}</span>
         ) : (
-          <>
-            <label className="flex cursor-pointer items-center gap-1.5">
-              <Checkbox checked={autopilot} onCheckedChange={toggleAutopilot} /> Autopilot
-            </label>
-            {autopilot && (
-              <span className={cn(secondsLeft !== null && !cancelled && 'font-medium text-foreground')}>
-                {cancelled
-                  ? 'Auto accept canceled — pick manually'
-                  : secondsLeft !== null && `● Auto accept in ${secondsLeft}s — move the mouse to cancel`}
-              </span>
-            )}
-            {active && <span className="ml-auto">Ctrl+Enter to accept</span>}
-          </>
+          <>{active && <span className="ml-auto">Ctrl+Enter to accept</span>}</>
         )}
       </div>
     </section>

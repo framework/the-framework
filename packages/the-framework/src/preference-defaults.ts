@@ -25,13 +25,7 @@ import type { Preferences } from './registry.js'
  * runs, which is not something to impose on everyone who clones the repo.
  */
 export const PROJECT_PREFERENCE_KEYS = [
-  'autopilot',
-  'technical',
   'vanilla',
-  'eco',
-  'ecoPlanning',
-  'ecoResearch',
-  'ecoMaintenance',
   'onBeforeMergeableQuality',
   'browser',
   // Per-project by nature (#1102): whether a session should publish itself is a fact about the

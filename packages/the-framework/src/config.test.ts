@@ -6,15 +6,11 @@ import { join } from 'node:path'
 import { loadFrameworkConfig, parseFrameworkConfig } from './config.js'
 
 test('parseFrameworkConfig reads preset + mode booleans + event', () => {
-  assert.deepEqual(
-    parseFrameworkConfig('preset: software-development\nautopilot: true\ntechnical: false\nevent: bug-fix\n'),
-    {
-      preset: 'software-development',
-      autopilot: true,
-      technical: false,
-      event: 'bug-fix',
-    },
-  )
+  assert.deepEqual(parseFrameworkConfig('preset: software-development\ntransparent: true\nevent: bug-fix\n'), {
+    preset: 'software-development',
+    transparent: true,
+    event: 'bug-fix',
+  })
 })
 
 test('parseFrameworkConfig reads the antiLazyPill toggle', () => {
@@ -50,14 +46,14 @@ test('parseFrameworkConfig rejects a non-map document and mistyped fields', () =
   assert.throws(() => parseFrameworkConfig('- a\n- b\n'), /must be a YAML map/)
   assert.throws(() => parseFrameworkConfig('preset: 3\n'), /"preset" must be a string/)
   assert.throws(() => parseFrameworkConfig('event: 3\n'), /"event" must be a string/)
-  assert.throws(() => parseFrameworkConfig('autopilot: yep\n'), /"autopilot" must be a boolean/)
+  assert.throws(() => parseFrameworkConfig('transparent: yep\n'), /"transparent" must be a boolean/)
 })
 
 test('loadFrameworkConfig reads the-framework.yml from a directory', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'framework-cfg-'))
   try {
-    await writeFile(join(dir, 'the-framework.yml'), 'preset: software-development\nautopilot: true\n')
-    assert.deepEqual(await loadFrameworkConfig(dir), { preset: 'software-development', autopilot: true })
+    await writeFile(join(dir, 'the-framework.yml'), 'preset: software-development\ntransparent: true\n')
+    assert.deepEqual(await loadFrameworkConfig(dir), { preset: 'software-development', transparent: true })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

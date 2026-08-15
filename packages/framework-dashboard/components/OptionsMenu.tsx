@@ -221,17 +221,12 @@ function OptionCheckboxRow({ row, busy, indent = false }: { row: OptionRow; busy
 
 export function OptionsMenu({
   options,
-  ecoOptions,
-  showEco,
   busy,
   label = 'Session options',
   runTarget,
   connection,
 }: {
   options: OptionRow[]
-  ecoOptions: OptionRow[]
-  /** Whether Eco's sub-drops apply right now (Eco on and not disabled by Vanilla). */
-  showEco: boolean
   busy: boolean
   /** The trigger's name. In-session composers pass no run options (#833), so theirs says
    *  "Preferences" rather than promising session control it does not have. */
@@ -276,14 +271,6 @@ export function OptionsMenu({
         {options.map(o => (
           <OptionCheckboxRow key={o.key} row={o} busy={busy} />
         ))}
-        {showEco && (
-          <>
-            <DropdownMenuSeparator />
-            {ecoOptions.map(o => (
-              <OptionCheckboxRow key={o.key} row={o} busy={busy} indent />
-            ))}
-          </>
-        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )

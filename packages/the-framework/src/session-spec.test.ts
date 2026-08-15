@@ -10,7 +10,7 @@ const SPEC: SessionSpec = {
   kind: 'build',
   cwd: '/work/app',
   runId: '2026-08-15T10-00-00-000Z',
-  options: { autoOpenPr: false, model: 'opus', eco: { autoPlanning: true } },
+  options: { autoOpenPr: false, model: 'opus', browser: true },
 }
 
 test('a spec round-trips through the file, values intact (D4)', async () => {

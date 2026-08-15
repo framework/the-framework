@@ -5,7 +5,6 @@ import {
   fileConfigLayer,
   resolveConfigKey,
   resolveRunConfig,
-  resolvedModes,
   RUN_CONFIG_DEFAULTS,
   type ConfigLayer,
 } from './config-layers.js'
@@ -19,21 +18,21 @@ const chain = (run = {}, project = {}, repo = {}, global = {}): ConfigLayer[] =>
 ]
 
 test('resolveConfigKey takes the nearest layer that set the key (#841)', () => {
-  assert.deepEqual(resolveConfigKey(chain({ autopilot: false }, { autopilot: true }), 'autopilot'), {
+  assert.deepEqual(resolveConfigKey(chain({ transparent: false }, { transparent: true }), 'transparent'), {
     value: false,
     from: 'run',
   })
-  assert.deepEqual(resolveConfigKey(chain({}, { autopilot: true }), 'autopilot'), { value: true, from: 'project' })
-  assert.deepEqual(resolveConfigKey(chain({}, {}, {}, { autopilot: false }), 'autopilot'), {
+  assert.deepEqual(resolveConfigKey(chain({}, { transparent: true }), 'transparent'), { value: true, from: 'project' })
+  assert.deepEqual(resolveConfigKey(chain({}, {}, {}, { transparent: false }), 'transparent'), {
     value: false,
     from: 'global',
   })
 })
 
 test('resolveConfigKey ignores layers that left the key unset (#841)', () => {
-  assert.equal(resolveConfigKey(chain(), 'autopilot'), undefined)
+  assert.equal(resolveConfigKey(chain(), 'transparent'), undefined)
   // An unset key in a nearer layer does not shadow a farther one that set it.
-  assert.deepEqual(resolveConfigKey(chain({ technical: true }, {}, { autopilot: true }), 'autopilot'), {
+  assert.deepEqual(resolveConfigKey(chain({ technical: true }, {}, { transparent: true }), 'transparent'), {
     value: true,
     from: 'the-framework.yml',
   })
@@ -41,16 +40,15 @@ test('resolveConfigKey ignores layers that left the key unset (#841)', () => {
 
 test('resolveRunConfig: each layer can win, and each can be absent (#841)', () => {
   for (const layer of ['run', 'project', 'the-framework.yml', 'global']) {
-    const layers = chain().map(l => (l.name === layer ? { ...l, values: { autopilot: true, preset: layer } } : l))
+    const layers = chain().map(l => (l.name === layer ? { ...l, values: { transparent: true, preset: layer } } : l))
     const resolved = resolveRunConfig(layers)
-    assert.equal(resolved.autopilot, true, `${layer} should win autopilot`)
+    assert.equal(resolved.transparent, true, `${layer} should win autopilot`)
     assert.equal(resolved.presetName, layer)
-    assert.equal(resolved.sources.autopilot, layer)
+    assert.equal(resolved.sources.transparent, layer)
   }
   // Every layer absent: the defaults hold and nothing claims a source.
   const bare = resolveRunConfig(chain())
-  assert.equal(bare.autopilot, RUN_CONFIG_DEFAULTS.autopilot)
-  assert.equal(bare.technical, RUN_CONFIG_DEFAULTS.technical)
+  assert.equal(bare.transparent, RUN_CONFIG_DEFAULTS.transparent)
   assert.equal(bare.antiLazyPill, RUN_CONFIG_DEFAULTS.antiLazyPill)
   assert.equal(bare.transparent, RUN_CONFIG_DEFAULTS.transparent)
   // The handoff pair defaults on (#1102): a session nobody configured hands itself back.
@@ -73,8 +71,8 @@ test('resolveRunConfig: a nearer false beats a farther true (#841)', () => {
 
 test('fileConfigLayer carries only the keys the-framework.yml set', () => {
   assert.deepEqual(fileConfigLayer({}), { name: 'the-framework.yml', values: {} })
-  assert.deepEqual(fileConfigLayer({ autopilot: false, preset: 'software-development' }).values, {
-    autopilot: false,
+  assert.deepEqual(fileConfigLayer({ transparent: false, preset: 'software-development' }).values, {
+    transparent: false,
     preset: 'software-development',
   })
   // `event` is the file's name for the build event key.
@@ -82,17 +80,11 @@ test('fileConfigLayer carries only the keys the-framework.yml set', () => {
   assert.equal(fileConfigLayer({}, 'other.yml').name, 'other.yml')
 })
 
-test('resolvedModes lists the active Open Loop modes in a stable order', () => {
-  assert.deepEqual(resolvedModes({ autopilot: false, technical: false }), [])
-  assert.deepEqual(resolvedModes({ autopilot: true, technical: false }), ['autopilot'])
-  assert.deepEqual(resolvedModes({ autopilot: true, technical: true }), ['autopilot', 'technical'])
-})
-
 test('describeResolvedConfig narrates which layer won each key (#841)', () => {
   assert.equal(describeResolvedConfig(resolveRunConfig(chain())), '')
   assert.equal(
-    describeResolvedConfig(resolveRunConfig(chain({ autopilot: false }, {}, { autopilot: true, preset: 'software-development' }))),
-    'preset=software-development (the-framework.yml), autopilot=off (run)',
+    describeResolvedConfig(resolveRunConfig(chain({ transparent: false }, {}, { transparent: true, preset: 'software-development' }))),
+    'preset=software-development (the-framework.yml), transparent=off (run)',
   )
   assert.equal(
     describeResolvedConfig(resolveRunConfig(chain({}, {}, { event: 'bug-fix', transparent: true }))),

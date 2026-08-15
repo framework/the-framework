@@ -50,22 +50,15 @@ describe('runOptionRows', () => {
     expect(noPr.disabled).toBe(true)
   })
 
-  test('autopilot is on by default, and off only when explicitly turned off', () => {
-    expect(find(rows({}).main, 'autopilot').checked).toBe(true)
-    expect(find(rows({ autopilot: false }).main, 'autopilot').checked).toBe(false)
-  })
-
   test('Transparent overrides the options below it: they read off and cannot be changed (#625)', () => {
     const main = rows({
       transparent: true,
-      autopilot: true,
-      technical: true,
+      browser: true,
       vanilla: true,
       onBeforeMergeableQuality: true,
-      browser: true,
     }).main
 
-    for (const key of ['autopilot', 'technical', 'vanilla', 'onBeforeMergeableQuality', 'browser']) {
+    for (const key of ['browser', 'vanilla', 'onBeforeMergeableQuality']) {
       const row = find(main, key)
       // Effective, not stored: the run ignores it, so the box must not claim it is on.
       expect(row.checked, `${key} checked`).toBe(false)
@@ -74,18 +67,6 @@ describe('runOptionRows', () => {
     // Transparent itself stays on and available.
     expect(find(main, 'transparent').checked).toBe(true)
     expect(find(main, 'transparent').disabled).toBeUndefined()
-  })
-
-  test('Eco has nothing to trim once the system prompt is off (Vanilla or Transparent)', () => {
-    expect(find(rows({ eco: true, vanilla: true }).main, 'eco')).toMatchObject({
-      checked: false,
-      disabled: true,
-      disabledReason: 'nothing to trim while the system prompt is off',
-    })
-    expect(find(rows({ eco: true, transparent: true }).main, 'eco').disabled).toBe(true)
-    // Plain Eco, nothing else set: available and on.
-    expect(find(rows({ eco: true }).main, 'eco').checked).toBe(true)
-    expect(find(rows({ eco: true }).main, 'eco').disabled).toBeUndefined()
   })
 
   test('Browser is Claude-only, because it rides Claude Code’s MCP config (#801)', () => {
@@ -106,31 +87,6 @@ describe('runOptionRows', () => {
     const row = find(rows({ browser: true, agent: 'nope' }).main, 'browser')
     expect(row.checked).toBe(false)
     expect(row.disabled).toBe(true)
-  })
-
-  test('the Eco drops apply only while Eco itself is in force', () => {
-    const off = rows({ ecoPlanning: true, ecoResearch: true }).eco
-    for (const key of ['ecoPlanning', 'ecoResearch']) {
-      expect(find(off, key), key).toMatchObject({
-        checked: false,
-        disabled: true,
-        disabledReason: 'only applies while Eco is on',
-      })
-    }
-    const on = find(rows({ eco: true, ecoPlanning: true }).eco, 'ecoPlanning')
-    expect(on.checked).toBe(true)
-    expect(on.disabled).toBeUndefined()
-  })
-
-  test('Auto maintenance trims nothing unless Post-merge cleanup runs (#556/#801)', () => {
-    expect(find(rows({ eco: true, ecoMaintenance: true }).eco, 'ecoMaintenance')).toMatchObject({
-      checked: false,
-      disabled: true,
-      disabledReason: 'only applies while Post-merge cleanup is on',
-    })
-    const live = find(rows({ eco: true, ecoMaintenance: true, onBeforeMergeableQuality: true }).eco, 'ecoMaintenance')
-    expect(live.checked).toBe(true)
-    expect(live.disabled).toBeUndefined()
   })
 
   test('Transparent names the agent actually selected, so the label is never a lie (#948)', () => {

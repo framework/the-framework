@@ -10,7 +10,7 @@ test('ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE carries the #326 on-before-mergeable b
   // system-prompt.test.ts. Both blocks declare TODO_FILE, so both can drift from the code.
   assert.ok(ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE.includes(`TODO_FILE: \`${FLAT_TODO_FILE}\``))
   assert.ok(ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE.includes('## Maintenance'))
-  for (const preset of ['maintainability', 'readability', 'security_audit']) {
+  for (const preset of ['maintainability', 'security_audit']) {
     assert.ok(ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE.includes(`tf.presets.${preset}.filePath`), `missing ${preset}`)
   }
 })
@@ -25,19 +25,6 @@ test('the business-knowledge section names every business-knowledge doc (#537)',
   for (const doc of BUSINESS_KNOWLEDGE_DOCS) {
     assert.ok(ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE.includes(`\`${doc.path}\``), `missing ${doc.path}`)
   }
-})
-
-test('eco.autoMaintenance drops the maintenance section and keeps the rest (#314/#537)', () => {
-  const prompt = renderOnBeforeMergeablePrompt({ session_name: 'add-oauth' }, { autoMaintenance: true })
-  assert.ok(!prompt.includes('## Maintenance'))
-  assert.ok(!prompt.includes('.the-framework/presets/'), 'the preset entries go with the section')
-  // The flag names maintenance only, so business knowledge must survive it.
-  assert.ok(prompt.includes('## Business knowledge'))
-  assert.ok(prompt.includes('add-oauth'))
-  assert.ok(!prompt.includes('${{'), 'the dropped section takes its fragments with it')
-  // Absent/off eco leaves the prompt whole.
-  assert.ok(renderOnBeforeMergeablePrompt({ session_name: 'x' }, {}).includes('## Maintenance'))
-  assert.ok(renderOnBeforeMergeablePrompt({ session_name: 'x' }).includes('## Maintenance'))
 })
 
 test('the template never nests a fragment inside another (#556)', () => {
@@ -57,24 +44,12 @@ test('renderOnBeforeMergeablePrompt names the session on every entry', () => {
   assert.match(prompt, /Apply \.the-framework\/presets\/security_audit\.md with tf\.params\.what set to "changes introduced by add-oauth"/)
 })
 
-test('renderOnBeforeMergeablePrompt adds the readability entry only under technical control (#326)', () => {
-  const on = renderOnBeforeMergeablePrompt({ session_name: 'add-oauth', settings: { technical_control: true } })
-  const off = renderOnBeforeMergeablePrompt({ session_name: 'add-oauth', settings: { technical_control: false } })
-  assert.match(on, /Apply \.the-framework\/presets\/readability\.md with tf\.params\.what set to "changes introduced by add-oauth"/)
-  assert.doesNotMatch(off, /readability/)
-  // The other two entries are unconditional either way.
-  for (const prompt of [on, off]) {
-    assert.match(prompt, /maintainability\.md/)
-    assert.match(prompt, /security_audit\.md/)
-  }
-})
-
 test('renderOnBeforeMergeablePrompt defaults absent settings to off rather than throwing (#556)', () => {
   // The template reads `tf.settings.technical_control`, so an absent `settings` would throw
   // on the property access rather than read as off.
   const prompt = renderOnBeforeMergeablePrompt({ session_name: 'add-oauth' })
   assert.doesNotMatch(prompt, /readability/)
-  assert.equal(prompt, renderOnBeforeMergeablePrompt({ session_name: 'add-oauth', settings: {} }))
+  assert.equal(prompt, renderOnBeforeMergeablePrompt({ session_name: 'add-oauth' }))
 })
 
 test('renderOnBeforeMergeablePrompt throws a useful error when the session name is missing (#556)', () => {

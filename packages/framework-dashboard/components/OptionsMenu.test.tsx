@@ -15,10 +15,9 @@ afterEach(() => {
 })
 
 const mainOptions = (): OptionRow[] => [
-  { key: 'autopilot', label: 'Autopilot', title: 't', checked: false },
-  { key: 'eco', label: 'Eco', title: 't', checked: true },
+  { key: 'browser', label: 'Browser', title: 't', checked: false },
+  { key: 'transparent', label: 'Transparent', title: 't', checked: true },
 ]
-const ecoOptions = (): OptionRow[] => [{ key: 'ecoPlanning', label: 'Auto planning', title: 't', checked: false }]
 
 function open() {
   fireEvent.click(screen.getByRole('button', { name: /session options/i }))
@@ -26,7 +25,7 @@ function open() {
 
 describe('OptionsMenu (#654)', () => {
   test('the trigger marks that options are on with a dot (#1046)', async () => {
-    render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={false} busy={false} />)
+    render(<OptionsMenu options={mainOptions()} busy={false} />)
     const trigger = screen.getByRole('button', { name: /session options/i })
     // A presence dot now, not a number: the count is what the tooltip says, the dot in the corner.
     expect((await hoverTooltip(trigger)).textContent).toMatch(/\bon$/)
@@ -35,45 +34,20 @@ describe('OptionsMenu (#654)', () => {
   })
 
   test('toggling an item writes the new value through', () => {
-    render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={false} busy={false} />)
+    render(<OptionsMenu options={mainOptions()} busy={false} />)
     open()
-    fireEvent.click(screen.getByText('Autopilot'))
-    expect(updatePreferences).toHaveBeenCalledWith({ autopilot: true })
-  })
-
-  test('hides the Eco sub-drops when Eco does not apply', () => {
-    render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={false} busy={false} />)
-    open()
-    expect(screen.queryByText('Auto planning')).toBeNull()
-  })
-
-  test('shows the Eco sub-drops when Eco applies', () => {
-    render(<OptionsMenu options={mainOptions()} ecoOptions={ecoOptions()} showEco={true} busy={false} />)
-    open()
-    expect(screen.getByText('Auto planning')).toBeTruthy()
+    fireEvent.click(screen.getByText('Browser'))
+    expect(updatePreferences).toHaveBeenCalledWith({ browser: true })
   })
 
   test('a disabled row is greyed out and says why, and cannot be toggled', () => {
     const options: OptionRow[] = [
       { key: 'browser', label: 'Browser', title: 't', description: 'Gives the agent a real browser.', checked: false, disabled: true, disabledReason: 'only on Claude Code' },
     ]
-    render(<OptionsMenu options={options} ecoOptions={ecoOptions()} showEco={false} busy={false} />)
+    render(<OptionsMenu options={options} busy={false} />)
     open()
     expect(screen.getByText(/only on Claude Code/)).toBeTruthy()
     fireEvent.click(screen.getByText('Browser'))
-    expect(updatePreferences).not.toHaveBeenCalled()
-  })
-
-  test('a disabled Eco sub-drop cannot be toggled either (#801)', () => {
-    // The sub-rows rendered the reason but stayed clickable, so a gated one (Auto maintenance under
-    // Post-merge cleanup) would have looked disabled and still written through.
-    const eco: OptionRow[] = [
-      { key: 'ecoMaintenance', label: 'Auto maintenance', title: 't', checked: false, disabled: true, disabledReason: 'only applies while Post-merge cleanup is on' },
-    ]
-    render(<OptionsMenu options={mainOptions()} ecoOptions={eco} showEco={true} busy={false} />)
-    open()
-    expect(screen.getByText(/only applies while Post-merge cleanup is on/)).toBeTruthy()
-    fireEvent.click(screen.getByText('Auto maintenance'))
     expect(updatePreferences).not.toHaveBeenCalled()
   })
 
@@ -82,8 +56,6 @@ describe('OptionsMenu (#654)', () => {
     render(
       <OptionsMenu
         options={mainOptions()}
-        ecoOptions={ecoOptions()}
-        showEco={false}
         busy={false}
         runTarget={{ value: 'local', onChange }}
       />,
@@ -95,7 +67,7 @@ describe('OptionsMenu (#654)', () => {
   })
 
   test('the Run on submenu is absent when no target control is passed (in-session) (#1050)', () => {
-    render(<OptionsMenu options={[]} ecoOptions={[]} showEco={false} busy={false} />)
+    render(<OptionsMenu options={[]} busy={false} />)
     open()
     expect(screen.queryByText('Run on')).toBeNull()
   })
@@ -128,7 +100,7 @@ describe('OptionsMenu (#654)', () => {
 
   function openRunOn(connection: ConnectionControl, value: RunTarget = 'local') {
     render(
-      <OptionsMenu options={[]} ecoOptions={[]} showEco={false} busy={false} runTarget={{ value, onChange: vi.fn() }} connection={connection} />,
+      <OptionsMenu options={[]} busy={false} runTarget={{ value, onChange: vi.fn() }} connection={connection} />,
     )
     open()
     fireEvent.click(screen.getByText('Run on'))
@@ -156,7 +128,7 @@ describe('OptionsMenu (#654)', () => {
     const onChange = vi.fn()
     const connection = connectionControl()
     render(
-      <OptionsMenu options={[]} ecoOptions={[]} showEco={false} busy={false} runTarget={{ value: 'local', onChange }} connection={connection} />,
+      <OptionsMenu options={[]} busy={false} runTarget={{ value: 'local', onChange }} connection={connection} />,
     )
     open()
     fireEvent.click(screen.getByText('Run on'))
@@ -211,8 +183,6 @@ describe('OptionsMenu (#654)', () => {
     render(
       <OptionsMenu
         options={[]}
-        ecoOptions={[]}
-        showEco={false}
         busy={false}
         runTarget={{ value: 'local', onChange }}
         connection={connectionControl({ isLocal: false, currentUrl: STUDIO_URL, onConnectLocal })}
@@ -232,8 +202,6 @@ describe('OptionsMenu (#654)', () => {
     render(
       <OptionsMenu
         options={[]}
-        ecoOptions={[]}
-        showEco={false}
         busy={false}
         runTarget={{ value: 'actions', onChange }}
         connection={connectionControl({ isLocal: true, selectedDeviceId: STUDIO_URL, onConnectLocal, onSelectDriver })}
@@ -279,7 +247,7 @@ describe('OptionsMenu (#654)', () => {
   })
 
   test('the device rows are absent without a connection control (#1066)', () => {
-    render(<OptionsMenu options={[]} ecoOptions={[]} showEco={false} busy={false} runTarget={{ value: 'local', onChange: vi.fn() }} />)
+    render(<OptionsMenu options={[]} busy={false} runTarget={{ value: 'local', onChange: vi.fn() }} />)
     open()
     fireEvent.click(screen.getByText('Run on'))
     expect(screen.queryByText(STUDIO_URL)).toBeNull()

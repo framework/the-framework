@@ -72,9 +72,9 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
     const project = await world.addProject()
 
     // The Settings page: patch a global and a per-project preference; both read back.
-    const patched = await rpc(patchPreferences)({ autopilot: false })
+    const patched = await rpc(patchPreferences)({ vanilla: false })
     assert.equal(patched.ok, true)
-    assert.equal((await rpc(onPreferences)()).autopilot, false)
+    assert.equal((await rpc(onPreferences)()).vanilla, false)
     const projectPatched = await rpc(patchProjectPreferences)(project.id, { model: 'fable-e2e' })
     assert.equal(projectPatched.ok, true)
     assert.equal((await rpc(onProjectPreferences)(project.id)).model, 'fable-e2e')

@@ -11,10 +11,6 @@ import { errorMessage } from './error-message.js'
 export interface FrameworkFileConfig {
   /** Domain preset to run under, by name (e.g. `software-development`). */
   preset?: string
-  /** Activate the preset's Autopilot mode variants. */
-  autopilot?: boolean
-  /** Activate the preset's Technical mode variants. */
-  technical?: boolean
   /** Build event kind the preset's review loop fires for, e.g. `bug-fix` (#265). */
   event?: string
   /** Inject the built-in system prompt (#326, via #301). Default `true`; set false to remove it. */
@@ -53,7 +49,7 @@ const STRING_CONFIG_KEYS = ['preset', 'event'] as const
  * resolution, and the resolved-config summary all iterate it, so a new mode is added here once and
  * flows through them (only its default and any renamed output field are declared per key).
  */
-export const BOOLEAN_CONFIG_KEYS = ['autopilot', 'technical', 'antiLazyPill', 'transparent', 'autoPushBranch', 'autoOpenPr', 'autoMerge'] as const
+export const BOOLEAN_CONFIG_KEYS = ['antiLazyPill', 'transparent', 'autoPushBranch', 'autoOpenPr', 'autoMerge'] as const
 /** Every config key, string then boolean, in declaration order. */
 export const CONFIG_KEYS = [...STRING_CONFIG_KEYS, ...BOOLEAN_CONFIG_KEYS] as const
 

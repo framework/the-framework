@@ -1,6 +1,5 @@
 import type { RunLocation } from '../run-location.js'
 import type { LinkedPr } from './gh.js'
-import type { EcoOptions } from '../system-prompt.js'
 
 // The dashboard's request/result vocabulary (#345/#396/#475): the shapes the Start / Add /
 // Preview RPCs speak. They live here, on neither the HTTP server nor the Telefunc mount, so
@@ -61,7 +60,6 @@ export interface StartRunOptions {
   /** Transparent mode (#625): run the wrapped agent fully raw (no framework system prompt, guard, dashboard, or TODO loop); maps to `--transparent`. */
   transparent?: boolean
   /** Fine-grained #326 section drops to save tokens. */
-  eco?: EcoOptions
   /** In-context directories (#439): each becomes a `--context <dir>` flag on the spawned run. */
   context?: string[]
   /** On-before-mergeable prompt (#326): on setReadyForMerge(), queue the quality follow-ups as TODO entries; maps to `--on-before-mergeable`. */

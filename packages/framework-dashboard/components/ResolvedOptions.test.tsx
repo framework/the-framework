@@ -5,8 +5,8 @@ import type { OptionRow } from './OptionsMenu.js'
 import { hoverTooltip, unhoverTooltip } from '../test-utils.js'
 
 const rows = (over: Partial<Record<string, boolean>> = {}): OptionRow[] => [
-  { key: 'autopilot', label: 'Autopilot', title: 'a', description: 'a', checked: over.autopilot ?? false },
-  { key: 'technical', label: 'Technical control', title: 't', description: 't', checked: over.technical ?? false },
+  { key: 'transparent', label: 'Transparent', title: 'a', description: 'a', checked: over.transparent ?? false },
+  { key: 'vanilla', label: 'Disable system prompt', title: 't', description: 't', checked: over.vanilla ?? false },
   {
     key: 'browser',
     label: 'Browser',
@@ -24,9 +24,9 @@ describe('ResolvedOptions (#842)', () => {
   })
 
   test('lists the options in play without opening the gear', () => {
-    render(<ResolvedOptions options={rows({ autopilot: true, technical: true })} sources={{}} fileConfig={{}} />)
-    expect(screen.getByText('Autopilot')).toBeTruthy()
-    expect(screen.getByText('Technical control')).toBeTruthy()
+    render(<ResolvedOptions options={rows({ transparent: true, vanilla: true })} sources={{}} fileConfig={{}} />)
+    expect(screen.getByText('Transparent')).toBeTruthy()
+    expect(screen.getByText('Disable system prompt')).toBeTruthy()
     expect(screen.queryByText('Browser')).toBeNull()
   })
 
@@ -40,13 +40,13 @@ describe('ResolvedOptions (#842)', () => {
   test('a value inherited from the repo yml is marked as not yours', async () => {
     render(
       <ResolvedOptions
-        options={rows({ autopilot: true, technical: true })}
-        sources={{ technical: 'repo', autopilot: 'global' }}
+        options={rows({ transparent: true, vanilla: true })}
+        sources={{ vanilla: 'repo', transparent: 'global' }}
         fileConfig={{}}
       />,
     )
-    const repo = screen.getByText('Technical control')
-    const yours = screen.getByText('Autopilot')
+    const repo = screen.getByText('Disable system prompt')
+    const yours = screen.getByText('Transparent')
     expect(repo.textContent).toContain('repo')
     // Which tier a chip came from is a hover away, on the chip itself.
     expect((await hoverTooltip(repo)).textContent).toContain('the-framework.yml')

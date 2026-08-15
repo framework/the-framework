@@ -3,7 +3,7 @@
 ## TLDR
 
 - Three shapes: an Approve/Decline confirmation, a multi-select checklist whose Accept button says exactly what it will send (down to "Accept none"), and a single-select list with the recommended option highlighted.
-- With Autopilot on, the recommended pick auto-accepts after a visible countdown; any mouse movement cancels it — a human who is present gets to decide. Surfaces that show many gates at once turn the countdown off.
+- It always asks. A gate only reaches a panel because somebody is watching; a session nobody is watching resolves its gates to the recommended option without one, so the audience is the signal rather than a setting.
 - A sent answer parks the panel — buttons off, "waiting for the session to pick it up" — until the session confirms and the question goes away.
 - The first open gate also answers to Ctrl+Enter, so the shortcut is unambiguous with several gates open.
 

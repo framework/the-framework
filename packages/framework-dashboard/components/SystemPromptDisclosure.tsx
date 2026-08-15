@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import { composeRunSystem, type EcoOptions } from '@gemstack/the-framework/client'
+import { composeRunSystem } from '@gemstack/the-framework/client'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover.js'
 import { Checkbox } from './ui/checkbox.js'
 import { cn } from '../lib/utils.js'
@@ -30,8 +30,6 @@ export function SystemPromptDisclosure({
   transparent,
   onTransparentChange,
   browser,
-  autopilot,
-  eco,
   context,
   user,
   busy,
@@ -47,8 +45,6 @@ export function SystemPromptDisclosure({
   onTransparentChange?: (value: boolean) => void
   /** The browser section rides with the protocols, so it is part of the prompt the run sends. */
   browser?: boolean
-  autopilot: boolean
-  eco: EcoOptions | undefined
   context: string[]
   /** The repo's own SYSTEM.md text (#872), so the preview shows the prompt the run sends. */
   user?: string | null | undefined
@@ -58,7 +54,7 @@ export function SystemPromptDisclosure({
     antiLazyPill: !disabled,
     ...(transparent ? { transparent: true } : {}),
     ...(browser ? { browser: true } : {}),
-    tf: { prompt, params: { autopilot, ...(eco ? { eco } : {}) } },
+    tf: { prompt },
     ...(context.length ? { context } : {}),
     ...(user ? { user } : {}),
   })

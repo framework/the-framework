@@ -1,6 +1,5 @@
 import { renderTemplate } from './prompt-template.js'
 import { presetContext } from './preset-registry.js'
-import type { TfContext } from './system-prompt.js'
 
 /**
  * The default target a preset runs against (#874): the session it was launched from, falling back
@@ -25,19 +24,13 @@ export interface PresetParam {
 export interface PresetRenderContext {
   /** The launching session's name, once one has been set. */
   session_name?: string | undefined
-  /** Framework settings, e.g. `technical_control`. Defaults to `{}` so a template never throws. */
-  settings?: TfContext['settings']
   /** stem -> `{ filePath }`, so a preset can point at another preset. Defaults to the registry. */
   presets?: Record<string, { filePath: string }> | undefined
 }
 
-/** The `tf` a preset renders against. `settings`/`presets` default so a template never throws. */
+/** The `tf` a preset renders against. `presets` defaults so a template never throws. */
 function tfFrom(ctx: PresetRenderContext): Record<string, unknown> {
-  return {
-    session_name: ctx.session_name,
-    settings: ctx.settings ?? {},
-    presets: ctx.presets ?? presetContext(),
-  }
+  return { session_name: ctx.session_name, presets: ctx.presets ?? presetContext() }
 }
 
 /**

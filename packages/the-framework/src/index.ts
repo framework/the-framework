@@ -241,7 +241,6 @@ export {
 export {
   resolveConfigKey,
   resolveRunConfig,
-  resolvedModes,
   fileConfigLayer,
   describeResolvedConfig,
   RUN_CONFIG_DEFAULTS,
@@ -295,7 +294,7 @@ export {
   type TodoLoopResult,
   type TodoLoopReason,
 } from './todo-loop.js'
-export { runOptionsFromPreferences, autopilotEnabled, preferencesFromFileConfig } from './run-options.js'
+export { runOptionsFromPreferences, preferencesFromFileConfig } from './run-options.js'
 export {
   startAutoPm,
   AUTO_PM_JOBS,

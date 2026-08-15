@@ -28,8 +28,6 @@ import type { FrameworkFileConfig } from './config.js'
  */
 export function preferencesFromFileConfig(file: FrameworkFileConfig): Preferences {
   return {
-    ...(file.autopilot !== undefined ? { autopilot: file.autopilot } : {}),
-    ...(file.technical !== undefined ? { technical: file.technical } : {}),
     ...(file.transparent !== undefined ? { transparent: file.transparent } : {}),
     ...(file.antiLazyPill !== undefined ? { vanilla: !file.antiLazyPill } : {}),
     // The handoff pair (#1102/#1173): whether a session publishes itself is a fact about the repo,
@@ -39,11 +37,6 @@ export function preferencesFromFileConfig(file: FrameworkFileConfig): Preference
     ...(file.autoOpenPr !== undefined ? { autoOpenPr: file.autoOpenPr } : {}),
     ...(file.autoMerge !== undefined ? { autoMerge: file.autoMerge } : {}),
   }
-}
-
-/** Autopilot defaults on (the demo default), matching the old localStorage semantics. */
-export function autopilotEnabled(preferences: Preferences): boolean {
-  return preferences.autopilot ?? true
 }
 
 /**
@@ -70,32 +63,21 @@ export function handoffFromPreferences(preferences: Preferences): { push: boolea
  * `resolvePreferences`' job, and this stays a pure mapping of one settled answer.
  */
 export function runOptionsFromPreferences(preferences: Preferences, context: string[] = []): StartRunOptions {
-  const autopilot = autopilotEnabled(preferences)
   const vanilla = preferences.vanilla ?? false
   const transparent = preferences.transparent ?? false
-  const eco = preferences.eco ?? false
-  const technical = preferences.technical ?? false
   const onBeforeMergeableQuality = preferences.onBeforeMergeableQuality ?? false
   const browser = preferences.browser ?? false
   const handoff = handoffFromPreferences(preferences)
   const model = preferences.model ?? ''
   const agent = preferences.agent ?? 'claude'
   const target = preferences.target ?? 'local'
-  const ecoDrops = {
-    ...(preferences.ecoPlanning ? { autoPlanning: true } : {}),
-    ...(preferences.ecoResearch ? { autoResearch: true } : {}),
-    ...(preferences.ecoMaintenance ? { autoMaintenance: true } : {}),
-  }
   return {
-    // The four toggles `the-framework.yml` also owns go out explicitly, `false` included (#842):
+    // The two toggles `the-framework.yml` also owns go out explicitly, `false` included (#842):
     // the caller has already resolved every layer it can see, so the run states the settled answer
     // and the CLI's own resolve (#841) takes it as the nearest layer. Sending nothing would let the
     // repo file turn back on what the launcher just showed as off.
-    autopilot,
-    technical,
     vanilla,
     transparent,
-    ...(eco && !vanilla && !transparent && Object.keys(ecoDrops).length ? { eco: ecoDrops } : {}),
     ...(onBeforeMergeableQuality ? { onBeforeMergeable: true } : {}),
     // Stated explicitly, `false` included: these default ON (#1102), so sending nothing would let
     // the run's own default turn back on what the launcher just showed as off.

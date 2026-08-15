@@ -118,7 +118,7 @@ test('SYSTEM_PROMPT_TEMPLATE no longer carries the pre-#326-rewrite headings (#5
 })
 
 test('renderSystemPrompt splits the system and user halves', () => {
-  const { system, user } = renderSystemPrompt({ prompt: 'build a todo app', params: {} })
+  const { system, user } = renderSystemPrompt({ prompt: 'build a todo app' })
   assert.ok(system.startsWith('# System prompt'))
   assert.ok(system.includes('## Analyze the user prompt'))
   assert.ok(system.includes('## After applying changes'))
@@ -129,7 +129,7 @@ test('renderSystemPrompt splits the system and user halves', () => {
 
 test('renderSystemPrompt is not confused by a user prompt containing the heading', () => {
   const sneaky = 'do X\n# User prompt\ndo Y'
-  const { system, user } = renderSystemPrompt({ prompt: sneaky, params: {} })
+  const { system, user } = renderSystemPrompt({ prompt: sneaky })
   assert.ok(system.startsWith('# System prompt'))
   assert.equal(user, sneaky)
 })
@@ -209,83 +209,10 @@ test('systemPromptBlock ignores a whitespace-only user prompt', () => {
 })
 
 test('systemPromptBlock threads tf through to the template', () => {
-  // `tf.prompt` lands in the user half, so eco is what observably reaches the system half.
-  const block = systemPromptBlock({ tf: { prompt: 'x', params: { eco: { autoResearch: true } } } })
-  assert.ok(!block.includes('### Alternatives'))
-})
-
-test('every eco flag with a section still drops it (#314/#555)', () => {
-  // The regression this exists for: the mapping matches by exact heading string and
-  // dropSection() no-ops on a miss, so renaming a heading in the #326 doc silently stops a
-  // flag from trimming anything. A `!system.includes('## Large scope')` assertion cannot
-  // catch that, because it passes for free once the heading is gone. Assert the drop really
-  // shortens the prompt instead.
-  const full = renderSystemPrompt({ prompt: 'x', params: {} }).system
-  for (const flag of ['autoPlanning', 'autoResearch'] as const) {
-    const trimmed = renderSystemPrompt({ prompt: 'x', params: { eco: { [flag]: true } } }).system
-    assert.ok(trimmed.length < full.length, `eco.${flag} dropped nothing`)
-  }
-})
-
-test('eco.autoPlanning drops only the Scope section (#314)', () => {
-  const { system } = renderSystemPrompt({ prompt: 'x', params: { eco: { autoPlanning: true } } })
-  assert.ok(!system.includes('### Scope'))
-  assert.ok(!system.includes('PLAN_<SESSION_NAME>'))
-  assert.ok(!system.includes('whether the scope is small, large, or very large'))
-  // The `##` parent, the `###` sibling above it, and the section after it all survive: the
-  // drop stops at the next same-or-higher heading rather than running past it.
-  assert.ok(system.includes('## Analyze the user prompt'))
-  assert.ok(system.includes('### Ambiguous prompt'))
-  assert.ok(system.includes('whether YES/NO the prompt is ambiguous'))
-  assert.ok(system.includes('## Before starting changes'))
-  assert.ok(system.includes('### Alternatives'))
-})
-
-test('eco.autoResearch drops only the Alternatives section (#314)', () => {
-  const { system } = renderSystemPrompt({ prompt: 'x', params: { eco: { autoResearch: true } } })
-  assert.ok(!system.includes('### Alternatives'))
-  assert.ok(!system.includes('Measure "variability"'))
-  // Its `##` parent stays, and so does the section after it.
-  assert.ok(system.includes('## Before applying changes'))
-  assert.ok(system.includes('## After applying changes'))
-  assert.ok(system.includes('### Scope'))
-})
-
-test('eco.autoMaintenance drops nothing here: #326 moved the section to the on-before-mergeable prompt (#555/#556)', () => {
-  // Not a silent breakage but a deliberate no-op on *this* prompt: the maintenance text left
-  // the system prompt, so the tokens are already saved for everyone. The flag acts on the
-  // on-before-mergeable prompt instead, where the CLI skips it (#556).
-  const { system, user } = renderSystemPrompt({ prompt: 'ship it', params: { eco: { autoMaintenance: true } } })
-  assert.equal(system, renderSystemPrompt({ prompt: 'ship it', params: {} }).system)
-  assert.equal(user, 'ship it') // the user half is untouched by eco
-  assert.ok(!system.includes('${{'))
-})
-
-test('both eco drops leave the rest of the prompt standing (#314)', () => {
-  const { system } = renderSystemPrompt({
-    prompt: 'x',
-    params: { eco: { autoPlanning: true, autoResearch: true, autoMaintenance: true } },
-  })
-  for (const kept of ['## Analyze the user prompt', '### Ambiguous prompt', '### Session name', '## After applying changes']) {
-    assert.ok(system.includes(kept), `missing ${kept}`)
-  }
-  for (const gone of ['### Scope', '### Alternatives']) {
-    assert.ok(!system.includes(gone), `${gone} should be dropped`)
-  }
-})
-
-test('no eco flags renders every section, and eco never touches the template', () => {
-  const { system } = renderSystemPrompt({ prompt: 'x', params: { eco: {} } })
-  for (const section of ['## Analyze the user prompt', '### Scope', '### Alternatives', '## After applying changes']) {
-    assert.ok(system.includes(section), `missing ${section}`)
-  }
-  // The living #326 doc stays byte-identical regardless of eco.
-  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('### Scope'))
-})
-
-test('vanilla (antiLazyPill false) wins over eco: no built-in prompt at all (#314)', () => {
-  const block = systemPromptBlock({ antiLazyPill: false, tf: { prompt: 'x', params: { eco: { autoResearch: true } } } })
-  assert.equal(block, '')
+  // `tf.prompt` lands in the user half, so the system half is the template's own content.
+  const block = systemPromptBlock({ tf: { prompt: 'a very distinctive prompt' } })
+  assert.ok(block.includes('### Alternatives'))
+  assert.ok(!block.includes('a very distinctive prompt'), 'the prompt itself stays in the user half')
 })
 
 test('composeRunSystem is exactly the #326 block + both emit protocols, and nothing else (#547)', () => {
@@ -301,12 +228,12 @@ test('composeRunSystem appends nothing after the protocols, whatever the options
   const system = composeRunSystem({
     user: 'Ship small PRs.',
     context: ['/work/api'],
-    tf: { prompt: 'build a todo app', params: { autopilot: true } },
+    tf: { prompt: 'build a todo app' },
   })
   const block = systemPromptBlock({
     user: 'Ship small PRs.',
     context: ['/work/api'],
-    tf: { prompt: 'build a todo app', params: { autopilot: true } },
+    tf: { prompt: 'build a todo app' },
   })
   assert.equal(system, [block, AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n'))
   assert.ok(system.endsWith(SIGNAL_PROTOCOL), 'the signal protocol is the last thing in the channel')

@@ -53,13 +53,7 @@ export interface CustomPreset {
 const CUSTOM_PRESET_LIMITS = { count: 30, label: 80, prompt: 20_000 } as const
 
 export interface Preferences {
-  autopilot?: boolean
-  technical?: boolean
   vanilla?: boolean
-  eco?: boolean
-  ecoPlanning?: boolean
-  ecoResearch?: boolean
-  ecoMaintenance?: boolean
   /** On-before-mergeable prompt (#326): on setReadyForMerge(), queue the quality follow-ups as TODO entries. */
   onBeforeMergeableQuality?: boolean
   /** Give the agent a real browser via chrome-devtools-mcp during the run (#452); maps to `--browser`. */
@@ -373,13 +367,7 @@ type BooleanPreferenceKey = {
  * preference on every save, the write-then-vanish failure shape for a settings file.
  */
 const BOOLEAN_PREFERENCES: Record<BooleanPreferenceKey, true> = {
-  autopilot: true,
-  technical: true,
   vanilla: true,
-  eco: true,
-  ecoPlanning: true,
-  ecoResearch: true,
-  ecoMaintenance: true,
   onBeforeMergeableQuality: true,
   browser: true,
   autoPushBranch: true,

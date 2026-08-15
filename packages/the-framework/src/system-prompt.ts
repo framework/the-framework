@@ -75,62 +75,23 @@ export function topicBindBlock(projects: readonly string[] | undefined): string 
 export const SYSTEM_PROMPT_TEMPLATE = SYSTEM_PROMPT
 
 /**
- * Eco fine-grained control (#314): each flag drops one whole section from the
- * built-in #326 prompt to save tokens, letting the agent auto-handle that concern.
- * The template itself stays byte-identical to the #326 doc; the sections are
- * removed after the split, so a dropped section never leaves a fragment behind.
- */
-export interface EcoOptions {
-  /** Drop `### Scope` (the PLAN-file planning section). */
-  autoPlanning?: boolean | undefined
-  /** Drop `### Alternatives` (the variability-rating research section). */
-  autoResearch?: boolean | undefined
-  /**
-   * Drop `## Maintenance`. Nothing to drop *here*: #326 moved that section out of the
-   * system prompt and into the on-before-mergeable prompt, so this flag acts on that prompt
-   * instead (#556) — see {@link ./on-before-mergeable-prompt.renderOnBeforeMergeablePrompt}. Listed here
-   * because it is still an {@link EcoOptions} flag.
-   */
-  autoMaintenance?: boolean | undefined
-}
-
-/**
- * Maps an {@link EcoOptions} flag to the heading it drops from the template. Partial: a
- * flag whose section no longer lives in this prompt has no entry.
- *
- * Every entry must match a heading that really exists. {@link dropSection} no-ops on a
- * miss, so a heading rename in the #326 doc would silently stop the flag from trimming
- * anything, with no test failure to catch it (a `!includes('## Large scope')` assertion
- * passes for free once that heading is gone). `system-prompt.test.ts` pins each entry
- * against the template and asserts the drop actually shortens the prompt.
- */
-const ECO_SECTION_HEADINGS: Partial<Record<keyof EcoOptions, string>> = {
-  autoPlanning: '### Scope',
-  autoResearch: '### Alternatives',
-}
-
-/**
  * The `tf` context the templates' `${{...}}` fragments read (#326/#350). One shape across
- * the prompts; each reads the subset it needs. `session_name` and `settings` are the
- * on-before-mergeable prompt's (#556), and are snake_case because the doc writes them that way.
+ * the prompts; each reads the subset it needs. `session_name` is the on-before-mergeable
+ * prompt's (#556), and is snake_case because the doc writes it that way.
  */
 export interface TfContext {
-  /** The user's prompt (the run intent, or the typed prompt): fills `${{tf.prompt}}`. */
+  /** The user's prompt (the session's intent, or the typed prompt): fills `${{tf.prompt}}`. */
   prompt: string
-  /** Run parameters the template branches on (e.g. `autopilot`, #325's mode sense; `eco`, #314). */
-  params: { autopilot?: boolean; eco?: EcoOptions | undefined } & Record<string, unknown>
   /**
-   * The session name the agent set via setSessionName(), carried on run state. Only the
+   * The session name the agent set via setSessionName(), carried on session state. Only the
    * on-before-mergeable prompt reads it, never the system prompt: it is set before the agent makes
    * changes and read afterwards, so it is not chicken-and-egg.
    */
   session_name?: string | undefined
-  /** The user's persisted settings the prompts branch on (the #314 Global options). */
-  settings?: { technical_control?: boolean | undefined } | undefined
 }
 
-/** The neutral context used when a caller has none: empty prompt, no modes. */
-const DEFAULT_TF: TfContext = { prompt: '', params: {} }
+/** The neutral context used when a caller has none: an empty prompt. */
+const DEFAULT_TF: TfContext = { prompt: '' }
 
 /** A project-context document: a repo-root path and the one-line gloss shown beside it (#559). */
 export interface ContextDoc {
@@ -231,46 +192,14 @@ export interface RenderedSystemPrompt {
 const USER_PROMPT_HEADING = '\n# User prompt\n'
 
 /**
- * Drop a whole `<heading>` section from a markdown block: everything from the heading
- * up to (but not including) the next heading of the same or a higher level, or the end.
- * The `\n\n` separator ahead of the section goes with it, so the surrounding blocks stay
- * spaced exactly as before. A heading that isn't present is a no-op.
- *
- * Level-aware because #326 nests the eco-droppable sections under `##` parents: dropping
- * `### Scope` has to stop at the next `###` sibling rather than run on to the next `##`
- * and swallow it.
- */
-export function dropSection(md: string, heading: string): string {
-  const at = md.indexOf(`\n${heading}`)
-  if (at === -1) return md
-  const level = /^#+/.exec(heading)?.[0].length ?? 2
-  const after = at + heading.length + 1
-  const next = new RegExp(`\\n#{1,${level}} `).exec(md.slice(after))
-  const end = next ? after + next.index : md.length
-  return md.slice(0, at) + md.slice(end)
-}
-
-/** Remove each Eco-enabled section from the template's system half (#314). */
-function applyEco(systemHalf: string, eco: EcoOptions | undefined): string {
-  if (!eco) return systemHalf
-  let out = systemHalf
-  for (const [key, heading] of Object.entries(ECO_SECTION_HEADINGS) as [keyof EcoOptions, string][]) {
-    if (eco[key]) out = dropSection(out, heading)
-  }
-  return out
-}
-
-/**
  * Render the built-in system prompt against a {@link TfContext} and split it at
  * the `# User prompt` heading. The split happens on the *template*, before
  * rendering, so a user prompt that itself contains the heading can never move
- * the boundary. Eco flags (#314) drop their sections from the system half here,
- * before rendering, so a dropped section's `${{...}}` fragments never evaluate.
+ * the boundary.
  */
 export function renderSystemPrompt(tf: TfContext = DEFAULT_TF): RenderedSystemPrompt {
   const at = SYSTEM_PROMPT_TEMPLATE.indexOf(USER_PROMPT_HEADING)
-  const rawSystemHalf = at === -1 ? SYSTEM_PROMPT_TEMPLATE : SYSTEM_PROMPT_TEMPLATE.slice(0, at)
-  const systemHalf = applyEco(rawSystemHalf, tf.params.eco)
+  const systemHalf = at === -1 ? SYSTEM_PROMPT_TEMPLATE : SYSTEM_PROMPT_TEMPLATE.slice(0, at)
   const userHalf = at === -1 ? '${{tf.prompt}}' : SYSTEM_PROMPT_TEMPLATE.slice(at + USER_PROMPT_HEADING.length)
   return {
     system: renderTemplate(systemHalf, { tf }).trim(),

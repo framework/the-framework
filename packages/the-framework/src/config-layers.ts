@@ -18,8 +18,6 @@ export interface RunConfigValues {
   preset?: string | undefined
   /** Build event kind the preset's review loop fires for (#265). */
   event?: string | undefined
-  autopilot?: boolean | undefined
-  technical?: boolean | undefined
   /** Inject the built-in #326 system prompt (#314). */
   antiLazyPill?: boolean | undefined
   /** Run the wrapped agent fully raw (#625). */
@@ -41,8 +39,6 @@ export interface ConfigLayer {
 
 /** What a key resolves to when no layer set it. */
 export const RUN_CONFIG_DEFAULTS = {
-  autopilot: false,
-  technical: false,
   antiLazyPill: true,
   transparent: false,
   // On by default (#1102): the zero-config handoff is what makes a session left alone hand
@@ -73,8 +69,6 @@ export function resolveConfigKey<K extends keyof RunConfigValues>(
 export interface ResolvedRunConfig {
   presetName?: string | undefined
   buildEvent?: string | undefined
-  autopilot: boolean
-  technical: boolean
   antiLazyPill: boolean
   transparent: boolean
   autoPushBranch: boolean
@@ -114,17 +108,9 @@ export function fileConfigLayer(file: FrameworkFileConfig, name = 'the-framework
   return { name, values }
 }
 
-/** The active Open Loop modes of a resolved config, in a stable order. */
-export function resolvedModes(config: Pick<ResolvedRunConfig, 'autopilot' | 'technical'>): string[] {
-  const modes: string[] = []
-  if (config.autopilot) modes.push('autopilot')
-  if (config.technical) modes.push('technical')
-  return modes
-}
-
 /**
  * A one-line summary of what a layer set and which one won, e.g.
- * `preset=software-development (the-framework.yml), autopilot=off (flag)`. Keys nobody set are
+ * `preset=software-development (the-framework.yml), vanilla=off (flag)`. Keys nobody set are
  * left out, so a run with no config anywhere narrates nothing.
  */
 export function describeResolvedConfig(config: ResolvedRunConfig): string {

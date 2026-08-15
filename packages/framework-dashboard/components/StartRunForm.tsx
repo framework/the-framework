@@ -3,7 +3,7 @@ import type { ProjectSummary } from '@gemstack/the-framework'
 import { runOptionsFromPreferences } from '@gemstack/the-framework/client'
 import { onAgentReady, onClaudeTrust, onProjects, onRepoAutoMerge } from '../server/projects.telefunc.js'
 import { onSystemPromptUser } from '../server/reads.telefunc.js'
-import { usePreferences, updatePreferences, autopilotEnabled } from '../lib/preferences.js'
+import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId } from '../lib/remote-target.js'
 import { useStartRun } from '../lib/use-start-run.js'
@@ -45,9 +45,8 @@ export function StartRunForm({
   const { busy, error, reset, start } = useStartRun()
   const composerRef = useRef<ComposerHandle>(null)
 
-  // The Global options persist daemon-side (#410), shared with the choice-gate countdown.
+  // The Global options persist daemon-side (#410).
   const preferences = usePreferences()
-  const autopilot = autopilotEnabled(preferences)
   const vanilla = preferences.vanilla ?? false
   const transparent = preferences.transparent ?? false // #625: the master off-switch (raw Claude Code)
 
@@ -155,8 +154,6 @@ export function StartRunForm({
       // smaller prompt than the run gets (#863 asks for the entire one). The browser
       // section is Claude-only, and that rule lives in the mapping rather than here.
       browser={options.browser ?? false}
-      autopilot={autopilot}
-      eco={options.eco}
       context={[...context]}
       user={userSystemPrompt}
       busy={busy}

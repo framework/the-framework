@@ -1,4 +1,4 @@
-The settings page: every setting in one findable place — appearance, agent and model, where runs execute, run options, eco, notifications, automation, saved devices and the browser bridge — plus the non-dismissible onboarding checklist.
+The settings page: every setting in one findable place — appearance, agent and model, where runs execute, run options, notifications, automation, saved devices and the browser bridge — plus the non-dismissible onboarding checklist.
 
 ## TLDR
 

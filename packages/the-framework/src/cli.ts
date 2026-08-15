@@ -35,7 +35,6 @@ import {
   type ConfigLayer,
   type ResolvedRunConfig,
 } from './config-layers.js'
-import { type EcoOptions } from './system-prompt.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
 import { appendLog, type LogEntry } from './logs.js'
@@ -206,15 +205,11 @@ export interface SessionOptions {
    * The mode toggles are tri-state (#841): `undefined` is "this run said nothing", so the repo's
    * the-framework.yml decides, while an explicit `--no-*` turns the mode off over the file.
    */
-  autopilot?: boolean | undefined
-  technical?: boolean | undefined
   /** `--vanilla`: remove the built-in #326 system prompt entirely (antiLazyPill off, #314). */
   vanilla?: boolean | undefined
   /** `--transparent` (#625): run the wrapped agent fully raw — no framework system prompt, emit
    * protocols, consumption guard, dashboard, or TODO loop, so a run is identical to `claude -p`. */
   transparent?: boolean | undefined
-  /** `--eco-*`: fine-grained #326 section drops to save tokens (#314). */
-  eco: Required<EcoOptions>
   /** `--context <dir>` (repeatable): in-context directories added as one `Context:` line (#439). */
   context: string[]
   /** `--on-before-mergeable`: fire the #326 on-before-mergeable prompt when the run signals setReadyForMerge(), queueing the quality follow-ups as TODO entries. */
@@ -316,7 +311,6 @@ export function parseArgs(argv: string[]): CliArgs {
 const SESSION_DEFAULTS = {
   agent: 'claude',
   scope: 'full',
-  eco: { autoPlanning: false, autoResearch: false, autoMaintenance: false },
   context: [],
   onBeforeMergeable: false,
   browser: false,
@@ -337,7 +331,6 @@ export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = proce
   const defined = <T>(value: T | undefined): value is T => value !== undefined
   return {
     ...SESSION_DEFAULTS,
-    eco: { ...SESSION_DEFAULTS.eco, ...o.eco },
     context: o.context ?? [],
     fake: env['FRAMEWORK_FAKE'] === '1',
     intent: spec.prompt,
@@ -358,8 +351,6 @@ export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = proce
     ...(o.planRun ? { planRun: true } : {}),
     ...(o.queueEntry?.trim() ? { queueEntry: o.queueEntry } : {}),
     ...(o.unattended ? { unattended: true } : {}),
-    ...(defined(o.autopilot) ? { autopilot: o.autopilot } : {}),
-    ...(defined(o.technical) ? { technical: o.technical } : {}),
     ...(defined(o.vanilla) ? { vanilla: o.vanilla } : {}),
     ...(defined(o.transparent) ? { transparent: o.transparent } : {}),
     ...(defined(o.autoPushBranch) ? { autoPushBranch: o.autoPushBranch } : {}),
@@ -406,13 +397,6 @@ export function unguardedNotices(opts: Pick<SessionOptions, 'agent' | 'maxCost' 
     notices.push(`the browser has no effect on ${spec.label}: the browser tools are wired through Claude Code's MCP config.`)
   }
   return notices
-}
-
-/** The Eco section drops in effect (#314), or `undefined` when none are set. */
-export function ecoOptions(opts: Pick<SessionOptions, 'eco'>): EcoOptions | undefined {
-  const { autoPlanning, autoResearch, autoMaintenance } = opts.eco
-  if (!autoPlanning && !autoResearch && !autoMaintenance) return undefined
-  return { autoPlanning, autoResearch, autoMaintenance }
 }
 
 /** The log kind a run records in `.the-framework/LOGS.md` (#379): the direct paths are prompts, a
@@ -472,8 +456,6 @@ function flagConfigLayer(opts: RunConfigFlags): ConfigLayer {
     values: {
       ...(opts.preset !== undefined ? { preset: opts.preset } : {}),
       ...(opts.buildEvent !== undefined ? { event: opts.buildEvent } : {}),
-      ...(opts.autopilot !== undefined ? { autopilot: opts.autopilot } : {}),
-      ...(opts.technical !== undefined ? { technical: opts.technical } : {}),
       // --vanilla is the negative face of the same key: it removes the built-in prompt.
       ...(opts.vanilla !== undefined ? { antiLazyPill: !opts.vanilla } : {}),
       ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
@@ -486,7 +468,7 @@ function flagConfigLayer(opts: RunConfigFlags): ConfigLayer {
 
 type RunConfigFlags = Pick<
   SessionOptions,
-  'preset' | 'autopilot' | 'technical' | 'buildEvent' | 'vanilla' | 'transparent' | 'autoPushBranch' | 'autoOpenPr' | 'autoMerge'
+  'preset' | 'buildEvent' | 'vanilla' | 'transparent' | 'autoPushBranch' | 'autoOpenPr' | 'autoMerge'
 >
 
 /**
@@ -567,8 +549,8 @@ async function settleRun(ctx: RunEpilogue, run: () => Promise<{ successLine: str
 
 /**
  * Resolve the system-prompt configuration both run paths share (#301/#314), echoing what
- * is in effect: a user SYSTEM.md, the built-in prompt toggle, the eco section drops, and the
- * in-context dirs. Reads SYSTEM.md once, so call it on the shared path before either run.
+ * is in effect: a user SYSTEM.md, the built-in prompt toggle, and the in-context dirs. Reads
+ * SYSTEM.md once, so call it on the shared path before the session starts.
  */
 async function resolvePromptConfig(
   opts: SessionOptions,
@@ -576,19 +558,17 @@ async function resolvePromptConfig(
   cwd: string,
   io: CliIO,
   transparent: boolean,
-): Promise<{ userSystemPrompt?: string; noBuiltinPrompt: boolean; eco?: EcoOptions }> {
+): Promise<{ userSystemPrompt?: string; noBuiltinPrompt: boolean }> {
   const userSystemPrompt = await loadUserSystemPrompt(cwd)
   // Transparent empties the whole channel, which subsumes "no built-in prompt".
   const noBuiltinPrompt = transparent || !config.antiLazyPill
-  const eco = ecoOptions(opts)
   if (userSystemPrompt) io.out(`◆ system prompt: ${SYSTEM_PROMPT_FILE}`)
   // Transparent already announced itself (guard line); don't double-report the prompt being off.
   // Name the layer that turned it off; at the flag tier that flag is --vanilla.
   const offBy = config.sources.antiLazyPill === 'flag' ? '--vanilla' : (config.sources.antiLazyPill ?? 'transparent')
   if (noBuiltinPrompt && !transparent) io.out(`◆ built-in system prompt: off (${offBy})`)
-  else if (eco) io.out(`◆ eco: dropping ${Object.keys(eco).filter(k => eco[k as keyof EcoOptions]).join(', ')}`)
   if (opts.context.length) io.out(`◆ context: ${opts.context.join(', ')}`)
-  return { ...(userSystemPrompt ? { userSystemPrompt } : {}), noBuiltinPrompt, ...(eco ? { eco } : {}) }
+  return { ...(userSystemPrompt ? { userSystemPrompt } : {}), noBuiltinPrompt }
 }
 
 /**
@@ -1188,9 +1168,8 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
       cwd,
       binPath,
       io,
-      { session_name: sessionName, settings: { technical_control: config.technical } },
+      { session_name: sessionName },
       opts.maxCost,
-      opts.eco,
     )
     onEvent({ kind: 'on-before-mergeable', outcome })
   }
@@ -1480,7 +1459,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     ...(promptConfig.noBuiltinPrompt ? { antiLazyPill: false } : {}),
     ...(browserAttached ? { browser: true } : {}),
     ...(transparent ? { transparent: true } : {}),
-    ...(promptConfig.eco ? { eco: promptConfig.eco } : {}),
     ...(opts.context.length ? { context: opts.context } : {}),
     ...(sessionLink ? { sessionLink } : {}),
   }
@@ -1500,9 +1478,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     kind,
     ...(opts.target ? { location: opts.target } : {}),
     prompt: isResearch ? presets.research.render(intent) : intent,
-    // Modes ride along even without a domain preset: autopilot also steers the #326 system
-    // prompt's maintenance stance.
-    ...(config.autopilot ? { autopilot: true } : {}),
     // Resume the stopped leg's conversation (#720/#1467); the prompt above is the continuation
     // message, which `runSession` then sends verbatim.
     ...(opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
@@ -1663,7 +1638,6 @@ export async function runOnBeforeMergeable(
   io: CliIO,
   tf: OnBeforeMergeableContext,
   maxCost?: number,
-  eco?: EcoOptions,
   // Vanilla by default: the follow-up must not run the session-name step and branch (#560).
   run: PromptRunner = (prompt, cwd, binPath, maxCost) => spawnPromptRun(prompt, cwd, binPath, maxCost, true),
   fs: StoreFs = nodeStoreFs(),
@@ -1677,7 +1651,7 @@ export async function runOnBeforeMergeable(
     io.out(`  ! on-before-mergeable: could not materialize presets (${errorMessage(err)})`)
   }
   io.out(`\n◆ on-before-mergeable: queueing quality follow-ups for ${tf.session_name}`)
-  const ok = await run(renderOnBeforeMergeablePrompt(tf, eco), cwd, binPath, maxCost)
+  const ok = await run(renderOnBeforeMergeablePrompt(tf), cwd, binPath, maxCost)
   if (!ok) io.out(`  ! on-before-mergeable queueing did not complete cleanly.`)
   return ok ? 'queued' : 'incomplete'
 }

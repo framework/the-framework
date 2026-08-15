@@ -12,7 +12,7 @@ let prefs: Preferences = {}
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => prefs,
   updatePreferences,
-  autopilotEnabled: (p: Preferences) => p.autopilot ?? true,
+  autopilotEnabled: (p: Preferences) => p.browser ?? true,
   themePreference: (p: Preferences) => p.theme ?? 'system',
   // #842: the launcher strip reads the resolved layers; nothing here sets a repo tier.
   usePreferenceSources: () => ({}),
@@ -159,14 +159,12 @@ describe('Composer (#721)', () => {
     prefs = { onBeforeMergeableQuality: true }
     renderComposer()
     fireEvent.click(screen.getByRole('button', { name: 'Session options' }))
-    // Autopilot no longer claims to relax the maintenance stance: #556 took that section out of the
-    // prompt, leaving the countdown as the whole feature. Scoped to the menu: the same label is on
-    // the resolved-options strip (#842), which explains where the value came from instead.
+    // Scoped to the menu: the same label is on the resolved-options strip (#842), which explains
+    // where the value came from instead.
     const menu = screen.getByRole('menu')
-    const autopilot = within(menu).getByText('Autopilot').closest('[role="menuitemcheckbox"]')!
-    const tip = await hoverTooltip(autopilot)
-    expect(tip.textContent).not.toMatch(/maintenance/i)
-    expect(tip.textContent).toMatch(/countdown/i)
+    const row = within(menu).getByText('Post-merge cleanup').closest('[role="menuitemcheckbox"]')!
+    const tip = await hoverTooltip(row)
+    expect(tip.textContent).toMatch(/ready for merge/i)
   })
 
   test('Browser is disabled with a reason off Claude Code (#801)', () => {
@@ -175,14 +173,6 @@ describe('Composer (#721)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Session options' }))
     // The browser rides Claude Code's MCP config, so under Codex the box was checkable and inert.
     expect(screen.getByText(/only on Claude Code/)).toBeTruthy()
-  })
-
-  test('Auto maintenance is gated on Post-merge cleanup (#801)', () => {
-    // It trims the post-merge prompt, so with that pass off it drops nothing.
-    prefs = { eco: true, ecoMaintenance: true, onBeforeMergeableQuality: false }
-    renderComposer()
-    fireEvent.click(screen.getByRole('button', { name: 'Session options' }))
-    expect(screen.getByText(/only applies while Post-merge cleanup is on/)).toBeTruthy()
   })
 
   test('the submit button is hidden until the editor has text, then appears and fires onSubmit', () => {
@@ -317,12 +307,12 @@ describe('the in-session options gear (#1172)', () => {
     renderComposer({ inSession: true, sessionEnded: true })
     fireEvent.click(screen.getByRole('button', { name: 'Resume options' }))
     const menu = screen.getByRole('menu')
-    for (const label of ['Autopilot', 'Push branch', 'Open PR', 'Auto-merge', 'Browser']) {
+    for (const label of ['Push branch', 'Open PR', 'Auto-merge', 'Browser']) {
       expect(within(menu).getByText(label)).toBeTruthy()
     }
     // The prompt-shaping rows stay out — the resumed transcript already carries its framing —
     // and "Run on" stays out too: the continuation is pinned to its conversation.
-    for (const label of ['Transparent', 'Technical control', 'Disable system prompt', 'Eco', 'Post-merge cleanup']) {
+    for (const label of ['Transparent', 'Disable system prompt', 'Post-merge cleanup']) {
       expect(within(menu).queryByText(label)).toBeNull()
     }
     expect(within(menu).queryByText('Run on')).toBeNull()

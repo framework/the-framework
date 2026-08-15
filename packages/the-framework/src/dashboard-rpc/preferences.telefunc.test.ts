@@ -29,7 +29,7 @@ test('savePreferences returns the typed error when the store write fails, not a 
       },
     }),
   })
-  const result = await savePreferences({ autopilot: true })
+  const result = await savePreferences({ vanilla: true })
   assert.deepEqual(result, { ok: false, error: 'failed to save preferences' })
 })
 
@@ -46,9 +46,9 @@ test('patchPreferences hands back what the store merged (#1148)', async () => {
     ok: true,
     preferences: { theme: 'dark', agent: 'codex' },
   })
-  assert.deepEqual(await patchProjectPreferences('app-1', { technical: true }), {
+  assert.deepEqual(await patchProjectPreferences('app-1', { vanilla: true }), {
     ok: true,
-    preferences: { model: 'sonnet', technical: true },
+    preferences: { model: 'sonnet', vanilla: true },
   })
 })
 

@@ -1,5 +1,5 @@
 import type { Driver, DriverSession } from './driver/index.js'
-import { composeRunSystem, renderSystemPrompt, type EcoOptions, type TfContext } from './system-prompt.js'
+import { composeRunSystem, renderSystemPrompt, type TfContext } from './system-prompt.js'
 import { createRunControls, emitSessionStart, endStopDetail } from './run-telemetry.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
 import { runAwaitRounds, type BindProjectDeps, type RecordMessage } from './await-gate.js'
@@ -70,10 +70,6 @@ export interface RunSessionOptions {
   bind?: BindProjectDeps
   /** Transparent mode (#625): empty the system channel entirely (raw `claude -p`); overrides antiLazyPill/eco. */
   transparent?: boolean
-  /** Whether autopilot mode is on: steers the #326 prompt's maintenance stance (#325). Default false. */
-  autopilot?: boolean
-  /** Eco fine-grained control (#314): drop the enabled #326 sections to save tokens. */
-  eco?: EcoOptions
   /** In-context directories (#439): added as one `Context:` line to the system prompt. */
   context?: readonly string[]
   /**
@@ -186,10 +182,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
   // the opening turn is the entire session and every phase after it is dropped rather than fed.
   const handsOff = isHandsOff(opts.location)
   // The built-in #326 system prompt + any user SYSTEM.md frame the session (#301).
-  const tf: TfContext = {
-    prompt: opts.prompt,
-    params: { autopilot: opts.autopilot === true, ...(opts.eco ? { eco: opts.eco } : {}) },
-  }
+  const tf: TfContext = { prompt: opts.prompt }
   // The "read" half of the bind mechanism (#1121/#1129): a topic session's channel lists the
   // projects it can bind to, read through the same injected seam the gate resolves against so no
   // `node:fs` reaches this path. Absent for a non-topic session, which gets no bind block at all.
@@ -341,9 +334,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
 function openingPrompt(opts: RunSessionOptions, kind: SessionKind, resuming: boolean, cwd: string): string {
   if (resuming || opts.transparent) return opts.prompt
   if (kind === 'prompt') {
-    return opts.antiLazyPill === false
-      ? opts.prompt
-      : renderSystemPrompt({ prompt: opts.prompt, params: { autopilot: opts.autopilot === true, ...(opts.eco ? { eco: opts.eco } : {}) } }).user
+    return opts.antiLazyPill === false ? opts.prompt : renderSystemPrompt({ prompt: opts.prompt }).user
   }
   // Gated on a real driver, so the fake one (which writes nothing, so its workspace always reads
   // empty) always takes the greenfield path and stays deterministic.

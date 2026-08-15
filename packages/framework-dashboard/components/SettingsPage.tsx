@@ -39,7 +39,7 @@ export function SettingsPage({
   const editors = useDetectedEditors()
   const theme = themePreference(preferences)
   // One shared table with the launcher (#958), rules already applied.
-  const { main: runOptions, eco: ecoRows } = runOptionRows(preferences)
+  const { main: runOptions } = runOptionRows(preferences)
   // A notification toggle is a preference; whether it can deliver is a capability (#948). Both are
   // shown, the same way the bell does, so a row cannot promise delivery that will not happen.
   const permission = useNotificationPermission()
@@ -126,12 +126,6 @@ export function SettingsPage({
           description="What a new session starts with. The launcher can still change them for one session."
         >
           {runOptions.map(row => (
-            <OptionToggleRow key={row.key} row={row} />
-          ))}
-        </Section>
-
-        <Section title="Eco" description="Drop sections of the system prompt to spend fewer tokens.">
-          {ecoRows.map(row => (
             <OptionToggleRow key={row.key} row={row} />
           ))}
         </Section>

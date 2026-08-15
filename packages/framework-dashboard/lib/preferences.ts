@@ -392,7 +392,6 @@ const EMPTY_SOURCES: PreferenceSources = {}
 // Autopilot's default-on moved into @gemstack/the-framework with the rest of the preferences ->
 // run options mapping (#858), so the daemon resolves it the same way. Re-exported here because
 // every component reaches for it through this module.
-export { autopilotEnabled } from '@gemstack/the-framework/client'
 
 export type ThemePreference = NonNullable<Preferences['theme']>
 

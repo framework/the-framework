@@ -155,7 +155,6 @@ export const Composer = forwardRef<ComposerHandle, {
   const preferences = usePreferences()
   const sources = usePreferenceSources() // #842: which layer won each option
   const fileConfig = useProjectFileConfig() // #842: the repo's committed the-framework.yml
-  const technical = preferences.technical ?? false
   const vanilla = preferences.vanilla ?? false
 
   // Presets render against the session they are launched from (#874). The run pages pass their
@@ -167,13 +166,12 @@ export const Composer = forwardRef<ComposerHandle, {
         id: p.name,
         label: p.label,
         ...(p.tooltip ? { tooltip: p.tooltip } : {}),
-        render: () => p.render(undefined, { session_name: sessionName, settings: { technical_control: technical } }),
+        render: () => p.render(undefined, { session_name: sessionName }),
         ...(p.newSession ? { newSession: true } : {}),
       })),
-    [sessionName, technical],
+    [sessionName],
   )
   const transparent = preferences.transparent ?? false // #625: the master off-switch (raw Claude Code)
-  const eco = preferences.eco ?? false
   const browser = preferences.browser ?? false
   const model = preferences.model ?? '' // #628: empty = the driver's default model
   const agent = preferences.agent ?? 'claude' // #650: which coding agent drives the run
@@ -257,7 +255,7 @@ export const Composer = forwardRef<ComposerHandle, {
   // The Global options as one table (#314), with every rule between them (#958). The table lives
   // in lib/run-option-rows.ts because the settings page renders the same options: a second copy
   // would let a rule hold in one place and not the other.
-  const { main: mainOptions, eco: ecoOptions } = runOptionRows(preferences)
+  const { main: mainOptions } = runOptionRows(preferences)
 
   const editorEl = (
     <PromptEditor
@@ -322,8 +320,6 @@ export const Composer = forwardRef<ComposerHandle, {
   const optionsGearEl = inSession && !sessionEnded ? null : (
     <OptionsMenu
       options={inSession ? resumeOptionRows(preferences) : mainOptions}
-      ecoOptions={inSession ? [] : ecoOptions}
-      showEco={!inSession && eco && !ecoDisabled}
       busy={busy}
       {...(inSession ? { label: 'Resume options' } : {})}
       // The "Run on" driver axis (#1050) is baked in at spawn, so it is offered only at the launcher —

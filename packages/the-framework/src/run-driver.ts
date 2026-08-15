@@ -1,3 +1,4 @@
+import type { RunLocation } from './run-location.js'
 import { createDriver, type CreateDriverOptions } from './agent.js'
 import { ActionsDriver, CloudDriver, type ActionsDriverOptions, type CloudDriverOptions, type Driver } from './driver/index.js'
 
@@ -16,7 +17,7 @@ export interface CreateRunDriverOptions extends CreateDriverOptions {
    * Where the run executes: `local` (this device, the default), `actions` (a GitHub Actions
    * runner, #1050) or `web` (a Claude Code cloud session, #610).
    */
-  target?: 'local' | 'actions' | 'web'
+  target?: RunLocation
   /** The Actions runner config, required when {@link target} is `actions`. */
   actionsConfig?: ActionsDriverOptions
   /** The cloud-session config used when {@link target} is `web`. Every field has a default. */

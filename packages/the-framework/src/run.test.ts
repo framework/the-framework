@@ -8,6 +8,7 @@ import { requestChoices, requestMultiSelect, runAwaitRounds, type ChoicesOption,
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { RunMessageQueue } from './run-messages.js'
 import { FakeDriver, type Driver, type DriverSession } from './driver/index.js'
+import type { RunLocation } from './run-location.js'
 import { composeRunSystem } from './system-prompt.js'
 import type { ChoiceRequest, FrameworkEvent } from './events.js'
 import { MAX_AWAIT_ROUNDS, PLAN_DECLINED_MESSAGE, continuationPrompt } from './turn-gate.js'
@@ -805,7 +806,7 @@ function handsOffDriver(): { driver: Driver; prompts: () => readonly string[] } 
     },
     sessionId: 'session_01ABC',
   })
-  return { driver: { name: 'fake', handsOff: true, start: opts => inner.start(opts) }, prompts: () => prompts }
+  return { driver: { name: 'fake', start: opts => inner.start(opts) }, prompts: () => prompts }
 }
 
 test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1225)', async () => {
@@ -818,6 +819,7 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
     const { todo } = await runSession({
       prompt: FAKE_INTENT,
       driver,
+      location: 'web',
       cwd,
       // Explicit, so this proves the hand-off outranks an opt-in rather than merely
       // sharing a default with it.
@@ -850,14 +852,14 @@ test('a hand-off run is told the await gates are unavailable, a local one is not
   // Our own prompt says "ambiguous prompt: showChoices + AWAIT". A cloud session that obeys it
   // parks forever on a question nobody attached can answer. The hands-off block amends the
   // await protocol for exactly these runs, and only these.
-  const systemOf = async (driver: Driver): Promise<string> => {
+  const systemOf = async (driver: Driver, location: RunLocation): Promise<string> => {
     const events: FrameworkEvent[] = []
-    await runSession({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: e => events.push(e) })
+    await runSession({ prompt: FAKE_INTENT, driver, location, cwd: '/tmp/ws', onEvent: e => events.push(e) })
     const prompt = events.find(e => e.kind === 'system-prompt')
     return prompt?.kind === 'system-prompt' ? prompt.text : ''
   }
-  assert.ok((await systemOf(handsOffDriver().driver)).includes('This session runs detached'))
-  assert.ok(!(await systemOf(new FakeDriver())).includes('This session runs detached'))
+  assert.ok((await systemOf(handsOffDriver().driver, 'web')).includes('This session runs detached'))
+  assert.ok(!(await systemOf(new FakeDriver(), 'local')).includes('This session runs detached'))
 })
 
 test('a hand-off run does not stay open for messages (#1225)', async () => {
@@ -868,6 +870,7 @@ test('a hand-off run does not stay open for messages (#1225)', async () => {
   const run = runSession({
     prompt: FAKE_INTENT,
     driver,
+    location: 'web',
     cwd: '/tmp/ws',
     messages,
     onEvent: () => {},

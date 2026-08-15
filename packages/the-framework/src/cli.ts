@@ -24,6 +24,7 @@ import {
 } from './run.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
+import { isHandsOff, isRunLocation, type RunLocation } from './run-location.js'
 import { readSessionSpec, writeSessionSpec, type SessionSpec } from './session-spec.js'
 import { sessionTodoPending } from './todo-loop.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from './config.js'
@@ -166,7 +167,7 @@ export interface SessionOptions {
   /** `--run-on <local|actions|web>` (#1050/#610): where the run executes. `actions` drives it on a
    * GitHub Actions runner via ActionsDriver (#934); `web` hands it to a Claude Code cloud session
    * via CloudDriver (#610); absent / `local` runs on this device as before. */
-  target?: 'local' | 'actions' | 'web' | undefined
+  target?: RunLocation | undefined
   cwd?: string | undefined
   /**
    * `--run-id <id>` (#736): the id the daemon allocated for this run before spawning it. Its
@@ -347,7 +348,7 @@ export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = proce
     ...(spec.continueRun ? { continueRun: true } : {}),
     ...(spec.topic ? { topic: true } : {}),
     ...(isAgentName(o.agent) ? { agent: o.agent } : {}),
-    ...(defined(o.target) ? { target: o.target } : {}),
+    ...(isRunLocation(o.target) ? { target: o.target } : {}),
     ...(o.model?.trim() ? { model: o.model.trim() } : {}),
     ...(o.resumeSession?.trim() ? { resumeSession: o.resumeSession.trim() } : {}),
     ...(o.via?.trim() ? { via: o.via.trim() } : {}),
@@ -1497,6 +1498,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   const runOpts: RunSessionOptions = {
     ...sharedRunOptions,
     kind,
+    ...(opts.target ? { location: opts.target } : {}),
     prompt: isResearch ? presets.research.render(intent) : intent,
     // Modes ride along even without a domain preset: autopilot also steers the #326 system
     // prompt's maintenance stance.
@@ -1512,7 +1514,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     await runSession(runOpts)
     // A hand-off ends at the hand-off (#1225): "done" would claim this machine built something
     // it never saw.
-    const successLine = driver.handsOff
+    const successLine = isHandsOff(opts.target)
       ? '\n✓ handed off. The session continues where it was sent, and opens its own pull request.'
       : isResearch
         ? '\n✓ research done: see the REVIEW-PROBLEMS / TODO files it wrote.'

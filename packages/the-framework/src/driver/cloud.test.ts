@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
+import { isHandsOff } from '../run-location.js'
 import { CLOUD_COMMAND, CLOUD_PROMPT_SEPARATOR, CloudDriver, cloudHandOffPrompt, trustRootOf, type RunPtyOptions } from './cloud.js'
 import type { DriverEvent } from './types.js'
 
@@ -255,8 +256,11 @@ test('there is no readCode: the workspace lives in a cloud VM', async () => {
   assert.equal(session.readCode, undefined)
 })
 
-test('the driver declares itself a hand-off, so a run ends at the first prompt (#1225)', () => {
-  // Load-bearing rather than descriptive: this flag is what stops the run reviewing,
-  // improving and asking about work that left this machine with the first prompt.
-  assert.equal(driverWith(CREATED).handsOff, true)
+test('the web location is the hand-off, so a run ends at the first prompt (#1225/D1)', () => {
+  // Load-bearing rather than descriptive: this is what stops a run working the backlog and
+  // asking about work that left this machine with the first prompt. It is a fact about *where*
+  // the turn ran, so it hangs off the location rather than off the driver that spawned it.
+  assert.equal(isHandsOff('web'), true)
+  assert.equal(isHandsOff('local'), false)
+  assert.equal(isHandsOff('actions'), false, 'an Actions runner streams its own replies')
 })

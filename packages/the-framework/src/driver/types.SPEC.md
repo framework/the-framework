@@ -6,7 +6,7 @@ The contract every wrapped coding agent must fit: start a session in a workspace
 - Each prompt is the fresh-context unit; personas are framing text carried on the session, not separate agents.
 - A turn always reports the tokens it spent, but a price only when the agent priced it — an unknown cost is omitted, never zero, so "free" and "unknown" can't be confused.
 - A quota reading is available-with-windows or unavailable-with-a-reason, and the reasons split "this attempt failed" (keep showing the last good reading) from "this setup has no quota" (drop it).
-- A driver can declare itself hands-off: its first prompt sends the work somewhere this machine cannot follow, so the run must end there.
+- A driver answers only "which CLI do I spawn". Whether a run ends at its first prompt is a fact about where that prompt executed, and lives with the location instead.
 
 ## Before writing SPEC.md files
 

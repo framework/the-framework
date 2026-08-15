@@ -26,6 +26,7 @@
 export * from './driver/index.js'
 export { buildPrompt, extendPrompt, scaffoldPrompt, isWorkspaceEmpty } from './steps.js'
 export { runSession, type SessionKind, type RunSessionOptions, type RunSessionResult } from './run.js'
+export { isHandsOff, isRunLocation, RUN_LOCATIONS, type RunLocation } from './run-location.js'
 export {
   requestChoices,
   requestMultiSelect,

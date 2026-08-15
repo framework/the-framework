@@ -1,3 +1,4 @@
+import type { RunLocation } from '../run-location.js'
 import { join } from 'node:path'
 import { hostname } from 'node:os'
 import type { FrameworkEvent } from '../events.js'
@@ -309,7 +310,7 @@ export interface OpenStoreOptions {
    */
   continueRun?: boolean
   /** Where this run executes (#1053/#610): recorded on the meta so the run view can read it. */
-  target?: 'local' | 'actions' | 'web'
+  target?: RunLocation
   /** A project-less topic run (#1120): recorded on the meta so a reader can tell it from a project run. */
   topic?: boolean
   /** The flow this run started under (#1467): recorded on the meta so a continuation can re-enter it. */
@@ -406,7 +407,7 @@ function freshMeta(
   intent?: string,
   owner?: RunOwner,
   id?: string,
-  target?: 'local' | 'actions' | 'web',
+  target?: RunLocation,
   topic?: boolean,
   kind?: 'build' | 'prompt',
 ): RunMeta {

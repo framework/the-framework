@@ -7,6 +7,7 @@ import { leaveResumeNote, runTodoLoop, type TodoLoopResult } from './todo-loop.j
 import { buildPrompt, extendPrompt, isWorkspaceEmpty, scaffoldPrompt } from './steps.js'
 import { type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import type { RunMessages } from './run-messages.js'
+import { isHandsOff, type RunLocation } from './run-location.js'
 
 /**
  * One session: frame the wrapped agent, send it a prompt, honor the gates it answers with, and
@@ -34,6 +35,12 @@ export interface RunSessionOptions {
   prompt: string
   /** Which opening prompt this session gets, and whether the backlog loop follows. Default `build`. */
   kind?: SessionKind
+  /**
+   * Where this session's turns execute (#1050/#610). Default `local`. Only `web` hands the work
+   * somewhere this machine cannot follow, which makes the opening prompt the whole session —
+   * see {@link isHandsOff}.
+   */
+  location?: RunLocation
   /** The wrapped coding agent. */
   driver: Driver
   /** Absolute workspace path the agent works in. */
@@ -175,6 +182,9 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
   }
 
   const kind = opts.kind ?? 'build'
+  // A hand-off location (#1225): the prompt leaves this machine and the reply never comes back, so
+  // the opening turn is the entire session and every phase after it is dropped rather than fed.
+  const handsOff = isHandsOff(opts.location)
   // The built-in #326 system prompt + any user SYSTEM.md frame the session (#301).
   const tf: TfContext = {
     prompt: opts.prompt,
@@ -187,7 +197,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
   const system = composeRunSystem({
     antiLazyPill: opts.antiLazyPill,
     browser: opts.browser,
-    handsOff: opts.driver.handsOff === true,
+    handsOff,
     topic: opts.topic,
     ...(topicProjects ? { topicProjects } : {}),
     transparent: opts.transparent,
@@ -230,13 +240,6 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
   // Non-blocking signals the agent emits per turn: markdown views (#441) and the #326 lifecycle
   // signals (session name, ready-for-merge). None stop the turn.
   const emitTurnSignals = createTurnSignalEmitter(emit)
-
-  // A hand-off driver (#1225): the prompt leaves this machine and the reply never comes back, so
-  // the opening turn is the entire session. Every phase after it — the backlog gate and live chat
-  // — would be reading the driver's own "handed off to <url>" summary as if the agent had written
-  // it. That is what put an unanswerable "Start the next backlog item?" on a dashboard whose agent
-  // was somewhere else entirely. So the phases are dropped rather than fed.
-  const handsOff = opts.driver.handsOff === true
 
   try {
     const rounds = await runAwaitRounds({

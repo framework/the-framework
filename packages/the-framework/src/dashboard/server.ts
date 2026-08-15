@@ -24,60 +24,42 @@ export interface DashboardOptions {
   /** Host to bind. Default `127.0.0.1` (localhost only). */
   host?: string
   /**
-   * Called when the browser starts a run (#345): the `sendStart` telefunction reaches
-   * this through the request context. Wire it to spawn the run (the daemon does); return
-   * `busy: true` to refuse because a run is already active. Omit to disable starting (the
-   * per-run dashboard and the relay never start runs); `sendStart` then reports so.
+   * Called when the browser starts a session (#345): the `sendStart` telefunction reaches this
+   * through the request context. Wire it to spawn the session; return `busy: true` to refuse
+   * because one is already active.
    */
-  onStart?: (
+  onStart: (
     prompt: string,
     kind: StartRunKind,
     options: StartRunOptions,
     projectId?: string,
   ) => StartRunResult | Promise<StartRunResult>
   /**
-   * The multi-project registry provider (#392/#427): the `onProjects` / read / steer
-   * telefunctions resolve project ids through this. Omit to use the real registry (the
-   * daemon does); the per-run dashboard passes a single-project provider, the relay an
-   * empty one.
+   * Called when the browser adds a project (#396): the `sendAddProject` telefunction reaches this
+   * through the request context. Wire it to install the repo (or every git repo under a
+   * directory) and register it.
    */
-  projects?: ProjectsProvider
-  /**
-   * Called when the browser adds a project (#396): the `sendAddProject` telefunction
-   * reaches this through the request context. Wire it to install the repo (or every git
-   * repo under a directory) and register it (the daemon does). Omit to disable adding.
-   */
-  onAddProject?: (path: string, directory: boolean) => Promise<AddProjectResult> | AddProjectResult
+  onAddProject: (path: string, directory: boolean) => Promise<AddProjectResult> | AddProjectResult
   /**
    * The user-preferences store (#410): the `onPreferences` / `savePreferences` telefunctions
-   * read/write it through the request context. Defaults to the real registry file (the daemon
-   * and per-run foreground dashboard both want it); the public relay serves its own mount and
-   * never wires one, so preferences stay inert there.
+   * read/write it through the request context.
    */
-  preferences?: PreferencesStore
+  preferences: PreferencesStore
   /**
    * The Discord credentials store (#1095): `onNotifyChannels` reports what it holds and
-   * `saveDiscordCredentials` writes through it. Defaults to the registry file; the daemon passes
-   * one that also reloads its Discord services, so a pasted token takes effect with no restart.
-   * The relay wires none, so nothing there can be configured.
+   * `saveDiscordCredentials` writes through it. The daemon passes one that also reloads its
+   * Discord services, so a pasted token takes effect with no restart.
    */
-  discord?: DiscordCredentialsStore
+  discord: DiscordCredentialsStore
+  /** Where the usage panel reads the quota from (#533). */
+  quota: QuotaSource
+  /** What auto PM last decided (#1161), for the line under the panel's toggle. */
+  autoPm: AutoPmReporter
   /**
-   * Where the usage panel reads the quota from (#533). Defaults to the daemon's
-   * own poller; the relay passes nothing and mounts no panel.
+   * Fire an auto PM sweep now instead of waiting out the interval (#1210). Resolves when the
+   * sweep does (#1433), so the trigger RPC can await it.
    */
-  quota?: QuotaSource
-  /**
-   * What auto PM last decided (#1161), for the line under the panel's toggle. Only the daemon
-   * runs the sweep, so every other host leaves it unset and the panel says nothing about it.
-   */
-  autoPm?: AutoPmReporter
-  /**
-   * Fire an auto PM sweep now instead of waiting out the interval (#1210). Daemon-only for the
-   * same reason as {@link autoPm}: the loop runs in that process, so nowhere else has one.
-   * Resolves when the sweep does (#1433), so the trigger RPC can await it.
-   */
-  autoPmSweep?: (opts?: { drainOnly?: boolean }) => void | Promise<void>
+  autoPmSweep: (opts?: { drainOnly?: boolean }) => void | Promise<void>
   /**
    * Serve the new dashboard bundle (#405) from this directory — the prerendered Vike SPA
    * (`index.html` + `assets/**`). The daemon also mounts the dashboard's Telefunc surface
@@ -93,20 +75,19 @@ export interface DashboardOptions {
    */
   token?: string
   /**
-   * The live-events source for a run this daemon is relaying from a connected device (#1067): a
-   * stream for such a run, else undefined so `onEvents` tails the on-disk log. Only the daemon
-   * wires one; the per-run dashboard and the relay leave it unset.
+   * The live-events source for a session this daemon is relaying from a connected device (#1067):
+   * a stream for such a session, else undefined so `onEvents` tails the on-disk log.
    */
-  eventsSource?: EventsSource
+  eventsSource: EventsSource
   /**
-   * The relayed-run lookup the read RPCs consult (#1067 slice 2); only the daemon wires it. A run-scoped
-   * RPC uses it to forward a remote run's read/steer/handoff to the device that owns it.
+   * The relayed-run lookup the read RPCs consult (#1067 slice 2). A run-scoped RPC uses it to
+   * forward a remote run's read/steer/handoff to the device that owns it.
    */
-  remote?: RemoteRuns
+  remote: RemoteRuns
   /**
    * Serve a relay-started run's events back to the daemon that relayed it here (#1067): the
-   * `/_relay/*` endpoints (start + events, plus the slice-2 `rpc`). Only the daemon wires one, and all
-   * are fronted by the same `token` guard above, so a device without the cookie cannot start or read a run.
+   * `/_relay/*` endpoints (start + events, plus the slice-2 `rpc`). All are fronted by the same
+   * `token` guard above, so a device without the cookie cannot start or read a run.
    */
   relay?: {
     tailEvents: (runId: string, onEvent: (event: import('../events.js').FrameworkEvent) => void) => () => void
@@ -147,7 +128,7 @@ export interface Dashboard {
  * / `sendAddProject` call the daemon's own closures via {@link DashboardOptions.onStart} /
  * {@link DashboardOptions.onAddProject}.
  */
-export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> {
+export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
   const host = opts.host ?? '127.0.0.1'
   const port = opts.port ?? 4200
   const clientBundleDir = opts.clientBundleDir
@@ -165,21 +146,17 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
 
   // The usage panel polls for the dashboard's whole life, not just during a run:
   // it has to show where the account stands while nothing is running (#533).
-  const quota = opts.quota ?? defaultQuotaSource()
-  // `projects` is passed raw (may be undefined) so the mount falls back to the global
-  // registry, byte-identical to the daemon default; the per-run dashboard passes a
-  // single-project provider, the relay an empty one.
+  const quota = opts.quota
   const telefuncMount = makeTelefuncMount(
     {
-      ...(opts.onStart ? { startRun: opts.onStart } : {}),
-      ...(opts.projects ? { projects: opts.projects } : {}),
-      ...(opts.onAddProject ? { addProject: opts.onAddProject } : {}),
-      ...(opts.eventsSource ? { eventsSource: opts.eventsSource } : {}),
-      ...(opts.remote ? { remote: opts.remote } : {}),
-      preferences: opts.preferences ?? registryPreferencesStore(),
-      discord: opts.discord ?? registryDiscordCredentialsStore(),
-      ...(opts.autoPm ? { autoPm: opts.autoPm } : {}),
-      ...(opts.autoPmSweep ? { autoPmSweep: opts.autoPmSweep } : {}),
+      startRun: opts.onStart,
+      addProject: opts.onAddProject,
+      eventsSource: opts.eventsSource,
+      remote: opts.remote,
+      preferences: opts.preferences,
+      discord: opts.discord,
+      autoPm: opts.autoPm,
+      autoPmSweep: opts.autoPmSweep,
       quota,
     },
     // The bound host, so the mount can reject a rebound `Host`: a page on evil.com whose DNS
@@ -187,12 +164,11 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
     { host },
   )
 
-  // The device-to-daemon relay endpoints (#1067): wired only when the daemon supplies both a start
-  // and an events tail. Fronted by the same token guard as every other route below.
-  const relayHandlers: RelayHandlers | undefined =
-    opts.onStart && opts.relay
-      ? { start: opts.onStart, tailEvents: opts.relay.tailEvents, ...(opts.relay.rpc ? { rpc: opts.relay.rpc } : {}) }
-      : undefined
+  // The device-to-daemon relay endpoints (#1067): wired only when an events tail is supplied.
+  // Fronted by the same token guard as every other route below.
+  const relayHandlers: RelayHandlers | undefined = opts.relay
+    ? { start: opts.onStart, tailEvents: opts.relay.tailEvents, ...(opts.relay.rpc ? { rpc: opts.relay.rpc } : {}) }
+    : undefined
 
   // The browser bridge (#1237). Off unless a token was supplied, and it carries that token itself
   // rather than riding the #1051 guard, which a loopback daemon does not have.

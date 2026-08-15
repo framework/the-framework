@@ -1,43 +1,45 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { provideTelefuncContext } from 'telefunc'
-import { onPreferences, savePreferences, patchPreferences, patchProjectPreferences } from './preferences.telefunc.js'
+import { savePreferences, patchPreferences, patchProjectPreferences } from './preferences.telefunc.js'
 import type { PreferencesStore } from '../registry.js'
 
-// Outside a Telefunc `serve({ context })` there is no preferences store on the context — the
-// same situation as the public relay, which never wires one. The RPCs must degrade safely: a
-// read falls back to the empty default, and a write reports it is not enabled rather than
-// touching the host's home file.
+/** A store whose every method works, with only the ones a test cares about overridden. */
+function store(over: Partial<PreferencesStore> = {}): PreferencesStore {
+  return {
+    read: async () => ({}),
+    save: async () => {},
+    patch: async patch => patch,
+    readProject: async () => ({}),
+    saveProject: async () => {},
+    patchProject: async (_projectId, patch) => patch,
+    ...over,
+  }
+}
 
-test('onPreferences with no store returns the empty default', async () => {
-  assert.deepEqual(await onPreferences(), {})
-})
-
-test('savePreferences with no store is a not-enabled no-op', async () => {
-  const result = await savePreferences({ autopilot: false })
-  assert.deepEqual(result, { ok: false, error: 'preferences are not enabled on this server' })
-})
+// One dashboard host wires the store on every request (D3), so there is no not-enabled case left
+// to degrade to. What is still worth asserting is a store whose write *fails*: that reports the
+// typed error rather than rejecting the RPC, so the client renders it instead of losing the save.
 
 test('savePreferences returns the typed error when the store write fails, not a rejection', async () => {
-  const store: PreferencesStore = {
-    read: async () => ({}),
-    save: async () => {
-      throw new Error('disk full')
-    },
-  }
-  provideTelefuncContext({ preferences: store })
+  provideTelefuncContext({
+    preferences: store({
+      save: async () => {
+        throw new Error('disk full')
+      },
+    }),
+  })
   const result = await savePreferences({ autopilot: true })
   assert.deepEqual(result, { ok: false, error: 'failed to save preferences' })
 })
 
 test('patchPreferences hands back what the store merged (#1148)', async () => {
-  const store: PreferencesStore = {
-    read: async () => ({}),
-    save: async () => {},
-    patch: async patch => ({ theme: 'dark', ...patch }),
-    patchProject: async (_projectId, patch) => ({ model: 'sonnet', ...patch }),
-  }
-  provideTelefuncContext({ preferences: store })
+  provideTelefuncContext({
+    preferences: store({
+      patch: async patch => ({ theme: 'dark', ...patch }),
+      patchProject: async (_projectId, patch) => ({ model: 'sonnet', ...patch }),
+    }),
+  })
 
   // The merged result is the point: the caller adopts it, which is how a stale tab converges.
   assert.deepEqual(await patchPreferences({ agent: 'codex' }), {
@@ -50,27 +52,17 @@ test('patchPreferences hands back what the store merged (#1148)', async () => {
   })
 })
 
-test('a store without the patch pair reports not-enabled rather than throwing (#1148)', async () => {
-  // Both are optional on the seam, so a host that predates them (or the relay) must degrade the
-  // same way the save pair does.
-  provideTelefuncContext({ preferences: { read: async () => ({}), save: async () => {} } as PreferencesStore })
-  const notEnabled = { ok: false, error: 'preferences are not enabled on this server' }
-  assert.deepEqual(await patchPreferences({ theme: 'dark' }), notEnabled)
-  assert.deepEqual(await patchProjectPreferences('app-1', { model: 'opus' }), notEnabled)
-})
-
 test('patchPreferences returns the typed error when the merge write fails (#1148)', async () => {
-  const store: PreferencesStore = {
-    read: async () => ({}),
-    save: async () => {},
-    patch: async () => {
-      throw new Error('disk full')
-    },
-    patchProject: async () => {
-      throw new Error('disk full')
-    },
-  }
-  provideTelefuncContext({ preferences: store })
+  provideTelefuncContext({
+    preferences: store({
+      patch: async () => {
+        throw new Error('disk full')
+      },
+      patchProject: async () => {
+        throw new Error('disk full')
+      },
+    }),
+  })
   const failed = { ok: false, error: 'failed to save preferences' }
   assert.deepEqual(await patchPreferences({ theme: 'dark' }), failed)
   assert.deepEqual(await patchProjectPreferences('app-1', { model: 'opus' }), failed)

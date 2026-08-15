@@ -2,11 +2,9 @@ import { contextAutoPm, contextAutoPmSweep, contextQuota } from './context.js'
 import type { AutoPmOutcome, AutoPmReport } from '../auto-pm.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
-// The usage panel's read surface (#533): where the account's subscription quota stands,
-// and where it stands against the quota boundary (#879). The source is threaded through
-// the Telefunc request context by the daemon, which polls for its whole life; a public
-// host (the relay) leaves it unwired, so the panel reports it has no reading rather than
-// an empty one.
+// The usage panel's read surface (#533): where the account's subscription quota stands, and where
+// it stands against the quota boundary (#879). The source is threaded through the Telefunc request
+// context by the dashboard, which polls for its whole life.
 
 /** An honest empty view: no reading, and so no boundary to measure against. */
 function noReading(): QuotaView {
@@ -17,9 +15,7 @@ function noReading(): QuotaView {
 
 /** Where the account's quota stands against its boundary. */
 export async function onQuota(): Promise<QuotaView> {
-  const source = contextQuota()
-  if (!source) return noReading()
-  return source.read().catch(() => noReading())
+  return contextQuota().read().catch(() => noReading())
 }
 
 /**
@@ -27,14 +23,12 @@ export async function onQuota(): Promise<QuotaView> {
  * `onQuota` because it is the same panel and the same gate: auto PM spends against exactly the
  * boundary drawn above it.
  *
- * `undefined` on a host with no sweep (the relay), which the panel reads as "nothing to say"
+ * `undefined` when the loop has nothing to report yet, which the panel reads as "nothing to say"
  * rather than as an idle sweep — the distinction this whole read exists to make.
  */
 export async function onAutoPm(): Promise<AutoPmReport | undefined> {
-  const report = contextAutoPm()
-  if (!report) return undefined
   try {
-    return report()
+    return contextAutoPm()()
   } catch {
     return undefined
   }
@@ -53,8 +47,7 @@ export async function onAutoPm(): Promise<AutoPmReport | undefined> {
  * be fire-and-forget, so two presses could show literally nothing — no loading state, no
  * outcome, and the stand-down reason recoverable only from the source. The outcomes are read
  * off the loop's own report once the tick resolves, so the card can say them without a poll
- * having to race the sweep. `false` still means a host with no loop (the relay), which the
- * button reads as "nothing here to trigger".
+ * having to race the sweep. `false` means the sweep itself failed.
  *
  * `drainOnly` narrows the sweep to working the queue (#1204): the drain routine's Run now spins
  * agents up on the queue's entries — the fan-out only the sweep can do — and an empty queue is
@@ -67,7 +60,6 @@ export async function sendAutoPmSweep(opts?: { drainOnly?: boolean }): Promise<{
   // the card fell back to "The sweep ran." — the very fallback this RPC exists to avoid. The
   // captured closure needs no context to be called later.
   const reporter = contextAutoPm()
-  if (!sweep) return { ok: false }
   try {
     await sweep(opts?.drainOnly ? { drainOnly: true } : undefined)
   } catch {
@@ -76,7 +68,7 @@ export async function sendAutoPmSweep(opts?: { drainOnly?: boolean }): Promise<{
   // The outcomes live on the loop's report — the same lines `onAutoPm` polls — read once the
   // tick has resolved, so they describe the sweep this click fired.
   try {
-    const report = reporter?.()
+    const report = reporter()
     return { ok: true, ...(report ? { outcomes: report.outcomes } : {}) }
   } catch {
     return { ok: true }

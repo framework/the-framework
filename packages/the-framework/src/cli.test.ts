@@ -54,13 +54,17 @@ function opts(fields: Partial<SessionSpec> = {}): SessionOptions {
 /**
  * Run one session the way the dashboard does: write its spec, hand the path over as `--session`.
  *
+ * A caller that does not name a checkout gets a throwaway one, never `spec()`'s placeholder: this
+ * actually runs, so the cwd has to be a directory the session may write into on any machine.
+ *
  * `fake` rides `FRAMEWORK_FAKE` rather than the spec, because the offline driver is a property of
  * the *process*, not of the session: the e2e harness's own bin sets the same variable on itself
  * before forwarding to `runCli`. Set and restored around the call, which is safe because
  * `node --test` runs a file's tests one at a time.
  */
 async function runSessionCli(fields: Partial<SessionSpec>, io: CliIO, fake = true): Promise<number> {
-  const path = await writeSessionSpec(spec(fields))
+  const cwd = fields.cwd ?? (await mkdtemp(join(tmpdir(), 'framework-session-cwd-')))
+  const path = await writeSessionSpec(spec({ ...fields, cwd }))
   const previous = process.env['FRAMEWORK_FAKE']
   if (fake) process.env['FRAMEWORK_FAKE'] = '1'
   else delete process.env['FRAMEWORK_FAKE']
@@ -108,8 +112,6 @@ test('the session spec is what carries a session, and it round-trips through ses
   assert.equal(o.continueRun, true)
   assert.equal(o.directPrompt, true)
   assert.equal(o.research, false)
-  // The one dashboard is already serving the UI; a spawned session never serves its own.
-  assert.equal(o.dashboard, false)
 })
 
 test('the backlog loop runs unless the spec says otherwise (#323)', () => {
@@ -766,32 +768,31 @@ test('a run that never asked for the post-merge cleanup stays quiet about it (#8
   }
 })
 
-// #905: which runs may be steered, and which stay open for chat. Both used to be the same
-// question answered by "is a daemon alive on this machine", which is not about this run at all.
+// #905: which sessions may be steered, and which stay open for chat. Both used to be the same
+// question answered by "is a daemon alive on this machine", which is not about this session at all.
 
-test('a dashboard-spawned run is steerable through its run id (#905)', () => {
-  // The dashboard spawns with --no-dashboard and passes --run-id. This is the case where every
-  // Stop press was dropped in silence: written to control.jsonl, tailed by nobody.
-  assert.equal(isSteerable({ persist: true, runId: '2026-07-20T20-20-14-026Z' }, false), true)
+test('a dashboard-spawned session is steerable through its run id (#905)', () => {
+  // This is the case where every Stop press was dropped in silence: written to control.jsonl,
+  // tailed by nobody.
+  assert.equal(isSteerable({ persist: true, runId: '2026-07-20T20-20-14-026Z' }), true)
 })
 
-test('with no dashboard and no run id, nothing can reach the run', () => {
-  assert.equal(isSteerable({ persist: true }, false), false)
+test('with no run id, nothing can reach the session', () => {
+  assert.equal(isSteerable({ persist: true }), false)
 })
 
-test('--no-persist is never steerable: there is no control file to tail', () => {
-  assert.equal(isSteerable({ persist: false, runId: 'r1' }, true), false)
+test('a session that does not persist is never steerable: there is no control file to tail', () => {
+  assert.equal(isSteerable({ persist: false, runId: 'r1' }), false)
 })
 
-test('a terminal --no-dashboard run does not stay open for chat, daemon or not (#905/#714)', () => {
-  // The other half of #905: it is reachable, but nobody is waiting in that terminal, so handing
-  // it the live-chat queue parked it forever. #714: "headless / CI runs end when done".
-  assert.equal(isInteractive({}, false), false)
+test('a session nobody started from the dashboard does not stay open for chat (#905/#714)', () => {
+  // The other half of #905: it may be reachable, but nobody is waiting, so handing it the
+  // live-chat queue parked it forever. #714: "headless / CI runs end when done".
+  assert.equal(isInteractive({}), false)
 })
 
-test('a run with a dashboard, or one the daemon started, stays open for chat (#714)', () => {
-  assert.equal(isInteractive({}, true), true)
-  assert.equal(isInteractive({ runId: 'r1' }, false), true)
+test('a session the dashboard started stays open for chat (#714)', () => {
+  assert.equal(isInteractive({ runId: 'r1' }), true)
 })
 
 test('the startup footer prints the commands and the version (#312)', async () => {

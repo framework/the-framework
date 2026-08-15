@@ -12,7 +12,6 @@ import { githubToken } from './dashboard/gh.js'
 import type { ActionsDriverOptions } from './driver/index.js'
 import { launchSharedBrowser, withBrowser, type SharedBrowser } from './browser.js'
 import { connectCdp, startBrowserStream, type BrowserStream } from './browser-stream.js'
-import { startDashboard, singleProjectProvider, resolveDashboardBundle, type Dashboard } from './dashboard/index.js'
 import { randomUUID } from 'node:crypto'
 import { formatFrameworkEvent, mergeWithheldWhy } from './terminal.js'
 import { CLAUDE_CODE_SESSION_LINK } from './session-link.js'
@@ -240,8 +239,6 @@ export interface SessionOptions {
   maxCost?: number
   todoLoop: boolean
   todoMaxItems?: number
-  /** Whether this session serves its own dashboard. Always false: the one dashboard spawned it. */
-  dashboard: boolean
   sessionLink?: string | undefined
   /** Whether the session records itself to `.the-framework/`. Always true outside tests. */
   persist: boolean
@@ -327,8 +324,6 @@ const SESSION_DEFAULTS = {
   context: [],
   onBeforeMergeable: false,
   browser: false,
-  // The dashboard spawned this session and is already serving the UI; it never serves its own.
-  dashboard: false,
   persist: true,
   todoLoop: true,
 } as const
@@ -509,7 +504,6 @@ export function mergeRunConfig(opts: RunConfigFlags, file: FrameworkFileConfig):
 /** The run-scoped state {@link settleRun} needs to close out either run path. */
 interface RunEpilogue {
   io: CliIO
-  dashboard: Dashboard | undefined
   store: RunStore | undefined
   control: ControlWatcher | undefined
   guard: { stop: () => void } | undefined
@@ -531,20 +525,15 @@ interface RunEpilogue {
 
 /**
  * Run one engine (a build or a direct prompt) and settle it identically: on success print its
- * line and keep the dashboard up until Ctrl+C; on a clean stop (interrupt
- * / budget cap #322) report it and stay up; on a real failure report it and close. The teardown
- * — flush the store, close the control channel + consumption guard — runs
- * either way. Returns the exit code (0 on success or a clean stop, 1 on a failure). Shared by
- * both run paths so their epilogues cannot drift.
+ * line; on a clean stop (interrupt / budget cap #322) report it; on a real failure report it. The
+ * teardown — flush the store, close the control channel + consumption guard — runs either way.
+ * Returns the exit code (0 on success or a clean stop, 1 on a failure). Shared by both run paths
+ * so their epilogues cannot drift.
  */
-async function settleRun(
-  ctx: RunEpilogue,
-  run: () => Promise<{ successLine: string }>,
-): Promise<number> {
-  const { io, dashboard } = ctx
+async function settleRun(ctx: RunEpilogue, run: () => Promise<{ successLine: string }>): Promise<number> {
+  const { io } = ctx
   try {
     const { successLine } = await run()
-    // Run settled: hand Ctrl+C back to the post-run dashboard/app wait below.
     ctx.clearInterrupt()
     io.out(successLine)
     // Before the close, not after (#835): close() archives the log into `runs/`, so an
@@ -556,12 +545,6 @@ async function settleRun(
     await ctx.maybeAutoHandoff()
     await ctx.finishLog()
     await ctx.store?.close() // flush the event log; best-effort
-    // Stay up while the dashboard is live, then tear it down.
-    if (dashboard) {
-      io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
-      await waitForInterrupt()
-      await dashboard.close()
-    }
     return 0
   } catch (err) {
     ctx.clearInterrupt()
@@ -569,15 +552,13 @@ async function settleRun(
     // and this is the only place the failing path can record it (#898).
     await ctx.finishLog()
     await ctx.store?.close()
-    // A clean stop (Stop button, Ctrl+C, or a budget cap #322) is not a failure: report it,
-    // keep the dashboard up so the stopped state stays visible, and exit 0.
+    // A clean stop (Stop button, Ctrl+C, or a budget cap #322) is not a failure: report it and
+    // exit 0. The dashboard that spawned this session shows the stopped state from its event log.
     if (ctx.isStopped()) {
       io.out('\n■ Stopped.')
-      if (dashboard) await keepDashboardUp(dashboard, io)
       return 0
     }
     io.err(`\n✗ ${ctx.failLabel} failed: ${errorMessage(err)}`)
-    await dashboard?.close()
     return 1
   } finally {
     ctx.clearInterrupt()
@@ -585,36 +566,6 @@ async function settleRun(
     ctx.guard?.stop()
     await ctx.browserStream?.close()
     await ctx.sharedBrowser?.close()
-  }
-}
-
-/**
- * Start this run's single-project dashboard on `cwd` (#427), or return undefined to run
- * headless. `enabled` gates it (a --no-persist run has no event log to stream); a missing
- * bundle (an old install) or a startup error also fall back to headless. `resumed` tags the
- * URL line, and `headlessNote` is the fallback message's tail.
- */
-async function startRunDashboard(
-  enabled: boolean,
-  cwd: string,
-  port: number | undefined,
-  io: CliIO,
-  labels: { resumed?: boolean; headlessNote: string },
-): Promise<Dashboard | undefined> {
-  if (!enabled) return undefined
-  const clientBundleDir = await resolveDashboardBundle()
-  if (!clientBundleDir) return undefined
-  try {
-    const dashboard = await startDashboard({
-      ...(port !== undefined ? { port } : {}),
-      clientBundleDir,
-      projects: singleProjectProvider(cwd),
-    })
-    io.out(`◆ dashboard${labels.resumed ? ' (resumed)' : ''}: ${dashboard.url}`)
-    return dashboard
-  } catch (err) {
-    io.err(`could not start dashboard (${errorMessage(err)}); ${labels.headlessNote}`)
-    return undefined
   }
 }
 
@@ -661,25 +612,24 @@ async function resolvePromptConfig(
  * (#922), and every Stop press then landed in control.jsonl and was read by nobody, in silence
  * (#905). A run id holds when a file about another process does not.
  */
-export function isSteerable(opts: { persist: boolean; runId?: string | undefined }, hasDashboard: boolean): boolean {
-  return opts.persist && (hasDashboard || opts.runId !== undefined)
+export function isSteerable(opts: { persist: boolean; runId?: string | undefined }): boolean {
+  return opts.persist && opts.runId !== undefined
 }
 
 /**
- * Whether this run should stay open for the user's own messages once it settles (#714).
+ * Whether this session should stay open for the user's own messages once it settles (#714).
  *
- * Narrower than {@link isSteerable} on purpose, and this is the other half of #905. Being
- * steerable only means someone *could* reach it; staying open means a human is expected to keep
- * talking to it. A headless run is neither, but it used to
- * inherit the chat queue purely because a daemon happened to be alive elsewhere on the machine,
- * and then parked forever on a message that terminal could never send. #714 said as much:
- * "headless / CI runs end when done, exactly as today."
+ * The other half of #905. Being steerable only means someone *could* reach it; staying open means
+ * a human is expected to keep talking to it. A headless run is neither, but it used to inherit the
+ * chat queue purely because a daemon happened to be alive elsewhere on the machine, and then
+ * parked forever on a message nothing could send. #714 said as much: "headless / CI runs end when
+ * done, exactly as today."
  *
- * So: this run's own dashboard, or the daemon started it (a run id) and therefore has a UI to
- * carry on the conversation in. Stop and gate picks keep working either way.
+ * So: the dashboard started it (a run id) and therefore has a UI to carry on the conversation in.
+ * Stop and gate picks keep working either way.
  */
-export function isInteractive(opts: { runId?: string | undefined }, hasDashboard: boolean): boolean {
-  return hasDashboard || opts.runId !== undefined
+export function isInteractive(opts: { runId?: string | undefined }): boolean {
+  return opts.runId !== undefined
 }
 
 /**
@@ -1003,15 +953,10 @@ async function runSession(opts: SessionOptions, io: CliIO): Promise<number> {
     pendingChoices.clear()
     messages.close()
   })
-  // No per-session dashboard: the one that spawned this session is already serving the UI, and
-  // reads this session's event/control logs off disk (D4 — `opts.dashboard` is never set).
-  const dashboard = await startRunDashboard(opts.dashboard && opts.persist && !transparent, cwd, undefined, io, {
-    headlessNote: 'continuing headless',
-  })
-  // The new dashboard steers this live run purely through control.jsonl (its Stop / choice
-  // picks are Telefunc writes to that file, #427), which the watcher below tails whenever
-  // the dashboard is up — not only when a daemon is.
-  const newDashboard = dashboard !== undefined
+  // No per-session dashboard (D3). The one that spawned this session is already serving the UI,
+  // reading this session's event log off disk and steering it through control.jsonl — the file is
+  // the seam, so a second server on a second port was only ever a second implementation of the
+  // product's front door.
 
   // Persist the orchestration state so a restart can --resume it (#211). The log
   // is the dashboard's own event stream, appended to .the-framework/ in the workspace.
@@ -1079,7 +1024,7 @@ async function runSession(opts: SessionOptions, io: CliIO): Promise<number> {
   let recordBind: ((projectId: string) => void) | undefined
 
   let control: ControlWatcher | undefined
-  if (isSteerable(opts, newDashboard)) {
+  if (isSteerable(opts)) {
     try {
       await resetControl(cwd)
       control = watchControl(cwd, entry => {
@@ -1147,7 +1092,7 @@ async function runSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // then landed in control.jsonl with nobody left to read them.
   const gateKeepalive = createGateKeepalive()
   const requestChoice =
-    (dashboard || control) && !opts.unattended
+    control !== undefined && !opts.unattended
       ? (req: ChoiceRequest): Promise<ChoicePick> =>
           gateKeepalive.hold(new Promise(resolve => pendingChoices.set(req.id, resolve)))
       : undefined
@@ -1158,12 +1103,11 @@ async function runSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // The parked message wait is the same empty-event-loop hazard as a parked gate (#1359), so it
   // is held the same way; a Stop closes the queue, which releases the hold.
   //
-  // Who parks and who ends is #1390: a daemon-spawned run (--run-id) drains what queued and then
-  // ends itself — its dashboard reopens the conversation via --resume (#762), so nothing needs to
-  // stay alive for the composer. A run serving its own terminal dashboard has no daemon to resume
-  // through, so it keeps the stay-open park; Ctrl+C / Stop is still its way out.
+  // Who parks and who ends is #1390: a dashboard-spawned session drains what queued and then ends
+  // itself — the dashboard reopens the conversation as a continuation (#762), so nothing needs to
+  // stay alive for the composer.
   const chatQueue =
-    isInteractive(opts, newDashboard) && requestChoice
+    isInteractive(opts) && requestChoice
       ? {
           messages: {
             next: (signal?: AbortSignal) => gateKeepalive.hold(messages.next(signal)),
@@ -1391,7 +1335,6 @@ async function runSession(opts: SessionOptions, io: CliIO): Promise<number> {
     await journal.finishLog().catch(() => {})
     control?.close()
     await sharedBrowser?.close().catch(() => {})
-    await dashboard?.close().catch(() => {})
     return 2
   }
 
@@ -1495,7 +1438,6 @@ async function runSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // getter because the onEvent sink sets it as the `end` event arrives.
   const epilogue = (failLabel: string): RunEpilogue => ({
     io,
-    dashboard,
     store,
     control,
     guard,
@@ -1764,13 +1706,6 @@ export async function runOnBeforeMergeable(
   return ok ? 'queued' : 'incomplete'
 }
 
-
-/** The post-run wait: keep the dashboard up until Ctrl+C, then close it. */
-async function keepDashboardUp(dashboard: Dashboard, io: CliIO): Promise<void> {
-  io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
-  await waitForInterrupt()
-  await dashboard.close()
-}
 
 /** Resolve when the process is interrupted (Ctrl+C), so the dashboard stays up. */
 function waitForInterrupt(): Promise<void> {

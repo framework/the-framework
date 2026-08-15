@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
+import { provideTestContext } from './test-context.js'
 import { dispatchRelayRpc, RELAY_RPC_NAMES } from './relay-dispatch.js'
 
 // The device-side whitelist dispatcher (#1067 slice 2): a daemon that relayed a run here calls one of a
@@ -30,6 +31,7 @@ test('dispatchRelayRpc rejects an unknown rpc name (#1067 slice 2)', async () =>
 test('dispatchRelayRpc runs a whitelisted rpc against the home id and returns its empty shape (#1067 slice 2)', async () => {
   // No project is registered under this id, so onGitStatus resolves no checkout and returns null - proof
   // the call reached the whitelisted impl with the home id (the caller's arg[0] project id is dropped).
+  provideTestContext()
   const result = await dispatchRelayRpc('the-framework:no-such-home', 'onGitStatus', ['remote-project-id', 'run-1'])
   assert.equal(result, null)
 })

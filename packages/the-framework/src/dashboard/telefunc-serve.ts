@@ -38,37 +38,34 @@ export interface RemoteRuns {
 }
 
 /**
- * The Telefunc request context the mount provides. `sendStart` reads `startRun` from it;
- * every project-keyed RPC reads `projects` (#427) — the daemon leaves it unset to use the
- * global registry, the per-run foreground dashboard passes a single-project provider. The
- * relay passes `eventsSource` (#426) so `onEvents` streams its in-memory run instead of a
- * file, plus an empty `projects` so the file/registry RPCs return nothing on a public host.
+ * What every telefunction reads off its request context.
+ *
+ * Every field is required (D3). These used to be optional because three hosts served this same
+ * surface — the daemon, a per-session foreground dashboard, and a public relay — each wiring a
+ * different subset, so every RPC carried an "absent capability" branch and the client rendered a
+ * degradation matrix. There is one host now, and it wires all of it.
  */
 export interface DashboardContext {
-  startRun?: StartRunHandler
-  addProject?: AddProjectHandler
-  projects?: ProjectsProvider
-  eventsSource?: EventsSource
-  /** The relayed-run lookup (#1067 slice 2): only the daemon wires it, so a run-scoped RPC can tell a
-   *  local run from one running on a connected device and forward the call there. */
-  remote?: RemoteRuns
-  /** The user-preferences store (#410). The daemon/foreground wire the real registry file;
-   * a public host (the relay) leaves it unset so `onPreferences`/`savePreferences` are inert. */
-  preferences?: PreferencesStore
-  /** The quota source behind the usage panel (#533). The daemon wires a live poller;
-   * a public host (the relay) leaves it unset, so `onQuota` reports it has no reading. */
-  quota?: QuotaSource
-  /** The Discord credentials store (#1095). The daemon wires one that also reloads its Discord
-   * services on a save; a public host leaves it unset, so nothing there is configurable. */
-  discord?: DiscordCredentialsStore
-  /** What auto PM last decided (#1161). Only the daemon runs the sweep, so only it wires this. */
-  autoPm?: AutoPmReporter
+  startRun: StartRunHandler
+  addProject: AddProjectHandler
+  /** The in-memory event stream for a run relayed from a connected device (#1067), else undefined. */
+  eventsSource: EventsSource
+  /** The relayed-run lookup (#1067 slice 2), so a run-scoped RPC can tell a local run from one
+   *  running on a connected device and forward the call there. */
+  remote: RemoteRuns
+  /** The user-preferences store (#410), over the registry file. */
+  preferences: PreferencesStore
+  /** The quota source behind the usage panel (#533). */
+  quota: QuotaSource
+  /** The Discord credentials store (#1095), which also reloads the Discord services on a save. */
+  discord: DiscordCredentialsStore
+  /** What auto PM last decided (#1161). */
+  autoPm: AutoPmReporter
   /**
-   * Run an auto PM sweep now rather than at the next interval (#1210). Same reason `autoPm` is
-   * daemon-only: the loop lives in that process, so nowhere else has one to fire. Resolves when
-   * the sweep does (#1433), so the trigger RPC can await it and return what it decided.
+   * Run an auto PM sweep now rather than at the next interval (#1210). Resolves when the sweep
+   * does (#1433), so the trigger RPC can await it and return what it decided.
    */
-  autoPmSweep?: (opts?: { drainOnly?: boolean }) => void | Promise<void>
+  autoPmSweep: (opts?: { drainOnly?: boolean }) => void | Promise<void>
 }
 
 let instance: Telefunc | undefined
@@ -138,15 +135,14 @@ export function isExpectedHost(req: IncomingMessage, boundHost: string | undefin
  * runs in the daemon process, so a `sendStart` telefunction can call the daemon's own
  * `startRun` via the request context. The `context` is exactly what each telefunction
  * reaches through {@link getContext} (see {@link DashboardContext}): the daemon wires the
- * full set, the relay passes only an events source plus an empty projects provider. Cross-
- * origin POSTs are rejected (CSRF: a page on evil.com must not steer or start a run), as are
- * requests carrying someone else's `Host` when we are bound to loopback (DNS rebinding: the
+ * Cross-origin POSTs are rejected (CSRF: a page on evil.com must not steer or start a session), as
+ * are requests carrying someone else's `Host` when we are bound to loopback (DNS rebinding: the
  * same page must not reach us by pointing its own name at `127.0.0.1`). Pass `opts.host` — the
- * address the server is bound to — to enable that second check; a host serving a public domain
- * (the relay) leaves it unset. Returns whether the request was Telefunc's.
+ * address the server is bound to — to enable that second check. Returns whether the request was
+ * Telefunc's.
  */
 export function makeTelefuncMount(
-  context: DashboardContext = {},
+  context: DashboardContext,
   opts: { host?: string } = {},
 ): (req: IncomingMessage, res: ServerResponse) => Promise<boolean> {
   return async (req, res) => {

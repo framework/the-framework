@@ -9,6 +9,7 @@ import { addProject, projectId as idFor } from '../registry.js'
 import { FRAMEWORK_DIR, WORKTREES_DIR, addWorktree, runBranchName } from '../store/index.js'
 import { CONTROL_FILE } from '../control.js'
 import { nodeGitRunner } from '../project.js'
+import { provideTestContext } from './test-context.js'
 
 // #749: a run tails the control log inside its own worktree (#736), so a steering call has to
 // resolve the RUN, not the project. Addressed at the project root, Stop / messages / choice picks
@@ -40,6 +41,9 @@ async function projectWithWorktreeRun(): Promise<{
   process.env.XDG_CONFIG_HOME = join(dir, 'cfg')
   await mkdir(process.env.XDG_CONFIG_HOME, { recursive: true })
   await addProject(dir, new Date().toISOString())
+  // The context every telefunction reads (D3). In tests it is a global that outlives an await,
+  // unlike the request-scoped one a real serve() provides.
+  provideTestContext()
 
   return {
     dir,
@@ -162,6 +166,9 @@ async function projectWithDirtyWorktree(): Promise<{
   process.env.XDG_CONFIG_HOME = join(dir, 'cfg')
   await mkdir(process.env.XDG_CONFIG_HOME, { recursive: true })
   await addProject(dir, new Date().toISOString())
+  // The context every telefunction reads (D3). In tests it is a global that outlives an await,
+  // unlike the request-scoped one a real serve() provides.
+  provideTestContext()
 
   return {
     dir,

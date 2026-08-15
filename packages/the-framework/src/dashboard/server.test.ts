@@ -5,11 +5,35 @@ import { connect } from 'node:net'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { startDashboard } from './server.js'
+import { startDashboard, type Dashboard, type DashboardOptions } from './server.js'
 import { isExpectedHost, isSameOriginRequest } from './telefunc-serve.js'
+import { registryPreferencesStore } from '../registry.js'
+import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
+import { defaultQuotaSource } from './quota.js'
 import type { FrameworkEvent } from '../events.js'
 import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'
 import type { IncomingMessage } from 'node:http'
+
+/**
+ * Start a dashboard the way the daemon does — every context capability wired (D3) — with only the
+ * parts a test cares about overridden. Since there is one host, the options are required, and a
+ * test asserting one route should still stand up the same server the product does.
+ */
+function dashboard(over: Partial<DashboardOptions> = {}): Promise<Dashboard> {
+  return startDashboard({
+    port: 0,
+    onStart: () => ({ ok: false, error: 'not wired in this test' }),
+    onAddProject: () => ({ ok: false, error: 'not wired in this test' }),
+    eventsSource: () => undefined,
+    remote: { target: () => undefined, list: () => [] },
+    preferences: registryPreferencesStore(),
+    discord: registryDiscordCredentialsStore(),
+    quota: defaultQuotaSource(),
+    autoPm: () => undefined,
+    autoPmSweep: () => {},
+    ...over,
+  })
+}
 
 function fetchText(url: string): Promise<{ status: number; body: string; type: string }> {
   return new Promise((resolvePromise, rejectPromise) => {
@@ -100,7 +124,7 @@ async function fakeBundle(): Promise<string> {
 }
 
 test('without a bundle the server reports the dashboard is not installed (503)', async () => {
-  const dash = await startDashboard({ port: 0 })
+  const dash = await dashboard()
   try {
     const { status, body } = await fetchText(dash.url + '/')
     assert.equal(status, 503)
@@ -112,7 +136,7 @@ test('without a bundle the server reports the dashboard is not installed (503)',
 
 test('serves the prerendered SPA shell at / and hashed assets, with an SPA fallback', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  const dash = await dashboard({ clientBundleDir: bundle })
   try {
     const root = await fetchText(dash.url + '/')
     assert.equal(root.status, 200)
@@ -134,7 +158,7 @@ test('serves the prerendered SPA shell at / and hashed assets, with an SPA fallb
 
 test('a malformed percent-encoded path serves the SPA shell and the server survives (#938)', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  const dash = await dashboard({ clientBundleDir: bundle })
   try {
     // `decodeURIComponent('/%zz')` throws; unguarded it is an unhandled rejection that kills the process.
     const bad = await fetchText(dash.url + '/%zz')
@@ -152,7 +176,7 @@ test('a malformed percent-encoded path serves the SPA shell and the server survi
 
 test('a malformed escape inside a browser-proxy path serves the shell and the server survives (#938)', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  const dash = await dashboard({ clientBundleDir: bundle })
   try {
     // Passes the pathname guard (the URL parses), enters the proxy dispatch, and only explodes
     // at decode time inside parseBrowserRoute — the crash the round-2 pass live-repro'd.
@@ -170,7 +194,7 @@ test('a malformed escape inside a browser-proxy path serves the shell and the se
 
 test('an unparseable absolute-form request target gets a 400 and the server survives (#938)', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  const dash = await dashboard({ clientBundleDir: bundle })
   try {
     // Node's parser passes absolute-form targets through verbatim; `new URL('http://[', ...)`
     // throws synchronously in the request handler, which unguarded kills the process.
@@ -187,7 +211,7 @@ test('an unparseable absolute-form request target gets a 400 and the server surv
 
 test('the Telefunc mount rejects a cross-origin POST (CSRF guard)', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  const dash = await dashboard({ clientBundleDir: bundle })
   try {
     const { status, body } = await postCrossOrigin(dash.url + '/_telefunc')
     assert.equal(status, 403)
@@ -200,7 +224,7 @@ test('the Telefunc mount rejects a cross-origin POST (CSRF guard)', async () => 
 
 test('the Telefunc mount rejects a rebound Host, which the Origin check alone lets through', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  const dash = await dashboard({ clientBundleDir: bundle })
   try {
     // The attack: same-origin as far as the browser is concerned, so `isSameOriginRequest` passes it.
     const rebound = await postRebound(dash.url + '/_telefunc')
@@ -226,7 +250,7 @@ const TOKEN = 'zX2p8Q0hqk3m9tR7vN1cW4bY6sJ5aL0dFgHiKlMnOp'
 // non-loopback drive is noted as a follow-up in the PR.
 async function guardedDashboard(): Promise<{ base: string; close: () => Promise<void> }> {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle, token: TOKEN })
+  const dash = await dashboard({ clientBundleDir: bundle, token: TOKEN })
   return {
     base: dash.url,
     close: async () => {
@@ -297,7 +321,7 @@ test('the fw_daemon cookie admits the bundle, /_telefunc, and /browser (#1051)',
 
 test('a loopback bind sets no token, so the gate is a no-op (byte-identical) (#1051)', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle }) // no token
+  const dash = await dashboard({ clientBundleDir: bundle }) // no token
   try {
     const res = await fetchAuth(dash.url + '/') // no cookie, no ?token=
     assert.equal(res.status, 200)
@@ -378,7 +402,7 @@ async function relayDashboard(): Promise<{
     for (const e of events) onEvent(e)
     return () => {}
   }
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle, token: TOKEN, onStart, relay: { tailEvents } })
+  const dash = await dashboard({ clientBundleDir: bundle, token: TOKEN, onStart, relay: { tailEvents } })
   return {
     base: dash.url,
     starts,

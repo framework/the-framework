@@ -7,28 +7,23 @@ import type { CustomPreset, Preferences, ProjectPreferences } from '../registry.
 // The user-preferences surface behind the new dashboard (#410): the Global options (Autopilot,
 // Technical, Vanilla, Eco + its section drops) the Start form and choice gate share. Persisted
 // daemon-side in the same `the-framework.json` as the project list, so they survive restarts
-// with no localStorage. The store is threaded through the Telefunc request context by the
-// daemon (the real registry file); a public host (the relay) leaves it unwired, so reads fall
-// back to defaults and writes report they are not enabled.
+// with no localStorage. The store is threaded through the Telefunc request context, which the one
+// dashboard host always wires (D3) — there is no second host left to degrade for.
 
 /** The outcome of a {@link savePreferences} write. */
 export type SavePreferencesResult = { ok: true } | { ok: false; error: string }
 
-/** The user's stored dashboard preferences, or `{}` on a host that has none / does not store them. */
+/** The user's stored dashboard preferences, or `{}` when the read fails. */
 export async function onPreferences(): Promise<Preferences> {
-  const store = contextPreferences()
-  if (!store) return {}
-  return store.read().catch(() => ({}))
+  return contextPreferences().read().catch(() => ({}))
 }
 
-/** Persist the dashboard preferences (sanitized in the store). No-op-safe on a public host. */
+/** Persist the dashboard preferences (sanitized in the store). */
 export async function savePreferences(preferences: Preferences): Promise<SavePreferencesResult> {
-  const store = contextPreferences()
-  if (!store) return { ok: false, error: 'preferences are not enabled on this server' }
-  // A failed write returns the advertised typed error rather than rejecting the RPC,
-  // so the client handles it the same as the not-enabled case (both `{ ok: false }`).
+  // A failed write returns the advertised typed error rather than rejecting the RPC, so the
+  // client renders it instead of losing the save to an exception it cannot read.
   try {
-    await store.save(preferences)
+    await contextPreferences().save(preferences)
     return { ok: true }
   } catch {
     return { ok: false, error: 'failed to save preferences' }
@@ -46,36 +41,30 @@ export type PatchPreferencesResult<T> = { ok: true; preferences: T } | { ok: fal
  * adopt the truth it just wrote against, so a tab converges instead of staying stale.
  */
 export async function patchPreferences(patch: Preferences): Promise<PatchPreferencesResult<Preferences>> {
-  const store = contextPreferences()
-  if (!store?.patch) return { ok: false, error: 'preferences are not enabled on this server' }
-  // Typed error rather than a rejection, like `savePreferences` — one shape for both failures.
+  // Typed error rather than a rejection, like `savePreferences` — one shape for every failure.
   try {
-    return { ok: true, preferences: await store.patch(patch) }
+    return { ok: true, preferences: await contextPreferences().patch(patch) }
   } catch {
     return { ok: false, error: 'failed to save preferences' }
   }
 }
 
 /**
- * One project's own run options (#840), or `{}` when it overrides nothing / the host stores
- * none. Separate from {@link onPreferences} rather than folded into it: the client needs the
- * two tiers apart to know which one a toggle should write to.
+ * One project's own run options (#840), or `{}` when it overrides nothing. Separate from
+ * {@link onPreferences} rather than folded into it: the client needs the two tiers apart to know
+ * which one a toggle should write to.
  */
 export async function onProjectPreferences(projectId: string): Promise<ProjectPreferences> {
-  const store = contextPreferences()
-  if (!store?.readProject) return {}
-  return store.readProject(projectId).catch(() => ({}))
+  return contextPreferences().readProject(projectId).catch(() => ({}))
 }
 
-/** Persist one project's run options (#840), sanitized in the store. No-op-safe on a public host. */
+/** Persist one project's run options (#840), sanitized in the store. */
 export async function saveProjectPreferences(
   projectId: string,
   preferences: ProjectPreferences,
 ): Promise<SavePreferencesResult> {
-  const store = contextPreferences()
-  if (!store?.saveProject) return { ok: false, error: 'preferences are not enabled on this server' }
   try {
-    await store.saveProject(projectId, preferences)
+    await contextPreferences().saveProject(projectId, preferences)
     return { ok: true }
   } catch {
     return { ok: false, error: 'failed to save preferences' }
@@ -87,10 +76,8 @@ export async function patchProjectPreferences(
   projectId: string,
   patch: ProjectPreferences,
 ): Promise<PatchPreferencesResult<ProjectPreferences>> {
-  const store = contextPreferences()
-  if (!store?.patchProject) return { ok: false, error: 'preferences are not enabled on this server' }
   try {
-    return { ok: true, preferences: await store.patchProject(projectId, patch) }
+    return { ok: true, preferences: await contextPreferences().patchProject(projectId, patch) }
   } catch {
     return { ok: false, error: 'failed to save preferences' }
   }
@@ -100,21 +87,19 @@ export async function patchProjectPreferences(
  * A project's shared custom presets (#1025), committed into its `.the-framework/` so they travel
  * with the repo — the team-shared counterpart to the user-tier {@link onPreferences} presets. Read
  * from the project's own checkout, so this resolves the project id to its workspace path rather than
- * touching the home registry. `[]` on a public host (no local checkout) or an unknown project.
+ * touching the home registry. `[]` for an unknown project.
  */
 export async function onProjectPresets(projectId: string): Promise<CustomPreset[]> {
-  if (!contextPreferences()) return []
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return []
   return readProjectPresets(cwd).catch(() => [])
 }
 
-/** Persist a project's shared custom presets into its `.the-framework/` (#1025). No-op-safe on a public host. */
+/** Persist a project's shared custom presets into its `.the-framework/` (#1025). */
 export async function saveProjectPresets(
   projectId: string,
   presets: CustomPreset[],
 ): Promise<SavePreferencesResult> {
-  if (!contextPreferences()) return { ok: false, error: 'preferences are not enabled on this server' }
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'unknown project' }
   try {
@@ -125,13 +110,8 @@ export async function saveProjectPresets(
   }
 }
 
-/**
- * The editors installed on this server (#727), for the "Preferred editor" picker. Detection reads
- * the daemon's own PATH, so it is gated on the same store presence as the other preference RPCs:
- * a public host (the relay) has no local checkout to open anyway, so it returns `[]`.
- */
+/** The editors installed on this server (#727), for the "Preferred editor" picker. */
 export async function onEditors(): Promise<EditorInfo[]> {
-  if (!contextPreferences()) return []
   return detectEditors().catch(() => [])
 }
 
@@ -145,7 +125,7 @@ export interface NotifyChannels {
    * not set. Still presence, never a value — nothing here can be turned back into a credential.
    */
   sources: DiscordCredentialStatus
-  /** Whether this host can store a credential at all. False on a public host, which wires no store. */
+  /** Whether this host can store a credential at all. */
   editable: boolean
 }
 
@@ -156,13 +136,10 @@ export interface NotifyChannels {
  *
  * Only presence is reported, never the values, and that is the whole contract: a credential set
  * from the dashboard (#1095) lives daemon-side and is never read back to a browser, so this stays
- * booleans plus where each came from. Gated like the other preference RPCs, so a public host
- * reports both absent.
+ * booleans plus where each came from.
  */
 export async function onNotifyChannels(): Promise<NotifyChannels> {
-  const discord = contextDiscord()
-  if (!contextPreferences() || !discord) return { discordWebhook: false, sources: {}, editable: false }
-  const sources = await discord.status().catch((): DiscordCredentialStatus => ({}))
+  const sources = await contextDiscord().status().catch((): DiscordCredentialStatus => ({}))
   return { discordWebhook: sources.webhook !== undefined, sources, editable: true }
 }
 
@@ -177,11 +154,8 @@ export async function onNotifyChannels(): Promise<NotifyChannels> {
  *
  * The exposure is bounded by the guard the rest of this surface already sits behind: on a
  * non-loopback bind every route requires the shared token (#1051), and anyone through that guard
- * can start runs — strictly more than setting a webhook URL. A public host wires no store, so
- * this refuses there.
+ * can start runs — strictly more than setting a webhook URL.
  */
 export async function saveDiscordCredentials(patch: DiscordCredentialsPatch): Promise<SavePreferencesResult> {
-  const discord = contextDiscord()
-  if (!discord) return { ok: false, error: 'Discord cannot be configured on this server.' }
-  return discord.save(patch).catch(() => ({ ok: false as const, error: 'failed to save' }))
+  return contextDiscord().save(patch).catch(() => ({ ok: false as const, error: 'failed to save' }))
 }

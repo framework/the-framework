@@ -3,8 +3,6 @@ export type { StartRunKind, StartRunOptions, StartRunResult, AddProjectResult, O
 export {
   summarizeProject,
   defaultProjectsProvider,
-  singleProjectProvider,
-  emptyProjectsProvider,
   type ProjectSummary,
   type ProjectsProvider,
   type SummarizeDeps,

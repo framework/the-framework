@@ -248,22 +248,20 @@ export interface Registry {
   secrets?: RegistrySecrets
 }
 
-/** A read/write handle for the user preferences, threaded through the dashboard's Telefunc
- * context so a public host (the relay) can leave it unwired. */
+/** A read/write handle for the user preferences, threaded through the dashboard's Telefunc context. */
 export interface PreferencesStore {
   read(): Promise<Preferences>
   save(preferences: Preferences): Promise<void>
   /**
-   * Merge only the keys the caller changed (#1148) and hand back the stored result. Optional so an
-   * existing implementation of this seam keeps compiling; without it the caller falls back to
+   * Merge only the keys the caller changed (#1148) and hand back the stored result. Preferred over
    * {@link save}, which replaces the whole block from a snapshot that may already be stale.
    */
-  patch?(patch: Preferences): Promise<Preferences>
-  /** One project's overrides (#840). Optional so a host that only stores globals still compiles. */
-  readProject?(projectId: string): Promise<ProjectPreferences>
-  saveProject?(projectId: string, preferences: ProjectPreferences): Promise<void>
+  patch(patch: Preferences): Promise<Preferences>
+  /** One project's overrides (#840). */
+  readProject(projectId: string): Promise<ProjectPreferences>
+  saveProject(projectId: string, preferences: ProjectPreferences): Promise<void>
   /** The {@link patch} counterpart for one project's overrides (#1148). */
-  patchProject?(projectId: string, patch: ProjectPreferences): Promise<ProjectPreferences>
+  patchProject(projectId: string, patch: ProjectPreferences): Promise<ProjectPreferences>
 }
 
 /** The registry file name: a single file under `$XDG_CONFIG_HOME` (dotted under `$HOME`). */

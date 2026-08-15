@@ -2,7 +2,7 @@ Reading and saving the user's settings: global dashboard preferences, per-projec
 
 ## TLDR
 
-- Settings live with the daemon, not the browser, so they survive restarts and follow the user across tabs; a public host stores none — reads fall back to defaults, writes answer that they are not enabled.
+- Settings live with the dashboard, not the browser, so they survive restarts and follow the user across tabs. A write that fails answers with the reason rather than rejecting, so the client renders it instead of losing the save.
 - A save can merge only the keys a tab changed and hand back what is now stored, so a stale tab converges instead of reverting settings it never touched.
 - A project's shared presets are committed into the repo itself, so they travel with the team rather than with one user.
 - Discord credentials are write-only: the browser can set them and learn that they exist (and where each came from), never read a value back; a save applies live, so the bot connects without a restart.

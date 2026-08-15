@@ -7,7 +7,9 @@ import { sendStop, sendChoice, sendMessage, sendSetHandoff, sendPushBranch, send
 // project id, meaningless here) is replaced with this device's home project id, so a relayed call can
 // only ever address the device's own home checkout, never another registered project. These functions
 // resolve their path through the same registry the browser's own calls do (the home project is
-// registered at daemon start) and use no Telefunc request context, so calling them directly is sound.
+// registered at daemon start). They run outside a Telefunc request, which is sound because the one
+// thing they read off the context here — is this run relayed onward? — defaults to no, and on the
+// device that is the truth: the run is local here, so forwarding it again would be a loop.
 // Whitelist only: start/preview/delete stay OFF it.
 
 type RelayFn = (...args: unknown[]) => Promise<unknown>

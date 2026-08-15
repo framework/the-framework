@@ -20,6 +20,7 @@ import { sendStart } from '../dashboard-rpc/control.telefunc.js'
 import { onRuns } from '../dashboard-rpc/reads.telefunc.js'
 import type { FrameworkEvent } from '../events.js'
 import type { StartRunKind, StartRunOptions } from '../dashboard/types.js'
+import type { SessionSpec } from '../session-spec.js'
 import type { QuotaView } from '../dashboard/quota.js'
 import type { AutoPmReport } from '../auto-pm.js'
 
@@ -72,8 +73,8 @@ export interface StoryWorld {
    * Every telefunction reads its context synchronously at its top, so provide-then-call holds.
    */
   rpc<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R
-  /** Argv of every run child this world spawned, one entry per spawn, oldest first. */
-  spawnedArgv(): Promise<string[][]>
+  /** The session spec of every child this world spawned, one entry per spawn, oldest first. */
+  spawnedSpecs(): Promise<SessionSpec[]>
   /**
    * Create a real git repo (initial commit included) and register it through the same
    * `sendAddProject` RPC the dashboard's Add-project dialog calls.
@@ -179,12 +180,12 @@ export async function makeWorld(): Promise<StoryWorld> {
     autoPm,
     rpc,
 
-    async spawnedArgv() {
+    async spawnedSpecs() {
       const raw = await readFile(argvFile, 'utf8').catch(() => '')
       return raw
         .split('\n')
         .filter(line => line.trim())
-        .map(line => JSON.parse(line) as string[])
+        .map(line => JSON.parse(line) as SessionSpec)
     },
 
     async addProject(files = {}) {

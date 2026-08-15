@@ -24,13 +24,10 @@ pnpm --filter @gemstack/framework-dashboard dev
 # open http://localhost:4300
 ```
 
-Populate a project to watch (offline, no Claude usage):
-
-```bash
-# from packages/framework
-node dist/bin.js --fake --no-dashboard --autopilot --cwd /tmp/demo-app
-node dist/bin.js --cwd /tmp/demo-app --port 4399   # registers it, then Ctrl-C the daemon
-```
+Populate a project to watch: run `pnpm dev:daemon` instead of `pnpm dev`, which brings a real
+daemon up in the dev server's own process, and start a session from the UI. The dashboard is the
+only way to start one — the CLI keeps four options and no verbs, and a session's whole
+configuration travels to it as a JSON spec (`--session <path>`), never as flags.
 
 ## Scope
 

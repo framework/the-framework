@@ -15,7 +15,7 @@
  *
  * - {@link Driver} / {@link DriverSession} — the contract
  * - {@link ClaudeCodeDriver} — the first real driver (`claude -p` stream-json)
- * - {@link FakeDriver} — deterministic offline driver for `--fake` / tests
+ * - {@link FakeDriver} — deterministic offline driver for `FRAMEWORK_FAKE` / tests
  *
  * ## Driver-backed steps
  * ai-autopilot's `Bootstrap` steps, re-implemented to run everything *through*
@@ -236,7 +236,18 @@ export {
   type VersionFetcher,
   type UpdateStatus,
 } from './update-check.js'
-export { runCli, parseArgs, runOnBeforeMergeable, promptRunArgs, type PromptRunner, type CliIO, type CliOptions } from './cli.js'
+export {
+  runCli,
+  parseArgs,
+  sessionOptions,
+  runOnBeforeMergeable,
+  promptRunSpec,
+  type PromptRunner,
+  type CliIO,
+  type CliArgs,
+  type SessionOptions,
+} from './cli.js'
+export { readSessionSpec, writeSessionSpec, type SessionSpec } from './session-spec.js'
 export { renderOnBeforeMergeablePrompt, ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE, type OnBeforeMergeableContext } from './on-before-mergeable-prompt.js'
 export {
   loadFrameworkConfig,

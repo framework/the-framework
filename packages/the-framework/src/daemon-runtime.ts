@@ -31,6 +31,7 @@ import {
   type RunMeta,
 } from './store/index.js'
 import type { FrameworkEvent } from './events.js'
+import { writeSessionSpec } from './session-spec.js'
 import type { StartRunKind, StartRunOptions, StartRunResult, AddProjectResult } from './dashboard/index.js'
 import type { EventsSource, RemoteRuns } from './dashboard/telefunc-serve.js'
 import { RelayedRuns, startRemoteRun } from './dashboard/remote-run.js'
@@ -137,8 +138,8 @@ export async function moveTopicRunHistory(scratchCwd: string, worktreeCwd: strin
   }
 }
 
-/** Spawn a detached, unref'd framework child (`node <binPath> <args...>`) that outlives us. */
-export function spawnDetached(binPath: string, args: string[], stderrFile?: string): ChildProcess {
+/** Spawn a detached, unref'd framework child (`node <binPath> --session <specPath>`) that outlives us. */
+export function spawnDetached(binPath: string, specPath: string, stderrFile?: string): ChildProcess {
   // stderr goes to a file, never a pipe: a detached child must not block on a dead parent's pipe
   // buffer, and the file is what makes a silent boot death diagnosable (#1261). Best-effort — a
   // run must still start when the log cannot be opened.
@@ -149,7 +150,10 @@ export function spawnDetached(binPath: string, args: string[], stderrFile?: stri
       fd = openSync(stderrFile, 'w')
     } catch {}
   }
-  const child = spawn(process.execPath, [binPath, ...args], { detached: true, stdio: ['ignore', 'ignore', fd ?? 'ignore'] })
+  const child = spawn(process.execPath, [binPath, '--session', specPath], {
+    detached: true,
+    stdio: ['ignore', 'ignore', fd ?? 'ignore'],
+  })
   if (fd !== undefined) closeSync(fd)
   child.unref()
   return child
@@ -242,68 +246,6 @@ const FINISHED_LEG_EXIT_GRACE_MS = 15_000
 const RETRY_PROMPT =
   'This session died to a transient connection error, not because anyone asked it to stop. Look at what you had already done, then carry on from there and finish the work.'
 
-/**
- * Translate the dashboard's Global options (#314) into CLI flags for the spawned
- * run. Only enabled toggles emit a flag, so a default (all-off) start is
- * byte-identical to before. `parseArgs` on the other side accepts every one.
- */
-export function startOptionFlags(options: StartRunOptions): string[] {
-  const flags: string[] = []
-  // The four toggles the repo's the-framework.yml also owns are tri-state (#842): an explicit
-  // `false` emits the `--no-*` form (#841) so a start from the launcher can turn off what the
-  // repo file turned on. Absent still emits nothing, leaving the file to decide.
-  for (const [key, flag] of [
-    ['autopilot', '--autopilot'],
-    ['technical', '--technical'],
-    ['vanilla', '--vanilla'],
-    ['transparent', '--transparent'],
-    // Tri-state for a different reason (#1102): these two default ON, so `false` must be said out
-    // loud or the run would re-arm what the launcher just disarmed.
-    ['autoPushBranch', '--auto-push-branch'],
-    ['autoOpenPr', '--auto-open-pr'],
-    // Tri-state like the mode toggles (#1216): defaults OFF, but the repo file may turn it on, so
-    // an explicit launcher `false` has to travel as `--no-auto-merge` to win over it.
-    ['autoMerge', '--auto-merge'],
-  ] as const) {
-    const value = options[key]
-    if (value === true) flags.push(flag)
-    else if (value === false) flags.push(`--no-${flag.slice(2)}`)
-  }
-  if (options.eco?.autoPlanning) flags.push('--eco-auto-planning')
-  if (options.eco?.autoResearch) flags.push('--eco-auto-research')
-  if (options.eco?.autoMaintenance) flags.push('--eco-auto-maintenance')
-  for (const dir of options.context ?? []) if (typeof dir === 'string' && dir.trim()) flags.push('--context', dir)
-  if (options.onBeforeMergeable) flags.push('--on-before-mergeable')
-  if (options.browser) flags.push('--browser')
-  if (typeof options.model === 'string' && options.model.trim()) flags.push('--model', options.model.trim())
-  // Agent (#650): only non-default (codex) needs a flag; claude is the CLI default.
-  if (typeof options.agent === 'string' && options.agent.trim() && options.agent !== 'claude') {
-    flags.push('--agent', options.agent.trim())
-  }
-  // Run target (#1050/#610): only a non-local target needs a flag; `local` is the default and
-  // emits nothing, so a local run's argv is unchanged.
-  if (options.target === 'actions' || options.target === 'web') flags.push('--run-on', options.target)
-  // The ticket this run implements (#1117): only ever a `tickets/<file>.md` the daemon read off
-  // the queue entry, and re-checked on the other side before it reaches the run's meta.
-  if (typeof options.ticket === 'string' && isTicketPath(options.ticket)) flags.push('--ticket', options.ticket)
-  // A planning run (#1327): the ticket above is being planned, not implemented, so the PR title
-  // must not inherit its issue as `(fix #42)` — the plan's merge would close it (#1334).
-  if (options.planRun) flags.push('--plan-run')
-  // The pinned queue entry (#1253): one line of agent-written queue text, passed verbatim (argv,
-  // never a shell) so the meta's claim matches the queue read byte for byte.
-  if (typeof options.queueEntry === 'string' && options.queueEntry.trim()) flags.push('--queue-entry', options.queueEntry)
-  // Unattended (#846): nobody is at the keyboard, so gates take the recommended option
-  // rather than park for an answer that is not coming.
-  if (options.unattended) flags.push('--unattended')
-  // The originating surface (#917): only a safe transport name is forwarded, since it reaches the
-  // conversation heading, which is line-parsed.
-  if (isSafeVia(options.via)) flags.push('--via', options.via)
-  // Resume a finished run's session (#720): the spawned run continues that conversation.
-  if (typeof options.resumeSession === 'string' && options.resumeSession.trim()) {
-    flags.push('--resume-session', options.resumeSession.trim())
-  }
-  return flags
-}
 
 export function delay(ms: number): Promise<void> {
   return new Promise(resolvePromise => setTimeout(resolvePromise, ms))
@@ -719,19 +661,16 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
     const note = `You have been moved into project ${basename(projectCwd)} and are now working in its checkout. Continue where you left off.`
     const continued = spawnDetached(
       realBin,
-      [
-        'prompt',
-        note,
-        ...startOptionFlags(options),
-        '--no-dashboard',
-        '--cwd',
-        workspace.cwd,
-        ...(workspace.runId ? ['--run-id', workspace.runId] : []),
-        // Reopen the moved run rather than truncating it, and resume the agent session so the
-        // conversation continues seamlessly. `--topic` is dropped: this is an ordinary project run now.
-        '--continue-run',
-        ...(sessionId ? ['--resume-session', sessionId] : []),
-      ],
+      // Reopen the moved run rather than truncating it, and resume the agent session so the
+      // conversation continues seamlessly. `topic` is dropped: this is an ordinary project run now.
+      await writeSessionSpec({
+        prompt: note,
+        kind: 'prompt',
+        cwd: workspace.cwd,
+        ...(workspace.runId ? { runId: workspace.runId } : {}),
+        continueRun: true,
+        options: { ...options, ...(sessionId ? { resumeSession: sessionId } : {}) },
+      }, env),
       workspace.runId ? runStderrPath(workspace.cwd) : undefined,
     )
     const settle = (detail: string): void => {
@@ -791,24 +730,9 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
     const key = scopedKey(TOPIC_PROJECT_KEY, runId)
     starting.add(key)
     try {
-      const runArgs =
-        kind === 'research'
-          ? ['research', ...(prompt ? [prompt] : [])]
-          : kind === 'prompt'
-            ? ['prompt', prompt]
-            : [prompt]
       const child = spawnDetached(
         realBin,
-        [
-          ...runArgs,
-          ...startOptionFlags(options),
-          '--no-dashboard',
-          '--cwd',
-          scratchCwd,
-          '--run-id',
-          runId,
-          '--topic',
-        ],
+        await writeSessionSpec({ prompt, kind, cwd: scratchCwd, runId, topic: true, options }, env),
         runStderrPath(scratchCwd),
       )
       // Re-home on bind (#1122): once, and only on a committed re-home. `rehomed` gates the scratch
@@ -843,7 +767,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
     }
   }
 
-  // Start-from-dashboard (#345): spawn `framework "<prompt>" --no-dashboard --cwd <checkout>`
+  // Start-from-dashboard (#345): spawn `framework --session <spec>` for the checkout
   // as a detached child — the same spawn ensureDaemon uses for the daemon itself. The run
   // streams into the page via its tailed event log, and its gates + Stop steer through the
   // control channel (#344).
@@ -954,29 +878,21 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
     activeRuns.delete(key)
     starting.add(key)
     try {
-      // [Research] (#331) runs the research subcommand; its empty prompt is fine
-      // (the "what" defaults to `this PR` in the CLI). A `prompt` kind (#353) is a
-      // preset the user reviewed in the textarea: run it verbatim, never re-render.
-      const runArgs =
-        kind === 'research'
-          ? ['research', ...(prompt ? [prompt] : [])]
-          : kind === 'prompt'
-            ? ['prompt', prompt]
-            : [prompt]
-      // `--run-id` hands the run the id its worktree is named with, so the directory and the
+      // [Research] (#331) carries an empty prompt fine: its "what" defaults to `this PR`. A
+      // `prompt` kind (#353) is a preset the user reviewed in the textarea: run it verbatim,
+      // never re-render. `runId` is the id its worktree is named with, so the directory and the
       // run recorded inside it are one string — and tells it the framework owns its branch.
       const child = spawnDetached(
         realBin,
-        [
-          ...runArgs,
-          ...startOptionFlags(options),
-          '--no-dashboard',
-          '--cwd',
-          workspace.cwd,
-          ...(workspace.runId ? ['--run-id', workspace.runId] : []),
+        await writeSessionSpec({
+          prompt,
+          kind,
+          cwd: workspace.cwd,
+          ...(workspace.runId ? { runId: workspace.runId } : {}),
           // Reopen the run's log instead of truncating it: the follow-up IS that run.
-          ...(continued ? ['--continue-run'] : []),
-        ],
+          ...(continued ? { continueRun: true } : {}),
+          options,
+        }, env),
         ...(workspace.runId ? [runStderrPath(workspace.cwd)] : []),
       )
       // The run narrates itself through its own `.the-framework/events.jsonl`, which the

@@ -1,14 +1,14 @@
 import { FakeDriver, type FakeTurn } from './driver/index.js'
 
 /**
- * The deterministic `--fake` scenario: a small Vike + Prisma orders app.
+ * The deterministic fake scenario: a small Vike + Prisma orders app.
  * It wires a {@link FakeDriver} whose scripted turns walk the exact prompt order
  * the flow issues — one build turn (#1372: with no preset and no serve config
  * nothing reviews the build, so the build is the whole loop) — so the flow runs
  * offline with no CLI and no model, driven entirely *through* the driver seam.
  */
 
-/** The default intent the `--fake` demo builds. */
+/** The default intent the fake demo builds. */
 export const FAKE_INTENT = 'A paginated orders page backed by an orders table, with sign-in.'
 
 // A small, plausible per-turn usage so the demo shows spend accumulating (#322).

@@ -93,14 +93,12 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
     assert.equal(resumed.ok, true, `the resume was refused: ${JSON.stringify(resumed)}`)
     await world.waitRun(project, runId, 'done')
     await world.waitRetired(project, runId)
-    const argv = await waitFor(async () => {
-      const spawns = await world.spawnedArgv()
+    const sent = await waitFor(async () => {
+      const spawns = await world.spawnedSpecs()
       return spawns.length >= 2 ? spawns[1] : undefined
     }, 'the resumed child to be spawned')
-    const modelFlag = argv.indexOf('--model')
-    assert.notEqual(modelFlag, -1, `the resumed run carries the project model: ${argv.join(' ')}`)
-    assert.equal(argv[modelFlag + 1], 'fable-e2e')
-    assert.ok(argv.includes('--continue-run'), 'the resumed run reopens the same session row')
+    assert.equal(sent.options.model, 'fable-e2e', 'the resumed run carries the project model')
+    assert.equal(sent.continueRun, true, 'the resumed run reopens the same session row')
 
     // One row throughout: the continuation is the same run, not a second history entry.
     const rows = await rpc(onRuns)(project.id)

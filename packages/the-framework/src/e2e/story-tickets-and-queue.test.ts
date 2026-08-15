@@ -89,10 +89,8 @@ test('queue a ticket, then a drain run claims it and the boards show it in progr
     const tail = await world.tailRun(project, runId)
     const gate = await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the drain run to park')
 
-    const argv = (await world.spawnedArgv())[0]!
-    const ticketFlag = argv.indexOf('--ticket')
-    assert.notEqual(ticketFlag, -1, `the drain child carries --ticket: ${argv.join(' ')}`)
-    assert.equal(argv[ticketFlag + 1], `tickets/${TICKET_FILE}`)
+    const sent = (await world.spawnedSpecs())[0]!
+    assert.equal(sent.options.ticket, `tickets/${TICKET_FILE}`, 'the drain child carries its ticket')
 
     const running = await waitFor(async () => {
       const run = (await rpc(onRuns)(project.id)).find(r => r.id === runId)

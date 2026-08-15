@@ -101,7 +101,6 @@ export async function onRuns(projectId: string): Promise<RunMeta[]> {
 export async function onRetainedWorktrees(projectId: string): Promise<string[]> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return []
-  // The CLI's `framework worktrees` builds the same view; one list, two surfaces (#752).
   const rows = await listProjectWorktrees(cwd, { sizes: false }).catch((): never[] => [])
   return rows.filter(row => !row.live).map(row => row.runId)
 }

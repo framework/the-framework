@@ -9,7 +9,7 @@ Automatically reclaims a finished session's checkout once its work has landed �
 
 ## Rationales
 
-- Removal reuses the same operation as the manual Remove, so uncommitted leftovers are committed to the kept branch first — everything deleted stays reconstructable from git.
+- Removal reuses the same operation as the dashboard's Remove, so uncommitted leftovers are committed to the kept branch first — everything deleted stays reconstructable from git.
 - A run that died at boot leaves an empty branch that looks merged; only its recorded outcome tells it from a real success, so the local signal alone reclaims cleanly finished runs only.
 
 ## Before writing SPEC.md files

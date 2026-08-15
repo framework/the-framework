@@ -131,7 +131,7 @@ test('sendRemoveWorktree rejects an unsafe run id before touching anything (#737
   }
 })
 
-// #982: the dashboard's Remove and `framework worktrees rm` are now one implementation, so the
+// #982: the dashboard's Remove and the sweep are now one implementation, so the
 // button gets the commit-first removal and the checks the CLI already had. Before that it went
 // straight to a forcing removeWorktree, which deleted the very diff a retained checkout was kept
 // for, and reported success for a session that had no worktree at all.

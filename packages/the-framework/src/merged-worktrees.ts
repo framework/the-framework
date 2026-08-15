@@ -87,7 +87,7 @@ export function landedVia(state: RunHandoff): LandedVia | undefined {
  * reason to delete a checkout.
  *
  * Removal itself is {@link removeProjectWorktree}, not a second copy of it, so the automatic path
- * and the two manual ones (`framework worktrees rm`, the dashboard's Remove button) are one
+ * and the manual one (the dashboard's Remove button) are one
  * behaviour. That also means uncommitted work in a landed checkout is committed to the kept branch
  * before the checkout goes, exactly as it is when a human removes it: still recoverable, just no
  * longer occupying disk.

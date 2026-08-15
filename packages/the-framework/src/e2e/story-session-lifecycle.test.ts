@@ -35,12 +35,14 @@ test('start a session, watch it live, and read the archived row when it ends', a
     assert.equal(session.kind === 'session' && session.fake, true)
     assert.equal(session.kind === 'session' && session.driver, 'fake')
 
-    // The spawned child got the exact flags the launcher's unticked handoff boxes map to: the
-    // spawn is detached, so the recorded argv is the only place this contract is observable.
-    const argv = (await world.spawnedArgv())[0]!
-    assert.ok(argv.includes('--no-auto-push-branch'), `argv carries --no-auto-push-branch: ${argv.join(' ')}`)
-    assert.ok(argv.includes('--no-auto-open-pr'), `argv carries --no-auto-open-pr: ${argv.join(' ')}`)
-    assert.ok(argv.includes('--run-id') && argv.includes(runId), 'the child was handed its worktree run id')
+    // The spawned child got exactly what the launcher's unticked handoff boxes say: the spawn is
+    // detached, so the recorded spec is the only place this contract is observable. An unticked
+    // box is a plain `false` in the spec — the flag it used to become had to be spelled
+    // `--no-auto-push-branch`, because argv cannot say false any other way.
+    const sent = (await world.spawnedSpecs())[0]!
+    assert.equal(sent.options.autoPushBranch, false)
+    assert.equal(sent.options.autoOpenPr, false)
+    assert.equal(sent.runId, runId, 'the child was handed its worktree run id')
 
     // The agent's turn reaches the feed: its tool actions, its reply, the accounted usage, and
     // the end marker — the exact sequence the transcript pane draws.

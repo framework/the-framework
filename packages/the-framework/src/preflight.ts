@@ -5,7 +5,7 @@ import { AGENT_SPECS, type AgentName } from './agent.js'
  * Preflight checks for a live run. A turnkey tool should fail *early and
  * clearly* when a prerequisite is missing, not spawn a broken process mid-run.
  * The main one: is the wrapped agent's CLI actually installed and runnable?
- * `--fake` needs none of this, so preflight only gates live runs.
+ * A fake session needs none of this, so preflight only gates live runs.
  *
  * It probes the agent the run actually picked (#542), so `--agent codex` is
  * checked against `codex` and fails on `codex` being missing, not `claude`.

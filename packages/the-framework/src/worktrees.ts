@@ -1,5 +1,4 @@
 import { join } from 'node:path'
-import { formatBytes } from './format-bytes.js'
 import { errorMessage } from './error-message.js'
 import {
   listWorktreeDirs,
@@ -92,7 +91,7 @@ async function sizeOf(cwd: string, runId: string): Promise<{ sizeBytes?: number 
 
 /**
  * Remove one retained worktree (#752/#737): the one implementation behind both surfaces that
- * offer it, the `framework worktrees rm` verb and the dashboard's Remove button (#982). They were
+ * offer it: the sweep and the dashboard's Remove button (#982). They were
  * two copies of the same checks and had already drifted, so a bogus session id read as a raw git
  * error on one and a plain sentence on the other.
  *
@@ -218,24 +217,3 @@ export async function pruneProjectWorktrees(cwd: string): Promise<PruneResult> {
   return result
 }
 
-/**
- * The `framework worktrees` table (#752). Pure so the layout is testable: columns padded to the
- * widest cell, and a message rather than an empty table when a project has no worktrees.
- */
-export function formatWorktreeList(rows: WorktreeRow[]): string[] {
-  if (rows.length === 0) return ['No worktrees. A session that finished cleanly does not keep one.']
-  const header = ['SESSION', 'STATUS', 'SIZE', 'BRANCH']
-  const body = rows.map(row => [
-    row.runId,
-    row.live ? 'running' : (row.status ?? 'unknown'),
-    formatBytes(row.sizeBytes, '-'),
-    row.branch ?? '-',
-  ])
-  const widths = header.map((_, column) => Math.max(...[header, ...body].map(cells => (cells[column] ?? '').length)))
-  const line = (cells: string[]): string =>
-    cells
-      .map((cell, column) => (column === cells.length - 1 ? cell : cell.padEnd(widths[column] ?? 0)))
-      .join('  ')
-      .trimEnd()
-  return [line(header), ...body.map(line)]
-}

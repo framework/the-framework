@@ -9,7 +9,6 @@ import {
   EventTailer,
   isProcessAlive,
   runDaemon,
-  startOptionFlags,
   registerHomeProject,
   registerReposDirectory,
   isNestedWithin,
@@ -73,82 +72,6 @@ const homeId = (cwd: string): string => projectId(resolve(cwd))
 const sendStart = (url: string, cwd: string, prompt: string, kind = 'build'): Promise<StartResult> =>
   callTelefunc(url, '/server/control.telefunc.ts', 'sendStart', [homeId(cwd), prompt, kind]) as Promise<StartResult>
 
-test('startOptionFlags maps only enabled Global options to CLI flags (#314)', () => {
-  assert.deepEqual(startOptionFlags({}), [])
-  assert.deepEqual(startOptionFlags({ autopilot: true, technical: true, vanilla: true }), [
-    '--autopilot',
-    '--technical',
-    '--vanilla',
-  ])
-  assert.deepEqual(startOptionFlags({ eco: { autoPlanning: true, autoMaintenance: true } }), [
-    '--eco-auto-planning',
-    '--eco-auto-maintenance',
-  ])
-  // Context (#439): one repeatable --context flag per selected dir; blanks dropped.
-  assert.deepEqual(startOptionFlags({ context: ['/work/api', '  ', '/work/ui'] }), [
-    '--context',
-    '/work/api',
-    '--context',
-    '/work/ui',
-  ])
-  // On-before-mergeable prompt (#326): maps to --on-before-mergeable.
-  assert.deepEqual(startOptionFlags({ onBeforeMergeable: true }), ['--on-before-mergeable'])
-  // Browser via chrome-devtools-mcp (#452): maps to --browser.
-  assert.deepEqual(startOptionFlags({ browser: true }), ['--browser'])
-  // Transparent (#625): the master off-switch maps to --transparent.
-  assert.deepEqual(startOptionFlags({ transparent: true }), ['--transparent'])
-})
-
-test('a disarmed handoff travels as the --no-* form, since it defaults on (#1102)', () => {
-  // The mirror image of #842's reason: these two are ON unless told otherwise, so an unticked box
-  // that sent nothing would be re-armed by the run's own default and the session would publish
-  // itself anyway.
-  assert.deepEqual(startOptionFlags({ autoPushBranch: false, autoOpenPr: false }), [
-    '--no-auto-push-branch',
-    '--no-auto-open-pr',
-  ])
-  assert.deepEqual(startOptionFlags({ autoPushBranch: true, autoOpenPr: true }), [
-    '--auto-push-branch',
-    '--auto-open-pr',
-  ])
-})
-
-test('auto-merge is tri-state too: both spellings travel, absence says nothing (#1216)', () => {
-  // Defaults OFF, but the repo yml may turn it on, so an explicit launcher false has to travel
-  // as --no-auto-merge to win over the file.
-  assert.deepEqual(startOptionFlags({ autoMerge: true }), ['--auto-merge'])
-  assert.deepEqual(startOptionFlags({ autoMerge: false }), ['--no-auto-merge'])
-  assert.deepEqual(startOptionFlags({}), [])
-})
-
-test('startOptionFlags spells an explicit off as the --no-* form (#842)', () => {
-  // The launcher resolves the repo yml itself now, so a toggle it shows as off has to travel as
-  // one: without --no-autopilot the file would turn it back on inside the run (#841).
-  assert.deepEqual(startOptionFlags({ autopilot: false, technical: false }), ['--no-autopilot', '--no-technical'])
-  assert.deepEqual(startOptionFlags({ vanilla: false, transparent: false }), ['--no-vanilla', '--no-transparent'])
-  // Absent still says nothing, so the repo file keeps deciding.
-  assert.deepEqual(startOptionFlags({}), [])
-  assert.deepEqual(startOptionFlags({ autopilot: true, technical: false }), ['--autopilot', '--no-technical'])
-  // Model (#628): maps to --model, trimmed; blank/whitespace is no choice -> no flag.
-  assert.deepEqual(startOptionFlags({ model: 'opus' }), ['--model', 'opus'])
-  assert.deepEqual(startOptionFlags({ model: '  sonnet  ' }), ['--model', 'sonnet'])
-  assert.deepEqual(startOptionFlags({ model: '   ' }), [])
-  // Agent (#650): only non-default codex emits --agent; claude is the CLI default -> no flag.
-  assert.deepEqual(startOptionFlags({ agent: 'codex' }), ['--agent', 'codex'])
-  assert.deepEqual(startOptionFlags({ agent: 'claude' }), [])
-  assert.deepEqual(startOptionFlags({ agent: '   ' }), [])
-  // Run target (#1050): only `actions` emits --run-on; `local` is the default -> no flag.
-  assert.deepEqual(startOptionFlags({ target: 'actions' }), ['--run-on', 'actions'])
-  assert.deepEqual(startOptionFlags({ target: 'local' }), [])
-  // Unattended (#846): auto PM's own runs, whose gates must not park for an absent human.
-  assert.deepEqual(startOptionFlags({ unattended: true }), ['--unattended'])
-  assert.deepEqual(startOptionFlags({ unattended: false }), [])
-  // Resume a finished run's session (#720): maps to --resume-session, trimmed; blank -> no flag.
-  assert.deepEqual(startOptionFlags({ resumeSession: 'sess-42' }), ['--resume-session', 'sess-42'])
-  assert.deepEqual(startOptionFlags({ resumeSession: '  sess-7  ' }), ['--resume-session', 'sess-7'])
-  assert.deepEqual(startOptionFlags({ resumeSession: '   ' }), [])
-})
-
 const logEvent = (message: string): FrameworkEvent => ({ kind: 'log', message })
 const line = (message: string): string => JSON.stringify(logEvent(message)) + '\n'
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
@@ -159,9 +82,8 @@ async function tmpWorkspace(): Promise<string> {
   return cwd
 }
 
-// The global daemon liveness now lives beside the registry (#393). Point it at a
-// throwaway config dir under the workspace so tests never touch the real $HOME and
-// clean up with the workspace. Returns the env the daemon fns resolve the path from.
+// Point the registry at a throwaway config dir under the workspace so tests never touch the real
+// $HOME and clean up with the workspace. Returns the env the daemon reads it from.
 async function configEnv(cwd: string): Promise<NodeJS.ProcessEnv> {
   const dir = join(cwd, 'cfg')
   await mkdir(dir, { recursive: true })
@@ -296,7 +218,9 @@ test('a git project starts concurrent runs, each in its own worktree (#736)', as
     await writeFile(
       stub,
       `const fs = require('node:fs')
-fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, JSON.stringify(process.argv.slice(2)) + '\\n')
+const argv = process.argv.slice(2)
+const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8'))
+fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, JSON.stringify(spec) + '\\n')
 setTimeout(() => {}, 800)
 `,
     )
@@ -320,10 +244,7 @@ setTimeout(() => {}, 800)
     }
     assert.equal(lines.length, 2, 'both children spawned')
 
-    const runs = lines.map(line => {
-      const args = JSON.parse(line) as string[]
-      return { cwd: args[args.indexOf('--cwd') + 1]!, runId: args[args.indexOf('--run-id') + 1]! }
-    })
+    const runs = lines.map(line => JSON.parse(line) as { cwd: string; runId: string })
     for (const run of runs) {
       assert.equal(run.cwd, join(cwd, FRAMEWORK_DIR, 'worktrees', run.runId), 'ran in the worktree named by its run id')
       assert.equal((await stat(run.cwd)).isDirectory(), true, 'the worktree checkout exists')
@@ -365,9 +286,10 @@ test('a finished run loses its worktree; a failed one keeps it, history saved ei
     await writeFile(
       stub,
       `const fs = require('node:fs'), path = require('node:path')
-const args = process.argv.slice(2)
-const runCwd = args[args.indexOf('--cwd') + 1]
-const runId = args[args.indexOf('--run-id') + 1]
+const argv = process.argv.slice(2)
+const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8'))
+const runCwd = spec.cwd
+const runId = spec.runId
 const status = fs.readFileSync(${JSON.stringify(join(cwd, 'status.txt'))}, 'utf8').trim()
 const dir = path.join(runCwd, '.the-framework')
 fs.mkdirSync(dir, { recursive: true })
@@ -438,18 +360,19 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
   }
 })
 
-test('sendStart spawns the run child (prompt, --no-dashboard, --cwd) one at a time when the project has no worktree (#345)', async () => {
+test('sendStart spawns the run child with its session spec, one at a time when the project has no worktree (#345)', async () => {
   // A non-git workspace cannot be given a worktree, so runs share the one checkout and the
   // pre-#736 one-at-a-time guard still applies. tmpWorkspace() is deliberately not a repo.
   const cwd = await tmpWorkspace()
-  // A stub CLI standing in for the framework bin: it records its argv, then
+  // A stub CLI standing in for the framework bin: it records the spec it was handed, then
   // stays alive briefly so the one-run-at-a-time guard has a window to trip.
   const stub = join(cwd, 'stub-cli.cjs')
   await writeFile(
     stub,
     `const fs = require('node:fs'), path = require('node:path')
-const args = process.argv.slice(2)
-fs.appendFileSync(path.join(args[args.indexOf('--cwd') + 1], 'started.log'), JSON.stringify(args) + '\\n')
+const argv = process.argv.slice(2)
+const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8'))
+fs.appendFileSync(path.join(spec.cwd, 'started.log'), JSON.stringify(spec) + '\\n')
 setTimeout(() => {}, 600)
 `,
   )
@@ -463,7 +386,7 @@ setTimeout(() => {}, 600)
     const first = await post('a blog')
     assert.equal(first.ok, true)
 
-    // The child got the prompt as one word plus the headless + workspace flags.
+    // The child got one JSON spec naming the prompt, its kind and its checkout (D4).
     let lines: string[] = []
     for (let i = 0; i < 100 && lines.length < 1; i++) {
       await new Promise(r => setTimeout(r, 20))
@@ -472,7 +395,7 @@ setTimeout(() => {}, 600)
         () => [],
       )
     }
-    assert.deepEqual(JSON.parse(lines[0]!), ['a blog', '--no-dashboard', '--cwd', cwd])
+    assert.deepEqual(JSON.parse(lines[0]!), { prompt: 'a blog', kind: 'build', cwd, options: {} })
 
     // While that child is alive, a second Start is refused (#322 runaway concern).
     const busy = await post('another app')
@@ -494,14 +417,15 @@ setTimeout(() => {}, 600)
   }
 })
 
-test('sendStart kind=research spawns the research subcommand, defaulting the what (#331)', async () => {
+test('sendStart kind=research travels as a kind, with an empty what left to the run to default (#331)', async () => {
   const cwd = await tmpWorkspace()
   const stub = join(cwd, 'stub-cli.cjs')
   await writeFile(
     stub,
     `const fs = require('node:fs'), path = require('node:path')
-const args = process.argv.slice(2)
-fs.appendFileSync(path.join(args[args.indexOf('--cwd') + 1], 'started.log'), JSON.stringify(args) + '\\n')
+const argv = process.argv.slice(2)
+const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8'))
+fs.appendFileSync(path.join(spec.cwd, 'started.log'), JSON.stringify(spec) + '\\n')
 `,
   )
   const env = await configEnv(cwd)
@@ -521,7 +445,7 @@ fs.appendFileSync(path.join(args[args.indexOf('--cwd') + 1], 'started.log'), JSO
         () => [],
       )
     }
-    assert.deepEqual(JSON.parse(lines[0]!), ['research', 'the auth flow', '--no-dashboard', '--cwd', cwd])
+    assert.deepEqual(JSON.parse(lines[0]!), { prompt: 'the auth flow', kind: 'research', cwd, options: {} })
 
     let second = await post('', 'research')
     for (let i = 0; i < 100 && !second.ok; i++) {
@@ -533,10 +457,10 @@ fs.appendFileSync(path.join(args[args.indexOf('--cwd') + 1], 'started.log'), JSO
       await new Promise(r => setTimeout(r, 20))
       lines = (await readFile(join(cwd, 'started.log'), 'utf8')).split('\n').filter(Boolean)
     }
-    assert.deepEqual(JSON.parse(lines[1]!), ['research', '--no-dashboard', '--cwd', cwd])
+    assert.deepEqual(JSON.parse(lines[1]!), { prompt: '', kind: 'research', cwd, options: {} })
 
-    // kind=prompt (#353): a preset the user reviewed in the textarea runs verbatim
-    // through the `prompt` subcommand, never re-rendered.
+    // kind=prompt (#353): a preset the user reviewed in the textarea runs verbatim, never
+    // re-rendered.
     const verbatim = 'Measure "problem variability" of this PR\n- List all high-level flows'
     let third = await post(verbatim, 'prompt')
     for (let i = 0; i < 100 && !third.ok; i++) {
@@ -548,7 +472,7 @@ fs.appendFileSync(path.join(args[args.indexOf('--cwd') + 1], 'started.log'), JSO
       await new Promise(r => setTimeout(r, 20))
       lines = (await readFile(join(cwd, 'started.log'), 'utf8')).split('\n').filter(Boolean)
     }
-    assert.deepEqual(JSON.parse(lines[2]!), ['prompt', verbatim, '--no-dashboard', '--cwd', cwd])
+    assert.deepEqual(JSON.parse(lines[2]!), { prompt: verbatim, kind: 'prompt', cwd, options: {} })
 
     ac.abort()
     await done
@@ -692,30 +616,4 @@ test('registerReposDirectory adds nothing while the opt-in is off (#1123)', asyn
   } finally {
     await rm(root, { recursive: true, force: true })
   }
-})
-
-test('startOptionFlags passes the ticket a run implements, and only a real one (#1117)', () => {
-  assert.deepEqual(startOptionFlags({ ticket: 'tickets/2026-07-25_login.md' }), ['--ticket', 'tickets/2026-07-25_login.md'])
-  // Nothing said = the run implements no particular ticket, which is every hand-written prompt.
-  assert.deepEqual(startOptionFlags({}), [])
-  // The value comes off a queue file an agent writes, so it is checked here as well as on the way
-  // in: a path that is not a ticket never becomes a flag.
-  for (const bad of ['tickets/../etc/passwd', '/etc/passwd', 'TODO_AGENTS.md', '']) {
-    assert.deepEqual(startOptionFlags({ ticket: bad }), [], `expected ${bad} to be dropped`)
-  }
-  // A planning run says so (#1327): the flag is what keeps its PR title from inheriting the
-  // ticket's issue as `(fix #42)` and closing it with the work still undone.
-  assert.deepEqual(startOptionFlags({ ticket: 'tickets/2026-07-25_login.md', planRun: true }), [
-    '--ticket',
-    'tickets/2026-07-25_login.md',
-    '--plan-run',
-  ])
-})
-
-test('startOptionFlags forwards the pinned queue entry verbatim, and drops a blank one (#1253)', () => {
-  assert.deepEqual(startOptionFlags({ queueEntry: 'Fix the flaky teardown test' }), [
-    '--queue-entry',
-    'Fix the flaky teardown test',
-  ])
-  assert.deepEqual(startOptionFlags({ queueEntry: '   ' }), [])
 })

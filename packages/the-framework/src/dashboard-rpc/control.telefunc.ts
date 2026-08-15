@@ -133,7 +133,7 @@ export async function sendMessage(projectId: string, text: string, runId?: strin
  * can inspect it; this is the explicit cleanup for one, since nothing removes them on a timer.
  *
  * The checks and the commit-first removal are {@link removeProjectWorktree}'s, shared with the
- * `framework worktrees rm` verb (#982) so the two surfaces cannot drift again. All this adds is
+ * removal path (#982) so the surfaces cannot drift again. All this adds is
  * the daemon-only step: a retained worktree can still be serving (#797), and that dev server
  * holds the tree being removed, so it is stopped rather than having the directory pulled out
  * from under it.

@@ -17,6 +17,7 @@ const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, c
 import { FRAMEWORK_DIR, WORKTREES_DIR, EVENTS_FILE, META_FILE, worktreePath, runBranchName, RUN_META_VERSION, startedAtFromRunId, type RunMeta } from './store/index.js'
 import { topicScratchPath, addProject, projectId } from './registry.js'
 import { nodeGitRunner } from './project.js'
+import type { SessionSpec } from './session-spec.js'
 
 /**
  * Where a run is allowed to land (#997). A run gets its own worktree (#736); the pre-#736
@@ -34,12 +35,14 @@ import { nodeGitRunner } from './project.js'
  */
 const RETRIED_RM = { recursive: true, force: true, maxRetries: 10, retryDelay: 100 } as const
 
-/** A stub CLI that records the argv it was spawned with, so a start is observable. */
+/** A stub CLI that records the session spec it was handed, so a start is observable. */
 async function writeStub(dir: string, log: string): Promise<string> {
   const stub = join(dir, 'stub-cli.cjs')
   await writeFile(
     stub,
-    `require('node:fs').appendFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)) + '\\n')\n`,
+    `const fs = require('node:fs')\n` +
+      `const argv = process.argv.slice(2)\n` +
+      `fs.appendFileSync(${JSON.stringify(log)}, fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8').replace(/\\s*\\n\\s*/g, '') + '\\n')\n`,
   )
   return stub
 }
@@ -55,13 +58,13 @@ async function writeStub(dir: string, log: string): Promise<string> {
 const POLL_ATTEMPTS = 500
 
 /** The stub's recorded starts, waited for (a start spawns detached). */
-async function startedArgs(log: string, expected: number): Promise<string[][]> {
+async function startedSpecs(log: string, expected: number): Promise<SessionSpec[]> {
   let lines: string[] = []
   for (let i = 0; i < POLL_ATTEMPTS && lines.length < expected; i++) {
     await new Promise(r => setTimeout(r, 20))
     lines = await readFile(log, 'utf8').then(s => s.split('\n').filter(Boolean), () => [])
   }
-  return lines.map(line => JSON.parse(line) as string[])
+  return lines.map(line => JSON.parse(line) as SessionSpec)
 }
 
 /** Capture `console.log` for the duration of `body`. */
@@ -103,7 +106,7 @@ test('a repo whose worktree could not be created fails the run instead of borrow
     assert.equal(result.ok, false, 'the Start is refused rather than downgraded into the main checkout')
     assert.match(result.ok ? '' : result.error, /could not create a worktree for this run/)
     // The real damage the fallback did: an agent editing the user's own working tree.
-    assert.deepEqual(await startedArgs(log, 1), [], 'no run was spawned at all')
+    assert.deepEqual(await startedSpecs(log, 1), [], 'no run was spawned at all')
     await runtime.dispose()
   } finally {
     await rm(cwd, RETRIED_RM)
@@ -122,10 +125,10 @@ test('a project that is not a git repo still falls back to the main checkout, an
 
     assert.equal(result?.ok, true, 'the pre-#736 fallback is intact for a project with no repo')
     assert.equal(result?.runId, undefined, 'and is still signalled by the absent runId')
-    const args = await startedArgs(log, 1)
-    assert.equal(args.length, 1, 'the run spawned')
-    assert.equal(args[0]![args[0]!.indexOf('--cwd') + 1], cwd, 'in the main checkout')
-    assert.equal(args[0]!.includes('--run-id'), false)
+    const specs = await startedSpecs(log, 1)
+    assert.equal(specs.length, 1, 'the run spawned')
+    assert.equal(specs[0]!.cwd, cwd, 'in the main checkout')
+    assert.equal(specs[0]!.runId, undefined)
     // The message has to name the reason: "no worktree (<git error>)" read the same whether git
     // was absent or git had failed, which is exactly the distinction that went missing.
     assert.match(logged, /is not a git repository, so it gets no worktree/)
@@ -163,10 +166,10 @@ test('a project-less topic run spawns in a neutral scratch dir with no worktree 
     assert.equal(result.ok, true, 'a topic run starts without a project')
     assert.ok(result.runId, 'and reports its allocated run id')
     const scratch = topicScratchPath(env, result.runId!)
-    const args = (await startedArgs(log, 1))[0]!
-    assert.equal(args[args.indexOf('--cwd') + 1], scratch, 'spawned into the config-home scratch dir')
-    assert.equal(args[args.indexOf('--run-id') + 1], result.runId, 'with its allocated run id')
-    assert.equal(args.includes('--topic'), true, 'flagged as a topic run so its meta records it')
+    const sent = (await startedSpecs(log, 1))[0]!
+    assert.equal(sent.cwd, scratch, 'spawned into the config-home scratch dir')
+    assert.equal(sent.runId, result.runId, 'with its allocated run id')
+    assert.equal(sent.topic, true, 'marked as a topic run so its meta records it')
     // The whole point: no repo, so no worktree anywhere near the home checkout.
     assert.equal(await stat(join(home, FRAMEWORK_DIR, WORKTREES_DIR)).then(() => true, () => false), false, 'no worktree allocated')
     assert.equal(await stat(scratch).then(s => s.isDirectory(), () => false), true, 'the scratch dir exists')
@@ -236,11 +239,11 @@ async function initRepo(prefix: string): Promise<string> {
 }
 
 /**
- * A stub CLI that records its argv, then (for a topic run only) stays alive until the daemon
- * terminates it on re-home (a real topic run parks in the chat loop the same way). The continued
- * `prompt` run exits at once, so it never lingers past the test.
+ * A stub CLI that records the spec it was handed, then (for a topic run only) stays alive until
+ * the daemon terminates it on re-home (a real topic run parks in the chat loop the same way). The
+ * continued `prompt` run exits at once, so it never lingers past the test.
  *
- * The SIGTERM handler is installed BEFORE the argv is recorded (#1165): a re-home terminates this
+ * The SIGTERM handler is installed BEFORE the spec is recorded (#1165): a re-home terminates this
  * process, and a signal that lands before the handler exists takes the default disposition and
  * kills it — so the run would vanish without ever saying it ran.
  */
@@ -250,11 +253,12 @@ async function writeTopicStub(dir: string, log: string): Promise<string> {
     stub,
     `const fs = require('node:fs')\n` +
       `const argv = process.argv.slice(2)\n` +
-      `if (argv.includes('--topic')) {\n` +
+      `const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8'))\n` +
+      `if (spec.topic) {\n` +
       `  const t = setInterval(() => {}, 1000)\n` +
       `  process.on('SIGTERM', () => { clearInterval(t); process.exit(0) })\n` +
       `}\n` +
-      `fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(argv) + '\\n')\n`,
+      `fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(spec) + '\\n')\n`,
   )
   return stub
 }
@@ -282,13 +286,13 @@ async function seedBoundTopicRun(scratch: string, runId: string, projectId: stri
  *
  * The loop returns the moment the starts land, so the cap only ever costs time on a real failure.
  */
-async function waitForArgs(log: string, expected: number): Promise<string[][]> {
+async function waitForSpecs(log: string, expected: number): Promise<SessionSpec[]> {
   let lines: string[] = []
   for (let i = 0; i < POLL_ATTEMPTS && lines.length < expected; i++) {
     await new Promise(r => setTimeout(r, 20))
     lines = await readFile(log, 'utf8').then(s => s.split('\n').filter(Boolean), () => [])
   }
-  return lines.map(line => JSON.parse(line) as string[])
+  return lines.map(line => JSON.parse(line) as SessionSpec)
 }
 
 test('binding a topic run re-homes it into the bound project: a worktree there, its session resumed, the scratch gone (#1122)', async () => {
@@ -315,14 +319,14 @@ test('binding a topic run re-homes it into the bound project: a worktree there, 
     // model that: the re-home it triggers terminates a child that may still be booting, which on a
     // loaded runner kills it before it records anything — the run then looks like it never spawned,
     // which is the CI-only `1 !== 2` this test kept failing with.
-    const topicStart = await waitForArgs(join(home, 'started.log'), 1)
+    const topicStart = await waitForSpecs(join(home, 'started.log'), 1)
     assert.equal(topicStart.length, 1, 'the topic run spawned')
-    assert.equal(topicStart[0]!.includes('--topic'), true, 'and it is the topic run')
+    assert.equal(topicStart[0]!.topic, true, 'and it is the topic run')
 
     // The run gets a session, then binds: exactly the state a real topic run reaches at its gate.
     await seedBoundTopicRun(scratch, runId, boundId, 'sess-xyz')
 
-    const starts = await waitForArgs(join(home, 'started.log'), 2)
+    const starts = await waitForSpecs(join(home, 'started.log'), 2)
     // When the second spawn does not arrive, say WHY (#1165). The daemon records a failed re-home
     // as an event in the scratch log and retains the scratch, so the reason is on disk; without
     // this the failure is a bare `1 !== 2` with nothing to act on. The recorded starts go in too:
@@ -342,12 +346,12 @@ test('binding a topic run re-homes it into the bound project: a worktree there, 
     assert.equal(starts.length, 2, 'the scratch run started, then the daemon spawned the continued run')
     const cont = starts[1]!
     const worktree = worktreePath(target, runId)
-    assert.equal(cont[0], 'prompt', 'the run continues as a prompt run carrying the move note')
-    assert.equal(cont[cont.indexOf('--cwd') + 1], worktree, 'in a worktree under the BOUND project, not the scratch')
-    assert.equal(cont[cont.indexOf('--run-id') + 1], runId, 'reusing the topic run id, so it stays one run')
-    assert.equal(cont.includes('--continue-run'), true, 'reopening the moved run rather than starting fresh')
-    assert.equal(cont[cont.indexOf('--resume-session') + 1], 'sess-xyz', 'resuming the SAME agent session')
-    assert.equal(cont.includes('--topic'), false, 'it is an ordinary project run now')
+    assert.equal(cont.kind, 'prompt', 'the run continues as a prompt run carrying the move note')
+    assert.equal(cont.cwd, worktree, 'in a worktree under the BOUND project, not the scratch')
+    assert.equal(cont.runId, runId, 'reusing the topic run id, so it stays one run')
+    assert.equal(cont.continueRun, true, 'reopening the moved run rather than starting fresh')
+    assert.equal(cont.options.resumeSession, 'sess-xyz', 'resuming the SAME agent session')
+    assert.equal(cont.topic, undefined, 'it is an ordinary project run now')
 
     // The re-home is structural: the run lives in a real worktree + branch under the target project.
     assert.equal(await stat(worktree).then(s => s.isDirectory(), () => false), true, 'the worktree exists')
@@ -393,9 +397,9 @@ test('a bind to an unresolvable project retains the scratch and surfaces the fai
     }
     assert.match(events, /could not re-home this run: unknown project ghost-project-000/, 'the failure is surfaced as an event')
     // The topic run itself started; the re-home did not spawn anything on top of it.
-    const starts = await waitForArgs(log, 1)
+    const starts = await waitForSpecs(log, 1)
     assert.equal(starts.length, 1, 'only the topic run spawned; no continued run')
-    assert.equal(starts[0]!.includes('--topic'), true, 'and that one start is the topic run')
+    assert.equal(starts[0]!.topic, true, 'and that one start is the topic run')
     assert.equal(await stat(scratch).then(() => true, () => false), true, 'the scratch is retained so the conversation is not lost')
   } finally {
     await runtime.stopRuns().catch(() => {})
@@ -566,10 +570,11 @@ async function writeFailingRunStub(dir: string, detail: string): Promise<string>
     stub,
     `const fs = require('node:fs')
 const path = require('node:path')
-const args = process.argv.slice(2)
-const cwd = args[args.indexOf('--cwd') + 1]
-const runId = args[args.indexOf('--run-id') + 1]
-fs.appendFileSync(path.join(cwd, 'spawned.log'), (args.includes('--continue-run') ? 'continue' : 'start') + '\\n')
+const argv = process.argv.slice(2)
+const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8'))
+const cwd = spec.cwd
+const runId = spec.runId
+fs.appendFileSync(path.join(cwd, 'spawned.log'), (spec.continueRun ? 'continue' : 'start') + '\\n')
 const dir = path.join(cwd, '.the-framework')
 fs.mkdirSync(dir, { recursive: true })
 const now = new Date().toISOString()

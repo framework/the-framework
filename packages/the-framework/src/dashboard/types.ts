@@ -65,8 +65,10 @@ export interface StartRunOptions {
   context?: string[]
   /** On-before-mergeable prompt (#326): on setReadyForMerge(), queue the quality follow-ups as TODO entries; maps to `--on-before-mergeable`. */
   onBeforeMergeable?: boolean
-  /** Give the agent a real browser via chrome-devtools-mcp during the run (#452); maps to `--browser`. */
+  /** Give the agent a real browser via chrome-devtools-mcp during the run (#452). */
   browser?: boolean
+  /** Cap this session's spend, in USD (#322). Only enforceable on an agent that reports a price per turn (#540). */
+  maxCost?: number
   /**
    * Push the session's branch to `origin` when it finishes (#1102); maps to `--auto-push-branch`.
    *

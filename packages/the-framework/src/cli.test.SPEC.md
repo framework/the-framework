@@ -1,4 +1,4 @@
-Covers the command line end to end: flag and subcommand parsing, config layering (flags beat the repo file, including turning modes off), the guards-not-in-force notices, session-link defaults, who can steer a run and who keeps it open for chat, log entries for runs that never finished, the quality follow-up's queueing and its recursion guard, branch renames once the agent names its session, continuations re-entering the flow their run recorded, and failing cleanly before a driver exists.
+Covers the command line end to end: the four options it accepts and the flags and verbs it now refuses, reading a session's options off its spec, config layering (the spec beats the repo file, including turning modes off), the guards-not-in-force notices, session-link defaults, who can steer a session and who keeps it open for chat, log entries for sessions that never finished, the quality follow-up's queueing and its recursion guard, branch renames once the agent names its session, continuations re-entering the flow their session recorded, and failing cleanly before a driver exists.
 
 ## Before writing SPEC.md files
 

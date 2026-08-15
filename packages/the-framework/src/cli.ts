@@ -25,6 +25,7 @@ import {
 } from './run.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
+import { readSessionSpec, writeSessionSpec, type SessionSpec } from './session-spec.js'
 import { sessionTodoPending } from './todo-loop.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from './config.js'
 import {
@@ -62,7 +63,6 @@ import {
   listProjectWorktrees,
   removeProjectWorktree,
   pruneProjectWorktrees,
-  formatWorktreeList,
 } from './worktrees.js'
 import { removeMergedWorktrees } from './merged-worktrees.js'
 import { defaultWhat } from './preset-prompt.js'
@@ -82,7 +82,7 @@ export const CLAUDE_CODE_SESSION_LIST = CLAUDE_CODE_SESSION_LINK
 
 /**
  * The session link to show for a run: the user's `--session-link` if given, else
- * the generic Claude Code entry point for a live run (nothing for `--fake`, which
+ * the generic Claude Code entry point for a live run (nothing for a fake one, which
  * has no real session). Pure, so the default is unit-testable without a live run.
  *
  * The default is Claude Code's *own* entry point, so it is only honest on a
@@ -90,7 +90,7 @@ export const CLAUDE_CODE_SESSION_LIST = CLAUDE_CODE_SESSION_LINK
  * to somewhere their run isn't. Codex keeps its sessions locally with nothing
  * equivalent to open, so another agent gets no default link at all (#542).
  */
-export function chooseSessionLink(opts: Pick<CliOptions, 'sessionLink' | 'agent'>, fake: boolean): string | undefined {
+export function chooseSessionLink(opts: Pick<SessionOptions, 'sessionLink' | 'agent'>, fake: boolean): string | undefined {
   if (opts.sessionLink) return opts.sessionLink
   return fake || opts.agent !== 'claude' ? undefined : CLAUDE_CODE_SESSION_LIST
 }
@@ -130,135 +130,41 @@ export function frameworkVersion(): string {
 const HELP = `The Framework — turnkey AI orchestration that wraps a coding agent (Claude Code or Codex).
 
 Usage:
-  framework                       Run the dashboard in the foreground (Ctrl+C stops it; logs visible).
-  framework [intent...]           Build what you describe, from scratch.
-  framework research [what]      Rate the "problem variability" of <what> (default:
-                                 this PR), then pick which problems to deep-dive.
-                                 A direct review prompt on existing code — no build.
-  framework prompt <text>         Run one prompt verbatim through the agent, honoring
-                                 its await gates — no scaffold/build pipeline. This is
-                                 what a dashboard preset sends after you edit it.
-  framework maintain              Sweep the registered repos: run the maintainability
-                                 loop on any that grew un-reviewed commits (#298).
-                                 --dry-run to preview; --max-repos / --max-cost to bound.
-  framework worktrees             List the checkouts this project's sessions kept.
-                                 rm <sessionId> removes one; prune removes every one
-                                 whose session is no longer running; sweep removes only
-                                 those whose branch has landed (#1036), keeping the branch.
-  framework --fake                Run the offline demo (no CLI, no model, deterministic).
-  framework doctor                Check prerequisites (Claude Code installed, etc.).
+  framework              Serve the dashboard in the foreground. Ctrl+C closes it and every
+                         session it is running; the server logs stream to this terminal.
 
 Options:
-  --fake                 Use the fake driver + scripted session (offline / CI).
-  --agent <claude|codex> Which agent CLI drives the session, on your own subscription
-                         (default: claude). Codex reports no price and no quota,
-                         so --max-cost and the consumption limits cannot gate it;
-                         the session says so at startup rather than imply a guard.
-  --run-on <local|actions|web>   Where the run executes (default: local, this
-                         device). actions drives it on a fresh GitHub Actions runner;
-                         needs a GitHub origin remote and a user token with repo +
-                         workflow scopes, from GH_TOKEN or from "gh auth login".
-                         web hands the task to a Claude Code
-                         cloud session on your own account, which runs it off this
-                         machine and opens its own PR; follow it on claude.ai or pull
-                         it back with claude --teleport.
-  --cwd <dir>            Workspace the agent builds in (default: current directory).
-  --model <id>           Model to pass through to the wrapped agent.
-  --via <surface>        Surface this run was started from (e.g. discord); recorded
-                         on the session's conversation turns.
-  --scope <prototype|full>   How much app to build (default: full).
-  --preset <name>        Run under an Open Loop domain preset (its loops + prompts
-                         + skills frame the build), e.g. software-development.
-  --autopilot            Activate the preset's Autopilot mode variants.
-  --technical            Activate the preset's Technical mode variants.
-                         (--preset / --autopilot / --technical / --kind can also be
-                          set per repo in the-framework.yml; these flags override it.)
-  --no-autopilot, --no-technical, --no-vanilla, --no-transparent
-                         The off switch for each toggle: this run overrides a repo
-                         the-framework.yml that turned it on (--no-vanilla puts the
-                         built-in prompt back). With neither form, the file decides.
-  --vanilla              Remove the built-in system prompt entirely. The agent still
-                         gets the AWAIT/SIGNAL emit contract, so it can drive the
-                         dashboard's gates; for a fully raw session use --transparent.
-                         Overrides the Eco flags below (no built-in prompt to trim).
-  --transparent          Fully transparent (#625): run the wrapped agent raw, exactly
-                         like plain "claude -p" — no framework system prompt, emit
-                         protocols, consumption guard, dashboard, or TODO loop. The
-                         coarse master off-switch; also settable per repo in
-                         the-framework.yml (transparent: true) or per user.
-  --eco-auto-planning    Drop the built-in prompt's "Large scope" (planning) section.
-  --eco-auto-research    Drop the built-in prompt's "Alternatives" (research) section.
-  --eco-auto-maintenance Drop the "Maintenance" section from the post-merge
-                         cleanup prompt. Needs --on-before-mergeable; #556 moved
-                         that section out of the built-in prompt.
-                         (The --eco-* flags trim the #326 prompt to save tokens.)
-  --context <dir>        Focus the agent on this directory (repeatable). Adds one
-                         "Context: <dirs>" line to the system prompt; the agent can
-                         still reach every repo, this just narrows where it looks.
-  --on-before-mergeable           When the run signals setReadyForMerge(), fire the on-before-mergeable
-                         prompt: queue the maintainability and security-audit follow-ups
-                         (plus readability under --technical) as TODO entries for the
-                         backlog loop to pick up (#326).
-  --browser              Give the agent a real browser during the run via
-                         chrome-devtools-mcp: navigate pages, read console + network,
-                         inspect the DOM, and screenshot. Off by default (#452).
-  --no-auto-push-branch  Do not push this session's branch to origin when it finishes.
-                         Pushing is the default, so the work does not sit on a local
-                         branch nobody is told about (#1102). Without either flag the
-                         repo's the-framework.yml autoPushBranch decides.
-  --no-auto-open-pr      Do not open a draft PR when the session finishes. Opening one
-                         is the default; it implies the push above (#1102). Without
-                         either flag the-framework.yml autoOpenPr decides.
-  --auto-merge           Merge the session's PR once it is opened (#1216): GitHub
-                         auto-merge when the repo allows it (lands when checks pass),
-                         else merged directly. Off by default — landing on the default
-                         branch has to be asked for. Without either flag
-                         the-framework.yml autoMerge decides.
-  --unattended           Nobody is watching: choice gates take the recommended option
-                         instead of waiting for an answer. Stop still works (#846).
-  --kind <name>          Build event kind the preset's review loop fires for, e.g.
-                         bug-fix or major-change (default: the-framework.yml's event,
-                         else the preset's own, else major-change). Selects which
-                         review chain gates the session.
-  --max-cost <usd>       Stop the session once it has spent this much (USD).
-  --no-todo-loop         Do not consume the agent's TODO backlog after the build
-                         (the loop is on by default; it gates per item on the
-                         dashboard and stops when the backlog is empty).
-  --max-todo-items <n>   Backlog entries worked per session (default: 25).
-  --permission-mode <mode>   Claude Code permission mode: default | acceptEdits |
-                             bypassPermissions | plan (default: bypassPermissions,
-                             so the headless loop can run installs/builds/tests).
-  --dangerously-skip-permissions   Bypass all agent permission checks (sandboxes only).
   --port <n>             Dashboard port (default: 4200).
-  --host <addr>          Daemon bind address (default: 127.0.0.1, localhost only). A non-loopback
-                         address (e.g. 0.0.0.0) exposes the daemon to your network and generates a
-                         shared token; the printed URL carries it, and any request without it gets
-                         401. Exposing a process spawner to the network is a security decision (#806).
-  --no-dashboard         Do not start the localhost dashboard.
-  --resume               Reopen the last session's dashboard from .the-framework/ in --cwd
-                         (read-only replay; no new agent session). Survives a restart.
-  --no-persist           Do not write the orchestration state to .the-framework/.
-  --skip-preflight       Skip the prerequisite checks before a live session.
-  --session-link <url>   A real per-session link to the live agent session, shown
-                         on the dashboard. Our sessions are headless (not Remote-
-                         Controlled), so by default the dashboard only offers the
-                         generic "Open Claude Code" entry point. Pass your own URL,
-                         using {sessionId} to template in the real Claude session
-                         id, e.g. "https://example.com/s/{sessionId}".
+  --host <addr>          Bind address (default: 127.0.0.1, localhost only). A non-loopback
+                         address (e.g. 0.0.0.0) exposes the dashboard to your network and
+                         generates a shared token; the printed URL carries it, and any request
+                         without it gets 401. Exposing a process spawner to the network is a
+                         security decision (#806).
   -h, --help             Show this help.
   -v, --version          Print the version.
 
-The Framework drives the wrapped agent as a black box: it prompts, reads the code,
-and gates on the outcome, then re-prompts. The
-localhost dashboard foregrounds the loop status beside the agent's own session.`
+Everything else is the dashboard: it is the product's user interface, and where a session's
+prompt, its options, its agent and its checkout are chosen. The dashboard spawns each session
+as its own process, handing it one JSON spec rather than a command line.
 
-/** Parsed CLI options. */
-export interface CliOptions {
-  help: boolean
-  version: boolean
+The Framework drives the wrapped agent as a black box: it prompts, reads the code, and gates on
+the outcome, then re-prompts. The dashboard foregrounds the loop status beside the agent's own
+session.`
+
+/**
+ * One session's resolved configuration, as the run reads it (D4).
+ *
+ * These used to be command-line flags, which made every one of them a human surface as well as
+ * the dashboard's process API. They arrive as a {@link SessionSpec} now — one JSON blob on a temp
+ * file — so what is left here is a plain options object with no argv semantics: no tri-state
+ * `--no-*` spellings, no mutual validation, no help text.
+ */
+export interface SessionOptions {
+  /** The `FakeDriver` (`FRAMEWORK_FAKE=1`): an offline stand-in for the agent, for tests and e2e. */
   fake: boolean
-  doctor: boolean
+  /** Skip the agent-CLI preflight. Set by the tests that inject their own readiness. */
   skipPreflight: boolean
+  /** What the session was asked to do. */
   intent: string
   /** `--agent <claude|codex>`: which agent CLI drives the run (#542). Default `claude`. */
   agent: AgentName
@@ -334,342 +240,185 @@ export interface CliOptions {
   maxCost?: number
   todoLoop: boolean
   todoMaxItems?: number
-  port?: number
-  /** `--host <addr>` (#1051): the daemon's bind address. Default loopback; a non-loopback address
-   * exposes the daemon to the network and gates it behind the generated shared token. */
-  host?: string | undefined
+  /** Whether this session serves its own dashboard. Always false: the one dashboard spawned it. */
   dashboard: boolean
   sessionLink?: string | undefined
-  permissionMode?: PermissionMode | undefined
-  skipPermissions: boolean
-  resume: boolean
+  /** Whether the session records itself to `.the-framework/`. Always true outside tests. */
   persist: boolean
-  /** `framework research [what]`: run the Research preset as a direct prompt (#331). */
+  /** {@link SessionSpec.kind} `research`: run the Research preset as a direct prompt (#331). */
   research: boolean
-  /** `framework prompt <text>`: run one prompt verbatim through the direct path (#353). */
+  /** {@link SessionSpec.kind} `prompt`: run one prompt verbatim through the direct path (#353). */
   directPrompt: boolean
-  /** `framework maintain`: sweep the registered repos, running the maintenance loop on un-reviewed commits (#298). */
-  maintain: boolean
-  /** `framework worktrees [rm <id> | prune]`: the retained-worktree cleanup the dashboard has (#752). */
-  worktrees?: WorktreesCommand
-  /** `--dry-run`: for `maintain`, list what would be reviewed without running anything. */
-  dryRun: boolean
-  /** `--max-repos <n>`: cap how many repos one maintenance sweep reviews. */
-  maxRepos?: number
+}
+
+/** What the CLI itself accepts: four options, no verbs (D4). */
+export interface CliArgs {
+  help: boolean
+  version: boolean
+  /** `--port <n>`: the port the dashboard binds. Default {@link DEFAULT_DAEMON_PORT}; `0` is ephemeral. */
+  port?: number
+  /**
+   * `--host <addr>` (#1051): the dashboard's bind address. Default loopback; a non-loopback
+   * address exposes it to the network and gates every route behind the generated shared token.
+   */
+  host?: string
+  /**
+   * `--session <path>`: run the session described by the JSON spec at `path` (D4). The dashboard's
+   * process API, not a human option — it is how one session is spawned, and the file is consumed.
+   */
+  session?: string
   error?: string
 }
 
-/** Parse argv (without the node/script prefix). Pure and testable. */
-export function parseArgs(argv: string[]): CliOptions {
-  const opts: CliOptions = {
-    help: false,
-    version: false,
-    fake: false,
-    doctor: false,
-    skipPreflight: false,
-    intent: '',
-    agent: 'claude',
-    scope: 'full',
-    eco: { autoPlanning: false, autoResearch: false, autoMaintenance: false },
-    context: [],
-    onBeforeMergeable: false,
-    browser: false,
-    // The handoff pair is left unset here on purpose: like the mode toggles it resolves over the
-    // config layers (#841), where no layer setting it means on (#1102) — a session left alone
-    // hands its work back by itself.
-    dashboard: true,
-    skipPermissions: false,
-    resume: false,
-    persist: true,
-    research: false,
-    directPrompt: false,
-    maintain: false,
-    dryRun: false,
-    todoLoop: true,
-  }
-  const PERMISSION_MODES: PermissionMode[] = ['default', 'acceptEdits', 'bypassPermissions', 'plan']
-  const words: string[] = []
-  // Parse an integer flag's value, recording opts.error (naming the flag) on a bad one. The
-  // integer flags all share this shape; only the lower bound (0 for --port, else 1) varies.
-  const intFlag = (value: string | undefined, label: string, min: number): number | undefined => {
-    const n = Number(value)
-    if (Number.isInteger(n) && n >= min) return n
-    opts.error = `invalid ${label}: must be a ${min > 0 ? 'positive' : 'non-negative'} integer`
-    return undefined
-  }
+/**
+ * Parse argv (without the node/script prefix). Pure and testable.
+ *
+ * Four options and nothing else. Everything a session needs used to be a flag here — sixty-seven
+ * of them, twenty-seven with no human user at all, because the dashboard serialized
+ * `StartRunOptions` onto a command line. Those travel as a {@link SessionSpec} now. `--host` and
+ * `--port` survive because they are the two things a browser cannot be asked and a dashboard
+ * cannot serve about itself; `--help` and `--version` because a command with options owes the
+ * user both.
+ */
+export function parseArgs(argv: string[]): CliArgs {
+  const opts: CliArgs = { help: false, version: false }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!
     switch (arg) {
-      case '-h':
       case '--help':
+      case '-h':
         opts.help = true
         break
-      case '-v':
       case '--version':
+      case '-v':
         opts.version = true
         break
-      case '--fake':
-        opts.fake = true
-        break
-      case '--no-dashboard':
-        opts.dashboard = false
-        break
-      case '--preset':
-        opts.preset = argv[++i]
-        break
-      case '--autopilot':
-        opts.autopilot = true
-        break
-      case '--no-autopilot':
-        opts.autopilot = false
-        break
-      case '--technical':
-        opts.technical = true
-        break
-      case '--no-technical':
-        opts.technical = false
-        break
-      case '--vanilla':
-        opts.vanilla = true
-        break
-      case '--no-vanilla':
-        opts.vanilla = false
-        break
-      case '--transparent':
-        opts.transparent = true
-        break
-      case '--no-transparent':
-        opts.transparent = false
-        break
-      case '--on-before-mergeable':
-        opts.onBeforeMergeable = true
-        break
-      case '--browser':
-        opts.browser = true
-        break
-      case '--auto-push-branch':
-        opts.autoPushBranch = true
-        break
-      case '--no-auto-push-branch':
-        opts.autoPushBranch = false
-        break
-      case '--auto-open-pr':
-        opts.autoOpenPr = true
-        break
-      case '--no-auto-open-pr':
-        opts.autoOpenPr = false
-        break
-      case '--auto-merge':
-        opts.autoMerge = true
-        break
-      case '--no-auto-merge':
-        opts.autoMerge = false
-        break
-      case '--eco-auto-planning':
-        opts.eco.autoPlanning = true
-        break
-      case '--eco-auto-research':
-        opts.eco.autoResearch = true
-        break
-      case '--eco-auto-maintenance':
-        opts.eco.autoMaintenance = true
-        break
-      case '--context': {
-        // Repeatable: `--context a --context b` -> the in-context directories (#439).
-        const dir = argv[++i]
-        if (dir) opts.context.push(dir)
-        break
-      }
-      case '--kind':
-        opts.buildEvent = argv[++i]
-        break
-      case '--resume':
-        opts.resume = true
-        break
-      case '--no-persist':
-        opts.persist = false
-        break
-      case '--skip-preflight':
-        opts.skipPreflight = true
-        break
-      case '--dangerously-skip-permissions':
-        opts.skipPermissions = true
-        break
-      case '--permission-mode': {
-        const value = argv[++i] as PermissionMode | undefined
-        if (value === undefined || !PERMISSION_MODES.includes(value)) {
-          opts.error = `invalid --permission-mode: ${value ?? '(missing)'}`
-        } else {
-          opts.permissionMode = value
-        }
-        break
-      }
-      case '--agent': {
-        const value = argv[++i]
-        if (!isAgentName(value)) opts.error = `invalid --agent: ${value ?? '(missing)'}. Expected: ${AGENTS.join(' | ')}`
-        else opts.agent = value
-        break
-      }
-      case '--run-on': {
-        const value = argv[++i]
-        if (value !== 'local' && value !== 'actions' && value !== 'web') opts.error = `invalid --run-on: ${value ?? '(missing)'}. Expected: local | actions | web`
-        else opts.target = value
-        break
-      }
-      case '--cwd':
-        opts.cwd = argv[++i]
-        break
-      case '--run-id':
-        opts.runId = argv[++i]
-        break
-      case '--continue-run':
-        opts.continueRun = true
-        break
-      case '--topic':
-        opts.topic = true
-        break
-      case '--model':
-        opts.model = argv[++i]
-        break
-      case '--resume-session':
-        opts.resumeSession = argv[++i]
-        break
-      case '--via':
-        opts.via = argv[++i]
-        break
-      case '--ticket':
-        opts.ticket = argv[++i]
-        break
-      case '--plan-run':
-        opts.planRun = true
-        break
-      case '--queue-entry':
-        opts.queueEntry = argv[++i]
-        break
-      case '--unattended':
-        opts.unattended = true
-        break
-      case '--session-link':
-        opts.sessionLink = argv[++i]
-        break
-      case '--scope': {
-        const value = argv[++i]
-        if (value !== 'prototype' && value !== 'full') opts.error = `invalid --scope: ${value ?? '(missing)'}`
-        else opts.scope = value
-        break
-      }
-      case '--max-cost': {
-        const n = Number(argv[++i])
-        if (!Number.isFinite(n) || n <= 0) opts.error = `invalid --max-cost: must be a positive number (USD)`
-        else opts.maxCost = n
-        break
-      }
-      case '--no-todo-loop':
-        opts.todoLoop = false
-        break
-      case '--dry-run':
-        opts.dryRun = true
-        break
-      case '--max-repos': {
-        const n = intFlag(argv[++i], '--max-repos', 1)
-        if (n !== undefined) opts.maxRepos = n
-        break
-      }
-      case '--max-todo-items': {
-        const n = intFlag(argv[++i], '--max-todo-items', 1)
-        if (n !== undefined) opts.todoMaxItems = n
-        break
-      }
       case '--port': {
-        const n = intFlag(argv[++i], '--port', 0)
-        if (n !== undefined) opts.port = n
+        const n = Number(argv[++i])
+        if (Number.isInteger(n) && n >= 0) opts.port = n
+        else opts.error = 'invalid --port: must be a non-negative integer'
         break
       }
-      case '--host':
-        opts.host = argv[++i]
+      case '--host': {
+        const value = argv[++i]
+        if (value === undefined) opts.error = 'invalid --host: missing address'
+        else opts.host = value
         break
+      }
+      case '--session': {
+        const value = argv[++i]
+        if (value === undefined) opts.error = 'invalid --session: missing path'
+        else opts.session = value
+        break
+      }
       default:
-        if (arg.startsWith('-')) opts.error = `unknown option: ${arg}`
-        else words.push(arg)
+        opts.error = arg.startsWith('-') ? `unknown option: ${arg}` : `unknown command: ${arg}`
     }
   }
-  // `framework doctor` and friends are subcommands, not an intent.
-  if (words[0] === 'doctor') {
-    opts.doctor = true
-    words.shift()
-    words.shift()
-  } else if (words[0] === 'research') {
-    opts.research = true
-    words.shift() // the remaining words are the "what" param (may be empty -> default)
-  } else if (words[0] === 'prompt') {
-    opts.directPrompt = true
-    words.shift() // the remaining words are the prompt text, run verbatim (#353)
-  } else if (words[0] === 'maintain') {
-    opts.maintain = true
-    words.shift() // maintain takes no positional args; the target is the registry
-  } else if (words[0] === 'worktrees') {
-    // `worktrees` / `worktrees prune` / `worktrees rm <sessionId>` (#752). Bare = list; an
-    // unknown sub-verb is a usage error rather than a silent list of something else.
-    words.shift()
-    const sub = words.shift()
-    if (sub === undefined || sub === 'list') opts.worktrees = { action: 'list' }
-    else if (sub === 'prune') opts.worktrees = { action: 'prune' }
-    else if (sub === 'sweep') opts.worktrees = { action: 'sweep' }
-    else if (sub === 'rm') {
-      const runId = words.shift()
-      opts.worktrees = { action: 'rm', ...(runId ? { runId } : {}) }
-    }
-    else opts.error = `unknown worktrees command: ${sub}`
-  }
-  opts.intent = words.join(' ').trim()
   return opts
 }
 
+/** The session defaults nothing sets any more, shared by {@link sessionOptions} and the tests. */
+const SESSION_DEFAULTS = {
+  skipPreflight: false,
+  agent: 'claude',
+  scope: 'full',
+  eco: { autoPlanning: false, autoResearch: false, autoMaintenance: false },
+  context: [],
+  onBeforeMergeable: false,
+  browser: false,
+  // The dashboard spawned this session and is already serving the UI; it never serves its own.
+  dashboard: false,
+  persist: true,
+  todoLoop: true,
+} as const
+
 /**
- * Resolve the Claude Code driver options for a live CLI run. The CLI is a
- * headless autonomous builder: every turn is `claude -p`, which cannot answer an
- * interactive approval. The driver's library default (`acceptEdits`) silently
- * denies installs/builds/tests, so the production-grade checklist can never
- * verify the app actually builds/runs (#225). Default the CLI to
- * `bypassPermissions` so the full loop runs unattended; `--permission-mode` and
- * `--dangerously-skip-permissions` still override.
+ * Read a session's options off the spec the dashboard wrote (D4).
+ *
+ * The handoff pair and the mode toggles are left unset when the spec says nothing about them, on
+ * purpose: that is what lets the repo's `the-framework.yml` decide, with nobody setting them
+ * resolving to on (#1102/#841). JSON distinguishes "absent" from `false` without needing a
+ * `--no-*` spelling for each, which is the whole reason this stopped being an argv.
  */
-export function claudeDriverOptions(opts: Pick<CliOptions, 'permissionMode' | 'skipPermissions'>): ClaudeCodeDriverOptions {
-  return opts.skipPermissions
-    ? { dangerouslySkipPermissions: true }
-    : { permissionMode: opts.permissionMode ?? 'bypassPermissions' }
+export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = process.env): SessionOptions {
+  const o = spec.options
+  const defined = <T>(value: T | undefined): value is T => value !== undefined
+  return {
+    ...SESSION_DEFAULTS,
+    eco: { ...SESSION_DEFAULTS.eco, ...o.eco },
+    context: o.context ?? [],
+    fake: env['FRAMEWORK_FAKE'] === '1',
+    intent: spec.prompt,
+    research: spec.kind === 'research',
+    directPrompt: spec.kind === 'prompt',
+    cwd: spec.cwd,
+    ...(spec.runId ? { runId: spec.runId } : {}),
+    ...(spec.continueRun ? { continueRun: true } : {}),
+    ...(spec.topic ? { topic: true } : {}),
+    ...(isAgentName(o.agent) ? { agent: o.agent } : {}),
+    ...(defined(o.target) ? { target: o.target } : {}),
+    ...(o.model?.trim() ? { model: o.model.trim() } : {}),
+    ...(o.resumeSession?.trim() ? { resumeSession: o.resumeSession.trim() } : {}),
+    ...(o.via?.trim() ? { via: o.via.trim() } : {}),
+    // The ticket comes off a queue file an agent writes, so it is re-checked here rather than
+    // trusted: a path that is not a ticket never reaches the run (#1117).
+    ...(o.ticket && isTicketPath(o.ticket) ? { ticket: o.ticket } : {}),
+    ...(o.planRun ? { planRun: true } : {}),
+    ...(o.queueEntry?.trim() ? { queueEntry: o.queueEntry } : {}),
+    ...(o.unattended ? { unattended: true } : {}),
+    ...(defined(o.autopilot) ? { autopilot: o.autopilot } : {}),
+    ...(defined(o.technical) ? { technical: o.technical } : {}),
+    ...(defined(o.vanilla) ? { vanilla: o.vanilla } : {}),
+    ...(defined(o.transparent) ? { transparent: o.transparent } : {}),
+    ...(defined(o.autoPushBranch) ? { autoPushBranch: o.autoPushBranch } : {}),
+    ...(defined(o.autoOpenPr) ? { autoOpenPr: o.autoOpenPr } : {}),
+    ...(defined(o.autoMerge) ? { autoMerge: o.autoMerge } : {}),
+    ...(o.onBeforeMergeable ? { onBeforeMergeable: true } : {}),
+    ...(o.browser ? { browser: true } : {}),
+    ...(o.maxCost !== undefined ? { maxCost: o.maxCost } : {}),
+  }
+}
+
+
+/**
+ * Resolve the Claude Code driver options for a live session. A session is a headless autonomous
+ * builder: every turn is `claude -p`, which cannot answer an interactive approval. The driver's
+ * library default (`acceptEdits`) silently denies installs/builds/tests, so the production-grade
+ * checklist can never verify the app actually builds/runs (#225). `bypassPermissions`, so the full
+ * loop runs unattended.
+ *
+ * There used to be a `--permission-mode` and a `--dangerously-skip-permissions` to override it.
+ * Neither had a dashboard control, so with the flags gone (D4) nothing sets them and the mode is
+ * simply what it always resolved to.
+ */
+export function claudeDriverOptions(): ClaudeCodeDriverOptions {
+  return { permissionMode: 'bypassPermissions' }
 }
 
 /**
- * The flags the picked agent cannot honor (#542), as lines to print at startup.
+ * The settings the picked agent cannot honor (#542), as lines to print at startup.
  *
- * A flag that silently does nothing is worse than one that errors. `--agent
- * codex --max-cost 5` reads as capped and isn't: the cap is only ever checked on
- * a turn that reports a price, and Codex reports none (#540). The consumption
- * limits go the same way — no quota to read means no gate. So the run says which
- * guards are not in force, rather than letting the flag imply they are.
+ * A setting that silently does nothing is worse than one that errors. Codex with a spend cap
+ * reads as capped and isn't: the cap is only ever checked on a turn that reports a price, and
+ * Codex reports none (#540). The consumption limits go the same way — no quota to read means no
+ * gate. So the session says which guards are not in force, rather than letting the setting imply
+ * they are.
  */
-export function unguardedNotices(
-  opts: Pick<CliOptions, 'agent' | 'maxCost' | 'browser' | 'permissionMode' | 'skipPermissions'>,
-): string[] {
+export function unguardedNotices(opts: Pick<SessionOptions, 'agent' | 'maxCost' | 'browser'>): string[] {
   const spec = AGENT_SPECS[opts.agent]
   const notices: string[] = []
   if (opts.maxCost != null && !spec.reportsCost) {
-    notices.push(`--max-cost $${opts.maxCost} cannot be enforced: ${spec.label} reports no price per turn, so the spend cap never fires (#540).`)
+    notices.push(`the $${opts.maxCost} spend cap cannot be enforced: ${spec.label} reports no price per turn, so it never fires (#540).`)
   }
-  if (opts.agent !== 'claude') {
-    if (opts.browser) {
-      notices.push(`--browser has no effect on ${spec.label}: the browser tools are wired through Claude Code's MCP config.`)
-    }
-    if (opts.permissionMode !== undefined || opts.skipPermissions) {
-      notices.push(`--permission-mode / --dangerously-skip-permissions have no effect on ${spec.label}: it sandboxes with its own policy (workspace-write).`)
-    }
+  if (opts.agent !== 'claude' && opts.browser) {
+    notices.push(`the browser has no effect on ${spec.label}: the browser tools are wired through Claude Code's MCP config.`)
   }
   return notices
 }
 
 /** The Eco section drops in effect (#314), or `undefined` when none are set. */
-export function ecoOptions(opts: Pick<CliOptions, 'eco'>): EcoOptions | undefined {
+export function ecoOptions(opts: Pick<SessionOptions, 'eco'>): EcoOptions | undefined {
   const { autoPlanning, autoResearch, autoMaintenance } = opts.eco
   if (!autoPlanning && !autoResearch && !autoMaintenance) return undefined
   return { autoPlanning, autoResearch, autoMaintenance }
@@ -678,7 +427,7 @@ export function ecoOptions(opts: Pick<CliOptions, 'eco'>): EcoOptions | undefine
 /** The log kind a run records in `.the-framework/LOGS.md` (#379): the direct paths are prompts, a
  * build run is a build. Transparent (#625) routes a build-kind run through the raw prompt path too,
  * so it logs as a prompt. */
-export function runLogKind(opts: Pick<CliOptions, 'directPrompt' | 'research'>, transparent = false): LogEntry['kind'] {
+export function runLogKind(opts: Pick<SessionOptions, 'directPrompt' | 'research'>, transparent = false): LogEntry['kind'] {
   return opts.directPrompt || opts.research || transparent ? 'prompt' : 'build'
 }
 
@@ -745,7 +494,7 @@ function flagConfigLayer(opts: RunConfigFlags): ConfigLayer {
 }
 
 type RunConfigFlags = Pick<
-  CliOptions,
+  SessionOptions,
   'preset' | 'autopilot' | 'technical' | 'buildEvent' | 'vanilla' | 'transparent' | 'autoPushBranch' | 'autoOpenPr' | 'autoMerge'
 >
 
@@ -875,7 +624,7 @@ async function startRunDashboard(
  * in-context dirs. Reads SYSTEM.md once, so call it on the shared path before either run.
  */
 async function resolvePromptConfig(
-  opts: CliOptions,
+  opts: SessionOptions,
   config: ResolvedRunConfig,
   cwd: string,
   io: CliIO,
@@ -903,7 +652,7 @@ async function resolvePromptConfig(
 /**
  * Whether this run can be steered over `.the-framework/control.jsonl` (#344): Stop, a choice pick,
  * a live message. True when its own dashboard is up (#427), or when whoever spawned it handed it a
- * run id — the dashboard spawns its runs with `--no-dashboard` and `--run-id`, and steers them
+ * run id — the dashboard spawns each session with one in its spec, and steers it
  * from its own process.
  *
  * This used to have a third clause, "a daemon is alive somewhere on this machine", read from a
@@ -921,7 +670,7 @@ export function isSteerable(opts: { persist: boolean; runId?: string | undefined
  *
  * Narrower than {@link isSteerable} on purpose, and this is the other half of #905. Being
  * steerable only means someone *could* reach it; staying open means a human is expected to keep
- * talking to it. A run typed into a terminal with `--no-dashboard` is neither, but it used to
+ * talking to it. A headless run is neither, but it used to
  * inherit the chat queue purely because a daemon happened to be alive elsewhere on the machine,
  * and then parked forever on a message that terminal could never send. #714 said as much:
  * "headless / CI runs end when done, exactly as today."
@@ -1126,75 +875,60 @@ export function createRunJournal(deps: {
 }
 
 export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<number> {
-  const opts = parseArgs(argv)
-  if (opts.error) {
-    io.err(opts.error)
+  const args = parseArgs(argv)
+  if (args.error) {
+    io.err(args.error)
     io.err('Run `framework --help` for usage.')
     return 2
   }
-  if (opts.help) {
+  if (args.help) {
     io.out(HELP)
     return 0
   }
-  if (opts.version) {
+  if (args.version) {
     io.out(frameworkVersion())
     return 0
   }
-  if (opts.doctor) {
-    const result = await preflight({ agent: opts.agent })
-    // A warning is neither a tick nor a cross (#1326): running as root is not a failed check,
-    // but printing it with a ✓ would file the one thing that breaks every run under "all good".
-    for (const check of result.checks) io.out(`${check.warn ? '!' : check.ok ? '✓' : '✗'} ${check.name}: ${check.detail}`)
-    if (result.ok && result.checks.some(c => c.warn)) io.out('\nNo failures, but read the warnings above before you start a session.')
-    else io.out(result.ok ? '\nAll good. You are ready to build.' : '\nSome checks failed. Fix them, then try again.')
-    return result.ok ? 0 : 1
+  // `--session <path>`: the dashboard's process API (D4). One session, described entirely by the
+  // JSON spec at that path — which is consumed as it is read, so a device token in its options
+  // does not outlive the session that used it.
+  if (args.session !== undefined) {
+    let spec: SessionSpec
+    try {
+      spec = await readSessionSpec(args.session)
+    } catch (err) {
+      io.err(`could not read the session spec (${errorMessage(err)}).`)
+      return 2
+    }
+    return runSession(sessionOptions(spec), io)
   }
-
-
-  // Resume a previous run's dashboard from its persisted log — the reload half of
-  // #211. No agent runs; we just replay the saved events into a fresh stream so
-  // the dashboard rehydrates exactly as it looked, then leave it up read-only.
-  if (opts.resume) return resumeRun(opts, io)
-
-  // `framework maintain` sweeps the registered repos, running the maintenance loop on
-  // any that grew un-reviewed commits (#298). No dashboard, no intent.
-  if (opts.maintain) return maintainCmd(opts, io)
-
-  // `framework worktrees` is the CLI half of the dashboard's retained-worktree cleanup (#752).
-  if (opts.worktrees) return worktreesCmd(opts.worktrees, opts.cwd ?? process.cwd(), io)
-
-  // Everything left is a live run — handled below so the top of runCli stays a dispatch table.
-  return runBuild(opts, io)
+  // Everything else is bare `framework`: serve the dashboard in the foreground until Ctrl-C.
+  return runForegroundDaemonCmd(args, io)
 }
 
 /**
- * The live-run command: a build, a direct `prompt`/`research`, or bare `framework` (which
- * foregrounds the dashboard when there is nothing to build). Resolves config over the layers,
- * runs preflight, wires this run's store / control channel / dashboard / browser / consumption
+ * One session's lifecycle: a build, or a direct `prompt`/`research`. Resolves config over the
+ * layers, runs preflight, wires the session's store / control channel / browser / consumption
  * guard / journal, then hands the whole thing to {@link settleRun}. Returns the process exit
  * code. Split out of {@link runCli} so the top reads as a dispatch table and this reads as one
- * run's lifecycle, like every other subcommand handler.
+ * session's lifecycle.
  */
-async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
+async function runSession(opts: SessionOptions, io: CliIO): Promise<number> {
   const fake = opts.fake
   const intent = opts.intent || (fake ? FAKE_INTENT : '')
-  // Bare `framework` (no prompt): run the dashboard server in the foreground so its logs
-  // (and server-thrown errors) are visible, and Ctrl+C stops it (#456). A prompt still
-  // builds. A bare `framework prompt` has nothing to run — verbatim text is required.
-  if (opts.directPrompt && !intent) {
-    io.err('framework prompt needs the prompt text, e.g. `framework prompt "review the auth flow"`.')
-    io.err('Run `framework --help` for usage.')
+  // A `prompt` session runs verbatim text, so it needs some. `research` is the one kind whose
+  // empty prompt is fine — its "what" falls back to the preset default.
+  if (!intent && !fake && !opts.research) {
+    io.err('this session has no prompt to run.')
     return 2
   }
-  // A bare `framework research` is a real run — its "what" falls back to the preset default.
-  if (!intent && !fake && !opts.research) return runForegroundDaemonCmd(opts, io)
 
   const cwd = opts.cwd ?? (fake ? join(tmpdir(), 'framework-fake-workspace') : process.cwd())
 
   // The project can carry its own Open Loop defaults in the-framework.yml (#258):
   // which domain preset + modes to build under. CLI flags override the file; a bad
   // file is a warning, never a failed run. Read from the run's own workspace, so a
-  // --fake demo (empty tmp cwd) stays deterministic unless pointed at a config dir.
+  // The fake demo (empty tmp cwd) stays deterministic unless pointed at a config dir.
   const fileConfig = await loadFrameworkConfig(cwd, msg => io.err(msg))
   // One resolve over the layers (#841): the nearest layer that set a key wins, so this run's
   // flags beat the repo file and an explicit `--no-autopilot` can turn off what the file set.
@@ -1215,7 +949,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // like a resumed one. The exception is a continuation (#1467): `--continue-run` re-enters an
   // existing run, whose recorded flow decides the path — there the session id is the point.
   if (opts.resumeSession && !(opts.research || opts.directPrompt || transparent || opts.continueRun)) {
-    io.err('--resume-session only applies to a prompt run, e.g. `framework prompt "keep going" --resume-session <id>`.')
+    io.err('a resumed agent session only applies to a prompt session, not a build.')
     io.err('Run `framework --help` for usage.')
     return 2
   }
@@ -1229,7 +963,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     for (const check of pre.checks.filter(c => c.warn)) io.err(`! ${check.name}: ${check.detail}`)
     if (!pre.ok) {
       for (const check of pre.checks.filter(c => !c.ok)) io.err(`✗ ${check.name}: ${check.detail}`)
-      io.err('Preflight failed. Fix the above, or pass --skip-preflight, or try `framework --fake`.')
+      io.err('Preflight failed. Fix the above, then start the session again.')
       return 2
     }
   }
@@ -1242,7 +976,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     for (const note of unguardedNotices(opts)) io.err(`note: ${note}`)
   }
 
-  const claudeOpts = claudeDriverOptions(opts)
+  const claudeOpts = claudeDriverOptions()
   // Computed once here, reused by extension discovery and the run.
   // One controller for the whole run: the dashboard Stop button aborts it once
   // wired below.
@@ -1269,11 +1003,9 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     pendingChoices.clear()
     messages.close()
   })
-  // Serve the new Vike + Telefunc dashboard (#405/#427) for this run, in single-project mode:
-  // the SPA reads this one `cwd`'s event/control logs without touching the global registry, so
-  // a one-shot run never pollutes the Projects list. It streams the persisted event log, so a
-  // --no-persist run (or an old install missing the built bundle) runs headless.
-  const dashboard = await startRunDashboard(opts.dashboard && opts.persist && !transparent, cwd, opts.port, io, {
+  // No per-session dashboard: the one that spawned this session is already serving the UI, and
+  // reads this session's event/control logs off disk (D4 — `opts.dashboard` is never set).
+  const dashboard = await startRunDashboard(opts.dashboard && opts.persist && !transparent, cwd, undefined, io, {
     headlessNote: 'continuing headless',
   })
   // The new dashboard steers this live run purely through control.jsonl (its Stop / choice
@@ -1880,10 +1612,10 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
  * any server-thrown errors are visible and Ctrl+C stops it — along with every session it is
  * running, which is the only mode there is. Blocks until the server is signalled (SIGINT/SIGTERM).
  */
-async function runForegroundDaemonCmd(opts: CliOptions, io: CliIO): Promise<number> {
-  const cwd = opts.cwd ?? process.cwd()
-  const port = opts.port ?? DEFAULT_DAEMON_PORT
-  const host = opts.host
+async function runForegroundDaemonCmd(args: CliArgs, io: CliIO): Promise<number> {
+  const cwd = process.cwd()
+  const port = args.port ?? DEFAULT_DAEMON_PORT
+  const host = args.host
   // #1051: pre-generate the shared token for a non-loopback bind so onListening (sync) can print
   // the reachable URL; runDaemon reuses the same persisted token.
   const token = host !== undefined && !isLoopbackHost(host) ? await ensureDaemonToken() : undefined
@@ -1949,169 +1681,43 @@ export function printStartupFooter(io: CliIO, opts: { fetchLatest?: VersionFetch
     .catch(() => {})
 }
 
-/** What `framework worktrees` was asked to do (#752). */
-export type WorktreesCommand =
-  | { action: 'list' }
-  | { action: 'rm'; runId?: string }
-  | { action: 'prune' }
-  /** Remove only the checkouts whose branch has landed (#1036) — the daemon's sweep, on demand. */
-  | { action: 'sweep' }
-
 /**
- * `framework worktrees` (#752): the retained-worktree cleanup the dashboard already has (#737),
- * from the terminal, so it is scriptable and available without opening a browser.
- *
- * Scoped to the cwd's project, like the rest of the CLI. A run that failed or was stopped keeps
- * its checkout so you can look at what it was holding, and nothing removes those on a timer — so
- * without this the only way to clear them was the dashboard, one click at a time.
+ * The session spec a spawned on-before-mergeable child runs with (D4). Pure so a test can assert
+ * it: note it carries **no** `onBeforeMergeable`, which is the recursion guard — a quality pass
+ * must not trigger its own suite.
  */
-async function worktreesCmd(command: WorktreesCommand, cwd: string, io: CliIO): Promise<number> {
-  if (command.action === 'list') {
-    for (const line of formatWorktreeList(await listProjectWorktrees(cwd))) io.out(line)
-    return 0
-  }
-  if (command.action === 'rm') {
-    if (!command.runId) {
-      io.err('usage: framework worktrees rm <sessionId>')
-      return 2
-    }
-    const result = await removeProjectWorktree(cwd, command.runId)
-    if (!result.ok) {
-      io.err(result.error)
-      return 1
-    }
-    io.out(`◆ removed the worktree for session ${command.runId}.`)
-    return 0
-  }
-  // The daemon runs this on a timer (#1036); here it is on demand, for a machine whose daemon is
-  // not running and for seeing what the sweep would say.
-  if (command.action === 'sweep') {
-    const { removed, failed } = await removeMergedWorktrees(cwd)
-    for (const item of removed) {
-      io.out(`◆ removed ${item.runId}: ${item.branch} ${item.via === 'pr' ? 'was merged on GitHub' : 'is merged into the base'}.`)
-    }
-    for (const item of failed) io.err(`✗ ${item.runId}: ${item.error}`)
-    if (removed.length === 0 && failed.length === 0) io.out('No landed worktrees to remove.')
-    else if (removed.length > 0) io.out(`The branches and the sessions are kept; only the checkouts were removed.`)
-    return failed.length > 0 ? 1 : 0
-  }
-  const { removed, skipped } = await pruneProjectWorktrees(cwd)
-  for (const skip of skipped) io.out(`  kept ${skip.runId}: ${skip.reason}`)
-  io.out(
-    removed.length === 0
-      ? 'Nothing to prune.'
-      : `◆ removed ${removed.length} worktree${removed.length === 1 ? '' : 's'}.`,
-  )
-  // A worktree that could not be removed is a failure to report, not a silent partial success.
-  return skipped.some(skip => skip.reason !== 'still running') ? 1 : 0
-}
-
-/**
- * `framework maintain`: the background maintenance sweep (#298). Walks the registered
- * repos, and for each with new commits since its last review runs the maintainability
- * loop (`framework prompt "<maintainability prompt>"`), budget-capped by `--max-cost`
- * and bounded by `--max-repos`. A first-seen repo is baselined (recorded, not reviewed
- * retroactively). `--dry-run` prints the plan without running anything.
- */
-async function maintainCmd(opts: CliOptions, io: CliIO): Promise<number> {
-  const projects = await listProjects()
-  if (projects.length === 0) {
-    io.out('No registered projects. Run `framework` in a repo to add one.')
-    return 0
-  }
-
-  const reviews = await planMaintenanceSweep(
-    projects.map(p => ({ id: p.id, path: p.path })),
-    nodeGitRunner(),
-  )
-
-  if (opts.dryRun) {
-    io.out(`Maintenance sweep (dry run) — ${reviews.length} registered repo${reviews.length === 1 ? '' : 's'}:`)
-    for (const r of reviews) io.out(`  ${describeReview(r)}`)
-    return 0
-  }
-
-  const binPath = process.argv[1]
-  if (!binPath) {
-    io.err('cannot locate the framework CLI entry to run the maintenance loop.')
-    return 1
-  }
-
-  const summary = await maintainSweep(reviews, {
-    run: review => spawnMaintenanceRun(review, binPath, opts.maxCost),
-    // Merged, not replaced: the automatic sweep (#882) keeps its own `sweptAt` in this file.
-    record: (path, state) => mergeMaintenanceState(path, state),
-    log: message => io.out(message),
-    now: () => new Date().toISOString(),
-    ...(opts.maxRepos !== undefined ? { maxRepos: opts.maxRepos } : {}),
-  })
-
-  io.out(
-    `Sweep done: ${summary.reviewed} reviewed, ${summary.baselined} baselined, ${summary.skipped} up-to-date, ` +
-      `${summary.failed} failed${summary.pending ? `, ${summary.pending} pending (--max-repos)` : ''}.`,
-  )
-  return summary.failed ? 1 : 0
-}
-
-/** One line describing a repo's assessed maintenance status, for the dry-run plan. */
-function describeReview(r: RepoReview): string {
-  const name = basename(r.path)
-  switch (r.action) {
-    case 'baseline':
-      return `${name} — baseline at ${short(r.headSha)} (first seen; nothing reviewed retroactively)`
-    case 'review':
-      return `${name} — review ${r.newCommits} new commit${r.newCommits === 1 ? '' : 's'} (${short(r.reviewedSha)}..${short(r.headSha)})${r.note ? ` [${r.note}]` : ''}`
-    case 'skip':
-      return `${name} — up to date`
-    case 'error':
-      return `${name} — skipped (${r.note ?? 'could not assess'})`
+export function promptRunSpec(prompt: string, cwd: string, maxCost?: number, vanilla = false): SessionSpec {
+  return {
+    prompt,
+    kind: 'prompt',
+    cwd,
+    options: {
+      ...(maxCost !== undefined ? { maxCost } : {}),
+      // The on-before-mergeable follow-up runs vanilla so it skips the #326 prompt's `### Session
+      // name` step: it is a follow-up to a session, not a session of its own, so it must not
+      // commit + branch + checkout a new `the-framework/<name>` branch. That stranded its output
+      // (the #556 TODO entries and #537 knowledge docs) on a branch nothing merges (#560). Vanilla
+      // keeps it on the session's current branch, where its output rides to review and merge with
+      // the work. The follow-up prompt is self-contained.
+      ...(vanilla ? { vanilla: true } : {}),
+    },
   }
 }
 
 /**
- * Run the maintainability loop on one repo by spawning `framework prompt "<prompt>"
- * --cwd <repo> --no-dashboard`, reusing the whole run path (preflight, driver, budget
- * cap, LOGS.md). The child inherits stdio so its run streams to the terminal.
- * Resolves true on a clean exit (0). Never re-execs a test entry (fork-bomb guard).
+ * Run one direct prompt by spawning `framework --session <spec>`, reusing the whole run path
+ * (preflight, driver, budget cap, LOGS.md). The child inherits stdio so its run streams to the
+ * terminal. Note the spec carries no `onBeforeMergeable`, so a quality pass never triggers its own
+ * on-before-mergeable prompt (the recursion guard). Resolves true on a clean exit (0). Never
+ * re-execs a test entry (fork-bomb guard).
  */
-function spawnMaintenanceRun(review: RepoReview, binPath: string, maxCost?: number): Promise<boolean> {
-  // Scope the maintainability pass to the un-reviewed range so the agent knows what to look at.
-  const what = review.reviewedSha ? `the changes in ${short(review.reviewedSha)}..${short(review.headSha)}` : 'the recent changes'
-  return spawnPromptRun(presets.maintainability.render(what), review.path, binPath, maxCost)
-}
-
-/**
- * The argv a spawned `framework prompt` child runs with. Pure so a test can assert it:
- * note it carries **no** `--on-before-mergeable`, which is the on-before-mergeable recursion guard (a quality
- * pass must not trigger its own suite).
- */
-export function promptRunArgs(prompt: string, cwd: string, binPath: string, maxCost?: number, vanilla = false): string[] {
-  const args = [binPath, 'prompt', prompt, '--no-dashboard', '--cwd', cwd]
-  if (maxCost !== undefined) args.push('--max-cost', String(maxCost))
-  // The on-before-mergeable follow-up runs `--vanilla` so it skips the #326 prompt's
-  // `### Session name` step: it is a follow-up to a session, not a session of its own,
-  // so it must not commit + branch + checkout a new `the-framework/<name>` branch. That
-  // stranded its output (the #556 TODO entries and #537 knowledge docs) on a branch
-  // nothing merges (#560). Vanilla keeps it on the session's current branch, where its
-  // output rides to review and merge with the work. The follow-up prompt is self-contained.
-  if (vanilla) args.push('--vanilla')
-  return args
-}
-
-/**
- * Run one direct prompt by spawning `framework prompt "<prompt>" --cwd <dir> --no-dashboard`,
- * reusing the whole run path (preflight, driver, budget cap, LOGS.md). The child inherits
- * stdio so its run streams to the terminal. Note it carries no `--on-before-mergeable`, so a quality
- * pass never triggers its own on-before-mergeable prompt (the recursion guard). Resolves true on a
- * clean exit (0). Never re-execs a test entry (fork-bomb guard).
- */
-function spawnPromptRun(prompt: string, cwd: string, binPath: string, maxCost?: number, vanilla = false): Promise<boolean> {
+async function spawnPromptRun(prompt: string, cwd: string, binPath: string, maxCost?: number, vanilla = false): Promise<boolean> {
   if (process.env.NODE_TEST_CONTEXT || /\.test\.[cm]?[jt]s$/.test(binPath)) {
-    return Promise.resolve(false) // refuse to spawn from a test entry
+    return false // refuse to spawn from a test entry
   }
-  const args = promptRunArgs(prompt, cwd, binPath, maxCost, vanilla)
+  const specPath = await writeSessionSpec(promptRunSpec(prompt, cwd, maxCost, vanilla))
   return new Promise<boolean>(resolvePromise => {
-    const child = spawn(process.execPath, args, { stdio: 'inherit' })
+    const child = spawn(process.execPath, [binPath, '--session', specPath], { stdio: 'inherit' })
     child.once('error', () => resolvePromise(false))
     child.once('exit', code => resolvePromise(code === 0))
   })
@@ -2156,50 +1762,6 @@ export async function runOnBeforeMergeable(
   const ok = await run(renderOnBeforeMergeablePrompt(tf, eco), cwd, binPath, maxCost)
   if (!ok) io.out(`  ! on-before-mergeable queueing did not complete cleanly.`)
   return ok ? 'queued' : 'incomplete'
-}
-
-
-/**
- * Reopen the last run from its persisted `.the-framework/` log and replay it into a
- * fresh dashboard (#211). No agent runs; the dashboard rehydrates from the saved
- * event stream and stays up read-only until Ctrl+C.
- */
-async function resumeRun(opts: CliOptions, io: CliIO): Promise<number> {
-  const cwd = opts.cwd ?? process.cwd()
-  let store: RunStore
-  try {
-    store = await RunStore.open(cwd, { fresh: false })
-  } catch (err) {
-    io.err(`could not open .the-framework/ in ${cwd} (${errorMessage(err)})`)
-    return 1
-  }
-  const events = await store.loadEvents()
-  if (events.length === 0) {
-    io.err(`Nothing to resume: no saved session found in ${store.dir}. Run \`framework "..."\` first.`)
-    return 1
-  }
-  const meta = (await store.readMeta()) ?? store.snapshot()
-
-  // Resume serves the new dashboard too (#427), single-project on this `cwd`: the saved
-  // `.the-framework/events.jsonl` is exactly what the SPA's event Channel tails, so the
-  // past run replays with no extra wiring (it is finished, so there is nothing to steer).
-  // A missing bundle (an old install) replays to the terminal only.
-  const dashboard = await startRunDashboard(opts.dashboard, cwd, opts.port, io, {
-    resumed: true,
-    headlessNote: 'replaying to terminal only',
-  })
-
-  for (const event of events) {
-    io.out(formatFrameworkEvent(event))
-  }
-  io.out(`\n• resumed ${meta.status} session of "${meta.intent ?? 'unknown intent'}" (${events.length} event(s)).`)
-
-  if (dashboard) {
-    io.out(`\nDashboard live at ${dashboard.url}. Press Ctrl+C to exit.`)
-    await waitForInterrupt()
-    await dashboard.close()
-  }
-  return 0
 }
 
 

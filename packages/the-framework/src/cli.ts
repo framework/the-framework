@@ -13,7 +13,6 @@ import type { ActionsDriverOptions } from './driver/index.js'
 import { launchSharedBrowser, withBrowser, type SharedBrowser } from './browser.js'
 import { connectCdp, startBrowserStream, type BrowserStream } from './browser-stream.js'
 import { startDashboard, singleProjectProvider, resolveDashboardBundle, type Dashboard } from './dashboard/index.js'
-import { startRelay, relayPublisher, type RelayPublisher } from './relay.js'
 import { randomUUID } from 'node:crypto'
 import { formatFrameworkEvent, mergeWithheldWhy } from './terminal.js'
 import { CLAUDE_CODE_SESSION_LINK } from './session-link.js'
@@ -150,7 +149,6 @@ Usage:
                                  those whose branch has landed (#1036), keeping the branch.
   framework --fake                Run the offline demo (no CLI, no model, deterministic).
   framework doctor                Check prerequisites (Claude Code installed, etc.).
-  framework relay                 Host a session relay so teammates can watch a session (#230).
 
 Options:
   --fake                 Use the fake driver + scripted session (offline / CI).
@@ -233,14 +231,12 @@ Options:
                              bypassPermissions | plan (default: bypassPermissions,
                              so the headless loop can run installs/builds/tests).
   --dangerously-skip-permissions   Bypass all agent permission checks (sandboxes only).
-  --port <n>             Dashboard port (default: 4200); with the relay, the relay port (4488).
+  --port <n>             Dashboard port (default: 4200).
   --host <addr>          Daemon bind address (default: 127.0.0.1, localhost only). A non-loopback
                          address (e.g. 0.0.0.0) exposes the daemon to your network and generates a
                          shared token; the printed URL carries it, and any request without it gets
                          401. Exposing a process spawner to the network is a security decision (#806).
   --no-dashboard         Do not start the localhost dashboard.
-  --share <relay-url>    Publish this session to a relay (from "framework relay") so
-                         teammates can watch it live; prints the shareable URL.
   --resume               Reopen the last session's dashboard from .the-framework/ in --cwd
                          (read-only replay; no new agent session). Survives a restart.
   --no-persist           Do not write the orchestration state to .the-framework/.
@@ -345,8 +341,6 @@ export interface CliOptions {
    * exposes the daemon to the network and gates it behind the generated shared token. */
   host?: string | undefined
   dashboard: boolean
-  relayServe: boolean
-  share?: string | undefined
   sessionLink?: string | undefined
   permissionMode?: PermissionMode | undefined
   skipPermissions: boolean
@@ -392,7 +386,6 @@ export function parseArgs(argv: string[]): CliOptions {
     // config layers (#841), where no layer setting it means on (#1102) — a session left alone
     // hands its work back by itself.
     dashboard: true,
-    relayServe: false,
     skipPermissions: false,
     resume: false,
     persist: true,
@@ -573,9 +566,6 @@ export function parseArgs(argv: string[]): CliOptions {
       case '--unattended':
         opts.unattended = true
         break
-      case '--share':
-        opts.share = argv[++i]
-        break
       case '--session-link':
         opts.sessionLink = argv[++i]
         break
@@ -620,12 +610,10 @@ export function parseArgs(argv: string[]): CliOptions {
         else words.push(arg)
     }
   }
-  // `framework doctor` / `framework relay` / `framework stop` are subcommands, not an intent.
+  // `framework doctor` / `framework stop` are subcommands, not an intent.
   if (words[0] === 'doctor') {
     opts.doctor = true
     words.shift()
-  } else if (words[0] === 'relay') {
-    opts.relayServe = true
     words.shift()
   } else if (words[0] === 'stop') {
     opts.stop = true
@@ -796,7 +784,6 @@ interface RunEpilogue {
   store: RunStore | undefined
   control: ControlWatcher | undefined
   guard: { stop: () => void } | undefined
-  publisher: RelayPublisher | undefined
   /** The run's Chrome (#793), stopped with the run so no headless browser outlives it. */
   sharedBrowser: SharedBrowser | undefined
   /** The preview of that browser (#802), stopped with the run. */
@@ -817,7 +804,7 @@ interface RunEpilogue {
  * Run one engine (a build or a direct prompt) and settle it identically: on success print its
  * line and keep the dashboard up until Ctrl+C; on a clean stop (interrupt
  * / budget cap #322) report it and stay up; on a real failure report it and close. The teardown
- * — flush the store, close the control channel + consumption guard, flush the relay — runs
+ * — flush the store, close the control channel + consumption guard — runs
  * either way. Returns the exit code (0 on success or a clean stop, 1 on a failure). Shared by
  * both run paths so their epilogues cannot drift.
  */
@@ -869,8 +856,6 @@ async function settleRun(
     ctx.guard?.stop()
     await ctx.browserStream?.close()
     await ctx.sharedBrowser?.close()
-    // Make sure every event (including the final `end`) reached the relay before exit.
-    if (ctx.publisher) await ctx.publisher.flush()
   }
 }
 
@@ -1043,7 +1028,7 @@ export interface RunJournal {
 
 /**
  * The run's event sink and the state its epilogue reads. One event arrives and this prints it,
- * persists it, publishes it to the relay, folds the fields the LOGS.md entry needs (session
+ * persists it, folds the fields the LOGS.md entry needs (session
  * id/link, the end event), tracks the settle flags (#322/#326), renames the framework-owned
  * branch once the agent names its session (#736), and re-emits a held browser-stream port
  * right after `session` so it lands in the slice the dashboard renders (#829). These jobs sat
@@ -1054,14 +1039,13 @@ export function createRunJournal(deps: {
   io: CliIO
   cwd: string
   store: RunStore | undefined
-  publisher: RelayPublisher | undefined
   runId: string | undefined
   kind: LogEntry['kind']
   title: string
   /** Awaited before the log entry is written: the queued conversation appends (#908). */
   beforeLog: () => Promise<void>
 }): RunJournal {
-  const { io, cwd, store, publisher } = deps
+  const { io, cwd, store } = deps
   // The framework's own verdict that the run stopped cleanly rather than failed — set by a
   // user interrupt or a budget cap (#322). Trusted over which signal aborted, since a budget
   // stop trips an internal signal the CLI never sees.
@@ -1112,7 +1096,6 @@ export function createRunJournal(deps: {
     }
     io.out(formatFrameworkEvent(event))
     void store?.append(event)
-    publisher?.publish(event)
 
     // Right after the session opens, so it lands inside the slice the dashboard renders.
     if (event.kind === 'session') {
@@ -1192,9 +1175,6 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     return result.ok ? 0 : 1
   }
 
-  // `framework relay` hosts the run relay: teammates open a run's URL and watch it
-  // live (#230). It runs until interrupted; a run publishes to it with `--share`.
-  if (opts.relayServe) return runRelayServer(opts, io)
 
   // Resume a previous run's dashboard from its persisted log — the reload half of
   // #211. No agent runs; we just replay the saved events into a fresh stream so
@@ -1468,16 +1448,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     }
   }
 
-  // Publish the run to a relay (#230) so teammates can watch it live. Best-effort:
-  // a relay that is down reports each failed POST here but never fails the run.
-  let publisher: RelayPublisher | undefined
-  if (opts.share) {
-    publisher = relayPublisher(opts.share, randomUUID(), err =>
-      io.err(`relay publish failed (${errorMessage(err)})`),
-    )
-    io.out(`◆ shared session: ${publisher.url}`)
-  }
-
   // Pause the choice gates when someone can answer: this run's own dashboard, or the
   // workspace daemon's via the control channel (#344). With neither, the gates auto-accept
   // the recommended option (#304). The run's requestChoice parks a resolver in pendingChoices
@@ -1542,7 +1512,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     io,
     cwd,
     store,
-    publisher,
     runId: opts.runId,
     // A build continuation (#1467) logs as the build run it re-enters, not as the prompt
     // start that carried it here.
@@ -1845,7 +1814,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     store,
     control,
     guard,
-    publisher,
     sharedBrowser,
     browserStream,
     clearInterrupt,
@@ -2291,21 +2259,6 @@ export async function runOnBeforeMergeable(
   return ok ? 'queued' : 'incomplete'
 }
 
-/**
- * `framework relay`: host the run relay (#230). Teammates open a run's URL
- * (printed when a run uses `--share <this-url>`) and watch it live with full
- * history replay. Runs until interrupted. Unauthenticated by design — anyone with
- * a run URL can watch; accounts/teams/steering come later.
- */
-async function runRelayServer(opts: CliOptions, io: CliIO): Promise<number> {
-  const relay = await startRelay(opts.port !== undefined ? { port: opts.port } : {})
-  io.out(`◆ relay listening at ${relay.url}`)
-  io.out(`  Sessions published with \`framework "..." --share ${relay.url}\` are watchable at ${relay.url}/?run=<id>`)
-  io.out(`  Press Ctrl+C to stop.`)
-  await waitForInterrupt()
-  await relay.close()
-  return 0
-}
 
 /**
  * Reopen the last run from its persisted `.the-framework/` log and replay it into a

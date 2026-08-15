@@ -72,13 +72,6 @@ export {
   type QuotaPollerOptions,
 } from './quota-poller.js'
 export {
-  startRelay,
-  relayPublisher,
-  type Relay,
-  type RelayOptions,
-  type RelayPublisher,
-} from './relay.js'
-export {
   type FrameworkEvent,
   type ChoiceOption,
   type ChoiceRequest,

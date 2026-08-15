@@ -503,19 +503,6 @@ test('parseArgs reads --kind as the build event (#265)', () => {
   assert.equal(parseArgs(['x']).buildEvent, undefined)
 })
 
-test('parseArgs reads the relay subcommand and --share (#230)', () => {
-  const relay = parseArgs(['relay', '--port', '5000'])
-  assert.equal(relay.relayServe, true)
-  assert.equal(relay.intent, '') // 'relay' is a subcommand, not an intent word
-  assert.equal(relay.port, 5000)
-  const share = parseArgs(['--share', 'http://host:4488', 'a', 'blog'])
-  assert.equal(share.share, 'http://host:4488')
-  assert.equal(share.intent, 'a blog')
-  assert.equal(parseArgs(['x']).relayServe, false)
-  assert.equal(parseArgs(['x']).share, undefined)
-})
-
-
 test('mergeRunConfig: the-framework.yml supplies defaults, flags override (#258)', () => {
   const flags = {}
   const modes = (config: { autopilot: boolean; technical: boolean }) => [config.autopilot, config.technical]
@@ -950,7 +937,6 @@ test('naming the session renames the run-id branch and records it as a branch ev
     io,
     cwd: repo,
     store: undefined,
-    publisher: undefined,
     runId: 'r1',
     kind: 'prompt',
     title: 'a run',
@@ -974,7 +960,6 @@ test('a browser URL is held until the session opens, then re-said after every la
     io,
     cwd: '/tmp',
     store: undefined,
-    publisher: undefined,
     runId: undefined,
     kind: 'prompt',
     title: 'a run',

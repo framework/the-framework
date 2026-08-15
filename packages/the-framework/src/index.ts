@@ -36,8 +36,6 @@ export * from './driver/index.js'
 export {
   driverBuild,
   driverImprove,
-  decideDeploy,
-  deployWith,
   buildPrompt,
   extendPrompt,
   improvePrompt,
@@ -48,7 +46,6 @@ export {
   runFramework,
   type RunFrameworkOptions,
   type RunFrameworkResult,
-  type DeployDecision,
   type ServeConfig,
   type AppPreview,
 } from './run.js'
@@ -87,7 +84,6 @@ export {
   type RelayOptions,
   type RelayPublisher,
 } from './relay.js'
-export { hostExecutor, type HostExecutorOptions } from './host-exec.js'
 export {
   type FrameworkEvent,
   type ChoiceOption,
@@ -257,7 +253,7 @@ export {
   type VersionFetcher,
   type UpdateStatus,
 } from './update-check.js'
-export { runCli, parseArgs, buildDeployTarget, runOnBeforeMergeable, promptRunArgs, type PromptRunner, type CliIO, type CliOptions } from './cli.js'
+export { runCli, parseArgs, runOnBeforeMergeable, promptRunArgs, type PromptRunner, type CliIO, type CliOptions } from './cli.js'
 export { renderOnBeforeMergeablePrompt, ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE, type OnBeforeMergeableContext } from './on-before-mergeable-prompt.js'
 export {
   loadFrameworkConfig,
@@ -377,7 +373,6 @@ export {
   fakeDriver,
   FAKE_INTENT,
   FAKE_SIGNALS,
-  FAKE_DEPLOY,
 } from './fake-script.js'
 export {
   AGENTS,

@@ -9,7 +9,6 @@ import { BROWSER_MCP_SERVERS, withBrowser } from './browser.js'
 import { EVENTS_FILE, FRAMEWORK_DIR, RUNS_DIR, type StoreFs } from './store/index.js'
 import { nodeGitRunner } from './project.js'
 import {
-  buildDeployTarget,
   chooseSessionLink,
   claudeDriverOptions,
   CLAUDE_CODE_SESSION_LIST,
@@ -713,24 +712,6 @@ test('runCli --daemon backgrounds the dashboard, not a usage error (#302/#456)',
   }
 })
 
-test('buildDeployTarget builds cloudflare, requires dokploy config, ignores unknown', () => {
-  assert.equal(buildDeployTarget('cloudflare', {}, '/ws').target?.name, 'cloudflare')
-  assert.match(buildDeployTarget('dokploy', {}, '/ws').error!, /dokploy-url and --dokploy-app/)
-  assert.equal(
-    buildDeployTarget('dokploy', { dokployUrl: 'https://d.example', dokployApp: 'app-1' }, '/ws').target?.name,
-    'dokploy',
-  )
-  const unknown = buildDeployTarget('fly', {}, '/ws')
-  assert.equal(unknown.target, undefined)
-  assert.equal(unknown.error, undefined)
-})
-
-test('runCli errors when --deploy dokploy lacks its config', async () => {
-  const { io } = capture()
-  const code = await runCli(['--deploy', 'dokploy', '--no-dashboard', 'a small app'], io)
-  assert.equal(code, 2)
-})
-
 test('parseArgs reads the doctor subcommand, not as intent', () => {
   const opts = parseArgs(['doctor'])
   assert.equal(opts.doctor, true)
@@ -769,9 +750,8 @@ test('runCli --fake --no-dashboard runs the whole flow offline', async () => {
   const text = out.join('\n')
   assert.match(text, /scope: full/) // the run opens on scope now that the architect is gone
   assert.match(text, /Build this app end to end/)
-  // #1372: nothing reviews the build — no checklist pass, straight to deploy.
+  // #1372: nothing reviews the build, so there is no checklist pass — the build is the whole run.
   assert.doesNotMatch(text, /checklist pass/)
-  assert.match(text, /deploy: SSR/)
   assert.match(text, /\u2713 done/)
 })
 

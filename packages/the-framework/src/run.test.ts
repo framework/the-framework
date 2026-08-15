@@ -7,7 +7,7 @@ import { defineDomainPreset, defineLoop } from '@gemstack/ai-autopilot'
 import type { Prompt } from '@gemstack/ai-autopilot'
 import { DEFAULT_MAX_PASSES, runFramework } from './run.js'
 import { requestChoices, requestMultiSelect, runAwaitRounds, type ChoicesOption, type MultiSelectOption } from './await-gate.js'
-import { FAKE_DEPLOY, FAKE_INTENT, FAKE_SIGNALS, fakeDriver } from './fake-script.js'
+import { FAKE_INTENT, FAKE_SIGNALS, fakeDriver } from './fake-script.js'
 import { RunMessageQueue } from './run-messages.js'
 import { FakeDriver, type Driver, type DriverSession } from './driver/index.js'
 import { composeRunSystem } from './system-prompt.js'
@@ -36,7 +36,6 @@ test('runFramework drives the whole flow through the driver, offline', async () 
     driver: fakeDriver(),
     cwd: '/tmp/ws',
     signals: FAKE_SIGNALS,
-    deploy: FAKE_DEPLOY,
     onEvent: e => events.push(e),
   })
 
@@ -48,8 +47,6 @@ test('runFramework drives the whole flow through the driver, offline', async () 
   assert.equal(result.passes, 0)
   assert.deepEqual(result.blockers, [])
 
-  // The deploy phase decided SSR -> cloudflare.
-  assert.equal(result.deploy?.plan.target, 'cloudflare')
 
   // We surfaced the wrapped agent's own progress.
   assert.ok(events.some(e => e.kind === 'driver'))
@@ -153,7 +150,7 @@ test('runFramework stops itself once the budget cap is reached (#322)', async ()
   assert.equal(end.ok, false)
   assert.equal(end.stopped, true)
   assert.match(end.detail ?? '', /budget reached/)
-  // The run stopped early: it never reached the deploy/production-grade tail.
+  // The run stopped early: it never reached the production-grade tail.
   assert.ok(!events.some(e => e.kind === 'bootstrap' && e.event.type === 'done'))
 })
 

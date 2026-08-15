@@ -6,10 +6,7 @@ import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   builtinDomainPresets,
-  cloudflareTarget,
-  dokployTarget,
   selectPreset,
-  type DeployTarget,
   type DomainPreset,
   type FrameworkSignals,
 } from '@gemstack/ai-autopilot'
@@ -21,7 +18,6 @@ import { githubToken } from './dashboard/gh.js'
 import type { ActionsDriverOptions } from './driver/index.js'
 import { launchSharedBrowser, withBrowser, type SharedBrowser } from './browser.js'
 import { connectCdp, startBrowserStream, type BrowserStream } from './browser-stream.js'
-import { hostExecutor } from './host-exec.js'
 import { startDashboard, singleProjectProvider, resolveDashboardBundle, type Dashboard } from './dashboard/index.js'
 import { startRelay, relayPublisher, type RelayPublisher } from './relay.js'
 import { randomUUID } from 'node:crypto'
@@ -32,12 +28,11 @@ import { runAutoHandoff, withheldMerge } from './dashboard/run-handoff.js'
 import {
   runFramework,
   type AppPreview,
-  type DeployDecision,
   type RunFrameworkOptions,
   type RunFrameworkResult,
   type ServeConfig,
 } from './run.js'
-import { FAKE_DEPLOY, FAKE_INTENT, FAKE_SIGNALS, fakeDriver } from './fake-script.js'
+import { FAKE_INTENT, FAKE_SIGNALS, fakeDriver } from './fake-script.js'
 import { readProjectSignals } from './project.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
 import { sessionTodoPending } from './todo-loop.js'
@@ -257,10 +252,6 @@ Options:
   --serve-path <path>    Path to health-check once it is up (default: /).
   --sandbox <where>      Where --serve runs: "local" (host, default) or "docker"
                          (a throwaway container, so agent code never runs on the host).
-  --deploy <target>      Deploy to this target (cloudflare, dokploy) or narrate any other.
-  --cf-project <name>    Cloudflare Pages project name (for a Pages deploy).
-  --dokploy-url <url>    Dokploy instance URL (required for --deploy dokploy).
-  --dokploy-app <id>     Dokploy application id (required for --deploy dokploy).
   --port <n>             Dashboard port (default: 4200); with the relay, the relay port (4488).
   --host <addr>          Daemon bind address (default: 127.0.0.1, localhost only). A non-loopback
                          address (e.g. 0.0.0.0) exposes the daemon to your network and generates a
@@ -369,10 +360,6 @@ export interface CliOptions {
   maxCost?: number
   todoLoop: boolean
   todoMaxItems?: number
-  deploy?: string | undefined
-  cfProject?: string | undefined
-  dokployUrl?: string | undefined
-  dokployApp?: string | undefined
   serve?: string | undefined
   serveInstall?: string | undefined
   serveBuild?: string | undefined
@@ -611,18 +598,6 @@ export function parseArgs(argv: string[]): CliOptions {
         break
       case '--unattended':
         opts.unattended = true
-        break
-      case '--deploy':
-        opts.deploy = argv[++i]
-        break
-      case '--cf-project':
-        opts.cfProject = argv[++i]
-        break
-      case '--dokploy-url':
-        opts.dokployUrl = argv[++i]
-        break
-      case '--dokploy-app':
-        opts.dokployApp = argv[++i]
         break
       case '--serve':
         opts.serve = argv[++i]
@@ -1404,31 +1379,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     domainPreset = resolved.preset
   }
 
-  // The fake demo defaults to a Cloudflare deploy decision so the flow ends with
-  // a deploy phase; a live run only narrates deploy when asked.
-  const deploy: DeployDecision | undefined = opts.deploy
-    ? { render: 'ssr', target: opts.deploy, reason: `deploy to ${opts.deploy}` }
-    : fake
-      ? FAKE_DEPLOY
-      : undefined
-
-  // A real deploy target actually ships the app. Only for live runs against a
-  // known target; --fake stays plan-only and deterministic. An unknown target
-  // just narrates the decision. Real targets never throw on missing creds.
-  // Validated up front like --preset: a bad flag combination is a usage error, and it must
-  // fail before the dashboard / store / control channel are wired — a raw return after them
-  // leaked every handle and left the run recorded as `running` forever.
-  let deployTarget: DeployTarget | undefined
-  if (!fake && opts.deploy) {
-    const built = buildDeployTarget(opts.deploy, opts, cwd)
-    if (built.error) {
-      io.err(built.error)
-      io.err('Run `framework --help` for usage.')
-      return 2
-    }
-    deployTarget = built.target
-  }
-
   // Fail early and clearly if a live run's prerequisites are missing — before the
   // run, which needs the wrapped agent.
   if (!fake && !opts.skipPreflight) {
@@ -2119,8 +2069,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     ...(opts.maxPasses ? { maxPasses: opts.maxPasses } : {}),
     ...(opts.todoLoop && !transparent ? {} : { todoLoop: false }),
     ...(opts.todoMaxItems ? { todoMaxItems: opts.todoMaxItems } : {}),
-    ...(deploy ? { deploy } : {}),
-    ...(deployTarget ? { deployTarget } : {}),
     ...(serve ? { serve } : {}),
     ...(serve && opts.sandbox ? { sandbox: opts.sandbox } : {}),
     // Modes ride along even without a domain preset: autopilot also steers the
@@ -2542,33 +2490,6 @@ async function resumeRun(opts: CliOptions, io: CliIO): Promise<number> {
   return 0
 }
 
-/**
- * Build a real {@link DeployTarget} for a known target name, or return an error /
- * nothing. `cloudflare` runs `wrangler` via a host executor bound to the build's
- * workspace; `dokploy` is a fetch to a self-hosted instance. Creds come from the
- * environment (CLOUDFLARE_API_TOKEN / DOKPLOY_AUTH_TOKEN).
- */
-export function buildDeployTarget(
-  name: string,
-  opts: Pick<CliOptions, 'cfProject' | 'dokployUrl' | 'dokployApp'>,
-  cwd: string,
-): { target?: DeployTarget; error?: string } {
-  if (name === 'cloudflare') {
-    return {
-      target: cloudflareTarget({
-        session: hostExecutor(cwd),
-        ...(opts.cfProject ? { projectName: opts.cfProject } : {}),
-      }),
-    }
-  }
-  if (name === 'dokploy') {
-    if (!opts.dokployUrl || !opts.dokployApp) {
-      return { error: '--deploy dokploy requires --dokploy-url and --dokploy-app' }
-    }
-    return { target: dokployTarget({ serverUrl: opts.dokployUrl, applicationId: opts.dokployApp }) }
-  }
-  return {} // Unknown target: narrate the decision only.
-}
 
 /** The post-run wait: keep the dashboard up until Ctrl+C, then close it. */
 async function keepDashboardUp(dashboard: Dashboard, io: CliIO): Promise<void> {

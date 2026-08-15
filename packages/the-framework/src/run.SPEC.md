@@ -1,4 +1,4 @@
-The build-run orchestrator: one agent session drives the whole flow — scope, build, optional review loop, deploy — then the backlog loop and live chat, with every phase streamed as events.
+The build-run orchestrator: one agent session drives the whole flow — scope, build, optional review loop — then the backlog loop and live chat, with every phase streamed as events.
 
 ## TLDR
 
@@ -10,7 +10,7 @@ The build-run orchestrator: one agent session drives the whole flow — scope, b
 
 ## Flows
 
-- Detect and narrate → frame the session → scope → build (pausing on the agent's questions) → review-and-improve until clean, when configured → deploy → backlog loop → optional live app preview → live chat → end.
+- Detect and narrate → frame the session → scope → build (pausing on the agent's questions) → review-and-improve until clean, when configured → backlog loop → optional live app preview → live chat → end.
 - On any stop or failure: classify why (shared with the direct-prompt path), emit a clean end event, and release the session.
 
 ## Before writing SPEC.md files

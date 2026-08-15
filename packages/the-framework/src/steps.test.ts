@@ -3,10 +3,9 @@ import { test } from 'node:test'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { LoopEngine, defineLoop, definePrompt, type DeployTarget, type SupervisorEvent } from '@gemstack/ai-autopilot'
+import { LoopEngine, defineLoop, definePrompt, type SupervisorEvent } from '@gemstack/ai-autopilot'
 import { FakeDriver } from './driver/index.js'
 import {
-  deployWith,
   domainLoopChecklist,
   driverBuild,
   driverImprove,
@@ -74,26 +73,6 @@ test('driverBuild emits supervisor events and returns the driver summary', async
     events.map(e => e.type),
     ['plan', 'dispatch-start', 'dispatch-result', 'synthesize'],
   )
-})
-
-test('deployWith runs the target against the decided plan and uses its name', async () => {
-  const calls: string[] = []
-  const target: DeployTarget = {
-    name: 'cloudflare',
-    deploy: ctx => {
-      calls.push(ctx.plan.render)
-      return { deployed: true, url: 'https://app.workers.dev', detail: 'shipped' }
-    },
-  }
-  const outcome = await deployWith({ render: 'ssr', reason: 'per-request data' }, target)({
-    scope: 'full',
-    intent: 'orders app',
-    productionGrade: true,
-  })
-  assert.equal(outcome.plan.target, 'cloudflare')
-  assert.equal(outcome.result.deployed, true)
-  assert.equal(outcome.result.url, 'https://app.workers.dev')
-  assert.deepEqual(calls, ['ssr'])
 })
 
 test('driverImprove prompts the driver with the blockers', async () => {

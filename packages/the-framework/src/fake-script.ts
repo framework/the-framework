@@ -1,14 +1,12 @@
 import type { FrameworkSignals } from '@gemstack/ai-autopilot'
 import { FakeDriver, type FakeTurn } from './driver/index.js'
-import type { DeployDecision } from './run.js'
 
 /**
  * The deterministic `--fake` scenario: a small Vike + Prisma orders app.
  * It wires a {@link FakeDriver} whose scripted turns walk the exact prompt order
  * the flow issues — one build turn (#1372: with no preset and no serve config
- * nothing reviews the build, so the build is the whole loop) — so the
- * scope -> deploy flow runs offline with no CLI and no model, driven entirely
- * *through* the driver seam.
+ * nothing reviews the build, so the build is the whole loop) — so the flow runs
+ * offline with no CLI and no model, driven entirely *through* the driver seam.
  */
 
 /** The default intent the `--fake` demo builds. */
@@ -17,13 +15,6 @@ export const FAKE_INTENT = 'A paginated orders page backed by an orders table, w
 /** Deps that make the Vike preset win detection in the demo. */
 export const FAKE_SIGNALS: FrameworkSignals = {
   dependencies: { 'vike-react': '1.0.0', react: '18.0.0', '@prisma/client': '5.0.0' },
-}
-
-/** The deploy decision narrated at the end of the demo. */
-export const FAKE_DEPLOY: DeployDecision = {
-  render: 'ssr',
-  target: 'cloudflare',
-  reason: 'per-request orders data + server-side auth',
 }
 
 // A small, plausible per-turn usage so the demo shows spend accumulating (#322).

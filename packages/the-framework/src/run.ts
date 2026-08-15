@@ -12,7 +12,6 @@ import {
   type BootstrapScope,
   type BootstrapSteps,
   type BuildContext,
-  type DeployTarget,
   type DomainPreset,
   type FrameworkDetection,
   type FrameworkSignals,
@@ -28,7 +27,7 @@ import { createRunControls, emitSessionStart, endStopDetail } from './run-teleme
 import { AWAIT_PROTOCOL, createTurnSignalEmitter } from './turn-gate.js'
 import { drainGates, runChatPhase, type BindProjectDeps, type RecordMessage } from './await-gate.js'
 import { leaveResumeNote, runTodoLoop, type TodoLoopResult } from './todo-loop.js'
-import { continueAfterChoice, decideDeploy, deployWith, domainLoopChecklist, driverBuild, driverImprove, driverLoopPrompts } from './steps.js'
+import { continueAfterChoice, domainLoopChecklist, driverBuild, driverImprove, driverLoopPrompts } from './steps.js'
 import { OPEN_LOOP_MODES, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import type { RunMessages } from './run-messages.js'
 import { errorMessage } from './error-message.js'
@@ -39,13 +38,6 @@ import { errorMessage } from './error-message.js'
  * bootstrapping an empty workspace before there is anything to polish (#182).
  */
 export const DEFAULT_MAX_PASSES = 5
-
-/** The deploy decision to narrate at the end (plan-only in v1: it does not ship). */
-export interface DeployDecision {
-  render: 'ssr' | 'ssg' | 'spa'
-  target: string
-  reason: string
-}
 
 /**
  * How to actually boot and serve the generated app so the loop can gate on it
@@ -141,14 +133,6 @@ export interface RunFrameworkOptions {
   buildEvent?: string
   /** Max full-fledged passes. Default {@link DEFAULT_MAX_PASSES} (5). */
   maxPasses?: number
-  /** A deploy decision to narrate at the end. Omit to skip the deploy phase. */
-  deploy?: DeployDecision
-  /**
-   * A real {@link DeployTarget} to *execute* the decided plan (e.g.
-   * `cloudflareTarget` / `dokployTarget`). Requires {@link deploy}. Omit to only
-   * narrate a plan-only decision.
-   */
-  deployTarget?: DeployTarget
   /**
    * Boot-and-serve verification for the full-fledged loop: when set, the
    * checklist gates on the app actually running, not just an agent review.
@@ -445,13 +429,6 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
           gateDeps,
         ),
         ...(handsOff || !checklist ? {} : { checklist, improve: driverImprove(session, workspaceOpt) }),
-        ...(opts.deploy
-          ? {
-              deploy: opts.deployTarget
-                ? deployWith(opts.deploy, opts.deployTarget)
-                : decideDeploy(opts.deploy),
-            }
-          : {}),
       },
     })
     const result = await bootstrap.run()

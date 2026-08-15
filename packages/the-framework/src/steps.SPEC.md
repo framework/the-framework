@@ -1,9 +1,10 @@
-Runs the build step by prompting the wrapped agent, which is treated as a black box that does the actual work.
+The prompts a build session opens with, and the one check that decides between them.
 
 ## TLDR
 
-- The build is one prompt whose framing states the one thing the agent cannot infer: build from scratch in an empty workspace, or work within the codebase that already exists — an existing project is extended, never re-scaffolded.
-- A build turn that leaves the workspace empty means the agent stalled: it is re-prompted once with a hard "create it from scratch" directive — unless it stopped on purpose to ask a question, which the ask-gate handles instead.
+- The framing states the one thing the agent cannot infer: build from scratch in an empty workspace, or work within the codebase that already exists — an existing project is extended, never re-scaffolded.
+- A workspace holding no source the agent could have written counts as empty; lockfiles, dotfiles, and dependency or output directories do not.
+- A third prompt exists for the case where a build left the workspace empty anyway: a hard "create it from scratch, an empty directory is expected" directive.
 
 ## Before writing SPEC.md files
 

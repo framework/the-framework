@@ -18,9 +18,9 @@ import { CLAUDE_CODE_SESSION_LINK } from './session-link.js'
 import { type AutoHandoffSkip, type ChoicePick, type ChoiceRequest, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
 import { runAutoHandoff, withheldMerge } from './dashboard/run-handoff.js'
 import {
-  runFramework,
-  type RunFrameworkOptions,
-  type RunFrameworkResult,
+  runSession,
+  type RunSessionOptions,
+  type SessionKind,
 } from './run.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
@@ -65,7 +65,6 @@ import {
 import { removeMergedWorktrees } from './merged-worktrees.js'
 import { defaultWhat } from './preset-prompt.js'
 import { renderOnBeforeMergeablePrompt, type OnBeforeMergeableContext } from './on-before-mergeable-prompt.js'
-import { runPrompt } from './prompt-run.js'
 import { presets } from './preset-catalog.js'
 import { errorMessage } from './error-message.js'
 
@@ -846,20 +845,19 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
       io.err(`could not read the session spec (${errorMessage(err)}).`)
       return 2
     }
-    return runSession(sessionOptions(spec), io)
+    return driveSession(sessionOptions(spec), io)
   }
   // Everything else is bare `framework`: serve the dashboard in the foreground until Ctrl-C.
   return runForegroundDaemonCmd(args, io)
 }
 
 /**
- * One session's lifecycle: a build, or a direct `prompt`/`research`. Resolves config over the
- * layers, runs preflight, wires the session's store / control channel / browser / consumption
- * guard / journal, then hands the whole thing to {@link settleRun}. Returns the process exit
- * code. Split out of {@link runCli} so the top reads as a dispatch table and this reads as one
- * session's lifecycle.
+ * Everything the CLI wires around one session before {@link runSession} drives it: config
+ * resolved over the layers, the store, the control channel, the browser, the consumption guard
+ * and the journal — then handed to {@link settleRun}. Returns the process exit code. Split out of
+ * {@link runCli} so the top reads as a dispatch table and this reads as one session's lifecycle.
  */
-async function runSession(opts: SessionOptions, io: CliIO): Promise<number> {
+async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   const fake = opts.fake
   const intent = opts.intent || (fake ? FAKE_INTENT : '')
   // A `prompt` session runs verbatim text, so it needs some. `research` is the one kind whose
@@ -1486,55 +1484,41 @@ async function runSession(opts: SessionOptions, io: CliIO): Promise<number> {
     ...(sessionLink ? { sessionLink } : {}),
   }
 
-  // `framework research [what]` (#331) and `framework prompt <text>` (#353): the
-  // direct prompt path — run one prompt through runPrompt, which honors its gates
-  // (#337/#339) but skips the scope -> build scaffolding entirely.
-  // Transparent (#625) joins them: "raw Claude Code" must bypass the build orchestration
-  // AND the prompt wrapping too, not just zero the system prompt — so a transparent run
-  // (any kind) runs its prompt verbatim here rather than through runFramework's
-  // scope -> build -> synthesize + extendPrompt. Research renders its preset template
-  // around the "what" (only when it isn't transparent); prompt/transparent run the text
-  // verbatim (it may already BE an edited preset, so it must not be re-rendered).
-  // Shares all the wiring above (dashboard, store, control channel, budget).
-  // A build continuation (#1467) falls through to runFramework below despite arriving as a
-  // `prompt` start: the flow it re-enters is the build run recorded on its own meta.
+  // Which prompt opens the session, and whether its backlog is worked afterwards (D2). A `prompt`
+  // session runs its text verbatim — it may already BE an edited preset, so it must not be
+  // re-rendered — and research renders its preset template around the "what" first. Transparent
+  // (#625) joins them: "raw Claude Code" must bypass the build framing too, not just zero the
+  // system prompt. A build continuation (#1467) stays a build despite arriving as a `prompt`
+  // start: the flow it re-enters is the one recorded on its own meta.
   const isResearch = opts.research && !transparent
-  if ((opts.research || opts.directPrompt || transparent) && !continueBuild) {
-    return settleRun(epilogue(isResearch ? 'research' : 'prompt session'), async () => {
-      await runPrompt({
-        ...sharedRunOptions,
-        prompt: isResearch ? presets.research.render(intent) : intent,
-        ...(config.autopilot ? { autopilot: true } : {}),
-        ...(opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
-      })
-      return {
-        successLine: isResearch
-          ? '\n✓ research done: see the REVIEW-PROBLEMS / TODO files it wrote.'
-          : '\n✓ prompt session done.',
-      }
-    })
-  }
+  const kind: SessionKind = (opts.research || opts.directPrompt || transparent) && !continueBuild ? 'prompt' : 'build'
+  const label = kind === 'build' ? 'session' : isResearch ? 'research' : 'prompt session'
 
-  const runOpts: RunFrameworkOptions = {
+  const runOpts: RunSessionOptions = {
     ...sharedRunOptions,
-    intent,
-    scope: opts.scope,
-    // A build continuation (#1467): resume the stopped leg's conversation; the intent above is
-    // the continuation message and runFramework sends it verbatim.
-    ...(continueBuild && opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
+    kind,
+    prompt: isResearch ? presets.research.render(intent) : intent,
+    // Modes ride along even without a domain preset: autopilot also steers the #326 system
+    // prompt's maintenance stance.
+    ...(config.autopilot ? { autopilot: true } : {}),
+    // Resume the stopped leg's conversation (#720/#1467); the prompt above is the continuation
+    // message, which `runSession` then sends verbatim.
+    ...(opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
     ...(opts.todoLoop && !transparent ? {} : { todoLoop: false }),
     ...(opts.todoMaxItems ? { todoMaxItems: opts.todoMaxItems } : {}),
-    // Modes ride along even without a domain preset: autopilot also steers the
-    // #326 system prompt's maintenance stance.
   }
 
-  return settleRun(epilogue('session'), async () => {
-    const { result } = await runFramework(runOpts)
+  return settleRun(epilogue(label), async () => {
+    await runSession(runOpts)
     // A hand-off ends at the hand-off (#1225): "done" would claim this machine built something
     // it never saw.
     const successLine = driver.handsOff
       ? '\n✓ handed off. The session continues where it was sent, and opens its own pull request.'
-      : '\n✓ done.'
+      : isResearch
+        ? '\n✓ research done: see the REVIEW-PROBLEMS / TODO files it wrote.'
+        : kind === 'prompt'
+          ? '\n✓ prompt session done.'
+          : '\n✓ done.'
     return { successLine }
   })
 }

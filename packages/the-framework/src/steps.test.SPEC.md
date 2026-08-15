@@ -1,4 +1,4 @@
-Covers the agent-backed build step: greenfield vs. existing-codebase framing, and the once-only scaffold retry for a workspace left empty.
+Covers the build prompts and the emptiness check they turn on: what counts as an empty workspace, greenfield framing that says so, extend framing that names the existing codebase and nothing else, and the scaffold directive that refuses to let an empty directory be a reason to stop.
 
 ## Before writing SPEC.md files
 

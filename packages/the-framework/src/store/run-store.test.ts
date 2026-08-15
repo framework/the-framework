@@ -68,7 +68,7 @@ const META = join(CWD, '.the-framework', 'run.json')
 
 const RUN: FrameworkEvent[] = [
   { kind: 'session', driver: 'fake', workspace: CWD, fake: true, sessionLink: 'https://claude.ai/code' },
-  { kind: 'bootstrap', event: { type: 'scope', scope: 'full', intent: 'a blog with comments' } },
+  { kind: 'intent', text: 'a blog with comments' },
   { kind: 'session-update', sessionId: 'sess-123', sessionLink: 'https://ex.com/s/sess-123' },
   { kind: 'end', ok: true },
 ]
@@ -101,10 +101,10 @@ test('a local target is left off the snapshot (default, #1053)', async () => {
   assert.equal('target' in (await store.readMeta())!, false)
 })
 
-test('a scope event still refines a seeded intent (build path)', async () => {
+test('an intent event still refines a seeded intent', async () => {
   const fs = memFs()
   const store = await RunStore.open(CWD, { fs, fresh: true, now: AT, intent: 'build a blog' })
-  await store.append({ kind: 'bootstrap', event: { type: 'scope', scope: 'full', intent: 'a blog with comments' } })
+  await store.append({ kind: 'intent', text: 'a blog with comments' })
   assert.equal(store.snapshot().intent, 'a blog with comments')
 })
 
@@ -119,7 +119,6 @@ test('append writes one JSONL line per event and derives meta', async () => {
 
   const meta = JSON.parse(fs.files.get(META)!) as RunMeta
   assert.equal(meta.intent, 'a blog with comments')
-  assert.equal(meta.scope, 'full')
   assert.equal(meta.driver, 'fake')
   assert.equal(meta.workspace, CWD)
   assert.equal(meta.sessionId, 'sess-123')
@@ -141,7 +140,7 @@ test('loadEvents skips a torn trailing line from an interrupted write', async ()
   const store = await RunStore.open(CWD, { fs, fresh: false, now: AT })
   const loaded = await store.loadEvents()
   assert.equal(loaded.length, 2)
-  assert.equal(loaded[1]!.kind, 'bootstrap')
+  assert.equal(loaded[1]!.kind, 'intent')
 })
 
 test('a non-fresh open preserves the existing log (resume)', async () => {
@@ -300,7 +299,7 @@ test('listRuns returns archived runs newest-first with intent + status (#303)', 
   for (const e of RUN) await a.append(e)
   await a.close()
   const b = await RunStore.open(CWD, { fs, fresh: true, now: '2026-07-05T00:00:00.000Z' })
-  await b.append({ kind: 'bootstrap', event: { type: 'scope', scope: 'full', intent: 'a todo app' } })
+  await b.append({ kind: 'intent', text: 'a todo app' })
   await b.close()
 
   const runs = await listRuns(CWD, fs)
@@ -889,9 +888,9 @@ test('a continuation keeps its original label through a re-entered scope event (
   const fs = memFs()
   const first = await RunStore.open(CWD, { fs, fresh: true, now: AT, intent: 'build a thing', kind: 'build' })
   await first.append({ kind: 'end', ok: false, stopped: true })
-  // The build continuation re-runs the bootstrap, whose scope event carries the resume message —
-  // the reopened run keeps its original intent (#762), not the message that woke it.
+  // A continuation's own intent event carries the resume message — the reopened session keeps its
+  // original intent (#762), not the message that woke it.
   const resumed = await RunStore.open(CWD, { fs, fresh: true, continueRun: true, now: AT })
-  await resumed.append({ kind: 'bootstrap', event: { type: 'scope', scope: 'full', intent: 'Resume: keep going.' } })
+  await resumed.append({ kind: 'intent', text: 'Resume: keep going.' })
   assert.equal(resumed.snapshot().intent, 'build a thing')
 })

@@ -1,4 +1,4 @@
-Tests the whole run flow offline: opt-in review loops driven by domain presets and build-event kinds, the agent's question gates (choices, multi-select, plan approval and decline) with headless fallbacks, budget and quota stops with resume notes, session links and usage totals, backlog and chat phases, hand-off runs ending at the hand-off, and resuming a stopped leg verbatim.
+Tests the whole session flow offline: the agent's question gates (choices, multi-select, plan approval and decline) with the auto-accept fallback when nobody is there to ask, budget and quota stops with resume notes, session links and usage totals, backlog and chat phases, greenfield vs. existing-codebase framing and the once-only scaffold retry, a prompt session running its text unframed and working no backlog, hand-off sessions ending at the hand-off, and resuming a stopped session verbatim.
 
 ## Before writing SPEC.md files
 

@@ -1,4 +1,3 @@
-import type { BootstrapEvent } from './run-types.js'
 import type { DriverEvent } from './driver/index.js'
 
 /** One selectable option in an interactive {@link ChoiceRequest} (#304). */
@@ -149,7 +148,7 @@ export function pickedIds(picked: string | readonly string[]): string[] {
 
 /**
  * The single event type the whole run streams over. It unifies three sources so
- * the dashboard (and terminal) render one timeline: bootstrap-phase narration
+ * the dashboard (and terminal) render one timeline: the session's own narration
  * (the moat: checklist verdicts, deploy), the wrapped
  * agent's own black-box progress, and framework-level status. We own this stream
  * (guardrail #2, #165) rather than surfacing the agent's transport directly.
@@ -178,8 +177,8 @@ export type FrameworkEvent =
    * gated on.
    */
   | { kind: 'system-prompt'; text: string }
-  /** A bootstrap-phase narration event (scope / checklist / deploy / ...). */
-  | { kind: 'bootstrap'; event: BootstrapEvent }
+  /** What this session was asked for, emitted once as it opens (#211). */
+  | { kind: 'intent'; text: string }
   /** The wrapped agent's own progress, forwarded verbatim (never gated on). */
   | { kind: 'driver'; event: DriverEvent }
   /**

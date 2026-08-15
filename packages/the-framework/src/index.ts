@@ -17,33 +17,15 @@
  * - {@link ClaudeCodeDriver} — the first real driver (`claude -p` stream-json)
  * - {@link FakeDriver} — deterministic offline driver for `FRAMEWORK_FAKE` / tests
  *
- * ## Driver-backed steps
- * ai-autopilot's `Bootstrap` steps, re-implemented to run everything *through*
- * the driver (option A): build / improve are prompts; a domain preset's review
- * loop gates on the `{ blockers }` verdicts its prompts report (#252, #1372).
- *
- * - {@link driverBuild} / {@link driverImprove}
- *
- * ## Run + product shell
- * - {@link runFramework} — detect the preset, drive the whole bootstrap flow, and
- *   stream {@link FrameworkEvent}s
+ * ## Session + product shell
+ * - {@link runSession} — frame the agent, send it one prompt, honor the gates it answers with,
+ *   and stream {@link FrameworkEvent}s
  * - {@link startDashboard} — the localhost UI over the event stream
  * - {@link runCli} / {@link parseArgs} — the `framework` command
  */
 export * from './driver/index.js'
-export {
-  driverBuild,
-  buildPrompt,
-  extendPrompt,
-  improvePrompt,
-  isWorkspaceEmpty,
-  type DriverStepOptions,
-} from './steps.js'
-export {
-  runFramework,
-  type RunFrameworkOptions,
-  type RunFrameworkResult,
-} from './run.js'
+export { buildPrompt, extendPrompt, scaffoldPrompt, isWorkspaceEmpty } from './steps.js'
+export { runSession, type SessionKind, type RunSessionOptions, type RunSessionResult } from './run.js'
 export {
   requestChoices,
   requestMultiSelect,
@@ -298,7 +280,6 @@ export {
   type ControlWatcher,
 } from './control.js'
 export { RunMessageQueue, type RunMessages } from './run-messages.js'
-export { runPrompt, type RunPromptOptions, type RunPromptResult } from './prompt-run.js'
 export {
   runTodoLoop,
   findTodoBacklog,

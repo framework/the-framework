@@ -1,9 +1,9 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runFramework } from './run.js'
+import { runSession } from './run.js'
 import { requestChoices, requestMultiSelect, runAwaitRounds, type ChoicesOption, type MultiSelectOption } from './await-gate.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { RunMessageQueue } from './run-messages.js'
@@ -27,10 +27,10 @@ function recordingDriver(): { driver: Driver; system: () => string } {
   return { driver, system: () => captured }
 }
 
-test('runFramework drives the whole flow through the driver, offline', async () => {
+test('a session drives the whole flow through the driver, offline', async () => {
   const events: FrameworkEvent[] = []
-  const { result } = await runFramework({
-    intent: FAKE_INTENT,
+  await runSession({
+    prompt: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
     onEvent: e => events.push(e),
@@ -46,10 +46,10 @@ test('runFramework drives the whole flow through the driver, offline', async () 
   assert.equal(events.at(-1)!.kind, 'end')
 })
 
-test('runFramework surfaces the wrapped agent real session id via session-update', async () => {
+test('runSession surfaces the wrapped agent real session id via session-update', async () => {
   const events: FrameworkEvent[] = []
-  await runFramework({
-    intent: FAKE_INTENT,
+  await runSession({
+    prompt: FAKE_INTENT,
     driver: fakeDriver(), // reports sessionId "fake-orders-app"
     cwd: '/tmp/ws',
     onEvent: e => events.push(e),
@@ -67,10 +67,10 @@ test('runFramework surfaces the wrapped agent real session id via session-update
   assert.ok(sessionIdx >= 0 && updateIdx > sessionIdx)
 })
 
-test('runFramework resolves a {sessionId} link template once the id is known', async () => {
+test('runSession resolves a {sessionId} link template once the id is known', async () => {
   const events: FrameworkEvent[] = []
-  await runFramework({
-    intent: FAKE_INTENT,
+  await runSession({
+    prompt: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
     sessionLink: 'https://code.example.com/s/{sessionId}',
@@ -88,10 +88,10 @@ test('runFramework resolves a {sessionId} link template once the id is known', a
   assert.equal(update.sessionLink, 'https://code.example.com/s/fake-orders-app')
 })
 
-test('runFramework accumulates per-turn usage and emits a running total (#322)', async () => {
+test('runSession accumulates per-turn usage and emits a running total (#322)', async () => {
   const events: FrameworkEvent[] = []
-  await runFramework({
-    intent: FAKE_INTENT,
+  await runSession({
+    prompt: FAKE_INTENT,
     driver: fakeDriver(), // every scripted turn reports $0.02 usage
     cwd: '/tmp/ws',
     onEvent: e => events.push(e),
@@ -113,12 +113,12 @@ test('runFramework accumulates per-turn usage and emits a running total (#322)',
   assert.equal(end.kind === 'end' && end.ok, true)
 })
 
-test('runFramework stops itself once the budget cap is reached (#322)', async () => {
+test('runSession stops itself once the budget cap is reached (#322)', async () => {
   const events: FrameworkEvent[] = []
   // $0.01 cap trips on the very first $0.02 turn (the build).
   await assert.rejects(
-    runFramework({
-      intent: FAKE_INTENT,
+    runSession({
+      prompt: FAKE_INTENT,
       driver: fakeDriver(),
       cwd: '/tmp/ws',
       budgetUsd: 0.01,
@@ -138,14 +138,14 @@ test('runFramework stops itself once the budget cap is reached (#322)', async ()
   assert.equal(end.ok, false)
   assert.equal(end.stopped, true)
   assert.match(end.detail ?? '', /budget reached/)
-  // The run stopped early: it never reached the production-grade tail.
-  assert.ok(!events.some(e => e.kind === 'bootstrap' && e.event.type === 'done'))
+  // The session stopped early: it never reported a clean end.
+  assert.ok(!events.some(e => e.kind === 'end' && e.ok))
 })
 
-test('runFramework shows a literal session link immediately (no template)', async () => {
+test('runSession shows a literal session link immediately (no template)', async () => {
   const events: FrameworkEvent[] = []
-  await runFramework({
-    intent: FAKE_INTENT,
+  await runSession({
+    prompt: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
     sessionLink: 'https://code.example.com/live',
@@ -160,20 +160,20 @@ test('runFramework shows a literal session link immediately (no template)', asyn
 
 test('the run system channel is exactly composeRunSystem, with nothing appended (#547)', async () => {
   const { driver, system } = recordingDriver()
-  await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: () => {} })
-  // runFramework composes no framing of its own.
+  await runSession({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: () => {} })
+  // runSession composes no framing of its own.
   assert.equal(system(), composeRunSystem({ tf: { prompt: FAKE_INTENT, params: {} } }))
 })
 
 test('transparent empties the build-path system channel (#625)', async () => {
   const { driver, system } = recordingDriver()
-  await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', transparent: true, onEvent: () => {} })
+  await runSession({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', transparent: true, onEvent: () => {} })
   assert.equal(system(), '') // raw claude: no #326 block, no emit protocols
 })
 
 test('the project never frames the agent (#547)', async () => {
   const { driver, system } = recordingDriver()
-  await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: () => {} })
+  await runSession({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: () => {} })
   // Nothing about the project reaches the prompt — no skill, persona or memory framing.
   assert.doesNotMatch(system(), /vike-auth|llms\.txt|Skill:|Persona:|Project memory/)
 })
@@ -289,8 +289,8 @@ test('a build turn that stops to ask fires a live gate and resumes on the pick (
 
   const events: FrameworkEvent[] = []
   const prompts: string[] = []
-  const { result } = await runFramework({
-    intent: FAKE_INTENT,
+  await runSession({
+    prompt: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
     onEvent: e => {
@@ -320,8 +320,8 @@ test('a run with no preset and no serve config reviews nothing (#1372)', async (
     },
     sessionId: 'blackbox1372',
   })
-  const { result } = await runFramework({
-    intent: FAKE_INTENT,
+  await runSession({
+    prompt: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
     onEvent: () => {},
@@ -347,8 +347,8 @@ test('a build turn that stops to showMultiSelect fires a checklist gate and resu
 
   const events: FrameworkEvent[] = []
   const prompts: string[] = []
-  await runFramework({
-    intent: FAKE_INTENT,
+  await runSession({
+    prompt: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
     onEvent: e => {
@@ -383,8 +383,8 @@ test('a build turn that stops for plan approval resumes on Approve (#358)', asyn
 
   const events: FrameworkEvent[] = []
   const prompts: string[] = []
-  const { result } = await runFramework({
-    intent: FAKE_INTENT,
+  await runSession({
+    prompt: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
     onEvent: e => {
@@ -420,8 +420,8 @@ test('a declined plan stops the run cleanly instead of building on (#358)', asyn
 
   const events: FrameworkEvent[] = []
   await assert.rejects(
-    runFramework({
-      intent: FAKE_INTENT,
+    runSession({
+      prompt: FAKE_INTENT,
       driver,
       cwd: '/tmp/ws',
       onEvent: e => events.push(e),
@@ -438,18 +438,26 @@ test('a declined plan stops the run cleanly instead of building on (#358)', asyn
   assert.equal(end.detail, 'plan declined')
 })
 
-test('without a requestChoice handler a build that asks is not gated (#337 headless)', async () => {
+test('with nobody to ask, a session takes the recommended option and carries on (#337/#846)', async () => {
+  // One path means one answer to "what does a headless session do at a gate" (D2). The build path
+  // used to leave the turn standing, so an unattended build stopped at its first question; the
+  // prompt path auto-accepted, which is what #846 describes as "the fallback a fully headless run
+  // already uses and the one autopilot would have clicked". That is the one that survives.
+  let resumed = false
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
       if (/Build this app end to end/.test(prompt)) return 'built it\n```await-choices\n{ "options": [{ "label": "A" }] }\n```'
+      if (/You paused to ask/.test(prompt)) resumed = true
       return 'done'
     },
     sessionId: 'headless337',
   })
   const events: FrameworkEvent[] = []
-  await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: e => events.push(e) })
-  assert.equal(events.some(e => e.kind === 'choice'), false)
-  assert.equal(events.some(e => e.kind === 'choice-resolved'), false)
+  await runSession({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: e => events.push(e) })
+  assert.equal(resumed, true, 'the session continued from the recommended pick')
+  const resolved = events.find(e => e.kind === 'choice-resolved')
+  assert.ok(resolved && resolved.kind === 'choice-resolved')
+  assert.equal(resolved.by, 'auto')
 })
 
 const CH_OPTS: ChoicesOption[] = [
@@ -524,8 +532,8 @@ test('requestChoices resolves to the recommended option if the run aborts while 
 
 test('a fake run skips the backlog loop by default; the demo stays deterministic (#323)', async () => {
   const events: FrameworkEvent[] = []
-  const result = await runFramework({
-    intent: FAKE_INTENT,
+  const result = await runSession({
+    prompt: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
     onEvent: e => events.push(e),
@@ -534,7 +542,7 @@ test('a fake run skips the backlog loop by default; the demo stays deterministic
   assert.equal(events.some(e => e.kind === 'log' && /Backlog/.test(e.message)), false)
 })
 
-test('runFramework runs the backlog loop after the build when opted in (#323)', async () => {
+test('runSession runs the backlog loop after the build when opted in (#323)', async () => {
   const { mkdtemp, rm, writeFile } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
@@ -544,8 +552,8 @@ test('runFramework runs the backlog loop after the build when opted in (#323)', 
     const events: FrameworkEvent[] = []
     // The fake script never edits the backlog, so the loop stall-stops after two
     // attempts — proving the wiring runs post-build with the run's own session.
-    const result = await runFramework({
-      intent: FAKE_INTENT,
+    const result = await runSession({
+      prompt: FAKE_INTENT,
       driver: fakeDriver(),
       cwd,
       todoLoop: true,
@@ -562,11 +570,11 @@ test('runFramework runs the backlog loop after the build when opted in (#323)', 
   }
 })
 
-test('runFramework pauses the run once the quota boundary is reached (#529/#879)', async () => {
+test('runSession pauses the run once the quota boundary is reached (#529/#879)', async () => {
   const events: FrameworkEvent[] = []
   await assert.rejects(
-    runFramework({
-      intent: FAKE_INTENT,
+    runSession({
+      prompt: FAKE_INTENT,
       driver: fakeDriver(),
       cwd: '/tmp/ws',
       consumptionGate: () => 'Current week (all models)',
@@ -581,13 +589,13 @@ test('runFramework pauses the run once the quota boundary is reached (#529/#879)
   assert.ok(end.kind === 'end' && end.detail?.startsWith('quota boundary reached (Current week (all models))'))
 })
 
-test('runFramework leaves a resume note on the backlog when it pauses (#529)', async () => {
+test('runSession leaves a resume note on the backlog when it pauses (#529)', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-pause-'))
   try {
     const events: FrameworkEvent[] = []
     await assert.rejects(
-      runFramework({
-        intent: FAKE_INTENT,
+      runSession({
+        prompt: FAKE_INTENT,
         driver: fakeDriver(),
         cwd,
         consumptionGate: () => 'Current week (all models)',
@@ -604,12 +612,12 @@ test('runFramework leaves a resume note on the backlog when it pauses (#529)', a
   }
 })
 
-test('runFramework appends the resume note to an existing backlog (#529)', async () => {
+test('runSession appends the resume note to an existing backlog (#529)', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-pause-'))
   try {
     await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] Something already open') // no trailing newline
     await assert.rejects(
-      runFramework({ intent: FAKE_INTENT, driver: fakeDriver(), cwd, consumptionGate: () => 'Current session' }),
+      runSession({ prompt: FAKE_INTENT, driver: fakeDriver(), cwd, consumptionGate: () => 'Current session' }),
     )
     const todo = await readFile(join(cwd, 'TODO_AGENTS.md'), 'utf8')
     // The existing entry survives and the note lands on its own line.
@@ -619,11 +627,11 @@ test('runFramework appends the resume note to an existing backlog (#529)', async
   }
 })
 
-test('runFramework carries on while the limits are clear (#529)', async () => {
+test('runSession carries on while the limits are clear (#529)', async () => {
   const events: FrameworkEvent[] = []
   let asked = 0
-  const { result } = await runFramework({
-    intent: FAKE_INTENT,
+  await runSession({
+    prompt: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
     consumptionGate: () => {
@@ -632,28 +640,26 @@ test('runFramework carries on while the limits are clear (#529)', async () => {
     },
     onEvent: e => events.push(e),
   })
-  assert.ok(result)
   assert.ok(asked > 0, 'the gate is consulted between turns')
   const end = events.at(-1)!
   assert.equal(end.kind === 'end' && end.ok, true)
 })
 
-test('runFramework carries on when the gate itself fails (#529)', async () => {
+test('runSession carries on when the gate itself fails (#529)', async () => {
   // Fail-open, per Rom on #519: an unreadable quota must not stop the work.
-  const { result } = await runFramework({
-    intent: FAKE_INTENT,
+  await runSession({
+    prompt: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
     consumptionGate: () => {
       throw new Error('quota unreadable')
     },
   })
-  assert.ok(result)
 })
 
-test('runFramework leaves the run ungated with no consumption gate (#529)', async () => {
-  const { result } = await runFramework({ intent: FAKE_INTENT, driver: fakeDriver(), cwd: '/tmp/ws' })
-  assert.ok(result)
+test('runSession leaves the session ungated with no consumption gate (#529)', async () => {
+  const { events } = await runSession({ prompt: FAKE_INTENT, driver: fakeDriver(), cwd: '/tmp/ws' })
+  assert.equal(events.at(-1)!.kind, 'end')
 })
 
 // The await rounds shared by the direct prompt path and the backlog loop (#569). Both used
@@ -809,8 +815,8 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
     const events: FrameworkEvent[] = []
     const asked: ChoiceRequest[] = []
     const { driver, prompts } = handsOffDriver()
-    const { result, todo } = await runFramework({
-      intent: FAKE_INTENT,
+    const { todo } = await runSession({
+      prompt: FAKE_INTENT,
       driver,
       cwd,
       // Explicit, so this proves the hand-off outranks an opt-in rather than merely
@@ -846,7 +852,7 @@ test('a hand-off run is told the await gates are unavailable, a local one is not
   // await protocol for exactly these runs, and only these.
   const systemOf = async (driver: Driver): Promise<string> => {
     const events: FrameworkEvent[] = []
-    await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: e => events.push(e) })
+    await runSession({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: e => events.push(e) })
     const prompt = events.find(e => e.kind === 'system-prompt')
     return prompt?.kind === 'system-prompt' ? prompt.text : ''
   }
@@ -859,8 +865,8 @@ test('a hand-off run does not stay open for messages (#1225)', async () => {
   // Left open on purpose: a run that still waited on it would never resolve, since the
   // composer it waits for cannot reach the session it handed to.
   const messages = new RunMessageQueue()
-  const run = runFramework({
-    intent: FAKE_INTENT,
+  const run = runSession({
+    prompt: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
     messages,
@@ -870,7 +876,7 @@ test('a hand-off run does not stay open for messages (#1225)', async () => {
   assert.notEqual(await Promise.race([run.then(() => 'ended' as const), timer]), 'waited')
 })
 
-test('runFramework resumes a stopped leg: session resumed, message sent verbatim (#1467)', async () => {
+test('runSession resumes a stopped leg: session resumed, message sent verbatim (#1467)', async () => {
   const fd = fakeDriver()
   let startedWith: { resumeSessionId?: string } | undefined
   const prompts: string[] = []
@@ -895,8 +901,8 @@ test('runFramework resumes a stopped leg: session resumed, message sent verbatim
   }
   const events: FrameworkEvent[] = []
   const RESUME = 'Resume: continue where the previous leg stopped.'
-  await runFramework({
-    intent: RESUME,
+  await runSession({
+    prompt: RESUME,
     driver,
     cwd: '/tmp/ws',
     resumeSessionId: 'sess-42',
@@ -906,8 +912,100 @@ test('runFramework resumes a stopped leg: session resumed, message sent verbatim
   assert.equal(startedWith?.resumeSessionId, 'sess-42')
   // The continuation message went out verbatim — no build/extend prompt re-framing (#782).
   assert.equal(prompts[0], RESUME)
-  // The flow still ran as a build: the bootstrap narration (synthesize included) rode along.
-  assert.ok(
-    events.some(e => e.kind === 'bootstrap' && e.event.type === 'build' && e.event.event.type === 'synthesize'),
-  )
+  // The flow still ran as a build: the session announced its intent and the backlog followed.
+  assert.ok(events.some(e => e.kind === 'intent' && e.text === RESUME))
+})
+
+// The build framing, now that one path opens every session (D2). These used to live in
+// steps.test.ts against `driverBuild`; the framing is the same, the seam it hangs off is not.
+
+/** A real-named driver over the fake one, so the workspace check is live (the fake opts out). */
+function realNamedDriver(turns: { text: string }[]): { driver: Driver; prompts: string[] } {
+  const prompts: string[] = []
+  const inner = new FakeDriver({ turns })
+  const driver: Driver = {
+    name: 'claude-code',
+    start: async opts => {
+      const session = await inner.start(opts)
+      const wrapped: DriverSession = {
+        ...session,
+        dispose: () => session.dispose(),
+        prompt: (text, o) => {
+          prompts.push(text)
+          return session.prompt(text, o)
+        },
+      }
+      return wrapped
+    },
+  }
+  return { driver, prompts }
+}
+
+test('a build extends an existing project instead of rebuilding it (#185)', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'fw-extend-'))
+  await mkdir(join(cwd, 'src'), { recursive: true })
+  await writeFile(join(cwd, 'src/index.ts'), 'export {}')
+  try {
+    const { driver, prompts } = realNamedDriver([{ text: 'added the feature' }])
+    await runSession({ prompt: 'add a search box', driver, cwd, todoLoop: false })
+    assert.match(prompts[0]!, /existing codebase/i)
+    assert.doesNotMatch(prompts[0]!, /scaffold the whole project|workspace may be empty/i)
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('a build uses greenfield framing for an empty workspace (#185)', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'fw-greenfield-'))
+  try {
+    const { driver, prompts } = realNamedDriver([{ text: 'scaffolded it' }, { text: 'scaffolded it properly' }])
+    await runSession({ prompt: 'a blog', driver, cwd, todoLoop: false })
+    assert.match(prompts[0]!, /Build this app end to end/i)
+    assert.doesNotMatch(prompts[0]!, /existing codebase/i)
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('a build re-prompts to scaffold from scratch when the workspace stays empty (#182)', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'fw-scaffold-'))
+  try {
+    const { driver, prompts } = realNamedDriver([
+      { text: 'thinking about the stack' },
+      { text: 'scaffolded the whole app' },
+    ])
+    const { text } = await runSession({ prompt: 'a blog', driver, cwd, todoLoop: false })
+    // Two turns: the build, then the hard from-scratch retry once nothing landed on disk.
+    assert.equal(prompts.length, 2)
+    assert.match(prompts[1]!, /from scratch|empty/i)
+    assert.equal(text, 'scaffolded the whole app')
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('a build does not re-prompt when it produced files (#182)', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'fw-noscaffold-'))
+  await writeFile(join(cwd, 'package.json'), '{}')
+  try {
+    const { driver, prompts } = realNamedDriver([{ text: 'built it' }])
+    await runSession({ prompt: 'a blog', driver, cwd, todoLoop: false })
+    assert.equal(prompts.length, 1)
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
+})
+
+test('a prompt session runs its text without build framing, and works no backlog (#353)', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'fw-promptkind-'))
+  await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] leftover task\n')
+  try {
+    const { driver, prompts } = realNamedDriver([{ text: 'reviewed it' }])
+    const { todo } = await runSession({ prompt: 'review the auth flow', kind: 'prompt', driver, cwd, antiLazyPill: false })
+    assert.equal(prompts.length, 1, 'one prompt, and no backlog turns after it')
+    assert.equal(prompts[0], 'review the auth flow')
+    assert.equal(todo, undefined)
+  } finally {
+    await rm(cwd, { recursive: true, force: true })
+  }
 })

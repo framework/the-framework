@@ -279,7 +279,6 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
         cwd: meta.cwd,
         status: meta.status,
         ...(meta.intent ? { intent: meta.intent } : {}),
-        ...(meta.scope ? { scope: meta.scope } : {}),
         ...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {}),
         ...(meta.sessionName ? { sessionName: meta.sessionName } : {}),
         ...(meta.readyForMerge ? { readyForMerge: true } : {}),

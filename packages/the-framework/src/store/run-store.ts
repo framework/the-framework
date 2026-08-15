@@ -105,9 +105,8 @@ export interface RunMeta {
   pid?: number
   /** The host the owning {@link pid} lives on, so a pid probe only trusts a match (#716). */
   host?: string
-  /** What the user asked to build (from the `scope` event). */
+  /** What this session was asked for (from the `intent` event). */
   intent?: string
-  scope?: string
   /** The wrapped agent (from the `session` event). */
   driver?: string
   /** The workspace the agent builds in (from the `session` event). */
@@ -283,9 +282,9 @@ export interface OpenStoreOptions {
    */
   clock?: () => string
   /**
-   * The run's intent (its prompt / request) shown in the dashboard's Runs list. A build run
-   * later refines this via its `bootstrap` scope event; a `prompt`/`research` run has no scope
-   * step, so seeding it here is the only way its row shows the prompt instead of "(no prompt)".
+   * The session's intent (its prompt / request) shown in the dashboard's sessions list. Seeded
+   * here so the row shows the prompt from the moment the store opens, before the session's own
+   * `intent` event lands; refreshed by that event.
    */
   intent?: string
   /**
@@ -349,14 +348,9 @@ export function applyEventToMeta(meta: RunMeta, event: FrameworkEvent, at: strin
     case 'choice-resolved':
       if (next.pendingChoice?.id === event.id) delete next.pendingChoice
       break
-    case 'bootstrap': {
-      const b = event.event
-      if (b.type === 'scope') {
-        next.intent = b.intent
-        next.scope = b.scope
-      }
+    case 'intent':
+      next.intent = event.text
       break
-    }
     case 'browser-stream':
       next.browserStreamPort = event.port
       break
@@ -557,10 +551,10 @@ export class RunStore {
   private tail: Promise<void> = Promise.resolve()
   private meta: RunMeta
   /**
-   * The intent a continuation must keep (#762/#1467): a reopened run keeps its original label,
-   * but a build continuation re-runs the bootstrap, whose `scope` event carries the resume
-   * message and would relabel the row through {@link applyEventToMeta}'s normal refinement.
-   * Unset for a fresh run, where the scope event's refinement stands.
+   * The intent a continuation must keep (#762/#1467): a reopened session keeps its original
+   * label, but a continuation's own `intent` event carries the resume message and would relabel
+   * the row through {@link applyEventToMeta}'s normal refinement. Unset for a fresh session,
+   * where that refinement stands.
    */
   private pinnedIntent: string | undefined
 
@@ -624,8 +618,8 @@ export class RunStore {
    */
   append(event: FrameworkEvent): Promise<void> {
     this.meta = applyEventToMeta(this.meta, event, this.clock())
-    // A continuation keeps the run's original label (#762) even through a re-entered
-    // bootstrap's scope event, which carries the resume message rather than a name (#1467).
+    // A continuation keeps the session's original label (#762) even though its own `intent`
+    // event carries the resume message rather than a name (#1467).
     if (this.pinnedIntent) this.meta = { ...this.meta, intent: this.pinnedIntent }
     this.tail = this.tail
       .then(() => this.fs.append(this.eventsPath, JSON.stringify(event) + '\n'))

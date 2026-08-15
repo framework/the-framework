@@ -1,4 +1,3 @@
-import type { BootstrapEvent } from './run-types.js'
 import type { DriverEvent, DriverRateLimit } from './driver/index.js'
 import { pickedIds, type AutoHandoffSkip, type AutoMergeOutcome, type ChoiceOption, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
 
@@ -98,8 +97,8 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `  ✓ chose ${pickedIds(event.picked).join(', ') || '(none)'} (${event.by})`
     case 'driver':
       return formatDriverEvent(event.event)
-    case 'bootstrap':
-      return formatBootstrapEvent(event.event)
+    case 'intent':
+      return `▶ "${truncate(event.text)}"`
     case 'end':
       return event.ok ? '✓ finished' : event.stopped ? '■ stopped' : `✗ failed: ${event.detail ?? 'unknown error'}`
   }
@@ -205,19 +204,6 @@ function formatRateLimit(limit: DriverRateLimit): string {
   if (limit.status === 'rejected') return `✗ quota exhausted (${limit.window}), resets ${resets}`
   if (limit.status === 'allowed_warning') return `! quota running low (${limit.window}), resets ${resets}`
   return `· quota ${limit.status} (${limit.window}), resets ${resets}`
-}
-
-function formatBootstrapEvent(event: BootstrapEvent): string {
-  switch (event.type) {
-    case 'scope':
-      return `▶ scope: ${event.scope} — "${event.intent}"`
-    case 'narrate':
-      return `  ${event.message}`
-    case 'build':
-      return `    build/${event.event.type}`
-    case 'done':
-      return '✓ done'
-  }
 }
 
 function truncate(text: string, max = 100): string {

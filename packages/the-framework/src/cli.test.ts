@@ -622,14 +622,14 @@ test('a session runs no preflight of its own: the dashboard already did (#1326)'
   assert.equal(await runSessionCli({}, io), 0)
 })
 
-test('runCli --fake --no-dashboard runs the whole flow offline', async () => {
+test('runCli runs a whole session offline', async () => {
   const { io, out } = capture()
-  const code = await runSessionCli({}, io)
+  const code = await runSessionCli({ prompt: 'a blog' }, io)
   assert.equal(code, 0)
   const text = out.join('\n')
-  assert.match(text, /scope: full/) // the run opens on scope now that the architect is gone
+  assert.match(text, /▶ "a blog"/) // what it was asked for, said once as the session opens
   assert.match(text, /Build this app end to end/)
-  // #1372: nothing reviews the build, so there is no checklist pass — the build is the whole run.
+  // #1372: nothing reviews the build, so there is no checklist pass — the build is the whole session.
   assert.doesNotMatch(text, /checklist pass/)
   assert.match(text, /\u2713 done/)
 })
@@ -975,14 +975,14 @@ test('runCli continues a build run through the build flow, not the prompt path (
       second.io,
     )
     assert.equal(code, 0)
-    // The continuation re-entered the build flow: bootstrap framing landed after the first end.
+    // The continuation re-entered the build flow: a second session opened after the first end.
     const lines = (await readFile(join(dir, FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
       .trim()
       .split('\n')
       .map(l => JSON.parse(l) as { kind: string })
     const firstEnd = lines.findIndex(e => e.kind === 'end')
     assert.ok(firstEnd >= 0)
-    assert.ok(lines.slice(firstEnd + 1).some(e => e.kind === 'bootstrap'))
+    assert.ok(lines.slice(firstEnd + 1).some(e => e.kind === 'intent'))
     // The meta still says build, and the row keeps its original label, not the resume message.
     const meta = JSON.parse(await readFile(metaPath, 'utf8')) as { kind?: string; intent?: string }
     assert.equal(meta.kind, 'build')

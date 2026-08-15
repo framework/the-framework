@@ -331,6 +331,95 @@ test('readLiveMeta yields undefined on a never-run workspace', async () => {
   assert.equal(await readLiveMeta(CWD, memFs()), undefined)
 })
 
+test('readLiveMeta re-reads a torn run.json rather than reporting the run gone (#1540)', async () => {
+  const fs = memFs()
+  const store = await RunStore.open(CWD, { fs, fresh: true, now: AT })
+  for (const e of RUN.slice(0, -1)) await store.append(e)
+  const settled = fs.files.get(META)!
+  // The run's own process rewrites its meta in place while every other reader polls it, so a
+  // read can land between that write's truncate and its bytes. The first read here sees the
+  // half-written file the way a real reader would; the write lands before the retry.
+  fs.files.set(META, settled.slice(0, 20))
+  let reads = 0
+  const tearing: StoreFs = {
+    ...fs,
+    async read(path) {
+      const raw = await fs.read(path)
+      if (path === META && ++reads === 1) return raw
+      if (path === META) fs.files.set(META, settled)
+      return path === META ? settled : raw
+    },
+  }
+  const live = await readLiveMeta(CWD, tearing)
+  assert.ok(live, 'the run is still there — a torn read is not an absent run')
+  assert.equal(live!.status, 'running')
+  assert.ok(reads > 1, 'the unparseable read was retried')
+})
+
+test('readLiveMeta gives up on a run.json that is corrupt for good', async () => {
+  const fs = memFs({ [META]: '{ this was never json' })
+  assert.equal(await readLiveMeta(CWD, fs), undefined)
+})
+
+test('run.json is renamed into place, never truncated where a reader can see it (#1540)', async () => {
+  const fs = memFs()
+  const written: string[] = []
+  const renamed: Array<[string, string]> = []
+  const atomic: StoreFs = {
+    ...fs,
+    async write(path, contents) {
+      written.push(path)
+      return fs.write(path, contents)
+    },
+    async rename(from, to) {
+      renamed.push([from, to])
+      fs.files.set(to, fs.files.get(from)!)
+      fs.files.delete(from)
+    },
+  }
+  const store = await RunStore.open(CWD, { fs: atomic, fresh: true, now: AT })
+  for (const e of RUN) await store.append(e)
+  await store.close()
+
+  // The invariant a concurrent reader depends on: the live meta's own path is never opened for
+  // writing, so it is never the empty file a truncate leaves behind. It only ever appears as a
+  // rename target, which swaps the whole file in one step.
+  assert.equal(
+    written.filter(path => path === META).length,
+    0,
+    `run.json was written in place: ${written.filter(path => path === META).length} time(s)`,
+  )
+  assert.ok(
+    renamed.some(([, to]) => to === META),
+    'the live meta was renamed into place',
+  )
+  // Every meta write, the archived copies included, goes scratch-then-rename; nothing is ever
+  // handed a path it then truncates.
+  assert.ok(
+    renamed.every(([from, to]) => from.startsWith(`${to}.`) && from.endsWith('.tmp')),
+    `a rename came from something other than that path's scratch file: ${JSON.stringify(renamed)}`,
+  )
+  assert.deepEqual(
+    written.filter(path => !path.endsWith('.tmp') && path.endsWith('.json')),
+    [],
+    'no meta path is opened for writing',
+  )
+  assert.equal(fs.files.has(META), true, 'and the meta is there afterwards')
+  assert.ok(
+    ![...fs.files.keys()].some(path => path.endsWith('.tmp')),
+    'no scratch file is left behind',
+  )
+})
+
+test('a store whose fs cannot rename still writes its meta in place', async () => {
+  const fs = memFs()
+  assert.equal(fs.rename, undefined)
+  const store = await RunStore.open(CWD, { fs, fresh: true, now: AT })
+  for (const e of RUN) await store.append(e)
+  const live = await readLiveMeta(CWD, fs)
+  assert.equal(live!.intent, 'a blog with comments')
+})
+
 test('loadRunEvents replays an archived run, and rejects unknown/unsafe ids (#303)', async () => {
   const fs = memFs()
   const store = await RunStore.open(CWD, { fs, fresh: true, now: AT })

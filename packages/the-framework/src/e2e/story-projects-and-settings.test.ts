@@ -90,7 +90,7 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
     // lock makes the continuation wait out the archive it is about to reopen, where it used
     // to reuse a checkout mid-retirement.
     const resumed = await rpc(sendStart)(project.id, 'Keep going', 'prompt', { continueRunId: runId })
-    assert.equal(resumed.ok, true)
+    assert.equal(resumed.ok, true, `the resume was refused: ${JSON.stringify(resumed)}`)
     await world.waitRun(project, runId, 'done')
     await world.waitRetired(project, runId)
     const argv = await waitFor(async () => {

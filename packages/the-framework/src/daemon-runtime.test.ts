@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { waitOutFinishedLeg } from './daemon-runtime.js'
+import { waitOutFinishedLeg, type FinishedLegState } from './daemon-runtime.js'
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -22,7 +22,7 @@ test('a free slot returns immediately, without even asking whether the leg ended
     emptySlots(),
     async () => {
       asked += 1
-      return true
+      return 'ended'
     },
     5_000,
   )
@@ -33,7 +33,7 @@ test('a leg still calling itself running is a real collision: no wait, the refus
   const slots = emptySlots()
   slots.activeRuns.set('p::r1', process.pid)
   const before = Date.now()
-  await waitOutFinishedLeg('p::r1', slots, async () => false, 5_000)
+  await waitOutFinishedLeg('p::r1', slots, async () => 'running', 5_000)
   assert.ok(Date.now() - before < 1_000, 'must not sit out the grace period')
   assert.ok(slots.activeRuns.has('p::r1'), 'the slot is left for the busy guard to judge')
 })
@@ -42,7 +42,7 @@ test('a finished leg is waited out: the wait ends once the exit clears the slot'
   const slots = emptySlots()
   slots.activeRuns.set('p::r1', process.pid)
   setTimeout(() => slots.activeRuns.delete('p::r1'), 60)
-  await waitOutFinishedLeg('p::r1', slots, async () => true, 5_000)
+  await waitOutFinishedLeg('p::r1', slots, async () => 'ended', 5_000)
   assert.equal(slots.activeRuns.has('p::r1'), false)
 })
 
@@ -50,7 +50,7 @@ test('the wait is bounded: a finished leg whose process never exits falls back t
   const slots = emptySlots()
   slots.activeRuns.set('p::r1', process.pid)
   const before = Date.now()
-  await waitOutFinishedLeg('p::r1', slots, async () => true, 120)
+  await waitOutFinishedLeg('p::r1', slots, async () => 'ended', 120)
   assert.ok(Date.now() - before >= 120, 'the grace period was sat out')
   assert.ok(slots.activeRuns.has('p::r1'), 'the still-occupied slot reaches the busy guard')
 })
@@ -64,12 +64,63 @@ test('a retirement already in flight is awaited even after the exit cleared the 
       retired = true
     }),
   )
-  await waitOutFinishedLeg('p::r1', slots, async () => true, 5_000)
+  await waitOutFinishedLeg('p::r1', slots, async () => 'ended', 5_000)
   assert.equal(retired, true)
 })
 
 test('a retirement that failed does not fail the continuation waiting on it', async () => {
   const slots = emptySlots()
   slots.retiring.set('p::r1', Promise.reject(new Error('archive on a full disk')))
-  await waitOutFinishedLeg('p::r1', slots, async () => true, 5_000)
+  await waitOutFinishedLeg('p::r1', slots, async () => 'ended', 5_000)
+})
+
+// #1540: the state is read off a `run.json` the leg's own process rewrites in place, so a read
+// that lands inside one of those writes has no answer. Sampled once and taken for "still
+// running", that lone unreadable moment skipped the wait and handed the continuation to the busy
+// guard while the leg was mid-exit — #1529's spurious refusal, back as a rarer race.
+
+test('an unreadable leg is asked again rather than taken for a live one', async () => {
+  const slots = emptySlots()
+  slots.activeRuns.set('p::r1', process.pid)
+  setTimeout(() => slots.activeRuns.delete('p::r1'), 90)
+  let asked = 0
+  await waitOutFinishedLeg(
+    'p::r1',
+    slots,
+    async () => {
+      asked += 1
+      return 'unknown'
+    },
+    5_000,
+  )
+  assert.equal(slots.activeRuns.has('p::r1'), false, 'the exit was waited out, not refused')
+  assert.ok(asked > 1, `the unreadable meta was re-read (asked ${asked} times)`)
+})
+
+test('an unreadable leg that then reports running still short-circuits to the guard', async () => {
+  const slots = emptySlots()
+  slots.activeRuns.set('p::r1', process.pid)
+  const states: FinishedLegState[] = ['unknown', 'unknown', 'running']
+  const before = Date.now()
+  await waitOutFinishedLeg('p::r1', slots, async () => states.shift() ?? 'running', 5_000)
+  assert.ok(Date.now() - before < 1_000, 'must not sit out the grace period')
+  assert.equal(states.length, 0, 'it kept asking until the leg committed')
+  assert.ok(slots.activeRuns.has('p::r1'), 'the slot is left for the busy guard to judge')
+})
+
+test('an ended leg is not re-read: the state is settled after the first answer', async () => {
+  const slots = emptySlots()
+  slots.activeRuns.set('p::r1', process.pid)
+  setTimeout(() => slots.activeRuns.delete('p::r1'), 90)
+  let asked = 0
+  await waitOutFinishedLeg(
+    'p::r1',
+    slots,
+    async () => {
+      asked += 1
+      return 'ended'
+    },
+    5_000,
+  )
+  assert.equal(asked, 1)
 })

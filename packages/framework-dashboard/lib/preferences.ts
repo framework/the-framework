@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import type { CustomPreset, FrameworkFileConfig, Preferences, ProjectPreferences, ProjectSummary } from '@gemstack/the-framework'
-import { preferencesFromFileConfig, notificationEnabled, PROJECT_PREFERENCE_KEYS } from '@gemstack/the-framework/client'
+import { preferencesFromFileConfig, notifyMethodEnabled, notifyCategoryEnabled, PROJECT_PREFERENCE_KEYS } from '@gemstack/the-framework/client'
 import {
   onPreferences,
   patchPreferences,
@@ -405,26 +405,27 @@ export function resolvedDark(theme: ThemePreference, systemDark: boolean): boole
   return theme === 'dark' || (theme === 'system' && systemDark)
 }
 
-// The five notification defaults are the framework's (#627), not the dashboard's: the daemon acts
-// on the same values, and the polarities are not uniform, so a second copy here is how the two
-// sides drift. These stay as named readers because the call sites read better for it.
+// The notification defaults are the framework's (#627), not the dashboard's: the daemon acts on
+// the same values, and the polarities are not uniform, so a second copy here is how the two sides
+// drift. These stay as named readers because the call sites read better for it — and each one now
+// says which axis it is asking about (B5).
 
-/** Browser notifications; the browser permission is still the real gate. */
+/** Browser delivery; the browser permission is still the real gate. */
 export function notificationsEnabled(preferences: Preferences): boolean {
-  return notificationEnabled(preferences, 'notifyBrowser')
+  return notifyMethodEnabled(preferences, 'browser')
 }
 
 /** Discord delivery. The daemon's webhook is the other gate (where to post; this is whether to). */
 export function discordEnabled(preferences: Preferences): boolean {
-  return notificationEnabled(preferences, 'notifyDiscord')
+  return notifyMethodEnabled(preferences, 'discord')
 }
 
-/** The "New activity" category: pings on a run starting or finishing. Composes with the methods above. */
+/** The "New activity" category: pings on a session starting or finishing. Composes with the methods above. */
 export function newActivityEnabled(preferences: Preferences): boolean {
-  return notificationEnabled(preferences, 'notifyNewActivity')
+  return notifyCategoryEnabled(preferences, 'newActivity')
 }
 
-/** The "needs you" category: a run awaiting your answer, or a PR to review. */
+/** The "needs you" category: a session awaiting your answer, or a PR to review. */
 export function humanInterventionEnabled(preferences: Preferences): boolean {
-  return notificationEnabled(preferences, 'notifyHumanIntervention')
+  return notifyCategoryEnabled(preferences, 'humanIntervention')
 }

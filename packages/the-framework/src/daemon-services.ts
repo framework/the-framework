@@ -2,7 +2,7 @@ import { basename, resolve } from 'node:path'
 import { listProjects, projectId, readPreferences, readProjectPreferences, readSecrets, resolvePreferences, type Preferences } from './registry.js'
 import { resolveDiscordCredentials, type DiscordCredentials } from './discord-credentials.js'
 import { errorMessage } from './error-message.js'
-import { discordNotificationEnabled, notificationEnabled } from './preference-defaults.js'
+import { notifies, notifyCategoryEnabled } from './preference-defaults.js'
 import { runOptionsFromPreferences, preferencesFromFileConfig } from './run-options.js'
 import { loadFrameworkConfig } from './config.js'
 import { readLiveMetas, listRuns, type LiveRun } from './store/index.js'
@@ -311,7 +311,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
             build: items => buildInterventions(items, { dashboardUrl: deps.dashboardUrl }),
             keyOf: interventionKey,
             onNew: async items => {
-              if (!discordNotificationEnabled(await prefs(), 'notifyHumanIntervention')) return
+              if (!notifies(await prefs(), 'discord', 'humanIntervention')) return
               const delivered = await postInterventionsDiscord(webhook, items).catch(() => false)
               if (!delivered) log('[framework] could not post a needs-you batch to the Discord webhook')
             },
@@ -321,7 +321,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
             build: buildActivity,
             keyOf: activityKey,
             onNew: async items => {
-              if (!discordNotificationEnabled(await prefs(), 'notifyNewActivity')) return
+              if (!notifies(await prefs(), 'discord', 'newActivity')) return
               const delivered = await postActivityDiscord(webhook, items).catch(() => false)
               if (!delivered) log('[framework] could not post an activity batch to the Discord webhook')
             },

@@ -323,7 +323,14 @@ export {
   materializePresets,
 } from './presets.js'
 export { presets, LAUNCHER_PRESETS, type PresetKey } from './preset-catalog.js'
-export { NOTIFICATION_DEFAULTS, notificationEnabled, discordNotificationEnabled } from './preference-defaults.js'
+export {
+  NOTIFICATION_DEFAULTS,
+  notifies,
+  notifyMethodEnabled,
+  notifyCategoryEnabled,
+  type NotifyMethod,
+  type NotifyCategory,
+} from './preference-defaults.js'
 export { interventionKey, pickNewInterventions } from './dashboard/keys.js'
 export { definePreset, defaultWhat, DEFAULT_WHAT, type PresetDef, type PresetParam, type PresetRenderContext } from './preset-prompt.js'
 export {

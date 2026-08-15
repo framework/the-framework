@@ -1,13 +1,6 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { definePrompt, promptInstructions, renderTask } from '@gemstack/ai-autopilot'
-import type {
-  BuildContext,
-  PlannedSubtask,
-  Prompt,
-  SubtaskResult,
-  SupervisorRun,
-} from '@gemstack/ai-autopilot'
+import type { BuildContext, PlannedSubtask, SubtaskResult, SupervisorRun } from './run-types.js'
 import type { DriverSession } from './driver/index.js'
 import { continuationPrompt, parseAwaitGate, type ParsedAwaitGate } from './turn-gate.js'
 

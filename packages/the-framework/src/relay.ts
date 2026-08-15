@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { EventStream } from '@gemstack/ai-autopilot'
+import { EventStream } from './event-stream.js'
 import type { FrameworkEvent } from './events.js'
 import { resolveDashboardBundle } from './dashboard/bundle.js'
 import { serveClientBundle } from './dashboard/static.js'

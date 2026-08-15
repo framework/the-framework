@@ -1,4 +1,4 @@
-import type { BootstrapEvent } from '@gemstack/ai-autopilot'
+import type { BootstrapEvent } from './run-types.js'
 import type { DriverEvent, DriverRateLimit } from './driver/index.js'
 import { pickedIds, type AutoHandoffSkip, type AutoMergeOutcome, type ChoiceOption, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
 
@@ -215,19 +215,8 @@ function formatBootstrapEvent(event: BootstrapEvent): string {
       return `  ${event.message}`
     case 'build':
       return `    build/${event.event.type}`
-    case 'checklist':
-      return event.passing
-        ? `  ✓ checklist pass ${event.pass}: no blockers`
-        : `  ✗ checklist pass ${event.pass}: ${event.blockers.join('; ')}`
-    case 'improve':
-      return `  → improving: ${event.blockers.join('; ')}`
-    case 'deploy':
-      return `▶ deploy: ${event.plan.render.toUpperCase()} → ${event.plan.target} (${event.plan.reason})`
     case 'done':
-      // No review passes means no review was configured (#1372), not an unfinished app.
-      return event.result.passes > 0
-        ? `✓ ${event.result.productionGrade ? 'review passed' : 'blockers remain'} after ${event.result.passes} pass(es)`
-        : '✓ done'
+      return '✓ done'
   }
 }
 

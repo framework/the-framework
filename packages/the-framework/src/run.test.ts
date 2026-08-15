@@ -3,8 +3,6 @@ import { test } from 'node:test'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { defineDomainPreset, defineLoop } from '@gemstack/ai-autopilot'
-import type { Prompt } from '@gemstack/ai-autopilot'
 import { runFramework } from './run.js'
 import { requestChoices, requestMultiSelect, runAwaitRounds, type ChoicesOption, type MultiSelectOption } from './await-gate.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
@@ -40,8 +38,6 @@ test('runFramework drives the whole flow through the driver, offline', async () 
 
   // No preset and no serve config, so nothing reviewed the build (#1372):
   // the loop never ran and the build turn was the whole run.
-  assert.equal(result.passes, 0)
-  assert.deepEqual(result.blockers, [])
 
 
   // We surfaced the wrapped agent's own progress.
@@ -182,47 +178,6 @@ test('the project never frames the agent (#547)', async () => {
   assert.doesNotMatch(system(), /vike-auth|llms\.txt|Skill:|Persona:|Project memory/)
 })
 
-/** A minimal domain preset whose major-change loop runs one review prompt. */
-function reviewPreset() {
-  const review: Prompt = {
-    id: 'review',
-    name: 'review',
-    title: 'Review',
-    description: 'Review the change.',
-    instructions: 'Review the app and end with a { blockers } verdict.',
-    passes: 1,
-    appliesTo: [],
-  }
-  return defineDomainPreset({
-    name: 'test-domain',
-    title: 'Test Domain',
-    loops: [defineLoop({ on: 'major-change', run: ['review'] })],
-    prompts: [review],
-  })
-}
-
-/** A preset with both a major-change and a bug-fix loop, each running a sentinel-tagged prompt. */
-function dualLoopPreset(opts: { defaultEvent?: string } = {}) {
-  const prompt = (id: string, sentinel: string): Prompt => ({
-    id,
-    name: id,
-    title: id,
-    description: '',
-    instructions: `${sentinel} — review and end with a { blockers } verdict.`,
-    passes: 1,
-    appliesTo: [],
-  })
-  return defineDomainPreset({
-    name: 'test-domain',
-    title: 'Test Domain',
-    ...(opts.defaultEvent ? { defaultEvent: opts.defaultEvent } : {}),
-    loops: [
-      defineLoop({ on: 'major-change', run: ['major-review'] }),
-      defineLoop({ on: 'bug-fix', run: ['bug-review'] }),
-    ],
-    prompts: [prompt('major-review', 'MAJOR-SENTINEL'), prompt('bug-review', 'BUGFIX-SENTINEL')],
-  })
-}
 
 /** A fake driver that records every prompt text it is sent, so a test can see which loop fired. */
 function promptRecordingDriver(): { driver: Driver; prompts: () => string[] } {
@@ -353,7 +308,6 @@ test('a build turn that stops to ask fires a live gate and resumes on the pick (
   // The pick was narrated and the driver was re-prompted to continue from it.
   assert.ok(events.some(e => e.kind === 'log' && /Continuing with your choice: Postgres/.test(e.message)))
   assert.ok(prompts.some(p => /You paused to ask.*Which data store.*chose: Postgres/s.test(p)))
-  assert.equal(result.passes, 0) // nothing reviewed the build (#1372)
 })
 
 test('a run with no preset and no serve config reviews nothing (#1372)', async () => {
@@ -375,8 +329,6 @@ test('a run with no preset and no serve config reviews nothing (#1372)', async (
   // The agent is a black box (#1372): with no opted-in review (preset) and no mechanical
   // gate (serve), the build prompt is the only prompt the agent ever sees.
   assert.equal(prompts.length, 1)
-  assert.equal(result.passes, 0)
-  assert.deepEqual(result.blockers, [])
 })
 
 test('a build turn that stops to showMultiSelect fires a checklist gate and resumes (#339)', async () => {
@@ -452,7 +404,6 @@ test('a build turn that stops for plan approval resumes on Approve (#358)', asyn
   // Approved: the driver was re-prompted to continue and the run finished.
   assert.ok(events.some(e => e.kind === 'log' && /Continuing with your choice: Approve/.test(e.message)))
   assert.ok(prompts.some(p => /You paused to ask.*Approve the orders plan.*chose: Approve/s.test(p)))
-  assert.equal(result.passes, 0) // nothing reviewed the build (#1372)
 })
 
 test('a declined plan stops the run cleanly instead of building on (#358)', async () => {
@@ -875,9 +826,6 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
     // The build prompt was the whole run: no phase followed it, so nothing read the
     // hand-off note as a reply.
     assert.equal(prompts().length, 1)
-    assert.equal(result.passes, 0)
-    assert.deepEqual(result.blockers, [])
-    assert.equal(result.stoppedEarly, false)
     // The backlog is still there and still unasked about: this machine has no standing to
     // ask which item to start next when the work is somewhere it cannot see.
     assert.equal(todo, undefined)

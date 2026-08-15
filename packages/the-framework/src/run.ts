@@ -1,12 +1,11 @@
-import {
-  type BootstrapEvent,
-  type BuildContext,
-  type BootstrapResult,
-  type BootstrapScope,
-  type SupervisorEvent,
-  type SupervisorRun,
-  type Verdict,
-} from '@gemstack/ai-autopilot'
+import type {
+  BootstrapEvent,
+  BootstrapResult,
+  BootstrapScope,
+  BuildContext,
+  SupervisorEvent,
+  SupervisorRun,
+} from './run-types.js'
 import type { Driver, DriverSession } from './driver/index.js'
 import { composeRunSystem, type EcoOptions, type TfContext } from './system-prompt.js'
 import { createRunControls, emitSessionStart, endStopDetail } from './run-telemetry.js'
@@ -265,16 +264,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
       onEvent: (event: SupervisorEvent) => emit({ kind: 'bootstrap', event: { type: 'build', event } }),
       signal: runSignal,
     })
-    // No review ran, so the review-shaped fields are constant: nothing gated the build (#1372).
-    const result: BootstrapResult = {
-      scope,
-      intent: opts.intent,
-      run: supervised,
-      passes: 0,
-      blockers: [],
-      productionGrade: false,
-      stoppedEarly: false,
-    }
+    const result: BootstrapResult = { scope, intent: opts.intent, run: supervised }
     emit({ kind: 'bootstrap', event: { type: 'done', result } })
     // The run controls (budget #322, decline #358, quota #529) abort between phases. The review
     // loop used to observe the abort for free; with it gone the run must look for itself before

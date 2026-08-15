@@ -1,4 +1,4 @@
-The run-overview cards projected from the event stream — the status line, the production-grade loop verdict, the deploy plan, and an honestly-labelled link to the live session — each rendered only once its data has arrived, with embedding views opting out of the parts their own chrome already shows.
+The run-overview cards projected from the event stream — the status line and an honestly-labelled link to the live session — each rendered only once its data has arrived, with embedding views opting out of the parts their own chrome already shows.
 
 ## Before writing SPEC.md files
 

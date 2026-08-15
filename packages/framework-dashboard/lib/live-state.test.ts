@@ -129,7 +129,6 @@ describe('isMetaPublishing', () => {
     id: 'r1',
     startedAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
-    passes: 1,
     handoff: { push: true, pr: true },
     ...over,
   })

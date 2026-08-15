@@ -15,7 +15,7 @@ const project = (id: string, path: string, lastActivityAt?: string): ProjectSumm
 })
 
 const meta = (status: RunMeta['status'], intent: string, updatedAt: string): RunMeta =>
-  ({ version: 1, status, id: 'r', startedAt: updatedAt, updatedAt, passes: 0, intent }) as RunMeta
+  ({ version: 1, status, id: 'r', startedAt: updatedAt, updatedAt, intent }) as RunMeta
 
 test('buildOverview surfaces only running runs, most-recently-updated first', async () => {
   const metas: Record<string, RunMeta> = {
@@ -63,7 +63,7 @@ test('buildOverview omits projects with no activity from recent', async () => {
 })
 
 const run = (id: string, startedAt: string): RunMeta =>
-  ({ version: 1, status: 'done', id, startedAt, updatedAt: startedAt, passes: 0 }) as RunMeta
+  ({ version: 1, status: 'done', id, startedAt, updatedAt: startedAt }) as RunMeta
 
 test('buildRecentRuns pools every project newest-first and tags each with its project', async () => {
   const runs: Record<string, RunMeta[]> = {
@@ -199,7 +199,7 @@ test('buildHotTickets tolerates a project whose tickets cannot be read', async (
 
 /** A live run meta carrying the ticket it is implementing (#1117). */
 const runOn = (id: string, ticket: string, status: RunMeta['status'] = 'running') =>
-  ({ version: 1, status, id, startedAt: 't', updatedAt: 't', passes: 0, ticket, cwd: '/w' }) as never
+  ({ version: 1, status, id, startedAt: 't', updatedAt: 't', ticket, cwd: '/w' }) as never
 
 test('ticketBucket: a run implementing it is in-progress, whatever the plan says (#1117)', () => {
   // The whole point of the link: a ticket nobody has planned yet, being coded right now, would

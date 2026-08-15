@@ -93,11 +93,9 @@ export {
 export { formatFrameworkEvent } from './terminal.js'
 export { resolveSessionLink, hasSessionIdPlaceholder, SESSION_ID_PLACEHOLDER } from './session-link.js'
 export {
-  loopStatus,
   sessionInfo,
   runProgress,
   handoffState,
-  type LoopStatus,
   type SessionInfo,
   type RunProgress,
   type HandoffState,
@@ -194,7 +192,6 @@ export {
   GIT_READ_TIMEOUT_MS,
   GIT_WRITE_TIMEOUT_MS,
   GIT_SLOW_TIMEOUT_MS,
-  readProjectSignals,
   type ProjectFs,
   type GitRunner,
 } from './project.js'
@@ -368,7 +365,6 @@ export { definePreset, defaultWhat, DEFAULT_WHAT, type PresetDef, type PresetPar
 export {
   fakeDriver,
   FAKE_INTENT,
-  FAKE_SIGNALS,
 } from './fake-script.js'
 export {
   AGENTS,

@@ -12,7 +12,6 @@ const run = (over: Partial<RunMeta> = {}): RunMeta => ({
   id: 'r1',
   startedAt: '2026-07-16T00:00:00Z',
   updatedAt: '2026-07-16T00:00:00Z',
-  passes: 0,
   ...over,
 })
 

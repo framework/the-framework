@@ -6,7 +6,6 @@ The right sidebar: tabs for the project's files, the documents the agent pushed 
 - Only the first pushed view pulls focus; after that an explicit pick is never overridden, and a tab that loses its content falls back to one that still has some.
 - The browser tab appears only when the run actually drives a browser — never for runs executing somewhere no browser exists.
 - While the launcher shows docs and history in its own column, the rail withholds those two tabs.
-- The production-grade loop's verdict is pinned under whatever tab is open — a standing fact about the run, not a panel you browse.
 
 ## Before writing SPEC.md files
 

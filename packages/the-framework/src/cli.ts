@@ -4,8 +4,6 @@ import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import {
-} from '@gemstack/ai-autopilot'
 import { type ClaudeCodeDriverOptions, type Driver, type DriverSession, type PermissionMode } from './driver/index.js'
 import { AGENTS, AGENT_SPECS, isAgentName, type AgentName } from './agent.js'
 import { createRunDriver } from './run-driver.js'
@@ -226,7 +224,6 @@ Options:
                          bug-fix or major-change (default: the-framework.yml's event,
                          else the preset's own, else major-change). Selects which
                          review chain gates the session.
-  --max-passes <n>       Full-fledged loop pass budget (default: 5).
   --max-cost <usd>       Stop the session once it has spent this much (USD).
   --no-todo-loop         Do not consume the agent's TODO backlog after the build
                          (the loop is on by default; it gates per item on the
@@ -258,7 +255,7 @@ Options:
   -v, --version          Print the version.
 
 The Framework drives the wrapped agent as a black box: it prompts, reads the code,
-and gates on the outcome (builds / serves / review-passes), then re-prompts. The
+and gates on the outcome, then re-prompts. The
 localhost dashboard foregrounds the loop status beside the agent's own session.`
 
 /** Parsed CLI options. */
@@ -340,7 +337,6 @@ export interface CliOptions {
   /** `--auto-merge` / `--no-auto-merge` (#1216): merge the session's PR once it is opened. Tri-state like {@link autoOpenPr}; resolves to off. */
   autoMerge?: boolean | undefined
   buildEvent?: string | undefined
-  maxPasses?: number
   maxCost?: number
   todoLoop: boolean
   todoMaxItems?: number
@@ -587,11 +583,6 @@ export function parseArgs(argv: string[]): CliOptions {
         const value = argv[++i]
         if (value !== 'prototype' && value !== 'full') opts.error = `invalid --scope: ${value ?? '(missing)'}`
         else opts.scope = value
-        break
-      }
-      case '--max-passes': {
-        const n = intFlag(argv[++i], '--max-passes', 1)
-        if (n !== undefined) opts.maxPasses = n
         break
       }
       case '--max-cost': {
@@ -1946,7 +1937,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     // A build continuation (#1467): resume the stopped leg's conversation; the intent above is
     // the continuation message and runFramework sends it verbatim.
     ...(continueBuild && opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
-    ...(opts.maxPasses ? { maxPasses: opts.maxPasses } : {}),
     ...(opts.todoLoop && !transparent ? {} : { todoLoop: false }),
     ...(opts.todoMaxItems ? { todoMaxItems: opts.todoMaxItems } : {}),
     // Modes ride along even without a domain preset: autopilot also steers the
@@ -1955,16 +1945,11 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
 
   return settleRun(epilogue('session'), async () => {
     const { result } = await runFramework(runOpts)
-    // A hand-off ran no review passes by design (#1225), so neither of the build lines fits:
-    // "prototype ready" would claim this machine built something it never saw.
+    // A hand-off ends at the hand-off (#1225): "done" would claim this machine built something
+    // it never saw.
     const successLine = driver.handsOff
       ? '\n✓ handed off. The session continues where it was sent, and opens its own pull request.'
-      : result.passes === 0
-        // No review passes: the run had no review configured (#1372 — no preset, no serve).
-        ? '\n✓ done.'
-        : result.productionGrade
-          ? `\n✓ review passed in ${result.passes} pass(es).`
-          : `\n• review not clean${result.stoppedEarly ? ` (stopped with ${result.blockers.length} blocker(s))` : ''}.`
+      : '\n✓ done.'
     return { successLine }
   })
 }
@@ -2355,7 +2340,7 @@ async function resumeRun(opts: CliOptions, io: CliIO): Promise<number> {
   for (const event of events) {
     io.out(formatFrameworkEvent(event))
   }
-  io.out(`\n• resumed ${meta.status} session of "${meta.intent ?? 'unknown intent'}" (${events.length} event(s), ${meta.passes} pass(es)).`)
+  io.out(`\n• resumed ${meta.status} session of "${meta.intent ?? 'unknown intent'}" (${events.length} event(s)).`)
 
   if (dashboard) {
     io.out(`\nDashboard live at ${dashboard.url}. Press Ctrl+C to exit.`)

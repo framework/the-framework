@@ -190,7 +190,6 @@ export async function markFailedStart(cwd: string, runId: string, intent: string
     id: runId,
     startedAt: startedAtFromRunId(runId) ?? now,
     updatedAt: now,
-    passes: 0,
     ...(intent.trim() ? { intent } : {}),
   }
   const stderrTail = (await readFile(runStderrPath(cwd), 'utf8').catch(() => '')).trim().slice(-2000)
@@ -890,7 +889,6 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
           id: result.runId,
           startedAt: now,
           updatedAt: now,
-          passes: 0,
           target: 'remote',
           ...(prompt ? { intent: prompt } : {}),
           ...(remote.label ? { remoteLabel: remote.label } : {}),

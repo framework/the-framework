@@ -23,7 +23,6 @@ function meta(overrides: Partial<RunMeta> = {}): RunMeta {
     id: 'run-1',
     startedAt: '2026-08-01T10:00:00.000Z',
     updatedAt: '2026-08-01T11:00:00.000Z',
-    passes: 1,
     mergeOutcome: 'watched',
     ...overrides,
   }

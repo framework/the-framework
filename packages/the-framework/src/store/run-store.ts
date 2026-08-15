@@ -97,8 +97,6 @@ export interface RunMeta {
   startedAt: string
   /** ISO timestamp of the last event written. */
   updatedAt: string
-  /** Full-fledged loop passes performed so far. */
-  passes: number
   /**
    * The OS pid of the process that owns this run (the one tailing `control.jsonl`), on {@link host}.
    * Persisted so a reader can tell a live run from one whose process died without writing `end`
@@ -356,10 +354,6 @@ export function applyEventToMeta(meta: RunMeta, event: FrameworkEvent, at: strin
       if (b.type === 'scope') {
         next.intent = b.intent
         next.scope = b.scope
-      } else if (b.type === 'checklist') {
-        next.passes = b.pass
-      } else if (b.type === 'done') {
-        next.passes = b.result.passes
       }
       break
     }
@@ -428,7 +422,6 @@ function freshMeta(
     id: id && isSafeRunId(id) ? id : runIdFromStartedAt(startedAt),
     startedAt,
     updatedAt: startedAt,
-    passes: 0,
     ...(owner ? { pid: owner.pid, host: owner.host } : {}),
     ...(intent ? { intent } : {}),
     // Only a non-local target travels; `local` is the default every reader already assumes.

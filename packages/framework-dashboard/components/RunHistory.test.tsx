@@ -30,7 +30,6 @@ function run(over: Partial<RunMeta> = {}): RunMeta {
     id: 'run-1',
     startedAt: '2026-07-19T16:05:44.756Z',
     updatedAt: '2026-07-19T16:06:21.000Z',
-    passes: 1,
     intent: "replace 'Hello, world!' with 'Welcome!'",
     ...over,
   }

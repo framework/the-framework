@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { loopStatus, sessionInfo, deployPlan, runProgress, handoffState } from './run-view.js'
+import { sessionInfo, runProgress, handoffState } from './run-view.js'
 import type { FrameworkEvent } from './events.js'
 
 test('runProgress starts building with no name and flips to ready on setReadyForMerge (#326)', () => {
@@ -17,20 +17,6 @@ test('runProgress takes the latest session name when the agent renames it (#326)
     { kind: 'session-name', name: 'better-name' },
   ]
   assert.equal(runProgress(events).sessionName, 'better-name')
-})
-
-test('loopStatus tracks the latest checklist verdict and closes on done (#431)', () => {
-  const boot = (event: Record<string, unknown>): FrameworkEvent => ({ kind: 'bootstrap', event: event as never })
-  assert.equal(loopStatus([{ kind: 'log', message: 'x' }]), null) // no checklist yet
-
-  const failing = loopStatus([boot({ type: 'checklist', pass: 1, blockers: ['no tests'], passing: false })])
-  assert.deepEqual(failing, { pass: 1, passing: false, blockers: ['no tests'], productionGrade: false, finished: false })
-
-  const done = loopStatus([
-    boot({ type: 'checklist', pass: 1, blockers: ['no tests'], passing: false }),
-    boot({ type: 'done', result: { passes: 2, blockers: [], productionGrade: true } }),
-  ])
-  assert.deepEqual(done, { pass: 2, passing: true, blockers: [], productionGrade: true, finished: true })
 })
 
 test('sessionInfo merges the opening session with the latest session-update link (#431)', () => {
@@ -64,16 +50,6 @@ test('sessionInfo carries the model per leg — the latest session event wins, a
   assert.equal(sessionInfo(two)?.model, 'sonnet')
   const bare: FrameworkEvent[] = [...two, { kind: 'session', driver: 'claude', workspace: '/w', fake: false }]
   assert.equal(sessionInfo(bare)?.model, undefined)
-})
-
-test('deployPlan returns the chosen deploy target from the deploy event; latest wins (#433)', () => {
-  const boot = (event: Record<string, unknown>): FrameworkEvent => ({ kind: 'bootstrap', event: event as never })
-  assert.equal(deployPlan([{ kind: 'log', message: 'x' }]), null) // no deploy yet
-  const plan = deployPlan([
-    boot({ type: 'deploy', plan: { render: 'ssg', target: 'github-pages', reason: 'static' }, result: { deployed: false } }),
-    boot({ type: 'deploy', plan: { render: 'ssr', target: 'dokploy', reason: 'per-request data' }, result: { deployed: true } }),
-  ])
-  assert.deepEqual(plan, { render: 'ssr', target: 'dokploy', reason: 'per-request data' })
 })
 
 test('a run with no handoff events reads as armed, matching what it will do (#1102)', () => {

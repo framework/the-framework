@@ -17,7 +17,7 @@ async function server(handler: (req: IncomingMessage, res: ServerResponse) => vo
 // A minimal running RunMeta stub, the local list row RelayedRuns keeps for a relayed run (#1077).
 function stubMeta(id: string, overrides: Partial<RunMeta> = {}): RunMeta {
   const now = new Date().toISOString()
-  return { version: RUN_META_VERSION, status: 'running', id, startedAt: now, updatedAt: now, passes: 0, target: 'remote', ...overrides }
+  return { version: RUN_META_VERSION, status: 'running', id, startedAt: now, updatedAt: now, target: 'remote', ...overrides }
 }
 
 // Drain a RelayedRuns stream to completion, so both its `end`-driven settle and its close flip have run.

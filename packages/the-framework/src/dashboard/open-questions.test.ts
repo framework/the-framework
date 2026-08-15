@@ -13,7 +13,6 @@ function liveRun(overrides: Partial<LiveRun> = {}): LiveRun {
     id: 'run-1',
     startedAt: '2026-08-01T10:00:00.000Z',
     updatedAt: '2026-08-01T11:00:00.000Z',
-    passes: 0,
     cwd: '/one/.the-framework/worktrees/run-1',
     pendingChoice: { id: 'gate-1', title: 'Approve the plan?' },
     ...overrides,

@@ -70,8 +70,6 @@ const RUN: FrameworkEvent[] = [
   { kind: 'session', driver: 'fake', workspace: CWD, fake: true, sessionLink: 'https://claude.ai/code' },
   { kind: 'bootstrap', event: { type: 'scope', scope: 'full', intent: 'a blog with comments' } },
   { kind: 'session-update', sessionId: 'sess-123', sessionLink: 'https://ex.com/s/sess-123' },
-  { kind: 'bootstrap', event: { type: 'checklist', pass: 1, blockers: ['no tests'], passing: false } },
-  { kind: 'bootstrap', event: { type: 'checklist', pass: 2, blockers: [], passing: true } },
   { kind: 'end', ok: true },
 ]
 
@@ -126,7 +124,6 @@ test('append writes one JSONL line per event and derives meta', async () => {
   assert.equal(meta.workspace, CWD)
   assert.equal(meta.sessionId, 'sess-123')
   assert.equal(meta.sessionLink, 'https://ex.com/s/sess-123')
-  assert.equal(meta.passes, 2)
   assert.equal(meta.status, 'done')
 })
 
@@ -163,13 +160,12 @@ test('loadEvents on a never-run workspace yields an empty array', async () => {
 test('metaFromEvents reconstructs the same snapshot as live appends', async () => {
   const meta = metaFromEvents(RUN, AT)
   assert.equal(meta.intent, 'a blog with comments')
-  assert.equal(meta.passes, 2)
   assert.equal(meta.status, 'done')
   assert.equal(meta.startedAt, AT)
 })
 
 test('applyEventToMeta records the model per leg — the latest session event wins, an unrecorded one clears it (#1438)', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   const first = applyEventToMeta(base, { kind: 'session', driver: 'claude', workspace: '/w', fake: false, model: 'fable' }, AT)
   assert.equal(first.model, 'fable')
   // A continuation leg may run a different model: fold, don't pin.
@@ -181,7 +177,7 @@ test('applyEventToMeta records the model per leg — the latest session event wi
 })
 
 test('applyEventToMeta mirrors the merge arming onto the meta, so a mid-run tab can read it (#1382)', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   const armed = applyEventToMeta(base, { kind: 'handoff-armed', push: true, pr: true, merge: true }, AT)
   assert.deepEqual(armed.handoff, { push: true, pr: true, merge: true })
   // A pre-#1382 event has no merge field: the mirror stays shaped like the event, not padded.
@@ -190,7 +186,7 @@ test('applyEventToMeta mirrors the merge arming onto the meta, so a mid-run tab 
 })
 
 test('applyEventToMeta folds the handoff report onto the meta, so list surfaces can tell publishing from done (#1455)', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   assert.equal(base.handoffReport, undefined, 'no report until the epilogue speaks')
   const done = applyEventToMeta(base, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
   assert.equal(done.handoffReport, 'done')
@@ -201,7 +197,7 @@ test('applyEventToMeta folds the handoff report onto the meta, so list surfaces 
 })
 
 test('applyEventToMeta folds the merge outcome onto the meta, so the CI watch can find its PRs (#1418)', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   assert.equal(base.mergeOutcome, undefined)
   const watched = applyEventToMeta(base, { kind: 'handoff', outcome: 'done', pushed: true, merge: { outcome: 'watched' } }, AT)
   assert.equal(watched.mergeOutcome, 'watched')
@@ -213,19 +209,19 @@ test('applyEventToMeta folds the merge outcome onto the meta, so the CI watch ca
 })
 
 test('applyEventToMeta marks a thrown run as failed', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   const failed = applyEventToMeta(base, { kind: 'end', ok: false, detail: 'boom' }, AT)
   assert.equal(failed.status, 'failed')
 })
 
 test('applyEventToMeta marks a user-stopped run as stopped, not failed (#218)', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   const stopped = applyEventToMeta(base, { kind: 'end', ok: false, stopped: true }, AT)
   assert.equal(stopped.status, 'stopped')
 })
 
 test('applyEventToMeta tracks whether the run is working or parked on the user (#785)', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   assert.equal(base.settledAt, undefined, 'a working run is not parked')
 
   const parked = applyEventToMeta(base, { kind: 'settled' }, AT)
@@ -243,7 +239,7 @@ test('applyEventToMeta tracks whether the run is working or parked on the user (
 })
 
 test('applyEventToMeta records the session name + ready-for-merge lifecycle signals (#326)', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   assert.equal(base.sessionName, undefined)
   assert.equal(base.readyForMerge, undefined)
   const named = applyEventToMeta(base, { kind: 'session-name', name: 'add-comments' }, AT)
@@ -254,7 +250,7 @@ test('applyEventToMeta records the session name + ready-for-merge lifecycle sign
 })
 
 test('applyEventToMeta records the ticket a run is implementing (#1117)', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   assert.equal(base.ticket, undefined, 'a run nobody linked to a ticket says nothing')
   const on = applyEventToMeta(base, { kind: 'ticket', path: 'tickets/2026-07-25_login.md' }, AT)
   assert.equal(on.ticket, 'tickets/2026-07-25_login.md')
@@ -265,7 +261,7 @@ test('applyEventToMeta records the ticket a run is implementing (#1117)', () => 
 })
 
 test('applyEventToMeta tracks the pending choice gate a run is parked on (#636)', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   assert.equal(base.pendingChoice, undefined)
   const asked = applyEventToMeta(base, { kind: 'choice', id: 'g1', title: 'Cache the auth store?', options: [{ id: 'y', label: 'Yes' }] }, AT)
   assert.deepEqual(asked.pendingChoice, { id: 'g1', title: 'Cache the auth store?' })
@@ -277,7 +273,7 @@ test('applyEventToMeta tracks the pending choice gate a run is parked on (#636)'
 })
 
 test('applyEventToMeta clears a pending choice when the run ends (#636)', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   const asked = applyEventToMeta(base, { kind: 'choice', id: 'g1', title: 'q?', options: [{ id: 'y', label: 'Yes' }] }, AT)
   const ended = applyEventToMeta(asked, { kind: 'end', ok: true }, AT)
   assert.equal(ended.pendingChoice, undefined)
@@ -446,13 +442,13 @@ test('a fresh run archives a prior run that never got closed (crash safety) (#30
 
 const RUNS = join(CWD, '.the-framework', 'runs')
 const runningMeta = (id: string): string =>
-  JSON.stringify({ version: RUN_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT, passes: 0 })
+  JSON.stringify({ version: RUN_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT })
 
 test('reconcileOrphanedRuns flips archived runs stuck at running to stopped (#642)', async () => {
   const fs = memFs({
     [join(RUNS, 'a.json')]: runningMeta('a'),
     [join(RUNS, 'b.json')]: runningMeta('b'),
-    [join(RUNS, 'c.json')]: JSON.stringify({ version: RUN_META_VERSION, status: 'done', id: 'c', startedAt: AT, updatedAt: AT, passes: 0 }),
+    [join(RUNS, 'c.json')]: JSON.stringify({ version: RUN_META_VERSION, status: 'done', id: 'c', startedAt: AT, updatedAt: AT }),
   })
   const fixed = await reconcileOrphanedRuns(CWD, fs)
   assert.equal(fixed, 2)
@@ -475,7 +471,7 @@ test('reconcileOrphanedRuns flips a live run and archives it, counting it once (
 // in-flight run. A second daemon boot then marked genuinely live runs as finished.
 test('reconcileOrphanedRuns leaves a run whose pid is alive on this host (#926)', async () => {
   const owned = (id: string, over: Record<string, unknown> = {}): string =>
-    JSON.stringify({ version: RUN_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT, passes: 0, pid: 42, host: hostname(), ...over })
+    JSON.stringify({ version: RUN_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT, pid: 42, host: hostname(), ...over })
   const fs = memFs({
     [META]: owned('live'),
     [join(RUNS, 'alive.json')]: owned('alive'),
@@ -498,7 +494,7 @@ test('reconcileOrphanedRuns leaves a run whose pid is alive on this host (#926)'
 
 test('reconcileOrphanedRuns is a no-op on a clean or empty workspace (#642)', async () => {
   assert.equal(await reconcileOrphanedRuns(CWD, memFs()), 0)
-  const done = memFs({ [META]: JSON.stringify({ version: RUN_META_VERSION, status: 'done', id: 'd', startedAt: AT, updatedAt: AT, passes: 0 }) })
+  const done = memFs({ [META]: JSON.stringify({ version: RUN_META_VERSION, status: 'done', id: 'd', startedAt: AT, updatedAt: AT }) })
   assert.equal(await reconcileOrphanedRuns(CWD, done), 0)
 })
 
@@ -506,7 +502,7 @@ test('reconcileOrphanedRuns is a no-op on a clean or empty workspace (#642)', as
 // reader can flip it to `stopped` (and archive it) without waiting for a daemon-restart reconcile.
 const HERE = hostname()
 const ownedMeta = (id: string, pid: number, host: string): string =>
-  JSON.stringify({ version: RUN_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT, passes: 0, pid, host })
+  JSON.stringify({ version: RUN_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT, pid, host })
 
 test('a fresh open records the owning pid + host so a dead run can be detected (#716)', async () => {
   const fs = memFs()
@@ -559,7 +555,7 @@ test('fresh open adopts the id the daemon allocated, ignoring an unsafe one (#73
 // #738: since #736 a run lives in its own worktree, so a project's live runs are spread across
 // `.the-framework/worktrees/*` rather than sitting at the project path.
 const worktreeMeta = (runId: string, over: Partial<RunMeta> = {}): string =>
-  JSON.stringify({ version: 1, status: 'running', id: runId, startedAt: AT, updatedAt: AT, passes: 0, ...over })
+  JSON.stringify({ version: 1, status: 'running', id: runId, startedAt: AT, updatedAt: AT, ...over })
 
 test('readLiveMetas finds a run living in each worktree, newest first (#738)', async () => {
   const fs = memFs({
@@ -613,17 +609,16 @@ const worktreeFiles = (runId: string, meta: Record<string, unknown>, events = ''
 })
 
 test('archiveWorktreeRun copies a finished run into the repo history (#737)', async () => {
-  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, passes: 2 }, '{"kind":"log","message":"hi"}\n'))
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }, '{"kind":"log","message":"hi"}\n'))
   const meta = await archiveWorktreeRun(worktreeAt('r1'), CWD, fs)
   assert.equal(meta?.status, 'done')
   assert.equal(fs.files.get(join(CWD, '.the-framework', 'runs', 'r1.jsonl')), '{"kind":"log","message":"hi"}\n', 'the log lands in the repo')
-  assert.equal((JSON.parse(fs.files.get(join(CWD, '.the-framework', 'runs', 'r1.json'))!) as RunMeta).passes, 2)
   // And the archived copy is what listRuns reads, so the run survives losing its worktree.
   assert.deepEqual((await listRuns(CWD, fs)).map(r => r.id), ['r1'])
 })
 
 test('archiveWorktreeRun records a run that died mid-flight as stopped, not running (#737)', async () => {
-  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT, passes: 0 }))
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT }))
   // The process is gone by the time we archive, so `running` here means it never closed.
   assert.equal((await archiveWorktreeRun(worktreeAt('r1'), CWD, fs))?.status, 'stopped')
   assert.equal((JSON.parse(fs.files.get(join(CWD, '.the-framework', 'runs', 'r1.json'))!) as RunMeta).status, 'stopped')
@@ -638,17 +633,16 @@ const sessionsAt = (id: string, ext: string) => join(CWD, '.the-framework', USER
 
 test('a named user files the archive under their own sessions, not runs/ (#1179)', async () => {
   // The whole point: `runs/` is gitignored, so a `git clean -fdx` took every session with it.
-  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, passes: 2 }, '{"kind":"log","message":"hi"}\n'))
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }, '{"kind":"log","message":"hi"}\n'))
   await archiveWorktreeRun(worktreeAt('r1'), CWD, fs, undefined, USER)
   assert.equal(fs.files.get(sessionsAt('r1', 'jsonl')), '{"kind":"log","message":"hi"}\n')
-  assert.equal((JSON.parse(fs.files.get(sessionsAt('r1', 'json'))!) as RunMeta).passes, 2)
   assert.equal(fs.files.has(join(CWD, '.the-framework', 'runs', 'r1.json')), false, 'and not in the transient dir')
 })
 
 test('the history lists every user, and the runs archived before this shipped (#1179)', async () => {
   // Both schemes coexist: `runs/` holds everything from before, and a teammate's directory is as
   // much a part of the project's history as your own — that is what committing it is for.
-  const done = (id: string) => JSON.stringify({ version: 1, status: 'done', id, startedAt: AT, updatedAt: AT, passes: 0 })
+  const done = (id: string) => JSON.stringify({ version: 1, status: 'done', id, startedAt: AT, updatedAt: AT })
   const fs = memFs({
     [join(CWD, '.the-framework', 'runs', 'r1.json')]: done('r1'),
     [sessionsAt('r2', 'json')]: done('r2'),
@@ -660,7 +654,7 @@ test('the history lists every user, and the runs archived before this shipped (#
 test('a run archived under both schemes is listed once (#1179)', async () => {
   // A run archived before #1179 and re-archived after exists in both places; the history is a list
   // of sessions, not of files.
-  const meta = JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, passes: 0 })
+  const meta = JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT })
   const fs = memFs({ [join(CWD, '.the-framework', 'runs', 'r1.json')]: meta, [sessionsAt('r1', 'json')]: meta })
   assert.deepEqual((await listRuns(CWD, fs)).map(run => run.id), ['r1'])
 })
@@ -668,7 +662,7 @@ test('a run archived under both schemes is listed once (#1179)', async () => {
 test('an archived log replays wherever it is filed (#1179)', async () => {
   // The id alone no longer names a path, so every reader has to look the run up.
   const fs = memFs({
-    [sessionsAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, passes: 0 }),
+    [sessionsAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }),
     [sessionsAt('r1', 'jsonl')]: '{"kind":"log","message":"replayed"}\n',
   })
   assert.deepEqual(await loadRunEvents(CWD, 'r1', fs), [{ kind: 'log', message: 'replayed' }])
@@ -678,14 +672,14 @@ test('a committed session stuck at running is reconciled too (#1179)', async () 
   // The boot reconcile used to sweep only `runs/`, so a crashed run archived under a user would
   // have shown as live forever, with a Stop that does nothing.
   const fs = memFs({
-    [sessionsAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT, passes: 0 }),
+    [sessionsAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT }),
   })
   assert.equal(await reconcileOrphanedRuns(CWD, fs, () => false), 1)
   assert.equal((JSON.parse(fs.files.get(sessionsAt('r1', 'json'))!) as RunMeta).status, 'stopped')
 })
 
 test('reconcileOrphanedRuns rescues a run a crashed daemon left in a worktree (#737)', async () => {
-  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT, passes: 0 }))
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT }))
   assert.equal(await reconcileOrphanedRuns(CWD, fs), 1)
   assert.equal(
     (JSON.parse(fs.files.get(join(worktreeAt('r1'), '.the-framework', 'run.json'))!) as RunMeta).status,
@@ -714,7 +708,7 @@ test('listWorktreeDirs names the run of each worktree, ignoring anything else in
 // that it reopens the same log instead of truncating it.
 test('continueRun reopens the existing run: same id, same log, running again (#762)', async () => {
   const fs = memFs({
-    [META]: JSON.stringify({ version: 1, status: 'stopped', id: 'r1', startedAt: AT, updatedAt: AT, passes: 3, intent: 'build a blog' }),
+    [META]: JSON.stringify({ version: 1, status: 'stopped', id: 'r1', startedAt: AT, updatedAt: AT, intent: 'build a blog' }),
     [EVENTS]: '{"kind":"log","message":"first leg"}\n',
   })
   const store = await RunStore.open(CWD, { fs, continueRun: true, now: '2026-07-04T01:00:00.000Z' })
@@ -722,7 +716,6 @@ test('continueRun reopens the existing run: same id, same log, running again (#7
   assert.equal(meta?.id, 'r1', 'the same run, so the rail shows one row')
   assert.equal(meta?.status, 'running', 'live again')
   assert.equal(meta?.intent, 'build a blog', 'and keeps what it was originally asked to do')
-  assert.equal(meta?.passes, 3, 'and what it already did')
   assert.equal(fs.files.get(EVENTS), '{"kind":"log","message":"first leg"}\n', 'the earlier output survives')
 
   // The continuing process owns it now, so a liveness probe reads it as alive, not orphaned (#716).
@@ -741,7 +734,7 @@ test('continueRun with nothing to reopen falls back to a fresh run (#762)', asyn
 test('restoreArchivedRun puts a torn-down run history back in its worktree (#762)', async () => {
   // #737 moved the history to the repo and removed the checkout; continuing needs it back.
   const fs = memFs({
-    [join(CWD, '.the-framework', 'runs', 'r1.json')]: JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, passes: 1 }),
+    [join(CWD, '.the-framework', 'runs', 'r1.json')]: JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }),
     [join(CWD, '.the-framework', 'runs', 'r1.jsonl')]: '{"kind":"log","message":"archived"}\n',
   })
   const wt = join(CWD, '.the-framework', 'worktrees', 'r1')
@@ -787,7 +780,7 @@ test('startedAtFromRunId inverts runIdFromStartedAt, and refuses foreign ids (#1
 })
 
 test('applyEventToMeta records the queue entry a drain pinned the run to (#1253)', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   assert.equal(base.queueEntry, undefined, 'a run no drain pinned says nothing')
   const on = applyEventToMeta(base, { kind: 'queue-entry', entry: 'Fix the flaky teardown test' }, AT)
   assert.equal(on.queueEntry, 'Fix the flaky teardown test')
@@ -798,7 +791,7 @@ test('applyEventToMeta records the queue entry a drain pinned the run to (#1253)
 })
 
 test('applyEventToMeta records the branch a branch event names (#1277)', () => {
-  const base = metaFromEvents(RUN.slice(0, 4), AT)
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
   const on = applyEventToMeta(base, { kind: 'branch', branch: 'the-framework/run-r1' }, AT)
   assert.equal(on.branch, 'the-framework/run-r1')
   // A rename mid-run replaces it: the meta always names the branch the work is on now.
@@ -818,7 +811,6 @@ const deadGatedMeta = (id: string): string =>
     id,
     startedAt: AT,
     updatedAt: AT,
-    passes: 1,
     pid: 999999,
     host: HERE,
     pendingChoice: { id: 'todo-next', title: 'Start the next backlog item?' },
@@ -857,7 +849,7 @@ test('archiveWorktreeRun writes the missing end into the worktree before copying
 
 test('archiveWorktreeRun leaves a run that wrote its own ending alone (#1359)', async () => {
   const events = '{"kind":"end","ok":true}\n'
-  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, passes: 1 }, events))
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }, events))
   await archiveWorktreeRun(worktreeAt('r1'), CWD, fs)
   assert.equal(fs.files.get(join(worktreeAt('r1'), '.the-framework', 'events.jsonl')), events, 'no surrogate end on a clean run')
 })

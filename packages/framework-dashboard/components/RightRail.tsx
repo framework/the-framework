@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import type { LogEntry, WorkspaceDoc } from '@gemstack/the-framework'
-import type { LoopStatus } from '@gemstack/the-framework/client'
-import { LoopStatusCard } from './LoopStatusCard.js'
 import { DocsPanel } from './DocsPanel.js'
 import { ProjectLogPanel } from './ProjectLogPanel.js'
 import { ViewsRail } from './ViewsRail.js'
@@ -46,7 +44,6 @@ export function RightRail({
   toggleContext,
   hasBrowser = false,
   target,
-  loop,
   docsInMain = false,
 }: {
   projectId: string | null
@@ -63,10 +60,6 @@ export function RightRail({
   hasBrowser?: boolean
   /** Where the selected run executes (#1053/#610): an `actions` run has no browser on the runner, so no pane; `remote` (#1067) has none locally either, and neither does a `web` cloud session. */
   target?: 'local' | 'actions' | 'remote' | 'web' | undefined
-  /** The selected run's production-grade loop verdict, pinned under the tabs rather than given a tab
-   *  of its own: it is a standing fact about the run, not a panel you browse, so it stays readable
-   *  whichever tab is open. Null for a run that never looped (a prototype scope, or a plain prompt). */
-  loop?: LoopStatus | null | undefined
   /**
    * The launcher renders Docs and History in its main column (#1455 items 2/3), so while it is
    * the main view the rail must not repeat them: their tabs are withheld and their polls skipped.
@@ -181,15 +174,6 @@ export function RightRail({
           <DocsPanel docs={docs} loaded={docsLoaded} />
         )}
       </div>
-      {/* Straight under the panel's content, not one of the tabs and not pinned to the floor: the
-          loop's verdict belongs to the run, so it holds still while you move between panels, and it
-          reads as the end of what the rail is saying rather than a footer you scroll to. Its own
-          scroller keeps a pass with many blockers from taking the rail. */}
-      {loop && (
-        <div className="max-h-[33%] shrink-0 overflow-y-auto px-2 pb-2">
-          <LoopStatusCard loop={loop} />
-        </div>
-      )}
     </aside>
   )
 }

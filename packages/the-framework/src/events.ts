@@ -1,4 +1,4 @@
-import type { BootstrapEvent } from '@gemstack/ai-autopilot'
+import type { BootstrapEvent } from './run-types.js'
 import type { DriverEvent } from './driver/index.js'
 
 /** One selectable option in an interactive {@link ChoiceRequest} (#304). */

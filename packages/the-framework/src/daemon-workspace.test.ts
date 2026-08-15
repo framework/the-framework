@@ -145,7 +145,6 @@ async function writeRunMeta(checkout: string, status: RunMeta['status'], extra: 
     id: 'run1',
     startedAt: '2026-07-24T00:00:00.000Z',
     updatedAt: '2026-07-24T00:00:00.000Z',
-    passes: 0,
     ...extra,
   }
   await writeFile(join(dir, 'run.json'), JSON.stringify(meta))
@@ -270,7 +269,6 @@ async function seedBoundTopicRun(scratch: string, runId: string, projectId: stri
     id: runId,
     startedAt: '2026-07-24T00:00:00.000Z',
     updatedAt: '2026-07-24T00:00:00.000Z',
-    passes: 0,
     topic: true,
     sessionId,
   }
@@ -420,7 +418,6 @@ test('moveTopicRunHistory copies the log and re-marks the meta as a bound projec
       id: 'run1',
       startedAt: '2026-07-24T00:00:00.000Z',
       updatedAt: '2026-07-24T00:00:00.000Z',
-      passes: 0,
       topic: true,
       sessionId: 'sess-1',
       intent: 'draft a plan',
@@ -578,7 +575,7 @@ fs.mkdirSync(dir, { recursive: true })
 const now = new Date().toISOString()
 fs.writeFileSync(
   path.join(dir, 'run.json'),
-  JSON.stringify({ version: ${RUN_META_VERSION}, status: 'failed', id: runId, startedAt: now, updatedAt: now, passes: 0, driver: 'claude-code' }),
+  JSON.stringify({ version: ${RUN_META_VERSION}, status: 'failed', id: runId, startedAt: now, updatedAt: now, driver: 'claude-code' }),
 )
 fs.appendFileSync(path.join(dir, 'events.jsonl'), JSON.stringify({ kind: 'end', ok: false, detail: ${JSON.stringify(detail)} }) + '\\n')
 process.exit(1)

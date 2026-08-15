@@ -33,7 +33,7 @@ async function projectWithWorktreeRun(): Promise<{
   // The live meta is what readLiveMetas discovers, and its id is what the caller addresses.
   await writeFile(
     join(worktree, FRAMEWORK_DIR, 'run.json'),
-    JSON.stringify({ version: 1, status: 'running', id: runId, startedAt: runId, updatedAt: runId, passes: 0 }),
+    JSON.stringify({ version: 1, status: 'running', id: runId, startedAt: runId, updatedAt: runId }),
   )
 
   const previous = process.env.XDG_CONFIG_HOME
@@ -207,7 +207,7 @@ test('onRetainedWorktrees hides a live run, and lists one that has finished (#73
     // Once it is no longer running, its retained checkout is listed.
     await writeFile(
       join(ctx.dir, FRAMEWORK_DIR, WORKTREES_DIR, ctx.runId, FRAMEWORK_DIR, 'run.json'),
-      JSON.stringify({ version: 1, status: 'failed', id: ctx.runId, startedAt: ctx.runId, updatedAt: ctx.runId, passes: 0 }),
+      JSON.stringify({ version: 1, status: 'failed', id: ctx.runId, startedAt: ctx.runId, updatedAt: ctx.runId }),
     )
     assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [ctx.runId])
   } finally {
@@ -261,7 +261,7 @@ test('a continued run reads as running, not as its archived first leg (#768)', a
     await mkdir(join(ctx.dir, FRAMEWORK_DIR, 'runs'), { recursive: true })
     await writeFile(
       join(ctx.dir, FRAMEWORK_DIR, 'runs', `${ctx.runId}.json`),
-      JSON.stringify({ version: 1, status: 'done', id: ctx.runId, startedAt: ctx.runId, updatedAt: ctx.runId, passes: 1 }),
+      JSON.stringify({ version: 1, status: 'done', id: ctx.runId, startedAt: ctx.runId, updatedAt: ctx.runId }),
     )
     const runs = (await onRuns(ctx.projectId)) as { id: string; status: string }[]
     const mine = runs.filter(run => run.id === ctx.runId)

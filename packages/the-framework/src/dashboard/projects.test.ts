@@ -23,7 +23,6 @@ const run = (id: string, updatedAt: string): RunMeta => ({
   id,
   startedAt: updatedAt,
   updatedAt,
-  passes: 0,
 })
 
 test('summarizeProject derives name from the path basename', async () => {

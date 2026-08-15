@@ -1,4 +1,3 @@
-import type { FrameworkSignals } from '@gemstack/ai-autopilot'
 import { FakeDriver, type FakeTurn } from './driver/index.js'
 
 /**
@@ -11,11 +10,6 @@ import { FakeDriver, type FakeTurn } from './driver/index.js'
 
 /** The default intent the `--fake` demo builds. */
 export const FAKE_INTENT = 'A paginated orders page backed by an orders table, with sign-in.'
-
-/** Deps that make the Vike preset win detection in the demo. */
-export const FAKE_SIGNALS: FrameworkSignals = {
-  dependencies: { 'vike-react': '1.0.0', react: '18.0.0', '@prisma/client': '5.0.0' },
-}
 
 // A small, plausible per-turn usage so the demo shows spend accumulating (#322).
 const FAKE_USAGE = { costUsd: 0.02, inputTokens: 1800, outputTokens: 600, cacheReadTokens: 12000, cacheCreationTokens: 800 }

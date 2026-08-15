@@ -572,7 +572,7 @@ const status = fs.readFileSync(${JSON.stringify(join(cwd, 'status.txt'))}, 'utf8
 const dir = path.join(runCwd, '.the-framework')
 fs.mkdirSync(dir, { recursive: true })
 fs.writeFileSync(path.join(dir, 'events.jsonl'), JSON.stringify({ kind: 'log', message: 'worked' }) + '\\n')
-fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify({ version: 1, status, id: runId, startedAt: runId, updatedAt: runId, passes: 1 }))
+fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify({ version: 1, status, id: runId, startedAt: runId, updatedAt: runId }))
 fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
 `,
     )

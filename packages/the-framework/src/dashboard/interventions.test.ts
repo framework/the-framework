@@ -20,7 +20,6 @@ const runningMeta = (over: Partial<RunMeta> = {}): RunMeta => ({
   id: 'r1',
   startedAt: '2026-07-16T00:00:00Z',
   updatedAt: '2026-07-16T00:00:00Z',
-  passes: 0,
   ...over,
 })
 
@@ -124,7 +123,6 @@ const doneMeta = (over: Partial<RunMeta> = {}): RunMeta => ({
   id: 'r1',
   startedAt: '2026-07-16T00:00:00Z',
   updatedAt: '2026-07-16T01:00:00Z',
-  passes: 0,
   branch: 'the-framework/add-cart',
   intent: 'add the cart',
   ...over,

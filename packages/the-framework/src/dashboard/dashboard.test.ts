@@ -14,7 +14,7 @@ const project = (id: string, path: string, lastActivityAt?: string): ProjectSumm
 })
 
 const run = (status: RunMeta['status'], startedAt: string): RunMeta =>
-  ({ version: 1, status, id: startedAt, startedAt, updatedAt: startedAt, passes: 0 }) as RunMeta
+  ({ version: 1, status, id: startedAt, startedAt, updatedAt: startedAt }) as RunMeta
 
 // A fixed clock so the 14-day activity window is deterministic.
 const NOW = () => new Date('2026-07-14T12:00:00Z')

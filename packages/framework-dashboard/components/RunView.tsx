@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FrameworkEvent } from '@gemstack/the-framework'
-import { handoffState, loopStatus, runProgress, sessionInfo, type LoopStatus } from '@gemstack/the-framework/client'
+import { handoffState, runProgress, sessionInfo, } from '@gemstack/the-framework/client'
 import { onRun, onRetainedWorktrees } from '../server/reads.telefunc.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useRunHandoff } from '../lib/use-run-handoff.js'
@@ -43,7 +43,6 @@ export function RunView({
   armedDefault,
   onRunStarted,
   onDeleted,
-  onLoopStatus,
 }: {
   projectId: string
   /** Which run this is (#749); absent right after Start, before the poll adopts its id. */
@@ -80,7 +79,6 @@ export function RunView({
   /** The loop's verdict, handed up so the right rail can pin it under its tabs. It is reported from
    *  here rather than read in the shell because a finished run's log is archived, and this view is
    *  the one that reads it back. */
-  onLoopStatus?: ((loop: LoopStatus | null) => void) | undefined
 }) {
   // The archived log, read only once the run has ended: while it runs, the channel is the truth.
   // `archiveBehind` re-reads it whenever the live channel has outgrown the copy on screen (#1460):
@@ -162,16 +160,6 @@ export function RunView({
   // disarmed — the record's snapshot is how the boxes read the same whether this tab watched the
   // run start or was opened halfway through.
   const armed = handoffState(shown, armedDefault)
-  // The loop's verdict goes to the rail, not above the feed. Reported on its VALUE, not the object
-  // (a fold rebuilds it every render), so a passing verdict is handed up once and not on every tick.
-  const loop = loopStatus(shown)
-  const loopKey = loop ? [loop.pass, loop.passing, loop.productionGrade, loop.finished, ...loop.blockers].join(' ') : ''
-  useEffect(() => {
-    onLoopStatus?.(loop)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by value; `loop` is a fresh object each render
-  }, [loopKey, onLoopStatus])
-  // Leaving the session clears it, so the rail does not keep one run's verdict over the next.
-  useEffect(() => () => onLoopStatus?.(null), [onLoopStatus])
   // Until the handoff has actually loaded, a just-stopped run keeps showing the file counts it
   // ended with (#1030): the summary swaps once, from the live counts to the handoff, instead of
   // blanking for the beat the handoff read takes.
@@ -254,7 +242,6 @@ export function RunView({
           showSessionLink={false}
           showName={false}
           showStatus={false}
-          showLoop={false}
           lost={lost}
           {...(feedLive ? {} : { stick: false, openAt: 'end' as const, emptyLabel: 'This session has no events.' })}
           // A web run's log dead-ends at the hand-off (#1265): the mirror box rides the tail of

@@ -1,4 +1,4 @@
-import { EventStream } from '@gemstack/ai-autopilot'
+import { EventStream } from '../event-stream.js'
 import type { FrameworkEvent } from '../events.js'
 import { applyEventToMeta, type RunMeta } from '../store/index.js'
 import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'

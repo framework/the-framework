@@ -66,7 +66,7 @@ test('a branch with neither signal has not landed (#1036)', () => {
  * (#1325), so a sweep test that is not about the run's outcome says so with this.
  */
 function doneRun(id: string, status: RunMeta['status'] = 'done'): RunMeta {
-  return { version: 1, status, id, startedAt: '2026-07-27T20:00:00.000Z', updatedAt: '2026-07-27T20:01:00.000Z', passes: 0 }
+  return { version: 1, status, id, startedAt: '2026-07-27T20:00:00.000Z', updatedAt: '2026-07-27T20:01:00.000Z' }
 }
 
 /** A sweep over fixed rows, recording which run ids removal was asked for. */

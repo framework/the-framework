@@ -8,14 +8,10 @@ export { formatBytes } from './format-bytes.js'
 export { errorMessage } from './error-message.js'
 export { pickedIds } from './events.js'
 export {
-  loopStatus,
   sessionInfo,
-  deployPlan,
   runProgress,
   handoffState,
-  type LoopStatus,
   type SessionInfo,
-  type DeployPlan,
   type RunProgress,
   type HandoffState,
 } from './run-view.js'

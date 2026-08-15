@@ -7,66 +7,6 @@ import type { AutoHandoffSkip, FrameworkEvent } from './events.js'
 // unit-tested against the real event shapes. The bootstrap phase (checklist/deploy)
 // carries the structured data; we surface it as cards.
 
-/** The production-grade loop status (#431): the current pass, whether it passed, and any blockers. */
-export interface LoopStatus {
-  pass: number
-  passing: boolean
-  blockers: string[]
-  /** True once the run reached production-grade (the loop ended with no blockers). */
-  productionGrade: boolean
-  /** True once a `done` bootstrap event has fired (the loop is over). */
-  finished: boolean
-}
-
-/**
- * The latest checklist verdict (#431), from the `checklist`/`improve`/`done` bootstrap
- * events. Null until a checklist has run — a prototype build never loops, and neither
- * does a run with no review configured (#1372: no preset, no serve); `done` with zero
- * passes is not a loop ending, so it does not open a status either. `done` closes an
- * open status out with the final verdict.
- */
-export function loopStatus(events: readonly FrameworkEvent[]): LoopStatus | null {
-  let status: LoopStatus | null = null
-  for (const event of events) {
-    if (event.kind !== 'bootstrap') continue
-    const e = event.event
-    if (e.type === 'checklist') {
-      status = { pass: e.pass, passing: e.passing, blockers: [...e.blockers], productionGrade: e.passing, finished: false }
-    } else if (e.type === 'improve') {
-      status = { pass: e.pass, passing: false, blockers: [...e.blockers], productionGrade: false, finished: false }
-    } else if (e.type === 'done') {
-      const r = e.result
-      if (r.passes === 0 && !status) continue
-      status = {
-        pass: r.passes,
-        passing: r.productionGrade,
-        blockers: [...r.blockers],
-        productionGrade: r.productionGrade,
-        finished: true,
-      }
-    }
-  }
-  return status
-}
-
-/** The chosen deploy plan (#433): how the app renders and where it lands, from the `deploy` bootstrap event. */
-export interface DeployPlan {
-  render: 'ssr' | 'ssg' | 'spa'
-  target: string
-  reason: string
-}
-
-/** The deploy plan the run decided on, or null before the deploy phase ran. Latest wins. */
-export function deployPlan(events: readonly FrameworkEvent[]): DeployPlan | null {
-  for (let i = events.length - 1; i >= 0; i--) {
-    const event = events[i]!
-    if (event.kind !== 'bootstrap' || event.event.type !== 'deploy') continue
-    const p = event.event.plan
-    return { render: p.render, target: p.target, reason: p.reason }
-  }
-  return null
-}
-
 /** The run's lifecycle progress (#326): the session name it chose and whether it is ready for merge. */
 export interface RunProgress {
   /** The `[a-z0-9-]` session name (also the branch), once the agent set one via `setSessionName()`. */

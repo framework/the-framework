@@ -209,12 +209,8 @@ export function renderSystemPrompt(tf: TfContext = DEFAULT_TF): RenderedSystemPr
 
 /** Inputs to {@link systemPromptBlock}. */
 export interface SystemPromptOptions {
-  /**
-   * Include the built-in #326 system prompt. Default `true`; set false per repo
-   * to remove it. The name is the historical `the-framework.yml` key (#301): the
-   * #326 prompt is the anti-lazy-pill's successor and answers to the same toggle.
-   */
-  antiLazyPill?: boolean | undefined
+  /** Remove the built-in #326 system prompt. Default `false` — it is included. */
+  vanilla?: boolean | undefined
   /** The user's own system prompt (e.g. from `SYSTEM.md`), injected after the built-in one. */
   user?: string | undefined
   /** Context for the template's `${{...}}` fragments. Default: {@link DEFAULT_TF}. */
@@ -277,9 +273,9 @@ export function systemPromptBlock(opts: SystemPromptOptions = {}): string {
   // The context docs ride with the built-in prompt, not with the user's dirs: they are
   // ours, and `--vanilla` means no framework-authored prompt at all (#547 rule 3). They
   // render as commented bullets under the dirs (#559), so the agent sees what each is for.
-  // `--vanilla` (antiLazyPill === false) drops both the framework's context docs and its
-  // built-in prompt; one boolean drives both so they can't fall out of step.
-  const includeBuiltin = opts.antiLazyPill !== false
+  // Vanilla drops both the framework's context docs and its built-in prompt; one boolean drives
+  // both so they can't fall out of step.
+  const includeBuiltin = opts.vanilla !== true
   const docs = includeBuiltin ? CONTEXT_DOCS : []
   if (dirs.length || docs.length) {
     const head = `Context:${dirs.length ? ` ${dirs.join(', ')}` : ''}`

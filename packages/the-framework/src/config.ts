@@ -14,8 +14,15 @@ export interface FrameworkFileConfig {
   preset?: string
   /** Build event kind the preset's review loop fires for, e.g. `bug-fix` (#265). */
   event?: string
-  /** Inject the built-in system prompt (#326, via #301). Default `true`; set false to remove it. */
-  antiLazyPill?: boolean
+  /**
+   * Remove the built-in #326 system prompt, keeping the session controls. Default `false`.
+   *
+   * One name for one concept (C3). This key used to be `antiLazyPill` — the historical name of
+   * the prompt's ancestor (#301) — spelled the other way round from the `vanilla` it mapped to
+   * everywhere else, so the file, the preference and the run option each said the same thing in a
+   * different direction and three comments apologised for it.
+   */
+  vanilla?: boolean
   /**
    * Transparent mode (#625): make every run in this project a raw `claude -p` — no framework
    * system prompt, no emit protocols, no consumption guard, no dashboard, no TODO loop. The
@@ -49,7 +56,7 @@ const ENUM_CONFIG_KEYS = ['handoff'] as const
  * resolution, and the resolved-config summary all iterate it, so a new mode is added here once and
  * flows through them (only its default and any renamed output field are declared per key).
  */
-export const BOOLEAN_CONFIG_KEYS = ['antiLazyPill', 'transparent'] as const
+export const BOOLEAN_CONFIG_KEYS = ['vanilla', 'transparent'] as const
 /** Every config key, string then enum then boolean, in declaration order. */
 export const CONFIG_KEYS = [...STRING_CONFIG_KEYS, ...ENUM_CONFIG_KEYS, ...BOOLEAN_CONFIG_KEYS] as const
 

@@ -13,9 +13,12 @@ test('parseFrameworkConfig reads preset + mode booleans + event', () => {
   })
 })
 
-test('parseFrameworkConfig reads the antiLazyPill toggle', () => {
-  assert.deepEqual(parseFrameworkConfig('antiLazyPill: false\n'), { antiLazyPill: false })
-  assert.throws(() => parseFrameworkConfig('antiLazyPill: nope\n'), /"antiLazyPill" must be a boolean/)
+test('parseFrameworkConfig reads the vanilla toggle (C3)', () => {
+  // The key the file speaks is the key everything else speaks, and it means the same direction:
+  // it used to be `antiLazyPill: false` here for what is `vanilla: true` everywhere else.
+  assert.deepEqual(parseFrameworkConfig('vanilla: true\n'), { vanilla: true })
+  assert.throws(() => parseFrameworkConfig('vanilla: nope\n'), /"vanilla" must be a boolean/)
+  assert.deepEqual(parseFrameworkConfig('antiLazyPill: false\n'), {}, 'the old name is not a key')
 })
 
 test('parseFrameworkConfig reads the transparent toggle (#625)', () => {

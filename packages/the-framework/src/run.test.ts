@@ -1004,7 +1004,7 @@ test('a prompt session runs its text without build framing, and works no backlog
   await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] leftover task\n')
   try {
     const { driver, prompts } = realNamedDriver([{ text: 'reviewed it' }])
-    const { todo } = await runSession({ prompt: 'review the auth flow', kind: 'prompt', driver, cwd, antiLazyPill: false })
+    const { todo } = await runSession({ prompt: 'review the auth flow', kind: 'prompt', driver, cwd, vanilla: true })
     assert.equal(prompts.length, 1, 'one prompt, and no backlog turns after it')
     assert.equal(prompts[0], 'review the auth flow')
     assert.equal(todo, undefined)

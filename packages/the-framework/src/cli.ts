@@ -206,7 +206,7 @@ export interface SessionOptions {
    * The mode toggles are tri-state (#841): `undefined` is "this run said nothing", so the repo's
    * the-framework.yml decides, while an explicit `--no-*` turns the mode off over the file.
    */
-  /** `--vanilla`: remove the built-in #326 system prompt entirely (antiLazyPill off, #314). */
+  /** Remove the built-in #326 system prompt entirely, keeping the session controls (#314). */
   vanilla?: boolean | undefined
   /** `--transparent` (#625): run the wrapped agent fully raw — no framework system prompt, emit
    * protocols, consumption guard, dashboard, or TODO loop, so a run is identical to `claude -p`. */
@@ -450,8 +450,7 @@ function flagConfigLayer(opts: RunConfigFlags): ConfigLayer {
     values: {
       ...(opts.preset !== undefined ? { preset: opts.preset } : {}),
       ...(opts.buildEvent !== undefined ? { event: opts.buildEvent } : {}),
-      // --vanilla is the negative face of the same key: it removes the built-in prompt.
-      ...(opts.vanilla !== undefined ? { antiLazyPill: !opts.vanilla } : {}),
+      ...(opts.vanilla !== undefined ? { vanilla: opts.vanilla } : {}),
       ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
       ...(opts.handoff !== undefined ? { handoff: opts.handoff } : {}),
     },
@@ -550,11 +549,11 @@ async function resolvePromptConfig(
 ): Promise<{ userSystemPrompt?: string; noBuiltinPrompt: boolean }> {
   const userSystemPrompt = await loadUserSystemPrompt(cwd)
   // Transparent empties the whole channel, which subsumes "no built-in prompt".
-  const noBuiltinPrompt = transparent || !config.antiLazyPill
+  const noBuiltinPrompt = transparent || config.vanilla
   if (userSystemPrompt) io.out(`◆ system prompt: ${SYSTEM_PROMPT_FILE}`)
   // Transparent already announced itself (guard line); don't double-report the prompt being off.
-  // Name the layer that turned it off; at the flag tier that flag is --vanilla.
-  const offBy = config.sources.antiLazyPill === 'flag' ? '--vanilla' : (config.sources.antiLazyPill ?? 'transparent')
+  // Name the layer that turned it off.
+  const offBy = config.sources.vanilla ?? 'transparent'
   if (noBuiltinPrompt && !transparent) io.out(`◆ built-in system prompt: off (${offBy})`)
   if (opts.context.length) io.out(`◆ context: ${opts.context.join(', ')}`)
   return { ...(userSystemPrompt ? { userSystemPrompt } : {}), noBuiltinPrompt }
@@ -1442,7 +1441,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     ...(opts.maxCost ? { budgetUsd: opts.maxCost } : {}),
     ...(guard ? { consumptionGate: guard.gate } : {}),
     ...(promptConfig.userSystemPrompt ? { systemPrompt: promptConfig.userSystemPrompt } : {}),
-    ...(promptConfig.noBuiltinPrompt ? { antiLazyPill: false } : {}),
+    ...(promptConfig.noBuiltinPrompt ? { vanilla: true } : {}),
     ...(browserAttached ? { browser: true } : {}),
     ...(transparent ? { transparent: true } : {}),
     ...(opts.context.length ? { context: opts.context } : {}),

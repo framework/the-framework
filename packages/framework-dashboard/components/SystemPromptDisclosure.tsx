@@ -51,7 +51,7 @@ export function SystemPromptDisclosure({
   busy: boolean
 }) {
   const text = composeRunSystem({
-    antiLazyPill: !disabled,
+    vanilla: disabled,
     ...(transparent ? { transparent: true } : {}),
     ...(browser ? { browser: true } : {}),
     tf: { prompt },

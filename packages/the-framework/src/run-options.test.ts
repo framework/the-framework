@@ -23,9 +23,10 @@ test('the yml-owned toggles travel as explicit booleans (#842)', () => {
 
 test('preferencesFromFileConfig maps the repo yml onto the preference keys (#842)', () => {
   assert.deepEqual(preferencesFromFileConfig({}), {})
-  // antiLazyPill is the file's name for the inverse of Vanilla.
-  assert.deepEqual(preferencesFromFileConfig({ antiLazyPill: false }), { vanilla: true })
-  assert.deepEqual(preferencesFromFileConfig({ antiLazyPill: true }), { vanilla: false })
+  // One name and one polarity, so the map across the boundary is a copy (C3): the file used to
+  // spell this `antiLazyPill` and mean the opposite, and the negation lived here.
+  assert.deepEqual(preferencesFromFileConfig({ vanilla: true }), { vanilla: true })
+  assert.deepEqual(preferencesFromFileConfig({ vanilla: false }), { vanilla: false })
   assert.deepEqual(preferencesFromFileConfig({ transparent: true }), { transparent: true })
   // The ladder rides the committed file too (#1173/#1216): how far a session publishes itself —
   // including whether its PRs may land on their own — is a fact about the repo.
@@ -38,8 +39,8 @@ test('preferencesFromFileConfig maps the repo yml onto the preference keys (#842
 test('a repo yml sits over the user tier, key by key (#842)', () => {
   // Two tiers (B5): yours, and the repo's committed file on top. A repo-shaped setting belongs to
   // the repo, so a per-machine override of it is a third answer to a question with two.
-  const global = { browser: true, transparent: true, vanilla: true }
-  const repo = preferencesFromFileConfig({ transparent: false, antiLazyPill: false })
+  const global = { browser: true, transparent: true, vanilla: false }
+  const repo = preferencesFromFileConfig({ transparent: false, vanilla: true })
   const resolved = { ...global, ...repo }
   assert.equal(resolved.browser, true) // the repo said nothing, so yours stands
   assert.equal(resolved.transparent, false) // an explicit false in the repo wins, not just a true

@@ -153,7 +153,7 @@ test('the channel carries the ticket and backlog format specs, so a spec can be 
     assert.ok(block.indexOf(spec) > block.indexOf(KNOWLEDGE_CONTEXT), `the ${heading} spec is not below the bullets`)
   }
   // Framework-authored content, so `--vanilla` drops it with the docs and the built-in prompt.
-  const vanilla = systemPromptBlock({ antiLazyPill: false, user: 'Only mine.' })
+  const vanilla = systemPromptBlock({ vanilla: true, user: 'Only mine.' })
   assert.ok(!vanilla.includes(TICKETING_FORMAT))
   assert.ok(!vanilla.includes(TODO_FORMAT))
 })
@@ -169,16 +169,16 @@ test('systemPromptBlock appends the user prompt after the built-in one', () => {
   assert.match(block, /AWAIT[\s\S]*Ship small PRs\./) // built-in first, then user
 })
 
-test('systemPromptBlock removes the built-in prompt when antiLazyPill is false', () => {
-  assert.equal(systemPromptBlock({ antiLazyPill: false }), '')
-  assert.equal(systemPromptBlock({ antiLazyPill: false, user: 'Only mine.' }), 'Only mine.')
+test('systemPromptBlock removes the built-in prompt when vanilla is on', () => {
+  assert.equal(systemPromptBlock({ vanilla: true }), '')
+  assert.equal(systemPromptBlock({ vanilla: true, user: 'Only mine.' }), 'Only mine.')
 })
 
 test('systemPromptBlock prepends a Context line for the selected directories (#439)', () => {
-  const block = systemPromptBlock({ antiLazyPill: false, user: 'Only mine.', context: ['/work/api', ' /work/ui '] })
+  const block = systemPromptBlock({ vanilla: true, user: 'Only mine.', context: ['/work/api', ' /work/ui '] })
   assert.equal(block, 'Context: /work/api, /work/ui\n\nOnly mine.') // trimmed + comma-joined, first
-  assert.equal(systemPromptBlock({ antiLazyPill: false, user: 'x', context: [] }), 'x') // empty adds nothing
-  assert.equal(systemPromptBlock({ antiLazyPill: false, user: 'x', context: ['  '] }), 'x') // blank entries dropped
+  assert.equal(systemPromptBlock({ vanilla: true, user: 'x', context: [] }), 'x') // empty adds nothing
+  assert.equal(systemPromptBlock({ vanilla: true, user: 'x', context: ['  '] }), 'x') // blank entries dropped
 })
 
 test('systemPromptBlock puts the knowledge docs in context, after the user dirs (#537)', () => {
@@ -188,11 +188,11 @@ test('systemPromptBlock puts the knowledge docs in context, after the user dirs 
   assert.ok(systemPromptBlock({}).startsWith(`${KNOWLEDGE_CONTEXT}\n\n`))
 })
 
-test('systemPromptBlock adds no knowledge docs when antiLazyPill is false (#537/#547)', () => {
+test('systemPromptBlock adds no knowledge docs when vanilla is on (#537/#547)', () => {
   // `--vanilla` is "Disable system prompt": the docs are framework-authored context, so
   // they go with the built-in prompt. Only the user's own dirs survive it.
-  assert.equal(systemPromptBlock({ antiLazyPill: false }), '')
-  assert.equal(systemPromptBlock({ antiLazyPill: false, context: ['/work/api'] }), 'Context: /work/api')
+  assert.equal(systemPromptBlock({ vanilla: true }), '')
+  assert.equal(systemPromptBlock({ vanilla: true, context: ['/work/api'] }), 'Context: /work/api')
 })
 
 test('systemPromptBlock is the #326 prompt and the user prompt, in that order, and nothing else (#457)', () => {
@@ -207,7 +207,7 @@ test('systemPromptBlock is the #326 prompt and the user prompt, in that order, a
 
 test('systemPromptBlock ignores a whitespace-only user prompt', () => {
   assert.equal(systemPromptBlock({ user: '   ' }), [CONTEXT_BLOCK, renderSystemPrompt().system].join('\n\n'))
-  assert.equal(systemPromptBlock({ antiLazyPill: false, user: '  \n ' }), '')
+  assert.equal(systemPromptBlock({ vanilla: true, user: '  \n ' }), '')
 })
 
 test('systemPromptBlock threads tf through to the template', () => {
@@ -258,7 +258,7 @@ test('composeRunSystem tells the agent it has a browser when the run does (#824)
 test('the browser section survives --vanilla but not transparent (#824)', () => {
   // It describes what the run can do, like the emit protocols, so dropping the built-in prompt
   // keeps it. Transparent means an empty channel, so nothing at all.
-  assert.ok(composeRunSystem({ antiLazyPill: false, browser: true }).includes(BROWSER_PROTOCOL))
+  assert.ok(composeRunSystem({ vanilla: true, browser: true }).includes(BROWSER_PROTOCOL))
   assert.equal(composeRunSystem({ transparent: true, browser: true }), '')
 })
 
@@ -281,14 +281,14 @@ test('composeRunSystem declares the await gates unavailable on a hands-off run (
 test('the hands-off block survives --vanilla but not transparent (#1234)', () => {
   // Availability is a property of the session, not of the built-in prompt: --vanilla still
   // teaches the gates, so it still has to say they cannot be answered here.
-  assert.ok(composeRunSystem({ antiLazyPill: false, handsOff: true }).includes(HANDS_OFF_PROTOCOL))
+  assert.ok(composeRunSystem({ vanilla: true, handsOff: true }).includes(HANDS_OFF_PROTOCOL))
   assert.equal(composeRunSystem({ transparent: true, handsOff: true }), '')
 })
 
 test('composeRunSystem keeps the emit protocols even with the built-in prompt off (#500/#501)', () => {
   // The drift that #500 fixed, now pinned at the single assembly point: --vanilla drops the
   // #326 block, but the agent still gets the AWAIT + SIGNAL emit contract.
-  const system = composeRunSystem({ antiLazyPill: false })
+  const system = composeRunSystem({ vanilla: true })
   assert.ok(!system.includes('# System prompt'), 'built-in #326 prompt is off')
   assert.equal(system, [AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n'))
 })
@@ -298,7 +298,7 @@ test('composeRunSystem is empty under transparent mode — no prompt, no emit pr
   // included, so the agent runs as raw `claude -p`. It overrides every other option.
   assert.equal(composeRunSystem({ transparent: true }), '')
   assert.equal(
-    composeRunSystem({ transparent: true, antiLazyPill: true, user: 'ignored', context: ['/work/api'] }),
+    composeRunSystem({ transparent: true, vanilla: false, user: 'ignored', context: ['/work/api'] }),
     '',
   )
 })

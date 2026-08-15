@@ -218,7 +218,7 @@ Instead of retyping flags every run, a project can commit its Open Loop defaults
 ```yaml
 preset: software-development
 event: bug-fix       # the build event kind its review loop fires for
-antiLazyPill: false  # remove the built-in system prompt (default: on)
+vanilla: true        # remove the built-in system prompt (default: keep it)
 transparent: false   # run the agent raw, with no framework wrapping at all
 handoff: merge       # how far a finished session publishes itself (default: pr)
 ```
@@ -227,7 +227,7 @@ Every field is optional. Config resolves layer by layer, and the nearest layer t
 *set* a key wins (#841). A layer that says nothing about a key does not participate:
 
 - **preset**: the session's own options > `the-framework.yml` `preset`
-- **modes**: `antiLazyPill` and `transparent` > off.
+- **modes**: `vanilla` and `transparent` > off.
 - **handoff**: one rung of a ladder rather than a set of switches — `local` publishes
   nothing, `push` pushes the session's branch, `pr` also opens a draft pull request,
   and `merge` also lands it. Each rung includes the ones below it, so "a PR without a
@@ -262,8 +262,7 @@ stance on autopilot runs).
 
 Drop a `SYSTEM.md` at the workspace root to add your own instructions on top (it
 travels with the repo, like the memory files). To remove the built-in prompt and keep
-only your own, set `antiLazyPill: false` in `the-framework.yml` (the key keeps its
-historical name). The run narrates what it picked up (`◆ system prompt: SYSTEM.md`).
+only your own, set `vanilla: true` in `the-framework.yml`. The run narrates what it picked up (`◆ system prompt: SYSTEM.md`).
 
 ## Status
 

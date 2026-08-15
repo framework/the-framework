@@ -67,14 +67,14 @@ describe('preferences', () => {
 
   test("the repo's the-framework.yml resolves over the global tier (#842)", async () => {
     onPreferences.mockResolvedValue({ browser: true, transparent: false })
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true, antiLazyPill: false } }])
+    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true, vanilla: true } }])
     openProject('app-a-1')
     const { usePreferences } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
     await flush()
     expect(result.current.transparent).toBe(true) // the repo turned it on over the global off
-    expect(result.current.vanilla).toBe(true) // antiLazyPill: false is the file's Vanilla
+    expect(result.current.vanilla).toBe(true) // the file's own key, same name and direction (C3)
     expect(result.current.browser).toBe(true) // the repo said nothing, so global stands
   })
 
@@ -109,14 +109,14 @@ describe('preferences', () => {
 
   test('usePreferenceSources names the tier that won each key (#842)', async () => {
     onPreferences.mockResolvedValue({ browser: true, model: 'sonnet' })
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true, antiLazyPill: false } }])
+    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true, vanilla: true } }])
     openProject('app-a-1')
     const { usePreferenceSources } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferenceSources())
     await flush()
     expect(result.current.transparent).toBe('repo')
-    expect(result.current.vanilla).toBe('repo') // the repo's antiLazyPill:false is Vanilla on
+    expect(result.current.vanilla).toBe('repo') // the repo's own vanilla:true
     expect(result.current.model).toBe('global')
     expect(result.current.browser).toBe('global')
   })

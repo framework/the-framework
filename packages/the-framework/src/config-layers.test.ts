@@ -49,7 +49,7 @@ test('resolveRunConfig: each layer can win, and each can be absent (#841)', () =
   // Every layer absent: the defaults hold and nothing claims a source.
   const bare = resolveRunConfig(chain())
   assert.equal(bare.transparent, RUN_CONFIG_DEFAULTS.transparent)
-  assert.equal(bare.antiLazyPill, RUN_CONFIG_DEFAULTS.antiLazyPill)
+  assert.equal(bare.vanilla, RUN_CONFIG_DEFAULTS.vanilla)
   assert.equal(bare.transparent, RUN_CONFIG_DEFAULTS.transparent)
   // The handoff defaults to the PR rung (#1102/#1216): a session nobody configured hands itself
   // back, and merging — the one rung above — has to be asked for.

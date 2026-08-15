@@ -23,14 +23,13 @@ import type { FrameworkFileConfig } from './config.js'
  * launcher and the daemon can layer it under the user's own options the same way. Only the keys
  * the file set come back, since an unset key must leave the tier below it alone.
  *
- * `antiLazyPill` is the file's name for the inverse of Vanilla: removing the built-in prompt.
  * `preset` and `event` have no preference counterpart (there is no preset picker) and stay on the
  * raw file config for display.
  */
 export function preferencesFromFileConfig(file: FrameworkFileConfig): Preferences {
   return {
     ...(file.transparent !== undefined ? { transparent: file.transparent } : {}),
-    ...(file.antiLazyPill !== undefined ? { vanilla: !file.antiLazyPill } : {}),
+    ...(file.vanilla !== undefined ? { vanilla: file.vanilla } : {}),
     // The handoff pair (#1102/#1173): whether a session publishes itself is a fact about the repo,
     // so the committed file may say it — and it is where push-without-PR stays reachable now the
     // launcher offers a single `Open PR` row.

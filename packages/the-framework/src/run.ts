@@ -53,12 +53,8 @@ export interface RunSessionOptions {
    * #326 system prompt, so a repo can add its own instructions on top of the default.
    */
   systemPrompt?: string
-  /**
-   * Inject the built-in #326 system prompt into every prompt (#301). Default
-   * `true`; pass `false` (e.g. from `the-framework.yml`) to remove it. The name
-   * is the historical config key: #326 is the anti-lazy-pill's (#297) successor.
-   */
-  antiLazyPill?: boolean
+  /** Remove the built-in #326 system prompt (#301/C3). Default `false` — it is included. */
+  vanilla?: boolean
   /** This session has a real browser (#824), so the system channel says so. */
   browser?: boolean
   /**
@@ -68,7 +64,7 @@ export interface RunSessionOptions {
   topic?: boolean
   /** The bind seams (#1121) a topic session's gate resolves against. Only meaningful with {@link topic}. */
   bind?: BindProjectDeps
-  /** Transparent mode (#625): empty the system channel entirely (raw `claude -p`); overrides antiLazyPill/eco. */
+  /** Transparent mode (#625): empty the system channel entirely (raw `claude -p`); overrides vanilla. */
   transparent?: boolean
   /** In-context directories (#439): added as one `Context:` line to the system prompt. */
   context?: readonly string[]
@@ -188,7 +184,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
   // `node:fs` reaches this path. Absent for a non-topic session, which gets no bind block at all.
   const topicProjects = opts.topic && opts.bind ? (await opts.bind.listProjects()).map(p => p.path) : undefined
   const system = composeRunSystem({
-    antiLazyPill: opts.antiLazyPill,
+    vanilla: opts.vanilla,
     browser: opts.browser,
     handsOff,
     topic: opts.topic,
@@ -334,7 +330,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
 function openingPrompt(opts: RunSessionOptions, kind: SessionKind, resuming: boolean, cwd: string): string {
   if (resuming || opts.transparent) return opts.prompt
   if (kind === 'prompt') {
-    return opts.antiLazyPill === false ? opts.prompt : renderSystemPrompt({ prompt: opts.prompt }).user
+    return opts.vanilla ? opts.prompt : renderSystemPrompt({ prompt: opts.prompt }).user
   }
   // Gated on a real driver, so the fake one (which writes nothing, so its workspace always reads
   // empty) always takes the greenfield path and stays deterministic.

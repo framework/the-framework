@@ -248,12 +248,15 @@ test('transparent is unset by default (#625)', () => {
   assert.equal(mergeRunConfig(opts(), {}).transparent, false)
 })
 
-test('the built-in prompt is off for a vanilla session or the-framework.yml antiLazyPill:false (#314)', () => {
-  assert.equal(mergeRunConfig(opts(), {}).antiLazyPill, true)
-  assert.equal(mergeRunConfig(opts({ options: { vanilla: true } }), {}).antiLazyPill, false)
-  assert.equal(mergeRunConfig(opts(), { antiLazyPill: false }).antiLazyPill, false)
+test('the built-in prompt is off for a vanilla session or the-framework.yml vanilla:true (#314/C3)', () => {
+  // One name and one polarity across the session, the file and the run option (C3). The file used
+  // to spell this `antiLazyPill` — and the other way round — so every layer boundary was also an
+  // inversion, which is what three apologising comments were for.
+  assert.equal(mergeRunConfig(opts(), {}).vanilla, false)
+  assert.equal(mergeRunConfig(opts({ options: { vanilla: true } }), {}).vanilla, true)
+  assert.equal(mergeRunConfig(opts(), { vanilla: true }).vanilla, true)
   // #841: an explicit `vanilla: false` puts the prompt back over a file that removed it.
-  assert.equal(mergeRunConfig(opts({ options: { vanilla: false } }), { antiLazyPill: false }).antiLazyPill, true)
+  assert.equal(mergeRunConfig(opts({ options: { vanilla: false } }), { vanilla: true }).vanilla, false)
 })
 
 test('runLogKind maps the run path to a project-log kind (#379)', () => {
@@ -466,17 +469,17 @@ test('a session persists itself, and the modes stay unset until the spec names t
 
 test('mergeRunConfig: the-framework.yml supplies defaults, flags override (#258)', () => {
   const flags = {}
-  const modes = (config: { antiLazyPill: boolean; transparent: boolean }) => [config.antiLazyPill, config.transparent]
+  const modes = (config: { vanilla: boolean; transparent: boolean }) => [config.vanilla, config.transparent]
   // file-only: the repo config drives the run
   const fromFile = mergeRunConfig(flags, { preset: 'software-development', transparent: true })
   assert.equal(fromFile.presetName, 'software-development')
-  assert.deepEqual(modes(fromFile), [true, true])
+  assert.deepEqual(modes(fromFile), [false, true])
   // a --preset flag wins over the file's preset
   assert.equal(mergeRunConfig({ preset: 'web-dev' }, { preset: 'software-development' }).presetName, 'web-dev')
   // a mode set by either layer is on; the flag layer says nothing about the mode it did not set
-  assert.deepEqual(modes(mergeRunConfig({ vanilla: true }, { transparent: true })), [false, true])
+  assert.deepEqual(modes(mergeRunConfig({ vanilla: true }, { transparent: true })), [true, true])
   // nothing set anywhere: no preset, no modes
-  assert.deepEqual(modes(mergeRunConfig(flags, {})), [true, false])
+  assert.deepEqual(modes(mergeRunConfig(flags, {})), [false, false])
   assert.equal(mergeRunConfig(flags, {}).presetName, undefined)
   // build event: the file's `event` supplies a default, --kind overrides it (#265)
   assert.equal(mergeRunConfig(flags, { event: 'bug-fix' }).buildEvent, 'bug-fix')
@@ -488,17 +491,14 @@ test('mergeRunConfig: a nearer layer can turn a mode off, not just on (#841)', (
   // The bug: with OR, a session could only ever enable. Now an explicit off beats a file that
   // enabled it — and with the spec that is a plain `false`, not a second `--no-*` spelling.
   assert.equal(mergeRunConfig(opts({ options: { transparent: false } }), { transparent: true }).transparent, false)
-  assert.equal(mergeRunConfig(opts({ options: { vanilla: false } }), { antiLazyPill: false }).antiLazyPill, true)
+  assert.equal(mergeRunConfig(opts({ options: { vanilla: false } }), { vanilla: true }).vanilla, false)
   // And the file still supplies the value when this session says nothing.
   assert.equal(mergeRunConfig(opts(), { transparent: true }).transparent, true)
   // The session still wins when it says "on" over a file that says "off".
   assert.equal(mergeRunConfig(opts({ options: { transparent: true } }), { transparent: false }).transparent, true)
   // A layer that set nothing does not participate: absent stays absent, defaults hold.
   const bare = mergeRunConfig(opts(), {})
-  assert.deepEqual(
-    { transparent: bare.transparent, antiLazyPill: bare.antiLazyPill },
-    { transparent: false, antiLazyPill: true },
-  )
+  assert.deepEqual({ transparent: bare.transparent, vanilla: bare.vanilla }, { transparent: false, vanilla: false })
   assert.deepEqual(bare.sources, {})
 })
 

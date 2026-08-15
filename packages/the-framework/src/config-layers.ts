@@ -19,8 +19,8 @@ export interface RunConfigValues {
   preset?: string | undefined
   /** Build event kind the preset's review loop fires for (#265). */
   event?: string | undefined
-  /** Inject the built-in #326 system prompt (#314). */
-  antiLazyPill?: boolean | undefined
+  /** Remove the built-in #326 system prompt, keeping the session controls (#314/C3). */
+  vanilla?: boolean | undefined
   /** Run the wrapped agent fully raw (#625). */
   transparent?: boolean | undefined
   /** How far a finished session publishes itself (#1102/#1216/B5). */
@@ -36,7 +36,7 @@ export interface ConfigLayer {
 
 /** What a key resolves to when no layer set it. */
 export const RUN_CONFIG_DEFAULTS = {
-  antiLazyPill: true,
+  vanilla: false,
   transparent: false,
   // `pr` by default (#1102): the zero-config handoff is what makes a session left alone hand
   // itself back. Merging is the rung above, because landing work on the default branch is not
@@ -63,7 +63,7 @@ export function resolveConfigKey<K extends keyof RunConfigValues>(
 export interface ResolvedRunConfig {
   presetName?: string | undefined
   buildEvent?: string | undefined
-  antiLazyPill: boolean
+  vanilla: boolean
   transparent: boolean
   /** How far this session publishes itself (#1102/#1216/B5). */
   handoff: HandoffLevel

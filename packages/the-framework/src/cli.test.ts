@@ -504,13 +504,6 @@ test('parseArgs reads --kind as the build event (#265)', () => {
   assert.equal(parseArgs(['x']).buildEvent, undefined)
 })
 
-test('parseArgs reads --sandbox and rejects an unknown value (#229)', () => {
-  assert.equal(parseArgs(['--sandbox', 'docker', 'x']).sandbox, 'docker')
-  assert.equal(parseArgs(['--sandbox', 'local', 'x']).sandbox, 'local')
-  assert.equal(parseArgs(['x']).sandbox, undefined)
-  assert.match(parseArgs(['--sandbox', 'vm', 'x']).error!, /invalid --sandbox/)
-})
-
 test('parseArgs reads the relay subcommand and --share (#230)', () => {
   const relay = parseArgs(['relay', '--port', '5000'])
   assert.equal(relay.relayServe, true)
@@ -633,13 +626,6 @@ test('runCli notes --kind given without a preset (#265)', async () => {
   const code = await runCli(['--fake', '--no-dashboard', '--kind', 'bug-fix'], io)
   assert.equal(code, 0)
   assert.ok(err.some(l => /build event "bug-fix" has no effect without a preset/.test(l)))
-})
-
-test('runCli notes --sandbox docker given without --serve (#229)', async () => {
-  const { io, err } = capture()
-  const code = await runCli(['--fake', '--no-dashboard', '--sandbox', 'docker'], io)
-  assert.equal(code, 0)
-  assert.ok(err.some(l => /--sandbox docker has no effect without --serve/.test(l)))
 })
 
 test('chooseSessionLink defaults a live run to the claude.ai/code session list (#212)', () => {

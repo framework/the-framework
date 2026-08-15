@@ -46,8 +46,6 @@ export {
   runFramework,
   type RunFrameworkOptions,
   type RunFrameworkResult,
-  type ServeConfig,
-  type AppPreview,
 } from './run.js'
 export {
   requestChoices,
@@ -58,7 +56,6 @@ export {
   type MultiSelectOption,
   type MultiSelectDeps,
 } from './await-gate.js'
-export { snapshotWorkspace, SANDBOX_IGNORE, type SnapshotOptions } from './sandbox.js'
 export {
   parseResetsAt,
   boundaryFromResetsAt,

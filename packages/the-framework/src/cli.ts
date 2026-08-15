@@ -27,10 +27,8 @@ import { type AutoHandoffSkip, type ChoicePick, type ChoiceRequest, type Framewo
 import { runAutoHandoff, withheldMerge } from './dashboard/run-handoff.js'
 import {
   runFramework,
-  type AppPreview,
   type RunFrameworkOptions,
   type RunFrameworkResult,
-  type ServeConfig,
 } from './run.js'
 import { FAKE_INTENT, FAKE_SIGNALS, fakeDriver } from './fake-script.js'
 import { readProjectSignals } from './project.js'
@@ -244,14 +242,6 @@ Options:
                              bypassPermissions | plan (default: bypassPermissions,
                              so the headless loop can run installs/builds/tests).
   --dangerously-skip-permissions   Bypass all agent permission checks (sandboxes only).
-  --serve <cmd>          Gate the loop on the app actually running (e.g. "npm run dev"),
-                         then keep it serving with a preview link on the dashboard.
-  --serve-install <cmd>  Install command before serving (e.g. "npm install").
-  --serve-build <cmd>    Build command before serving (e.g. "npm run build").
-  --serve-port <n>       Port the app listens on (default: 3000).
-  --serve-path <path>    Path to health-check once it is up (default: /).
-  --sandbox <where>      Where --serve runs: "local" (host, default) or "docker"
-                         (a throwaway container, so agent code never runs on the host).
   --port <n>             Dashboard port (default: 4200); with the relay, the relay port (4488).
   --host <addr>          Daemon bind address (default: 127.0.0.1, localhost only). A non-loopback
                          address (e.g. 0.0.0.0) exposes the daemon to your network and generates a
@@ -360,12 +350,6 @@ export interface CliOptions {
   maxCost?: number
   todoLoop: boolean
   todoMaxItems?: number
-  serve?: string | undefined
-  serveInstall?: string | undefined
-  serveBuild?: string | undefined
-  servePort?: number
-  servePath?: string | undefined
-  sandbox?: 'local' | 'docker' | undefined
   port?: number
   /** `--host <addr>` (#1051): the daemon's bind address. Default loopback; a non-loopback address
    * exposes the daemon to the network and gates it behind the generated shared token. */
@@ -599,29 +583,6 @@ export function parseArgs(argv: string[]): CliOptions {
       case '--unattended':
         opts.unattended = true
         break
-      case '--serve':
-        opts.serve = argv[++i]
-        break
-      case '--serve-install':
-        opts.serveInstall = argv[++i]
-        break
-      case '--serve-build':
-        opts.serveBuild = argv[++i]
-        break
-      case '--serve-path':
-        opts.servePath = argv[++i]
-        break
-      case '--serve-port': {
-        const n = intFlag(argv[++i], '--serve-port', 1)
-        if (n !== undefined) opts.servePort = n
-        break
-      }
-      case '--sandbox': {
-        const where = argv[++i]
-        if (where !== 'local' && where !== 'docker') opts.error = `invalid --sandbox: expected "local" or "docker"`
-        else opts.sandbox = where
-        break
-      }
       case '--share':
         opts.share = argv[++i]
         break
@@ -889,7 +850,7 @@ interface RunEpilogue {
 
 /**
  * Run one engine (a build or a direct prompt) and settle it identically: on success print its
- * line and keep the dashboard (and any app preview) up until Ctrl+C; on a clean stop (interrupt
+ * line and keep the dashboard up until Ctrl+C; on a clean stop (interrupt
  * / budget cap #322) report it and stay up; on a real failure report it and close. The teardown
  * — flush the store, close the control channel + consumption guard, flush the relay — runs
  * either way. Returns the exit code (0 on success or a clean stop, 1 on a failure). Shared by
@@ -897,15 +858,14 @@ interface RunEpilogue {
  */
 async function settleRun(
   ctx: RunEpilogue,
-  run: () => Promise<{ successLine: string; preview?: AppPreview }>,
+  run: () => Promise<{ successLine: string }>,
 ): Promise<number> {
   const { io, dashboard } = ctx
   try {
-    const { successLine, preview } = await run()
+    const { successLine } = await run()
     // Run settled: hand Ctrl+C back to the post-run dashboard/app wait below.
     ctx.clearInterrupt()
     io.out(successLine)
-    if (preview) io.out(`\n▶ Your app is running at ${preview.url} — open it in a browser.`)
     // Before the close, not after (#835): close() archives the log into `runs/`, so an
     // outcome appended afterwards would miss the copy the dashboard's history reads.
     await ctx.maybeFireOnBeforeMergeable()
@@ -915,13 +875,11 @@ async function settleRun(
     await ctx.maybeAutoHandoff()
     await ctx.finishLog()
     await ctx.store?.close() // flush the event log; best-effort
-    // Stay up while the dashboard and/or the app are live, then tear both down.
-    if (dashboard || preview) {
-      if (dashboard) io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
-      else io.out(`\nPress Ctrl+C to stop the app.`)
+    // Stay up while the dashboard is live, then tear it down.
+    if (dashboard) {
+      io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
       await waitForInterrupt()
-      if (preview) await preview.stop()
-      await dashboard?.close()
+      await dashboard.close()
     }
     return 0
   } catch (err) {
@@ -1805,11 +1763,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   if (buildEvent && !domainPreset) {
     io.err(`note: build event "${buildEvent}" has no effect without a preset.`)
   }
-  // The sandbox only wraps the serve verification, so it is a no-op without --serve.
-  if (opts.sandbox === 'docker' && !opts.serve) {
-    io.err(`note: --sandbox docker has no effect without --serve.`)
-  }
-
   // The run owns the browser (#793): launching it here, rather than letting chrome-devtools-mcp
   // launch its own, is what lets the #609 preview attach to the same page. Undefined when the
   // machine has no Chrome, which leaves `--browser` on its old path rather than failing the run.
@@ -2045,19 +1998,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     })
   }
 
-  const serve: ServeConfig | undefined = opts.serve
-    ? {
-        command: opts.serve,
-        // The CLI keeps the dashboard (and app) up until Ctrl+C, so leave the app
-        // serving with a preview link once the run succeeds.
-        keepAlive: true,
-        ...(opts.serveInstall ? { install: opts.serveInstall } : {}),
-        ...(opts.serveBuild ? { build: opts.serveBuild } : {}),
-        ...(opts.servePort !== undefined ? { port: opts.servePort } : {}),
-        ...(opts.servePath ? { healthPath: opts.servePath } : {}),
-      }
-    : undefined
-
   const runOpts: RunFrameworkOptions = {
     ...sharedRunOptions,
     intent,
@@ -2069,8 +2009,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     ...(opts.maxPasses ? { maxPasses: opts.maxPasses } : {}),
     ...(opts.todoLoop && !transparent ? {} : { todoLoop: false }),
     ...(opts.todoMaxItems ? { todoMaxItems: opts.todoMaxItems } : {}),
-    ...(serve ? { serve } : {}),
-    ...(serve && opts.sandbox ? { sandbox: opts.sandbox } : {}),
     // Modes ride along even without a domain preset: autopilot also steers the
     // #326 system prompt's maintenance stance.
     ...(domainPreset ? { preset: domainPreset } : {}),
@@ -2079,7 +2017,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   }
 
   return settleRun(epilogue('session'), async () => {
-    const { result, preview } = await runFramework(runOpts)
+    const { result } = await runFramework(runOpts)
     // A hand-off ran no review passes by design (#1225), so neither of the build lines fits:
     // "prototype ready" would claim this machine built something it never saw.
     const successLine = driver.handsOff
@@ -2090,7 +2028,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
         : result.productionGrade
           ? `\n✓ review passed in ${result.passes} pass(es).`
           : `\n• review not clean${result.stoppedEarly ? ` (stopped with ${result.blockers.length} blocker(s))` : ''}.`
-    return { successLine, ...(preview ? { preview } : {}) }
+    return { successLine }
   })
 }
 

@@ -1,12 +1,9 @@
 import {
   Bootstrap,
-  DockerRunner,
-  LocalRunner,
   LoopEngine,
   dockerAvailable,
   builtinFrameworkPresetRegistry,
   mergeChecklists,
-  serveCheck,
   type BootstrapEvent,
   type BootstrapResult,
   type BootstrapScope,
@@ -16,11 +13,9 @@ import {
   type FrameworkDetection,
   type FrameworkSignals,
   type LoopPassContext,
-  type RunnerSession,
   type SupervisorRun,
   type Verdict,
 } from '@gemstack/ai-autopilot'
-import { snapshotWorkspace } from './sandbox.js'
 import type { Driver, DriverSession } from './driver/index.js'
 import { composeRunSystem, type EcoOptions, type TfContext } from './system-prompt.js'
 import { createRunControls, emitSessionStart, endStopDetail } from './run-telemetry.js'
@@ -38,34 +33,6 @@ import { errorMessage } from './error-message.js'
  * bootstrapping an empty workspace before there is anything to polish (#182).
  */
 export const DEFAULT_MAX_PASSES = 5
-
-/**
- * How to actually boot and serve the generated app so the loop can gate on it
- * *running*, not just on an agent's review. When set, the run's checklist step
- * installs, (builds,) starts the app, and fetches it; a failure becomes a
- * blocker the loop hands back to the agent to fix.
- */
-export interface ServeConfig {
-  /** The command that starts the app (e.g. `npm run dev`). */
-  command: string
-  /** Install command run first (e.g. `npm install`). */
-  install?: string
-  /** Build command run after install (e.g. `npm run build`). */
-  build?: string
-  /** Port the app listens on. Default 3000. */
-  port?: number
-  /** How long to wait for it to accept connections. Default 15000ms. */
-  waitMs?: number
-  /** Path to fetch once it is up. Default `/`. */
-  healthPath?: string
-  /**
-   * Keep the app serving after a successful run and hand back an
-   * {@link AppPreview} the caller must {@link AppPreview.stop}. Default `false`:
-   * the serve gate boots the app only to check it, then tears it down. The CLI
-   * sets this so the dashboard can show a live preview link until Ctrl+C.
-   */
-  keepAlive?: boolean
-}
 
 /** Options for {@link runFramework}. */
 export interface RunFrameworkOptions {
@@ -133,28 +100,6 @@ export interface RunFrameworkOptions {
   buildEvent?: string
   /** Max full-fledged passes. Default {@link DEFAULT_MAX_PASSES} (5). */
   maxPasses?: number
-  /**
-   * Boot-and-serve verification for the full-fledged loop: when set, the
-   * checklist gates on the app actually running, not just an agent review.
-   */
-  serve?: ServeConfig
-  /**
-   * Where the {@link serve} verification runs (#229). `"local"` (default) boots the
-   * app on the host, adopting the agent's cwd in place. `"docker"` sandboxes it: a
-   * throwaway container is booted, the source is copied in fresh before each check
-   * (the build still runs on the host in this slice), deps install inside the
-   * container, and the app serves on a mapped port — so agent-authored code never
-   * installs or runs on the host. Requires a reachable Docker daemon; no-op without
-   * {@link serve}.
-   */
-  sandbox?: 'local' | 'docker'
-  /**
-   * A pre-provisioned {@link RunnerSession} to run the serve check in, bypassing
-   * {@link sandbox} provisioning. Advanced / testing seam — the caller owns its
-   * lifecycle is handed to the run (it is disposed with the run). Omit to let
-   * {@link sandbox} provision one.
-   */
-  runner?: RunnerSession
   /**
    * A link to the live agent session, shown on the dashboard. Either a literal
    * URL, or a template with `{sessionId}` (see {@link SESSION_ID_PLACEHOLDER})
@@ -230,31 +175,11 @@ export interface RunFrameworkOptions {
   onEvent?: (event: FrameworkEvent) => void
 }
 
-/**
- * A running instance of the generated app, handed back so the caller can show a
- * live preview link and keep it up until the user is done (then {@link stop}).
- */
-export interface AppPreview {
-  /** The localhost URL the app is served at. */
-  url: string
-  /** The command that started it (e.g. `npm run dev`). */
-  command: string
-  /** Stop the app and free its runner. Idempotent. */
-  stop(): Promise<void>
-}
-
 /** What a run returns. */
 export interface RunFrameworkResult {
   result: BootstrapResult
   detection: FrameworkDetection
   events: FrameworkEvent[]
-  /**
-   * The generated app, left running when a {@link ServeConfig} was supplied and
-   * the run finished. The caller owns its lifecycle: show {@link AppPreview.url},
-   * then call {@link AppPreview.stop} (e.g. on Ctrl+C). Absent when no serve
-   * config was set or the app could not be booted.
-   */
-  preview?: AppPreview
   /**
    * The domain preset's review policy, materialized against this run's driver:
    * its loops plus its prompts as driver-backed passes. Present only when a
@@ -372,19 +297,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     emit,
   })
 
-  // Boot-and-serve gate: provision a runner so the checklist can gate on the app
-  // actually running. Local adopts (never deletes) the driver's cwd in place; docker
-  // sandboxes the check in a throwaway container (#229). An injected runner wins over both.
-  const sandbox = opts.sandbox ?? 'local'
-  const s = opts.serve
-  let runner: RunnerSession | undefined
-  if (s) runner = opts.runner ?? (await provisionServeRunner(sandbox, opts.cwd, s, emit))
-  const checklist = withServeCheck(reviewChecklist, runner, s, {
-    sandbox,
-    cwd: opts.cwd,
-    injectedRunner: opts.runner !== undefined,
-    emit,
-  })
+  const checklist = reviewChecklist
 
   // A real driver writes files to the workspace, so the build/improve steps can
   // detect an empty workspace and hard-scaffold it (#182). The fake driver writes
@@ -409,10 +322,9 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
   // what put a verdict-is-missing complaint and an unanswerable "Start the next
   // backlog item?" call on a dashboard whose agent was somewhere else entirely. So the phases
   // are dropped rather than fed: Bootstrap skips its whole loop when no `checklist` step is
-  // given, which leaves scope -> build and nothing after it. A run with no preset and no
-  // serve config has no checklist either (#1372), and skips the loop the same way.
+  // given, which leaves scope -> build and nothing after it. A run with no preset has no
+  // checklist either (#1372), and skips the loop the same way.
   const handsOff = opts.driver.handsOff === true
-  let preview: AppPreview | undefined
   try {
     const bootstrap = new Bootstrap({
       maxPasses: opts.maxPasses ?? DEFAULT_MAX_PASSES,
@@ -455,12 +367,6 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
         maxItems: opts.todoMaxItems,
       })
     }
-    // The serve gate boots the app only to check it, then stops it. When the
-    // caller opts in (keepAlive), boot it once more after success and leave it up
-    // so the user can open it; the caller owns tearing it down (Ctrl+C). Failure
-    // to boot is non-fatal. Default off, so a programmatic run never leaks a
-    // process a caller that ignores `preview` would never stop.
-    if (runner && s?.keepAlive) preview = await startAppPreview(runner, s, emit)
     // Live chat (#714): with the build settled, take the user's own messages, each continuing
     // the same session — draining what queued and ending on idle (#1390), or parked until Stop
     // for a terminal-dashboard run (stayOpenChat).
@@ -480,7 +386,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     // one phase in. The link itself is already on the driver's `cloud <url>` action.
     if (handsOff) emit({ kind: 'log', message: 'Handed off: the rest of this run happens in its own session, which opens its own pull request.' })
     emit({ kind: 'end', ok: true })
-    return { result, detection, events, ...(preview ? { preview } : {}), ...(loop ? { loop } : {}), ...(todo ? { todo } : {}) }
+    return { result, detection, events, ...(loop ? { loop } : {}), ...(todo ? { todo } : {}) }
   } catch (err) {
     const { stopped, detail } = await endStopDetail({
       err,
@@ -496,8 +402,6 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     throw err
   } finally {
     await session.dispose()
-    // Keep the runner alive only when it owns a live preview handed to the caller.
-    if (runner && !preview) await runner.dispose()
   }
 }
 
@@ -528,35 +432,6 @@ function buildReview(
   }
   return { loop, reviewChecklist }
 }
-
-/**
- * Union the review checklist with a boot-and-serve gate (#229) when the run has a runner:
- * `serveCheck` verifies the app actually boots, and `mergeChecklists` runs it alongside
- * the review. A docker sandbox re-seeds the container from the host source before every
- * check (the build writes to the host each pass); local reads the host dir live, so it
- * needs no sync. Without a runner/serve the review checklist stands alone — which may be
- * no checklist at all (#1372: no preset, no serve → nothing gates the build).
- */
-function withServeCheck(
-  review: BootstrapSteps['checklist'],
-  runner: RunnerSession | undefined,
-  serve: ServeConfig | undefined,
-  ctx: { sandbox: 'local' | 'docker'; cwd: string; injectedRunner: boolean; emit: (event: FrameworkEvent) => void },
-): BootstrapSteps['checklist'] {
-  if (!runner || !serve) return review
-  const check = serveCheck(runner, {
-    serve: serve.command,
-    ...(serve.install ? { install: serve.install } : {}),
-    ...(serve.build ? { build: serve.build } : {}),
-    ...(serve.port !== undefined ? { port: serve.port } : {}),
-    ...(serve.waitMs !== undefined ? { waitMs: serve.waitMs } : {}),
-    ...(serve.healthPath ? { healthPath: serve.healthPath } : {}),
-    onProgress: message => ctx.emit({ kind: 'log', message: `serve: ${message}` }),
-  })
-  const serveStep = ctx.sandbox === 'docker' && !ctx.injectedRunner ? syncThenServe(runner, ctx.cwd, check, ctx.emit) : check
-  return review ? mergeChecklists(review, serveStep) : serveStep
-}
-
 
 /**
  * The agent-authored await gate (#337 / #339): the turn-boundary counterpart to the
@@ -594,7 +469,7 @@ function agentAwaitGate(
     emitTurnSignals(run.text)
     // The run controls (budget #322, quota #529) abort on the build turn's own usage.
     // The build can be the bootstrap's last step (#1372: no checklist without a preset or
-    // serve config), so a stop the loop would once have caught must throw here — otherwise
+    // preset), so a stop the loop would once have caught must throw here — otherwise
     // the bootstrap settles an aborted run as done.
     const throwIfStopped = () => {
       if (!deps.signal?.aborted) return
@@ -617,93 +492,5 @@ function agentAwaitGate(
     else if (drained.exhausted) emit({ kind: 'log', message: 'Proceeding with the build (await limit reached).' })
     throwIfStopped()
     return drained.turn
-  }
-}
-
-/**
- * Boot the generated app in the adopted runner and keep it serving. Reuses the
- * same {@link ServeConfig} the serve gate used (deps are already installed from
- * the gate), so this only `start`s the server and `preview`s the port. Returns a
- * handle that stops the app and frees the runner; on any failure it narrates and
- * returns `undefined` so a run never fails just because the demo preview didn't
- * come up.
- */
-async function startAppPreview(
-  runner: RunnerSession,
-  serve: ServeConfig,
-  emit: (event: FrameworkEvent) => void,
-): Promise<AppPreview | undefined> {
-  if (!runner.start || !runner.preview) return undefined
-  let proc: Awaited<ReturnType<NonNullable<RunnerSession['start']>>> | undefined
-  try {
-    proc = await runner.start(serve.command)
-    const { url } = await runner.preview({
-      port: serve.port ?? 3000,
-      waitMs: serve.waitMs ?? 15_000,
-    })
-    emit({ kind: 'preview', url, command: serve.command })
-    let stopped = false
-    return {
-      url,
-      command: serve.command,
-      stop: async () => {
-        if (stopped) return
-        stopped = true
-        try {
-          await proc?.stop()
-        } finally {
-          await runner.dispose()
-        }
-      },
-    }
-  } catch (err) {
-    emit({ kind: 'log', message: `preview: could not boot the app (${errorMessage(err)})` })
-    // Leave cleanup to the caller's finally (runner.dispose stops leftovers).
-    return undefined
-  }
-}
-
-/**
- * Provision the runner the serve gate verifies in (#229). `local` adopts the host
- * cwd in place (dispose leaves it); `docker` boots a throwaway container the check
- * seeds and tears down. Fails fast with a clear message when docker is requested
- * but not reachable, so the run never limps on unsandboxed by surprise.
- */
-async function provisionServeRunner(
-  sandbox: 'local' | 'docker',
-  cwd: string,
-  serve: ServeConfig,
-  emit: (event: FrameworkEvent) => void,
-): Promise<RunnerSession> {
-  if (sandbox === 'docker') {
-    if (!(await dockerAvailable())) {
-      throw new Error(
-        'sandbox: --sandbox docker was requested but Docker is not reachable (need a running daemon and the `docker` CLI on PATH).',
-      )
-    }
-    emit({ kind: 'log', message: 'sandbox: booting a Docker container for the serve check' })
-    // preview() publishes the container's fixed port, so it must match the port the
-    // serve check previews on (serve.port, default 3000).
-    return new DockerRunner({ previewPort: serve.port ?? 3000 }).boot()
-  }
-  return new LocalRunner().adopt(cwd)
-}
-
-/**
- * Wrap a serve check so the sandbox is re-seeded with the host source before it
- * runs. The build happens on the host in this slice, so an isolated container has
- * to be synced each pass to see what the agent just wrote.
- */
-function syncThenServe(
-  runner: RunnerSession,
-  cwd: string,
-  check: NonNullable<BootstrapSteps['checklist']>,
-  emit: (event: FrameworkEvent) => void,
-): NonNullable<BootstrapSteps['checklist']> {
-  return async (ctx: LoopPassContext): Promise<Verdict> => {
-    const files = await snapshotWorkspace(cwd)
-    for (const [path, contents] of Object.entries(files)) await runner.fs.write(path, contents)
-    emit({ kind: 'log', message: `serve: synced ${Object.keys(files).length} file(s) into the sandbox` })
-    return check(ctx)
   }
 }

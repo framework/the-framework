@@ -331,6 +331,36 @@ test('readLiveMeta yields undefined on a never-run workspace', async () => {
   assert.equal(await readLiveMeta(CWD, memFs()), undefined)
 })
 
+test('readLiveMeta re-reads a torn run.json rather than reporting the run gone (#1540)', async () => {
+  const fs = memFs()
+  const store = await RunStore.open(CWD, { fs, fresh: true, now: AT })
+  for (const e of RUN.slice(0, -1)) await store.append(e)
+  const settled = fs.files.get(META)!
+  // The run's own process rewrites its meta in place while every other reader polls it, so a
+  // read can land between that write's truncate and its bytes. The first read here sees the
+  // half-written file the way a real reader would; the write lands before the retry.
+  fs.files.set(META, settled.slice(0, 20))
+  let reads = 0
+  const tearing: StoreFs = {
+    ...fs,
+    async read(path) {
+      const raw = await fs.read(path)
+      if (path === META && ++reads === 1) return raw
+      if (path === META) fs.files.set(META, settled)
+      return path === META ? settled : raw
+    },
+  }
+  const live = await readLiveMeta(CWD, tearing)
+  assert.ok(live, 'the run is still there — a torn read is not an absent run')
+  assert.equal(live!.status, 'running')
+  assert.ok(reads > 1, 'the unparseable read was retried')
+})
+
+test('readLiveMeta gives up on a run.json that is corrupt for good', async () => {
+  const fs = memFs({ [META]: '{ this was never json' })
+  assert.equal(await readLiveMeta(CWD, fs), undefined)
+})
+
 test('loadRunEvents replays an archived run, and rejects unknown/unsafe ids (#303)', async () => {
   const fs = memFs()
   const store = await RunStore.open(CWD, { fs, fresh: true, now: AT })

@@ -452,13 +452,35 @@ function parseEventLog(raw: string): FrameworkEvent[] {
   return events
 }
 
-/** Read + parse a persisted {@link RunMeta} file, or `undefined` if missing/unreadable. */
+/** How many times a meta that would not parse is re-read before it is called corrupt (#1540). */
+const TORN_META_READ_RETRIES = 2
+
+/** The pause between those re-reads: long enough for the write that tore the read to land. */
+const TORN_META_READ_DELAY_MS = 5
+
+/**
+ * Read + parse a persisted {@link RunMeta} file, or `undefined` if missing/unreadable.
+ *
+ * Re-read on a parse failure (#1540). {@link writeMetaFile} rewrites `run.json` in place, and the
+ * process doing the writing is not the process doing the reading — a run owns its own meta, while
+ * the daemon and every dashboard read poll it from outside. A reader that lands between that
+ * write's truncate and its bytes sees an empty or half-written file, which is common rather than
+ * exotic: a tight read/write pair on a loaded machine tears on the order of one read in ten.
+ *
+ * Reporting that as `undefined` makes a live run *vanish* from every composed read for one poll —
+ * how a continuation came to be refused as a collision with the very leg it was continuing. A torn
+ * read is transient by construction, so ask again; a file still unparseable after the retries is
+ * genuinely corrupt and yields `undefined`, exactly as before.
+ */
 async function readMetaFile(fs: StoreFs, path: string): Promise<RunMeta | undefined> {
-  if (!(await fs.exists(path))) return undefined
-  try {
-    return JSON.parse(await fs.read(path)) as RunMeta
-  } catch {
-    return undefined
+  for (let attempt = 0; ; attempt++) {
+    if (!(await fs.exists(path))) return undefined
+    try {
+      return JSON.parse(await fs.read(path)) as RunMeta
+    } catch {
+      if (attempt >= TORN_META_READ_RETRIES) return undefined
+      await new Promise(resolve => setTimeout(resolve, TORN_META_READ_DELAY_MS))
+    }
   }
 }
 

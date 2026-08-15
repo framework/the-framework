@@ -1,0 +1,5 @@
+---
+'@gemstack/the-framework': patch
+---
+
+Closed the last hole in "resuming a session the instant it finishes is not refused" (#1529), and the read race behind it. A session's snapshot is rewritten in place by the session's own process while the daemon and every dashboard read poll it from outside, so a read landing inside one of those writes comes back torn — often, not exotically, on a loaded machine. Every reader took that for "no such session", which made a live session blink out of listings for a poll, and made the continuation's wait skip itself: asked once whether the previous leg had ended, an unreadable answer read as "still running", so the Resume went straight to the busy guard while the leg it was continuing was mid-exit and got refused after all. Snapshots are now re-read instead of being reported gone, and the wait tells "still running" apart from "cannot say this instant" — it keeps asking until the leg commits, and only a leg that genuinely reports itself running is treated as a collision.

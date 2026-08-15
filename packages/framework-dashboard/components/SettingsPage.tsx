@@ -9,7 +9,7 @@ import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.
 import { OnboardingChecklist } from './OnboardingChecklist.js'
 import { BridgeSettings } from './BridgeSettings.js'
 import { DevicesSettings } from './DevicesSettings.js'
-import { DiscordBotDialog, DiscordWebhookDialog } from './DiscordDialogs.js'
+import { DiscordWebhookDialog } from './DiscordDialogs.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Button } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'
@@ -47,9 +47,7 @@ export function SettingsPage({
   // setup dialogs settles every one of them at once rather than each on its own timer.
   const channels = useNotifyChannels()
   const webhookReady = channels === null || channels.discordWebhook
-  const botReady = channels === null || channels.discordBot
   const browserBlocked = permission === 'denied'
-  const [discordBotOpen, setDiscordBotOpen] = useState(false)
   const [discordWebhookOpen, setDiscordWebhookOpen] = useState(false)
 
   return (
@@ -177,21 +175,6 @@ export function SettingsPage({
             checked={preferences.notifyNewActivity ?? false}
             onChange={next => updatePreferences({ notifyNewActivity: next })}
           />
-          <ToggleRow
-            label="Discord bot"
-            description={
-              botReady
-                ? 'Let Discord messages start and steer sessions.'
-                : 'Not configured — no bot token is set on the daemon'
-            }
-            checked={preferences.discordBot ?? false}
-            onChange={next => updatePreferences({ discordBot: next })}
-            action={
-              <Button variant="outline" size="sm" onClick={() => setDiscordBotOpen(true)}>
-                {channels?.discordBot ? 'Bot token' : 'Set up'}
-              </Button>
-            }
-          />
         </Section>
 
         <Section title="Automation">
@@ -230,7 +213,6 @@ export function SettingsPage({
         </Section>
       </div>
 
-      <DiscordBotDialog open={discordBotOpen} onOpenChange={setDiscordBotOpen} channels={channels} onSaved={reloadNotifyChannels} />
       <DiscordWebhookDialog
         open={discordWebhookOpen}
         onOpenChange={setDiscordWebhookOpen}

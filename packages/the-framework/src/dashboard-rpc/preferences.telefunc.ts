@@ -139,8 +139,6 @@ export async function onEditors(): Promise<EditorInfo[]> {
 export interface NotifyChannels {
   /** A webhook is set, so Discord delivery can fire. */
   discordWebhook: boolean
-  /** A bot token is set, so the Discord chatbot can answer. */
-  discordBot: boolean
   /**
    * Where each credential came from (#1095), so the UI can offer an edit for one it stores and
    * say "set on the daemon" for one it cannot touch. An absent key means that credential is
@@ -163,9 +161,9 @@ export interface NotifyChannels {
  */
 export async function onNotifyChannels(): Promise<NotifyChannels> {
   const discord = contextDiscord()
-  if (!contextPreferences() || !discord) return { discordWebhook: false, discordBot: false, sources: {}, editable: false }
+  if (!contextPreferences() || !discord) return { discordWebhook: false, sources: {}, editable: false }
   const sources = await discord.status().catch((): DiscordCredentialStatus => ({}))
-  return { discordWebhook: sources.webhook !== undefined, discordBot: sources.botToken !== undefined, sources, editable: true }
+  return { discordWebhook: sources.webhook !== undefined, sources, editable: true }
 }
 
 /**

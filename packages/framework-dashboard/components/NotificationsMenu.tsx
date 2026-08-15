@@ -1,6 +1,6 @@
 import { Bell, BellOff } from 'lucide-react'
 import { useNotificationPermission } from '../lib/notification-permission.js'
-import { usePreferences, updatePreferences, notificationsEnabled, discordEnabled, discordBotEnabled, newActivityEnabled, humanInterventionEnabled } from '../lib/preferences.js'
+import { usePreferences, updatePreferences, notificationsEnabled, discordEnabled, newActivityEnabled, humanInterventionEnabled } from '../lib/preferences.js'
 import { useNotifyChannels } from '../lib/notify-channels.js'
 import { cn } from '../lib/utils.js'
 import { OptionLabel } from './OptionsMenu.js'
@@ -29,7 +29,6 @@ export function NotificationsMenu() {
   const discord = discordEnabled(preferences)
   const activity = newActivityEnabled(preferences)
   const needsYou = humanInterventionEnabled(preferences)
-  const discordBot = discordBotEnabled(preferences)
   const permission = useNotificationPermission()
   const browserSupported = permission !== 'unsupported'
   const blocked = permission === 'denied'
@@ -39,7 +38,6 @@ export function NotificationsMenu() {
   // so setting a credential there settles this too.
   const channels = useNotifyChannels()
   const webhookReady = channels === null || channels.discordWebhook
-  const botReady = channels === null || channels.discordBot
   // Browser only actually fires once the browser has granted permission; Discord counts once
   // it is both on and deliverable — a toggle without the daemon env var lit the bell for a
   // channel delivering nothing (#948). "Active" drives the bell + dot.
@@ -122,22 +120,6 @@ export function NotificationsMenu() {
             className="items-start"
           >
             <OptionLabel label="New activity" description="A session started or finished" />
-          </DropdownMenuCheckboxItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          {/* Its own group, not a delivery method (#916): everything above posts outward, this
-              takes messages back in and lets them start and steer sessions (#680). */}
-          <DropdownMenuLabel>Chat</DropdownMenuLabel>
-          <DropdownMenuCheckboxItem
-            checked={discordBot}
-            onCheckedChange={next => updatePreferences({ discordBot: next })}
-            className="items-start"
-          >
-            <OptionLabel
-              label="Discord bot"
-              description={botReady ? 'Start and steer sessions from Discord' : 'Not configured — add a bot token in Settings'}
-            />
           </DropdownMenuCheckboxItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

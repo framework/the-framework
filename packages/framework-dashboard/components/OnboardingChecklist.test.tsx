@@ -63,12 +63,11 @@ describe('OnboardingChecklist (#1139)', () => {
     await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
 
     // Four integrations/inputs are optional; adding a project and filling the queue are not.
-    expect(screen.getAllByText('Optional')).toHaveLength(4)
+    expect(screen.getAllByText('Optional')).toHaveLength(3)
     const marked = (label: string) => screen.getByText(label).querySelector('span')?.textContent === 'Optional'
     expect(marked('Add a project')).toBe(false)
     expect(marked('Populate the queue of AI tasks')).toBe(false)
     expect(marked('Populate tickets/')).toBe(true)
-    expect(marked('Add the Discord bot')).toBe(true)
   })
 
   test('an unticked step is a checkbox, not a radio button', async () => {

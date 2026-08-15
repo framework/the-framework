@@ -420,11 +420,6 @@ export function discordEnabled(preferences: Preferences): boolean {
   return notificationEnabled(preferences, 'notifyDiscord')
 }
 
-/** The Discord chatbot (#680). The daemon's bot token is the other gate. */
-export function discordBotEnabled(preferences: Preferences): boolean {
-  return notificationEnabled(preferences, 'discordBot')
-}
-
 /** The "New activity" category: pings on a run starting or finishing. Composes with the methods above. */
 export function newActivityEnabled(preferences: Preferences): boolean {
   return notificationEnabled(preferences, 'notifyNewActivity')

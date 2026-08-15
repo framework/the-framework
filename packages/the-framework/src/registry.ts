@@ -117,13 +117,6 @@ export interface Preferences {
    */
   notifyDiscord?: boolean
   /**
-   * Run the Discord chatbot (#680): take messages from Discord and drive runs with them, rather
-   * than only posting notifications outward. Absent = off, like {@link notifyDiscord}, and for a
-   * stronger reason — this one *acts* on what it reads. Gates the daemon's bot on top of a
-   * `DISCORD_BOT_TOKEN` being set (the token is how to connect; this is whether to).
-   */
-  discordBot?: boolean
-  /**
    * Auto PM (#685): let the daemon start a PM run by itself when the agent queue has run dry
    * and there is plenty of budget left, so leftover subscription quota goes on the roadmap
    * instead of expiring. **Absent = off**: it spends the user's allowance without being asked,
@@ -222,8 +215,6 @@ export {
  * second one would only spread the same exposure over two paths to keep 0600 on.
  */
 export interface RegistrySecrets {
-  /** The Discord chatbot's token (#680). Overridden by `DISCORD_BOT_TOKEN` when that is set. */
-  discordBotToken?: string
   /** Where Discord notifications are posted (#627). Overridden by `DISCORD_WEBHOOK` when that is set. */
   discordWebhook?: string
 }
@@ -231,7 +222,6 @@ export interface RegistrySecrets {
 /** The {@link RegistrySecrets} keys, as a `Record` so the compiler enforces completeness both
  * ways — the same shape (and the same #944 lesson) as the preference tables below. */
 const SECRET_KEYS: Record<keyof RegistrySecrets, true> = {
-  discordBotToken: true,
   discordWebhook: true,
 }
 
@@ -399,7 +389,6 @@ const BOOLEAN_PREFERENCES: Record<BooleanPreferenceKey, true> = {
   transparent: true,
   notifyBrowser: true,
   notifyDiscord: true,
-  discordBot: true,
   notifyNewActivity: true,
   notifyHumanIntervention: true,
   autoPm: true,

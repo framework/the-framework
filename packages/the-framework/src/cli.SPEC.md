@@ -1,4 +1,4 @@
-The framework command: parses what was typed, dispatches the subcommands (dashboard in fore- or background, health check, stop, replay, relay, maintenance sweep, worktree cleanup), and wires a live run end to end.
+The framework command: parses what was typed, dispatches the subcommands (dashboard in fore- or background, health check, stop, replay, maintenance sweep, worktree cleanup), and wires a live run end to end.
 
 ## TLDR
 

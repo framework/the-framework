@@ -67,8 +67,6 @@ export const NOTIFICATION_DEFAULTS = {
   notifyNewActivity: false,
   /** Discord delivery (#627): reaches you with no dashboard open, so opt-in. */
   notifyDiscord: false,
-  /** The Discord chatbot (#680): it *acts* on what it reads, so opt-in for a stronger reason. */
-  discordBot: false,
 } as const satisfies Partial<Record<keyof Preferences, boolean>>
 
 /** A notification preference, with its default applied. */

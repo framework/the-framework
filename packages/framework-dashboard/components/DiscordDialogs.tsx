@@ -3,7 +3,7 @@ import { credentialEnvVar, validateCredential } from '@gemstack/the-framework/cl
 import { saveDiscordCredentials, type NotifyChannels } from '../server/preferences.telefunc.js'
 import { Dialog } from './ui/dialog.js'
 import { Button } from './ui/button.js'
-import { usePreferences, updatePreferences, discordBotEnabled, discordEnabled } from '../lib/preferences.js'
+import { usePreferences, updatePreferences, discordEnabled } from '../lib/preferences.js'
 
 // The two Discord setup dialogs (#958, credentials in #1095).
 //
@@ -19,11 +19,7 @@ import { usePreferences, updatePreferences, discordBotEnabled, discordEnabled } 
 // The descriptions are exported because each is shown twice on purpose: once on the Onboarding
 // checklist row, and again inside the dialog, which is also reachable without the checklist.
 
-/** What the Discord bot is, in one line. Shown on the checklist row and again inside the dialog. */
-export const DISCORD_BOT_DESCRIPTION =
-  'Brings sessions into Discord: it posts what each session is doing, and lets you start and steer sessions by replying — so you can follow work with no dashboard open.'
-
-/** What the Discord webhook is, in one line. Same two homes as the bot description above. */
+/** What the Discord webhook is, in one line. Shown on the checklist row and inside the dialog. */
 export const DISCORD_WEBHOOK_DESCRIPTION =
   'Delivers notifications to Discord, so a session waiting on you reaches you with no dashboard open.'
 
@@ -37,34 +33,7 @@ interface DialogProps {
   onSaved: () => void
 }
 
-/** The Discord bot's explainer and setup dialog (#958/#1095). */
-export function DiscordBotDialog(props: DialogProps) {
-  const enabled = discordBotEnabled(usePreferences())
-  return (
-    <CredentialDialog
-      {...props}
-      credential="botToken"
-      title="Discord bot"
-      description={DISCORD_BOT_DESCRIPTION}
-      label="Bot token"
-      placeholder="Paste the bot token"
-      steps={[
-        'Create a Discord application with a bot, and invite it to your server.',
-        'Copy the bot token from its Bot tab.',
-        'Paste it below.',
-      ]}
-      toggle={{
-        on: enabled,
-        onLabel: 'Bot enabled',
-        offLabel: 'Bot disabled',
-        description: 'Whether Discord messages may start and steer sessions.',
-        set: next => updatePreferences({ discordBot: next }),
-      }}
-    />
-  )
-}
-
-/** The Discord notifications explainer and setup dialog (#1095), the webhook twin of the bot one. */
+/** The Discord notifications explainer and setup dialog (#1095). */
 export function DiscordWebhookDialog(props: DialogProps) {
   const on = discordEnabled(usePreferences())
   return (
@@ -119,7 +88,7 @@ function CredentialDialog({
   steps,
   toggle,
 }: DialogProps & {
-  credential: 'botToken' | 'webhook'
+  credential: 'webhook'
   title: string
   description: string
   label: string
@@ -157,7 +126,7 @@ function CredentialDialog({
     setError(null)
     // Written out rather than a computed key: a `{ [credential]: next }` widens to an index
     // signature, and the patch's whole point is that an unmentioned credential is left alone.
-    const patch = credential === 'botToken' ? { botToken: next } : { webhook: next }
+    const patch = { webhook: next }
     const result = await saveDiscordCredentials(patch).catch(() => ({
       ok: false as const,
       error: 'Could not reach the daemon.',

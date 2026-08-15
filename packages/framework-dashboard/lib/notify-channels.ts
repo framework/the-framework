@@ -16,7 +16,7 @@ let inFlight: Promise<void> | null = null
 const listeners = new Set<() => void>()
 
 /** Nothing configured, nothing storable: what a host reports before the first read lands. */
-const EMPTY: NotifyChannels = { discordWebhook: false, discordBot: false, sources: {}, editable: false }
+const EMPTY: NotifyChannels = { discordWebhook: false, sources: {}, editable: false }
 
 function notify(): void {
   for (const listener of listeners) listener()

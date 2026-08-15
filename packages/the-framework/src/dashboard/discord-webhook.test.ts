@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { postDiscordWebhook } from './discord-webhook.js'
-import { MAX_CONTENT } from '../discord/rest.js'
+import { MAX_CONTENT } from './discord-webhook.js'
 import { postInterventionsDiscord, type Intervention } from './interventions.js'
 
 test('content over the Discord limit is clamped, with the cut marked (#940)', async () => {

@@ -10,7 +10,7 @@ import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.
 import { useNotificationPermission } from '../lib/notification-permission.js'
 import { useStartRun } from '../lib/use-start-run.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
-import { DiscordBotDialog, DiscordWebhookDialog, DISCORD_BOT_DESCRIPTION, DISCORD_WEBHOOK_DESCRIPTION } from './DiscordDialogs.js'
+import { DiscordWebhookDialog, DISCORD_WEBHOOK_DESCRIPTION } from './DiscordDialogs.js'
 import { Button } from './ui/button.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -69,7 +69,6 @@ export function OnboardingChecklist({
   const [addingProject, setAddingProject] = useState(false)
   const [addingCwd, setAddingCwd] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
-  const [discordBotOpen, setDiscordBotOpen] = useState(false)
   const [discordWebhookOpen, setDiscordWebhookOpen] = useState(false)
 
   // The project onboarding acts on: the one this server runs in when it is registered, else the
@@ -154,18 +153,6 @@ export function OnboardingChecklist({
           {!targetProjectId && <span className="text-xs text-muted-foreground">Add a project first</span>}
           {startError && <span className="text-xs text-destructive">{startError}</span>}
         </div>
-      ),
-    },
-    {
-      key: 'discord-bot',
-      label: 'Add the Discord bot',
-      description: DISCORD_BOT_DESCRIPTION,
-      done: channels?.discordBot ?? false,
-      optional: true,
-      action: (
-        <Button size="sm" variant="outline" onClick={() => setDiscordBotOpen(true)}>
-          Set up the bot
-        </Button>
       ),
     },
     {
@@ -267,12 +254,6 @@ export function OnboardingChecklist({
           onClose={() => setAddingProject(false)}
         />
       )}
-      <DiscordBotDialog
-        open={discordBotOpen}
-        onOpenChange={setDiscordBotOpen}
-        channels={channels}
-        onSaved={reloadNotifyChannels}
-      />
       <DiscordWebhookDialog
         open={discordWebhookOpen}
         onOpenChange={setDiscordWebhookOpen}

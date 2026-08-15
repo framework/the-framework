@@ -23,10 +23,6 @@ import { startConversationCommitter } from './conversation-commit.js'
 import { startMergedWorktreeSweep } from './merged-worktrees.js'
 import { resolveRunPr } from './dashboard/run-handoff.js'
 import { readConversation } from './conversations.js'
-import { startDiscordBot, DISCORD_VIA } from './discord/bot.js'
-import { startDiscordReplyMirror } from './discord/reply-mirror.js'
-import { snapshotLiveRun } from './discord/live-run.js'
-import { postMessage } from './discord/rest.js'
 import { sendChoice, sendMessage, sendStop } from './dashboard-rpc/control.telefunc.js'
 import type { ProjectSummary } from './dashboard/projects.js'
 import type { QuotaSource } from './dashboard/quota.js'
@@ -35,7 +31,6 @@ import type { StartRunOptions, StartRunResult } from './dashboard/types.js'
 /**
  * Everything the daemon runs in the background beside serving the dashboard: the two Discord
  * notification watchers (#627), auto PM (#685/#773), the conversation committer (#912), and the
- * Discord chatbot (#680) with its reply mirror (#932).
  *
  * All of it used to sit inline in `runDaemon`, which meant its body was a lifecycle narrative with
  * ~200 lines of service wiring in the middle of it. Each of these is gated the same way (an env
@@ -290,7 +285,6 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   // this reclaims space rather than throwing work away.
   const mergedWorktrees = startMergedWorktreeSweep({ projects, log })
 
-  const botEnabled = async () => notificationEnabled(await prefs(), 'discordBot')
   // `resolve` matters: projectId hashes the path string, and `--cwd` reaches us verbatim, so a
   // relative path would hash to an id no project lookup can resolve. Same derivation the runtime uses.
   const homeId = projectId(resolve(deps.cwd))
@@ -303,7 +297,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
    * exactly the set that has to come up, and when one is cleared, exactly the set that has to go.
    */
   const startDiscord = (credentials: DiscordCredentials) => {
-    const { webhook, botToken } = credentials
+    const { webhook } = credentials
 
     // Discord notifications (#627): fire on new "needs you" items even when no dashboard is open.
     // Two gates — the webhook (where to post) and the per-user preference (whether to). The
@@ -335,79 +329,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         ]
       : []
 
-    // Send a session's answers back to the channel that asked (#932). The committed conversation
-    // (#908) is the source: it holds the settled reply the user would have read, which is what
-    // belongs in chat. Bound per run by the bot, since the channel is only known when a message
-    // arrives.
-    const replyMirror = botToken
-      ? startDiscordReplyMirror({
-          readConversation: async runId => {
-            // A run's transcript lives in the checkout the run used, which for a daemon-spawned run
-            // is its own worktree rather than the project root.
-            const summaries = await projects()
-            let listed = false
-            for (const project of summaries) {
-              const metas = await readLiveMetas(project.path).then(
-                m => ((listed = true), m),
-                (): LiveRun[] => [],
-              )
-              const meta = metas.find(run => run.id === runId)
-              if (meta) return readConversation(meta.cwd, runId).catch(() => [])
-            }
-            // `undefined` = the listings worked and the run genuinely is not there (archived, or its
-            // project removed); the mirror counts these and releases the binding, so per-poll IO
-            // stops growing (#941). An empty/unreadable registry or all-failing meta reads is a
-            // transient outage, not evidence the run is gone — `[]` keeps the binding alive.
-            return summaries.length > 0 && listed ? undefined : []
-          },
-          post: (channelId, text) => postMessage(botToken, channelId, text),
-          enabled: botEnabled,
-          // The discord modules do not prefix their own lines, so the daemon does it for them.
-          onLog: message => log(`[framework] ${message}`),
-        })
-      : undefined
-
-    // The Discord chatbot (#680). Two gates like the watchers above: a bot token (a bot can read
-    // replies; the #627 webhook cannot) and the per-user `discordBot` preference, read per message
-    // so the toggle takes effect without a restart. No token means no bot.
-    const bot = botToken
-      ? startDiscordBot({
-          token: botToken,
-          target: async () => {
-            const home = (await projects()).find(p => p.id === homeId)
-            return home ? { id: home.id, name: home.name } : { id: homeId, name: basename(deps.cwd) }
-          },
-          liveRun: async id => snapshotLiveRun(id, await projectPath(id)),
-          // `via` so the opening turn is filed under Discord too (#917): without it a chat-started
-          // session reads as if its first message came from the dashboard and only the follow-ups
-          // came from Discord, which is a worse record than attributing none of it.
-          start: async (id, text) => {
-            const result = await startUnattended(id, text, { via: DISCORD_VIA })
-            return result.ok ? result.runId : undefined
-          },
-          sendMessage: (id, text, runId) => sendMessage(id, text, runId, DISCORD_VIA),
-          sendChoice: (id, gateId, pick, runId) => sendChoice(id, gateId, pick, 'user', runId),
-          sendStop,
-          ...(replyMirror ? { onRunBound: (runId, channelId) => replyMirror.bind(runId, channelId) } : {}),
-          enabled: botEnabled,
-          ...(env.DISCORD_CHANNEL_ID ? { channelId: env.DISCORD_CHANNEL_ID } : {}),
-          onLog: message => log(`[framework] ${message}`),
-        })
-      : undefined
-
-    // Say so when the token is set but the toggle is not: the bot would otherwise connect and then
-    // ignore every message, which reads as broken rather than as off.
-    if (botToken) {
-      void botEnabled().then(on => {
-        if (!on) log('[framework] Discord bot: the token is set but the `discordBot` preference is off, so it will not answer.')
-      })
-    }
-
     return () => {
-      // The bot's gateway socket is the one connection here that would otherwise hold the event
-      // loop open on its own.
-      bot?.stop()
-      replyMirror?.stop()
       for (const watcher of watchers) watcher.stop()
     }
   }

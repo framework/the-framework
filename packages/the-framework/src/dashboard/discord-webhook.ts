@@ -1,4 +1,12 @@
-import { clampContent } from '../discord/rest.js'
+/** Discord rejects a message over 2000 characters outright, so a long reply is trimmed. */
+export const MAX_CONTENT = 2000
+
+/** Trim to Discord's limit, marking the cut so a truncated answer never reads as a complete one. */
+function clampContent(text: string): string {
+  if (text.length <= MAX_CONTENT) return text
+  const notice = '\n… (truncated)'
+  return text.slice(0, MAX_CONTENT - notice.length) + notice
+}
 
 /**
  * The one Discord *webhook* transport (#627): a single POST of one message. The two

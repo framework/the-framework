@@ -236,7 +236,6 @@ test('every boolean preference survives a save; the sanitizer cannot silently dr
     transparent: true,
     notifyBrowser: true,
     notifyDiscord: true,
-    discordBot: true,
     notifyNewActivity: true,
     notifyHumanIntervention: true,
     autoPm: true,
@@ -717,33 +716,27 @@ test('two concurrent first-binds settle on one shared token, not two (#1051)', a
 
 test('a saved secret round-trips and lands at the top level, not in preferences (#1095)', async () => {
   const fs = memFs()
-  await writeSecrets({ discordBotToken: 'a-token-long-enough-to-pass' }, fs, ENV)
+  await writeSecrets({ discordWebhook: 'https://hook' }, fs, ENV)
 
-  assert.deepEqual(await readSecrets(fs, ENV), { discordBotToken: 'a-token-long-enough-to-pass' })
+  assert.deepEqual(await readSecrets(fs, ENV), { discordWebhook: 'https://hook' })
   const written = JSON.parse(fs.files.get(FILE)!)
-  assert.equal(written.secrets.discordBotToken, 'a-token-long-enough-to-pass')
+  assert.equal(written.secrets.discordWebhook, 'https://hook')
   assert.deepEqual(written.preferences, {})
 })
 
 test('a secrets patch leaves the credential it does not mention alone (#1095)', async () => {
   const fs = memFs()
-  await writeSecrets({ discordBotToken: 'a-token-long-enough-to-pass', discordWebhook: 'https://hook' }, fs, ENV)
+  await writeSecrets({ discordWebhook: 'https://hook' }, fs, ENV)
   await writeSecrets({ discordWebhook: 'https://other' }, fs, ENV)
 
-  assert.deepEqual(await readSecrets(fs, ENV), {
-    discordBotToken: 'a-token-long-enough-to-pass',
-    discordWebhook: 'https://other',
-  })
+  assert.deepEqual(await readSecrets(fs, ENV), { discordWebhook: 'https://other' })
 })
 
 test('null clears one credential, and clearing the last one drops the block (#1095)', async () => {
   const fs = memFs()
-  await writeSecrets({ discordBotToken: 'a-token-long-enough-to-pass', discordWebhook: 'https://hook' }, fs, ENV)
+  await writeSecrets({ discordWebhook: 'https://hook' }, fs, ENV)
 
   await writeSecrets({ discordWebhook: null }, fs, ENV)
-  assert.deepEqual(await readSecrets(fs, ENV), { discordBotToken: 'a-token-long-enough-to-pass' })
-
-  await writeSecrets({ discordBotToken: null }, fs, ENV)
   assert.deepEqual(await readSecrets(fs, ENV), {})
   assert.equal('secrets' in JSON.parse(fs.files.get(FILE)!), false)
 })
@@ -788,8 +781,8 @@ test('a filesystem with no chmod still writes the registry (#1095)', async () =>
 test('a token stays put when a secret is saved beside it (#1051/#1095)', async () => {
   const fs = memFs()
   const token = await ensureDaemonToken(fs, ENV)
-  await writeSecrets({ discordBotToken: 'a-token-long-enough-to-pass' }, fs, ENV)
+  await writeSecrets({ discordWebhook: 'https://hook' }, fs, ENV)
 
   assert.equal(await readDaemonToken(fs, ENV), token)
-  assert.deepEqual(await readSecrets(fs, ENV), { discordBotToken: 'a-token-long-enough-to-pass' })
+  assert.deepEqual(await readSecrets(fs, ENV), { discordWebhook: 'https://hook' })
 })

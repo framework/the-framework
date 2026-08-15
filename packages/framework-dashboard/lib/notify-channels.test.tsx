@@ -11,8 +11,8 @@ vi.mock('../server/preferences.telefunc.js', () => ({ onNotifyChannels }))
 
 const { useNotifyChannels, reloadNotifyChannels } = await import('./notify-channels.js')
 
-const configured: NotifyChannels = { discordWebhook: true, discordBot: true, sources: { webhook: 'stored', botToken: 'stored' }, editable: true }
-const empty: NotifyChannels = { discordWebhook: false, discordBot: false, sources: {}, editable: true }
+const configured: NotifyChannels = { discordWebhook: true, sources: { webhook: 'stored' }, editable: true }
+const empty: NotifyChannels = { discordWebhook: false, sources: {}, editable: true }
 
 /** Two independent readers, the way the settings page and the checklist sit on one screen. */
 function Reader({ name }: { name: string }) {

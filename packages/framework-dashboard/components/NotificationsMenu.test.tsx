@@ -8,7 +8,7 @@ const updatePreferences = vi.hoisted(() => vi.fn())
 // configured unless a test overrides it. Mocked at the lib layer like the preferences below,
 // so a test sets the fact directly rather than racing a module-level cache to fill.
 const channels = vi.hoisted(() => ({
-  value: { discordWebhook: true, discordBot: true, sources: {}, editable: true } as unknown,
+  value: { discordWebhook: true, sources: {}, editable: true } as unknown,
 }))
 vi.mock('../lib/notify-channels.js', () => ({ useNotifyChannels: () => channels.value }))
 let prefs: Preferences = {}
@@ -17,7 +17,6 @@ vi.mock('../lib/preferences.js', () => ({
   updatePreferences,
   notificationsEnabled: (p: Preferences) => p.notifyBrowser ?? true,
   discordEnabled: (p: Preferences) => p.notifyDiscord ?? false,
-  discordBotEnabled: (p: Preferences) => p.discordBot ?? false,
   newActivityEnabled: (p: Preferences) => p.notifyNewActivity ?? false,
   humanInterventionEnabled: (p: Preferences) => p.notifyHumanIntervention ?? true,
 }))
@@ -26,7 +25,7 @@ const { NotificationsMenu } = await import('./NotificationsMenu.js')
 
 beforeEach(() => {
   prefs = {}
-  channels.value = { discordWebhook: true, discordBot: true, sources: {}, editable: true }
+  channels.value = { discordWebhook: true, sources: {}, editable: true }
   updatePreferences.mockReset()
   vi.stubGlobal('Notification', { permission: 'granted', requestPermission: vi.fn() })
 })
@@ -90,41 +89,15 @@ describe('NotificationsMenu (#676)', () => {
     expect(screen.getByText('Blocked in your browser settings')).toBeTruthy()
   })
 
-  test('the Discord bot is its own group, not a delivery method (#916)', () => {
-    render(<NotificationsMenu />)
-    open()
-    // Everything under "Deliver to" posts outward; the bot takes messages in and acts on them,
-    // so it is grouped apart rather than sitting next to the Discord notification toggle.
-    expect(screen.getByText('Chat')).toBeTruthy()
-    expect(screen.getByText('Discord bot')).toBeTruthy()
-  })
-
-  test('the Discord bot toggle is off by default and writes the preference (#916)', () => {
-    render(<NotificationsMenu />)
-    open()
-    const item = screen.getByText('Discord bot').closest('[role="menuitemcheckbox"]')
-    expect(item?.getAttribute('aria-checked')).toBe('false')
-
-    fireEvent.click(screen.getByText('Discord bot'))
-    expect(updatePreferences).toHaveBeenCalledWith({ discordBot: true })
-  })
-
-  test('turning the bot on does not light the bell, which is about notifications (#916)', async () => {
-    prefs = { discordBot: true, notifyBrowser: false, notifyDiscord: false }
-    render(<NotificationsMenu />)
-    expect(await bellTooltip()).toBe('Notifications')
-  })
-
   // #948: the toggle is a preference; delivery needs the daemon env var. An unconfigured
   // channel must neither light the bell nor read as if it will page you.
   test('Discord on with no webhook does not light the bell and says why', async () => {
-    channels.value = { discordWebhook: false, discordBot: false, sources: {}, editable: true }
+    channels.value = { discordWebhook: false, sources: {}, editable: true }
     prefs = { notifyDiscord: true, notifyBrowser: false }
     render(<NotificationsMenu />)
     await waitFor(async () => expect(await bellTooltip()).toBe('Notifications'))
     open()
     expect(screen.getByText('Not configured — add a webhook in Settings')).toBeTruthy()
-    expect(screen.getByText('Not configured — add a bot token in Settings')).toBeTruthy()
   })
 
   test('a configured webhook keeps the bell lit for Discord delivery', async () => {

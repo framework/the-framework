@@ -4,7 +4,6 @@ import { mkdtemp, mkdir, readdir, readFile, writeFile, rm } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { appendControl } from './control.js'
-import { daemonStatePath } from './daemon.js'
 import { BROWSER_MCP_SERVERS, withBrowser } from './browser.js'
 import { EVENTS_FILE, FRAMEWORK_DIR, RUNS_DIR, type StoreFs } from './store/index.js'
 import { nodeGitRunner } from './project.js'
@@ -387,20 +386,6 @@ test('runCli prompt runs the text through the direct path (#353)', async () => {
   assert.ok(out.some(l => /prompt session done/.test(l)))
 })
 
-test('parseArgs reads the stop subcommand and the --daemon / internal --daemon-serve flags (#456)', () => {
-  const stop = parseArgs(['stop'])
-  assert.equal(stop.stop, true)
-  assert.equal(stop.intent, '') // "stop" is a command, not build intent
-  const daemon = parseArgs(['--daemon', '--port', '4477'])
-  assert.equal(daemon.daemon, true)
-  assert.equal(daemon.daemonServe, false)
-  assert.equal(daemon.port, 4477)
-  const serve = parseArgs(['--daemon-serve', '--port', '4477'])
-  assert.equal(serve.daemonServe, true)
-  assert.equal(serve.daemon, false)
-  assert.equal(parseArgs([]).stop, false) // bare invocation is not stop
-})
-
 test('parseArgs flags unknown options and bad values', () => {
   assert.match(parseArgs(['--nope']).error!, /unknown option/)
   assert.match(parseArgs(['--scope', 'huge']).error!, /invalid --scope/)
@@ -608,43 +593,17 @@ test('runCli usage error exits 2', async () => {
   assert.equal(await runCli(['--bogus'], io), 2)
 })
 
-test('runCli bare framework foregrounds the dashboard, deferring to a running background daemon (#456)', async () => {
-  const { io, out } = capture()
-  const cfg = await mkdtemp(join(tmpdir(), 'framework-fg-'))
-  const prevXdg = process.env.XDG_CONFIG_HOME
-  process.env.XDG_CONFIG_HOME = cfg
-  try {
-    // Seed a live background daemon (this process is alive) so the foreground path
-    // short-circuits before binding a port and blocking the test.
-    const statePath = daemonStatePath(process.env)
-    await mkdir(dirname(statePath), { recursive: true })
-    await writeFile(
-      statePath,
-      JSON.stringify({ pid: process.pid, port: 4200, url: 'http://localhost:4200', startedAt: new Date().toISOString() }),
-    )
-    const code = await runCli(['--cwd', cfg], io)
-    assert.equal(code, 0)
-    assert.ok(out.some(l => /already running in the background/.test(l)))
-  } finally {
-    if (prevXdg === undefined) delete process.env.XDG_CONFIG_HOME
-    else process.env.XDG_CONFIG_HOME = prevXdg
-    await rm(cfg, { recursive: true, force: true })
+// The CLI is foreground-only, so there is no `--daemon`, no `stop`, and no background dashboard
+// for a bare `framework` to defer to. Bare `framework` binds a port and blocks until Ctrl-C, which
+// is `runDaemon`'s own contract, covered in daemon.test.ts rather than here.
+test('runCli rejects the retired background-daemon flags as usage errors', async () => {
+  for (const argv of [['--daemon'], ['--daemon-serve']]) {
+    const { io } = capture()
+    assert.equal(await runCli(argv, io), 2, `${argv.join(' ')} is not a flag`)
   }
-})
-
-test('runCli --daemon backgrounds the dashboard, not a usage error (#302/#456)', async () => {
-  const { io, err } = capture()
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-daemon-'))
-  try {
-    // `--daemon` routes to ensureDaemonCmd. The spawn is refused from a test entry (it
-    // would re-exec this test file and fork-bomb), so it degrades to exit 1 — the point
-    // is it never spawns and is not a usage error (exit 2).
-    const code = await runCli(['--daemon', '--cwd', cwd], io)
-    assert.notEqual(code, 2)
-    assert.ok(err.some(l => /dashboard daemon/.test(l)))
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
+  // `stop` is not a usage error, just an ordinary word: there is no background daemon to stop, so
+  // it reads as intent like any other bare word.
+  assert.equal(parseArgs(['stop']).intent, 'stop')
 })
 
 test('parseArgs reads the doctor subcommand, not as intent', () => {
@@ -710,25 +669,23 @@ test('runCli --transparent runs a bare prompt raw, skipping the build flow + wra
   }
 })
 
-test('a live daemon steers a dashboard-less run through its gates via control.jsonl (#344)', async () => {
+test('the dashboard steers a dashboard-less run through its gates via control.jsonl (#344)', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-ws-'))
   const cfg = await mkdtemp(join(tmpdir(), 'framework-cfg-'))
   const prevAwait = process.env.FRAMEWORK_FAKE_AWAIT
   const prevXdg = process.env.XDG_CONFIG_HOME
   process.env.FRAMEWORK_FAKE_AWAIT = 'choices' // the fake build stops to ask (#341)
-  process.env.XDG_CONFIG_HOME = cfg // the run reads the global daemon liveness from here (#393)
+  process.env.XDG_CONFIG_HOME = cfg
   try {
-    // Fake the machine's live daemon (#393): our own pid always reads as alive. The
-    // run's steering check is now global, so the liveness goes in the config dir.
     await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true })
-    await writeFile(
-      daemonStatePath(),
-      JSON.stringify({ pid: process.pid, port: 1, url: 'http://127.0.0.1:1', startedAt: '' }),
-    )
 
     const { io, out } = capture()
     let settled = false
-    const done = runCli(['--fake', '--no-dashboard', '--cwd', cwd], io).finally(() => (settled = true))
+    // --run-id is what the dashboard passes when it spawns, and what makes this run steerable
+    // (#905): the dashboard drives the control file on the other end.
+    const done = runCli(['--fake', '--no-dashboard', '--cwd', cwd, '--run-id', 'r-steer'], io).finally(
+      () => (settled = true),
+    )
 
     // Play the daemon: tail events.jsonl for the build's parked await-choices gate and
     // answer it with its recommended pick, exactly as the daemon page's Accept button would.
@@ -830,25 +787,18 @@ test('a run that never asked for the post-merge cleanup stays quiet about it (#8
 // #905: which runs may be steered, and which stay open for chat. Both used to be the same
 // question answered by "is a daemon alive on this machine", which is not about this run at all.
 
-test('a daemon-spawned run is steerable even with no daemon state file (#905)', () => {
-  // The daemon spawns with --no-dashboard and passes --run-id, and its state file can go missing
-  // while it is very much alive (#922). This is the case where every Stop press was dropped in
-  // silence: written to control.jsonl, tailed by nobody.
-  assert.equal(isSteerable({ persist: true, runId: '2026-07-20T20-20-14-026Z' }, false, false), true)
+test('a dashboard-spawned run is steerable through its run id (#905)', () => {
+  // The dashboard spawns with --no-dashboard and passes --run-id. This is the case where every
+  // Stop press was dropped in silence: written to control.jsonl, tailed by nobody.
+  assert.equal(isSteerable({ persist: true, runId: '2026-07-20T20-20-14-026Z' }, false), true)
 })
 
-test('a live daemon still steers a run it did not spawn (#393)', () => {
-  // Its dashboard lists and steers any project's run, so Stop must keep working for a run
-  // started by hand in a terminal.
-  assert.equal(isSteerable({ persist: true }, false, true), true)
-})
-
-test('with no dashboard, no run id and no daemon, nothing can reach the run', () => {
-  assert.equal(isSteerable({ persist: true }, false, false), false)
+test('with no dashboard and no run id, nothing can reach the run', () => {
+  assert.equal(isSteerable({ persist: true }, false), false)
 })
 
 test('--no-persist is never steerable: there is no control file to tail', () => {
-  assert.equal(isSteerable({ persist: false, runId: 'r1' }, true, true), false)
+  assert.equal(isSteerable({ persist: false, runId: 'r1' }, true), false)
 })
 
 test('a terminal --no-dashboard run does not stay open for chat, daemon or not (#905/#714)', () => {
@@ -864,30 +814,23 @@ test('a run with a dashboard, or one the daemon started, stays open for chat (#7
 
 test('the startup footer prints the commands and the version (#312)', async () => {
   const { io, out } = capture()
-  await printStartupFooter(io, { background: true, fetchLatest: async () => frameworkVersion() })
+  await printStartupFooter(io, { fetchLatest: async () => frameworkVersion() })
   assert.ok(out.includes('Type a prompt on the dashboard to start a session, or use:'))
   assert.ok(out.includes(`The Framework v${frameworkVersion()}`))
   assert.ok(out.includes(`✅ Up to date (v${frameworkVersion()})`))
 })
 
-test('the foreground footer drops `framework stop`, which only stops a detached dashboard (#312)', async () => {
-  const background = capture()
-  await printStartupFooter(background.io, { background: true, fetchLatest: async () => undefined })
-  const foreground = capture()
-  await printStartupFooter(foreground.io, { background: false, fetchLatest: async () => undefined })
-  assert.ok(background.out.some(l => l.includes('framework stop')))
-  assert.ok(!foreground.out.some(l => l.includes('framework stop')))
-  // Everything else is the same footer, including the version.
-  assert.ok(foreground.out.includes(`The Framework v${frameworkVersion()}`))
+test('the footer offers no `framework stop`: Ctrl-C is how the foreground dashboard ends (#312)', async () => {
+  const { io, out } = capture()
+  await printStartupFooter(io, { fetchLatest: async () => undefined })
+  assert.ok(!out.some(l => l.includes('framework stop')))
+  assert.ok(out.includes(`The Framework v${frameworkVersion()}`))
 })
 
 test('the version prints before npm answers, and a newer release is announced after (#312)', async () => {
   const { io, out } = capture()
   let release: (v: string) => void = () => {}
-  const pending = printStartupFooter(io, {
-    background: true,
-    fetchLatest: () => new Promise<string>(resolve => (release = resolve)),
-  })
+  const pending = printStartupFooter(io, { fetchLatest: () => new Promise<string>(resolve => (release = resolve)) })
   // The static half is out while the registry call is still in flight — bare `framework` blocks on
   // the server forever, so anything held back until after the await would never be printed there.
   assert.ok(out.includes(`The Framework v${frameworkVersion()}`))
@@ -899,10 +842,7 @@ test('the version prints before npm answers, and a newer release is announced af
 
 test('an unreachable npm registry costs the footer nothing (#312)', async () => {
   const { io, out } = capture()
-  await printStartupFooter(io, {
-    background: true,
-    fetchLatest: () => Promise.reject(new Error('offline')),
-  })
+  await printStartupFooter(io, { fetchLatest: () => Promise.reject(new Error('offline')) })
   assert.ok(out.includes(`The Framework v${frameworkVersion()}`))
   assert.ok(!out.some(l => l.includes('Up to date') || l.includes('Update available')))
 })

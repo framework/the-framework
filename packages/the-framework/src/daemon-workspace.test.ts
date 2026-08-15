@@ -363,7 +363,7 @@ test('binding a topic run re-homes it into the bound project: a worktree there, 
     // The scratch it left is gone (not merely retained): the conversation moved on, it did not die there.
     assert.equal(await stat(scratch).then(() => true, () => false), false, 'the scratch dir is removed')
   } finally {
-    await runtime.suspendRuns().catch(() => {})
+    await runtime.stopRuns().catch(() => {})
     await runtime.dispose()
     await rm(home, RETRIED_RM)
     await rm(config, RETRIED_RM)
@@ -398,7 +398,7 @@ test('a bind to an unresolvable project retains the scratch and surfaces the fai
     assert.equal(starts[0]!.includes('--topic'), true, 'and that one start is the topic run')
     assert.equal(await stat(scratch).then(() => true, () => false), true, 'the scratch is retained so the conversation is not lost')
   } finally {
-    await runtime.suspendRuns().catch(() => {})
+    await runtime.stopRuns().catch(() => {})
     await runtime.dispose()
     await rm(home, RETRIED_RM)
     await rm(config, RETRIED_RM)

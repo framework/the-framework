@@ -5,7 +5,7 @@ import { errorMessage } from './error-message.js'
 import { discordNotificationEnabled, notificationEnabled } from './preference-defaults.js'
 import { runOptionsFromPreferences, preferencesFromFileConfig } from './run-options.js'
 import { loadFrameworkConfig } from './config.js'
-import { readSuspendedRuns, writeSuspendedRuns, resumableRuns, readLiveMetas, listRuns, type LiveRun } from './store/index.js'
+import { readLiveMetas, listRuns, type LiveRun } from './store/index.js'
 import { startKeyedWatcher, type KeyedWatcher } from './dashboard/keyed-watcher.js'
 import { buildInterventions, interventionKey, postInterventionsDiscord } from './dashboard/interventions.js'
 import { buildActivity, activityKey, postActivityDiscord } from './dashboard/activity.js'
@@ -383,58 +383,3 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   }
 }
 
-/**
- * Resume what the last daemon suspended (#923).
- *
- * A run does not outlive its daemon: it is stopped at shutdown and its id + agent session recorded,
- * so a restart continues the same conversation in the same worktree instead of leaving an orphan
- * behind. The state survives the process, which is the #857 direction; the process does not.
- *
- * Capped by age so a machine that has been off for a week does not wake up spending a day's quota
- * on stale work, and the record is cleared as it is read, so a run that fails to resume is not
- * retried on every boot.
- */
-export async function resumeSuspendedRuns(
-  env: NodeJS.ProcessEnv,
-  startRun: BackgroundServiceDeps['startRun'],
-  log: (message: string) => void,
-): Promise<void> {
-  for (const record of await listProjects(undefined, env).catch(() => [])) {
-    const suspended = await readSuspendedRuns(record.path).catch(() => [])
-    if (suspended.length === 0) continue
-    await writeSuspendedRuns(record.path, []).catch(() => {})
-    const resumable = resumableRuns(suspended, Date.now())
-    const dropped = suspended.length - resumable.length
-    const where = basename(record.path)
-    if (dropped > 0) log(`[framework] ${dropped} suspended session(s) in ${where} are too old to resume`)
-    for (const run of resumable) {
-      const options = await resolveProjectRunOptions(record.id, env)
-      const result = await startRun(
-        RESUME_PROMPT,
-        {
-          ...options,
-          unattended: true,
-          continueRunId: run.runId,
-          ...(run.sessionId ? { resumeSession: run.sessionId } : {}),
-          // Hand the drain's pin back (#1268): the resumed process re-emits the queue-entry
-          // event, so the claim reaches the rebuilt meta whether or not the replay kept it.
-          ...(run.queueEntry ? { queueEntry: run.queueEntry } : {}),
-        },
-        record.id,
-      )
-      log(
-        result.ok
-          ? `[framework] resumed session ${run.runId} in ${where}`
-          : `[framework] could not resume session ${run.runId}: ${result.error}`,
-      )
-    }
-  }
-}
-
-/**
- * What a resumed run is asked to do (#923). The agent comes back with its own session, so it has
- * the whole conversation: the only thing it is missing is why it suddenly stopped mid-task.
- */
-export const RESUME_PROMPT =
-  'This session was interrupted when The Framework restarted, not by anyone asking you to stop. Look at what you had already done, then carry on from there. ' +
-  'The session lifecycle still applies: once the work is genuinely finished with nothing left to do, call setReadyForMerge() — without it the finished work is never merged.'

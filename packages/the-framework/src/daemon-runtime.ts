@@ -28,9 +28,7 @@ import {
   META_FILE,
   RUN_META_VERSION,
   isPidAlive,
-  writeSuspendedRuns,
   type RunMeta,
-  type SuspendedRun,
 } from './store/index.js'
 import type { FrameworkEvent } from './events.js'
 import type { StartRunKind, StartRunOptions, StartRunResult, AddProjectResult } from './dashboard/index.js'
@@ -427,10 +425,10 @@ export interface ProjectRuntime {
   /** Live runs on a project (#685), so a background job can tell an idle project from a busy one. */
   activeRunCount: (targetProjectId: string) => number
   /**
-   * Stop the runs this daemon spawned and record each as resumable (#923). Returns how many
-   * were suspended. Called on shutdown, before the previews go.
+   * Stop the runs this daemon spawned. Returns how many were stopped. Called on shutdown, before
+   * the previews go.
    */
-  suspendRuns: (graceMs?: number) => Promise<number>
+  stopRuns: (graceMs?: number) => Promise<number>
   /** Stop every live preview so their dev servers do not outlive the daemon (#475). */
   dispose: () => Promise<void>
 }
@@ -903,8 +901,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
     // `{resumeSession, continueRunId, agent}` and nothing else, so the run's armed handoff fell
     // back to bare defaults — a session that ran its first leg merge-armed resumed with the merge
     // silently disarmed and ended in a draft PR. The project's resolved options are the base and
-    // the caller's explicit ones stay on top: the same overlay the daemon-restart resume path
-    // (resumeSuspendedRuns) has always done. A fresh start is untouched — the launcher resolves
+    // the caller's explicit ones stay on top. A fresh start is untouched — the launcher resolves
     // its options client-side and sends them whole.
     if (options.continueRunId) {
       options = { ...(await resolveProjectRunOptions(projectKey, env)), ...options }
@@ -1051,47 +1048,25 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
   }
 
   /**
-   * Stop the runs this daemon spawned, and record them as resumable (#923).
+   * Stop the runs this daemon spawned. Ctrl-C closes everything: the dashboard runs in the
+   * foreground, and nothing it started outlives it.
    *
    * A spawned run is detached so it survives the CLI that asked for it, not so it survives the
    * daemon that owns it: left alone it becomes an orphan on `ppid 1`, holding a worktree and a
    * headless browser, with no daemon left that knows about it. So each gets a SIGTERM, which the
    * run already handles by aborting cleanly and group-killing its agent, and a SIGKILL if it will
-   * not go. Only runs in `activeRuns` — a run this daemon merely steers (#393) is not its to stop.
+   * not go. Only runs in `activeRuns` — a run this daemon merely steers is not its to stop.
    *
-   * What is stopped here is not lost: the run keeps its worktree and branch (a run that ends
-   * `stopped` is retained, see tearDownWorktree), and its id + agent session are written to the
-   * project so the next daemon can continue the same conversation in the same checkout. A run that
-   * managed to finish while we were asking is left out — there is nothing to resume.
+   * What is stopped here is not lost, it is just not restarted for you: the run keeps its worktree
+   * and branch (a run that ends `stopped` is retained, see tearDownWorktree), so the next start
+   * continues the same conversation in the same checkout — when you ask for it.
    */
-  const suspendRuns = async (graceMs = 5000): Promise<number> => {
-    const byProject = new Map<string, SuspendedRun[]>()
+  const stopRuns = async (graceMs = 5000): Promise<number> => {
     const stopping = [...activeRuns.entries()]
     activeRuns.clear()
-    for (const [key, pid] of stopping) {
-      const { projectKey, runId } = parseScopedKey(key)
-      const projectCwd = await resolveProject(projectKey)
-      if (!(await terminate(pid, graceMs))) continue
-      // A fallback run (no worktree, no run id) cannot be continued, so it is stopped and no more.
-      if (!runId || !projectCwd) continue
-      const meta = (await readLiveMetas(projectCwd).catch(() => [])).find(run => run.id === runId)
-      if (meta?.status === 'done') continue
-      const entry: SuspendedRun = {
-        runId,
-        suspendedAt: new Date().toISOString(),
-        ...(meta?.sessionId ? { sessionId: meta.sessionId } : {}),
-        // The drain's pin travels with the record (#1268): the resumed run re-emits it, so the
-        // sweep's claim on the entry (#1253) survives the restart even if the meta replay drops it.
-        ...(meta?.queueEntry ? { queueEntry: meta.queueEntry } : {}),
-      }
-      byProject.set(projectCwd, [...(byProject.get(projectCwd) ?? []), entry])
-    }
-    let suspended = 0
-    for (const [projectCwd, runs] of byProject) {
-      await writeSuspendedRuns(projectCwd, runs).catch(() => {})
-      suspended += runs.length
-    }
-    return suspended
+    let stopped = 0
+    for (const [, pid] of stopping) if (await terminate(pid, graceMs)) stopped++
+    return stopped
   }
 
   // The dashboard's events source (#1067): a stream for a run this daemon is relaying from a device,
@@ -1128,7 +1103,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
     remoteRuns,
     onRelayRpc,
     activeRunCount,
-    suspendRuns,
+    stopRuns,
     dispose,
   }
 }

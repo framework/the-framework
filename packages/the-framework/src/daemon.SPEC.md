@@ -1,12 +1,12 @@
-The machine's one persistent background process: it serves the dashboard, spawns and tracks runs, and outlives any single run.
+The process behind the dashboard: it serves the UI, spawns sessions, and runs the background services.
 
 ## TLDR
 
-- One daemon per machine, recorded in a single global state file so a later invocation from any repo finds it, starts one if none is running, or stops it; a heartbeat rewrites the record if something deletes it, while yielding to another live daemon.
-- The dashboard is a projection of each project's on-disk event log, and steering flows back through an append-only control file — files are the seam, never a direct run-to-daemon connection.
+- It runs in the foreground and only in the foreground. Ctrl-C closes the dashboard and every session it is running, so there is no liveness record, no machine-global state file, and no second process to find, reuse or stop.
+- The dashboard is a projection of each project's on-disk event log, and steering flows back through an append-only control file — files are the seam, never a direct session-to-dashboard connection.
 - Bound to localhost by default; binding to the network requires a generated shared token, because a process that spawns agents would otherwise be remote code execution for whoever finds the port.
-- At boot it registers the home project (and, when opted in, every repo in the user's repos directory), marks runs a dead daemon left "running" as stopped, resumes what the previous daemon suspended, and starts the background services.
-- Shutdown is ordered: background services quiesce first, live runs are suspended for resume, their conversations committed, then the dashboard and the state file go.
+- At boot it registers the home project (and, when opted in, every repo in the user's repos directory), marks sessions a dead process left "running" as stopped, and starts the background services. It resumes nothing: Ctrl-C was deliberate.
+- Shutdown is ordered: background services quiesce first, live sessions are stopped, their conversations committed, then the dashboard goes.
 
 ## Before writing SPEC.md files
 

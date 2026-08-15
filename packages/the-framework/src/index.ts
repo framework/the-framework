@@ -276,25 +276,7 @@ export {
   type PreflightOptions,
   type VersionProbe,
 } from './preflight.js'
-export {
-  ensureDaemon,
-  runDaemon,
-  stopDaemon,
-  daemonStatus,
-  readDaemonState,
-  writeDaemonState,
-  startDaemonStateHeartbeat,
-  isProcessAlive,
-  EventTailer,
-  DAEMON_STATE_FILE,
-  DAEMON_STATE_HEARTBEAT_MS,
-  DEFAULT_DAEMON_PORT,
-  type DaemonState,
-  type DaemonStateHeartbeat,
-  type EnsureResult,
-  type EnsureDaemonOptions,
-  type RunDaemonOptions,
-} from './daemon.js'
+export { runDaemon, isProcessAlive, EventTailer, DEFAULT_DAEMON_PORT, type DaemonState, type RunDaemonOptions } from './daemon.js'
 export {
   appendControl,
   resetControl,

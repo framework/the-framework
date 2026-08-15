@@ -7,7 +7,7 @@ What the daemon does for a project: starting runs in isolated checkouts, retirin
 - A finished run's history is archived into the project; a clean finish loses its checkout, a failed or stopped run keeps it for inspection.
 - A run killed by a transient connection error is continued automatically (at most twice), and a child that died before booting is marked failed with the cause surfaced — never left "waiting to start" forever.
 - Project-less "topic" runs start in a neutral scratch dir and move into their project, conversation intact, once they bind to one.
-- On shutdown, live runs are stopped and recorded so the next daemon resumes the same conversations in the same checkouts; a run can also be forwarded to a connected device, its events relayed back.
+- On shutdown, live runs are stopped rather than orphaned; each keeps its worktree and branch, so the dashboard can continue the same conversation in the same checkout when asked. A run can also be forwarded to a connected device, its events relayed back.
 
 ## Before writing SPEC.md files
 

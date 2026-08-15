@@ -7,8 +7,7 @@ Everything the daemon runs in the background beside serving the dashboard: Disco
 - The CI watch merges a watched PR once its checks pass, and puts a fix agent on one whose checks fail.
 - The Discord notification watchers are rebuilt when the webhook changes, so a value pasted into the dashboard works immediately.
 - Every background start forces unattended mode, so gates auto-answer instead of parking forever on an absent human.
-- Shutdown has two phases: stop everything that could start a run, then commit the conversations the stopped runs just wrote.
-- After a restart, the runs the previous daemon suspended are resumed in the same checkout and conversation — unless too old to be worth stale work.
+- Shutdown has two phases: stop everything that could start a run, then commit the conversations the stopped runs just wrote. Nothing is resumed on the next boot — Ctrl-C closed those sessions deliberately.
 
 ## Before writing SPEC.md files
 

@@ -10,14 +10,17 @@ import { defineConfig, type Plugin, type UserConfig } from 'vite'
 //
 // `pnpm dev` alone is the Vite dev server with no Telefunc context, so `sendStart` reports "starting
 // a session is not enabled on this server" (same gap that leaves preferences unpersisted in dev).
-// Only the daemon has the `startRun` handler. This plugin brings up that daemon (the framework's own
-// `ensureDaemon`, idempotent — it reuses one already running) and proxies `/_telefunc` (RPCs and the
-// SSE Channel) to it, so the live-reload UI gets the full backend, run-starting included.
+// Only the daemon has the `startRun` handler. This plugin brings that daemon up *inside the dev
+// server's own process* and proxies `/_telefunc` (RPCs and the SSE Channel) to it, so the
+// live-reload UI gets the full backend, run-starting included.
+//
+// In-process, not spawned: the CLI is foreground-only, so there is no detached daemon to reuse and
+// nothing to leave behind — Ctrl-C on the dev server takes the daemon with it. `runDaemon` blocks
+// until shutdown, so it is left unawaited and `onListening` reports the port it bound.
 //
 // The proxy middleware is registered synchronously so it lands ahead of Telefunc's own middleware;
 // it holds requests until the daemon is up. Left out by default so the plain dev server stays a
-// pure UI harness with no detached process spawned behind it. The daemon is detached and outlives
-// the dev server (stop it with `the-framework stop`).
+// pure UI harness with no backend behind it.
 function frameworkDevDaemon(): Plugin {
   return {
     name: 'framework:dev-daemon',
@@ -26,23 +29,19 @@ function frameworkDevDaemon(): Plugin {
       if (!process.env.FRAMEWORK_DEV_DAEMON) return
       let target: { hostname: string; port: string } | null = null
       const ready = (async () => {
-        const [{ ensureDaemon }, { fileURLToPath }, path] = await Promise.all([
-          import('@gemstack/the-framework'),
-          import('node:url'),
-          import('node:path'),
-        ])
-        // The daemon spawns a detached child of the framework CLI; without an explicit binPath it
-        // would re-invoke `process.argv[1]`, which here is vite, not the framework. Point it at the
-        // framework's own bin (dist/bin.js, beside its resolved dist/index.js). The package is
-        // ESM-only (no CJS main), so resolve via the ESM resolver rather than require.resolve.
-        const binPath = path.join(path.dirname(fileURLToPath(import.meta.resolve('@gemstack/the-framework'))), 'bin.js')
+        const { runDaemon } = await import('@gemstack/the-framework')
         const cwd = process.env.FRAMEWORK_DEV_DAEMON_CWD || process.cwd()
-        const { state, alreadyRunning } = await ensureDaemon(cwd, { binPath })
-        const url = new URL(state.url)
-        target = { hostname: url.hostname, port: url.port || '4200' }
-        server.config.logger.info(
-          `\n[framework] dev daemon ${alreadyRunning ? 'reused' : 'started'} at ${state.url} — starting runs is enabled\n`,
-        )
+        // Ephemeral port: the dev server owns the address the browser talks to, and binding 4200
+        // would collide with a `framework` the developer is running in another terminal.
+        const url = await new Promise<string>((resolvePromise, rejectPromise) => {
+          void runDaemon(cwd, { port: 0, onListening: state => resolvePromise(state.url) }).then(
+            () => rejectPromise(new Error('the dev daemon exited before it bound')),
+            rejectPromise,
+          )
+        })
+        const bound = new URL(url)
+        target = { hostname: bound.hostname, port: bound.port || '4200' }
+        server.config.logger.info(`\n[framework] dev daemon started at ${url} — starting runs is enabled\n`)
       })().catch((err: unknown) => {
         server.config.logger.error(
           `[framework] dev daemon did not start (${err instanceof Error ? err.message : String(err)}); ` +

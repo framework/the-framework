@@ -927,10 +927,10 @@ function ownerLiveness(meta: RunMeta, isAlive: (pid: number) => boolean): 'live'
  * Best-effort: a read/write error skips that run, never throws.
  *
  * A run whose pid is alive on this host is left alone (#926). This used to flip every `running`
- * meta on the assumption that a fresh daemon drives no in-flight run, which holds only while
- * exactly one daemon ever boots: a second one (and before #922, every failed `framework --daemon`
- * spawned one) marked genuinely live runs as finished, giving them a no-op Stop in the dashboard.
- * A meta with no `pid` keeps the old behaviour, since there is nothing better to go on.
+ * meta on the assumption that a fresh dashboard drives no in-flight run, which holds only while
+ * exactly one is ever booted: a second one marked genuinely live runs as finished, giving them a
+ * no-op Stop in the dashboard. A meta with no `pid` keeps the old behaviour, since there is
+ * nothing better to go on.
  */
 export async function reconcileOrphanedRuns(
   cwd: string,

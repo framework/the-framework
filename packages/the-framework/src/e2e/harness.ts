@@ -253,7 +253,7 @@ export async function makeWorld(): Promise<StoryWorld> {
     async close() {
       for (const tail of tails) tail.stop()
       // Same order as daemon shutdown: stop the runs this world spawned, then the previews.
-      await runtime.suspendRuns(2000).catch(() => 0)
+      await runtime.stopRuns(2000).catch(() => 0)
       // Teardowns fire off child-exit events and outlive the assertions — deleting the repos
       // under a mid-flight archive-commit-retire kills its git ("cannot lock ref 'HEAD'") and
       // litters the output with stranded-worktree warnings. Acquiring each run's lock is the

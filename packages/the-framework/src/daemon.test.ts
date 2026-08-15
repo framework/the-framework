@@ -7,18 +7,14 @@ import { join, resolve } from 'node:path'
 import type { FrameworkEvent } from './events.js'
 import {
   EventTailer,
-  readDaemonState,
   isProcessAlive,
-  daemonStatus,
-  stopDaemon,
   runDaemon,
-  daemonStatePath,
-  writeDaemonState,
-  startDaemonStateHeartbeat,
   startOptionFlags,
   registerHomeProject,
   registerReposDirectory,
   isNestedWithin,
+  type DaemonState,
+  type RunDaemonOptions,
 } from './daemon.js'
 import type { PreflightResult } from './preflight.js'
 
@@ -28,6 +24,30 @@ import type { PreflightResult } from './preflight.js'
  * machine running them happens to have `claude` installed and logged in.
  */
 const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
+
+/**
+ * Start a daemon and wait until it reports where it bound. The CLI is foreground-only, so there
+ * is no liveness file to poll: `onListening` is the only way a caller learns the port.
+ *
+ * The daemon's own promise comes back too — it resolves on shutdown, so abort the signal and
+ * await it before the test removes the workspace underneath it.
+ */
+async function startDaemon(cwd: string, opts: RunDaemonOptions): Promise<{ done: Promise<void>; state: DaemonState }> {
+  let report!: (state: DaemonState) => void
+  let fail!: (err: unknown) => void
+  const listening = new Promise<DaemonState>((resolvePromise, rejectPromise) => {
+    report = resolvePromise
+    fail = rejectPromise
+  })
+  const done = runDaemon(cwd, { ...opts, onListening: state => report(state) })
+  // runDaemon only settles on shutdown, so it is never awaited here. Settling *before* it binds
+  // means it failed to come up: forward that, or `listening` would hang the test forever.
+  void done.then(
+    () => fail(new Error('the daemon exited before it bound')),
+    (err: unknown) => fail(err),
+  )
+  return { done, state: await listening }
+}
 import { listRuns } from './store/index.js'
 import { EVENTS_FILE, FRAMEWORK_DIR, addWorktree } from './store/index.js'
 import { controlPath } from './control.js'
@@ -217,135 +237,24 @@ test('isProcessAlive is true for this process and false for a dead pid', () => {
   assert.equal(isProcessAlive(2 ** 31 - 1), false) // an impossibly high, unused pid
 })
 
-test('readDaemonState returns undefined when absent or malformed', async () => {
-  const cwd = await tmpWorkspace()
-  const env = await configEnv(cwd)
-  try {
-    assert.equal(await readDaemonState(env), undefined) // absent
-    await writeFile(daemonStatePath(env), 'not json')
-    assert.equal(await readDaemonState(env), undefined) // malformed
-    await writeFile(daemonStatePath(env), JSON.stringify({ pid: 1 })) // missing fields
-    assert.equal(await readDaemonState(env), undefined)
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-// #922: it used to delete the file here, so one check against a stale pid unregistered a
-// daemon that was actually running, and nothing ever wrote the record back.
-test('daemonStatus reports a stale state file as no daemon, without deleting it', async () => {
-  const cwd = await tmpWorkspace()
-  const env = await configEnv(cwd)
-  try {
-    const stale = { pid: 2 ** 31 - 1, port: 4477, url: 'http://127.0.0.1:4477', startedAt: '' }
-    await writeFile(daemonStatePath(env), JSON.stringify(stale))
-    assert.equal(await daemonStatus(env), undefined) // dead pid -> not running
-    assert.deepEqual(await readDaemonState(env), stale) // ...and the read left the file alone
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('the state-file heartbeat rewrites a deleted record and yields to a live daemon', async () => {
-  const cwd = await tmpWorkspace()
-  const env = await configEnv(cwd)
-  try {
-    const mine = { pid: process.pid, port: 4478, url: 'http://127.0.0.1:4478', startedAt: '' }
-    const heartbeat = startDaemonStateHeartbeat(mine, env, 60_000) // driven by hand, not by time
-    await writeDaemonState(mine, env)
-
-    await rm(daemonStatePath(env), { force: true })
-    await heartbeat.beat()
-    assert.deepEqual(await readDaemonState(env), mine) // a deletion heals
-
-    // A record naming another *live* process belongs to that daemon; ours must not clobber it.
-    const other = { pid: process.ppid, port: 4479, url: 'http://127.0.0.1:4479', startedAt: '' }
-    await writeFile(daemonStatePath(env), JSON.stringify(other))
-    await heartbeat.beat()
-    assert.deepEqual(await readDaemonState(env), other)
-
-    // A record naming a dead process is stale, so it is taken over.
-    await writeFile(daemonStatePath(env), JSON.stringify({ ...other, pid: 2 ** 31 - 1 }))
-    await heartbeat.beat()
-    assert.deepEqual(await readDaemonState(env), mine)
-
-    heartbeat.stop()
-    await rm(daemonStatePath(env), { force: true })
-    await heartbeat.beat()
-    assert.equal(await readDaemonState(env), undefined) // stopped means stopped
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('stopDaemon reports false when nothing is running', async () => {
-  const cwd = await tmpWorkspace()
-  const env = await configEnv(cwd)
-  try {
-    assert.equal(await stopDaemon(env), false)
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-// #514: stopDaemon must not return until the process is actually gone — the port is only
-// free once it is, so an immediate restart would otherwise race it (EADDRINUSE -> "the
-// daemon did not come up in time", with the old daemon still serving a stale bundle).
-// This daemon ignores SIGTERM, standing in for a wedged shutdown: only the escalation ends it.
-test('stopDaemon waits for the daemon to exit, escalating past an ignored SIGTERM (#514)', async () => {
-  const cwd = await tmpWorkspace()
-  const env = await configEnv(cwd)
-  const child = spawn(
-    process.execPath,
-    ['-e', "process.on('SIGTERM', () => {}); console.log('ready'); setInterval(() => {}, 1000)"],
-    { stdio: ['ignore', 'pipe', 'ignore'] },
-  )
-  // Wait until it prints ready: before that its SIGTERM handler is not installed yet and the
-  // default action would kill it, which would pass this test for the wrong reason.
-  await new Promise<void>(resolvePromise => child.stdout!.once('data', () => resolvePromise()))
-  try {
-    await writeFile(
-      daemonStatePath(env),
-      JSON.stringify({ pid: child.pid, port: 4200, url: 'http://127.0.0.1:4200', startedAt: '2026-01-01T00:00:00.000Z' }),
-    )
-    assert.equal(await stopDaemon(env, { timeoutMs: 300 }), true)
-    // The contract: once stopDaemon returns, the daemon is gone (so its port is free).
-    assert.equal(isProcessAlive(child.pid!), false)
-  } finally {
-    try {
-      child.kill('SIGKILL')
-    } catch {
-      // already reaped
-    }
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('runDaemon serves the dashboard, records its state, and cleans up on shutdown', async () => {
+test('runDaemon serves the dashboard, and shuts down when the signal aborts', async () => {
   const cwd = await tmpWorkspace()
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
-
-    // Wait for the daemon to bind and report itself.
-    let state = await readDaemonState(env)
-    for (let i = 0; i < 100 && !state; i++) {
-      await new Promise(r => setTimeout(r, 20))
-      state = await readDaemonState(env)
-    }
-    assert.ok(state, 'daemon wrote its state file')
-    assert.equal(state!.pid, process.pid)
-    assert.match(state!.url, /^http:\/\/127\.0\.0\.1:\d+$/)
+    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
+    assert.equal(state.pid, process.pid)
+    assert.match(state.url, /^http:\/\/127\.0\.0\.1:\d+$/)
 
     // The new Vike + Telefunc dashboard (its prerendered SPA shell) is served.
-    const res = await fetch(state!.url)
+    const res = await fetch(state.url)
     assert.equal(res.status, 200)
     assert.match(await res.text(), /id="root"/)
 
+    // Ctrl-C closes everything: the daemon runs in the foreground and owns nothing beyond itself.
     ac.abort()
     await done
-    assert.equal(await readDaemonState(env), undefined) // state file removed on exit
+    await assert.rejects(fetch(state.url)) // the port is free again
   } finally {
     ac.abort()
     await rm(cwd, { recursive: true, force: true })
@@ -357,14 +266,8 @@ test('runDaemon comes up on a fresh workspace with no .the-framework yet', async
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
-    let state = await readDaemonState(env)
-    for (let i = 0; i < 100 && !state; i++) {
-      await new Promise(r => setTimeout(r, 20))
-      state = await readDaemonState(env)
-    }
-    assert.ok(state, 'the daemon created .the-framework/ itself and wrote its state file')
-    assert.equal((await fetch(state!.url)).status, 200)
+    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
+    assert.equal((await fetch(state.url)).status, 200)
     ac.abort()
     await done
   } finally {
@@ -398,18 +301,12 @@ setTimeout(() => {}, 800)
 `,
     )
     const env = await configEnv(cwd)
-    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
-    let state = await readDaemonState(env)
-    for (let i = 0; i < 100 && !state; i++) {
-      await new Promise(r => setTimeout(r, 20))
-      state = await readDaemonState(env)
-    }
-    assert.ok(state, 'daemon wrote its state file')
+    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
 
     // The whole point of #736: the second Start is no longer refused as busy while the
     // first child is alive, because the two no longer share a working tree.
-    const first = await sendStart(state!.url, cwd, 'a blog')
-    const second = await sendStart(state!.url, cwd, 'another app')
+    const first = await sendStart(state.url, cwd, 'a blog')
+    const second = await sendStart(state.url, cwd, 'another app')
     assert.equal(first.ok, true)
     assert.equal(second.ok, true, 'a concurrent run on the same project is allowed')
 
@@ -480,18 +377,12 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
 `,
     )
     const env = await configEnv(cwd)
-    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
-    let state = await readDaemonState(env)
-    for (let i = 0; i < 100 && !state; i++) {
-      await new Promise(r => setTimeout(r, 20))
-      state = await readDaemonState(env)
-    }
-    assert.ok(state, 'daemon wrote its state file')
+    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
 
     /** Start a run whose stub reports `status`, and resolve once its worktree has settled. */
     const runWith = async (status: string, nth: number): Promise<string> => {
       await writeFile(join(cwd, 'status.txt'), status)
-      assert.equal((await sendStart(state!.url, cwd, `run ${status}`)).ok, true)
+      assert.equal((await sendStart(state.url, cwd, `run ${status}`)).ok, true)
       let ids: string[] = []
       for (let i = 0; i < 150 && ids.length < nth; i++) {
         await new Promise(r => setTimeout(r, 20))
@@ -565,15 +456,9 @@ setTimeout(() => {}, 600)
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
-    let state = await readDaemonState(env)
-    for (let i = 0; i < 100 && !state; i++) {
-      await new Promise(r => setTimeout(r, 20))
-      state = await readDaemonState(env)
-    }
-    assert.ok(state, 'daemon wrote its state file')
+    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
 
-    const post = (prompt: string) => sendStart(state!.url, cwd, prompt)
+    const post = (prompt: string) => sendStart(state.url, cwd, prompt)
 
     const first = await post('a blog')
     assert.equal(first.ok, true)
@@ -622,15 +507,9 @@ fs.appendFileSync(path.join(args[args.indexOf('--cwd') + 1], 'started.log'), JSO
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
-    let state = await readDaemonState(env)
-    for (let i = 0; i < 100 && !state; i++) {
-      await new Promise(r => setTimeout(r, 20))
-      state = await readDaemonState(env)
-    }
-    assert.ok(state, 'daemon wrote its state file')
+    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
 
-    const post = (prompt: string, kind: string) => sendStart(state!.url, cwd, prompt, kind)
+    const post = (prompt: string, kind: string) => sendStart(state.url, cwd, prompt, kind)
 
     // With a what -> it is passed through; without -> omitted so the CLI defaults it.
     assert.equal((await post('the auth flow', 'research')).ok, true)
@@ -685,14 +564,8 @@ test('sendStart refuses to re-exec a test entry as the run (#345)', async () => 
   const ac = new AbortController()
   try {
     // No binPath: argv[1] here is this test file — the fork-bomb guard must trip.
-    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
-    let state = await readDaemonState(env)
-    for (let i = 0; i < 100 && !state; i++) {
-      await new Promise(r => setTimeout(r, 20))
-      state = await readDaemonState(env)
-    }
-    assert.ok(state, 'daemon wrote its state file')
-    const result = await sendStart(state!.url, cwd, 'a blog')
+    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
+    const result = await sendStart(state.url, cwd, 'a blog')
     assert.ok(result.ok === false && /test entry/.test(result.error), 'the fork-bomb guard refuses a test entry')
     ac.abort()
     await done
@@ -712,18 +585,12 @@ test('runDaemon steers through the control log: sendStop / sendChoice append ent
   const prevXdg = process.env['XDG_CONFIG_HOME']
   process.env['XDG_CONFIG_HOME'] = env['XDG_CONFIG_HOME']
   try {
-    const done = runDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
-    let state = await readDaemonState(env)
-    for (let i = 0; i < 100 && !state; i++) {
-      await new Promise(r => setTimeout(r, 20))
-      state = await readDaemonState(env)
-    }
-    assert.ok(state, 'daemon wrote its state file')
+    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
 
     // The dashboard steers over Telefunc: sendStop / sendChoice append to control.jsonl.
     const id = homeId(cwd)
-    await callTelefunc(state!.url, '/server/control.telefunc.ts', 'sendStop', [id])
-    await callTelefunc(state!.url, '/server/control.telefunc.ts', 'sendChoice', [id, 'plan-approval', 'alt:0', 'user'])
+    await callTelefunc(state.url, '/server/control.telefunc.ts', 'sendStop', [id])
+    await callTelefunc(state.url, '/server/control.telefunc.ts', 'sendChoice', [id, 'plan-approval', 'alt:0', 'user'])
 
     // Both landed in the control log (appends are async fire-and-forget: poll).
     let lines: string[] = []

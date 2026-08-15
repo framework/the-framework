@@ -43,7 +43,7 @@ import type { BindProjectDeps, RecordMessage } from './await-gate.js'
 import { preflight } from './preflight.js'
 import { RunStore, commitPendingWork, currentBranch, nodeStoreFs, renameRunBranch, runBranchName, type StoreFs } from './store/index.js'
 import { materializePresets } from './presets.js'
-import { daemonStatus, ensureDaemon, isLoopbackHost, registerHomeProject, runDaemon, stopDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
+import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { appendControl, resetControl, watchControl, type ControlWatcher } from './control.js'
 import { RunMessageQueue } from './run-messages.js'
 import { createGateKeepalive } from './gate-keepalive.js'
@@ -131,9 +131,7 @@ const HELP = `The Framework — turnkey AI orchestration that wraps a coding age
 
 Usage:
   framework                       Run the dashboard in the foreground (Ctrl+C stops it; logs visible).
-  framework --daemon              Run the dashboard in the background; print commands and return.
   framework [intent...]           Build what you describe, from scratch.
-  framework stop                  Stop the background dashboard for this workspace.
   framework research [what]      Rate the "problem variability" of <what> (default:
                                  this PR), then pick which problems to deep-dive.
                                  A direct review prompt on existing code — no build.
@@ -346,12 +344,6 @@ export interface CliOptions {
   skipPermissions: boolean
   resume: boolean
   persist: boolean
-  /** `framework --daemon`: run the dashboard in the background (detached), then return (#456). */
-  daemon: boolean
-  /** Serve the dashboard in-process — the detached child's entry, spawned by the background path (internal, #456). */
-  daemonServe: boolean
-  /** `framework stop`: stop the background daemon for this workspace. */
-  stop: boolean
   /** `framework research [what]`: run the Research preset as a direct prompt (#331). */
   research: boolean
   /** `framework prompt <text>`: run one prompt verbatim through the direct path (#353). */
@@ -389,9 +381,6 @@ export function parseArgs(argv: string[]): CliOptions {
     skipPermissions: false,
     resume: false,
     persist: true,
-    daemon: false,
-    daemonServe: false,
-    stop: false,
     research: false,
     directPrompt: false,
     maintain: false,
@@ -496,12 +485,6 @@ export function parseArgs(argv: string[]): CliOptions {
         break
       case '--resume':
         opts.resume = true
-        break
-      case '--daemon':
-        opts.daemon = true
-        break
-      case '--daemon-serve':
-        opts.daemonServe = true
         break
       case '--no-persist':
         opts.persist = false
@@ -610,13 +593,10 @@ export function parseArgs(argv: string[]): CliOptions {
         else words.push(arg)
     }
   }
-  // `framework doctor` / `framework stop` are subcommands, not an intent.
+  // `framework doctor` and friends are subcommands, not an intent.
   if (words[0] === 'doctor') {
     opts.doctor = true
     words.shift()
-    words.shift()
-  } else if (words[0] === 'stop') {
-    opts.stop = true
     words.shift()
   } else if (words[0] === 'research') {
     opts.research = true
@@ -922,23 +902,18 @@ async function resolvePromptConfig(
  */
 /**
  * Whether this run can be steered over `.the-framework/control.jsonl` (#344): Stop, a choice pick,
- * a live message. True when its own dashboard is up (#427), when the machine's daemon is live
- * (#393, whose dashboard lists and steers any project's run), or when whoever spawned it handed it
- * a run id.
+ * a live message. True when its own dashboard is up (#427), or when whoever spawned it handed it a
+ * run id — the dashboard spawns its runs with `--no-dashboard` and `--run-id`, and steers them
+ * from its own process.
  *
- * That last clause is the #905 fix. The daemon spawns runs with `--no-dashboard`, so `daemonAlive`
- * was the only thing wiring their control channel, and it is a machine-global file that went
- * missing while the daemon was very much alive: `daemonStatus()` deleted it on a stale pid and
- * nothing rewrote it (#922, since fixed). Every Stop press then landed in control.jsonl and was read by
- * nobody, with no error anywhere. A run id is a fact about this run, so it holds when the file
- * does not.
+ * This used to have a third clause, "a daemon is alive somewhere on this machine", read from a
+ * global state file. That file is gone with the background daemon (D4b), and it was never a fact
+ * about *this* run in the first place: it went missing while the daemon was very much alive
+ * (#922), and every Stop press then landed in control.jsonl and was read by nobody, in silence
+ * (#905). A run id holds when a file about another process does not.
  */
-export function isSteerable(
-  opts: { persist: boolean; runId?: string | undefined },
-  hasDashboard: boolean,
-  daemonAlive: boolean,
-): boolean {
-  return opts.persist && (hasDashboard || opts.runId !== undefined || daemonAlive)
+export function isSteerable(opts: { persist: boolean; runId?: string | undefined }, hasDashboard: boolean): boolean {
+  return opts.persist && (hasDashboard || opts.runId !== undefined)
 }
 
 /**
@@ -1181,23 +1156,6 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
   // the dashboard rehydrates exactly as it looked, then leave it up read-only.
   if (opts.resume) return resumeRun(opts, io)
 
-  // `--daemon-serve` is the detached child's own entry: it *is* the persistent dashboard,
-  // serving until signalled. Internal — the background `--daemon` path spawns it (#456).
-  if (opts.daemonServe) {
-    await runDaemon(opts.cwd ?? process.cwd(), {
-      ...(opts.port !== undefined ? { port: opts.port } : {}),
-      ...(opts.host !== undefined ? { host: opts.host } : {}),
-    })
-    return 0
-  }
-
-  // `framework --daemon` runs the dashboard in the background (detached) and returns, printing
-  // the convenience commands (#456). Bare `framework` foregrounds it instead (below).
-  if (opts.daemon) return ensureDaemonCmd(opts, io)
-
-  // `framework stop` stops this workspace's background dashboard.
-  if (opts.stop) return stopDaemonCmd(opts, io)
-
   // `framework maintain` sweeps the registered repos, running the maintenance loop on
   // any that grew un-reviewed commits (#298). No dashboard, no intent.
   if (opts.maintain) return maintainCmd(opts, io)
@@ -1367,13 +1325,8 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // first so a previous run's picks can never fire into this one (gate ids repeat across
   // runs).
   //
-  // Wired when this run's own dashboard is up (#427), or when whoever spawned it said it is
-  // steerable. That second half used to ask `daemonStatus()`, a machine-global file this run has
-  // nothing to do with, and it was wrong in both directions (#905): absent while a daemon is live,
-  // so a daemon-spawned run ignored Stop completely (the daemon spawns with --no-dashboard, so the
-  // file was the only thing wiring it); and present while unrelated to this run, so a headless run
-  // parked in the #714 chat loop forever. The daemon passes --run-id when it spawns, which is a
-  // fact about *this* run rather than about the machine, so that is the signal now.
+  // Wired when this run's own dashboard is up (#427), or when whoever spawned it passed --run-id
+  // and therefore steers it (see {@link isSteerable}).
   // What this session hands back when it ends (#1102). Mutable: the action bar's checkboxes can
   // disarm it at any point up to the moment it settles, which is the whole point of them being
   // pre-commitments rather than buttons. Opening a PR implies pushing, so the pair is normalised
@@ -1394,7 +1347,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   let recordBind: ((projectId: string) => void) | undefined
 
   let control: ControlWatcher | undefined
-  if (isSteerable(opts, newDashboard, await daemonStatus() !== undefined)) {
+  if (isSteerable(opts, newDashboard)) {
     try {
       await resetControl(cwd)
       control = watchControl(cwd, entry => {
@@ -1923,23 +1876,14 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
 }
 
 /**
- * Bare `framework` (no prompt): run the dashboard server in the foreground (#456), so its
- * logs and any server-thrown errors are visible and Ctrl+C stops it. If a background daemon
- * (`framework --daemon`) already owns the port, defer to it rather than fight for the bind.
- * Blocks until the server is signalled (SIGINT/SIGTERM).
+ * Bare `framework` (no prompt): run the dashboard server in the foreground (#456), so its logs and
+ * any server-thrown errors are visible and Ctrl+C stops it — along with every session it is
+ * running, which is the only mode there is. Blocks until the server is signalled (SIGINT/SIGTERM).
  */
 async function runForegroundDaemonCmd(opts: CliOptions, io: CliIO): Promise<number> {
   const cwd = opts.cwd ?? process.cwd()
   const port = opts.port ?? DEFAULT_DAEMON_PORT
   const host = opts.host
-  const existing = await daemonStatus()
-  if (existing) {
-    io.out(`◆ dashboard already running in the background: ${existing.url}`)
-    io.out('  Stop it with `framework stop`, or open the URL above.')
-    // The dashboard this defers to *is* the background one, so its footer is the background one.
-    await printStartupFooter(io, { background: true })
-    return 0
-  }
   // #1051: pre-generate the shared token for a non-loopback bind so onListening (sync) can print
   // the reachable URL; runDaemon reuses the same persisted token.
   const token = host !== undefined && !isLoopbackHost(host) ? await ensureDaemonToken() : undefined
@@ -1952,11 +1896,11 @@ async function runForegroundDaemonCmd(opts: CliOptions, io: CliIO): Promise<numb
         if (!isLoopbackHost(state.host ?? DEFAULT_DAEMON_HOST)) {
           printNonLoopbackAccess(io, state.host ?? DEFAULT_DAEMON_HOST, state.url, token)
         }
-        io.out('  Ctrl+C to stop. Server logs stream below.')
+        io.out('  Ctrl+C to stop the dashboard and every session it is running. Server logs stream below.')
         // #312 asks bare `framework` to print the commands + version too. onListening is sync and
         // runDaemon then blocks until signalled, so this is fire-and-forget by necessity: the
         // update line lands a moment later, above the server logs.
-        void printStartupFooter(io, { background: false })
+        void printStartupFooter(io)
       },
     })
   } catch (err) {
@@ -1981,37 +1925,6 @@ function printNonLoopbackAccess(io: CliIO, host: string, url: string, token: str
 }
 
 /**
- * `framework --daemon` (#456): ensure the persistent background dashboard is running
- * for this workspace, then print the URL, the convenience commands, and the version.
- * Idempotent — a second call just re-reports the live one. Bare `framework` foregrounds
- * the same server instead.
- */
-async function ensureDaemonCmd(opts: CliOptions, io: CliIO): Promise<number> {
-  const cwd = opts.cwd ?? process.cwd()
-  const port = opts.port ?? DEFAULT_DAEMON_PORT
-  let result
-  try {
-    result = await ensureDaemon(cwd, { port, ...(opts.host !== undefined ? { host: opts.host } : {}) })
-  } catch (err) {
-    io.err(`could not start the dashboard daemon (${errorMessage(err)}).`)
-    return 1
-  }
-  // One daemon per machine (#393): when it is already running, `framework` in a new repo
-  // would not otherwise register that repo (only the daemon's own cwd is added on startup).
-  // Register it here too, best-effort, so it shows up in the Projects list either way.
-  await registerHomeProject(cwd)
-
-  const { state, alreadyRunning } = result
-  io.out(`◆ dashboard ${alreadyRunning ? 'already running' : 'started'}: ${state.url}`)
-  // #1051: warn + print the token URL when the daemon is actually bound non-loopback. Keyed off the
-  // host that is bound, not the flag, so re-reporting an already-running loopback daemon stays quiet.
-  const boundHost = state.host ?? DEFAULT_DAEMON_HOST
-  if (!isLoopbackHost(boundHost)) printNonLoopbackAccess(io, boundHost, state.url, await readDaemonToken())
-  await printStartupFooter(io, { background: true })
-  return 0
-}
-
-/**
  * The startup footer every dashboard path prints (#312): the convenience commands, the version,
  * and then — once npm answers — whether that version is the latest.
  *
@@ -2019,19 +1932,12 @@ async function ensureDaemonCmd(opts: CliOptions, io: CliIO): Promise<number> {
  * info first, and the foreground path (bare `framework`) blocks on the server forever, so a line
  * printed after the await would never appear there at all. `checkForUpdate` is already forgiving:
  * offline or slow (2.5s cap) resolves to 'unknown', which prints nothing.
- *
- * `background: false` drops the `framework stop` line — that stops a *detached* dashboard, and the
- * foreground path tells you Ctrl+C instead.
  */
-export function printStartupFooter(
-  io: CliIO,
-  opts: { background: boolean; fetchLatest?: VersionFetcher },
-): Promise<void> {
+export function printStartupFooter(io: CliIO, opts: { fetchLatest?: VersionFetcher } = {}): Promise<void> {
   const version = frameworkVersion()
   io.out('')
   io.out('Type a prompt on the dashboard to start a session, or use:')
   io.out('  framework "<what to build>"   Build (streams to the dashboard)')
-  if (opts.background) io.out('  framework stop                Stop the background dashboard')
   io.out('  framework --help              All options')
   io.out('')
   io.out(`The Framework v${version}`)
@@ -2098,13 +2004,6 @@ async function worktreesCmd(command: WorktreesCommand, cwd: string, io: CliIO): 
   )
   // A worktree that could not be removed is a failure to report, not a silent partial success.
   return skipped.some(skip => skip.reason !== 'still running') ? 1 : 0
-}
-
-/** `framework stop`: stop the machine's background dashboard, if any (#393). */
-async function stopDaemonCmd(_opts: CliOptions, io: CliIO): Promise<number> {
-  const stopped = await stopDaemon()
-  io.out(stopped ? '◆ dashboard stopped.' : 'No background dashboard was running.')
-  return 0
 }
 
 /**

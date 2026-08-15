@@ -5,9 +5,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  builtinDomainPresets,
   selectPreset,
-  type DomainPreset,
   type FrameworkSignals,
 } from '@gemstack/ai-autopilot'
 import { type ClaudeCodeDriverOptions, type Driver, type DriverSession, type PermissionMode } from './driver/index.js'
@@ -39,7 +37,6 @@ import {
   describeResolvedConfig,
   fileConfigLayer,
   resolveRunConfig,
-  resolvedModes,
   type ConfigLayer,
   type ResolvedRunConfig,
 } from './config-layers.js'
@@ -804,26 +801,6 @@ export function mergeRunConfig(opts: RunConfigFlags, file: FrameworkFileConfig):
   return resolveRunConfig([flagConfigLayer(opts), fileConfigLayer(file)])
 }
 
-/**
- * Resolve `--preset <name>` to a shipped {@link DomainPreset}, loaded with the
- * active `modes` so its conditions variants are selected (#254, #256). Returns
- * nothing when no `--preset` was given; an error (with the available names) when
- * the name does not match a built-in.
- */
-export async function resolveDomainPreset(
-  name: string | undefined,
-  modes: readonly string[],
-): Promise<{ preset?: DomainPreset; error?: string }> {
-  if (!name) return {}
-  const presets = await builtinDomainPresets({ modes })
-  const preset = selectPreset(presets, name)
-  if (!preset) {
-    const available = presets.map(p => p.name).join(', ') || '(none shipped)'
-    return { error: `unknown --preset: ${name}. Available: ${available}` }
-  }
-  return { preset }
-}
-
 /** The run-scoped state {@link settleRun} needs to close out either run path. */
 interface RunEpilogue {
   io: CliIO
@@ -1317,26 +1294,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     return 2
   }
 
-  // Resolve which Open Loop domain preset (+ modes + build event) to run under:
-  // --preset / the-framework.yml, or none at all (#545). Nothing infers one.
-  let presetName = config.presetName
-  let modeList = resolvedModes(config)
-  let buildEvent = config.buildEvent
-  let domainPreset: DomainPreset | undefined
-
-  // An explicit --preset / the-framework.yml preset is validated up front — a bad
-  // name is a usage error, independent of the environment, so it fails the same way
-  // whether or not the agent is installed (before preflight).
-  if (presetName) {
-    const resolved = await resolveDomainPreset(presetName, modeList)
-    if (resolved.error) {
-      io.err(resolved.error)
-      io.err('Run `framework --help` for usage.')
-      return 2
-    }
-    domainPreset = resolved.preset
-  }
-
   // Fail early and clearly if a live run's prerequisites are missing — before the
   // run, which needs the wrapped agent.
   if (!fake && !opts.skipPreflight) {
@@ -1752,17 +1709,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     else if (merge?.outcome === 'failed') io.err(`✗ could not merge the PR: ${merge.error}`)
   }
 
-  // A mode/kind given with no preset in effect has nothing to act on: note it.
-  // Autopilot is the exception — it auto-answers the run's choice gates, which
-  // needs no preset. (It no longer steers the prompt's maintenance stance: #556
-  // moved that section out, see #801.)
-  const presetOnlyModes = modeList.filter(m => m !== 'autopilot')
-  if (presetOnlyModes.length && !domainPreset) {
-    io.err(`note: ${presetOnlyModes.join(' + ')} mode(s) have no effect without a preset.`)
-  }
-  if (buildEvent && !domainPreset) {
-    io.err(`note: build event "${buildEvent}" has no effect without a preset.`)
-  }
   // The run owns the browser (#793): launching it here, rather than letting chrome-devtools-mcp
   // launch its own, is what lets the #609 preview attach to the same page. Undefined when the
   // machine has no Chrome, which leaves `--browser` on its old path rather than failing the run.
@@ -1987,7 +1933,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
       await runPrompt({
         ...sharedRunOptions,
         prompt: isResearch ? presets.research.render(intent) : intent,
-        ...(modeList.includes('autopilot') ? { autopilot: true } : {}),
+        ...(config.autopilot ? { autopilot: true } : {}),
         ...(opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
       })
       return {
@@ -2011,9 +1957,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     ...(opts.todoMaxItems ? { todoMaxItems: opts.todoMaxItems } : {}),
     // Modes ride along even without a domain preset: autopilot also steers the
     // #326 system prompt's maintenance stance.
-    ...(domainPreset ? { preset: domainPreset } : {}),
-    ...(modeList.length ? { modes: modeList } : {}),
-    ...(buildEvent ? { buildEvent } : {}),
   }
 
   return settleRun(epilogue('session'), async () => {

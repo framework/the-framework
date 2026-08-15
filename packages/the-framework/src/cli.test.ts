@@ -19,7 +19,6 @@ import {
   parseArgs,
   printStartupFooter,
   promptRunArgs,
-  resolveDomainPreset,
   runCli,
   runLogEntry,
   runLogKind,
@@ -569,28 +568,6 @@ test('parseArgs leaves the mode toggles unset until a flag names them (#841)', (
   assert.equal(parseArgs(['--no-transparent', 'x']).transparent, false)
 })
 
-test('resolveDomainPreset resolves a shipped preset by name (#254/#256)', async () => {
-  const none = await resolveDomainPreset(undefined, [])
-  assert.deepEqual(none, {})
-
-  const { preset, error } = await resolveDomainPreset('software-development', [])
-  assert.equal(error, undefined)
-  assert.equal(preset?.name, 'software-development')
-  assert.ok((preset?.loops.length ?? 0) >= 1)
-
-  const bad = await resolveDomainPreset('no-such-domain', [])
-  assert.equal(bad.preset, undefined)
-  assert.match(bad.error!, /unknown --preset: no-such-domain/)
-  assert.match(bad.error!, /software-development/) // lists what's available
-})
-
-test('runCli rejects an unknown --preset with a usage error (exit 2)', async () => {
-  const { io, err } = capture()
-  const code = await runCli(['--preset', 'nope', 'a blog'], io)
-  assert.equal(code, 2)
-  assert.ok(err.some(l => /unknown --preset: nope/.test(l)))
-})
-
 test('runCli rejects --resume-session on a build run rather than dropping it (#782)', async () => {
   const { io, err } = capture()
   const code = await runCli(['--fake', '--no-dashboard', '--resume-session', 'sess-42'], io)
@@ -606,26 +583,11 @@ test('runCli honors --resume-session on the prompt path it belongs to (#782)', a
   assert.ok(!err.some(l => /--resume-session only applies/.test(l)))
 })
 
-test('runCli notes mode flags given without a preset', async () => {
-  const { io, err } = capture()
-  // --fake so the note fires before any real run; unknown-preset path is not hit.
-  const code = await runCli(['--fake', '--no-dashboard', '--technical'], io)
-  assert.equal(code, 0)
-  assert.ok(err.some(l => /technical mode\(s\) have no effect without a preset/.test(l)))
-})
-
 test('runCli does not note --autopilot without a preset (it auto-answers choice gates)', async () => {
   const { io, err } = capture()
   const code = await runCli(['--fake', '--no-dashboard', '--autopilot'], io)
   assert.equal(code, 0)
   assert.ok(!err.some(l => /have no effect without a preset/.test(l)))
-})
-
-test('runCli notes --kind given without a preset (#265)', async () => {
-  const { io, err } = capture()
-  const code = await runCli(['--fake', '--no-dashboard', '--kind', 'bug-fix'], io)
-  assert.equal(code, 0)
-  assert.ok(err.some(l => /build event "bug-fix" has no effect without a preset/.test(l)))
 })
 
 test('chooseSessionLink defaults a live run to the claude.ai/code session list (#212)', () => {

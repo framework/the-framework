@@ -117,11 +117,16 @@ test('502s when the bridge is gone', async () => {
   // than hang the pane.
   const bridge = await fakeBridge()
   const dead = bridge.port
-  bridge.close()
+  // The proxy takes its own port BEFORE the bridge gives its one up. Closing first frees the
+  // bridge's port back to the ephemeral pool, and the proxy's `listen(0)` is then sometimes
+  // handed that very number (measured at ~1 in 1500 on Linux) — whereupon the proxy dials
+  // itself, its own handler does not recognise the bare `/stream` it sends as a browser route,
+  // and the 404 it falls through to comes back where this expects the refusal's 502.
   const proxy = await proxyServer(async () => dead)
+  bridge.close()
   try {
     const res = await fetch(`${proxy.url}/browser/proj/run/stream`)
-    assert.equal(res.status, 502)
+    assert.equal(res.status, 502, `expected the refused connection's 502, got ${res.status}: ${await res.text()}`)
   } finally {
     proxy.close()
   }

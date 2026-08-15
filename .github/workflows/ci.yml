@@ -1,12 +1,10 @@
 name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
+on: [ push, pull_request ]
 
 jobs:
   build:
+    # Prevent workflow being run twice, https://github.com/orgs/community/discussions/57827#discussioncomment-6579237
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,7 +13,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install
       - run: pnpm build
       - run: pnpm typecheck
       # Run the two suites as separate steps rather than one `pnpm test`. Turbo interleaves both

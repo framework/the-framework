@@ -349,6 +349,13 @@ async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
 }
 
 /**
+ * What the previous leg of a run says about itself, for {@link waitOutFinishedLeg}. `unknown` is
+ * the honest third answer — the leg has no readable state *this instant* — and is deliberately
+ * not folded into either of the other two.
+ */
+export type FinishedLegState = 'ended' | 'running' | 'unknown'
+
+/**
  * Wait out the previous leg of the run a continuation is aimed at (#1529). A Resume clicked the
  * instant a run's row flips `done` can land while the child that wrote that ending is still
  * mid-exit: the run's slot then still holds a live pid, and the busy guard read "already active"
@@ -357,18 +364,35 @@ async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
  * right behind it (see `retiring` in {@link createProjectRuntime}), so wait for both, bounded by
  * `graceMs`, and let the reuse read a settled archive. A leg still calling itself `running` is a
  * genuine collision: not waited on, so the guard's refusal stands.
+ *
+ * `readLegState` is asked until it commits, rather than sampled once (#1540). A leg's state is
+ * read off a `run.json` its own process rewrites in place, so a single read can come back
+ * `unknown` for reasons that have nothing to do with the leg — a torn read, or the beat between
+ * the archive being written and the worktree going. Taking one such sample for "still running"
+ * skipped the wait entirely and handed the continuation to the busy guard mid-exit: #1529's
+ * refusal back as a rarer race, and the flake that sent this here. Only a leg that positively
+ * reports `running` short-circuits; `unknown` re-asks on the next tick, and the loop still ends
+ * the moment the slot clears, so the common path costs exactly one read as before.
  */
 export async function waitOutFinishedLeg(
   key: string,
   slots: { starting: Set<string>; activeRuns: Map<string, number>; retiring: Map<string, Promise<void>> },
-  legHasEnded: () => Promise<boolean>,
+  readLegState: () => Promise<FinishedLegState>,
   graceMs: number,
 ): Promise<void> {
   const occupied = (): boolean => slots.starting.has(key) || slots.activeRuns.has(key)
   if (!occupied() && !slots.retiring.has(key)) return
-  if (!(await legHasEnded())) return
   const deadline = Date.now() + graceMs
-  while (occupied() && Date.now() < deadline) await delay(25)
+  let ended = false
+  while (occupied() && Date.now() < deadline) {
+    // Settled at `ended`: the leg cannot un-finish, so the read is not repeated once it answers.
+    if (!ended) {
+      const state = await readLegState()
+      if (state === 'running') return
+      ended = state === 'ended'
+    }
+    await delay(25)
+  }
   await slots.retiring.get(key)?.catch(() => {})
 }
 
@@ -909,8 +933,11 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
         async () => {
           // The composed read (live meta wins over archive): the leg just wrote `done` into its
           // worktree and teardown has not archived it yet, so the archive-only list cannot see it.
+          // No row at all is `unknown`, never `ended` (#1540): the leg is mid-teardown, or its
+          // meta was caught mid-rewrite, and neither says anything about whether it is still up.
           const meta = continueRunId ? await findRun(projectCwd, continueRunId).catch(() => undefined) : undefined
-          return meta !== undefined && meta.status !== 'running'
+          if (!meta) return 'unknown'
+          return meta.status === 'running' ? 'running' : 'ended'
         },
         FINISHED_LEG_EXIT_GRACE_MS,
       )

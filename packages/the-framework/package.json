@@ -60,7 +60,6 @@
     "check:prompt-drift": "node scripts/check-prompt-drift.mjs"
   },
   "dependencies": {
-    "@gemstack/ai-autopilot": "workspace:^",
     "telefunc": "^0.2.22",
     "yaml": "^2.5.0"
   },

@@ -5,22 +5,18 @@ Autonomous AI programming: humans make the important decisions while The Framewo
 - The product is a local daemon plus a dashboard. You register your repos, and from then on coding agents (Claude Code today, others behind the same seam) work on them in sessions: each session gets a throwaway copy of the repo, does its work, and hands the result off as a pull request. Your own checkout is never touched.
 - The human's job shrinks to decisions: answer the questions a session parks on, accept or reject proposed tickets, review PRs. Everything else — picking the next task, triaging, planning, fixing red CI, merging on green — the daemon does by itself when nobody is at the keyboard, as long as the account's quota allows it.
 - The coding agent is a black box: The Framework prompts it, lets it run a full turn, then reads the code and the turn's final message. It never micro-manages individual tool calls, and the agent keeps its own subscription login — The Framework adds orchestration, not another AI bill.
-- The product sits on a stack of engines that are also published on their own: an orchestration layer (scope → build → review loops until production-grade) and an agent runtime (providers, tools, streaming). Two satellites complete the family: a browser extension that bridges claude.ai cloud sessions back to the daemon, and the product's website.
+- Two satellites complete the family: a browser extension that bridges claude.ai cloud sessions back to the daemon, and the product's website.
 - The Framework develops itself: this repo's `tickets/` and `TODO_AGENTS.md` are its own roadmap and queue, worked by the very loops described here.
 
 ```mermaid
 graph TD
     dash["<b>framework-dashboard</b><br/>the UI — a pure projection of<br/>the files the daemon writes"]
     product["<b>the-framework</b><br/>the product: CLI + daemon + session lifecycle,<br/>git handoff, autonomy, chat surfaces"]
-    autopilot["<b>ai-autopilot</b><br/>orchestration: bootstrap spine,<br/>review loops, supervisor"]
-    sdk["<b>ai-sdk</b><br/>agent runtime: providers,<br/>tools, streaming"]
 
     dash --> product
-    product --> autopilot
-    autopilot --> sdk
 ```
 
-One family, one rule: the arrows point one way — the dashboard renders the product, the product orchestrates through `ai-autopilot`, which runs agents through `ai-sdk` — and nothing depends "up".
+The arrows point one way — the dashboard renders the product — and nothing depends "up".
 
 ## Rationales
 

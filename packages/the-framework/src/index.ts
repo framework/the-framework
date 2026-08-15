@@ -1,13 +1,11 @@
 /**
  * `@gemstack/the-framework` — **The (AI) Framework**: turnkey, zero-config AI
  * orchestration. It wraps a coding-agent CLI (Claude Code today) as a **black
- * box** and takes a user from an idea to a running app, with a localhost
+ * box** and takes a ticket to a reviewed pull request, with a localhost
  * dashboard that foregrounds the orchestration the agent's own chat cannot show.
  *
- * The whole product is built on `@gemstack/ai-autopilot`'s already-shipped
- * spine (bootstrap, the loop, presets, deploy targets);
- * this package adds the two missing pieces from #166: the **driver** seam that
- * wraps the agent, and the **product shell** (CLI + dashboard) that drives it.
+ * Two pieces: the **driver** seam that wraps the agent, and the **product shell**
+ * (CLI + dashboard) that drives it.
  *
  * ## Driver seam
  * The one abstraction we wrap a coding-agent CLI behind. We prompt it, let its

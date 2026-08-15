@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { LoopEngine, defineLoop, definePrompt, type SupervisorEvent } from '@gemstack/ai-autopilot'
+import type { SupervisorEvent } from './run-types.js'
 import { FakeDriver } from './driver/index.js'
 import {
   driverBuild,

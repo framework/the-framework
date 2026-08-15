@@ -23,9 +23,6 @@ produced, and gates on the **outcome** (builds / serves / review-passes), then
 re-prompts. The seam is the code, never the agent's individual tool calls, so the
 wrapped agent keeps its subscription-based auth and stays swappable.
 
-It runs on `@gemstack/ai-autopilot`'s spine (bootstrap flow, the loop, framework
-presets, deploy targets) and adds the two missing pieces:
-
 - **The driver seam** ([`Driver`](./src/driver/types.ts)) - the one abstraction
   we wrap an agent CLI behind. [`ClaudeCodeDriver`](./src/driver/claude-code.ts)
   is the first real driver (`claude -p` in stream-json mode, one fresh invocation

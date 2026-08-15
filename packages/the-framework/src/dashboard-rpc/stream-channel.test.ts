@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { EventStream } from '@gemstack/ai-autopilot'
+import { EventStream } from '../event-stream.js'
 import { forwardStream } from './stream-channel.js'
 
 const tick = () => new Promise(r => setImmediate(r))

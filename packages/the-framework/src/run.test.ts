@@ -7,7 +7,7 @@ import { defineDomainPreset, defineLoop } from '@gemstack/ai-autopilot'
 import type { Prompt } from '@gemstack/ai-autopilot'
 import { runFramework } from './run.js'
 import { requestChoices, requestMultiSelect, runAwaitRounds, type ChoicesOption, type MultiSelectOption } from './await-gate.js'
-import { FAKE_INTENT, FAKE_SIGNALS, fakeDriver } from './fake-script.js'
+import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { RunMessageQueue } from './run-messages.js'
 import { FakeDriver, type Driver, type DriverSession } from './driver/index.js'
 import { composeRunSystem } from './system-prompt.js'
@@ -31,16 +31,12 @@ function recordingDriver(): { driver: Driver; system: () => string } {
 
 test('runFramework drives the whole flow through the driver, offline', async () => {
   const events: FrameworkEvent[] = []
-  const { result, detection } = await runFramework({
+  const { result } = await runFramework({
     intent: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     onEvent: e => events.push(e),
   })
-
-  // Preset detection picked Vike from the deps.
-  assert.equal(detection.framework, 'Vike')
 
   // No preset and no serve config, so nothing reviewed the build (#1372):
   // the loop never ran and the build turn was the whole run.
@@ -60,7 +56,6 @@ test('runFramework surfaces the wrapped agent real session id via session-update
     intent: FAKE_INTENT,
     driver: fakeDriver(), // reports sessionId "fake-orders-app"
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     onEvent: e => events.push(e),
   })
 
@@ -82,7 +77,6 @@ test('runFramework resolves a {sessionId} link template once the id is known', a
     intent: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     sessionLink: 'https://code.example.com/s/{sessionId}',
     onEvent: e => events.push(e),
   })
@@ -104,7 +98,6 @@ test('runFramework accumulates per-turn usage and emits a running total (#322)',
     intent: FAKE_INTENT,
     driver: fakeDriver(), // every scripted turn reports $0.02 usage
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     onEvent: e => events.push(e),
   })
 
@@ -132,7 +125,6 @@ test('runFramework stops itself once the budget cap is reached (#322)', async ()
       intent: FAKE_INTENT,
       driver: fakeDriver(),
       cwd: '/tmp/ws',
-      signals: FAKE_SIGNALS,
       budgetUsd: 0.01,
       onEvent: e => events.push(e),
     }),
@@ -160,7 +152,6 @@ test('runFramework shows a literal session link immediately (no template)', asyn
     intent: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     sessionLink: 'https://code.example.com/live',
     onEvent: e => events.push(e),
   })
@@ -173,23 +164,22 @@ test('runFramework shows a literal session link immediately (no template)', asyn
 
 test('the run system channel is exactly composeRunSystem, with nothing appended (#547)', async () => {
   const { driver, system } = recordingDriver()
-  await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', signals: FAKE_SIGNALS, onEvent: () => {} })
-  // runFramework composes no framing of its own: detection narrates, it never reaches the prompt.
-  assert.equal(system(), composeRunSystem({ tf: { prompt: FAKE_INTENT, params: { autopilot: false } } }))
+  await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: () => {} })
+  // runFramework composes no framing of its own.
+  assert.equal(system(), composeRunSystem({ tf: { prompt: FAKE_INTENT, params: {} } }))
 })
 
 test('transparent empties the build-path system channel (#625)', async () => {
   const { driver, system } = recordingDriver()
-  await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', signals: FAKE_SIGNALS, transparent: true, onEvent: () => {} })
+  await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', transparent: true, onEvent: () => {} })
   assert.equal(system(), '') // raw claude: no #326 block, no emit protocols
 })
 
-test('detected deps never reach the system channel (#547)', async () => {
+test('the project never frames the agent (#547)', async () => {
   const { driver, system } = recordingDriver()
-  // FAKE_SIGNALS carries vike-react + @prisma/client; none of it may frame the agent.
-  const { detection } = await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', signals: FAKE_SIGNALS, onEvent: () => {} })
-  assert.equal(detection.framework, 'Vike') // detection still happens...
-  assert.doesNotMatch(system(), /vike-auth|llms\.txt|Skill:|Persona:|Project memory/) // ...but stays out of the prompt
+  await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: () => {} })
+  // Nothing about the project reaches the prompt — no skill, persona or memory framing.
+  assert.doesNotMatch(system(), /vike-auth|llms\.txt|Skill:|Persona:|Project memory/)
 })
 
 /** A minimal domain preset whose major-change loop runs one review prompt. */
@@ -348,7 +338,6 @@ test('a build turn that stops to ask fires a live gate and resumes on the pick (
     intent: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     onEvent: e => {
       events.push(e)
       if (e.kind === 'driver' && e.event.type === 'start') prompts.push(e.event.prompt)
@@ -381,7 +370,6 @@ test('a run with no preset and no serve config reviews nothing (#1372)', async (
     intent: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     onEvent: () => {},
   })
   // The agent is a black box (#1372): with no opted-in review (preset) and no mechanical
@@ -411,7 +399,6 @@ test('a build turn that stops to showMultiSelect fires a checklist gate and resu
     intent: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     onEvent: e => {
       events.push(e)
       if (e.kind === 'driver' && e.event.type === 'start') prompts.push(e.event.prompt)
@@ -448,7 +435,6 @@ test('a build turn that stops for plan approval resumes on Approve (#358)', asyn
     intent: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     onEvent: e => {
       events.push(e)
       if (e.kind === 'driver' && e.event.type === 'start') prompts.push(e.event.prompt)
@@ -487,7 +473,6 @@ test('a declined plan stops the run cleanly instead of building on (#358)', asyn
       intent: FAKE_INTENT,
       driver,
       cwd: '/tmp/ws',
-      signals: FAKE_SIGNALS,
       onEvent: e => events.push(e),
       requestChoice: async req => ({ picked: req.confirm ? 'decline' : 'proceed', by: 'user' }),
     }),
@@ -511,7 +496,7 @@ test('without a requestChoice handler a build that asks is not gated (#337 headl
     sessionId: 'headless337',
   })
   const events: FrameworkEvent[] = []
-  await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', signals: FAKE_SIGNALS, onEvent: e => events.push(e) })
+  await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: e => events.push(e) })
   assert.equal(events.some(e => e.kind === 'choice'), false)
   assert.equal(events.some(e => e.kind === 'choice-resolved'), false)
 })
@@ -592,7 +577,6 @@ test('a fake run skips the backlog loop by default; the demo stays deterministic
     intent: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     onEvent: e => events.push(e),
   })
   assert.equal(result.todo, undefined)
@@ -613,7 +597,6 @@ test('runFramework runs the backlog loop after the build when opted in (#323)', 
       intent: FAKE_INTENT,
       driver: fakeDriver(),
       cwd,
-      signals: FAKE_SIGNALS,
       todoLoop: true,
       onEvent: e => events.push(e),
     })
@@ -635,7 +618,6 @@ test('runFramework pauses the run once the quota boundary is reached (#529/#879)
       intent: FAKE_INTENT,
       driver: fakeDriver(),
       cwd: '/tmp/ws',
-      signals: FAKE_SIGNALS,
       consumptionGate: () => 'Current week (all models)',
       onEvent: e => events.push(e),
     }),
@@ -657,7 +639,6 @@ test('runFramework leaves a resume note on the backlog when it pauses (#529)', a
         intent: FAKE_INTENT,
         driver: fakeDriver(),
         cwd,
-        signals: FAKE_SIGNALS,
         consumptionGate: () => 'Current week (all models)',
         onEvent: e => events.push(e),
       }),
@@ -677,7 +658,7 @@ test('runFramework appends the resume note to an existing backlog (#529)', async
   try {
     await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] Something already open') // no trailing newline
     await assert.rejects(
-      runFramework({ intent: FAKE_INTENT, driver: fakeDriver(), cwd, signals: FAKE_SIGNALS, consumptionGate: () => 'Current session' }),
+      runFramework({ intent: FAKE_INTENT, driver: fakeDriver(), cwd, consumptionGate: () => 'Current session' }),
     )
     const todo = await readFile(join(cwd, 'TODO_AGENTS.md'), 'utf8')
     // The existing entry survives and the note lands on its own line.
@@ -694,7 +675,6 @@ test('runFramework carries on while the limits are clear (#529)', async () => {
     intent: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     consumptionGate: () => {
       asked++
       return null
@@ -713,7 +693,6 @@ test('runFramework carries on when the gate itself fails (#529)', async () => {
     intent: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     consumptionGate: () => {
       throw new Error('quota unreadable')
     },
@@ -722,7 +701,7 @@ test('runFramework carries on when the gate itself fails (#529)', async () => {
 })
 
 test('runFramework leaves the run ungated with no consumption gate (#529)', async () => {
-  const { result } = await runFramework({ intent: FAKE_INTENT, driver: fakeDriver(), cwd: '/tmp/ws', signals: FAKE_SIGNALS })
+  const { result } = await runFramework({ intent: FAKE_INTENT, driver: fakeDriver(), cwd: '/tmp/ws' })
   assert.ok(result)
 })
 
@@ -883,7 +862,6 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
       intent: FAKE_INTENT,
       driver,
       cwd,
-      signals: FAKE_SIGNALS,
       // Explicit, so this proves the hand-off outranks an opt-in rather than merely
       // sharing a default with it.
       todoLoop: true,
@@ -920,7 +898,7 @@ test('a hand-off run is told the await gates are unavailable, a local one is not
   // await protocol for exactly these runs, and only these.
   const systemOf = async (driver: Driver): Promise<string> => {
     const events: FrameworkEvent[] = []
-    await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', signals: FAKE_SIGNALS, onEvent: e => events.push(e) })
+    await runFramework({ intent: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: e => events.push(e) })
     const prompt = events.find(e => e.kind === 'system-prompt')
     return prompt?.kind === 'system-prompt' ? prompt.text : ''
   }
@@ -937,7 +915,6 @@ test('a hand-off run does not stay open for messages (#1225)', async () => {
     intent: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     messages,
     onEvent: () => {},
   })
@@ -974,7 +951,6 @@ test('runFramework resumes a stopped leg: session resumed, message sent verbatim
     intent: RESUME,
     driver,
     cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
     resumeSessionId: 'sess-42',
     onEvent: e => events.push(e),
   })

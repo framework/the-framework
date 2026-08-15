@@ -5,8 +5,6 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  selectPreset,
-  type FrameworkSignals,
 } from '@gemstack/ai-autopilot'
 import { type ClaudeCodeDriverOptions, type Driver, type DriverSession, type PermissionMode } from './driver/index.js'
 import { AGENTS, AGENT_SPECS, isAgentName, type AgentName } from './agent.js'
@@ -28,8 +26,7 @@ import {
   type RunFrameworkOptions,
   type RunFrameworkResult,
 } from './run.js'
-import { FAKE_INTENT, FAKE_SIGNALS, fakeDriver } from './fake-script.js'
-import { readProjectSignals } from './project.js'
+import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
 import { sessionTodoPending } from './todo-loop.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from './config.js'
@@ -1317,9 +1314,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   }
 
   const claudeOpts = claudeDriverOptions(opts)
-  // Detection signals: fixed for the fake demo, read from the project otherwise.
   // Computed once here, reused by extension discovery and the run.
-  const signals = fake ? FAKE_SIGNALS : readProjectSignals(cwd)
   // One controller for the whole run: the dashboard Stop button aborts it once
   // wired below.
   const controller = new AbortController()
@@ -1948,7 +1943,6 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     ...sharedRunOptions,
     intent,
     scope: opts.scope,
-    signals,
     // A build continuation (#1467): resume the stopped leg's conversation; the intent above is
     // the continuation message and runFramework sends it verbatim.
     ...(continueBuild && opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),

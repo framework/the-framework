@@ -1,11 +1,8 @@
 import {
-  builtinFrameworkPresetRegistry,
   type BootstrapEvent,
   type BuildContext,
   type BootstrapResult,
   type BootstrapScope,
-  type FrameworkDetection,
-  type FrameworkSignals,
   type SupervisorEvent,
   type SupervisorRun,
   type Verdict,
@@ -38,8 +35,6 @@ export interface RunFrameworkOptions {
   cwd: string
   /** Model id to pass through to the driver. */
   model?: string
-  /** Signals for preset detection (deps/files). Default: none, so the flagship preset wins. */
-  signals?: FrameworkSignals
   /**
    * A user-authored system prompt (from `SYSTEM.md`) injected into every prompt
    * (#301). Load with `loadUserSystemPrompt(cwd)`. Composed after the built-in
@@ -145,17 +140,14 @@ export interface RunFrameworkOptions {
 /** What a run returns. */
 export interface RunFrameworkResult {
   result: BootstrapResult
-  detection: FrameworkDetection
   events: FrameworkEvent[]
   /** How the backlog loop (#323) ended, when it ran. */
   todo?: TodoLoopResult
 }
 
 /**
- * Run the whole turnkey flow: detect the framework preset, frame the wrapped
- * agent with its framework skill (page builder + docs), then drive ai-autopilot's `Bootstrap`
- * (scope → build) entirely *through*
- * the driver (option A). Every phase, plus the agent's own progress, streams as
+ * Run the whole turnkey flow: frame the wrapped agent, then drive scope → build entirely
+ * *through* the driver (option A). Every phase, plus the agent's own progress, streams as
  * a {@link FrameworkEvent}. Reversible: swap in a
  * different `Driver`, without touching this wiring.
  */
@@ -172,11 +164,6 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     }
   }
 
-  // 1. Detect the framework the project already uses. Detection only narrates
-  // ("Detected Vike") and rides the result — nothing about it reaches the agent's
-  // prompt (#547).
-  const signals = opts.signals ?? {}
-  const { preset, detection } = builtinFrameworkPresetRegistry().select(signals)
   // The built-in #326 system prompt + any user SYSTEM.md are the whole prompt. Only
   // the template's system half is used here: each Bootstrap step composes its own
   // prompt around the intent, so the user-prompt slot stays with the steps.
@@ -209,10 +196,6 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
   // per-turn user prompts ride along as `driver` `start` events, so the dashboard
   // can show every prompt sent.
   if (system) emit({ kind: 'system-prompt', text: system })
-  emit({
-    kind: 'log',
-    message: `Detected ${detection.framework ?? preset.framework} (confidence ${detection.confidence})`,
-  })
   // The run's abort plumbing and driver-event sink: the caller's signal composed with
   // the budget (#322), consumption (#529), and plan-decline (#358) self-stops.
   const { runSignal, onDriverEvent, consumptionTrip, budgetController, consumptionController, declineController } =
@@ -334,7 +317,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     // one phase in. The link itself is already on the driver's `cloud <url>` action.
     if (handsOff) emit({ kind: 'log', message: 'Handed off: the rest of this run happens in its own session, which opens its own pull request.' })
     emit({ kind: 'end', ok: true })
-    return { result, detection, events, ...(todo ? { todo } : {}) }
+    return { result, events, ...(todo ? { todo } : {}) }
   } catch (err) {
     const { stopped, detail } = await endStopDetail({
       err,

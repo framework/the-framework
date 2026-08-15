@@ -192,8 +192,6 @@ export interface SessionOptions {
   ticket?: string | undefined
   /** `--plan-run` (#1327): the `--ticket` is being planned, not implemented, so the PR title must not inherit its issue as `(fix #42)` (#1334) — the plan's merge would close the issue with the work still undone. */
   planRun?: boolean
-  /** `--queue-entry <text>` (#1253): the one queue entry a routine drain pinned this run to; recorded on the run's meta so the sweep's claim outlives the daemon and the local process. */
-  queueEntry?: string | undefined
   /** `--unattended`: no human is watching, so choice gates take the recommended option (#846). */
   unattended?: boolean
   scope: 'prototype' | 'full'
@@ -340,7 +338,6 @@ export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = proce
     // trusted: a path that is not a ticket never reaches the run (#1117).
     ...(o.ticket && isTicketPath(o.ticket) ? { ticket: o.ticket } : {}),
     ...(o.planRun ? { planRun: true } : {}),
-    ...(o.queueEntry?.trim() ? { queueEntry: o.queueEntry } : {}),
     ...(o.unattended ? { unattended: true } : {}),
     ...(defined(o.vanilla) ? { vanilla: o.vanilla } : {}),
     ...(defined(o.transparent) ? { transparent: o.transparent } : {}),
@@ -966,9 +963,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // about why the run exists, not a state that changes, and folding it to meta is what lets the
   // Overview mark that ticket as being implemented right now.
   if (opts.ticket && isTicketPath(opts.ticket)) onEvent({ kind: 'ticket', path: opts.ticket })
-  // The queue entry a routine drain pinned this run to (#1253), same shape as the ticket above:
-  // once, at start, folded to meta — the durable half of the sweep's claim on the entry.
-  if (opts.queueEntry?.trim()) onEvent({ kind: 'queue-entry', entry: opts.queueEntry })
   // The branch this run actually starts on (#1277): recorded, not guessed, so surfaces reading
   // the meta mid-run resolve the same name teardown will later confirm. Undefined outside a git
   // checkout (a non-repo project), and then nothing is recorded.

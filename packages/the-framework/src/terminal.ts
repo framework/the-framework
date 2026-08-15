@@ -37,8 +37,6 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `◆ bound to project ${event.projectId}`
     case 'ticket':
       return `  implementing ${event.path}`
-    case 'queue-entry':
-      return `  working the queue entry: ${event.entry}`
     case 'branch':
       return `  branch: ${event.branch}`
     case 'on-before-mergeable':

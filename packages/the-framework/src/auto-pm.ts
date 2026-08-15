@@ -483,15 +483,6 @@ export interface AutoPmDeps {
     project: AutoPmProject,
     assignments: readonly PlanAssignment[],
   ): Promise<readonly PlanAssignment[]>
-  /**
-   * Which of `candidates` are claimed by a run outside this loop's memory (#1253): pinned to a
-   * run that is still live, or to a finished one whose PR is still open. The in-memory pin dies
-   * with the daemon, and a hands-off web run's local process ends at the hand-off while the cloud
-   * session still works the entry — both would otherwise put the same entry back on the market
-   * and fan it out to a second agent. Unreadable means unclaimed: the in-memory pins still guard
-   * the common case, and refusing the whole sweep over a `gh` hiccup would stall a healthy queue.
-   */
-  claimedEntries?(project: AutoPmProject, candidates: readonly string[]): Promise<readonly string[]>
   /** Progress line. */
   log(message: string): void
   /** Override the tick interval. */
@@ -716,14 +707,12 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           const assigned = new Set(
             (pending.get(project.id) ?? []).flatMap(run => (run.entry !== undefined ? [run.entry] : [])),
           )
-          const unassigned = (entries ?? []).filter(entry => !assigned.has(entry))
-          // The durable claims (#1253), asked only about entries the memory above did not already
-          // rule out: a run this loop never started (or has forgotten across a restart), or one
-          // whose local process ended at the web hand-off, may still own an entry via its meta.
-          const claimed = new Set(
-            unassigned.length ? await deps.claimedEntries?.(project, unassigned).catch(() => []) ?? [] : [],
-          )
-          const open = unassigned.filter(entry => !claimed.has(entry))
+          // An entry someone else already worked is not on the queue to begin with (E2): the
+          // check-off travels in that run's own PR, and the merge is what takes it off. A third
+          // claim used to be re-derived here — from run metas, their PRs, and the queue diffs of
+          // open PRs on other machines — which is a guess assembled at read time rather than a
+          // claim anyone wrote down.
+          const open = (entries ?? []).filter(entry => !assigned.has(entry))
           if (!open.length) {
             note(project, false, 'every open queue entry is already being worked on')
             continue

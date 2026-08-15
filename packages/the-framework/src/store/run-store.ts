@@ -135,14 +135,6 @@ export interface RunMeta {
    * behind. Absent on every run nobody linked to a ticket.
    */
   ticket?: string
-  /**
-   * The queue entry this run was pinned to by the routine's drain (#1253), verbatim.
-   *
-   * The durable half of the sweep's pin: the in-memory pin dies with the daemon, and a hands-off
-   * web run's local process ends at the hand-off, but the meta stays — so the sweep can keep an
-   * entry off the market while any run that names it is live or has an open PR.
-   */
-  queueEntry?: string
   /** Whether the agent signalled `setReadyForMerge()` (#326): building (false/absent) vs ready (true). */
   readyForMerge?: boolean
   /**
@@ -364,9 +356,6 @@ export function applyEventToMeta(meta: RunMeta, event: FrameworkEvent, at: strin
       break
     case 'ticket':
       next.ticket = event.path
-      break
-    case 'queue-entry':
-      next.queueEntry = event.entry
       break
     case 'branch':
       next.branch = event.branch

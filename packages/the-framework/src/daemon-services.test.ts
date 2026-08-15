@@ -102,15 +102,12 @@ test('the concurrency setting on disk is the number of agents the routine spins 
     // the setting already on actually takes.
     await settle(() => starts.length >= 4)
     assert.equal(starts.length, 4, 'the batch is the setting, not the default and not the queue length')
-    // One pinned entry each, in queue order, and each prompt names its own entry: this is what
-    // makes four agents do disjoint work rather than four copies of the first entry.
-    assert.deepEqual(
-      starts.map(s => s.options.queueEntry),
-      QUEUE_ENTRIES.slice(0, 4),
-    )
-    for (const start of starts) {
+    // One entry each, in queue order: this is what makes four agents do disjoint work rather than
+    // four copies of the first entry. The prompt is where the pin lives (E2) — it used to also
+    // ride the run's meta, so a third claim mechanism could be re-derived from it later.
+    for (const [index, start] of starts.entries()) {
       assert.match(start.prompt, /work on this one open entry only/)
-      assert.ok(start.prompt.includes(start.options.queueEntry!), 'the prompt pins the entry the claim names')
+      assert.ok(start.prompt.includes(QUEUE_ENTRIES[index]!), `the prompt pins ${QUEUE_ENTRIES[index]}`)
       // Nobody is at the keyboard, so a gate must auto-answer rather than park (#846/#1279).
       assert.equal(start.options.unattended, true)
       // The drain job lands its own PRs (#1216): the job's flag rides the start as the ladder's
@@ -146,10 +143,9 @@ test("the drain row's Run now fans out to the setting with auto-run off (#1204/#
     running.wakeAutoPm({ onDemand: true, drainOnly: true })
     await settle(() => starts.length >= 3)
     assert.equal(starts.length, 3, 'the click spins the setting up, not one agent')
-    assert.deepEqual(
-      starts.map(s => s.options.queueEntry),
-      QUEUE_ENTRIES.slice(0, 3),
-    )
+    for (const [index, start] of starts.entries()) {
+      assert.ok(start.prompt.includes(QUEUE_ENTRIES[index]!), `the prompt pins ${QUEUE_ENTRIES[index]}`)
+    }
   } finally {
     await stop()
   }

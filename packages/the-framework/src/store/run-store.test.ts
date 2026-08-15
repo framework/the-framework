@@ -778,17 +778,6 @@ test('startedAtFromRunId inverts runIdFromStartedAt, and refuses foreign ids (#1
   assert.equal(startedAtFromRunId(''), undefined)
 })
 
-test('applyEventToMeta records the queue entry a drain pinned the run to (#1253)', () => {
-  const base = metaFromEvents(RUN.slice(0, 3), AT)
-  assert.equal(base.queueEntry, undefined, 'a run no drain pinned says nothing')
-  const on = applyEventToMeta(base, { kind: 'queue-entry', entry: 'Fix the flaky teardown test' }, AT)
-  assert.equal(on.queueEntry, 'Fix the flaky teardown test')
-  // The claim must outlive the run: a finished web run's meta is what keeps the entry off the
-  // market while its PR is open.
-  const ended = applyEventToMeta(on, { kind: 'end', ok: true }, AT)
-  assert.equal(ended.queueEntry, 'Fix the flaky teardown test')
-})
-
 test('applyEventToMeta records the branch a branch event names (#1277)', () => {
   const base = metaFromEvents(RUN.slice(0, 3), AT)
   const on = applyEventToMeta(base, { kind: 'branch', branch: 'the-framework/run-r1' }, AT)

@@ -947,54 +947,6 @@ test('a refusal ends the batch, so the refused work is retried rather than skipp
   assert.equal(attempts, 2, 'one start took, the second was refused, and the batch stopped there')
 })
 
-test('a durably claimed entry is not re-fanned: the web hand-off and restart case (#1253)', async () => {
-  // The pin on entry a lives in a run meta (a hands-off web run, or one from before a daemon
-  // restart), not in this loop's memory. The sweep must treat it exactly like an in-flight pin.
-  const prompts: string[] = []
-  const { loop } = harness({
-    cooldownMs: 0,
-    concurrency: async () => 2,
-    queue: async () => ['entry a', 'entry b', 'entry c'],
-    claimedEntries: async (_p, candidates) => candidates.filter(entry => entry === 'entry a'),
-    start: async (_p, job) => {
-      prompts.push(job.prompt)
-      return `run-${prompts.length}`
-    },
-  })
-  await loop.tick()
-  loop.stop()
-  assert.equal(prompts.length, 2)
-  assert.match(prompts[0]!, /entry b/)
-  assert.match(prompts[1]!, /entry c/)
-  assert.ok(!prompts.some(prompt => prompt.includes('entry a')), 'the claimed entry stays off the market')
-})
-
-test('a queue whose every entry is durably claimed stands the sweep down (#1253)', async () => {
-  const { loop, started } = harness({
-    cooldownMs: 0,
-    concurrency: async () => 4,
-    queue: async () => ['entry a'],
-    claimedEntries: async () => ['entry a'],
-  })
-  await loop.tick()
-  loop.stop()
-  assert.equal(started.length, 0)
-  assert.equal(loop.report().outcomes[0]?.message, 'every open queue entry is already being worked on')
-})
-
-test('an unreadable claim list means none: the in-memory pins still guard the common case (#1253)', async () => {
-  const { loop, started } = harness({
-    cooldownMs: 0,
-    queue: async () => ['entry a'],
-    claimedEntries: async () => {
-      throw new Error('gh is down')
-    },
-  })
-  await loop.tick()
-  loop.stop()
-  assert.equal(started.length, 1, 'a gh hiccup must not stall a healthy queue')
-})
-
 test('a drain-only sweep works the queue and never borrows the tick for the rotation (#1204)', async () => {
   // The drain row's Run now: with entries waiting it fans out like any drain sweep...
   const prompts: string[] = []

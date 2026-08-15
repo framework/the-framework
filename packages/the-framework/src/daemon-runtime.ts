@@ -601,8 +601,6 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
           unattended: true,
           continueRunId: runId,
           ...(meta.sessionId ? { resumeSession: meta.sessionId } : {}),
-          // The drain's pin rides along (#1268), so the claim survives onto the continued meta.
-          ...(meta.queueEntry ? { queueEntry: meta.queueEntry } : {}),
         },
         targetProjectId,
       ).then(result => {

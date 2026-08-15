@@ -259,13 +259,6 @@ export type FrameworkEvent =
    */
   | { kind: 'ticket'; path: string }
   /**
-   * The one queue entry this run was pinned to by the routine's drain (#1253). An event for the
-   * same reason `ticket` is: only an event reaches the run's meta, and the meta is what outlives
-   * the sweep's memory — the claim must survive a daemon restart, and a hands-off run whose local
-   * process ends at the hand-off while the cloud session still works the entry.
-   */
-  | { kind: 'queue-entry'; entry: string }
-  /**
    * The branch the run's work is on (#1277), observed off the checkout rather than guessed:
    * emitted at start with the branch the run actually begins on, and again when the framework
    * renames the run-id branch after the agent names the session. Folded to `RunMeta.branch`,

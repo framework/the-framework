@@ -13,11 +13,10 @@ import { startAutoPm, AUTO_PM_JOBS, quotaHeadroom, type AutoPmReport } from './a
 import { ciFixPrompt, startCiWatch } from './ci-watch.js'
 import { releaseStalePinnedBranch } from './stale-branch.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
-import { claimedQueueEntries, promoteQueue } from './queue-promote.js'
+import { promoteQueue } from './queue-promote.js'
 import { FLAT_TODO_FILE, TICKETS_DIR } from './tickets.js'
 import { acquireTicketLocks } from './ticket-locks.js'
 import { readTickets } from './dashboard/tickets.js'
-import { cachedOpenPrFilePatches } from './dashboard/gh.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { startSessionCommitter } from './session-commit.js'
 import { startMergedWorktreeSweep } from './merged-worktrees.js'
@@ -201,24 +200,12 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         // title must not inherit the issue as `(fix #42)` — the plan's merge would close the
         // issue with the work still undone (#1334).
         ...(ticket && !job.drains ? { planRun: true } : {}),
-        ...(job.entry !== undefined ? { queueEntry: job.entry } : {}),
         // The job says its PRs may land themselves (#1216): the drain implements work whose
         // review already happened on the queue. Rides to the run as the ladder's top rung.
         ...(job.autoMerge ? { handoff: 'merge' as const } : {}),
       })
       return result.ok ? result.runId : undefined
     },
-    // The durable half of the drain pins (#1253): entries claimed by run metas rather than this
-    // process's memory. The PR lookup rides the #1257 cache, so a sweep costs at most one `gh`
-    // read per open entry per TTL.
-    claimedEntries: async (project, candidates) =>
-      claimedQueueEntries(project.path, candidates, {
-        runs: listRuns,
-        pr: resolveRunPr,
-        // The cross-machine leg (#1313): an open PR retires its entry whichever machine — or
-        // cloud session — drained it. Rides the same #1028 cache as the PR lookups.
-        queuePatches: path => cachedOpenPrFilePatches(path, FLAT_TODO_FILE),
-      }),
     // The daemon promotes the queue, never the agent (#852): the run stays sandboxed in its
     // worktree, and one known file is copied across once it has finished cleanly.
     promote: async (project, { runId, entry }) => {

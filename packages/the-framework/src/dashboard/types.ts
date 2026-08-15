@@ -103,19 +103,6 @@ export interface StartRunOptions {
    * `(fix #42)` (#1334) — a plan's merge would close the issue with the work still undone.
    */
   planRun?: boolean
-  /**
-   * The one queue entry a routine drain pinned this run to (#1253), verbatim; maps to
-   * `--queue-entry`. Recorded on the run's meta so the sweep's claim on the entry outlives both
-   * the daemon (a restart forgets its in-memory pins) and the run's local process (a hands-off
-   * web run ends at the hand-off while the cloud session still works the entry).
-   */
-  queueEntry?: string
-  /**
-   * The surface this run was asked for from (#917), e.g. `discord`; maps to `--via`. Recorded on
-   * the session's conversation turns so a run started from a chat surface is not filed under the
-   * dashboard. Absent = the local surface, exactly as before.
-   */
-  via?: string
   /** Resume a finished run's conversation (#720): its captured agent session id; maps to `--resume-session`. The run's prompt continues that session (full prior context) instead of starting fresh. Sent with `kind: 'prompt'` when you message a run that has ended. */
   resumeSession?: string
   /**

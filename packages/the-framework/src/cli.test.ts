@@ -234,9 +234,6 @@ test('the ticket a session implements is re-checked, since it comes off a file a
   // A planning run says so (#1327): it is what keeps its PR title from inheriting the ticket's
   // issue as `(fix #42)` and closing it with the work still undone.
   assert.equal(opts({ options: { planRun: true } }).planRun, true)
-  // The pinned queue entry travels verbatim, and a blank one says nothing (#1253).
-  assert.equal(opts({ options: { queueEntry: 'Fix the flaky teardown test' } }).queueEntry, 'Fix the flaky teardown test')
-  assert.equal(opts({ options: { queueEntry: '   ' } }).queueEntry, undefined)
 })
 
 test('transparent is unset by default (#625)', () => {

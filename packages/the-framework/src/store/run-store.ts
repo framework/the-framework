@@ -254,6 +254,12 @@ export interface StoreFs {
   mkdir(path: string): Promise<void>
   /** List a directory's entries (names only). Missing dir yields `[]`. */
   readdir(path: string): Promise<string[]>
+  /**
+   * Replace `to` with `from` in one step. Optional: an adapter that has it gets torn-proof meta
+   * writes (see {@link writeMetaFile}), and one that does not writes in place, which is right for
+   * the in-memory fakes — a `Map.set` cannot be observed half-done.
+   */
+  rename?(from: string, to: string): Promise<void>
 }
 
 /** Options for {@link RunStore.open}. */
@@ -461,16 +467,12 @@ const TORN_META_READ_DELAY_MS = 5
 /**
  * Read + parse a persisted {@link RunMeta} file, or `undefined` if missing/unreadable.
  *
- * Re-read on a parse failure (#1540). {@link writeMetaFile} rewrites `run.json` in place, and the
- * process doing the writing is not the process doing the reading — a run owns its own meta, while
- * the daemon and every dashboard read poll it from outside. A reader that lands between that
- * write's truncate and its bytes sees an empty or half-written file, which is common rather than
- * exotic: a tight read/write pair on a loaded machine tears on the order of one read in ten.
- *
- * Reporting that as `undefined` makes a live run *vanish* from every composed read for one poll —
- * how a continuation came to be refused as a collision with the very leg it was continuing. A torn
- * read is transient by construction, so ask again; a file still unparseable after the retries is
- * genuinely corrupt and yields `undefined`, exactly as before.
+ * Re-read on a parse failure (#1540). {@link writeMetaFile} closes this off at the source, so this
+ * is the backstop rather than the defence: a meta written by an older CLI still on a plain
+ * in-place write — a daemon reading a run started before an upgrade — can still be caught
+ * mid-truncate, and reporting that as `undefined` makes a live run *vanish* from every composed
+ * read for one poll. A torn read is transient by construction, so ask again; a file still
+ * unparseable after the retries is genuinely corrupt and yields `undefined`, exactly as before.
  */
 async function readMetaFile(fs: StoreFs, path: string): Promise<RunMeta | undefined> {
   for (let attempt = 0; ; attempt++) {
@@ -484,10 +486,27 @@ async function readMetaFile(fs: StoreFs, path: string): Promise<RunMeta | undefi
   }
 }
 
-/** Write a {@link RunMeta} file. The one owner of the on-disk encoding, symmetric to
- * {@link readMetaFile} — every meta write in this module goes through it. */
-function writeMetaFile(fs: StoreFs, path: string, meta: RunMeta): Promise<void> {
-  return fs.write(path, JSON.stringify(meta, null, 2) + '\n')
+/**
+ * Write a {@link RunMeta} file. The one owner of the on-disk encoding, symmetric to
+ * {@link readMetaFile} — every meta write in this module goes through it.
+ *
+ * Written beside the target and renamed over it (#1540). A meta is rewritten by the run that owns
+ * it, over and over, while the daemon and every dashboard read poll it from another process; a
+ * plain write truncates the file before it refills, so a reader landing in that window saw an
+ * empty one and reported the run *gone*. A rename swaps the whole file in one step, so a reader
+ * gets either the entire previous meta or the entire new one and never a half of either — which
+ * {@link readMetaFile}'s retry can only paper over, never prevent. An adapter with no `rename`
+ * writes in place as before.
+ */
+async function writeMetaFile(fs: StoreFs, path: string, meta: RunMeta): Promise<void> {
+  const contents = JSON.stringify(meta, null, 2) + '\n'
+  if (!fs.rename) return fs.write(path, contents)
+  // Named for the writing process: a run and the daemon teardown archiving it can both be
+  // writing the same meta, and they must not share a scratch file and splice their writes into
+  // one. `.tmp` also keeps it out of the archive listing, which takes only `.json`.
+  const scratch = `${path}.${process.pid}.tmp`
+  await fs.write(scratch, contents)
+  await fs.rename(scratch, path)
 }
 
 /**
@@ -1072,8 +1091,8 @@ export async function loadRunEvents(
 export function nodeStoreFs(): StoreFs {
   // Destructured rather than returned whole: the narrow interface is the contract,
   // so the object should not carry methods the store was never handed.
-  const { read, write, append, exists, mkdir, readdir } = nodeFs()
-  return { read, write, append, exists, mkdir, readdir }
+  const { read, write, append, exists, mkdir, readdir, rename } = nodeFs()
+  return { read, write, append, exists, mkdir, readdir, rename }
 }
 
 /**

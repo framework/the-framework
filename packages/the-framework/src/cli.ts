@@ -40,7 +40,6 @@ import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFet
 import { appendLog, type LogEntry } from './logs.js'
 import { appendMessage, isSafeVia } from './conversations.js'
 import type { BindProjectDeps, RecordMessage } from './await-gate.js'
-import { preflight } from './preflight.js'
 import { RunStore, commitPendingWork, currentBranch, nodeStoreFs, renameRunBranch, runBranchName, type StoreFs } from './store/index.js'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
@@ -161,8 +160,6 @@ session.`
 export interface SessionOptions {
   /** The `FakeDriver` (`FRAMEWORK_FAKE=1`): an offline stand-in for the agent, for tests and e2e. */
   fake: boolean
-  /** Skip the agent-CLI preflight. Set by the tests that inject their own readiness. */
-  skipPreflight: boolean
   /** What the session was asked to do. */
   intent: string
   /** `--agent <claude|codex>`: which agent CLI drives the run (#542). Default `claude`. */
@@ -317,7 +314,6 @@ export function parseArgs(argv: string[]): CliArgs {
 
 /** The session defaults nothing sets any more, shared by {@link sessionOptions} and the tests. */
 const SESSION_DEFAULTS = {
-  skipPreflight: false,
   agent: 'claude',
   scope: 'full',
   eco: { autoPlanning: false, autoResearch: false, autoMaintenance: false },
@@ -904,19 +900,13 @@ async function runSession(opts: SessionOptions, io: CliIO): Promise<number> {
     return 2
   }
 
-  // Fail early and clearly if a live run's prerequisites are missing — before the
-  // run, which needs the wrapped agent.
-  if (!fake && !opts.skipPreflight) {
-    const pre = await preflight({ agent: opts.agent })
-    // Warnings travel even on a pass (#1326): running as root does not fail a check, but it is
-    // why every run after it dies with an empty log, so it is said before the spending, not after.
-    for (const check of pre.checks.filter(c => c.warn)) io.err(`! ${check.name}: ${check.detail}`)
-    if (!pre.ok) {
-      for (const check of pre.checks.filter(c => !c.ok)) io.err(`✗ ${check.name}: ${check.detail}`)
-      io.err('Preflight failed. Fix the above, then start the session again.')
-      return 2
-    }
-  }
+  // No preflight here. The dashboard already ran it before spawning this session (#1326,
+  // `daemon-runtime`'s `agentPreflight`) and refused the start outright if the picked agent could
+  // not run, so a doomed session spends no branch and no worktree — and the report lands on the
+  // surface the user is looking at, rather than in a log they have to go and find. Re-running it
+  // here was the same check a second time, and it was wrong for a session that runs somewhere else
+  // entirely: `--run-on actions` needs no local agent CLI at all, which is exactly why the
+  // dashboard's own check skips it.
 
   // Which agent is about to spend the user's subscription, and which guards are
   // not in force while it does — said *before* the first turn. A cap that turns

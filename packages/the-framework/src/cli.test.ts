@@ -614,11 +614,12 @@ test('runCli rejects the retired flags and verbs as usage errors (D4/D4b)', asyn
   }
 })
 
-test('runCli --fake skips preflight (offline never needs the agent CLI)', async () => {
+test('a session runs no preflight of its own: the dashboard already did (#1326)', async () => {
   const { io } = capture()
-  // No claude probe is invoked for --fake; this must succeed regardless of env.
-  const code = await runSessionCli({}, io)
-  assert.equal(code, 0)
+  // Nothing here probes for the agent CLI, so this succeeds regardless of what is installed —
+  // which is the point: the dashboard refused the start if the agent could not run, and a
+  // `--run-on actions` session needs no local agent at all.
+  assert.equal(await runSessionCli({}, io), 0)
 })
 
 test('runCli --fake --no-dashboard runs the whole flow offline', async () => {

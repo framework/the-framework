@@ -1,4 +1,4 @@
-Pre-run checks so a session fails early and clearly when a prerequisite is missing, instead of spawning a broken agent mid-run.
+Pre-start checks so a session is refused early and clearly when a prerequisite is missing, instead of spawning a broken agent. Run once, by the dashboard, before it spawns anything — the session itself does not check again.
 
 ## TLDR
 

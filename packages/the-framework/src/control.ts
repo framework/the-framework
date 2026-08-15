@@ -2,6 +2,7 @@ import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { isSafeVia } from './conversations.js'
 import type { ChoiceBy } from './events.js'
+import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { FRAMEWORK_DIR } from './store/index.js'
 import { JsonlTailer, followFile } from './jsonl-tail.js'
 
@@ -32,14 +33,18 @@ export type ControlEntry =
    */
   | { kind: 'message'; text: string; via?: string }
   /**
-   * Re-arm or disarm the end-of-session handoff (#1102): whether this session pushes its branch
-   * and opens a draft PR when it finishes.
+   * Move the end-of-session handoff (#1102): how far this session publishes itself when it
+   * finishes — keep it local, push the branch, open a PR, merge it.
+   *
+   * One rung rather than a pair of booleans (B5): a surface offering checkboxes converts on its
+   * side, so an impossible answer resolves *down* there instead of arriving here as "a PR with no
+   * push" for this end to repair upward.
    *
    * Steering rather than an event because it is an instruction to the run, and it has to reach a
    * run whose dashboard tab was opened after it started. The run echoes what it applied back as an
    * event, which is what puts it on the meta the checkboxes read.
    */
-  | { kind: 'handoff'; push: boolean; pr: boolean }
+  | { kind: 'handoff'; level: HandoffLevel }
   /**
    * Bind a project-less topic run to a project (#1121): the await-gate resolver appends this once
    * it registers + binds the picked project, and the run folds `projectId` onto its meta. The
@@ -104,9 +109,9 @@ function isControlEntry(value: unknown): value is ControlEntry {
   const v = value as Record<string, unknown>
   if (v['kind'] === 'stop') return true
   if (v['kind'] === 'merge') return true
-  // Both halves must be real booleans: a half-written entry would otherwise disarm by accident,
+  // The rung must be one of the four: a half-written entry would otherwise disarm by accident,
   // and this decides whether the session's work reaches the remote at all.
-  if (v['kind'] === 'handoff') return typeof v['push'] === 'boolean' && typeof v['pr'] === 'boolean'
+  if (v['kind'] === 'handoff') return isHandoffLevel(v['level'])
   // A bind needs a non-empty projectId; it decides which project the run re-homes into (#1121).
   if (v['kind'] === 'bind') return typeof v['projectId'] === 'string' && v['projectId'].length > 0
   // `via` is optional (older entries have none), but a present one must be a safe transport name:

@@ -217,31 +217,27 @@ Instead of retyping flags every run, a project can commit its Open Loop defaults
 
 ```yaml
 preset: software-development
-autopilot: true      # activate the preset's Autopilot mode variants
-technical: false
-event: bug-fix        # the build event kind its review loop fires for
-antiLazyPill: false   # remove the built-in system prompt (default: on)
-autoOpenPr: false     # do not open a draft PR when a session finishes (default: on)
-autoPushBranch: true  # with autoOpenPr off: still push the session's branch (default: on)
-autoMerge: true       # merge the session's PR once it is opened (default: off)
+event: bug-fix       # the build event kind its review loop fires for
+antiLazyPill: false  # remove the built-in system prompt (default: on)
+transparent: false   # run the agent raw, with no framework wrapping at all
+handoff: merge       # how far a finished session publishes itself (default: pr)
 ```
 
 Every field is optional. Config resolves layer by layer, and the nearest layer that
 *set* a key wins (#841). A layer that says nothing about a key does not participate:
 
-- **preset**: `--preset` > `the-framework.yml` `preset`
-- **modes**: `--autopilot` / `--no-autopilot` (and the `--technical`, `--vanilla`,
-  `--transparent` pairs) > the file's boolean > off. Without either flag the file
-  decides, so a repo that turns a mode on can be turned back off for one run with
-  `--no-<mode>`.
-- **handoff**: `--auto-open-pr` / `--no-auto-open-pr` (and the `--auto-push-branch`
-  pair) > the file's boolean > **on** (#1102): a session nobody configured pushes its
-  branch and opens a draft PR when it finishes. The launcher offers the one `Open PR`
-  toggle; push-without-PR lives here and in the flags.
-- **event**: `--kind` > `the-framework.yml` `event` > the preset's own default > `major-change`
+- **preset**: the session's own options > `the-framework.yml` `preset`
+- **modes**: `antiLazyPill` and `transparent` > off.
+- **handoff**: one rung of a ladder rather than a set of switches — `local` publishes
+  nothing, `push` pushes the session's branch, `pr` also opens a draft pull request,
+  and `merge` also lands it. Each rung includes the ones below it, so "a PR without a
+  push" is not a state anything can be asked for. Unset means **`pr`** (#1102): a
+  session nobody configured pushes its branch and opens a draft PR when it finishes,
+  because merging is the one rung that has to be asked for (#1216).
+- **event**: `the-framework.yml` `event` > the preset's own default > `major-change`
 
 When any layer contributes something, the run narrates what won and where it came
-from (`◆ config: preset=software-development (the-framework.yml), autopilot=off (flag)`).
+from (`◆ config: preset=software-development (the-framework.yml), handoff=merge (flag)`).
 A malformed file is a warning, never a failed run.
 
 The dashboard reads the file too (#842): it rides on the project payload, so the

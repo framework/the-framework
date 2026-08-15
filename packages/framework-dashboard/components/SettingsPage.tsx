@@ -272,7 +272,7 @@ function OptionToggleRow({ row }: { row: OptionRow }) {
         <Checkbox
           checked={row.checked}
           disabled={disabled}
-          onCheckedChange={next => updatePreferences({ [row.key]: next === true } as Partial<Preferences>)}
+          onCheckedChange={next => updatePreferences(row.patch(next === true))}
           aria-label={row.label}
         />
       }

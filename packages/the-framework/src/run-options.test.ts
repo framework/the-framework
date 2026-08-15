@@ -3,28 +3,16 @@ import { test } from 'node:test'
 import { runOptionsFromPreferences, handoffFromPreferences, preferencesFromFileConfig } from './run-options.js'
 import { resolvePreferences } from './registry.js'
 
-test('auto-merge travels explicitly in both directions (#1216)', () => {
-  assert.equal(runOptionsFromPreferences({ autoMerge: true }).autoMerge, true)
-  assert.equal(runOptionsFromPreferences({ autoMerge: false }).autoMerge, false)
-  assert.equal(runOptionsFromPreferences({}).autoMerge, false)
-})
-
-test('the handoff defaults to armed, and push is the rung under the PR (#1102/#1379)', () => {
-  assert.deepEqual(handoffFromPreferences({}), { push: true, pr: true })
-  // Turning the push rung off publishes nothing, whatever the PR half says: `gh` will not open a
-  // PR for a branch the remote has never seen, so "PR without push" was never a state a run could
-  // honour. It used to resolve that by forcing push back on, which left "publish nothing"
-  // unreachable from the launcher — the ladder resolves it the other way.
-  assert.deepEqual(handoffFromPreferences({ autoPushBranch: false }), { push: false, pr: false })
-  assert.deepEqual(handoffFromPreferences({ autoPushBranch: false, autoOpenPr: true }), { push: false, pr: false })
-  assert.deepEqual(handoffFromPreferences({ autoOpenPr: false }), { push: true, pr: false })
-  assert.deepEqual(handoffFromPreferences({ autoPushBranch: false, autoOpenPr: false }), { push: false, pr: false })
-})
-
-test('a disarmed handoff travels as an explicit false, so the run cannot re-arm it (#1102)', () => {
-  const off = runOptionsFromPreferences({ autoPushBranch: false, autoOpenPr: false })
-  assert.equal(off.autoPushBranch, false)
-  assert.equal(off.autoOpenPr, false)
+test('the handoff defaults to the PR rung, and every rung travels explicitly (#1102/#1216)', () => {
+  // Unset is `pr`, which is what makes the handoff zero-config: a session left alone pushes its
+  // branch and opens a draft PR rather than leaving work on a local branch nobody was told about.
+  assert.equal(handoffFromPreferences({}), 'pr')
+  assert.equal(runOptionsFromPreferences({}).handoff, 'pr')
+  for (const level of ['local', 'push', 'pr', 'merge'] as const) {
+    assert.equal(handoffFromPreferences({ handoff: level }), level)
+    // Explicit on the wire, so a run can never re-arm what the launcher disarmed.
+    assert.equal(runOptionsFromPreferences({ handoff: level }).handoff, level)
+  }
 })
 
 test('the yml-owned toggles travel as explicit booleans (#842)', () => {
@@ -40,14 +28,10 @@ test('preferencesFromFileConfig maps the repo yml onto the preference keys (#842
   assert.deepEqual(preferencesFromFileConfig({ antiLazyPill: false }), { vanilla: true })
   assert.deepEqual(preferencesFromFileConfig({ antiLazyPill: true }), { vanilla: false })
   assert.deepEqual(preferencesFromFileConfig({ transparent: true }), { transparent: true })
-  // The handoff pair rides the committed file too (#1173): the push setting's home now the
-  // launcher gear offers a single `Open PR` row.
-  assert.deepEqual(preferencesFromFileConfig({ autoPushBranch: false, autoOpenPr: false }), {
-    autoPushBranch: false,
-    autoOpenPr: false,
-  })
-  // And so does auto-merge (#1216): whether sessions may land their own PRs is a fact about the repo.
-  assert.deepEqual(preferencesFromFileConfig({ autoMerge: true }), { autoMerge: true })
+  // The ladder rides the committed file too (#1173/#1216): how far a session publishes itself —
+  // including whether its PRs may land on their own — is a fact about the repo.
+  assert.deepEqual(preferencesFromFileConfig({ handoff: 'local' }), { handoff: 'local' })
+  assert.deepEqual(preferencesFromFileConfig({ handoff: 'merge' }), { handoff: 'merge' })
   // preset and event have no preference counterpart, so they are not mapped.
   assert.deepEqual(preferencesFromFileConfig({ preset: 'software-development', event: 'bug-fix' }), {})
 })

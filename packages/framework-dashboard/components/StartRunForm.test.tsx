@@ -189,12 +189,12 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
   test('the gh half is requested only while a PR or merge rung is armed (#1419)', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
-    prefs.current = { autoPushBranch: true, autoOpenPr: false }
+    prefs.current = { handoff: 'push' }
     const pushOnly = render(<StartRunForm {...props} />)
     await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('claude', false))
     pushOnly.unmount()
 
-    prefs.current = { autoOpenPr: true }
+    prefs.current = { handoff: 'pr' }
     render(<StartRunForm {...props} />)
     await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('claude', true))
   })
@@ -235,7 +235,7 @@ describe('StartRunForm auto-merge-disabled warning (#1417)', () => {
   test('an armed merge on a repo that refuses auto-merge warns, with the fix, without blocking', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
-    prefs.current = { autoMerge: true }
+    prefs.current = { handoff: 'merge' }
     onRepoAutoMerge.mockResolvedValue({ known: true, allowed: false })
     render(<StartRunForm {...props} />)
     expect(await screen.findByText(/auto-merge disabled/)).toBeTruthy()
@@ -248,7 +248,7 @@ describe('StartRunForm auto-merge-disabled warning (#1417)', () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
 
-    prefs.current = { autoMerge: true }
+    prefs.current = { handoff: 'merge' }
     onRepoAutoMerge.mockResolvedValue({ known: true, allowed: true })
     const allowed = render(<StartRunForm {...props} />)
     await waitFor(() => expect(onRepoAutoMerge).toHaveBeenCalled())

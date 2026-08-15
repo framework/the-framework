@@ -23,7 +23,7 @@ test('start a session, watch it live, and read the archived row when it ends', a
   const rpc = world.rpc
   try {
     const project = await world.addProject()
-    const runId = await world.startRun(project, 'Add a login page', { autoPushBranch: false, autoOpenPr: false })
+    const runId = await world.startRun(project, 'Add a login page', { handoff: 'local' })
     const tail = await world.tailRun(project, runId)
 
     // The live feed narrates the run the way the session view renders it: the session banner
@@ -35,13 +35,11 @@ test('start a session, watch it live, and read the archived row when it ends', a
     assert.equal(session.kind === 'session' && session.fake, true)
     assert.equal(session.kind === 'session' && session.driver, 'fake')
 
-    // The spawned child got exactly what the launcher's unticked handoff boxes say: the spawn is
-    // detached, so the recorded spec is the only place this contract is observable. An unticked
-    // box is a plain `false` in the spec — the flag it used to become had to be spelled
-    // `--no-auto-push-branch`, because argv cannot say false any other way.
+    // The spawned child got exactly what the launcher's unticked handoff box says: the spawn is
+    // detached, so the recorded spec is the only place this contract is observable. "Publish
+    // nothing" is one named rung (B5) rather than a set of falses that each reader has to add up.
     const sent = (await world.spawnedSpecs())[0]!
-    assert.equal(sent.options.autoPushBranch, false)
-    assert.equal(sent.options.autoOpenPr, false)
+    assert.equal(sent.options.handoff, 'local')
     assert.equal(sent.runId, runId, 'the child was handed its worktree run id')
 
     // The agent's turn reaches the feed: its tool actions, its reply, the accounted usage, and
@@ -153,7 +151,7 @@ test("publish a finished session: push its branch from the handoff panel (#799)"
     await git(world.home, 'init', '-q', '--bare', remote)
     await git(project.cwd, 'remote', 'add', 'origin', remote)
 
-    const runId = await world.startRun(project, 'Ship the settings page', { autoPushBranch: false, autoOpenPr: false })
+    const runId = await world.startRun(project, 'Ship the settings page', { handoff: 'local' })
     await world.waitRun(project, runId, 'done')
 
     // Pushed the instant the row flips done — deliberately INSIDE teardown's window. This used

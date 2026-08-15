@@ -10,42 +10,54 @@ const rows = (preferences: Preferences) => runOptionRows(preferences)
 const find = (list: OptionRow[], key: string) => list.find(r => r.key === key)!
 
 describe('runOptionRows', () => {
-  test('the publish ladder shows all three rungs, in order, both on by default (#1379)', () => {
+  test('the publish ladder shows all three rungs, in order, up to PR by default (#1379)', () => {
     // The pair this replaced showed only Open PR, so "Open PR: off" silently meant push-only — the
     // launcher said publishing was off while the session header armed "Push branch: on".
     const main = rows({}).main
-    const ladder = main.filter(r => ['autoPushBranch', 'autoOpenPr', 'autoMerge'].includes(r.key))
-    expect(ladder.map(r => r.key)).toEqual(['autoPushBranch', 'autoOpenPr', 'autoMerge'])
-    expect(find(main, 'autoPushBranch').checked).toBe(true)
-    expect(find(main, 'autoOpenPr').checked).toBe(true)
-    expect(find(rows({ autoOpenPr: false }).main, 'autoOpenPr').checked).toBe(false)
+    const ladder = main.filter(r => ['push', 'pr', 'merge'].includes(r.key))
+    expect(ladder.map(r => r.key)).toEqual(['push', 'pr', 'merge'])
+    expect(find(main, 'push').checked).toBe(true)
+    expect(find(main, 'pr').checked).toBe(true)
+    expect(find(rows({ handoff: 'push' }).main, 'pr').checked).toBe(false)
   })
 
-  test('Open PR needs Push branch, and unticking push disarms the whole ladder (#1379)', () => {
+  test('each rung writes the level it means, so unticking one lowers the ladder (B5)', () => {
+    // Three boxes over one stored ordinal: what a box *writes* is the rung it stands for, which is
+    // why "PR off" can never leave a merge armed with nothing under it.
+    const main = rows({ handoff: 'merge' }).main
+    expect(find(main, 'pr').patch(false)).toEqual({ handoff: 'push' })
+    expect(find(main, 'push').patch(false)).toEqual({ handoff: 'local' })
+    expect(find(main, 'merge').patch(true)).toEqual({ handoff: 'merge' })
+    expect(find(main, 'merge').patch(false)).toEqual({ handoff: 'pr' })
+    // An ordinary row still just writes its own key.
+    expect(find(main, 'browser').patch(true)).toEqual({ browser: true })
+  })
+
+  test('Open PR needs Push branch, and a disarmed ladder disarms every rung above (#1379)', () => {
     // The gating is what makes the contradictory state (PR on / push off) unreachable, and what
     // finally makes "publish nothing" expressible from the launcher.
-    const noPush = rows({ autoPushBranch: false, autoOpenPr: true, autoMerge: true }).main
-    expect(find(noPush, 'autoPushBranch').checked).toBe(false)
-    const pr = find(noPush, 'autoOpenPr')
+    const noPush = rows({ handoff: 'local' }).main
+    expect(find(noPush, 'push').checked).toBe(false)
+    const pr = find(noPush, 'pr')
     expect(pr.checked).toBe(false)
     expect(pr.disabled).toBe(true)
     expect(pr.disabledReason).toMatch(/Push branch/)
     // The rung above it goes with it rather than staying live over a disarmed PR.
-    expect(find(noPush, 'autoMerge').checked).toBe(false)
-    expect(find(noPush, 'autoMerge').disabled).toBe(true)
+    expect(find(noPush, 'merge').checked).toBe(false)
+    expect(find(noPush, 'merge').disabled).toBe(true)
     // With push on, Open PR is an ordinary live row again.
-    expect(find(rows({}).main, 'autoOpenPr').disabled).toBeUndefined()
+    expect(find(rows({}).main, 'pr').disabled).toBeUndefined()
   })
 
   test('Auto-merge is off by default and needs Open PR to mean anything (#1216)', () => {
     // Default-off, unlike the row above: publishing a branch is reversible, landing it on the
     // default branch is not.
     const main = rows({}).main
-    expect(find(main, 'autoMerge').checked).toBe(false)
-    expect(find(main, 'autoMerge').disabled).toBeUndefined()
-    expect(find(rows({ autoMerge: true }).main, 'autoMerge').checked).toBe(true)
+    expect(find(main, 'merge').checked).toBe(false)
+    expect(find(main, 'merge').disabled).toBeUndefined()
+    expect(find(rows({ handoff: 'merge' }).main, 'merge').checked).toBe(true)
     // With Open PR off there is nothing to merge: effective value off, and the row says why.
-    const noPr = find(rows({ autoMerge: true, autoOpenPr: false }).main, 'autoMerge')
+    const noPr = find(rows({ handoff: 'push' }).main, 'merge')
     expect(noPr.checked).toBe(false)
     expect(noPr.disabled).toBe(true)
   })

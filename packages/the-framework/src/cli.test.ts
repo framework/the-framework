@@ -136,30 +136,26 @@ test('the browser is opt-in (#452)', () => {
   assert.equal(opts({ options: { browser: true } }).browser, true)
 })
 
-test('the handoff resolves ON, which is what makes it zero-config (#1102)', () => {
+test('the handoff resolves to the PR rung, which is what makes it zero-config (#1102)', () => {
   // Unlike most toggles, nobody saying anything means yes: a plain run pushes its branch and
-  // opens a draft PR when it finishes. A spec that says nothing leaves them unset, so the repo's
-  // the-framework.yml can decide (#1173) — and JSON says an explicit off with a plain `false`,
-  // where argv needed a whole second `--no-*` spelling for each.
-  assert.equal(opts().autoPushBranch, undefined)
-  assert.equal(opts().autoOpenPr, undefined)
-  assert.equal(opts({ options: { autoPushBranch: false } }).autoPushBranch, false)
-  assert.equal(opts({ options: { autoOpenPr: false } }).autoOpenPr, false)
-  const bare = mergeRunConfig(opts(), {})
-  assert.equal(bare.autoPushBranch, true)
-  assert.equal(bare.autoOpenPr, true)
+  // opens a draft PR when it finishes. A spec that says nothing leaves it unset, so the repo's
+  // the-framework.yml can decide (#1173).
+  assert.equal(opts().handoff, undefined)
+  assert.equal(opts({ options: { handoff: 'local' } }).handoff, 'local')
+  // A rung nobody defines is not a rung: a spec is not trusted input, it is a file on disk.
+  assert.equal(opts({ options: { handoff: 'nonsense' as 'local' } }).handoff, undefined)
+  assert.equal(mergeRunConfig(opts(), {}).handoff, 'pr')
 })
 
-test('the-framework.yml can disarm the handoff, and the spec overrides the file (#1173)', () => {
-  // The launcher gear offers one `Open PR` row. Nearest layer wins, like every other yml boolean.
-  const fromFile = mergeRunConfig(opts(), { autoOpenPr: false })
-  assert.equal(fromFile.autoOpenPr, false)
-  assert.equal(fromFile.autoPushBranch, true) // push-only: the file said nothing about the push
-  assert.equal(fromFile.sources.autoOpenPr, 'the-framework.yml')
-  const overridden = mergeRunConfig(opts({ options: { autoOpenPr: true } }), { autoOpenPr: false })
-  assert.equal(overridden.autoOpenPr, true)
-  assert.equal(overridden.sources.autoOpenPr, 'flag')
-  assert.equal(mergeRunConfig(opts(), { autoPushBranch: false, autoOpenPr: false }).autoPushBranch, false)
+test('the-framework.yml can move the handoff, and the spec overrides the file (#1173)', () => {
+  // Nearest layer wins, like every other yml key.
+  const fromFile = mergeRunConfig(opts(), { handoff: 'push' })
+  assert.equal(fromFile.handoff, 'push')
+  assert.equal(fromFile.sources.handoff, 'the-framework.yml')
+  const overridden = mergeRunConfig(opts({ options: { handoff: 'merge' } }), { handoff: 'push' })
+  assert.equal(overridden.handoff, 'merge')
+  assert.equal(overridden.sources.handoff, 'flag')
+  assert.equal(mergeRunConfig(opts(), { handoff: 'local' }).handoff, 'local')
 })
 
 test('the spec carries the agent session a follow-up continues (#720)', () => {

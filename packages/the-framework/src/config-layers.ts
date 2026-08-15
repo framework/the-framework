@@ -1,3 +1,4 @@
+import { DEFAULT_HANDOFF, type HandoffLevel } from './handoff-level.js'
 import { BOOLEAN_CONFIG_KEYS, CONFIG_KEYS, type FrameworkFileConfig } from './config.js'
 
 /**
@@ -22,12 +23,8 @@ export interface RunConfigValues {
   antiLazyPill?: boolean | undefined
   /** Run the wrapped agent fully raw (#625). */
   transparent?: boolean | undefined
-  /** Push a session's branch to `origin` when it finishes (#1102/#1173). */
-  autoPushBranch?: boolean | undefined
-  /** Open a draft PR for a session's branch when it finishes (#1102/#1173). */
-  autoOpenPr?: boolean | undefined
-  /** Merge the session's PR once it is opened (#1216). */
-  autoMerge?: boolean | undefined
+  /** How far a finished session publishes itself (#1102/#1216/B5). */
+  handoff?: HandoffLevel | undefined
 }
 
 /** One tier of config, with the label the run narrates when this tier wins a key. */
@@ -41,13 +38,10 @@ export interface ConfigLayer {
 export const RUN_CONFIG_DEFAULTS = {
   antiLazyPill: true,
   transparent: false,
-  // On by default (#1102): the zero-config handoff is what makes a session left alone hand
-  // itself back.
-  autoPushBranch: true,
-  autoOpenPr: true,
-  // Off by default (#1216): landing work on the default branch is not reversible the way pushing
-  // a branch is, so it has to be asked for.
-  autoMerge: false,
+  // `pr` by default (#1102): the zero-config handoff is what makes a session left alone hand
+  // itself back. Merging is the rung above, because landing work on the default branch is not
+  // reversible the way pushing a branch is (#1216).
+  handoff: DEFAULT_HANDOFF,
 } as const
 
 /**
@@ -71,9 +65,8 @@ export interface ResolvedRunConfig {
   buildEvent?: string | undefined
   antiLazyPill: boolean
   transparent: boolean
-  autoPushBranch: boolean
-  autoOpenPr: boolean
-  autoMerge: boolean
+  /** How far this session publishes itself (#1102/#1216/B5). */
+  handoff: HandoffLevel
   /** Winning layer name per key; a key left to its default is absent here. */
   sources: Partial<Record<keyof RunConfigValues, string>>
 }
@@ -95,6 +88,7 @@ export function resolveRunConfig(layers: readonly ConfigLayer[]): ResolvedRunCon
     ...(preset ? { presetName: preset } : {}),
     ...(event ? { buildEvent: event } : {}),
     ...modes,
+    handoff: pick('handoff') ?? RUN_CONFIG_DEFAULTS.handoff,
     sources,
   }
 }
@@ -117,6 +111,7 @@ export function describeResolvedConfig(config: ResolvedRunConfig): string {
   const shown: [keyof RunConfigValues, string][] = [
     ['preset', config.presetName ?? ''],
     ...BOOLEAN_CONFIG_KEYS.map((key): [keyof RunConfigValues, string] => [key, onOff(config[key])]),
+    ['handoff', config.handoff],
     ['event', config.buildEvent ?? ''],
   ]
   return shown

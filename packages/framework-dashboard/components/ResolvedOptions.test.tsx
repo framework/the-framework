@@ -5,10 +5,11 @@ import type { OptionRow } from './OptionsMenu.js'
 import { hoverTooltip, unhoverTooltip } from '../test-utils.js'
 
 const rows = (over: Partial<Record<string, boolean>> = {}): OptionRow[] => [
-  { key: 'transparent', label: 'Transparent', title: 'a', description: 'a', checked: over.transparent ?? false },
-  { key: 'vanilla', label: 'Disable system prompt', title: 't', description: 't', checked: over.vanilla ?? false },
+  { key: 'transparent', patch: checked => ({ transparent: checked }), label: 'Transparent', title: 'a', description: 'a', checked: over.transparent ?? false },
+  { key: 'vanilla', patch: checked => ({ vanilla: checked }), label: 'Disable system prompt', title: 't', description: 't', checked: over.vanilla ?? false },
   {
     key: 'browser',
+    patch: checked => ({ browser: checked }),
     label: 'Browser',
     title: 'b',
     description: 'b',

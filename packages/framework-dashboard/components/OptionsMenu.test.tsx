@@ -15,8 +15,8 @@ afterEach(() => {
 })
 
 const mainOptions = (): OptionRow[] => [
-  { key: 'browser', label: 'Browser', title: 't', checked: false },
-  { key: 'transparent', label: 'Transparent', title: 't', checked: true },
+  { key: 'browser', patch: checked => ({ browser: checked }), label: 'Browser', title: 't', checked: false },
+  { key: 'transparent', patch: checked => ({ transparent: checked }), label: 'Transparent', title: 't', checked: true },
 ]
 
 function open() {
@@ -42,7 +42,7 @@ describe('OptionsMenu (#654)', () => {
 
   test('a disabled row is greyed out and says why, and cannot be toggled', () => {
     const options: OptionRow[] = [
-      { key: 'browser', label: 'Browser', title: 't', description: 'Gives the agent a real browser.', checked: false, disabled: true, disabledReason: 'only on Claude Code' },
+      { key: 'browser', patch: checked => ({ browser: checked }), label: 'Browser', title: 't', description: 'Gives the agent a real browser.', checked: false, disabled: true, disabledReason: 'only on Claude Code' },
     ]
     render(<OptionsMenu options={options} busy={false} />)
     open()

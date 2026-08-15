@@ -216,13 +216,15 @@ describe('the handoff checkboxes (#1102)', () => {
     // It used to leave the push armed, which is a thing still happening that nothing on screen said.
     render(<HandoffArm projectId="p1" runId="run-1" state={armed} />)
     fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => expect(sendSetHandoff).toHaveBeenCalledWith('p1', 'run-1', false, false))
+    await waitFor(() => expect(sendSetHandoff).toHaveBeenCalledWith('p1', 'run-1', 'local'))
   })
 
   test('ticking it arms the push too, since opening a PR needs the branch on the remote', async () => {
+    // One rung travels (B5), and it already includes the push: nothing on the receiving end has to
+    // remember that a PR implies one.
     render(<HandoffArm projectId="p1" runId="run-1" state={{ push: false, pr: false, merge: false }} />)
     fireEvent.click(screen.getByText('Open PR'))
-    await waitFor(() => expect(sendSetHandoff).toHaveBeenCalledWith('p1', 'run-1', true, true))
+    await waitFor(() => expect(sendSetHandoff).toHaveBeenCalledWith('p1', 'run-1', 'pr'))
   })
 
   test('a push-only session says "Push branch", rather than an unticked box while it pushes (#1173)', () => {

@@ -28,14 +28,10 @@ export const PROJECT_PREFERENCE_KEYS = [
   'vanilla',
   'onBeforeMergeableQuality',
   'browser',
-  // Per-project by nature (#1102): whether a session should publish itself is a fact about the
-  // repo, not about the machine. A scratch repo wants it on; someone else's repo you have push
-  // rights to may well not.
-  'autoPushBranch',
-  'autoOpenPr',
-  // Per-project for the same #1102 reason, and then some (#1216): whether a repo lets sessions
-  // land their own PRs is the sharpest per-repo call there is.
-  'autoMerge',
+  // Per-project by nature (#1102/#1216): how far a session publishes itself is a fact about the
+  // repo, not about the machine. A scratch repo wants the whole ladder; someone else's repo you
+  // have push rights to may well not.
+  'handoff',
   'transparent',
   'model',
   'agent',

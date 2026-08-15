@@ -1,4 +1,5 @@
 import { isRunLocation, type RunLocation } from './run-location.js'
+import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { isAgentName } from './agent-names.js'
@@ -59,17 +60,14 @@ export interface Preferences {
   /** Give the agent a real browser via chrome-devtools-mcp during the run (#452); maps to `--browser`. */
   browser?: boolean
   /**
-   * Push a session's branch to `origin` when it finishes (#1102). Absent = on.
+   * How far a finished session publishes itself (#1102/#1216/B5): keep it local, push the branch,
+   * open a draft PR, or merge that PR. Absent = {@link DEFAULT_HANDOFF} (`pr`).
    *
    * Default-on, unlike most of this file, because it is what makes the handoff zero-config: the
    * old behaviour was a button nobody was obliged to press, and work that stayed on a local
    * branch nobody was told about (#860). A session can still opt out from its action bar.
    */
-  autoPushBranch?: boolean
-  /** Open a draft PR for a session's branch when it finishes (#1102). Absent = on; implies {@link autoPushBranch}. */
-  autoOpenPr?: boolean
-  /** Merge a session's PR once it is opened (#1216). Absent = off: landing on the default branch has to be asked for, unlike the default-on publish pair above. */
-  autoMerge?: boolean
+  handoff?: HandoffLevel
   /**
    * Transparent mode (#625): run the wrapped agent raw — no framework system prompt, emit
    * protocols, consumption guard, dashboard, or TODO loop, so a run is identical to `claude -p`.
@@ -370,9 +368,6 @@ const BOOLEAN_PREFERENCES: Record<BooleanPreferenceKey, true> = {
   vanilla: true,
   onBeforeMergeableQuality: true,
   browser: true,
-  autoPushBranch: true,
-  autoOpenPr: true,
-  autoMerge: true,
   transparent: true,
   notifyBrowser: true,
   notifyDiscord: true,
@@ -415,6 +410,7 @@ function sanitizePreferences(value: unknown): Preferences {
   // `target` (#1050) is a string, so the boolean-only PREFERENCE_KEYS loop would silently eat it;
   // it gets its own branch like `theme`, constrained to the known set (anything else = default `local`).
   if (isRunLocation(input['target'])) preferences.target = input['target']
+  if (isHandoffLevel(input['handoff'])) preferences.handoff = input['handoff']
   // `autoSpendOffset` (#960) is the one numeric preference: a slider position in percentage
   // points, clamped so a hand-edited file cannot push the limit somewhere the slider could not.
   const offset = input['autoSpendOffset']

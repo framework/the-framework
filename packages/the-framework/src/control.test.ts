@@ -142,13 +142,15 @@ test('a handoff entry needs both booleans, so a half-written line cannot disarm 
     const seen: ControlEntry[] = []
     const watcher = watchControl(dir, entry => seen.push(entry), 20)
     try {
-      // Malformed first: a missing or non-boolean half must be dropped, not coerced. Getting this
-      // wrong would silently stop a session publishing its work.
-      await appendFile(controlPath(dir), JSON.stringify({ kind: 'handoff', push: true }) + '\n')
-      await appendFile(controlPath(dir), JSON.stringify({ kind: 'handoff', push: 'yes', pr: false }) + '\n')
-      await appendControl(dir, { kind: 'handoff', push: true, pr: false })
+      // Malformed first: a missing rung, or one that names nothing, must be dropped rather than
+      // coerced. Getting this wrong would silently stop a session publishing its work.
+      await appendFile(controlPath(dir), JSON.stringify({ kind: 'handoff' }) + '\n')
+      await appendFile(controlPath(dir), JSON.stringify({ kind: 'handoff', level: 'publish' }) + '\n')
+      // And the pair this replaced (B5) is not a rung either, so a stale writer disarms nothing.
+      await appendFile(controlPath(dir), JSON.stringify({ kind: 'handoff', push: true, pr: false }) + '\n')
+      await appendControl(dir, { kind: 'handoff', level: 'push' })
       assert.ok(await until(() => seen.length > 0), 'the well-formed entry never arrived')
-      assert.deepEqual(seen, [{ kind: 'handoff', push: true, pr: false }])
+      assert.deepEqual(seen, [{ kind: 'handoff', level: 'push' }])
     } finally {
       watcher.close()
     }

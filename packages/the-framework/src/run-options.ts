@@ -1,3 +1,4 @@
+import { DEFAULT_HANDOFF, type HandoffLevel } from './handoff-level.js'
 import type { Preferences } from './registry.js'
 import type { StartRunOptions } from './dashboard/types.js'
 import type { FrameworkFileConfig } from './config.js'
@@ -33,27 +34,21 @@ export function preferencesFromFileConfig(file: FrameworkFileConfig): Preference
     // The handoff pair (#1102/#1173): whether a session publishes itself is a fact about the repo,
     // so the committed file may say it — and it is where push-without-PR stays reachable now the
     // launcher offers a single `Open PR` row.
-    ...(file.autoPushBranch !== undefined ? { autoPushBranch: file.autoPushBranch } : {}),
-    ...(file.autoOpenPr !== undefined ? { autoOpenPr: file.autoOpenPr } : {}),
-    ...(file.autoMerge !== undefined ? { autoMerge: file.autoMerge } : {}),
+    ...(file.handoff !== undefined ? { handoff: file.handoff } : {}),
   }
 }
 
 /**
- * The end-of-session handoff a set of preferences arms (#1102). Both halves default on, which is
+ * How far a set of preferences publishes a finished session (#1102/B5). Defaults to `pr`, which is
  * what makes it zero-config: a session left alone pushes its branch and opens a draft PR.
  *
- * A ladder, not a pair (#1379): pushing is the rung under opening a PR, so `autoPushBranch` is the
- * master and turning it off publishes nothing. `gh` will not open a PR for a branch the remote has
- * never seen, so "PR without push" was never a state a run could honour — it used to resolve the
- * contradiction by turning push back *on*, which meant a launcher that offered "publish nothing"
- * could not deliver it. Normalised here rather than in the three places that read it.
- *
- * Defaults are untouched: both on, so anyone who never opens the menu gets identical behaviour.
+ * A ladder, not three switches (#1379): the rungs are nested, so "PR without push" was never a
+ * state a session could honour — `gh` will not open a PR for a branch the remote has never seen.
+ * As an ordinal that combination is not representable at all, rather than repaired by turning the
+ * push back on, which is what made a launcher offering "publish nothing" unable to deliver it.
  */
-export function handoffFromPreferences(preferences: Preferences): { push: boolean; pr: boolean } {
-  const push = preferences.autoPushBranch ?? true
-  return { push, pr: push && (preferences.autoOpenPr ?? true) }
+export function handoffFromPreferences(preferences: Preferences): HandoffLevel {
+  return preferences.handoff ?? DEFAULT_HANDOFF
 }
 
 /**
@@ -79,13 +74,9 @@ export function runOptionsFromPreferences(preferences: Preferences, context: str
     vanilla,
     transparent,
     ...(onBeforeMergeableQuality ? { onBeforeMergeable: true } : {}),
-    // Stated explicitly, `false` included: these default ON (#1102), so sending nothing would let
-    // the run's own default turn back on what the launcher just showed as off.
-    autoPushBranch: handoff.push,
-    autoOpenPr: handoff.pr,
-    // Same explicitness the other way round (#1216): it defaults OFF, but the repo file may say
-    // on, and the launcher's settled answer has to win over it.
-    autoMerge: preferences.autoMerge ?? false,
+    // Stated explicitly, every rung included: it defaults to `pr` (#1102), so sending nothing
+    // would let the session's own default publish more than the launcher just showed.
+    handoff,
     // Claude-only (#801): another agent's driver takes no MCP servers, so sending it would only earn
     // the CLI's "no effect" notice. Matches the box being disabled off Claude Code.
     ...(browser && agent === 'claude' ? { browser: true } : {}),

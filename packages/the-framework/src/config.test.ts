@@ -23,18 +23,16 @@ test('parseFrameworkConfig reads the transparent toggle (#625)', () => {
   assert.throws(() => parseFrameworkConfig('transparent: nope\n'), /"transparent" must be a boolean/)
 })
 
-test('parseFrameworkConfig reads the handoff pair (#1173)', () => {
-  // Where the push setting lives now the launcher gear offers a single `Open PR` row.
-  assert.deepEqual(parseFrameworkConfig('autoPushBranch: false\nautoOpenPr: false\n'), {
-    autoPushBranch: false,
-    autoOpenPr: false,
-  })
-  assert.throws(() => parseFrameworkConfig('autoOpenPr: nope\n'), /"autoOpenPr" must be a boolean/)
-})
-
-test('parseFrameworkConfig reads the auto-merge toggle (#1216)', () => {
-  assert.deepEqual(parseFrameworkConfig('autoMerge: true\n'), { autoMerge: true })
-  assert.throws(() => parseFrameworkConfig('autoMerge: nope\n'), /"autoMerge" must be a boolean/)
+test('parseFrameworkConfig reads the handoff rung (#1173/#1216)', () => {
+  // How far a session publishes itself is one repo-level setting: keep it local, push the branch,
+  // open a PR, merge it. The three booleans this replaced could spell combinations no session
+  // could honour, and the file was where a user met them first (B5).
+  assert.deepEqual(parseFrameworkConfig('handoff: local\n'), { handoff: 'local' })
+  assert.deepEqual(parseFrameworkConfig('handoff: merge\n'), { handoff: 'merge' })
+  // A rung nobody defines is refused by name, so a typo is a startup error rather than a session
+  // that quietly publishes nothing.
+  assert.throws(() => parseFrameworkConfig('handoff: publish\n'), /"handoff" must be one of local \| push \| pr \| merge/)
+  assert.throws(() => parseFrameworkConfig('handoff: true\n'), /"handoff" must be one of local \| push \| pr \| merge/)
 })
 
 test('parseFrameworkConfig treats an empty document as {}', () => {

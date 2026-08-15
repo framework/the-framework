@@ -25,6 +25,7 @@ import {
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
 import { isHandsOff, isRunLocation, type RunLocation } from './run-location.js'
+import { handoffStages, isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { readSessionSpec, writeSessionSpec, type SessionSpec } from './session-spec.js'
 import { sessionTodoPending } from './todo-loop.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from './config.js'
@@ -217,16 +218,11 @@ export interface SessionOptions {
   /** `--browser`: give the agent a real browser via chrome-devtools-mcp (navigate, console, network, DOM, screenshot) during the run (#452). */
   browser: boolean
   /**
-   * `--auto-push-branch` / `--no-auto-push-branch` (#1102): push this session's branch to `origin`
-   * when it finishes. Tri-state like the mode toggles (#841): `undefined` is "this run said
-   * nothing", so the repo's the-framework.yml decides, and nobody setting it resolves to on —
-   * which is what makes the handoff zero-config.
+   * How far this session publishes itself when it finishes (#1102/#1216/B5). `undefined` is "this
+   * session said nothing", so the repo's the-framework.yml decides, and nobody setting it resolves
+   * to `pr` — which is what makes the handoff zero-config.
    */
-  autoPushBranch?: boolean | undefined
-  /** `--auto-open-pr` / `--no-auto-open-pr` (#1102): open a draft PR when the session finishes. Tri-state like {@link autoPushBranch}; resolves to on. Implies the push. */
-  autoOpenPr?: boolean | undefined
-  /** `--auto-merge` / `--no-auto-merge` (#1216): merge the session's PR once it is opened. Tri-state like {@link autoOpenPr}; resolves to off. */
-  autoMerge?: boolean | undefined
+  handoff?: HandoffLevel | undefined
   buildEvent?: string | undefined
   maxCost?: number
   todoLoop: boolean
@@ -353,9 +349,7 @@ export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = proce
     ...(o.unattended ? { unattended: true } : {}),
     ...(defined(o.vanilla) ? { vanilla: o.vanilla } : {}),
     ...(defined(o.transparent) ? { transparent: o.transparent } : {}),
-    ...(defined(o.autoPushBranch) ? { autoPushBranch: o.autoPushBranch } : {}),
-    ...(defined(o.autoOpenPr) ? { autoOpenPr: o.autoOpenPr } : {}),
-    ...(defined(o.autoMerge) ? { autoMerge: o.autoMerge } : {}),
+    ...(isHandoffLevel(o.handoff) ? { handoff: o.handoff } : {}),
     ...(o.onBeforeMergeable ? { onBeforeMergeable: true } : {}),
     ...(o.browser ? { browser: true } : {}),
     ...(o.maxCost !== undefined ? { maxCost: o.maxCost } : {}),
@@ -459,17 +453,12 @@ function flagConfigLayer(opts: RunConfigFlags): ConfigLayer {
       // --vanilla is the negative face of the same key: it removes the built-in prompt.
       ...(opts.vanilla !== undefined ? { antiLazyPill: !opts.vanilla } : {}),
       ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
-      ...(opts.autoPushBranch !== undefined ? { autoPushBranch: opts.autoPushBranch } : {}),
-      ...(opts.autoOpenPr !== undefined ? { autoOpenPr: opts.autoOpenPr } : {}),
-      ...(opts.autoMerge !== undefined ? { autoMerge: opts.autoMerge } : {}),
+      ...(opts.handoff !== undefined ? { handoff: opts.handoff } : {}),
     },
   }
 }
 
-type RunConfigFlags = Pick<
-  SessionOptions,
-  'preset' | 'buildEvent' | 'vanilla' | 'transparent' | 'autoPushBranch' | 'autoOpenPr' | 'autoMerge'
->
+type RunConfigFlags = Pick<SessionOptions, 'preset' | 'buildEvent' | 'vanilla' | 'transparent' | 'handoff'>
 
 /**
  * Resolve a run's config over its layers, nearest wins (#841): the run's flags, then the repo's
@@ -974,19 +963,19 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // Wired when this run's own dashboard is up (#427), or when whoever spawned it passed --run-id
   // and therefore steers it (see {@link isSteerable}).
   // What this session hands back when it ends (#1102). Mutable: the action bar's checkboxes can
-  // disarm it at any point up to the moment it settles, which is the whole point of them being
-  // pre-commitments rather than buttons. Opening a PR implies pushing, so the pair is normalised
-  // wherever it is set.
-  // Merge is carried alongside but has no checkbox (#1216): it is a per-run/per-repo setting, not
-  // an action-bar pre-commitment. The one thing that mutates it after this line is the user's own
-  // Merge action (#1391), which also records the human authorization below.
-  const armedHandoff = { push: config.autoPushBranch || config.autoOpenPr, pr: config.autoOpenPr, merge: config.autoMerge }
+  // move it at any point up to the moment it settles, which is the whole point of them being
+  // pre-commitments rather than buttons. One rung, not three flags (B5), so the stages cannot
+  // disagree — every reader derives them, and a box unticked mid-run lowers the whole ladder
+  // instead of leaving a merge armed with no PR under it.
+  // The one thing that raises it after this line is the user's own Merge action (#1391), which
+  // also records the human authorization below.
+  let armedHandoff: HandoffLevel = config.handoff
   // The user pressed Merge (#1391): a human authorized the merge, so the #1363 gate must not also
   // demand the agent's ready-for-merge signal — a human's word outranks it.
   let mergeAuthorized = false
   // Assigned once the journal exists, which is after the control watcher is wired: a change that
   // arrives before then still lands on `armedHandoff`, it just has no event to announce it yet.
-  let announceHandoff: ((push: boolean, pr: boolean) => void) | undefined
+  let announceHandoff: (() => void) | undefined
   // Same deferral as announceHandoff: an await-bind-project / await-create-project gate binds this
   // topic run to a project (#1121), and only an event puts that on the meta a later-opened tab can
   // read. Wired once the journal exists (below).
@@ -1007,9 +996,8 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
           return
         }
         if (entry.kind === 'handoff') {
-          armedHandoff.push = entry.push || entry.pr
-          armedHandoff.pr = entry.pr
-          announceHandoff?.(armedHandoff.push, armedHandoff.pr)
+          armedHandoff = entry.level
+          announceHandoff?.()
           return
         }
         if (entry.kind === 'bind') {
@@ -1021,11 +1009,9 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
           // The user's Merge action (#1391): arm the full ladder and record the human
           // authorization. Not an abort — the session still ends at its own natural end (#1390)
           // and the merge fires there; announcing re-arms keeps the meta a mid-run tab reads true.
-          armedHandoff.push = true
-          armedHandoff.pr = true
-          armedHandoff.merge = true
+          armedHandoff = 'merge'
           mergeAuthorized = true
-          announceHandoff?.(true, true)
+          announceHandoff?.()
           // A session parked on the backlog offer (#323) is waiting to know whether to take more
           // work. Merge answers that: wrap up now. Other gates keep waiting — they are questions
           // about the work itself, which merging does not answer.
@@ -1122,11 +1108,11 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // Put the armed state on the run's meta (#1102), and keep it there as the checkboxes change it.
   // The control channel carries the instruction, but only an event reaches meta, and meta is the
   // only thing a dashboard tab opened mid-run can read the boxes back from.
-  // Merge rides along from the closure rather than the signature (#1382): it has no checkbox and
-  // never changes after launch, but every armed line must carry it or the meta a mid-run tab
-  // reads back would say "draft PR" about a run that is set to merge.
-  announceHandoff = (push, pr) => onEvent({ kind: 'handoff-armed', push, pr, merge: armedHandoff.merge === true })
-  announceHandoff(armedHandoff.push, armedHandoff.pr)
+  // The event still spells the three stages out (#1382): it is a snapshot a dashboard tab reads
+  // back, and every armed line must carry the merge stage or the meta would say "draft PR" about a
+  // run that is set to merge. Derived from the rung, so the three can never contradict it.
+  announceHandoff = () => onEvent({ kind: 'handoff-armed', ...handoffStages(armedHandoff) })
+  announceHandoff()
   // The ticket this run implements (#1117), if the daemon named one. Once, at start: it is a fact
   // about why the run exists, not a state that changes, and folding it to meta is what lets the
   // Overview mark that ticket as being implemented right now.
@@ -1178,9 +1164,9 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // action bar's checkboxes were unticked. Runs after the on-before-mergeable step above, so
   // anything that step committed is part of what gets published rather than a commit left behind.
   const maybeAutoHandoff = async (): Promise<void> => {
-    const armed = { ...armedHandoff }
+    const armed = handoffStages(armedHandoff)
     const skip = (reason: AutoHandoffSkip) => onEvent({ kind: 'handoff', outcome: 'skipped', reason })
-    if (!armed.push && !armed.pr) return skip('not-armed')
+    if (!armed.push) return skip('not-armed')
     // A stopped run is a session the user cut short; publishing what it happened to reach is the
     // opposite of what stopping meant. Same call the on-before-mergeable step makes.
     if (journal.stoppedCleanly()) return skip('run-stopped')

@@ -101,9 +101,9 @@ test('rearm the handoff mid-run; the meta a reloaded tab reads follows (#1102)',
     const gate = await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the parked gate')
     if (gate.kind !== 'choice') return
 
-    // The boxes start armed (push + PR are the defaults), and unticking them mid-run re-announces
-    // the armed state — the event is what folds onto the meta a tab opened later reads back.
-    await rpc(sendSetHandoff)(project.id, runId, false, false)
+    // The box starts armed (the PR rung is the default), and unticking it mid-run re-announces the
+    // armed state — the event is what folds onto the meta a tab opened later reads back.
+    await rpc(sendSetHandoff)(project.id, runId, 'local')
     await waitFor(
       () => tail.events.find(e => e.kind === 'handoff-armed' && !e.push && !e.pr),
       'the disarmed announcement',

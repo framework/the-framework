@@ -113,9 +113,9 @@ test('the concurrency setting on disk is the number of agents the routine spins 
       assert.ok(start.prompt.includes(start.options.queueEntry!), 'the prompt pins the entry the claim names')
       // Nobody is at the keyboard, so a gate must auto-answer rather than park (#846/#1279).
       assert.equal(start.options.unattended, true)
-      // The drain job lands its own PRs (#1216): the flag rides the start so it reaches the run
-      // as --auto-merge.
-      assert.equal(start.options.autoMerge, true)
+      // The drain job lands its own PRs (#1216): the job's flag rides the start as the ladder's
+      // top rung, so it reaches the run already meaning "push, open, merge".
+      assert.equal(start.options.handoff, 'merge')
       // A drain implements its ticket, so its PR title may close the issue — planRun is only
       // for the fanned-out planners (#1327), whose merge must not.
       assert.equal(start.options.planRun, undefined)

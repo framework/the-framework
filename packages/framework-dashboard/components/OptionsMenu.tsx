@@ -27,9 +27,6 @@ import {
  * menu's existing importers do not have to care where the table moved to. */
 export type { OptionRow } from '../lib/run-option-rows.js'
 
-function setOption(key: keyof Preferences, checked: boolean) {
-  updatePreferences({ [key]: checked } as Partial<Preferences>)
-}
 
 // Moved to ui/option-label.tsx (#948) so menus without preference wiring can share it;
 // re-exported to keep this module the import site the other menus already use.
@@ -204,7 +201,7 @@ function OptionCheckboxRow({ row, busy, indent = false }: { row: OptionRow; busy
           <DropdownMenuCheckboxItem
             checked={row.checked}
             disabled={busy || !!row.disabled}
-            onCheckedChange={checked => setOption(row.key, checked)}
+            onCheckedChange={checked => updatePreferences(row.patch(checked))}
             className={indent ? 'items-start pl-8' : 'items-start'}
           />
         }

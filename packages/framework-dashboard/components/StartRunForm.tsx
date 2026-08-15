@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { ProjectSummary } from '@gemstack/the-framework'
-import { runOptionsFromPreferences } from '@gemstack/the-framework/client'
+import { DEFAULT_HANDOFF, handoffReaches, runOptionsFromPreferences } from '@gemstack/the-framework/client'
 import { onAgentReady, onClaudeTrust, onProjects, onRepoAutoMerge } from '../server/projects.telefunc.js'
 import { onSystemPromptUser } from '../server/reads.telefunc.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
@@ -105,7 +105,7 @@ export function StartRunForm({
   // CLI, so a missing or logged-out `gh` is said now, not hours later as a silently unopened PR.
   const localAgent = options.target !== 'actions' && !remoteDevice
   const agent = options.agent ?? 'claude'
-  const publishArmed = localAgent && (options.autoOpenPr === true || options.autoMerge === true)
+  const publishArmed = localAgent && handoffReaches(options.handoff ?? DEFAULT_HANDOFF, 'pr')
   const ready = useLoaded<Awaited<ReturnType<typeof onAgentReady>> | null>(
     () => (localAgent ? onAgentReady(agent, publishArmed) : Promise.resolve(null)),
     null,
@@ -116,7 +116,7 @@ export function StartRunForm({
   // direct merge — the PR lands before CI has run (#1417/#1406). Warn with the fix BEFORE the
   // session is spent, the way #1318 warns about trust. Read only while the merge rung is armed;
   // a remote run merges on its own device, so it is not probed here.
-  const mergeArmed = options.autoMerge === true && !remoteDevice
+  const mergeArmed = options.handoff === 'merge' && !remoteDevice
   const repoAutoMerge = useLoaded<Awaited<ReturnType<typeof onRepoAutoMerge>>>(
     () => (mergeArmed ? onRepoAutoMerge(projectId) : Promise.resolve(null)),
     null,

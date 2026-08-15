@@ -1,3 +1,4 @@
+import type { HandoffLevel } from '../handoff-level.js'
 import type { RunLocation } from '../run-location.js'
 import type { LinkedPr } from './gh.js'
 
@@ -69,17 +70,11 @@ export interface StartRunOptions {
   /** Cap this session's spend, in USD (#322). Only enforceable on an agent that reports a price per turn (#540). */
   maxCost?: number
   /**
-   * Push the session's branch to `origin` when it finishes (#1102); maps to `--auto-push-branch`.
-   *
-   * Tri-state like the four `the-framework.yml` toggles, and for the same reason: it defaults ON,
-   * so an explicit `false` has to travel as `--no-auto-push-branch` or the run's own default would
-   * turn back on what the launcher showed as off.
+   * How far this session publishes itself when it finishes (#1102/#1216/B5): `local`, `push`, `pr`
+   * or `merge`. Absent leaves it to the repo file, then the default (`pr`) — which is what makes
+   * the handoff zero-config.
    */
-  autoPushBranch?: boolean
-  /** Open a draft PR for the session's branch when it finishes (#1102); maps to `--auto-open-pr`. Implies {@link autoPushBranch}. */
-  autoOpenPr?: boolean
-  /** Merge the session's PR once it is opened (#1216); maps to `--auto-merge`. Tri-state like {@link autoOpenPr}, but resolves to off: landing on the default branch has to be asked for. */
-  autoMerge?: boolean
+  handoff?: HandoffLevel
   /** The model to run the wrapped agent on (#628); maps to `--model`. Absent = the driver's own default. */
   model?: string
   /** Which coding agent drives the run (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */

@@ -14,6 +14,7 @@ import { withRunLock } from '../run-locks.js'
 import { removeProjectWorktree, deleteProjectRun } from '../worktrees.js'
 import { commitSessionWork, mergeSessionPr, openSessionPullRequest, pushRunBranch, runBranchFor, type HandoffResult } from '../dashboard/run-handoff.js'
 import type { ChoiceBy } from '../events.js'
+import { isHandoffLevel, type HandoffLevel } from '../handoff-level.js'
 import type {
   DeleteSessionResult,
   RemoveWorktreeResult,
@@ -54,19 +55,22 @@ export async function sendStop(projectId: string, runId?: string): Promise<void>
 }
 
 /**
- * Arm or disarm a live session's end-of-session handoff (#1102): whether it pushes its branch and
- * opens a draft PR when it finishes.
+ * Move a live session's end-of-session handoff (#1102): how far it publishes itself when it
+ * finishes.
  *
  * Steering rather than a setting write, because it is about *this* session: the preference sets
- * where the boxes start, and this is the user changing their mind for one run. The run echoes what
- * it applied back as an event, so the boxes read from the run's meta rather than from local state
- * that a reload would lose.
+ * where the ladder starts, and this is the user changing their mind for one run. The run echoes
+ * what it applied back as an event, so the surface reads from the run's meta rather than from local
+ * state that a reload would lose.
+ *
+ * One rung on the wire (B5), so there is nothing to normalise here: a surface offering the stages
+ * as separate boxes resolves them on its own side, where an impossible answer settles *down* to the
+ * rung actually asked for instead of being repaired upward into a push nobody ticked.
  */
-export async function sendSetHandoff(projectId: string, runId: string, push: boolean, pr: boolean): Promise<void> {
-  return relayOr(runId, 'sendSetHandoff', [projectId, runId, push, pr], async () => {
-    // Opening a PR needs the branch on the remote, so the pair is normalised before it is stored
-    // rather than left for each reader to remember.
-    await appendControlFor(projectId, { kind: 'handoff', push: push || pr, pr }, runId)
+export async function sendSetHandoff(projectId: string, runId: string, level: HandoffLevel): Promise<void> {
+  return relayOr(runId, 'sendSetHandoff', [projectId, runId, level], async () => {
+    if (!isHandoffLevel(level)) return
+    await appendControlFor(projectId, { kind: 'handoff', level }, runId)
   }, undefined)
 }
 

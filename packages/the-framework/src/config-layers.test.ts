@@ -51,11 +51,9 @@ test('resolveRunConfig: each layer can win, and each can be absent (#841)', () =
   assert.equal(bare.transparent, RUN_CONFIG_DEFAULTS.transparent)
   assert.equal(bare.antiLazyPill, RUN_CONFIG_DEFAULTS.antiLazyPill)
   assert.equal(bare.transparent, RUN_CONFIG_DEFAULTS.transparent)
-  // The handoff pair defaults on (#1102): a session nobody configured hands itself back.
-  assert.equal(bare.autoPushBranch, true)
-  assert.equal(bare.autoOpenPr, true)
-  // Auto-merge defaults off (#1216): landing on the default branch has to be asked for.
-  assert.equal(bare.autoMerge, false)
+  // The handoff defaults to the PR rung (#1102/#1216): a session nobody configured hands itself
+  // back, and merging — the one rung above — has to be asked for.
+  assert.equal(bare.handoff, 'pr')
   assert.equal(bare.presetName, undefined)
   assert.equal(bare.buildEvent, undefined)
   assert.deepEqual(bare.sources, {})

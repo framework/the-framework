@@ -10,7 +10,7 @@ const SPEC: SessionSpec = {
   kind: 'build',
   cwd: '/work/app',
   runId: '2026-08-15T10-00-00-000Z',
-  options: { autoOpenPr: false, model: 'opus', browser: true },
+  options: { handoff: 'local', model: 'opus', browser: true },
 }
 
 test('a spec round-trips through the file, values intact (D4)', async () => {
@@ -18,13 +18,14 @@ test('a spec round-trips through the file, values intact (D4)', async () => {
   assert.deepEqual(await readSessionSpec(path), SPEC)
 })
 
-test('an explicit false survives, which is the whole reason this is not an argv (D4)', async () => {
-  // As a flag this needed a second `--no-auto-open-pr` spelling, because argv has only "present"
-  // and "absent". JSON says it directly, and says nothing when the session means nothing.
+test('an explicit value survives, and so does saying nothing (D4)', async () => {
+  // As flags this needed a `--no-*` spelling per boolean, because argv has only "present" and
+  // "absent". JSON says the value directly, and says nothing when the session means nothing —
+  // which is what leaves the repo's the-framework.yml free to decide.
   const off = await readSessionSpec(await writeSessionSpec(SPEC))
-  assert.equal(off.options.autoOpenPr, false)
+  assert.equal(off.options.handoff, 'local')
   const silent = await readSessionSpec(await writeSessionSpec({ ...SPEC, options: {} }))
-  assert.equal(silent.options.autoOpenPr, undefined)
+  assert.equal(silent.options.handoff, undefined)
 })
 
 test('reading a spec consumes it: a device token does not outlive the session (D4)', async () => {

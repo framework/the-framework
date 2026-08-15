@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { HandoffState, RunHandoff } from '@gemstack/the-framework'
+import { handoffFromStages, type HandoffLevel } from '@gemstack/the-framework/client'
 import { GitMerge, GitPullRequest } from 'lucide-react'
 import { sendMerge, sendOpenPullRequest, sendSetHandoff } from '../server/control.telefunc.js'
 import type { RunHandoffState } from '../lib/use-run-handoff.js'
@@ -76,16 +77,19 @@ export function HandoffArm({
   // The event stream is the truth, but it round-trips through a file the run tails, so a click
   // would visibly bounce back for a beat. `pending` holds what we last asked for until the events
   // agree, the same shape the quota slider needed for a polled value (#979).
-  const [pending, setPending] = useState<{ push: boolean; pr: boolean } | null>(null)
-  const shown = pending ?? state
+  const [pending, setPending] = useState<HandoffLevel | null>(null)
+  // The event spells the stages out; the ladder is what they mean (B5). Read as a rung here, so
+  // this component never has to reason about a combination the rung cannot hold.
+  const armed = handoffFromStages(state)
+  const shown = pending ?? armed
   useEffect(() => {
-    if (pending && pending.push === state.push && pending.pr === state.pr) setPending(null)
-  }, [pending, state.push, state.pr])
+    if (pending && pending === armed) setPending(null)
+  }, [pending, armed])
 
-  const set = (next: { push: boolean; pr: boolean }): void => {
+  const set = (next: HandoffLevel): void => {
     setPending(next)
     setBusy(true)
-    void sendSetHandoff(projectId, runId, next.push, next.pr)
+    void sendSetHandoff(projectId, runId, next)
       .catch(() => setPending(null))
       .finally(() => setBusy(false))
   }
@@ -100,10 +104,10 @@ export function HandoffArm({
   // this session is set to. A push-only session still says "Push branch" rather than showing an
   // unticked "Open PR" while pushing behind it — the box never describes something other than what
   // will happen. Ticking it takes the full step; unticking it means the session hands off nothing.
-  const pushOnly = shown.push && !shown.pr
+  const pushOnly = shown === 'push'
   // Merge arming has no checkbox (#1216) but the label must own it (#1382): a box saying "Open PR"
   // on a run that will land on main by itself is the lie this component exists to not tell.
-  const merges = state.merge && !pushOnly
+  const merges = shown === 'merge'
   return (
     <div className="flex items-center gap-x-3 whitespace-nowrap text-xs text-muted-foreground">
       <Arm
@@ -115,9 +119,12 @@ export function HandoffArm({
               ? 'Open a pull request when this session finishes and merge it once it is open, pushing the branch on the way.'
               : 'Open a draft pull request when this session finishes, pushing the branch on the way.'
         }
-        checked={shown.pr || pushOnly}
+        checked={shown !== 'local'}
         disabled={busy}
-        onChange={on => set(on ? { push: true, pr: true } : { push: false, pr: false })}
+        // Unticking means "hand off nothing"; re-ticking lands on the zero-config rung rather than
+        // restoring a merge the box never mentioned. The label always names the rung it is showing,
+        // so the two agree either way.
+        onChange={on => set(on ? 'pr' : 'local')}
       />
     </div>
   )

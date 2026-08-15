@@ -46,6 +46,18 @@ export { PROJECT_PREFERENCE_KEYS, NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAU
 // The preferences -> run options mapping (#858), shared with the daemon so an unattended run
 // starts with the same settings a launcher-started one would. Pure field logic, no Node imports.
 export { runOptionsFromPreferences, handoffFromPreferences, preferencesFromFileConfig } from './run-options.js'
+// The publish ladder (B5). The dashboard offers the rungs as checkboxes and the session header as
+// one box, so both need the ordinal and the two conversions — an impossible answer has to resolve
+// on the surface that collected it, not on the run that receives it.
+export {
+  DEFAULT_HANDOFF,
+  HANDOFF_LEVELS,
+  handoffFromStages,
+  handoffReaches,
+  handoffStages,
+  isHandoffLevel,
+  type HandoffLevel,
+} from './handoff-level.js'
 // The Discord credential rules (#1095): the same precedence and validation the daemon enforces,
 // so the setup dialog rejects a malformed token before the round trip instead of guessing at it.
 export {

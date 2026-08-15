@@ -205,8 +205,8 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         ...(ticket && !job.drains ? { planRun: true } : {}),
         ...(job.entry !== undefined ? { queueEntry: job.entry } : {}),
         // The job says its PRs may land themselves (#1216): the drain implements work whose
-        // review already happened on the queue. Rides to the run as `--auto-merge`.
-        ...(job.autoMerge ? { autoMerge: true } : {}),
+        // review already happened on the queue. Rides to the run as the ladder's top rung.
+        ...(job.autoMerge ? { handoff: 'merge' as const } : {}),
       })
       return result.ok ? result.runId : undefined
     },
@@ -268,11 +268,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         if (!project) return undefined
         // The fix lands on the red PR's own branch, so this run's handoff must not push or open
         // anything of its own.
-        const result = await startUnattended(project.id, ciFixPrompt(request), {
-          autoPushBranch: false,
-          autoOpenPr: false,
-          autoMerge: false,
-        })
+        const result = await startUnattended(project.id, ciFixPrompt(request), { handoff: 'local' })
         return result.ok ? result.runId : undefined
       },
     },

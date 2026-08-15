@@ -211,51 +211,6 @@ function reviewPreset() {
   })
 }
 
-test("a domain preset's loop drives the production-grade review phase (#252)", async () => {
-  const events: FrameworkEvent[] = []
-  const driver = new FakeDriver({
-    turns: [
-      { text: 'Built the app.' }, // build
-      { text: 'Reviewed.\n```json\n{"blockers":[]}\n```' }, // the domain review prompt, clean
-    ],
-    sessionId: 'test',
-  })
-  const { result, loop } = await runFramework({
-    intent: FAKE_INTENT,
-    driver,
-    cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
-    preset: reviewPreset(),
-    onEvent: e => events.push(e),
-  })
-  assert.ok(loop) // the preset loop was materialized...
-  assert.ok(events.some(e => e.kind === 'log' && /Test Domain loop drives/.test(e.message))) // ...and announced as the reviewer
-  assert.equal(result.productionGrade, true)
-  assert.equal(result.passes, 1) // cleared on the first domain-review pass (not the built-in checklist)
-})
-
-test('the domain review loop blocks, improve runs, then it clears (#252)', async () => {
-  const driver = new FakeDriver({
-    turns: [
-      { text: 'Built the app.' }, // build
-      { text: 'Reviewed.\n```json\n{"blockers":["needs error handling"]}\n```' }, // review, pass 1: blocks
-      { text: 'Added error handling.' }, // improve
-      { text: 'Reviewed.\n```json\n{"blockers":[]}\n```' }, // review, pass 2: clean
-    ],
-    sessionId: 'test',
-  })
-  const { result } = await runFramework({
-    intent: FAKE_INTENT,
-    driver,
-    cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
-    preset: reviewPreset(),
-    onEvent: () => {},
-  })
-  assert.equal(result.passes, 2) // blocked once, improved, cleared — the domain loop drove both passes
-  assert.equal(result.productionGrade, true)
-})
-
 /** A preset with both a major-change and a bug-fix loop, each running a sentinel-tagged prompt. */
 function dualLoopPreset(opts: { defaultEvent?: string } = {}) {
   const prompt = (id: string, sentinel: string): Prompt => ({
@@ -308,63 +263,9 @@ function promptRecordingDriver(): { driver: Driver; prompts: () => string[] } {
   return { driver, prompts: () => sent }
 }
 
-test('a bug-fix build event fires the preset bug-fix loop, not major-change (#265)', async () => {
-  const events: FrameworkEvent[] = []
-  const { driver, prompts } = promptRecordingDriver()
-  await runFramework({
-    intent: FAKE_INTENT,
-    driver,
-    cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
-    preset: dualLoopPreset(),
-    buildEvent: 'bug-fix',
-    onEvent: e => events.push(e),
-  })
-  assert.ok(events.some(e => e.kind === 'log' && /Test Domain loop drives the bug-fix review/.test(e.message)))
-  assert.ok(prompts().some(p => p.includes('BUGFIX-SENTINEL'))) // the bug-fix chain ran...
-  assert.ok(!prompts().some(p => p.includes('MAJOR-SENTINEL'))) // ...and the major-change chain did not
-})
-
-test('a preset defaultEvent selects the loop; an explicit buildEvent overrides it (#265)', async () => {
-  const byDefault = promptRecordingDriver()
-  await runFramework({
-    intent: FAKE_INTENT,
-    driver: byDefault.driver,
-    cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
-    preset: dualLoopPreset({ defaultEvent: 'bug-fix' }),
-    onEvent: () => {},
-  })
-  assert.ok(byDefault.prompts().some(p => p.includes('BUGFIX-SENTINEL'))) // preset default alone reaches bug-fix
-
-  const overridden = promptRecordingDriver()
-  await runFramework({
-    intent: FAKE_INTENT,
-    driver: overridden.driver,
-    cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
-    preset: dualLoopPreset({ defaultEvent: 'bug-fix' }),
-    buildEvent: 'major-change',
-    onEvent: () => {},
-  })
-  assert.ok(overridden.prompts().some(p => p.includes('MAJOR-SENTINEL'))) // run choice wins over the preset default
-})
-
 test('the default pass budget is raised for from-scratch builds (#182)', () => {
   // 3 was too low: the first passes go to bootstrapping an empty workspace.
   assert.equal(DEFAULT_MAX_PASSES, 5)
-})
-
-test('runFramework prototype scope skips the full-fledged loop', async () => {
-  const { result } = await runFramework({
-    intent: 'a quick landing page',
-    scope: 'prototype',
-    driver: fakeDriver(),
-    cwd: '/tmp/ws',
-    signals: FAKE_SIGNALS,
-  })
-  assert.equal(result.passes, 0)
-  assert.equal(result.productionGrade, false)
 })
 
 const MS_OPTS: MultiSelectOption[] = [

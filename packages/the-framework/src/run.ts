@@ -1,18 +1,13 @@
 import {
   Bootstrap,
-  LoopEngine,
-  dockerAvailable,
   builtinFrameworkPresetRegistry,
-  mergeChecklists,
   type BootstrapEvent,
   type BootstrapResult,
   type BootstrapScope,
   type BootstrapSteps,
   type BuildContext,
-  type DomainPreset,
   type FrameworkDetection,
   type FrameworkSignals,
-  type LoopPassContext,
   type SupervisorRun,
   type Verdict,
 } from '@gemstack/ai-autopilot'
@@ -22,7 +17,7 @@ import { createRunControls, emitSessionStart, endStopDetail } from './run-teleme
 import { AWAIT_PROTOCOL, createTurnSignalEmitter } from './turn-gate.js'
 import { drainGates, runChatPhase, type BindProjectDeps, type RecordMessage } from './await-gate.js'
 import { leaveResumeNote, runTodoLoop, type TodoLoopResult } from './todo-loop.js'
-import { continueAfterChoice, domainLoopChecklist, driverBuild, driverImprove, driverLoopPrompts } from './steps.js'
+import { continueAfterChoice, driverBuild, driverImprove } from './steps.js'
 import { OPEN_LOOP_MODES, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import type { RunMessages } from './run-messages.js'
 import { errorMessage } from './error-message.js'
@@ -75,29 +70,6 @@ export interface RunFrameworkOptions {
   eco?: EcoOptions
   /** In-context directories (#439): added as one `Context:` line to the system prompt. */
   context?: readonly string[]
-  /**
-   * A user-picked Open Loop domain preset ({loops, prompts}) to run the build
-   * under (#251). Its loops + prompts are materialized into a driver-backed {@link LoopEngine}
-   * exposed as {@link RunFrameworkResult.loop}. Load it with `loadDomainPreset` /
-   * `softwareDevelopmentPreset` (pass `modes` there to activate variants). Omit
-   * for the framework-only run.
-   */
-  preset?: DomainPreset
-  /**
-   * The active modes for the run (e.g. `['autopilot']`). Narrated with the
-   * {@link preset}, which is expected to be loaded with them already applied.
-   * (`autopilot` no longer steers the system prompt: #556 moved the maintenance
-   * section out, leaving the choice-gate countdown as its whole effect. See #801.)
-   */
-  modes?: readonly string[]
-  /**
-   * The loop event kind the review phase dispatches (#265) — this is what makes a
-   * run a bug fix vs a feature: `bug-fix` fires the preset's bug-fix loop, the
-   * default `major-change` fires its major-change loop. Overrides the preset's own
-   * `defaultEvent`. A kind the preset has no loop for reviews nothing (#1372).
-   * No-op without a preset.
-   */
-  buildEvent?: string
   /** Max full-fledged passes. Default {@link DEFAULT_MAX_PASSES} (5). */
   maxPasses?: number
   /**
@@ -180,14 +152,6 @@ export interface RunFrameworkResult {
   result: BootstrapResult
   detection: FrameworkDetection
   events: FrameworkEvent[]
-  /**
-   * The domain preset's review policy, materialized against this run's driver:
-   * its loops plus its prompts as driver-backed passes. Present only when a
-   * {@link RunFrameworkOptions.preset} was supplied. It also drives the run's
-   * review phase (#252): each checklist pass dispatches a `major-change` event
-   * through it.
-   */
-  loop?: LoopEngine
   /** How the backlog loop (#323) ended, when it ran. */
   todo?: TodoLoopResult
 }
@@ -195,9 +159,9 @@ export interface RunFrameworkResult {
 /**
  * Run the whole turnkey flow: detect the framework preset, frame the wrapped
  * agent with its framework skill (page builder + docs), then drive ai-autopilot's `Bootstrap`
- * (scope → build → full-fledged loop → deploy) entirely *through*
+ * (scope → build) entirely *through*
  * the driver (option A). Every phase, plus the agent's own progress, streams as
- * a {@link FrameworkEvent}. Reversible: swap in a real deploy target, or a
+ * a {@link FrameworkEvent}. Reversible: swap in a
  * different `Driver`, without touching this wiring.
  */
 export async function runFramework(opts: RunFrameworkOptions): Promise<RunFrameworkResult> {
@@ -218,14 +182,13 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
   // prompt (#547).
   const signals = opts.signals ?? {}
   const { preset, detection } = builtinFrameworkPresetRegistry().select(signals)
-  const domainPreset = opts.preset
   // The built-in #326 system prompt + any user SYSTEM.md are the whole prompt. Only
   // the template's system half is used here: each Bootstrap step composes its own
   // prompt around the intent, so the user-prompt slot stays with the steps.
   // `tf.params.autopilot` reflects the run's autopilot mode (#325).
   const tf: TfContext = {
     prompt: opts.intent,
-    params: { autopilot: opts.modes?.includes('autopilot') ?? false, ...(opts.eco ? { eco: opts.eco } : {}) },
+    params: { ...(opts.eco ? { eco: opts.eco } : {}) },
   }
   // The "read" half of the bind mechanism (#1121/#1129): a topic run's channel lists the projects
   // it can bind to. Read through the same injected seam the gate resolves against, so no `node:fs`
@@ -255,16 +218,6 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     kind: 'log',
     message: `Detected ${detection.framework ?? preset.framework} (confidence ${detection.confidence})`,
   })
-  if (domainPreset) {
-    const modeNote = opts.modes?.length ? ` (modes: ${opts.modes.join(', ')})` : ''
-    emit({
-      kind: 'log',
-      message: `Domain preset: ${domainPreset.title}${modeNote}; ${domainPreset.loops.length}-loop review policy in effect`,
-    })
-    // Surface the run's active modes as read-only checkboxes on the dashboard (#272).
-    emit({ kind: 'modes', all: OPEN_LOOP_MODES, active: opts.modes ?? [] })
-  }
-
   // The run's abort plumbing and driver-event sink: the caller's signal composed with
   // the budget (#322), consumption (#529), and plan-decline (#358) self-stops.
   const { runSignal, onDriverEvent, consumptionTrip, budgetController, consumptionController, declineController } =
@@ -288,16 +241,9 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     onEvent: onDriverEvent,
   })
 
-  // The domain preset's review policy (exposed on the result) and the review
-  // checklist it drives — absent without a preset (#1372): the agent is a black
-  // box, so nothing reviews its work unless the user opted in.
-  const { loop, reviewChecklist } = buildReview(session, domainPreset, {
-    ...(opts.buildEvent ? { buildEvent: opts.buildEvent } : {}),
-    signal: runSignal,
-    emit,
-  })
-
-  const checklist = reviewChecklist
+  // #1372: with the domain-preset review policy gone, nothing reviews the build — the agent is
+  // a black box and the build turn is the whole run.
+  const checklist = undefined
 
   // A real driver writes files to the workspace, so the build/improve steps can
   // detect an empty workspace and hard-scaffold it (#182). The fake driver writes
@@ -386,7 +332,7 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
     // one phase in. The link itself is already on the driver's `cloud <url>` action.
     if (handsOff) emit({ kind: 'log', message: 'Handed off: the rest of this run happens in its own session, which opens its own pull request.' })
     emit({ kind: 'end', ok: true })
-    return { result, detection, events, ...(loop ? { loop } : {}), ...(todo ? { todo } : {}) }
+    return { result, detection, events, ...(todo ? { todo } : {}) }
   } catch (err) {
     const { stopped, detail } = await endStopDetail({
       err,
@@ -403,34 +349,6 @@ export async function runFramework(opts: RunFrameworkOptions): Promise<RunFramew
   } finally {
     await session.dispose()
   }
-}
-
-/**
- * Materialize the domain preset's review policy against the run's driver, and the review
- * checklist it drives (#252) — each pass fires the preset's review chain through the
- * driver. Without a preset there is no review checklist at all (#1372): the agent is
- * treated as a black box, so the run reviews only what the user opted into. The build
- * event kind: an explicit run choice wins, else the preset's own default, else
- * `major-change` — how a `bug-fix` run reaches the preset's bug-fix loop (#265). The
- * `loop` is returned so the caller can expose it on the result.
- */
-function buildReview(
-  session: DriverSession,
-  domainPreset: DomainPreset | undefined,
-  ctx: { buildEvent?: string; signal: AbortSignal; emit: (event: FrameworkEvent) => void },
-): { loop: LoopEngine | undefined; reviewChecklist: BootstrapSteps['checklist'] } {
-  const loop = domainPreset
-    ? new LoopEngine({
-        loops: [...domainPreset.loops],
-        prompts: driverLoopPrompts(session, domainPreset.prompts, { signal: ctx.signal }),
-      })
-    : undefined
-  const buildEvent = ctx.buildEvent ?? domainPreset?.defaultEvent ?? 'major-change'
-  const reviewChecklist = loop ? domainLoopChecklist(loop, { kind: buildEvent }) : undefined
-  if (loop && domainPreset) {
-    ctx.emit({ kind: 'log', message: `Review policy: the ${domainPreset.title} loop drives the ${buildEvent} review` })
-  }
-  return { loop, reviewChecklist }
 }
 
 /**
@@ -468,8 +386,8 @@ function agentAwaitGate(
     let run = await base(ctx)
     emitTurnSignals(run.text)
     // The run controls (budget #322, quota #529) abort on the build turn's own usage.
-    // The build can be the bootstrap's last step (#1372: no checklist without a preset or
-    // preset), so a stop the loop would once have caught must throw here — otherwise
+    // The build is the bootstrap's last step (#1372: nothing reviews it), so a stop the loop
+    // would once have caught must throw here — otherwise
     // the bootstrap settles an aborted run as done.
     const throwIfStopped = () => {
       if (!deps.signal?.aborted) return

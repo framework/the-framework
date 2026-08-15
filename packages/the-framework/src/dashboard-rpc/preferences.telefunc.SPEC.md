@@ -1,4 +1,4 @@
-Reading and saving the user's settings: global dashboard preferences, per-project run options, a project's shared presets, the editor picker, and the Discord credentials.
+Reading and saving the user's settings: the dashboard preferences, a project's shared presets, the editor picker, and the Discord credentials.
 
 ## TLDR
 

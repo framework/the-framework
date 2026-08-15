@@ -127,8 +127,8 @@ export function RoutineWork({
       return
     }
     setStarting(job.name)
-    // The global options only: the Overview has no project open, so the per-project tier (#840) is
-    // not resolved here and the run starts on the same defaults a fresh launcher would use.
+    // Your settings only: the Overview has no project open, so the repo's committed file is not
+    // resolved here and the run starts on the same defaults a fresh launcher would use.
     // Unattended (#1279): a routine fired by a card is the same work the sweep starts, so it runs
     // the same way — gates auto-answer, the run ends at settle, and the armed handoff fires,
     // instead of parking in the stay-open chat loop with its PR never opened.

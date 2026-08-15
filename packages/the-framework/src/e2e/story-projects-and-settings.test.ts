@@ -5,12 +5,7 @@ import { join } from 'node:path'
 import { makeWorld, waitFor } from './harness.js'
 import { onProjects, sendAddProject } from '../dashboard-rpc/projects.telefunc.js'
 import { onGitStatus, onRuns, onDocs } from '../dashboard-rpc/reads.telefunc.js'
-import {
-  onPreferences,
-  patchPreferences,
-  onProjectPreferences,
-  patchProjectPreferences,
-} from '../dashboard-rpc/preferences.telefunc.js'
+import { onPreferences, patchPreferences } from '../dashboard-rpc/preferences.telefunc.js'
 import { onQuota, onAutoPm, sendAutoPmSweep } from '../dashboard-rpc/quota.telefunc.js'
 import { sendStart } from '../dashboard-rpc/control.telefunc.js'
 
@@ -71,13 +66,12 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
   try {
     const project = await world.addProject()
 
-    // The Settings page: patch a global and a per-project preference; both read back.
-    const patched = await rpc(patchPreferences)({ vanilla: false })
+    // The Settings page: patch your settings and read them back. One writable tier (B5) — the
+    // repo's committed the-framework.yml is the other, and it is edited in the repo.
+    const patched = await rpc(patchPreferences)({ vanilla: false, model: 'fable-e2e' })
     assert.equal(patched.ok, true)
     assert.equal((await rpc(onPreferences)()).vanilla, false)
-    const projectPatched = await rpc(patchProjectPreferences)(project.id, { model: 'fable-e2e' })
-    assert.equal(projectPatched.ok, true)
-    assert.equal((await rpc(onProjectPreferences)(project.id)).model, 'fable-e2e')
+    assert.equal((await rpc(onPreferences)()).model, 'fable-e2e')
 
     // First leg: a plain run, finished.
     const runId = await world.startRun(project, 'Build the settings page')

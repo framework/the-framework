@@ -2,7 +2,7 @@ import { contextDiscord, contextPreferences, resolveProjectPath } from './contex
 import type { DiscordCredentialStatus, DiscordCredentialsPatch } from '../discord-credentials.js'
 import { detectEditors, type EditorInfo } from '../dashboard/open-in-app.js'
 import { readProjectPresets, writeProjectPresets } from '../project-presets.js'
-import type { CustomPreset, Preferences, ProjectPreferences } from '../registry.js'
+import type { CustomPreset, Preferences } from '../registry.js'
 
 // The user-preferences surface behind the new dashboard (#410): the Global options (Autopilot,
 // Technical, Vanilla, Eco + its section drops) the Start form and choice gate share. Persisted
@@ -44,40 +44,6 @@ export async function patchPreferences(patch: Preferences): Promise<PatchPrefere
   // Typed error rather than a rejection, like `savePreferences` — one shape for every failure.
   try {
     return { ok: true, preferences: await contextPreferences().patch(patch) }
-  } catch {
-    return { ok: false, error: 'failed to save preferences' }
-  }
-}
-
-/**
- * One project's own run options (#840), or `{}` when it overrides nothing. Separate from
- * {@link onPreferences} rather than folded into it: the client needs the two tiers apart to know
- * which one a toggle should write to.
- */
-export async function onProjectPreferences(projectId: string): Promise<ProjectPreferences> {
-  return contextPreferences().readProject(projectId).catch(() => ({}))
-}
-
-/** Persist one project's run options (#840), sanitized in the store. */
-export async function saveProjectPreferences(
-  projectId: string,
-  preferences: ProjectPreferences,
-): Promise<SavePreferencesResult> {
-  try {
-    await contextPreferences().saveProject(projectId, preferences)
-    return { ok: true }
-  } catch {
-    return { ok: false, error: 'failed to save preferences' }
-  }
-}
-
-/** {@link patchPreferences} for one project's run options (#1148). */
-export async function patchProjectPreferences(
-  projectId: string,
-  patch: ProjectPreferences,
-): Promise<PatchPreferencesResult<ProjectPreferences>> {
-  try {
-    return { ok: true, preferences: await contextPreferences().patchProject(projectId, patch) }
   } catch {
     return { ok: false, error: 'failed to save preferences' }
   }

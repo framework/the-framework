@@ -23,10 +23,9 @@ import { cn } from '../lib/utils.js'
 // for one. This is the page the Overview's "you can resume the onboarding on the settings page"
 // points at, so the checklist lives here too and is not dismissible.
 //
-// Everything here writes the GLOBAL tier. `usePreferences`/`updatePreferences` scope themselves to
-// the project in the URL, and this route has none (#958 reserves `/settings`), so a value set here
-// is the default rather than one repo's override — which is what a settings page should mean. The
-// per-project overrides stay where the run is configured, in the launcher's gear.
+// Everything here writes the one writable tier: your own settings (B5). A repo-shaped value belongs
+// in that repo's committed `the-framework.yml`, which is edited in the repo, so a settings page can
+// only ever mean "the default" — which is what a settings page should mean.
 
 export function SettingsPage({
   onRunStarted,
@@ -56,7 +55,7 @@ export function SettingsPage({
         <div>
           <h1 className="text-xl font-semibold">Settings</h1>
           <p className="text-sm text-muted-foreground">
-            Your defaults, everywhere. A project can still override its run options from the launcher.
+            Your defaults, everywhere. A repo can override them in its own the-framework.yml.
           </p>
         </div>
 
@@ -123,7 +122,7 @@ export function SettingsPage({
             shown greyed with its reason rather than hidden, since this is where you come to look. */}
         <Section
           title="Run options"
-          description="What a new session starts with. The launcher can still change them for one session."
+          description="What a new session starts with. The launcher's gear shows the same options, and a session's own action bar can still change its ending."
         >
           {runOptions.map(row => (
             <OptionToggleRow key={row.key} row={row} />

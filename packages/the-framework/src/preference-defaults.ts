@@ -1,45 +1,17 @@
 import type { Preferences } from './registry.js'
 
 /**
- * Which preference keys a project may override, and what an unset notification preference means.
+ * What an unset preference means, and the bounds the controls that write them share.
  *
  * A leaf module (no `node:*`) so `client.ts` can export it and the dashboard reads the same values
- * the daemon acts on. Both were previously written on both sides of the package boundary with
- * nothing tying them together:
+ * the daemon acts on. The notification defaults used to be named predicates in the dashboard and
+ * open-coded at each daemon call site, in three different spellings, with a comment warning the
+ * reader not to copy the sibling's polarity. That warning is what a default with one home does not
+ * need.
  *
- * - the key list was a second `Set<string>` in the dashboard, which erased the type link — adding a
- *   key here type-checked clean while the dashboard silently routed it to the global tier;
- * - the notification defaults were named predicates in the dashboard and open-coded at each daemon
- *   call site, in three different spellings, with a comment warning the reader not to copy the
- *   sibling's polarity. That warning is what a default with one home does not need.
- *
- * No cycle: `registry.ts` re-exports the key list from here, and the `Preferences` import going the
+ * No cycle: `registry.ts` re-exports the bounds from here, and the `Preferences` import going the
  * other way is type-only, so it erases.
  */
-
-/**
- * The preference keys a project may override (#840).
- *
- * These are the *user's* per-project choices, not the repo's: they live in the user's home file
- * rather than the committed `the-framework.yml` because `model` and `agent` name what this machine
- * runs, which is not something to impose on everyone who clones the repo.
- */
-export const PROJECT_PREFERENCE_KEYS = [
-  'vanilla',
-  'onBeforeMergeableQuality',
-  'browser',
-  // Per-project by nature (#1102/#1216): how far a session publishes itself is a fact about the
-  // repo, not about the machine. A scratch repo wants the whole ladder; someone else's repo you
-  // have push rights to may well not.
-  'handoff',
-  'transparent',
-  'model',
-  'agent',
-  'target',
-] as const
-
-/** What one project overrides: a subset of {@link Preferences}, storing only the keys it sets. */
-export type ProjectPreferences = Pick<Preferences, (typeof PROJECT_PREFERENCE_KEYS)[number]>
 
 /**
  * Notifications are a 2×2, and naming the axes is the point (B5).

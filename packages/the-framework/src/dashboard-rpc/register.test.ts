@@ -37,9 +37,3 @@ test('every exported telefunction is registered (#866)', () => {
   assert.deepEqual(missing, [], `not registered, so the daemon answers 400: ${missing.join(', ')}`)
 })
 
-test('the two per-project preference telefunctions are registered (#866)', () => {
-  registerDashboardTelefunctions()
-  const registered = registeredTelefunctionNames()
-  assert.equal(registered.has('onProjectPreferences'), true)
-  assert.equal(registered.has('saveProjectPreferences'), true)
-})

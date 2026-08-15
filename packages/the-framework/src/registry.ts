@@ -4,13 +4,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { isAgentName } from './agent-names.js'
 import { nodeFs } from './node-fs.js'
-import {
-  PROJECT_PREFERENCE_KEYS,
-  MAX_SPEND_OFFSET,
-  DEFAULT_SPEND_OFFSET,
-  MAX_AUTO_PM_CONCURRENCY,
-  type ProjectPreferences,
-} from './preference-defaults.js'
+import { MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, MAX_AUTO_PM_CONCURRENCY } from './preference-defaults.js'
 
 /**
  * The multi-project registry (#390): the list of projects the user has
@@ -174,25 +168,14 @@ export interface Preferences {
   reposDirectoryAutoGrant?: boolean
 }
 
-/**
- * The run options a project may override (#840). The rest of {@link Preferences} stays global
- * on purpose: `theme`, `editor`, the notification toggles and `customPresets` are about the
- * user, not the repo.
- *
- * These are the *user's* per-project choices, not the repo's: they live in the user's home
- * file rather than the committed `the-framework.yml` because `model` and `agent` name what
- * this machine runs, which is not something to impose on everyone who clones the repo.
- */
-// The key list lives in the leaf `preference-defaults.ts` so the dashboard reads the same one
-// (a second copy there erased the type link, see that module); re-exported so this stays the
-// import site for everything that already reads it beside `Preferences`.
+// The bounds the browser's controls and this file's sanitizer both need live in the leaf
+// `preference-defaults.ts`; re-exported so this stays the import site for everything that
+// already reads them beside `Preferences`.
 export {
-  PROJECT_PREFERENCE_KEYS,
   MAX_SPEND_OFFSET,
   DEFAULT_SPEND_OFFSET,
   DEFAULT_AUTO_PM_CONCURRENCY,
   MAX_AUTO_PM_CONCURRENCY,
-  type ProjectPreferences,
 } from './preference-defaults.js'
 
 /**
@@ -229,12 +212,10 @@ const MAX_SECRET_LENGTH = 500
 export interface Registry {
   projects: ProjectRecord[]
   preferences: Preferences
-  /** Per-project overrides (#840), keyed by {@link ProjectRecord.id}. Absent keys fall through. */
-  projectPreferences: Record<string, ProjectPreferences>
   /**
    * The shared daemon token (#1051): generated on the first non-loopback bind and reused after.
    * A top-level field, deliberately not a {@link Preferences} one, so it is never shipped to the
-   * browser bundle or the per-project override map. Absent on a loopback-only machine.
+   * browser bundle. Absent on a loopback-only machine.
    */
   daemonToken?: string
   /** Third-party credentials set from the dashboard (#1095). Absent until one is saved. */
@@ -250,11 +231,6 @@ export interface PreferencesStore {
    * {@link save}, which replaces the whole block from a snapshot that may already be stale.
    */
   patch(patch: Preferences): Promise<Preferences>
-  /** One project's overrides (#840). */
-  readProject(projectId: string): Promise<ProjectPreferences>
-  saveProject(projectId: string, preferences: ProjectPreferences): Promise<void>
-  /** The {@link patch} counterpart for one project's overrides (#1148). */
-  patchProject(projectId: string, patch: ProjectPreferences): Promise<ProjectPreferences>
 }
 
 /** The registry file name: a single file under `$XDG_CONFIG_HOME` (dotted under `$HOME`). */
@@ -448,40 +424,6 @@ function sanitizeNameList(value: unknown): string[] {
 }
 
 /**
- * Keep only the keys a project may override (#840), each sanitized by the same rules as the
- * global object, so a hand-edited registry cannot smuggle a global-only key onto a project.
- */
-function sanitizeProjectPreferences(value: unknown): ProjectPreferences {
-  const sanitized = sanitizePreferences(value) as Record<string, unknown>
-  const preferences: Record<string, unknown> = {}
-  for (const key of PROJECT_PREFERENCE_KEYS) {
-    if (sanitized[key] !== undefined) preferences[key] = sanitized[key]
-  }
-  return preferences as ProjectPreferences
-}
-
-/** The whole per-project block, dropping malformed entries and projects that override nothing. */
-function sanitizeProjectPreferenceMap(value: unknown): Record<string, ProjectPreferences> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
-  const map: Record<string, ProjectPreferences> = {}
-  for (const [id, stored] of Object.entries(value as Record<string, unknown>)) {
-    if (!id) continue
-    const preferences = sanitizeProjectPreferences(stored)
-    if (Object.keys(preferences).length) map[id] = preferences
-  }
-  return map
-}
-
-/**
- * The preferences in force for a project (#840): the global object with the project's
- * overrides on top, so a project that sets nothing behaves exactly as it does today.
- * Only the keys the project actually stored win; the rest fall through.
- */
-export function resolvePreferences(global: Preferences, project: ProjectPreferences | undefined): Preferences {
-  return { ...global, ...project }
-}
-
-/**
  * Keep only well-formed custom presets (#626): each needs a non-empty id, label, and prompt;
  * label/prompt are trimmed and length-capped, the list capped at {@link CUSTOM_PRESET_LIMITS.count},
  * and duplicate ids dropped. A malformed entry is skipped, not thrown — a bad registry never breaks the read.
@@ -533,7 +475,7 @@ export async function readRegistry(
   fs: RegistryFs = nodeRegistryFs(),
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<Registry> {
-  const empty: Registry = { projects: [], preferences: {}, projectPreferences: {} }
+  const empty: Registry = { projects: [], preferences: {} }
   let parsed: unknown
   try {
     parsed = JSON.parse(await fs.read(registryPath(env)))
@@ -549,7 +491,6 @@ export async function readRegistry(
   return {
     projects,
     preferences: sanitizePreferences(obj.preferences),
-    projectPreferences: sanitizeProjectPreferenceMap(obj.projectPreferences),
     // #1051: kept only as a non-empty string, so a hand-edited registry can't smuggle a junk token.
     ...(typeof obj.daemonToken === 'string' && obj.daemonToken ? { daemonToken: obj.daemonToken } : {}),
     ...(secrets ? { secrets } : {}),
@@ -557,9 +498,7 @@ export async function readRegistry(
 }
 
 /**
- * Write the registry back as pretty object-form JSON, creating the parent dir. The per-project
- * block is omitted while empty, so a user who never sets a per-project option keeps the file
- * they have today.
+ * Write the registry back as pretty object-form JSON, creating the parent dir.
  *
  * Atomic (#991): the JSON goes to a temp file beside the real one and is then renamed over it,
  * the same shape #922 gave the daemon state file. A direct write truncates first, so a crash, a
@@ -575,11 +514,10 @@ export async function readRegistry(
  */
 async function writeRegistry(registry: Registry, fs: RegistryFs, env: NodeJS.ProcessEnv): Promise<void> {
   const file = registryPath(env)
-  const { projects, preferences, projectPreferences, daemonToken, secrets } = registry
+  const { projects, preferences, daemonToken, secrets } = registry
   const contents = {
     projects,
     preferences,
-    ...(Object.keys(projectPreferences).length ? { projectPreferences } : {}),
     ...(daemonToken ? { daemonToken } : {}),
     ...(secrets && Object.keys(secrets).length ? { secrets } : {}),
   }
@@ -689,8 +627,7 @@ export async function removeProject(
     const registry = await readRegistry(fs, env)
     const remaining = registry.projects.filter(project => project.id !== id)
     if (remaining.length === registry.projects.length) return false
-    const { [id]: _dropped, ...projectPreferences } = registry.projectPreferences
-    await writeRegistry({ ...registry, projects: remaining, projectPreferences }, fs, env)
+    await writeRegistry({ ...registry, projects: remaining }, fs, env)
     return true
   })
 }
@@ -737,55 +674,6 @@ export async function patchPreferences(
     const preferences = sanitizePreferences({ ...registry.preferences, ...patch })
     await writeRegistry({ ...registry, preferences }, fs, env)
     return preferences
-  })
-}
-
-/** One project's overrides (#840), or `{}` when it has none. */
-export async function readProjectPreferences(
-  projectId: string,
-  fs: RegistryFs = nodeRegistryFs(),
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<ProjectPreferences> {
-  return (await readRegistry(fs, env)).projectPreferences[projectId] ?? {}
-}
-
-/**
- * Persist one project's overrides (#840), sanitized, leaving the globals and every other
- * project untouched. Storing nothing drops the entry rather than leaving an empty object,
- * so the file stays readable and "overrides nothing" has one representation.
- */
-export async function writeProjectPreferences(
-  projectId: string,
-  preferences: ProjectPreferences,
-  fs: RegistryFs = nodeRegistryFs(),
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<void> {
-  return serialize(async () => {
-    const registry = await readRegistry(fs, env)
-    const sanitized = sanitizeProjectPreferences(preferences)
-    const { [projectId]: _previous, ...rest } = registry.projectPreferences
-    const projectPreferences = Object.keys(sanitized).length ? { ...rest, [projectId]: sanitized } : rest
-    await writeRegistry({ ...registry, projectPreferences }, fs, env)
-  })
-}
-
-/**
- * Merge `patch` over one project's overrides (#1148) and return the result — {@link patchPreferences}
- * for the project tier, and the same reason: the run options a tab holds are as stale as its globals.
- */
-export async function patchProjectPreferences(
-  projectId: string,
-  patch: ProjectPreferences,
-  fs: RegistryFs = nodeRegistryFs(),
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<ProjectPreferences> {
-  return serialize(async () => {
-    const registry = await readRegistry(fs, env)
-    const { [projectId]: previous, ...rest } = registry.projectPreferences
-    const sanitized = sanitizeProjectPreferences({ ...previous, ...patch })
-    const projectPreferences = Object.keys(sanitized).length ? { ...rest, [projectId]: sanitized } : rest
-    await writeRegistry({ ...registry, projectPreferences }, fs, env)
-    return sanitized
   })
 }
 
@@ -887,8 +775,5 @@ export function registryPreferencesStore(
     read: () => readPreferences(fs, env),
     save: async preferences => changed(preferences, await writePreferences(preferences, fs, env)),
     patch: async patch => changed(patch, await patchPreferences(patch, fs, env)),
-    readProject: projectId => readProjectPreferences(projectId, fs, env),
-    saveProject: (projectId, preferences) => writeProjectPreferences(projectId, preferences, fs, env),
-    patchProject: (projectId, patch) => patchProjectPreferences(projectId, patch, fs, env),
   }
 }

@@ -1,5 +1,5 @@
 import { basename, resolve } from 'node:path'
-import { listProjects, projectId, readPreferences, readProjectPreferences, readSecrets, resolvePreferences, type Preferences } from './registry.js'
+import { listProjects, projectId, readPreferences, readSecrets, type Preferences } from './registry.js'
 import { resolveDiscordCredentials, type DiscordCredentials } from './discord-credentials.js'
 import { errorMessage } from './error-message.js'
 import { notifies, notifyCategoryEnabled } from './preference-defaults.js'
@@ -103,21 +103,20 @@ function readPrefs(env: NodeJS.ProcessEnv): Promise<Preferences> {
 }
 
 /**
- * The run options a project's settings imply (#858): the global tier, then the repo's committed
- * `the-framework.yml` (#842), then the project's own overrides (#840) on top. The same mapping and
- * the same layer order the launcher uses, so a run started by the daemon and a run started by hand
- * differ only in who asked for it. An unreadable tier falls back to empty rather than failing the
- * start: the defaults are what the run would have used anyway.
+ * The run options a project's settings imply (#858): the user's global tier, then the repo's
+ * committed `the-framework.yml` (#842) on top. The same mapping and the same two tiers the launcher
+ * uses, so a run started by the daemon and a run started by hand differ only in who asked for it.
+ * An unreadable tier falls back to empty rather than failing the start: the defaults are what the
+ * run would have used anyway.
  *
  * Exported for the daemon's continuation starts (#1467): a dashboard Resume sends only its seed
  * (`resumeSession` + `continueRunId`), so these are the base its options overlay.
  */
 export async function resolveProjectRunOptions(id: string, env: NodeJS.ProcessEnv): Promise<StartRunOptions> {
   const global = await readPrefs(env)
-  const project = await readProjectPreferences(id, undefined, env).catch(() => undefined)
   const path = (await listProjects(undefined, env).catch(() => [])).find(p => p.id === id)?.path
   const file = path ? await loadFrameworkConfig(path).catch(() => ({})) : {}
-  return runOptionsFromPreferences(resolvePreferences({ ...global, ...preferencesFromFileConfig(file) }, project))
+  return runOptionsFromPreferences({ ...global, ...preferencesFromFileConfig(file) })
 }
 
 export function startBackgroundServices(deps: BackgroundServiceDeps): BackgroundServices {

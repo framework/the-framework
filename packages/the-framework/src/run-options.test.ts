@@ -1,7 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { runOptionsFromPreferences, handoffFromPreferences, preferencesFromFileConfig } from './run-options.js'
-import { resolvePreferences } from './registry.js'
 
 test('the handoff defaults to the PR rung, and every rung travels explicitly (#1102/#1216)', () => {
   // Unset is `pr`, which is what makes the handoff zero-config: a session left alone pushes its
@@ -36,14 +35,15 @@ test('preferencesFromFileConfig maps the repo yml onto the preference keys (#842
   assert.deepEqual(preferencesFromFileConfig({ preset: 'software-development', event: 'bug-fix' }), {})
 })
 
-test('a repo yml sits under the project overrides and over the global tier (#842)', () => {
-  const global = { browser: true, transparent: true }
+test('a repo yml sits over the user tier, key by key (#842)', () => {
+  // Two tiers (B5): yours, and the repo's committed file on top. A repo-shaped setting belongs to
+  // the repo, so a per-machine override of it is a third answer to a question with two.
+  const global = { browser: true, transparent: true, vanilla: true }
   const repo = preferencesFromFileConfig({ transparent: false, antiLazyPill: false })
-  // The layer order the daemon and the launcher both use: global, repo, then the project's own.
-  const resolved = resolvePreferences({ ...global, ...repo }, { vanilla: false })
-  assert.equal(resolved.browser, true) // nobody nearer set it
-  assert.equal(resolved.transparent, false) // the repo turned it off
-  assert.equal(resolved.vanilla, false) // the project overrode the repo's antiLazyPill:false
+  const resolved = { ...global, ...repo }
+  assert.equal(resolved.browser, true) // the repo said nothing, so yours stands
+  assert.equal(resolved.transparent, false) // an explicit false in the repo wins, not just a true
+  assert.equal(resolved.vanilla, true) // the repo's antiLazyPill:false maps to exactly this key
 })
 
 test('the agent is sent only when it is not the default (#858)', () => {
@@ -68,10 +68,10 @@ test('browser is dropped for an agent that cannot use it (#801)', () => {
   assert.equal(runOptionsFromPreferences({ browser: true, agent: 'codex' }).browser, undefined)
 })
 
-test("a project's settings beat the global ones (#840/#858)", () => {
-  // The path auto PM takes: resolve the two tiers, then map the answer.
-  const resolved = resolvePreferences({ agent: 'claude', model: 'sonnet' }, { agent: 'codex' })
+test("the repo's file beats your own settings (#842/#858)", () => {
+  // The path auto PM takes: merge the two tiers, then map the answer.
+  const resolved = { ...{ transparent: false, model: 'sonnet' }, ...preferencesFromFileConfig({ transparent: true }) }
   const options = runOptionsFromPreferences(resolved)
-  assert.equal(options.agent, 'codex')
-  assert.equal(options.model, 'sonnet') // untouched by the project tier
+  assert.equal(options.transparent, true)
+  assert.equal(options.model, 'sonnet') // untouched by the repo tier
 })

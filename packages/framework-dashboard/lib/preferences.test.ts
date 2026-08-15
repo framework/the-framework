@@ -3,15 +3,11 @@ import { act, renderHook } from '@testing-library/react'
 
 const onPreferences = vi.hoisted(() => vi.fn())
 const patchPreferences = vi.hoisted(() => vi.fn())
-const onProjectPreferences = vi.hoisted(() => vi.fn())
-const patchProjectPreferences = vi.hoisted(() => vi.fn())
 const onProjectPresets = vi.hoisted(() => vi.fn())
 const saveProjectPresets = vi.hoisted(() => vi.fn())
 vi.mock('../server/preferences.telefunc.js', () => ({
   onPreferences,
   patchPreferences,
-  onProjectPreferences,
-  patchProjectPreferences,
   onProjectPresets,
   saveProjectPresets,
 }))
@@ -36,10 +32,6 @@ describe('preferences', () => {
     // The daemon merges the patch and hands back what it stored (#1148); with nothing else
     // stored, that is the patch itself.
     patchPreferences.mockReset().mockImplementation(async (patch: unknown) => ({ ok: true, preferences: patch }))
-    onProjectPreferences.mockReset().mockResolvedValue({})
-    patchProjectPreferences
-      .mockReset()
-      .mockImplementation(async (_id: string, patch: unknown) => ({ ok: true, preferences: patch }))
     onProjectPresets.mockReset().mockResolvedValue([])
     saveProjectPresets.mockReset().mockResolvedValue({ ok: true })
     onProjects.mockReset().mockResolvedValue([])
@@ -73,94 +65,6 @@ describe('preferences', () => {
     expect(result.current).toEqual({ browser: false, vanilla: true })
   })
 
-  // Per-project run options (#840).
-
-  test('a project layers its own run options over the global ones', async () => {
-    openProject('app-a-14csz1v')
-    onPreferences.mockResolvedValue({ browser: true, model: 'sonnet', theme: 'dark' })
-    onProjectPreferences.mockResolvedValue({ model: 'opus' })
-    const { usePreferences } = await import('./preferences.js')
-
-    const { result } = renderHook(() => usePreferences())
-    await flush()
-    expect(onProjectPreferences).toHaveBeenCalledWith('app-a-14csz1v')
-    // The project's model wins; everything it did not set falls through.
-    expect(result.current).toEqual({ browser: true, model: 'opus', theme: 'dark' })
-  })
-
-  test('a run option written on a project page lands on the project, not the globals', async () => {
-    openProject('app-a-14csz1v')
-    onPreferences.mockResolvedValue({})
-    const { usePreferences, updatePreferences } = await import('./preferences.js')
-
-    const { result } = renderHook(() => usePreferences())
-    await flush()
-    act(() => updatePreferences({ model: 'opus' }))
-
-    expect(patchProjectPreferences).toHaveBeenCalledWith('app-a-14csz1v', { model: 'opus' })
-    expect(patchPreferences).not.toHaveBeenCalled()
-    expect(result.current.model).toBe('opus')
-  })
-
-  test('a user-level option stays global even on a project page', async () => {
-    openProject('app-a-14csz1v')
-    onPreferences.mockResolvedValue({})
-    const { usePreferences, updatePreferences } = await import('./preferences.js')
-
-    renderHook(() => usePreferences())
-    await flush()
-    // theme is about the user, not the repo (#800), so it never lands on a project.
-    act(() => updatePreferences({ theme: 'dark' }))
-
-    expect(patchPreferences).toHaveBeenCalledWith({ theme: 'dark' })
-    expect(patchProjectPreferences).not.toHaveBeenCalled()
-  })
-
-  test('a patch spanning both tiers is split across them', async () => {
-    openProject('app-a-14csz1v')
-    onPreferences.mockResolvedValue({})
-    const { usePreferences, updatePreferences } = await import('./preferences.js')
-
-    renderHook(() => usePreferences())
-    await flush()
-    act(() => updatePreferences({ agent: 'codex', theme: 'light' }))
-
-    expect(patchProjectPreferences).toHaveBeenCalledWith('app-a-14csz1v', { agent: 'codex' })
-    expect(patchPreferences).toHaveBeenCalledWith({ theme: 'light' })
-  })
-
-  test('off a project page every option is global, as before', async () => {
-    onPreferences.mockResolvedValue({})
-    const { usePreferences, updatePreferences } = await import('./preferences.js')
-
-    renderHook(() => usePreferences())
-    await flush()
-    act(() => updatePreferences({ model: 'opus' }))
-
-    // The Overview has no project to own the choice, so it sets the fallback.
-    expect(patchPreferences).toHaveBeenCalledWith({ model: 'opus' })
-    expect(patchProjectPreferences).not.toHaveBeenCalled()
-    expect(onProjectPreferences).not.toHaveBeenCalled()
-  })
-
-  test("one project's options do not follow you into the next", async () => {
-    // The bug behind #800: options were one global object, so switching projects carried them.
-    openProject('app-a-14csz1v')
-    onPreferences.mockResolvedValue({ model: 'sonnet' })
-    onProjectPreferences.mockImplementation(async (id: string) => (id === 'app-a-14csz1v' ? { model: 'opus' } : {}))
-    const { usePreferences } = await import('./preferences.js')
-
-    const { result, rerender } = renderHook(() => usePreferences())
-    await flush()
-    expect(result.current.model).toBe('opus')
-
-    openProject('app-b-9zzz')
-    rerender()
-    await flush()
-    // Project B never chose a model, so it gets the global one rather than A's.
-    expect(result.current.model).toBe('sonnet')
-  })
-
   test("the repo's the-framework.yml resolves over the global tier (#842)", async () => {
     onPreferences.mockResolvedValue({ browser: true, transparent: false })
     onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true, antiLazyPill: false } }])
@@ -174,16 +78,22 @@ describe('preferences', () => {
     expect(result.current.browser).toBe(true) // the repo said nothing, so global stands
   })
 
-  test("a project's own option beats the repo file (#842)", async () => {
+  test('a repo-shaped setting is written in the repo, so a toggle only ever writes your tier (B5)', async () => {
+    // A third tier used to sit above the file — the user's per-project overrides — so the same
+    // question had two answers on one machine and a write had to be split between them.
+    openProject('app-a-1')
     onPreferences.mockResolvedValue({})
     onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true } }])
-    onProjectPreferences.mockResolvedValue({ transparent: false })
-    openProject('app-a-1')
-    const { usePreferences } = await import('./preferences.js')
+    const { usePreferences, updatePreferences } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
     await flush()
-    expect(result.current.transparent).toBe(false)
+    act(() => updatePreferences({ model: 'opus', theme: 'dark' }))
+
+    expect(patchPreferences).toHaveBeenCalledWith({ model: 'opus', theme: 'dark' })
+    expect(result.current.model).toBe('opus')
+    // And the repo's own key still wins over yours, which is the point of it being committed.
+    expect(result.current.transparent).toBe(true)
   })
 
   test('a repo that sets nothing changes nothing (#842)', async () => {
@@ -197,10 +107,9 @@ describe('preferences', () => {
     expect(result.current).toEqual({ vanilla: true })
   })
 
-  test('usePreferenceSources names the layer that won each key (#842)', async () => {
+  test('usePreferenceSources names the tier that won each key (#842)', async () => {
     onPreferences.mockResolvedValue({ browser: true, model: 'sonnet' })
     onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true, antiLazyPill: false } }])
-    onProjectPreferences.mockResolvedValue({ model: 'opus' })
     openProject('app-a-1')
     const { usePreferenceSources } = await import('./preferences.js')
 
@@ -208,7 +117,7 @@ describe('preferences', () => {
     await flush()
     expect(result.current.transparent).toBe('repo')
     expect(result.current.vanilla).toBe('repo') // the repo's antiLazyPill:false is Vanilla on
-    expect(result.current.model).toBe('project')
+    expect(result.current.model).toBe('global')
     expect(result.current.browser).toBe('global')
   })
 
@@ -336,18 +245,16 @@ describe('preferences', () => {
     expect(result.current.theme).toBe('light')
   })
 
-  test('refreshPreferences re-reads both tiers, so a background tab stops showing a stale value', async () => {
+  test('refreshPreferences re-reads your tier, so a background tab stops showing a stale value', async () => {
     openProject('app-a-14csz1v')
-    onPreferences.mockResolvedValue({ theme: 'dark' })
-    onProjectPreferences.mockResolvedValue({ model: 'sonnet' })
+    onPreferences.mockResolvedValue({ theme: 'dark', model: 'sonnet' })
     const { usePreferences, refreshPreferences } = await import('./preferences.js')
 
     const { result } = renderHook(() => usePreferences())
     await flush()
     expect(result.current).toEqual({ theme: 'dark', model: 'sonnet' })
 
-    onPreferences.mockResolvedValue({ theme: 'light' })
-    onProjectPreferences.mockResolvedValue({ model: 'opus' })
+    onPreferences.mockResolvedValue({ theme: 'light', model: 'opus' })
     refreshPreferences()
     await flush()
     expect(result.current).toEqual({ theme: 'light', model: 'opus' })

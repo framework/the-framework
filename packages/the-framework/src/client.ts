@@ -42,7 +42,7 @@ export { AUTO_PM_ROUTINES, AUTO_PM_JOBS, AUTO_PM_DRAIN_JOB, AUTO_PM_MAINTENANCE_
 // The identity + diff both notifier paths run, and the preference defaults both sides read (#627).
 // Pure, so the dashboard shares them rather than keeping copies that drift silently.
 export { interventionKey, pickNewInterventions, activityKey, pickNewActivity } from './dashboard/keys.js'
-export { PROJECT_PREFERENCE_KEYS, NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, DEFAULT_AUTO_PM_CONCURRENCY, MAX_AUTO_PM_CONCURRENCY, notifies, notifyMethodEnabled, notifyCategoryEnabled, type NotifyMethod, type NotifyCategory, type ProjectPreferences } from './preference-defaults.js'
+export { NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, DEFAULT_AUTO_PM_CONCURRENCY, MAX_AUTO_PM_CONCURRENCY, notifies, notifyMethodEnabled, notifyCategoryEnabled, type NotifyMethod, type NotifyCategory } from './preference-defaults.js'
 // The preferences -> run options mapping (#858), shared with the daemon so an unattended run
 // starts with the same settings a launcher-started one would. Pure field logic, no Node imports.
 export { runOptionsFromPreferences, handoffFromPreferences, preferencesFromFileConfig } from './run-options.js'

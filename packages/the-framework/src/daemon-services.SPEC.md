@@ -3,6 +3,7 @@ Everything the daemon runs in the background beside serving the dashboard: Disco
 ## TLDR
 
 - Every service re-reads its preference on each tick, so a dashboard toggle takes effect without restarting the daemon.
+- A run the daemon starts resolves its options from the same two tiers the launcher uses — your settings, then the repo's committed file — so a run nobody asked for and a run someone clicked differ only in who asked.
 - Auto PM spends idle quota on the roadmap: it fans out up to the configured number of unattended agents, each pinned to one queue entry, and promotes the queue once a run finishes cleanly; the daemon, never the agent, writes queue promotions and ticket locks.
 - The CI watch merges a watched PR once its checks pass, and puts a fix agent on one whose checks fail.
 - The Discord notification watchers are rebuilt when the webhook changes, so a value pasted into the dashboard works immediately.

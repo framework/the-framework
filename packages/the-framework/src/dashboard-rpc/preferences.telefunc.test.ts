@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { provideTelefuncContext } from 'telefunc'
-import { savePreferences, patchPreferences, patchProjectPreferences } from './preferences.telefunc.js'
+import { savePreferences, patchPreferences } from './preferences.telefunc.js'
 import type { PreferencesStore } from '../registry.js'
 
 /** A store whose every method works, with only the ones a test cares about overridden. */
@@ -10,9 +10,6 @@ function store(over: Partial<PreferencesStore> = {}): PreferencesStore {
     read: async () => ({}),
     save: async () => {},
     patch: async patch => patch,
-    readProject: async () => ({}),
-    saveProject: async () => {},
-    patchProject: async (_projectId, patch) => patch,
     ...over,
   }
 }
@@ -37,7 +34,6 @@ test('patchPreferences hands back what the store merged (#1148)', async () => {
   provideTelefuncContext({
     preferences: store({
       patch: async patch => ({ theme: 'dark', ...patch }),
-      patchProject: async (_projectId, patch) => ({ model: 'sonnet', ...patch }),
     }),
   })
 
@@ -45,10 +41,6 @@ test('patchPreferences hands back what the store merged (#1148)', async () => {
   assert.deepEqual(await patchPreferences({ agent: 'codex' }), {
     ok: true,
     preferences: { theme: 'dark', agent: 'codex' },
-  })
-  assert.deepEqual(await patchProjectPreferences('app-1', { vanilla: true }), {
-    ok: true,
-    preferences: { model: 'sonnet', vanilla: true },
   })
 })
 
@@ -58,12 +50,7 @@ test('patchPreferences returns the typed error when the merge write fails (#1148
       patch: async () => {
         throw new Error('disk full')
       },
-      patchProject: async () => {
-        throw new Error('disk full')
-      },
     }),
   })
-  const failed = { ok: false, error: 'failed to save preferences' }
-  assert.deepEqual(await patchPreferences({ theme: 'dark' }), failed)
-  assert.deepEqual(await patchProjectPreferences('app-1', { model: 'opus' }), failed)
+  assert.deepEqual(await patchPreferences({ theme: 'dark' }), { ok: false, error: 'failed to save preferences' })
 })

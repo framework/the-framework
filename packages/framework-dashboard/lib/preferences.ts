@@ -1,14 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import type { CustomPreset, FrameworkFileConfig, Preferences, ProjectPreferences, ProjectSummary } from '@gemstack/the-framework'
-import { preferencesFromFileConfig, notifyMethodEnabled, notifyCategoryEnabled, PROJECT_PREFERENCE_KEYS } from '@gemstack/the-framework/client'
-import {
-  onPreferences,
-  patchPreferences,
-  onProjectPreferences,
-  patchProjectPreferences,
-  onProjectPresets,
-  saveProjectPresets,
-} from '../server/preferences.telefunc.js'
+import type { CustomPreset, FrameworkFileConfig, Preferences, ProjectSummary } from '@gemstack/the-framework'
+import { preferencesFromFileConfig, notifyMethodEnabled, notifyCategoryEnabled } from '@gemstack/the-framework/client'
+import { onPreferences, patchPreferences, onProjectPresets, saveProjectPresets } from '../server/preferences.telefunc.js'
 import { onProjects } from '../server/projects.telefunc.js'
 import { parseRoute } from './route.js'
 
@@ -23,21 +16,16 @@ import { parseRoute } from './route.js'
 // cached object meant a tab replayed every value it happened to hold, so a tab open since before
 // someone else's change reverted it on its next write — most visibly the theme.
 //
-// Two tiers since #840: the global object, and the open project's own run options on top of it.
-// Components never see the split — `usePreferences()` hands back the resolved result, so a
-// toggle reads the same way it always did — but a write lands on whichever tier owns the key.
-
-/** Run options a project owns, as a Set for the write split; the rest of
- * {@link Preferences} is global (#840). The list itself is the framework's, via the
- * browser-safe client entry, so adding a key there routes it here without a second copy. */
-const PROJECT_KEYS = new Set<string>(PROJECT_PREFERENCE_KEYS)
+// Two tiers (B5): your settings, and the open project's committed `the-framework.yml` on top.
+// Only the first is writable — the repo file is edited in the repo — so every write goes to one
+// place and there is no split to get wrong. A third tier lived here (the user's per-project
+// overrides, #840), duplicating for one machine what the committed file already says for everyone,
+// and its price was a write-split, per-tier write bookkeeping and a three-way provenance union.
 
 const EMPTY: Preferences = {}
 const EMPTY_FILE: FrameworkFileConfig = {}
 let cache: Preferences | null = null
 let loading: Promise<void> | null = null
-const projects = new Map<string, ProjectPreferences>()
-const projectLoads = new Set<string>()
 /** Each project's committed `the-framework.yml`, as served on the project payload (#842). */
 const files = new Map<string, FrameworkFileConfig>()
 let filesLoading: Promise<void> | null = null
@@ -57,14 +45,6 @@ let sources = new Map<string, PreferenceSources>()
  */
 let globalWrites = 0
 let globalPending = 0
-const projectWrites = new Map<string, number>()
-const projectPending = new Map<string, number>()
-
-function bump(map: Map<string, number>, key: string, by: number): number {
-  const next = (map.get(key) ?? 0) + by
-  map.set(key, next)
-  return next
-}
 const listeners = new Set<() => void>()
 
 function notify(): void {
@@ -78,8 +58,8 @@ function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
-/** Which layer a resolved preference came from (#842). Absent = nobody set it. */
-export type PreferenceSource = 'project' | 'repo' | 'global'
+/** Which of the two tiers a resolved preference came from (#842). Absent = nobody set it. */
+export type PreferenceSource = 'repo' | 'global'
 
 /** The winning layer per key, for showing what is inherited rather than yours. */
 export type PreferenceSources = Partial<Record<keyof Preferences, PreferenceSource>>
@@ -94,11 +74,9 @@ function snapshot(projectId: string | null): Preferences {
   const key = projectId ?? ''
   const hit = resolved.get(key)
   if (hit) return hit
-  const project = projectId ? projects.get(projectId) : undefined
   const repo = fileTier(projectId)
-  // Nearest wins (#800/#841): your project options, then the repo's committed file, then global.
-  const value =
-    project || repo !== EMPTY ? { ...(cache ?? EMPTY), ...repo, ...project } : (cache ?? EMPTY)
+  // Nearest wins (#841): the repo's committed file over your own settings.
+  const value = repo === EMPTY ? (cache ?? EMPTY) : { ...(cache ?? EMPTY), ...repo }
   resolved.set(key, value)
   return value
 }
@@ -111,7 +89,6 @@ function sourceSnapshot(projectId: string | null): PreferenceSources {
   const tiers: [PreferenceSource, Preferences][] = [
     ['global', cache ?? EMPTY],
     ['repo', fileTier(projectId)],
-    ['project', (projectId ? projects.get(projectId) : undefined) ?? EMPTY],
   ]
   // Later tiers are nearer, so each one that set a key overwrites the recorded source.
   for (const [name, values] of tiers) {
@@ -141,20 +118,6 @@ function ensureLoaded(projectId: string | null): void {
   }
   if (!filesLoaded) loadFileConfigs()
   ensureProjectPresetsLoaded(projectId)
-  if (!projectId || projects.has(projectId) || projectLoads.has(projectId)) return
-  projectLoads.add(projectId)
-  void onProjectPreferences(projectId)
-    .then(preferences => {
-      // Same `??=` reasoning as above: a toggle during the load already wrote this entry.
-      if (!projects.has(projectId)) projects.set(projectId, preferences)
-    })
-    .catch(() => {
-      if (!projects.has(projectId)) projects.set(projectId, {})
-    })
-    .finally(() => {
-      projectLoads.delete(projectId)
-      notify()
-    })
 }
 
 /**
@@ -261,59 +224,36 @@ function activeProjectId(): string | null {
  * the UI responsive; the save round-trip is best-effort (a failed save is not worth surfacing
  * over a checkbox toggle).
  *
- * With a project open, the run options in the patch land on that project and the rest stay
- * global (#840) — so changing the model for one repo no longer follows you into the next.
+ * One destination (B5): a repo-shaped setting belongs in the repo's committed file, which is
+ * edited in the repo, so everything writable here is yours and goes to the one place.
  */
 export function updatePreferences(patch: Partial<Preferences>): void {
-  const projectId = activeProjectId()
-  const entries = Object.entries(patch)
-  const projectPatch = projectId ? entries.filter(([key]) => PROJECT_KEYS.has(key)) : []
-  const globalPatch = entries.filter(([key]) => !projectId || !PROJECT_KEYS.has(key))
-
-  if (globalPatch.length) {
-    const changed = Object.fromEntries(globalPatch)
-    cache = { ...(cache ?? {}), ...changed }
-    const seq = ++globalWrites
-    globalPending++
-    void patchPreferences(changed)
-      .then(result => {
-        // Adopt what the daemon now stores, so this tab stops being stale about anything
-        // another tab changed. Skipped when a newer write has since gone out: that answer
-        // is the more recent truth, and it is about to arrive.
-        if (result.ok && seq === globalWrites) {
-          cache = result.preferences
-          notify()
-        }
-      })
-      .catch(() => {})
-      .finally(() => globalPending--)
-  }
-  if (projectId && projectPatch.length) {
-    const changed = Object.fromEntries(projectPatch)
-    projects.set(projectId, { ...(projects.get(projectId) ?? {}), ...changed })
-    const seq = bump(projectWrites, projectId, 1)
-    bump(projectPending, projectId, 1)
-    void patchProjectPreferences(projectId, changed)
-      .then(result => {
-        if (result.ok && seq === projectWrites.get(projectId)) {
-          projects.set(projectId, result.preferences)
-          notify()
-        }
-      })
-      .catch(() => {})
-      .finally(() => bump(projectPending, projectId, -1))
-  }
+  cache = { ...(cache ?? {}), ...patch }
+  const seq = ++globalWrites
+  globalPending++
+  void patchPreferences(patch)
+    .then(result => {
+      // Adopt what the daemon now stores, so this tab stops being stale about anything another
+      // tab changed. Skipped when a newer write has since gone out: that answer is the more
+      // recent truth, and it is about to arrive.
+      if (result.ok && seq === globalWrites) {
+        cache = result.preferences
+        notify()
+      }
+    })
+    .catch(() => {})
+    .finally(() => globalPending--)
   notify()
 }
 
 /**
- * Re-read both preference tiers (#1148). Wired to the window regaining focus, next to
+ * Re-read your settings (#1148). Wired to the window regaining focus, next to
  * {@link refreshFileConfigs}: a tab left open in the background is showing values someone else
  * may have changed, and until #1148 it would also write them back.
  *
- * A tier with a write in flight is left alone, whether the write went out before this read or
- * after it: until the daemon has stored those keys, no read of it can answer with them, and the
- * write's own reply carries the merged truth anyway.
+ * Skipped while a write is in flight, whether it went out before this read or after it: until the
+ * daemon has stored those keys, no read can answer with them, and the write's own reply carries
+ * the merged truth anyway.
  */
 export function refreshPreferences(): void {
   const seq = globalWrites
@@ -321,16 +261,6 @@ export function refreshPreferences(): void {
     .then(preferences => {
       if (seq !== globalWrites || globalPending > 0) return
       cache = preferences
-      notify()
-    })
-    .catch(() => {})
-  const projectId = activeProjectId()
-  if (!projectId) return
-  const projectSeq = projectWrites.get(projectId) ?? 0
-  void onProjectPreferences(projectId)
-    .then(preferences => {
-      if (projectSeq !== (projectWrites.get(projectId) ?? 0) || (projectPending.get(projectId) ?? 0) > 0) return
-      projects.set(projectId, preferences)
       notify()
     })
     .catch(() => {})
@@ -342,9 +272,9 @@ export function useActiveProjectId(): string | null {
 }
 
 /**
- * The user preferences in force: the global object, the open project's committed
- * `the-framework.yml` (#842), then its own run options on top (#840). Loaded once from the daemon
- * per tier and kept in sync across components.
+ * The user preferences in force: your own settings with the open project's committed
+ * `the-framework.yml` (#842) on top. Loaded once from the daemon per tier and kept in sync across
+ * components.
  */
 export function usePreferences(): Preferences {
   const projectId = typeof window === 'undefined' ? null : parseRoute(window.location.pathname).projectId

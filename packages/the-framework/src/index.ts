@@ -110,7 +110,6 @@ export {
   type MaintenanceFs,
 } from './maintenance.js'
 export { startDashboard, summarizeProject, defaultProjectsProvider, readDocs, type Dashboard, type DashboardOptions, type StartRunKind, type StartRunResult, type AddProjectResult, type OnboardingSuggestion, type AgentReady, type PreviewResult, type PreviewStatus, type RunWorktree, type ProjectSummary, type ProjectsProvider, type SummarizeDeps, type WorkspaceDoc, readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta, type TicketGithubLink, type ProjectQueue, type QueueItem, type Overview, type ActiveRun, type RecentProject, type RecentRun, buildRecentRuns, type HotTicket, type HotBucket, buildHotTickets, collectAllTickets, type ProjectTickets, type AllTicketsDeps, type DashboardData, type ProjectStat, type ActivityDay, type GitStatus, type LinkedPr, type FileDiff, type FileChange, type FileContent, type RunHandoff, type HandoffCommit, type HandoffFile, type HandoffResult, buildInterventions, type Intervention, type OpenPr, type PrLister, type InterventionsDeps, buildOpenQuestions, openChoiceRequest, type OpenQuestion, type OpenQuestionsDeps, buildActivity, activityKey, pickNewActivity, type Activity, type ActivityDeps, type BridgeQuestion, type BridgeEvent, type BridgeAnswer } from './dashboard/index.js'
-export { startPreview, detectDevScript, detectServeTargets, parsePreviewUrl, PREVIEW_SCRIPTS, type PreviewHandle, type StartPreviewOptions, type ServeTarget } from './preview.js'
 export {
   RunStore,
   nodeStoreFs,

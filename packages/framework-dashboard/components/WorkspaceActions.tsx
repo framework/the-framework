@@ -8,7 +8,6 @@ import { useAction } from '../lib/use-action.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { cn } from '../lib/utils.js'
-import { PreviewBar } from './PreviewBar.js'
 import { Button, buttonVariants } from './ui/button.js'
 import { OptionLabel } from './ui/option-label.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -134,7 +133,6 @@ export function WorkspaceActions({
         </DropdownMenuContent>
       </DropdownMenu>
       {/* Serve (#475) the checkout this bar is about: the project's, or the session's own (#797). */}
-      <PreviewBar projectId={projectId} runId={runId} inline />
       {error && <span className="text-xs text-danger">{error}</span>}
     </>
   )

@@ -1,4 +1,4 @@
-The session's one overflow menu: everything you can do to a session — open it on GitHub, in the file manager, an editor or the agent's own app, copy the terminal resume command, serve a preview, stop it, arm a merge, remove its worktree, delete it.
+The session's one overflow menu: everything you can do to a session — open it on GitHub, in the file manager, an editor or the agent's own app, copy the terminal resume command, stop it, arm a merge, remove its worktree, delete it.
 
 ## TLDR
 

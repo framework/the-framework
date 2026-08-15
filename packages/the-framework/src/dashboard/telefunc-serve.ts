@@ -9,8 +9,7 @@ import type { PreferencesStore } from '../registry.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from './quota.js'
 import type { AutoPmReporter } from '../auto-pm.js'
-import type { AddProjectResult, PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from './types.js'
-import type { ServeTarget } from '../preview.js'
+import type { AddProjectResult, StartRunKind, StartRunOptions, StartRunResult } from './types.js'
 import type { RunMeta } from '../store/index.js'
 
 /** Wired by the daemon so `sendStart` can reach the daemon's own `startRun` closure. */
@@ -23,16 +22,6 @@ export type StartRunHandler = (
 
 /** Wired by the daemon so `sendAddProject` can install + register a repo (#433). */
 export type AddProjectHandler = (path: string, directory: boolean) => AddProjectResult | Promise<AddProjectResult>
-
-/** Wired by the daemon so the Preview RPCs can serve/stop/report a project's app (#475). */
-export interface PreviewHandlers {
-  /** `runId` serves that session's own worktree instead of the project's checkout (#797). */
-  start: (projectId?: string, targetId?: string, runId?: string) => PreviewResult | Promise<PreviewResult>
-  /** List the servable apps (#651) for the Serve picker in a multi-package repo. */
-  targets: (projectId?: string, runId?: string) => ServeTarget[] | Promise<ServeTarget[]>
-  stop: (projectId?: string, runId?: string) => void | Promise<void>
-  status: (projectId?: string, runId?: string) => PreviewStatus | Promise<PreviewStatus>
-}
 
 /** Resolve a run to its live event stream: the relay feeds `onEvents` from its own in-memory stream
  * rather than a file on disk (#426), and the daemon feeds a run it is relaying from a device (#1067).
@@ -58,8 +47,6 @@ export interface RemoteRuns {
 export interface DashboardContext {
   startRun?: StartRunHandler
   addProject?: AddProjectHandler
-  /** The Preview handler set (#475); the daemon wires it, other hosts leave it unset. */
-  preview?: PreviewHandlers
   projects?: ProjectsProvider
   eventsSource?: EventsSource
   /** The relayed-run lookup (#1067 slice 2): only the daemon wires it, so a run-scoped RPC can tell a

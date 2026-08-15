@@ -12,7 +12,7 @@ import { BROWSER_PROXY_PREFIX, handleBrowserProxy } from './browser-proxy.js'
 import { makeTelefuncMount } from './telefunc-serve.js'
 import { requestPathname } from '../request-path.js'
 import type { AddProjectResult, PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from './types.js'
-import type { EventsSource, PreviewHandlers, RemoteRuns } from './telefunc-serve.js'
+import type { EventsSource, RemoteRuns } from './telefunc-serve.js'
 import { handleRelayRequest, RELAY_PREFIX, type RelayHandlers } from './relay-endpoints.js'
 import { BRIDGE_PREFIX, handleBridgeRequest, type BridgeHandlers } from './bridge-endpoints.js'
 import { bridgeQuestions } from './bridge-store.js'
@@ -48,18 +48,6 @@ export interface DashboardOptions {
    * repo under a directory) and register it (the daemon does). Omit to disable adding.
    */
   onAddProject?: (path: string, directory: boolean) => Promise<AddProjectResult> | AddProjectResult
-  /**
-   * The Preview handler set (#475): serve a project's built result on demand, list its servable
-   * apps, stop it, and report whether one is running. Omit to disable Preview (the per-run
-   * dashboard and the relay never serve one).
-   *
-   * One field of the shared {@link PreviewHandlers} type rather than four separate callbacks: the
-   * four were re-declared here without their `runId` parameter, so the per-session Preview (#797)
-   * reached the daemon only because this file happened to pass each function straight through by
-   * reference. One wrapper added for a log line or a guard would have dropped `runId` silently,
-   * with nothing for the compiler or a test to catch.
-   */
-  preview?: PreviewHandlers
   /**
    * The user-preferences store (#410): the `onPreferences` / `savePreferences` telefunctions
    * read/write it through the request context. Defaults to the real registry file (the daemon
@@ -186,7 +174,6 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
       ...(opts.onStart ? { startRun: opts.onStart } : {}),
       ...(opts.projects ? { projects: opts.projects } : {}),
       ...(opts.onAddProject ? { addProject: opts.onAddProject } : {}),
-      ...(opts.preview ? { preview: opts.preview } : {}),
       ...(opts.eventsSource ? { eventsSource: opts.eventsSource } : {}),
       ...(opts.remote ? { remote: opts.remote } : {}),
       preferences: opts.preferences ?? registryPreferencesStore(),

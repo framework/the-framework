@@ -150,7 +150,6 @@ export async function makeWorld(): Promise<StoryWorld> {
   const context = {
     startRun: runtime.onStart,
     addProject: runtime.onAddProject,
-    preview: runtime.preview,
     eventsSource: runtime.remoteEventsSource,
     remote: runtime.remoteRuns,
     preferences: registryPreferencesStore(),

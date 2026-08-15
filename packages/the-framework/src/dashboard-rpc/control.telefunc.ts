@@ -3,7 +3,7 @@ import { appendControl, type ControlEntry } from '../control.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
 import { isSafeVia } from '../conversations.js'
 import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
-import { resolveProjectPath, resolveRunPath, contextPreferences, contextPreview } from './context.js'
+import { resolveProjectPath, resolveRunPath, contextPreferences } from './context.js'
 import { relayOr } from './relay-run.js'
 import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
@@ -16,14 +16,11 @@ import { commitSessionWork, mergeSessionPr, openSessionPullRequest, pushRunBranc
 import type { ChoiceBy } from '../events.js'
 import type {
   DeleteSessionResult,
-  PreviewResult,
-  PreviewStatus,
   RemoveWorktreeResult,
   StartRunKind,
   StartRunOptions,
   StartRunResult,
 } from '../dashboard/types.js'
-import type { ServeTarget } from '../preview.js'
 import type { DashboardContext } from '../dashboard/telefunc-serve.js'
 import type { Preferences } from '../registry.js'
 
@@ -146,28 +143,20 @@ export async function sendRemoveWorktree(projectId: string, runId: string): Prom
 }
 
 /**
- * Shared body of the two worktree-removing writes (#982/#1032): resolve the local checkout, refuse
- * when there is none (the read-only relay), and run the removal with the daemon-only step of
- * stopping a preview that may be serving the tree (#797) before it comes off disk. Only the
- * removal action and its result shape differ.
- *
- * The context is read before the first await: telefunc only exposes it synchronously, at the top
- * of the telefunction. Through the tolerant accessor, since these are also called directly.
+ * Shared body of the two worktree-removing writes (#982/#1032): resolve the local checkout and
+ * refuse when there is none. Only the removal action and its result shape differ.
  */
 async function withWorktreeRemoval<T>(
   projectId: string,
   runId: string,
   remove: (cwd: string, opts: { beforeRemove: (id: string) => Promise<void> }) => Promise<T>,
 ): Promise<T | { ok: false; error: string }> {
-  const preview = contextPreview()
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
   // Under the run lock: a Remove/Delete clicked the moment a run ends races teardown's own
   // archive-commit-remove of the same checkout; serialized, whichever runs second finds the
   // state the first one left and acts on that.
-  return withRunLock(worktreePath(cwd, runId), () =>
-    remove(cwd, { beforeRemove: async id => { await preview?.stop(projectId, id) } }),
-  )
+  return withRunLock(worktreePath(cwd, runId), () => remove(cwd, { beforeRemove: async () => {} }))
 }
 
 /**
@@ -231,44 +220,6 @@ export async function sendStartTopic(
   const text = prompt.trim()
   if (!text && kind !== 'research') return { ok: false, error: 'a non-empty prompt is required' }
   return startRun(text, kind, { ...options, topic: true })
-}
-
-/**
- * Open a project's Preview (#475): serve its built result on demand and return the live URL.
- * The daemon provides the Preview handlers on the request context, so this runs in-process
- * (like `sendStart`). Idempotent — opening while a preview is up returns the running one.
- * Returns an error result when Preview is not enabled on this host (the relay/per-run view).
- */
-export async function sendPreview(projectId: string, targetId?: string, runId?: string): Promise<PreviewResult> {
-  const { preview } = getContext<DashboardContext>()
-  if (!preview) return { ok: false, error: 'preview is not enabled on this server' }
-  // With a session id this serves that session's own worktree (#797). Without one it is the
-  // project's checkout, which is what the project home asks for.
-  return preview.start(projectId, targetId, runId)
-}
-
-/**
- * List a project's servable apps (#651) for the Serve picker: the root plus each workspace package
- * that has a dev/serve script. A single-package repo returns at most one, so the button stays a
- * plain Serve; a monorepo returns several to choose from. Empty when Preview is not enabled.
- */
-export async function onServeTargets(projectId: string, runId?: string): Promise<ServeTarget[]> {
-  const { preview } = getContext<DashboardContext>()
-  if (!preview) return []
-  return preview.targets(projectId, runId)
-}
-
-/** Stop a project's Preview (#475). A no-op when none is running, or Preview is not enabled. */
-export async function sendStopPreview(projectId: string, runId?: string): Promise<void> {
-  const { preview } = getContext<DashboardContext>()
-  if (preview) await preview.stop(projectId, runId)
-}
-
-/** Report whether a project's Preview is already running (#475), so a reload rehydrates the button. */
-export async function onPreviewStatus(projectId: string, runId?: string): Promise<PreviewStatus> {
-  const { preview } = getContext<DashboardContext>()
-  if (!preview) return { running: false }
-  return preview.status(projectId, runId)
 }
 
 /**

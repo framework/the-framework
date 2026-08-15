@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FrameworkEvent, ServeTarget } from '@gemstack/the-framework'
+import type { FrameworkEvent } from '@gemstack/the-framework'
 import { sessionInfo } from '@gemstack/the-framework/client'
 import { MoreVertical, Github, FolderOpen, Code, Check, Play, ExternalLink, Square, FolderX, Trash2, Copy, GitMerge } from 'lucide-react'
 import { onGithubUrl } from '../server/reads.telefunc.js'
@@ -9,10 +9,6 @@ import {
   sendMerge,
   sendRemoveWorktree,
   sendDeleteSession,
-  sendPreview,
-  onServeTargets,
-  sendStopPreview,
-  onPreviewStatus,
 } from '../server/control.telefunc.js'
 import type { EditorInfo } from '../server/preferences.telefunc.js'
 import { useLoaded } from '../lib/use-async.js'
@@ -100,26 +96,7 @@ export function SessionActionsMenu({
   const editorRows: EditorInfo[] =
     editor && !detectedEditors.some(e => e.bin === editor) ? [...detectedEditors, { bin: editor, label: editor }] : detectedEditors
 
-  // Serve state (#475), same as PreviewBar: rehydrate a preview the daemon is already running and
-  // list the servable apps, so a multi-app repo offers a picker.
-  const [url, setUrl] = useState<string | null>(null)
-  const [targets, setTargets] = useState<ServeTarget[]>([])
   const { busy, error, reset, run } = useAction()
-  useEffect(() => {
-    let live = true
-    setUrl(null)
-    setTargets([])
-    reset()
-    void onPreviewStatus(projectId, runId ?? undefined).then(status => {
-      if (live && status.running) setUrl(status.url ?? null)
-    })
-    void onServeTargets(projectId, runId ?? undefined).then(list => {
-      if (live) setTargets(list)
-    })
-    return () => {
-      live = false
-    }
-  }, [projectId, runId, reset])
 
   // A landed Stop stays "Stopping…" until the end event flips `active`, so it can't be re-fired.
   const [stopRequested, setStopRequested] = useState(false)
@@ -134,17 +111,6 @@ export function SessionActionsMenu({
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const openApp = (target: 'files' | 'editor') => run(() => sendOpenInApp(projectId, target, runId ?? undefined), 'Failed to open.')
-  const serve = (targetId?: string) =>
-    void run(() => sendPreview(projectId, targetId, runId ?? undefined), 'Failed to start the preview.').then(result => {
-      if (result?.ok) setUrl(result.url)
-    })
-  const stopServe = () =>
-    void run(async () => {
-      await sendStopPreview(projectId, runId ?? undefined)
-      return true as const
-    }, 'Failed to stop the preview.').then(stopped => {
-      if (stopped) setUrl(null)
-    })
   const stopSession = () =>
     void run(() => sendStop(projectId, runId ?? undefined).then(() => true), 'Could not stop the session.').then(result => {
       if (result) setStopRequested(true)
@@ -260,40 +226,6 @@ export function SessionActionsMenu({
 
           <DropdownMenuSeparator />
 
-          {/* Serve: a live URL becomes Open + Stop; a multi-app repo offers a picker submenu. */}
-          {url ? (
-            <>
-              <DropdownMenuItem render={<a href={url} target="_blank" rel="noreferrer" />}>
-                <ExternalLink className="h-3.5 w-3.5 shrink-0" /> Open preview
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled={busy} onClick={() => void stopServe()}>
-                <Square className="h-3 w-3 shrink-0 fill-current" /> Stop serving
-              </DropdownMenuItem>
-            </>
-          ) : targets.length > 1 ? (
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger disabled={busy}>
-                <Play className="h-3.5 w-3.5 shrink-0" /> Serve
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                {/* Group parts need Menu.Group above them, or Base UI throws its error #31 and the
-                    boundary eats the whole view. Same list as PreviewBar's picker, same wrapper. */}
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel>Serve which app</DropdownMenuLabel>
-                  {targets.map(t => (
-                    <DropdownMenuItem key={t.id} disabled={busy} onClick={() => serve(t.id)}>
-                      <span className="truncate">{t.label}</span>
-                      <span className="ml-auto pl-3 text-xs text-muted-foreground">{t.script}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          ) : (
-            <DropdownMenuItem disabled={busy} onClick={() => serve()}>
-              <Play className="h-3.5 w-3.5 shrink-0" /> {busy ? 'Starting…' : 'Serve'}
-            </DropdownMenuItem>
-          )}
           {active && (
             <DropdownMenuItem disabled={stopping} onClick={() => void stopSession()}>
               <Square className="h-3 w-3 shrink-0 fill-current" /> {stopping ? 'Stopping…' : 'Stop session'}

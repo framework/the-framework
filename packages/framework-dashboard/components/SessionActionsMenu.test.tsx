@@ -5,10 +5,6 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 // telefunc + editor reads; stub them the way WorkspaceActions.test did.
 const onGithubUrl = vi.fn(async () => 'https://github.com/o/r')
 const sendOpenInApp = vi.fn(async () => ({ ok: true as const }))
-const sendPreview = vi.fn(async () => ({ ok: true as const, url: 'http://localhost:5173', command: 'dev' }))
-const onServeTargets = vi.fn(async () => [] as unknown[])
-const onPreviewStatus = vi.fn(async () => ({ running: false }))
-const sendStopPreview = vi.fn(async () => {})
 const sendStop = vi.fn(async () => {})
 const sendMerge = vi.fn(async () => ({ ok: true as const }))
 const sendRemoveWorktree = vi.fn(async () => ({ ok: true as const }))
@@ -16,10 +12,6 @@ const sendDeleteSession = vi.fn(async () => ({ ok: true as const }))
 vi.mock('../server/reads.telefunc.js', () => ({ onGithubUrl }))
 vi.mock('../server/control.telefunc.js', () => ({
   sendOpenInApp,
-  sendPreview,
-  onServeTargets,
-  onPreviewStatus,
-  sendStopPreview,
   sendStop,
   sendMerge,
   sendRemoveWorktree,
@@ -46,7 +38,6 @@ describe('SessionActionsMenu (#toolbar-menu)', () => {
     // No retained worktree here, so the folder item names the project root it will actually open.
     expect(screen.getByText('Open project folder')).toBeTruthy()
     expect(screen.getByText('Open in editor')).toBeTruthy()
-    expect(screen.getByText('Serve')).toBeTruthy()
     expect(screen.getByText('Delete session')).toBeTruthy()
   })
 
@@ -111,26 +102,6 @@ describe('SessionActionsMenu (#toolbar-menu)', () => {
     expect(sendDeleteSession).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(sendDeleteSession).toHaveBeenCalledWith('p1', 'run-1'))
-  })
-})
-
-describe('the Serve submenu on a multi-app repo (#toolbar-menu)', () => {
-  test('renders its picker without blowing up the view', async () => {
-    // The label inside the submenu is a Menu group part; unwrapped it throws Base UI's error #31
-    // and the page boundary swallows the whole session view. This is the branch a monorepo hits
-    // as soon as the preview URL clears (e.g. right after Stop session).
-    onServeTargets.mockResolvedValue([
-      { id: 'root', label: 'gemstack', script: 'dev' },
-      { id: 'docs', label: 'docs', script: 'dev' },
-    ])
-    render(<SessionActionsMenu projectId="p1" runId="run-1" events={[]} onDeleted={vi.fn()} />)
-    openMenu()
-    // The row only becomes a submenu trigger once the async target list lands with more than one.
-    await waitFor(() => expect(screen.getByText('Serve').closest('[aria-haspopup]')).toBeTruthy())
-    fireEvent.click(screen.getByText('Serve'))
-    await waitFor(() => expect(screen.getByText('Serve which app')).toBeTruthy())
-    expect(screen.getByText('docs')).toBeTruthy()
-    onServeTargets.mockResolvedValue([])
   })
 })
 

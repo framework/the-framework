@@ -34,14 +34,13 @@ import {
 } from './store/index.js'
 import type { FrameworkEvent } from './events.js'
 import type { StartRunKind, StartRunOptions, StartRunResult, AddProjectResult } from './dashboard/index.js'
-import type { EventsSource, PreviewHandlers, RemoteRuns } from './dashboard/telefunc-serve.js'
+import type { EventsSource, RemoteRuns } from './dashboard/telefunc-serve.js'
 import { RelayedRuns, startRemoteRun } from './dashboard/remote-run.js'
 import { runBranchFor } from './dashboard/run-handoff.js'
 import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
 import { tailEvents, tailRunEvents } from './dashboard-rpc/events-tail.js'
 import { isSafeVia } from './conversations.js'
 import { ensureSessionsIgnored, resolveUserDir } from './sessions.js'
-import { createPreviewRuntime } from './preview-runtime.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId, topicScratchPath } from './registry.js'
 import { isTicketPath } from './tickets.js'
@@ -413,8 +412,6 @@ export interface ProjectRuntimeOptions {
 export interface ProjectRuntime {
   onStart: (prompt: string, kind: StartRunKind, options?: StartRunOptions, targetProjectId?: string) => Promise<StartRunResult>
   onAddProject: (path: string, directory: boolean) => Promise<AddProjectResult>
-  /** The Preview handler set (#475/#797), handed to the dashboard as one value so `runId` survives. */
-  preview: PreviewHandlers
   /** The live event stream for a run this daemon is relaying from a device (#1067), else undefined
    *  so `onEvents` falls back to tailing the on-disk log. Wired as the dashboard's events source. */
   remoteEventsSource: EventsSource
@@ -481,10 +478,6 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
     const records = await listProjects(undefined, env).catch(() => [])
     return records.find(record => record.id === id)?.path
   }
-
-  // App previews (#475/#797) are their own runtime: they share only this resolver and the key scheme,
-  // and the run half reaches in exactly once, to stop a finished run's preview (see tearDownWorktree).
-  const previews = createPreviewRuntime({ homeId, resolveProject })
 
   /**
    * Put a continued run (#762) back in its own checkout: the same worktree if it was retained, else
@@ -609,10 +602,6 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
   const tearDownWorktree = (projectCwd: string, worktree: string, runId?: string): Promise<void> =>
     withRunLock(worktree, async () => {
       try {
-        // A session can be serving its own checkout (#797), and that dev server holds the directory
-        // it is about to lose. Stop it first, whether or not the worktree ends up removed: the run
-        // is over, so the preview is serving a tree nothing is working on.
-        await previews.preview.stop(projectKeyFor(projectCwd), runId)
         // Where the work ended up, recorded before the checkout can go (#799). The branch outlives
         // the worktree and is the only handle the dashboard has left on a finished session.
         const branch = await currentBranch(worktree)
@@ -1129,13 +1118,11 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
 
   const dispose = async (): Promise<void> => {
     relayedRuns.dispose()
-    await previews.dispose()
   }
 
   return {
     onStart,
     onAddProject,
-    preview: previews.preview,
     remoteEventsSource,
     tailRelayEvents,
     remoteRuns,

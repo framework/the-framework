@@ -47,7 +47,6 @@ import { RunMessageQueue } from './run-messages.js'
 import { createGateKeepalive } from './gate-keepalive.js'
 import { nodeGitRunner } from './project.js'
 import { addProject, ensureDaemonToken, listProjects, readDaemonToken, readPreferences, resolveProjectPath } from './registry.js'
-import { startConsumptionGuard } from './consumption-guard.js'
 import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 import {
   planMaintenanceSweep,
@@ -218,7 +217,6 @@ export interface SessionOptions {
    */
   handoff?: HandoffLevel | undefined
   buildEvent?: string | undefined
-  maxCost?: number
   todoLoop: boolean
   todoMaxItems?: number
   sessionLink?: string | undefined
@@ -344,7 +342,6 @@ export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = proce
     ...(isHandoffLevel(o.handoff) ? { handoff: o.handoff } : {}),
     ...(o.onBeforeMergeable ? { onBeforeMergeable: true } : {}),
     ...(o.browser ? { browser: true } : {}),
-    ...(o.maxCost !== undefined ? { maxCost: o.maxCost } : {}),
   }
 }
 
@@ -367,18 +364,12 @@ export function claudeDriverOptions(): ClaudeCodeDriverOptions {
 /**
  * The settings the picked agent cannot honor (#542), as lines to print at startup.
  *
- * A setting that silently does nothing is worse than one that errors. Codex with a spend cap
- * reads as capped and isn't: the cap is only ever checked on a turn that reports a price, and
- * Codex reports none (#540). The consumption limits go the same way — no quota to read means no
- * gate. So the session says which guards are not in force, rather than letting the setting imply
- * they are.
+ * A setting that silently does nothing is worse than one that errors. So the session says which
+ * settings are not in force, rather than letting them imply they are.
  */
-export function unguardedNotices(opts: Pick<SessionOptions, 'agent' | 'maxCost' | 'browser'>): string[] {
+export function unguardedNotices(opts: Pick<SessionOptions, 'agent' | 'browser'>): string[] {
   const spec = AGENT_SPECS[opts.agent]
   const notices: string[] = []
-  if (opts.maxCost != null && !spec.reportsCost) {
-    notices.push(`the $${opts.maxCost} spend cap cannot be enforced: ${spec.label} reports no price per turn, so it never fires (#540).`)
-  }
   if (opts.agent !== 'claude' && opts.browser) {
     notices.push(`the browser has no effect on ${spec.label}: the browser tools are wired through Claude Code's MCP config.`)
   }
@@ -421,7 +412,6 @@ interface RunEpilogue {
   io: CliIO
   store: RunStore | undefined
   control: ControlWatcher | undefined
-  guard: { stop: () => void } | undefined
   /** The run's Chrome (#793), stopped with the run so no headless browser outlives it. */
   sharedBrowser: SharedBrowser | undefined
   /** The preview of that browser (#802), stopped with the run. */
@@ -472,7 +462,6 @@ async function settleRun(ctx: RunEpilogue, run: () => Promise<{ successLine: str
   } finally {
     ctx.clearInterrupt()
     ctx.control?.close()
-    ctx.guard?.stop()
     await ctx.browserStream?.close()
     await ctx.sharedBrowser?.close()
   }
@@ -693,8 +682,8 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
 
 /**
  * Everything the CLI wires around one session before {@link runSession} drives it: config
- * resolved over the layers, the store, the control channel, the browser, the consumption guard
- * and the journal — then handed to {@link settleRun}. Returns the process exit code. Split out of
+ * resolved over the layers, the store, the control channel, the browser and the journal — then
+ * handed to {@link settleRun}. Returns the process exit code. Split out of
  * {@link runCli} so the top reads as a dispatch table and this reads as one session's lifecycle.
  */
 async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
@@ -722,7 +711,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
 
   // Transparent mode (#625): the coarse master off-switch — `--transparent` or the-framework.yml.
   // When on, this run is byte-identical to raw `claude -p`: no framework system channel (composed
-  // empty below), no consumption guard, no dashboard, no TODO loop. Resolved once here so every
+  // empty below), no dashboard, no TODO loop. Resolved once here so every
   // one of those sites reads the same answer.
   const transparent = config.transparent
 
@@ -746,9 +735,8 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // entirely: `--run-on actions` needs no local agent CLI at all, which is exactly why the
   // dashboard's own check skips it.
 
-  // Which agent is about to spend the user's subscription, and which guards are
-  // not in force while it does — said *before* the first turn. A cap that turns
-  // out not to apply is worth knowing before the spending, not after (#542).
+  // Which agent is about to spend the user's subscription, and which settings are not in force
+  // while it does — said *before* the first turn (#542).
   if (!fake) {
     if (opts.agent !== 'claude') io.out(`◆ agent: ${AGENT_SPECS[opts.agent].label}`)
     for (const note of unguardedNotices(opts)) io.err(`note: ${note}`)
@@ -993,13 +981,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     if (!sessionName) return skip('no-session-name')
     const binPath = process.argv[1]
     if (!binPath) return skip('no-bin-path')
-    const outcome = await runOnBeforeMergeable(
-      cwd,
-      binPath,
-      io,
-      { session_name: sessionName },
-      opts.maxCost,
-    )
+    const outcome = await runOnBeforeMergeable(cwd, binPath, io, { session_name: sessionName })
     onEvent({ kind: 'on-before-mergeable', outcome })
   }
 
@@ -1204,27 +1186,12 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // event ahead of `session` never reaches the dashboard (#829).
   if (browserStream) journal.announceBrowserPort(browserStream.port)
 
-  // The quota boundary (#879). Nothing to configure and nothing to pass: the
-  // boundary is derived from the account's own week, so a run started from a
-  // terminal is gated exactly like one started from the dashboard. `undefined`
-  // when the agent can't report a quota (the fake driver, or Codex), which
-  // leaves the run ungated — the fail-open Rom confirmed.
-  // Transparent mode (#625) leaves the run fully raw, so the guard is off with it — the run is
-  // `claude -p` with no framework behavior, spend included.
-  const guard = transparent
-    ? undefined
-    : startConsumptionGuard({
-        driver,
-        // The #960 slider joins the per-run gate (#1490), read from the registry the same way
-        // the daemon's quota source reads it — so the Usage bar and this gate cannot disagree.
-        limitOffset: async () => (await readPreferences()).autoSpendOffset ?? DEFAULT_SPEND_OFFSET,
-        ...(opts.model ? { model: opts.model } : {}),
-      })
-  if (transparent) io.out(`◆ transparent: on — raw ${AGENT_SPECS[opts.agent].label}, no framework prompt, guard, dashboard, or TODO loop`)
-  else if (guard) io.out('◆ quota boundary: on')
-  else if (!fake) {
-    io.out(`◆ quota boundary: off — ${AGENT_SPECS[opts.agent].label} reports no quota, so nothing gates your subscription spend.`)
-  }
+  // Nothing gates a session that is already running (E1). One gate decides whether a session may
+  // *start* — the daemon's quota boundary, fed by the same slider the Usage bar shows — and once
+  // it has, the session runs to its own end. Interrupting mid-flight is the worst moment to
+  // economise: the tokens are already spent, the work is half-done, and what is saved is the cheap
+  // part while what is lost is the expensive part.
+  if (transparent) io.out(`◆ transparent: on — raw ${AGENT_SPECS[opts.agent].label}, no framework prompt, dashboard, or TODO loop`)
 
   // A user SYSTEM.md + the anti-lazy-pill toggle shape the system prompt (#301), and the eco
   // flags trim the built-in one (#314). Resolve and echo once, shared by both run paths.
@@ -1236,7 +1203,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     io,
     store,
     control,
-    guard,
     sharedBrowser,
     browserStream,
     clearInterrupt,
@@ -1279,8 +1245,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     ...(requestChoice ? { requestChoice } : {}),
     ...chatQueue,
     ...(opts.model ? { model: opts.model } : {}),
-    ...(opts.maxCost ? { budgetUsd: opts.maxCost } : {}),
-    ...(guard ? { consumptionGate: guard.gate } : {}),
     ...(promptConfig.userSystemPrompt ? { systemPrompt: promptConfig.userSystemPrompt } : {}),
     ...(promptConfig.noBuiltinPrompt ? { vanilla: true } : {}),
     ...(browserAttached ? { browser: true } : {}),
@@ -1405,13 +1369,12 @@ export function printStartupFooter(io: CliIO, opts: { fetchLatest?: VersionFetch
  * it: note it carries **no** `onBeforeMergeable`, which is the recursion guard — a quality pass
  * must not trigger its own suite.
  */
-export function promptRunSpec(prompt: string, cwd: string, maxCost?: number, vanilla = false): SessionSpec {
+export function promptRunSpec(prompt: string, cwd: string, vanilla = false): SessionSpec {
   return {
     prompt,
     kind: 'prompt',
     cwd,
     options: {
-      ...(maxCost !== undefined ? { maxCost } : {}),
       // The on-before-mergeable follow-up runs vanilla so it skips the #326 prompt's `### Session
       // name` step: it is a follow-up to a session, not a session of its own, so it must not
       // commit + branch + checkout a new `the-framework/<name>` branch. That stranded its output
@@ -1430,11 +1393,11 @@ export function promptRunSpec(prompt: string, cwd: string, maxCost?: number, van
  * on-before-mergeable prompt (the recursion guard). Resolves true on a clean exit (0). Never
  * re-execs a test entry (fork-bomb guard).
  */
-async function spawnPromptRun(prompt: string, cwd: string, binPath: string, maxCost?: number, vanilla = false): Promise<boolean> {
+async function spawnPromptRun(prompt: string, cwd: string, binPath: string, vanilla = false): Promise<boolean> {
   if (process.env.NODE_TEST_CONTEXT || /\.test\.[cm]?[jt]s$/.test(binPath)) {
     return false // refuse to spawn from a test entry
   }
-  const specPath = await writeSessionSpec(promptRunSpec(prompt, cwd, maxCost, vanilla))
+  const specPath = await writeSessionSpec(promptRunSpec(prompt, cwd, vanilla))
   return new Promise<boolean>(resolvePromise => {
     const child = spawn(process.execPath, [binPath, '--session', specPath], { stdio: 'inherit' })
     child.once('error', () => resolvePromise(false))
@@ -1443,7 +1406,7 @@ async function spawnPromptRun(prompt: string, cwd: string, binPath: string, maxC
 }
 
 /** How the on-before-mergeable prompt is spawned; injectable so tests observe it without spawning. */
-export type PromptRunner = (prompt: string, cwd: string, binPath: string, maxCost?: number) => Promise<boolean>
+export type PromptRunner = (prompt: string, cwd: string, binPath: string) => Promise<boolean>
 
 /**
  * Fire the #326 on-before-mergeable prompt after a run signalled setReadyForMerge(): one
@@ -1463,9 +1426,8 @@ export async function runOnBeforeMergeable(
   binPath: string,
   io: CliIO,
   tf: OnBeforeMergeableContext,
-  maxCost?: number,
   // Vanilla by default: the follow-up must not run the session-name step and branch (#560).
-  run: PromptRunner = (prompt, cwd, binPath, maxCost) => spawnPromptRun(prompt, cwd, binPath, maxCost, true),
+  run: PromptRunner = (prompt, cwd, binPath) => spawnPromptRun(prompt, cwd, binPath, true),
   fs: StoreFs = nodeStoreFs(),
 ): Promise<'queued' | 'incomplete'> {
   // Ensure the presets exist so the queued entries' filePaths resolve, even in a repo
@@ -1477,7 +1439,7 @@ export async function runOnBeforeMergeable(
     io.out(`  ! on-before-mergeable: could not materialize presets (${errorMessage(err)})`)
   }
   io.out(`\n◆ on-before-mergeable: queueing quality follow-ups for ${tf.session_name}`)
-  const ok = await run(renderOnBeforeMergeablePrompt(tf), cwd, binPath, maxCost)
+  const ok = await run(renderOnBeforeMergeablePrompt(tf), cwd, binPath)
   if (!ok) io.out(`  ! on-before-mergeable queueing did not complete cleanly.`)
   return ok ? 'queued' : 'incomplete'
 }

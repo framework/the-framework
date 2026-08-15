@@ -309,8 +309,6 @@ export type FrameworkEvent =
       cacheReadTokens: number
       cacheCreationTokens: number
       turns: number
-      /** The budget cap in USD this run is gated on, when one was set. */
-      budgetUsd?: number
     }
   /**
    * The run's active Open Loop modes (#272), emitted once when a domain preset is

@@ -108,39 +108,8 @@ test('runSession accumulates per-turn usage and emits a running total (#322)', a
   // The fake driver prices its turns, so the total carries a cost.
   assert.ok(Math.abs(last.costUsd! - last.turns * 0.02) < 1e-9)
   assert.ok(last.cacheReadTokens > 0)
-  // No cap was set, so the total carries no budget and the run finished cleanly.
-  assert.equal(last.budgetUsd, undefined)
   const end = events.at(-1)!
   assert.equal(end.kind === 'end' && end.ok, true)
-})
-
-test('runSession stops itself once the budget cap is reached (#322)', async () => {
-  const events: FrameworkEvent[] = []
-  // $0.01 cap trips on the very first $0.02 turn (the build).
-  await assert.rejects(
-    runSession({
-      prompt: FAKE_INTENT,
-      driver: fakeDriver(),
-      cwd: '/tmp/ws',
-      budgetUsd: 0.01,
-      onEvent: e => events.push(e),
-    }),
-  )
-
-  const usage = events.filter(e => e.kind === 'usage')
-  assert.ok(usage.length >= 1)
-  assert.equal(usage[0]!.kind === 'usage' && usage[0]!.budgetUsd, 0.01)
-  assert.ok(events.some(e => e.kind === 'log' && e.message.startsWith('Budget reached:')))
-
-  const end = events.at(-1)!
-  assert.equal(end.kind, 'end')
-  if (end.kind !== 'end') return
-  // A budget stop is a clean stop, not a failure.
-  assert.equal(end.ok, false)
-  assert.equal(end.stopped, true)
-  assert.match(end.detail ?? '', /budget reached/)
-  // The session stopped early: it never reported a clean end.
-  assert.ok(!events.some(e => e.kind === 'end' && e.ok))
 })
 
 test('runSession shows a literal session link immediately (no template)', async () => {
@@ -569,98 +538,6 @@ test('runSession runs the backlog loop after the build when opted in (#323)', as
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
-})
-
-test('runSession pauses the run once the quota boundary is reached (#529/#879)', async () => {
-  const events: FrameworkEvent[] = []
-  await assert.rejects(
-    runSession({
-      prompt: FAKE_INTENT,
-      driver: fakeDriver(),
-      cwd: '/tmp/ws',
-      consumptionGate: () => 'Current week (all models)',
-      onEvent: e => events.push(e),
-    }),
-  )
-  assert.ok(events.some(e => e.kind === 'log' && e.message === 'Quota boundary reached (Current week (all models)) — pausing the session.'))
-  const end = events.at(-1)!
-  assert.equal(end.kind, 'end')
-  // A limit is a clean stop, like the budget cap — not a failure.
-  assert.equal(end.kind === 'end' && end.stopped, true)
-  assert.ok(end.kind === 'end' && end.detail?.startsWith('quota boundary reached (Current week (all models))'))
-})
-
-test('runSession leaves a resume note on the backlog when it pauses (#529)', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-pause-'))
-  try {
-    const events: FrameworkEvent[] = []
-    await assert.rejects(
-      runSession({
-        prompt: FAKE_INTENT,
-        driver: fakeDriver(),
-        cwd,
-        consumptionGate: () => 'Current week (all models)',
-        onEvent: e => events.push(e),
-      }),
-    )
-    // The backlog is what a later run drains, so the note needs no machinery of its own.
-    // With no existing backlog, it is created at the #682 location, the root TODO_AGENTS.md.
-    const todo = await readFile(join(cwd, 'TODO_AGENTS.md'), 'utf8')
-    assert.match(todo, /^- \[ \] Resume .+$/m)
-    assert.ok(events.some(e => e.kind === 'log' && e.message.includes('to pick up when the limit resets')))
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('runSession appends the resume note to an existing backlog (#529)', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-pause-'))
-  try {
-    await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] Something already open') // no trailing newline
-    await assert.rejects(
-      runSession({ prompt: FAKE_INTENT, driver: fakeDriver(), cwd, consumptionGate: () => 'Current session' }),
-    )
-    const todo = await readFile(join(cwd, 'TODO_AGENTS.md'), 'utf8')
-    // The existing entry survives and the note lands on its own line.
-    assert.match(todo, /- \[ \] Something already open\n- \[ \] Resume /)
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('runSession carries on while the limits are clear (#529)', async () => {
-  const events: FrameworkEvent[] = []
-  let asked = 0
-  await runSession({
-    prompt: FAKE_INTENT,
-    driver: fakeDriver(),
-    cwd: '/tmp/ws',
-    consumptionGate: () => {
-      asked++
-      return null
-    },
-    onEvent: e => events.push(e),
-  })
-  assert.ok(asked > 0, 'the gate is consulted between turns')
-  const end = events.at(-1)!
-  assert.equal(end.kind === 'end' && end.ok, true)
-})
-
-test('runSession carries on when the gate itself fails (#529)', async () => {
-  // Fail-open, per Rom on #519: an unreadable quota must not stop the work.
-  await runSession({
-    prompt: FAKE_INTENT,
-    driver: fakeDriver(),
-    cwd: '/tmp/ws',
-    consumptionGate: () => {
-      throw new Error('quota unreadable')
-    },
-  })
-})
-
-test('runSession leaves the session ungated with no consumption gate (#529)', async () => {
-  const { events } = await runSession({ prompt: FAKE_INTENT, driver: fakeDriver(), cwd: '/tmp/ws' })
-  assert.equal(events.at(-1)!.kind, 'end')
 })
 
 // The await rounds shared by the direct prompt path and the backlog loop (#569). Both used

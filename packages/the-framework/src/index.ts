@@ -45,7 +45,6 @@ export {
   type BoundaryWindow,
   type QuotaBoundaryStatus,
 } from './quota-boundary.js'
-export { startConsumptionGuard, type ConsumptionGuard, type StartConsumptionGuardOptions } from './consumption-guard.js'
 export { pollerQuotaSource, defaultQuotaSource, type QuotaView, type QuotaSource } from './dashboard/quota.js'
 export {
   QuotaPoller,

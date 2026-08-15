@@ -67,8 +67,6 @@ export interface StartRunOptions {
   onBeforeMergeable?: boolean
   /** Give the agent a real browser via chrome-devtools-mcp during the run (#452). */
   browser?: boolean
-  /** Cap this session's spend, in USD (#322). Only enforceable on an agent that reports a price per turn (#540). */
-  maxCost?: number
   /**
    * How far this session publishes itself when it finishes (#1102/#1216/B5): `local`, `push`, `pr`
    * or `merge`. Absent leaves it to the repo file, then the default (`pr`) — which is what makes

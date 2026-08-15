@@ -3,7 +3,7 @@ import { composeRunSystem, renderSystemPrompt, type TfContext } from './system-p
 import { createRunControls, emitSessionStart, endStopDetail } from './run-telemetry.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
 import { runAwaitRounds, type BindProjectDeps } from './await-gate.js'
-import { leaveResumeNote, runTodoLoop, type TodoLoopResult } from './todo-loop.js'
+import { runTodoLoop, type TodoLoopResult } from './todo-loop.js'
 import { buildPrompt, extendPrompt, isWorkspaceEmpty, scaffoldPrompt } from './steps.js'
 import { type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import type { RunMessages } from './run-messages.js'
@@ -83,25 +83,6 @@ export interface RunSessionOptions {
    * without pausing. The CLI wires this to the dashboard's Accept button.
    */
   requestChoice?: (req: ChoiceRequest) => Promise<ChoicePick>
-  /**
-   * Stop the session once cumulative agent cost reaches this many USD (budget cap,
-   * #322). Checked after each turn that reports usage: the turn that crosses the
-   * cap finishes, then the session stops itself (a clean stop, not a failure). Omit
-   * for no cap. This gates on what *this session* spent, which is a separate question
-   * from where the account's quota stands (readable via #517 / #521, and gated on
-   * by #519's consumption limits).
-   */
-  budgetUsd?: number
-  /**
-   * Consult the consumption limits between turns (#529): return the limit that
-   * has been reached to pause the session, or `null` to carry on.
-   *
-   * Must answer from a cached reading — a live quota read spawns the whole agent
-   * CLI (~5s). Compose one from a `QuotaPoller` and `consumptionStatus`. Omit to
-   * leave the session ungated, which is also what a gate that throws resolves to:
-   * an unreadable quota must never stop the user's work (Rom's call on #519).
-   */
-  consumptionGate?: () => string | null
   /**
    * Work the agent's own `TODO_AGENTS.md` backlog after the opening exchange settles (#323), one
    * gated entry per turn until it is empty. Default: on for a `build` session with a real driver,
@@ -201,16 +182,14 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
   emit({ kind: 'intent', text: opts.prompt })
   if (system) emit({ kind: 'system-prompt', text: system })
 
-  // Usage accounting + the self-stops (#322/#529): the session signal composes the caller's
-  // abort with the budget, consumption and plan-decline (#358) aborts.
-  const { runSignal, onDriverEvent, consumptionTrip, budgetController, consumptionController, declineController } =
-    createRunControls({
-      emit,
-      signal: opts.signal,
-      sessionLink: opts.sessionLink,
-      budgetUsd: opts.budgetUsd,
-      consumptionGate: opts.consumptionGate,
-    })
+  // Usage accounting plus the one self-stop left (#358): the session signal composes the caller's
+  // abort with the plan-decline abort. Nothing stops a session for spending (E1) — that is decided
+  // before it starts.
+  const { runSignal, onDriverEvent, declineController } = createRunControls({
+    emit,
+    signal: opts.signal,
+    sessionLink: opts.sessionLink,
+  })
 
   // One driver session for the whole run; each prompt is a fresh invocation. A continuation
   // (#720/#1467) resumes the stopped leg's conversation instead of starting anew.
@@ -298,16 +277,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
     emit({ kind: 'end', ok: true })
     return { text, events, ...(todo ? { todo } : {}) }
   } catch (err) {
-    const { stopped, detail } = await endStopDetail({
-      err,
-      ...(opts.signal ? { signal: opts.signal } : {}),
-      budgetController,
-      consumptionController,
-      declineController,
-      consumptionTrip,
-      ...(opts.budgetUsd != null ? { budgetUsd: opts.budgetUsd } : {}),
-      leaveResumeNote: () => leaveResumeNote(opts.cwd, events, emit),
-    })
+    const { stopped, detail } = endStopDetail({ err, ...(opts.signal ? { signal: opts.signal } : {}), declineController })
     emit({ kind: 'end', ok: false, ...(stopped ? { stopped: true } : {}), detail })
     throw err
   } finally {

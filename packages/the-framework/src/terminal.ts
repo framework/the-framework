@@ -79,7 +79,7 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
         const tokens = event.inputTokens + event.cacheReadTokens + event.outputTokens
         return `  tokens: ${tokens.toLocaleString('en-US')} (${event.outputTokens.toLocaleString('en-US')} out) ${turns} — no price reported`
       }
-      return `  spend: $${event.costUsd.toFixed(4)}${event.budgetUsd ? ` / $${event.budgetUsd}` : ''} ${turns}`
+      return `  spend: $${event.costUsd.toFixed(4)} ${turns}`
     }
     case 'modes': {
       const shown = event.all.map(m => `${event.active.includes(m) ? '[x]' : '[ ]'} ${m}`).join('  ')

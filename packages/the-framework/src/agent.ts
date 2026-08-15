@@ -39,12 +39,6 @@ export interface AgentSpec {
   installHint: string
   /** How preflight asks the CLI whether it is logged in (#1326). */
   auth: AgentAuthSpec
-  /**
-   * Whether the agent prices its own turns. When it doesn't, the spend cap
-   * (#322) has no number to gate on and silently never fires, so the CLI says
-   * so instead of implying a guard that isn't there (#540).
-   */
-  reportsCost: boolean
 }
 
 /** The agents we can drive, and what each can tell us about itself. */
@@ -69,7 +63,6 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
       },
       fix: 'claude auth login',
     },
-    reportsCost: true,
   },
   codex: {
     label: AGENT_LABELS.codex,
@@ -82,7 +75,6 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
       loggedIn: ({ output }) => (/not logged in/i.test(output) ? false : /logged in/i.test(output) ? true : undefined),
       fix: 'codex login',
     },
-    reportsCost: false,
   },
 }
 

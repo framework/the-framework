@@ -26,8 +26,6 @@ test('a cloud run meta ends with the real session URL, not the generic entry poi
     emit: e => events.push(e),
     // What a Claude run gets without an explicit --session-link: the generic entry point.
     sessionLink: CLAUDE_CODE_SESSION_LINK,
-    budgetController: new AbortController(),
-    consumptionController: new AbortController(),
   })
   const driver = new CloudDriver({
     runTag: () => 'tag',

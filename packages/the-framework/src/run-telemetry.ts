@@ -44,44 +44,25 @@ export interface DriverEventHandlerOptions {
   emit: (event: FrameworkEvent) => void
   /** The session link template, when the caller configured one. */
   sessionLink?: string | undefined
-  /** The run's spend cap (#322). Omitted = uncapped. */
-  budgetUsd?: number | undefined
-  /**
-   * Answers "has the account reached its quota boundary?" between turns (#879).
-   * Returns the label of the window that reached it, or null while there is room.
-   */
-  consumptionGate?: (() => string | null) | undefined
-  /** Tripped when the budget cap is crossed. */
-  budgetController: AbortController
-  /** Tripped when the consumption gate reports a window is spent. */
-  consumptionController: AbortController
 }
 
 /** What {@link createDriverEventHandler} hands back. */
 export interface DriverEventHandler {
   /** Wire this as the driver session's `onEvent`. */
   onDriverEvent: (event: DriverEvent) => void
-  /** The window that reached the boundary, once the consumption gate has fired. */
-  consumptionTrip: () => string | undefined
 }
 
 /**
- * Watch the driver's black box (#165) and turn it into the run's stream: surface the
- * real session id as `session-update` once known (that is the honest handle a UI links
- * to, and it changes per prompt, so re-emit), fold each turn's usage into the run total,
- * and trip the two self-stops.
+ * Watch the driver's black box (#165) and turn it into the run's stream: surface the real session
+ * id as `session-update` once known (that is the honest handle a UI links to, and it changes per
+ * prompt, so re-emit), and fold each turn's usage into the run total.
  *
- * Both stops fire *after* the turn that crossed them: its cost is already spent, so the
- * point is to stop the next one. Each is signalled once, and the run's `AbortSignal.any`
- * composition carries it downstream. An agent that reports no price leaves `costUsd`
- * undefined and so can never trip the budget cap (#540). A consumption gate that throws
- * is treated as "carry on": an unreadable quota must not stop the work (#519), and the
- * gate is answered from a cached reading because a live one spawns the agent CLI (~5s).
+ * It used to trip two self-stops here as well — a per-run USD cap and a mid-run quota gate — each
+ * firing *after* the turn that crossed it, when its cost was already spent (E1).
  */
 export function createDriverEventHandler(opts: DriverEventHandlerOptions): DriverEventHandler {
-  const { emit, budgetController, consumptionController } = opts
+  const { emit } = opts
   let lastSessionId: string | undefined
-  let consumptionTrip: string | undefined
   const usage = new UsageMeter()
 
   const onDriverEvent = (event: DriverEvent): void => {
@@ -108,27 +89,10 @@ export function createDriverEventHandler(opts: DriverEventHandlerOptions): Drive
     if (!event.usage) return
     usage.add(event.usage)
     const totals = usage.totals()
-    emit({ kind: 'usage', ...totals, ...(opts.budgetUsd != null ? { budgetUsd: opts.budgetUsd } : {}) })
-    if (opts.budgetUsd != null && totals.costUsd !== undefined && totals.costUsd >= opts.budgetUsd && !budgetController.signal.aborted) {
-      emit({ kind: 'log', message: `Budget reached: $${totals.costUsd.toFixed(4)} of $${opts.budgetUsd} — stopping the session.` })
-      budgetController.abort(new Error('[framework] budget reached'))
-    }
-    if (opts.consumptionGate && !consumptionController.signal.aborted) {
-      let reached: string | null = null
-      try {
-        reached = opts.consumptionGate()
-      } catch (err) {
-        console.error('[framework] consumptionGate threw; carrying on:', err)
-      }
-      if (reached) {
-        consumptionTrip = reached
-        emit({ kind: 'log', message: `Quota boundary reached (${reached}) — pausing the session.` })
-        consumptionController.abort(new Error('[framework] quota boundary reached'))
-      }
-    }
+    emit({ kind: 'usage', ...totals })
   }
 
-  return { onDriverEvent, consumptionTrip: () => consumptionTrip }
+  return { onDriverEvent }
 }
 
 /** Inputs to {@link createRunControls}. */
@@ -137,48 +101,31 @@ export interface RunControlsOptions {
   /** The caller's abort signal (Stop button / Ctrl+C / control channel), if any. */
   signal?: AbortSignal | undefined
   sessionLink?: string | undefined
-  budgetUsd?: number | undefined
-  consumptionGate?: (() => string | null) | undefined
 }
 
 /** The run's abort plumbing plus its driver-event sink. */
 export interface RunControls extends DriverEventHandler {
   /** The composed signal every driver turn runs under. */
   runSignal: AbortSignal
-  /** Trips a clean stop once this run has spent its budget cap (#322). */
-  budgetController: AbortController
-  /** Trips a clean pause once the account's quota window is spent (#529). */
-  consumptionController: AbortController
   /** Trips a clean stop when the user declines a plan (#358); inert on the direct path. */
   declineController: AbortController
 }
 
 /**
- * Compose the run's signal and wire its driver-event handler in one place. The caller's
- * signal is OR'd (via {@link AbortSignal.any}) with three self-stops — the budget cap
- * (#322), a spent consumption window (#529), and a declined plan (#358) — so anything
- * downstream that watches `runSignal` stops the same way regardless of which fired.
- * Shared by the build (`run.ts`) and direct-prompt (`prompt-run.ts`) paths.
+ * Compose the run's signal and wire its driver-event handler in one place. The caller's signal is
+ * OR'd (via {@link AbortSignal.any}) with the one self-stop left — a declined plan (#358) — so
+ * anything downstream that watches `runSignal` stops the same way regardless of which fired.
+ *
+ * There were three (E1). A per-run USD cap and a mid-run quota gate also aborted a session that
+ * was already going, which is the worst moment to economise: the tokens are already spent, the
+ * work is half-done, and what is saved is the cheap part while what is lost is the expensive part.
+ * Spending is decided once, before a session starts.
  */
 export function createRunControls(opts: RunControlsOptions): RunControls {
-  const budgetController = new AbortController()
   const declineController = new AbortController()
-  const consumptionController = new AbortController()
-  const runSignal = AbortSignal.any([
-    ...(opts.signal ? [opts.signal] : []),
-    budgetController.signal,
-    declineController.signal,
-    consumptionController.signal,
-  ])
-  const handler = createDriverEventHandler({
-    emit: opts.emit,
-    sessionLink: opts.sessionLink,
-    budgetUsd: opts.budgetUsd,
-    consumptionGate: opts.consumptionGate,
-    budgetController,
-    consumptionController,
-  })
-  return { ...handler, runSignal, budgetController, consumptionController, declineController }
+  const runSignal = AbortSignal.any([...(opts.signal ? [opts.signal] : []), declineController.signal])
+  const handler = createDriverEventHandler({ emit: opts.emit, sessionLink: opts.sessionLink })
+  return { ...handler, runSignal, declineController }
 }
 
 /** Inputs to {@link endStopDetail}. */
@@ -187,42 +134,17 @@ export interface StopDetailOptions {
   err: unknown
   /** The caller's own signal, to tell a caller stop from a self-stop. */
   signal?: AbortSignal | undefined
-  budgetController: AbortController
-  consumptionController: AbortController
   declineController: AbortController
-  consumptionTrip: () => string | undefined
-  budgetUsd?: number | undefined
-  /**
-   * Leave a resume note when the run paused on a consumption limit, returning where
-   * it will resume from. Injected (not imported) so this module stays free of the
-   * todo loop it would otherwise import in a cycle.
-   */
-  leaveResumeNote: () => Promise<string | undefined>
 }
 
 /**
- * Classify why a run's turn loop threw and render the `end` event's `detail`. A caller
- * interrupt, a budget cap (#322), a declined plan (#358), or a spent consumption window
- * (#529) are all clean stops; anything else is a real failure. The resume note is written
- * here (once `paused` is known) rather than at the trip, because it is file I/O racing the
- * run unwinding. Shared so the two run paths can never disagree on what "stopped" means.
+ * Classify why a run's turn loop threw and render the `end` event's `detail`. A caller interrupt
+ * or a declined plan (#358) are clean stops; anything else is a real failure. Shared so the two
+ * run paths can never disagree on what "stopped" means.
  */
-export async function endStopDetail(opts: StopDetailOptions): Promise<{ stopped: boolean; detail: string }> {
+export function endStopDetail(opts: StopDetailOptions): { stopped: boolean; detail: string } {
   const callerAborted = opts.signal?.aborted === true
-  const budgetStopped = opts.budgetController.signal.aborted && !callerAborted
   const declined = opts.declineController.signal.aborted
-  const paused = opts.consumptionController.signal.aborted && !callerAborted
-  const stopped =
-    callerAborted || opts.budgetController.signal.aborted || declined || opts.consumptionController.signal.aborted
-  const resumeNote = paused ? await opts.leaveResumeNote() : undefined
-  const detail = declined
-    ? 'plan declined'
-    : budgetStopped
-      ? `budget reached ($${opts.budgetUsd})`
-      : paused
-        ? `quota boundary reached${opts.consumptionTrip() ? ` (${opts.consumptionTrip()})` : ''}${resumeNote ? `; will resume from ${resumeNote}` : ''}`
-        : opts.err instanceof Error
-          ? opts.err.message
-          : String(opts.err)
-  return { stopped, detail }
+  const detail = declined ? 'plan declined' : opts.err instanceof Error ? opts.err.message : String(opts.err)
+  return { stopped: callerAborted || declined, detail }
 }

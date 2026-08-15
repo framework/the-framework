@@ -173,20 +173,18 @@ test('withBrowser folds chrome-devtools-mcp into driver options only when enable
 })
 
 test('promptRunSpec runs a headless prompt and carries NO onBeforeMergeable (recursion guard, #326)', () => {
-  assert.deepEqual(promptRunSpec('audit this', '/work/app', 3), {
+  assert.deepEqual(promptRunSpec('audit this', '/work/app'), {
     prompt: 'audit this',
     kind: 'prompt',
     cwd: '/work/app',
-    options: { maxCost: 3 },
+    options: {},
   })
-  // maxCost is optional, and not vanilla by default: a normal quality run keeps the #326 prompt.
-  assert.deepEqual(promptRunSpec('x', '/w').options, {})
 })
 
 test('promptRunSpec goes vanilla so the on-before-mergeable follow-up skips the session-name branch step (#560)', () => {
   // The follow-up is not a session; vanilla drops the #326 prompt (and its `### Session
   // name` step), so the run stays on the session branch instead of stranding its output.
-  assert.equal(promptRunSpec('queue follow-ups', '/work/app', 3, true).options.vanilla, true)
+  assert.equal(promptRunSpec('queue follow-ups', '/work/app', true).options.vanilla, true)
 })
 
 test('runOnBeforeMergeable queues the follow-ups in ONE run instead of running the presets (#326/#556)', async () => {
@@ -196,7 +194,7 @@ test('runOnBeforeMergeable queues the follow-ups in ONE run instead of running t
     seen.push(prompt)
     return Promise.resolve(true)
   }
-  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, undefined, run, memFs())
+  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, run, memFs())
   // One child run, not three: it asks for TODO entries rather than doing the passes.
   assert.equal(seen.length, 1)
   const prompt = seen[0]!
@@ -210,16 +208,14 @@ test('runOnBeforeMergeable queues the follow-ups in ONE run instead of running t
 
 test('runOnBeforeMergeable is best-effort: a failed queueing run is reported, never thrown (#326)', async () => {
   const { io, out } = capture()
-  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, undefined, () =>
-    Promise.resolve(false), memFs(),
-  )
+  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, () => Promise.resolve(false), memFs())
   assert.ok(out.some(l => /on-before-mergeable queueing did not complete/.test(l)))
 })
 
 test('runOnBeforeMergeable materializes the presets so the queued filePaths resolve (#598)', async () => {
   const { io } = capture()
   const fs = memFs()
-  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, undefined, () => Promise.resolve(true), fs)
+  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, () => Promise.resolve(true), fs)
   // The entry points at .the-framework/presets/maintainability.md; that file must now exist.
   assert.ok(fs.files.has(join('/work/app', '.the-framework/presets/maintainability.md')))
   assert.ok(fs.files.has(join('/work/app', '.the-framework/presets/security_audit.md')))
@@ -342,17 +338,8 @@ test('createDriver builds the agent --agent picked (#542)', () => {
   assert.equal(createDriver({ agent: 'codex' }).name, 'codex')
 })
 
-test('unguardedNotices says --max-cost cannot gate an agent with no price (#542/#540)', () => {
-  // The whole point: the cap is only checked on a turn that reports a price, so
-  // on Codex it silently never fires. Saying nothing would read as capped.
-  const notes = unguardedNotices({ agent: 'codex', maxCost: 5, browser: false })
-  assert.equal(notes.length, 1)
-  assert.match(notes[0]!, /\$5 spend cap cannot be enforced/)
-  assert.match(notes[0]!, /Codex/)
-})
-
-test('unguardedNotices is silent when the guards really do apply (#542)', () => {
-  assert.deepEqual(unguardedNotices({ agent: 'claude', maxCost: 5, browser: true }), [])
+test('unguardedNotices is silent when the settings really do apply (#542)', () => {
+  assert.deepEqual(unguardedNotices({ agent: 'claude', browser: true }), [])
   assert.deepEqual(unguardedNotices({ agent: 'codex', browser: false }), [])
 })
 
@@ -360,11 +347,6 @@ test('unguardedNotices flags the Claude-only browser on another agent (#542)', (
   const notes = unguardedNotices({ agent: 'codex', browser: true })
   assert.equal(notes.length, 1)
   assert.match(notes[0]!, /browser has no effect/)
-})
-
-test('the spend cap travels on the spec (#322)', () => {
-  assert.equal(opts({ options: { maxCost: 2.5 } }).maxCost, 2.5)
-  assert.equal(opts().maxCost, undefined)
 })
 
 test('claudeDriverOptions runs the headless agent at bypassPermissions (#225)', () => {
@@ -581,9 +563,7 @@ test('the dashboard steers a dashboard-less run through its gates via control.js
 test('runOnBeforeMergeable reports how it went, so the caller can emit it (#835)', async () => {
   const { io } = capture()
   const fire = (ok: boolean) =>
-    runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, undefined, () =>
-      Promise.resolve(ok), memFs(),
-    )
+    runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, () => Promise.resolve(ok), memFs())
   assert.equal(await fire(true), 'queued')
   assert.equal(await fire(false), 'incomplete')
 })

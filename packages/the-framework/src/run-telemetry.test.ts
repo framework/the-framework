@@ -12,8 +12,6 @@ function handler(events: FrameworkEvent[], sessionLink?: string) {
   return createDriverEventHandler({
     emit: e => events.push(e),
     ...(sessionLink ? { sessionLink } : {}),
-    budgetController: new AbortController(),
-    consumptionController: new AbortController(),
   })
 }
 

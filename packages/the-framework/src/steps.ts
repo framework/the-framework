@@ -1,17 +1,12 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { definePrompt, LoopEngine, promptInstructions, renderTask } from '@gemstack/ai-autopilot'
+import { definePrompt, promptInstructions, renderTask } from '@gemstack/ai-autopilot'
 import type {
   BuildContext,
-  LoopEvent,
-  LoopPassContext,
-  LoopPrompt,
-  LoopRunResult,
   PlannedSubtask,
   Prompt,
   SubtaskResult,
   SupervisorRun,
-  Verdict,
 } from '@gemstack/ai-autopilot'
 import type { DriverSession } from './driver/index.js'
 import { continuationPrompt, parseAwaitGate, type ParsedAwaitGate } from './turn-gate.js'
@@ -253,96 +248,3 @@ export function driverBuild(
     return supervisorRun(results)
   }
 }
-
-/**
- * A checklist step backed by a domain preset's review loop (#252): each pass
- * dispatches a `major-change` (by default) loop event, so the preset's review
- * chain fires through the wrapped agent, and returns the union of the `{ blockers }`
- * verdicts its prompts reported. Bootstrap keeps its pass/improve/maxPasses
- * machinery, the domain policy just decides what blocks.
- *
- * A preset with no loop for the event kind is not a review at all: nothing
- * blocks. The user opted into *this preset's* reviews, not a substitute (#1372 —
- * the built-in checklist that used to fill this gap is gone).
- */
-export function domainLoopChecklist(
-  loop: LoopEngine,
-  opts: { kind?: string } = {},
-): (ctx: LoopPassContext) => Promise<Verdict> {
-  const kind = opts.kind ?? 'major-change'
-  return async ctx => {
-    const event: LoopEvent = { kind, summary: ctx.intent }
-    if (loop.matches(event).length === 0) return { blockers: [] }
-    return verdictFromLoopRun(await loop.handle(event))
-  }
-}
-
-/**
- * Fold a loop run into one {@link Verdict}: the union of every prompt's reported
- * blockers. A prompt that ran but reported no verdict is advisory (it does not
- * block); a prompt that failed to execute is surfaced as a blocker so an errored
- * review is not mistaken for a pass.
- */
-export function verdictFromLoopRun(run: LoopRunResult): Verdict {
-  const blockers: string[] = []
-  for (const outcome of run.outcomes) {
-    if (outcome.verdict && outcome.verdict.blockers.length) blockers.push(...outcome.verdict.blockers)
-    else if (!outcome.passing) blockers.push(`review "${outcome.promptId}" did not complete`)
-  }
-  return { blockers }
-}
-
-/** The improve step: a fresh invocation that fixes the current blockers. */
-export function driverImprove(
-  session: DriverSession,
-  opts: {
-    prompt?: (blockers: readonly string[]) => string
-    /**
-     * When the workspace is still empty at improve time, switch from the
-     * blocker-polish prompt to a hard "scaffold the whole app from scratch"
-     * directive (#182) — otherwise "smallest changes / no unrelated features"
-     * blocks the agent from building the app that does not exist yet. Off by
-     * default; the runner enables it for real drivers.
-     */
-    verifyWorkspace?: boolean
-  } & DriverStepOptions = {},
-): (ctx: LoopPassContext) => Promise<void> {
-  const compose = opts.prompt ?? improvePrompt
-  return async ctx => {
-    const text = shouldScaffold(session, opts.verifyWorkspace) ? scaffoldPrompt(ctx.intent) : compose(ctx.blockers)
-    await session.prompt(text, {
-      ...(opts.system ? { system: opts.system } : {}),
-      ...(ctx.signal ? { signal: ctx.signal } : {}),
-    })
-  }
-}
-
-/**
- * Materialize a domain preset's {@link Prompt} bodies into driver-backed
- * {@link LoopPrompt}s so its loops can run through the wrapped agent. Each pass is
- * one fresh {@link DriverSession.prompt} call (the driver's fresh-context unit),
- * prompted with the prompt body and the rendered {@link renderTask | loop event},
- * returning the agent's text.
- */
-export function driverLoopPrompts(
-  session: DriverSession,
-  prompts: readonly Prompt[],
-  opts: { signal?: AbortSignal } & DriverStepOptions = {},
-): LoopPrompt[] {
-  return prompts.map(prompt =>
-    definePrompt({
-      id: prompt.id,
-      passes: prompt.passes,
-      run: async ctx => {
-        const instructions = promptInstructions(prompt)
-        const framing = opts.system ? `${opts.system}\n\n${instructions}` : instructions
-        const turn = await session.prompt(`${framing}\n\n${renderTask(ctx.event)}`, {
-          ...(opts.signal ? { signal: opts.signal } : {}),
-        })
-        return turn.text
-      },
-    }),
-  )
-}
-
-

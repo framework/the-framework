@@ -35,7 +35,6 @@
 export * from './driver/index.js'
 export {
   driverBuild,
-  driverImprove,
   buildPrompt,
   extendPrompt,
   improvePrompt,

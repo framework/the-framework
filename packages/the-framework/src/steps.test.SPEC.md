@@ -1,4 +1,4 @@
-Covers the agent-backed steps: greenfield vs. existing-codebase build framing, the once-only scaffold retry for a workspace left empty, preset review verdicts (blockers unioned across the chain, an errored review blocks, no matching review passes), and the improve prompt carrying the blockers.
+Covers the agent-backed build step: greenfield vs. existing-codebase framing, and the once-only scaffold retry for a workspace left empty.
 
 ## Before writing SPEC.md files
 

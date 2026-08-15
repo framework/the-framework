@@ -1,0 +1,7 @@
+---
+'@gemstack/the-framework': patch
+---
+
+A session's snapshot can no longer be read half-written, which was quietly making live sessions disappear. `run.json` is rewritten by the session that owns it, over and over, while the daemon and every dashboard read poll it from another process — and a plain write truncates the file before it refills, so a reader landing in that window got an empty file. Measured on this repo's own snapshot shape, that is around one concurrent read in ten, not a curiosity. Every reader took the unparseable result for "no such session", so a live session dropped out of listings for a poll at a time: the sidebar could show one of two concurrent sessions, and a Resume fired the instant its session finished was refused as a collision with the very leg it was continuing, since the wait that should have let the leg exit asked once, got no readable answer, and treated that as "still running".
+
+Snapshots are now written to a scratch file and renamed into place, so a reader sees either the whole previous snapshot or the whole new one and never a piece of either. A snapshot that still will not parse — one written by an older CLI on an in-place write — is re-read before being called corrupt rather than reported as an absent session. And the continuation's wait now tells "still running" apart from "cannot say this instant": it keeps asking until the leg commits, and only a leg that genuinely reports itself running counts as a collision.

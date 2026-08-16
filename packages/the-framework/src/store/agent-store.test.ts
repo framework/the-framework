@@ -455,9 +455,12 @@ test('listAgents still reads the archive under the name D5 renamed away from (#1
   const fs = memFs({
     [join(user, 'sessions', '2026-old.json')]: meta('2026-old'),
     [join(user, 'agents', '2026-new.json')]: meta('2026-new'),
+    // The transient location's old name too, which holds everything archived before the committed
+    // scheme existed — the one history with no second copy anywhere.
+    [join(CWD, '.the-framework', 'runs', '2026-ancient.json')]: meta('2026-ancient'),
   })
   const agents = await listAgents(CWD, fs)
-  assert.deepEqual(agents.map(r => r.id).sort(), ['2026-new', '2026-old'])
+  assert.deepEqual(agents.map(r => r.id).sort(), ['2026-ancient', '2026-new', '2026-old'])
 })
 
 test('reconcileOrphanedAgents flips archived runs stuck at running to stopped (#642)', async () => {

@@ -68,6 +68,14 @@ export const ARCHIVE_DIR = 'agents'
  */
 export const LEGACY_ARCHIVE_DIR = 'sessions'
 
+/**
+ * What {@link AGENTS_DIR} was called before the same rename: the transient `runs/`.
+ *
+ * Read, never written, for the same reason — it holds everything a project archived before #1179,
+ * which is exactly the history that was never committed and so has no other copy anywhere.
+ */
+export const LEGACY_AGENTS_DIR = 'runs'
+
 /** Filesystem-safe, lexicographically-sortable agent id from an ISO start time. */
 export function agentIdFromStartedAt(startedAt: string): string {
   // ISO is fixed-width, so replacing the `:`/`.` separators keeps lexical order
@@ -709,7 +717,7 @@ async function archiveDirs(fs: StoreFs, dir: string): Promise<string[]> {
       if ((await fs.readdir(candidate)).length > 0) dirs.push(candidate)
     }
   }
-  dirs.push(join(dir, AGENTS_DIR))
+  dirs.push(join(dir, AGENTS_DIR), join(dir, LEGACY_AGENTS_DIR))
   return dirs
 }
 

@@ -27,6 +27,7 @@ export {
   AGENTS_DIR,
   ARCHIVE_DIR,
   LEGACY_ARCHIVE_DIR,
+  LEGACY_AGENTS_DIR,
   AGENT_META_VERSION,
   type StoreFs,
   type AgentMeta,

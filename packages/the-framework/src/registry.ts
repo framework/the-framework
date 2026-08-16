@@ -356,8 +356,12 @@ function sanitizePreferences(value: unknown): Preferences {
     if (typeof input[key] === 'boolean') preferences[key] = input[key] as boolean
   }
   // `model` (#628) is a free-form string preference; the rest are booleans. A blank string is "no
-  // choice", same as absent, so it is dropped rather than persisted.
-  if (typeof input['model'] === 'string' && input['model'].trim()) preferences.model = input['model'].trim()
+  // choice", same as absent, so it is dropped rather than persisted. So is the literal word
+  // "Default": that was a picker *label* whose stored value was empty (#1143), and a file carrying
+  // it as the value — hand-edited, or written by a build that mistook the two — would otherwise be
+  // handed to the CLI as `--model Default` and fail the turn on a word nobody chose.
+  const model = typeof input['model'] === 'string' ? input['model'].trim() : ''
+  if (model && model.toLowerCase() !== 'default') preferences.model = model
   // `agent` (#650) is constrained to the known set so junk never reaches the run; the set is
   // the shared node-free vocabulary (agent-names.ts). Default = claude.
   if (isDriverName(input['driver'] as string | undefined)) preferences.driver = input['driver'] as string

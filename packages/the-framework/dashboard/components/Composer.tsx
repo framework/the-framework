@@ -35,9 +35,12 @@ import { cn } from '../lib/utils.js'
 // (`kind: 'prompt'`). Emptying the box falls back to a normal `build` run. The list, its order and
 // each preset's label live with the presets themselves (#874), so a preset's run-kind name and the
 // button that starts it cannot drift apart across the package boundary.
-// The agent + model tree (#650/#656/#658): each agent lists ONLY its own models, since `--model`
-// passes straight through to that agent's CLI. Picking a model in an agent's submenu sets both, so
-// an incompatible pair can't be chosen. Empty value = the agent's own default (no `--model` flag).
+// The driver + model tree (#650/#656/#658): each driver lists ONLY its own models, since `--model`
+// passes straight through to that CLI. Picking a model in a driver's submenu sets both, so an
+// incompatible pair can't be chosen. Every entry is a real model id: a "Default" entry used to head
+// each list, and picking it stored nothing, so the menu's own answer to "which model" was "we do
+// not know" (#1143). Not choosing is still a state — it is just no longer something to pick, and
+// the trigger says so rather than naming the first model as if it had been chosen.
 // The names and labels are the framework's own vocabulary (browser-safe via /client); only the
 // icons and model lists are UI data, and the Record<DriverName, ...> shape means a new agent
 // framework-side is a compile error here rather than a silently missing menu entry.
@@ -45,7 +48,6 @@ const DRIVER_UI: Record<DriverName, { icon: DriverOption['icon']; models: Driver
   claude: {
     icon: <ClaudeLogo className="h-4 w-4" />,
     models: [
-      { value: '', label: 'Default' },
       { value: 'fable', label: 'Fable' },
       { value: 'opus', label: 'Opus' },
       { value: 'sonnet', label: 'Sonnet' },
@@ -55,7 +57,6 @@ const DRIVER_UI: Record<DriverName, { icon: DriverOption['icon']; models: Driver
   codex: {
     icon: <CodexLogo className="h-4 w-4" />,
     models: [
-      { value: '', label: 'Default' },
       { value: 'gpt-5-codex', label: 'GPT-5 Codex' },
       { value: 'gpt-5', label: 'GPT-5' },
       { value: 'o3', label: 'o3' },

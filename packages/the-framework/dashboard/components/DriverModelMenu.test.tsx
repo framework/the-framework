@@ -10,18 +10,12 @@ const drivers: DriverOption[] = [
     value: 'claude',
     label: 'Claude Code',
     icon: <svg data-testid="claude-logo" />,
-    models: [
-      { value: '', label: 'Default model' },
-      { value: 'opus', label: 'Opus' },
-    ],
+    models: [{ value: 'opus', label: 'Opus' }],
   },
   {
     value: 'codex',
     label: 'Codex',
-    models: [
-      { value: '', label: 'Default model' },
-      { value: 'gpt-5-codex', label: 'GPT-5 Codex' },
-    ],
+    models: [{ value: 'gpt-5-codex', label: 'GPT-5 Codex' }],
   },
 ]
 
@@ -55,5 +49,28 @@ describe('DriverModelMenu tree (#658)', () => {
     fireEvent.click(screen.getByText('Claude Code')) // Claude submenu
     expect(screen.getByText('Opus')).toBeTruthy() // Claude's own model
     expect(screen.queryByText('GPT-5 Codex')).toBeNull() // a Claude submenu never lists Codex models
+  })
+
+  test('with no model pinned the trigger names no model, rather than the first one (#1143)', async () => {
+    // The list used to open with a "Default" entry storing an empty value, and the label fell back
+    // to the first entry — so an unset preference read as whichever model happened to be listed
+    // first. Naming a model the run does not pass is the failure the ticket is about.
+    renderMenu({ model: '' })
+    const trigger = screen.getByRole('button')
+    expect(trigger.textContent).not.toContain('Opus')
+    expect((await hoverTooltip(trigger)).textContent).toContain("Model: the CLI's own default")
+  })
+
+  test('a model belonging to the other driver is not claimed as this one (#1143)', async () => {
+    renderMenu({ driver: 'claude', model: 'gpt-5-codex' })
+    const trigger = screen.getByRole('button')
+    expect(trigger.textContent).not.toContain('GPT-5 Codex')
+    expect((await hoverTooltip(trigger)).textContent).toContain("Model: the CLI's own default")
+  })
+
+  test('the trigger is named for assistive tech even with nothing but a logo on it (#1143)', () => {
+    renderMenu({ model: '' })
+    // The rendered text is a logo and a chevron; without an explicit name this button says nothing.
+    expect(screen.getByRole('button', { name: "Driver: Claude Code · Model: the CLI's own default" })).toBeTruthy()
   })
 })

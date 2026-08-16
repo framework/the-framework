@@ -115,9 +115,9 @@ afterEach(cleanup)
 
 const STUDIO = 'http://192.168.1.5:4200'
 
-// The agent/model trigger wears the model it will run with — 'Default' with no preference stored —
-// and names the agent on hover (#1149), where it used to carry a `title`.
-const agentTrigger = () => screen.getByRole('button', { name: 'Default' })
+// The driver/model trigger names both in its own label (#1143): with no model pinned it is a logo
+// and a chevron, so the name cannot come from the rendered text the way it used to.
+const agentTrigger = () => screen.getByRole('button', { name: /^Driver: / })
 
 describe('Composer (#721)', () => {
   test('renders the full control row: agent/model, options gear, and the submit button', async () => {
@@ -126,7 +126,7 @@ describe('Composer (#721)', () => {
     // button is the discoverable one.
     expect(screen.getByRole('button', { name: /Presets/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Session options' })).toBeTruthy()
-    expect((await hoverTooltip(agentTrigger())).textContent).toContain('Agent: Claude Code')
+    expect((await hoverTooltip(agentTrigger())).textContent).toContain('Driver: Claude Code')
     // The submit button appears only once the prompt has text (#721).
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'x' } })
     expect(screen.getByRole('button', { name: /Start session/ })).toBeTruthy()
@@ -137,7 +137,7 @@ describe('Composer (#721)', () => {
     // They used to be dropped here, which meant a navbar run silently used the stored agent,
     // model and options with nothing on screen saying which.
     expect(screen.queryByRole('button', { name: 'Session options' })).not.toBeNull()
-    expect((await hoverTooltip(agentTrigger())).textContent).toContain('Agent: Claude Code')
+    expect((await hoverTooltip(agentTrigger())).textContent).toContain('Driver: Claude Code')
     // The editor + submit still work (so `/` `<` `@` `#` triggers remain live in the editor).
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'quick run' } })
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))

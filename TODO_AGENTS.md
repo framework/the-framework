@@ -8,7 +8,6 @@
 
 ## Priority 3
 
-- [Remove the useless 'Default' option from the model picker](tickets/2026-07-25_bug-cannot-select-fable.md) — the original "can't select Fable" bug is fixed; only the Default-entry removal remains. Handle existing configs storing "Default" with a sensible fallback.
 
 ## Priority 2
 

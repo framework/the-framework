@@ -403,6 +403,17 @@ test('writePreferences keeps the model string but drops a blank one (#628)', asy
   assert.deepEqual(await readPreferences(fs, ENV), {}) // blank -> no choice, dropped
 })
 
+test('the word "Default" is not a model, however a file came to hold it (#1143)', async () => {
+  // It was a picker label whose stored value was empty. A file carrying it as the *value* would
+  // otherwise reach the CLI as `--model Default` and fail the turn on a word nobody chose.
+  const fs = memFs({ [FILE]: JSON.stringify([APP_A]) })
+  await writePreferences({ model: 'opus' }, fs, ENV)
+  await writePreferences({ model: 'Default' }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), {})
+  await writePreferences({ model: ' default ' }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), {})
+})
+
 test('writePreferences keeps a known agent and drops an unknown one (#650)', async () => {
   const fs = memFs({ [FILE]: JSON.stringify([APP_A]) })
   await writePreferences({ driver: 'codex' }, fs, ENV)

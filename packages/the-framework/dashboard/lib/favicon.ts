@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 
 // The tab icon follows the mark (#875): the black & white knot while nothing is running, the
-// brand's animated colour variant while an agent is working. Vike's `favicon` config only emits
-// the initial `<link rel="icon">` (pages/+config.ts), so the swap is a client-side href write.
+// brand's animated colour variant while an agent is working. The static shell emits the initial
+// `<link rel="icon">` (index.html), so the swap is a client-side href write.
 
 /** The mark as shipped: the neutral ramp, with its own dark-mode fills inside the file. */
 export const IDLE_FAVICON = '/logo.svg'

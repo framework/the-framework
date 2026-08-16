@@ -3,7 +3,7 @@
 // Six strands, each a flat fill in a neutral ramp. The fills are CSS variables rather than the
 // literal hex values so the mark survives a dark background: the shipped ramp runs neutral-950 ->
 // neutral-500, which on a dark canvas would sink the leading strands into it. `--logo-1..6` carry
-// the brand values in light and a lightened ramp in dark (see `layouts/tailwind.css`).
+// the brand values in light and a lightened ramp in dark (see `tailwind.css`).
 //
 // Not `currentColor` with per-strand opacity, which is the obvious way to make an SVG theme-aware:
 // a knot's over/under crossings are literal overlaps, painted in order, so any strand below 100%

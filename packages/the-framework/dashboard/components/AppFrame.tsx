@@ -1,12 +1,11 @@
 import { useEffect, type ReactNode } from 'react'
-import './tailwind.css'
 import { usePreferences, themePreference, resolvedDark } from '../lib/preferences.js'
-import { ErrorBoundary } from '../components/ErrorBoundary.js'
+import { ErrorBoundary } from './ErrorBoundary.js'
 
-// The dashboard's color theme (#725): system (default, follow the OS), light, or dark. Client-only
-// (ssr:false), so toggling the `.dark` class in an effect is fine. Until the preferences load over
+// The dashboard's color theme (#725): system (default, follow the OS), light, or dark. The app is
+// client-only, so toggling the `.dark` class in an effect is fine. Until the preferences load over
 // Telefunc the choice is `system`, so a dark-OS user still gets dark first paint.
-export default function LayoutDefault({ children }: { children: ReactNode }) {
+export function AppFrame({ children }: { children: ReactNode }) {
   const theme = themePreference(usePreferences())
   useEffect(() => {
     const root = document.documentElement

@@ -1,4 +1,4 @@
-Covers route-as-URL: reading the live address rather than build-time parameters, navigating, replacing the history entry for corrections, and adding no entry for where you already are.
+Covers route-as-URL against the real browser history (there is no router left to mock): reading the live address, navigating and re-reading it, adding a history entry so Back returns, replacing that entry for corrections, adding none for where you already are, and following Back/Forward when the browser drives them.
 
 ## Before writing SPEC.md files
 

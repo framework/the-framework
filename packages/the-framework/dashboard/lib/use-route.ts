@@ -1,15 +1,34 @@
-import { usePageContext } from 'vike-react/usePageContext'
-import { navigate } from 'vike/client/router'
+import { useSyncExternalStore } from 'react'
 import { parseRoute, formatRoute, type Route } from './route.js'
 
-// The route as state (#784): read the current one, go to another. Vike's client router owns the
-// URL, so Back/Forward are free and a session is a link you can paste, reload, and open twice.
+// The route as state (#784): read the current one, go to another. Back/Forward are free, and a
+// session is a link you can paste, reload, and open twice.
 //
-// It reads `urlPathname`, not the route's `routeParams`: the shell is prerendered for `/` (ssr:false,
-// one static index.html the daemon serves for every path), so the params baked into it are the
-// build-time ones and never change, while `urlPathname` tracks the browser on both a hard load and
-// a client navigation. Hence the catch-all `+route.ts` — it exists so a navigation to any path
-// resolves to this page, and nothing reads what it returns.
+// This was Vike's client router (F1). Its entire contribution here was a `usePageContext()` that
+// exposed `urlPathname` and a `navigate()` — plus a catch-all `+route.ts` whose return value was
+// deliberately never read, existing only so a navigation to any path resolved to the one page, and
+// an `+onBeforePrerenderStart.ts` naming `/` so a shell got emitted at all. What is left is the
+// History API, which is what those were wrapping.
+
+/** Subscribers to the URL, woken by Back/Forward and by our own pushes. */
+const listeners = new Set<() => void>()
+
+function notify(): void {
+  for (const listener of listeners) listener()
+}
+
+function subscribe(listener: () => void): () => void {
+  // `popstate` covers Back/Forward; the History API does not fire it for our own pushes, which is
+  // why `go` notifies directly.
+  if (listeners.size === 0) window.addEventListener('popstate', notify)
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size === 0) window.removeEventListener('popstate', notify)
+  }
+}
+
+const currentPath = (): string => window.location.pathname
 
 export function useRoute(): {
   route: Route
@@ -17,14 +36,16 @@ export function useRoute(): {
    *  (adopting a started run's id), not a step you should be able to go Back to. */
   go: (next: Route, options?: { replace?: boolean }) => void
 } {
-  const { urlPathname } = usePageContext()
+  const urlPathname = useSyncExternalStore(subscribe, currentPath, () => '/')
   const route = parseRoute(urlPathname)
 
   const go = (next: Route, options?: { replace?: boolean }) => {
     const url = formatRoute(next)
     // Going where you already are is not a history entry.
     if (url === urlPathname) return
-    void navigate(url, options?.replace ? { overwriteLastHistoryEntry: true } : undefined)
+    if (options?.replace) window.history.replaceState(null, '', url)
+    else window.history.pushState(null, '', url)
+    notify()
   }
 
   return { route, go }

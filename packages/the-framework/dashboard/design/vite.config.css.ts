@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 
 // Compiles the gallery's Tailwind entry to one plain .css file, which build.mts inlines into
-// every card. Separate from the app's vite.config.ts on purpose: no Vike, no Telefunc, no React
+// every card. Separate from the app's vite.config.ts on purpose: no Telefunc, no React
 // plugin — this build exists only to produce CSS.
 export default defineConfig({
   plugins: [tailwindcss()],

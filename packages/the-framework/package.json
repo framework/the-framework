@@ -77,8 +77,6 @@
     "tailwind-merge": "^2.6.0",
     "telefunc": "^0.2.22",
     "tiptap-markdown": "^0.8.10",
-    "vike": "^0.4.235",
-    "vike-react": "^0.6.5",
     "yaml": "^2.5.0"
   },
   "devDependencies": {

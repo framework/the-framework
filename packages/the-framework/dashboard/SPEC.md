@@ -5,6 +5,7 @@ The dashboard UI: a browser app served by the daemon that renders everything the
 - Every read is a projection of state the daemon assembles (session logs, tickets, the queue, git and GitHub state, preferences); every write is a call into the daemon. The one exception is saved remote devices: their access tokens stay in this browser only, handed to the daemon per call.
 - The URL is the selection: the overview at `/`, a project at `/{projectId}`, one session at `/{projectId}/{sessionId}`, plus cross-project tickets, a per-ticket page and its plan page, and settings. A session is a link you can paste, reload, and bookmark — there is no selection state to disagree with the address bar.
 - A session's events stream live over one channel bound to that session's own log; everything else polls. A finished session reads from the archive instead, catching up whenever the live channel outgrew it.
+- It is a plain client-side bundle: one static page the daemon serves for every address, and all the behaviour in the browser. There is no server rendering and no framework between the HTML and the app.
 - Watch mode: opened against a shared relay link, the same app renders one session read-only.
 
 ## Flows

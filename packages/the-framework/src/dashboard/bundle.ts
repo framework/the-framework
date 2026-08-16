@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /**
- * Locate the prerendered dashboard bundle (#405): `dist/dashboard-bundle/client`, where Vite
+ * Locate the built dashboard bundle (#405): `dist/dashboard-bundle`, where Vite
  * writes it. Returns the directory only when its `index.html` exists, else undefined (the caller
  * then serves the legacy page.ts). Shared by the daemon and the per-run foreground dashboard (#427).
  *
@@ -17,6 +17,6 @@ export async function resolveDashboardBundle(): Promise<string | undefined> {
   // directory whether this is running out of `dist/`, `dist-test/`, or `src/` — all three sit one
   // level under the package, and the bundle is only ever built once, into `dist/`.
   const here = dirname(fileURLToPath(import.meta.url)) // <pkg>/{dist,dist-test,src}/dashboard
-  const dir = join(here, '..', '..', 'dist', 'dashboard-bundle', 'client')
+  const dir = join(here, '..', '..', 'dist', 'dashboard-bundle')
   return (await stat(join(dir, 'index.html')).then(s => s.isFile()).catch(() => false)) ? dir : undefined
 }

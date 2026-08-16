@@ -18,7 +18,7 @@ const viewport = () => {
 
 // Read from the dashboard root, which is vitest's cwd (the package's `test` script cds here for
 // exactly this reason); `import.meta.url` is not a file URL under jsdom.
-const tailwind = readFileSync('layouts/tailwind.css', 'utf8')
+const tailwind = readFileSync('tailwind.css', 'utf8')
 
 // #914: the port dropped upstream's viewport styling because those utilities came from a plugin we
 // do not have. They are local now, so the pairing is what needs pinning: a class the stylesheet

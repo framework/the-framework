@@ -18,7 +18,7 @@ import { useIsMobile } from '../../lib/use-mobile.js'
 // tooltip uses our Tooltip API (Portal + Positioner live inside TooltipContent, so `side`/`align`
 // pass straight to it) instead of a separate TooltipPositioner; and the mobile branch does not
 // forward the wrapper's div props onto the Sheet's Dialog root. `--sidebar-*` tokens live in
-// layouts/tailwind.css.
+// tailwind.css.
 
 const SIDEBAR_COOKIE_NAME = 'sidebar_state'
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7

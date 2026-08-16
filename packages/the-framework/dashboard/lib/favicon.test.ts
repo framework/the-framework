@@ -10,7 +10,7 @@ const icon = () => document.querySelector<HTMLLinkElement>('link[rel~="icon"]')?
 
 // #875: the tab is the half of the signal you see while the dashboard is in the background.
 describe('useFavicon', () => {
-  test('swaps the link Vike emitted rather than adding a second one', () => {
+  test('swaps the link the shell emitted rather than adding a second one', () => {
     document.head.innerHTML = `<link rel="icon" href="${IDLE_FAVICON}" />`
     const { rerender } = renderHook(({ working }) => useFavicon(working), { initialProps: { working: true } })
     expect(icon()).toBe(WORKING_FAVICON)

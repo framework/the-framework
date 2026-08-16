@@ -1,6 +1,6 @@
 # The Framework dashboard
 
-The Framework's localhost dashboard: **Vike (SPA) + React + Tailwind v4 + shadcn/ui + Telefunc**,
+The Framework's localhost dashboard: **Vite + React + Tailwind v4 + shadcn/ui + Telefunc**,
 side-by-side with the current `page.ts` MVP page (which is untouched).
 
 This directory used to be a package of its own, `@gemstack/framework-dashboard`. It is a directory

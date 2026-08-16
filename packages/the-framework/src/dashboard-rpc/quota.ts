@@ -3,8 +3,8 @@ import type { AutoPmOutcome, AutoPmReport } from '../auto-pm.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
 // The usage panel's read surface (#533): where the account's subscription quota stands, and where
-// it stands against the quota boundary (#879). The source is threaded through the Telefunc request
-// context by the dashboard, which polls for its whole life.
+// it stands against the quota boundary (#879). The source is wired into the dashboard context by
+// the daemon, and the panel polls it for its whole life.
 
 /** An honest empty view: no reading, and so no boundary to measure against. */
 function noReading(): QuotaView {
@@ -55,10 +55,11 @@ export async function onAutoPm(): Promise<AutoPmReport | undefined> {
  */
 export async function sendAutoPmSweep(opts?: { drainOnly?: boolean }): Promise<{ ok: boolean; outcomes?: AutoPmOutcome[] }> {
   const sweep = contextAutoPmSweep()
-  // The reporter is captured BEFORE the sweep is awaited: the Telefunc request context does not
-  // survive an await, so a post-await `contextAutoPm()` found nothing on every real request and
-  // the card fell back to "The sweep ran." — the very fallback this RPC exists to avoid. The
-  // captured closure needs no context to be called later.
+  // The reporter is captured BEFORE the sweep is awaited. It had to be: the context was
+  // request-scoped and did not survive an await, so a post-await `contextAutoPm()` found nothing
+  // on every real request and the card fell back to "The sweep ran." — the very fallback this RPC
+  // exists to avoid. The context is wired once at start-up now (F3), so the order is no longer
+  // load-bearing; the captured closure needs no context to be called later either way.
   const reporter = contextAutoPm()
   try {
     await sweep(opts?.drainOnly ? { drainOnly: true } : undefined)

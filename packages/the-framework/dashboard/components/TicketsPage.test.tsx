@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const onAllTickets = vi.hoisted(() => vi.fn())
-// TicketsPanel (rendered per project here) reaches for these too; unmocked they pull the real
-// telefunc client into jsdom, same as TicketsPanel's own suite.
+// TicketsPanel (rendered per project here) reaches for these too; unmocked they fetch a daemon
+// that is not there, same as TicketsPanel's own suite.
 const onTicketsMeta = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onAllTickets, onTicketsMeta }))
 vi.mock('../rpc/control.js', () => ({ sendQueueTicket: vi.fn(), sendStart: vi.fn() }))

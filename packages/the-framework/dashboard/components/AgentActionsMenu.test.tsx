@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 // The ⋮ menu subsumes the old WorkspaceActions / Stop / Remove / Delete row, so it pulls the same
-// telefunc + editor reads; stub them the way WorkspaceActions.test did.
+// RPC + editor reads; stub them the way WorkspaceActions.test did.
 const onGithubUrl = vi.fn(async () => 'https://github.com/o/r')
 const sendOpenInApp = vi.fn(async () => ({ ok: true as const }))
 const sendStop = vi.fn(async () => {})

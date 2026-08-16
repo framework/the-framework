@@ -24,9 +24,9 @@ export interface DashboardOptions {
   /** Host to bind. Default `127.0.0.1` (localhost only). */
   host?: string
   /**
-   * Called when the browser starts a session (#345): the `sendStart` telefunction reaches this
-   * through the request context. Wire it to spawn the session; return `busy: true` to refuse
-   * because one is already active.
+   * Called when the browser starts a session (#345): the `sendStart` RPC reaches this through the
+   * wired dashboard context. Wire it to spawn the session; return `busy: true` to refuse because
+   * one is already active.
    */
   onStart: (
     prompt: string,
@@ -35,14 +35,14 @@ export interface DashboardOptions {
     projectId?: string,
   ) => StartAgentResult | Promise<StartAgentResult>
   /**
-   * Called when the browser adds a project (#396): the `sendAddProject` telefunction reaches this
-   * through the request context. Wire it to install the repo (or every git repo under a
+   * Called when the browser adds a project (#396): the `sendAddProject` RPC reaches this through
+   * the wired dashboard context. Wire it to install the repo (or every git repo under a
    * directory) and register it.
    */
   onAddProject: (path: string, directory: boolean) => Promise<AddProjectResult> | AddProjectResult
   /**
-   * The user-preferences store (#410): the `onPreferences` / `savePreferences` telefunctions
-   * read/write it through the request context.
+   * The user-preferences store (#410): the `onPreferences` / `savePreferences` RPCs read and
+   * write it through the wired dashboard context.
    */
   preferences: PreferencesStore
   /**
@@ -61,8 +61,8 @@ export interface DashboardOptions {
    */
   autoPmSweep: (opts?: { drainOnly?: boolean }) => void | Promise<void>
   /**
-   * Serve the new dashboard bundle (#405) from this directory — the prerendered Vike SPA
-   * (`index.html` + `assets/**`). The daemon also mounts the dashboard's Telefunc surface
+   * Serve the new dashboard bundle (#405) from this directory — the built SPA
+   * (`index.html` + `assets/**`). The daemon also mounts the dashboard's RPC surface
    * at `/_rpc` (the calls + the live-event stream). Omit only for a broken install with
    * no built bundle, where the server reports the bundle is missing.
    */
@@ -71,7 +71,7 @@ export interface DashboardOptions {
    * The shared token that guards a non-loopback bind (#1051): with it set, every route (static
    * bundle, `/_rpc`, `/browser`, `/_relay`) needs a valid `fw_daemon` cookie or a matching
    * `?token=`, else 401. Omit for a loopback bind, where the guard is a no-op and local UX is
-   * byte-identical. A separate concern from the CSRF origin check in telefunc-serve.ts.
+   * byte-identical. A separate concern from the CSRF origin check in rpc-serve.ts.
    */
   token?: string
   /**
@@ -111,7 +111,7 @@ export interface DashboardOptions {
   bridgeSessions?: () => Promise<import('./bridge-endpoints.js').BridgeSession[]>
 }
 
-/** A running localhost dashboard: the prerendered SPA + its Telefunc mount. */
+/** A running localhost dashboard: the built SPA + its RPC mount. */
 export interface Dashboard {
   /** The URL to open. */
   readonly url: string
@@ -120,13 +120,12 @@ export interface Dashboard {
 }
 
 /**
- * Start the localhost dashboard: a tiny `node:http` server that serves the prerendered
- * SPA (#405) and mounts its RPC surface at `/_rpc` — the calls and the
- * live-event Channel. The dashboard reads the run's `.the-framework/events.jsonl` over the
- * Channel and steers it through `control.jsonl`, so there is no in-process event stream
- * here; the server is a static-bundle + RPC host. Telefunc runs in-process, so `sendStart`
- * / `sendAddProject` call the daemon's own closures via {@link DashboardOptions.onStart} /
- * {@link DashboardOptions.onAddProject}.
+ * Start the localhost dashboard: a tiny `node:http` server that serves the built SPA (#405) and
+ * mounts its RPC surface at `/_rpc` — the calls and the live-event stream. The dashboard reads the
+ * agent's `.the-framework/events.jsonl` over that stream and steers it through `control.jsonl`, so
+ * there is no in-process event stream here; the server is a static-bundle + RPC host. The RPCs run
+ * in the daemon's own process, so `sendStart` / `sendAddProject` call the daemon's own closures via
+ * {@link DashboardOptions.onStart} / {@link DashboardOptions.onAddProject}.
  */
 export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
   const host = opts.host ?? '127.0.0.1'

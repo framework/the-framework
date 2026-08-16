@@ -54,8 +54,8 @@ export interface AgentTail {
 }
 
 /**
- * Everything one story test stands up: the daemon runtime on a temp home, the Telefunc request
- * context the daemon would provide, and factories for registered projects. `close()` is the
+ * Everything one story test stands up: the daemon runtime on a temp home, the dashboard context
+ * the daemon would wire, and factories for registered projects. `close()` is the
  * whole teardown — it stops spawned runs the way daemon shutdown does, then removes the state.
  */
 export interface StoryWorld {
@@ -67,10 +67,9 @@ export interface StoryWorld {
   /** The auto-PM panel's stubs (mutable): what `onAutoPm` reports and what a sweep records. */
   autoPm: { report?: AutoPmReport; sweeps: Array<{ drainOnly?: boolean }> }
   /**
-   * Bind one dashboard RPC to this world's request context. The real mount provides the context
-   * per request; sync-mode telefunc drops a provided context at the next macrotask, so a story
-   * spanning real IO must re-provide it before every call — which is exactly what this does.
-   * Every telefunction reads its context synchronously at its top, so provide-then-call holds.
+   * Bind one dashboard RPC to this world's context. The real mount wires the context once, at
+   * start-up; a story stands several worlds up in one process, so re-providing before every call
+   * is what keeps each story's calls addressing its own world rather than the last one's.
    */
   rpc<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R
   /** The session spec of every child this world spawned, one entry per spawn, oldest first. */
@@ -130,7 +129,7 @@ export async function withFakeAwait<T>(mode: 'choices' | 'multiselect' | 'confir
 const agentReady = async () => ({ ok: true, checks: [] })
 
 /**
- * Stand up one story world. The Telefunc context mirrors `runDaemon`'s `startDashboard` wiring
+ * Stand up one story world. The dashboard context mirrors `runDaemon`'s `startDashboard` wiring
  * piece for piece — same closures, same registry-backed stores — except where the daemon holds a
  * live poller/loop (quota, auto PM), which a story controls through mutable stubs instead.
  */

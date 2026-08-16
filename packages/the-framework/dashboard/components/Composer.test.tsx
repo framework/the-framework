@@ -22,11 +22,11 @@ vi.mock('../lib/preferences.js', () => ({
   saveProjectPresetList: vi.fn(),
   useActiveProjectId: () => null,
 }))
-// The editor picker (#727) detects installed editors over Telefunc; stub it to none in the test.
+// The editor picker (#727) detects installed editors over an RPC; stub it to none in the test.
 vi.mock('../lib/editors.js', () => ({ useDetectedEditors: () => [] }))
 // Composer loads its own projects for the `@` picker (#743); stub the read to none.
 vi.mock('../rpc/projects.js', () => ({ onProjects: () => Promise.resolve([]) }))
-// The device health poll (#1072) reaches the daemon over Telefunc; a hoisted stub so each test can
+// The device health poll (#1072) reaches the daemon over an RPC; a hoisted stub so each test can
 // answer online/offline for the "Run on" target (#1073).
 const checkDevices = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/devices.js', () => ({ checkDevices }))

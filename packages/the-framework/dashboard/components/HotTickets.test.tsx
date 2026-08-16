@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { HotTicket, HotBucket } from '../../dist/index.js'
 
-// HotTickets reads onHotTickets over the telefunc shim; stub it so the import graph stays out of
-// telefunc and the poll returns fixtures.
+// HotTickets reads onHotTickets over the RPC stub; stub it so nothing fetches a daemon that is
+// not there and the poll returns fixtures.
 const onHotTickets = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onHotTickets }))
 

@@ -27,7 +27,7 @@ const TABS: Record<Tab, { label: string; help: string }> = {
 
 // The right sidebar (#314 third rail): the ad-hoc markdown views the agent pushes (#441) and
 // the surfaced docs (PLAN/TODO). Views come from the live event stream, passed down from the
-// shell; docs are a Telefunc-backed read of the selected project. The rail jumps to a fresh first view; choice gates live inline in the
+// shell; docs are an RPC read of the selected project. The rail jumps to a fresh first view; choice gates live inline in the
 // transcript now (#1455 items 6/7), so nothing here pulls focus for them.
 export function RightRail({
   projectId,

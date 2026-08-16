@@ -10,10 +10,10 @@ import { nodeFs } from '../node-fs.js'
  * creates the directory and spawns the process, and only then does the run write its meta, so
  * a lookup by run state alone misses a run that certainly exists.
  *
- * The directory probe matters beyond a slow first read: a Telefunc Channel resolves its path
- * once, when the client subscribes. Falling back to the project root would not self-correct a
- * moment later — the channel would tail the wrong file for the life of the subscription, which
- * is how a newly started run once showed a previous run's output.
+ * The directory probe matters beyond a slow first read: the event stream resolves its path once,
+ * when the browser opens it. Falling back to the project root would not self-correct a moment
+ * later — the stream would tail the wrong file for as long as that connection lived, which is how
+ * a newly started agent once showed a previous one's output.
  *
  * An unknown or finished `agentId` falls back to the project root rather than failing: the
  * run's worktree may already be gone, and the project's own state is still the sane thing to

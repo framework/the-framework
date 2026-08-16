@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
-// The device health poll (#1072) reaches the daemon over Telefunc; hoisted so the factory below can
+// The device health poll (#1072) reaches the daemon over an RPC; hoisted so the factory below can
 // close over it (a plain const is initialised after vi.mock hoists).
 const checkDevices = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/devices.js', () => ({ checkDevices }))

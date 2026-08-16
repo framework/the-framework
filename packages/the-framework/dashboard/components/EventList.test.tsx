@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 
 // The inline choice rows (#1455 item 6) mount real ChoicePanels, which post over the control
-// shim; stub it (and the preferences plumbing) so the telefunc client never loads into jsdom.
+// stub; stub it (and the preferences plumbing) so nothing fetches a daemon that is not there.
 const sendChoice = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/control.js', () => ({ sendChoice }))
 vi.mock('../lib/preferences.js', () => ({

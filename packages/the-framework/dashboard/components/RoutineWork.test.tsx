@@ -10,8 +10,8 @@ import {
 } from '../../dist/client.js'
 import { hoverTooltip } from '../test-utils.js'
 
-// Everything the card reads goes through a lib module, so the mocks stop short of telefunc: an
-// unmocked `*.telefunc.js` in the import graph fails as an assertIsNotBrowser bug report.
+// Everything the card reads goes through a lib module, so the mocks stop at the `rpc/` stubs: an
+// unmocked one reaches for `/_rpc/<name>`, and there is no daemon behind jsdom to answer.
 const onProjects = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/projects.js', () => ({ onProjects }))
 

@@ -169,8 +169,8 @@ export async function sendDeleteAgent(projectId: string, agentId: string): Promi
 /**
  * Start a run in the project (#405, #345): the one write that needs the daemon, since
  * spawning goes through the daemon's own `startAgent` closure (with its one-run-per-
- * project busy guard). The daemon provides `startAgent` on the Telefunc request context,
- * so this runs in-process. `kind` defaults to a plain build run; a `build`/`prompt`
+ * project busy guard). The daemon wires `startAgent` into the dashboard context, and this
+ * runs in the daemon's own process, so the call reaches it directly. `kind` defaults to a plain build run; a `build`/`prompt`
  * needs a non-empty prompt, `research` may be empty (its "what" defaults server-side).
  * Returns the daemon's {@link StartAgentResult} — `busy` when a run is already active.
  */

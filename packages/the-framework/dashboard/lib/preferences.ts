@@ -6,7 +6,7 @@ import { onProjects } from '../rpc/projects.js'
 import { parseRoute } from './route.js'
 
 // The dashboard's Global options (#410), owned by the daemon and persisted in the same
-// `the-framework.json` as the project list — no more localStorage. Loaded once over Telefunc
+// `the-framework.json` as the project list — no more localStorage. Loaded once over its RPC
 // and cached in this module so every component (the Start form's toggles + the choice-gate
 // countdown) reads one shared value and stays in lockstep: an update writes through to the
 // cache, notifies subscribers, and persists daemon-side. Prerender has no daemon, so the

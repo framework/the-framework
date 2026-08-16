@@ -7,8 +7,7 @@ const sendStart = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/control.js', () => ({ sendStart }))
 
 // The last-import stamp (#1208). Mocked at the lib boundary like every other read here: an
-// unmocked `*.telefunc.js` anywhere in the import graph fails the whole file as an
-// assertIsNotBrowser "telefunc bug", which reads as anything but the missing mock it is.
+// unmocked RPC stub fetches `/_rpc/<name>`, and nothing answers that behind jsdom.
 const onTicketsMeta = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onTicketsMeta }))
 

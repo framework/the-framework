@@ -186,11 +186,11 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     ...(opts.driverPreflight !== undefined ? { driverPreflight: opts.driverPreflight } : {}),
   })
 
-  // The daemon serves the prerendered Vike + Telefunc dashboard (#405/#426): the SPA reads
-  // each project's `.the-framework/events.jsonl` over a Telefunc Channel and steers over
-  // control.jsonl, so there is no in-process event stream to feed here. The runtime's RPCs
-  // reach the browser through the Telefunc request context. A missing bundle (a broken
-  // install) surfaces as a 503 from the server.
+  // The daemon serves the built dashboard bundle (#405/#426): the SPA reads each project's
+  // `.the-framework/events.jsonl` over `GET /_rpc/events` and steers over control.jsonl, so there
+  // is no in-process event stream to feed here. The runtime's RPCs reach the browser through the
+  // dashboard context the mount is wired with. A missing bundle (a broken install) surfaces as a
+  // 503 from the server.
   const clientBundleDir = await resolveDashboardBundle()
   // Owned here rather than left to the dashboard (#685): auto PM has to consult the same
   // long-lived meter the usage panel draws, and a second poller would double a rate-limited read.

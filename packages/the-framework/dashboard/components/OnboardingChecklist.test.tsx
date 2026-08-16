@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { DashboardData } from '../../dist/index.js'
 import { presets } from '../../dist/client.js'
 
-// The checklist reads its state over several telefunc shims and hooks; stub them all so the import
-// graph stays out of telefunc and each row's "done" comes from a fixture rather than a real daemon.
+// The checklist reads its state over several RPC stubs and hooks; stub them all so nothing reaches
+// for a daemon and each row's "done" comes from a fixture instead.
 const onDashboard = vi.hoisted(() => vi.fn())
 const onOnboarding = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onDashboard }))

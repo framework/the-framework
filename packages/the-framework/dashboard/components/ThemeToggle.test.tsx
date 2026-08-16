@@ -4,8 +4,8 @@ import { hoverTooltip } from '../test-utils.js'
 
 const updatePreferences = vi.hoisted(() => vi.fn())
 const usePreferences = vi.hoisted(() => vi.fn())
-// The whole module is mocked: importing it for real pulls telefunc (and a server transport) into
-// a component test. `themePreference` is one line, so restating it costs less than that.
+// The whole module is mocked: importing it for real puts a preferences fetch behind a component
+// test. `themePreference` is one line, so restating it costs less than that.
 vi.mock('../lib/preferences.js', () => ({
   updatePreferences,
   usePreferences,

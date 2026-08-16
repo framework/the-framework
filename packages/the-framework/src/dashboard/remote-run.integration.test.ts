@@ -21,7 +21,7 @@ import type { HandoffResult } from './agent-handoff.js'
 // loopback: daemon A (the browser's local daemon, a real project runtime) relays a run to daemon B
 // (the device, a dashboard whose Start is stubbed so no agent actually spawns). We assert the run
 // is created on B, that A never touched its own busy guard, and that B's events stream back through
-// A's relayed-run source in order. That is the whole path minus the final same-origin Telefunc hop on A,
+// A's relayed-run source in order. That is the whole path minus the final same-origin RPC hop on A,
 // which relay.test.ts / server.test.ts cover on their own.
 
 const TOKEN = 'zX2p8Q0hqk3m9tR7vN1cW4bY6sJ5aL0dFgHiKlMnOp'

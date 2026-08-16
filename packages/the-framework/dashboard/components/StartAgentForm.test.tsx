@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-// Everything the form reads goes through a lib module, so the mocks stop short of telefunc: an
-// unmocked `*.telefunc.js` in the import graph fails as an assertIsNotBrowser bug report.
+// Everything the form reads goes through a lib module, so the mocks stop at the `rpc/` stubs: an
+// unmocked one reaches for `/_rpc/<name>`, and there is no daemon behind jsdom to answer.
 const onProjects = vi.hoisted(() => vi.fn())
 const onClaudeTrust = vi.hoisted(() => vi.fn())
 const onDriverReady = vi.hoisted(() => vi.fn())

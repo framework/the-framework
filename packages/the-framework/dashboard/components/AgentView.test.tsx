@@ -19,7 +19,7 @@ vi.mock('../rpc/control.js', () => ({
   sendChoice: vi.fn(async () => null),
 }))
 // The feed's inline choice rows (#1455 item 6) pull ChoicePanel — and with it the preferences
-// module, whose telefunc reads must not load into jsdom.
+// module, whose RPC reads must not fetch a daemon that is not there.
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => ({}),
   updatePreferences: vi.fn(),

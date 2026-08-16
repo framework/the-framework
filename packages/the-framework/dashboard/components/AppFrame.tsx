@@ -3,8 +3,8 @@ import { usePreferences, themePreference, resolvedDark } from '../lib/preference
 import { ErrorBoundary } from './ErrorBoundary.js'
 
 // The dashboard's color theme (#725): system (default, follow the OS), light, or dark. The app is
-// client-only, so toggling the `.dark` class in an effect is fine. Until the preferences load over
-// Telefunc the choice is `system`, so a dark-OS user still gets dark first paint.
+// client-only, so toggling the `.dark` class in an effect is fine. Until the preferences arrive
+// from the daemon the choice is `system`, so a dark-OS user still gets dark first paint.
 export function AppFrame({ children }: { children: ReactNode }) {
   const theme = themePreference(usePreferences())
   useEffect(() => {

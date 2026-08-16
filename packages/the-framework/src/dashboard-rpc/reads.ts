@@ -28,10 +28,9 @@ import { readDaemonToken, readPreferences, type Preferences } from '../registry.
 // The read model behind the new dashboard (#405): the run history, a run's replay, the
 // surfaced PLAN/TODO docs, and the committed LOGS.md — each keyed by project id and
 // backed by the same readers the daemon's legacy /api/* endpoints use, so the dashboard
-// stays a projection of the same files. These implementations live in @gemstack/the-framework
-// so the daemon can serve them in-process (the client imports them via re-export shims
-// in `dashboard/server/`, keeping the baked RPC keys `/server/reads.telefunc.ts`). The
-// live run stream is its own Telefunc Channel (events.telefunc.ts).
+// stays a projection of the same files. They live beside the daemon rather than in the
+// browser's own tree so it can serve them in-process; the dashboard calls them by name over
+// `POST /_rpc/<name>`. The live agent stream is its own endpoint (`GET /_rpc/events`).
 
 /**
  * Resolve a project id and run a forgiving read against its workspace: an unknown project
@@ -80,9 +79,10 @@ async function withProjects<T>(build: (projects: Awaited<ReturnType<ReturnType<t
  * instead of losing it.
  */
 export async function onAgents(projectId: string): Promise<AgentMeta[]> {
-  // Read the relayed-run stubs BEFORE any await (#1077): telefunc only exposes getContext()
-  // synchronously at the top of a telefunction, so calling contextRemote() after an await loses
-  // the request context and drops every remote run from the list on a reload.
+  // The relayed-agent stubs (#1077). Read up front by habit rather than by necessity now: the
+  // context was request-scoped and evaporated at the first await, so reading it late dropped
+  // every remote agent from the list on a reload. It is wired once at start-up (F3), so an await
+  // no longer costs anything — nothing here depends on this staying above one.
   const remote = contextRemote()?.list(projectId) ?? []
   const cwd = await resolveProjectPath(projectId)
   const local = cwd ? await readAllAgents(cwd) : []

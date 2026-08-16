@@ -6,7 +6,7 @@ import { Checkbox } from './ui/checkbox.js'
 
 // Add project(s) (#396/#433): install a single repo, or every git repo directly under a
 // directory, and register each so it joins the list. The daemon does the work; this posts
-// the path over the `sendAddProject` telefunction and reloads on success.
+// the path over the `sendAddProject` RPC and reloads on success.
 //
 // Lifted out of the projects sidebar when #772 replaced that rail with a navbar dropdown:
 // the picker has no room for a two-step form, so it opens this as a small modal instead.

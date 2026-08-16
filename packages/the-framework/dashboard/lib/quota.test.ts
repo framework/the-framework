@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import type { QuotaView } from '../../dist/index.js'
 
-// The RPC is a telefunc shim over the wire, so stub it: these tests are about the
-// hook's own behavior (poll, keep-last-on-failure, stop on unmount), not the daemon.
+// The read is a fetch over the wire, so stub it: these tests are about the hook's own
+// behavior (poll, keep-last-on-failure, stop on unmount), not the daemon.
 const onQuota = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/quota.js', () => ({ onQuota }))
 

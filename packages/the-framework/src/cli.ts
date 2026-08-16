@@ -691,13 +691,15 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
 
   const cwd = opts.cwd ?? (fake ? join(tmpdir(), 'framework-fake-workspace') : process.cwd())
 
-  // The project can carry its own defaults in the-framework.yml (#258):
-  // which domain preset + modes to build under. CLI flags override the file; a bad
-  // file is a warning, never a failed run. Read from the run's own workspace, so a
-  // The fake demo (empty tmp cwd) stays deterministic unless pointed at a config dir.
+  // The project can carry its own defaults in the-framework.yml (#258): the prompt switches and
+  // how far a finished agent publishes itself. A bad file is a warning, never a failed agent. Read
+  // from the agent's own workspace, so the fake demo (an empty tmp cwd) stays deterministic unless
+  // it is pointed at a config dir.
   const fileConfig = await loadFrameworkConfig(cwd, msg => io.err(msg))
-  // One resolve over the layers (#841): the nearest layer that set a key wins, so this run's
-  // flags beat the repo file and an explicit `--no-autopilot` can turn off what the file set.
+  // One resolve over the layers (#841): the nearest layer that set a key wins, so what the caller
+  // asked for beats the repo file. Not CLI flags — the CLI has no such flags since D4; these are
+  // the spec the dashboard (or an embedder) handed this process, and `false` there is an answer,
+  // not an absence, so it can turn off what the file set.
   const config = mergeAgentConfig(opts, fileConfig)
   const fromConfig = describeResolvedConfig(config)
   if (fromConfig) io.out(`◆ config: ${fromConfig}`)

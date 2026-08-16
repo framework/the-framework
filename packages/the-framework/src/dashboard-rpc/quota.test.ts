@@ -31,11 +31,11 @@ test('sendAutoPmSweep awaits the sweep, then answers with the outcomes it decide
 })
 
 test('the outcomes survive the await — the request context does not, so the reporter is captured first (#1433)', async () => {
-  // In production the Telefunc context is request-scoped and gone after the first await, so a
-  // post-await `contextAutoPm()` read found nothing and every real click fell back to a bare
-  // `{ok:true}` — while this suite's provided context happily outlived the await
-  // and hid it. Model the loss: the fake sweep yanks the context mid-flight, the way resolving
-  // the tick does for a real request.
+  // The context used to be request-scoped and gone after the first await, so a post-await
+  // `contextAutoPm()` read found nothing and every real click fell back to a bare `{ok:true}` —
+  // while this suite's provided context happily outlived the await and hid it. It is wired once at
+  // start-up now (F3) and no longer evaporates, but capturing the reporter first is still what the
+  // RPC promises, so the loss stays modelled: the fake sweep yanks the context mid-flight.
   provideTestContext({
     autoPmSweep: async () => {
       await Promise.resolve()

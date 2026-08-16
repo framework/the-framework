@@ -9,7 +9,7 @@ import { AgentOutcomes } from '../components/AgentOutcomes.js'
 
 // The gallery's card registry (#DESIGN). Every entry renders the REAL component wherever the
 // component can stand alone, so a card cannot quietly drift from what ships. The few that cannot
-// (portalled tooltips, anything behind a Telefunc read) are marked `replica` and say so on the
+// (portalled tooltips, anything behind an RPC read) are marked `replica` and say so on the
 // card, because a silent hand-copy is exactly the drift this gallery exists to catch.
 
 export interface Preview {

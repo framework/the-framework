@@ -13,7 +13,7 @@ import { ContextMenu } from './ContextMenu.js'
 import { SystemPromptDisclosure } from './SystemPromptDisclosure.js'
 
 // Start a run in the selected project (#405): the one write that goes through the daemon's own
-// `startAgent` (with its one-run-per-project busy guard), posted over Telefunc. The editor + control
+// `startAgent` (with its one-run-per-project busy guard), posted over `sendStart`. The editor + control
 // row are the shared Composer (#721); this form owns the submit (sendStart with the collected
 // Global options), the system-prompt preview, and the Context selector. Shown when no run is active;
 // a `busy` result means one already is.

@@ -7,7 +7,7 @@ import { Logo } from './Logo.js'
 
 // The shared-run watch view (#426/#230): when the dashboard is opened on the relay at
 // `/?run=<id>`, it shows one run read-only, streamed from the relay's in-memory event
-// feed over the same Telefunc `onEvents` Channel the daemon uses. No Projects/Runs/Docs
+// feed over the same `GET /_rpc/events` stream the daemon uses. No Projects/Runs/Docs
 // rails and no steering — a teammate with the link watches, they do not drive.
 export function RelayView({ agentId: agentId }: { agentId: string }) {
   // The run id rides in the projectId slot: the relay keys `onEvents` by it (no registry).

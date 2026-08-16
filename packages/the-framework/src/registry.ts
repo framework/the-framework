@@ -27,8 +27,9 @@ export interface ProjectRecord {
 /**
  * The dashboard's Global options (#410), persisted next to the project list so they
  * survive restarts without localStorage — the daemon reads/writes them, the SPA reads
- * them over Telefunc. Flat booleans mirroring the Start form's toggles; every field is
- * optional and absent means off (Autopilot still defaults on in the UI).
+ * them over `POST /_rpc/onPreferences`. Mostly flat booleans mirroring the Start form's
+ * toggles; every field is optional and absent means off, except where a field documents its
+ * own default below.
  */
 
 /**
@@ -222,7 +223,7 @@ export interface Registry {
   secrets?: RegistrySecrets
 }
 
-/** A read/write handle for the user preferences, threaded through the dashboard's Telefunc context. */
+/** A read/write handle for the user preferences, wired into the dashboard's context by the daemon. */
 export interface PreferencesStore {
   read(): Promise<Preferences>
   save(preferences: Preferences): Promise<void>

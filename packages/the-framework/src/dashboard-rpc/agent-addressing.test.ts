@@ -41,7 +41,7 @@ async function projectWithWorktreeAgent(): Promise<{
   process.env.XDG_CONFIG_HOME = join(dir, 'cfg')
   await mkdir(process.env.XDG_CONFIG_HOME, { recursive: true })
   await addProject(dir, new Date().toISOString())
-  // The context every telefunction reads (D3). In tests it is a global that outlives an await,
+  // The context every RPC reads (D3). In tests it is a global that outlives an await,
   // unlike the request-scoped one a real serve() provides.
   provideTestContext()
 
@@ -170,7 +170,7 @@ async function projectWithDirtyWorktree(): Promise<{
   process.env.XDG_CONFIG_HOME = join(dir, 'cfg')
   await mkdir(process.env.XDG_CONFIG_HOME, { recursive: true })
   await addProject(dir, new Date().toISOString())
-  // The context every telefunction reads (D3). In tests it is a global that outlives an await,
+  // The context every RPC reads (D3). In tests it is a global that outlives an await,
   // unlike the request-scoped one a real serve() provides.
   provideTestContext()
 
@@ -233,9 +233,9 @@ test('onRetainedWorktrees hides a live run, and lists one that has finished (#73
 })
 
 // #766: for the first seconds of a run there is a worktree but no `agent.json` yet. Resolving by run
-// state misses it and falls back to the project root, and because a Telefunc Channel resolves its
-// path once at subscribe time, the feed then tails the root's log — a previous run's output — for
-// the life of the subscription. Resolve by the directory, which the daemon creates before it spawns.
+// state misses it and falls back to the project root, and because the event stream resolves its
+// path once, when the browser opens it, the feed then tails the root's log — a previous agent's
+// output — for the life of that connection. Resolve by the directory, which the daemon creates before it spawns.
 test('a run that has a worktree but has not written its state yet still resolves to it (#766)', async () => {
   const ctx = await projectWithWorktreeAgent()
   try {

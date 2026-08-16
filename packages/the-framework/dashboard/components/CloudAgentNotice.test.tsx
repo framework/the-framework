@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { FrameworkEvent } from '../../dist/index.js'
 
-// The component reads the bridge over telefunc, and an unmocked telefunc module dies in the
-// browser test environment with `assertIsNotBrowser`, which reads as a telefunc bug and is not.
+// The component reads the bridge over three RPCs; unmocked they fetch `/_rpc/<name>`, which no
+// daemon answers behind jsdom, so each read hangs or throws instead of returning a fixture.
 const onBridgeQuestion = vi.fn(async () => null as unknown)
 const onBridgeEvents = vi.fn(async () => [] as unknown)
 const onBridgeAnswer = vi.fn(async () => null as unknown)

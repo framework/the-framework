@@ -3,8 +3,8 @@ import type { AgentLocation } from '../agent-location.js'
 import type { LinkedPr } from './gh.js'
 
 // The dashboard's request/result vocabulary (#345/#396/#475): the shapes the Start / Add /
-// Preview RPCs speak. They live here, on neither the HTTP server nor the Telefunc mount, so
-// both — plus the telefunctions themselves — depend on this leaf rather than on each other.
+// Preview RPCs speak. They live here, on neither the HTTP server nor the RPC mount, so both —
+// plus the RPCs themselves — depend on this leaf rather than on each other.
 
 /** The outcome of removing a retained worktree (#737). */
 export type RemoveWorktreeResult = { ok: true } | { ok: false; error: string }

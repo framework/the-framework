@@ -104,7 +104,7 @@ export function validateCredential(credential: keyof DiscordCredentials, value: 
 }
 
 /**
- * The store the dashboard's Telefunc context carries (#1095): status out, edits in. The daemon
+ * The store the dashboard's context carries (#1095): status out, edits in. The daemon
  * wires one; a public host (the relay) leaves it unset, so the RPCs report nothing configured and
  * refuse the write, the same way the preferences store degrades.
  */

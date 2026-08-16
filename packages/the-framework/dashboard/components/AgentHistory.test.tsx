@@ -5,15 +5,15 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SidebarProvider } from './ui/sidebar.js'
 import { hoverTooltip } from '../test-utils.js'
 
-// AgentHistory pulls in AddProjectPanel, which imports the projects telefunc shim; stub it so the
-// import graph does not drag telefunc into jsdom. Import AgentHistory after the mock is in place.
+// AgentHistory pulls in AddProjectPanel, which imports the projects RPC stubs; stub them so
+// nothing fetches a daemon that is not there. Import AgentHistory after the mock is in place.
 // Resolves to an empty list: AddProjectPanel (reachable from the rail) reads projects on demand.
 const onProjects = vi.hoisted(() => vi.fn(() => Promise.resolve([])))
 const sendAddProject = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/projects.js', () => ({ onProjects, sendAddProject }))
 
 // The rail now also carries the app chrome moved off the top navbar (#772 follow-up). Three of
-// those pull the preferences/devices telefunc shims into jsdom, which this suite deliberately
+// those pull the preferences/devices RPC stubs into jsdom, which this suite deliberately
 // avoids. It is about the runs list, not the chrome (each has its own suite), so stub them out.
 vi.mock('./ThemeToggle.js', () => ({ ThemeToggle: () => null }))
 vi.mock('./NotificationsMenu.js', () => ({ NotificationsMenu: () => null }))

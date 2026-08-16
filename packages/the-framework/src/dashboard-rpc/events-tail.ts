@@ -21,8 +21,8 @@ const POLL_MS = 1000
  * a failed first read: the marker still fires (the poll retries the read), because a client
  * waiting on it forever would freeze its feed.
  *
- * Kept transport-agnostic (a plain `onEvent` callback, not a channel) so the file
- * side can be driven on its own; events.telefunc.ts wires it to a Telefunc Channel.
+ * Kept transport-agnostic (a plain `onEvent` callback, not a stream) so the file
+ * side can be driven on its own; `events.ts` wires it to the SSE endpoint.
  */
 export function tailEvents<T = unknown>(path: string, onEvent: (event: T) => void, onReplayed?: () => void): () => void {
   const tailer = new JsonlTailer<T>(path, onEvent)

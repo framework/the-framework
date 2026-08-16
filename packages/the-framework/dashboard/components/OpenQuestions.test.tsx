@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { OpenQuestion } from '../../dist/index.js'
 
-// The hub polls onOpenQuestions over the telefunc shim, and its ChoicePanels post over the
-// control shim; stub both so the real telefunc client never loads into jsdom.
+// The hub polls onOpenQuestions over the reads stub, and its ChoicePanels post over the control
+// stub; stub both so nothing fetches a daemon that is not there.
 const onOpenQuestions = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onOpenQuestions }))
 const sendChoice = vi.hoisted(() => vi.fn())

@@ -518,7 +518,7 @@ test('runDaemon steers through the control log: sendStop / sendChoice append ent
   const cwd = await tmpWorkspace()
   const env = await configEnv(cwd)
   const ac = new AbortController()
-  // sendStop / sendChoice resolve the project through the registry the Telefunc layer reads
+  // sendStop / sendChoice resolve the project through the registry the RPC layer reads
   // from `process.env` (not the daemon's injected `env`), so point the config dir there for
   // this test; restore it after. (sendStart uses the daemon's own homeId shortcut instead.)
   const prevXdg = process.env['XDG_CONFIG_HOME']

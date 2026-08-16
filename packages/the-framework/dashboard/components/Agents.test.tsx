@@ -5,7 +5,7 @@ import { Agents } from './Agents.js'
 
 // The Overview's Agents card (#1139), which replaced Working now — since trimmed to the sessions
 // working right now, the finished ones being the sidebar session list's job. Everything it renders
-// arrives as props, so there is no telefunc in its import graph and no mock to set up.
+// arrives as props, so there is no RPC in its import graph and no mock to set up.
 //
 // What these pin is the click: #1189 made an Overview row open the session it names instead of
 // dropping the reader on the project launcher, and the tests that held that line went with

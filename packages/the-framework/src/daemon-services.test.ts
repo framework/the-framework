@@ -141,7 +141,7 @@ test("the drain row's Run now fans out to the setting with auto-run off (#1204/#
     await settle(() => starts.length > 0, 300)
     assert.equal(starts.length, 0, 'auto-run off means the schedule starts nothing by itself')
     // Exactly what the card's Run now sends for the draining routine, through the same
-    // `wakeAutoPm` seam the Telefunc endpoint calls.
+    // `wakeAutoPm` seam the RPC calls.
     running.wakeAutoPm({ onDemand: true, drainOnly: true })
     await settle(() => starts.length >= 3)
     assert.equal(starts.length, 3, 'the click spins the setting up, not one agent')

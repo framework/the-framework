@@ -37,7 +37,7 @@ export function useAction(): {
   return { busy, error, reset, run }
 }
 
-/** A telefunc mutation's failure branch: `{ ok: false, error }`. Void results are not failures. */
+/** A mutating RPC's failure branch: `{ ok: false, error }`. Void results are not failures. */
 function isFailure(result: unknown): result is { ok: false; error?: string } {
   return typeof result === 'object' && result !== null && 'ok' in result && (result as { ok: unknown }).ok === false
 }

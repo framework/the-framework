@@ -196,8 +196,8 @@ function fingerprint(question: BridgeQuestion): string {
 /**
  * The daemon's one store. A module singleton rather than a {@link DashboardContext} field
  * because both ends live in the same process but reach it by different routes: the bridge
- * endpoint writes from the raw HTTP handler, and the dashboard reads from a telefunction,
- * which cannot be handed anything the request did not carry.
+ * endpoint writes from the raw HTTP handler, and the dashboard reads from an RPC, which is
+ * handed only what the wired context carries.
  */
 let instance: BridgeQuestions | undefined
 

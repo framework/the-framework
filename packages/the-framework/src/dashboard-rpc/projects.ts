@@ -11,7 +11,7 @@ import type { DashboardContext } from '../dashboard/rpc-serve.js'
 // The Projects sidebar behind the new dashboard (#405): the global registry (#390) the
 // daemon and CLI write — id, path, name, activated, last activity. The per-run
 // foreground dashboard (#427) scopes this to a single project via the request context.
-// The live event stream is its own Telefunc Channel (events.telefunc.ts).
+// The live event stream is its own endpoint rather than a call (`GET /_rpc/events`).
 export async function onProjects(): Promise<ProjectSummary[]> {
   return contextProjects().list()
 }
@@ -20,7 +20,7 @@ export async function onProjects(): Promise<ProjectSummary[]> {
  * Add project(s) from the dashboard (#396/#433): install a single repo, or every git
  * repo under a directory, and register each so it joins the Projects list. Like
  * `sendStart` this needs the daemon (it spawns git + writes the shared registry), so it
- * calls the daemon's own `addProject` closure from the Telefunc request context. Returns
+ * calls the daemon's own `addProject` closure off the wired dashboard context. Returns
  * the daemon's {@link AddProjectResult}; a public host (the relay) leaves it unwired.
  */
 export async function sendAddProject(path: string, directory: boolean): Promise<AddProjectResult> {

@@ -6,8 +6,8 @@ import { defineConfig, type Plugin, type UserConfig } from 'vite'
 
 // Opt-in (`pnpm dev:daemon`, i.e. FRAMEWORK_DEV_DAEMON=1): let the dev server actually start runs.
 //
-// `pnpm dev` alone is the Vite dev server with no Telefunc context, so `sendStart` reports "starting
-// a session is not enabled on this server" (same gap that leaves preferences unpersisted in dev).
+// `pnpm dev` alone is the Vite dev server with no daemon behind it, so nothing answers `/_rpc` and
+// `sendStart` fails (the same gap that leaves preferences unpersisted in dev).
 // Only the daemon has the `startAgent` handler. This plugin brings that daemon up *inside the dev
 // server's own process* and proxies `/_rpc` (the calls and the SSE stream) to it, so the
 // live-reload UI gets the full backend, run-starting included.
@@ -16,8 +16,8 @@ import { defineConfig, type Plugin, type UserConfig } from 'vite'
 // nothing to leave behind — Ctrl-C on the dev server takes the daemon with it. `runDaemon` blocks
 // until shutdown, so it is left unawaited and `onListening` reports the port it bound.
 //
-// The proxy middleware is registered synchronously so it lands ahead of Telefunc's own middleware;
-// it holds requests until the daemon is up. Left out by default so the plain dev server stays a
+// The proxy middleware is registered synchronously so it lands ahead of Vite's own handling of the
+// path; it holds requests until the daemon is up. Left out by default so the plain dev server stays a
 // pure UI harness with no backend behind it.
 function frameworkDevDaemon(): Plugin {
   return {

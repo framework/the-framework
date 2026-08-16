@@ -381,8 +381,8 @@ export interface ProjectRuntime {
 
 /**
  * The daemon's per-project runtime (#393): the run and preview state keyed by project id,
- * plus the RPCs the dashboard invokes over Telefunc. A project runs any number of concurrent
- * runs (each in its own worktree, #736) and one preview. The home `cwd` is the default target — a request
+ * plus the RPCs the dashboard invokes over `POST /_rpc/<name>`. A project runs any number of
+ * concurrent agents (each in its own worktree, #736) and one preview. The home `cwd` is the default target — a request
  * with no project id (or the home id) resolves to it without a registry lookup. Split out of
  * {@link runDaemon} so the daemon body reads as lifecycle and this reads as business logic.
  */
@@ -737,7 +737,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         ...(workspace.agentId ? [agentStderrPath(workspace.cwd)] : []),
       )
       // The run narrates itself through its own `.the-framework/events.jsonl`, which the
-      // dashboard streams over a Telefunc Channel; the daemon just tracks liveness.
+      // dashboard streams over `GET /_rpc/events`; the daemon just tracks liveness.
       const settle = (detail: string): void => {
         activeAgents.delete(key)
         const { cwd: checkout, agentId } = workspace

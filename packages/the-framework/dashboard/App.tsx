@@ -48,8 +48,8 @@ const EMPTY_RECENT: RecentAgent[] = []
 // selection in the top nav as a dropdown since #772 (it used to be a rail of its own). The main pane
 // is one of three views chosen by the selection: the project home/launcher (Live, the default —
 // Start form + cards) or one session's own view (AgentView), live or finished — the same frame
-// either way (#1026). Everything over the wire is Telefunc. A projection of the same .the-framework
-// files the daemon writes.
+// either way (#1026). Everything over the wire is `POST /_rpc/<name>`. A projection of the same
+// .the-framework files the daemon writes.
 //
 // The selection IS the URL (#784): `/` the Overview, `/{projectId}` the project home,
 // `/{projectId}/{sessionId}` one session. It used to be three pieces of React state — the
@@ -240,7 +240,7 @@ export function App() {
   }
 
   // The live run feed is owned here so both the main view and the right rail's views tab read
-  // one shared Telefunc Channel. Hooks run before the relay early return below.
+  // one shared event stream. Hooks run before the relay early return below.
   // The run whose feed and controls are in play is simply the one in the URL; in the no-id
   // fallback there is none yet, and a null id resolves to the project root, as before.
   const { events, lost } = useLiveEvents(projectId, agentId, agentStart.tick)

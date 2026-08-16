@@ -4,11 +4,12 @@ import { detectEditors, type EditorInfo } from '../dashboard/open-in-app.js'
 import { readProjectPresets, writeProjectPresets } from '../project-presets.js'
 import type { CustomPreset, Preferences } from '../registry.js'
 
-// The user-preferences surface behind the new dashboard (#410): the Global options (Autopilot,
-// Technical, Vanilla, Eco + its section drops) the Start form and choice gate share. Persisted
-// daemon-side in the same `the-framework.json` as the project list, so they survive restarts
-// with no localStorage. The store is threaded through the Telefunc request context, which the one
-// dashboard host always wires (D3) — there is no second host left to degrade for.
+// The user-preferences surface behind the new dashboard (#410): the settings the Start form and
+// the choice gate share — the two prompt switches (C1), the driver and model, the handoff rung,
+// and the rest of the Settings page. Persisted daemon-side in the same `the-framework.json` as the
+// project list, so they survive restarts with no localStorage. The store is wired into the
+// dashboard context, which the one host always wires in full (D3) — there is no second host left
+// to degrade for.
 
 /** The outcome of a {@link savePreferences} write. */
 export type SavePreferencesResult = { ok: true } | { ok: false; error: string }

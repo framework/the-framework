@@ -117,10 +117,6 @@ export default defineConfig({
   // (`/server/reads.telefunc.ts`) the paths they have always been.
   root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [frameworkDevDaemon(), telefuncDevUrlFix(), react(), telefunc(), tailwindcss()],
-  // `@/*` -> the dashboard root, matching tsconfig `paths` (used by the copied-in animate-ui components).
-  resolve: {
-    alias: { '@': fileURLToPath(new URL('.', import.meta.url)) },
-  },
   build: {
     // Straight into the package's own dist, where the daemon serves it from. There used to be a
     // copy step between the two — a whole turbo task — because the bundle was built in a

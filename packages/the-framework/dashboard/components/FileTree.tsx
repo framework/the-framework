@@ -1,18 +1,53 @@
-import { useMemo, useState } from 'react'
-import { Check, FileIcon } from 'lucide-react'
+import { useMemo, useState, type ElementType, type ReactNode } from 'react'
+import { Check, FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react'
 import { onProjectFileStatus } from '../server/reads.telefunc.js'
 import { usePolled } from '../lib/use-async.js'
+import { cn } from '../lib/utils.js'
 import { FilePreviewHover } from './FilePreview.js'
-import {
-  Files,
-  FolderItem,
-  FolderTrigger,
-  FolderPanel,
-  SubFiles,
-  FileItem,
-} from './animate-ui/components/base/files/index.js'
 
 type FileGitStatus = 'untracked' | 'modified' | 'deleted'
+
+/** The row tint for a changed file or folder — one meaning, one colour (F4). */
+const STATUS_TEXT: Record<FileGitStatus, string> = {
+  untracked: 'text-success',
+  modified: 'text-warning',
+  deleted: 'text-danger',
+}
+
+/** The dot a changed folder carries, in the same vocabulary. */
+const STATUS_DOT: Record<FileGitStatus, string> = {
+  untracked: 'bg-success',
+  modified: 'bg-warning',
+  deleted: 'bg-danger',
+}
+
+/** A changed file says which change it is; a folder only says that something under it changed. */
+const STATUS_LETTER: Record<FileGitStatus, string> = { untracked: 'U', modified: 'M', deleted: 'D' }
+
+/** One tree row: an icon, a name, and git's verdict on the right when it has one. */
+function Row({ icon: Icon, gitStatus, badge, className, children }: {
+  icon: ElementType
+  gitStatus?: FileGitStatus | undefined
+  /** `letter` for a file (which change), `dot` for a folder (something under it). */
+  badge: 'letter' | 'dot'
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <span className={cn('flex items-center justify-between gap-2 p-2', gitStatus && STATUS_TEXT[gitStatus], className)}>
+      <span className="flex items-center gap-2">
+        <Icon className="size-4.5 shrink-0" />
+        <span className="text-sm">{children}</span>
+      </span>
+      {gitStatus &&
+        (badge === 'letter' ? (
+          <span className="text-sm font-medium">{STATUS_LETTER[gitStatus]}</span>
+        ) : (
+          <span className={cn('size-2 shrink-0 rounded-full', STATUS_DOT[gitStatus])} />
+        ))}
+    </span>
+  )
+}
 
 /** Stable, so the `useMemo` on `status` doesn't re-run for a fresh empty object. */
 const EMPTY_STATUS: Record<string, FileGitStatus> = {}
@@ -21,8 +56,12 @@ const EMPTY_STATUS: Record<string, FileGitStatus> = {}
 // `git ls-files` list (onProjectFiles, shared with the `#` picker #504). It is a file-level
 // CONTEXT PICKER, not an editor — clicking a file toggles it in the run Context, the same
 // set the `#` chips and the whole-repo Context selector feed. Localhost-only: no files (the
-// relay has no checkout) renders nothing. Uses the animate-ui Files primitives for the
-// animated folder expand/collapse and hover highlight, plus per-file git-status dots.
+// relay has no checkout) renders nothing.
+//
+// Folders are native `<details>`: open/closed state, keyboard operation and the disclosure
+// semantics come from the browser. This used to be 1,225 lines of vendored animate-ui — a copied
+// component registry, not a dependency, and `@ts-nocheck`'d so none of it was even typechecked —
+// whose contribution was an expand animation and a hover highlight on a file list in a side panel.
 
 type TreeNode = {
   name: string
@@ -111,12 +150,20 @@ export function FileTree({
       {[...node.dirs.values()].sort(byName).map(dir => {
         const dirGit = folderStatus.get(dir.path)
         return (
-          <FolderItem key={dir.path} value={dir.path}>
-            <FolderTrigger {...(dirGit ? { gitStatus: dirGit } : {})}>{dir.name}</FolderTrigger>
-            <FolderPanel>
-              <SubFiles>{renderNode(dir)}</SubFiles>
-            </FolderPanel>
-          </FolderItem>
+          <details key={dir.path} className="group">
+            <summary className="cursor-pointer list-none rounded-lg hover:bg-accent">
+              <Row icon={FolderIcon} gitStatus={dirGit} badge="dot" className="group-open:hidden">
+                {dir.name}
+              </Row>
+              <Row icon={FolderOpenIcon} gitStatus={dirGit} badge="dot" className="hidden group-open:flex">
+                {dir.name}
+              </Row>
+            </summary>
+            {/* The guide line down the left of a folder's contents. */}
+            <div className="relative ml-6 before:absolute before:inset-y-0 before:-left-2 before:h-full before:w-px before:bg-border">
+              {renderNode(dir)}
+            </div>
+          </details>
         )
       })}
       {[...node.files]
@@ -128,14 +175,15 @@ export function FileTree({
           // No `title`: the hover preview card already leads with the full path, and a native
           // tooltip on top of it is the slow system one the dashboard no longer uses (#1149).
           const item = (
-            <FileItem
-              icon={isOn ? Check : FileIcon}
-              className={'pointer-events-auto cursor-pointer' + (isOn ? ' text-primary' : '')}
+            <button
+              type="button"
               onClick={() => onToggle(path)}
-              {...(git ? { gitStatus: git } : {})}
+              className={cn('w-full rounded-lg text-start hover:bg-accent', isOn && 'text-primary')}
             >
-              {name}
-            </FileItem>
+              <Row icon={isOn ? Check : FileIcon} gitStatus={git} badge="letter">
+                {name}
+              </Row>
+            </button>
           )
           // Every file previews on hover: a changed one shows its diff (#816), an unchanged one
           // its contents (#828). `git` picks which read the card makes, so the tree's own status
@@ -171,11 +219,9 @@ export function FileTree({
               {visible.length} of {files.length} files
             </p>
           )}
-          {/* p-0 overrides the primitive's own p-2: the panel around it already sets the inset, and
-              the doubled padding pushed the tree off the filter box above it. The tree is the one
-              panel with no scroller of its own, so it carries one: a long repo scrolls here rather
-              than stretching the rail past what follows it. */}
-          <Files className="min-h-0 flex-auto overflow-y-auto p-0 text-sm">{renderNode(tree)}</Files>
+          {/* The tree is the one panel with no scroller of its own, so it carries one: a long repo
+              scrolls here rather than stretching the rail past what follows it. */}
+          <div className="min-h-0 w-full flex-auto overflow-y-auto text-sm">{renderNode(tree)}</div>
         </>
       )}
     </div>

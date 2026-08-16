@@ -4,15 +4,12 @@ import { defineConfig } from 'vitest/config'
 
 // Unit tests for the dashboard's hooks and components. Deliberately NOT vite.config.ts:
 // that one carries telefunc() and the dev-server plugins, which serve the app and only get in the way
-// here. All the unit tests need is the JSX transform and the `@` alias.
+// here. All the unit tests need is the JSX transform.
 export default defineConfig({
   // Pinned for the same reason as vite.config.ts: the dashboard is a directory in a package whose
   // scripts run one level up (A7), so the cwd is not the root these globs are written against.
   root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [react()],
-  resolve: {
-    alias: { '@': fileURLToPath(new URL('.', import.meta.url)) },
-  },
   test: {
     environment: 'jsdom',
     globals: true,

@@ -7,7 +7,7 @@ The dashboard's React component catalog: every page, panel and control the brows
 - The Overview's widgets each show one slice of what the daemon knows: quota pace, agents working now, the Human Queue, the AI queue, routine work, hot tickets, activity and outcomes, and an onboarding checklist whose steps tick off real facts rather than clicks.
 - The launcher's controls — presets, agent/model and option menus, the Context selector, the system-prompt preview — read and write the same preferences and mappings the run itself uses, so no surface can disagree with the session it configures.
 - Everything renders state the daemon owns (reads poll or stream, writes are daemon calls; components keep only view state), and the house rule is honesty: controls name what will actually happen, no state rides on colour alone, warnings teach before a session is spent but never block, and empty states name their reason instead of dead-ending.
-- Three sub-kits supply the raw material: the vendored UI primitives, their animated counterparts, and the composer's mention-aware prompt-editor engine.
+- Two sub-kits supply the raw material: the vendored UI primitives and the composer's mention-aware prompt-editor engine.
 
 ## Before writing SPEC.md files
 

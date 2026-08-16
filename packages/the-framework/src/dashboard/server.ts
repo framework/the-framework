@@ -9,7 +9,7 @@ import { defaultQuotaSource, type QuotaSource } from './quota.js'
 import type { AutoPmReporter } from '../auto-pm.js'
 import { serveClientBundle } from './static.js'
 import { BROWSER_PROXY_PREFIX, handleBrowserProxy } from './browser-proxy.js'
-import { makeRpcMount, RPC_PREFIX } from './rpc-serve.js'
+import { makeRpcMount, RPC_PREFIX, isSameOriginRequest, isExpectedHost } from './rpc-serve.js'
 import { requestPathname } from '../request-path.js'
 import type { AddProjectResult, PreviewResult, PreviewStatus, StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
 import type { EventsSource, RemoteAgents } from './rpc-serve.js'
@@ -204,9 +204,13 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
     }
     // #1051: one guard fronting every route on a non-loopback bind; a no-op when no token is set.
     if (token !== undefined && !authorizeDaemonRequest(req, res, token)) return
-    // The device relay (#1067): another daemon posts an agent here and streams its events back. Behind
-    // the guard above, so a device without the cookie is already 401'd; unwired hosts 404 it.
+    // The device relay (#1067): another daemon posts an agent here and streams its events back.
+    // The token guard above is a no-op on a loopback bind, so — exactly like the RPC mount below —
+    // the relay carries its own CSRF + DNS-rebinding guard, or a page the user merely visited could
+    // POST /_relay/start to spawn an agent (the real device caller sends no Origin and a loopback
+    // Host, so both checks pass it; only a browser's cross-origin/rebound request is turned away).
     if (pathname === RELAY_PREFIX || pathname.startsWith(`${RELAY_PREFIX}/`)) {
+      if (!guardBrowserOrigin(req, res, host)) return
       void handleRelayRequest(req, res, pathname, relayHandlers)
       return
     }
@@ -215,8 +219,11 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
       return
     }
     // The browser preview (#813) is proxied, not an RPC: it is an endless MJPEG body and a
-    // raw input POST, neither of which is a call.
+    // raw input POST, neither of which is a call. It carries the same guard as the RPCs: a raw
+    // /browser/…/input POST steers the agent's Chrome, so a cross-origin or rebound caller must
+    // not reach it (the dashboard's own <img>/fetch is same-origin and passes).
     if (pathname.startsWith(`${BROWSER_PROXY_PREFIX}/`)) {
+      if (!guardBrowserOrigin(req, res, host)) return
       void handleBrowserProxy(req, res)
         .then(handled => {
           if (!handled) void serveClientBundle(req, res, clientBundleDir)
@@ -252,6 +259,19 @@ function closeServer(server: Server): Promise<void> {
   // Force-close keep-alive + streaming sockets (e.g. an open /_relay/events body, #1067) so close() resolves instead of waiting on them.
   server.closeAllConnections()
   return new Promise(resolvePromise => server.close(() => resolvePromise()))
+}
+
+/**
+ * The CSRF + DNS-rebinding guard the RPC mount applies, lifted to the routes that dispatch outside
+ * it — the device relay and the browser-preview proxy. Both are state-changing (spawn an agent,
+ * steer its Chrome) and both are wired unconditionally on a loopback bind, where the shared-token
+ * guard is a no-op, so without this a page the user merely visited reaches them. Returns true to
+ * admit the request; on rejection it has already answered 403.
+ */
+function guardBrowserOrigin(req: IncomingMessage, res: ServerResponse, host: string): boolean {
+  if (isSameOriginRequest(req) && isExpectedHost(req, host)) return true
+  res.writeHead(403, { 'content-type': 'text/plain' }).end('forbidden')
+  return false
 }
 
 /** The cookie a bootstrapped browser carries on every same-origin request (#1051). */

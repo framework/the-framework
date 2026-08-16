@@ -13,11 +13,13 @@ import { sendStop, sendChoice, sendMessage, sendSetHandoff, sendPushBranch, send
 // Whitelist only: start/preview/delete stay OFF it.
 
 type RelayFn = (...args: unknown[]) => Promise<unknown>
-const RELAY_FNS = {
+// Null-prototype, like RPC_HANDLERS (R1): the key is a request-controlled string, so a plain object
+// would answer `constructor`/`toString`/`valueOf` off Object.prototype and invoke them as handlers.
+const RELAY_FNS = Object.assign(Object.create(null) as Record<string, RelayFn>, {
   onProjectFiles, onProjectFileStatus, onFileDiff, onAgentChanges, onFileContent,
   onGitStatus, onAgentWorktree, onAgentHandoff, onAgent,
   sendStop, sendChoice, sendMessage, sendSetHandoff, sendPushBranch, sendOpenPullRequest, sendMerge,
-} as unknown as Record<string, RelayFn>
+}) as unknown as Record<string, RelayFn>
 
 /** The names a relay caller may invoke. */
 export const RELAY_RPC_NAMES: readonly string[] = Object.keys(RELAY_FNS)

@@ -383,7 +383,7 @@ function readNdjson(url: string, cookie: string, count: number): Promise<{ statu
 
 // A guarded dashboard wired for the device relay (#1067): a stub start that records its calls, and
 // an events tail backed by a fixed list. Mirrors what the daemon wires, minus a real spawn.
-async function relayDashboard(): Promise<{
+async function relayDashboard(opts: { token?: string | undefined } = { token: TOKEN }): Promise<{
   base: string
   starts: Array<{ prompt: string; kind: StartAgentKind; options: StartAgentOptions; projectId?: string }>
   close: () => Promise<void>
@@ -402,7 +402,7 @@ async function relayDashboard(): Promise<{
     for (const e of events) onEvent(e)
     return () => {}
   }
-  const dash = await dashboard({ clientBundleDir: bundle, token: TOKEN, onStart, relay: { tailEvents } })
+  const dash = await dashboard({ clientBundleDir: bundle, ...(opts.token ? { token: opts.token } : {}), onStart, relay: { tailEvents } })
   return {
     base: dash.url,
     starts,
@@ -469,6 +469,28 @@ test('/_relay/ping is 401 without the cookie, 200 with it, and starts nothing (#
     assert.equal(ok.status, 200)
     assert.equal(ok.body, '') // an empty body: it only proves reachability
     assert.equal(starts.length, 0) // a health check must never spawn a run
+  } finally {
+    await close()
+  }
+})
+
+// On a loopback bind the shared-token guard is off (#1051), so the relay carries the RPC mount's
+// own CSRF + DNS-rebinding guard — without it a page the user merely visits could POST /_relay/start.
+test('a loopback relay rejects a cross-origin POST and a rebound Host, and starts nothing', async () => {
+  const { base, starts, close } = await relayDashboard({ token: undefined })
+  try {
+    const body = JSON.stringify({ prompt: 'do it', kind: 'build', options: { autopilot: true } })
+
+    const crossOrigin = await postCrossOrigin(`${base}/_relay/start`)
+    assert.equal(crossOrigin.status, 403) // an Origin that is not this server: CSRF
+    const rebound = await postRebound(`${base}/_relay/start`)
+    assert.equal(rebound.status, 403) // same-origin to the browser, but the Host names evil.com
+    assert.equal(starts.length, 0) // neither reached the spawn
+
+    // The real device caller sends no Origin and a loopback Host, so it still passes.
+    const ok = await postAuth(`${base}/_relay/start`, body)
+    assert.equal(ok.status, 200)
+    assert.equal(starts.length, 1)
   } finally {
     await close()
   }

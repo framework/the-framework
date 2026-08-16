@@ -1,4 +1,4 @@
-The shared pause-and-ask machinery: an agent can park a run mid-conversation to ask the human something — pick one option, tick several, approve or decline a plan, handle a browser page it is stuck on, or bind the run to a project — and the run continues with the answer.
+The shared pause-and-ask machinery: an agent can park a run mid-conversation to ask the human something — pick one option, tick several, approve or decline a plan, or handle a browser page it is stuck on — and the run continues with the answer.
 
 ## TLDR
 

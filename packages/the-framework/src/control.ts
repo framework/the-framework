@@ -39,12 +39,6 @@ export type ControlEntry =
    */
   | { kind: 'handoff'; level: HandoffLevel }
   /**
-   * Bind a project-less topic run to a project (#1121): the await-gate resolver appends this once
-   * it registers + binds the picked project, and the run folds `projectId` onto its meta. The
-   * worktree re-home this implies is #1122.
-   */
-  | { kind: 'bind'; projectId: string }
-  /**
    * The user's Merge action on a live session (#1391): arm the full publish ladder and record that
    * a human authorized the merge, so the merge gate (#1363) does not also demand the agent's
    * ready-for-merge signal — a human's word outranks it. The session still merges at its own end
@@ -105,8 +99,6 @@ function isControlEntry(value: unknown): value is ControlEntry {
   // The rung must be one of the four: a half-written entry would otherwise disarm by accident,
   // and this decides whether the session's work reaches the remote at all.
   if (v['kind'] === 'handoff') return isHandoffLevel(v['level'])
-  // A bind needs a non-empty projectId; it decides which project the run re-homes into (#1121).
-  if (v['kind'] === 'bind') return typeof v['projectId'] === 'string' && v['projectId'].length > 0
   if (v['kind'] === 'message') return typeof v['text'] === 'string' && v['text'].length > 0
   if (v['kind'] !== 'choice') return false
   if (typeof v['id'] !== 'string' || !v['id']) return false

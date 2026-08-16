@@ -38,7 +38,6 @@ import {
 } from './config-layers.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
-import type { BindProjectDeps } from './await-gate.js'
 import { RunStore, commitPendingWork, currentBranch, nodeStoreFs, renameRunBranch, runBranchName, type StoreFs } from './store/index.js'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
@@ -46,7 +45,7 @@ import { appendControl, resetControl, watchControl, type ControlWatcher } from '
 import { RunMessageQueue } from './run-messages.js'
 import { createGateKeepalive } from './gate-keepalive.js'
 import { nodeGitRunner } from './project.js'
-import { addProject, ensureDaemonToken, listProjects, readDaemonToken, readPreferences, resolveProjectPath } from './registry.js'
+import { ensureDaemonToken, readDaemonToken, readPreferences } from './registry.js'
 import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 import {
   planMaintenanceSweep,
@@ -179,11 +178,6 @@ export interface SessionOptions {
    * stays one row in the history.
    */
   continueRun?: boolean | undefined
-  /**
-   * `--topic` (#1120): this run is project-less. Set by the daemon when it spawns a topic run into a
-   * neutral scratch `--cwd`; recorded on the run's meta so a reader can tell it from a project run.
-   */
-  topic?: boolean | undefined
   model?: string | undefined
   /** `--resume-session <id>` (#720): continue a finished run's agent session — the prompt resumes that conversation (full prior context). Set by the dashboard when you message a run that has ended. */
   resumeSession?: string | undefined
@@ -327,7 +321,6 @@ export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = proce
     cwd: spec.cwd,
     ...(spec.runId ? { runId: spec.runId } : {}),
     ...(spec.continueRun ? { continueRun: true } : {}),
-    ...(spec.topic ? { topic: true } : {}),
     ...(isAgentName(o.agent) ? { agent: o.agent } : {}),
     ...(isRunLocation(o.target) ? { target: o.target } : {}),
     ...(o.model?.trim() ? { model: o.model.trim() } : {}),
@@ -796,8 +789,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
         kind: runLogKind(opts, transparent) === 'build' ? 'build' : 'prompt',
         // Where the run executes (#1053): the run view reads it to switch to the Actions affordance.
         ...(opts.target ? { target: opts.target } : {}),
-        // A project-less topic run (#1120): recorded so a reader can tell it from a project run.
-        ...(opts.topic ? { topic: true } : {}),
       })
     } catch (err) {
       io.err(`could not persist session state (${errorMessage(err)}); continuing without it`)
@@ -834,11 +825,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // Assigned once the journal exists, which is after the control watcher is wired: a change that
   // arrives before then still lands on `armedHandoff`, it just has no event to announce it yet.
   let announceHandoff: (() => void) | undefined
-  // Same deferral as announceHandoff: an await-bind-project / await-create-project gate binds this
-  // topic run to a project (#1121), and only an event puts that on the meta a later-opened tab can
-  // read. Wired once the journal exists (below).
-  let recordBind: ((projectId: string) => void) | undefined
-
   let control: ControlWatcher | undefined
   if (isSteerable(opts)) {
     try {
@@ -855,11 +841,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
         if (entry.kind === 'handoff') {
           armedHandoff = entry.level
           announceHandoff?.()
-          return
-        }
-        if (entry.kind === 'bind') {
-          // Fold the bind onto meta + the event log; the daemon watches for it and re-homes (#1122).
-          recordBind?.(entry.projectId)
           return
         }
         if (entry.kind === 'merge') {
@@ -956,9 +937,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // checkout (a non-repo project), and then nothing is recorded.
   const startBranch = await currentBranch(cwd)
   if (startBranch) onEvent({ kind: 'branch', branch: startBranch })
-  // Wired now the journal exists: a bind resolved from a topic run's gate folds to meta (#1121).
-  recordBind = projectId => onEvent({ kind: 'bind', projectId })
-
   // Fire the #326 on-before-mergeable prompt once a --on-before-mergeable run has settled and the agent
   // signalled setReadyForMerge(). Skipped for a fake/offline run and when the run was stopped —
   // and every outcome, including each skip, is emitted as an event so the dashboard can show it (#835).
@@ -996,12 +974,6 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     // opposite of what stopping meant. Same call the on-before-mergeable step makes.
     if (journal.stoppedCleanly()) return skip('run-stopped')
     if (fake) return skip('fake-run')
-    // A topic run (#1120) lives in a project-less scratch dir: no repo, no branch, nothing to
-    // publish. Without this, the commit attempt below burns its retries against a non-repo and
-    // labels the end `commit-failed` — alarming copy about work that never existed. It never
-    // had a branch, which is what branch-gone says.
-    if (opts.topic) return skip('branch-gone')
-
     // The daemon commits whatever the agent left uncommitted, but only after this process exits
     // (`tearDownWorktree`), so at this point the tree can still hold real work. Pushing first
     // would publish a branch missing the session's last edits. Its own checkout only: a plain
@@ -1221,32 +1193,11 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // it reads, and who can answer it. They were written out twice, thirteen conditional spreads
   // each, so a new one had to be added to both by hand — and a run started as a build and a run
   // started as a prompt are the same run in every respect but the scaffolding around the prompt.
-  // A project-less topic run (#1120) can bind to a project mid-run via an await gate (#1121): the
-  // resolver lists / registers projects against the real registry and signals the bind over the
-  // control channel, which the watcher above folds to the run's meta. Topic runs only.
-  const bindDeps: BindProjectDeps | undefined = opts.topic
-    ? {
-        listProjects: () => listProjects(),
-        addProject: async path => {
-          // Validate before touching the registry: a relative / missing / non-directory path
-          // declines cleanly back to the agent rather than landing junk in the home file (#1121).
-          const resolved = await resolveProjectPath(path)
-          if (!resolved.ok) return { ok: false, error: resolved.error }
-          const already = (await listProjects()).some(p => p.path === resolved.path)
-          const record = await addProject(resolved.path, new Date().toISOString())
-          return { ok: true, project: { id: record.id, path: record.path }, created: !already }
-        },
-        recordBind: projectId => void appendControl(cwd, { kind: 'bind', projectId }),
-      }
-    : undefined
-
   const sharedRunOptions = {
     driver,
     cwd,
     onEvent,
     signal: controller.signal,
-    ...(opts.topic ? { topic: true } : {}),
-    ...(bindDeps ? { bind: bindDeps } : {}),
     ...(requestChoice ? { requestChoice } : {}),
     ...chatQueue,
     ...(opts.model ? { model: opts.model } : {}),

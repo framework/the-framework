@@ -38,7 +38,7 @@ import { tailEvents, tailRunEvents } from './dashboard-rpc/events-tail.js'
 import { ensureSessionsIgnored, resolveUserDir } from './sessions.js'
 import { removeProjectWorktree } from './worktrees.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
-import { addProject, listProjects, projectId, topicScratchPath } from './registry.js'
+import { addProject, listProjects, projectId } from './registry.js'
 import { isTicketPath } from './tickets.js'
 import { resolveProjectRunOptions } from './daemon-services.js'
 import { installProject, enumerateGitRepos } from './install.js'
@@ -93,50 +93,11 @@ export async function cleanupTimedOutWorktree(repo: string, runId: string, err: 
   await rm(worktreePath(repo, runId), { recursive: true, force: true }).catch(() => {})
 }
 
-/**
- * Retire a finished topic run's scratch dir (#1120): a run that finished cleanly has nothing left
- * to look at, so its scratch goes; a failed or stopped run keeps it, which is when you want to see
- * what it died holding.
- *
- * Deliberately *not* the worktree rule (E5). That rule is "only remove what is on the remote",
- * which is what makes every removal recoverable — and a scratch dir is not a git checkout, so
- * there is no branch to push and nowhere for its `run.json`/`events.jsonl` to be recoverable from.
- * With nothing to push, the ending it had is the only signal there is.
- *
- * Best-effort: this runs off a process-exit event with nothing to return to.
- */
-export async function tearDownTopicScratch(scratchCwd: string): Promise<void> {
-  const meta = await readLiveMeta(scratchCwd).catch(() => undefined)
-  if (meta?.status !== 'done') return // failed / stopped / unreadable: keep it for inspection
-  await rm(scratchCwd, { recursive: true, force: true }).catch(() => {})
-}
-
-/** Best-effort append of a `log` event to a run's live stream, so a daemon-side note (a #1122
- * re-home failure) surfaces on a run whose own process wrote every other line. Never throws. */
+/** Best-effort append of a `log` event to a run's live stream, so a daemon-side note surfaces on a
+ * run whose own process wrote every other line. Never throws. */
 async function appendRunLog(cwd: string, message: string): Promise<void> {
   const event: FrameworkEvent = { kind: 'log', message }
   await appendFile(join(cwd, FRAMEWORK_DIR, EVENTS_FILE), JSON.stringify(event) + '\n').catch(() => {})
-}
-
-/**
- * Move a bound topic run's history into its new worktree (#1122), so `--continue-run` reopens the
- * same run row rather than starting empty. Copies the event log and the meta, with `topic` cleared
- * and the bound project recorded, since the run is an ordinary project run from here on. A torn/
- * missing meta is left behind, so continue-run falls back to a fresh row rather than writing junk.
- */
-export async function moveTopicRunHistory(scratchCwd: string, worktreeCwd: string, boundProjectId: string): Promise<void> {
-  const from = join(scratchCwd, FRAMEWORK_DIR)
-  const to = join(worktreeCwd, FRAMEWORK_DIR)
-  await mkdir(to, { recursive: true })
-  await writeFile(join(to, EVENTS_FILE), await readFile(join(from, EVENTS_FILE), 'utf8').catch(() => ''))
-  const raw = await readFile(join(from, META_FILE), 'utf8').catch(() => '')
-  if (!raw) return
-  try {
-    const { topic: _topic, ...meta } = JSON.parse(raw) as RunMeta
-    await writeFile(join(to, META_FILE), JSON.stringify({ ...meta, boundProjectId }, null, 2) + '\n')
-  } catch {
-    // torn meta: leave it, so continue-run opens a fresh row instead of on a half-written one
-  }
 }
 
 /** Spawn a detached, unref'd framework child (`node <binPath> --session <specPath>`) that outlives us. */
@@ -427,9 +388,6 @@ export interface ProjectRuntime {
  */
 export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPreflight }: ProjectRuntimeOptions): ProjectRuntime {
   const homeId = projectId(resolve(cwd))
-  // The run-key namespace for project-less topic runs (#1120): `@`-prefixed so it can never equal a
-  // real project id (projectId always appends `-<hash>`), so a topic run belongs to no project.
-  const TOPIC_PROJECT_KEY = '@topic'
   // Live run pids, keyed per run rather than per project (#736) — see onStart for the key.
   const activeRuns = new Map<string, number>()
   const starting = new Set<string>() // reserved keys mid-spawn, to close the async gap
@@ -653,160 +611,6 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
     timer.unref?.()
   }
 
-  /**
-   * Re-home a bound topic run into its project (#1122). A topic run (#1120) lives in a neutral
-   * scratch dir; binding it to a project (#1121) has to MOVE the conversation there. This reuses the
-   * continue-run machinery (#762) pointed at a newly chosen project: allocate a fresh worktree in the
-   * bound project, copy the run's history in, resume the SAME agent session in that worktree, and
-   * stop the scratch child. The one case #762 never hit is the target project having no prior
-   * worktree for this run, which is exactly {@link allocateWorkspace}'s job.
-   *
-   * Returns whether it re-homed. On failure (unknown project, or a worktree that could not be
-   * allocated) it retains the scratch and surfaces a log event, so the conversation is never lost
-   * and the run never points at a dead cwd, the same retain-on-failure direction as a worktree.
-   * `markRehomed` is called the instant re-home is committed (before the scratch child is stopped),
-   * so the child's own teardown leaves the scratch for this to remove rather than racing it.
-   */
-  const rehomeTopicRun = async (opts: {
-    scratchCwd: string
-    runId: string
-    boundProjectId: string
-    options: StartRunOptions
-    realBin: string
-    child: ChildProcess
-    markRehomed: () => void
-  }): Promise<boolean> => {
-    const { scratchCwd, runId, boundProjectId, options, realBin, child, markRehomed } = opts
-    const projectCwd = await resolveProject(boundProjectId)
-    if (!projectCwd) {
-      await appendRunLog(scratchCwd, `could not re-home this run: unknown project ${boundProjectId}`)
-      return false
-    }
-    // The resume handle, read before the scratch goes: without it the agent starts a fresh session.
-    const sessionId = (await readLiveMeta(scratchCwd).catch(() => undefined))?.sessionId
-    const allocated = await allocateWorkspace(projectCwd, runId)
-    if (!allocated.ok) {
-      await appendRunLog(scratchCwd, `could not re-home this run into ${basename(projectCwd)}: ${allocated.error}`)
-      return false
-    }
-    const workspace = allocated.workspace
-    // Committed now: stop the scratch child (its conversation lives in the resumed session, not in
-    // scratch), and take the scratch teardown away from its exit handler so this owns it.
-    markRehomed()
-    if (child.pid !== undefined) await terminate(child.pid, 5000)
-    await moveTopicRunHistory(scratchCwd, workspace.cwd, boundProjectId)
-    const key = scopedKey(boundProjectId, workspace.runId)
-    // A short continuation note in the spirit of continuationPrompt: the resumed session already
-    // carries the whole conversation, so this only tells it where it now is.
-    const note = `You have been moved into project ${basename(projectCwd)} and are now working in its checkout. Continue where you left off.`
-    const continued = spawnDetached(
-      realBin,
-      // Reopen the moved run rather than truncating it, and resume the agent session so the
-      // conversation continues seamlessly. `topic` is dropped: this is an ordinary project run now.
-      await writeSessionSpec({
-        prompt: note,
-        kind: 'prompt',
-        cwd: workspace.cwd,
-        ...(workspace.runId ? { runId: workspace.runId } : {}),
-        continueRun: true,
-        options: { ...options, ...(sessionId ? { resumeSession: sessionId } : {}) },
-      }, env),
-      workspace.runId ? runStderrPath(workspace.cwd) : undefined,
-    )
-    const settle = (detail: string): void => {
-      activeRuns.delete(key)
-      const { cwd: checkout, runId: movedRunId } = workspace
-      if (!movedRunId) return
-      // The moved meta is normally already there, so the marker no-ops; it only writes when the
-      // copy was torn AND the resumed child died at boot (#1261) — the same hang either way.
-      parkRetirement(
-        key,
-        markFailedStart(checkout, movedRunId, '', detail)
-          .catch(() => {})
-          .then(() => tearDownWorktree(projectCwd, checkout, movedRunId)),
-      )
-    }
-    continued.once('error', err => settle(`its process could not be spawned (${errorMessage(err)})`))
-    continued.once('exit', (code, signal) => settle(exitDetail(code, signal)))
-    if (continued.pid !== undefined) activeRuns.set(key, continued.pid)
-    // Re-home succeeded, so the scratch is spent: remove it outright. The retain-on-failure rule is
-    // for a run that ended in scratch, not one that moved on with its conversation intact.
-    await rm(scratchCwd, { recursive: true, force: true }).catch(() => {})
-    return true
-  }
-
-  /**
-   * Start a project-less "topic" run (#1120): no project, no repo, no worktree. The run spawns in a
-   * neutral scratch dir under the config home, so the agent has nothing to touch — the "ask a
-   * question / plan / draft a ticket without a repo" path. It still produces the normal lifecycle
-   * (`events.jsonl`, `run.json`, settle) inside that dir, so its files are readable exactly like a
-   * worktree run's. Its `--run-id` is unique per start, so the busy guard never trips; it is keyed
-   * off {@link TOPIC_PROJECT_KEY} so it belongs to no registered project.
-   *
-   * Once the run binds to a project (#1121) it re-homes into that project's worktree (#1122): the
-   * daemon tails the scratch run's own event log for the `bind` recorded there and hands the
-   * conversation to {@link rehomeTopicRun}, rather than adding a run<->daemon IPC path.
-   */
-  const onStartTopic = async (
-    prompt: string,
-    kind: StartRunKind,
-    options: StartRunOptions,
-  ): Promise<StartRunResult> => {
-    let realBin: string
-    try {
-      realBin = resolveSpawnBin(binPath)
-    } catch (err) {
-      return { ok: false, error: errorMessage(err) }
-    }
-    const runId = runIdFromStartedAt(new Date().toISOString())
-    const scratchCwd = topicScratchPath(env, runId)
-    try {
-      // The `.the-framework/` dir too, so the bind watcher's fs.watch attaches before the run's
-      // first write rather than relying on the poll backstop to notice the dir appear.
-      await mkdir(join(scratchCwd, FRAMEWORK_DIR), { recursive: true })
-    } catch (err) {
-      return { ok: false, error: `could not create a scratch directory for this topic run: ${errorMessage(err)}` }
-    }
-    const key = scopedKey(TOPIC_PROJECT_KEY, runId)
-    starting.add(key)
-    try {
-      const child = spawnDetached(
-        realBin,
-        await writeSessionSpec({ prompt, kind, cwd: scratchCwd, runId, topic: true, options }, env),
-        runStderrPath(scratchCwd),
-      )
-      // Re-home on bind (#1122): once, and only on a committed re-home. `rehomed` gates the scratch
-      // teardown below; `inFlight` stops a second bind racing a re-home already underway, but a bind
-      // that failed to re-home leaves the watcher armed so a later bind (to a good project) retries.
-      let rehomed = false
-      let inFlight = false
-      let stopBindWatch = (): void => {}
-      const settle = (detail: string): void => {
-        activeRuns.delete(key)
-        stopBindWatch()
-        if (rehomed) return // a committed re-home removes the scratch itself
-        // The failed marker lands before the teardown reads the meta (#1261), so a boot death is
-        // recorded and the retain-on-fail rule then keeps the scratch for inspection.
-        void markFailedStart(scratchCwd, runId, prompt, detail).finally(() => void tearDownTopicScratch(scratchCwd))
-      }
-      child.once('error', err => settle(`its process could not be spawned (${errorMessage(err)})`))
-      child.once('exit', (code, signal) => settle(exitDetail(code, signal)))
-      stopBindWatch = tailEvents<FrameworkEvent>(join(scratchCwd, FRAMEWORK_DIR, EVENTS_FILE), event => {
-        if (rehomed || inFlight || event.kind !== 'bind') return
-        inFlight = true
-        void rehomeTopicRun({ scratchCwd, runId, boundProjectId: event.projectId, options, realBin, child, markRehomed: () => (rehomed = true) })
-          .then(ok => {
-            if (ok) stopBindWatch()
-          })
-          .finally(() => (inFlight = false))
-      })
-      if (child.pid !== undefined) activeRuns.set(key, child.pid)
-      return { ok: true, runId }
-    } finally {
-      starting.delete(key)
-    }
-  }
-
   // Start-from-dashboard (#345): spawn `framework --session <spec>` for the checkout
   // as a detached child — the same spawn ensureDaemon uses for the daemon itself. The run
   // streams into the page via its tailed event log, and its gates + Stop steer through the
@@ -848,9 +652,6 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
       }
       return result
     }
-    // Project-less topic run (#1120): no project, no repo, no worktree — spawned into a neutral
-    // scratch dir instead. Kept a branch of its own rather than overloading "absent projectId = home".
-    if (options.topic) return onStartTopic(prompt, kind, options)
     const projectKey = targetProjectId ?? homeId
     const projectCwd = await resolveProject(targetProjectId)
     if (!projectCwd) return { ok: false, error: `unknown project: ${targetProjectId}` }

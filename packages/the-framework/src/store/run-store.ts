@@ -207,12 +207,6 @@ export interface RunMeta {
   /** The connected device a remote run (#1067) executes on, for the session list + notice after a reload. */
   remoteLabel?: string
   /**
-   * A project-less "topic" run (#1120): started with no project, in a neutral scratch dir with no
-   * repo. Persisted so a reader can tell it from a project run without the daemon's memory (which a
-   * restart loses), and so teardown retains vs removes its scratch dir by the same policy as a worktree.
-   */
-  topic?: true
-  /**
    * The flow this run started under (#1467): `build` for the scope→build orchestration, `prompt`
    * for the direct-prompt path (research and transparent runs record `prompt` too). Persisted so a
    * continuation (#762) can re-enter the flow its first leg ran — the composer's Resume always
@@ -228,12 +222,6 @@ export interface RunMeta {
    * on its own default (and on records from before this field).
    */
   model?: string
-  /**
-   * The project a topic run (#1120) bound itself to (#1121): set from a `bind` event when the
-   * agent resolves an `await-bind-project` / `await-create-project` gate. Present means the run is
-   * no longer project-less; the worktree re-home it implies is #1122.
-   */
-  boundProjectId?: string
 }
 
 /**
@@ -308,8 +296,6 @@ export interface OpenStoreOptions {
   continueRun?: boolean
   /** Where this run executes (#1053/#610): recorded on the meta so the run view can read it. */
   target?: RunLocation
-  /** A project-less topic run (#1120): recorded on the meta so a reader can tell it from a project run. */
-  topic?: boolean
   /** The flow this run started under (#1467): recorded on the meta so a continuation can re-enter it. */
   kind?: 'build' | 'prompt'
 }
@@ -371,9 +357,6 @@ export function applyEventToMeta(meta: RunMeta, event: FrameworkEvent, at: strin
     case 'settled':
       next.settledAt = at
       break
-    case 'bind':
-      next.boundProjectId = event.projectId
-      break
     case 'driver':
       // Any new turn means the agent is working again, so the run is no longer parked (#785).
       if (event.event.type === 'start') delete next.settledAt
@@ -405,7 +388,6 @@ function freshMeta(
   owner?: RunOwner,
   id?: string,
   target?: RunLocation,
-  topic?: boolean,
   kind?: 'build' | 'prompt',
 ): RunMeta {
   return {
@@ -418,8 +400,6 @@ function freshMeta(
     ...(intent ? { intent } : {}),
     // Only a non-local target travels; `local` is the default every reader already assumes.
     ...(target && target !== 'local' ? { target } : {}),
-    // Only the topic flag travels; a project run is the default (absent).
-    ...(topic ? { topic: true } : {}),
     ...(kind ? { kind } : {}),
   }
 }
@@ -587,7 +567,7 @@ export class RunStore {
     await fs.mkdir(dir)
     const owner = opts.owner ?? { pid: process.pid, host: hostname() }
     const clock = opts.clock ?? (() => new Date().toISOString())
-    const store = new RunStore(fs, dir, clock, freshMeta(now, opts.intent, owner, opts.id, opts.target, opts.topic, opts.kind))
+    const store = new RunStore(fs, dir, clock, freshMeta(now, opts.intent, owner, opts.id, opts.target, opts.kind))
     if (opts.continueRun) {
       // Reopen: the log stays, the row keeps its original intent, and this process takes ownership
       // so a liveness probe (#716) reads the run as alive rather than as an orphan.

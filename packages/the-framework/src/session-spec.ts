@@ -22,14 +22,12 @@ export interface SessionSpec {
   prompt: string
   /** Build from an intent, run one prompt verbatim, or run the Research preset. */
   kind: StartRunKind
-  /** The checkout the session runs in: a worktree, a project, or a topic run's scratch dir. */
+  /** The checkout the session runs in: a worktree, or the project itself. */
   cwd: string
   /** The id its worktree is named with, so the directory and the run recorded inside it are one string. */
   runId?: string
   /** Reopen `runId`'s log instead of truncating it: the follow-up IS that run (#762). */
   continueRun?: boolean
-  /** Start project-less in a scratch dir, with no repo or worktree (#1120). */
-  topic?: boolean
   /** Everything the launcher's options gear and Settings decide about the session. */
   options: StartRunOptions
 }

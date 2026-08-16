@@ -2,7 +2,7 @@ import type { Driver, DriverSession } from './driver/index.js'
 import { composeRunSystem, renderSystemPrompt, type TfContext } from './system-prompt.js'
 import { createRunControls, emitSessionStart, endStopDetail } from './run-telemetry.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
-import { runAwaitRounds, type BindProjectDeps } from './await-gate.js'
+import { runAwaitRounds } from './await-gate.js'
 import { runTodoLoop, type TodoLoopResult } from './todo-loop.js'
 import { buildPrompt, extendPrompt, isWorkspaceEmpty, scaffoldPrompt } from './steps.js'
 import { type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
@@ -57,13 +57,6 @@ export interface RunSessionOptions {
   vanilla?: boolean
   /** This session has a real browser (#824), so the system channel says so. */
   browser?: boolean
-  /**
-   * This is a project-less "topic" session (#1120): advertise the bind gate (#1121) in the system
-   * channel and wire {@link bind} so an `await-bind-project` / `await-create-project` gate resolves.
-   */
-  topic?: boolean
-  /** The bind seams (#1121) a topic session's gate resolves against. Only meaningful with {@link topic}. */
-  bind?: BindProjectDeps
   /** Transparent mode (#625): empty the system channel entirely (raw `claude -p`); overrides vanilla. */
   transparent?: boolean
   /** In-context directories (#439): added as one `Context:` line to the system prompt. */
@@ -158,16 +151,10 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
   const handsOff = isHandsOff(opts.location)
   // The built-in #326 system prompt + any user SYSTEM.md frame the session (#301).
   const tf: TfContext = { prompt: opts.prompt }
-  // The "read" half of the bind mechanism (#1121/#1129): a topic session's channel lists the
-  // projects it can bind to, read through the same injected seam the gate resolves against so no
-  // `node:fs` reaches this path. Absent for a non-topic session, which gets no bind block at all.
-  const topicProjects = opts.topic && opts.bind ? (await opts.bind.listProjects()).map(p => p.path) : undefined
   const system = composeRunSystem({
     vanilla: opts.vanilla,
     browser: opts.browser,
     handsOff,
-    topic: opts.topic,
-    ...(topicProjects ? { topicProjects } : {}),
     transparent: opts.transparent,
     user: opts.systemPrompt,
     tf,
@@ -215,7 +202,6 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
       requestChoice: opts.requestChoice,
       emit,
       signal: runSignal,
-      ...(opts.bind ? { bind: opts.bind } : {}),
       ...(resuming ? { resume: true } : {}),
       // Chat comes after the backlog for a build, so it is wired below rather than here.
       ...(opts.messages && (kind === 'prompt' || handsOff) ? { messages: opts.messages } : {}),

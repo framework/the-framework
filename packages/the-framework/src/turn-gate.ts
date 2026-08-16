@@ -83,38 +83,12 @@ export interface ParsedBrowserGate {
   url?: string
 }
 
-/**
- * A project-less topic run (#1120) asking to bind to one of the projects already registered,
- * parsed from an `await-bind-project` block (#1121). The options are not in the block: the
- * framework fills them from the registry at resolution time, so the agent never has to know
- * (or guess) which projects exist.
- */
-export interface ParsedBindProjectGate {
-  /** The question shown above the project list. */
-  title: string
-}
-
-/**
- * A project-less topic run (#1120) asking to register a new project by path and bind to it,
- * parsed from an `await-create-project` block (#1121). The confirmation IS the permission grant
- * (registering a path hands the app filesystem access to it), so resolution recommends Approve,
- * like {@link ParsedConfirmationGate}.
- */
-export interface ParsedCreateProjectGate {
-  /** The question shown above the Approve / Decline buttons. */
-  title: string
-  /** The absolute repo path to register, when the agent named one. */
-  path?: string
-}
-
 /** A parsed await gate: any kind, discriminated by `kind`. */
 export type ParsedAwaitGate =
   | ({ kind: 'choices' } & ParsedChoicesGate)
   | ({ kind: 'multi' } & ParsedMultiSelectGate)
   | ({ kind: 'confirm' } & ParsedConfirmationGate)
   | ({ kind: 'browser' } & ParsedBrowserGate)
-  | ({ kind: 'bind-project' } & ParsedBindProjectGate)
-  | ({ kind: 'create-project' } & ParsedCreateProjectGate)
 
 /** The answer a resolved confirmation gate (#358) yields: the picked button's label. */
 export const CONFIRM_APPROVED = 'Approve'
@@ -123,13 +97,6 @@ export const CONFIRM_DECLINED = 'Decline'
 /** The answers a resolved browser gate (#796) yields. */
 export const BROWSER_HANDLED = 'Handled it'
 export const BROWSER_NOT_HANDLED = 'Could not handle it'
-
-/** The Approve / Decline buttons a create-project gate (#1121) shows. */
-export const CREATE_PROJECT_APPROVE = 'Register and bind'
-export const CREATE_PROJECT_DECLINE = 'Not now'
-
-/** The answer a bind-project gate yields when the registry is empty — nothing to pick (#1121). */
-export const NO_PROJECTS_TO_BIND = 'No projects are registered yet, so there is nothing to bind to.'
 
 /**
  * How many times the agent may stop to ask, and be resumed, before a run stops honoring
@@ -376,28 +343,6 @@ export function parseBrowserGate(text: string): ParsedBrowserGate | undefined {
 }
 
 /**
- * Parse a trailing `await-bind-project` block (#1121): a project-less topic run asking to bind to
- * a registered project. The block carries only a title — the framework fills the project list from
- * the registry at resolution time — so an empty or malformed body still triggers the gate with the
- * fallback title, rather than being dropped.
- */
-export function parseBindProjectGate(text: string): ParsedBindProjectGate | undefined {
-  const block = lastBlock(text, 'await-bind-project')
-  if (!block) return undefined
-  const record = parseRecord(block.body) ?? {}
-  return { title: str(record.title) || 'Bind this run to a project' }
-}
-
-/**
- * Parse a trailing `await-create-project` block (#1121): a topic run asking to register a new
- * project by `path` and bind to it. Same tolerance as {@link parseConfirmationGate} — blank-title
- * fallback, malformed block ignored, a non-string path dropped.
- */
-export function parseCreateProjectGate(text: string): ParsedCreateProjectGate | undefined {
-  return parseRecordGate(text, 'await-create-project', 'path', 'Register and bind this project?')
-}
-
-/**
  * Parse whichever await gate a build turn ended on (#337 / #339 / #358 / #796). When more
  * than one block kind is present (an agent shouldn't emit several), the one that
  * appears latest in the text wins; a malformed later block falls back to an earlier
@@ -419,8 +364,6 @@ const GATE_KINDS: readonly { tag: string; parse: (text: string) => ParsedAwaitGa
   { tag: 'await-multiselect', parse: text => tagged('multi', parseMultiSelectGate(text)) },
   { tag: 'await-confirmation', parse: text => tagged('confirm', parseConfirmationGate(text)) },
   { tag: 'await-browser', parse: text => tagged('browser', parseBrowserGate(text)) },
-  { tag: 'await-bind-project', parse: text => tagged('bind-project', parseBindProjectGate(text)) },
-  { tag: 'await-create-project', parse: text => tagged('create-project', parseCreateProjectGate(text)) },
 ]
 
 /** Stamp a parsed gate with its kind, passing an unparseable one through as `undefined`. */

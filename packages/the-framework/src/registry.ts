@@ -266,20 +266,6 @@ export function registryPath(env: NodeJS.ProcessEnv): string {
   return join(env.HOME ?? '', '.' + REGISTRY_FILE)
 }
 
-/** The dotted basename topic scratch dirs live under, mirroring the registry file's. */
-const TOPICS_DIR = 'the-framework-topics'
-
-/**
- * The neutral scratch directory a project-less "topic" run (#1120) executes in: `<runId>/`
- * under a config-home folder, resolved exactly like {@link registryPath} so it never lands in a
- * repo. It is deliberately NOT a git checkout, which is what makes a topic run repo-less — a run
- * to ask a question, plan, or draft a ticket with no code for the agent to touch.
- */
-export function topicScratchPath(env: NodeJS.ProcessEnv, runId: string): string {
-  const root = env.XDG_CONFIG_HOME ? join(env.XDG_CONFIG_HOME, TOPICS_DIR) : join(env.HOME ?? '', '.' + TOPICS_DIR)
-  return join(root, runId)
-}
-
 /** Minimal fs seam so the registry is unit-testable without touching disk. */
 export interface RegistryFs {
   /** Rejects when the file is absent. */
@@ -565,28 +551,6 @@ export async function listProjects(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<ProjectRecord[]> {
   return (await readRegistry(fs, env)).projects
-}
-
-/** A validated project path (#1121), or the reason it was rejected. */
-export type ProjectPathResult = { ok: true; path: string } | { ok: false; error: string }
-
-/**
- * Validate a path a topic run wants to register + bind to (#1121): it must be a non-empty,
- * absolute path to an existing directory. `resolve` collapses any `.`/`..` before it reaches the
- * registry, so a relative-based traversal can never smuggle in a path the agent did not name; the
- * absolute requirement is the guard, mirroring how {@link addProject} normalizes what it stores.
- * `isDirectory` is injected so this is unit-testable without touching disk; it defaults to real fs.
- */
-export async function resolveProjectPath(
-  path: string,
-  isDirectory: (p: string) => Promise<boolean> = p => nodeFs().isDirectory(p),
-): Promise<ProjectPathResult> {
-  const trimmed = typeof path === 'string' ? path.trim() : ''
-  if (!trimmed) return { ok: false, error: 'no path was given' }
-  if (!isAbsolute(trimmed)) return { ok: false, error: `the path must be absolute: ${trimmed}` }
-  const absolute = resolve(trimmed)
-  if (!(await isDirectory(absolute))) return { ok: false, error: `no such directory: ${absolute}` }
-  return { ok: true, path: absolute }
 }
 
 /**

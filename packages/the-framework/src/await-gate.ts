@@ -3,10 +3,7 @@ import {
   BROWSER_NOT_HANDLED,
   CONFIRM_APPROVED,
   CONFIRM_DECLINED,
-  CREATE_PROJECT_APPROVE,
-  CREATE_PROJECT_DECLINE,
   MAX_AWAIT_ROUNDS,
-  NO_PROJECTS_TO_BIND,
   PLAN_DECLINED_MESSAGE,
   continuationPrompt,
   isDeclinedConfirmation,
@@ -23,43 +20,12 @@ import type { ChatMessage, RunMessages } from './run-messages.js'
 // what removed the run <-> todo-loop cycle. run.ts composes these primitives into a lifecycle;
 // it does not own them.
 
-/** One project the bind gate (#1121) can offer or register: the minimal fields the resolver needs. */
-export interface BindProjectChoice {
-  id: string
-  path: string
-}
-
-/**
- * The outcome of an `await-create-project` registration (#1121). A result rather than a throw so an
- * unusable path (relative, missing, not a directory) declines cleanly back to the agent instead of
- * crashing the run; `created` is false when the path was already registered, so the gate can say so.
- */
-export type AddProjectResult =
-  | { ok: true; project: BindProjectChoice; created: boolean }
-  | { ok: false; error: string }
-
-/**
- * The registry + recording seams a bind gate (#1121) resolves against, injected so the await
- * machinery stays orchestrator-free: the CLI wires these to the real registry + control channel,
- * a test to spies. Present only for a project-less topic run (#1120); absent for every other run.
- */
-export interface BindProjectDeps {
-  /** The projects an `await-bind-project` gate offers, from the registry. */
-  listProjects: () => Promise<BindProjectChoice[]>
-  /** Validate + register (idempotent) a project by path, for an `await-create-project` gate. */
-  addProject: (path: string) => Promise<AddProjectResult>
-  /** Record the bind onto the run once a project is picked or created (#1121). */
-  recordBind: (projectId: string) => void
-}
-
 /** The gate-id stems by kind, so a POST-back is matched to the gate that asked (round 0 keeps it). */
 const GATE_BASE_ID: Record<ParsedAwaitGate['kind'], string> = {
   choices: 'await-choices',
   multi: 'await-multiselect',
   confirm: 'await-confirmation',
   browser: 'await-browser',
-  'bind-project': 'await-bind-project',
-  'create-project': 'await-create-project',
 }
 
 /**
@@ -77,8 +43,6 @@ export async function resolveAwaitGate(
     requestChoice?: ((req: ChoiceRequest) => Promise<ChoicePick>) | undefined
     emit: (event: FrameworkEvent) => void
     signal?: AbortSignal | undefined
-    /** The bind seams for a topic run (#1121); absent for every other run. */
-    bind?: BindProjectDeps | undefined
   },
 ): Promise<string> {
   const signalOpt = deps.signal ? { signal: deps.signal } : {}
@@ -131,56 +95,6 @@ export async function resolveAwaitGate(
     const labels = gate.options.filter(o => picked.includes(o.id)).map(o => o.label)
     return labels.length ? labels.join(', ') : '(none)'
   }
-  if (gate.kind === 'bind-project') {
-    // A project-less topic run (#1120) picks from the registered projects (#1121). The framework
-    // fills the options from the registry, not the agent's block, so it can never offer one that
-    // is gone. With no registry wired or nothing registered, there is nothing to bind to.
-    const projects = deps.bind ? await deps.bind.listProjects() : []
-    if (!deps.bind || projects.length === 0) return NO_PROJECTS_TO_BIND
-    const picked = await requestChoices({
-      id,
-      title: gate.title,
-      options: projects.map(p => ({ id: p.id, label: p.path })),
-      emit: deps.emit,
-      ...choiceOpt,
-      ...signalOpt,
-    })
-    // Defensive: requestChoices coerces any invalid pick back to a valid registry id, so this miss
-    // is unreachable in practice. It stays as a safety net rather than an assumed-present lookup.
-    const project = projects.find(p => p.id === picked)
-    if (!project) return NO_PROJECTS_TO_BIND
-    // The gate only records the bind; the daemon watches for it and re-homes the run (#1122).
-    deps.bind.recordBind(project.id)
-    return `Bound this run to ${project.path}.`
-  }
-  if (gate.kind === 'create-project') {
-    // Registering a path grants the app filesystem access to it, so the confirmation IS the grant:
-    // recommended Approve, like the plan gate (#358). Declining just keeps the run project-less.
-    const picked = await requestChoices({
-      id,
-      title: gate.path ? `${gate.title} (${gate.path})` : gate.title,
-      options: [
-        { id: 'approve', label: CREATE_PROJECT_APPROVE },
-        { id: 'decline', label: CREATE_PROJECT_DECLINE },
-      ],
-      recommended: 'approve',
-      confirm: true,
-      emit: deps.emit,
-      ...choiceOpt,
-      ...signalOpt,
-    })
-    if (picked === 'decline' || !deps.bind) return 'You chose not to register a project; continue without one.'
-    if (!gate.path) return 'No path was given, so nothing was registered; continue without a project, or bind to a registered one.'
-    // The seam validates the path (absolute, exists, is a directory) and never throws: an unusable
-    // path declines back to the agent, so a bad path can never crash the run.
-    const result = await deps.bind.addProject(gate.path)
-    if (!result.ok) return `Could not register that project: ${result.error}. Continue without a project, or give an existing absolute repo path.`
-    // The gate only records the bind; the daemon watches for it and re-homes the run (#1122).
-    deps.bind.recordBind(result.project.id)
-    return result.created
-      ? `Registered and bound this run to ${result.project.path}.`
-      : `That project was already registered; bound this run to ${result.project.path}.`
-  }
   const pickedId = await requestChoices({
     id,
     title: gate.title,
@@ -231,8 +145,6 @@ export interface AwaitRoundsOptions {
    * conversation (full prior context) instead of starting fresh. Default off.
    */
   resume?: boolean | undefined
-  /** The bind seams for a project-less topic run (#1121); absent for every other run. */
-  bind?: BindProjectDeps | undefined
 }
 
 /** The shared deps of a turn that may hit an await gate or a chat message. */
@@ -241,8 +153,6 @@ export interface AwaitTurnDeps {
   emit: (event: FrameworkEvent) => void
   emitTurnSignals: (text: string) => void
   signal?: AbortSignal | undefined
-  /** The bind seams for a project-less topic run (#1121); absent for every other run. */
-  bind?: BindProjectDeps | undefined
 }
 
 /**
@@ -346,7 +256,6 @@ export async function runAwaitRounds(opts: AwaitRoundsOptions): Promise<AwaitRou
     emit,
     emitTurnSignals,
     signal: opts.signal,
-    bind: opts.bind,
   }
   const signalOpt = opts.signal ? { signal: opts.signal } : {}
 

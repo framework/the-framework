@@ -24,7 +24,7 @@ test('start a session, watch it live, and read the archived row when it ends', a
     const agentId = await world.startAgent(project, 'Add a login page', { handoff: 'local' })
     const tail = await world.tailAgent(project, agentId)
 
-    // The live feed narrates the run the way the session view renders it: the session banner
+    // The live feed narrates the agent the way the session view renders it: the session banner
     // first (naming the fake driver, so no real agent is running), then the agent's own turn.
     const session = await waitFor(
       () => tail.events.find(e => e.kind === 'session'),
@@ -59,14 +59,14 @@ test('start a session, watch it live, and read the archived row when it ends', a
     assert.equal(meta.driver, 'fake')
 
     // A cleanly finished session retires its worktree (#737): nothing left to inspect, so the
-    // checkout is gone from disk, the Remove list is empty, and the run addresses the project root.
+    // checkout is gone from disk, the Remove list is empty, and the agent addresses the project root.
     await world.waitRetired(project, agentId)
     assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [])
     const worktree = await rpc(onAgentWorktree)(project.id, agentId)
     assert.equal(worktree?.own, false)
 
-    // The archived history replays the same story the live tail told (#1472 reads the run's own
-    // journal, not another run's), and the cross-project surfaces list the session.
+    // The archived history replays the same story the live tail told (#1472 reads the agent's own
+    // journal, not another agent's), and the cross-project surfaces list the session.
     const replay = await rpc(onAgent)(project.id, agentId)
     assert.ok(replay.some(e => e.kind === 'session') && replay.some(e => e.kind === 'end'), 'replay has the whole journal')
     const activity = await rpc(onActivity)()
@@ -74,7 +74,7 @@ test('start a session, watch it live, and read the archived row when it ends', a
     const recent = await rpc(onRecentAgents)()
     assert.ok(recent.some(r => r.projectId === project.id && r.agent.id === agentId))
 
-    // The session's record rides its branch, not main: teardown commits the archive to the run
+    // The session's record rides its branch, not main: teardown commits the archive to the agent
     // branch, so the handoff panel sees a branch of pure bookkeeping — #1291 calls that `empty`,
     // meaning nothing publishable.
     const handoff = await rpc(onAgentHandoff)(project.id, agentId)
@@ -90,7 +90,7 @@ test('two sessions run concurrently, each in its own worktree (#736)', async () 
   const rpc = world.rpc
   try {
     const project = await world.addProject()
-    // Both runs park on their scripted question, so both are provably alive at the same time —
+    // Both agents park on their scripted question, so both are provably alive at the same time —
     // the one-working-tree collision #736 removed would have refused the second Start.
     const [runA, runB] = await withFakeAwait('choices', async () => {
       const a = await world.startAgent(project, 'First feature')
@@ -152,7 +152,7 @@ test("publish a finished session: push its branch from the handoff panel (#799)"
     // commit the work this session left uncommitted" and teardown stranded the worktree. Then it
     // raced teardown's *push* instead, once only the commit was serialized: both sides created
     // the same ref and the loser got `cannot lock ref … reference already exists`, which when
-    // teardown lost meant the worktree was kept. The run lock spans commit and push on both
+    // teardown lost meant the worktree was kept. The agent lock spans commit and push on both
     // sides, so the first click works and teardown still retires cleanly.
     const pushed = await rpc(sendPushBranch)(project.id, agentId)
     assert.equal(pushed.ok, true, `push failed: ${'error' in pushed ? pushed.error : ''}`)

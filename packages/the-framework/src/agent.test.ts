@@ -13,7 +13,7 @@ import { composeAgentSystem } from './system-prompt.js'
 import type { ChoiceRequest, FrameworkEvent } from './events.js'
 import { MAX_AWAIT_ROUNDS, continuationPrompt, stopMessage } from './turn-gate.js'
 
-/** A driver that records the `system` framing it is started with, delegating the run to the fake. */
+/** A driver that records the `system` framing it is started with, delegating the agent to the fake. */
 function recordingDriver(): { driver: Driver; system: () => string } {
   const fd = fakeDriver()
   let captured = ''
@@ -38,7 +38,7 @@ test('a session drives the whole flow through the driver, offline', async () => 
   })
 
   // No preset and no serve config, so nothing reviewed the build (#1372):
-  // the loop never ran and the build turn was the whole run.
+  // the loop never ran and the build turn was the whole agent.
 
 
   // We surfaced the wrapped agent's own progress.
@@ -387,7 +387,7 @@ test('a build turn that stops for plan approval resumes on Approve (#358)', asyn
   assert.equal(gate.file, 'PLAN_orders.agent.md')
   assert.equal(gate.recommended, 'approve')
   assert.deepEqual(gate.options.map(o => o.id), ['approve', 'decline'])
-  // Approved: the driver was re-prompted to continue and the run finished.
+  // Approved: the driver was re-prompted to continue and the agent finished.
   assert.ok(events.some(e => e.kind === 'log' && /Continuing with your choice: Approve/.test(e.message)))
   assert.ok(prompts.some(p => /You paused to ask.*Approve the orders plan.*chose: Approve/s.test(p)))
 })
@@ -464,7 +464,7 @@ test('an unmarked option is an ordinary answer, whatever it is labelled (#358)',
 test('with nobody to ask, a session takes the recommended option and carries on (#337/#846)', async () => {
   // One path means one answer to "what does a headless session do at a gate" (D2). The build path
   // used to leave the turn standing, so an unattended build stopped at its first question; the
-  // prompt path auto-accepted, which is what #846 describes as "the fallback a fully headless run
+  // prompt path auto-accepted, which is what #846 describes as "the fallback a fully headless agent
   // already uses and the one autopilot would have clicked". That is the one that survives.
   let resumed = false
   const driver = new FakeDriver({
@@ -574,7 +574,7 @@ test('runAgent runs the backlog loop after the build when opted in (#323)', asyn
   try {
     const events: FrameworkEvent[] = []
     // The fake script never edits the backlog, so the loop stall-stops after two
-    // attempts — proving the wiring runs post-build with the run's own session.
+    // attempts — proving the wiring runs post-build with the agent's own session.
     const result = await runAgent({
       prompt: FAKE_INTENT,
       driver: fakeDriver(),
@@ -584,7 +584,7 @@ test('runAgent runs the backlog loop after the build when opted in (#323)', asyn
     })
     assert.deepEqual(result.todo, { completed: 2, reason: 'stalled', file: 'TODO_AGENTS.md' })
     assert.ok(events.some(e => e.kind === 'log' && /Backlog: TODO_AGENTS\.md has 1 open item\(s\)/.test(e.message)))
-    // The loop runs before the run's end event.
+    // The loop runs before the agent's end event.
     const endIndex = events.findIndex(e => e.kind === 'end')
     const stallIndex = events.findIndex(e => e.kind === 'log' && /no progress/.test(e.message))
     assert.ok(stallIndex !== -1 && stallIndex < endIndex)
@@ -696,9 +696,9 @@ test('runAwaitRounds gives up after MAX_AWAIT_ROUNDS and reports it exhausted', 
 })
 
 test('a stay-open run says it is parked each time it waits for the user (#785/#1390)', async () => {
-  // The stay-open park is now only for a run whose own terminal dashboard is the single surface
+  // The stay-open park is now only for an agent whose own terminal dashboard is the single surface
   // (#1390) — everything else ends itself on an idle queue. In that mode, the build settles and
-  // chat parks: that is the moment the agent stops working and the run is waiting on you. Before
+  // chat parks: that is the moment the agent stops working and the agent is waiting on you. Before
   // #785 nothing said so, and the dashboard kept animating "running".
   const prompts: string[] = []
   const driver = new FakeDriver({ respond: prompt => (prompts.push(prompt), 'built it') })
@@ -728,7 +728,7 @@ test('a stay-open run says it is parked each time it waits for the user (#785/#1
 })
 
 test('runAwaitRounds does not report exhausted when a chat phase follows the opening cap (#742)', async () => {
-  // The opening prompt asks forever and hits the cap, but live chat is wired: the run stays open
+  // The opening prompt asks forever and hits the cap, but live chat is wired: the agent stays open
   // and ends because chat closes (Stop), not "at the await limit". So exhausted must be false —
   // before #742 the opening drain's `exhausted: true` leaked through into a spurious end log.
   const driver = new FakeDriver({ respond: () => choicesGate('Again?') })
@@ -786,7 +786,7 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
       onEvent: e => events.push(e),
     })
 
-    // The build prompt was the whole run: no phase followed it, so nothing read the
+    // The build prompt was the whole agent: no phase followed it, so nothing read the
     // hand-off note as a reply.
     assert.equal(prompts().length, 1)
     // The backlog is still there and still unasked about: this machine has no standing to
@@ -806,7 +806,7 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
 test('a hand-off run is told the await gates are unavailable, a local one is not (#1234)', async () => {
   // Our own prompt says "ambiguous prompt: showChoices + AWAIT". A cloud session that obeys it
   // parks forever on a question nobody attached can answer. The hands-off block amends the
-  // await protocol for exactly these runs, and only these.
+  // await protocol for exactly these agents, and only these.
   const systemOf = async (driver: Driver, location: AgentLocation): Promise<string> => {
     const events: FrameworkEvent[] = []
     await runAgent({ prompt: FAKE_INTENT, driver, location, cwd: '/tmp/ws', onEvent: e => events.push(e) })
@@ -819,7 +819,7 @@ test('a hand-off run is told the await gates are unavailable, a local one is not
 
 test('a hand-off run does not stay open for messages (#1225)', async () => {
   const { driver } = handsOffDriver()
-  // Left open on purpose: a run that still waited on it would never resolve, since the
+  // Left open on purpose: an agent that still waited on it would never resolve, since the
   // composer it waits for cannot reach the session it handed to.
   const messages = new AgentMessageQueue()
   const agent = runAgent({

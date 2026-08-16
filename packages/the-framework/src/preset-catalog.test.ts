@@ -97,7 +97,7 @@ test('the quality presets carry their #326 instructions', () => {
 })
 
 test('UX runs to completion instead of gating on a human (#962)', () => {
-  // The "(auto)" in the label is the contract: it rates, then fixes, so a run started from it
+  // The "(auto)" in the label is the contract: it rates, then fixes, so an agent started from it
   // finishes on its own. The gated sibling that offers its ratings as choices is #962's follow-up.
   const out = presets.ux.render()
   assert.equal(out.includes('<AWAIT>'), false)
@@ -192,7 +192,7 @@ test('each triage preset pins its own session name and aborts on a taken branch 
 })
 
 test('neither ungated triage preset waits on a human (#891/#892 vs #698)', () => {
-  // They run unattended from the rotation, so an <AWAIT> would park the run against nobody.
+  // They run unattended from the rotation, so an <AWAIT> would park the agent against nobody.
   // The gated sibling is the one that legitimately has it.
   for (const out of [presets.triageQuick.render(), presets.triageConsensual.render()]) {
     assert.equal(out.includes('<AWAIT>'), false)

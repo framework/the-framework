@@ -92,7 +92,7 @@ describe('RoutineWork (#1159)', () => {
     // Unattended (#1279): a card-fired routine ends at settle and its handoff fires, like the
     // sweep's own runs, instead of parking in the stay-open chat loop.
     expect(options).toMatchObject({ unattended: true })
-    // The run id is the whole point: without it the shell renders the launcher, so "Run now"
+    // The agent id is the whole point: without it the shell renders the launcher, so "Run now"
     // landed on an empty composer with its own session nowhere on screen (#1191).
     await waitFor(() => expect(started).toHaveLength(1))
     expect(started[0]).toEqual(['p1', ROTATION_JOB.prompt, 'run-1'])

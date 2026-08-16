@@ -6,10 +6,10 @@ import { FRAMEWORK_DIR } from './store/index.js'
 import { JsonlTailer, followFile } from './jsonl-tail.js'
 
 /**
- * The dashboard-to-run control channel (#344): the reverse of the event log.
+ * The dashboard-to-agent control channel (#344): the reverse of the event log.
  * Events flow run -> `.the-framework/events.jsonl` -> daemon -> browser; steering
  * flows browser -> daemon -> `.the-framework/control.jsonl` -> run. The daemon
- * appends a {@link ControlEntry} per Stop click / choice pick, and the run tails
+ * appends a {@link ControlEntry} per Stop click / choice pick, and the agent tails
  * the file, aborting or resolving its parked gate. Same file-is-the-seam design
  * as the forward direction — no run<->daemon IPC.
  */
@@ -17,13 +17,13 @@ import { JsonlTailer, followFile } from './jsonl-tail.js'
 /** The control log filename under `.the-framework/`. */
 export const CONTROL_FILE = 'control.jsonl'
 
-/** One steering instruction from the dashboard to the live run. */
+/** One steering instruction from the dashboard to the live agent. */
 export type ControlEntry =
-  /** Stop the run (the daemon dashboard's Stop button). */
+  /** Stop the agent (the daemon dashboard's Stop button). */
   | { kind: 'stop' }
   /** Resolve a parked choice gate: the pick for the pending {@link ChoiceRequest} id. */
   | { kind: 'choice'; id: string; pick: string | string[]; by: ChoiceBy }
-  /** A live-chat message the user sent to the running run (#714). */
+  /** A live-chat message the user sent to the running agent (#714). */
   | { kind: 'message'; text: string }
   /**
    * Move the end-of-session handoff (#1102): how far this session publishes itself when it
@@ -33,8 +33,8 @@ export type ControlEntry =
    * side, so an impossible answer resolves *down* there instead of arriving here as "a PR with no
    * push" for this end to repair upward.
    *
-   * Steering rather than an event because it is an instruction to the run, and it has to reach a
-   * run whose dashboard tab was opened after it started. The run echoes what it applied back as an
+   * Steering rather than an event because it is an instruction to the agent, and it has to reach a
+   * run whose dashboard tab was opened after it started. The agent echoes what it applied back as an
    * event, which is what puts it on the meta the checkboxes read.
    */
   | { kind: 'handoff'; level: HandoffLevel }
@@ -58,7 +58,7 @@ export async function appendControl(cwd: string, entry: ControlEntry): Promise<v
 }
 
 /**
- * Truncate the control log. A run calls this at start so a previous run's picks
+ * Truncate the control log. An agent calls this at start so a previous agent's picks
  * can never fire into this one (gate ids like `plan-approval` repeat across runs).
  */
 export async function resetControl(cwd: string): Promise<void> {
@@ -75,7 +75,7 @@ export interface ControlWatcher {
  * Tail the workspace's control log, dispatching each well-formed entry as it is
  * appended. An `fs.watch` on `.the-framework/` plus a poll backstop, mirroring the
  * daemon's event tail (`fs.watch` is unreliable across platforms). Malformed or
- * unknown lines are skipped so a bad write can never crash a run.
+ * unknown lines are skipped so a bad write can never crash an agent.
  */
 export function watchControl(
   cwd: string,

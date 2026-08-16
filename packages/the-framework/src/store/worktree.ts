@@ -3,20 +3,20 @@ import { nodeGitRunner, type GitRunner } from '../project.js'
 import { FRAMEWORK_DIR, WORKTREES_DIR, isSafeAgentId } from './agent-store.js'
 
 /**
- * Git-worktree lifecycle for concurrent runs (#453/#735): give each run its own
+ * Git-worktree lifecycle for concurrent agents (#453/#735): give each agent its own
  * checkout so N runs on one repo never fight over the working tree. Pure plumbing
  * over the existing {@link GitRunner} seam; no daemon wiring, no concurrency, no
  * dashboard changes (those are the sibling #453 slices). This module only knows
  * how to add, list, remove, and prune worktrees.
  */
 
-/** The path a run's worktree gets: `<repo>/.the-framework/worktrees/<agentId>`. */
+/** The path an agent's worktree gets: `<repo>/.the-framework/worktrees/<agentId>`. */
 export function worktreePath(repo: string, agentId: string): string {
   return join(repo, FRAMEWORK_DIR, WORKTREES_DIR, agentId)
 }
 
 /**
- * The branch a framework-allocated worktree starts on (#736). The run id exists
+ * The branch a framework-allocated worktree starts on (#736). The agent id exists
  * before the session name does, so the branch is created from the id and renamed
  * by {@link renameAgentBranch} once the agent picks a name.
  */
@@ -37,7 +37,7 @@ export interface WorktreeInfo {
 /** Inputs to {@link addWorktree}. The caller owns branch naming (#736). */
 export interface AddWorktreeOptions {
   agentId: string
-  /** The branch to create for the run. */
+  /** The branch to create for the agent. */
   branch: string
   /** Base ref to branch from; defaults to the repo's current HEAD. */
   base?: string
@@ -50,7 +50,7 @@ export interface AddedWorktree {
 }
 
 /**
- * Create a worktree for a run on a fresh branch: `git worktree add -b <branch>
+ * Create a worktree for an agent on a fresh branch: `git worktree add -b <branch>
  * <path> [base]`. Git makes the leaf dir (and any missing parents) itself. The
  * `agentId` is validated as path-safe first so a caller can never traverse out of
  * `.the-framework/worktrees/`. Rejects on any git failure (a caller that wants a
@@ -68,11 +68,11 @@ export async function addWorktree(
 }
 
 /**
- * Check an *existing* branch out into a run's worktree (#762): `git worktree add <path> <branch>`,
- * no `-b`. Continuing a run puts it back on the branch its work is already on, rather than
+ * Check an *existing* branch out into an agent's worktree (#762): `git worktree add <path> <branch>`,
+ * no `-b`. Continuing an agent puts it back on the branch its work is already on, rather than
  * branching again from HEAD and stranding what it did last time.
  *
- * Rejects on git failure, like {@link addWorktree}: a continued run needs its checkout.
+ * Rejects on git failure, like {@link addWorktree}: a continued agent needs its checkout.
  */
 export async function attachWorktree(
   repo: string,
@@ -120,7 +120,7 @@ export function parseWorktreeList(porcelain: string): WorktreeInfo[] {
 }
 
 /**
- * Commit whatever the run left behind, on the run's own branch (#786).
+ * Commit whatever the agent left behind, on the agent's own branch (#786).
  *
  * An agent that edits and stops without committing is behaving as instructed: the
  * system prompt has it commit *pre-existing* changes before it starts, never its own
@@ -162,8 +162,8 @@ export async function commitPendingWork(
 }
 
 /**
- * Remove a run's worktree. Tolerant of an already-gone / never-registered path so
- * teardown stays idempotent (the run child is detached; the daemon only holds its pid).
+ * Remove an agent's worktree. Tolerant of an already-gone / never-registered path so
+ * teardown stays idempotent (the agent child is detached; the daemon only holds its pid).
  *
  * Plain removal first: it refuses a checkout git considers unclean, which after
  * {@link commitPendingWork} means a state we did not anticipate. Falling back to
@@ -200,7 +200,7 @@ export async function currentBranch(path: string, agent: GitRunner = nodeGitRunn
 }
 
 /**
- * Rename a run's branch once the agent names the session (#736): the worktree is
+ * Rename an agent's branch once the agent names the session (#736): the worktree is
  * created on `the-framework/agent-<agentId>` before a name exists, and this puts the
  * readable `the-framework/<sessionName>` on it.
  *
@@ -209,7 +209,7 @@ export async function currentBranch(path: string, agent: GitRunner = nodeGitRunn
  * and until that step is dropped there (the prompt ships verbatim from the issue,
  * so it is not ours to edit) the agent may already have moved off `from` — in
  * which case it named the branch itself and there is nothing to rename. Returns
- * whether it renamed, and never throws: a run must not die over a branch name.
+ * whether it renamed, and never throws: an agent must not die over a branch name.
  */
 export async function renameAgentBranch(
   path: string,

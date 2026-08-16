@@ -9,12 +9,12 @@ import { errorMessage } from './error-message.js'
 /**
  * Committing the session archives the daemon writes (#912/#1179) into the project checkout.
  *
- * A run's own worktree sweeps its archive on teardown (`store/worktree.ts`). The main checkout has
+ * An agent's own worktree sweeps its archive on teardown (`store/worktree.ts`). The main checkout has
  * no such path — `install.ts` commits once at activation and nothing after — so an archive written
  * there sat as a working-tree change until a human happened to commit it. That is the gap between
  * "the history is in Git" and "the history reaches Git by itself".
  *
- * It used to carry a second pathspec, the per-run conversation markdown, and the machinery for
+ * It used to carry a second pathspec, the per-agent conversation markdown, and the machinery for
  * choosing between them: a pathspec matching no file aborts the whole `git add`, so every project
  * that had sessions but had never recorded a chat needed the other pattern dropped. With one
  * record (B3) there is one pathspec and nothing to choose.
@@ -76,7 +76,7 @@ export function nodePathProbe(): PathProbe {
 /**
  * The commit message a batch writes. Names what moved, so the log line stands alone.
  *
- * Counted by run, not by file: one archived run is a `<id>.json` and a `<id>.jsonl`, and
+ * Counted by run, not by file: one archived agent is a `<id>.json` and a `<id>.jsonl`, and
  * "2 sessions" for a single session would be a lie told by the batch's own commit message.
  */
 export function commitMessage(files: string[]): string {

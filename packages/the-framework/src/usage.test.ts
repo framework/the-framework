@@ -13,7 +13,7 @@ test('UsageMeter starts at zero, with no cost until one is reported (#540)', () 
     cacheCreationTokens: 0,
     turns: 0,
   })
-  // Absent, not 0: a `$0` total would read as "this run was free".
+  // Absent, not 0: a `$0` total would read as "this agent was free".
   assert.equal('costUsd' in totals, false)
 })
 
@@ -46,7 +46,7 @@ test('UsageMeter counts tokens for an agent that reports no price (#540)', () =>
 })
 
 test('UsageMeter totals a cost from the turns that had one (#540)', () => {
-  // Mixed is not a real run today (one agent per run), but the total must still
+  // Mixed is not a real agent today (one agent per agent), but the total must still
   // mean "what we know was spent" rather than silently drop the priced turns.
   const m = new UsageMeter()
   m.add({ inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheCreationTokens: 0 })

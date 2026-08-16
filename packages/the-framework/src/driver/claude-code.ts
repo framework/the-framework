@@ -35,7 +35,7 @@ export interface ClaudeCodeDriverOptions {
    * MCP servers to expose to the agent for this session (#452). Written to a
    * temp config file passed via `--mcp-config`, so they merge with the user's
    * own configured MCP servers rather than replacing them. Used by `--browser`
-   * to wire chrome-devtools-mcp (a real browser + DevTools tools) into the run.
+   * to wire chrome-devtools-mcp (a real browser + DevTools tools) into the agent.
    */
   mcpServers?: Record<string, McpServerSpec>
   /** Environment for the child process. Default `process.env`. */
@@ -95,7 +95,7 @@ export class ClaudeCodeSession implements DriverSession {
   ) {
     this.cwd = startOpts.cwd
     this.id = `claude-code-${++sessionCounter}`
-    // Resume a finished run (#720): seeding lastSessionId makes the very first `resume` prompt
+    // Resume a finished agent (#720): seeding lastSessionId makes the very first `resume` prompt
     // `--resume` this conversation, exactly as a mid-run chat turn continues its own session.
     this.lastSessionId = startOpts.resumeSessionId
   }
@@ -243,7 +243,7 @@ export class StreamJsonParser {
     }
 
     // Announced on the very first stream line, so it must not wait for `result`: a turn that is
-    // stopped or dies mid-flight would take the id — the run's `claude --resume` handle — with
+    // stopped or dies mid-flight would take the id — the agent's `claude --resume` handle — with
     // it (#1322). Emitted only when it changes; every subsequent line repeats the same id.
     const announced: DriverEvent[] = []
     if (typeof obj['session_id'] === 'string' && obj['session_id'] !== this.sessionId) {

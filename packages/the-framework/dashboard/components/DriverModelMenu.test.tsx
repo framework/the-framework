@@ -54,7 +54,7 @@ describe('DriverModelMenu tree (#658)', () => {
   test('with no model pinned the trigger names no model, rather than the first one (#1143)', async () => {
     // The list used to open with a "Default" entry storing an empty value, and the label fell back
     // to the first entry — so an unset preference read as whichever model happened to be listed
-    // first. Naming a model the run does not pass is the failure the ticket is about.
+    // first. Naming a model the agent does not pass is the failure the ticket is about.
     renderMenu({ model: '' })
     const trigger = screen.getByRole('button')
     expect(trigger.textContent).not.toContain('Opus')

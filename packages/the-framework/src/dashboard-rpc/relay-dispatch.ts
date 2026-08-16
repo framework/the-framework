@@ -1,7 +1,7 @@
 import { onProjectFiles, onProjectFileStatus, onFileDiff, onAgentChanges, onFileContent, onGitStatus, onAgentWorktree, onAgentHandoff, onAgent } from './reads.js'
 import { sendStop, sendChoice, sendMessage, sendSetHandoff, sendPushBranch, sendOpenPullRequest, sendMerge } from './control.js'
 
-// The device side of the remote-run relay (#1067 slice 2). A daemon that relayed a run here asks this
+// The device side of the remote-agent relay (#1067 slice 2). A daemon that relayed an agent here asks this
 // to read/steer/hand off THAT run against THIS device's own checkout. Every entry is a run-scoped RPC
 // the dashboard already exposes to its own browser. The only change: arg[0] (the remote daemon's
 // project id, meaningless here) is replaced with this device's home project id, so a relayed call can

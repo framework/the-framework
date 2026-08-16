@@ -57,7 +57,7 @@ test('an open PR is a triage genuinely pending, so the branch is kept (#1293)', 
 })
 
 test('a branch with no PR history is unprovable, not stale: kept (#1293)', async () => {
-  // Either a run still working toward its handoff, or a gh that could not answer (ghPrsForBranch
+  // Either an agent still working toward its handoff, or a gh that could not answer (ghPrsForBranch
   // resolves [] on failure). Deleting on a hiccup would discard work, so neither is released.
   const git = fakeGit({ local: true })
   const outcome = await releaseStalePinnedBranch('/repo', BRANCH, { git: git.agent, prs: async () => [] })

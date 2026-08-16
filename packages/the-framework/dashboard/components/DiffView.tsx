@@ -2,7 +2,7 @@ import type { FileContent, FileDiff } from '../../dist/index.js'
 import { cn } from '../lib/utils.js'
 
 // What a file looks like in a card: its diff from git's unified output (#816), shared by the
-// tree's hover card and the run view's Changes section (#817) so a change reads the same wherever
+// tree's hover card and the agent view's Changes section (#817) so a change reads the same wherever
 // you meet it, and an unchanged file's contents (#828).
 //
 // Deliberately plain: colored +/- lines, no syntax highlighting, no editing. The dashboard is
@@ -19,7 +19,7 @@ function Binary() {
   return <p className="p-2 text-xs text-muted-foreground">Binary file, nothing to show.</p>
 }
 
-/** Added/removed counts as the `+12 −3` pair the tree and the run view both show. */
+/** Added/removed counts as the `+12 −3` pair the tree and the agent view both show. */
 export function DiffStat({ added, removed, className }: { added: number; removed: number; className?: string }) {
   return (
     <span className={cn('shrink-0 font-mono text-[10px] tabular-nums', className)}>

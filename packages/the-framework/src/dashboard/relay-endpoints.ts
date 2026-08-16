@@ -3,21 +3,21 @@ import type { FrameworkEvent } from '../events.js'
 import type { StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
 
 /**
- * The device-side of the remote-run relay (#1067): the two endpoints a daemon exposes so another
+ * The device-side of the remote-agent relay (#1067): the two endpoints a daemon exposes so another
  * daemon (holding this device's token) can run a session here and watch it. They live under
  * `/_relay`, behind the shared-token guard (#1051) in {@link startDashboard}. The guard admits a matching
  * `fw_daemon` cookie without the browser-only `?token=` 302, so a daemon-to-daemon call passes with
  * a cookie and a token-less caller is already 401'd before it reaches here.
  *
- * - `POST /_relay/start`  starts an ordinary local run and returns its {@link StartAgentResult}. It
+ * - `POST /_relay/start`  starts an ordinary local agent and returns its {@link StartAgentResult}. It
  *   runs in this device's own home checkout (slice 1); which project it targets is a later slice.
- * - `GET  /_relay/events?run=<id>` streams that run's events as newline-delimited JSON until it
+ * - `GET  /_relay/events?run=<id>` streams that agent's events as newline-delimited JSON until it
  *   ends or the caller disconnects.
  * - `GET  /_relay/ping` (#1072) a cookie-guarded reachability probe: 200 and an empty body, starts
  *   nothing. The online/offline status the dashboard shows is the local daemon calling this on each
  *   saved device with its token; a token-less caller is already 401'd by the shared-token guard (#1051) above.
  * - `POST /_relay/rpc` (#1067 slice 2) runs one whitelisted run-scoped RPC (a read/diff/steer/handoff/
- *   push/PR) against this device's own checkout for the daemon relaying a run here, answering {result}.
+ *   push/PR) against this device's own checkout for the daemon relaying an agent here, answering {result}.
  */
 export const RELAY_PREFIX = '/_relay'
 
@@ -26,7 +26,7 @@ export interface RelayHandlers {
   start: (prompt: string, kind: StartAgentKind, options: StartAgentOptions, projectId?: string) => StartAgentResult | Promise<StartAgentResult>
   tailEvents: (agentId: string, onEvent: (event: FrameworkEvent) => void) => () => void
   /** Run one whitelisted read/steer/handoff RPC against THIS device's own checkout, for the daemon
-   *  relaying a run here (#1067 slice 2); the caller wraps the result as {result}. */
+   *  relaying an agent here (#1067 slice 2); the caller wraps the result as {result}. */
   rpc?: (fn: string, args: unknown[]) => Promise<unknown>
 }
 
@@ -64,7 +64,7 @@ function handlePing(req: IncomingMessage, res: ServerResponse): void {
   res.end()
 }
 
-/** `POST /_relay/start`: read the run request, start it locally, and answer with the result JSON. */
+/** `POST /_relay/start`: read the agent request, start it locally, and answer with the result JSON. */
 async function handleStart(req: IncomingMessage, res: ServerResponse, handlers: RelayHandlers): Promise<void> {
   if (req.method !== 'POST') return end(res, 405, 'method not allowed', { allow: 'POST' })
   let body: RelayStartBody
@@ -76,7 +76,7 @@ async function handleStart(req: IncomingMessage, res: ServerResponse, handlers: 
   const prompt = typeof body.prompt === 'string' ? body.prompt : ''
   const kind: StartAgentKind = body.kind === 'research' || body.kind === 'prompt' ? body.kind : 'build'
   const options = (body.options && typeof body.options === 'object' ? body.options : {}) as StartAgentOptions
-  // Never relay onward from a relayed run: strip any nested target before starting it here.
+  // Never relay onward from a relayed agent: strip any nested target before starting it here.
   const { remote: _drop, ...local } = options
   let result: StartAgentResult
   try {
@@ -88,7 +88,7 @@ async function handleStart(req: IncomingMessage, res: ServerResponse, handlers: 
   res.end(JSON.stringify(result))
 }
 
-/** `GET /_relay/events?run=<id>`: stream the run's events as newline-delimited JSON. */
+/** `GET /_relay/events?run=<id>`: stream the agent's events as newline-delimited JSON. */
 function handleEvents(req: IncomingMessage, res: ServerResponse, handlers: RelayHandlers): void {
   if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
   const agentId = new URL(req.url ?? '/', 'http://localhost').searchParams.get('run')

@@ -79,7 +79,7 @@ export interface AgentPtyOptions {
   cwd: string
   /** Called with each chunk of terminal output. */
   onData: (chunk: string) => void
-  /** Stop the invocation: the caller has what it needs, or the run was aborted. */
+  /** Stop the invocation: the caller has what it needs, or the agent was aborted. */
   signal: AbortSignal
 }
 
@@ -96,19 +96,19 @@ const SESSION_URL = /https:\/\/claude\.ai\/code\/(session_[A-Za-z0-9]+)\S*/
  * The workspace-trust question, matched with every space removed so a terminal that draws
  * the words with cursor moves rather than literal spaces still matches. The driver does not
  * answer it: trusting a workspace is the user's call to make once, in their own terminal,
- * not something a background run should decide on their behalf. It is detected only so the
+ * not something a background agent should decide on their behalf. It is detected only so the
  * run says what it is parked on instead of timing out with nothing to show.
  */
 const TRUST_PROMPT = 'trustthisfolder'
 
 /**
- * The project root a run worktree belongs to, which is where trust has to be granted.
+ * The project root an agent worktree belongs to, which is where trust has to be granted.
  *
  * The CLI records trust per directory and everything under a trusted directory inherits it
  * (verified live: a fresh worktree of a trusted root boots straight to the REPL, a fresh
- * worktree of an untrusted root always shows the dialog). A run's cwd is an ephemeral
+ * worktree of an untrusted root always shows the dialog). An agent's cwd is an ephemeral
  * worktree — gone before the user could act on advice that names it — so the only advice
- * that works is: trust the root once, and every run worktree under it is covered.
+ * that works is: trust the root once, and every agent worktree under it is covered.
  */
 export function trustRootOf(cwd: string): string {
   const match = /^(.+?)\/\.the-framework\/worktrees\/[^/]+\/?$/.exec(cwd)
@@ -149,15 +149,15 @@ export function cloudHandOffPrompt(task: string, ...injected: (string | undefine
 /**
  * One hand-off to Claude Code on the web — **exactly one, for the life of the session.**
  *
- * A run is not a single prompt. The loop prompts again for every pass (plan, build, review,
- * the TODO backlog), so a driver that started a cloud session per prompt turned one run into
+ * An agent is not a single prompt. The loop prompts again for every pass (plan, build, review,
+ * the TODO backlog), so a driver that started a cloud session per prompt turned one agent into
  * six of them on the account. That is not a caveat, it is the wrong shape: the same task
  * handed to six independent cloud VMs is six agents racing on one repo.
  *
  * So the first prompt hands off, and every later one reports the hand-off that already
  * happened without spending another session. There is no continuation to offer either way —
  * the CLI can start a cloud session and pull one back, but it cannot send a second message
- * to one, so the honest answer to "keep going" is "this run is already over there".
+ * to one, so the honest answer to "keep going" is "this agent is already over there".
  */
 export class CloudSession implements DriverSession {
   readonly id: string
@@ -166,7 +166,7 @@ export class CloudSession implements DriverSession {
   private readonly framing: string | undefined
   private readonly controllers = new Set<AbortController>()
   private disposed = false
-  /** The cloud session this run was handed to, once it exists. Set at most once. */
+  /** The cloud session this agent was handed to, once it exists. Set at most once. */
   private handedOff: { url: string; sessionId: string } | undefined
 
   constructor(
@@ -187,7 +187,7 @@ export class CloudSession implements DriverSession {
     const full = cloudHandOffPrompt(text, this.framing, opts.system)
     this.emit({ type: 'start', prompt: full })
 
-    // Already handed off: say so and spend nothing. This is the guard that keeps one run to
+    // Already handed off: say so and spend nothing. This is the guard that keeps one agent to
     // one cloud session however many times the loop comes back round.
     if (this.handedOff) return this.report(this.handedOff, 'again')
 
@@ -248,7 +248,7 @@ export class CloudSession implements DriverSession {
       this.controllers.delete(controller)
     }
 
-    // A user abort (Stop, the run signal) also lands here with `found` unset — the pty run
+    // A user abort (Stop, the agent signal) also lands here with `found` unset — the pty run
     // resolves once the controller aborts. Name it what it was, not "no cloud session was
     // created", which is the CLI-failure message.
     if (!found && (this.startOpts.signal?.aborted || opts.signal?.aborted))
@@ -265,7 +265,7 @@ export class CloudSession implements DriverSession {
   }
 
   /**
-   * Report where this run went. The `first` hand-off emits the `cloud <url>` action the run
+   * Report where this agent went. The `first` hand-off emits the `cloud <url>` action the agent
    * view links through to — mirroring the Actions driver's `run <url>` — and a later pass
    * says the work is already there, so a loop that keeps prompting cannot read the same turn
    * as fresh progress and cannot spend a second session.
@@ -357,7 +357,7 @@ function runPtyWithScript(opts: AgentPtyOptions): Promise<void> {
         closeSync(stdin)
         rmSync(dir, { recursive: true, force: true })
       } catch {
-        // Best effort: a leftover temp file must not fail a run that otherwise worked.
+        // Best effort: a leftover temp file must not fail an agent that otherwise worked.
       }
     }
 

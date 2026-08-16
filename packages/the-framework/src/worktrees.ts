@@ -18,17 +18,17 @@ import {
 } from './store/index.js'
 import { pushAgentBranch } from './dashboard/agent-handoff.js'
 
-/** A retained worktree and the run that left it behind (#752). */
+/** A retained worktree and the agent that left it behind (#752). */
 export interface WorktreeRow {
-  /** The run id, which is also the worktree's directory name. */
+  /** The agent id, which is also the worktree's directory name. */
   agentId: string
-  /** The branch the run's work landed on, when its meta recorded one (#799). */
+  /** The branch the agent's work landed on, when its meta recorded one (#799). */
   branch?: string
-  /** How the run that left this checkout ended, or `running` while it is still going. */
+  /** How the agent that left this checkout ended, or `running` while it is still going. */
   status?: AgentStatus
-  /** Size on disk in bytes, absent for a live run (its tree is still changing) or when unreadable. */
+  /** Size on disk in bytes, absent for a live agent (its tree is still changing) or when unreadable. */
   sizeBytes?: number
-  /** True while the run owning this checkout is still going: it is in use, not retained. */
+  /** True while the agent owning this checkout is still going: it is in use, not retained. */
   live: boolean
 }
 
@@ -61,7 +61,7 @@ export interface RemoveWorktreeOptions {
  * retained-worktrees list is built from, through the same store reads, so the CLI is a second
  * surface rather than a second behaviour.
  *
- * A live run's checkout is included and flagged rather than hidden: "what is this directory and
+ * A live agent's checkout is included and flagged rather than hidden: "what is this directory and
  * why can I not remove it" is exactly the question the list has to answer.
  */
 export async function listProjectWorktrees(cwd: string, opts: { sizes?: boolean } = {}): Promise<WorktreeRow[]> {
@@ -105,8 +105,8 @@ async function sizeOf(cwd: string, agentId: string): Promise<{ sizeBytes?: numbe
  * is one failure mode now, and it is legible: the push did not land, so the checkout stays and the
  * reason says why.
  *
- * Refuses while the run is still going — a run's checkout is where its agent is working, and Stop
- * is how you end a run, not pulling the floor out from under it.
+ * Refuses while the agent is still going — an agent's checkout is where its agent is working, and Stop
+ * is how you end an agent, not pulling the floor out from under it.
  */
 export async function removeProjectWorktree(
   cwd: string,
@@ -171,7 +171,7 @@ async function rmFile(path: string): Promise<void> {
  *
  * This is the sibling of {@link removeProjectWorktree}, and the difference is the whole point.
  * Remove-worktree reclaims the checkout on disk and keeps the session — its row, its replayable
- * log — because the history was already archived. Delete removes that archive too: the run meta
+ * log — because the history was already archived. Delete removes that archive too: the agent meta
  * (`<id>.json`, what the rail lists) and its event log (`<id>.jsonl`, what replays), wherever they
  * are filed, so the row is gone for good. It is the one destructive-of-history action, which is
  * why the surfaces that call it confirm first. Since #1179 that archive is committed, so the files
@@ -183,7 +183,7 @@ async function rmFile(path: string): Promise<void> {
  * dashboard action should do silently, so the branch stays and delete means "remove from the
  * dashboard", not "erase every trace".
  *
- * Refuses while the run is still going — Stop is how a run ends. Any uncommitted work in the
+ * Refuses while the agent is still going — Stop is how an agent ends. Any uncommitted work in the
  * worktree is discarded with it, which is the intent here (the session is being thrown away),
  * unlike remove-worktree, which commits that work to the kept branch first.
  */
@@ -216,7 +216,7 @@ export async function deleteProjectAgent(cwd: string, agentId: string, opts: Del
 
 /**
  * Remove every retained worktree whose run is not live (#752): the "clean all of this up" case.
- * A live run keeps its checkout and is reported as skipped, so the count always adds up to what
+ * A live agent keeps its checkout and is reported as skipped, so the count always adds up to what
  * the list showed — and so does one whose branch could not reach the remote (E5).
  */
 export async function pruneProjectWorktrees(cwd: string): Promise<PruneResult> {

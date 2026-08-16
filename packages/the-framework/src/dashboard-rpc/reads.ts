@@ -25,7 +25,7 @@ import type { BridgeEvent, BridgeHello, BridgeQuestion } from '../dashboard/brid
 import type { BridgeAnswer, BridgeContact } from '../dashboard/bridge-store.js'
 import { readDaemonToken, readPreferences, type Preferences } from '../registry.js'
 
-// The read model behind the new dashboard (#405): the run history, a run's replay, the
+// The read model behind the new dashboard (#405): the agent history, an agent's replay, the
 // surfaced PLAN/TODO docs, and the committed LOGS.md — each keyed by project id and
 // backed by the same readers the daemon's legacy /api/* endpoints use, so the dashboard
 // stays a projection of the same files. They live beside the daemon rather than in the
@@ -35,7 +35,7 @@ import { readDaemonToken, readPreferences, type Preferences } from '../registry.
 /**
  * Resolve a project id and run a forgiving read against its workspace: an unknown project
  * or a failing read both fall back to `empty`. The uniform readers below are one call each
- * over this; the run history and null-returning git readers stay bespoke (extra logic or a
+ * over this; the agent history and null-returning git readers stay bespoke (extra logic or a
  * distinct empty).
  */
 async function withProject<T>(projectId: string, read: (cwd: string) => Promise<T>, empty: T): Promise<T> {
@@ -61,20 +61,20 @@ async function withProjects<T>(build: (projects: Awaited<ReturnType<ReturnType<t
 
 /**
  * The project's runs, most-recent first (or `[]`). The archived (finished) runs
- * from `agents/`, plus every live run prepended — so the sidebar shows an in-progress
+ * from `agents/`, plus every live agent prepended — so the sidebar shows an in-progress
  * run with a `running` status the moment it starts, not only after it closes.
  *
  * Since #736 a project has any number of live runs, each in its own worktree, so this reads
  * them all (#738) instead of the single one that used to sit at the project path. They come
- * back as {@link LiveAgent}s, carrying the `cwd` of the checkout that run is editing.
+ * back as {@link LiveAgent}s, carrying the `cwd` of the checkout that agent is editing.
  *
  * One row per id, and where both a live and an archived copy exist the live one wins (#768): a
  * continued run (#762) has an archive from its first leg while being live again, and the archive
- * would otherwise show a running run as finished. The status is not filtered on: `readLiveMeta`
- * may have just self-healed a dead run to `stopped` (#716), and that freshly-archived row can
+ * would otherwise show a running agent as finished. The status is not filtered on: `readLiveMeta`
+ * may have just self-healed a dead agent to `stopped` (#716), and that freshly-archived row can
  * lag `listAgents` by a poll — keeping it regardless leaves the row visible with no flicker.
  *
- * A run relayed to a connected device (#1067) lives only in the daemon's memory, never on disk, so
+ * An agent relayed to a connected device (#1067) lives only in the daemon's memory, never on disk, so
  * its in-memory stub is merged in too (#1077): that is what re-opens it after a dashboard reload
  * instead of losing it.
  */
@@ -87,13 +87,13 @@ export async function onAgents(projectId: string): Promise<AgentMeta[]> {
   const cwd = await resolveProjectPath(projectId)
   const local = cwd ? await readAllAgents(cwd) : []
   if (remote.length === 0) return local
-  // A relayed run (#1067) lives only in the daemon's memory, not on disk; surface it in the list so
+  // A relayed agent (#1067) lives only in the daemon's memory, not on disk; surface it in the list so
   // a reload re-opens it instead of losing it. Remote wins an id tie (it is the live authority).
   return [...remote, ...local.filter(agent => !remote.some(r => r.id === agent.id))]
 }
 
 /**
- * The run ids that still have a worktree on disk (#737). A run that failed or was stopped keeps
+ * The agent ids that still have a worktree on disk (#737). An agent that failed or was stopped keeps
  * its checkout so you can go look at what it was holding; this is how the dashboard knows which
  * finished run has one to offer removing. Live runs are excluded — their worktree is in use.
  */
@@ -109,10 +109,10 @@ export async function onRetainedWorktrees(projectId: string): Promise<string[]> 
  * uncommitted changes, and — once it is no longer live — what that checkout costs on disk.
  *
  * The dashboard could not answer "where is this session working". The git status bar reads the
- * *project*, so a session's own branch was visible nowhere, and a worktree a run kept (#737) was
+ * *project*, so a session's own branch was visible nowhere, and a worktree an agent kept (#737) was
  * a name in a list with no size and no way in.
  *
- * `own` separates a run with its own worktree from one that fell back to the main checkout (a
+ * `own` separates an agent with its own worktree from one that fell back to the main checkout (a
  * project with no git repo): "uncommitted changes" means something different there, since that
  * working tree is the user's, not the agent's.
  */
@@ -123,20 +123,20 @@ export async function onAgentWorktree(projectId: string, agentId: string): Promi
     const path = await resolveAgentPath(projectId, agentId)
     if (!path) return null
     const own = path !== root
-    // Since-filtered like every run-scoped PR read (#1255): in the run's own worktree the
-    // checkout's branch is the run's, but a reused pinned branch has a predecessor's PR history.
+    // Since-filtered like every run-scoped PR read (#1255): in the agent's own worktree the
+    // checkout's branch is the agent's, but a reused pinned branch has a predecessor's PR history.
     const since = startedAtFromAgentId(agentId)
     const [status, live] = await Promise.all([
       readGitStatus(path, since !== undefined ? { since } : {}).catch(() => undefined),
       readLiveMetas(root).catch(() => []),
     ])
-    // Size is only read for a checkout nothing is writing to: a live run's tree changes under the
+    // Size is only read for a checkout nothing is writing to: a live agent's tree changes under the
     // poll, and `du` over a build directory mid-build is a cost with no answer worth having.
     const running = live.some(agent => agent.id === agentId && agent.status === 'running')
     const size = own && !running ? await worktreeSize(path) : undefined
-    // In the run's own worktree, the checkout's branch is the run's, so the (since-filtered)
+    // In the agent's own worktree, the checkout's branch is the agent's, so the (since-filtered)
     // status read's PR is right. Once the worktree is gone the checkout is the project root, and
-    // its current branch has nothing to do with this run (#1255) — resolve by the run's own
+    // its current branch has nothing to do with this agent (#1255) — resolve by the agent's own
     // branch names instead.
     const agent = own ? undefined : await findAgent(root, agentId).catch(() => undefined)
     const pr = own
@@ -159,7 +159,7 @@ export async function onAgentWorktree(projectId: string, agentId: string): Promi
   }, null)
 }
 
-/** One archived run's event log for replay (or `[]` when the run or project is gone). */
+/** One archived agent's event log for replay (or `[]` when the agent or project is gone). */
 export async function onAgent(projectId: string, agentId: string): Promise<FrameworkEvent[]> {
   return relayOr(agentId, 'onAgent', [projectId, agentId], async () => {
     const cwd = await resolveProjectPath(projectId)
@@ -237,7 +237,7 @@ export async function onDashboard(): Promise<DashboardData> {
  * The project's files for the `#` context picker (#504) and the panel tree (#492): every
  * file git sees (tracked + untracked, honoring .gitignore), repo-relative and sorted, via
  * `git ls-files`. Localhost-only by nature — the relay has no checkout, so it resolves `[]`.
- * Pass a live `agentId` to list that run's worktree instead of the project root (#738).
+ * Pass a live `agentId` to list that agent's worktree instead of the project root (#738).
  */
 export async function onProjectFiles(projectId: string, agentId?: string): Promise<string[]> {
   return relayOr(agentId, 'onProjectFiles', [projectId, agentId], () => withAgentPath(projectId, agentId, crawlRepoFiles, []), [])
@@ -246,7 +246,7 @@ export async function onProjectFiles(projectId: string, agentId?: string): Promi
 /**
  * Per-file git status for the tree's dots (#492): repo-relative path -> untracked/modified/
  * deleted, from `git status --porcelain`. `{}` when not a repo / on the relay (no checkout).
- * Pass a live `agentId` to see that run's own worktree rather than the project root (#738).
+ * Pass a live `agentId` to see that agent's own worktree rather than the project root (#738).
  */
 export async function onProjectFileStatus(projectId: string, agentId?: string): Promise<Record<string, FileGitStatus>> {
   return relayOr<Record<string, FileGitStatus>>(
@@ -260,7 +260,7 @@ export async function onProjectFileStatus(projectId: string, agentId?: string): 
 
 /**
  * One changed file's diff, for the tree's hover card (#816). Null when the path is not a changed
- * file, is unsafe (see `safeRepoPath`), or there is no checkout. Reads the run's own worktree when
+ * file, is unsafe (see `safeRepoPath`), or there is no checkout. Reads the agent's own worktree when
  * `agentId` names one, so it shows the same change the tree dotted (#815).
  *
  * The status comes from the same `git status` the dots do, rather than from the caller: a client
@@ -297,7 +297,7 @@ export async function onAgentChanges(projectId: string, agentId?: string): Promi
 
 /**
  * One unchanged file's contents, for the tree's hover card (#828). Null when the path is unsafe
- * (see `safeRepoPath`), outside the checkout, or unreadable. Reads the run's own worktree when
+ * (see `safeRepoPath`), outside the checkout, or unreadable. Reads the agent's own worktree when
  * `agentId` names one, so it shows the copy the tree is listing (#815).
  *
  * The caller picks this or {@link onFileDiff} from the status the tree already holds; a changed
@@ -322,8 +322,8 @@ export async function onGithubUrl(projectId: string): Promise<string | null> {
 
 /**
  * The project's git status (#491): active branch, dirty flag, linked PR. Null when not a repo /
- * relay. Pass a live `agentId` to read that run's worktree, which is the branch and the dirty
- * state that actually belong to it (#738). A run-scoped read is since-filtered (#1255): a run on
+ * relay. Pass a live `agentId` to read that agent's worktree, which is the branch and the dirty
+ * state that actually belong to it (#738). A run-scoped read is since-filtered (#1255): an agent on
  * a reused pinned branch must not wear a predecessor's merged PR as its own badge.
  */
 export async function onGitStatus(projectId: string, agentId?: string): Promise<GitStatus | null> {
@@ -340,9 +340,9 @@ export async function onGitStatus(projectId: string, agentId?: string): Promise<
  * committed, what it changed, and whether that has been pushed or opened as a PR.
  *
  * Read from the *project* checkout against the session's branch, not from the session's worktree.
- * A clean run's worktree is removed when it finishes, and `resolveAgentPath` then falls back to the
+ * A clean agent's worktree is removed when it finishes, and `resolveAgentPath` then falls back to the
  * project root — so a worktree-addressed read reports the project's own branch and the user's own
- * uncommitted changes as though they were the session's. The branch is what outlives the run, so
+ * uncommitted changes as though they were the session's. The branch is what outlives the agent, so
  * the branch is what this asks about.
  */
 export async function onAgentHandoff(projectId: string, agentId: string): Promise<AgentHandoff | null> {
@@ -375,11 +375,11 @@ export async function onSystemPromptUser(projectId: string): Promise<string | nu
  * The question a Claude web session is parked on, as reported by the browser bridge (#1237).
  *
  * Keyed by cloud session id rather than run id because that is what the bridge can see: it reads
- * a claude.ai page, which knows its session and nothing about our runs. The run view already
- * derives that id from the run's own `cloud <url>` event, so the join happens on the client
+ * a claude.ai page, which knows its session and nothing about our runs. The agent view already
+ * derives that id from the agent's own `cloud <url>` event, so the join happens on the client
  * without the daemon having to index runs by session.
  *
- * Returns null for anything unrecognised, so a run with no bridge, no question, or a target that
+ * Returns null for anything unrecognised, so an agent with no bridge, no question, or a target that
  * is not `web` renders exactly as it did before.
  */
 export async function onBridgeQuestion(sessionId: string): Promise<BridgeQuestion | null> {

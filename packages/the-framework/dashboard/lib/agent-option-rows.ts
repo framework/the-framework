@@ -39,7 +39,7 @@ export type OptionRow = {
   patch: (checked: boolean) => Partial<Preferences>
 }
 
-/** The run options, with every rule between them already applied. */
+/** The agent options, with every rule between them already applied. */
 export interface AgentOptionRows {
   main: OptionRow[]
 }
@@ -48,8 +48,8 @@ export interface AgentOptionRows {
  * The run-option table for a resolved set of preferences.
  *
  * `checked` is the *effective* value, not the stored one: an option overridden by Transparent reads
- * as off, because that is what the run will do. So a surface that renders this can never claim an
- * option is on while the run ignores it.
+ * as off, because that is what the agent will do. So a surface that renders this can never claim an
+ * option is on while the agent ignores it.
  */
 export function agentOptionRows(preferences: Preferences): AgentOptionRows {
   const transparent = preferences.transparent ?? false // #625: the master off-switch
@@ -91,7 +91,7 @@ export function agentOptionRows(preferences: Preferences): AgentOptionRows {
       ...overriddenByTransparent(transparent),
     },
     // Where the handoff gets its default (#1102). A session's own action bar can still untick the
-    // whole ladder for that one run (#1173); this is what every new session starts from.
+    // whole ladder for that one agent (#1173); this is what every new session starts from.
     //
     // The publish ladder (#1379): three rungs, each enabled only while the one below it is on. The
     // pair this replaced (#1164/#1173) showed only `Open PR`, so "Open PR: off" silently meant

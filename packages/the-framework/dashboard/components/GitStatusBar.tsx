@@ -8,7 +8,7 @@ import { cn } from '../lib/utils.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // The checkout in play (#491, part of #488): active branch, a clean/dirty dot, the linked PR.
-// Polled, so it tracks a run committing or branching. Hidden when there is no git repo (or on
+// Polled, so it tracks an agent committing or branching. Hidden when there is no git repo (or on
 // the relay, which has no local checkout).
 //
 // One component for both pages (#809). With a `agentId` it reads that session's own worktree, which
@@ -44,7 +44,7 @@ export function GitStatusBar({
   projectName?: string | null | undefined
   /** What the branch holds, in a phrase — rendered beside the branch's own status. */
   summary?: ReactNode
-  /** What state the run itself is in (stopped, ready for merge, …), said beside the tree's own
+  /** What state the agent itself is in (stopped, ready for merge, …), said beside the tree's own
    *  clean/dirty rather than at the far end of the bar: they are one line of facts about the
    *  session, where the bar's end is where its controls live. */
   agentState?: ReactNode

@@ -47,7 +47,7 @@ describe('DevicesSettings (#1052/#1072)', () => {
 
   test('removing the device a run is targeting clears the run target (#1072)', () => {
     // The composer applies this guard on its own remove; managing the roster from settings has to
-    // apply it too, or the next run points at a device that is no longer in the list.
+    // apply it too, or the next agent points at a device that is no longer in the list.
     checkDevices.mockResolvedValue({})
     const studio = addProfile({ url: STUDIO, token: 'aaa', label: 'Studio' })
     selectRemoteDevice(studio.id)

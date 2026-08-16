@@ -110,7 +110,7 @@ describe('Enhanced System Prompt fine-grained options (#863)', () => {
   })
 })
 
-// #863 asks for the ENTIRE prompt, and the browser section is part of what the run sends.
+// #863 asks for the ENTIRE prompt, and the browser section is part of what the agent sends.
 describe('Enhanced System Prompt covers the browser section (#863)', () => {
   test('the browser run shows a longer prompt than the same run without it', () => {
     const { unmount } = render(<SystemPromptDisclosure {...baseProps} disabled={false} />)

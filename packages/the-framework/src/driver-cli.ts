@@ -2,7 +2,7 @@ import { ClaudeCodeDriver, CodexDriver, type ClaudeCodeDriverOptions, type Drive
 import { DRIVER_LABELS, type DriverName } from './driver-names.js'
 
 /**
- * Which agent drives a run (#542). Each is a whole coding-agent CLI the user
+ * Which agent drives an agent (#542). Each is a whole coding-agent CLI the user
  * already pays for, driven on their own subscription with no API key (#495).
  *
  * The names live in the node-free `agent-names.ts` so the dashboard and the registry read
@@ -17,7 +17,7 @@ export { DRIVERS, isDriverName, driverFromImpl, DRIVER_LABELS, type DriverName }
  * The exit code cannot decide this on its own: `claude auth status` prints its answer as JSON
  * and exits 0 either way. So each agent reads its own answer, and anything unrecognised comes
  * back `undefined` (could not say) rather than `false`. That asymmetry is deliberate. A wrong
- * "you are logged out" blocks a setup that works, which is worse than the silent dead run this
+ * "you are logged out" blocks a setup that works, which is worse than the silent dead agent this
  * exists to prevent, so only a CLI that says no out loud fails preflight.
  */
 export interface AgentAuthSpec {

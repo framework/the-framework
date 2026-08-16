@@ -20,7 +20,7 @@ import { nodeGitRunner } from './project.js'
 import type { AgentSpec } from './agent-spec.js'
 
 /**
- * Where a run is allowed to land (#997). A run gets its own worktree (#736); the pre-#736
+ * Where an agent is allowed to land (#997). An agent gets its own worktree (#736); the pre-#736
  * fallback into the project's own checkout survives only for a project that cannot host one at
  * all. A repo whose `worktree add` failed used to take that same fallback, which pointed the
  * agent at the user's working tree and its uncommitted work.
@@ -138,7 +138,7 @@ test('a project that is not a git repo still falls back to the main checkout, an
   }
 })
 
-/** Write a run's live meta into a checkout, so a teardown/read has a status to act on. */
+/** Write an agent's live meta into a checkout, so a teardown/read has a status to act on. */
 async function writeAgentMeta(checkout: string, status: AgentMeta['status'], extra: Partial<AgentMeta> = {}): Promise<void> {
   const dir = join(checkout, FRAMEWORK_DIR)
   await mkdir(dir, { recursive: true })
@@ -172,7 +172,7 @@ test('a SIGTERMed worktree add has its partial checkout removed, other failures 
   }
 })
 
-/** A committed git repo to re-home a run into, path realpath'd so it matches what git reports. */
+/** A committed git repo to re-home an agent into, path realpath'd so it matches what git reports. */
 async function initRepo(prefix: string): Promise<string> {
   const repo = await realpath(await mkdtemp(join(tmpdir(), prefix)))
   const git = nodeGitRunner()
@@ -185,7 +185,7 @@ async function initRepo(prefix: string): Promise<string> {
   return repo
 }
 
-/** A stub CLI that prints a boot error to stderr and dies without ever opening its run store (#1261). */
+/** A stub CLI that prints a boot error to stderr and dies without ever opening its agent store (#1261). */
 async function writeDyingStub(dir: string): Promise<string> {
   const stub = join(dir, 'dying-stub.cjs')
   await writeFile(
@@ -240,13 +240,13 @@ test('a worktree run whose child dies at boot is marked failed instead of waitin
 
     // The whole point: the child never wrote a lifecycle, so the daemon leaves one.
     const meta = await waitForMeta(worktree)
-    assert.ok(meta, 'the daemon wrote a agent.json for the dead child')
+    assert.ok(meta, 'the daemon wrote an agent.json for the dead child')
     assert.equal(meta.status, 'failed', 'marked failed, so the page stops saying "Waiting for the session to start"')
     assert.equal(meta.id, agentId, 'under the run id the worktree is named with')
     assert.equal(meta.startedAt, startedAtFromAgentId(agentId), 'dated by its run id, not by when the daemon noticed')
     assert.equal(meta.intent, 'build a thing', 'carrying the prompt, so the run row is identifiable')
 
-    // The cause is visible: the child's stderr was captured and its tail is in the run log.
+    // The cause is visible: the child's stderr was captured and its tail is in the agent log.
     const events = await waitForLogLine(worktree, /failed to start/)
     assert.match(events, /The session failed to start: its process exited with code 1/)
     assert.match(events, /Cannot find package 'some-workspace-dep'/, 'the stderr tail names the actual boot error')
@@ -297,7 +297,7 @@ test('lastAgentFailureDetail reads the child-written end, and only a failed one 
 })
 
 /**
- * A stub CLI that behaves like a run whose driver died mid-work: it writes its own lifecycle
+ * A stub CLI that behaves like an agent whose driver died mid-work: it writes its own lifecycle
  * (agent.json + a failed `end` carrying `detail`), records each spawn, and exits 1.
  */
 async function writeFailingAgentStub(dir: string, detail: string): Promise<string> {
@@ -343,10 +343,10 @@ test('a run that dies to a transient API error is continued, at most twice (#128
     const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; agentId?: string }
     assert.equal(result.ok, true)
     const worktree = worktreePath(cwd, result.agentId!)
-    // The retry continues the SAME run in its retained checkout, rather than starting a new one.
+    // The retry continues the SAME agent in its retained checkout, rather than starting a new one.
     const lines = await waitForSpawns(worktree, 1 + MAX_TRANSIENT_RETRIES)
     assert.deepEqual(lines, ['start', 'continue', 'continue'])
-    // And the cap holds: a run that keeps dying transiently stays failed.
+    // And the cap holds: an agent that keeps dying transiently stays failed.
     await new Promise(r => setTimeout(r, 400))
     const after = (await readFile(join(worktree, 'spawned.log'), 'utf8')).trim().split('\n').filter(Boolean)
     assert.equal(after.length, 1 + MAX_TRANSIENT_RETRIES)
@@ -381,7 +381,7 @@ test('a run that fails on its own terms is not retried (#1281)', async () => {
 })
 
 /**
- * #1326: a run must not spend a branch and a worktree on an agent that can never start.
+ * #1326: an agent must not spend a branch and a worktree on a driver that can never start.
  *
  * This is what #1323 looked like from outside: every session died before writing its agent.json,
  * on both agents, across six projects, and the only visible trace was run branches piling up
@@ -407,7 +407,7 @@ test('a start on a logged-out agent is refused, and spends no branch or worktree
   try {
     const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; error?: string }
     assert.equal(result.ok, false)
-    // The reason names the fix, rather than leaving the user to guess at a dead run.
+    // The reason names the fix, rather than leaving the user to guess at a dead agent.
     assert.match(result.error!, /not logged in/)
     assert.match(result.error!, /auth login/)
 

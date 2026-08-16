@@ -1,7 +1,7 @@
 import type { DriverEvent, DriverRateLimit } from './driver/index.js'
 import { pickedIds, type AutoHandoffSkip, type AutoMergeOutcome, type ChoiceOption, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
 
-// The terminal surface for the run's event stream: render one {@link FrameworkEvent} as one
+// The terminal surface for the agent's event stream: render one {@link FrameworkEvent} as one
 // human-readable line. This is the CLI's counterpart to the dashboard's read-model
 // projections (run-view.ts) — a pure formatter over the same union, kept out of events.ts so
 // the event contract stays a plain data module (and browser-safe for the client bundle).
@@ -50,7 +50,7 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       }
     case 'handoff-armed': {
       // Said as what will happen, not as two flags: the line is read once, at a glance.
-      // A merge-armed run's PR is opened ready, not draft, and lands by itself — the line must say
+      // A merge-armed agent's PR is opened ready, not draft, and lands by itself — the line must say
       // so (#1382): merging unattended is the one consequence a reader cannot be left to infer.
       if (event.pr && event.merge) return `  when this ends: push the branch, open a PR, and merge it`
       if (event.pr) return `  when this ends: push the branch and open a draft PR`

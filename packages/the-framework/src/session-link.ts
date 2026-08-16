@@ -21,7 +21,7 @@ export function resolveSessionLink(template: string, sessionId: string): string 
 }
 
 /**
- * The generic Claude Code entry point. It is NOT a per-run live session: a
+ * The generic Claude Code entry point. It is NOT a per-agent live session: a
  * headless run is not Remote-Controlled, so there is no deep link to build (see
  * #214). We surface this only as an "Open Claude Code" affordance; a real live
  * link comes from an explicit `sessionLink`.

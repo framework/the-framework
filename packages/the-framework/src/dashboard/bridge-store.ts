@@ -23,9 +23,9 @@ const MAX_SESSION_EVENTS = 300
 /**
  * The questions a Claude web session is parked on, keyed by its cloud session id (#1237).
  *
- * A cloud run has no live local session to hang a choice gate on: #1231 ends the run at the
- * hand-off, so by the time the agent asks anything the run is already `done`. The join back to
- * a run is `AgentMeta.sessionId`, which a web run already carries because `CloudSession` reports
+ * A cloud agent has no live local session to hang a choice gate on: #1231 ends the agent at the
+ * hand-off, so by the time the agent asks anything the agent is already `done`. The join back to
+ * an agent is `AgentMeta.sessionId`, which a web agent already carries because `CloudSession` reports
  * the cloud id on its result.
  *
  * In memory on purpose. A question is only answerable while the session that asked it is still
@@ -179,7 +179,7 @@ export class BridgeQuestions {
     return [...this.bySession.values()].sort((a, b) => b.receivedAt.localeCompare(a.receivedAt))
   }
 
-  /** Drop a session's question, once it is answered or its run is gone. */
+  /** Drop a session's question, once it is answered or its agent is gone. */
   clear(sessionId: string): void {
     this.bySession.delete(sessionId)
     this.eventsBySession.delete(sessionId)

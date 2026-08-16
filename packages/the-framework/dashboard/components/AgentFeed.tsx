@@ -4,8 +4,8 @@ import { TriangleAlert } from 'lucide-react'
 import { EventList } from './EventList.js'
 import { AgentOverview } from './AgentOverview.js'
 
-// One run's feed: the run overview plus the live/replayed event log, or a waiting placeholder
-// before anything has streamed. Shared by the run's own view (AgentView, which shows the session
+// One agent's feed: the agent overview plus the live/replayed event log, or a waiting placeholder
+// before anything has streamed. Shared by the agent's own view (AgentView, which shows the session
 // link in its action bar instead — `showSessionLink={false}`) and the read-only relay watch view
 // (RelayView, which keeps it since it has no action bar). `lost` is the live channel's health
 // (#948): while the stream is down the feed is behind reality, and saying so beats letting
@@ -29,18 +29,18 @@ export function AgentFeed({
   projectId?: string | undefined
   agentId?: string | null | undefined
   showSessionLink?: boolean
-  /** The run's own view sets this false: its action bar's breadcrumb already names the session. */
+  /** The agent's own view sets this false: its action bar's breadcrumb already names the session. */
   showName?: boolean
-  /** The run's own view sets this false: its action bar carries the status beside the ⋮ menu. */
+  /** The agent's own view sets this false: its action bar carries the status beside the ⋮ menu. */
   showStatus?: boolean
-  /** The run's own view sets this false: its right rail pins the loop's verdict under the tabs. */
+  /** The agent's own view sets this false: its right rail pins the loop's verdict under the tabs. */
   lost?: boolean
   /** A finished log is static (#1026): it does not follow new output, and opens at its end. */
   stick?: boolean
   openAt?: 'start' | 'end'
-  /** What an empty feed says: a live run is waiting, a finished one has nothing to replay. */
+  /** What an empty feed says: a live agent is waiting, a finished one has nothing to replay. */
   emptyLabel?: string
-  /** Rendered after the last log row, inside the scroller (#1265): a web run's live mirror box. */
+  /** Rendered after the last log row, inside the scroller (#1265): a web agent's live mirror box. */
   tail?: ReactNode
 }) {
   const lostBanner = lost && (

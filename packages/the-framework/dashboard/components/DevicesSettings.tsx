@@ -14,7 +14,7 @@ import { cn } from '../lib/utils.js'
 // Adding and removing a device already worked, but only from the composer's "Run on" menu, and the
 // composer exists on a project launcher and nowhere else: from the Overview or the settings page
 // there was no way to manage the roster at all. The picker keeps listing devices, because choosing
-// a run target is a per-run act; which devices exist is configuration, so it belongs here.
+// an agent target is a per-agent act; which devices exist is configuration, so it belongs here.
 //
 // Unlike everything else on the settings page these are NOT preferences. A device carries a token,
 // so it lives in this browser's localStorage and never reaches the daemon (see profiles.ts). The
@@ -27,8 +27,8 @@ export function DevicesSettings() {
   const selectedDeviceId = useSelectedRemoteDeviceId()
   const [adding, setAdding] = useState(false)
 
-  // The same guard the composer applies (#1072): a device that is removed must not stay the run
-  // target, or the next run points at something that is no longer in the list.
+  // The same guard the composer applies (#1072): a device that is removed must not stay the agent
+  // target, or the next agent points at something that is no longer in the list.
   const remove = (profile: ConnectionProfile) => {
     if (selectedDeviceId === profile.id) selectRemoteDevice(null)
     removeProfile(profile.id)

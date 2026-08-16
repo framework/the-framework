@@ -6,10 +6,10 @@ import { FLAT_TODO_FILE } from './tickets.js'
 import { errorMessage } from './error-message.js'
 
 /**
- * Promoting the agent queue out of a finished run's branch and into the project checkout (#852).
+ * Promoting the agent queue out of a finished agent's branch and into the project checkout (#852).
  *
  * Runs happen in their own git worktree (#736), which is right for code and wrong for the queue:
- * `TODO_AGENTS.md` is shared mutable state, and a worktree forks it. So a quick-wins run (#773)
+ * `TODO_AGENTS.md` is shared mutable state, and a worktree forks it. So a quick-wins agent (#773)
  * wrote a perfectly good queue onto a branch nobody reads, auto PM kept seeing an empty checkout,
  * and it re-derived the same entries every cooldown, forever, spending real quota each time.
  *
@@ -35,23 +35,23 @@ export type QueuePromotion =
       /**
        * Worth trying again next tick: the queue file is mid-edit in the checkout, and the human's
        * work outranks an unattended tidy-up only until they commit it. Every other skip is final
-       * for this run. The callee owns this call — the daemon used to decide it by string-matching
+       * for this agent. The callee owns this call — the daemon used to decide it by string-matching
        * the prose `reason`, where a one-word copyedit would have silently turned "retry next
        * tick" into "settled forever".
        */
       retry?: true
     }
 
-/** The commit message a promotion writes. Names the run so the history says where it came from. */
+/** The commit message a promotion writes. Names the agent so the history says where it came from. */
 function promotionMessage(agentId: string): string {
   return `[The Framework] queue updates from ${agentId}`
 }
 
 /**
- * Copy `TODO_AGENTS.md` from a finished run's branch into the project checkout and commit it.
+ * Copy `TODO_AGENTS.md` from a finished agent's branch into the project checkout and commit it.
  *
  * Skips, rather than forcing, when:
- * - the run recorded no branch (nothing to read from)
+ * - the agent recorded no branch (nothing to read from)
  * - the branch has no queue file, or it matches the checkout already (nothing to do)
  * - the checkout has uncommitted changes to the queue file — a human is mid-edit, and their work
  *   outranks an unattended tidy-up
@@ -68,7 +68,7 @@ export async function promoteQueue(
   if (!branch) return { promoted: false, reason: 'the run recorded no branch' }
 
   try {
-    // The queue as the run left it. A run that never touched it has no such path on the branch.
+    // The queue as the agent left it. An agent that never touched it has no such path on the branch.
     const fromBranch = await git(['show', `${branch}:${FLAT_TODO_FILE}`], projectCwd).catch(() => undefined)
     if (fromBranch === undefined) return { promoted: false, reason: 'the run left no queue file on its branch' }
 
@@ -80,11 +80,11 @@ export async function promoteQueue(
     const dirty = (await git(['status', '--porcelain', '--', FLAT_TODO_FILE], projectCwd)).trim()
     if (dirty) return { promoted: false, reason: 'the checkout has uncommitted queue changes', retry: true }
 
-    // A run pinned to one entry (#1204) lands that entry, not its whole file: with several drains
-    // in flight the wholesale copy below would carry each run's stale view of every *other* entry,
+    // An agent pinned to one entry (#1204) lands that entry, not its whole file: with several drains
+    // in flight the wholesale copy below would carry each agent's stale view of every *other* entry,
     // and the last promotion of the tick would un-check whatever the earlier ones had just retired.
     if (agent.entry !== undefined) {
-      // The queue where the run forked, so an entry it *added* can be told from one somebody
+      // The queue where the agent forked, so an entry it *added* can be told from one somebody
       // *removed* while it worked. Both look alike from the branch alone — present there, absent
       // here — and `todo_format.md` makes removal the way to retire an entry, so guessing wrong
       // resurrects work a human deliberately struck off. No merge base (a rewritten history, say)
@@ -126,7 +126,7 @@ function entryTexts(md: string): Set<string> {
 }
 
 /**
- * Land what a drain run pinned to one entry actually did (#1204): retire that entry, and keep any
+ * Land what a drain agent pinned to one entry actually did (#1204): retire that entry, and keep any
  * follow-ups it queued.
  *
  * Additive by construction, which is what makes it safe to run concurrently: it only ever checks a
@@ -134,7 +134,7 @@ function entryTexts(md: string): Set<string> {
  * landing in either order compose, and the worst a wrong guess can do is leave a duplicate line
  * for a human to delete rather than silently send an agent to redo finished work.
  *
- * A follow-up is an entry the run's branch has that `atBase` did not: written during the run. The
+ * A follow-up is an entry the agent's branch has that `atBase` did not: written during the agent. The
  * fork point is what tells that from an entry somebody *removed* meanwhile, which looks identical
  * from the branch alone and which `todo_format.md` makes the ordinary way to retire an entry. With
  * no fork point to compare against, nothing is added -- resurrecting struck-off work is worse than

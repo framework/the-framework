@@ -5,7 +5,7 @@ import { actionsRunUrl } from '../lib/live-state.js'
 // The run view's affordance for a GitHub Actions target (#1053). An Actions run replays its
 // transcript in a burst at the end (fresh runner per turn), so a live feed looks stalled with
 // nothing streaming. This says the wait is expected and links through to the live Actions run.
-// Renders nothing for a local/remote/web run, so the run view can mount it unconditionally.
+// Renders nothing for a local/remote/web run, so the agent view can mount it unconditionally.
 export function ActionsRunNotice({
   target,
   events,
@@ -13,7 +13,7 @@ export function ActionsRunNotice({
 }: {
   target?: 'local' | 'actions' | 'remote' | 'web' | undefined
   events: readonly FrameworkEvent[]
-  /** Whether the run is still going: the "updates on completion" line only applies while it runs. */
+  /** Whether the agent is still going: the "updates on completion" line only applies while it runs. */
   live: boolean
 }) {
   if (target !== 'actions') return null

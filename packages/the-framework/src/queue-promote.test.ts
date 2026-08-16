@@ -54,7 +54,7 @@ test('two concurrent drains compose whichever order they land in (#1204)', () =>
 })
 
 test('landPinnedEntry never resurrects an entry another run already retired (#1204)', () => {
-  // The run's branch still shows entry a open, because it forked before the other run landed.
+  // The agent's branch still shows entry a open, because it forked before the other agent landed.
   // Absence, not openness, is what marks a follow-up, so the stale open line is not re-added.
   const checkout = ['- [x] entry a', '- [ ] entry b', ''].join('\n')
   const out = landPinnedEntry(checkout, BASE, 'entry b', BASE)
@@ -101,7 +101,7 @@ test('a pinned run lands only its entry, and commits just the queue file (#1204)
     written.push(c)
   })
   assert.deepEqual(outcome, { promoted: true, branch: 'work' })
-  // The other run's retired entry b is still retired: the run's own stale copy did not land.
+  // The other agent's retired entry b is still retired: the agent's own stale copy did not land.
   assert.match(written[0]!, /- \[x\] entry a/)
   assert.match(written[0]!, /- \[x\] entry b/)
   assert.ok(!calls.some(args => args[0] === 'checkout'), 'a pinned run does not copy the branch file wholesale')
@@ -109,7 +109,7 @@ test('a pinned run lands only its entry, and commits just the queue file (#1204)
 })
 
 test('a pinned run whose entry is already retired lands nothing (#1204)', async () => {
-  // Someone struck it off while the run worked. There is nothing left to do, and nothing on the
+  // Someone struck it off while the agent worked. There is nothing left to do, and nothing on the
   // branch that the fork point did not already have, so no empty commit is written.
   const done = ['## Priority 7', '', '- [x] entry a', '- [ ] entry b', ''].join('\n')
   const git: GitRunner = async args => {
@@ -126,7 +126,7 @@ test('a pinned run whose entry is already retired lands nothing (#1204)', async 
 
 test('an entry removed by hand while the run worked is not resurrected (#1204)', () => {
   // `todo_format.md` makes removal the ordinary way to retire an entry, so "on the branch, absent
-  // here" cannot mean "the run added it". Without the fork point this re-queued struck-off work.
+  // here" cannot mean "the agent added it". Without the fork point this re-queued struck-off work.
   const checkout = ['## Priority 7', '', '- [ ] entry a', ''].join('\n')
   const out = landPinnedEntry(checkout, BASE, 'entry a', BASE)
   assert.doesNotMatch(out, /entry b/)

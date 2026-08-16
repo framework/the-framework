@@ -84,7 +84,7 @@ test('readZip reads stored entries, which is what tiny files get (#610)', () => 
 
 test('readZip survives a transcript larger than one deflate block (#610)', () => {
   // A real transcript is tens of thousands of lines; a fixture that fits in a single
-  // block would not exercise the inflate path the way an actual run does.
+  // block would not exercise the inflate path the way an actual agent does.
   const body = JSON.stringify(Array.from({ length: 5000 }, (_, i) => ({ type: 'assistant', i })))
   const entries = readZip(makeZip([{ name: 'execution.json', body }]))
   assert.equal(entries[0]!.data.toString('utf8'), body)

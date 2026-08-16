@@ -10,7 +10,7 @@ const emptySlots = (): { starting: Set<string>; activeAgents: Map<string, number
   retiring: new Map<string, Promise<void>>(),
 })
 
-// The seam behind #1529: a Resume fired the instant a run flips `done` used to reach the busy
+// The seam behind #1529: a Resume fired the instant an agent flips `done` used to reach the busy
 // guard while the child that wrote that ending was still mid-exit, and the guard refused a
 // session that was over by its own account. These pin the wait's decision table; the settings
 // story exercises the full daemon path.

@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
 } from './ui/dropdown-menu.js'
 
-// The run Context picker (#439/#314) as a dropdown on the launcher's "In play" row. It was an
+// The agent Context picker (#439/#314) as a dropdown on the launcher's "In play" row. It was an
 // inline disclosure that pushed the whole form down when opened; a dropdown keeps it folded away
 // until asked for. Ticking other repos narrows the agent's focus (it can still reach every repo);
 // the Files list shows what a `#` mention or the file tree added, each removable.
@@ -28,7 +28,7 @@ export function ContextMenu({
 }: {
   /** The registered repos other than the current one — the focus targets (#665). */
   otherProjects: ProjectSummary[]
-  /** The run Context set (repo paths + file paths), for the checked state. */
+  /** The agent Context set (repo paths + file paths), for the checked state. */
   context: Set<string>
   /** The individual files in the Context, added via `#` or the tree. */
   contextFiles: string[]

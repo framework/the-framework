@@ -6,7 +6,7 @@ import { errorMessage } from '../error-message.js'
 
 /**
  * The server-side half of "run on a connected device" (#1067). The local daemon holds the saved
- * device's token, so it - not the browser - drives the remote daemon: it POSTs the run to the
+ * device's token, so it - not the browser - drives the remote daemon: it POSTs the agent to the
  * remote's `/_relay/start` and then fetch-streams the remote's `/_relay/events` back into a local
  * {@link EventStream}, which the dashboard reads over its normal same-origin `onEvents` channel. So
  * the browser never talks cross-origin and the token never leaves the two daemons (issue #1067 (b)).
@@ -16,7 +16,7 @@ import { errorMessage } from '../error-message.js'
  * 302, and its `/_rpc` CSRF check (absent Origin passes) is not even on these raw routes.
  */
 
-/** Where a relayed run executes: the remote daemon's origin and its #1051 token. Memory-only. */
+/** Where a relayed agent executes: the remote daemon's origin and its #1051 token. Memory-only. */
 export interface RemoteTarget {
   url: string
   token: string
@@ -58,7 +58,7 @@ function relayHeaders(token: string): Record<string, string> {
 }
 
 /**
- * Start a run on the remote daemon and return its {@link StartAgentResult} (with the remote's own run
+ * Start an agent on the remote daemon and return its {@link StartAgentResult} (with the remote's own run
  * id). A non-2xx or a transport failure surfaces as an `ok: false` result the dashboard shows, the
  * same shape a local refusal has, so the caller does not special-case remote errors.
  */
@@ -80,8 +80,8 @@ export async function startRemoteAgent(target: RemoteTarget, body: RelayStartBod
 const RPC_TIMEOUT_MS = 60_000 // a relayed git push/PR runs over the network on the device
 
 /**
- * Relay one run-scoped RPC to the device that owns a remote run (#1067 slice 2). The local daemon
- * holds the device token, so a read/diff/handoff/push/PR for a relayed run runs ON the device: POST
+ * Relay one run-scoped RPC to the device that owns a remote agent (#1067 slice 2). The local daemon
+ * holds the device token, so a read/diff/handoff/push/PR for a relayed agent runs ON the device: POST
  * {fn, args} to the remote's /_relay/rpc over the shared-token cookie (#1051) (no Origin), returning the device's
  * result. Throws on an unreachable device or a non-2xx so the caller falls back to its own empty/error
  * shape, the same way a failed local read does.
@@ -99,8 +99,8 @@ export async function relayRpc(target: RemoteTarget, fn: string, args: unknown[]
 }
 
 /**
- * Fetch-stream a remote run's newline-delimited events into `onEvent` until the remote closes the
- * body, the run ends, or `cancel()` is called. A 401 (the token was rotated) ends the stream
+ * Fetch-stream a remote agent's newline-delimited events into `onEvent` until the remote closes the
+ * body, the agent ends, or `cancel()` is called. A 401 (the token was rotated) ends the stream
  * cleanly rather than as an error, so the dashboard sees a normal `done`, not a lost connection.
  * Returns a cancel function; calling it aborts the fetch and releases the reader.
  */
@@ -169,27 +169,27 @@ interface RelayedAgent {
 }
 
 /**
- * The local daemon's live relayed runs (#1067), keyed by the remote run id. Registering a run opens
+ * The local daemon's live relayed runs (#1067), keyed by the remote agent id. Registering an agent opens
  * an {@link EventStream} the dashboard reads through `onEvents`, fed by {@link streamRemoteEvents}
  * from the remote. This map is where a saved device's token lives daemon-side: in memory, for the
  * run's lifetime.
  *
- * The `targets` map outlives the event pump (#1067 slice 2): a finished remote run's post-run reads,
+ * The `targets` map outlives the event pump (#1067 slice 2): a finished remote agent's post-run reads,
  * push and open-PR still have to reach the device after its event stream has ended, so the device
  * target is kept until {@link dispose} clears it, not dropped when the stream closes.
  *
- * The `metas` map (#1077) holds a local {@link AgentMeta} stub per relayed run so `onAgents` can show a
+ * The `metas` map (#1077) holds a local {@link AgentMeta} stub per relayed agent so `onAgents` can show a
  * remote run in the session list and re-open it after a dashboard reload; {@link list} projects it
  * per project. Same lifetime as `targets`: it outlives the event stream and is cleared on dispose.
  */
 export class RelayedAgents {
   private readonly agents = new Map<string, RelayedAgent>()
   private readonly targets = new Map<string, RemoteTarget>()
-  // The local AgentMeta stub for each relayed run, so onAgents can show a remote run in the session list
+  // The local AgentMeta stub for each relayed agent, so onAgents can show a remote agent in the session list
   // and re-open it after a reload; outlives the event stream, cleared on dispose (same lifetime as targets).
   private readonly metas = new Map<string, { meta: AgentMeta; projectId: string }>()
 
-  /** Open a local stream for a remote run and start pumping the remote's events into it. */
+  /** Open a local stream for a remote agent and start pumping the remote's events into it. */
   register(agentId: string, target: RemoteTarget, meta: AgentMeta, projectId: string): void {
     this.targets.set(agentId, target) // kept past the stream, for post-run reads/push/PR (slice 2)
     this.metas.set(agentId, { meta, projectId }) // the local list row, so a reload re-opens the run (#1077)
@@ -202,12 +202,12 @@ export class RelayedAgents {
     this.agents.set(agentId, { target, stream, cancel })
   }
 
-  /** The live event stream for a relayed run, or undefined when this daemon is not relaying it. */
+  /** The live event stream for a relayed agent, or undefined when this daemon is not relaying it. */
   get(agentId: string | undefined): EventStream<FrameworkEvent> | undefined {
     return agentId ? this.agents.get(agentId)?.stream : undefined
   }
 
-  /** The device a relayed run runs on, kept past the event stream so post-run push/PR still reach it. */
+  /** The device a relayed agent runs on, kept past the event stream so post-run push/PR still reach it. */
   target(agentId: string | undefined): RemoteTarget | undefined {
     return agentId ? this.targets.get(agentId) : undefined
   }
@@ -220,7 +220,7 @@ export class RelayedAgents {
     return rows.sort((a, b) => (a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0))
   }
 
-  /** Fold each relayed event into the run's list row via the store's own reducer (#1077), so the
+  /** Fold each relayed event into the agent's list row via the store's own reducer (#1077), so the
    *  local stub mirrors the device: the terminal status on `end`, the waiting flag while it is parked
    *  (#785), the driver once its session starts. Events carry no write time, so this stamps its own. */
   private apply(agentId: string, event: FrameworkEvent): void {
@@ -229,13 +229,13 @@ export class RelayedAgents {
     entry.meta = applyEventToMeta(entry.meta, event, new Date().toISOString())
   }
 
-  /** Close a relayed run's event stream (not its target). Idempotent. */
+  /** Close a relayed agent's event stream (not its target). Idempotent. */
   private endStream(agentId: string): void {
     const agent = this.agents.get(agentId)
     if (!agent) return
     this.agents.delete(agentId)
     agent.stream.close() // a clean close surfaces as `done` in the browser, not a lost stream
-    // The stream dropped with no terminal event: the run is no longer live, so stop showing it as such.
+    // The stream dropped with no terminal event: the agent is no longer live, so stop showing it as such.
     const entry = this.metas.get(agentId)
     if (entry && entry.meta.status === 'running') entry.meta.status = 'stopped'
   }

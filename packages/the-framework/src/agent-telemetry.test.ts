@@ -5,7 +5,7 @@ import type { Driver } from './driver/index.js'
 import type { FrameworkEvent } from './events.js'
 
 // #1322: the resume button needed a `session-update`, which only fired at `result` — a turn
-// stopped mid-flight took the session id (the run's `claude --resume` handle) down with it.
+// stopped mid-flight took the session id (the agent's `claude --resume` handle) down with it.
 // The driver's turn-start announcement now lands the update before anything can lose it.
 
 function handler(events: FrameworkEvent[], sessionLink?: string) {

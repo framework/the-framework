@@ -4,7 +4,7 @@ import type { FrameworkEvent } from '../../dist/index.js'
 // dashboard stamps each one as it comes off the channel. A side table rather than a field:
 // the event type stays the framework's, and everything downstream (live-state selectors,
 // the replay path, tests) keeps passing plain FrameworkEvent[] around. Replayed events are
-// never stamped, so a past run simply shows no times instead of wrong ones.
+// never stamped, so a past agent simply shows no times instead of wrong ones.
 const receivedTimes = new WeakMap<FrameworkEvent, number>()
 
 /** Stamp an event with "now" as it arrives off the live channel. */

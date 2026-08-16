@@ -25,7 +25,7 @@ import { nodeGitRunner, type GitRunner } from './project.js'
 /** The directory, under a user's own directory, that holds their archived runs. */
 export { ARCHIVE_DIR }
 
-/** Where a run's history goes when git has no identity configured. */
+/** Where an agent's history goes when git has no identity configured. */
 export const ANONYMOUS_USER_DIR = 'anonymous'
 
 /**
@@ -82,7 +82,7 @@ export async function ensureArchiveIgnored(cwd: string, _user: string, fs: Store
  * The directory name for the identity this repo commits under, from `git config user.email`.
  *
  * Cached per repo for the process's life: it is read on every archive, it changes about as often
- * as a git identity does, and a run that outlived a config change would only mean the next run
+ * as a git identity does, and an agent that outlived a config change would only mean the next agent
  * files itself correctly. A missing or unreadable identity yields {@link ANONYMOUS_USER_DIR}, so
  * history is still kept — filing it under a placeholder is strictly better than dropping it.
  */

@@ -24,7 +24,7 @@ async function registerProject(cwd: string, over: Parameters<typeof provideTestC
   return projectId(resolve(cwd))
 }
 
-// A run started from the dashboard has to name the ticket it is about to implement, the same way
+// An agent started from the dashboard has to name the ticket it is about to implement, the same way
 // the sweep's own drain does (#1117). The daemon reads that off the `drains` flag on its job; a
 // click arrives with nothing but prompt text, so the resolution happens here.
 
@@ -50,7 +50,7 @@ test('a drain started from the dashboard carries the ticket it is about to work 
   try {
     const result = await sendStart(id, presets.drainQueue.render())
     assert.equal(result.ok, true)
-    // Without this the run implemented the ticket and the Overview's in-progress lane stayed empty,
+    // Without this the agent implemented the ticket and the Overview's in-progress lane stayed empty,
     // because only the daemon's own drain was tagging what it took off the queue.
     assert.equal(started()?.ticket, 'tickets/2026-07-25_login.md')
   } finally {
@@ -63,7 +63,7 @@ test('any other prompt starts without a ticket, however busy the queue is (#1117
   try {
     await sendStart(id, 'Have a look at the login page')
     // Naming the queue's next entry here would show a ticket as being implemented on the strength
-    // of a run that never touched it.
+    // of an agent that never touched it.
     assert.equal(started()?.ticket, undefined)
   } finally {
     await rm(cwd, { recursive: true, force: true })

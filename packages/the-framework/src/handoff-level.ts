@@ -41,7 +41,7 @@ export function handoffReaches(level: HandoffLevel, rung: HandoffLevel): boolean
 }
 
 /**
- * The ladder as the three questions the run and the UI actually ask of it.
+ * The ladder as the three questions the agent and the UI actually ask of it.
  *
  * Derived rather than stored: this is a view of the ordinal, so a caller can keep saying "is the
  * push armed" without any of them being able to disagree with each other.

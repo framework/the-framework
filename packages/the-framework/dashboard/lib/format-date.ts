@@ -1,4 +1,4 @@
-// Timestamps reach the UI as plain strings: a run's `startedAt` from the store, a log
+// Timestamps reach the UI as plain strings: an agent's `startedAt` from the store, a log
 // entry's `at` read verbatim out of a LOGS.md heading. Nothing validates them on the way
 // in, and `new Date(...).toLocaleString()` renders anything it cannot parse as the literal
 // "Invalid Date" (#759). So every display site formats through here, and an absent or

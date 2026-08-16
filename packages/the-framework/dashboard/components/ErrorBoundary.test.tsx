@@ -5,7 +5,7 @@ import { ErrorBoundary } from './ErrorBoundary.js'
 afterEach(cleanup)
 
 // React logs a caught render error to console.error (twice, plus the boundary's own log). That is
-// expected here and only clutters the run, so swallow it for these cases.
+// expected here and only clutters the agent, so swallow it for these cases.
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })

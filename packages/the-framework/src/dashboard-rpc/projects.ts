@@ -9,7 +9,7 @@ import type { AddProjectResult, OnboardingSuggestion } from '../dashboard/types.
 import type { DashboardContext } from '../dashboard/rpc-serve.js'
 
 // The Projects sidebar behind the new dashboard (#405): the global registry (#390) the
-// daemon and CLI write — id, path, name, activated, last activity. The per-run
+// daemon and CLI write — id, path, name, activated, last activity. The per-agent
 // foreground dashboard (#427) scopes this to a single project via the request context.
 // The live event stream is its own endpoint rather than a call (`GET /_rpc/events`).
 export async function onProjects(): Promise<ProjectSummary[]> {
@@ -47,7 +47,7 @@ export async function onOnboarding(): Promise<OnboardingSuggestion> {
 }
 
 /**
- * Whether Claude Code trusts this project's root (#1318): the launcher warns before a web run
+ * Whether Claude Code trusts this project's root (#1318): the launcher warns before a web agent
  * on an untrusted project, which is doomed to die on the CLI's interactive trust dialog
  * (#1314), instead of after it. Read-only — trusting a folder stays the user's own act in the
  * CLI; run worktrees inherit the root's answer. `null` when the project is unknown here, and

@@ -57,7 +57,7 @@ export interface DriverStartOptions {
   /**
    * Resume a prior agent session id (#720): seed the session so its very first
    * prompt (with `resume`) continues that conversation instead of starting fresh.
-   * This is how a finished run is revived from the dashboard — its captured session
+   * This is how a finished agent is revived from the dashboard — its captured session
    * id is threaded here so the opening message lands with the full prior context.
    * A driver that can't resume ignores it and runs fresh (the best-effort contract).
    */
@@ -65,7 +65,7 @@ export interface DriverStartOptions {
   /**
    * Observe the agent's *own* progress as it works. Black-box granularity: we
    * forward these for visibility (the dashboard) but never branch control flow
-   * on them. Isolated: a throwing callback must not break the run.
+   * on them. Isolated: a throwing callback must not break the agent.
    */
   onEvent?: (event: DriverEvent) => void
 }
@@ -156,7 +156,7 @@ export interface DriverUsage {
  * Where the account's subscription quota stands, as reported by the wrapped
  * agent (#517). Claude Code emits one of these per turn on its `stream-json`
  * output; drivers that cannot report it simply omit it. This is the account
- * limit, not this run's spend — {@link DriverUsage} covers the latter.
+ * limit, not this agent's spend — {@link DriverUsage} covers the latter.
  */
 export interface DriverRateLimit {
   /**
@@ -264,7 +264,7 @@ export type DriverEvent =
   /**
    * The agent announced its session id, at the start of the turn (#1322). `result` repeats it,
    * but a turn that never settles — a manual Stop, an error, a kill — used to take the id down
-   * with it, and with it the run's `claude --resume` handle. Telemetry consumes this one rather
+   * with it, and with it the agent's `claude --resume` handle. Telemetry consumes this one rather
    * than forwarding it: the id is plumbing, not conversation.
    */
   | { type: 'session'; sessionId: string }

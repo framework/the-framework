@@ -54,7 +54,7 @@ const EMPTY_STATUS: Record<string, FileGitStatus> = {}
 
 // The project panel's file tree (#492): a lazy, collapsible tree built from the flat
 // `git ls-files` list (onProjectFiles, shared with the `#` picker #504). It is a file-level
-// CONTEXT PICKER, not an editor — clicking a file toggles it in the run Context, the same
+// CONTEXT PICKER, not an editor — clicking a file toggles it in the agent Context, the same
 // set the `#` chips and the whole-repo Context selector feed. Localhost-only: no files (the
 // relay has no checkout) renders nothing.
 //
@@ -116,7 +116,7 @@ export function FileTree({
   onToggle,
 }: {
   projectId: string
-  /** The selected run, so the dots describe its worktree and not the project root (#815). */
+  /** The selected agent, so the dots describe its worktree and not the project root (#815). */
   agentId?: string | null | undefined
   files: string[]
   selected: Set<string>
@@ -124,8 +124,8 @@ export function FileTree({
 }) {
   const [query, setQuery] = useState('')
 
-  // Per-file git status for the dots (#492): polled so it tracks a run editing files. Scoped to
-  // the selected run's worktree (#815) so the dots agree with the branch and Serve in the action
+  // Per-file git status for the dots (#492): polled so it tracks an agent editing files. Scoped to
+  // the selected agent's worktree (#815) so the dots agree with the branch and Serve in the action
   // bar right above, which have resolved the worktree since #738.
   const { value: status } = usePolled<Record<string, FileGitStatus>>(
     () => onProjectFileStatus(projectId, agentId ?? undefined),

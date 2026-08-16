@@ -21,19 +21,19 @@ export const RESUME_MESSAGE =
 
 // One composer for a session, live or finished (#1026).
 //
-// There used to be two: AgentChat while the run was running, AgentResumeChat once it ended. They
+// There used to be two: AgentChat while the agent was running, AgentResumeChat once it ended. They
 // looked identical and differed only in what submit did, but the session view swapped one for the
-// other the moment a run stopped — so the editor remounted under the user, taking any half-typed
-// message with it, and for a run that never reported a session id the composer vanished entirely
+// other the moment an agent stopped — so the editor remounted under the user, taking any half-typed
+// message with it, and for an agent that never reported a session id the composer vanished entirely
 // and left a dead end.
 //
 // So the composer stays; the send changes:
-//   - running          → a `message` control entry the run drains between turns (#714)
-//   - ended, resumable → a fresh run seeded with `--resume <sessionId>`, continuing this run (#720)
+//   - running          → a `message` control entry the agent drains between turns (#714)
+//   - ended, resumable → a fresh agent seeded with `--resume <sessionId>`, continuing this agent (#720)
 //   - ended, no id     → a new session carrying the text, which is all that is left to offer
-// A new-session preset (#959) always starts its own run, in every one of those states.
+// A new-session preset (#959) always starts its own agent, in every one of those states.
 //
-// The empty box's submit slot is the session's control (#1455): Stop while the run is live (the
+// The empty box's submit slot is the session's control (#1455): Stop while the agent is live (the
 // pause that used to hide in the ⋮ menu), Resume once it was stopped (the offer that used to sit
 // in the action bar, #1391). Typing swaps the slot back to the send ↑ — one slot, three states,
 // like Claude Code's composer.
@@ -53,20 +53,20 @@ export function AgentComposer({
   projectId: string
   /** Which run this addresses (#749); absent falls back to the project's control log. */
   agentId?: string | null | undefined
-  /** Whether the run is still running — the only thing that changes what a send does. */
+  /** Whether the agent is still running — the only thing that changes what a send does. */
   live: boolean
-  /** The agent session id, once reported: what a finished run resumes from. */
+  /** The agent session id, once reported: what a finished agent resumes from. */
   sessionId?: string | undefined
   /** The driver that ran it, so a continuation resumes on the same agent (#831). */
   driver?: string | undefined
   files: string[]
   addContext: (path: string) => void
-  /** Drop a path from the run Context when its chip leaves the editor (#948). */
+  /** Drop a path from the agent Context when its chip leaves the editor (#948). */
   removeContext?: ((path: string) => void) | undefined
   /** This session's name (#874), so a preset launched here targets it by default. */
   sessionName?: string | undefined
   onAgentStarted?: ((intent: string, agentId?: string) => void) | undefined
-  /** How the run ended (#948), so the note does not call a crash "ended". */
+  /** How the agent ended (#948), so the note does not call a crash "ended". */
   outcome?: AgentOutcome | undefined
 }) {
   const composerRef = useRef<ComposerHandle>(null)
@@ -75,7 +75,7 @@ export function AgentComposer({
   // The slot's Stop (#1455), its own action so a message send's busy beat cannot read as
   // "stopping". A landed Stop stays "Stopping…" until the end event flips `live`, so it cannot
   // be re-fired — the same latch the ⋮ menu's Stop keeps. Released the moment `live` drops, not
-  // only on a run switch: a Resume continues the SAME run (#762), so a latch keyed to the run id
+  // only on an agent switch: a Resume continues the SAME agent (#762), so a latch keyed to the agent id
   // alone re-engaged on the resumed session and froze its Stop as a disabled spinner.
   const { busy: stopBusy, error: stopError, run: runStop } = useAction()
   const [stopRequested, setStopRequested] = useState(false)
@@ -85,7 +85,7 @@ export function AgentComposer({
   }, [live])
   // The mirror latch for Resume (#1460): between the resume RPC resolving and the resumed leg's
   // first event flipping `live`, `outcome` momentarily stops reading `stopped` — without this the
-  // slot flickered Resume → collapsed → Stop. Released when the run reads live (the normal exit)
+  // slot flickered Resume → collapsed → Stop. Released when the agent reads live (the normal exit)
   // or when the row changes under the composer.
   const [resuming, setResuming] = useState(false)
   useEffect(() => setResuming(false), [agentId])
@@ -100,8 +100,8 @@ export function AgentComposer({
 
   const send = async (text: string, _kind: 'build' | 'prompt', opts: { newAgent: boolean }): Promise<void> => {
     if (busy || starting) return
-    // A new-session preset is not a continuation (#959): it drops the resume seed and the run id,
-    // so it opens its own run with its own worktree, branch and transcript.
+    // A new-session preset is not a continuation (#959): it drops the resume seed and the agent id,
+    // so it opens its own agent with its own worktree, branch and transcript.
     if (opts.newAgent || (!live && !resumable)) {
       const started = await start(projectId, text, 'prompt', {})
       if (started) {
@@ -125,8 +125,8 @@ export function AgentComposer({
       composerRef.current?.focus()
       return
     }
-    // A continuation is a `prompt` run seeded with the finished run's session id (#720). It
-    // resumes on the run's own agent; the model and the system-prompt options are moot here, since
+    // A continuation is a `prompt` run seeded with the finished agent's session id (#720). It
+    // resumes on the agent's own agent; the model and the system-prompt options are moot here, since
     // the resumed transcript keeps the framing and model it already had.
     // The session records the implementation that ran it; the option takes the driver name (#831).
     const picked = driverFromImpl(driver)
@@ -136,8 +136,8 @@ export function AgentComposer({
       'prompt',
       {
         resumeSession: sessionId as string,
-        // Continue this run rather than opening a new row (#762): the follow-up writes into the
-        // same run, on the same branch, so one thing you asked for stays one entry.
+        // Continue this agent rather than opening a new row (#762): the follow-up writes into the
+        // same agent, on the same branch, so one thing you asked for stays one entry.
         ...(agentId ? { continueAgentId: agentId } : {}),
         ...(picked && picked !== 'claude' ? { driver: picked } : {}),
       },
@@ -254,7 +254,7 @@ export function AgentComposer({
   )
 }
 
-/** A run that ended before reporting a session id cannot be resumed by any agent — the one state
+/** An agent that ended before reporting a session id cannot be resumed by any agent — the one state
  *  where the box is not a continuation. It is the composer's own placeholder rather than a note
  *  above it: the message is about what typing here does, so it belongs where you type. */
 const NOT_CONTINUABLE =

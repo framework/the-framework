@@ -16,7 +16,7 @@ export interface ProjectStat {
   projectName: string
   /** Whether the repo still has its `.the-framework/` marker. */
   activated: boolean
-  /** Whether a run is live for this project right now. */
+  /** Whether an agent is live for this project right now. */
   running: boolean
   /** Archived (finished) runs recorded under `agents/`. */
   agents: number

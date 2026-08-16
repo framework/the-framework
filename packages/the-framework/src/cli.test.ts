@@ -20,10 +20,10 @@ import {
   runCli,
   agentLogKind,
   runOnBeforeMergeable,
-  sessionOptions,
+  agentOptions,
   unguardedNotices,
   type CliIO,
-  type SessionOptions,
+  type AgentOptions,
   isSteerable,
   isInteractive,
 } from './cli.js'
@@ -44,8 +44,8 @@ function spec(fields: Partial<AgentSpec> = {}): AgentSpec {
 }
 
 /** A session's resolved options, straight off a spec — the shape `parseArgs` used to return. */
-function opts(fields: Partial<AgentSpec> = {}): SessionOptions {
-  return sessionOptions(spec(fields))
+function opts(fields: Partial<AgentSpec> = {}): AgentOptions {
+  return agentOptions(spec(fields))
 }
 
 /**
@@ -101,7 +101,7 @@ test('parseArgs keeps four options and no verbs (D4)', () => {
   assert.match(parseArgs(['--port', 'x']).error!, /--port/)
 })
 
-test('the session spec is what carries a session, and it round-trips through sessionOptions (D4)', () => {
+test('the session spec is what carries a session, and it round-trips through agentOptions (D4)', () => {
   const o = opts({ prompt: 'a blog app', kind: 'prompt', cwd: '/work/api', agentId: 'r1', continueAgent: true })
   assert.equal(o.intent, 'a blog app')
   assert.equal(o.cwd, '/work/api')
@@ -114,7 +114,7 @@ test('the session spec is what carries a session, and it round-trips through ses
 test('the backlog loop runs unless the spec says otherwise (#323)', () => {
   assert.equal(opts().todoLoop, true)
   assert.equal(opts().todoMaxItems, undefined)
-  // Unattended (#846): off unless asked, so an ordinary run still parks its gates for the human.
+  // Unattended (#846): off unless asked, so an ordinary agent still parks its gates for the human.
   assert.equal(opts().unattended, undefined)
   assert.equal(opts({ options: { unattended: true } }).unattended, true)
 })
@@ -135,7 +135,7 @@ test('the browser is opt-in (#452)', () => {
 })
 
 test('the handoff resolves to the PR rung, which is what makes it zero-config (#1102)', () => {
-  // Unlike most toggles, nobody saying anything means yes: a plain run pushes its branch and
+  // Unlike most toggles, nobody saying anything means yes: a plain agent pushes its branch and
   // opens a draft PR when it finishes. A spec that says nothing leaves it unset, so the repo's
   // the-framework.yml can decide (#1173).
   assert.equal(opts().handoff, undefined)
@@ -183,7 +183,7 @@ test('promptAgentSpec runs a headless prompt and carries NO onBeforeMergeable (r
 
 test('promptAgentSpec goes vanilla so the on-before-mergeable follow-up skips the session-name branch step (#560)', () => {
   // The follow-up is not a session; vanilla drops the built-in system prompt (#326) (and its `### Session
-  // name` step), so the run stays on the session branch instead of stranding its output.
+  // name` step), so the agent stays on the session branch instead of stranding its output.
   assert.equal(promptAgentSpec('queue follow-ups', '/work/app', true).options.vanilla, true)
 })
 
@@ -227,7 +227,7 @@ test('the ticket a session implements is re-checked, since it comes off a file a
   for (const bad of ['tickets/../etc/passwd', '/etc/passwd', 'TODO_AGENTS.md', '']) {
     assert.equal(opts({ options: { ticket: bad } }).ticket, undefined, `expected ${bad} to be dropped`)
   }
-  // A planning run says so (#1327): it is what keeps its PR title from inheriting the ticket's
+  // A planning agent says so (#1327): it is what keeps its PR title from inheriting the ticket's
   // issue as `(fix #42)` and closing it with the work still undone.
   assert.equal(opts({ options: { planAgent: true } }).planAgent, true)
 })
@@ -240,7 +240,7 @@ test('transparent is unset by default (#625)', () => {
 })
 
 test('the built-in prompt is off for a vanilla session or the-framework.yml vanilla:true (#314/C3)', () => {
-  // One name and one polarity across the session, the file and the run option (C3). The file used
+  // One name and one polarity across the session, the file and the agent option (C3). The file used
   // to spell this `antiLazyPill` — and the other way round — so every layer boundary was also an
   // inversion, which is what three apologising comments were for.
   assert.equal(mergeAgentConfig(opts(), {}).vanilla, false)
@@ -254,7 +254,7 @@ test('agentLogKind maps the run path to the flow recorded on the meta (#379/#146
   assert.equal(agentLogKind({ directPrompt: false, research: false }), 'build')
   assert.equal(agentLogKind({ directPrompt: true, research: false }), 'prompt')
   assert.equal(agentLogKind({ directPrompt: false, research: true }), 'prompt')
-  // Transparent (#625) routes a build-kind run through the raw prompt path, so it records as one.
+  // Transparent (#625) routes a build-kind agent through the raw prompt path, so it records as one.
   assert.equal(agentLogKind({ directPrompt: false, research: false }, true), 'prompt')
 })
 
@@ -367,7 +367,7 @@ test('a session persists itself, and the modes stay unset until the spec names t
 test('mergeAgentConfig: the-framework.yml supplies defaults, flags override (#258)', () => {
   const flags = {}
   const modes = (config: { vanilla: boolean; transparent: boolean }) => [config.vanilla, config.transparent]
-  // file-only: the repo config drives the run
+  // file-only: the repo config drives the agent
   const fromFile = mergeAgentConfig(flags, { preset: 'software-development', transparent: true })
   assert.equal(fromFile.presetName, 'software-development')
   assert.deepEqual(modes(fromFile), [false, true])
@@ -506,7 +506,7 @@ test('the dashboard steers a dashboard-less run through its gates via control.js
 
     const { io, out } = capture()
     let settled = false
-    // --run-id is what the dashboard passes when it spawns, and what makes this run steerable
+    // --run-id is what the dashboard passes when it spawns, and what makes this agent steerable
     // (#905): the dashboard drives the control file on the other end.
     const done = runAgentCli({ cwd, agentId: 'r-steer' }, io).finally(
       () => (settled = true),
@@ -531,7 +531,7 @@ test('the dashboard steers a dashboard-less run through its gates via control.js
       }
       // The steered build now stays open waiting for a chat message or Stop (#714). Once it has
       // been steered through its gate and produced its output, end it with a Stop, exactly as the
-      // dashboard's Stop button would; otherwise `done` never resolves and the run hangs.
+      // dashboard's Stop button would; otherwise `done` never resolves and the agent hangs.
       if (answered.has('await-choices') && /\u2713 done/.test(out.join('\n'))) {
         await appendControl(cwd, { kind: 'stop' })
         break
@@ -572,7 +572,7 @@ test('a declined post-merge cleanup lands in the archived event log, not on stdo
   const dir = await mkdtemp(join(tmpdir(), 'framework-obm-'))
   try {
     const { io } = capture()
-    // A fake run never signals ready-for-merge, so the step declines. The point is that the
+    // A fake agent never signals ready-for-merge, so the step declines. The point is that the
     // decline is *reported*: it has to survive into runs/, which close() copies the log into.
     const code = await runAgentCli({ prompt: 'review the auth flow', kind: 'prompt', cwd: dir, options: { onBeforeMergeable: true } }, io)
     assert.equal(code, 0)
@@ -678,7 +678,7 @@ test('naming the session renames the run-id branch and records it as a branch ev
   git('config', 'user.email', 'test@example.com')
   git('config', 'user.name', 'Test')
   git('commit', '--allow-empty', '-q', '-m', 'seed')
-  // The state allocateWorkspace leaves a run in: checked out on its run-id branch (#736).
+  // The state allocateWorkspace leaves an agent in: checked out on its run-id branch (#736).
   git('checkout', '-q', '-b', 'the-framework/agent-r1')
   const { io, out } = capture()
   const journal = createAgentJournal({
@@ -729,7 +729,7 @@ test('a browser URL is held until the session opens, then re-said after every la
  * A `--run-on actions` run with no token must end as `failed`, and must end at all.
  *
  * Both halves regressed together. The config check sits after `agent.json` is written but before
- * `settleAgent` owns the run, so returning raw left the status at `running` with nobody to correct
+ * `settleAgent` owns the agent, so returning raw left the status at `running` with nobody to correct
  * it; and the control tail it had already wired held the event loop open, so the process never
  * exited either. From the dashboard that was a session stuck on "running" forever, with the real
  * reason sitting unread in stderr.log.
@@ -758,7 +758,7 @@ test('a --run-on actions run with no token anywhere ends failed instead of hangi
   await writeFile(join(stubBin, 'gh'), '#!/bin/sh\nexit 1\n', { mode: 0o755 })
 
   const bin = new URL('./bin.js', import.meta.url)
-  // Scrubbed, not overridden: an inherited token from the developer's shell would take the run
+  // Scrubbed, not overridden: an inherited token from the developer's shell would take the agent
   // past the very branch under test.
   const { GH_TOKEN: _gh, GITHUB_TOKEN: _gathub, ...rest } = process.env
   const env = { ...rest, PATH: `${stubBin}:${rest.PATH ?? ''}` }

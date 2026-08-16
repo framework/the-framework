@@ -18,8 +18,8 @@ import type { FrameworkEvent } from '../events.js'
 import type { HandoffResult } from './agent-handoff.js'
 
 // The real two-daemon proof for "run on a connected device" (#1067). Two HTTP servers stand up on
-// loopback: daemon A (the browser's local daemon, a real project runtime) relays a run to daemon B
-// (the device, a dashboard whose Start is stubbed so no agent actually spawns). We assert the run
+// loopback: daemon A (the browser's local daemon, a real project runtime) relays an agent to daemon B
+// (the device, a dashboard whose Start is stubbed so no agent actually spawns). We assert the agent
 // is created on B, that A never touched its own busy guard, and that B's events stream back through
 // A's relayed-run source in order. That is the whole path minus the final same-origin RPC hop on A,
 // which relay.test.ts / server.test.ts cover on their own.
@@ -96,7 +96,7 @@ test('a run submitted with options.remote is created on the other daemon and its
   try {
     const result = await runtimeA.onStart('build the thing', 'build', { remote: { url: deviceB.url, token: TOKEN, label: 'my-laptop' } })
 
-    // The run was created on B, and A returned B's own run id (not a locally allocated one).
+    // The agent was created on B, and A returned B's own run id (not a locally allocated one).
     assert.equal(result.ok, true)
     assert.equal(result.ok && result.agentId, B_RUN)
     assert.equal(bStarts.length, 1)
@@ -107,7 +107,7 @@ test('a run submitted with options.remote is created on the other daemon and its
     // A's own busy guard never fired: it allocated no worktree and spawned nothing.
     assert.equal(runtimeA.activeAgentCount(homeIdA), 0)
 
-    // The relayed run keeps a local list row on A (#1077), so a dashboard reload re-opens it instead of
+    // The relayed agent keeps a local list row on A (#1077), so a dashboard reload re-opens it instead of
     // losing it: a remote stub carrying B's run id, the device label, and the prompt, running until the
     // relay stream ends. Read before draining, while it is still live.
     const listed = runtimeA.remoteAgents.list(homeIdA)

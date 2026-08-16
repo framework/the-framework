@@ -17,7 +17,7 @@ import type { Intervention } from './interventions.js'
 
 /**
  * The stable identity of an intervention. A PR is its url (survives title edits and re-sorts);
- * the other two are keyed on the project plus the thing waiting — the gate id, or the run whose
+ * the other two are keyed on the project plus the thing waiting — the gate id, or the agent whose
  * branch is unpushed — since their url is the shared dashboard URL and would otherwise collide.
  */
 export function interventionKey(item: Intervention): string {
@@ -36,7 +36,7 @@ export function pickNewInterventions(seen: ReadonlySet<string>, current: Interve
 
 /**
  * The stable identity of an activity item: its kind + project + run. The kind is part of the key
- * so a run's `started` and `finished` are two separate announcements (one when it kicks off, one
+ * so an agent's `started` and `finished` are two separate announcements (one when it kicks off, one
  * when it lands), each firing exactly once.
  */
 export function activityKey(item: Activity): string {

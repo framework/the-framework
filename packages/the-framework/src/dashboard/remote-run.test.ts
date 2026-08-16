@@ -14,7 +14,7 @@ async function server(handler: (req: IncomingMessage, res: ServerResponse) => vo
   return { url: `http://127.0.0.1:${port}`, close: () => new Promise<void>(r => srv.close(() => r())) }
 }
 
-// A minimal running AgentMeta stub, the local list row RelayedAgents keeps for a relayed run (#1077).
+// A minimal running AgentMeta stub, the local list row RelayedAgents keeps for a relayed agent (#1077).
 function stubMeta(id: string, overrides: Partial<AgentMeta> = {}): AgentMeta {
   const now = new Date().toISOString()
   return { version: AGENT_META_VERSION, status: 'running', id, startedAt: now, updatedAt: now, target: 'remote', ...overrides }
@@ -252,7 +252,7 @@ test('RelayedAgents.list surfaces a relayed run as a remote row, scoped to its p
   }
 })
 
-// Register a relayed run against a device that emits one log line then an optional end line and closes,
+// Register a relayed agent against a device that emits one log line then an optional end line and closes,
 // and return the status left on its list row once RelayedAgents has fully drained the stream (#1077).
 async function relayEndStatus(endEvent: FrameworkEvent | null): Promise<string | undefined> {
   const srv = await server((_req, res) => {
@@ -279,7 +279,7 @@ test("a relayed run's list row flips to the device's ending, or stopped if the s
 })
 
 test('a relayed run reads as waiting while the device has it parked on the user (#1067/#785)', async () => {
-  // The device streams `settled` and keeps the run alive: the local list row must mirror that as
+  // The device streams `settled` and keeps the agent alive: the local list row must mirror that as
   // waiting (settledAt set, still running), not a permanent running, so the badge matches the device.
   const srv = await server((_req, res) => {
     res.writeHead(200, { 'content-type': 'application/x-ndjson' })

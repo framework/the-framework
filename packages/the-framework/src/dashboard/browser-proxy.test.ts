@@ -4,7 +4,7 @@ import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { parseBrowserRoute, handleBrowserProxy, type BrowserPortLookup } from './browser-proxy.js'
 
-// #813: the pane is served through the daemon so it stays same-origin, and so the run's own
+// #813: the pane is served through the daemon so it stays same-origin, and so the agent's own
 // port is never something a client gets to name.
 
 test('parseBrowserRoute reads a project, a run, and a leg', () => {
@@ -38,7 +38,7 @@ test('parseBrowserRoute survives a malformed escape or target instead of throwin
   assert.equal(parseBrowserRoute('http://['), undefined)
 })
 
-/** A stand-in for the run's bridge, recording what reached it. */
+/** A stand-in for the agent's bridge, recording what reached it. */
 async function fakeBridge(): Promise<{ port: number; hits: { url: string; body: string }[]; close: () => void }> {
   const hits: { url: string; body: string }[] = []
   const server: Server = createServer((req, res) => {
@@ -102,7 +102,7 @@ test('forwards an input POST body through to the bridge', async () => {
 })
 
 test('404s a run with no preview rather than reaching for a port', async () => {
-  // The ordinary case: a run started without Browser, or one that already ended.
+  // The ordinary case: an agent started without Browser, or one that already ended.
   const proxy = await proxyServer(async () => undefined)
   try {
     const res = await fetch(`${proxy.url}/browser/proj/run/stream`)
@@ -113,7 +113,7 @@ test('404s a run with no preview rather than reaching for a port', async () => {
 })
 
 test('502s when the bridge is gone', async () => {
-  // A port from a run that just died: the connection is refused, and that must answer rather
+  // A port from an agent that just died: the connection is refused, and that must answer rather
   // than hang the pane.
   const bridge = await fakeBridge()
   const dead = bridge.port

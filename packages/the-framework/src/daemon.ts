@@ -125,7 +125,7 @@ export interface RunDaemonOptions {
   host?: string
   /** Shut the daemon down when this aborts (in addition to SIGINT/SIGTERM). For tests. */
   signal?: AbortSignal
-  /** The CLI entry script to re-invoke for a dashboard-started run (#345). Default `process.argv[1]`. */
+  /** The CLI entry script to re-invoke for a dashboard-started agent (#345). Default `process.argv[1]`. */
   binPath?: string
   /** Env the registry is read from. Default `process.env`; injectable for tests. */
   env?: NodeJS.ProcessEnv
@@ -156,7 +156,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   const bridgeOn = (await readPreferences(undefined, env).catch((): Preferences => ({}))).bridge === true
   const bridgeToken = bridgeOn ? await ensureDaemonToken(undefined, env) : undefined
   // Steering (#344): the daemon owns no run, so its Stop button and choice picks
-  // append to `.the-framework/control.jsonl`; the live run tails that file. Appends
+  // append to `.the-framework/control.jsonl`; the live agent tails that file. Appends
   // are best-effort — a full disk must not take the dashboard down with it.
   // The event/control logs and the fs.watch all live under `.the-framework/` — create
   // it up front so the daemon works as the very first command in a fresh workspace
@@ -204,8 +204,8 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     quota,
     onStart: runtime.onStart,
     onAddProject: runtime.onAddProject,
-    // Relay a run to/from a connected device (#1067): the events source streams a run this daemon
-    // is relaying, `remote` lets the read RPCs forward a remote run's reads/steer/push to its device
+    // Relay an agent to/from a connected device (#1067): the events source streams an agent this daemon
+    // is relaying, `remote` lets the read RPCs forward a remote agent's reads/steer/push to its device
     // (slice 2), and the `/_relay/*` endpoints let another daemon run + read + steer a session here.
     eventsSource: runtime.remoteEventsSource,
     remote: runtime.remoteAgents,
@@ -243,7 +243,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     throw err
   }
 
-  // Every background start is a verbatim prompt run (#353): these are preset prompts and chat
+  // Every background start is a verbatim prompt agent (#353): these are preset prompts and chat
   // text, not build intents to scaffold from.
   const startAgent = (prompt: string, options: StartAgentOptions, id: string) => runtime.onStart(prompt, 'prompt', options, id)
 
@@ -267,15 +267,15 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
 
   await waitForShutdown(opts.signal)
 
-  // Nothing may start or steer a run from here on, so the background services go first (#923):
+  // Nothing may start or steer an agent from here on, so the background services go first (#923):
   // auto PM or a Discord message arriving mid-shutdown would start one while we stop the rest.
   await services.quiesce()
-  // Stop the runs this daemon spawned, before the previews they may be serving. Left running they
+  // Stop the agents this daemon spawned, before the previews they may be serving. Left running they
   // are orphans nothing tracks; stopped here they keep their worktree and branch, so the dashboard
   // can continue them on the next start.
   const stopped = await runtime.stopAgents().catch(() => 0)
   if (stopped > 0) console.log(`[framework] stopped ${stopped} agent(s)`)
-  // Now that the runs' last events are on disk, commit their archives (#912/#1179) — otherwise an
+  // Now that the agents' last events are on disk, commit their archives (#912/#1179) — otherwise an
   // uncommitted session sits until a human notices, which is the gap that service exists to close.
   const committed = await services.flushAgents()
   if (committed > 0) console.log(`[framework] committed agent archives in ${committed} project(s)`)
@@ -305,7 +305,7 @@ function waitForShutdown(signal?: AbortSignal): Promise<void> {
 /**
  * The cloud sessions the browser bridge should have a tab open for (#1237).
  *
- * Across every registered project, because a cloud run is not tied to the daemon's home
+ * Across every registered project, because a cloud agent is not tied to the daemon's home
  * checkout, and best-effort per project so one unreadable repo cannot empty the list.
  */
 async function listBridgeSessions(env: NodeJS.ProcessEnv): Promise<BridgeSession[]> {

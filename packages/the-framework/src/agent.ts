@@ -24,7 +24,7 @@ import { isHandsOff, type AgentLocation } from './agent-location.js'
  */
 
 /** What a session is: an intent to build from, or a prompt to run verbatim. */
-export type SessionKind = 'build' | 'prompt'
+export type AgentKind = 'build' | 'prompt'
 
 /** Options for {@link runAgent}. */
 export interface RunAgentOptions {
@@ -34,7 +34,7 @@ export interface RunAgentOptions {
    */
   prompt: string
   /** Which opening prompt this session gets, and whether the backlog loop follows. Default `build`. */
-  kind?: SessionKind
+  kind?: AgentKind
   /**
    * Where this session's turns execute (#1050/#610). Default `local`. Only `web` hands the work
    * somewhere this machine cannot follow, which makes the opening prompt the whole session —
@@ -178,7 +178,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
     sessionLink: opts.sessionLink,
   })
 
-  // One driver session for the whole run; each prompt is a fresh invocation. A continuation
+  // One driver session for the whole agent; each prompt is a fresh invocation. A continuation
   // (#720/#1467) resumes the stopped leg's conversation instead of starting anew.
   const resuming = typeof opts.resumeSessionId === 'string' && opts.resumeSessionId.length > 0
   const session: DriverSession = await opts.driver.start({
@@ -211,7 +211,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
     if (rounds.exhausted) emit({ kind: 'log', message: 'Finishing the session (await limit reached).' })
     // An answer marked `stop` (#358) ends the session rather than carrying on: the user takes over
     // with fresh instructions, so building on a plan they just declined is the one thing not to
-    // do. Tripped through the run signal so every path ends the same way a Stop does — the prompt
+    // do. Tripped through the agent signal so every path ends the same way a Stop does — the prompt
     // path used to finish cleanly here instead, which meant the same decline read as a completed
     // session on one path and a stop on the other.
     if (rounds.stopped) answerController.abort(new Error('[framework] stopped by your answer'))
@@ -281,7 +281,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
  * "raw `claude -p`" means. A build is framed for the workspace it lands in: an existing codebase
  * is *extended*, not rebuilt from scratch (#185).
  */
-function openingPrompt(opts: RunAgentOptions, kind: SessionKind, resuming: boolean, cwd: string): string {
+function openingPrompt(opts: RunAgentOptions, kind: AgentKind, resuming: boolean, cwd: string): string {
   if (resuming || opts.transparent) return opts.prompt
   if (kind === 'prompt') {
     return opts.vanilla ? opts.prompt : renderSystemPrompt({ prompt: opts.prompt }).user

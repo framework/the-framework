@@ -4,11 +4,11 @@ import type { ProjectSummary } from './projects.js'
 
 // Every session's open question, in one place (#1455 item 4).
 //
-// A run parked on a choice gate was only answerable from inside its own session view; with
+// An agent parked on a choice gate was only answerable from inside its own session view; with
 // several sessions running the questions scattered, and the Overview badge could only count
 // them. The launcher's hub needs the *full* gate — options, multi, recommended — and that is
-// not on the run meta: `pendingChoice` carries only id and title, because that is all the rail's
-// badge needed. The options live in the `choice` event, so this reads each parked run's log
+// not on the agent meta: `pendingChoice` carries only id and title, because that is all the rail's
+// badge needed. The options live in the `choice` event, so this reads each parked agent's log
 // through the store's own reader — the same move the Discord chat surface makes (live-run.ts),
 // which keeps one torn-line policy rather than a drifted copy.
 
@@ -19,18 +19,18 @@ export interface OpenQuestion {
   agentId: string
   /** The session's name (#326) when it chose one — the card's label; else fall back to {@link intent}. */
   sessionName?: string
-  /** What the run was asked to do, for a card whose session never named itself. */
+  /** What the agent was asked to do, for a card whose session never named itself. */
   intent?: string
-  /** When the run last spoke, ISO: what the longest-waiting-first order sorts on. */
+  /** When the agent last spoke, ISO: what the longest-waiting-first order sorts on. */
   updatedAt?: string
   choice: ChoiceRequest
 }
 
 /** Injectable seams so {@link buildOpenQuestions} is unit-testable off disk. */
 export interface OpenQuestionsDeps {
-  /** The live-run reader (default {@link readLiveMetas}). */
+  /** The live-agent reader (default {@link readLiveMetas}). */
   liveAgents?: (cwd: string) => Promise<LiveAgent[]>
-  /** A run checkout's event log (default {@link readEventLog}). */
+  /** An agent checkout's event log (default {@link readEventLog}). */
   events?: (cwd: string) => Promise<FrameworkEvent[]>
 }
 
@@ -54,7 +54,7 @@ export function openChoiceRequest(events: FrameworkEvent[], gateId: string): Cho
 }
 
 /**
- * Every project's parked questions, longest-waiting first (#1455): a run that has been blocked
+ * Every project's parked questions, longest-waiting first (#1455): an agent that has been blocked
  * on its human the longest is the one to unblock first.
  *
  * Forgiving throughout, like every cross-project rollup: an unreadable project, run list or
@@ -72,7 +72,7 @@ export async function buildOpenQuestions(
   for (const project of projects) {
     for (const meta of await liveAgents(project.path).catch((): LiveAgent[] => [])) {
       if (meta.status !== 'running' || !meta.pendingChoice) continue
-      // The run's own checkout, not the project root: a daemon-spawned run logs in its worktree.
+      // The agent's own checkout, not the project root: a daemon-spawned agent logs in its worktree.
       const choice = openChoiceRequest(await events(meta.cwd).catch((): FrameworkEvent[] => []), meta.pendingChoice.id)
       if (!choice) continue
       items.push({

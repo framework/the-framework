@@ -51,7 +51,7 @@ test('resetControl truncates so a previous run\'s picks never replay', async () 
     await resetControl(cwd)
     assert.equal(await readFile(controlPath(cwd), 'utf8'), '')
 
-    // A watcher started after the reset (a fresh run) only sees new entries.
+    // A watcher started after the reset (a fresh agent) only sees new entries.
     const seen: ControlEntry[] = []
     const watcher = watchControl(cwd, e => seen.push(e), 20)
     try {
@@ -170,7 +170,7 @@ function isCommittedFrameworkFile(path: string): boolean {
 
 test('no runtime state under .the-framework is tracked in git (#1298/#1311)', async () => {
   // #1311 untracked `control.jsonl` and added nothing to keep it untracked, so eighteen hours
-  // later a run's own branch committed an empty one straight back onto main (#1309). The rule is
+  // later an agent's own branch committed an empty one straight back onto main (#1309). The rule is
   // wider than that one file: `.the-framework/` is transient except the committed DB, and a
   // tracked agent.json or events.jsonl would churn every checkout the same way.
   const { execFileSync } = await import('node:child_process')

@@ -1,11 +1,11 @@
 /**
- * Where a run's turns actually execute — the axis the `Driver` seam used to swallow (D1).
+ * Where an agent's turns actually execute — the axis the `Driver` seam used to swallow (D1).
  *
  * There were five "drivers": `claude-code`, `codex`, `cloud`, `actions`, `fake`. Two of those are
  * the same agent in a different place — Claude Code on claude.ai, and Claude Code in a GitHub
  * Actions runner — so the seam modelled *which agent* and *where it runs* as one dimension.
  *
- * The cost was visible in `handsOff`: a **driver property that disabled half a run's phases**,
+ * The cost was visible in `handsOff`: a **driver property that disabled half an agent's phases**,
  * because a property of *where* had leaked into the abstraction for *what*. It lives here now, as
  * a fact about the location, and `Driver` is back to "which CLI do I spawn".
  *
@@ -13,7 +13,7 @@
  * this axis, and none of them should have to reach the driver layer to do it.
  */
 
-/** Where a run executes. */
+/** Where an agent executes. */
 export type AgentLocation = 'local' | 'actions' | 'web'
 
 /** Every location, for validating what arrives from a browser or a config file. */
@@ -26,9 +26,9 @@ export function isAgentLocation(value: unknown): value is AgentLocation {
 
 /**
  * Whether this location hands the task somewhere this machine cannot follow (#1225), making the
- * first prompt the whole run.
+ * first prompt the whole agent.
  *
- * Everything a run would do after that prompt — work the backlog, stay open for messages — would
+ * Everything an agent would do after that prompt — work the backlog, stay open for messages — would
  * be reading the driver's own "handed off to <url>" summary as if the agent had written it. That
  * is what put an unanswerable "Start the next backlog item?" on a dashboard whose agent was
  * somewhere else entirely.

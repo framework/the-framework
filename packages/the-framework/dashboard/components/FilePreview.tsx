@@ -5,12 +5,12 @@ import { usePolled } from '../lib/use-async.js'
 import { ContentView, DiffStat, DiffView } from './DiffView.js'
 
 // Hover a file in the tree, see what is in it. Clicking is already taken — it toggles the path in
-// the run Context (#504) — so hover is the free gesture. Base UI's PreviewCard is the hover-card
+// the agent Context (#504) — so hover is the free gesture. Base UI's PreviewCard is the hover-card
 // primitive: it holds open while the pointer travels into the card, so a long body stays scrollable.
 //
 // A changed file shows its diff (#816), an unchanged one its contents (#828). The tree already
 // holds each file's status, so `changed` picks the read here rather than the server looking the
-// status up again. Both reads resolve the selected run's worktree (#815).
+// status up again. Both reads resolve the selected agent's worktree (#815).
 //
 // The card is its own component because a closed PreviewCard does not mount its popup: mounting
 // *is* opening, so the read is lazy by construction (nothing is fetched for the files you never

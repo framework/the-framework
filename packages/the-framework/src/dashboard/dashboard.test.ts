@@ -65,7 +65,7 @@ test('buildDashboard buckets run activity across a 14-day window, oldest-first',
   assert.equal(data.activity.at(-1)!.date, '2026-07-14') // today, last
   assert.equal(data.activity.at(-1)!.count, 2)
   assert.equal(data.activity.find(d => d.date === '2026-07-08')!.count, 1)
-  // The June run falls outside the window and is not counted anywhere.
+  // The June agent falls outside the window and is not counted anywhere.
   assert.equal(data.activity.reduce((n, d) => n + d.count, 0), 3)
 })
 

@@ -1,7 +1,7 @@
 import { X } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
-// The files picked into the run Context (#661), listed like the repo rows but with an X to remove
+// The files picked into the agent Context (#661), listed like the repo rows but with an X to remove
 // instead of a checkbox. Files reach the Context two ways — a `#` mention in the prompt (#504) and
 // the right-rail file tree — and both add the same relative path to the shared context set.
 // Without this they were invisible once the prompt was cleared; the X also unticks the file tree.

@@ -24,7 +24,7 @@ const TURNS: FakeTurn[] = [BUILD_TURN]
 // Demo variants that make the build stop to ask, so the turn-boundary gates (#337
 // single-select / #339 multi-select checklist) can be seen offline. The build turn ends
 // with an await block; the framework shows the gate, waits, then re-prompts (RESUME_TURN),
-// and the run continues as usual. Needs the dashboard on (so requestChoice is
+// and the agent continues as usual. Needs the dashboard on (so requestChoice is
 // wired); selected via FRAMEWORK_FAKE_AWAIT=choices|multiselect|confirmation.
 const AWAIT_CHOICES_TURN: FakeTurn = {
   text:

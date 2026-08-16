@@ -66,6 +66,6 @@ test('AgentMessageQueue takeQueued() is undefined once closed, pending or not (#
   const q = new AgentMessageQueue()
   q.push('stale')
   q.close()
-  // A closed queue is an aborted run: a stale message must not start a new turn.
+  // A closed queue is an aborted agent: a stale message must not start a new turn.
   assert.equal(q.takeQueued(), undefined)
 })

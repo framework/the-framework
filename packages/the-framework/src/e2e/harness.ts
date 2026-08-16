@@ -46,7 +46,7 @@ export interface StoryProject {
   cwd: string
 }
 
-/** A live tail of one run's event log — the same source `onEvents` streams to the browser. */
+/** A live tail of one agent's event log — the same source `onEvents` streams to the browser. */
 export interface AgentTail {
   /** Every event seen so far, in arrival order. Poll with {@link waitFor}. */
   events: FrameworkEvent[]
@@ -79,19 +79,19 @@ export interface StoryWorld {
    * `sendAddProject` RPC the dashboard's Add-project dialog calls.
    */
   addProject(files?: Record<string, string>): Promise<StoryProject>
-  /** Start a run through the same `sendStart` RPC the launcher calls; returns the run id. */
+  /** Start an agent through the same `sendStart` RPC the launcher calls; returns the agent id. */
   startAgent(project: StoryProject, prompt: string, options?: StartAgentOptions, kind?: StartAgentKind): Promise<string>
-  /** Poll `onAgents` until the run reports one of `until`, failing after `timeoutMs`. */
+  /** Poll `onAgents` until the agent reports one of `until`, failing after `timeoutMs`. */
   waitAgent(project: StoryProject, agentId: string, until: AgentStatus | AgentStatus[], timeoutMs?: number): Promise<AgentMeta>
   /**
-   * Wait until the daemon's teardown has retired the run's worktree. A run's meta flips to
+   * Wait until the daemon's teardown has retired the agent's worktree. An agent's meta flips to
    * `done` before teardown archives the checkout, and acting on the session in that window
    * (push, resume) races teardown's own git commits — the same window a user hits by clicking
    * Push the instant a session finishes. The stories that act on a finished session wait here
    * first, which is also the honest reading of "finished".
    */
   waitRetired(project: StoryProject, agentId: string, timeoutMs?: number): Promise<void>
-  /** Follow a run's event log live (replays what is already on disk first). */
+  /** Follow an agent's event log live (replays what is already on disk first). */
   tailAgent(project: StoryProject, agentId: string): Promise<AgentTail>
   close(): Promise<void>
 }
@@ -246,7 +246,7 @@ export async function makeWorld(): Promise<StoryWorld> {
     async tailAgent(project, agentId) {
       const events: FrameworkEvent[] = []
       // The relocating tail — the same seam the dashboard's onEvents rides: when teardown moves
-      // the journal into the archive, the tail re-resolves the run's journal and carries its
+      // the journal into the archive, the tail re-resolves the agent's journal and carries its
       // offset, so the feed keeps the final events even when their fs.watch signal was lost.
       const stop = tailAgentEvents<FrameworkEvent>(
         () => resolveAgentEventsPath(project.cwd, agentId),
@@ -259,11 +259,11 @@ export async function makeWorld(): Promise<StoryWorld> {
 
     async close() {
       for (const tail of tails) tail.stop()
-      // Same order as daemon shutdown: stop the runs this world spawned, then the previews.
+      // Same order as daemon shutdown: stop the agents this world spawned, then the previews.
       await runtime.stopAgents(2000).catch(() => 0)
       // Teardowns fire off child-exit events and outlive the assertions — deleting the repos
       // under a mid-flight archive-commit-retire kills its git ("cannot lock ref 'HEAD'") and
-      // litters the output with stranded-worktree warnings. Acquiring each run's lock is the
+      // litters the output with stranded-worktree warnings. Acquiring each agent's lock is the
       // daemon's own way of waiting a teardown out.
       await Promise.all(
         started.map(({ cwd, agentId }) =>

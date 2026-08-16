@@ -50,10 +50,10 @@ export function resolveProjectPath(projectId: string): Promise<string | undefine
 }
 
 /**
- * The checkout a call should act on: a live run's own worktree when `agentId` names one (#738/#749),
- * else the project root. Since #736 a run reads and writes inside its worktree — its event log,
+ * The checkout a call should act on: a live agent's own worktree when `agentId` names one (#738/#749),
+ * else the project root. Since #736 an agent reads and writes inside its worktree — its event log,
  * its control log, its working tree — so anything addressed at a *run* has to resolve here, not
- * at the project path, or it reads an empty log and steers a run that is not listening. The
+ * at the project path, or it reads an empty log and steers an agent that is not listening. The
  * resolution itself (and its #766 first-seconds subtlety) lives in the store's
  * {@link resolveAgentCheckout}, shared with the daemon; this adds only the project-id lookup.
  */
@@ -63,20 +63,20 @@ export async function resolveAgentPath(projectId: string, agentId?: string): Pro
 }
 
 /**
- * The in-memory {@link EventsSource} (#426). It answers only for a run this daemon is relaying
- * from a connected device (#1067) — such a run has no `.the-framework/events.jsonl` here — and
- * returns undefined for an ordinary local run, whose log `onEvents` tails off disk.
+ * The in-memory {@link EventsSource} (#426). It answers only for an agent this daemon is relaying
+ * from a connected device (#1067) — such an agent has no `.the-framework/events.jsonl` here — and
+ * returns undefined for an ordinary local agent, whose log `onEvents` tails off disk.
  */
 export function contextEventsSource(): EventsSource {
   return fromContext('eventsSource')
 }
 
 /**
- * The relayed-run lookup (#1067 slice 2). A run-scoped RPC uses it to tell an ordinary local run
+ * The relayed-agent lookup (#1067 slice 2). A run-scoped RPC uses it to tell an ordinary local agent
  * (resolve a local checkout) from one running on a connected device (forward the call there).
  *
  * The one accessor with a default rather than a throw, because "unwired" has a real meaning here:
- * a call arriving over `/_relay/rpc` is the *device* side of the relay, and the run it names is
+ * a call arriving over `/_relay/rpc` is the *device* side of the relay, and the agent it names is
  * local to that device. Forwarding it onward would be a loop, so the honest answer there is that
  * nothing is relayed from here.
  */

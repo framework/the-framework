@@ -13,7 +13,7 @@ export const TICKETS_DIR = 'tickets'
 /**
  * The flat, durable backlog/roadmap file — the confirmed-task queue (the "AI task queue"
  * the repo-context (#683) fragment names). Lives at the repo root as `TODO_AGENTS.md` (#682):
- * moved out of `tickets/` so that directory holds only tickets. This is the file a run
+ * moved out of `tickets/` so that directory holds only tickets. This is the file an agent
  * drains and the dashboard surfaces — the only backlog kind since the session-scoped
  * `TODO_<slug>.agent.md` files were retired (#1369).
  */

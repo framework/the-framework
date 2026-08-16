@@ -11,14 +11,14 @@ import { CONTROL_FILE } from '../control.js'
 import { nodeGitRunner } from '../project.js'
 import { provideTestContext } from './test-context.js'
 
-// #749: a run tails the control log inside its own worktree (#736), so a steering call has to
+// #749: an agent tails the control log inside its own worktree (#736), so a steering call has to
 // resolve the RUN, not the project. Addressed at the project root, Stop / messages / choice picks
-// reach a file the run is not watching, which is why they silently did nothing.
+// reach a file the agent is not watching, which is why they silently did nothing.
 //
 // These run against the real registry, pointed at a temp $XDG_CONFIG_HOME so the user's own
 // registry is never touched.
 
-/** A project with one live run in a worktree. Returns its ids and the two candidate log paths. */
+/** A project with one live agent in a worktree. Returns its ids and the two candidate log paths. */
 async function projectWithWorktreeAgent(): Promise<{
   dir: string
   projectId: string
@@ -95,9 +95,9 @@ test('sendMessage and sendChoice address the run too (#749)', async () => {
 test('an unknown or absent run id falls back to the project root, as before #736 (#749)', async () => {
   const ctx = await projectWithWorktreeAgent()
   try {
-    // No run id at all: the pre-#736 addressing, still right for a run with no worktree.
+    // No run id at all: the pre-#736 addressing, still right for an agent with no worktree.
     await sendStop(ctx.projectId)
-    // A run that has since finished and had its worktree removed must not throw or vanish.
+    // An agent that has since finished and had its worktree removed must not throw or vanish.
     await sendStop(ctx.projectId, 'a-run-that-is-gone')
     assert.deepEqual(await entries(ctx.rootControl), [{ kind: 'stop' }, { kind: 'stop' }])
     assert.deepEqual(await entries(ctx.agentControl), [], 'the live run is left alone')
@@ -107,8 +107,8 @@ test('an unknown or absent run id falls back to the project root, as before #736
   }
 })
 
-// #737: a failed run keeps its worktree for inspection, so removing one is an explicit action —
-// and must never yank the checkout out from under a run that is still going.
+// #737: a failed agent keeps its worktree for inspection, so removing one is an explicit action —
+// and must never yank the checkout out from under an agent that is still going.
 
 test('sendRemoveWorktree refuses while that run is still live (#737)', async () => {
   const ctx = await projectWithWorktreeAgent() // its agent.json says `running`
@@ -232,7 +232,7 @@ test('onRetainedWorktrees hides a live run, and lists one that has finished (#73
   }
 })
 
-// #766: for the first seconds of a run there is a worktree but no `agent.json` yet. Resolving by run
+// #766: for the first seconds of an agent there is a worktree but no `agent.json` yet. Resolving by run
 // state misses it and falls back to the project root, and because the event stream resolves its
 // path once, when the browser opens it, the feed then tails the root's log — a previous agent's
 // output — for the life of that connection. Resolve by the directory, which the daemon creates before it spawns.
@@ -267,9 +267,9 @@ test('a run id with no worktree at all still falls back to the project root (#76
   }
 })
 
-// #768: a continued run (#762) has an archived copy from its first leg AND is live again. The
-// dedup used to keep the archive and drop the live copy, so the dashboard showed a running run as
-// finished — the run really was going, the UI just rendered its stale replay and looked dead.
+// #768: a continued agent (#762) has an archived copy from its first leg AND is live again. The
+// dedup used to keep the archive and drop the live copy, so the dashboard showed a running agent as
+// finished — the agent really was going, the UI just rendered its stale replay and looked dead.
 test('a continued run reads as running, not as its archived first leg (#768)', async () => {
   const ctx = await projectWithWorktreeAgent() // its worktree meta says `running`
   try {

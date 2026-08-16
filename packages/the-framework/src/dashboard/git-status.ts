@@ -21,11 +21,11 @@ export interface GitStatusDeps {
   git?: GitRunner
   pr?: PrLookup
   /**
-   * The run's start, when the status is read for a run's checkout (#1255). The default lookup is
-   * `gh pr view`, which answers the newest PR for the branch *in any state* — so a run on a reused
+   * The agent's start, when the status is read for an agent's checkout (#1255). The default lookup is
+   * `gh pr view`, which answers the newest PR for the branch *in any state* — so an agent on a reused
    * pinned branch (`the-framework/triage-quick`) wears a predecessor's merged PR as its own badge.
    * With `since` set the PR is picked from the branch's whole history by {@link pickAgentPr}
-   * instead: an open PR, or a closed one no older than the run itself.
+   * instead: an open PR, or a closed one no older than the agent itself.
    */
   since?: string
   /** The branch's full PR history, for the {@link GitStatusDeps.since} path (default {@link cachedPrsForBranch}). */

@@ -48,7 +48,7 @@ function memFs(seed: Record<string, string> = {}): StoreFs & { files: Map<string
     async readdir(dir) {
       // Derive children from the flat path map: file basenames whose dirname is `dir`, plus
       // the first segment of anything deeper (the real fs lists subdirectories too, which is
-      // how `readLiveMetas` finds the per-run worktrees).
+      // how `readLiveMetas` finds the per-agent worktrees).
       const prefix = dir.endsWith('/') ? dir : dir + '/'
       const names = new Set<string>()
       for (const p of files.keys()) {
@@ -232,7 +232,7 @@ test('applyEventToMeta tracks whether the run is working or parked on the user (
   const working = applyEventToMeta(parked, { kind: 'driver', event: { type: 'start', prompt: 'and dark mode' } }, AT)
   assert.equal(working.settledAt, undefined)
 
-  // A run that has ended is not waiting on anyone.
+  // An agent that has ended is not waiting on anyone.
   const ended = applyEventToMeta(applyEventToMeta(base, { kind: 'settled' }, AT), { kind: 'end', ok: true }, AT)
   assert.equal(ended.settledAt, undefined)
   assert.equal(ended.status, 'done')
@@ -254,7 +254,7 @@ test('applyEventToMeta records the ticket a run is implementing (#1117)', () => 
   assert.equal(base.ticket, undefined, 'a run nobody linked to a ticket says nothing')
   const on = applyEventToMeta(base, { kind: 'ticket', path: 'tickets/2026-07-25_login.md' }, AT)
   assert.equal(on.ticket, 'tickets/2026-07-25_login.md')
-  // It is a fact about why the run exists, so it outlives the work: a reader looking at a finished
+  // It is a fact about why the agent exists, so it outlives the work: a reader looking at a finished
   // run still gets to see which ticket it was.
   const ended = applyEventToMeta(on, { kind: 'end', ok: true }, AT)
   assert.equal(ended.ticket, 'tickets/2026-07-25_login.md')
@@ -315,7 +315,7 @@ test('readLiveMeta reads the in-progress agent.json with a running status (befor
   const fs = memFs()
   const store = await AgentStore.open(CWD, { fs, fresh: true, now: AT })
   for (const e of RUN.slice(0, -1)) await store.append(e) // every event but the terminal `end`
-  // No close(): the run is still live. Its meta reads back as running with the intent.
+  // No close(): the agent is still live. Its meta reads back as running with the intent.
   const live = await readLiveMeta(CWD, fs)
   assert.ok(live, 'live meta present')
   assert.equal(live!.status, 'running')
@@ -332,7 +332,7 @@ test('readLiveMeta re-reads a torn agent.json rather than reporting the run gone
   const store = await AgentStore.open(CWD, { fs, fresh: true, now: AT })
   for (const e of RUN.slice(0, -1)) await store.append(e)
   const settled = fs.files.get(META)!
-  // The run's own process rewrites its meta in place while every other reader polls it, so a
+  // The agent's own process rewrites its meta in place while every other reader polls it, so a
   // read can land between that write's truncate and its bytes. The first read here sees the
   // half-written file the way a real reader would; the write lands before the retry.
   fs.files.set(META, settled.slice(0, 20))
@@ -352,7 +352,7 @@ test('readLiveMeta re-reads a torn agent.json rather than reporting the run gone
   assert.ok(reads > 1, 'the unparseable read was retried')
 })
 
-test('readLiveMeta gives up on a agent.json that is corrupt for good', async () => {
+test('readLiveMeta gives up on an agent.json that is corrupt for good', async () => {
   const fs = memFs({ [META]: '{ this was never json' })
   assert.equal(await readLiveMeta(CWD, fs), undefined)
 })
@@ -432,7 +432,7 @@ test('a fresh run archives a prior run that never got closed (crash safety) (#30
   const fs = memFs()
   const crashed = await AgentStore.open(CWD, { fs, fresh: true, now: '2026-07-04T00:00:00.000Z' })
   for (const e of RUN) await crashed.append(e)
-  // no close() — simulate a crash. Now a new run opens fresh over the live files.
+  // no close() — simulate a crash. Now a new agent opens fresh over the live files.
   await AgentStore.open(CWD, { fs, fresh: true, now: '2026-07-05T00:00:00.000Z' })
 
   const agents = await listAgents(CWD, fs)
@@ -498,7 +498,7 @@ test('reconcileOrphanedAgents is a no-op on a clean or empty workspace (#642)', 
   assert.equal(await reconcileOrphanedAgents(CWD, done), 0)
 })
 
-// #716: a run whose process dies without writing `end`. The owning pid+host are persisted so a
+// #716: an agent whose process dies without writing `end`. The owning pid+host are persisted so a
 // reader can flip it to `stopped` (and archive it) without waiting for a daemon-restart reconcile.
 const HERE = hostname()
 const ownedMeta = (id: string, pid: number, host: string): string =>
@@ -516,7 +516,7 @@ test('readLiveMeta self-heals a running run whose owning process is gone: stoppe
   const fs = memFs({ [META]: ownedMeta('2026-dead', 999999, HERE) })
   const live = await readLiveMeta(CWD, fs, () => false) // pid probe says the owner is gone
   assert.equal(live!.status, 'stopped')
-  // The on-disk agent.json is flipped, and the run is archived (as stopped) so it stays in history.
+  // The on-disk agent.json is flipped, and the agent is archived (as stopped) so it stays in history.
   assert.equal((JSON.parse(fs.files.get(META)!) as AgentMeta).status, 'stopped')
   const agents = await listAgents(CWD, fs)
   assert.deepEqual(agents.map(r => [r.id, r.status]), [['2026-dead', 'stopped']])
@@ -542,7 +542,7 @@ test('readLiveMeta does not trust a pid from a different host (#716)', async () 
 })
 
 test('fresh open adopts the id the daemon allocated, ignoring an unsafe one (#736)', async () => {
-  // The daemon names the run's worktree with the id before spawning it, so the run must
+  // The daemon names the agent's worktree with the id before spawning it, so the agent must
   // record that id rather than derive a second one from its own start time.
   const adopted = await AgentStore.open(CWD, { fs: memFs(), fresh: true, now: AT, id: 'run-42' })
   assert.equal((await adopted.readMeta())?.id, 'run-42')
@@ -552,7 +552,7 @@ test('fresh open adopts the id the daemon allocated, ignoring an unsafe one (#73
   assert.equal((await unsafe.readMeta())?.id, agentIdFromStartedAt(AT))
 })
 
-// #738: since #736 a run lives in its own worktree, so a project's live runs are spread across
+// #738: since #736 an agent lives in its own worktree, so a project's live runs are spread across
 // `.the-framework/worktrees/*` rather than sitting at the project path.
 const worktreeMeta = (agentId: string, over: Partial<AgentMeta> = {}): string =>
   JSON.stringify({ version: 1, status: 'running', id: agentId, startedAt: AT, updatedAt: AT, ...over })
@@ -585,7 +585,7 @@ test('readLiveMetas also returns a run at the project root (the non-git fallback
 
 test('readLiveMetas is empty on a project that never ran, and skips a junk worktree name', async () => {
   assert.deepEqual(await readLiveMetas(CWD, memFs()), [])
-  // Only our own `<agentId>` directories are read; anything else in there is not a run of ours.
+  // Only our own `<agentId>` directories are read; anything else in there is not an agent of ours.
   const fs = memFs({
     [join(CWD, '.the-framework', 'worktrees', '.tmp-scratch', '.the-framework', 'agent.json')]: worktreeMeta('x'),
   })
@@ -600,7 +600,7 @@ test('readLiveMetas self-heals a dead run in a worktree, same as the single read
   assert.equal((JSON.parse(fs.files.get(path)!) as AgentMeta).status, 'stopped', 'and is healed on disk')
 })
 
-// #737: a run's history lives inside its worktree, so removing that worktree would delete the run
+// #737: an agent's history lives inside its worktree, so removing that worktree would delete the agent
 // from the dashboard's history. It is copied into the repo first, which is what makes teardown safe.
 const worktreeAt = (agentId: string) => join(CWD, '.the-framework', 'worktrees', agentId)
 const worktreeFiles = (agentId: string, meta: Record<string, unknown>, events = '') => ({
@@ -613,7 +613,7 @@ test('archiveWorktreeAgent copies a finished run into the repo history (#737)', 
   const meta = await archiveWorktreeAgent(worktreeAt('r1'), CWD, fs)
   assert.equal(meta?.status, 'done')
   assert.equal(fs.files.get(join(CWD, '.the-framework', 'agents', 'r1.jsonl')), '{"kind":"log","message":"hi"}\n', 'the log lands in the repo')
-  // And the archived copy is what listAgents reads, so the run survives losing its worktree.
+  // And the archived copy is what listAgents reads, so the agent survives losing its worktree.
   assert.deepEqual((await listAgents(CWD, fs)).map(r => r.id), ['r1'])
 })
 
@@ -670,7 +670,7 @@ test('the history lists every user, and the runs archived before this shipped (#
 })
 
 test('a run archived under both schemes is listed once (#1179)', async () => {
-  // A run archived before #1179 and re-archived after exists in both places; the history is a list
+  // An agent archived before #1179 and re-archived after exists in both places; the history is a list
   // of sessions, not of files.
   const meta = JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT })
   const fs = memFs({ [join(CWD, '.the-framework', 'agents', 'r1.json')]: meta, [archiveAt('r1', 'json')]: meta })
@@ -678,7 +678,7 @@ test('a run archived under both schemes is listed once (#1179)', async () => {
 })
 
 test('an archived log replays wherever it is filed (#1179)', async () => {
-  // The id alone no longer names a path, so every reader has to look the run up.
+  // The id alone no longer names a path, so every reader has to look the agent up.
   const fs = memFs({
     [archiveAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }),
     [archiveAt('r1', 'jsonl')]: '{"kind":"log","message":"replayed"}\n',
@@ -687,7 +687,7 @@ test('an archived log replays wherever it is filed (#1179)', async () => {
 })
 
 test('a committed session stuck at running is reconciled too (#1179)', async () => {
-  // The boot reconcile used to sweep only `agents/`, so a crashed run archived under a user would
+  // The boot reconcile used to sweep only `agents/`, so a crashed agent archived under a user would
   // have shown as live forever, with a Stop that does nothing.
   const fs = memFs({
     [archiveAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT }),
@@ -721,8 +721,8 @@ test('listWorktreeDirs names the run of each worktree, ignoring anything else in
   assert.deepEqual(await listWorktreeDirs(join(CWD, 'never-ran'), fs), [])
 })
 
-// #762: messaging a stopped run continues THAT run, so the history shows one row rather than an
-// unrelated-looking second one. The follow-up is still a separate process; what makes it one run is
+// #762: messaging a stopped agent continues THAT run, so the history shows one row rather than an
+// unrelated-looking second one. The follow-up is still a separate process; what makes it one agent is
 // that it reopens the same log instead of truncating it.
 test('continueAgent reopens the existing run: same id, same log, running again (#762)', async () => {
   const fs = memFs({
@@ -760,14 +760,14 @@ test('restoreArchivedAgent puts a torn-down run history back in its worktree (#7
   assert.equal(fs.files.get(join(wt, '.the-framework', 'events.jsonl')), '{"kind":"log","message":"archived"}\n')
   assert.equal((JSON.parse(fs.files.get(join(wt, '.the-framework', 'agent.json'))!) as AgentMeta).id, 'r1')
 
-  // Idempotent: a checkout that already holds a live run keeps it (its log is the newer one).
+  // Idempotent: a checkout that already holds a live agent keeps it (its log is the newer one).
   assert.equal(await restoreArchivedAgent(CWD, wt, 'r1', fs), false)
   // Nothing archived, nothing to do.
   assert.equal(await restoreArchivedAgent(CWD, join(CWD, 'nope'), 'r404', memFs()), false)
 })
 
 test('updatedAt tracks the last event, not the run start (settledAt likewise)', async () => {
-  // The regression: the open timestamp was reused for every append, so a run that had been going
+  // The regression: the open timestamp was reused for every append, so an agent that had been going
   // for hours still reported updatedAt === startedAt. Everything that orders by recency — the
   // overview's active runs, the activity feed, the interventions queue — sorted on that.
   const ticks = ['2026-01-01T00:00:10.000Z', '2026-01-01T00:00:20.000Z']
@@ -798,13 +798,13 @@ test('startedAtFromAgentId inverts agentIdFromStartedAt, and refuses foreign ids
 })
 
 test('applyEventToMeta records the pull request a session opened (E6)', () => {
-  // The number is a fact about the run, so the run writes it down — rather than every later
+  // The number is a fact about the agent, so the agent writes it down — rather than every later
   // surface re-deriving it from branch names and creation times.
   const base = metaFromEvents(RUN.slice(0, 3), AT)
   assert.equal(base.pr, undefined, 'a session with no PR says nothing')
   const on = applyEventToMeta(base, { kind: 'pull-request', number: 42, url: 'https://x/pull/42' }, AT)
   assert.deepEqual(on.pr, { number: 42, url: 'https://x/pull/42' })
-  // It must outlive the run: every read of it happens after the session has ended.
+  // It must outlive the agent: every read of it happens after the session has ended.
   assert.deepEqual(applyEventToMeta(on, { kind: 'end', ok: true }, AT).pr, { number: 42, url: 'https://x/pull/42' })
 })
 
@@ -817,7 +817,7 @@ test('applyEventToMeta records the branch a branch event names (#1277)', () => {
   assert.equal(renamed.branch, 'the-framework/cool-name')
 })
 
-// #1359: a run that dies holding an open gate. The process exited without writing `end` (the
+// #1359: an agent that dies holding an open gate. The process exited without writing `end` (the
 // empty-event-loop death), so every flip of a dead `running` run must write the ending on its
 // behalf: an `end` event in the log (what expires the dashboard's question) and a meta without
 // the pendingChoice (what clears the "needs you" surfaces).
@@ -843,7 +843,7 @@ test('readLiveMeta writes the end a dead run never did: log + meta + archive (#1
   const healed = await readLiveMeta(CWD, fs, () => false)
   assert.equal(healed!.status, 'stopped')
   assert.equal(healed!.pendingChoice, undefined, 'a dead run is not awaiting anything')
-  // The live log now ends: a dashboard replaying it sees the run finish and expires the gate.
+  // The live log now ends: a dashboard replaying it sees the agent finish and expires the gate.
   const end = lastEvent(fs.files.get(EVENTS)!)
   assert.equal(end['kind'], 'end')
   assert.equal(end['ok'], false)

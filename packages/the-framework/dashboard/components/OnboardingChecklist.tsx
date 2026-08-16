@@ -72,7 +72,7 @@ export function OnboardingChecklist({
   const [discordWebhookOpen, setDiscordWebhookOpen] = useState(false)
 
   // The project onboarding acts on: the one this server runs in when it is registered, else the
-  // only/most recent one. Onboarding is a first-run flow, so there is rarely a second candidate.
+  // only/most recent one. Onboarding is a first-agent flow, so there is rarely a second candidate.
   const targetProjectId = suggestion?.cwdProjectId ?? data?.projects[0]?.projectId ?? null
 
   const projectCount = data?.totals.projects ?? 0

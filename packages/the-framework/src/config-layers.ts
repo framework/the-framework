@@ -2,7 +2,7 @@ import { DEFAULT_HANDOFF, type HandoffLevel } from './handoff-level.js'
 import { BOOLEAN_CONFIG_KEYS, CONFIG_KEYS, type FrameworkFileConfig } from './config.js'
 
 /**
- * Resolving a run's settings across config layers (#841).
+ * Resolving an agent's settings across config layers (#841).
  *
  * The layers used to combine with `||`, which meant a flag could only ever turn a mode *on* and
  * the-framework.yml could only ever turn one *on*: no layer could say `false`. #800 needs "a
@@ -13,7 +13,7 @@ import { BOOLEAN_CONFIG_KEYS, CONFIG_KEYS, type FrameworkFileConfig } from './co
  * that an explicit `false` in a nearer layer now wins.
  */
 
-/** The run settings a config layer can carry. Keys left `undefined` mean "this layer said nothing". */
+/** The agent settings a config layer can carry. Keys left `undefined` mean "this layer said nothing". */
 export interface AgentConfigValues {
   /** Preset name. */
   preset?: string | undefined
@@ -27,7 +27,7 @@ export interface AgentConfigValues {
   handoff?: HandoffLevel | undefined
 }
 
-/** One tier of config, with the label the run narrates when this tier wins a key. */
+/** One tier of config, with the label the agent narrates when this tier wins a key. */
 export interface ConfigLayer {
   /** Where these values came from, e.g. `flag` or `the-framework.yml`. */
   name: string
@@ -59,7 +59,7 @@ export function resolveConfigKey<K extends keyof AgentConfigValues>(
   return undefined
 }
 
-/** A run's settled config, plus which layer supplied each key a layer actually set. */
+/** An agent's settled config, plus which layer supplied each key a layer actually set. */
 export interface ResolvedAgentConfig {
   presetName?: string | undefined
   buildEvent?: string | undefined
@@ -71,7 +71,7 @@ export interface ResolvedAgentConfig {
   sources: Partial<Record<keyof AgentConfigValues, string>>
 }
 
-/** Resolve every run setting over `layers` (nearest first), falling back to {@link RUN_CONFIG_DEFAULTS}. */
+/** Resolve every agent setting over `layers` (nearest first), falling back to {@link RUN_CONFIG_DEFAULTS}. */
 export function resolveAgentConfig(layers: readonly ConfigLayer[]): ResolvedAgentConfig {
   const sources: Partial<Record<keyof AgentConfigValues, string>> = {}
   const pick = <K extends keyof AgentConfigValues>(key: K): NonNullable<AgentConfigValues[K]> | undefined => {
@@ -105,7 +105,7 @@ export function fileConfigLayer(file: FrameworkFileConfig, name = 'the-framework
 /**
  * A one-line summary of what a layer set and which one won, e.g.
  * `preset=software-development (the-framework.yml), vanilla=off (flag)`. Keys nobody set are
- * left out, so a run with no config anywhere narrates nothing.
+ * left out, so an agent with no config anywhere narrates nothing.
  */
 export function describeResolvedConfig(config: ResolvedAgentConfig): string {
   const shown: [keyof AgentConfigValues, string][] = [

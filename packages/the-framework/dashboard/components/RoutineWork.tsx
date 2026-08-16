@@ -128,16 +128,16 @@ export function RoutineWork({
     }
     setStarting(job.name)
     // Your settings only: the Overview has no project open, so the repo's committed file is not
-    // resolved here and the run starts on the same defaults a fresh launcher would use.
+    // resolved here and the agent starts on the same defaults a fresh launcher would use.
     // Unattended (#1279): a routine fired by a card is the same work the sweep starts, so it runs
-    // the same way — gates auto-answer, the run ends at settle, and the armed handoff fires,
+    // the same way — gates auto-answer, the agent ends at settle, and the armed handoff fires,
     // instead of parking in the stay-open chat loop with its PR never opened.
     const result = await start(projectId, job.prompt, 'prompt', { ...agentOptionsFromPreferences(preferences), unattended: true })
     setStarting(null)
-    // Go to the run itself, not merely to its project (#1191): selecting the project renders the
+    // Go to the agent itself, not merely to its project (#1191): selecting the project renders the
     // launcher, so the button that says "Run now" landed you on an empty composer and the session
     // it had just started was nowhere on screen. Handing the id over is what makes it the
-    // selection; with no id yet the shell lands on the project and adopts the running run once the
+    // selection; with no id yet the shell lands on the project and adopts the running agent once the
     // poll surfaces it, which is the same fallback every other start path uses.
     if (result) onAgentStarted(projectId, job.prompt, result.agentId)
   }

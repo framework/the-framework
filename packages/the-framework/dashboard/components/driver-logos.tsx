@@ -1,6 +1,6 @@
 import type { DriverName } from '../../dist/client.js'
 
-// Monochrome brand logomarks for the coding agents (#656), so the run picker can show a logo
+// Monochrome brand logomarks for the coding agents (#656), so the agent picker can show a logo
 // instead of the agent's name. They inherit the text colour (`fill="currentColor"`) and take a
 // className for sizing. Decorative by default — the accessible name is carried by the option's
 // label; pass `title` where the logo is the only thing naming the agent (the Sessions rail).

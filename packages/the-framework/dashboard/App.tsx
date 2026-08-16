@@ -53,7 +53,7 @@ const EMPTY_RECENT: RecentAgent[] = []
 //
 // The selection IS the URL (#784): `/` the Overview, `/{projectId}` the project home,
 // `/{projectId}/{sessionId}` one session. It used to be three pieces of React state — the
-// selected run, the just-started run, and a "follow the live feed" flag — reconciled at render,
+// selected agent, the just-started agent, and a "follow the live feed" flag — reconciled at render,
 // and each of #761/#766/#768/#774 was a case where they disagreed about which run was in play.
 // A route cannot disagree with itself, and a session becomes a link: paste it, reload it,
 // bookmark it, open two side by side. A refresh returns to the same project for free, which is
@@ -62,15 +62,15 @@ export function App() {
   const { route, go } = useRoute()
   const { view, projectId, agentId: agentId, ticketSlug, plan } = route
 
-  // A just-started run: bump the tick so the Sessions rail shows an optimistic "starting…" row
-  // with the typed prompt at once, before the spawned process writes its run.json. `id` is the
+  // A just-started agent: bump the tick so the Sessions rail shows an optimistic "starting…" row
+  // with the typed prompt at once, before the spawned process writes its agent.json. `id` is the
   // one the daemon allocated for it (#761) — the URL already points there, and this is what tells
   // the main pane that a session missing from the list is starting, not gone.
-  // `runsOn` names the device a just-started remote run executes on (#1067), so the live view can
-  // mark where it runs and degrade the panels that are local-only. Undefined for a local run.
+  // `runsOn` names the device a just-started remote agent executes on (#1067), so the live view can
+  // mark where it runs and degrade the panels that are local-only. Undefined for a local agent.
   const [agentStart, setAgentStart] = useState<{ tick: number; intent: string; id: string | null; runsOn?: string }>({ tick: 0, intent: '', id: null })
   // A project with no git checkout gets no worktree, so Start hands back no id and there is
-  // nothing to navigate to yet. That fallback is one run at a time (daemon.ts keys the busy guard
+  // nothing to navigate to yet. That fallback is one agent at a time (daemon.ts keys the busy guard
   // by project there), so "the running one" is still a safe guess — adopt it the moment the poll
   // surfaces it. This is the one place the selection is still inferred, and only where it can't
   // be known.
@@ -78,7 +78,7 @@ export function App() {
 
   const { agents: agents, reload, loaded: agentsLoaded } = useAgents(projectId)
 
-  // The run Context set lives in the shell (#492/#504) so the two surfaces that feed it share
+  // The agent Context set lives in the shell (#492/#504) so the two surfaces that feed it share
   // one source of truth: the `#` file chips + whole-repo Context selector in the Start form
   // (main pane), and the file tree in the right rail.
   const { context, add: addContext, remove: removeContext, toggle: toggleContext, reset: resetContext } = useContextSet()
@@ -94,7 +94,7 @@ export function App() {
   // The selected project's files (git ls-files), handed to both the `#` picker and the tree.
   // Empty when no project / on the relay (no checkout). Scoped to the selected session's
   // worktree (#815), the same checkout the action bar's branch, Serve and open-folder act on;
-  // polled so a file the run creates shows up rather than waiting for a reload.
+  // polled so a file the agent creates shows up rather than waiting for a reload.
   const { value: files } = usePolled<string[]>(
     projectId ? () => onProjectFiles(projectId, agentId ?? undefined) : null,
     EMPTY_FILES,
@@ -139,30 +139,30 @@ export function App() {
   // route — a selected project's own `runs` (above) carry its rail.
   const { value: recentAgents } = usePolled<RecentAgent[]>(projectId === null ? onRecentAgents : null, EMPTY_RECENT, 10_000, [projectId])
 
-  // A run just started in `inProject`, which is not always the selected one: the onboarding
+  // An agent just started in `inProject`, which is not always the selected one: the onboarding
   // checklist starts one from the Overview and the settings page, where nothing is selected (#1169).
   const agentStarted = (inProject: string | null, intent: string, startedId?: string, runsOn?: string) => {
-    // Continuing the run already on screen (#762) appends to its journal — nothing truncates, so
+    // Continuing the agent already on screen (#762) appends to its journal — nothing truncates, so
     // nothing would re-replay after a reset. Bumping the tick here is what blanked the transcript
     // the moment a message resumed an ended session; a continuation keeps the feed instead.
     const continued = startedId !== undefined && startedId === agentId && inProject === projectId
     setAgentStart(prev => ({ tick: continued ? prev.tick : prev.tick + 1, intent, id: startedId ?? null, ...(runsOn ? { runsOn } : {}) }))
     setAdopting(startedId === undefined)
-    // The picked context went with that run; the next launch starts from a clean focus (#948).
+    // The picked context went with that agent; the next launch starts from a clean focus (#948).
     resetContext()
-    // Go to the run we just started — a real history entry, so Back returns to where you launched
+    // Go to the agent we just started — a real history entry, so Back returns to where you launched
     // from. Its row does not exist yet; the main pane shows it live on the strength of the id.
     // With no id yet, land on its project so the effect below can adopt the running one; `go`
     // no-ops when that is already the URL.
     go({ projectId: inProject, agentId: startedId ?? null })
-    // The new run just appends to the rail; reload so its real row shows up quickly.
+    // The new agent just appends to the rail; reload so its real row shows up quickly.
     reload()
   }
 
-  /** The same, for the surfaces that start a run inside the selected project. */
+  /** The same, for the surfaces that start an agent inside the selected project. */
   const onAgentStarted = (intent: string, startedId?: string, runsOn?: string) => agentStarted(projectId, intent, startedId, runsOn)
 
-  // The no-id fallback only: adopt the running run as the selection once the poll surfaces it.
+  // The no-id fallback only: adopt the running agent as the selection once the poll surfaces it.
   // A correction rather than a step, so it replaces the history entry.
   useEffect(() => {
     if (!adopting) return
@@ -239,29 +239,29 @@ export function App() {
     go({ view: 'tickets', projectId: id, agentId: null, ticketSlug: slug, plan: true })
   }
 
-  // The live run feed is owned here so both the main view and the right rail's views tab read
+  // The live agent feed is owned here so both the main view and the right rail's views tab read
   // one shared event stream. Hooks run before the relay early return below.
-  // The run whose feed and controls are in play is simply the one in the URL; in the no-id
+  // The agent whose feed and controls are in play is simply the one in the URL; in the no-id
   // fallback there is none yet, and a null id resolves to the project root, as before.
   const { events, lost } = useLiveEvents(projectId, agentId, agentStart.tick)
-  // The rail's views stay scoped to the newest `session` segment even though a run's feed no
+  // The rail's views stay scoped to the newest `session` segment even though an agent's feed no
   // longer is (a resumed session appends a second segment to the same journal). Choice gates
   // are no longer folded here: they live inline in the transcript (#1455 items 6/7), where
   // EventList derives open/answered state from the same events it renders.
   const current = currentAgentEvents(events)
   const views = projectId ? agentViews(current) : []
   // The selected session's loop verdict, for the rail's pinned block under the tabs. It comes up
-  // from AgentView rather than being folded here: a finished run's events live in its archived log,
+  // from AgentView rather than being folded here: a finished agent's events live in its archived log,
   // which that view is the one to read.
 
   // On the relay (#426), the URL carries `?run=<id>` and there is no local registry or
-  // files — show that one run read-only. `window` is absent during prerender (ssr:false),
+  // files — show that one agent read-only. `window` is absent during prerender (ssr:false),
   // so this resolves to the full shell at build time and only flips in the browser.
   const relayAgent = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('run')
 
   // Is an agent working (#875)? Drives the mark and the tab icon. Both off on the relay: there is
   // no project registry behind it, so the cross-project read cannot answer, and RelayView owns
-  // both from its one run's feed instead.
+  // both from its one agent's feed instead.
   const local = relayAgent === null
   const working = useWorking(local)
   useFavicon(working, local)
@@ -275,7 +275,7 @@ export function App() {
   if (relayAgent) return <RelayView agentId={relayAgent} />
 
   // Route the main pane: the Overview dashboard when no project is selected (#471); else the
-  // project home/launcher, a running run's live output, or a finished run's replay. Each live
+  // project home/launcher, a running agent's live output, or a finished agent's replay. Each live
   // run streams its own feed and is steered by its own id (#749).
   const selectedAgent = agentId ? agents.find(agent => agent.id === agentId) : undefined
   const renderMain = () => {
@@ -310,7 +310,7 @@ export function App() {
       )
     if (agentId === null) {
       // Just pressed Start on a project with no worktree: follow the live output until the poll
-      // surfaces the run and the effect above adopts its id.
+      // surfaces the agent and the effect above adopts its id.
       if (adopting) return <AgentView projectId={projectId} agentId={null} events={events} live label={agentStart.intent || undefined} projectName={projectName} remoteLabel={agentStart.runsOn} files={files} addContext={addContext} removeContext={removeContext} lost={lost} onAgentStarted={onAgentStarted} />
       return (
         <ProjectHome
@@ -327,7 +327,7 @@ export function App() {
       )
     }
     if (!selectedAgent) {
-      // Not in the list: either the run we just started (its run.json lands a beat later) or a
+      // Not in the list: either the agent we just started (its agent.json lands a beat later) or a
       // list we have not read yet. Both are live views; only a session that is genuinely absent
       // from a list we did read is gone.
       if (agentId === agentStart.id || !agentsLoaded)
@@ -341,7 +341,7 @@ export function App() {
         />
       )
     }
-    // Live and finished are the same view (#1026): only `live` changes, so a run ending swaps
+    // Live and finished are the same view (#1026): only `live` changes, so an agent ending swaps
     // what the bar, feed and composer say without remounting any of them.
     return (
       <AgentView

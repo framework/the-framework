@@ -1,4 +1,4 @@
-A driver that runs the agent on GitHub Actions instead of this machine: dispatch a workflow, wait for it, read back the transcript the run uploads.
+A driver that runs the agent on GitHub Actions instead of this machine: dispatch a workflow, wait for it, read back the transcript the agent uploads.
 
 ## TLDR
 

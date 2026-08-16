@@ -6,7 +6,7 @@ import { UsageMeter } from './usage.js'
 // The telemetry both entry paths share. A build (`run.ts`) and a direct prompt
 // (`prompt-run.ts`) differ in what they *do* with the agent, but the accounting around
 // it is the same: name the session, follow the driver's event stream, total the usage,
-// and stop the run when it has spent too much (#322) or the account's quota ran out
+// and stop the agent when it has spent too much (#322) or the account's quota ran out
 // (#529). This lived twice, byte-identical, which is how the backlog loop ended up
 // without a copy of the sibling turn-signal parsing at all (#563).
 
@@ -14,7 +14,7 @@ import { UsageMeter } from './usage.js'
 export interface SessionStartOptions {
   emit: (event: FrameworkEvent) => void
   driver: Driver
-  /** The workspace the run works in. */
+  /** The workspace the agent works in. */
   cwd: string
   /** The session link, literal or templated with `{sessionId}`. */
   sessionLink?: string | undefined
@@ -23,7 +23,7 @@ export interface SessionStartOptions {
 }
 
 /**
- * Emit the run's opening `session` event. A literal link is shown right away; a
+ * Emit the agent's opening `session` event. A literal link is shown right away; a
  * templated one (`.../{sessionId}`) can only resolve once the driver reports its
  * session id, so it waits for the `session-update` from {@link createDriverEventHandler}.
  */
@@ -53,11 +53,11 @@ export interface DriverEventHandler {
 }
 
 /**
- * Watch the driver's black box (#165) and turn it into the run's stream: surface the real session
+ * Watch the driver's black box (#165) and turn it into the agent's stream: surface the real session
  * id as `session-update` once known (that is the honest handle a UI links to, and it changes per
- * prompt, so re-emit), and fold each turn's usage into the run total.
+ * prompt, so re-emit), and fold each turn's usage into the agent total.
  *
- * It used to trip two self-stops here as well — a per-run USD cap and a mid-run quota gate — each
+ * It used to trip two self-stops here as well — a per-agent USD cap and a mid-run quota gate — each
  * firing *after* the turn that crossed it, when its cost was already spent (E1).
  */
 export function createDriverEventHandler(opts: DriverEventHandlerOptions): DriverEventHandler {
@@ -103,7 +103,7 @@ export interface AgentControlsOptions {
   sessionLink?: string | undefined
 }
 
-/** The run's abort plumbing plus its driver-event sink. */
+/** The agent's abort plumbing plus its driver-event sink. */
 export interface AgentControls extends DriverEventHandler {
   /** The composed signal every driver turn runs under: the caller's, or the answer's. */
   agentSignal: AbortSignal
@@ -112,12 +112,12 @@ export interface AgentControls extends DriverEventHandler {
 }
 
 /**
- * Compose the run's signal and wire its driver-event handler in one place. The caller's signal is
+ * Compose the agent's signal and wire its driver-event handler in one place. The caller's signal is
  * OR'd (via {@link AbortSignal.any}) with the one self-stop left — an answer that says to stop
  * (#358) — so anything downstream that watches `agentSignal` stops the same way regardless of which
  * fired.
  *
- * There were three (E1). A per-run USD cap and a mid-run quota gate also aborted a session that
+ * There were three (E1). A per-agent USD cap and a mid-run quota gate also aborted a session that
  * was already going, which is the worst moment to economise: the tokens are already spent, the
  * work is half-done, and what is saved is the cheap part while what is lost is the expensive part.
  * Spending is decided once, before a session starts.
@@ -135,7 +135,7 @@ export function createAgentControls(opts: AgentControlsOptions): AgentControls {
 
 /** Inputs to {@link endStopDetail}. */
 export interface StopDetailOptions {
-  /** The error the run's turn loop threw. */
+  /** The error the agent's turn loop threw. */
   err: unknown
   /** The caller's own signal, to tell a caller stop from a self-stop. */
   signal?: AbortSignal | undefined
@@ -144,9 +144,9 @@ export interface StopDetailOptions {
 }
 
 /**
- * Classify why a run's turn loop threw and render the `end` event's `detail`. A caller interrupt
+ * Classify why an agent's turn loop threw and render the `end` event's `detail`. A caller interrupt
  * or an answer that said to stop (#358) are clean stops; anything else is a real failure. Shared
- * so the two run paths can never disagree on what "stopped" means.
+ * so the two agent paths can never disagree on what "stopped" means.
  */
 export function endStopDetail(opts: StopDetailOptions): { stopped: boolean; detail: string } {
   const callerAborted = opts.signal?.aborted === true

@@ -85,7 +85,7 @@ function frameworkDevDaemon(): Plugin {
 export default defineConfig({
   // The dashboard is a directory inside @gemstack/the-framework rather than a package of its own
   // (A7), so `root` is pinned to this file's directory instead of inherited from the cwd — the
-  // scripts that run it live one level up.
+  // scripts that agent it live one level up.
   root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [frameworkDevDaemon(), react(), tailwindcss()],
   build: {

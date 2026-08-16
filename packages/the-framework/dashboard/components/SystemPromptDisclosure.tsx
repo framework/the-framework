@@ -6,22 +6,22 @@ import { cn } from '../lib/utils.js'
 
 /**
  * "Enhanced System Prompt" (#863, was "See actual prompt sent" #520): the built-in system
- * prompt, shown in full, before the run — so a user can read what The Framework wraps their
+ * prompt, shown in full, before the agent — so a user can read what The Framework wraps their
  * prompt in rather than take our word for it.
  *
- * It renders through `composeAgentSystem`, the same function the run itself composes
+ * It renders through `composeAgentSystem`, the same function the agent itself composes
  * with, so the toggles above it are shown doing exactly what they really do. That
  * is the whole point: no second copy of the wrapping logic to drift from the real
  * one.
  *
  * Since #547 nothing is read off disk and appended at run time, so this is the
- * whole prompt for every run kind, not a preview of most of it.
+ * whole prompt for every agent kind, not a preview of most of it.
  *
  * The two rows are the two axes the composer already has, not new settings: the #326
  * built-in block (`vanilla`, inverted) and the framework integration as a whole
  * (`transparent`, inverted — with that off the channel is empty and the agent runs as raw
  * `claude -p`, #625). They write the same preferences the session-options gear does, so the
- * two surfaces cannot disagree about what this run will send.
+ * two surfaces cannot disagree about what this agent will send.
  */
 export function SystemPromptDisclosure({
   prompt,
@@ -43,10 +43,10 @@ export function SystemPromptDisclosure({
   transparent?: boolean
   /** Omitted where the integration is not the caller's to switch; the row then reads as fixed. */
   onTransparentChange?: (value: boolean) => void
-  /** The browser section rides with the protocols, so it is part of the prompt the run sends. */
+  /** The browser section rides with the protocols, so it is part of the prompt the agent sends. */
   browser?: boolean
   context: string[]
-  /** The repo's own SYSTEM.md text (#872), so the preview shows the prompt the run sends. */
+  /** The repo's own SYSTEM.md text (#872), so the preview shows the prompt the agent sends. */
   user?: string | null | undefined
   busy: boolean
 }) {
@@ -60,10 +60,10 @@ export function SystemPromptDisclosure({
   })
 
   // Transparent is the master off-switch, so it turns the built-in block off whatever
-  // `vanilla` says — the row has to read the way the run will actually behave.
+  // `vanilla` says — the row has to read the way the agent will actually behave.
   const antiLazyOn = !disabled && !transparent
   const integrationOn = !transparent
-  // Lit only when *completely* enabled (#863): either axis off dims the dot, even though a run
+  // Lit only when *completely* enabled (#863): either axis off dims the dot, even though an agent
   // with only the built-in block off still sends the emit protocols.
   const fullyOn = antiLazyOn && integrationOn
 

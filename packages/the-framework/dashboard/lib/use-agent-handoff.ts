@@ -4,7 +4,7 @@ import { onAgentHandoff } from '../rpc/reads.js'
 import { usePolled } from './use-async.js'
 import { useAction } from './use-action.js'
 
-/** What the run view knows about the session's branch, and how it acts on it. */
+/** What the agent view knows about the session's branch, and how it acts on it. */
 export type AgentHandoffState = {
   handoff: AgentHandoff | null
   /** True once the read has answered, so an empty state isn't flashed before then. */
@@ -17,7 +17,7 @@ export type AgentHandoffState = {
 }
 
 // The handoff read lifted out of its panel: the same answer now feeds two places — the summary and
-// the actions in the run's action bar, and the commits/files detail the bar expands. Reading it
+// the actions in the agent's action bar, and the commits/files detail the bar expands. Reading it
 // once keeps them from disagreeing and halves the polling.
 export function useAgentHandoff(projectId: string, agentId: string | null | undefined, enabled = true): AgentHandoffState {
   // Polled rather than read once: a push or a PR opened from here (or from a terminal) changes

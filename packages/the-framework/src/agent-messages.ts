@@ -1,17 +1,17 @@
 /**
- * The live-chat message channel (#714): the user's own turns into a running run.
+ * The live-chat message channel (#714): the user's own turns into a running agent.
  *
- * A run's await gates (#337) are the agent asking the user; this is the reverse —
+ * An agent's await gates (#337) are the agent asking the user; this is the reverse —
  * the user speaking to the agent unprompted. Each message continues the *same*
  * agent session (`claude --resume <id>`), so the conversation keeps its full
  * context. The run loop drains this once the work settles; a daemon-spawned
  * session then ends itself when the queue is idle (#1390) — a follow-up message
- * reopens the conversation via `--resume`, like Claude Code web — while a run
+ * reopens the conversation via `--resume`, like Claude Code web — while an agent
  * with its own terminal dashboard keeps the old stay-open wait, since that
  * surface has no daemon to resume through.
  *
  * Wired only when an interactive channel can deliver messages (a live dashboard /
- * daemon over `control.jsonl`). A headless run gets no {@link AgentMessages}, so its
+ * daemon over `control.jsonl`). A headless agent gets no {@link AgentMessages}, so its
  * loop ends when the agent stops asking — byte-identical to before this existed.
  */
 
@@ -22,19 +22,19 @@ export interface ChatMessage {
   text: string
 }
 
-/** A source of user chat messages for a running run. */
+/** A source of user chat messages for a running agent. */
 export interface AgentMessages {
   /**
    * The next user message. Returns an already-queued message immediately (drain
    * between turns); otherwise waits for one (stay-open). Resolves `undefined` when
-   * the run should stop waiting — the signal aborted (Stop / budget cap) or the
+   * the agent should stop waiting — the signal aborted (Stop / budget cap) or the
    * source was closed — so the loop ends cleanly rather than hanging.
    */
   next(signal?: AbortSignal): Promise<ChatMessage | undefined>
   /**
    * The next user message only if one has already arrived — never waits (#1390). What the
    * end-of-run drain asks: a queued follow-up is processed, an idle queue ends the session.
-   * `undefined` once closed, so an aborted run never starts a new turn off a stale message.
+   * `undefined` once closed, so an aborted agent never starts a new turn off a stale message.
    */
   takeQueued(): ChatMessage | undefined
 }

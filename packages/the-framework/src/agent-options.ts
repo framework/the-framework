@@ -4,11 +4,11 @@ import type { StartAgentOptions } from './dashboard/types.js'
 import type { FrameworkFileConfig } from './config.js'
 
 /**
- * Turning the user's preferences into the options a run starts with (#858).
+ * Turning the user's preferences into the options an agent starts with (#858).
  *
  * This lived in the dashboard client, which was fine while the browser was the only thing that
- * started runs. Auto PM (#685) starts them too, and passed nothing at all — so an unattended run
- * ignored the driver, the model and every other per-project setting (#840) that a run started from
+ * started runs. Auto PM (#685) starts them too, and passed nothing at all — so an unattended agent
+ * ignored the driver, the model and every other per-project setting (#840) that an agent started from
  * the launcher would have honoured.
  *
  * It lives here, in pure code with no Node imports, so both callers share one mapping rather than
@@ -51,7 +51,7 @@ export function handoffFromPreferences(preferences: Preferences): HandoffLevel {
 }
 
 /**
- * The run options a set of already-resolved preferences implies.
+ * The agent options a set of already-resolved preferences implies.
  *
  * Takes the merged view, not the two tiers: who wins between the global and the project setting is
  * `resolvePreferences`' job, and this stays a pure mapping of one settled answer.
@@ -67,7 +67,7 @@ export function agentOptionsFromPreferences(preferences: Preferences, context: s
   const target = preferences.target ?? 'local'
   return {
     // The two toggles `the-framework.yml` also owns go out explicitly, `false` included (#842):
-    // the caller has already resolved every layer it can see, so the run states the settled answer
+    // the caller has already resolved every layer it can see, so the agent states the settled answer
     // and the CLI's own resolve (#841) takes it as the nearest layer. Sending nothing would let the
     // repo file turn back on what the launcher just showed as off.
     vanilla,
@@ -82,7 +82,7 @@ export function agentOptionsFromPreferences(preferences: Preferences, context: s
     ...(model ? { model } : {}),
     ...(driver !== 'claude' ? { driver } : {}),
     // Run target (#1050/#610): only a non-local target travels; `local` is the default the CLI
-    // already assumes, so a local run's options stay byte-identical to before either target existed.
+    // already assumes, so a local agent's options stay byte-identical to before either target existed.
     ...(target && target !== 'local' ? { target } : {}),
     ...(context.length ? { context } : {}),
   }

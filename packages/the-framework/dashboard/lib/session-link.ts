@@ -1,4 +1,4 @@
-// A run's "Open session" link — offered only when it actually opens the run. A headless Claude
+// An agent's "Open session" link — offered only when it actually opens the agent. A headless Claude
 // Code run has no per-session URL: the framework defaults to the generic claude.ai/code entry,
 // which opens the product page, not the session, so it isn't worth an action (the session id is
 // still visible in the event log). A link is returned only when the URL genuinely encodes the id —
@@ -18,7 +18,7 @@ export interface SessionLinkView {
   label: string
 }
 
-/** A run's per-session deep link, or null when there is none worth showing. */
+/** An agent's per-session deep link, or null when there is none worth showing. */
 export function describeSessionLink(session?: SessionLike | null): SessionLinkView | null {
   const href = session?.sessionLink
   const id = session?.sessionId

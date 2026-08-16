@@ -27,7 +27,7 @@ export function workOnTicketDraft(file: string): string {
 }
 
 /**
- * Open a ticket that no run is implementing (#1139). It has no session to jump to, so the click
+ * Open a ticket that no agent is implementing (#1139). It has no session to jump to, so the click
  * lands on its project's launcher — which used to arrive with an empty composer and the ticket
  * forgotten, making the row a dead end. Stashing the draft first means the launcher rehydrates
  * (#1066, launcher-only and taken once) prefilled with this ticket.
@@ -57,7 +57,7 @@ export function HotTickets({
   onSelectAgent,
 }: {
   onSelectProject: (id: string) => void
-  /** A ticket a run is implementing knows which run (#1117), so its row opens that session. */
+  /** A ticket an agent is implementing knows which run (#1117), so its row opens that session. */
   onSelectAgent: (id: string, agentId: string) => void
 }) {
   const { value: tickets } = usePolled<HotTicket[]>(onHotTickets, EMPTY, 10_000, [])
@@ -128,8 +128,8 @@ function Lane({
                   render={
                     <button
                       type="button"
-                      // A ticket being implemented names its run, and that session is what the row is
-                      // reporting; one with no run yet opens its project's launcher, asking for it.
+                      // A ticket being implemented names its agent, and that session is what the row is
+                      // reporting; one with no agent yet opens its project's launcher, asking for it.
                       onClick={() => (t.agentId ? onSelectAgent(t.projectId, t.agentId) : openTicket(t, onSelectProject))}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
                     />
@@ -149,7 +149,7 @@ function Lane({
   )
 }
 
-// The one fact that earns the lane: a run implementing it right now, else the plan that made it
+// The one fact that earns the lane: an agent implementing it right now, else the plan that made it
 // in-progress, else the priority that put it in the high-priority lane. AI-Queue rows carry
 // nothing extra — the lane already says it.
 //

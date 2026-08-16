@@ -7,8 +7,8 @@ import { ProjectDocs } from './ProjectDocs.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
 // The project home / launcher — what "Live" selects. Always the Start form + preset cards +
-// the current stack overview; it is never consumed by a run. Starting one appends a run to
-// the rail and adds that run's own view (AgentView) alongside — this page stays put, so you can
+// the current stack overview; it is never consumed by an agent. Starting one appends an agent to
+// the rail and adds that agent's own view (AgentView) alongside — this page stays put, so you can
 // launch again. (Actually running several at once lands with git worktrees, #453.)
 //
 // Below the form, the sections (#1455): every session's open questions in one answerable
@@ -31,7 +31,7 @@ export function ProjectHome({
 }: {
   projectId: string
   events: FrameworkEvent[]
-  /** Carries the started run's id through to the shell; dropping it is what #1169 was. */
+  /** Carries the started agent's id through to the shell; dropping it is what #1169 was. */
   onAgentStarted?: ((intent: string, agentId?: string, runsOn?: string) => void) | undefined
   files: string[]
   context: Set<string>

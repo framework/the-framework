@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { Preferences } from '../../dist/index.js'
 
 // The two writes this component chooses between: a control-log message into the open session, or
-// a run of its own — plus the slot's Stop (#1455).
+// an agent of its own — plus the slot's Stop (#1455).
 const sendMessage = vi.hoisted(() => vi.fn())
 const sendStart = vi.hoisted(() => vi.fn())
 const sendStop = vi.hoisted(() => vi.fn())
@@ -63,7 +63,7 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-// One slot, three states (#1455): the empty box's submit slot holds Stop while the run is live,
+// One slot, three states (#1455): the empty box's submit slot holds Stop while the agent is live,
 // Resume once it was stopped with a session id, and nothing (the launcher collapse) otherwise.
 describe('AgentComposer slot control (#1455)', () => {
   test('a live session offers Stop in the slot, and pressing it stops this run', async () => {
@@ -78,7 +78,7 @@ describe('AgentComposer slot control (#1455)', () => {
   })
 
   test('the Stopping… latch releases when the stop lands, so a resumed run gets a working Stop again', async () => {
-    // A Resume continues the SAME run (#762) — same id — so a latch keyed to the run id alone
+    // A Resume continues the SAME agent (#762) — same id — so a latch keyed to the agent id alone
     // re-engaged on the resumed session and froze its Stop as a disabled spinner.
     sendStop.mockResolvedValue(undefined)
     const ui = (live: boolean) => (
@@ -131,12 +131,12 @@ describe('AgentComposer slot control (#1455)', () => {
     const { rerender } = render(<AgentComposer {...base} live={false} outcome={{ ok: false, stopped: true }} />)
     fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
     await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(1))
-    // The resumed leg's first events momentarily stop `outcome` reading `stopped` while the runs
+    // The resumed leg's first events momentarily stop `outcome` reading `stopped` while the agents
     // poll still says not-live: the slot used to flicker Resume → collapsed → Stop through here.
     rerender(<AgentComposer {...base} live={false} outcome={undefined} />)
     const held = screen.getByRole('button', { name: 'Resume' })
     expect((held as HTMLButtonElement).disabled).toBe(true)
-    // The run reads live: the latch releases and the slot hands over to Stop.
+    // The agent reads live: the latch releases and the slot hands over to Stop.
     rerender(<AgentComposer {...base} live outcome={undefined} />)
     expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Stop agent' })).toBeTruthy()
@@ -167,7 +167,7 @@ describe('AgentComposer, live (#714)', () => {
     // No continueAgentId: a continuation would put it back on this session's branch (#762).
     expect(options.continueAgentId).toBeUndefined()
     expect(options.resumeSession).toBeUndefined()
-    // And the view follows the run it just started, or the user would be left watching the old one.
+    // And the view follows the agent it just started, or the user would be left watching the old one.
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('Import tickets from GitHub', 'run-2'))
   })
 
@@ -205,8 +205,8 @@ describe('AgentComposer, finished (#720)', () => {
 
   test("resumes on the run's own agent, not the global pref (#831)", async () => {
     sendStart.mockResolvedValue({ ok: true })
-    // The pref says Codex, but this run ran under Claude. Handing its session id to `codex --resume`
-    // would be meaningless, so the run's driver wins.
+    // The pref says Codex, but this agent ran under Claude. Handing its session id to `codex --resume`
+    // would be meaningless, so the agent's driver wins.
     prefs = { driver: 'codex', model: 'gpt-5' }
     renderComposer({ ...ended, driver: 'claude-code' })
     fireEvent.click(screen.getByText('submit-normal'))
@@ -242,7 +242,7 @@ describe('AgentComposer, finished (#720)', () => {
 describe('AgentComposer, finished with no session id (#1026)', () => {
   test('stays, and says the send starts a new session instead of vanishing', () => {
     renderComposer({ live: false })
-    // The dead-end note used to replace the composer entirely, so a run that stopped early left
+    // The dead-end note used to replace the composer entirely, so an agent that stopped early left
     // nowhere to type. It is now the placeholder rather than a note above the box: the message is
     // about what typing here does, so it is said where you type — and only once.
     expect(props().placeholder).toMatch(/can’t be continued/i)

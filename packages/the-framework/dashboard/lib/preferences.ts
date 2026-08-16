@@ -304,7 +304,7 @@ export function usePreferenceSources(): PreferenceSources {
 
 /**
  * The open project's raw `the-framework.yml` (#842). The launcher shows `preset` and `event` from
- * it directly: they steer the run but have no preference counterpart, so the gear cannot set them.
+ * it directly: they steer the agent but have no preference counterpart, so the gear cannot set them.
  */
 export function useProjectFileConfig(): FrameworkFileConfig {
   const projectId = typeof window === 'undefined' ? null : parseRoute(window.location.pathname).projectId

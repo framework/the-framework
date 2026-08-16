@@ -93,11 +93,11 @@ test('SYSTEM_PROMPT_TEMPLATE carries the built-in prompt sections (#326) verbati
     assert.ok(SYSTEM_PROMPT_TEMPLATE.includes(section), `missing ${section}`)
   }
   // Derived from the constant, not a literal (#885): the prompt tells the agent where to write
-  // its backlog, and `promoteQueue` only carries FLAT_TODO_FILE off a run's branch. When the two
-  // disagree, an unattended run's queue is written to a name nothing ever promotes. #1420 dropped
+  // its backlog, and `promoteQueue` only carries FLAT_TODO_FILE off an agent's branch. When the two
+  // disagree, an unattended agent's queue is written to a name nothing ever promotes. #1420 dropped
   // the `TODO_FILE:` glossary line and names the file inline instead — the invariant is the name.
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes(`\`${FLAT_TODO_FILE}\``))
-  // The analysis artifact is gone (B2): every run wrote `ANALYSIS_RESULT.md` into the repo and
+  // The analysis artifact is gone (B2): every agent wrote `ANALYSIS_RESULT.md` into the repo and
   // nothing ever read it back, so the prompt no longer asks for one.
   assert.equal(SYSTEM_PROMPT_TEMPLATE.includes('ANALYSIS_RESULT'), false)
   // #1276: an agent edited the user's own checkout through absolute paths while committing
@@ -249,21 +249,21 @@ test('composeAgentSystem says nothing about a browser unless the run has one (#8
 
 test('composeAgentSystem tells the agent it has a browser when the run does (#824)', () => {
   // Without this the chrome-devtools tools are wired but never mentioned, so the agent uses
-  // WebFetch and the browser (and its preview) sits on about:blank for the whole run.
+  // WebFetch and the browser (and its preview) sits on about:blank for the whole agent.
   const system = composeAgentSystem({ browser: true })
   assert.ok(system.includes(BROWSER_PROTOCOL))
   assert.ok(system.endsWith(SIGNAL_PROTOCOL), 'the signal protocol is still last (#547)')
 })
 
 test('the browser section survives --vanilla but not transparent (#824)', () => {
-  // It describes what the run can do, like the emit protocols, so dropping the built-in prompt
+  // It describes what the agent can do, like the emit protocols, so dropping the built-in prompt
   // keeps it. Transparent means an empty channel, so nothing at all.
   assert.ok(composeAgentSystem({ vanilla: true, browser: true }).includes(BROWSER_PROTOCOL))
   assert.equal(composeAgentSystem({ transparent: true, browser: true }), '')
 })
 
 test('composeAgentSystem stays quiet about hands-off unless the run is one (#1234)', () => {
-  // A local run's gates work; telling it they do not would auto-answer questions a human is
+  // A local agent's gates work; telling it they do not would auto-answer questions a human is
   // sitting right there to take.
   assert.ok(!composeAgentSystem().includes(HANDS_OFF_PROTOCOL))
 })

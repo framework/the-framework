@@ -18,12 +18,12 @@ export interface FrameworkFileConfig {
    *
    * One name for one concept (C3). This key used to be `antiLazyPill` — the historical name of
    * the prompt's ancestor (#301) — spelled the other way round from the `vanilla` it mapped to
-   * everywhere else, so the file, the preference and the run option each said the same thing in a
+   * everywhere else, so the file, the preference and the agent option each said the same thing in a
    * different direction and three comments apologised for it.
    */
   vanilla?: boolean
   /**
-   * Transparent mode (#625): make every run in this project a raw `claude -p` — no framework
+   * Transparent mode (#625): make every agent in this project a raw `claude -p` — no framework
    * system prompt, no emit protocols, no consumption guard, no dashboard, no TODO loop. The
    * coarse "only-pick-what-you-need" master off-switch, at the per-project tier. Default `false`.
    */
@@ -91,7 +91,7 @@ function legacyHandoff(obj: Record<string, unknown>, source: string): HandoffLev
 /**
  * Read `the-framework.yml` (or `.yaml`) from a directory. A missing file yields
  * `{}`. Best-effort: a malformed file is reported via `onWarn` and treated as
- * empty, never a failed run. CLI flags override whatever this returns.
+ * empty, never a failed agent. CLI flags override whatever this returns.
  */
 export async function loadFrameworkConfig(
   dir: string,

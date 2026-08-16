@@ -242,7 +242,7 @@ describe('the handoff checkboxes (#1102)', () => {
   })
 
   test('the click holds until the run echoes it back, so the box does not bounce', async () => {
-    // The instruction round-trips through a file the run tails, so the events lag the click by a
+    // The instruction round-trips through a file the agent tails, so the events lag the click by a
     // beat. Rendering the stale value in that window would flick the box back on under the cursor.
     const { rerender } = render(<HandoffArm projectId="p1" agentId="run-1" state={armed} />)
     fireEvent.click(screen.getByText('Open PR'))

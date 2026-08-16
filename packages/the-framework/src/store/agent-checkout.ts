@@ -4,11 +4,11 @@ import { worktreePath } from './worktree.js'
 import { nodeFs } from '../node-fs.js'
 
 /**
- * The checkout a run id resolves to (#738/#797): the run's own worktree while it exists, else
- * the project root. Live metas first — a running run records its cwd — then the worktree
- * directory itself, which exists before the run has written its `agent.json` (#766): the daemon
- * creates the directory and spawns the process, and only then does the run write its meta, so
- * a lookup by run state alone misses a run that certainly exists.
+ * The checkout an agent id resolves to (#738/#797): the agent's own worktree while it exists, else
+ * the project root. Live metas first — a running agent records its cwd — then the worktree
+ * directory itself, which exists before the agent has written its `agent.json` (#766): the daemon
+ * creates the directory and spawns the process, and only then does the agent write its meta, so
+ * a lookup by agent state alone misses an agent that certainly exists.
  *
  * The directory probe matters beyond a slow first read: the event stream resolves its path once,
  * when the browser opens it. Falling back to the project root would not self-correct a moment
@@ -32,10 +32,10 @@ export async function resolveAgentCheckout(projectCwd: string, agentId: string |
 /**
  * The events journal a run-scoped subscribe should tail (#1472). Follows
  * {@link resolveAgentCheckout}'s order — live meta cwd, then the worktree — but where that
- * resolution would fall back to the project root, an ended run's **archived** `<id>.jsonl`
- * wins: the archive existing proves the run ended, and it is the run's own record, where the
+ * resolution would fall back to the project root, an ended agent's **archived** `<id>.jsonl`
+ * wins: the archive existing proves the agent ended, and it is the agent's own record, where the
  * root journal belongs to whatever root run wrote it last. The root journal stays the final
- * fallback for the no-archive residue, so a just-starting root run (no meta yet, #766, and no
+ * fallback for the no-archive residue, so a just-starting root agent (no meta yet, #766, and no
  * worktree to probe) streams exactly as before.
  *
  * Only the events tails resolve here; every other run-addressed surface keeps

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '../lib/utils.js'
 
-// One collapsible-section toggle (#659), shared so every disclosure under the run controls
+// One collapsible-section toggle (#659), shared so every disclosure under the agent controls
 // ("See actual prompt sent", "Context") reads the same: a chevron that rotates when open, then
 // the label, muted until hovered. Keeping them in one place stops the styles drifting apart.
 export function DisclosureToggle({

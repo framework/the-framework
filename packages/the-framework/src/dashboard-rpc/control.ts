@@ -23,29 +23,29 @@ import type {
 import type { DashboardContext } from '../dashboard/rpc-serve.js'
 import type { Preferences } from '../registry.js'
 
-// The write side behind the new dashboard (#405): steering a live run. The reverse of
+// The write side behind the new dashboard (#405): steering a live agent. The reverse of
 // the event stream — events flow run -> events.jsonl -> Channel -> browser; steering
-// flows browser -> here -> the run's `.the-framework/control.jsonl` -> run, which tails that
+// flows browser -> here -> the agent's `.the-framework/control.jsonl` -> run, which tails that
 // file and aborts or resolves its gate. Same file-is-the-seam design as the daemon's legacy
-// onStop/onChoice (#344/#393). Each steering call takes the run id (#749): a run tails the
-// log inside its own worktree since #736, so the entry has to be written there. (Starting a run needs a spawn + the daemon's busy guard, so `sendStart`
+// onStop/onChoice (#344/#393). Each steering call takes the agent id (#749): an agent tails the
+// log inside its own worktree since #736, so the entry has to be written there. (Starting an agent needs a spawn + the daemon's busy guard, so `sendStart`
 // lands with the daemon-serves-the-bundle wiring, not here.)
 
 /**
  * Resolve the checkout to steer and append one entry to its `control.jsonl`. A no-op when
- * there is no local path (the read-only relay), so the run channel is only ever written by a
+ * there is no local path (the read-only relay), so the agent channel is only ever written by a
  * host that owns the workspace.
  *
- * The `agentId` is what makes steering land (#749): a run tails the control log inside its own
+ * The `agentId` is what makes steering land (#749): an agent tails the control log inside its own
  * worktree, so an entry written to the project root reaches nothing. Absent, it addresses the
- * project root, which is still right for a run that has no worktree (the non-git fallback).
+ * project root, which is still right for an agent that has no worktree (the non-git fallback).
  */
 async function appendControlFor(projectId: string, entry: ControlEntry, agentId?: string): Promise<void> {
   const cwd = await resolveAgentPath(projectId, agentId)
   if (cwd) await appendControl(cwd, entry)
 }
 
-/** Stop a live run (the Stop button): append a stop entry to the run's control log. */
+/** Stop a live agent (the Stop button): append a stop entry to the agent's control log. */
 export async function sendStop(projectId: string, agentId?: string): Promise<void> {
   return relayOr(agentId, 'sendStop', [projectId, agentId], async () => {
     await appendControlFor(projectId, { kind: 'stop' }, agentId)
@@ -57,8 +57,8 @@ export async function sendStop(projectId: string, agentId?: string): Promise<voi
  * finishes.
  *
  * Steering rather than a setting write, because it is about *this* session: the preference sets
- * where the ladder starts, and this is the user changing their mind for one run. The run echoes
- * what it applied back as an event, so the surface reads from the run's meta rather than from local
+ * where the ladder starts, and this is the user changing their mind for one agent. The agent echoes
+ * what it applied back as an event, so the surface reads from the agent's meta rather than from local
  * state that a reload would lose.
  *
  * One rung on the wire (B5), so there is nothing to normalise here: a surface offering the stages
@@ -92,7 +92,7 @@ export async function sendChoice(
 /**
  * Queue the user's pick for the question a Claude web session is parked on (#1237).
  *
- * Not a control-log write like {@link sendChoice}: a cloud run has no live local session to
+ * Not a control-log write like {@link sendChoice}: a cloud agent has no live local session to
  * steer, so the pick goes to the bridge store, where the browser extension collects it, types
  * it into the session's composer and submits. Only a label of the currently parked question is
  * accepted, so this can never put arbitrary text in front of another product's agent. Local
@@ -113,7 +113,7 @@ export async function sendBridgeAnswerCancel(sessionId: string): Promise<void> {
 
 /**
  * Send a live-chat message to the project's running run (#714): append a `message` entry
- * that the run drains between turns, continuing the same session via `--resume`. Empty
+ * that the agent drains between turns, continuing the same session via `--resume`. Empty
  * messages are dropped.
  */
 export async function sendMessage(projectId: string, text: string, agentId?: string): Promise<void> {
@@ -125,7 +125,7 @@ export async function sendMessage(projectId: string, text: string, agentId?: str
 }
 
 /**
- * Remove a retained worktree (#737). A run that failed or was stopped keeps its checkout so you
+ * Remove a retained worktree (#737). An agent that failed or was stopped keeps its checkout so you
  * can inspect it; this is the explicit cleanup for one, since nothing removes them on a timer.
  *
  * The checks and the commit-first removal are {@link removeProjectWorktree}'s, shared with the
@@ -149,7 +149,7 @@ async function withWorktreeRemoval<T>(
 ): Promise<T | { ok: false; error: string }> {
   const cwd = await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
-  // Under the run lock: a Remove/Delete clicked the moment a run ends races teardown's own
+  // Under the agent lock: a Remove/Delete clicked the moment an agent ends races teardown's own
   // archive-commit-remove of the same checkout; serialized, whichever runs second finds the
   // state the first one left and acts on that.
   return withAgentLock(worktreePath(cwd, agentId), () => remove(cwd, { beforeRemove: async () => {} }))
@@ -167,12 +167,12 @@ export async function sendDeleteAgent(projectId: string, agentId: string): Promi
 }
 
 /**
- * Start a run in the project (#405, #345): the one write that needs the daemon, since
+ * Start an agent in the project (#405, #345): the one write that needs the daemon, since
  * spawning goes through the daemon's own `startAgent` closure (with its one-run-per-
  * project busy guard). The daemon wires `startAgent` into the dashboard context, and this
- * runs in the daemon's own process, so the call reaches it directly. `kind` defaults to a plain build run; a `build`/`prompt`
+ * runs in the daemon's own process, so the call reaches it directly. `kind` defaults to a plain build agent; a `build`/`prompt`
  * needs a non-empty prompt, `research` may be empty (its "what" defaults server-side).
- * Returns the daemon's {@link StartAgentResult} — `busy` when a run is already active.
+ * Returns the daemon's {@link StartAgentResult} — `busy` when an agent is already active.
  */
 export async function sendStart(
   projectId: string,
@@ -185,7 +185,7 @@ export async function sendStart(
   const text = prompt.trim()
   if (!text && kind !== 'research') return { ok: false, error: 'a non-empty prompt is required' }
   // A drain fired by hand is the same work the sweep does, so it says the same thing about itself
-  // (#1117). Resolved here rather than sent by the caller: the value lands on the run's meta and is
+  // (#1117). Resolved here rather than sent by the caller: the value lands on the agent's meta and is
   // rendered, so it is read off the queue on this side instead of trusted from a browser. An
   // explicit ticket on the options wins, since a caller that names one knows better than a guess.
   const ticket = options.ticket ?? (await ticketForStart(projectId, text))
@@ -236,7 +236,7 @@ async function handoffTargetFor(
 /**
  * Push a finished session's branch to `origin` (#799).
  *
- * A click rather than something the run does on its way out: pushing publishes the agent's work
+ * A click rather than something the agent does on its way out: pushing publishes the agent's work
  * to a shared remote under the user's name, which is the user's call.
  */
 export async function sendPushBranch(projectId: string, agentId: string): Promise<HandoffResult> {
@@ -244,7 +244,7 @@ export async function sendPushBranch(projectId: string, agentId: string): Promis
     const target = await handoffTargetFor(projectId, agentId)
     if (!target) return { ok: false, error: 'unknown session' }
     const branch = agentBranchFor(target.agent)
-    // Commit *and* push under the run lock: clicked the moment a session flips `done`, this used
+    // Commit *and* push under the agent lock: clicked the moment a session flips `done`, this used
     // to commit against the checkout teardown was committing in and lose. Serialized, whichever
     // side runs first commits everything pending; the other finds a clean tree — or no checkout
     // at all, which commitAgentWork already reads as "the branch is authoritative".
@@ -265,7 +265,7 @@ export async function sendPushBranch(projectId: string, agentId: string): Promis
 /**
  * Open a PR for a finished session's branch (#799), pushing it first if the remote lacks it.
  *
- * The title and body come from what the run already recorded: the session name the agent chose
+ * The title and body come from what the agent already recorded: the session name the agent chose
  * and the intent the user asked for. Nothing new is invented and nothing extra is asked of the
  * user, which is the point of "offer the next step rather than describe it".
  */
@@ -284,7 +284,7 @@ export async function sendOpenPullRequest(projectId: string, agentId: string): P
     if (!opened) {
       return { ok: false, error: 'could not commit the work this session left uncommitted' }
     }
-    // Record it on the run (E6). The session's own process is gone by now, so there is no event
+    // Record it on the agent (E6). The session's own process is gone by now, so there is no event
     // stream to carry the fact — but it is the same fact, and every surface reads it from the same
     // place either way rather than re-deriving it from branch names.
     if (opened.ok && opened.number !== undefined && opened.url) {
@@ -297,11 +297,11 @@ export async function sendOpenPullRequest(projectId: string, agentId: string): P
 /**
  * The user's Merge action (#1391): one button, two states of the session it addresses.
  *
- * A live run gets a `merge` control entry — the run arms the full publish ladder, records the
+ * A live agent gets a `merge` control entry — the agent arms the full publish ladder, records the
  * human authorization (which the human-authorized merge gate (#1363) honors instead of demanding the agent's signal), and
- * merges at its own natural end (#1390). A finished run has no process to steer, so its open PR
+ * merges at its own natural end (#1390). A finished agent has no process to steer, so its open PR
  * is merged directly — the answer to the withheld-merge ending, where an agent that never
- * signalled left a draft behind. If the run ends between the check and the write, the entry lands
+ * signalled left a draft behind. If the agent ends between the check and the write, the entry lands
  * unread; the ended view then offers the direct merge, so the second click still gets there.
  */
 export async function sendMerge(projectId: string, agentId: string): Promise<HandoffResult> {
@@ -333,12 +333,12 @@ export interface QueuedTicket {
 }
 
 /**
- * Put a ticket on the project's agent queue (#697), so the next drain run works it.
+ * Put a ticket on the project's agent queue (#697), so the next drain agent works it.
  *
- * A direct write rather than a run: the queue is a plain file the dashboard already reads,
+ * A direct write rather than an agent: the queue is a plain file the dashboard already reads,
  * and asking an agent to append one line would cost a turn and could do anything else besides.
  * It writes the project checkout's flat backlog specifically, which is the durable queue #624
- * settled on and the one a worktree run's queue is promoted into (#852).
+ * settled on and the one a worktree agent's queue is promoted into (#852).
  *
  * Given a `ticket`, the entry is placed in the matching `## Priority N` section rather than
  * appended to the end of the file, and it links back to the ticket it came from. Both halves of

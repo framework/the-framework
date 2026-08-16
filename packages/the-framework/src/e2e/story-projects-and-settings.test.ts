@@ -10,7 +10,7 @@ import { onQuota, onAutoPm, sendAutoPmSweep } from '../dashboard-rpc/quota.js'
 import { sendStart } from '../dashboard-rpc/control.js'
 
 // The projects & settings stories (README.md): registering a repo, what the sidebar then shows,
-// how settings written in the dashboard reach the runs the daemon starts, and the usage panel.
+// how settings written in the dashboard reach the agents the daemon starts, and the usage panel.
 
 test('add a project: it is installed, registered, and readable like the sidebar reads it (#396)', async () => {
   const world = await makeWorld()
@@ -28,7 +28,7 @@ test('add a project: it is installed, registered, and readable like the sidebar 
     assert.equal(mine?.path, project.cwd)
     assert.equal(mine?.activated, true)
 
-    // The project header's reads answer: the branch, an empty docs rail, an empty run history.
+    // The project header's reads answer: the branch, an empty docs rail, an empty agent history.
     const status = await rpc(onGitStatus)(project.id)
     assert.equal(status?.branch, 'main')
     assert.deepEqual(await rpc(onDocs)(project.id), [])
@@ -74,14 +74,14 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
     assert.equal((await rpc(onPreferences)()).vanilla, false)
     assert.equal((await rpc(onPreferences)()).model, 'fable-e2e')
 
-    // First leg: a plain run, finished.
+    // First leg: a plain agent, finished.
     const agentId = await world.startAgent(project, 'Build the settings page')
     await world.waitAgent(project, agentId, 'done')
 
     // The composer's Resume sends only its seed (#1467); the daemon overlays the project's
     // resolved options, so the model chosen in Settings reaches the continued session's argv.
     // Fired the instant the row flips done — deliberately inside teardown's window: the busy
-    // guard waits out the still-exiting first leg instead of refusing (#1529), and the run
+    // guard waits out the still-exiting first leg instead of refusing (#1529), and the agent
     // lock makes the continuation wait out the archive it is about to reopen, where it used
     // to reuse a checkout mid-retirement.
     const resumed = await rpc(sendStart)(project.id, 'Keep going', 'prompt', { continueAgentId: agentId })
@@ -95,7 +95,7 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
     assert.equal(sent.options.model, 'fable-e2e', 'the resumed run carries the project model')
     assert.equal(sent.continueAgent, true, 'the resumed run reopens the same session row')
 
-    // One row throughout: the continuation is the same run, not a second history entry.
+    // One row throughout: the continuation is the same agent, not a second history entry.
     const rows = await rpc(onAgents)(project.id)
     assert.equal(rows.filter(r => r.id === agentId).length, 1)
   } finally {

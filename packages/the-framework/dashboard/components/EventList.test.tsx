@@ -73,7 +73,7 @@ describe('EventList conversation rows', () => {
 })
 
 // Colour carries meaning in the log (#1199/#1170): a failure is red, the reader's own turn is
-// blue, and a stopped run is neither, since stopping was asked for.
+// blue, and a stopped agent is neither, since stopping was asked for.
 describe('EventList row colour', () => {
   test('an agent error renders in red (#1199)', () => {
     render(<EventList events={[{ kind: 'driver', event: { type: 'error', message: 'rate limited' } }]} stick={false} />)
@@ -232,7 +232,7 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
 })
 
 // The latest `browser` row hosts the live inline preview (#1455 item 6b); earlier rows and the
-// read-only relay watch keep the formatter's text, and an ended run's pane degrades (#1359).
+// read-only relay watch keep the formatter's text, and an ended agent's pane degrades (#1359).
 describe('EventList inline browser rows (#1455 item 6b)', () => {
   const browser = (url = 'https://app.test/'): FrameworkEvent => ({ kind: 'browser', url })
 

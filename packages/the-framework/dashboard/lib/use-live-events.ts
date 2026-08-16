@@ -5,15 +5,15 @@ import { onEvents, type EventChannel } from '../rpc/events.js'
 import { currentAgentEvents } from './live-state.js'
 import { stampReceived } from './event-times.js'
 
-// The live run feed (#405), shared. The dashboard is a projection of the selected project's
+// The live agent feed (#405), shared. The dashboard is a projection of the selected project's
 // `.the-framework/events.jsonl`, streamed over Server-Sent Events that push one
 // `FrameworkEvent` per new line. Both the main event view and the right rail's choice gates
 // (#440) read this same stream, so the subscription lives here and each consumer owns one
 // channel rather than opening a second.
 //
-// The feed is per RUN, not per project (#749): each run tails its own worktree's log since #736,
-// so the selected run id picks the log to follow. Changing it resubscribes, which is what makes
-// selecting run A vs run B show different output. Omitted (the relay, or a Start whose id has not
+// The feed is per RUN, not per project (#749): each agent tails its own worktree's log since #736,
+// so the selected agent id picks the log to follow. Changing it resubscribes, which is what makes
+// selecting agent A vs agent B show different output. Omitted (the relay, or a Start whose id has not
 // been adopted yet) falls back to the project root.
 
 /** The live feed plus whether its channel is currently down (#948). */
@@ -45,12 +45,12 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
   const [lost, setLost] = useState(false)
   const [done, setDone] = useState(false)
 
-  // Drop the accumulated feed at a run boundary the caller knows about (a fresh Start bumps
-  // `resetKey`), WITHOUT tearing down the subscription. The new run truncates events.jsonl a
+  // Drop the accumulated feed at an agent boundary the caller knows about (a fresh Start bumps
+  // `resetKey`), WITHOUT tearing down the subscription. The new agent truncates events.jsonl a
   // beat later, so until its first line streams the buffer would otherwise still hold the
   // finished run — which the jump-to-live view (#705) would show. Clearing here means the pane
-  // waits empty for the new run instead. The live tail then re-reads the truncated file on its
-  // own (JsonlTailer rewrite detection) and streams the new run in.
+  // waits empty for the new agent instead. The live tail then re-reads the truncated file on its
+  // own (JsonlTailer rewrite detection) and streams the new agent in.
   useEffect(() => {
     setEvents([])
   }, [resetKey])
@@ -132,15 +132,15 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
       if (graceTimer) clearTimeout(graceTimer)
       void channel?.close()
     }
-    // agentId is a dependency: selecting another run must resubscribe to that run's log (#749).
+    // agentId is a dependency: selecting another agent must resubscribe to that agent's log (#749).
   }, [projectId, agentId])
 
-  // Scope the accumulated feed to the run in progress — but only for the project-root fallback:
+  // Scope the accumulated feed to the agent in progress — but only for the project-root fallback:
   // that subscription lives across run boundaries (it only resets on a project switch), so
-  // without the slice a second run would show the previous run's log until it finished. A run's
-  // own tail (#749) holds nothing but that run — including the second `session` boundary a
+  // without the slice a second agent would show the previous agent's log until it finished. An agent's
+  // own tail (#749) holds nothing but that agent — including the second `session` boundary a
   // resumed session (#762) appends to the SAME journal, where slicing is exactly wrong: it hid
-  // everything before the resume for as long as the run was live. See {@link currentAgentEvents}.
+  // everything before the resume for as long as the agent was live. See {@link currentAgentEvents}.
   const scoped = useMemo(() => (agentId ? events : currentAgentEvents(events)), [events, agentId])
   return { events: scoped, lost, done }
 }

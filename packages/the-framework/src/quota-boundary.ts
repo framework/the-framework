@@ -191,7 +191,7 @@ function windowModel(label: string): string | undefined {
  *
  * `undefined` when there is no reading, or when the week's reset cannot be
  * placed. That is "we do not know", and each caller decides what to do with it:
- * the per-run guard carries on, unattended work stands down.
+ * the per-agent guard carries on, unattended work stands down.
  */
 export function quotaBoundaryStatus(input: {
   windows: DriverQuotaWindow[]

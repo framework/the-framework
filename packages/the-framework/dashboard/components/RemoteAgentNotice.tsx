@@ -1,10 +1,10 @@
 import { MonitorSmartphone } from 'lucide-react'
 
-// The run view's banner for a session running on a connected device (#1067, slice 2). Its live feed,
+// The agent view's banner for a session running on a connected device (#1067, slice 2). Its live feed,
 // diff, worktree, handoff, and push/PR all relay back through the local daemon and render normally; the
-// one thing still local-only is the browser preview (slice 3), so this only flags where the run executes
-// and that the screencast is not available for a remote run yet. Renders nothing without a device label,
-// so the run view can mount it unconditionally.
+// one thing still local-only is the browser preview (slice 3), so this only flags where the agent executes
+// and that the screencast is not available for a remote agent yet. Renders nothing without a device label,
+// so the agent view can mount it unconditionally.
 export function RemoteAgentNotice({ device }: { device?: string | undefined }) {
   if (!device) return null
   return (

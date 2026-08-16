@@ -59,7 +59,7 @@ describe('HotTickets (#1112)', () => {
   })
 
   test('a ticket being implemented with no plan or spike still gets a tag (#1117)', async () => {
-    // The gap the run link opens up: in-progress used to imply planned-or-spiked, so a bare
+    // The gap the agent link opens up: in-progress used to imply planned-or-spiked, so a bare
     // implementing ticket would have shown an unexplained row.
     onHotTickets.mockResolvedValue([{ ...ht('a.md', 'alpha', 'in-progress'), agentId: 'run-7' }])
     render(<HotTickets onSelectProject={() => {}} onSelectAgent={vi.fn()} />)
@@ -69,7 +69,7 @@ describe('HotTickets (#1112)', () => {
 
 describe('a hot ticket that names a run opens that run', () => {
   test('an implemented ticket goes to its session, not its project home', async () => {
-    // The in-progress lane exists because a run said it is implementing this ticket (#1117), so
+    // The in-progress lane exists because an agent said it is implementing this ticket (#1117), so
     // the session it names is what the row is reporting on.
     onHotTickets.mockResolvedValue([{ ...ht('a.md', 'alpha', 'in-progress'), agentId: 'run-9' }])
     const onSelectAgent = vi.fn()

@@ -70,23 +70,23 @@ export interface ComposerHandle {
   focus: () => void
 }
 
-// The shared run composer (#721): the Tiptap editor (`/` `<` `@` `#` triggers, presets, mentions)
+// The shared agent composer (#721): the Tiptap editor (`/` `<` `@` `#` triggers, presets, mentions)
 // plus the control row — agent/model select, presets menu, Global-options gear, and the submit
 // button. Factored out of the launcher (StartAgentForm) so the run-view chat (AgentComposer) gets the exact
 // same surface, wired to the same data (files, presets, prefs). The caller owns what happens on
-// submit: the launcher starts a run (with collected options), the chat sends a message. The `@`
+// submit: the launcher starts an agent (with collected options), the chat sends a message. The `@`
 // picker's project list is Composer's own concern, so it loads it here (#743) rather than making
 // every host pass the same list down.
 export const Composer = forwardRef<ComposerHandle, {
   /** The current project's files for the `#` picker (#504). */
   files: string[]
-  /** Add a path to the run Context (from an `@`/`#` mention). */
+  /** Add a path to the agent Context (from an `@`/`#` mention). */
   addContext: (path: string) => void
-  /** Drop a path from the run Context when its `@`/`#` chip leaves the editor (#948). */
+  /** Drop a path from the agent Context when its `@`/`#` chip leaves the editor (#948). */
   removeContext?: ((path: string) => void) | undefined
   /** Run the composed text. `kind` is `prompt` once a preset was loaded, else `build`.
    *  `newAgent` (#959) says the loaded preset must open a session of its own, so the two
-   *  in-session hosts send it as a new run instead of into the session they sit in. */
+   *  in-session hosts send it as a new agent instead of into the session they sit in. */
   onSubmit: (text: string, kind: 'build' | 'prompt', opts: { newAgent: boolean }) => void | Promise<void>
   /** Mirror the live prompt + kind out, so the launcher can drive its disclosure/context UI. */
   onPromptChange?: ((prompt: string, kind: 'build' | 'prompt') => void) | undefined
@@ -104,16 +104,16 @@ export const Composer = forwardRef<ComposerHandle, {
   /** Off inside a session (#831): a session is bound to the agent it started with, so the select
    *  would only ever rewrite the *next* session's default. Chosen at the launcher instead. */
   showDriverModel?: boolean | undefined
-  /** Inside a running/finished session (#833): every run option is baked in at spawn, so the
+  /** Inside a running/finished session (#833): every agent option is baked in at spawn, so the
    *  gear drops them (keeping the genuinely global editor pick) and the "In play" strip goes —
    *  both would otherwise read as controls over *this* session that only rewrite the next one. */
   inAgent?: boolean | undefined
   /** The session has ended (#1172): the next message is a Resume, i.e. a NEW leg that resolves
    *  the current preferences at start (#1469) — so the gear returns, offering just the options
-   *  that shape that leg (publish ladder, Autopilot, Browser). While the run is live nothing is
+   *  that shape that leg (publish ladder, Autopilot, Browser). While the agent is live nothing is
    *  adjustable, and the gear is dropped entirely instead of opening empty. Only read in-session. */
   agentEnded?: boolean | undefined
-  /** The session this composer sits in, if any (#874): a preset launched from a run page targets
+  /** The session this composer sits in, if any (#874): a preset launched from an agent page targets
    *  that session by default, instead of the whole codebase. Absent at the launcher, where no
    *  session exists yet. */
   sessionName?: string | undefined
@@ -158,7 +158,7 @@ export const Composer = forwardRef<ComposerHandle, {
   const fileConfig = useProjectFileConfig() // #842: the repo's committed the-framework.yml
   const vanilla = preferences.vanilla ?? false
 
-  // Presets render against the session they are launched from (#874). The run pages pass their
+  // Presets render against the session they are launched from (#874). The agent pages pass their
   // session name so a preset targets that session by default; the launcher passes none, and the
   // default falls through to the whole codebase.
   const presets = useMemo(
@@ -229,7 +229,7 @@ export const Composer = forwardRef<ComposerHandle, {
   }
 
   // A preset (from the `/` menu or the Presets button) loads the rendered template into the
-  // editor, which chip-ifies its tags; the run then goes verbatim as a `prompt` kind.
+  // editor, which chip-ifies its tags; the agent then goes verbatim as a `prompt` kind.
   const loadPreset = (label: string, replaced: boolean, presetNewAgent = false) => {
     setKind('prompt')
     setNewAgent(presetNewAgent)
@@ -245,7 +245,7 @@ export const Composer = forwardRef<ComposerHandle, {
 
   const onPromptEdit = (value: string) => {
     setPrompt(value)
-    // An emptied box is a fresh start: back to a normal build run.
+    // An emptied box is a fresh start: back to a normal build agent.
     const nextKind = !value.trim() && kind !== 'build' ? 'build' : kind
     if (nextKind !== kind) setKind(nextKind)
     // Emptying the box drops the preset, and with it its new-session rule.
@@ -283,7 +283,7 @@ export const Composer = forwardRef<ComposerHandle, {
   )
 
   // The agent/model select and the options gear, shared by both forms (#755). They were compact's
-  // one real omission: a run started from the navbar used the stored agent, model and options with
+  // one real omission: an agent started from the navbar used the stored agent, model and options with
   // nothing on screen saying which. Every value is preferences-backed and global, so the same
   // controls in either place read and write the same state.
   const driverModelEl = showDriverModel && (
@@ -311,11 +311,11 @@ export const Composer = forwardRef<ComposerHandle, {
     />
   )
   // The options gear sits with the agent/model select and submit at the end of the row (#1046), so
-  // the three run controls read as one cluster.
+  // the three agent controls read as one cluster.
   //
-  // In-session it follows what the next action arms (#1172): while the run is LIVE nothing is
+  // In-session it follows what the next action arms (#1172): while the agent is LIVE nothing is
   // adjustable (options were baked in at spawn, #833) and the gear is dropped entirely — it used
-  // to render with an empty dropdown. Once the run has ENDED, the next message is a Resume — a new
+  // to render with an empty dropdown. Once the agent has ENDED, the next message is a Resume — a new
   // leg that resolves the current preferences at start (#1469) — so the gear returns with just the
   // rows that shape that leg (`resumeOptionRows`).
   const optionsGearEl = inAgent && !agentEnded ? null : (
@@ -336,12 +336,12 @@ export const Composer = forwardRef<ComposerHandle, {
               currentUrl,
               isLocal: isLocalConnection,
               selectedDeviceId,
-              // #1067: selecting a device makes it the run target in place, no navigation.
+              // #1067: selecting a device makes it the agent target in place, no navigation.
               onSelect: (p: ConnectionProfile) => selectRemoteDevice(p.id),
               onSelectDriver: () => selectRemoteDevice(null),
               onConnectLocal: connectLocal,
               onAddDevice: () => setAddingDevice(true),
-              // #1072: drop a saved device; clear the selection if it was the run target.
+              // #1072: drop a saved device; clear the selection if it was the agent target.
               onRemove: (p: ConnectionProfile) => {
                 if (selectedDeviceId === p.id) selectRemoteDevice(null)
                 removeProfile(p.id)

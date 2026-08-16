@@ -246,7 +246,7 @@ const TOKEN = 'zX2p8Q0hqk3m9tR7vN1cW4bY6sJ5aL0dFgHiKlMnOp'
 
 // The guard triggers on the token being configured, not on the bind host (a non-loopback bind is
 // exactly what configures one). Binding loopback with the token set exercises every guard path
-// without an external bind that could trip the OS firewall in an automated run; the true two-daemon
+// without an external bind that could trip the OS firewall in an automated agent; the true two-daemon
 // non-loopback drive is noted as a follow-up in the PR.
 async function guardedDashboard(): Promise<{ base: string; close: () => Promise<void> }> {
   const bundle = await fakeBundle()

@@ -24,9 +24,9 @@ export interface AgentSpec {
   kind: StartAgentKind
   /** The checkout the session runs in: a worktree, or the project itself. */
   cwd: string
-  /** The id its worktree is named with, so the directory and the run recorded inside it are one string. */
+  /** The id its worktree is named with, so the directory and the agent recorded inside it are one string. */
   agentId?: string
-  /** Reopen `agentId`'s log instead of truncating it: the follow-up IS that run (#762). */
+  /** Reopen `agentId`'s log instead of truncating it: the follow-up IS that agent (#762). */
   continueAgent?: boolean
   /** Everything the launcher's options gear and Settings decide about the session. */
   options: StartAgentOptions

@@ -56,7 +56,7 @@ describe('pendingChoices', () => {
   })
 
   test('an end event expires every open gate (#1359)', () => {
-    // A run that died mid-gate never wrote choice-resolved; the store's surrogate end is what
+    // An agent that died mid-gate never wrote choice-resolved; the store's surrogate end is what
     // says the question's audience is gone. Rendering past it left the panel answerable forever.
     const end: FrameworkEvent = { kind: 'end', ok: false, stopped: true, detail: 'its process died without reporting an end' }
     expect(pendingChoices([choice('c1', 'One?'), choice('c2', 'Two?'), end])).toEqual([])
@@ -74,7 +74,7 @@ describe('isAgentActive', () => {
 
   test('a resumed session is active again: the stopped segment\'s end does not count (#762)', () => {
     // A resume appends a second `session` boundary to the SAME journal. "Was there ever an end"
-    // read the resumed-live run as inactive — hiding Stop while the agent worked.
+    // read the resumed-live agent as inactive — hiding Stop while the agent worked.
     const resumed = [
       { kind: 'session' },
       { kind: 'end', ok: false, stopped: true },
@@ -218,7 +218,7 @@ describe('agentOutcome', () => {
   })
 
   test('a resumed session has no outcome until ITS segment ends (#762)', () => {
-    // First-end-wins kept a resumed run "stopped" for ever: while it was live again, and even
+    // First-end-wins kept a resumed agent "stopped" for ever: while it was live again, and even
     // after it later finished clean. The ending is the current segment's, or nothing yet.
     const stopped = { kind: 'end', ok: false, stopped: true }
     const midResume = [{ kind: 'session' }, stopped, { kind: 'session' }, { kind: 'log', message: 'go' }] as FrameworkEvent[]
@@ -254,7 +254,7 @@ describe('actionsRunUrl', () => {
 
 describe('agentSettled (#1173)', () => {
   test('a session parked on you is settled, though its process is still up', () => {
-    // The whole bug: this run is `status: running` and will stay that way for as long as the
+    // The whole bug: this agent is `status: running` and will stay that way for as long as the
     // conversation is open (#714), so anything keyed off liveness thinks the agent is still working.
     expect(agentSettled([{ kind: 'log', message: 'go' }, { kind: 'settled' }])).toBe(true)
     expect(agentSettled([{ kind: 'log', message: 'go' }])).toBe(false)

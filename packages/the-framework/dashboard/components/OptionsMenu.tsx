@@ -34,7 +34,7 @@ import { OptionLabel } from './ui/option-label.js'
 export { OptionLabel }
 
 /**
- * Where a run executes (#1050/#610). `local` runs on this device; `actions` on a GitHub Actions
+ * Where an agent executes (#1050/#610). `local` runs on this device; `actions` on a GitHub Actions
  * runner; `web` hands it to a Claude Code cloud session on the user's own account.
  */
 export type AgentTarget = 'local' | 'actions' | 'web'
@@ -46,9 +46,9 @@ export type AgentTargetControl = {
 }
 
 /**
- * The saved-devices half of the flat "Run on" list (#1052/#1066/#1067). A device is a run TARGET,
+ * The saved-devices half of the flat "Run on" list (#1052/#1066/#1067). A device is an agent TARGET,
  * selected in place: picking one no longer navigates the browser (#1067). The local daemon relays
- * the run to it. So a device row calls `onSelect` (ephemeral UI state, the checkmark follows it) just
+ * the agent to it. So a device row calls `onSelect` (ephemeral UI state, the checkmark follows it) just
  * as a driver row calls `onChange`; the difference is only that a device is not persisted. "This
  * machine" while genuinely on a remote daemon still calls `onConnectLocal` (go home).
  */
@@ -59,16 +59,16 @@ export type ConnectionControl = {
   currentUrl: string | null
   /** Whether the current origin is loopback (this machine's own daemon). */
   isLocal: boolean
-  /** The device selected as the run target (its profile id), or null when a driver row is (#1067). */
+  /** The device selected as the agent target (its profile id), or null when a driver row is (#1067). */
   selectedDeviceId: string | null
-  /** Select a saved device as the run target, with no navigation (#1067). */
+  /** Select a saved device as the agent target, with no navigation (#1067). */
   onSelect: (profile: ConnectionProfile) => void
   /** Clear the device selection back to a driver target (#1067). */
   onSelectDriver: () => void
   /** Return to this machine's own daemon when currently on a remote one (#1066). */
   onConnectLocal: () => void
   onAddDevice: () => void
-  /** Drop a saved device (#1072). The caller clears the selection if this was the run target. */
+  /** Drop a saved device (#1072). The caller clears the selection if this was the agent target. */
   onRemove: (profile: ConnectionProfile) => void
   /** Each device's online/offline status (#1072); an id absent from the map is still being checked. */
   status: Record<string, DeviceStatus>
@@ -87,9 +87,9 @@ function StatusDot({ status }: { status: DeviceStatus | undefined }) {
   )
 }
 
-// The run targets the gear offers (#1050/#610). A single-select modeled on the agent tree
+// The agent targets the gear offers (#1050/#610). A single-select modeled on the agent tree
 // (Check-marked rows), not the boolean OptionRow. "Claude web" describes the hand-off it is
-// rather than promising a streamed run: the session runs on claude.ai and opens its own PR.
+// rather than promising a streamed agent: the session runs on claude.ai and opens its own PR.
 const RUN_TARGET_ROWS: { value: AgentTarget; label: string; description: string }[] = [
   { value: 'local', label: 'This machine', description: 'Run on this machine, as today.' },
   { value: 'actions', label: 'GitHub Actions', description: 'Run on a fresh GitHub Actions runner.' },
@@ -97,7 +97,7 @@ const RUN_TARGET_ROWS: { value: AgentTarget; label: string; description: string 
 ]
 
 // One flat "Run on" list (#1066/#1067): the driver rows, then the saved devices and "Add a device",
-// with a single checkmark. Selecting a device makes it the run target in place (#1067), so the
+// with a single checkmark. Selecting a device makes it the agent target in place (#1067), so the
 // checkmark can sit on a device while the dashboard stays on the local daemon (no navigation).
 // When genuinely on a remote daemon (a manual connection), that device carries the mark instead.
 function AgentTargetSub({ control, connection, busy }: { control: AgentTargetControl; connection?: ConnectionControl | undefined; busy: boolean }) {

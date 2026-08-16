@@ -41,7 +41,7 @@ test('the sessions pathspec is glob-magic and reaches the files, not just the di
 })
 
 test('the commit message counts sessions by run, not by file (#1179)', () => {
-  // One archived run is two files, so counting files would have a single session commit say "2".
+  // One archived agent is two files, so counting files would have a single session commit say "2".
   const agent = ['.the-framework/git@example.com/agents/r1.json', '.the-framework/git@example.com/agents/r1.jsonl']
   assert.equal(commitMessage(agent), '[The Framework] a session')
   assert.equal(commitMessage([...agent, '.the-framework/git@example.com/agents/r2.json']), '[The Framework] 2 sessions')

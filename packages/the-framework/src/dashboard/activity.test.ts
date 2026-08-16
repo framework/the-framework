@@ -76,6 +76,6 @@ test('pickNewActivity returns only items whose key is unseen', () => {
   const started: Activity = { projectId: 'a', projectName: 'a', agentId: 'r1', kind: 'started' }
   const finished: Activity = { projectId: 'a', projectName: 'a', agentId: 'r1', kind: 'finished' }
   const seen = new Set([activityKey(started)])
-  // The same run finishing is a new key, so it is picked up even though its start was already seen.
+  // The same agent finishing is a new key, so it is picked up even though its start was already seen.
   assert.deepEqual(pickNewActivity(seen, [started, finished]), [finished])
 })

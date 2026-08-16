@@ -197,7 +197,7 @@ test('buildHotTickets tolerates a project whose tickets cannot be read', async (
   assert.deepEqual(hot.map(h => h.ticket.file), ['x.md'])
 })
 
-/** A live run meta carrying the ticket it is implementing (#1117). */
+/** A live agent meta carrying the ticket it is implementing (#1117). */
 const runOn = (id: string, ticket: string, status: AgentMeta['status'] = 'running') =>
   ({ version: 1, status, id, startedAt: 't', updatedAt: 't', ticket, cwd: '/w' }) as never
 
@@ -226,7 +226,7 @@ test('buildHotTickets marks the ticket a live run is implementing, with its run 
 })
 
 test('buildHotTickets ignores a finished run and another project\'s ticket (#1117)', async () => {
-  // A run that has ended is not implementing anything, however recently it stopped — so x.md carries
+  // An agent that has ended is not implementing anything, however recently it stopped — so x.md carries
   // no agentId and sits in the AI Queue by its link alone.
   const finished = await buildHotTickets([project('alpha', '/a')], {
     tickets: async () => [ticket('x.md')],

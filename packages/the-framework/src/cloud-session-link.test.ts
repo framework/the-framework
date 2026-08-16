@@ -6,7 +6,7 @@ import { metaFromEvents } from './store/index.js'
 import { CLAUDE_CODE_SESSION_LINK } from './session-link.js'
 import type { FrameworkEvent } from './events.js'
 
-// #1317: a web run's meta dead-ended on the generic https://claude.ai/code — recorded by the
+// #1317: a web agent's meta dead-ended on the generic https://claude.ai/code — recorded by the
 // opening `session` event before any session existed — even though the CloudDriver had the real
 // URL in hand. This wires the real driver through the real telemetry into the real meta fold,
 // so the contract that the deep link wins is pinned end to end, not per layer.
@@ -24,7 +24,7 @@ test('a cloud run meta ends with the real session URL, not the generic entry poi
   const events: FrameworkEvent[] = []
   const handler = createDriverEventHandler({
     emit: e => events.push(e),
-    // What a Claude run gets without an explicit session link: the generic entry point.
+    // What a Claude agent gets without an explicit session link: the generic entry point.
     sessionLink: CLAUDE_CODE_SESSION_LINK,
   })
   const driver = new CloudDriver({

@@ -32,7 +32,7 @@ export interface OnboardingSuggestion {
 }
 
 /**
- * Whether the picked driver's CLI can start a run (#1326), as the launcher needs to hear it:
+ * Whether the picked driver's CLI can start an agent (#1326), as the launcher needs to hear it:
  * what is wrong and what fixes it, never what is right. Both lists are already written for a
  * human, so the warning renders them rather than mapping codes to copy.
  */
@@ -61,11 +61,11 @@ export interface StartAgentOptions {
   /** Transparent mode (#625): run the wrapped agent fully raw (no framework system prompt, guard, dashboard, or TODO loop); maps to `--transparent`. */
   transparent?: boolean
   /** Fine-grained #326 section drops to save tokens. */
-  /** In-context directories (#439): each becomes a `--context <dir>` flag on the spawned run. */
+  /** In-context directories (#439): each becomes a `--context <dir>` flag on the spawned agent. */
   context?: string[]
   /** On-before-mergeable prompt (#326): on setReadyForMerge(), queue the quality follow-ups as TODO entries; maps to `--on-before-mergeable`. */
   onBeforeMergeable?: boolean
-  /** Give the agent a real browser via chrome-devtools-mcp during the run (#452). */
+  /** Give the agent a real browser via chrome-devtools-mcp during the agent (#452). */
   browser?: boolean
   /**
    * How far this session publishes itself when it finishes (#1102/#1216/B5): `local`, `push`, `pr`
@@ -75,48 +75,48 @@ export interface StartAgentOptions {
   handoff?: HandoffLevel
   /** The model to run the wrapped agent on (#628); maps to `--model`. Absent = the driver's own default. */
   model?: string
-  /** Which coding agent drives the run (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
+  /** Which coding agent drives the agent (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
   driver?: string
   /** Where this run executes (#1050/#610): `local` (this device, the default), `actions` (a fresh GitHub Actions runner via ActionsDriver) or `web` (a Claude Code cloud session via CloudDriver); maps to `--run-on`. Absent = local, i.e. today's behavior. */
   target?: AgentLocation
   /**
-   * Nobody is watching this run (#846): its choice gates take the recommended option instead of
-   * parking for an answer, which is the fallback a fully headless run already uses and the one
-   * autopilot would have clicked. It also keeps the run out of the stay-open chat loop, so it
+   * Nobody is watching this agent (#846): its choice gates take the recommended option instead of
+   * parking for an answer, which is the fallback a fully headless agent already uses and the one
+   * autopilot would have clicked. It also keeps the agent out of the stay-open chat loop, so it
    * ends at settle and its armed handoff fires. Set by the work the daemon starts on its own
    * (auto PM, #685) and by dashboard surfaces that fire routine/preset work (#1279).
-   * Stop still works — that aborts the run controller, not a gate.
+   * Stop still works — that aborts the agent controller, not a gate.
    */
   unattended?: boolean
   /**
-   * The `tickets/<file>.md` this run implements (#1117); maps to `--ticket`. Set by the daemon
-   * when it starts a drain run and the queue entry it will work links back to a ticket, so the
+   * The `tickets/<file>.md` this agent implements (#1117); maps to `--ticket`. Set by the daemon
+   * when it starts a drain agent and the queue entry it will work links back to a ticket, so the
    * Overview can show that ticket as being implemented rather than guessing from its plan.
    */
   ticket?: string
   /**
-   * This run plans its {@link ticket} rather than implementing it; maps to `--plan-run`. Set by
+   * This agent plans its {@link ticket} rather than implementing it; maps to `--plan-run`. Set by
    * the daemon on a fanned-out [Plan tickets] run (#1327), whose PR lands only the plan: the
-   * ticket still rides for the run's meta, but the PR title must not inherit the issue as
+   * ticket still rides for the agent's meta, but the PR title must not inherit the issue as
    * `(fix #42)` (#1334) — a plan's merge would close the issue with the work still undone.
    */
   planAgent?: boolean
-  /** Resume a finished run's conversation (#720): its captured agent session id; maps to `--resume-session`. The run's prompt continues that session (full prior context) instead of starting fresh. Sent with `kind: 'prompt'` when you message a run that has ended. */
+  /** Resume a finished agent's conversation (#720): its captured agent session id; maps to `--resume-session`. The agent's prompt continues that session (full prior context) instead of starting fresh. Sent with `kind: 'prompt'` when you message an agent that has ended. */
   resumeSession?: string
   /**
-   * Continue this run rather than starting a new one (#762): the follow-up writes into that run's
-   * own log, on its own branch, so a stopped run you message again stays one row in the history
+   * Continue this agent rather than starting a new one (#762): the follow-up writes into that agent's
+   * own log, on its own branch, so a stopped agent you message again stays one row in the history
    * instead of spawning an unrelated-looking second one.
    */
   continueAgentId?: string
   /**
-   * Run this session on a connected device (#1067): the local daemon relays the run to the remote
+   * Run this session on a connected device (#1067): the local daemon relays the agent to the remote
    * daemon at `url` (authenticating with `token` as the `fw_daemon` cookie) and streams its events
-   * back into the local run view. The device `label` rides along (memory-only, like `url`/`token`) so
-   * the local session list + notice can show which device the run is on after a reload (#1077).
+   * back into the local agent view. The device `label` rides along (memory-only, like `url`/`token`) so
+   * the local session list + notice can show which device the agent is on after a reload (#1077).
    * Memory-only relay config the dashboard sets at submit time from a saved device. NEVER persisted to
    * Preferences or the registry, and never a CLI flag: a device token is a per-browser secret. Absent =
-   * run locally, exactly as today. Stripped before the run is forwarded, so the remote starts an
+   * run locally, exactly as today. Stripped before the agent is forwarded, so the remote starts an
    * ordinary local run and does not relay onward.
    */
   remote?: { url: string; token: string; label?: string }
@@ -134,9 +134,9 @@ export type StartAgentKind = 'build' | 'research' | 'prompt'
 /** The outcome of a Start attempt (#345). */
 export type StartAgentResult =
   /**
-   * `agentId` is the id the daemon allocated for the run (#761), present whenever it got its own
-   * worktree. The dashboard needs it to select the run it just started: with concurrent runs
-   * (#736) it can no longer find that run by looking for "the running one", because the previous
+   * `agentId` is the id the daemon allocated for the agent (#761), present whenever it got its own
+   * worktree. The dashboard needs it to select the agent it just started: with concurrent agents
+   * (#736) it can no longer find that agent by looking for "the running one", because the previous
    * run is still running and the new one has not written its `agent.json` yet.
    */
   | { ok: true; agentId?: string }
@@ -157,12 +157,12 @@ export interface PreviewStatus {
 /**
  * Where a session is working (#798): the checkout, its branch, and what it is holding. Read by
  * the dashboard so a session's action bar can say which worktree it has, rather than leaving the
- * user to infer it from a run id.
+ * user to infer it from an agent id.
  */
 export interface AgentWorktree {
-  /** Absolute path of the checkout this run works in. */
+  /** Absolute path of the checkout this agent works in. */
   path: string
-  /** True when it is the run's own worktree; false when it fell back to the project's checkout. */
+  /** True when it is the agent's own worktree; false when it fell back to the project's checkout. */
   own: boolean
   /** Uncommitted changes present in that checkout. */
   dirty: boolean

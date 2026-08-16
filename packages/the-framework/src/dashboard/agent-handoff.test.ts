@@ -274,7 +274,7 @@ test('a real repo: a branch whose work is already in the base reports empty (#11
     await exec('git', ['commit', '-m', 'base'], { cwd: dir })
 
     // The session branches off and commits nothing: its edit was never committed, which is the
-    // shape a run that forgets to commit leaves behind.
+    // shape an agent that forgets to commit leaves behind.
     await exec('git', ['branch', 'the-framework/demo'], { cwd: dir })
     // Meanwhile the base moves on, which is the ordinary case on a repo anyone else is working in.
     await writeFile(join(dir, 'README.md'), 'base, moved on\n')
@@ -714,10 +714,10 @@ test('pickAgentPr trusts an open PR, and otherwise only one created after the ru
   const open = { number: 1301, url: 'u1301', state: 'OPEN', title: 'open one', createdAt: '2026-07-20T00:00:00Z' }
   const since = '2026-07-26T21:17:39.507Z'
 
-  // The predecessor's merged PR is not this run's, however recently gh lists it.
+  // The predecessor's merged PR is not this agent's, however recently gh lists it.
   assert.equal(pickAgentPr([stale], since), undefined)
-  // The run's own PR still counts after it merges, and the oldest post-start entry is the one
-  // this run opened.
+  // The agent's own PR still counts after it merges, and the oldest post-start entry is the one
+  // this agent opened.
   assert.equal(pickAgentPr([later, own, stale], since)?.number, 1249)
   // An open PR on the branch is where pushed commits land, whatever its age.
   assert.equal(pickAgentPr([stale, open], since)?.number, 1301)
@@ -741,8 +741,8 @@ test('a gone branch still reports its PR: it is a remote question (#1255)', asyn
 })
 
 test('resolveAgentPr reads the PR the run recorded, and asks gh only for its state (E6)', async () => {
-  // The number is a fact about the run, written down when the PR was opened. It used to be
-  // re-derived from three candidate branch names filtered by the run's start time — a guess
+  // The number is a fact about the agent, written down when the PR was opened. It used to be
+  // re-derived from three candidate branch names filtered by the agent's start time — a guess
   // assembled at read time, standing in for one integer nobody had recorded.
   const asked: (string | undefined)[] = []
   const prs = async (_cwd: string, branch?: string) => {
@@ -767,7 +767,7 @@ test('resolveAgentPr answers nothing for a run that recorded no PR (E6)', async 
 })
 
 test('a recorded PR the live read cannot confirm still answers with its number and url (E6)', async () => {
-  // A branch this machine cannot see — a hands-off web run's, or one already deleted after merge.
+  // A branch this machine cannot see — a hands-off web agent's, or one already deleted after merge.
   // The recorded fact is the answer; only its state is unknown.
   const found = await resolveAgentPr('/repo', { id: 'r1', pr: { number: 42, url: 'u42' } }, async () => ({
     value: undefined,

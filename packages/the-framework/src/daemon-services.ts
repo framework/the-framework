@@ -49,16 +49,16 @@ const AUTO_PM_EVERY = Math.round(DEFAULT_AUTO_PM_INTERVAL_MS / DAEMON_TICK_MS)
 /** What the daemon needs back: the two shutdown phases, in the order the daemon's teardown needs them. */
 export interface BackgroundServices {
   /**
-   * Stop everything that could start or steer a run, before the daemon suspends the runs it owns.
+   * Stop everything that could start or steer an agent, before the daemon suspends the agents it owns.
    * Ordered first on purpose: auto PM or a Discord message arriving mid-shutdown would otherwise
-   * start a run while we are busy stopping them.
+   * start an agent while we are busy stopping them.
    *
-   * Resolves once the tick in flight has finished, so the sweeps are off the repo before the runs
+   * Resolves once the tick in flight has finished, so the sweeps are off the repo before the agents
    * are torn down — these jobs commit and push, and stopping their clock does not stop their turn.
    */
   quiesce: () => Promise<void>
   /**
-   * Commit whatever the shutdown just archived (#912/#1179), after the runs have been stopped so
+   * Commit whatever the shutdown just archived (#912/#1179), after the agents have been stopped so
    * their last events are on disk. Returns how many projects were committed.
    */
   flushAgents: () => Promise<number>
@@ -90,16 +90,16 @@ export interface BackgroundServiceDeps {
   /** The daemon's home workspace. Chat has no project picker, so a message with no run starts one here. */
   cwd: string
   env: NodeJS.ProcessEnv
-  /** The dashboard's own URL, so a paused-run item (#636) can link back to it. */
+  /** The dashboard's own URL, so a paused-agent item (#636) can link back to it. */
   dashboardUrl: string
   /** The long-lived quota meter the usage panel draws; auto PM gates on the same reading. */
   quota: QuotaSource
-  /** Start a run in a project. */
+  /** Start an agent in a project. */
   startAgent: (prompt: string, options: StartAgentOptions, projectId: string) => Promise<StartAgentResult>
   /** How many runs are live on a project, so a background job can tell idle from busy. */
   activeAgentCount: (projectId: string) => number
   /**
-   * The runs this daemon is still responsible for, whose checkouts the worktree sweep must leave
+   * The agents this daemon is still responsible for, whose checkouts the worktree sweep must leave
    * alone. See {@link MergedSweepOptions.busy}.
    */
   busyAgentIds: () => ReadonlySet<string>
@@ -112,15 +112,15 @@ async function listSummaries(env: NodeJS.ProcessEnv): Promise<ProjectSummary[]> 
   return records.map(p => ({ id: p.id, path: p.path, name: basename(p.path), activated: true }))
 }
 
-/** The user's preferences, or empty when they cannot be read — the defaults are what a run would use anyway. */
+/** The user's preferences, or empty when they cannot be read — the defaults are what an agent would use anyway. */
 function readPrefs(env: NodeJS.ProcessEnv): Promise<Preferences> {
   return readPreferences(undefined, env).catch(() => ({}) as Preferences)
 }
 
 /**
- * The run options a project's settings imply (#858): the user's global tier, then the repo's
+ * The agent options a project's settings imply (#858): the user's global tier, then the repo's
  * committed `the-framework.yml` (#842) on top. The same mapping and the same two tiers the launcher
- * uses, so a run started by the daemon and a run started by hand differ only in who asked for it.
+ * uses, so an agent started by the daemon and an agent started by hand differ only in who asked for it.
  * An unreadable tier falls back to empty rather than failing the start: the defaults are what the
  * run would have used anyway.
  *
@@ -140,7 +140,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   const prefs = () => readPrefs(env)
 
   /**
-   * Start a run nobody is watching. `unattended` is forced on top of the project's settings rather
+   * Start an agent nobody is watching. `unattended` is forced on top of the project's settings rather
    * than read from them: it is a property of there being no human at the keyboard, not a
    * preference, and without it every choice gate parks forever on an answer that is not coming
    * (#846). All three background starters go through here, so none can forget either half.
@@ -194,9 +194,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // not reach the machines it exists for.
     lockPlans: (project, assignments) => acquireTicketLocks(project.path, assignments, { log }),
     start: async (project, job) => {
-      // A draining run works one open queue entry, and since #1164 that entry links back to the
-      // ticket it was queued from — so this is the one moment the framework knows what a run is
-      // about to implement, and can say so on the run's meta (#1117). A sweep-built drain names its
+      // A draining agent works one open queue entry, and since #1164 that entry links back to the
+      // ticket it was queued from — so this is the one moment the framework knows what an agent is
+      // about to implement, and can say so on the agent's meta (#1117). A sweep-built drain names its
       // own pinned entry (#1204), so the drain-lane (#1117) keeps working with several drains in flight;
       // the first-open-entry read is the fallback for a drain job wired without one. Every other
       // job puts work on the queue rather than taking it off, so there is nothing to name.
@@ -209,8 +209,8 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
           job.ticket !== undefined
           ? `${TICKETS_DIR}/${job.ticket}`
           : undefined
-      // The pinned entry itself also rides along (#1253), so the claim on it reaches the run's
-      // meta and outlives both this process's memory and the run's local process.
+      // The pinned entry itself also rides along (#1253), so the claim on it reaches the agent's
+      // meta and outlives both this process's memory and the agent's local process.
       const result = await startUnattended(project.id, job.prompt, {
         ...(ticket ? { ticket } : {}),
         // A fanned-out plan agent plans its ticket rather than implementing it (#1327), so its PR
@@ -218,22 +218,22 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         // issue with the work still undone (#1334).
         ...(ticket && !job.drains ? { planAgent: true } : {}),
         // The job says its PRs may land themselves (#1216): the drain implements work whose
-        // review already happened on the queue. Rides to the run as the ladder's top rung.
+        // review already happened on the queue. Rides to the agent as the ladder's top rung.
         ...(job.autoMerge ? { handoff: 'merge' as const } : {}),
       })
       return result.ok ? result.agentId : undefined
     },
-    // The daemon promotes the queue, never the agent (#852): the run stays sandboxed in its
+    // The daemon promotes the queue, never the agent (#852): the agent stays sandboxed in its
     // worktree, and one known file is copied across once it has finished cleanly.
     promote: async (project, { agentId, entry }) => {
       const agent = (await listAgents(project.path).catch(() => [])).find(r => r.id === agentId)
       // Unknown or still going: not settled, so it is tried again next tick.
       if (!agent || agent.status === 'running') return { settled: false, promoted: false }
       // The entry it was pinned to travels with it (#1204), so the promotion lands that one entry
-      // rather than the run's whole view of the queue.
+      // rather than the agent's whole view of the queue.
       const outcome = await promoteQueue(project.path, { ...agent, ...(entry !== undefined ? { entry } : {}) })
       if (!outcome.promoted) log(`[framework] auto PM: ${outcome.reason} (${agentId})`)
-      // A finished run is settled either way — one that wrote no queue is not going to start.
+      // A finished agent is settled either way — one that wrote no queue is not going to start.
       // The exception (a checkout busy with the user's own queue edits) is the callee's to flag.
       const retry = !outcome.promoted && outcome.retry === true
       return { settled: !retry, promoted: outcome.promoted }
@@ -241,7 +241,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     log,
   })
 
-  // Commit the session archives written into the main checkout (#912/#1179). A run's own worktree
+  // Commit the session archives written into the main checkout (#912/#1179). An agent's own worktree
   // sweeps its archive on teardown; nothing did the same for one held in the checkout itself, so it
   // sat as an uncommitted change until a human noticed. Path-scoped and debounced, and it skips a
   // repo that is mid-rebase or index-locked rather than committing into someone's work.
@@ -249,7 +249,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
 
   // Watch the PRs the framework is waiting to land (#1418): merge a `watched` PR once its checks
   // pass (the #1417/#1406 answer for repos without GitHub auto-merge), and put an agent on a
-  // watched PR whose checks fail. The merge half runs ungated — it finishes a merge the run was
+  // watched PR whose checks fail. The merge half runs ungated — it finishes a merge the agent was
   // already armed and authorized for. The fix half starts runs on its own, so it takes the same
   // consent the other self-starting work does: the `autoPm` preference (read per attempt, like
   // every other per-tick gate here) and quota headroom.
@@ -263,7 +263,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         if (!quotaHeadroom(boundary).start) return undefined
         const project = (await projects()).find(p => p.path === cwd)
         if (!project) return undefined
-        // The fix lands on the red PR's own branch, so this run's handoff must not push or open
+        // The fix lands on the red PR's own branch, so this agent's handoff must not push or open
         // anything of its own.
         const result = await startUnattended(project.id, ciFixPrompt(request), { handoff: 'local' })
         return result.ok ? result.agentId : undefined

@@ -4,10 +4,10 @@ import { agentStatusPill } from '../lib/agent-status.js'
 import { describeSessionLink } from '../lib/session-link.js'
 import { cn } from '../lib/utils.js'
 
-// The run overview (#431): the "moat" the wrapped agent's own chat cannot show, rebuilt
+// The agent overview (#431): the "moat" the wrapped agent's own chat cannot show, rebuilt
 // on the new dashboard. Each card is a pure projection of the event stream (run-view.ts
-// in @gemstack/the-framework) — the run's status and a link
-// to the live session. Cards render only when their data has arrived, so an early run
+// in @gemstack/the-framework) — the agent's status and a link
+// to the live session. Cards render only when their data has arrived, so an early agent
 // shows nothing extra.
 export function AgentOverview({
   events,
@@ -17,11 +17,11 @@ export function AgentOverview({
 }: {
   events: FrameworkEvent[]
   showSessionLink?: boolean
-  /** The run's own view sets this false: its action bar already names the session in the breadcrumb,
+  /** The agent's own view sets this false: its action bar already names the session in the breadcrumb,
    *  so the status line just shows the state (and reads the same whether or not the agent reported a
    *  name). The relay watch and project home keep it, since they have no breadcrumb. */
   showName?: boolean
-  /** The run's own view sets this false too: the status is a label in its toolbar, beside the ⋮
+  /** The agent's own view sets this false too: the status is a label in its toolbar, beside the ⋮
    *  menu, rather than a banner over the feed. The relay watch and project home have no toolbar,
    *  so they keep the line. */
   showStatus?: boolean

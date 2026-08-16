@@ -116,8 +116,8 @@ test('a watcher error does not throw, and the poll keeps the tail alive (#996)',
  *
  * The watcher was left ref'd, so a caller that opted out of holding the process open was still
  * held open by it. That only stayed invisible while every caller closed its tail on the way out;
- * a run that aborted on a config fault before its tail had an owner never exited, and sat there
- * with the run recorded as `running` forever.
+ * an agent that aborted on a config fault before its tail had an owner never exited, and sat there
+ * with the agent recorded as `running` forever.
  *
  * Asserted in a child process, because that is the actual claim: not "unref was called" but "the
  * process is able to exit". A ref'd watcher hangs it until the test timeout kills it.

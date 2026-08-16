@@ -5,14 +5,14 @@ import { isAgentActive } from '../lib/live-state.js'
 import { useFavicon } from '../lib/favicon.js'
 import { Logo } from './Logo.js'
 
-// The shared-run watch view (#426/#230): when the dashboard is opened on the relay at
-// `/?run=<id>`, it shows one run read-only, streamed from the relay's in-memory event
+// The shared-agent watch view (#426/#230): when the dashboard is opened on the relay at
+// `/?run=<id>`, it shows one agent read-only, streamed from the relay's in-memory event
 // feed over the same `GET /_rpc/events` stream the daemon uses. No Projects/Runs/Docs
 // rails and no steering — a teammate with the link watches, they do not drive.
 export function RelayView({ agentId: agentId }: { agentId: string }) {
-  // The run id rides in the projectId slot: the relay keys `onEvents` by it (no registry).
+  // The agent id rides in the projectId slot: the relay keys `onEvents` by it (no registry).
   const { events, lost, done } = useLiveEvents(agentId)
-  // The mark and the tab icon (#875) follow the one run being watched, since that is all the
+  // The mark and the tab icon (#875) follow the one agent being watched, since that is all the
   // relay knows about — it has no project registry to ask.
   const working = isAgentActive(events)
   useFavicon(working)

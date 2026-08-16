@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { DRIVER_SPECS, type DriverName } from './driver-cli.js'
 
 /**
- * Preflight checks for a live run. A turnkey tool should fail *early and
+ * Preflight checks for a live agent. A turnkey tool should fail *early and
  * clearly* when a prerequisite is missing, not spawn a broken process mid-run.
  * The main one: is the wrapped driver's CLI actually installed and runnable?
  * A fake session needs none of this, so preflight only gates live runs.
@@ -24,7 +24,7 @@ export interface PreflightCheck {
   /** Human-readable detail: the version when ok, or how to fix it when not. */
   detail: string
   /**
-   * A problem worth saying out loud that must not block the run. Root is the case: a container
+   * A problem worth saying out loud that must not block the agent. Root is the case: a container
    * legitimately runs everything as root, so refusing to start there would break more than it
    * explains.
    */
@@ -76,8 +76,8 @@ export interface PreflightOptions {
   /** The invoking user `sudo` recorded, named in the root warning. Default read from the environment. */
   sudoUser?: string | undefined
   /**
-   * Also check `gh` (#1419): the run's PR/merge rung is armed, and the handoff opens and merges
-   * PRs through the GitHub CLI. Missing or logged-out `gh` warns without blocking — the run
+   * Also check `gh` (#1419): the agent's PR/merge rung is armed, and the handoff opens and merges
+   * PRs through the GitHub CLI. Missing or logged-out `gh` warns without blocking — the agent
    * itself starts fine and the push rung is plain git; only the PR onward would silently degrade.
    */
   publish?: boolean
@@ -107,7 +107,7 @@ export async function preflight(opts: PreflightOptions = {}): Promise<PreflightR
 
   if (cli.ok) {
     const loggedIn = spec.auth.loggedIn(await probe(bin, spec.auth.args))
-    // Only an explicit no fails. `undefined` means the CLI would not say, and a run that might
+    // Only an explicit no fails. `undefined` means the CLI would not say, and an agent that might
     // work is worth more than a warning we cannot stand behind.
     if (loggedIn === false) {
       checks.push({
@@ -122,7 +122,7 @@ export async function preflight(opts: PreflightOptions = {}): Promise<PreflightR
 
   // The publish half (#1419): an armed PR/merge fires `gh` at the finish, hours after the Start
   // that could have said it will not work. Warnings, not failures — the session's own work needs
-  // no gh, and the push rung is plain git, so the run is worth starting either way.
+  // no gh, and the push rung is plain git, so the agent is worth starting either way.
   if (opts.publish) {
     const ghCli = await probe('gh', ['--version'])
     if (!ghCli.ok) {
@@ -147,7 +147,7 @@ export async function preflight(opts: PreflightOptions = {}): Promise<PreflightR
   }
 
   // Root is the sudo-HOME trap (#1323), and it fails every agent identically: `sudo` moves `HOME`, the CLI
-  // looks for its credentials under root's home instead of the user's, finds none, and every run
+  // looks for its credentials under root's home instead of the user's, finds none, and every agent
   // dies the same way with the same empty log. Named here because the failure it causes says
   // nothing at all about its cause.
   if ((opts.isRoot ?? runningAsRoot)()) {

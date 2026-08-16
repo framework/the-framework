@@ -103,14 +103,14 @@ export interface AgentHandoffDeps {
    */
   checkout?: string
   /**
-   * When the run started (ISO), so the PR lookup can tell the run's own PR from an earlier run's
+   * When the agent started (ISO), so the PR lookup can tell the agent's own PR from an earlier agent's
    * on the same branch name (#1251). Without it, only an open PR is trusted.
    */
   since?: string
 }
 
 /**
- * The branch a run's work is on.
+ * The branch an agent's work is on.
  *
  * Prefers what was recorded while the worktree existed (#799), because the built-in system prompt (#326) lets the
  * agent name its own branch, which makes both derivations below a guess. They stay as a fallback
@@ -128,7 +128,7 @@ const AGENT_BRANCH_PREFIX = 'the-framework/'
 
 /**
  * The branch's PR as it applies to *this* run: the injected seam when the caller gave one, else
- * the cached history filtered through {@link pickAgentPr} with the run's start time (#1251).
+ * the cached history filtered through {@link pickAgentPr} with the agent's start time (#1251).
  */
 async function lookupAgentPr(cwd: string, branch: string, deps: AgentHandoffDeps): Promise<Cached<LinkedPr | undefined>> {
   if (deps.pr) return { value: await deps.pr(cwd, branch).catch(() => undefined), pending: false }
@@ -139,29 +139,29 @@ async function lookupAgentPr(cwd: string, branch: string, deps: AgentHandoffDeps
 /** The cached single-PR read {@link resolveAgentPr} asks for the recorded PR's current state. */
 export type CachedBranchPrLookup = (cwd: string, branch?: string) => Promise<Cached<LinkedPr | undefined>>
 
-/** What {@link resolveAgentPr} needs to know about a run: structurally satisfied by {@link AgentMeta}. */
+/** What {@link resolveAgentPr} needs to know about an agent: structurally satisfied by {@link AgentMeta}. */
 export interface PrAgent {
   id: string
   branch?: string
   sessionName?: string
-  /** The pull request the run recorded when one was opened for it (E6). */
+  /** The pull request the agent recorded when one was opened for it (E6). */
   pr?: { number: number; url: string }
 }
 
 /**
- * The pull request that belongs to a run: the one it recorded (E6), read live for its state.
+ * The pull request that belongs to an agent: the one it recorded (E6), read live for its state.
  *
- * The number is a fact about the run, so the run writes it down — at the moment its handoff opens
+ * The number is a fact about the agent, so the agent writes it down — at the moment its handoff opens
  * the PR, or when the dashboard's button does after the process is gone. Every surface then reads
  * the same integer instead of re-deriving it.
  *
  * What that replaced: a three-way branch-name ladder (the recorded branch, then the session-name
- * branch, then the run-id branch, because a hands-off web run's checkout is gone and its session
+ * branch, then the run-id branch, because a hands-off web agent's checkout is gone and its session
  * name may be a reused pin) plus a timestamp heuristic on top of it, so that a predecessor's PR on
- * a shared branch name was not mistaken for this run's. Three sources and a guess, standing in for
+ * a shared branch name was not mistaken for this agent's. Three sources and a guess, standing in for
  * one integer nobody had written down — the same lesson the `branch` event (#1277) already learned.
  *
- * The *state* is still read live, because it changes without this run doing anything: a PR merges,
+ * The *state* is still read live, because it changes without this agent doing anything: a PR merges,
  * a human closes it. That read rides the PR-lookup cache (#1028), and `pending` while it is warming means the
  * caller can ask again rather than render "no PR".
  */
@@ -174,9 +174,9 @@ export async function resolveAgentPr(
   const branch = agentBranchFor(agent)
   const read = await prs(cwd, branch).catch((): Cached<LinkedPr | undefined> => ({ value: undefined, pending: false }))
   // The live read is about the recorded PR's *state*; a different number on the branch is some
-  // other PR and never this run's answer.
+  // other PR and never this agent's answer.
   if (read.value && read.value.number === agent.pr.number) return { value: read.value, pending: false }
-  // Nothing live to say, so the recorded fact stands on its own: a run whose PR is on a branch this
+  // Nothing live to say, so the recorded fact stands on its own: an agent whose PR is on a branch this
   // machine cannot see still has a PR, and its number and URL are what the surfaces need.
   return { value: { ...agent.pr, state: read.pending ? 'OPEN' : 'UNKNOWN', title: '' }, pending: read.pending }
 }
@@ -186,7 +186,7 @@ export async function resolveAgentPr(
  *
  * The direct answer to the withheld-merge ending (#1363): a session whose agent never signalled
  * ready-for-merge leaves a draft PR behind, and this is the human saying "it's good, land it".
- * `ghMergePr` marks a draft ready on the way, for exactly that case. Refuses when the run has no
+ * `ghMergePr` marks a draft ready on the way, for exactly that case. Refuses when the agent has no
  * PR or it is no longer open — "already merged" is an answer, not an action.
  */
 export async function mergeAgentPr(
@@ -278,7 +278,7 @@ export async function readAgentHandoff(
   const hasRemote = (await agent(['remote'])).trim().length > 0
   const pending = await countPendingWork(git, deps.checkout)
   if (!tip) {
-    // The branch being gone locally does not mean the work is: a hands-off web run pushes its
+    // The branch being gone locally does not mean the work is: a hands-off web agent pushes its
     // branch and opens its PR remotely, and a merged branch gets deleted. The PR is a remote
     // question, so it is still answerable — and it is the one thing left worth showing (#1255).
     const pr = await lookupAgentPr(cwd, branch, deps)
@@ -337,7 +337,7 @@ export async function readAgentHandoff(
     deletions: files.reduce((sum, f) => sum + f.deletions, 0),
     // A session that changed nothing is a real outcome, not an error: it gets said, not shown as
     // an empty branch with buttons that would push nothing. Bookkeeping-only counts as nothing
-    // (#1291): every run's branch carries the framework's own records — the pre-work (#326) commit
+    // (#1291): every agent's branch carries the framework's own records — the pre-work (#326) commit
     // sweeps in the conversation file the daemon just wrote — and publishing those alone produced
     // junk PRs of pure paper trail. The files decide, not the commits: a branch of bookkeeping
     // sweeps has commits and still nothing to hand off.
@@ -368,8 +368,8 @@ async function countPendingWork(git: GitRunner, checkout: string | undefined): P
 /**
  * Commit what a session left uncommitted, so what it did is what gets handed off (#1173).
  *
- * The automatic handoff commits the session's leftovers on the run's way out, but that happens
- * when the run process exits, and the finishing step is offered as soon as the agent settles
+ * The automatic handoff commits the session's leftovers on the agent's way out, but that happens
+ * when the agent process exits, and the finishing step is offered as soon as the agent settles
  * (#1178), which for a session left open for another turn is much earlier. Pressing the button is
  * the same instruction given by hand, so it sweeps the same leftovers into what it publishes. The
  * button only shows for a branch that already carries commits (#1173): a no-diff branch names its
@@ -397,7 +397,7 @@ export async function commitAgentWork(
 /** The outcome of a handoff action, in the `{ ok }` shape the dashboard's `useAction` understands. */
 /**
  * What a handoff action did. The PR's `number` rides along with its `url` (E6), because the number
- * is the fact worth *recording* — every surface that wants a run's PR then reads it off the run
+ * is the fact worth *recording* — every surface that wants an agent's PR then reads it off the agent
  * rather than re-deriving it from branch names and timestamps.
  */
 export type HandoffResult = { ok: true; url?: string; number?: number } | { ok: false; error: string }
@@ -517,7 +517,7 @@ function movedPastPr(state: Pick<AgentHandoff, 'pr' | 'commits'>): boolean {
 }
 
 /**
- * Open a PR for a finished session, deciding from what the run recorded which cases should not
+ * Open a PR for a finished session, deciding from what the agent recorded which cases should not
  * open one. Reads the branch's handoff first: a branch that no longer exists, or a session that
  * changed nothing, is a clear error rather than an empty PR, and a branch that already has a PR
  * returns that one. Title is the session name (else the intent's first line, else the id); body
@@ -531,7 +531,7 @@ export async function openAgentPullRequest(
 ): Promise<HandoffResult> {
   const branch = agentBranchFor(agent)
   const handoff = await readAgentHandoff(cwd, branch, { since: agent.startedAt }).catch(() => undefined)
-  // The run's PR first, even when its branch is gone locally: a hands-off web run's branch only
+  // The agent's PR first, even when its branch is gone locally: a hands-off web agent's branch only
   // ever existed on the remote, and its PR is the answer the button exists to give (#1255).
   // Unless the session demonstrably kept committing after that PR merged or closed (#1512) —
   // then the old PR is not the answer, the new work needs its own.
@@ -559,7 +559,7 @@ export interface HandoffIntent {
   /**
    * Merge the PR once it is opened (#1216). Absent = off, unlike the pair above: landing work on
    * the default branch is not something to arm by default. No action-bar checkbox mutates it —
-   * it comes settled off the run's config.
+   * it comes settled off the agent's config.
    */
   merge?: boolean
 }
@@ -587,9 +587,9 @@ export function withheldMerge(deps: { readyForMerge: boolean; agentTodoOpen: boo
 }
 
 /**
- * What auto-handoff did, so the run can say it as an event (#835).
+ * What auto-handoff did, so the agent can say it as an event (#835).
  *
- * A dashboard-started run is spawned with `stdio: 'ignore'`, so anything printed here reaches
+ * A dashboard-started agent is spawned with `stdio: 'ignore'`, so anything printed here reaches
  * nobody: the outcome has to travel as an event or it does not travel at all. Skips are reported
  * for the same reason a skipped on-before-mergeable is — silence reads as "it ran and did nothing".
  */
@@ -626,8 +626,8 @@ export async function agentAutoHandoff(
   // yes-or-no (#1028), which is right for a panel repainting every 15s and wrong here: "not known
   // yet" would read as "no PR" and this would open a second one. Proved against a real remote —
   // only `gh` refusing the duplicate stopped it. This runs once, at the end of a session, so it
-  // can afford to wait for a real answer. Filtered by the run's start time (#1251): a merged PR
-  // from an earlier run on the same branch name must not stop this run from opening its own.
+  // can afford to wait for a real answer. Filtered by the agent's start time (#1251): a merged PR
+  // from an earlier agent on the same branch name must not stop this agent from opening its own.
   // `latest` order (#1512): the decision below compares the branch tip against the PR's head, and
   // only the last PR that saw the branch answers that — against the first, work a second PR
   // already landed would read as unlanded and reopen.
@@ -665,7 +665,7 @@ export async function agentAutoHandoff(
         title: agentPrTitle(agent),
         body: agentPrBody(agent),
         // GitHub refuses to merge or auto-merge a draft, so an armed merge (#1216) opens the PR
-        // ready: its review happened on the queue before the run, which is the same reason the
+        // ready: its review happened on the queue before the agent, which is the same reason the
         // merge is armed at all. Draft stays the default for PRs a human is meant to look at.
         draft: !intent.merge,
         ...(state.base ? { base: state.base } : {}),
@@ -704,14 +704,14 @@ export async function agentAutoHandoff(
 }
 
 /**
- * The little a handoff needs to know about the run it is for: which branch, and what to say on
- * the PR. Narrower than {@link AgentMeta} so the run process can call this before its meta is
- * final, and so a caller cannot quietly start depending on the rest of the run's state.
+ * The little a handoff needs to know about the agent it is for: which branch, and what to say on
+ * the PR. Narrower than {@link AgentMeta} so the agent process can call this before its meta is
+ * final, and so a caller cannot quietly start depending on the rest of the agent's state.
  */
 export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'sessionName' | 'intent'> &
   Partial<Pick<AgentMeta, 'startedAt'>> & {
     /**
-     * The GitHub issue the run's ticket tracks (`#42`), when it implements one (#1334). Carried
+     * The GitHub issue the agent's ticket tracks (`#42`), when it implements one (#1334). Carried
      * into the PR title as `(fix #42)` so the squash-merge commit — which inherits the title —
      * closes the issue; without it an auto-merged quick-win leaves its ticket open.
      */

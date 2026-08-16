@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 
 // Client connection profiles (#1052): the saved daemons this browser can hop to. "A device I have"
-// is a CONNECTION, not a run driver — the SPA is served by its daemon and every transport is
+// is a CONNECTION, not an agent driver — the SPA is served by its daemon and every transport is
 // same-origin, so switching devices means navigating the browser to that daemon's origin, where the
 // #1051 bootstrap sets the fw_daemon cookie from `?token=` and everything is same-origin again.
 //
@@ -125,7 +125,7 @@ export function connectUrl(profile: Pick<ConnectionProfile, 'url' | 'token'>, dr
 }
 
 /** Navigate the browser to a saved device, carrying its token and the live composer draft (#1066).
- * This is the connection hop, NOT a run submit: the remote SPA re-authenticates same-origin from the
+ * This is the connection hop, NOT an agent submit: the remote SPA re-authenticates same-origin from the
  * cookie the bootstrap sets, and rehydrates the draft into its composer. */
 export function connectTo(profile: ConnectionProfile, draft?: string): void {
   globalThis.location?.assign(connectUrl(profile, draft))

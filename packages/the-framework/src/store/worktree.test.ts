@@ -195,7 +195,7 @@ test('removeWorktree falls back to --force when git calls the checkout unclean (
   ])
 })
 
-// The whole point of #786: a finished run's uncommitted edit must survive teardown.
+// The whole point of #786: a finished agent's uncommitted edit must survive teardown.
 test('a dirty run worktree keeps its work on the branch after removal (#786)', async () => {
   const git = nodeGitRunner()
   const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-worktree-')))

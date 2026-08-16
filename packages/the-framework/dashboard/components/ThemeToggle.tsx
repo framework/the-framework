@@ -6,7 +6,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // The appearance control (#754). The theme has been switchable since #725, but it lived inside the
-// per-run options gear: an app-wide setting filed under one run's options, and absent entirely on a
+// per-agent options gear: an app-wide setting filed under one agent's options, and absent entirely on a
 // screen showing only the navbar. Nobody found it. It belongs in the header, which is always there.
 //
 // Same `preferences.theme` the rest of the app reads (LayoutDefault resolves it and toggles `dark`

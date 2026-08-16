@@ -14,7 +14,7 @@ vi.mock('../rpc/projects.js', () => ({ onProjects, sendAddProject }))
 
 // The rail now also carries the app chrome moved off the top navbar (#772 follow-up). Three of
 // those pull the preferences/devices RPC stubs into jsdom, which this suite deliberately
-// avoids. It is about the runs list, not the chrome (each has its own suite), so stub them out.
+// avoids. It is about the agents list, not the chrome (each has its own suite), so stub them out.
 vi.mock('./ThemeToggle.js', () => ({ ThemeToggle: () => null }))
 vi.mock('./NotificationsMenu.js', () => ({ NotificationsMenu: () => null }))
 vi.mock('./ConnectionIndicator.js', () => ({ ConnectionIndicator: () => null }))
@@ -66,7 +66,7 @@ describe('AgentHistory (#785)', () => {
   })
 
   test('a run whose handoff reported — and a pre-fold record — read as plain done (#1455)', () => {
-    // The reported run's window is closed; the version-1 record predates the fold, so its
+    // The reported agent's window is closed; the version-1 record predates the fold, so its
     // missing report says nothing and must not read as forever-publishing.
     renderRail(
       <AgentHistory
@@ -84,7 +84,7 @@ describe('AgentHistory (#785)', () => {
   })
 
   test('a session selected before its row lands highlights the starting row (#784)', () => {
-    // Start navigates to the run's id right away; its run.json, and so its row, arrives a beat
+    // Start navigates to the agent's id right away; its agent.json, and so its row, arrives a beat
     // later. The highlight belongs on the optimistic row standing in for it, not on the home row.
     const { container, rerender } = renderRail(
       <AgentHistory projectId="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} startTick={0} startIntent="" />,
@@ -102,10 +102,10 @@ describe('AgentHistory (#785)', () => {
   })
 
   test('the starting row retires when the run it stands in for lands, even if it never ran', () => {
-    // The runs list polls every 2s, so a session that starts and fails inside one interval is never
+    // The agents list polls every 2s, so a session that starts and fails inside one interval is never
     // once observed `running`. The stand-in used to wait for a running row to hand over to, so it
     // sat beside the finished session's own row claiming a second session was starting, until a
-    // 20s deadline swept it. Landing is the handover, whatever status the run landed in.
+    // 20s deadline swept it. Landing is the handover, whatever status the agent landed in.
     const { container, rerender } = renderRail(
       <AgentHistory projectId="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} startTick={0} startIntent="" />,
     )
@@ -116,7 +116,7 @@ describe('AgentHistory (#785)', () => {
     )
     expect([...container.querySelectorAll('button')].some(row => row.textContent?.includes('starting…'))).toBe(true)
 
-    // The poll catches up: the run is already over, and was never seen running.
+    // The poll catches up: the agent is already over, and was never seen running.
     rerender(
       <SidebarProvider>
         <AgentHistory

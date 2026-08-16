@@ -21,7 +21,7 @@ test('only web runs that carry a cloud session are offered (#1237)', () => {
       agent({ id: 'a', target: 'web', sessionId: 'session_A' }),
       agent({ id: 'b', target: 'local', sessionId: 'session_B' }),
       agent({ id: 'c', target: 'actions', sessionId: 'session_C' }),
-      // A web run whose hand-off never landed has nothing to open.
+      // A web agent whose hand-off never landed has nothing to open.
       agent({ id: 'd', target: 'web' }),
     ],
     NOW,
@@ -30,7 +30,7 @@ test('only web runs that carry a cloud session are offered (#1237)', () => {
 })
 
 test('status is not the filter, because every web run reads done (#1231)', () => {
-  // #1231 ends a web run at the hand-off, so `done` says nothing about whether its session is
+  // #1231 ends a web agent at the hand-off, so `done` says nothing about whether its session is
   // parked. Filtering on status would offer nothing at all.
   const got = bridgeSessionsFrom([agent({ target: 'web', sessionId: 'session_A', status: 'done' })], NOW)
   assert.equal(got.length, 1)
@@ -53,7 +53,7 @@ test('newest first, and never more tabs than the cap (#1237)', () => {
   )
   const got = bridgeSessionsFrom(agents, NOW)
   assert.equal(got.length, BRIDGE_SESSION_LIMIT)
-  // A browser that quietly accumulates tabs is worse than a bridge that misses an old run.
+  // A browser that quietly accumulates tabs is worse than a bridge that misses an old agent.
   assert.deepEqual(got.map(s => s.id), ['session_7', 'session_6', 'session_5'])
 })
 

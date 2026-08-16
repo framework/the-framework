@@ -24,7 +24,7 @@ export const ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE = ON_BEFORE_MERGEABLE_PROMPT
 
 /** What the on-before-mergeable prompt's fragments read. */
 export interface OnBeforeMergeableContext {
-  /** The session the finished run named via setSessionName(). Every line of the prompt names it. */
+  /** The session the finished agent named via setSessionName(). Every line of the prompt names it. */
   session_name: string
   /**
    * The materialized presets, stem -> `{ filePath }` (#326). The `## Maintenance` entries carry

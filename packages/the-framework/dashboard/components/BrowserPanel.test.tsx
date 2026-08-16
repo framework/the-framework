@@ -36,7 +36,7 @@ describe('BrowserPanel failure recovery (#946)', () => {
     expect(screen.getByText(/not reachable/)).toBeTruthy()
 
     // The parent switches runs without remounting: the failure belonged to the old stream,
-    // so the new run must start clean rather than inherit "not reachable" (the old latch
+    // so the new agent must start clean rather than inherit "not reachable" (the old latch
     // only ever cleared by the accident of a remount).
     rerender(<BrowserPanel projectId="p" agentId="r2" />)
     expect(frame().getAttribute('src')).toContain('/browser/p/r2/stream')

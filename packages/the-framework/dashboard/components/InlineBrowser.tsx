@@ -7,9 +7,9 @@ import { BrowserPanel } from './BrowserPanel.js'
  * letterboxed inside — the same proxied stream the rail's Browser tab shows, so the two
  * surfaces can never disagree about what the browser is doing.
  *
- * The degrade ladder (#1359 — never a dead control): while the run is live the box holds the
+ * The degrade ladder (#1359 — never a dead control): while the agent is live the box holds the
  * interactive BrowserPanel, which hands back a still of the newest frame every couple of
- * seconds. When the run ends under the reader (`live` flips false on the mounted component),
+ * seconds. When the agent ends under the reader (`live` flips false on the mounted component),
  * the box keeps that last still with a one-line overlay saying the preview ended — never a
  * dead stream, never a spinner. No still captured (the reader arrived after the end, or no
  * frame ever painted) → the row is just its one-liner. The still lives only in this viewer's
@@ -25,7 +25,7 @@ export function InlineBrowser({
   agentId: string
   /** The page this row announced — what the one-liner names when there is nothing to show. */
   url: string
-  /** Whether the run (and so the stream) is still going; false degrades the pane in place. */
+  /** Whether the agent (and so the stream) is still going; false degrades the pane in place. */
   live: boolean
 }) {
   const [frame, setFrame] = useState<string | undefined>(undefined)

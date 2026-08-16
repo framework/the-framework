@@ -24,7 +24,7 @@ export function ViewsRail({ views }: { views: AgentView[] }) {
     if (fresh >= 0) setActive(fresh)
   }, [views])
 
-  // A view can vanish (a new run truncates the stream); keep the selection in range.
+  // A view can vanish (a new agent truncates the stream); keep the selection in range.
   const current = views[Math.min(active, views.length - 1)]
 
   const scroller = useRef<HTMLDivElement>(null)

@@ -61,7 +61,7 @@ describe('parseRoute', () => {
   })
 
   it('leaves every other second segment a session, so only the reserved word is taken (#1144)', () => {
-    // A run id is derived from its start time, so it can never be the bare reserved word — but
+    // An agent id is derived from its start time, so it can never be the bare reserved word — but
     // anything merely starting with it still has to route to a session.
     expect(parseRoute('/my-repo/tickets-ab')).toEqual({ projectId: 'my-repo', agentId: 'tickets-ab' })
   })

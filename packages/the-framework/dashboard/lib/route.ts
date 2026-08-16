@@ -24,7 +24,7 @@ export const SETTINGS_SEGMENT = 'settings'
  * as a project's second segment (`/{projectId}/tickets/{slug}`, one ticket's own page).
  *
  * Safe to reserve in both spots for the same reason as {@link SETTINGS_SEGMENT}: a project id
- * always carries a `-<hash>` suffix, and a run id is derived from its start time
+ * always carries a `-<hash>` suffix, and an agent id is derived from its start time
  * (`agentIdFromStartedAt`) — neither is ever this bare word.
  */
 export const TICKETS_SEGMENT = 'tickets'

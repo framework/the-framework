@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 
 /**
  * The browser bridge (#1237): the one endpoint an extension running in the user's own Claude
- * session posts to, so a question a cloud run is parked on becomes visible in the dashboard.
+ * session posts to, so a question a cloud agent is parked on becomes visible in the dashboard.
  *
  * **Why this route carries its own token, unlike every other one.** The #1051 guard in
  * `startDashboard` only exists on a non-loopback bind, and what protects a loopback daemon is
@@ -25,7 +25,7 @@ export const BRIDGE_PREFIX = '/_bridge'
 
 /** A question a cloud session is parked on, as reported by the bridge. */
 export interface BridgeQuestion {
-  /** The cloud session that asked, which joins back to a run through `AgentMeta.sessionId`. */
+  /** The cloud session that asked, which joins back to an agent through `AgentMeta.sessionId`. */
   sessionId: string
   title: string
   options: { label: string; detail?: string }[]
@@ -75,7 +75,7 @@ export interface BridgeHandlers {
   /** What the injected page script reports about itself. */
   hello?: (hello: BridgeHello) => void
   /**
-   * The cloud sessions worth watching, newest first. The extension cannot know a run started:
+   * The cloud sessions worth watching, newest first. The extension cannot know an agent started:
    * it only sees pages the user is already on, so without this the bridge works only when
    * somebody happens to be looking at claude.ai. This is how a tab gets opened for them.
    */

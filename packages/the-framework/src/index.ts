@@ -25,7 +25,7 @@
  */
 export * from './driver/index.js'
 export { buildPrompt, extendPrompt, scaffoldPrompt, isWorkspaceEmpty } from './steps.js'
-export { runAgent, type SessionKind, type RunAgentOptions, type RunAgentResult } from './agent.js'
+export { runAgent, type AgentKind, type RunAgentOptions, type RunAgentResult } from './agent.js'
 export { isHandsOff, isAgentLocation, AGENT_LOCATIONS, type AgentLocation } from './agent-location.js'
 export {
   requestChoices,
@@ -189,13 +189,13 @@ export {
 export {
   runCli,
   parseArgs,
-  sessionOptions,
+  agentOptions,
   runOnBeforeMergeable,
   promptAgentSpec,
   type PromptRunner,
   type CliIO,
   type CliArgs,
-  type SessionOptions,
+  type AgentOptions,
 } from './cli.js'
 export { readAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
 export { renderOnBeforeMergeablePrompt, ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE, type OnBeforeMergeableContext } from './on-before-mergeable-prompt.js'

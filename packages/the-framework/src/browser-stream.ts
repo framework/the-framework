@@ -2,14 +2,14 @@ import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 
 /**
- * The run's browser, streamed to a human (#802, part of #609).
+ * The agent's browser, streamed to a human (#802, part of #609).
  *
- * The browser hand-off gate (#796) parks a run and asks someone to deal with a login wall or a
- * captcha. The browser it is parked on is headless and owned by the run (#793), so there is
+ * The browser hand-off gate (#796) parks an agent and asks someone to deal with a login wall or a
+ * captcha. The browser it is parked on is headless and owned by the agent (#793), so there is
  * nothing for that person to click. This serves it: the latest screencast frame as MJPEG, and
  * clicks/keys back in over POST.
  *
- * Why the run hosts this rather than the dashboard driving Chrome directly: Chrome refuses
+ * Why the agent hosts this rather than the dashboard driving Chrome directly: Chrome refuses
  * DevTools socket connections carrying an `Origin` header unless launched with
  * `--remote-allow-origins`, and opening that up would let any page the user happens to visit
  * drive the agent's browser. The debug port stays unreachable from the web; this bridge is the
@@ -22,7 +22,7 @@ import type { AddressInfo } from 'node:net'
 export interface BrowserStream {
   /** Where the dashboard points an `<img>` (`/stream`) and posts input (`/input`). */
   url: string
-  /** The loopback port {@link url} is on, published on the run's log so the daemon can proxy it (#813). */
+  /** The loopback port {@link url} is on, published on the agent's log so the daemon can proxy it (#813). */
   port: number
   /** Stop streaming and close the server. Safe to call twice. */
   close(): Promise<void>
@@ -122,11 +122,11 @@ export type CdpConnect = (webSocketDebuggerUrl: string) => Promise<CdpSession>
 
 /**
  * Start the bridge. Returns undefined when Chrome has no page to stream — the caller carries
- * on without a pane rather than failing the run.
+ * on without a pane rather than failing the agent.
  *
  * The stream is bound to loopback explicitly: the frames can contain whatever the human is
  * typing, including a password, so this must not be reachable from the network. For the same
- * reason no frame is ever written to disk or into the run's event log.
+ * reason no frame is ever written to disk or into the agent's event log.
  */
 export async function startBrowserStream(opts: {
   browserUrl: string
@@ -187,7 +187,7 @@ export async function startBrowserStream(opts: {
    * Chrome does not finalize a `multipart/x-mixed-replace` part until the next boundary arrives,
    * so the most recent frame is always held back unpainted. A still page never produces that next
    * frame, which left the pane blank while holding a perfectly good JPEG — and a still page is
-   * exactly the case this exists for: a run parked on a login wall is not repainting itself.
+   * exactly the case this exists for: an agent parked on a login wall is not repainting itself.
    *
    * Repeating the frame supplies the boundary. Loopback only, and only while a viewer is attached.
    */

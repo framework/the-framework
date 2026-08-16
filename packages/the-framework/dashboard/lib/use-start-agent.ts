@@ -3,15 +3,15 @@ import { useAction } from './use-action.js'
 
 type StartArgs = Parameters<typeof sendStart>
 
-// Starting a run is the one mutation with a failure branch of its own: the daemon refuses a
+// Starting an agent is the one mutation with a failure branch of its own: the daemon refuses a
 // second run on the same checkout with `busy`. Both composers that start runs (the launcher
-// and the finished-run continuation) route through here, so the refusal reads the same on
+// and the finished-agent continuation) route through here, so the refusal reads the same on
 // either surface and neither hand-rolls the busy/error/finally scaffold useAction owns.
 export function useStartAgent(): {
   busy: boolean
   error: string | null
   reset: () => void
-  /** Start the run; resolves with the success branch, or `undefined` (error state set). */
+  /** Start the agent; resolves with the success branch, or `undefined` (error state set). */
   start: (
     projectId: string,
     text: string,

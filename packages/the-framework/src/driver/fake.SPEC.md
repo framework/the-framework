@@ -3,7 +3,7 @@ An in-memory driver that replays scripted turns deterministically, so the whole 
 ## TLDR
 
 - Emits the same events a real driver does and records every prompt it receives, so tests can assert both what the user saw and what the agent was told.
-- A short script never starves a long run: once the turns run out, the last one repeats.
+- A short script never starves a long agent: once the turns run out, the last one repeats.
 
 ## Before writing SPEC.md files
 

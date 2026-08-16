@@ -12,7 +12,7 @@ export { interventionKey, pickNewInterventions } from './keys.js'
 // Rom's design (#624): proposals and finished work are both just PRs, so the bulk of what
 // needs a human is the set of open PRs across the registered projects — merge to confirm,
 // close to reject. This rolls those up, the same way overview.ts rolls up running runs. The
-// second source (#636) is a run paused at an await gate — a live run whose latest state is an
+// second source (#636) is an agent paused at an await gate — a live agent whose latest state is an
 // unresolved choice, waiting for the user's answer. #627 notifications ride this whole set.
 
 /**
@@ -24,8 +24,8 @@ export interface Intervention {
   projectId: string
   projectName: string
   /**
-   * `pr` = an open PR to review/merge or close; `awaiting` = a run paused on a choice gate (#636);
-   * `unpushed` = a finished run whose branch has commits that were never pushed (#860).
+   * `pr` = an open PR to review/merge or close; `awaiting` = an agent paused on a choice gate (#636);
+   * `unpushed` = a finished agent whose branch has commits that were never pushed (#860).
    */
   kind: 'pr' | 'awaiting' | 'unpushed'
   title: string
@@ -35,29 +35,29 @@ export interface Intervention {
   number?: number
   /** The parked gate's id (`awaiting` only) — its stable identity, so it notifies exactly once. */
   awaitId?: string
-  /** Which run this is about (`awaiting` #738 / `unpushed`): a project has several runs. */
+  /** Which run this is about (`awaiting` #738 / `unpushed`): a project has several agents. */
   agentId?: string
   /** The branch the work is sitting on (`unpushed` only). */
   branch?: string
   /** How many commits are waiting (`unpushed` only). */
   commits?: number
-  /** When the PR was opened (`pr`) or the run last updated (the other two), ISO, for ordering. */
+  /** When the PR was opened (`pr`) or the agent last updated (the other two), ISO, for ordering. */
   createdAt?: string
 }
 
 /** Injectable seam so {@link buildInterventions} is unit-testable off disk. */
 export interface InterventionsDeps {
   prs?: PrLister
-  /** The live-run reader (default {@link readLiveMetas}); drives the `awaiting` source (#636). */
+  /** The live-agent reader (default {@link readLiveMetas}); drives the `awaiting` source (#636). */
   liveAgents?: (cwd: string) => Promise<LiveAgent[]>
-  /** The finished-run reader (default {@link listAgents}); drives the `unpushed` source (#860). */
+  /** The finished-agent reader (default {@link listAgents}); drives the `unpushed` source (#860). */
   agents?: (cwd: string) => Promise<AgentMeta[]>
   /** Reads a branch's state (default {@link readAgentHandoff}); drives the `unpushed` source (#860). */
   handoff?: (cwd: string, branch: string) => Promise<AgentHandoff | undefined>
   /**
    * How many of a project's most recent finished runs to inspect for unpushed work. Each one costs
    * a handful of git reads, and this runs on a poll, so old history is not re-walked every minute:
-   * work that has sat unpushed for dozens of runs is not news, and the run list stays the record.
+   * work that has sat unpushed for dozens of runs is not news, and the agent list stays the record.
    */
   handoffLimit?: number
   /**
@@ -103,10 +103,10 @@ export async function buildInterventions(
         ...(pr.createdAt ? { createdAt: pr.createdAt } : {}),
       })
     }
-    // A run paused mid-flight to ask the user is a "needs you" too (#636): a live run that is
-    // still `running` and has an unresolved choice gate. A run parks on one gate at a time, but
-    // a project now has several concurrent runs (#736), so each parked run contributes its own
-    // item — keyed on the gate id, plus the run id so two runs are told apart.
+    // An agent paused mid-flight to ask the user is a "needs you" too (#636): a live agent that is
+    // still `running` and has an unresolved choice gate. An agent parks on one gate at a time, but
+    // a project now has several concurrent agents (#736), so each parked agent contributes its own
+    // item — keyed on the gate id, plus the agent id so two agents are told apart.
     for (const meta of await liveAgents(project.path).catch(() => [])) {
       if (meta.status !== 'running' || !meta.pendingChoice) continue
       items.push({
@@ -120,10 +120,10 @@ export async function buildInterventions(
         ...(meta.updatedAt ? { createdAt: meta.updatedAt } : {}),
       })
     }
-    // A finished run whose work never left the machine is a "needs you" too (#860). Until now the
-    // queue only knew about a PR that is *already on GitHub* and a run parked on a gate, so a run
+    // A finished agent whose work never left the machine is a "needs you" too (#860). Until now the
+    // queue only knew about a PR that is *already on GitHub* and an agent parked on a gate, so an agent
     // that committed real code and stopped produced neither, and nothing told anyone: the overview
-    // drops it (it filters on `running`) and the handoff panel is behind clicking into that run.
+    // drops it (it filters on `running`) and the handoff panel is behind clicking into that agent.
     //
     // Surfacing only: this says there is a decision waiting, it does not take it. Since #1102 a
     // session usually pushes itself, so what reaches here is the remainder — auto-handoff turned
@@ -138,7 +138,7 @@ export async function buildInterventions(
 }
 
 /**
- * The finished runs of a project whose branch still holds unpushed, unmerged commits (#860).
+ * The finished agents of a project whose branch still holds unpushed, unmerged commits (#860).
  *
  * Only the most recent {@link InterventionsDeps.handoffLimit} finished runs are inspected: each
  * costs several git reads and this runs on a poll.
@@ -149,7 +149,7 @@ async function unpushedFor(project: ProjectSummary, deps: InterventionsDeps): Pr
     deps.handoff ??
     // The default skips the `gh` PR lookup `readAgentHandoff` would otherwise do per branch: an open
     // PR means the branch was pushed, so `pushed` already excludes it, and the `pr` kind above is
-    // what surfaces it. Paying an 8s-timeout network call per run on every poll to learn that
+    // what surfaces it. Paying an 8s-timeout network call per agent on every poll to learn that
     // would be the most expensive part of this whole queue.
     ((cwd: string, branch: string) => readAgentHandoff(cwd, branch, { pr: async () => undefined }))
 
@@ -185,7 +185,7 @@ async function unpushedFor(project: ProjectSummary, deps: InterventionsDeps): Pr
  * watcher that posts it: it switches on every `kind`, so adding a kind is a change here, not in
  * a transport module that has no other opinion about what an intervention is.
  *
- * A PR reads `#123 Title — url`; a paused run (#636) has no number and only the dashboard url,
+ * A PR reads `#123 Title — url`; a paused agent (#636) has no number and only the dashboard url,
  * so it reads `Title — awaiting your answer` with the link appended when the daemon knows it.
  * Unpushed work (#860) names the branch, since that is the actionable part.
  */

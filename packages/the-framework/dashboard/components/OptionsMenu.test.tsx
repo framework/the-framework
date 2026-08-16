@@ -154,7 +154,7 @@ describe('OptionsMenu (#654)', () => {
   })
 
   test('selecting a device puts the checkmark on it and quiets the driver rows (#1067)', () => {
-    // On the local daemon, a selected device is the run target in place, with no navigation involved.
+    // On the local daemon, a selected device is the agent target in place, with no navigation involved.
     openAgentOn(connectionControl({ isLocal: true, selectedDeviceId: STUDIO_URL }), 'actions')
     expect(isChecked(STUDIO_URL)).toBe(true)
     expect(isChecked(THIS_MACHINE)).toBe(false)

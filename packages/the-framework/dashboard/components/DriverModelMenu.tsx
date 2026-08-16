@@ -13,7 +13,7 @@ import {
   DropdownMenuSubContent,
 } from './ui/dropdown-menu.js'
 
-// The run's driver + model as one tree (#650/#656/#658): the top level is the coding drivers, and
+// The agent's driver + model as one tree (#650/#656/#658): the top level is the coding drivers, and
 // each driver's submenu holds only its own models. Picking a model sets both the driver and the
 // model together, so an incompatible pair (e.g. Codex + a Claude model) can't be chosen. The
 // trigger shows the current driver's logo then the model.
@@ -46,7 +46,7 @@ function driverOf(drivers: DriverOption[], value: string): DriverOption | undefi
  * Deliberately *not* falling back to the first model (#1143). The list used to open with a
  * "Default" entry storing an empty value, and the fallback made that entry's label the answer to
  * "which model is this". Dropping the entry without dropping the fallback would be worse than
- * either: the trigger would name a model the run does not actually pass.
+ * either: the trigger would name a model the agent does not actually pass.
  */
 function modelLabel(driver: DriverOption | undefined, model: string): string | undefined {
   return driver?.models.find(m => m.value === model)?.label

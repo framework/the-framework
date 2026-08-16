@@ -25,7 +25,7 @@ export function BrowserPanel({
   inline?: boolean
   /**
    * Called with a data-URL still of the newest frame every couple of seconds while streaming
-   * (#1455 item 6b). The caller keeps it so a pane whose run ends can degrade to that still
+   * (#1455 item 6b). The caller keeps it so a pane whose agent ends can degrade to that still
    * instead of a dead stream (#1359). The frame lives only in this viewer's memory — never in
    * the log or on disk, the same rule the stream itself follows.
    */
@@ -33,12 +33,12 @@ export function BrowserPanel({
 }) {
   const img = useRef<HTMLImageElement>(null)
   const [attempt, setAttempt] = useState(0)
-  // The failure is keyed to the exact stream it happened on, so a different run or a Retry
+  // The failure is keyed to the exact stream it happened on, so a different agent or a Retry
   // starts clean instead of inheriting a latched "not reachable" until remount (#946): one
-  // early onError (the tab opened before the run's stream endpoint was up) must not be terminal.
+  // early onError (the tab opened before the agent's stream endpoint was up) must not be terminal.
   const [failedKey, setFailedKey] = useState<string | undefined>(undefined)
   const base = `/browser/${encodeURIComponent(projectId)}/${encodeURIComponent(agentId)}`
-  // Coming back to a run whose earlier stream failed must try again, not replay the stale
+  // Coming back to an agent whose earlier stream failed must try again, not replay the stale
   // failure: the stream may have come up since. Adjust-during-render is the sanctioned way
   // to reset state on a prop change without a remount.
   const [lastBase, setLastBase] = useState(base)

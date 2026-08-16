@@ -41,7 +41,7 @@ test('every retained checkout is offered to the one rule, whatever its run did (
 })
 
 test('a checkout the daemon has not finished with is left alone (E5)', async () => {
-  // "Not live" on disk is not "the daemon is done with it": a run's meta flips to `done` a beat
+  // "Not live" on disk is not "the daemon is done with it": an agent's meta flips to `done` a beat
   // before its teardown archives the history and reclaims the checkout, so a sweep landing in that
   // window would race the teardown for the same directory.
   const asked: string[] = []
@@ -55,7 +55,7 @@ test('a checkout the daemon has not finished with is left alone (E5)', async () 
 })
 
 test('a live session keeps its checkout: its agent is working in there (#1036)', async () => {
-  // Stop is how a run ends, not pulling the floor out from under it.
+  // Stop is how an agent ends, not pulling the floor out from under it.
   const { asked, agent: agent } = fakeSweep([row({ agentId: 'live', live: true, status: 'running' })])
   const { removed } = await agent()
   assert.deepEqual(removed, [])
@@ -134,7 +134,7 @@ test('a project whose sweep throws does not stop the ones after it (#1036)', asy
 const RUN_ID = 'run1'
 
 /**
- * A repo with a session worktree that has a commit of its own on the run branch, and a bare repo
+ * A repo with a session worktree that has a commit of its own on the agent branch, and a bare repo
  * standing in for `origin` — which is the whole subject here, so it is real rather than stubbed.
  */
 async function repoWithAgentWork(opts: { remote?: boolean } = {}): Promise<{ repo: string; path: string; branch: string }> {

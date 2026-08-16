@@ -6,7 +6,7 @@ import { Button } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'
 import { cn } from '../lib/utils.js'
 
-// "Your call" — the interactive gate the run parks on (#304/#332), rendered from the
+// "Your call" — the interactive gate the agent parks on (#304/#332), rendered from the
 // live event stream and posted back over the control RPC (rpc/control.ts) to the
 // project's control.jsonl. One shape: a question with options, picked one at a time or
 // several at once (#332). There were three — an Approve/Decline confirm got its own green and
@@ -38,7 +38,7 @@ export function ChoicePanel({
    * Whether autopilot's auto-accept countdown may run here (#1455). The launcher's questions hub
    * turns it off: it renders every parked session's gate at once, and a page that answers all of
    * them ten seconds after being opened is not a hub, it is a mass auto-accept. The session's own
-   * rail keeps the countdown — there the user chose to look at that one run.
+   * rail keeps the countdown — there the user chose to look at that one agent.
    */
   countdown?: boolean
   /**

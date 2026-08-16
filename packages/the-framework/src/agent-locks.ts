@@ -1,10 +1,10 @@
 import { resolve } from 'node:path'
 
 /**
- * Serialize everything that mutates one run's checkout.
+ * Serialize everything that mutates one agent's checkout.
  *
- * A run's meta flips to `done` the moment its child writes it — a beat before the daemon's
- * teardown archives the history, commits the bookkeeping to the run branch, and retires the
+ * An agent's meta flips to `done` the moment its child writes it — a beat before the daemon's
+ * teardown archives the history, commits the bookkeeping to the agent branch, and retires the
  * worktree. Every run-addressed action a user can fire off that fresh `done` (Push / Open PR's
  * commit step, Remove/Delete of the checkout, a Resume that reuses it) used to run its own git
  * against the same checkout teardown was committing in: the loser reported "could not commit the
@@ -14,7 +14,7 @@ import { resolve } from 'node:path'
  * whole fix — there is no second process to coordinate with.
  *
  * Keyed by the checkout path, resolved: teardown and the actions all name the same worktree, so
- * they contend on one key; actions against a run whose worktree is already gone key on the
+ * they contend on one key; actions against an agent whose worktree is already gone key on the
  * project root, where nothing contends. A waiter chains on the predecessor's *settlement* — a
  * failed teardown must not skip the push waiting behind it — and each caller still gets its own
  * outcome (or failure) back untouched.

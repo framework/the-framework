@@ -16,7 +16,7 @@ import type { MultiSelectOption } from './await-gate.js'
 export const AWAIT_PROTOCOL = PROTOCOLS_AWAIT
 
 /**
- * Told to a hands-off run only (#1234): the await gates {@link AWAIT_PROTOCOL} just taught are
+ * Told to a hands-off agent only (#1234): the await gates {@link AWAIT_PROTOCOL} just taught are
  * not available in this session, so an ambiguous prompt takes its most plausible reading instead
  * of parking forever on a question nobody attached can answer. Worded as availability rather
  * than as a rule, so it deletes itself cleanly once choices become a per-session capability.
@@ -25,7 +25,7 @@ export const AWAIT_PROTOCOL = PROTOCOLS_AWAIT
 export const HANDS_OFF_PROTOCOL = PROTOCOLS_HANDS_OFF
 
 /**
- * Told to the agent only when the run has a browser (#824): that it has one, and that anything
+ * Told to the agent only when the agent has a browser (#824): that it has one, and that anything
  * it needs to see or act on goes through the chrome-devtools tools rather than `WebFetch`.
  * Lives in `prompts/protocols/browser.md`.
  */
@@ -87,7 +87,7 @@ export interface ParsedAwaitGate {
 }
 
 /**
- * How many times the agent may stop to ask, and be resumed, before a run stops honoring
+ * How many times the agent may stop to ask, and be resumed, before an agent stops honoring
  * gates and just finishes. A property of the await protocol, so every path that runs gates
  * shares it: a build, a direct prompt, and the backlog loop each used to declare their own.
  */
@@ -102,7 +102,7 @@ export const MAX_AWAIT_ROUNDS = 5
  * instead of one path and not the others (#570).
  *
  * No "do not ask again" tail: a capable agent does not re-ask a settled question on
- * its own, so spelling it out is babysitting we leave off until a run shows it is
+ * its own, so spelling it out is babysitting we leave off until an agent shows it is
  * needed (#570 review).
  */
 export function continuationPrompt(question: string, answer: string): string {
@@ -184,7 +184,7 @@ export function parseSessionName(text: string): string | undefined {
 /**
  * Whether the agent signalled `setReadyForMerge()` this turn (#326): the presence of a
  * `ready-for-merge` block (per {@link SIGNAL_PROTOCOL}) anywhere in the text. Non-blocking
- * and body-less — it just flips the run from building to ready-for-review.
+ * and body-less — it just flips the agent from building to ready-for-review.
  */
 export function parseReadyForMerge(text: string): boolean {
   return /```ready-for-merge(?:\s[\s\S]*?)?```/.test(text)
@@ -220,7 +220,7 @@ const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
  * Tolerant by design, because a bad parse must never crash a build: ids are synthesized from
  * position when the agent names none, a label-less option is dropped, a blank title falls back,
  * `recommended` may be given as a label or an id, and a malformed block is ignored. A block whose
- * options all fall away is not a gate — the run carries on rather than parking on an empty question.
+ * options all fall away is not a gate — the agent carries on rather than parking on an empty question.
  */
 export function parseAwaitGate(text: string): ParsedAwaitGate | undefined {
   // Latest first, so the newest question wins — falling back to an earlier one when the agent's

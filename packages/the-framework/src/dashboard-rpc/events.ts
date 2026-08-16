@@ -11,10 +11,10 @@ import { forwardStream } from './stream-forward.js'
 
 /**
  * The events file to tail, or undefined when the project is unknown. With a `agentId` this is
- * that run's own log inside its worktree (#749): since #736 a run appends there, not to the
+ * that agent's own log inside its worktree (#749): since #736 an agent appends there, not to the
  * project root, so streaming the project path would follow a file nothing writes to. Once the
- * run has ended and its worktree is gone, the run's archived `<id>.jsonl` is that log (#1472) —
- * tailing the project root there would stream a foreign run's journal.
+ * run has ended and its worktree is gone, the agent's archived `<id>.jsonl` is that log (#1472) —
+ * tailing the project root there would stream a foreign agent's journal.
  */
 async function resolveEventsPath(projectId: string, agentId?: string): Promise<string | undefined> {
   const cwd = await resolveProjectPath(projectId)
@@ -30,22 +30,22 @@ async function resolveEventsPath(projectId: string, agentId?: string): Promise<s
  */
 export type StreamSync = { kind: 'stream-sync' }
 
-/** What `onEvents` streams: the run's events, plus the wire-only end-of-replay marker. */
+/** What `onEvents` streams: the agent's events, plus the wire-only end-of-replay marker. */
 export type LiveFeedEvent = FrameworkEvent | StreamSync
 
 /**
- * Follow one run's events: `send` is called per event until the returned stop function runs.
+ * Follow one agent's events: `send` is called per event until the returned stop function runs.
  * Returns undefined when there is nothing to stream (an unknown project), which the mount ends as
  * a clean close — mirroring the read model's empty results rather than throwing at the client.
  *
- * Pass the `agentId` to follow that run's own log (#749). A project has several concurrent runs
- * since #736, each writing inside its worktree, so the run id is what makes the feed that run's
- * rather than a mix — and without it the feed for a worktree run is empty. Omitting it keeps the
+ * Pass the `agentId` to follow that agent's own log (#749). A project has several concurrent agents
+ * since #736, each writing inside its worktree, so the agent id is what makes the feed that agent's
+ * rather than a mix — and without it the feed for a worktree agent is empty. Omitting it keeps the
  * pre-#736 behavior of tailing the project root.
  *
- * Two sources, chosen by what is wired. An in-memory stream wins: a run the daemon is relaying
+ * Two sources, chosen by what is wired. An in-memory stream wins: an agent the daemon is relaying
  * from a device (#1067). Otherwise the on-disk log. The daemon's source answers only for relayed
- * runs, so an ordinary local run falls through to tailing the log.
+ * runs, so an ordinary local agent falls through to tailing the log.
  *
  * Only the on-disk tail sends the {@link StreamSync} marker: the in-memory sources have no replay
  * boundary to report, so a reconnecting client falls back to a grace deadline before swapping its
@@ -58,21 +58,21 @@ export async function streamAgentEvents(
   onDone?: () => void,
 ): Promise<(() => void) | undefined> {
   const stream = contextEventsSource()(projectId, agentId)
-  // An in-memory run: replay + follow it, and end when it ends — a relayed run that finished has
+  // An in-memory agent: replay + follow it, and end when it ends — a relayed agent that finished has
   // nothing more to say, and leaving the response open would read as a live feed gone quiet.
   if (stream) return forwardStream(stream, send, onDone)
 
-  // Everywhere else: tail the run's on-disk events.jsonl (undefined path -> nothing to stream).
+  // Everywhere else: tail the agent's on-disk events.jsonl (undefined path -> nothing to stream).
   // The relocating tail, because the journal moves mid-subscription: teardown copies it into the
   // archive and removes the worktree, and a fixed-path tail whose fs.watch missed the final
-  // appends went silent without the run's `end`. On the move it re-resolves (the archive, #1472)
+  // appends went silent without the agent's `end`. On the move it re-resolves (the archive, #1472)
   // and carries its offset, so the feed gets exactly the lines the move would have swallowed.
   const path = await resolveEventsPath(projectId, agentId)
   if (!path) return undefined
   // The one place a run-scoped feed must NOT relocate to: the project-root journal, which is
   // resolveAgentEventsPath's last-resort fallback once a Delete has removed worktree and archive
-  // alike — it is another run's feed (#1472). A deleted session's tab goes quiet instead. The
-  // initial attach stays permissive: a fallback run (non-git project) legitimately lives there.
+  // alike — it is another agent's feed (#1472). A deleted session's tab goes quiet instead. The
+  // initial attach stays permissive: a fallback agent (non-git project) legitimately lives there.
   const rootJournal = agentId === undefined ? undefined : await resolveEventsPath(projectId, undefined)
   let initial = true
   return tailAgentEvents(

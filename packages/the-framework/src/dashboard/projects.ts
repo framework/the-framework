@@ -26,7 +26,7 @@ export interface ProjectSummary {
   lastActivityAt?: string
   /**
    * The repo's committed run defaults from `the-framework.yml` (#842), so the launcher can show
-   * what a run there will actually resolve to. Read fresh on every summarize, which is what keeps
+   * what an agent there will actually resolve to. Read fresh on every summarize, which is what keeps
    * it current after an edit; absent when the repo sets nothing (or the file is malformed, which
    * {@link loadFrameworkConfig} reports as empty rather than failing).
    */
@@ -50,7 +50,7 @@ export interface SummarizeDeps {
  *
  * Activity is the sessions themselves (B3). It used to be the newest of those and the latest
  * `LOGS.md` entry — a committed markdown re-narration of the same sessions, which could only ever
- * be older than the run it described.
+ * be older than the agent it described.
  */
 export async function summarizeProject(record: ProjectRecord, deps: SummarizeDeps = {}): Promise<ProjectSummary> {
   const checkActivated = deps.isActivated ?? isActivated

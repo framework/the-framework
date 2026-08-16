@@ -4,7 +4,7 @@ import { Node, mergeAttributes, nodeInputRule } from '@tiptap/core'
 // editor but serializes back to the EXACT plain text the agent already parses today — an
 // angle-bracket macro (`<AWAIT>`, `<REVIEW_FILE>`), an action call (`showMultiSelect()`), or
 // a reference (`@my-app`). Because a chip flattens to its `text` verbatim, the prompt over
-// the wire is unchanged: presets, the run contract, everything downstream stays the same.
+// the wire is unchanged: presets, the agent contract, everything downstream stays the same.
 
 /** What a token is, which drives its chip colour and which menu inserts it. */
 export type TokenKind = 'macro' | 'action' | 'reference' | 'project' | 'file'

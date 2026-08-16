@@ -160,7 +160,7 @@ describe('the mirror row at the log tail (#1265)', () => {
     render(<CloudMirrorRow target="web" events={[handOff()]} />)
     await waitFor(() => expect(screen.getByText('Reading the repo')).toBeTruthy())
     expect(screen.getByText('Found three packages')).toBeTruthy()
-    // The provenance boundary: the box says what it is, so a scrape never reads as the run's own log.
+    // The provenance boundary: the box says what it is, so a scrape never reads as the agent's own log.
     expect(screen.getByRole('status', { name: /Cloud session mirror/i })).toBeTruthy()
   })
 

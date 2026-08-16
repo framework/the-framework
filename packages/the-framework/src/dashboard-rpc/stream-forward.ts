@@ -1,12 +1,12 @@
 /**
  * Forward an async-iterable of events to a `send` sink until the source is exhausted or
  * the returned stop function is called (#426). This is the bridge behind a relayed
- * run's live feed: the run is an `AsyncIterable` that replays its buffered history then follows
+ * run's live feed: the agent is an `AsyncIterable` that replays its buffered history then follows
  * live, and each value becomes one `send(event)`. Transport-agnostic on purpose — a plain
  * callback, so the pump is driven and tested on its own, and the mount decides what a value
  * becomes on the wire.
  *
- * `onDone` fires when the source runs out on its own — a relayed run that finished. Without it a
+ * `onDone` fires when the source runs out on its own — a relayed agent that finished. Without it a
  * consumer cannot tell "nothing more is coming" from "nothing has happened yet", so an SSE
  * response would stay open forever on a stream that was already over.
  *

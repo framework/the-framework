@@ -22,7 +22,7 @@ test('tailEvents seeds with what is already logged, then follows appends', async
   try {
     await sleep(150)
     assert.deepEqual(seen, ['first'])
-    // Append, the way a run writes its log. This used to rewrite the whole file, which truncates
+    // Append, the way an agent writes its log. This used to rewrite the whole file, which truncates
     // it first — and a poll landing in that instant makes the tailer do exactly what it is built
     // to do (#567): treat the log as rewritten, reset, and replay `first`. The rewrite path is
     // covered on purpose by the next test; this one is about following appends (#811).
@@ -118,7 +118,7 @@ test('tailEvents reports the replay boundary even when the log does not exist ye
   }
 })
 
-// The relocating tail: a run's journal is copied verbatim into the archive at teardown and the
+// The relocating tail: an agent's journal is copied verbatim into the archive at teardown and the
 // worktree is removed. tailAgentEvents re-resolves the path when the tailed file disappears and
 // carries the read offset across the move, so the feed gets exactly the lines the move would
 // have swallowed — once, with no replay of what was already delivered.
@@ -141,7 +141,7 @@ test('tailAgentEvents follows the journal into the archive: missed lines arrive 
     assert.deepEqual(seen, ['one', 'two'])
     // The retirement, compressed: the final lines land and the journal moves in one breath, so
     // whether the watcher saw the appends before the move is scheduling luck — exactly the
-    // window that used to swallow a fast run's `end`. Either way the tail must deliver
+    // window that used to swallow a fast agent's `end`. Either way the tail must deliver
     // everything, each line once.
     await appendFile(live, line('three') + line('four'))
     await rename(live, archive)

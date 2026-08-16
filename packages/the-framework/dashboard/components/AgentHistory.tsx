@@ -40,12 +40,12 @@ type Row = { key: string; agent: AgentMeta; project?: string; active: boolean; o
 // The Runs rail (#314 second sidebar), now the shadcn Sidebar (#shared-shell): one component on
 // every route, so the home/Overview and a session page share the exact same left column instead of
 // the rail vanishing the moment no project is selected. "New" is the permanent home/launcher —
-// selecting it shows the Start form + cards (ProjectHome), and it is never consumed by a run. Below
+// selecting it shows the Start form + cards (ProjectHome), and it is never consumed by an agent. Below
 // it sit the recent sessions: a project's own agents when one is selected, and — on the Overview,
 // where no project is — every project's sessions pooled newest-first (`recentAgents`), each row
 // naming its project and jumping into it when selected. `agents`/`recentAgents` are owned by the shell
 // so the rail and the main pane share one list. `startTick`/`startIntent` seed an optimistic
-// "starting…" row the instant Start is clicked, until the real run.json lands.
+// "starting…" row the instant Start is clicked, until the real agent.json lands.
 export function AgentHistory({
   projectId,
   agents,
@@ -100,9 +100,9 @@ export function AgentHistory({
   onProjectAdded?: () => void
   startTick?: number
   startIntent?: string
-  /** Just started a run that reported no id, so there is nothing selected to highlight yet (#705):
+  /** Just started an agent that reported no id, so there is nothing selected to highlight yet (#705):
    *  put the highlight on the running/optimistic row rather than the New row until the shell adopts
-   *  the run's real id. A run that did report one is selected by URL instead (#784). */
+   *  the agent's real id. An agent that did report one is selected by URL instead (#784). */
   followLive?: boolean
 }) {
   // The optimistic row, and the agents that already existed when Start was clicked. The two are one
@@ -116,13 +116,13 @@ export function AgentHistory({
 
   const hasRunning = agents.some(agent => agent.status === 'running')
   const newestRunningAgentId = agents.find(agent => agent.status === 'running')?.id
-  // The handover: the row this one stands in for has landed once a run appears that was not in the
+  // The handover: the row this one stands in for has landed once an agent appears that was not in the
   // list when Start was clicked — whatever its status.
   //
   // Watching `running` alone was too narrow. The agents list polls every 2s, so a session that starts
   // and finishes inside one interval is never once observed running, and the stand-in had nothing to
   // hand over to: it sat beside the finished session's own row, claiming a second session was
-  // starting, until the deadline below swept it. That was hard to hit while a broken run hung as
+  // starting, until the deadline below swept it. That was hard to hit while a broken agent hung as
   // `running` forever; it stopped being hard once such agents began failing in milliseconds.
   const landed = optimistic !== null && agents.some(agent => !optimistic.known.has(agent.id))
   useEffect(() => {
@@ -131,7 +131,7 @@ export function AgentHistory({
   useEffect(() => {
     setOptimistic(null)
   }, [projectId])
-  // A start that never produces a run at all has nothing to hand over to either, so without a
+  // A start that never produces an agent at all has nothing to hand over to either, so without a
   // deadline the row said "starting…" forever (#948). The Start form surfaces the actual error;
   // this just stops the rail pretending. Still the backstop, not the usual path: `landed` above
   // retires the row as soon as the real one exists.
@@ -148,7 +148,7 @@ export function AgentHistory({
   // painted together for a frame while the effect is still queued.
   const showOptimistic = !crossProject && optimistic !== null && !hasRunning && !landed
 
-  // A session selected but not in the list is one just started, whose row lands with its run.json
+  // A session selected but not in the list is one just started, whose row lands with its agent.json
   // a beat later (#784): the optimistic row is standing in for it, so highlight that. Following a
   // just-started run (#705) counts too, before its id is known.
   const starting = followLive || (selectedAgentId !== null && !agents.some(agent => agent.id === selectedAgentId))
@@ -164,7 +164,7 @@ export function AgentHistory({
     : agents.map(agent => ({
         key: agent.id,
         agent: agent,
-        // Following live highlights the newest running run, not every one of them (#738):
+        // Following live highlights the newest running agent, not every one of them (#738):
         // `agents` is newest-first, so that is the first with a running status.
         active: agent.id === selectedAgentId || (followLive && agent.id === newestRunningAgentId),
         onClick: () => onSelect(agent.id),
@@ -502,7 +502,7 @@ function NewButton({
   )
 }
 
-// One run row: a pulsing dot + RUNNING badge for a working run, a still dot + WAITING for one
+// One agent row: a pulsing dot + RUNNING badge for a working agent, a still dot + WAITING for one
 // parked on the user (#785), else the terminal-status badge.
 function AgentHistoryRow({
   status,
@@ -538,14 +538,14 @@ function AgentHistoryRow({
   /** The device's label, for the glyph's tooltip. */
   remoteLabel?: string | undefined
 }) {
-  // Only a live run can be waiting on you; a finished one is just finished.
+  // Only a live agent can be waiting on you; a finished one is just finished.
   const parked = waiting && status === 'running'
   const picked = driverFromImpl(driver)
-  // A web run's local process ends at the hand-off by design, so its `done` is about this
+  // A web agent's local process ends at the hand-off by design, so its `done` is about this
   // machine, not the session (#1264): the cloud side keeps working and opens its own PR. Saying
   // "done" under ten working cloud agents is the lie the demo would put on camera.
   const inCloud = cloud && status === 'done'
-  // "In cloud" outranks "publishing…": a web run's local half is over either way, and the cloud
+  // "In cloud" outranks "publishing…": a web agent's local half is over either way, and the cloud
   // side owns its own push/PR, so the cloud word is the truer one for that row.
   const publishingNow = publishing && !inCloud
   // The title only fades + carries a tooltip when it actually overflows the fixed-width rail; a

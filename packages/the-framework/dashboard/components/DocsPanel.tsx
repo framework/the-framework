@@ -5,7 +5,7 @@ import { Markdown } from './Markdown.js'
 import { cn } from '../lib/utils.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
-// The surfaced documents (#319/#328): the PLAN/TODO the agent writes, rendered beside the run.
+// The surfaced documents (#319/#328): the PLAN/TODO the agent writes, rendered beside the agent.
 // The read lives in the rail (#1146), which needs to know whether there are any docs before it
 // offers the tab; this renders what it is handed.
 export function DocsPanel({ docs, loaded }: { docs: WorkspaceDoc[]; loaded: boolean }) {

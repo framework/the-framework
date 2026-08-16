@@ -4,7 +4,7 @@ import { findFlatTodo } from '../tickets.js'
 
 /**
  * The plan/backlog document categories the dashboard surfaces in its sidebar
- * (#319, part of the MVP UI #309), so the human can read them beside the run.
+ * (#319, part of the MVP UI #309), so the human can read them beside the agent.
  *
  * The Framework's system prompt writes these per session (#323/#326):
  * `PLAN_<SESSION>.agent.md` (the plan for now) and `TODO_<SESSION>.agent.md` (the

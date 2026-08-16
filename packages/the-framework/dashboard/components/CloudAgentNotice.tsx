@@ -9,11 +9,11 @@ import { CopyButton } from './ui/copy-button.js'
 /** How often to ask the daemon whether the bridge reported a question. */
 const POLL_MS = 4000
 
-// The run view's affordance for a Claude web target (#610). This target is a hand-off, not a
+// The agent view's affordance for a Claude web target (#610). This target is a hand-off, not a
 // streamed run: the session runs on Anthropic's infrastructure, does its own worktree and opens
 // its own PR, and there is no read-back API we can use to follow it with, so the honest thing to
 // show is where the work went and how to reach it rather than an empty feed that looks stalled.
-// Renders nothing for any other target, so the run view can mount it unconditionally.
+// Renders nothing for any other target, so the agent view can mount it unconditionally.
 export function CloudAgentNotice({
   target,
   events,
@@ -63,7 +63,7 @@ export function CloudAgentNotice({
 /**
  * The question the session is parked on, once the browser bridge has reported one (#1237).
  *
- * Answering is a two-step pick-then-send, unlike the one-click gates of a local run: the send
+ * Answering is a two-step pick-then-send, unlike the one-click gates of a local agent: the send
  * has the extension type into the user's own claude.ai session, so the pick is confirmed
  * explicitly, and while it waits for delivery it can still be withdrawn. The link out stays as
  * the manual path for whoever prefers to answer over there.
@@ -202,9 +202,9 @@ export function scrubMirrorText(text: string): string {
 }
 
 /**
- * The one live boxed row at the tail of a web run's log (#1265): the log itself dead-ends at
+ * The one live boxed row at the tail of a web agent's log (#1265): the log itself dead-ends at
  * "Handed off: …", and this is what happens after — the bridge mirror streaming in place, with a
- * connecting placeholder so a web run never shows dead air.
+ * connecting placeholder so a web agent never shows dead air.
  *
  * Deliberately a single clearly-labelled box rather than ordinary log rows: `events.jsonl` is
  * durable provenance-clean data, the mirror is a best-effort tab scrape read through a browser
@@ -302,7 +302,7 @@ function useBridgeAnswer(sessionId: string | undefined): BridgeAnswer | undefine
 
 /**
  * Poll the daemon for this session's parked question. Polled rather than streamed because the
- * bridge writes over HTTP from a browser extension and never touches the run's event log, so
+ * bridge writes over HTTP from a browser extension and never touches the agent's event log, so
  * there is no event for the live channel to carry.
  */
 function useBridgeQuestion(sessionId: string | undefined): BridgeQuestion | undefined {

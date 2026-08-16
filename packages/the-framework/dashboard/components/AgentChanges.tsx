@@ -7,10 +7,10 @@ import { FilePreviewCard } from './FilePreview.js'
 import { DiffStat } from './DiffView.js'
 import { cn } from '../lib/utils.js'
 
-// What the session changed, in the run view (#817). Watching a run you saw `· Edit` go by and
+// What the session changed, in the agent view (#817). Watching an agent you saw `· Edit` go by and
 // never learned which file moved; finding out meant leaving the dashboard for `git diff`.
 //
-// Read from the run's worktree, not from the agent's tool calls: the driver surfaces a tool's
+// Read from the agent's worktree, not from the agent's tool calls: the driver surfaces a tool's
 // name and not its arguments by design (#165), and deriving this from git is both the honest
 // source (the outcome, not the intent) and the one that works for every agent. Each row expands
 // to the same diff the tree's hover card shows (#816).

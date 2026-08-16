@@ -89,7 +89,7 @@ function HumanQueue({
   onSelectProject: (id: string) => void
   onSelectAgent: (projectId: string, agentId: string) => void
 }) {
-  // Awaiting and unpushed both name a run (#636/#860), so the row opens that session — which is what
+  // Awaiting and unpushed both name an agent (#636/#860), so the row opens that session — which is what
   // its "Open the session" promise says. Only if the id is somehow absent does it fall back to the
   // project, rather than doing nothing.
   const openAgent = (item: Intervention) =>

@@ -3,14 +3,14 @@ import { resolve } from 'node:path'
 import type { DriverEvent } from './types.js'
 
 // The pieces every driver session needs but that are not agent-specific: emitting events
-// without letting a listener throw into the run, folding the session + per-call signals and
+// without letting a listener throw into the agent, folding the session + per-call signals and
 // framing, and reading a workspace file. The agent-specific parts (argv, the output parser,
 // how framing is delivered) stay in each driver; these do not, so a second driver reuses
 // them rather than copying them.
 
 /**
  * A {@link DriverStartOptions.onEvent} caller that never lets a listener throw into the
- * driver — a throwing dashboard handler must not abort the agent run. An absent `onEvent`
+ * driver — a throwing dashboard handler must not abort the agent. An absent `onEvent`
  * is a no-op. `driver` names it in the swallow log so a thrown handler stays traceable.
  */
 export function makeEmit(onEvent: ((event: DriverEvent) => void) | undefined, driver: string): (event: DriverEvent) => void {

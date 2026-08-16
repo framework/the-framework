@@ -52,7 +52,7 @@ export interface Preferences {
   vanilla?: boolean
   /** On-before-mergeable prompt (#326): on setReadyForMerge(), queue the quality follow-ups as TODO entries. */
   onBeforeMergeableQuality?: boolean
-  /** Give the agent a real browser via chrome-devtools-mcp during the run (#452); maps to `--browser`. */
+  /** Give the agent a real browser via chrome-devtools-mcp during the agent (#452); maps to `--browser`. */
   browser?: boolean
   /**
    * How far a finished session publishes itself (#1102/#1216/B5): keep it local, push the branch,
@@ -65,30 +65,30 @@ export interface Preferences {
   handoff?: HandoffLevel
   /**
    * Transparent mode (#625): run the wrapped agent raw — no framework system prompt, emit
-   * protocols, consumption guard, dashboard, or TODO loop, so a run is identical to `claude -p`.
+   * protocols, consumption guard, dashboard, or TODO loop, so an agent is identical to `claude -p`.
    * The coarse master off-switch ("only pick what you need"); maps to `--transparent`. Absent = off.
    */
   transparent?: boolean
   /** Fire a browser notification when a new item lands on the "needs you" queue (#627). Absent = on. */
   notifyBrowser?: boolean
   /**
-   * Also notify on plain run activity — a run started, a run finished (#627). The default-off
+   * Also notify on plain run activity — an agent started, an agent finished (#627). The default-off
    * counterpart to the always-on "needs you" notifications: it keeps you loosely informed of the
    * pipeline moving even when nothing needs you. A *category* toggle: it composes with the method
    * toggles ({@link notifyBrowser} / {@link notifyDiscord}), so activity reaches whichever are on.
    */
   notifyNewActivity?: boolean
   /**
-   * The "needs you" category (#627): notify when a run is awaiting your answer or a PR is ready
+   * The "needs you" category (#627): notify when an agent is awaiting your answer or a PR is ready
    * to review. A *category* toggle, like {@link notifyNewActivity}, composing with the method
    * toggles ({@link notifyBrowser} / {@link notifyDiscord}). **Absent = on**: unlike the other
    * flat opt-in booleans, human-intervention pings are the baseline The Framework leans on, so an
    * unset preference keeps them firing; a user turns them off explicitly.
    */
   notifyHumanIntervention?: boolean
-  /** The model to run on (#628), e.g. `opus` / `sonnet`; maps to a run's `--model`. Absent = the driver's default. */
+  /** The model to run on (#628), e.g. `opus` / `sonnet`; maps to an agent's `--model`. Absent = the driver's default. */
   model?: string
-  /** Which coding agent drives the run (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
+  /** Which coding agent drives the agent (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
   driver?: string
   /** Preferred editor for "Open in editor" (#727): an editor CLI (e.g. `code`, `cursor`, `zed`).
    * Absent falls back to `$FRAMEWORK_EDITOR`, then `code`. */
@@ -105,7 +105,7 @@ export interface Preferences {
    */
   notifyDiscord?: boolean
   /**
-   * Auto PM (#685): let the daemon start a PM run by itself when the agent queue has run dry
+   * Auto PM (#685): let the daemon start a PM agent by itself when the agent queue has run dry
    * and there is plenty of budget left, so leftover subscription quota goes on the roadmap
    * instead of expiring. **Absent = off**: it spends the user's allowance without being asked,
    * so it is opt-in like {@link notifyDiscord} rather than a baseline.
@@ -113,7 +113,7 @@ export interface Preferences {
   autoPm?: boolean
   /**
    * The browser bridge (#1237): let an extension running in the user's own Claude session report
-   * the question a Claude web run is parked on, so it shows in the dashboard rather than only on
+   * the question a Claude web agent is parked on, so it shows in the dashboard rather than only on
    * claude.ai. **Absent = off.** It opens the daemon's one route reachable from another origin,
    * so it is opt-in rather than a baseline, and turning it on is what mints the bridge token.
    */
@@ -134,7 +134,7 @@ export interface Preferences {
    *
    * Only the draining routine fans out: it takes work *off* the queue, one pinned entry per agent,
    * so several at once do disjoint work. The rotation invents work and each of its jobs rewrites
-   * the queue file, so it stays one run per tick whatever this says.
+   * the queue file, so it stays one agent per tick whatever this says.
    */
   autoPmConcurrency?: number
   /**
@@ -364,7 +364,7 @@ function legacyHandoffPreference(input: Record<string, unknown>): HandoffLevel |
   const push = pushed ?? true
   return handoffFromStages({ push, pr: push && (opened ?? true), merge: merged ?? false })
 }
-/** The run targets the dashboard offers (#1050/#610); anything else means the default `local`. */
+/** The agent targets the dashboard offers (#1050/#610); anything else means the default `local`. */
 function sanitizePreferences(value: unknown): Preferences {
   if (typeof value !== 'object' || value === null) return {}
   const input = value as Record<string, unknown>
@@ -379,7 +379,7 @@ function sanitizePreferences(value: unknown): Preferences {
   // handed to the CLI as `--model Default` and fail the turn on a word nobody chose.
   const model = typeof input['model'] === 'string' ? input['model'].trim() : ''
   if (model && model.toLowerCase() !== 'default') preferences.model = model
-  // `agent` (#650) is constrained to the known set so junk never reaches the run; the set is
+  // `agent` (#650) is constrained to the known set so junk never reaches the agent; the set is
   // the shared node-free vocabulary (agent-names.ts). Default = claude.
   if (isDriverName(input['driver'] as string | undefined)) preferences.driver = input['driver'] as string
   // `editor` (#727) is a free-form CLI name, trimmed and length-capped so junk / a huge string

@@ -3,10 +3,10 @@ import { pickedIds, type ChoicePick, type ChoiceRequest, type FrameworkEvent } f
 import type { DriverSession, DriverTurn } from './driver/index.js'
 import type { ChatMessage, AgentMessages } from './agent-messages.js'
 
-// The shared await/choice/chat machinery (#304/#337/#339/#714), lifted out of the run
+// The shared await/choice/chat machinery (#304/#337/#339/#714), lifted out of the agent
 // lifecycle so the build path (run.ts), the direct prompt path (prompt-run.ts), and the
 // backlog loop (todo-loop.ts) can all reach it without importing the orchestrator — which is
-// what removed the run <-> todo-loop cycle. run.ts composes these primitives into a lifecycle;
+// what removed the agent <-> todo-loop cycle. run.ts composes these primitives into a lifecycle;
 // it does not own them.
 
 /** What a resolved gate yields. */
@@ -87,19 +87,19 @@ export interface AwaitRoundsOptions {
   signal?: AbortSignal | undefined
   /**
    * Live chat (#714): once the agent stops asking, take the user's own messages,
-   * each resuming the same session. Unset for a headless run, which then
+   * each resuming the same session. Unset for a headless agent, which then
    * ends when the agent stops asking — byte-identical to before this existed.
    */
   messages?: AgentMessages | undefined
   /**
    * Keep the chat parked for the next message instead of ending on an idle queue (#1390).
-   * Only for a run whose own terminal dashboard is the single surface — everything else
+   * Only for an agent whose own terminal dashboard is the single surface — everything else
    * ends itself and is reopened via `--resume`. Default off.
    */
   stayOpenChat?: boolean | undefined
   /**
    * Resume a prior session on the OPENING prompt (#720): when the driver session was
-   * seeded with a finished run's id, this makes the first message `--resume` that
+   * seeded with a finished agent's id, this makes the first message `--resume` that
    * conversation (full prior context) instead of starting fresh. Default off.
    */
   resume?: boolean | undefined
@@ -134,7 +134,7 @@ export async function drainGates<T extends { text: string }>(
     const { answer, stop } = await resolveAwaitGate(gate, round, deps)
     // A stopping answer is the one answer the agent is never given (#358): it is told nothing and
     // the turn it asked from is the last one. Not exhausted — the round cap had nothing to do
-    // with it, and reporting both would make a deliberate stop read as a run that ran out.
+    // with it, and reporting both would make a deliberate stop read as an agent that ran out.
     if (stop) {
       deps.emit({ kind: 'log', message: stopMessage(answer) })
       return { turn, exhausted: false, stopped: true }
@@ -162,12 +162,12 @@ function promptContinuation(session: DriverSession, deps: AwaitTurnDeps): (quest
  * message that already arrived is processed, and once the queue is idle the session ends
  * itself rather than parking on the user — merge fires at that natural end (armed + gated),
  * and a follow-up reopens the conversation via `--resume` (#762), like Claude Code web.
- * `stayOpen` keeps the old park-for-the-next-message lifecycle, for a run whose own terminal
+ * `stayOpen` keeps the old park-for-the-next-message lifecycle, for an agent whose own terminal
  * dashboard is the only surface — it has no daemon to resume through, so ending would leave
- * its composer a dead end; that run still ends on Stop / budget cap (next -> undefined).
+ * its composer a dead end; that agent still ends on Stop / budget cap (next -> undefined).
  *
  * Reports the settled `exhausted` of the *last* chat turn (#742): entering chat means the
- * opening prompt's await-round cap is no longer the run's end reason, and a phase that ends
+ * opening prompt's await-round cap is no longer the agent's end reason, and a phase that ends
  * on Stop / close is not exhausted at all.
  */
 export async function runChatPhase(session: DriverSession, messages: AgentMessages, seed: DriverTurn, deps: AwaitTurnDeps, stayOpen = false): Promise<{ turn: DriverTurn; exhausted: boolean; stopped: boolean }> {
@@ -183,7 +183,7 @@ export async function runChatPhase(session: DriverSession, messages: AgentMessag
       message = await messages.next(deps.signal)
     } else {
       // Nothing needs a human (#1390): no park, no `settled` limbo — an idle queue is the
-      // session's natural end, and the run's `end` event follows right behind it.
+      // session's natural end, and the agent's `end` event follows right behind it.
       message = deps.signal?.aborted ? undefined : messages.takeQueued()
     }
     if (message === undefined) return { turn, exhausted, stopped: false } // idle queue / Stop / budget cap: end the conversation.
@@ -204,7 +204,7 @@ export async function runChatPhase(session: DriverSession, messages: AgentMessag
 /**
  * Prompt the agent and honor its await gates (#337) until it stops asking: resolve each gate to
  * the user's answer, re-prompt with it, and repeat up to {@link MAX_AWAIT_ROUNDS}. When a live-chat
- * {@link AwaitRoundsOptions.messages} source is wired, the run then stays open for the user's own
+ * {@link AwaitRoundsOptions.messages} source is wired, the agent then stays open for the user's own
  * messages (#714) rather than finishing.
  *
  * Every turn here is a turn like any other, so each one's signals are emitted. That is the
@@ -221,8 +221,8 @@ export async function runAwaitRounds(opts: AwaitRoundsOptions): Promise<AwaitRou
   }
   const signalOpt = opts.signal ? { signal: opts.signal } : {}
 
-  // Resuming a finished run (#720): the opening message continues the seeded session, so the
-  // agent replies with full prior context. A fresh run leaves `resume` unset — unchanged.
+  // Resuming a finished agent (#720): the opening message continues the seeded session, so the
+  // agent replies with full prior context. A fresh agent leaves `resume` unset — unchanged.
   const opening = await session.prompt(opts.prompt, { ...signalOpt, ...(opts.resume ? { resume: true } : {}) })
   emitTurnSignals(opening.text)
   const drained = await drainGates(opening, deps, promptContinuation(session, deps))
@@ -232,8 +232,8 @@ export async function runAwaitRounds(opts: AwaitRoundsOptions): Promise<AwaitRou
   if (drained.stopped) return { text: drained.turn.text, exhausted: false, stopped: true }
 
   // Live chat (#714): take the user's messages — draining what queued and ending on idle, or
-  // parked until Stop for a terminal-dashboard run (#1390). Headless leaves it unset,
-  // so the run ends here exactly as before. Once chat runs, its settled state is the run's end
+  // parked until Stop for a terminal-dashboard agent (#1390). Headless leaves it unset,
+  // so the agent ends here exactly as before. Once chat runs, its settled state is the agent's end
   // reason, not the opening drain's (#742) — otherwise a chat closed by Stop would still be
   // reported "exhausted" and log a spurious await-limit notice.
   if (messages) {
@@ -248,7 +248,7 @@ const PROCEED: ChoicePick = { picked: 'proceed', by: 'auto' }
 
 /**
  * Resolve with the human's pick, or fall back to `fallback` if the pick rejects or
- * the run aborts first (user stop / budget cap #322) — so a gate parked for input
+ * the agent aborts first (user stop / budget cap #322) — so a gate parked for input
  * never hangs. Never rejects. Cleans up its abort listener either way. The fallback
  * is the single-select `proceed` by default; a multi-select passes its default set.
  */
@@ -292,11 +292,11 @@ export interface ChoicesDeps {
   recommended?: string
   /** The markdown file under approval; the dashboard's doc sidebar renders it. */
   file?: string
-  /** The interactive handler (the CLI wires it to the dashboard); omit for a headless run. */
+  /** The interactive handler (the CLI wires it to the dashboard); omit for a headless agent. */
   requestChoice?: (req: ChoiceRequest) => Promise<ChoicePick>
-  /** Emit the `choice` / `choice-resolved` events onto the run stream. */
+  /** Emit the `choice` / `choice-resolved` events onto the agent stream. */
   emit: (event: FrameworkEvent) => void
-  /** The run signal; a gate parked for a pick unblocks (to the recommended option) if the run aborts. */
+  /** The agent signal; a gate parked for a pick unblocks (to the recommended option) if the agent aborts. */
   signal?: AbortSignal
 }
 
@@ -305,8 +305,8 @@ export interface ChoicesDeps {
  * pre-selected, pause, and resolve to the *one* option id the user picked. The twin
  * of {@link requestMultiSelect} for "pick one" — the agent-facing `showChoices()`
  * from the built-in system (#326) prompt and the [Research] preset (#331) both build on it.
- * A headless run (no `requestChoice`), or one aborted mid-await, falls back to the
- * recommended option without hanging, so a programmatic run stays deterministic.
+ * A headless agent (no `requestChoice`), or one aborted mid-await, falls back to the
+ * recommended option without hanging, so a programmatic agent stays deterministic.
  */
 export async function requestChoices(deps: ChoicesDeps): Promise<string> {
   const { options, requestChoice, emit } = deps
@@ -352,11 +352,11 @@ export interface MultiSelectDeps {
   title: string
   /** The options to choose from (checkboxes). */
   options: readonly MultiSelectOption[]
-  /** The interactive handler (the CLI wires it to the dashboard); omit for a headless run. */
+  /** The interactive handler (the CLI wires it to the dashboard); omit for a headless agent. */
   requestChoice?: (req: ChoiceRequest) => Promise<ChoicePick>
-  /** Emit the `choice` / `choice-resolved` events onto the run stream. */
+  /** Emit the `choice` / `choice-resolved` events onto the agent stream. */
   emit: (event: FrameworkEvent) => void
-  /** The run signal; a gate parked for a pick unblocks (to the defaults) if the run aborts. */
+  /** The agent signal; a gate parked for a pick unblocks (to the defaults) if the agent aborts. */
   signal?: AbortSignal
 }
 
@@ -364,7 +364,7 @@ export interface MultiSelectDeps {
  * The multi-select gate (#332): show a checklist with the default-checked options
  * pre-selected, pause, and resolve to the *subset* of option ids the user kept
  * checked. Built on the same `choice` gate + POST-back resolver as the single-select
- * plan-approval gate (#304), just in checklist mode. A headless run (no
+ * plan-approval gate (#304), just in checklist mode. A headless agent (no
  * `requestChoice`) auto-accepts the default set without pausing, so a programmatic
  * run stays deterministic. This is the primitive the [Research] preset (#331) uses
  * to let the user pick which problems to deep-dive.

@@ -23,17 +23,17 @@ export type StartAgentHandler = (
 /** Wired by the daemon so `sendAddProject` can install + register a repo (#433). */
 export type AddProjectHandler = (path: string, directory: boolean) => AddProjectResult | Promise<AddProjectResult>
 
-/** Resolve a run to its live event stream: the relay feeds `onEvents` from its own in-memory stream
- * rather than a file on disk (#426), and the daemon feeds a run it is relaying from a device (#1067).
+/** Resolve an agent to its live event stream: the relay feeds `onEvents` from its own in-memory stream
+ * rather than a file on disk (#426), and the daemon feeds an agent it is relaying from a device (#1067).
  * Returns undefined when there is no in-memory stream, so `onEvents` falls back to tailing the log. */
 export type EventsSource = (projectId: string, agentId?: string) => AsyncIterable<FrameworkEvent> | undefined
 
-/** Look up the device a relayed run (#1067) executes on, or undefined for an ordinary local run. The
- *  daemon wires this from its live relayed-run map; a run-scoped RPC uses it to forward a remote run's
+/** Look up the device a relayed agent (#1067) executes on, or undefined for an ordinary local agent. The
+ *  daemon wires this from its live relayed-agent map; a run-scoped RPC uses it to forward a remote agent's
  *  read/steer/handoff to that device instead of resolving a (nonexistent) local checkout. */
 export interface RemoteAgents {
   target(agentId: string | undefined): { url: string; token: string } | undefined
-  /** A project's relayed run stubs (#1077), so `onAgents` can show a remote run in the list and re-open it after a reload. */
+  /** A project's relayed run stubs (#1077), so `onAgents` can show a remote agent in the list and re-open it after a reload. */
   list(projectId: string): AgentMeta[]
 }
 
@@ -48,9 +48,9 @@ export interface RemoteAgents {
 export interface DashboardContext {
   startAgent: StartAgentHandler
   addProject: AddProjectHandler
-  /** The in-memory event stream for a run relayed from a connected device (#1067), else undefined. */
+  /** The in-memory event stream for an agent relayed from a connected device (#1067), else undefined. */
   eventsSource: EventsSource
-  /** The relayed-run lookup (#1067 slice 2), so a run-scoped RPC can tell a local run from one
+  /** The relayed-agent lookup (#1067 slice 2), so a run-scoped RPC can tell a local agent from one
    *  running on a connected device and forward the call there. */
   remote: RemoteAgents
   /** The user-preferences store (#410), over the registry file. */
@@ -72,7 +72,7 @@ export interface DashboardContext {
  * CSRF guard for the state-changing RPCs. A browser attaches an `Origin`
  * header to every cross-site request, so we reject any POST whose Origin is not this
  * same server (or a loopback host) — otherwise a page on `evil.com` could `fetch()` the
- * localhost dashboard and spawn/steer a run. An absent Origin means a non-browser caller
+ * localhost dashboard and spawn/steer an agent. An absent Origin means a non-browser caller
  * (curl, the test suite) with no ambient session to abuse, so it passes. Lives here beside
  * the mount, its only caller.
  */
@@ -137,7 +137,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
 }
 
 /**
- * Stream a run's events as Server-Sent Events (#405). One JSON value per `data:` line; the
+ * Stream an agent's events as Server-Sent Events (#405). One JSON value per `data:` line; the
  * response ending IS the clean close the client distinguishes from a dropped connection.
  *
  * This was a Telefunc Channel. The Channel gave serialization, reconnect and typing over a

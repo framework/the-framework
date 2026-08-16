@@ -4,7 +4,7 @@ import { worktreePath } from './store/index.js'
 
 // Reclaim a session's checkout once its work is on the remote (#1036/E5).
 //
-// A worktree used to be kept or reclaimed by what state its run ended in: a clean finish removed
+// A worktree used to be kept or reclaimed by what state its agent ended in: a clean finish removed
 // it, a failure or stop kept it "so you can look at what it was holding" (#752), and a merged
 // branch reclaimed it later — through two different "landed" signals, because a squash merge
 // rewrites the commits and the local ancestor check never fires. Nothing removed the rest on a
@@ -21,7 +21,7 @@ import { worktreePath } from './store/index.js'
 
 /** One worktree this sweep removed. */
 export interface RemovedWorktree {
-  /** The run id, which is also the worktree's directory name. */
+  /** The agent id, which is also the worktree's directory name. */
   agentId: string
 }
 
@@ -54,10 +54,10 @@ export interface MergedSweepDeps {
  * The decision is entirely {@link removeProjectWorktree}'s — commit what is pending, push the
  * branch, remove only once the remote has it — so the automatic path and the manual one (the
  * dashboard's Remove button) are one behaviour rather than two that can disagree. This adds the
- * loop, the one thing it must never touch (a live run's checkout, where its agent is working), and
- * the run lock.
+ * loop, the one thing it must never touch (a live agent's checkout, where its agent is working), and
+ * the agent lock.
  *
- * The lock is load-bearing: a run's meta flips to `done` a beat before its teardown finishes
+ * The lock is load-bearing: an agent's meta flips to `done` a beat before its teardown finishes
  * archiving, so a sweep landing in that window would remove the checkout out from under the
  * archive — which then recreates the directory it was reading from, and the removal silently
  * un-happens. Every other actor on a checkout already takes this lock.
@@ -91,10 +91,10 @@ export interface MergedSweepOptions {
   projects: () => Promise<readonly { path: string }[]>
   log: (message: string) => void
   /**
-   * The runs the daemon is still responsible for — spawning, running, or mid-retirement — whose
+   * The agents the daemon is still responsible for — spawning, running, or mid-retirement — whose
    * checkouts this must not touch.
    *
-   * "Not live" on disk is not "the daemon is finished with it": a run's meta flips to `done` a
+   * "Not live" on disk is not "the daemon is finished with it": an agent's meta flips to `done` a
    * beat before its teardown archives the history and reclaims the checkout, and a sweep landing
    * in that window races the teardown for the same directory. Absent means nothing is busy, which
    * is right for a caller that spawns no runs.

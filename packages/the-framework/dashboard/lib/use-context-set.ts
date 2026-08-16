@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-// The run Context set (#492/#504): the file/repo paths the user picked to focus the agent,
+// The agent Context set (#492/#504): the file/repo paths the user picked to focus the agent,
 // with immutable add/toggle so React sees a fresh Set on each change. Owned by the shell so
 // the Start form's `#`/whole-repo picker and the right-rail file tree share one source of
 // truth; `reset()` clears it when the selected project changes (its paths were that project's).

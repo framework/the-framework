@@ -3,18 +3,18 @@ import { createDriver, type CreateDriverOptions } from './driver-cli.js'
 import { ActionsDriver, CloudDriver, type ActionsDriverOptions, type CloudDriverOptions, type Driver } from './driver/index.js'
 
 /**
- * Build the {@link Driver} for a run's *target* (#1050): where the turn runs, on top of the agent
+ * Build the {@link Driver} for an agent's *target* (#1050): where the turn runs, on top of the agent
  * axis {@link createDriver} owns. `actions` returns an {@link ActionsDriver} (#934) built from the
  * resolved owner/repo/token; `web` returns a {@link CloudDriver} (#610), which hands the task to a
  * Claude Code cloud session; anything else falls through to the local agent driver — byte-identical
  * to today.
  *
  * Kept off {@link createDriver} on purpose: ActionsDriver's owner/repo/token do not fit
- * {@link CreateDriverOptions}, and folding them in would push GitHub config onto every local run.
+ * {@link CreateDriverOptions}, and folding them in would push GitHub config onto every local agent.
  */
 export interface CreateAgentDriverOptions extends CreateDriverOptions {
   /**
-   * Where the run executes: `local` (this device, the default), `actions` (a GitHub Actions
+   * Where the agent executes: `local` (this device, the default), `actions` (a GitHub Actions
    * runner, #1050) or `web` (a Claude Code cloud session, #610).
    */
   target?: AgentLocation
@@ -24,7 +24,7 @@ export interface CreateAgentDriverOptions extends CreateDriverOptions {
   cloudConfig?: CloudDriverOptions
 }
 
-/** The one place a run path turns `--run-on` into a real driver. */
+/** The one place an agent path turns `--run-on` into a real driver. */
 export function createAgentDriver(opts: CreateAgentDriverOptions): Driver {
   if (opts.target === 'actions') {
     if (!opts.actionsConfig) {

@@ -19,7 +19,7 @@ export function faviconHref(working: boolean): string {
  * Point the tab icon at {@link faviconHref} (client-only).
  *
  * `enabled` is false where the caller is not the one that knows: the shell hands the tab over to
- * the relay view, which reads a single run's feed rather than the project registry.
+ * the relay view, which reads a single agent's feed rather than the project registry.
  */
 export function useFavicon(working: boolean, enabled = true): void {
   useEffect(() => {

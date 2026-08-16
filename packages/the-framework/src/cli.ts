@@ -20,7 +20,7 @@ import { agentAutoHandoff, withheldMerge } from './dashboard/agent-handoff.js'
 import {
   runAgent,
   type RunAgentOptions,
-  type SessionKind,
+  type AgentKind,
 } from './agent.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
@@ -66,8 +66,8 @@ import { presets } from './preset-catalog.js'
 import { errorMessage } from './error-message.js'
 
 /**
- * The default link shown for a live run: the generic Claude Code entry point,
- * surfaced as "Open Claude Code" (not a per-run live session). We drive Claude
+ * The default link shown for a live agent: the generic Claude Code entry point,
+ * surfaced as "Open Claude Code" (not a per-agent live session). We drive Claude
  * Code headless, which is not Remote-Controlled, so there is no per-session deep
  * link to construct (#214). Set `sessionLink: "...{sessionId}..."` on the spec if you
  * wire up a real one.
@@ -75,16 +75,16 @@ import { errorMessage } from './error-message.js'
 export const CLAUDE_CODE_SESSION_LIST = CLAUDE_CODE_SESSION_LINK
 
 /**
- * The session link to show for a run: the spec's `sessionLink` if given, else
- * the generic Claude Code entry point for a live run (nothing for a fake one, which
- * has no real session). Pure, so the default is unit-testable without a live run.
+ * The session link to show for an agent: the spec's `sessionLink` if given, else
+ * the generic Claude Code entry point for a live agent (nothing for a fake one, which
+ * has no real session). Pure, so the default is unit-testable without a live agent.
  *
  * The default is Claude Code's *own* entry point, so it is only honest on a
  * Claude run: pointing a Codex session at claude.ai/code offers the user a link
  * to somewhere their run isn't. Codex keeps its sessions locally with nothing
  * equivalent to open, so another agent gets no default link at all (#542).
  */
-export function chooseSessionLink(opts: Pick<SessionOptions, 'sessionLink' | 'driver'>, fake: boolean): string | undefined {
+export function chooseSessionLink(opts: Pick<AgentOptions, 'sessionLink' | 'driver'>, fake: boolean): string | undefined {
   if (opts.sessionLink) return opts.sessionLink
   return fake || opts.driver !== 'claude' ? undefined : CLAUDE_CODE_SESSION_LIST
 }
@@ -146,42 +146,42 @@ the outcome, then re-prompts. The dashboard foregrounds the loop status beside t
 session.`
 
 /**
- * One session's resolved configuration, as the run reads it (D4).
+ * One agent's resolved configuration, as it reads it itself (D4).
  *
  * These used to be command-line flags, which made every one of them a human surface as well as
  * the dashboard's process API. They arrive as a {@link AgentSpec} now — one JSON blob on a temp
  * file — so what is left here is a plain options object with no argv semantics: no tri-state
  * `--no-*` spellings, no mutual validation, no help text.
  */
-export interface SessionOptions {
+export interface AgentOptions {
   /** The `FakeDriver` (`FRAMEWORK_FAKE=1`): an offline stand-in for the agent, for tests and e2e. */
   fake: boolean
   /** What the session was asked to do. */
   intent: string
   /** Which coding-agent CLI does the work (#542). Default `claude`. */
   driver: DriverName
-  /** `--run-on <local|actions|web>` (#1050/#610): where the run executes. `actions` drives it on a
+  /** `--run-on <local|actions|web>` (#1050/#610): where the agent executes. `actions` drives it on a
    * GitHub Actions runner via ActionsDriver (#934); `web` hands it to a Claude Code cloud session
    * via CloudDriver (#610); absent / `local` runs on this device as before. */
   target?: AgentLocation | undefined
   cwd?: string | undefined
   /**
-   * `--run-id <id>` (#736): the id the daemon allocated for this run before spawning it. Its
-   * presence says the framework owns this run's checkout — `--cwd` is a worktree the daemon
-   * created on a `the-framework/agent-<id>` branch, which the run renames once the agent names
+   * `--run-id <id>` (#736): the id the daemon allocated for this agent before spawning it. Its
+   * presence says the framework owns this agent's checkout — `--cwd` is a worktree the daemon
+   * created on a `the-framework/agent-<id>` branch, which the agent renames once the agent names
    * the session. Absent for a plain `framework "..."`, which runs in the user's own checkout.
    */
   agentId?: string | undefined
   /**
-   * `--continue-run` (#762): this run continues the run `--run-id` names rather than starting a new
-   * one. The store reopens that run's log instead of truncating it, so messaging a stopped run
+   * `--continue-run` (#762): this agent continues the agent `--run-id` names rather than starting a new
+   * one. The store reopens that agent's log instead of truncating it, so messaging a stopped agent
    * stays one row in the history.
    */
   continueAgent?: boolean | undefined
   model?: string | undefined
-  /** `--resume-session <id>` (#720): continue a finished run's agent session — the prompt resumes that conversation (full prior context). Set by the dashboard when you message a run that has ended. */
+  /** `--resume-session <id>` (#720): continue a finished agent's agent session — the prompt resumes that conversation (full prior context). Set by the dashboard when you message an agent that has ended. */
   resumeSession?: string | undefined
-  /** `--ticket <path>` (#1117): the `tickets/<file>.md` this run is implementing. Set by the daemon when it starts a drain run, from the ticket its queue entry links to; recorded on the run's meta. */
+  /** `--ticket <path>` (#1117): the `tickets/<file>.md` this agent is implementing. Set by the daemon when it starts a drain agent, from the ticket its queue entry links to; recorded on the agent's meta. */
   ticket?: string | undefined
   /** `--plan-run` (#1327): the `--ticket` is being planned, not implemented, so the PR title must not inherit its issue as `(fix #42)` (#1334) — the plan's merge would close the issue with the work still undone. */
   planAgent?: boolean
@@ -190,19 +190,19 @@ export interface SessionOptions {
   scope: 'prototype' | 'full'
   preset?: string | undefined
   /**
-   * The mode toggles are tri-state (#841): `undefined` is "this run said nothing", so the repo's
+   * The mode toggles are tri-state (#841): `undefined` is "this agent said nothing", so the repo's
    * the-framework.yml decides, while an explicit `--no-*` turns the mode off over the file.
    */
   /** Remove the built-in #326 system prompt entirely, keeping the session controls (#314). */
   vanilla?: boolean | undefined
   /** `--transparent` (#625): run the wrapped agent fully raw — no framework system prompt, emit
-   * protocols, consumption guard, dashboard, or TODO loop, so a run is identical to `claude -p`. */
+   * protocols, consumption guard, dashboard, or TODO loop, so an agent is identical to `claude -p`. */
   transparent?: boolean | undefined
   /** `--context <dir>` (repeatable): in-context directories added as one `Context:` line (#439). */
   context: string[]
-  /** `--on-before-mergeable`: fire the built-in on-before-mergeable (#326) prompt when the run signals setReadyForMerge(), queueing the quality follow-ups as TODO entries. */
+  /** `--on-before-mergeable`: fire the built-in on-before-mergeable (#326) prompt when the agent signals setReadyForMerge(), queueing the quality follow-ups as TODO entries. */
   onBeforeMergeable: boolean
-  /** `--browser`: give the agent a real browser via chrome-devtools-mcp (navigate, console, network, DOM, screenshot) during the run (#452). */
+  /** `--browser`: give the agent a real browser via chrome-devtools-mcp (navigate, console, network, DOM, screenshot) during the agent (#452). */
   browser: boolean
   /**
    * How far this session publishes itself when it finishes (#1102/#1216/B5). `undefined` is "this
@@ -289,7 +289,7 @@ export function parseArgs(argv: string[]): CliArgs {
   return opts
 }
 
-/** The session defaults nothing sets any more, shared by {@link sessionOptions} and the tests. */
+/** The session defaults nothing sets any more, shared by {@link agentOptions} and the tests. */
 const SESSION_DEFAULTS = {
   driver: 'claude',
   scope: 'full',
@@ -308,7 +308,7 @@ const SESSION_DEFAULTS = {
  * resolving to on (#1102/#841). JSON distinguishes "absent" from `false` without needing a
  * `--no-*` spelling for each, which is the whole reason this stopped being an argv.
  */
-export function sessionOptions(spec: AgentSpec, env: NodeJS.ProcessEnv = process.env): SessionOptions {
+export function agentOptions(spec: AgentSpec, env: NodeJS.ProcessEnv = process.env): AgentOptions {
   const o = spec.options
   const defined = <T>(value: T | undefined): value is T => value !== undefined
   return {
@@ -326,7 +326,7 @@ export function sessionOptions(spec: AgentSpec, env: NodeJS.ProcessEnv = process
     ...(o.model?.trim() ? { model: o.model.trim() } : {}),
     ...(o.resumeSession?.trim() ? { resumeSession: o.resumeSession.trim() } : {}),
     // The ticket comes off a queue file an agent writes, so it is re-checked here rather than
-    // trusted: a path that is not a ticket never reaches the run (#1117).
+    // trusted: a path that is not a ticket never reaches the agent (#1117).
     ...(o.ticket && isTicketPath(o.ticket) ? { ticket: o.ticket } : {}),
     ...(o.planAgent ? { planAgent: true } : {}),
     ...(o.unattended ? { unattended: true } : {}),
@@ -360,7 +360,7 @@ export function claudeDriverOptions(): ClaudeCodeDriverOptions {
  * A setting that silently does nothing is worse than one that errors. So the session says which
  * settings are not in force, rather than letting them imply they are.
  */
-export function unguardedNotices(opts: Pick<SessionOptions, 'driver' | 'browser'>): string[] {
+export function unguardedNotices(opts: Pick<AgentOptions, 'driver' | 'browser'>): string[] {
   const spec = DRIVER_SPECS[opts.driver]
   const notices: string[] = []
   if (opts.driver !== 'claude' && opts.browser) {
@@ -369,14 +369,14 @@ export function unguardedNotices(opts: Pick<SessionOptions, 'driver' | 'browser'
   return notices
 }
 
-/** Which flow a run starts under (#1467), recorded on its meta: the direct paths are prompts, a
- * build run is a build. Transparent (#625) routes a build-kind run through the raw prompt path too,
+/** Which flow an agent starts under (#1467), recorded on its meta: the direct paths are prompts, a
+ * build agent is a build. Transparent (#625) routes a build-kind agent through the raw prompt path too,
  * so it records as a prompt. */
-export function agentLogKind(opts: Pick<SessionOptions, 'directPrompt' | 'research'>, transparent = false): SessionKind {
+export function agentLogKind(opts: Pick<AgentOptions, 'directPrompt' | 'research'>, transparent = false): AgentKind {
   return opts.directPrompt || opts.research || transparent ? 'prompt' : 'build'
 }
 
-/** This run's own flags as the nearest config layer (#841). A flag left off says nothing. */
+/** This agent's own flags as the nearest config layer (#841). A flag left off says nothing. */
 function flagConfigLayer(opts: AgentConfigFlags): ConfigLayer {
   return {
     name: 'flag',
@@ -390,10 +390,10 @@ function flagConfigLayer(opts: AgentConfigFlags): ConfigLayer {
   }
 }
 
-type AgentConfigFlags = Pick<SessionOptions, 'preset' | 'buildEvent' | 'vanilla' | 'transparent' | 'handoff'>
+type AgentConfigFlags = Pick<AgentOptions, 'preset' | 'buildEvent' | 'vanilla' | 'transparent' | 'handoff'>
 
 /**
- * Resolve a run's config over its layers, nearest wins (#841): the run's flags, then the repo's
+ * Resolve an agent's config over its layers, nearest wins (#841): the agent's flags, then the repo's
  * `the-framework.yml`. #800 slots the project-user and global tiers in between and at the end.
  */
 export function mergeAgentConfig(opts: AgentConfigFlags, file: FrameworkFileConfig): ResolvedAgentConfig {
@@ -405,15 +405,15 @@ interface AgentEpilogue {
   io: CliIO
   store: AgentStore | undefined
   control: ControlWatcher | undefined
-  /** The run's Chrome (#793), stopped with the run so no headless browser outlives it. */
+  /** The agent's Chrome (#793), stopped with the agent so no headless browser outlives it. */
   sharedBrowser: SharedBrowser | undefined
-  /** The preview of that browser (#802), stopped with the run. */
+  /** The preview of that browser (#802), stopped with the agent. */
   browserStream: BrowserStream | undefined
   clearInterrupt: () => void
   maybeFireOnBeforeMergeable: () => Promise<void>
   /** Hand the session's work back (#1102): push its branch and open a draft PR, if still armed. */
   maybeAutoHandoff: () => Promise<void>
-  /** True once the run stopped cleanly (interrupt / budget cap) rather than failed. */
+  /** True once the agent stopped cleanly (interrupt / budget cap) rather than failed. */
   isStopped: () => boolean
   /** How a real failure is labelled: "run", "research", or "prompt run". */
   failLabel: string
@@ -423,7 +423,7 @@ interface AgentEpilogue {
  * Run one engine (a build or a direct prompt) and settle it identically: on success print its
  * line; on a clean stop (interrupt / budget cap #322) report it; on a real failure report it. The
  * teardown — flush the store, close the control channel + consumption guard — runs either way.
- * Returns the exit code (0 on success or a clean stop, 1 on a failure). Shared by both run paths
+ * Returns the exit code (0 on success or a clean stop, 1 on a failure). Shared by both agent paths
  * so their epilogues cannot drift.
  */
 async function settleAgent(ctx: AgentEpilogue, run: () => Promise<{ successLine: string }>): Promise<number> {
@@ -461,12 +461,12 @@ async function settleAgent(ctx: AgentEpilogue, run: () => Promise<{ successLine:
 }
 
 /**
- * Resolve the system-prompt configuration both run paths share (#301/#314), echoing what
+ * Resolve the system-prompt configuration both agent paths share (#301/#314), echoing what
  * is in effect: a user SYSTEM.md, the built-in prompt toggle, and the in-context dirs. Reads
  * SYSTEM.md once, so call it on the shared path before the session starts.
  */
 async function resolvePromptConfig(
-  opts: SessionOptions,
+  opts: AgentOptions,
   config: ResolvedAgentConfig,
   cwd: string,
   io: CliIO,
@@ -487,10 +487,10 @@ async function resolvePromptConfig(
 /**
  * The `framework` command. Wires the parsed options into {@link runFramework}
  * over a live dashboard + terminal narration, and resolves with an exit code.
- * Returns 0 on success, 1 on a run error, 2 on a usage error.
+ * Returns 0 on success, 1 on an agent error, 2 on a usage error.
  */
 /**
- * Whether this run can be steered over `.the-framework/control.jsonl` (#344): Stop, a choice pick,
+ * Whether this agent can be steered over `.the-framework/control.jsonl` (#344): Stop, a choice pick,
  * a live message. True when its own dashboard is up (#427), or when whoever spawned it handed it a
  * run id — the dashboard spawns each session with one in its spec, and steers it
  * from its own process.
@@ -499,7 +499,7 @@ async function resolvePromptConfig(
  * global state file. That file is gone with the background daemon (D4b), and it was never a fact
  * about *this* run in the first place: it went missing while the daemon was very much alive
  * (#922), and every Stop press then landed in control.jsonl and was read by nobody, in silence
- * (#905). A run id holds when a file about another process does not.
+ * (#905). An agent id holds when a file about another process does not.
  */
 export function isSteerable(opts: { persist: boolean; agentId?: string | undefined }): boolean {
   return opts.persist && opts.agentId !== undefined
@@ -509,12 +509,12 @@ export function isSteerable(opts: { persist: boolean; agentId?: string | undefin
  * Whether this session should stay open for the user's own messages once it settles (#714).
  *
  * The other half of #905. Being steerable only means someone *could* reach it; staying open means
- * a human is expected to keep talking to it. A headless run is neither, but it used to inherit the
+ * a human is expected to keep talking to it. A headless agent is neither, but it used to inherit the
  * chat queue purely because a daemon happened to be alive elsewhere on the machine, and then
  * parked forever on a message nothing could send. #714 said as much: "headless / CI runs end when
  * done, exactly as today."
  *
- * So: the dashboard started it (a run id) and therefore has a UI to carry on the conversation in.
+ * So: the dashboard started it (an agent id) and therefore has a UI to carry on the conversation in.
  * Stop and gate picks keep working either way.
  */
 export function isInteractive(opts: { agentId?: string | undefined }): boolean {
@@ -522,10 +522,10 @@ export function isInteractive(opts: { agentId?: string | undefined }): boolean {
 }
 
 /**
- * Route Ctrl+C / SIGTERM into aborting the run — not into default signal termination, which
+ * Route Ctrl+C / SIGTERM into aborting the agent — not into default signal termination, which
  * would kill the framework while its spawned Claude Code tree keeps running (the
  * orphaned-process leak). Aborting drives the driver to group-kill its child; a second
- * signal force-quits. Returns the disarm, called once the run settles.
+ * signal force-quits. Returns the disarm, called once the agent settles.
  */
 function armInterrupt(controller: AbortController, io: CliIO): () => void {
   let interrupts = 0
@@ -545,14 +545,14 @@ function armInterrupt(controller: AbortController, io: CliIO): () => void {
   }
 }
 
-/** What the run journal exposes to the epilogue. See {@link createAgentJournal}. */
+/** What the agent journal exposes to the epilogue. See {@link createAgentJournal}. */
 export interface AgentJournal {
   onEvent: (event: FrameworkEvent) => void
   /** The session name the agent chose via setSessionName() (#326), once it has. */
   sessionName: () => string | undefined
-  /** The agent signalled setReadyForMerge() this run (#326). */
+  /** The agent signalled setReadyForMerge() this agent (#326). */
   sawReadyForMerge: () => boolean
-  /** The run stopped cleanly (user interrupt / budget cap #322) rather than failed. */
+  /** The agent stopped cleanly (user interrupt / budget cap #322) rather than failed. */
   stoppedCleanly: () => boolean
   /** Hold the browser preview's port until the session opens (#829/#813). */
   announceBrowserPort: (port: number) => void
@@ -563,7 +563,7 @@ export interface AgentJournal {
 }
 
 /**
- * The run's event sink and the state its epilogue reads. One event arrives and this prints it,
+ * The agent's event sink and the state its epilogue reads. One event arrives and this prints it,
  * persists it, tracks the settle flags (#322/#326), renames the framework-owned branch once the
  * agent names its session (#736), and re-emits a held browser-stream port right after `session` so
  * it lands in the slice the dashboard renders (#829). These jobs sat inline in runCli across six
@@ -577,7 +577,7 @@ export function createAgentJournal(deps: {
   agentId: string | undefined
 }): AgentJournal {
   const { io, cwd, store } = deps
-  // The framework's own verdict that the run stopped cleanly rather than failed — set by a
+  // The framework's own verdict that the agent stopped cleanly rather than failed — set by a
   // user interrupt or a budget cap (#322). Trusted over which signal aborted, since a budget
   // stop trips an internal signal the CLI never sees.
   let stoppedCleanly = false
@@ -585,7 +585,7 @@ export function createAgentJournal(deps: {
   let sessionName: string | undefined
   // The browser preview's port, announced on the first `session` event rather than when the
   // bridge opens (#829): the dashboard renders only the tail from the last `session` event, so
-  // anything emitted ahead of it is dropped from the run's view.
+  // anything emitted ahead of it is dropped from the agent's view.
   let pendingBrowserPort: number | undefined
   // The page the browser preview is on (#1455 item 6b). Held the same way the port is until a
   // session opens; after that a navigation emits straight away. Re-emitted after EVERY `session`
@@ -667,7 +667,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
       io.err(`could not read the session spec (${errorMessage(err)}).`)
       return 2
     }
-    return driveSession(sessionOptions(spec), io)
+    return driveAgent(agentOptions(spec), io)
   }
   // Everything else is bare `framework`: serve the dashboard in the foreground until Ctrl-C.
   return runForegroundDaemonCmd(args, io)
@@ -679,7 +679,7 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
  * handed to {@link settleAgent}. Returns the process exit code. Split out of
  * {@link runCli} so the top reads as a dispatch table and this reads as one session's lifecycle.
  */
-async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
+async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   const fake = opts.fake
   const intent = opts.intent || (fake ? FAKE_INTENT : '')
   // A `prompt` session runs verbatim text, so it needs some. `research` is the one kind whose
@@ -705,12 +705,12 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   if (fromConfig) io.out(`◆ config: ${fromConfig}`)
 
   // Transparent mode (#625): the coarse master off-switch — `--transparent` or the-framework.yml.
-  // When on, this run is byte-identical to raw `claude -p`: no framework system channel (composed
+  // When on, this agent is byte-identical to raw `claude -p`: no framework system channel (composed
   // empty below), no dashboard, no TODO loop. Resolved once here so every
   // one of those sites reads the same answer.
   const transparent = config.transparent
 
-  // Only the direct-prompt path resumes a conversation (#782): a build run rebuilds the
+  // Only the direct-prompt path resumes a conversation (#782): a build agent rebuilds the
   // scope/build framing a resumed transcript already carries, so it takes no session id and
   // used to drop the flag on the floor. Silently losing the context you asked to continue
   // from is the worst outcome, so say so and stop rather than run a fresh session that looks
@@ -738,12 +738,12 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   }
 
   const claudeOpts = claudeDriverOptions()
-  // Computed once here, reused by extension discovery and the run.
-  // One controller for the whole run: the dashboard Stop button aborts it once
+  // Computed once here, reused by extension discovery and the agent.
+  // One controller for the whole agent: the dashboard Stop button aborts it once
   // wired below.
   const controller = new AbortController()
 
-  // Ctrl+C / SIGTERM during a live run aborts the run; disarmed once it settles so the
+  // Ctrl+C / SIGTERM during a live agent aborts the agent; disarmed once it settles so the
   // post-run dashboard wait keeps its own Ctrl+C handling.
   const clearInterrupt = armInterrupt(controller, io)
 
@@ -751,12 +751,12 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // runFramework checks the signal between phases and the driver kills its current
   // turn on it, so a stop takes effect promptly.
   //
-  // Interactive choices (#304): the run's requestChoice handler parks a resolver
+  // Interactive choices (#304): the agent's requestChoice handler parks a resolver
   // here keyed by the choice id; the dashboard's Accept / autopilot POSTs the pick
-  // to /choice, which resolves it. Aborting the run resolves any pending choice
-  // (proceed) so the gate never hangs a stopped run.
+  // to /choice, which resolves it. Aborting the agent resolves any pending choice
+  // (proceed) so the gate never hangs a stopped agent.
   const pendingChoices = new Map<string, (pick: ChoicePick) => void>()
-  // Live-chat messages the user sends to the running run (#714). The control watcher
+  // Live-chat messages the user sends to the running agent (#714). The control watcher
   // pushes each here; the run loop drains them between turns and waits here when idle.
   const messages = new AgentMessageQueue()
   controller.signal.addEventListener('abort', () => {
@@ -776,20 +776,20 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   let store: AgentStore | undefined
   if (opts.persist) {
     try {
-      // Seed the run's intent (its prompt) so the dashboard's Runs list labels it instead of
-      // showing "(no prompt)". A build run refines this via its scope event; a prompt/research
+      // Seed the agent's intent (its prompt) so the dashboard's Runs list labels it instead of
+      // showing "(no prompt)". A build agent refines this via its scope event; a prompt/research
       // run keeps it. Research with no "what" uses the same preset default the log title uses.
       store = await AgentStore.open(cwd, {
         fresh: true,
         intent: intent || (opts.research ? defaultWhat() : ''),
-        // Adopt the daemon's id (#736) so the run and the worktree it lives in share one.
+        // Adopt the daemon's id (#736) so the agent and the worktree it lives in share one.
         ...(opts.agentId ? { id: opts.agentId } : {}),
-        // Continuing (#762): keep the existing log rather than starting this run's history over.
+        // Continuing (#762): keep the existing log rather than starting this agent's history over.
         ...(opts.continueAgent ? { continueAgent: true } : {}),
-        // The flow this run starts under (#1467), so a later continuation can re-enter it. A
-        // continuation itself keeps the prior meta's record — this seed only lands on a fresh run.
+        // The flow this agent starts under (#1467), so a later continuation can re-enter it. A
+        // continuation itself keeps the prior meta's record — this seed only lands on a fresh agent.
         kind: agentLogKind(opts, transparent) === 'build' ? 'build' : 'prompt',
-        // Where the run executes (#1053): the run view reads it to switch to the Actions affordance.
+        // Where the agent executes (#1053): the agent view reads it to switch to the Actions affordance.
         ...(opts.target ? { target: opts.target } : {}),
       })
     } catch (err) {
@@ -797,21 +797,21 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     }
   }
 
-  // Continuing a build run (#1467): the composer's Resume always arrives as a `prompt` start,
-  // but the reopened meta remembers the flow the first leg ran. When it was a build run and the
+  // Continuing a build agent (#1467): the composer's Resume always arrives as a `prompt` start,
+  // but the reopened meta remembers the flow the first leg ran. When it was a build agent and the
   // conversation is resumable, re-enter the build flow (synthesize framing, backlog loop, the
   // build ending) with the message sent verbatim — not the bare prompt ending that used to
-  // downgrade a resumed build run. Runs from before the meta recorded a kind stay on the prompt
+  // downgrade a resumed build agent. Runs from before the meta recorded a kind stay on the prompt
   // path, exactly as they did.
   const continueBuild =
     opts.continueAgent === true && !!opts.resumeSession && !transparent && store?.snapshot().kind === 'build'
 
-  // Steer this run through .the-framework/control.jsonl (#344): a Stop button or choice
+  // Steer this agent through .the-framework/control.jsonl (#344): a Stop button or choice
   // pick appends an entry, we tail the file and abort / resolve the parked gate. Reset
-  // first so a previous run's picks can never fire into this one (gate ids repeat across
+  // first so a previous agent's picks can never fire into this one (gate ids repeat across
   // runs).
   //
-  // Wired when this run's own dashboard is up (#427), or when whoever spawned it passed --run-id
+  // Wired when this agent's own dashboard is up (#427), or when whoever spawned it passed --run-id
   // and therefore steers it (see {@link isSteerable}).
   // What this session hands back when it ends (#1102). Mutable: the action bar's checkboxes can
   // move it at any point up to the moment it settles, which is the whole point of them being
@@ -873,15 +873,15 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     }
   }
 
-  // Pause the choice gates when someone can answer: this run's own dashboard, or the
+  // Pause the choice gates when someone can answer: this agent's own dashboard, or the
   // workspace daemon's via the control channel (#344). With neither, the gates auto-accept
-  // the recommended option (#304). The run's requestChoice parks a resolver in pendingChoices
+  // the recommended option (#304). The agent's requestChoice parks a resolver in pendingChoices
   // keyed by the choice id; a dashboard/daemon pick (or an abort) resolves it.
-  // An unattended run (#846) is steerable but unwatched: keep the control channel for Stop and
+  // An unattended agent (#846) is steerable but unwatched: keep the control channel for Stop and
   // live messages, and leave requestChoice unset so each gate takes its recommended option. Auto
   // PM (#685) fires when nobody is there, and a parked gate would hang it until someone looked.
   //
-  // Each parked wait is held by the keepalive (#1359): a daemon-spawned run (--no-dashboard, all
+  // Each parked wait is held by the keepalive (#1359): a daemon-spawned agent (--no-dashboard, all
   // stdio detached, per-prompt driver children, unref'd control watcher) has nothing else ref'd
   // between turns, so Node ran out of scheduled work and exited 0 mid-await — the gate's picks
   // then landed in control.jsonl with nobody left to read them.
@@ -892,8 +892,8 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
           gateKeepalive.hold(new Promise(resolve => pendingChoices.set(req.id, resolve)))
       : undefined
 
-  // Whether to hand the run the live-chat queue (#714) once it settles. Steerable is not enough
-  // (#905): a terminal run with --no-dashboard could be reached by a daemon's dashboard, but
+  // Whether to hand the agent the live-chat queue (#714) once it settles. Steerable is not enough
+  // (#905): a terminal agent with --no-dashboard could be reached by a daemon's dashboard, but
   // nobody is waiting in it, and it used to park forever on a message that never came.
   // The parked message wait is the same empty-event-loop hazard as a parked gate (#1359), so it
   // is held the same way; a Stop closes the queue, which releases the hold.
@@ -913,16 +913,16 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
       : {}
 
   // The session link shown on the dashboard: the spec's `sessionLink`, else Claude Code's own entry for
-  // a live Claude run, else nothing (#212/#542). Same for both run paths.
+  // a live Claude agent, else nothing (#212/#542). Same for both agent paths.
   const sessionLink = chooseSessionLink(opts, fake)
 
-  // Everything the run reports that its epilogue needs — the settle flags, the deferred
+  // Everything the agent reports that its epilogue needs — the settle flags, the deferred
   // browser-port announcement — plus the fan-out of every event to the terminal and the store,
   // lives in the journal. runCli reads its getters below.
   const journal = createAgentJournal({ io, cwd, store, agentId: opts.agentId })
   const onEvent = journal.onEvent
 
-  // Put the armed state on the run's meta (#1102), and keep it there as the checkboxes change it.
+  // Put the armed state on the agent's meta (#1102), and keep it there as the checkboxes change it.
   // The control channel carries the instruction, but only an event reaches meta, and meta is the
   // only thing a dashboard tab opened mid-run can read the boxes back from.
   // The event still spells the three stages out (#1382): it is a snapshot a dashboard tab reads
@@ -930,17 +930,17 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // run that is set to merge. Derived from the rung, so the three can never contradict it.
   announceHandoff = () => onEvent({ kind: 'handoff-armed', ...handoffStages(armedHandoff) })
   announceHandoff()
-  // The ticket this run implements (#1117), if the daemon named one. Once, at start: it is a fact
-  // about why the run exists, not a state that changes, and folding it to meta is what lets the
+  // The ticket this agent implements (#1117), if the daemon named one. Once, at start: it is a fact
+  // about why the agent exists, not a state that changes, and folding it to meta is what lets the
   // Overview mark that ticket as being implemented right now.
   if (opts.ticket && isTicketPath(opts.ticket)) onEvent({ kind: 'ticket', path: opts.ticket })
-  // The branch this run actually starts on (#1277): recorded, not guessed, so surfaces reading
+  // The branch this agent actually starts on (#1277): recorded, not guessed, so surfaces reading
   // the meta mid-run resolve the same name teardown will later confirm. Undefined outside a git
   // checkout (a non-repo project), and then nothing is recorded.
   const startBranch = await currentBranch(cwd)
   if (startBranch) onEvent({ kind: 'branch', branch: startBranch })
-  // Fire the built-in on-before-mergeable (#326) prompt once a --on-before-mergeable run has settled and the agent
-  // signalled setReadyForMerge(). Skipped for a fake/offline run and when the run was stopped —
+  // Fire the built-in on-before-mergeable (#326) prompt once a --on-before-mergeable agent has settled and the agent
+  // signalled setReadyForMerge(). Skipped for a fake/offline run and when the agent was stopped —
   // and every outcome, including each skip, is emitted as an event so the dashboard can show it (#835).
   const maybeFireOnBeforeMergeable = async (): Promise<void> => {
     // The step was never asked for, so there is no outcome to report and nothing to explain.
@@ -952,7 +952,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     if (!journal.sawReadyForMerge()) return skip('not-ready-for-merge')
     if (journal.stoppedCleanly()) return skip('run-stopped')
     if (fake) return skip('fake-run')
-    // --eco-auto-maintenance (#314) no longer skips the whole run: since #537 this prompt
+    // --eco-auto-maintenance (#314) no longer skips the whole agent: since #537 this prompt
     // also carries `## Business knowledge`, which the flag does not name. It drops just
     // `## Maintenance` inside renderOnBeforeMergeablePrompt() instead.
     // Every line of the prompt names the session, so there is nothing to queue without one.
@@ -972,7 +972,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     const armed = handoffStages(armedHandoff)
     const skip = (reason: AutoHandoffSkip) => onEvent({ kind: 'handoff', outcome: 'skipped', reason })
     if (!armed.push) return skip('not-armed')
-    // A stopped run is a session the user cut short; publishing what it happened to reach is the
+    // A stopped agent is a session the user cut short; publishing what it happened to reach is the
     // opposite of what stopping meant. Same call the on-before-mergeable step makes.
     if (journal.stoppedCleanly()) return skip('run-stopped')
     if (fake) return skip('fake-run')
@@ -1014,7 +1014,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     const sessionName = journal.sessionName()
     // The ticket's GitHub issue rides the PR title as `(fix #42)` (#1334): the squash-merge
     // subject inherits the title, so the merge closes the issue — without it, an auto-merged
-    // quick-win leaves its ticket open. Not on a plan run (#1327): its PR lands the plan, not
+    // quick-win leaves its ticket open. Not on a plan agent (#1327): its PR lands the plan, not
     // the work, so the merge must not close the issue. Best-effort: a ticket that cannot be
     // read fixes nothing.
     const fixes = opts.ticket && isTicketPath(opts.ticket) && !opts.planAgent
@@ -1033,7 +1033,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
         ? { ...handedOff, merge: { outcome: 'withheld' as const, reason: mergeGate } }
         : handedOff
     onEvent({ kind: 'handoff', ...outcome })
-    // Record the PR itself (E6), so every later surface reads the number off the run instead of
+    // Record the PR itself (E6), so every later surface reads the number off the agent instead of
     // re-deriving it from branch names and creation times.
     if (outcome.outcome === 'done' && outcome.number !== undefined && outcome.url) {
       onEvent({ kind: 'pull-request', number: outcome.number, url: outcome.url })
@@ -1051,12 +1051,12 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     else if (merge?.outcome === 'failed') io.err(`✗ could not merge the PR: ${merge.error}`)
   }
 
-  // The run owns the browser (#793): launching it here, rather than letting chrome-devtools-mcp
+  // The agent owns the browser (#793): launching it here, rather than letting chrome-devtools-mcp
   // launch its own, is what lets the preview (#609) attach to the same page. Undefined when the
-  // machine has no Chrome, which leaves `--browser` on its old path rather than failing the run.
+  // machine has no Chrome, which leaves `--browser` on its old path rather than failing the agent.
   // Local runs only: the browser tools are wired on this machine, so a `--run-on web`/`actions`
   // session could never reach them — launching Chrome here would leak a headless browser per
-  // run, and the system channel must only claim a browser the run really has (#824).
+  // run, and the system channel must only claim a browser the agent really has (#824).
   const localAgent = opts.target === undefined || opts.target === 'local'
   const sharedBrowser = opts.browser && !fake && localAgent ? await launchSharedBrowser() : undefined
   if (opts.browser && !fake && !localAgent) {
@@ -1066,11 +1066,11 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   }
 
   /**
-   * Give up before a driver exists, on a config fault the run cannot recover from.
+   * Give up before a driver exists, on a config fault the agent cannot recover from.
    *
    * These aborts sit in an awkward window: `agent.json` already says `running` (it is written back
    * at :1433), but {@link settleAgent} — which owns the `end` event and the handle cleanup — does
-   * not wrap anything until its `ctx` is built further down. Returning raw therefore left the run
+   * not wrap anything until its `ctx` is built further down. Returning raw therefore left the agent
    * recorded as `running` forever with nobody to correct it, and the dashboard showed a session
    * that never moved. So close it out here the same way settleAgent would: say why, record the
    * failure, release the handles.
@@ -1080,7 +1080,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
    */
   const abortBeforeDriver = async (reason: string): Promise<number> => {
     io.err(reason)
-    // Release every handle settleAgent would: the armed interrupt trap, the run's own dashboard
+    // Release every handle settleAgent would: the armed interrupt trap, the agent's own dashboard
     // server, and the LOGS.md entry — leaving any of them behind kept the process alive with a
     // swallowed first Ctrl+C, exactly the hang this helper exists to prevent.
     clearInterrupt()
@@ -1088,7 +1088,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
       await store?.append({ kind: 'end', ok: false, detail: reason })
       await store?.close()
     } catch {
-      // Persistence is never allowed to be the thing that keeps a failing run alive.
+      // Persistence is never allowed to be the thing that keeps a failing agent alive.
     }
     control?.close()
     await sharedBrowser?.close().catch(() => {})
@@ -1098,7 +1098,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // Run on GitHub Actions (#1050): owner/repo come from the project's origin remote, the token from
   // the environment or, failing that, the `gh` CLI (#1352) — never the committed the-framework.yml,
   // since a repo file is public and this must be a user credential. Resolved before the driver so a
-  // missing remote or token fails the run with a clear reason rather than deep inside ActionsDriver.
+  // missing remote or token fails the agent with a clear reason rather than deep inside ActionsDriver.
   let actionsConfig: ActionsDriverOptions | undefined
   if (opts.target === 'actions' && !fake) {
     const slug = await githubSlugFor(cwd)
@@ -1109,7 +1109,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     if (!token) {
       // Both ways out, because neither is guessable from the other: the env var is what CI sets,
       // and `gh auth login` is what a laptop has. Says which process needs it, too — the daemon
-      // hands each run its own environment, so exporting the variable in a shell does nothing for
+      // hands each agent its own environment, so exporting the variable in a shell does nothing for
       // a daemon that is already up.
       return await abortBeforeDriver(
         '--run-on actions needs a GitHub user token (repo + workflow scopes): set GH_TOKEN in the environment ' +
@@ -1144,7 +1144,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // Whether the agent actually ends up with browser tools, which is narrower than the flag: they
   // ride Claude Code's MCP config, so `--browser` on another agent wires nothing (see
   // `unguardedNotices`), the fake driver has no tools at all, and a remote target never sees
-  // this machine's MCP config. The system channel must only claim a browser the run really has (#824).
+  // this machine's MCP config. The system channel must only claim a browser the agent really has (#824).
   const browserAttached = opts.browser && !fake && opts.driver === 'claude' && localAgent
 
   // The preview of that browser (#802): the agent's Chrome is headless, so when it parks on an
@@ -1161,7 +1161,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     : undefined
   // The port travels as an event — persisted and published live — because a dashboard-started
   // run is spawned with its stdout discarded, so a printed URL reaches nobody (#813). The
-  // journal holds it until the session opens: the bridge exists before the run does, and an
+  // journal holds it until the session opens: the bridge exists before the agent does, and an
   // event ahead of `session` never reaches the dashboard (#829).
   if (browserStream) journal.announceBrowserPort(browserStream.port)
 
@@ -1173,10 +1173,10 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   if (transparent) io.out(`◆ transparent: on — raw ${DRIVER_SPECS[opts.driver].label}, no framework prompt, dashboard, or TODO loop`)
 
   // A user SYSTEM.md + the anti-lazy-pill toggle shape the system prompt (#301), and the eco
-  // flags trim the built-in one (#314). Resolve and echo once, shared by both run paths.
+  // flags trim the built-in one (#314). Resolve and echo once, shared by both agent paths.
   const promptConfig = await resolvePromptConfig(opts, config, cwd, io, transparent)
 
-  // The run-scoped state both run paths hand to settleAgent to close out. stoppedCleanly is a
+  // The run-scoped state both agent paths hand to settleAgent to close out. stoppedCleanly is a
   // getter because the onEvent sink sets it as the `end` event arrives.
   const epilogue = (failLabel: string): AgentEpilogue => ({
     io,
@@ -1191,10 +1191,10 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     failLabel,
   })
 
-  // The options both run paths pass through unchanged: who the agent is, what it may spend, what
+  // The options both agent paths pass through unchanged: who the agent is, what it may spend, what
   // it reads, and who can answer it. They were written out twice, thirteen conditional spreads
-  // each, so a new one had to be added to both by hand — and a run started as a build and a run
-  // started as a prompt are the same run in every respect but the scaffolding around the prompt.
+  // each, so a new one had to be added to both by hand — and an agent started as a build and an agent
+  // started as a prompt are the same agent in every respect but the scaffolding around the prompt.
   const sharedAgentOptions = {
     driver,
     cwd,
@@ -1218,7 +1218,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // system prompt. A build continuation (#1467) stays a build despite arriving as a `prompt`
   // start: the flow it re-enters is the one recorded on its own meta.
   const isResearch = opts.research && !transparent
-  const kind: SessionKind = (opts.research || opts.directPrompt || transparent) && !continueBuild ? 'prompt' : 'build'
+  const kind: AgentKind = (opts.research || opts.directPrompt || transparent) && !continueBuild ? 'prompt' : 'build'
   const label = kind === 'build' ? 'session' : isResearch ? 'research' : 'prompt session'
 
   const agentOpts: RunAgentOptions = {
@@ -1345,8 +1345,8 @@ export function promptAgentSpec(prompt: string, cwd: string, vanilla = false): A
 }
 
 /**
- * Run one direct prompt by spawning `framework --agent <spec>`, reusing the whole run path
- * (preflight, driver, budget cap, LOGS.md). The child inherits stdio so its run streams to the
+ * Run one direct prompt by spawning `framework --agent <spec>`, reusing the whole agent path
+ * (preflight, driver, budget cap, LOGS.md). The child inherits stdio so its agent streams to the
  * terminal. Note the spec carries no `onBeforeMergeable`, so a quality pass never triggers its own
  * on-before-mergeable prompt (the recursion guard). Resolves true on a clean exit (0). Never
  * re-execs a test entry (fork-bomb guard).
@@ -1367,7 +1367,7 @@ async function spawnPromptAgent(prompt: string, cwd: string, binPath: string, va
 export type PromptRunner = (prompt: string, cwd: string, binPath: string) => Promise<boolean>
 
 /**
- * Fire the built-in on-before-mergeable (#326) prompt after a run signalled setReadyForMerge(): one
+ * Fire the built-in on-before-mergeable (#326) prompt after an agent signalled setReadyForMerge(): one
  * `framework prompt` child on the same workspace that appends the quality follow-ups to the
  * session's TODO file, for the backlog loop (#323/#538) to pick up.
  *
@@ -1377,7 +1377,7 @@ export type PromptRunner = (prompt: string, cwd: string, binPath: string) => Pro
  * on the same git index. Best-effort, like the suite was: a failure is logged, never thrown.
  *
  * Returns how it went so the caller can emit it as an event (#835); the `io` lines stay for
- * a terminal run, which is the one surface that can still read them.
+ * a terminal agent, which is the one surface that can still read them.
  */
 export async function runOnBeforeMergeable(
   cwd: string,
@@ -1390,7 +1390,7 @@ export async function runOnBeforeMergeable(
 ): Promise<'queued' | 'incomplete'> {
   // Ensure the presets exist so the queued entries' filePaths resolve, even in a repo
   // activated before they shipped or a fresh clone (they are gitignored) (#598). Best-effort,
-  // like the rest of this run: a materialize failure must not block the queueing.
+  // like the rest of this agent: a materialize failure must not block the queueing.
   try {
     await materializePresets(cwd, fs)
   } catch (err) {

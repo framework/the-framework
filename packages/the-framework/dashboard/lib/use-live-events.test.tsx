@@ -33,9 +33,9 @@ function Probe({ projectId, agentId: agentId }: { projectId: string | null; agen
   return <span>{lost ? 'lost' : 'live'}</span>
 }
 
-// #770: right after Start, the run's row does not exist yet. The feed used to subscribe with no run
-// id in that window, which resolves server-side to the project root — so a newly started run showed
-// the PREVIOUS run's log for a beat before correcting itself. The shell passes the id it got back
+// #770: right after Start, the agent's row does not exist yet. The feed used to subscribe with no run
+// id in that window, which resolves server-side to the project root — so a newly started agent showed
+// the PREVIOUS agent's log for a beat before correcting itself. The shell passes the id it got back
 // from Start, so there is no window where the feed is pointed at the wrong log.
 describe('useLiveEvents addressing (#770)', () => {
   test('subscribes to the run it was given', async () => {
@@ -95,9 +95,9 @@ describe('useLiveEvents stream loss (#948)', () => {
   })
 })
 
-// A resumed session (#762) appends a second `session` boundary to the SAME journal. A run's own
-// tail (#749) holds nothing but that run, so its feed must keep everything — slicing at the last
-// `session` hid the whole pre-resume transcript for as long as the run was live. The project-root
+// A resumed session (#762) appends a second `session` boundary to the SAME journal. An agent's own
+// tail (#749) holds nothing but that agent, so its feed must keep everything — slicing at the last
+// `session` hid the whole pre-resume transcript for as long as the agent was live. The project-root
 // fallback still slices: that subscription genuinely spans run boundaries.
 describe('useLiveEvents run scoping', () => {
   const log = (message: string) => ({ kind: 'log', message })

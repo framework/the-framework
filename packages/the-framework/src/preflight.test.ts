@@ -118,7 +118,7 @@ test('a logged-in codex passes (#1326)', async () => {
 
 test('a CLI that will not say whether it is logged in does not fail the run (#1326)', async () => {
   // An older CLI prints usage for a subcommand it does not have. Unreadable means unknown, and
-  // a run that might work beats a warning we cannot stand behind.
+  // an agent that might work beats a warning we cannot stand behind.
   const result = await preflight({ ...notRoot, probe: probeFor({ auth: { ok: false, output: "error: unknown command 'auth'" } }) })
   assert.equal(result.ok, true)
   assert.equal(result.checks.find(c => c.name === 'claude auth'), undefined)
@@ -145,7 +145,7 @@ test('the auth answer is read off stderr too (#1326)', async () => {
 })
 
 // #1326: root is the sudo-HOME trap (#1323). sudo moves HOME, so the CLI reads root's credentials, finds
-// none, and every run dies identically with a log that says nothing about why.
+// none, and every agent dies identically with a log that says nothing about why.
 
 test('running as root warns without blocking the run (#1326)', async () => {
   const result = await preflight({ probe: probeFor({}), isRoot: () => true, sudoUser: undefined })
@@ -181,7 +181,7 @@ test('preflightProblems lists only the failures, each with its fix (#1326)', asy
 })
 
 // #1419: an armed PR/merge rung publishes through `gh` at the finish, hours after the Start that
-// could have said it will not work. Warnings only — the run itself needs no gh to do its work.
+// could have said it will not work. Warnings only — the agent itself needs no gh to do its work.
 
 /** A probe that answers for `gh` separately from the agent CLI, which always passes here. */
 function withGh(gh: { version: { ok: boolean; output: string }; auth?: { ok: boolean; output: string } }): CliProbe {

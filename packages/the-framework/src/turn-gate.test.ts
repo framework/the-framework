@@ -46,7 +46,7 @@ test('parseAwaitGate falls back to an earlier block when the later one is malfor
 })
 
 test('parseAwaitGate ignores a malformed or optionless block rather than throwing (#337)', () => {
-  // A block with nothing pickable in it is not a gate: the run carries on rather than parking on
+  // A block with nothing pickable in it is not a gate: the agent carries on rather than parking on
   // an empty question, and a bad parse must never crash a build.
   assert.equal(parseAwaitGate(block('{ not json')), undefined)
   assert.equal(parseAwaitGate(block('"just a string"')), undefined)

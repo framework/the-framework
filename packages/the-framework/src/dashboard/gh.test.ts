@@ -35,7 +35,7 @@ test('with no token in the environment, the gh CLI credential is used (#1352)', 
 })
 
 test('a gh that is missing, logged out, or refusing yields no token rather than throwing', async () => {
-  // The caller turns undefined into the run's stated reason; a rejection here would instead
+  // The caller turns undefined into the agent's stated reason; a rejection here would instead
   // surface as an unhandled failure deep in the start path.
   const { gh } = fakeGh(new Error('gh: command not found'))
   assert.equal(await githubToken('/repo', {}, gh), undefined)
@@ -93,7 +93,7 @@ test('any other refusal is reported, not retried as a direct merge (#1216)', asy
 })
 
 test('a draft PR is marked ready and the auto-merge retried (#1216)', async () => {
-  // The already-open path can find a draft a previous run's handoff left behind. GitHub refuses
+  // The already-open path can find a draft a previous agent's handoff left behind. GitHub refuses
   // to merge or auto-merge drafts, so the draft refusal means ready-then-retry, not failure.
   const calls: string[][] = []
   let drafted = true

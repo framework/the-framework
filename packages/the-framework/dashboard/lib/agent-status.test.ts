@@ -23,9 +23,9 @@ describe('agentStatusPill', () => {
     expect(agentStatusPill([named, readyForMerge, ended({ ok: true })])).toMatchObject({ label: 'ready for merge' })
   })
 
-  // The states are exclusive by construction — one run, one word. These two hold the facts at the
-  // same time (the run said ready-for-merge, then was stopped / then failed), and how it ENDED
-  // wins: the green would otherwise be a lie about a run that did not get there (#948).
+  // The states are exclusive by construction — one agent, one word. These two hold the facts at the
+  // same time (the agent said ready-for-merge, then was stopped / then failed), and how it ENDED
+  // wins: the green would otherwise be a lie about an agent that did not get there (#948).
   test('stopped outranks an earlier ready-for-merge', () => {
     expect(agentStatusPill([named, readyForMerge, ended({ ok: false, stopped: true })])).toMatchObject({ label: 'stopped' })
   })
@@ -67,7 +67,7 @@ describe('agentStatusPill', () => {
 
   test('a resumed session builds again — the stopped segment does not hold the pill (#762)', () => {
     // A resume appends a second `session` boundary to the same journal; the yellow "stopped"
-    // stuck to a live run because first-end-wins outranked everything that followed.
+    // stuck to a live agent because first-end-wins outranked everything that followed.
     const resumed = [named, ended({ ok: false, stopped: true }), { kind: 'session' } as FrameworkEvent]
     expect(agentStatusPill(resumed)).toMatchObject({ label: 'building…' })
     expect(agentStatusPill([...resumed, ended({ ok: true })])).toMatchObject({ label: 'finished' })

@@ -35,9 +35,9 @@ interface PromptEditorProps {
   /** A preset picked from the `/` menu (so the form can flip to a `prompt` run). `replaced` says
    *  whether a typed draft was overwritten — undo brings it back, and the form's note says so. */
   onPreset?: (label: string, replaced: boolean, newAgent?: boolean) => void
-  /** A project referenced via `@` (so the form can add it to the run context). */
+  /** A project referenced via `@` (so the form can add it to the agent context). */
   onMentionProject?: (path: string) => void
-  /** A file referenced via `#` (so the form can add its repo-relative path to the run context). */
+  /** A file referenced via `#` (so the form can add its repo-relative path to the agent context). */
   onMentionFile?: (relPath: string) => void
   /** An `@`/`#` chip left the editor (deleted, or replaced by a preset) — undo the context
    *  focus it added, so the prompt and the Context set cannot diverge (#948). */
@@ -264,7 +264,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
           if (macro) insertToken(ed, range, macro)
         },
       }),
-      // `@` — references: the registered projects. A mention also focuses the run on that repo.
+      // `@` — references: the registered projects. A mention also focuses the agent on that repo.
       makeTrigger({
         char: '@',
         key: 'at',
@@ -283,7 +283,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
         },
       }),
       // `#` — files: the finer-grained sibling of `@` (#504). Type to filter the project's
-      // files (git ls-files); picking one focuses the run on that file via the Context line.
+      // files (git ls-files); picking one focuses the agent on that file via the Context line.
       makeTrigger({
         char: '#',
         key: 'hash',

@@ -80,14 +80,14 @@ export interface DashboardOptions {
    */
   eventsSource: EventsSource
   /**
-   * The relayed-run lookup the read RPCs consult (#1067 slice 2). A run-scoped RPC uses it to
-   * forward a remote run's read/steer/handoff to the device that owns it.
+   * The relayed-agent lookup the read RPCs consult (#1067 slice 2). A run-scoped RPC uses it to
+   * forward a remote agent's read/steer/handoff to the device that owns it.
    */
   remote: RemoteAgents
   /**
-   * Serve a relay-started run's events back to the daemon that relayed it here (#1067): the
+   * Serve a relay-started agent's events back to the daemon that relayed it here (#1067): the
    * `/_relay/*` endpoints (start + events, plus the slice-2 `rpc`). All are fronted by the same
-   * `token` guard above, so a device without the cookie cannot start or read a run.
+   * `token` guard above, so a device without the cookie cannot start or read an agent.
    */
   relay?: {
     tailEvents: (agentId: string, onEvent: (event: import('../events.js').FrameworkEvent) => void) => () => void
@@ -143,7 +143,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
     return listenDashboard(server, host, port, () => closeServer(server))
   }
 
-  // The usage panel polls for the dashboard's whole life, not just during a run:
+  // The usage panel polls for the dashboard's whole life, not just during an agent:
   // it has to show where the account stands while nothing is running (#533).
   const quota = opts.quota
   const rpcMount = makeRpcMount(
@@ -204,7 +204,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
     }
     // #1051: one guard fronting every route on a non-loopback bind; a no-op when no token is set.
     if (token !== undefined && !authorizeDaemonRequest(req, res, token)) return
-    // The device relay (#1067): another daemon posts a run here and streams its events back. Behind
+    // The device relay (#1067): another daemon posts an agent here and streams its events back. Behind
     // the guard above, so a device without the cookie is already 401'd; unwired hosts 404 it.
     if (pathname === RELAY_PREFIX || pathname.startsWith(`${RELAY_PREFIX}/`)) {
       void handleRelayRequest(req, res, pathname, relayHandlers)
@@ -229,7 +229,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
     void serveClientBundle(req, res, clientBundleDir)
   })
   return listenDashboard(server, host, port, async () => {
-    // Stop polling with the server: the poller outlives every run by design,
+    // Stop polling with the server: the poller outlives every agent by design,
     // so nothing else would ever end it.
     quota.stop()
     await closeServer(server)

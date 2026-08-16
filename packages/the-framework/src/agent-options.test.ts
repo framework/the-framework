@@ -9,7 +9,7 @@ test('the handoff defaults to the PR rung, and every rung travels explicitly (#1
   assert.equal(agentOptionsFromPreferences({}).handoff, 'pr')
   for (const level of ['local', 'push', 'pr', 'merge'] as const) {
     assert.equal(handoffFromPreferences({ handoff: level }), level)
-    // Explicit on the wire, so a run can never re-arm what the launcher disarmed.
+    // Explicit on the wire, so an agent can never re-arm what the launcher disarmed.
     assert.equal(agentOptionsFromPreferences({ handoff: level }).handoff, level)
   }
 })

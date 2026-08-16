@@ -31,8 +31,8 @@ test('formatFrameworkEvent renders a multi-select choice as a checklist (#332)',
 })
 
 test('formatFrameworkEvent says the armed line as what will happen, merge included (#1382)', () => {
-  // A merge-armed run opens a ready PR and lands it by itself — the line must own that, not say
-  // "draft PR" about a run that is configured to merge to main unattended.
+  // A merge-armed agent opens a ready PR and lands it by itself — the line must own that, not say
+  // "draft PR" about an agent that is configured to merge to main unattended.
   assert.equal(
     formatFrameworkEvent({ kind: 'handoff-armed', push: true, pr: true, merge: true }),
     '  when this ends: push the branch, open a PR, and merge it',

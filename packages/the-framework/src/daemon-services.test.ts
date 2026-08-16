@@ -75,7 +75,7 @@ async function services(preferences: Record<string, unknown>) {
       starts.push({ prompt, options, projectId })
       return { ok: true, agentId: `run-${starts.length}` }
     },
-    // What the daemon's own counter reports: the runs this sweep has asked for are live, so the
+    // What the daemon's own counter reports: the agents this sweep has asked for are live, so the
     // cap is measured against them rather than against a constant zero.
     activeAgentCount: () => starts.length,
     busyAgentIds: () => new Set<string>(),
@@ -106,14 +106,14 @@ test('the concurrency setting on disk is the number of agents the routine spins 
     assert.equal(starts.length, 4, 'the batch is the setting, not the default and not the queue length')
     // One entry each, in queue order: this is what makes four agents do disjoint work rather than
     // four copies of the first entry. The prompt is where the pin lives (E2) — it used to also
-    // ride the run's meta, so a third claim mechanism could be re-derived from it later.
+    // ride the agent's meta, so a third claim mechanism could be re-derived from it later.
     for (const [index, start] of starts.entries()) {
       assert.match(start.prompt, /work on this one open entry only/)
       assert.ok(start.prompt.includes(QUEUE_ENTRIES[index]!), `the prompt pins ${QUEUE_ENTRIES[index]}`)
       // Nobody is at the keyboard, so a gate must auto-answer rather than park (#846/#1279).
       assert.equal(start.options.unattended, true)
       // The drain job lands its own PRs (#1216): the job's flag rides the start as the ladder's
-      // top rung, so it reaches the run already meaning "push, open, merge".
+      // top rung, so it reaches the agent already meaning "push, open, merge".
       assert.equal(start.options.handoff, 'merge')
       // A drain implements its ticket, so its PR title may close the issue — planAgent is only
       // for the fanned-out planners (#1327), whose merge must not.

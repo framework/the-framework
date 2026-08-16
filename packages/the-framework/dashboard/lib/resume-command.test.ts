@@ -12,7 +12,7 @@ describe('buildResumeCommand (#1195)', () => {
   })
 
   test('falls back to the bare id when no workspace was recorded', () => {
-    // An older run, or one that never opened a session: the id is still worth handing over.
+    // An older agent, or one that never opened a session: the id is still worth handing over.
     expect(buildResumeCommand({ sessionId: 'sess-1' })).toBe('sess-1')
   })
 

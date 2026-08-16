@@ -5,7 +5,7 @@ import { CLOUD_COMMAND, CLOUD_PROMPT_SEPARATOR, CloudDriver, cloudHandOffPrompt,
 import type { DriverEvent } from './types.js'
 
 /**
- * What the CLI actually prints on a successful `--cloud`, captured from a real run. The
+ * What the CLI actually prints on a successful `--cloud`, captured from a real agent. The
  * escape codes are part of the fixture on purpose: this output comes off a terminal, so the
  * parser has to read through them rather than around them.
  */
@@ -53,7 +53,7 @@ test('the session link rides an `action` event, the way the Actions run link doe
   await session.prompt('go')
   assert.ok(events.some(e => e.type === 'action' && e.label === `cloud ${URL}`))
   assert.ok(events.some(e => e.type === 'result' && e.sessionId === SESSION))
-  // The result also carries the real URL (#1317), which is what reaches the run meta.
+  // The result also carries the real URL (#1317), which is what reaches the agent meta.
   assert.ok(events.some(e => e.type === 'result' && e.sessionLink === URL))
 })
 
@@ -136,7 +136,7 @@ test('an untrusted workspace fails fast and says how to fix it, rather than hang
 
 test('trust advice for a run worktree names the project root, which outlives the worktree', async () => {
   // Trust is per directory and inherited downward (a fresh worktree of a trusted root shows
-  // no dialog), so trusting the root once covers every run worktree — the old advice named
+  // no dialog), so trusting the root once covers every agent worktree — the old advice named
   // the ephemeral worktree path, which is gone before anyone could follow it.
   const events: DriverEvent[] = []
   const driver = new CloudDriver({
@@ -159,14 +159,14 @@ test('trustRootOf strips exactly the run-worktree suffix and nothing else', () =
   assert.equal(trustRootOf('/repo/.the-framework/worktrees/2026-01-01T00-00-00-000Z'), '/repo')
   assert.equal(trustRootOf('/repo'), '/repo')
   assert.equal(trustRootOf('/repo/packages/app'), '/repo/packages/app')
-  // A deeper path inside a run worktree is not the worktree itself: leave it alone rather
+  // A deeper path inside an agent worktree is not the worktree itself: leave it alone rather
   // than guess.
   assert.equal(trustRootOf('/repo/.the-framework/worktrees/run1/nested'), '/repo/.the-framework/worktrees/run1/nested')
 })
 
 test('the prompt sits directly after --cloud, ahead of the model flag', () => {
   // The description is `--cloud`'s own value, not a positional argument. With the model flag
-  // in between, every run on an account with a model preference died on "--cloud requires a
+  // in between, every agent on an account with a model preference died on "--cloud requires a
   // description" while runs without one worked, which is what made it look unrelated to the
   // model at first. Nothing else observes this order, so it is pinned here.
   const promptAt = CLOUD_COMMAND.indexOf('"$FW_CLOUD_PROMPT"')
@@ -197,8 +197,8 @@ test('a safe model id is passed through', async () => {
 })
 
 test('a run hands off ONCE, however many times the loop prompts', async () => {
-  // The regression this exists for: a run is not one prompt. The loop prompts per pass, and
-  // spawning a session each time turned one run into six of them racing on the same repo.
+  // The regression this exists for: an agent is not one prompt. The loop prompts per pass, and
+  // spawning a session each time turned one agent into six of them racing on the same repo.
   const calls: AgentPtyOptions[] = []
   const session = await driverWith(CREATED, calls).start({ cwd: '/repo' })
   const first = await session.prompt('build the thing')
@@ -216,7 +216,7 @@ test('a later pass says the work is already in the cloud, rather than repeating 
   assert.match(first.text, /^Handed off to Claude Code on the web/)
   assert.match(second.text, /already handed off/i)
   assert.match(second.text, /nothing further to do here/i)
-  // Both still point at the same place, so the run view links through either way.
+  // Both still point at the same place, so the agent view links through either way.
   assert.match(second.text, new RegExp(SESSION))
 })
 
@@ -257,7 +257,7 @@ test('there is no readCode: the workspace lives in a cloud VM', async () => {
 })
 
 test('the web location is the hand-off, so a run ends at the first prompt (#1225/D1)', () => {
-  // Load-bearing rather than descriptive: this is what stops a run working the backlog and
+  // Load-bearing rather than descriptive: this is what stops an agent working the backlog and
   // asking about work that left this machine with the first prompt. It is a fact about *where*
   // the turn ran, so it hangs off the location rather than off the driver that spawned it.
   assert.equal(isHandsOff('web'), true)

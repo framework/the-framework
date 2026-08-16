@@ -48,7 +48,7 @@ export function rpc<F extends (...args: never[]) => unknown>(
 }
 
 /**
- * A live feed of one run's events.
+ * A live feed of one agent's events.
  *
  * The contract the dashboard relies on, unchanged from the Channel it replaced: `listen` per
  * event, and `onClose` telling a clean end (the server is done — an unknown project, a finished
@@ -62,7 +62,7 @@ export interface EventChannel {
 }
 
 /**
- * Subscribe to a run's events over SSE. Rejects when the subscription itself fails, which the
+ * Subscribe to an agent's events over SSE. Rejects when the subscription itself fails, which the
  * caller retries; a stream that opens and later dies closes with an error instead.
  *
  * Read with `fetch` rather than `EventSource` because `EventSource` reconnects on its own

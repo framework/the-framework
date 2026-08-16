@@ -12,7 +12,7 @@ vi.mock('../rpc/projects.js', () => ({ onProjects, onClaudeTrust, onDriverReady,
 const onSystemPromptUser = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onSystemPromptUser }))
 
-// Mutable so a test can pick the run target (#1318); reset to Global defaults after each.
+// Mutable so a test can pick the agent target (#1318); reset to Global defaults after each.
 const prefs = vi.hoisted(() => ({ current: {} as Record<string, unknown> }))
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => prefs.current,
@@ -49,7 +49,7 @@ vi.mock('./SystemPromptDisclosure.js', () => ({ SystemPromptDisclosure: () => nu
 const { StartAgentForm } = await import('./StartAgentForm.js')
 
 // A ready agent by default (#1326), so every other test renders the form it means to test
-// rather than the "your CLI cannot start a run" warning.
+// rather than the "your CLI cannot start an agent" warning.
 beforeEach(() => {
   onDriverReady.mockResolvedValue({ ok: true, problems: [], warnings: [] })
 })
@@ -118,14 +118,14 @@ describe('StartAgentForm web-run trust warning (#1318)', () => {
     expect(screen.queryByText(/has not been trusted/)).toBeNull()
     trusted.unmount()
 
-    // Config unreadable: do not cry wolf — the run's own failure advice is the fallback.
+    // Config unreadable: do not cry wolf — the agent's own failure advice is the fallback.
     onClaudeTrust.mockResolvedValue({ known: false, trusted: false, root: '/repo' })
     const unknown = render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onClaudeTrust).toHaveBeenCalledTimes(2))
     expect(screen.queryByText(/has not been trusted/)).toBeNull()
     unknown.unmount()
 
-    // A local run never asks the question at all.
+    // A local agent never asks the question at all.
     prefs.current = {}
     onClaudeTrust.mockClear()
     render(<StartAgentForm {...props} />)

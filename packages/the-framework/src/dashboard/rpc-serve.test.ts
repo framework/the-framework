@@ -146,7 +146,7 @@ test('the event stream ends cleanly when there is nothing to stream', async () =
 })
 
 test('the event stream sends one SSE frame per event', async () => {
-  // A relayed run (#1067): an in-memory source, which is the branch that does not tail a file.
+  // A relayed agent (#1067): an in-memory source, which is the branch that does not tail a file.
   async function* source() {
     yield { kind: 'log', message: 'one' } as const
     yield { kind: 'log', message: 'two' } as const

@@ -73,7 +73,7 @@ const INTERVENTIONS: NotificationSpec<Intervention> = {
   pickNew: pickNewInterventions,
   keyOf: interventionKey,
   title: (first, count) => (count === 1 ? `Human Queue · ${first.projectName}` : `${count} items in your Human Queue`),
-  // A PR by number, a paused run by its question (#636), a finished run by what sits unpushed (#860).
+  // A PR by number, a paused agent by its question (#636), a finished agent by what sits unpushed (#860).
   label: item => {
     if (item.kind === 'awaiting') return item.title
     if (item.kind === 'unpushed') {
@@ -83,7 +83,7 @@ const INTERVENTIONS: NotificationSpec<Intervention> = {
     }
     return `#${item.number} ${item.title}`
   },
-  // A PR opens on GitHub; a paused run and unpushed work both live in this dashboard, so those
+  // A PR opens on GitHub; a paused agent and unpushed work both live in this dashboard, so those
   // just bring the tab forward (project selection is client state, not a URL).
   clickUrl: first => (first.kind === 'awaiting' || first.kind === 'unpushed' ? undefined : first.url),
 }
@@ -94,7 +94,7 @@ const ACTIVITY: NotificationSpec<Activity> = {
   title: (first, count) =>
     count === 1 ? `${first.kind === 'started' ? 'Agent started' : 'Agent finished'} · ${first.projectName}` : `${count} agent updates`,
   label: item => `${item.kind === 'started' ? 'Started' : 'Finished'}: ${item.title ?? 'a session'}`,
-  // Activity lives in this dashboard (no external URL like a PR) — the runs rail takes it from there.
+  // Activity lives in this dashboard (no external URL like a PR) — the agents rail takes it from there.
   clickUrl: () => undefined,
 }
 
@@ -103,7 +103,7 @@ export function useInterventionNotifications(interventions: Intervention[], enab
   useNewItemNotifications(interventions, enabled, INTERVENTIONS)
 }
 
-/** Notify when a run starts or finishes (#627). */
+/** Notify when an agent starts or finishes (#627). */
 export function useActivityNotifications(activity: Activity[], enabled: boolean): void {
   useNewItemNotifications(activity, enabled, ACTIVITY)
 }

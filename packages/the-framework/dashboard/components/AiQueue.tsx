@@ -62,13 +62,13 @@ export function AiQueue({
     const prompt = workOnEntryPrompt(entry)
     setStarting(key)
     // Unattended (#1279): starting a queue entry from the card is the same work the drain sweep
-    // starts, so it runs the same way — gates auto-answer, the run ends at settle, and the armed
+    // starts, so it runs the same way — gates auto-answer, the agent ends at settle, and the armed
     // handoff fires, instead of parking in the stay-open chat loop with its PR never opened.
     const result = await start(projectId, prompt, 'prompt', { ...agentOptionsFromPreferences(preferences), unattended: true })
     setStarting(null)
-    // Go to the run itself (#1191): one agent on one named entry is a session to watch, unlike the
+    // Go to the agent itself (#1191): one agent on one named entry is a session to watch, unlike the
     // sweep's fan-out, which lands in the Agents card. With no id yet the shell lands on the
-    // project and adopts the running run once the poll surfaces it.
+    // project and adopts the running agent once the poll surfaces it.
     if (result) onAgentStarted(projectId, prompt, result.agentId)
   }
 

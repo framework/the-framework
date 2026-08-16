@@ -22,7 +22,7 @@ if (argvFile) {
     const specPath = args[args.indexOf('--agent') + 1]
     appendFileSync(argvFile, readFileSync(specPath!, 'utf8').replace(/\s*\n\s*/g, '') + '\n')
   } catch {
-    // recording is diagnostics, never a reason to fail the run
+    // recording is diagnostics, never a reason to fail the agent
   }
 }
 

@@ -30,7 +30,7 @@ test('SeenTracker seeds a baseline on the first poll, then returns only new item
 test('SeenTracker keys on the caller\'s identity, so a run started and finished are two announcements', () => {
   const tracker = new SeenTracker(activityKey)
   assert.deepEqual(tracker.observe([started('r1')]), [])
-  // The same run finishing is a new key -> announced.
+  // The same agent finishing is a new key -> announced.
   assert.deepEqual(tracker.observe([finished('r1')]).map(i => i.kind), ['finished'])
   assert.deepEqual(tracker.observe([finished('r1')]), [])
 })

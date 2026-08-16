@@ -5,12 +5,12 @@ import { AgentActionsMenu } from './AgentActionsMenu.js'
 import { agentStatusPill } from '../lib/agent-status.js'
 import { cn } from '../lib/utils.js'
 
-// One run's action bar: what the session IS (its branch / PR / summary, as a disclosure) on the
+// One agent's action bar: what the session IS (its branch / PR / summary, as a disclosure) on the
 // left, and what you can DO to it on the right. The doing is a single ⋮ overflow menu
-// (AgentActionsMenu) instead of a row of icon buttons that came and went with the run's state;
+// (AgentActionsMenu) instead of a row of icon buttons that came and went with the agent's state;
 // only the handoff's next step (Push / Open PR) stays out as a visible button, since it moves the
 // work forward. One bar for the session whether running or finished (AgentView), so the controls stay
-// put when a run reaches Done.
+// put when an agent reaches Done.
 export function AgentActionBar({
   projectId,
   agentId: agentId,
@@ -33,7 +33,7 @@ export function AgentActionBar({
   label?: string | undefined
   /** The session's project, shown as a `project / session` breadcrumb before the name. */
   projectName?: string | null | undefined
-  /** True when this finished run still has a worktree on disk, so it can be removed (#737). */
+  /** True when this finished agent still has a worktree on disk, so it can be removed (#737). */
   retainedWorktree?: boolean
   /** Told after that worktree is removed, so the menu item goes. */
   onWorktreeRemoved?: () => void

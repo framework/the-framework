@@ -212,7 +212,7 @@ test('a git project starts concurrent runs, each in its own worktree (#736)', as
     await git(['add', '-A'], cwd)
     await git(['commit', '-m', 'init'], cwd)
 
-    // The stub logs to the *repo*, not to its own --cwd: each run now gets a different one.
+    // The stub logs to the *repo*, not to its own --cwd: each agent now gets a different one.
     const stub = join(cwd, 'stub-cli.cjs')
     await writeFile(
       stub,
@@ -251,7 +251,7 @@ setTimeout(() => {}, 800)
     }
     assert.notEqual(agents[0]!.cwd, agents[1]!.cwd, 'the two runs got different checkouts')
 
-    // Each run is on its own `the-framework/agent-<id>` branch, and the user's own checkout
+    // Each agent is on its own `the-framework/agent-<id>` branch, and the user's own checkout
     // was never moved off the branch it was sitting on.
     const branches = await git(['branch', '--format=%(refname:short)'], cwd)
     for (const agent of agents) assert.ok(branches.includes(`the-framework/agent-${agent.agentId}`), `branch for ${agent.agentId}`)
@@ -283,7 +283,7 @@ test('a run loses its worktree once its work is on the remote, whatever the run 
     await git(['init', '-q', '--bare', join(cwd, 'origin.git')], cwd)
     await git(['remote', 'add', 'origin', join(cwd, 'origin.git')], cwd)
 
-    // The stub plays a run: it writes the meta a real run would leave behind, with the status
+    // The stub plays an agent: it writes the meta a real agent would leave behind, with the status
     // read from a file the test controls, then exits so the daemon's teardown fires.
     const stub = join(cwd, 'stub-cli.cjs')
     await writeFile(
@@ -304,7 +304,7 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
     const env = await configEnv(cwd)
     const { done, state } = await startDaemon(cwd, { driverPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
 
-    /** Start a run whose stub reports `status`, and resolve once its worktree has settled. */
+    /** Start an agent whose stub reports `status`, and resolve once its worktree has settled. */
     const runWith = async (status: string, nth: number): Promise<string> => {
       await writeFile(join(cwd, 'status.txt'), status)
       assert.equal((await sendStart(state.url, cwd, `run ${status}`)).ok, true)
@@ -319,7 +319,7 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
 
     /**
      * Poll for the archived history to appear, which is the teardown having run. Asked through
-     * `listAgents` rather than by stat'ing a path: since #1179 a run is archived under whichever
+     * `listAgents` rather than by stat'ing a path: since #1179 an agent is archived under whichever
      * user ran it, and what this test cares about is that the project's history has it.
      */
     const archivedMeta = async (agentId: string): Promise<{ branch?: string } | undefined> => {
@@ -333,7 +333,7 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
     const archived = async (agentId: string): Promise<boolean> => (await archivedMeta(agentId)) !== undefined
 
     /**
-     * Poll until the run's checkout is off disk. Generous, because teardown now commits *and
+     * Poll until the agent's checkout is off disk. Generous, because teardown now commits *and
      * pushes* the branch before it can remove anything (E5), and a loaded CI box running the
      * suite's files in parallel makes that several seconds of real git.
      */
@@ -360,7 +360,7 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
       'the work reached the remote, which is what let the checkout go',
     )
 
-    // A failure goes the same way (E5): how the run ended is not what decides this, whether its
+    // A failure goes the same way (E5): how the agent ended is not what decides this, whether its
     // work is recoverable is. It used to be kept "for inspection", which meant one full checkout
     // accumulated per failed session until a human noticed.
     const failedId = await runWith('failed', 2)

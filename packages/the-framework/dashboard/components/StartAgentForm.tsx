@@ -12,7 +12,7 @@ import { Composer, type ComposerHandle } from './Composer.js'
 import { ContextMenu } from './ContextMenu.js'
 import { SystemPromptDisclosure } from './SystemPromptDisclosure.js'
 
-// Start a run in the selected project (#405): the one write that goes through the daemon's own
+// Start an agent in the selected project (#405): the one write that goes through the daemon's own
 // `startAgent` (with its one-run-per-project busy guard), posted over `sendStart`. The editor + control
 // row are the shared Composer (#721); this form owns the submit (sendStart with the collected
 // Global options), the system-prompt preview, and the Context selector. Shown when no run is active;
@@ -27,11 +27,11 @@ export function StartAgentForm({
   toggleContext,
 }: {
   projectId: string
-  /** `runsOn` names the device a remote run executes on (#1067), for the "runs on <device>" marker. */
+  /** `runsOn` names the device a remote agent executes on (#1067), for the "runs on <device>" marker. */
   onAgentStarted?: ((intent: string, agentId?: string, runsOn?: string) => void) | undefined
   /** The project's files for the `#` picker (#504), owned by the shell. */
   files: string[]
-  /** The run Context set, shared with the right-rail file tree (#492) — owned by the shell. */
+  /** The agent Context set, shared with the right-rail file tree (#492) — owned by the shell. */
   context: Set<string>
   /** Add a path to the Context (from an `@`/`#` mention). */
   addContext: (path: string) => void
@@ -61,7 +61,7 @@ export function StartAgentForm({
   // paths). Split out the files so they can be shown + removed, and count each kind separately.
   const projectPaths = new Set(projects.map(p => p.path))
   const contextFiles = [...context].filter(path => !projectPaths.has(path))
-  // The current project is already the run's workspace, so it isn't offered as a focus target
+  // The current project is already the agent's workspace, so it isn't offered as a focus target
   // (#665) — only the other registered repos are, and only those count toward the header.
   const otherProjects = projects.filter(p => p.id !== projectId)
   const selectedRepos = otherProjects.filter(p => context.has(p.path)).length
@@ -72,24 +72,24 @@ export function StartAgentForm({
     .filter(Boolean)
     .join(' · ')
 
-  // The device this run targets (#1067), if one is picked in the "Run on" gear. Its token is a
-  // per-browser secret, so it rides the run as memory-only `options.remote` and is never persisted.
+  // The device this agent targets (#1067), if one is picked in the "Run on" gear. Its token is a
+  // per-browser secret, so it rides the agent as memory-only `options.remote` and is never persisted.
   const profiles = useConnectionProfiles()
   const selectedDeviceId = useSelectedRemoteDeviceId()
   const remoteDevice = selectedDeviceId ? profiles.find(p => p.id === selectedDeviceId) : undefined
 
-  // The options this run will start with: the daemon's own mapping (#858), read once, so the
-  // submit and the system-prompt preview below cannot disagree with the run they describe. A picked
+  // The options this agent will start with: the daemon's own mapping (#858), read once, so the
+  // submit and the system-prompt preview below cannot disagree with the agent they describe. A picked
   // device adds the relay target (#1067); absent, this is byte-identical to a local start.
   const options = {
     ...agentOptionsFromPreferences(preferences, [...context]),
     ...(remoteDevice ? { remote: { url: remoteDevice.url, token: remoteDevice.token, label: remoteDevice.label } } : {}),
   }
 
-  // A web run on a project Claude Code has not been trusted in dies on the CLI's interactive
-  // trust dialog (#1314), so say so BEFORE the run is spent, with the one-time fix (#1318).
+  // A web agent on a project Claude Code has not been trusted in dies on the CLI's interactive
+  // trust dialog (#1314), so say so BEFORE the agent is spent, with the one-time fix (#1318).
   // Read only when web is the target; `known: false` (config unreadable) shows nothing rather
-  // than crying wolf, and the run's own failure advice remains the fallback.
+  // than crying wolf, and the agent's own failure advice remains the fallback.
   const web = options.target === 'web' && !remoteDevice
   const trust = useLoaded<Awaited<ReturnType<typeof onClaudeTrust>>>(
     () => (web ? onClaudeTrust(projectId) : Promise.resolve(null)),
@@ -98,8 +98,8 @@ export function StartAgentForm({
   )
   const untrusted = web && trust !== null && trust.known && !trust.trusted
 
-  // Can the picked driver's CLI start a run at all (#1326)? An `actions` run needs nothing local,
-  // and a remote run executes on its own device, so neither is probed here. Re-read when the agent
+  // Can the picked driver's CLI start an agent at all (#1326)? An `actions` run needs nothing local,
+  // and a remote agent executes on its own device, so neither is probed here. Re-read when the agent
   // changes, since the answer is per CLI: `claude` being logged in says nothing about `codex`.
   // An armed PR/merge rung adds the `gh` half (#1419): the handoff publishes through the GitHub
   // CLI, so a missing or logged-out `gh` is said now, not hours later as a silently unopened PR.
@@ -115,7 +115,7 @@ export function StartAgentForm({
   // An armed merge on a repo with GitHub auto-merge disabled silently degrades to an immediate
   // direct merge — the PR lands before CI has run (#1417/#1406). Warn with the fix BEFORE the
   // session is spent, the way #1318 warns about trust. Read only while the merge rung is armed;
-  // a remote run merges on its own device, so it is not probed here.
+  // a remote agent merges on its own device, so it is not probed here.
   const mergeArmed = options.handoff === 'merge' && !remoteDevice
   const repoAutoMerge = useLoaded<Awaited<ReturnType<typeof onRepoAutoMerge>>>(
     () => (mergeArmed ? onRepoAutoMerge(projectId) : Promise.resolve(null)),
@@ -127,15 +127,15 @@ export function StartAgentForm({
   const submit = async (text: string, submitKind: 'build' | 'prompt') => {
     if (busy) return
     setNote('Starting…')
-    // A preset run (`submitKind === 'prompt'`) is fired work, not a conversation: it runs
+    // A preset agent (`submitKind === 'prompt'`) is fired work, not a conversation: it runs
     // unattended (#1279), ending at settle with its armed handoff firing, exactly as the same
     // routine does when the auto-PM sweep starts it. A typed prompt keeps the stay-open chat.
     const result = await start(projectId, text, submitKind, submitKind === 'prompt' ? { ...options, unattended: true } : options)
     setNote(null)
     if (result) {
-      // Show the run in the Runs rail immediately (#405): the spawned process writes its run.json
+      // Show the agent in the Runs rail immediately (#405): the spawned process writes its agent.json
       // a beat later, so seed an optimistic row with the typed prompt until the real meta takes over.
-      // A remote run (#1067) carries the device label so the view can mark where it executes.
+      // A remote agent (#1067) carries the device label so the view can mark where it executes.
       onAgentStarted?.(text, result.agentId, remoteDevice?.label) // select the run we just started (#761)
       composerRef.current?.clear()
       setPrompt('')
@@ -151,7 +151,7 @@ export function StartAgentForm({
       transparent={transparent}
       onTransparentChange={value => updatePreferences({ transparent: value })}
       // Read off the options this form will really send, so the preview cannot claim a
-      // smaller prompt than the run gets (#863 asks for the entire one). The browser
+      // smaller prompt than the agent gets (#863 asks for the entire one). The browser
       // section is Claude-only, and that rule lives in the mapping rather than here.
       browser={options.browser ?? false}
       context={[...context]}

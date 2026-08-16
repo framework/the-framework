@@ -41,18 +41,18 @@ export function RightRail({
   docsInMain = false,
 }: {
   projectId: string | null
-  /** The selected run: scopes the file tree to its worktree (#815) and keys the browser preview. */
+  /** The selected agent: scopes the file tree to its worktree (#815) and keys the browser preview. */
   agentId?: string | null | undefined
   views: AgentView[]
   /** The project's files for the Files tab tree (#492); empty on the relay. */
   files: string[]
-  /** The run Context set, shared with the Start form (#504). */
+  /** The agent Context set, shared with the Start form (#504). */
   context: Set<string>
   /** Toggle a file path in the Context. */
   toggleContext: (path: string) => void
-  /** Whether the selected run is serving a browser preview (#813), i.e. it was started with Browser on. */
+  /** Whether the selected agent is serving a browser preview (#813), i.e. it was started with Browser on. */
   hasBrowser?: boolean
-  /** Where the selected run executes (#1053/#610): an `actions` run has no browser on the runner, so no pane; `remote` (#1067) has none locally either, and neither does a `web` cloud session. */
+  /** Where the selected agent executes (#1053/#610): an `actions` run has no browser on the runner, so no pane; `remote` (#1067) has none locally either, and neither does a `web` cloud session. */
   target?: 'local' | 'actions' | 'remote' | 'web' | undefined
   /**
    * The launcher renders Docs in its main column (#1455 item 2), so while it is the main view the
@@ -99,13 +99,13 @@ export function RightRail({
 
   if (!projectId) return null
 
-  // Files first (#492): the project peek surface, before the run's own choices/views/docs/log.
+  // Files first (#492): the project peek surface, before the agent's own choices/views/docs/log.
   // Every tab is earned by content (#1146): a tab that can only say "nothing yet" is one the rail
   // does not offer, and a rail with no tabs left is not shown at all.
   const tabs: Tab[] = [
     ...(hasFiles ? ['files' as const] : []),
     ...(hasViews ? ['views' as const] : []),
-    // Only when the run actually has one (#813) — a dead tab teaches people the preview is broken.
+    // Only when the agent actually has one (#813) — a dead tab teaches people the preview is broken.
     ...(showBrowser && agentId ? ['browser' as const] : []),
     ...(hasDocs ? ['docs' as const] : []),
   ]

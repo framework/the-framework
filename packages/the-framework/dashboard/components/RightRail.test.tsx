@@ -62,7 +62,7 @@ describe('RightRail width', () => {
 })
 
 // A GitHub Actions run has no browser on the runner (#1053), so the pane must not be offered even
-// when the browser flag is on; a local run keeps it.
+// when the browser flag is on; a local agent keeps it.
 describe('RightRail browser tab (#1053)', () => {
   test('a local run with a browser offers the Browser tab', () => {
     render(<RightRail {...baseProps} hasBrowser />)
@@ -76,7 +76,7 @@ describe('RightRail browser tab (#1053)', () => {
 })
 
 // The loop's verdict is pinned under the tabs rather than being one of them: it is a standing fact
-// about the run, so it stays put while you move between panels.
+// about the agent, so it stays put while you move between panels.
 describe('RightRail tab labels (#1145)', () => {
   test('a tab says what it holds when hovered', async () => {
     render(<RightRail {...baseProps} />)
@@ -150,7 +150,7 @@ describe('RightRail empty panels (#1146)', () => {
   test('the open tab losing its content falls back to one that still has some', async () => {
     const { rerender } = render(<RightRail {...baseProps} views={[view]} />)
     await settle()
-    // Picked by hand, so nothing auto-defaults away from it; then the run ends and the views
+    // Picked by hand, so nothing auto-defaults away from it; then the agent ends and the views
     // go with it, leaving the remembered tab pointing at something that is no longer there.
     fireEvent.click(screen.getByRole('tab', { name: /views/i }))
     expect(screen.getByRole('tab', { name: /views/i }).getAttribute('aria-selected')).toBe('true')

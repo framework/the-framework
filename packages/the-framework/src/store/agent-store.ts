@@ -15,10 +15,10 @@ import { nodeFs } from '../node-fs.js'
  */
 
 /**
- * The directory, under the workspace root, that holds the persisted run. Same
+ * The directory, under the workspace root, that holds the persisted agent. Same
  * `.the-framework/` directory as the committed project log (#313): one dir holds
- * both the transient run state (events.jsonl / agent.json / agents/) and the DB
- * (LOGS.md); a seeded `.the-framework/.gitignore` keeps the run state untracked.
+ * both the transient agent state (events.jsonl / agent.json / agents/) and the DB
+ * (LOGS.md); a seeded `.the-framework/.gitignore` keeps the agent state untracked.
  */
 export const FRAMEWORK_DIR = '.the-framework'
 
@@ -39,17 +39,17 @@ export const META_FILE = 'agent.json'
 
 /**
  * Where finished runs are archived, so the dashboard can list a project's run
- * history (#303). The live run stays at `events.jsonl`/`agent.json` (the daemon
+ * history (#303). The live agent stays at `events.jsonl`/`agent.json` (the daemon
  * tails it); on {@link AgentStore.close} a copy lands here as `<id>.jsonl` +
- * `<id>.json`, giving the history sidebar a per-run log to replay.
+ * `<id>.json`, giving the history sidebar a per-agent log to replay.
  */
 export const AGENTS_DIR = 'agents'
 
 /**
  * Where a project's finished runs are archived now (#1179): `.the-framework/<user>/sessions/`,
  * which the install-time ignore un-ignores so the history is committed and survives a
- * `git clean -fdx`. {@link AGENTS_DIR} stays the transient location — a run worktree still archives
- * into its own throwaway checkout there, and it is where every run archived before this shipped
+ * `git clean -fdx`. {@link AGENTS_DIR} stays the transient location — an agent worktree still archives
+ * into its own throwaway checkout there, and it is where every agent archived before this shipped
  * still lives, so both are read.
  *
  * The name lives here beside its sibling rather than in `sessions.ts`, which owns the per-user
@@ -64,14 +64,14 @@ export function agentIdFromStartedAt(startedAt: string): string {
   return startedAt.replace(/[:.]/g, '-')
 }
 
-/** A run id is path-safe: no separators or traversal, only our own charset. */
+/** An agent id is path-safe: no separators or traversal, only our own charset. */
 export function isSafeAgentId(id: string): boolean {
   return /^[A-Za-z0-9_-]+$/.test(id)
 }
 
 /**
  * The inverse of {@link agentIdFromStartedAt}, for a caller that has the id but not the meta
- * (#1251): the CLI's end-of-run handoff needs the start time to tell the run's own PR from a
+ * (#1251): the CLI's end-of-run handoff needs the start time to tell the agent's own PR from a
  * predecessor's on the same branch name. Undefined for an id that is not one of ours.
  */
 export function startedAtFromAgentId(id: string): string | undefined {
@@ -82,25 +82,25 @@ export function startedAtFromAgentId(id: string): string | undefined {
 /** Bumped when the on-disk shape changes, so a reader can detect an old file. */
 export const AGENT_META_VERSION = 2
 
-/** How a run ended (or that it is still going). */
+/** How an agent ended (or that it is still going). */
 export type AgentStatus = 'running' | 'done' | 'stopped' | 'failed'
 
 /**
- * A queryable snapshot of the run, derived entirely from the event log. Lets the
- * dashboard render a header (and a future run list) without parsing every line.
+ * A queryable snapshot of the agent, derived entirely from the event log. Lets the
+ * dashboard render a header (and a future agent list) without parsing every line.
  */
 export interface AgentMeta {
   version: number
   status: AgentStatus
-  /** Stable, path-safe id for this run (derived from {@link startedAt}). */
+  /** Stable, path-safe id for this agent (derived from {@link startedAt}). */
   id: string
   /** ISO timestamp the store was opened (run start). */
   startedAt: string
   /** ISO timestamp of the last event written. */
   updatedAt: string
   /**
-   * The OS pid of the process that owns this run (the one tailing `control.jsonl`), on {@link host}.
-   * Persisted so a reader can tell a live run from one whose process died without writing `end`
+   * The OS pid of the process that owns this agent (the one tailing `control.jsonl`), on {@link host}.
+   * Persisted so a reader can tell a live agent from one whose process died without writing `end`
    * (#716): a `running` meta whose owning pid is gone is stale and gets flipped to `stopped`.
    */
   pid?: number
@@ -119,20 +119,20 @@ export interface AgentMeta {
   /** The session name the agent chose (#326), also its `the-framework/<name>` branch. */
   sessionName?: string
   /**
-   * The branch the run's work is on: folded from `branch` events as the run observes it (#1277),
+   * The branch the agent's work is on: folded from `branch` events as the agent observes it (#1277),
    * and corrected at teardown while the worktree still exists (#799).
    *
-   * Not reliably derivable instead of recorded: a clean run loses its checkout, and the #326
+   * Not reliably derivable instead of recorded: a clean agent loses its checkout, and the #326
    * prompt lets the agent create its own branch, so neither `the-framework/<sessionName>` nor
    * the run-id branch is guaranteed to be the one holding the commits.
    */
   branch?: string
   /**
-   * The ticket this run is implementing (#1117), repo-relative (`tickets/<file>.md`).
+   * The ticket this agent is implementing (#1117), repo-relative (`tickets/<file>.md`).
    *
    * Set only when the framework picked the ticket itself, so the Overview can show a ticket that is
    * being coded right now as `implementing` instead of inferring it from the plan/spike it left
-   * behind. Absent on every run nobody linked to a ticket.
+   * behind. Absent on every agent nobody linked to a ticket.
    */
   ticket?: string
   /**
@@ -146,13 +146,13 @@ export interface AgentMeta {
    * What this session's end-of-session handoff is armed to do (#1102): push its branch, and open
    * a draft PR for it. Both start on.
    *
-   * On the meta because the checkboxes that show it live in a different process from the run that
-   * obeys it, and a tab opened after the run started has no event history to fold — the same
-   * reason {@link browserStreamPort} is here. Absent means an older run, which the reader treats
-   * as armed, matching what that run will actually do.
+   * On the meta because the checkboxes that show it live in a different process from the agent that
+   * obeys it, and a tab opened after the agent started has no event history to fold — the same
+   * reason {@link browserStreamPort} is here. Absent means an older agent, which the reader treats
+   * as armed, matching what that agent will actually do.
    *
    * `merge` mirrors the auto-merge arming (#1216, #1382) — display-only, like the rest of this
-   * field: the run merges off its own config, never off the meta. Absent on records from before
+   * field: the agent merges off its own config, never off the meta. Absent on records from before
    * #1382, which the reader treats as off.
    */
   handoff?: { push: boolean; pr: boolean; merge?: boolean }
@@ -160,7 +160,7 @@ export interface AgentMeta {
    * How the end-of-session handoff reported back (#1455), folded from the `handoff` event.
    *
    * What lets a list surface — which reads meta, not the event log — tell "ended, still
-   * publishing" from "ended, published": between a clean `end` and this field, an armed run's
+   * publishing" from "ended, published": between a clean `end` and this field, an armed agent's
    * epilogue is still pushing / opening the PR, exactly the window the session pill calls
    * "publishing…" (#1431). Only trustworthy at {@link AgentMeta.version} ≥ 2: older records never
    * folded the event, so its absence there says nothing and must not read as forever-publishing.
@@ -172,28 +172,28 @@ export interface AgentMeta {
    * What the daemon's CI watch scans for: `watched` is a PR waiting for green that *this* side
    * must merge (the repo could not arm GitHub auto-merge), `auto-armed` one GitHub will land by
    * itself but whose checks going red is still ours to notice. On the meta because the watch
-   * reads metas, not event logs, and must survive both the run's process and the daemon's.
-   * Absent on runs from before this field, and on every run whose handoff had no merge to report.
+   * reads metas, not event logs, and must survive both the agent's process and the daemon's.
+   * Absent on runs from before this field, and on every agent whose handoff had no merge to report.
    */
   mergeOutcome?: 'auto-armed' | 'merged' | 'watched' | 'withheld' | 'failed'
   /**
-   * The choice gate the run is currently parked on (#636): set when a `choice` event fires and
-   * cleared when its `choice-resolved` (or the run's `end`) arrives. Present means the run is
+   * The choice gate the agent is currently parked on (#636): set when a `choice` event fires and
+   * cleared when its `choice-resolved` (or the agent's `end`) arrives. Present means the agent is
    * paused waiting for the user's answer — the second "needs you" source after open PRs (#624).
    */
   pendingChoice?: { id: string; title: string }
   /**
-   * When the run settled and parked on the user (#785), or absent while the agent is working.
+   * When the agent settled and parked on the user (#785), or absent while the agent is working.
    *
-   * Deliberately not a {@link AgentStatus} value: the run IS still live while it waits (its
+   * Deliberately not a {@link AgentStatus} value: the agent IS still live while it waits (its
    * process is alive, it still takes messages, it still holds the project), and a dozen readers
    * key "live" off `status === 'running'`. This is the orthogonal fact — working, or waiting on
-   * you — which `status` cannot carry because it only changes when the run ends.
+   * you — which `status` cannot carry because it only changes when the agent ends.
    */
   settledAt?: string
   /**
-   * The loopback port the run's browser preview is listening on (#813), or absent when the run
-   * has no browser. What lets the daemon proxy the pane: the port is allocated per run and the
+   * The loopback port the agent's browser preview is listening on (#813), or absent when the agent
+   * has no browser. What lets the daemon proxy the pane: the port is allocated per agent and the
    * dashboard is a different process, so meta is the only place it can learn it.
    */
   browserStreamPort?: number
@@ -201,16 +201,16 @@ export interface AgentMeta {
    * Where this run executes (#1050/#1053/#610): `actions` for a GitHub Actions run, `web` for a
    * Claude Code cloud session, `remote` when relayed to a connected device (#1067), absent for a
    * local run. Persisted so the run view can tell a burst-mode Actions run from a stalled live
-   * feed, show a cloud run's session link after a reload, and gate the browser pane off (#1053).
+   * feed, show a cloud agent's session link after a reload, and gate the browser pane off (#1053).
    */
   target?: 'local' | 'actions' | 'remote' | 'web'
-  /** The connected device a remote run (#1067) executes on, for the session list + notice after a reload. */
+  /** The connected device a remote agent (#1067) executes on, for the session list + notice after a reload. */
   remoteLabel?: string
   /**
-   * The flow this run started under (#1467): `build` for the scope→build orchestration, `prompt`
+   * The flow this agent started under (#1467): `build` for the scope→build orchestration, `prompt`
    * for the direct-prompt path (research and transparent runs record `prompt` too). Persisted so a
    * continuation (#762) can re-enter the flow its first leg ran — the composer's Resume always
-   * arrives as a `prompt` start, and without this record a resumed build run ended as a bare
+   * arrives as a `prompt` start, and without this record a resumed build agent ended as a bare
    * prompt session (no synthesize framing, no backlog offer). Absent on records from before this
    * field, which a reader treats as unknown (the continuation then keeps the prompt path).
    */
@@ -250,7 +250,7 @@ export interface OpenStoreOptions {
   /** The filesystem adapter. Default {@link nodeStoreFs}. */
   fs?: StoreFs
   /**
-   * Truncate any prior log so this is a clean run (MVP: one run per workspace).
+   * Truncate any prior log so this is a clean agent (MVP: one agent per workspace).
    * `false` (the default) opens read-only-ish for {@link AgentStore.loadEvents} —
    * the `--resume` path — and does not clear the log.
    */
@@ -259,9 +259,9 @@ export interface OpenStoreOptions {
   now?: string
   /**
    * Reads the current time for each appended event, so {@link AgentMeta.updatedAt} tracks the last
-   * event rather than the run's start. Injectable so tests can step it deterministically.
+   * event rather than the agent's start. Injectable so tests can step it deterministically.
    *
-   * Separate from {@link now} on purpose: `now` is when the run *opened*, and a single timestamp
+   * Separate from {@link now} on purpose: `now` is when the agent *opened*, and a single timestamp
    * cannot answer both questions. Reusing it for appends froze `updatedAt` at `startedAt` for a
    * run's whole life, which every reader that orders by recency (the overview, the activity feed,
    * the interventions queue) silently sorted on.
@@ -274,29 +274,29 @@ export interface OpenStoreOptions {
    */
   intent?: string
   /**
-   * Who owns this run (#716). Defaults to the current process on this host — the process opening a
-   * fresh store *is* the run's owner. Injectable so tests can seed a specific (dead) pid.
+   * Who owns this agent (#716). Defaults to the current process on this host — the process opening a
+   * fresh store *is* the agent's owner. Injectable so tests can seed a specific (dead) pid.
    */
   owner?: AgentOwner
   /**
-   * The run's id, overriding the one derived from {@link OpenStoreOptions.now}. The daemon
-   * allocates the id before it spawns the run (it names the run's worktree with it, #736) and
-   * passes it in, so the worktree directory and the run inside it are one string rather than two
+   * The agent's id, overriding the one derived from {@link OpenStoreOptions.now}. The daemon
+   * allocates the id before it spawns the agent (it names the agent's worktree with it, #736) and
+   * passes it in, so the worktree directory and the agent inside it are one string rather than two
    * timestamps taken a moment apart. Ignored unless path-safe.
    */
   id?: string
   /**
-   * Reopen the run already at this path instead of starting a new one (#762): keep its event log
+   * Reopen the agent already at this path instead of starting a new one (#762): keep its event log
    * and its original intent, and flip it back to `running` under this process. What makes a
    * continued run one row in the history rather than two: the follow-up is a second process, but
-   * it writes into the same run.
+   * it writes into the same agent.
    *
-   * Falls back to a fresh run when there is nothing to reopen.
+   * Falls back to a fresh agent when there is nothing to reopen.
    */
   continueAgent?: boolean
-  /** Where this run executes (#1053/#610): recorded on the meta so the run view can read it. */
+  /** Where this agent executes (#1053/#610): recorded on the meta so the agent view can read it. */
   target?: AgentLocation
-  /** The flow this run started under (#1467): recorded on the meta so a continuation can re-enter it. */
+  /** The flow this agent started under (#1467): recorded on the meta so a continuation can re-enter it. */
   kind?: 'build' | 'prompt'
 }
 
@@ -358,14 +358,14 @@ export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: str
       next.settledAt = at
       break
     case 'driver':
-      // Any new turn means the agent is working again, so the run is no longer parked (#785).
+      // Any new turn means the agent is working again, so the agent is no longer parked (#785).
       if (event.event.type === 'start') delete next.settledAt
       break
     case 'end':
       next.status = event.ok ? 'done' : event.stopped ? 'stopped' : 'failed'
       delete next.pendingChoice // a finished run is not awaiting anything
       delete next.settledAt // nor is it waiting on you
-      // The bridge dies with the run, so a kept port would send the pane at whatever else
+      // The bridge dies with the agent, so a kept port would send the pane at whatever else
       // the OS handed that number next.
       delete next.browserStreamPort
       break
@@ -375,13 +375,13 @@ export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: str
   return next
 }
 
-/** Who owns a live run: its OS pid and the host that pid lives on (#716). */
+/** Who owns a live agent: its OS pid and the host that pid lives on (#716). */
 export interface AgentOwner {
   pid: number
   host: string
 }
 
-/** The seed meta a run starts from, before any event is folded in. */
+/** The seed meta an agent starts from, before any event is folded in. */
 function freshMeta(
   startedAt: string,
   intent?: string,
@@ -406,7 +406,7 @@ function freshMeta(
 
 /**
  * Parse a JSONL event log. A blank or malformed trailing line (e.g. a crash
- * mid-write) stops the read rather than throwing, so a partial run still replays
+ * mid-write) stops the read rather than throwing, so a partial agent still replays
  * everything up to the cut.
  */
 function parseEventLog(raw: string): FrameworkEvent[] {
@@ -434,8 +434,8 @@ const TORN_META_READ_DELAY_MS = 5
  *
  * Re-read on a parse failure (#1540). {@link writeMetaFile} closes this off at the source, so this
  * is the backstop rather than the defence: a meta written by an older CLI still on a plain
- * in-place write — a daemon reading a run started before an upgrade — can still be caught
- * mid-truncate, and reporting that as `undefined` makes a live run *vanish* from every composed
+ * in-place write — a daemon reading an agent started before an upgrade — can still be caught
+ * mid-truncate, and reporting that as `undefined` makes a live agent *vanish* from every composed
  * read for one poll. A torn read is transient by construction, so ask again; a file still
  * unparseable after the retries is genuinely corrupt and yields `undefined`, exactly as before.
  */
@@ -455,10 +455,10 @@ async function readMetaFile(fs: StoreFs, path: string): Promise<AgentMeta | unde
  * Write a {@link AgentMeta} file. The one owner of the on-disk encoding, symmetric to
  * {@link readMetaFile} — every meta write in this module goes through it.
  *
- * Written beside the target and renamed over it (#1540). A meta is rewritten by the run that owns
+ * Written beside the target and renamed over it (#1540). A meta is rewritten by the agent that owns
  * it, over and over, while the daemon and every dashboard read poll it from another process; a
  * plain write truncates the file before it refills, so a reader landing in that window saw an
- * empty one and reported the run *gone*. A rename swaps the whole file in one step, so a reader
+ * empty one and reported the agent *gone*. A rename swaps the whole file in one step, so a reader
  * gets either the entire previous meta or the entire new one and never a half of either — which
  * {@link readMetaFile}'s retry can only paper over, never prevent. An adapter with no `rename`
  * writes in place as before.
@@ -466,7 +466,7 @@ async function readMetaFile(fs: StoreFs, path: string): Promise<AgentMeta | unde
 async function writeMetaFile(fs: StoreFs, path: string, meta: AgentMeta): Promise<void> {
   const contents = JSON.stringify(meta, null, 2) + '\n'
   if (!fs.rename) return fs.write(path, contents)
-  // Named for the writing process: a run and the daemon teardown archiving it can both be
+  // Named for the writing process: an agent and the daemon teardown archiving it can both be
   // writing the same meta, and they must not share a scratch file and splice their writes into
   // one. `.tmp` also keeps it out of the archive listing, which takes only `.json`.
   const scratch = `${path}.${process.pid}.tmp`
@@ -475,10 +475,10 @@ async function writeMetaFile(fs: StoreFs, path: string, meta: AgentMeta): Promis
 }
 
 /**
- * The `end` event written on behalf of a run whose process died without reporting one (#1359):
+ * The `end` event written on behalf of an agent whose process died without reporting one (#1359):
  * a crash, a `kill -9`, or the empty-event-loop exit a parked gate used to cause. Every reader
  * of the stream — the dashboard's outcome pill, its choice rail, the meta fold — keys "over"
- * off a single `end` event, so a death that skipped it left the run's last question rendering
+ * off a single `end` event, so a death that skipped it left the agent's last question rendering
  * as answerable forever while its picks were read by nobody.
  */
 function orphanEndEvent(): FrameworkEvent {
@@ -486,9 +486,9 @@ function orphanEndEvent(): FrameworkEvent {
 }
 
 /**
- * Record a dead run's missing ending in place (#1359): append the surrogate `end` event to the
+ * Record a dead agent's missing ending in place (#1359): append the surrogate `end` event to the
  * checkout's live log and fold it into the meta via {@link applyEventToMeta} — so the status
- * flips to `stopped` and a `pendingChoice` the run died holding expires exactly as a run-written
+ * flips to `stopped` and a `pendingChoice` the agent died holding expires exactly as a run-written
  * end would expire it. Best-effort on both writes: healing must never make a read throw.
  */
 async function recordOrphanEnd(fs: StoreFs, dir: string, meta: AgentMeta): Promise<AgentMeta> {
@@ -500,7 +500,7 @@ async function recordOrphanEnd(fs: StoreFs, dir: string, meta: AgentMeta): Promi
 }
 
 /**
- * Flip the live run at `dir` to `stopped` and archive it, returning the stopped meta. The
+ * Flip the live agent at `dir` to `stopped` and archive it, returning the stopped meta. The
  * shared tail of every self-heal: a `running` meta whose process is gone must both stop
  * showing as live and keep its history. The flip goes through {@link recordOrphanEnd}, so
  * the log gains the `end` event the dead process never wrote (#1359) before the archive
@@ -520,7 +520,7 @@ export function metaFromEvents(events: readonly FrameworkEvent[], startedAt: str
 }
 
 /**
- * Durable, append-only store for a single run's orchestration events, plus a
+ * Durable, append-only store for a single agent's orchestration events, plus a
  * derived {@link AgentMeta} snapshot. Writes are serialized through one tail
  * promise so an append and its meta rewrite never interleave; {@link close}
  * flushes that queue before the process exits.
@@ -557,7 +557,7 @@ export class AgentStore {
 
   /**
    * Open (creating `.the-framework/` if needed) under the workspace `cwd`. `fresh`
-   * truncates any prior log for a new run; the default preserves it so a resume
+   * truncates any prior log for a new agent; the default preserves it so a resume
    * can {@link loadEvents}.
    */
   static async open(cwd: string, opts: OpenStoreOptions = {}): Promise<AgentStore> {
@@ -570,7 +570,7 @@ export class AgentStore {
     const store = new AgentStore(fs, dir, clock, freshMeta(now, opts.intent, owner, opts.id, opts.target, opts.kind))
     if (opts.continueAgent) {
       // Reopen: the log stays, the row keeps its original intent, and this process takes ownership
-      // so a liveness probe (#716) reads the run as alive rather than as an orphan.
+      // so a liveness probe (#716) reads the agent as alive rather than as an orphan.
       const prior = await readMetaFile(fs, store.metaPath)
       if (prior) {
         store.meta = { ...prior, status: 'running', pid: owner.pid, host: owner.host, updatedAt: now }
@@ -580,7 +580,7 @@ export class AgentStore {
       }
     }
     if (opts.fresh) {
-      // A new run truncates the live log. First rescue the prior run if it never
+      // A new agent truncates the live log. First rescue the prior agent if it never
       // got archived (e.g. a crash exited before close), so no history is lost.
       await archivePriorAgent(fs, dir).catch(() => {})
       await fs.write(store.eventsPath, '')
@@ -592,7 +592,7 @@ export class AgentStore {
   /**
    * Append one event to the log and refresh the meta snapshot. Fire-and-forget at
    * the call site: internally chained so writes stay ordered. A failed write is
-   * swallowed (persistence is best-effort — it must never break a live run).
+   * swallowed (persistence is best-effort — it must never break a live agent).
    */
   append(event: FrameworkEvent): Promise<void> {
     this.meta = applyEventToMeta(this.meta, event, this.clock())
@@ -609,9 +609,9 @@ export class AgentStore {
   }
 
   /**
-   * Flush any queued writes, then archive this run into `agents/` so it shows up in
+   * Flush any queued writes, then archive this agent into `agents/` so it shows up in
    * the dashboard's history (#303). Both best-effort: persistence must never break
-   * a run, so an archive failure is logged, not thrown.
+   * an agent, so an archive failure is logged, not thrown.
    */
   async close(): Promise<void> {
     await this.tail
@@ -629,7 +629,7 @@ export class AgentStore {
 
   /**
    * Read and parse the persisted event log. A blank or malformed trailing line
-   * (e.g. a crash mid-write) is skipped rather than throwing, so a partial run
+   * (e.g. a crash mid-write) is skipped rather than throwing, so a partial agent
    * still replays everything up to the cut. Missing file yields `[]`.
    */
   async loadEvents(): Promise<FrameworkEvent[]> {
@@ -648,15 +648,15 @@ export class AgentStore {
 }
 
 /**
- * The directory a run's archive lives in: this user's committed `sessions/` when a caller named
+ * The directory an agent's archive lives in: this user's committed `sessions/` when a caller named
  * one (#1179), else the transient `agents/`. Callers pass a user only where the archive is meant to
- * be kept — the project's copy — never for the copy a run leaves inside its own worktree.
+ * be kept — the project's copy — never for the copy an agent leaves inside its own worktree.
  */
 function archiveDir(dir: string, user?: string): string {
   return user ? join(dir, user, ARCHIVE_DIR) : join(dir, AGENTS_DIR)
 }
 
-/** Paths of a run's archived log + meta. */
+/** Paths of an agent's archived log + meta. */
 function archivePaths(dir: string, id: string, user?: string): { events: string; meta: string } {
   const agents = archiveDir(dir, user)
   return { events: join(agents, `${id}.jsonl`), meta: join(agents, `${id}.json`) }
@@ -675,8 +675,8 @@ function archivePaths(dir: string, id: string, user?: string): { events: string;
  * `.the-framework/` is simply not one (readdir yields `[]` for anything that is not a directory).
  */
 /**
- * Where one run's archive actually sits, searched across {@link archiveDirs}, or `undefined` when
- * it is nowhere. A run id alone no longer names a path: which user archived it decides that, and a
+ * Where one agent's archive actually sits, searched across {@link archiveDirs}, or `undefined` when
+ * it is nowhere. An agent id alone no longer names a path: which user archived it decides that, and a
  * reader (the continue (#762), a removal) only has the id.
  */
 async function findArchive(fs: StoreFs, dir: string, agentId: string): Promise<{ events: string; meta: string } | undefined> {
@@ -698,8 +698,8 @@ async function archiveDirs(fs: StoreFs, dir: string): Promise<string[]> {
 }
 
 /**
- * Copy a run's live log + meta into its archive as `<id>.jsonl` / `<id>.json`. The live files stay
- * put (the daemon keeps tailing them until the next run); this is a durable snapshot for the
+ * Copy an agent's live log + meta into its archive as `<id>.jsonl` / `<id>.json`. The live files stay
+ * put (the daemon keeps tailing them until the next agent); this is a durable snapshot for the
  * history list. Idempotent per id. `user` files it under that user's committed sessions (#1179).
  */
 async function archiveAgent(fs: StoreFs, dir: string, meta: AgentMeta, eventsPath: string, user?: string): Promise<void> {
@@ -712,8 +712,8 @@ async function archiveAgent(fs: StoreFs, dir: string, meta: AgentMeta, eventsPat
 }
 
 /**
- * Archive the run currently sitting in the live files, unless it is already in
- * `agents/`. Used at the start of a fresh run so a crash that skipped
+ * Archive the agent currently sitting in the live files, unless it is already in
+ * `agents/`. Used at the start of a fresh agent so a crash that skipped
  * {@link AgentStore.close} still leaves its history behind.
  */
 async function archivePriorAgent(fs: StoreFs, dir: string): Promise<void> {
@@ -724,11 +724,11 @@ async function archivePriorAgent(fs: StoreFs, dir: string): Promise<void> {
 }
 
 /**
- * Put an archived run's history back where a run reads it (#762), so a continued run picks up its
+ * Put an archived agent's history back where an agent reads it (#762), so a continued agent picks up its
  * own log rather than starting empty. The inverse of {@link archiveWorktreeAgent}: teardown moved the
  * history to the repo, and continuing needs it in the checkout again.
  *
- * A no-op when the worktree already holds a live run (nothing to restore, and its log is newer),
+ * A no-op when the worktree already holds a live agent (nothing to restore, and its log is newer),
  * or when there is no archive. Never throws.
  */
 export async function restoreArchivedAgent(
@@ -753,8 +753,8 @@ export async function restoreArchivedAgent(
 }
 
 /**
- * The run ids that have a worktree directory under `.the-framework/worktrees/` (#737). Names
- * only, from the filesystem: a directory here IS a run's checkout, and its name is the run id.
+ * The agent ids that have a worktree directory under `.the-framework/worktrees/` (#737). Names
+ * only, from the filesystem: a directory here IS an agent's checkout, and its name is the agent id.
  * Forgiving — a project that never ran concurrently has no such dir and yields `[]`.
  */
 export async function listWorktreeDirs(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<string[]> {
@@ -763,17 +763,17 @@ export async function listWorktreeDirs(cwd: string, fs: StoreFs = nodeStoreFs())
 }
 
 /**
- * Archive a worktree run's history into the *main repo* (#737), returning the meta it archived.
+ * Archive a worktree agent's history into the *main repo* (#737), returning the meta it archived.
  *
- * A run writes its `agent.json` / `events.jsonl` inside its own worktree (#736), so deleting that
- * worktree would delete the run's history with it. This copies it into the repo, which is the one
+ * An agent writes its `agent.json` / `events.jsonl` inside its own worktree (#736), so deleting that
+ * worktree would delete the agent's history with it. This copies it into the repo, which is the one
  * place the dashboard's history reads from, so teardown becomes safe.
  *
  * `user` files the copy under that user's committed `sessions/` (#1179) instead of the transient
- * `agents/`. It is this copy, not the one the run left in its own worktree, that is meant to last:
- * every run in a git repo gets a worktree, so this is the only archive of it that outlives the
+ * `agents/`. It is this copy, not the one the agent left in its own worktree, that is meant to last:
+ * every agent in a git repo gets a worktree, so this is the only archive of it that outlives the
  * checkout, and committing it is what makes the history survive `git clean -fdx`. The worktree's
- * own copy deliberately stays untracked — it would otherwise be committed onto the run's branch as
+ * own copy deliberately stays untracked — it would otherwise be committed onto the agent's branch as
  * well and collide with this one on merge.
  *
  * A meta still marked `running` is flipped to `stopped` first: this runs when the process is
@@ -794,7 +794,7 @@ export async function archiveWorktreeAgent(
     if (!live?.id || !isSafeAgentId(live.id)) return undefined
     // The flip writes the worktree's own log + meta too (#1359): the death gains its `end`
     // event before the archive copies the log, so no reader — live tail or archived replay —
-    // is left holding an open gate for a dead run.
+    // is left holding an open gate for a dead agent.
     const stopped: AgentMeta = live.status === 'running' ? await recordOrphanEnd(fs, worktreeDir, live) : live
     // The branch is read from the checkout by the caller and stamped here, because this is the
     // last moment it can be observed: the worktree is about to go (#799).
@@ -807,7 +807,7 @@ export async function archiveWorktreeAgent(
 }
 
 /**
- * The archived log + meta paths of one run, wherever it is filed, or `[]` when it is nowhere.
+ * The archived log + meta paths of one agent, wherever it is filed, or `[]` when it is nowhere.
  * Exported so a caller that deletes a session (the dashboard's Remove) does not have to know which
  * user archived it — before #1179 the path was derivable from the id alone, and now it is not.
  */
@@ -850,7 +850,7 @@ function isDeadRunningAgent(meta: AgentMeta | undefined, isAlive: (pid: number) 
 
 /**
  * Every archived meta a project has, across all of {@link archiveDirs}, with the path it came from.
- * De-duplicated by run id, first directory winning: a run archived before #1179 and re-archived
+ * De-duplicated by run id, first directory winning: an agent archived before #1179 and re-archived
  * into its user's sessions afterwards exists in both places, and the history must show it once.
  * The user directories are searched before `agents/`, so the committed copy is the one that wins.
  */
@@ -884,7 +884,7 @@ export async function listAgents(cwd: string, fs: StoreFs = nodeStoreFs()): Prom
  * field) or one owned by another host cannot be probed from here. The two callers treat it
  * differently on purpose — the boot reconcile flips an unknown to `stopped` (a fresh daemon
  * drives no in-flight run, and there is nothing better to go on), while the self-heal on read
- * leaves it alone (a routine read must not kill a run another machine may own).
+ * leaves it alone (a routine read must not kill an agent another machine may own).
  */
 function ownerLiveness(meta: AgentMeta, isAlive: (pid: number) => boolean): 'live' | 'dead' | 'unknown' {
   if (meta.status !== 'running' || meta.pid === undefined || meta.host !== hostname()) return 'unknown'
@@ -893,12 +893,12 @@ function ownerLiveness(meta: AgentMeta, isAlive: (pid: number) => boolean): 'liv
 
 /**
  * Reconcile runs a dead process left marked `running` — the live `agent.json`, an archived
- * `runs/*.json`, or a run inside a worktree. Such a run shows as active while nothing is left
+ * `runs/*.json`, or an agent inside a worktree. Such an agent shows as active while nothing is left
  * to read its `control.jsonl`, so its Stop is a no-op. Each is flipped to `stopped`; the live
  * run is archived first (idempotent) so its history is kept. Returns how many were reconciled.
- * Best-effort: a read/write error skips that run, never throws.
+ * Best-effort: a read/write error skips that agent, never throws.
  *
- * A run whose pid is alive on this host is left alone (#926). This used to flip every `running`
+ * An agent whose pid is alive on this host is left alone (#926). This used to flip every `running`
  * meta on the assumption that a fresh dashboard drives no in-flight run, which holds only while
  * exactly one is ever booted: a second one marked genuinely live runs as finished, giving them a
  * no-op Stop in the dashboard. A meta with no `pid` keeps the old behaviour, since there is
@@ -911,14 +911,14 @@ export async function reconcileOrphanedAgents(
 ): Promise<number> {
   const dir = join(cwd, FRAMEWORK_DIR)
   let fixed = 0
-  // Archived runs stuck at `running` (e.g. a prior live run the next run never rescued), wherever
-  // they are archived. Done before the live run so its fresh archive isn't re-counted here.
+  // Archived runs stuck at `running` (e.g. a prior live agent the next agent never rescued), wherever
+  // they are archived. Done before the live agent so its fresh archive isn't re-counted here.
   for (const { path, meta } of await readAllArchivedMetaEntries(fs, dir)) {
     if (!isDeadRunningAgent(meta, isAlive)) continue
     try {
       // The archived pair sits side by side (`<id>.json` + `<id>.jsonl`), so the surrogate end
-      // (#1359) lands in both: the replayed log sees the run finish, and the meta fold drops
-      // the pendingChoice the run died holding.
+      // (#1359) lands in both: the replayed log sees the agent finish, and the meta fold drops
+      // the pendingChoice the agent died holding.
       const event = orphanEndEvent()
       await fs.append(path.replace(/\.json$/, '.jsonl'), JSON.stringify(event) + '\n').catch(() => {})
       await writeMetaFile(fs, path, applyEventToMeta(meta, event, new Date().toISOString()))
@@ -927,8 +927,8 @@ export async function reconcileOrphanedAgents(
       // write failed — best-effort, skip
     }
   }
-  // The live run: flip it, then archive so a crash that skipped close() still
-  // leaves the stopped run in the history list.
+  // The live agent: flip it, then archive so a crash that skipped close() still
+  // leaves the stopped agent in the history list.
   const live = await readMetaFile(fs, join(dir, META_FILE))
   if (isDeadRunningAgent(live, isAlive)) {
     await stopAndArchiveLive(fs, dir, live)
@@ -936,9 +936,9 @@ export async function reconcileOrphanedAgents(
   }
 
   // Runs living in worktrees (#736/#737). A daemon that died mid-run never ran its teardown, so
-  // each of those runs is orphaned the same way — except its history sits inside the worktree,
+  // each of those agents is orphaned the same way — except its history sits inside the worktree,
   // where nothing reads it. Flip it in place (so the dashboard stops showing it as live) and copy
-  // it into the repo's history. The worktree itself is left on disk: a run that ended this way did
+  // it into the repo's history. The worktree itself is left on disk: an agent that ended this way did
   // not end cleanly, and those are kept for inspection. Removing one is an explicit action.
   for (const name of await fs.readdir(join(dir, WORKTREES_DIR))) {
     if (!isSafeAgentId(name)) continue
@@ -958,7 +958,7 @@ export async function reconcileOrphanedAgents(
  * Whether `pid` is a live process on this host. `process.kill(pid, 0)` sends no signal but
  * throws `ESRCH` once the process is gone; `EPERM` means it exists under another user (still
  * alive). A pid on a *different* host is unknowable here, so callers guard on {@link AgentMeta.host}
- * before trusting a result. A recycled pid (another process reusing a dead run's number) reads as
+ * before trusting a result. A recycled pid (another process reusing a dead agent's number) reads as
  * alive — an accepted, vanishingly rare miss on a single dev box.
  */
 export function isPidAlive(pid: number): boolean {
@@ -973,15 +973,15 @@ export function isPidAlive(pid: number): boolean {
 /**
  * The live (in-progress) run's meta snapshot from `.the-framework/agent.json`, or
  * `undefined` when none/unreadable. Unlike {@link listAgents} (which reads the
- * archived `agents/` copies written on close), this is the run the daemon is
+ * archived `agents/` copies written on close), this is the agent the daemon is
  * tailing right now — so the dashboard can list it with a `running` status
  * before it finishes. Missing or torn file yields `undefined`, never throws.
  *
- * Self-heals a stale run on read (#716): if the meta says `running` but its owning process died
+ * Self-heals a stale agent on read (#716): if the meta says `running` but its owning process died
  * without writing `end` (a crash, `kill -9`, or the machine sleeping), nothing is left to consume
  * `control.jsonl` — so Stop is a no-op and the row is stuck. When the owning pid is gone on this
  * host, flip it to `stopped` and archive it, so the dashboard clears the row on the next poll
- * instead of only after a daemon restart's boot-time {@link reconcileOrphanedAgents}. A run whose
+ * instead of only after a daemon restart's boot-time {@link reconcileOrphanedAgents}. An agent whose
  * meta predates this field (no `pid`) is left untouched — the boot reconcile still catches it.
  */
 export async function readLiveMeta(
@@ -998,25 +998,25 @@ export async function readLiveMeta(
 }
 
 /**
- * A live run plus the checkout it is running in (#738). Since #736 a run lives in its own
+ * A live agent plus the checkout it is running in (#738). Since #736 an agent lives in its own
  * worktree, so a project's live run is no longer a single thing and no longer sits at the
- * project path: `cwd` says which checkout to read that run's git/file status from.
+ * project path: `cwd` says which checkout to read that agent's git/file status from.
  */
 export interface LiveAgent extends AgentMeta {
-  /** The run's own checkout: a worktree under `.the-framework/worktrees/`, or the repo root. */
+  /** The agent's own checkout: a worktree under `.the-framework/worktrees/`, or the repo root. */
   cwd: string
 }
 
 /**
- * Every live run of a project (#738): the list variant of {@link readLiveMeta}.
+ * Every live agent of a project (#738): the list variant of {@link readLiveMeta}.
  *
- * A run started from the dashboard gets its own worktree (#736) and writes its `agent.json`
+ * An agent started from the dashboard gets its own worktree (#736) and writes its `agent.json`
  * inside it, so the project path alone no longer sees any of them. This looks in both places:
  * each `.the-framework/worktrees/*` checkout, and the repo root itself, which is where a
- * project that cannot be given a worktree (not a git repo) still runs and where every run
+ * project that cannot be given a worktree (not a git repo) still runs and where every agent
  * from before #736 lives.
  *
- * Each candidate goes through {@link readLiveMeta}, so a stale run self-heals exactly as it
+ * Each candidate goes through {@link readLiveMeta}, so a stale agent self-heals exactly as it
  * did. Newest first, by id. Never throws: an unreadable worktree is skipped.
  */
 export async function readLiveMetas(
@@ -1026,7 +1026,7 @@ export async function readLiveMetas(
 ): Promise<LiveAgent[]> {
   const worktreesDir = join(cwd, FRAMEWORK_DIR, WORKTREES_DIR)
   const names = await fs.readdir(worktreesDir).catch(() => [])
-  // isSafeAgentId: the directory name is the run id, and anything else in there is not ours.
+  // isSafeAgentId: the directory name is the agent id, and anything else in there is not ours.
   const candidates = [cwd, ...names.filter(isSafeAgentId).map(name => join(worktreesDir, name))]
   const agents: LiveAgent[] = []
   for (const candidate of candidates) {
@@ -1037,7 +1037,7 @@ export async function readLiveMetas(
 }
 
 /**
- * Read one archived run's event log for replay. Returns `undefined` for an
+ * Read one archived agent's event log for replay. Returns `undefined` for an
  * unknown or unsafe id; a torn trailing line is dropped (same rule as the live
  * {@link AgentStore.loadEvents}).
  */
@@ -1065,9 +1065,9 @@ export function nodeStoreFs(): StoreFs {
  * a side that cannot be read simply contributes nothing.
  *
  * Live wins over archived (#768). The dedup used to drop the live copy, which was right while
- * "archived" meant "finished for good": a run was only ever copied into `agents/` on its way out.
- * Continuing a run (#762) breaks that — the run has an archived copy from its first leg AND is
- * live again — and keeping the archive showed a running run as finished.
+ * "archived" meant "finished for good": an agent was only ever copied into `agents/` on its way out.
+ * Continuing an agent (#762) breaks that — the agent has an archived copy from its first leg AND is
+ * live again — and keeping the archive showed a running agent as finished.
  *
  * This composition, not its two halves, is what every caller actually wants; the store exporting
  * only the halves is why three separate modules each grew their own copy of it.
@@ -1081,7 +1081,7 @@ export async function readAllAgents(cwd: string, fs: StoreFs = nodeStoreFs()): P
 }
 
 /**
- * One run's meta by id, live copy winning over archived — {@link readAllAgents}'s rule for a
+ * One agent's meta by id, live copy winning over archived — {@link readAllAgents}'s rule for a
  * single row. The find-by-id shape the RPCs kept privately rebuilding, for the same reason
  * the list shape did: the store exported only the halves.
  */
@@ -1106,14 +1106,14 @@ export async function readEventLog(cwd: string, fs: StoreFs = nodeStoreFs()): Pr
 }
 
 /**
- * Record the pull request a finished run's work is on (E6).
+ * Record the pull request a finished agent's work is on (E6).
  *
- * A PR opened by the dashboard's button happens *after* the run's process is gone, so there is no
- * event stream left to carry it — but the fact is exactly as worth recording as the one the run
+ * A PR opened by the dashboard's button happens *after* the agent's process is gone, so there is no
+ * event stream left to carry it — but the fact is exactly as worth recording as the one the agent
  * emits for itself, and every surface reads it from the same place either way. So the archived meta
  * is patched in place.
  *
- * Best-effort and idempotent: a run with no archive yet, an unreadable meta, or a failed write
+ * Best-effort and idempotent: an agent with no archive yet, an unreadable meta, or a failed write
  * simply leaves the record as it was. The cost of missing it is one surface having to ask `gh`,
  * which is what all of them used to do.
  */

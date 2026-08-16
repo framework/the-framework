@@ -37,7 +37,7 @@ import {
 } from './ui/dropdown-menu.js'
 
 // One ⋮ overflow menu for everything you can DO to a session (#toolbar-menu), instead of a row of
-// five-plus icon buttons that came and went with the run's state. It folds in what used to be
+// five-plus icon buttons that came and went with the agent's state. It folds in what used to be
 // WorkspaceActions (GitHub / folder / editor / Serve), the Stop button, Remove worktree, Open
 // session, and Delete. The handoff's Push / Open PR stay visible in the bar — they move the work
 // forward, not just open it somewhere. Serve keeps its state (Serve → Open/Stop, or a picker
@@ -64,7 +64,7 @@ export function AgentActionsMenu({
   const info = sessionInfo(events)
   const session = describeSessionLink(info)
 
-  // Whether this session still has a checkout of its own. A live run is working in one; a finished
+  // Whether this session still has a checkout of its own. A live agent is working in one; a finished
   // run only keeps one while its work has not reached the remote (#737/E5), since that is what
   // teardown waits for before reclaiming it. Without this the folder item promised the session's
   // folder and silently opened the project root instead, because `resolveAgentCheckout` falls back

@@ -16,7 +16,7 @@ test('demoTurns choices: the build stops to ask a single-select the gate can par
   assert.ok(gate)
   assert.equal(gate.recommended, 'opt:0')
   assert.ok(gate.options.some(o => /Session cookies/.test(o.label)))
-  // The turn right after the ask is the resume (no gate), so the run continues.
+  // The turn right after the ask is the resume (no gate), so the agent continues.
   assert.equal(parseAwaitGate(turns[1]!.text), undefined)
 })
 

@@ -9,7 +9,7 @@ import { formatDateTimeShort } from './format-date.js'
 // So the loudest thing on most rows said nothing, and the rows were told apart by the quietest.
 //
 // The fallbacks in order: the agent's own name for the session (#326, also its branch), then the
-// branch its work landed on, then when nothing describes the run, the time it started. A date is
+// branch its work landed on, then when nothing describes the agent, the time it started. A date is
 // a poor name but a real one, and it belongs on the line that identifies the row.
 export function agentLabel(agent: Pick<AgentMeta, 'intent' | 'sessionName' | 'branch' | 'startedAt'>): string {
   return agent.intent?.trim() || agent.sessionName?.trim() || agent.branch?.trim() || formatDateTimeShort(agent.startedAt)

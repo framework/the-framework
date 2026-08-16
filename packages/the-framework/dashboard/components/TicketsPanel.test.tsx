@@ -79,7 +79,7 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(sendStart.mock.calls[0]?.[1]).toBe(workOnTicketPrompt('2026-07-20_do-the-thing.md'))
     expect(sendStart.mock.calls[0]?.[1]).toBe('Work on tickets/2026-07-20_do-the-thing.md. Do not start any other ticket.')
     // Unattended like the AI Queue card's play button (#1279), with the ticket on the options so
-    // the run's meta names what it implements (#1117) — the prompt is not the drain preset, so
+    // the agent's meta names what it implements (#1117) — the prompt is not the drain preset, so
     // the daemon would not infer it.
     expect(sendStart.mock.calls[0]?.[3]).toEqual({ unattended: true, ticket: 'tickets/2026-07-20_do-the-thing.md' })
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r4'))
@@ -219,7 +219,7 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(sendStart.mock.calls[0]?.[1]).toBe(presets.importTickets.render())
     // Unattended (#1279): a button-fired import ends at settle instead of parking in the chat loop.
     expect(sendStart.mock.calls[0]?.[3]).toEqual({ unattended: true })
-    // The run id is what lands you on the import session rather than the project home (#1169).
+    // The agent id is what lands you on the import session rather than the project home (#1169).
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r1'))
   })
 

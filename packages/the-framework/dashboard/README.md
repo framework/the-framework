@@ -10,7 +10,7 @@ sequence it, for a dependency that only ever pointed one way.
 It is a **projection of the same files the daemon writes** — no daemon process, no
 IPC:
 
-- **Reads** — `POST /_rpc/<name>` (`rpc/reads.ts`, `rpc/projects.ts`, …) for run history, a run's
+- **Reads** — `POST /_rpc/<name>` (`rpc/reads.ts`, `rpc/projects.ts`, …) for run history, an agent's
   replay, the surfaced PLAN/TODO docs, and the committed `LOGS.md`.
 - **Live event stream** — Server-Sent Events at `GET /_rpc/events` (`rpc/events.ts`) tailing
   the selected session's `.the-framework/events.jsonl`; each new line becomes one SSE frame.

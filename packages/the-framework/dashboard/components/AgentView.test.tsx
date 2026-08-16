@@ -90,7 +90,7 @@ describe('AgentView event source (#1026/#1383)', () => {
   })
 
   test("a foreign journal's events never beat this run's archive, however long (#1460)", async () => {
-    // The live channel is not guaranteed to be this run's journal: an ended run whose worktree is
+    // The live channel is not guaranteed to be this agent's journal: an ended agent whose worktree is
     // gone resolves to the project ROOT journal server-side, which holds whatever root run wrote
     // it last. "The channel knows more" must not let that longer foreign feed replace the archive.
     onAgent.mockResolvedValue(ARCHIVED)
@@ -105,7 +105,7 @@ describe('AgentView event source (#1026/#1383)', () => {
   })
 
   test('an archive that catches up takes back over, bringing the epilogue events with it (#1460)', async () => {
-    // A clean run's `handoff` only ever lands in the archive — the worktree journal dies with the
+    // A clean agent's `handoff` only ever lands in the archive — the worktree journal dies with the
     // teardown — so once the feed outgrows the copy on screen the archive is re-read, and the
     // re-read is how the PR line reaches the screen without a manual refresh.
     const ahead = [...ARCHIVED, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'end', ok: true }] as FrameworkEvent[]

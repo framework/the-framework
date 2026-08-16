@@ -18,13 +18,13 @@ import { AgentDetails } from './AgentDetails.js'
 // One session's view, whether it is running or finished (#1026).
 //
 // This used to be two components — AgentLive and AgentReplay — and the page swapped one for the other
-// the instant a run's status flipped. Everything remounted at once: the action bar blanked while
+// the instant an agent's status flipped. Everything remounted at once: the action bar blanked while
 // its git read went out again, the output was replaced by "Loading session…" while the archived
-// log was fetched, the run overview disappeared, and the composer was rebuilt. A session ending is
+// log was fetched, the agent overview disappeared, and the composer was rebuilt. A session ending is
 // the moment you are most likely to be reading it, and the whole page flinched.
 //
 // So the frame is stable and only its contents change: the same bar, feed and composer stay
-// mounted, and `live` decides what they say. The log is the same log — while the run is live it
+// mounted, and `live` decides what they say. The log is the same log — while the agent is live it
 // arrives over the channel, and once it ends the archived copy is read and swapped in behind the
 // events already on screen.
 export function AgentView({
@@ -47,23 +47,23 @@ export function AgentView({
   projectId: string
   /** Which run this is (#749); absent right after Start, before the poll adopts its id. */
   agentId?: string | null | undefined
-  /** The live channel's events for this run — all there is while it runs. */
+  /** The live channel's events for this agent — all there is while it runs. */
   events: FrameworkEvent[]
-  /** Whether the run is still running. */
+  /** Whether the agent is still running. */
   live: boolean
   /** The session's own name — the same label the rail shows (#1030). It leads the action bar as
-   * the stable identity, so the branch renaming itself near the end of a run (#736) reads as a
+   * the stable identity, so the branch renaming itself near the end of an agent (#736) reads as a
    * detail changing rather than the whole view changing. */
   label?: string | undefined
   /** The session's project, shown as a `project / session` breadcrumb in the action bar. */
   projectName?: string | null | undefined
-  /** The armed handoff pair from the run record (#1376) — the mirror a live tab needs because the
+  /** The armed handoff pair from the agent record (#1376) — the mirror a live tab needs because the
    * opening `handoff-armed` event predates the channel. Absent (no record yet) keeps the armed
    * default. */
   armedDefault?: { push: boolean; pr: boolean } | undefined
-  /** Where the run executes (#1053/#610): `actions` swaps the live feed for a burst-mode affordance; `remote` is relayed to a device (#1067); `web` is handed to a Claude Code cloud session. */
+  /** Where the agent executes (#1053/#610): `actions` swaps the live feed for a burst-mode affordance; `remote` is relayed to a device (#1067); `web` is handed to a Claude Code cloud session. */
   target?: 'local' | 'actions' | 'remote' | 'web' | undefined
-  /** The device this run executes on (#1067), when it is relayed to a connected one. Set only for a
+  /** The device this agent executes on (#1067), when it is relayed to a connected one. Set only for a
    *  just-started remote run: its diff, handoff, and push/PR now relay to the device (slice 2), so the
    *  panels are shown, and a "runs on <device>" notice only flags that the browser preview stays local. */
   remoteLabel?: string | undefined
@@ -72,15 +72,15 @@ export function AgentView({
   removeContext?: ((path: string) => void) | undefined
   /** The live channel's health (#948) — surfaced as a banner over the feed. */
   lost?: boolean
-  /** Jump to the run a preset or a continuation started (#959). */
+  /** Jump to the agent a preset or a continuation started (#959). */
   onAgentStarted?: ((intent: string, agentId?: string) => void) | undefined
   /** Leave this session after it is deleted (#1032) — back to the project home. */
   onDeleted?: (() => void) | undefined
   /** The loop's verdict, handed up so the right rail can pin it under its tabs. It is reported from
-   *  here rather than read in the shell because a finished run's log is archived, and this view is
+   *  here rather than read in the shell because a finished agent's log is archived, and this view is
    *  the one that reads it back. */
 }) {
-  // The archived log, read only once the run has ended: while it runs, the channel is the truth.
+  // The archived log, read only once the agent has ended: while it runs, the channel is the truth.
   // `archiveBehind` re-reads it whenever the live channel has outgrown the copy on screen (#1460):
   // a resumed session streams new events while `live` is still false for a poll round-trip, and a
   // clean run's `handoff` event only ever lands in the archive — its worktree journal is torn down
@@ -91,7 +91,7 @@ export function AgentView({
     null,
     [projectId, agentId, live, archiveBehind],
   )
-  // Whether this run kept its worktree (#737): a failed/stopped run does, a clean one had it
+  // Whether this agent kept its worktree (#737): a failed/stopped run does, a clean one had it
   // removed when it finished. Drives the Remove button, and is cleared locally once removed so
   // the button goes without waiting for a refetch.
   const retained = useLoaded<string[]>(!live && agentId ? () => onRetainedWorktrees(projectId) : null, [], [projectId, agentId, live])
@@ -99,12 +99,12 @@ export function AgentView({
   const onWorktreeRemoved = useCallback(() => setRemoved(true), [])
   const hasWorktree = !live && !removed && agentId !== null && agentId !== undefined && retained.includes(agentId)
 
-  // Whether the agent is still working, which is not whether the run's process is up (#1173).
+  // Whether the agent is still working, which is not whether the agent's process is up (#1173).
   // A session that has settled parks on you but stays alive to take your next message (#785/#714),
   // so its status reads `running` indefinitely. Keying the handoff off `live` meant a finished
   // session showed its two arming checkboxes for ever and never offered the action they describe
   // — the agent was done, and the answer to "what do I do now?" was nothing.
-  // Read off the channel rather than `shown`: while the run is live those are the same events,
+  // Read off the channel rather than `shown`: while the agent is live those are the same events,
   // and once it is not, `working` is false whatever they say.
   const working = live && !agentSettled(events)
 
@@ -119,7 +119,7 @@ export function AgentView({
   }, [])
   const toggle = useCallback(() => setOpen(o => !o), [])
 
-  // The events already on screen keep their place while the archived copy is read, so a run
+  // The events already on screen keep their place while the archived copy is read, so an agent
   // ending swaps the source without blanking the output. An EMPTY archive never replaces them
   // either (#1383): `onAgent` answers `[]` both for "gone" and for "not archived yet", and a Stop
   // races the archive write — swapping the live feed for that `[]` blanked the view to "This
@@ -132,10 +132,10 @@ export function AgentView({
   // archive is re-read behind it (`archiveBehind` above) and takes back over once it has caught
   // up, which is also how the epilogue's archive-only events reach the screen.
   //
-  // "Knows more" is only trustworthy when the channel is this run's OWN journal. It is not
-  // guaranteed to be: an ended run whose worktree is gone resolves to the project ROOT journal
+  // "Knows more" is only trustworthy when the channel is this agent's OWN journal. It is not
+  // guaranteed to be: an ended agent whose worktree is gone resolves to the project ROOT journal
   // server-side (resolveAgentCheckout's fallback), and that file holds whatever root run wrote it
-  // last — a longer foreign feed must never beat the run's archive. The archive is the run's own
+  // last — a longer foreign feed must never beat the agent's archive. The archive is the agent's own
   // record, so its opening event is the fingerprint the channel has to match; an unloaded or
   // empty archive can't be checked and keeps the pre-existing show-the-feed fallback.
   const sameJournal =
@@ -145,14 +145,14 @@ export function AgentView({
   useEffect(() => {
     if (!live && archived !== null && feedAhead) setArchiveBehind(events.length)
   }, [live, archived, feedAhead, events.length])
-  // Live as the FEED knows it (#1460): the runs poll takes up to 2s to notice a resumed session,
+  // Live as the FEED knows it (#1460): the agents poll takes up to 2s to notice a resumed session,
   // but its events are already streaming. The feed's own verdict drives the scroll contract and
   // the composer slot, so the continuation renders (and Stop takes over from Resume) the moment
   // the first event lands rather than when the poll does.
   const feedLive = live || (feedAhead && isAgentActive(events))
   const session = sessionInfo(shown)
   const progress = agentProgress(shown)
-  // How the run ended (#948) — read once for the composer's note and the Resume offer below.
+  // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
   const outcome = live ? undefined : agentOutcome(shown)
   // What the session hands back when it ends (#1102), folded from its own events, seeded from the
   // run record's mirror (#1376): the opening `handoff-armed` event is written before the live
@@ -160,7 +160,7 @@ export function AgentView({
   // disarmed — the record's snapshot is how the boxes read the same whether this tab watched the
   // run start or was opened halfway through.
   const armed = handoffState(shown, armedDefault)
-  // Until the handoff has actually loaded, a just-stopped run keeps showing the file counts it
+  // Until the handoff has actually loaded, a just-stopped agent keeps showing the file counts it
   // ended with (#1030): the summary swaps once, from the live counts to the handoff, instead of
   // blanking for the beat the handoff read takes.
   const showHandoff = !working && handoff.loaded
@@ -231,7 +231,7 @@ export function AgentView({
       ) : (
         // A finished log is static, so it does not follow new output; it opens at the end, where
         // the outcome, the final spend and the last changes are (#948). "Live" for the scroll
-        // contract is the feed's own state, not the runs poll (#1460): a resumed session streams
+        // contract is the feed's own state, not the agents poll (#1460): a resumed session streams
         // its new leg up to two seconds before `live` flips, and entering follow mode with the
         // first streamed row absorbs the continuation one event at a time instead of jolting the
         // scroller when the poll lands.
@@ -244,7 +244,7 @@ export function AgentView({
           showStatus={false}
           lost={lost}
           {...(feedLive ? {} : { stick: false, openAt: 'end' as const, emptyLabel: 'This agent has no events.' })}
-          // A web run's log dead-ends at the hand-off (#1265): the mirror box rides the tail of
+          // A web agent's log dead-ends at the hand-off (#1265): the mirror box rides the tail of
           // the scroller, where "and then…" belongs. Self-nulling for every other target.
           tail={<CloudMirrorRow target={target} events={shown} />}
         />

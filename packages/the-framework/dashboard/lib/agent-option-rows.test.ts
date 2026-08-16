@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import type { Preferences } from '../../dist/index.js'
 import { agentOptionRows, type OptionRow } from './agent-option-rows.js'
 
-// The rules between the run options (#314/#625/#801/#958). They live in one table because two
+// The rules between the agent options (#314/#625/#801/#958). They live in one table because two
 // surfaces render them (the launcher gear and the settings page); these pin the rules themselves,
 // so neither surface can quietly disagree with the other.
 
@@ -72,7 +72,7 @@ describe('agentOptionRows', () => {
 
     for (const key of ['browser', 'vanilla', 'onBeforeMergeableQuality']) {
       const row = find(main, key)
-      // Effective, not stored: the run ignores it, so the box must not claim it is on.
+      // Effective, not stored: the agent ignores it, so the box must not claim it is on.
       expect(row.checked, `${key} checked`).toBe(false)
       expect(row.disabled, `${key} disabled`).toBe(true)
     }

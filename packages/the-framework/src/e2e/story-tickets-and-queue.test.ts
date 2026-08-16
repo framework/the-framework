@@ -13,7 +13,7 @@ import { sendChoice, sendQueueTicket } from '../dashboard-rpc/control.js'
 import { presets } from '../preset-catalog.js'
 
 // The roadmap stories (README.md): tickets are proposals, the flat TODO queue holds confirmed
-// work, and a drain run claims the queue's next entry — the propose -> decide -> work loop the
+// work, and a drain agent claims the queue's next entry — the propose -> decide -> work loop the
 // Tickets and Queue pages drive.
 
 const TICKET_FILE = '2026-08-01_login-page.md'
@@ -83,8 +83,8 @@ test('queue a ticket, then a drain run claims it and the boards show it in progr
     const hotQueued = await rpc(onHotTickets)()
     assert.ok(hotQueued.some(h => h.projectId === project.id && h.ticket.file === TICKET_FILE))
 
-    // A hand-fired drain resolves the queue's next entry to its ticket (#1117) — the run's meta
-    // names it while the run is live, which is what flips the boards to "implementing".
+    // A hand-fired drain resolves the queue's next entry to its ticket (#1117) — the agent's meta
+    // names it while the agent is live, which is what flips the boards to "implementing".
     const agentId = await withFakeAwait('choices', () => world.startAgent(project, presets.drainQueue.render()))
     const tail = await world.tailAgent(project, agentId)
     const gate = await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the drain run to park')

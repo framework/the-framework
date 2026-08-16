@@ -11,7 +11,7 @@ const project = (id: string, path: string): ProjectSummary => ({ id, path, name:
 /** No paused run anywhere — keeps the PR-only tests hermetic (no disk read). */
 const noAgents = async (): Promise<LiveAgent[]> => []
 
-/** A live run in its own worktree (#738), which is what the reader now returns. */
+/** A live agent in its own worktree (#738), which is what the reader now returns. */
 const live = (meta: AgentMeta, cwd = '/a/.the-framework/worktrees/r1'): LiveAgent => ({ ...meta, cwd })
 
 const runningAgentMeta = (over: Partial<AgentMeta> = {}): AgentMeta => ({
@@ -115,7 +115,7 @@ test('interventionKey is the url for a PR and project+gate for an awaiting run',
   )
 })
 
-// #860: a finished run whose branch still holds unpushed, unmerged commits.
+// #860: a finished agent whose branch still holds unpushed, unmerged commits.
 
 const doneMeta = (over: Partial<AgentMeta> = {}): AgentMeta => ({
   version: 1,

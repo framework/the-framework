@@ -11,7 +11,7 @@ const POLL_MS = 1000
  * lines are skipped. Returns a stop function that removes the watcher and the poll.
  *
  * The reading is {@link JsonlTailer} and the following is {@link followFile}, the same
- * two pieces the run's control tail is built from. This used to be its own copy of both,
+ * two pieces the agent's control tail is built from. This used to be its own copy of both,
  * which is how it ended up missing the tailer's same-length-rewrite detection (#567).
  *
  * `onReplayed` is told once the first pull — the replay of everything already logged — has
@@ -41,14 +41,14 @@ export function tailEvents<T = unknown>(path: string, onEvent: (event: T) => voi
 }
 
 /**
- * Tail a run's journal across its relocations: the same read-then-follow as {@link tailEvents},
+ * Tail an agent's journal across its relocations: the same read-then-follow as {@link tailEvents},
  * but the path is re-resolved whenever the tailed file disappears after having existed.
  *
- * A run's `events.jsonl` does not sit still. Teardown copies it verbatim into the archive and
+ * An agent's `events.jsonl` does not sit still. Teardown copies it verbatim into the archive and
  * removes the worktree; a continuation restores it into a fresh checkout. A fixed-path tail
  * whose file was retired went silent *without the final lines* whenever the last `fs.watch`
  * signal was lost — the 1s poll then found the file gone and had nothing to read, so the feed
- * never learned the run ended. This tail treats "the file existed and is now gone" as the
+ * never learned the agent ended. This tail treats "the file existed and is now gone" as the
  * relocation it is: it asks `resolvePath` where the journal lives now (`resolveAgentEventsPath`
  * already answers the archive once the worktree is gone, #1472), retargets the same tailer —
  * the copy is content-identical, so the offset carries and nothing is replayed — and follows
@@ -93,7 +93,7 @@ export function tailAgentEvents<T = unknown>(
       await tailer.pull()
       return
     }
-    // Gone before anything was written is a run still booting, not a move.
+    // Gone before anything was written is an agent still booting, not a move.
     if (!sawFile || relocating) return
     relocating = true
     try {

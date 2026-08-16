@@ -103,7 +103,7 @@ test('acquireTicketLocks rolls the files back when the commit fails (#1420)', as
 })
 
 test('acquireTicketLocks keeps the batch when only the push fails, and says so (#1420)', async () => {
-  // The commit still guards every run forked from this checkout; the push is the cross-machine
+  // The commit still guards every agent forked from this checkout; the push is the cross-machine
   // half (#1320), so its failure is logged rather than standing the fan-out down.
   const { logs, deps } = checkout({ 'tickets/a.md': '# a' })
   const pushless: TicketLockDeps = {

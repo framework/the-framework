@@ -15,10 +15,10 @@ export {
   type AgentProgress,
   type HandoffState,
 } from './agent-view.js'
-// The Start-a-run presets (#433): pure prompt builders (no Node imports) the dashboard
+// The Start-an-agent presets (#433): pure prompt builders (no Node imports) the dashboard
 // prefills into the textarea, then runs verbatim as a `prompt` kind.
 // The prompt-wrapping logic itself (#520), so the dashboard can show the user the
-// built-in prompt *before* a run rather than describing it. These are pure string
+// built-in prompt *before* an agent rather than describing it. These are pure string
 // work — `loadUserSystemPrompt` is the module's only Node-bound export and stays
 // out of here, which is what keeps this importable in a browser.
 export {
@@ -43,12 +43,12 @@ export { AUTO_PM_ROUTINES, AUTO_PM_JOBS, AUTO_PM_DRAIN_JOB, AUTO_PM_MAINTENANCE_
 // Pure, so the dashboard shares them rather than keeping copies that drift silently.
 export { interventionKey, pickNewInterventions, activityKey, pickNewActivity } from './dashboard/keys.js'
 export { NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, DEFAULT_AUTO_PM_CONCURRENCY, MAX_AUTO_PM_CONCURRENCY, notifies, notifyMethodEnabled, notifyCategoryEnabled, type NotifyMethod, type NotifyCategory } from './preference-defaults.js'
-// The preferences -> run options mapping (#858), shared with the daemon so an unattended run
+// The preferences -> run options mapping (#858), shared with the daemon so an unattended agent
 // starts with the same settings a launcher-started one would. Pure field logic, no Node imports.
 export { agentOptionsFromPreferences, handoffFromPreferences, preferencesFromFileConfig } from './agent-options.js'
 // The publish ladder (B5). The dashboard offers the rungs as checkboxes and the session header as
 // one box, so both need the ordinal and the two conversions — an impossible answer has to resolve
-// on the surface that collected it, not on the run that receives it.
+// on the surface that collected it, not on the agent that receives it.
 export {
   DEFAULT_HANDOFF,
   HANDOFF_LEVELS,

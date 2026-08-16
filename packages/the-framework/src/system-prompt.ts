@@ -63,7 +63,7 @@ const INSIGHTS_DOC: ContextDoc = { path: 'knowledge-base/INSIGHTS.md', comment: 
 
 /**
  * The business-knowledge docs (#537): what the repo has learned about itself, which the
- * agent both reads at the start of a run and folds new knowledge back into at merge. The
+ * agent both reads at the start of an agent and folds new knowledge back into at merge. The
  * on-before-mergeable prompt's `## Business knowledge` section names this exact set, so the
  * agent is never told to read one set of files and update another (pinned by a test). A
  * subset of {@link CONTEXT_DOCS}.
@@ -71,7 +71,7 @@ const INSIGHTS_DOC: ContextDoc = { path: 'knowledge-base/INSIGHTS.md', comment: 
 export const BUSINESS_KNOWLEDGE_DOCS: readonly ContextDoc[] = [DECISIONS_DOC, FACTS_DOC, INSIGHTS_DOC]
 
 /**
- * The two file-format specs, carried in the run's own system channel (#1163).
+ * The two file-format specs, carried in the agent's own system channel (#1163).
  *
  * Two of the {@link CONTEXT_DOCS} have a shape the agent has to follow: `tickets/**.md` and
  * `TODO_AGENTS.md`. The #674 call is that their spec ships *inside the package* rather than being
@@ -99,7 +99,7 @@ const TICKET_FORMAT_HEADING = 'Ticketing format'
 const TODO_FORMAT_HEADING = 'TODO_AGENTS.md'
 
 /**
- * Everything the agent keeps in context at the start of a run (#683), which
+ * Everything the agent keeps in context when it starts (#683), which
  * {@link systemPromptBlock} renders as the `Context:` bullets. A superset of
  * {@link BUSINESS_KNOWLEDGE_DOCS}: it adds `GOAL.md`, `BUSINESS_LOGIC.md`, and the
  * roadmap/queue/history pointers the agent reads but does *not* fold knowledge back into —
@@ -180,13 +180,13 @@ export interface SystemPromptOptions {
    */
   transparent?: boolean | undefined
   /**
-   * This run has a real browser attached (#824). Adds the section telling the agent so: the
+   * This agent has a real browser attached (#824). Adds the section telling the agent so: the
    * tools are wired through MCP, which the agent discovers, but nothing otherwise says to prefer
    * them — so it reaches for `WebFetch`, and the browser (and its preview) sits unused.
    */
   browser?: boolean | undefined
   /**
-   * This run hands off to a remote session nothing local can steer (#1231), so the await gates
+   * This agent hands off to a remote session nothing local can steer (#1231), so the await gates
    * are not available in it (#1234). Appends {@link HANDS_OFF_PROTOCOL} right after the await
    * protocol it amends, so an ambiguous prompt takes its most plausible reading and says so,
    * instead of parking a cloud session forever on a question nobody attached can answer.
@@ -230,15 +230,15 @@ export function systemPromptBlock(opts: SystemPromptOptions = {}): string {
 export type AgentSystemOptions = SystemPromptOptions
 
 /**
- * Assemble a run's full system channel — the single place it is composed (#501), so the
+ * Assemble an agent's full system channel — the single place it is composed (#501), so the
  * build path and the direct-prompt path, before D2 collapsed them into one {@link runAgent}
  * cannot drift. That drift is exactly what dropped the session-action (#326) layer from `--vanilla`
  * builds (#500): the two sites each inlined the composition and one nested the protocols
  * inside the built-in-prompt branch.
  *
  * Order is fixed: the built-in system prompt (#326) block (context / built-in prompt / user SYSTEM.md)
- * first, then the emit protocols. Nothing else is appended — a build run's system channel
- * is exactly this (#547), which is what lets the dashboard show the whole prompt before a run
+ * first, then the emit protocols. Nothing else is appended — a build agent's system channel
+ * is exactly this (#547), which is what lets the dashboard show the whole prompt before an agent
  * starts (#520). The protocols are otherwise unconditional — they are the *emit contract* (how
  * the agent signals an awaited choice and the setSessionName()/setReadyForMerge() lifecycle),
  * not prompt content — so the agent needs them even with the built-in prompt off (`--vanilla`).
@@ -250,7 +250,7 @@ export function composeAgentSystem(opts: AgentSystemOptions = {}): string {
   if (opts.transparent) return ''
   const promptBlock = systemPromptBlock(opts)
   // The browser section rides with the protocols, not with the built-in prompt: like them it
-  // describes what this run can do, so `--vanilla` (no framework prompt) still gets it — the
+  // describes what this agent can do, so `--vanilla` (no framework prompt) still gets it — the
   // tools are there either way.
   // Ahead of the protocols, so the signal protocol stays the last thing in the channel (#547).
   const browser = opts.browser ? [BROWSER_PROTOCOL] : []

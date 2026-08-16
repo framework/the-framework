@@ -19,7 +19,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 // verdict and the next step ride in the action bar beside the branch they are about, and the
 // commits and files are what the bar expands to (#1023).
 //
-// The read is branch-addressed, so it survives the checkout: a clean run's worktree is removed
+// The read is branch-addressed, so it survives the checkout: a clean agent's worktree is removed
 // when it ends.
 
 const MAX_COMMITS = 6
@@ -74,7 +74,7 @@ export function HandoffArm({
   state: HandoffState
 }) {
   const [busy, setBusy] = useState(false)
-  // The event stream is the truth, but it round-trips through a file the run tails, so a click
+  // The event stream is the truth, but it round-trips through a file the agent tails, so a click
   // would visibly bounce back for a beat. `pending` holds what we last asked for until the events
   // agree, the same shape the quota slider needed for a polled value (#979).
   const [pending, setPending] = useState<HandoffLevel | null>(null)
@@ -106,7 +106,7 @@ export function HandoffArm({
   // will happen. Ticking it takes the full step; unticking it means the session hands off nothing.
   const pushOnly = shown === 'push'
   // Merge arming has no checkbox (#1216) but the label must own it (#1382): a box saying "Open PR"
-  // on a run that will land on main by itself is the lie this component exists to not tell.
+  // on an agent that will land on main by itself is the lie this component exists to not tell.
   const merges = shown === 'merge'
   return (
     <div className="flex items-center gap-x-3 whitespace-nowrap text-xs text-muted-foreground">

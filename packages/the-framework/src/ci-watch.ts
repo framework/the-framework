@@ -21,7 +21,7 @@ import type { Cached } from './dashboard/cache.js'
 // feed the same handlers from a webhook receiver and only the trigger changes.
 
 /**
- * How long a run's watched PR stays on the sweep's list: long enough to survive a weekend of the
+ * How long an agent's watched PR stays on the sweep's list: long enough to survive a weekend of the
  * daemon being off, short enough that the sweep's `gh` spend cannot grow with the archive. A PR
  * older than this is a human's to land — it has been red or unmergeable for a week.
  */
@@ -42,7 +42,7 @@ export const NO_CHECKS_GRACE_MS = 3 * 60 * 1000
 const MAX_CI_FIX_ATTEMPTS = 2
 
 /**
- * The marker a CI-fix run's prompt opens with, so attempts are discoverable from run metas. The
+ * The marker a CI-fix agent's prompt opens with, so attempts are discoverable from run metas. The
  * `@` is always there, sha or not: it is what stops "PR #12" reading as a prefix of "PR #123"
  * when the metas are scanned for prior attempts.
  */
@@ -61,7 +61,7 @@ export interface CiFixRequest {
 }
 
 /**
- * The prompt a CI-fix session runs (#1418). Explicit about the git mechanics because the run gets
+ * The prompt a CI-fix session runs (#1418). Explicit about the git mechanics because the agent gets
  * an ordinary session worktree on its own scratch branch: the PR's branch may be checked out in a
  * retained worktree elsewhere, so `push origin HEAD:<branch>` is the one spelling that always
  * lands the fix without fighting over who holds the branch.
@@ -109,16 +109,16 @@ export interface CiSweepResult {
 
 /** Injectable seams so the sweep is unit-testable off disk and off `gh`. */
 export interface CiSweepDeps {
-  /** Every run meta worth scanning — live and archived (default: both stores). */
+  /** Every agent meta worth scanning — live and archived (default: both stores). */
   agents?: (cwd: string) => Promise<AgentMeta[]>
-  /** The PR that belongs to a run (default {@link resolveAgentPr}, which rides the PR-lookup cache (#1028)). */
+  /** The PR that belongs to an agent (default {@link resolveAgentPr}, which rides the PR-lookup cache (#1028)). */
   pr?: (cwd: string, agent: PrAgent) => Promise<Cached<LinkedPr | undefined>>
   /** A PR's combined check state (default {@link ghPrCiStatus}). */
   ci?: (cwd: string, number: number) => Promise<PrCiStatus>
-  /** Merge a run's open PR (default {@link mergeAgentPr}, which also forgets the PR caches). */
+  /** Merge an agent's open PR (default {@link mergeAgentPr}, which also forgets the PR caches). */
   merge?: (cwd: string, agent: PrAgent) => Promise<HandoffResult>
   /**
-   * Start a CI-fix session for a red PR (#1418's fix half), resolving the run id or undefined
+   * Start a CI-fix session for a red PR (#1418's fix half), resolving the agent id or undefined
    * when the wiring declined (preference off, no quota headroom, start failed). Absent = the fix
    * half is off and red PRs are only left for the merge half to keep ignoring.
    */
@@ -136,7 +136,7 @@ export interface CiSweepDeps {
   now?: () => number
 }
 
-/** Both stores' metas: the live runs (their conversation is still going) and the archive. */
+/** Both stores' metas: the live agents (their conversation is still going) and the archive. */
 async function allAgentMetas(cwd: string): Promise<AgentMeta[]> {
   const [live, archived] = await Promise.all([
     readLiveMetas(cwd).catch((): AgentMeta[] => []),
@@ -145,7 +145,7 @@ async function allAgentMetas(cwd: string): Promise<AgentMeta[]> {
   return [...live, ...archived]
 }
 
-/** Whether a meta is one of this sweep's candidates: an ended run with a merge the CI decides. */
+/** Whether a meta is one of this sweep's candidates: an ended agent with a merge the CI decides. */
 function watchable(meta: AgentMeta, now: number): boolean {
   if (meta.status === 'running') return false
   if (meta.mergeOutcome !== 'watched' && meta.mergeOutcome !== 'auto-armed') return false

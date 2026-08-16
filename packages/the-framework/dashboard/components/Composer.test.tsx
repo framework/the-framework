@@ -134,7 +134,7 @@ describe('Composer (#721)', () => {
 
   test('compact (#723) keeps the agent/model + options controls (#755)', async () => {
     const { onSubmit } = renderComposer({ compact: true, submitLabel: 'Start' })
-    // They used to be dropped here, which meant a navbar run silently used the stored agent,
+    // They used to be dropped here, which meant a navbar agent silently used the stored agent,
     // model and options with nothing on screen saying which.
     expect(screen.queryByRole('button', { name: 'Session options' })).not.toBeNull()
     expect((await hoverTooltip(agentTrigger())).textContent).toContain('Driver: Claude Code')
@@ -255,7 +255,7 @@ describe('Composer (#721)', () => {
     // The stub editor does not mirror the loaded text into the DOM input, and jsdom drops a
     // change event whose value did not actually change — so give it something to clear.
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'edited' } })
-    // Clearing it back to a typed prompt is a fresh start: a plain build run, in this session.
+    // Clearing it back to a typed prompt is a fresh start: a plain build agent, in this session.
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: '' } })
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'just a question' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))

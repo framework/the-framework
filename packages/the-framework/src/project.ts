@@ -96,7 +96,7 @@ function gitWords(args: string[]): string[] {
 /**
  * The timeout for one git invocation, chosen by subcommand (#997). One flat 10s budget covered
  * the repo's ~20 call sites, so the slowest two ran under what is really a read's budget: a
- * SIGTERM'd `worktree add` drops a run into the user's main checkout, a SIGTERM'd `push` may
+ * SIGTERM'd `worktree add` drops an agent into the user's main checkout, a SIGTERM'd `push` may
  * have half-landed. Mirrors the read/write split `gh` already has (dashboard/gh.ts).
  */
 export function gitTimeoutMs(args: string[]): number {

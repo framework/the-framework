@@ -5,7 +5,7 @@ import { join } from 'node:path'
  * The prompts a build session opens with, and the one check that decides between them.
  *
  * This was the driver-backed half of ai-autopilot's `Bootstrap` spine: injectable build / improve
- * steps whose results were wrapped in a synthetic supervised run so the narration could show a
+ * steps whose results were wrapped in a synthetic supervised agent so the narration could show a
  * phase. The spine went with the review loop (A3/A5), and the session that used it is now one
  * prompt honoring gates (D2), so what survives is the prompt text itself.
  */
@@ -22,7 +22,7 @@ export function buildPrompt(intent: string): string {
 }
 
 /**
- * Framing for a run against an *existing* codebase. The greenfield {@link buildPrompt} tells the
+ * Framing for an agent against an *existing* codebase. The greenfield {@link buildPrompt} tells the
  * agent the workspace may be empty and to scaffold from scratch, which is the wrong instruction
  * when the user pointed the framework at a project that already exists (#185).
  *

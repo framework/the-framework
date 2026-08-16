@@ -34,7 +34,7 @@ function tfFrom(ctx: PresetRenderContext): Record<string, unknown> {
 }
 
 /**
- * {@link DEFAULT_WHAT}, rendered. Exported so a caller that *labels* a run (the CLI's log title)
+ * {@link DEFAULT_WHAT}, rendered. Exported so a caller that *labels* an agent (the CLI's log title)
  * says the same thing the prompt targets, instead of keeping its own copy of the default.
  */
 export function defaultWhat(ctx: PresetRenderContext = {}): string {
@@ -43,7 +43,7 @@ export function defaultWhat(ctx: PresetRenderContext = {}): string {
 
 /** How one preset is declared. Everything that differs between presets, and nothing else. */
 export interface PresetSpec {
-  /** The run-kind name, as the CLI subcommand and the run record use it. */
+  /** The run-kind name, as the CLI subcommand and the agent record use it. */
   name: string
   /** The prompt template, from `prompts/presets/<stem>.md`. */
   template: string

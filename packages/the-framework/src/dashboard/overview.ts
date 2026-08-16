@@ -6,7 +6,7 @@ import { TICKETS_DIR } from '../tickets.js'
 
 // The first-sidebar Overview (#437, part of #314): a cross-project glance at what the agent
 // is working on right now, the size of the backlog, and the recently active projects. It
-// rolls up three existing file projections across the whole registry — the live run meta
+// rolls up three existing file projections across the whole registry — the live agent meta
 // (`.the-framework/agent.json`, kept current per event), the TODO queue (queue.ts), and each
 // project's last activity (ProjectSummary.lastActivityAt from LOGS.md).
 
@@ -16,13 +16,13 @@ export interface ActiveAgent {
   projectName: string
   /** Which run this is (#738): a project can have several in flight, one per worktree. */
   agentId: string
-  /** The run's own checkout, so its git/file status is read from the worktree it edits (#738). */
+  /** The agent's own checkout, so its git/file status is read from the worktree it edits (#738). */
   cwd: string
   status: AgentStatus
-  /** What the user asked to build (the run's `scope` event). */
+  /** What the user asked to build (the agent's `scope` event). */
   intent?: string
   scope?: string
-  /** ISO timestamp of the run's last event. */
+  /** ISO timestamp of the agent's last event. */
   updatedAt?: string
   /** The session name the agent chose (#326), when it set one. */
   sessionName?: string
@@ -39,7 +39,7 @@ export interface RecentProject {
 
 /** The cross-project Overview payload. */
 export interface Overview {
-  /** Projects with a running run, most-recently-updated first. */
+  /** Projects with a running agent, most-recently-updated first. */
   active: ActiveAgent[]
   /** Total open TODO items across every project. */
   queueOpen: number
@@ -124,10 +124,10 @@ export interface HotTicket {
   bucket: HotBucket
   ticket: WorkspaceTicket
   /**
-   * A run is implementing this ticket right now (#1117): its id, for the card to link into.
+   * An agent is implementing this ticket right now (#1117): its id, for the card to link into.
    *
    * The difference between "someone planned this at some point" and "this is being coded as you
-   * look at it", which the plan/spike proxy could not tell apart. Only set for a ticket a live run
+   * look at it", which the plan/spike proxy could not tell apart. Only set for a ticket a live agent
    * actually recorded (`AgentMeta.ticket`), so absent still means the lane was inferred.
    */
   agentId?: string
@@ -150,7 +150,7 @@ function isHighPriority(priority: string): boolean {
 
 /**
  * A ticket's lane (#1139), or null when it is in none of the three the card shows:
- * - in-progress: a run is implementing it right now (#1117), or failing that the agent has
+ * - in-progress: an agent is implementing it right now (#1117), or failing that the agent has
  *   planned it, so work is under way in the older, inferred sense.
  * - ai-queue: it sits in the AI Queue — an open `TODO_AGENTS.md` entry links to it — so the
  *   framework will pick it up on its own.
@@ -159,7 +159,7 @@ function isHighPriority(priority: string): boolean {
  * Precedence follows that order: work already under way outranks a queued ticket, which outranks a
  * bare priority flag. Everything else is dropped — the card is a shortlist, not the whole backlog.
  *
- * `implementing` is the only hard evidence and exists for a drain run only, so the plan proxy
+ * `implementing` is the only hard evidence and exists for a drain agent only, so the plan proxy
  * still carries every ticket someone is working by hand.
  */
 export function ticketBucket(
@@ -258,7 +258,7 @@ export interface OverviewDeps {
 }
 
 /**
- * Build the cross-project Overview: the running runs (every live run of each project, one per
+ * Build the cross-project Overview: the running agents (every live agent of each project, one per
  * worktree since #736), the total open TODO count (from {@link collectQueue}), and the most
  * recently active projects (by {@link ProjectSummary.lastActivityAt}). Forgiving — a project
  * with no live run, or none running, simply contributes nothing to `active`.
@@ -269,7 +269,7 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
 
   const active: ActiveAgent[] = []
   for (const project of projects) {
-    // Every live run of the project (#738), not just the one that used to sit at its path.
+    // Every live agent of the project (#738), not just the one that used to sit at its path.
     for (const meta of await liveAgents(project.path).catch(() => [])) {
       if (meta.status !== 'running') continue
       active.push({

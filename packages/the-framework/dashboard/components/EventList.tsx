@@ -29,10 +29,10 @@ import {
 //   - Choice gates, when the log knows its project (#1455 item 6): an open gate renders the same
 //     interactive ChoicePanel the rail used to hold, so the question is answered from the flow;
 //     a resolved one collapses to the AnsweredChoice ✓ card and hides its "✓ chose" line.
-//   - The latest `browser` row, when the log knows its project AND run (#1455 item 6b): it hosts
+//   - The latest `browser` row, when the log knows its project AND agent (#1455 item 6b): it hosts
 //     the live inline preview (InlineBrowser); earlier browser rows keep their one-line text, and
 //     a re-said URL replaces its earlier row in place rather than stacking a duplicate.
-// The kind badge shows once per run of same-group rows — a 200-line driver turn used to be 200
+// The kind badge shows once per agent of same-group rows — a 200-line driver turn used to be 200
 // identical badges (#948). A driver `start` breaks out of the AGENT group so the user's turn gets
 // its own YOU badge. Live rows carry their arrival time at each group boundary; replayed events were
 // never live, so they show none. Scrolling rides shadcn's Base UI message-scroller (#712): live
@@ -60,7 +60,7 @@ function isLong(text: string): boolean {
   return text.replace(/\s+/g, ' ').trim().length > 100
 }
 
-/** Grouping key for the once-per-run badge: the user's prompt stands apart from the agent's work. */
+/** Grouping key for the once-per-agent badge: the user's prompt stands apart from the agent's work. */
 function rowGroup(e: FrameworkEvent): string {
   if (e.kind === 'driver') return e.event.type === 'start' ? 'you' : 'agent'
   return e.kind
@@ -79,7 +79,7 @@ function isTurnBoundary(e: FrameworkEvent): boolean {
 
 /**
  * Whether a row reports a failure, which reads in red (#1199). Two shapes say it: the agent (or
- * its transport) erroring mid-run, and the run settling badly. A *stopped* run is neither, since
+ * its transport) erroring mid-run, and the agent settling badly. A *stopped* run is neither, since
  * the user asked for that, so it stays neutral rather than being coloured like a fault.
  */
 function isFailure(e: FrameworkEvent): boolean {
@@ -104,7 +104,7 @@ function rowTone(e: FrameworkEvent): string {
  * none do. The body keeps rowTone: colour the *marker*, not the text.
  *
  *   - your decisions (`choice`/`choice-resolved`) — amber, the rows the log most wants found
- *   - milestones (a CLEAN `end`, `ready-for-merge`) — green, how far the run got; a stopped or
+ *   - milestones (a CLEAN `end`, `ready-for-merge`) — green, how far the agent got; a stopped or
  *     failed end is not a milestone (failure is already red, stopped stays neutral), and
  *     `handoff` stays muted because its body reports per-rung outcomes that may be mixed
  *   - pushed surfaces (`view`, `browser-stream`, `preview`) — primary, the agent showing you something
@@ -119,7 +119,7 @@ function badgeTone(e: FrameworkEvent): string {
 }
 
 /**
- * Hoist the run's first prompt to the top of the log (#1170).
+ * Hoist the agent's first prompt to the top of the log (#1170).
  *
  * It is emitted after the `session` and `system-prompt` events, so the one line the reader wrote
  * themselves opened three rows down, under a char-count summary of a prompt they did not write.
@@ -264,7 +264,7 @@ export function EventList({
   stick?: boolean
   /** Where a non-following log opens; a replay opens at the outcome (#948), not page one. */
   openAt?: 'start' | 'end'
-  /** Pinned after the last row, inside the scroller (#1265): the log's "and then…" — a web run's
+  /** Pinned after the last row, inside the scroller (#1265): the log's "and then…" — a web agent's
    *  live mirror box — that must scroll (and stick) with the log rather than float over it. */
   tail?: ReactNode
   /** The log's own project (#1455 item 6): with it, a `choice` row IS the interaction — an open

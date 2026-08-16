@@ -303,7 +303,7 @@ test('a backlog turn emits its signals: views, session name, ready-for-merge', a
   try {
     const events: FrameworkEvent[] = []
     // The protocols are unconditional, so the agent is told it can signal on ANY turn,
-    // a backlog turn included. Everything it emits has to reach the run stream.
+    // a backlog turn included. Everything it emits has to reach the agent stream.
     const driver = new FakeDriver({
       respond: () => {
         writeFileSync(file, '- [x] tidy the login redirect\n')
@@ -468,7 +468,7 @@ test('nextQueuedTicket names the ticket the next drain run will pick up (#1117)'
     )
     assert.equal(await nextQueuedTicket(cwd), 'tickets/2026-07-25_login.md')
 
-    // A queue whose first open entry is plain text: a drain run there implements no ticket, and
+    // A queue whose first open entry is plain text: a drain agent there implements no ticket, and
     // saying "the one below it" would label the wrong ticket as being worked.
     await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] tidy the README\n- [ ] [Login](tickets/2026-07-25_login.md)\n')
     assert.equal(await nextQueuedTicket(cwd), undefined)
@@ -491,12 +491,12 @@ test('ticketForPrompt names a ticket for a hand-fired drain, and for nothing els
     assert.equal(await ticketForPrompt(`\n${presets.drainQueue.render()}  `, cwd), 'tickets/2026-07-25_login.md')
 
     // Every other prompt implements whatever it likes; naming the queue's next entry for it would
-    // put a ticket in the in-progress lane on the strength of an unrelated run.
+    // put a ticket in the in-progress lane on the strength of an unrelated agent.
     assert.equal(await ticketForPrompt('Work on the queue please', cwd), undefined)
     assert.equal(await ticketForPrompt(presets.planTickets.render(), cwd), undefined)
     assert.equal(await ticketForPrompt('', cwd), undefined)
 
-    // A read that throws is a lane label, not a run: it must never take the start down with it.
+    // A read that throws is a lane label, not an agent: it must never take the start down with it.
     const boom = async () => {
       throw new Error('unreadable queue')
     }

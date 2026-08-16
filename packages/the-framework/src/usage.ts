@@ -1,7 +1,7 @@
 import type { DriverUsage } from './driver/index.js'
 
 /**
- * Cumulative token + cost usage for a run (#322). Extends {@link DriverUsage}
+ * Cumulative token + cost usage for an agent (#322). Extends {@link DriverUsage}
  * with a turn count so a surface can show both the spend and how many agent
  * turns produced it.
  */
@@ -12,7 +12,7 @@ export interface UsageTotals extends DriverUsage {
 
 /**
  * The starting total. `costUsd` is absent rather than `0`: an agent that never
- * prices a turn must not accumulate a total that reads as "this run was free"
+ * prices a turn must not accumulate a total that reads as "this agent was free"
  * (#540). It appears as soon as one turn reports a price.
  */
 const ZERO: UsageTotals = {
@@ -27,7 +27,7 @@ const ZERO: UsageTotals = {
  * Accumulates per-turn {@link DriverUsage} into a running total for the whole
  * run and lets a budget cap gate on it (#322).
  *
- * This tracks what *this run* spent, not where the account's subscription quota
+ * This tracks what *this agent* spent, not where the account's subscription quota
  * stands — the agent reports that separately, per turn, as `DriverRateLimit`
  * (#517). An earlier version of this note claimed the account limit was
  * unreachable under subscription auth; it isn't.

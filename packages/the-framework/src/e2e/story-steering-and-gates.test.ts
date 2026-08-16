@@ -14,7 +14,7 @@ import {
 
 // The steering stories (README.md): everything the user does TO a live session — answer its
 // question, chat with it, change its handoff, stop it — flows browser -> RPC -> control.jsonl ->
-// the run process, and the observable answer comes back through the run's own event log.
+// the agent process, and the observable answer comes back through the agent's own event log.
 
 test('answer a parked session’s question from the questions hub (#304/#1455)', async () => {
   const world = await makeWorld()
@@ -24,7 +24,7 @@ test('answer a parked session’s question from the questions hub (#304/#1455)',
     const agentId = await withFakeAwait('choices', () => world.startAgent(project, 'Wire up auth'))
     const tail = await world.tailAgent(project, agentId)
 
-    // The run parks: the full gate (title, options, recommendation) reaches the feed, and the
+    // The agent parks: the full gate (title, options, recommendation) reaches the feed, and the
     // cross-project questions hub lists it against this session.
     const gate = await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the parked gate')
     assert.equal(gate.kind, 'choice')
@@ -39,7 +39,7 @@ test('answer a parked session’s question from the questions hub (#304/#1455)',
     assert.equal(question.choice.id, gate.id)
     assert.deepEqual(question.choice.options.map(o => o.id), gate.options.map(o => o.id))
 
-    // The user picks the recommended option. The run records who answered and carries on to done.
+    // The user picks the recommended option. The agent records who answered and carries on to done.
     await rpc(sendChoice)(project.id, gate.id, gate.recommended!, 'user', agentId)
     const resolved = await waitFor(() => tail.events.find(e => e.kind === 'choice-resolved'), 'the resolution event')
     assert.equal(resolved.kind === 'choice-resolved' && resolved.picked, gate.recommended)
@@ -79,9 +79,9 @@ test('chat with a live session: a message becomes the next agent turn (#714)', a
     await world.waitAgent(project, agentId, 'done')
     await world.waitRetired(project, agentId)
 
-    // What was said survives the session (#1179): teardown archives the run's event log into the
+    // What was said survives the session (#1179): teardown archives the agent's event log into the
     // project checkout, where the daemon's committer picks it up, so a clone carries the exchange
-    // and not just the fact a run happened. The event log *is* that record (B3) — a second, prose
+    // and not just the fact an agent happened. The event log *is* that record (B3) — a second, prose
     // re-narration used to be committed beside it, which is what the Discord mirror then polled and
     // diffed instead of reading this.
     const archived = await archivedAgentPaths(project.cwd, agentId)
@@ -134,7 +134,7 @@ test('stop a session; its checkout is reclaimed once the work is on the remote, 
     const tail = await world.tailAgent(project, agentId)
     await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the parked gate')
 
-    // Stop while parked: the run ends `stopped`, not failed — the user interrupted it.
+    // Stop while parked: the agent ends `stopped`, not failed — the user interrupted it.
     await rpc(sendStop)(project.id, agentId)
     const end = await waitFor(() => tail.events.find(e => e.kind === 'end'), 'the end event')
     assert.equal(end.kind === 'end' && end.stopped, true)
@@ -142,7 +142,7 @@ test('stop a session; its checkout is reclaimed once the work is on the remote, 
     await world.waitAgent(project, agentId, 'stopped')
 
     // One rule (E5): the checkout goes once its work is on the remote, whatever the session did.
-    // A stopped run used to keep it "for inspection", and nothing ever took those back — so a
+    // A stopped agent used to keep it "for inspection", and nothing ever took those back — so a
     // machine accumulated one full checkout per stopped session until a human noticed. What was
     // stopped is not lost: the branch is on the remote, and `git worktree add` brings it back.
     await world.waitRetired(project, agentId)

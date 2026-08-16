@@ -4,10 +4,10 @@ import { usePolled } from './use-async.js'
 
 // The selected project's agents (live + archived), polled. Owned by the shell (+Page) so both
 // the Runs rail and the main pane read one list: the rail renders the rows, the pane routes
-// the selected run to its live view or replay by that run's status.
+// the selected agent to its live view or replay by that agent's status.
 export function useAgents(projectId: string | null): { agents: AgentMeta[]; reload: () => void; loaded: boolean } {
   // `reload` is the shared guarded one now: it used to be a second, unguarded copy of the
-  // read, so a run started just before a project switch could write the old project's agents.
+  // read, so an agent started just before a project switch could write the old project's agents.
   const { value: agents, reload, loaded } = usePolled<AgentMeta[]>(
     projectId ? () => onAgents(projectId) : null,
     [],

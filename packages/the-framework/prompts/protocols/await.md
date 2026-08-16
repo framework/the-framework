@@ -1,26 +1,24 @@
 ## Awaiting a choice
 When these instructions tell you to showChoices() / showMultiSelect() / showMarkdown() and then AWAIT, do not decide for the user.
 End your turn with one fenced code block, then stop.
-For a single choice (showChoices, pick one), tag it `await-choices`:
+Tag it `await-choices`:
 ```await-choices
 { "title": "<the question>", "options": [{ "label": "<option>", "detail": "<optional one-liner>" }], "recommended": "<the label to default to>" }
 ```
-For a multi-select (showMultiSelect, pick any number), tag it `await-multiselect` and set `default` on the entries that start checked:
-```await-multiselect
-{ "title": "<the prompt>", "options": [{ "label": "<option>", "detail": "<optional one-liner>", "default": true }] }
-```
-For a plan/document approval (showMarkdown of a file you wrote, then AWAIT), tag it `await-confirmation` and name the file:
-```await-confirmation
-{ "title": "<what to approve>", "file": "PLAN_<slug>.agent.md" }
-```
+Every question you stop to ask is this one block, whatever it is about:
+- An approval is two options: `{ "title": "Ship this?", "options": [{ "label": "Approve" }, { "label": "Decline" }], "recommended": "Approve" }`.
+- A plan or document you wrote and want signed off adds `"file": "PLAN_<slug>.agent.md"`, and the framework shows that file beside the question.
+- Several answers at once (showMultiSelect) adds `"multi": true`, and `"default": true` on the entries that start checked.
+- `recommended` is what the framework picks when nobody is there to answer, so name the option that is safe to take unattended.
+
 The framework shows it, waits for the user, and re-prompts you with their answer. Do not continue past it on your own.
 
 ## Handing the browser to a human
-When you are working in a browser and hit something you cannot or should not get past yourself — a login wall, a captcha, an SSO or 2FA step — stop and hand it over. Never type a password, never attempt a captcha, and never use a credential you found lying around in the repo or the environment. Tag the block `await-browser`:
-```await-browser
-{ "title": "<what the human needs to do>", "url": "<the page you are stuck on>" }
+When you are working in a browser and hit something you cannot or should not get past yourself — a login wall, a captcha, an SSO or 2FA step — stop and hand it over. Never type a password, never attempt a captcha, and never use a credential you found lying around in the repo or the environment. Ask with the same `await-choices` block, naming the page and recommending the option that is true when nobody is there:
+```await-choices
+{ "title": "<what the human needs to do> (<the page you are stuck on>)", "options": [{ "label": "Handled it" }, { "label": "Could not handle it" }], "recommended": "Could not handle it" }
 ```
-The user acts in that browser, then you are re-prompted. Their answer says whether it was handled: if it was not, do not retry the same page — say what you could not reach and work on what you can, or stop. Use this only for the browser; a decision the user needs to make is `await-choices`.
+The user acts in that browser, then you are re-prompted. If their answer says it was not handled, do not retry the same page — say what you could not reach and work on what you can, or stop.
 
 ## Showing a document without waiting
 To display markdown in the side panel without blocking (a plan, a summary, a writeup) and keep working, put a `show-markdown` block anywhere in your turn. The first line is its title:

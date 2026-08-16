@@ -105,46 +105,42 @@ export interface RunControlsOptions {
 
 /** The run's abort plumbing plus its driver-event sink. */
 export interface RunControls extends DriverEventHandler {
-  /** The composed signal every driver turn runs under. */
+  /** The signal every driver turn runs under: the caller's, and nothing else. */
   runSignal: AbortSignal
-  /** Trips a clean stop when the user declines a plan (#358); inert on the direct path. */
-  declineController: AbortController
 }
 
 /**
- * Compose the run's signal and wire its driver-event handler in one place. The caller's signal is
- * OR'd (via {@link AbortSignal.any}) with the one self-stop left — a declined plan (#358) — so
- * anything downstream that watches `runSignal` stops the same way regardless of which fired.
+ * Wire the run's signal and its driver-event handler in one place.
  *
- * There were three (E1). A per-run USD cap and a mid-run quota gate also aborted a session that
- * was already going, which is the worst moment to economise: the tokens are already spent, the
- * work is half-done, and what is saved is the cheap part while what is lost is the expensive part.
- * Spending is decided once, before a session starts.
+ * There were three self-stops (E1), then one (D6), now none — so this composes nothing and the
+ * caller's signal *is* the run's signal. A per-run USD cap and a mid-run quota gate used to abort
+ * a session that was already going, which is the worst moment to economise: the tokens are already
+ * spent, the work is half-done, and what is saved is the cheap part while what is lost is the
+ * expensive part. Spending is decided once, before a session starts. The last one left, a declined
+ * plan, went with the gate kind that raised it: a decline is now an answer the agent is given,
+ * like any other, rather than a process the framework kills out from under it.
  */
 export function createRunControls(opts: RunControlsOptions): RunControls {
-  const declineController = new AbortController()
-  const runSignal = AbortSignal.any([...(opts.signal ? [opts.signal] : []), declineController.signal])
   const handler = createDriverEventHandler({ emit: opts.emit, sessionLink: opts.sessionLink })
-  return { ...handler, runSignal, declineController }
+  return { ...handler, runSignal: opts.signal ?? new AbortController().signal }
 }
 
 /** Inputs to {@link endStopDetail}. */
 export interface StopDetailOptions {
   /** The error the run's turn loop threw. */
   err: unknown
-  /** The caller's own signal, to tell a caller stop from a self-stop. */
+  /** The caller's own signal: an interrupt through it is a stop, not a failure. */
   signal?: AbortSignal | undefined
-  declineController: AbortController
 }
 
 /**
  * Classify why a run's turn loop threw and render the `end` event's `detail`. A caller interrupt
- * or a declined plan (#358) are clean stops; anything else is a real failure. Shared so the two
- * run paths can never disagree on what "stopped" means.
+ * is a clean stop; anything else is a real failure. Shared so the two run paths can never disagree
+ * on what "stopped" means.
  */
 export function endStopDetail(opts: StopDetailOptions): { stopped: boolean; detail: string } {
-  const callerAborted = opts.signal?.aborted === true
-  const declined = opts.declineController.signal.aborted
-  const detail = declined ? 'plan declined' : opts.err instanceof Error ? opts.err.message : String(opts.err)
-  return { stopped: callerAborted || declined, detail }
+  return {
+    stopped: opts.signal?.aborted === true,
+    detail: opts.err instanceof Error ? opts.err.message : String(opts.err),
+  }
 }

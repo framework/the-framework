@@ -169,10 +169,9 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
   emit({ kind: 'intent', text: opts.prompt })
   if (system) emit({ kind: 'system-prompt', text: system })
 
-  // Usage accounting plus the one self-stop left (#358): the session signal composes the caller's
-  // abort with the plan-decline abort. Nothing stops a session for spending (E1) — that is decided
-  // before it starts.
-  const { runSignal, onDriverEvent, declineController } = createRunControls({
+  // Usage accounting, and the run's signal. Nothing stops a session but the caller: not spending
+  // (E1, decided before it starts) and not a declined plan (D6, an answer the agent is given).
+  const { runSignal, onDriverEvent } = createRunControls({
     emit,
     signal: opts.signal,
     sessionLink: opts.sessionLink,
@@ -209,26 +208,20 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
     })
     // The agent kept asking past the limit: finish with the latest turn rather than loop.
     if (rounds.exhausted) emit({ kind: 'log', message: 'Finishing the session (await limit reached).' })
-    // A declined plan (#358) stops the session rather than carrying on: the user takes over with
-    // fresh instructions, so building on a plan they rejected is the one thing not to do. The
-    // prompt path used to finish cleanly here instead, which meant the same decline read as a
-    // completed session on one path and a stop on the other.
-    if (rounds.declined) declineController.abort(new Error('[framework] plan declined'))
     let text = rounds.text
 
     // #182: a build must actually produce an app. If nothing landed on disk the agent stalled
     // (e.g. sanity-checking the stack), so re-prompt once with a hard "create it from scratch"
     // directive. Only for a real driver — the fake one writes nothing, so its workspace always
     // reads empty — and only when the agent is not mid-question, which the gates just drained.
-    if (kind === 'build' && !resuming && opts.driver.name !== 'fake' && !rounds.declined && isWorkspaceEmpty(opts.cwd)) {
+    if (kind === 'build' && !resuming && opts.driver.name !== 'fake' && isWorkspaceEmpty(opts.cwd)) {
       const scaffolded = await session.prompt(scaffoldPrompt(opts.prompt), { signal: runSignal })
       emitTurnSignals(scaffolded.text)
       text = scaffolded.text
     }
 
-    // The session controls (budget #322, decline #358, quota #529) abort between turns, and the
-    // opening rounds do not observe the abort themselves, so look before treating this as a
-    // success — otherwise an aborted session settles as done.
+    // A Stop aborts between turns, and the opening rounds do not observe the abort themselves,
+    // so look before treating this as a success — otherwise an aborted session settles as done.
     if (runSignal.aborted) {
       throw runSignal.reason instanceof Error ? runSignal.reason : new Error('[framework] run stopped')
     }
@@ -263,7 +256,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
     emit({ kind: 'end', ok: true })
     return { text, events, ...(todo ? { todo } : {}) }
   } catch (err) {
-    const { stopped, detail } = endStopDetail({ err, ...(opts.signal ? { signal: opts.signal } : {}), declineController })
+    const { stopped, detail } = endStopDetail({ err, ...(opts.signal ? { signal: opts.signal } : {}) })
     emit({ kind: 'end', ok: false, ...(stopped ? { stopped: true } : {}), detail })
     throw err
   } finally {

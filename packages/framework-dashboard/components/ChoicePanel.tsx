@@ -8,8 +8,10 @@ import { cn } from '../lib/utils.js'
 
 // "Your call" — the interactive gate the run parks on (#304/#332), rendered from the
 // live event stream and posted back over Telefunc (server/control.telefunc.ts) to the
-// project's control.jsonl. Three shapes: an Approve/Decline confirm (#358), a
-// multi-select checklist (#332), and the single-select list (#304). It always asks: a gate
+// project's control.jsonl. One shape: a question with options, picked one at a time or
+// several at once (#332). There were three — an Approve/Decline confirm got its own green and
+// red buttons — but an approval is a question with two options, and rendering it as its own
+// card only meant the agent had to know which of three blocks to emit. It always asks: a gate
 // only reaches a panel when somebody is watching, and a session nobody is watching resolves
 // its gates to the recommended option without one. The panel clears itself when the resulting
 // `choice-resolved` event streams in
@@ -81,12 +83,10 @@ export function ChoicePanel({
       return next
     })
 
-  const approveId = choice.recommended ?? choice.options[0]?.id
-  const declineId = choice.options.find(o => o.id !== approveId)?.id ?? approveId
-
-  // What Accept picks: the checked subset for a multi-select, else the recommended option
-  // (an Approve for a confirm gate). Shared by the button, the countdown, and Ctrl+Enter.
-  const autoPick = (): string | string[] => (choice.multi ? [...checkedRef.current] : (approveId ?? ''))
+  // What Accept picks: the checked subset for a multi-select, else the recommended option (the
+  // first when the agent named none). Shared by the button, the countdown, and Ctrl+Enter.
+  const recommendedId = choice.recommended ?? choice.options[0]?.id
+  const autoPick = (): string | string[] => (choice.multi ? [...checkedRef.current] : (recommendedId ?? ''))
   const accept = (by: 'user' | 'autopilot' = 'user') => post(autoPick(), by)
 
   // Any mouse movement cancels the auto-accept — the human is here, so let them pick.
@@ -121,27 +121,7 @@ export function ChoicePanel({
       <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your call</div>
       <h2 className="mb-3 text-sm font-medium">{choice.title}</h2>
 
-      {choice.confirm ? (
-        <div className="flex gap-2">
-          <Button
-            /* `text-background`, not white: the success token is dark on the light canvas and light
-               on the dark one, so the label has to invert with it to stay legible on both. */
-            className="bg-success text-background hover:bg-success hover:opacity-90"
-            disabled={parked || !approveId}
-            onClick={() => approveId && post(approveId)}
-          >
-            Approve
-          </Button>
-          <Button
-            variant="outline"
-            className="border-danger/50 text-danger hover:bg-danger/10 hover:text-danger"
-            disabled={parked || !declineId}
-            onClick={() => declineId && post(declineId)}
-          >
-            Decline
-          </Button>
-        </div>
-      ) : choice.multi ? (
+      {choice.multi ? (
         <>
           <ul className="mb-3 space-y-1">
             {choice.options.map(o => (

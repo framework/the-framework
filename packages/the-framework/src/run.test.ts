@@ -11,7 +11,7 @@ import { FakeDriver, type Driver, type DriverSession } from './driver/index.js'
 import type { RunLocation } from './run-location.js'
 import { composeRunSystem } from './system-prompt.js'
 import type { ChoiceRequest, FrameworkEvent } from './events.js'
-import { MAX_AWAIT_ROUNDS, PLAN_DECLINED_MESSAGE, continuationPrompt } from './turn-gate.js'
+import { MAX_AWAIT_ROUNDS, continuationPrompt } from './turn-gate.js'
 
 /** A driver that records the `system` framing it is started with, delegating the run to the fake. */
 function recordingDriver(): { driver: Driver; system: () => string } {
@@ -303,8 +303,8 @@ test('a run with no preset and no serve config reviews nothing (#1372)', async (
 
 test('a build turn that stops to showMultiSelect fires a checklist gate and resumes (#339)', async () => {
   const awaitBlock =
-    'Rated the problems.\n```await-multiselect\n' +
-    '{ "title": "Which problems to deep-dive?", "options": [{ "id": "auth", "label": "auth", "default": true }, { "id": "routing", "label": "routing" }] }\n' +
+    'Rated the problems.\n```await-choices\n' +
+    '{ "title": "Which problems to deep-dive?", "multi": true, "options": [{ "id": "auth", "label": "auth", "default": true }, { "id": "routing", "label": "routing" }] }\n' +
     '```'
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
@@ -329,7 +329,7 @@ test('a build turn that stops to showMultiSelect fires a checklist gate and resu
     requestChoice: async req => (req.multi ? { picked: ['routing'], by: 'user' } : { picked: 'proceed', by: 'user' }),
   })
 
-  const gate = events.find(e => e.kind === 'choice' && e.id === 'await-multiselect')
+  const gate = events.find(e => e.kind === 'choice' && e.id === 'await-choices')
   assert.ok(gate && gate.kind === 'choice' && gate.multi === true)
   assert.ok(gate.options.some(o => o.id === 'auth' && o.default === true))
   // Resumed with the user's selection (routing only), not the defaults.
@@ -339,8 +339,8 @@ test('a build turn that stops to showMultiSelect fires a checklist gate and resu
 
 test('a build turn that stops for plan approval resumes on Approve (#358)', async () => {
   const awaitBlock =
-    'The scope is large, so I wrote a plan.\n```await-confirmation\n' +
-    '{ "title": "Approve the orders plan?", "file": "PLAN_orders.agent.md" }\n' +
+    'The scope is large, so I wrote a plan.\n```await-choices\n' +
+    '{ "title": "Approve the orders plan?", "file": "PLAN_orders.agent.md", "options": [{ "id": "approve", "label": "Approve" }, { "id": "decline", "label": "Decline" }], "recommended": "approve" }\n' +
     '```'
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
@@ -364,10 +364,9 @@ test('a build turn that stops for plan approval resumes on Approve (#358)', asyn
     requestChoice: async () => ({ picked: 'approve', by: 'user' }),
   })
 
-  // The approval surfaced as a confirmation gate carrying the plan file.
-  const gate = events.find(e => e.kind === 'choice' && e.id === 'await-confirmation')
+  // The approval surfaced as an ordinary gate carrying the plan file — one card, two options.
+  const gate = events.find(e => e.kind === 'choice' && e.id === 'await-choices')
   assert.ok(gate && gate.kind === 'choice')
-  assert.equal(gate.confirm, true)
   assert.equal(gate.file, 'PLAN_orders.agent.md')
   assert.equal(gate.recommended, 'approve')
   assert.deepEqual(gate.options.map(o => o.id), ['approve', 'decline'])
@@ -376,36 +375,39 @@ test('a build turn that stops for plan approval resumes on Approve (#358)', asyn
   assert.ok(prompts.some(p => /You paused to ask.*Approve the orders plan.*chose: Approve/s.test(p)))
 })
 
-test('a declined plan stops the run cleanly instead of building on (#358)', async () => {
-  const awaitBlock = 'Plan written.\n```await-confirmation\n{ "title": "Approve?", "file": "PLAN_x.agent.md" }\n```'
-  let resumed = false
+test('a declined plan is an answer the agent is given, not a run the framework kills (#358/D6)', async () => {
+  // It used to be the last self-stop in the codebase: declining an `await-confirmation` aborted
+  // the run, so the "one gate shape" collapse took the mechanism that raised it. A decline is now
+  // delivered like any other answer and the agent decides — which is what the protocol already
+  // told it to do ("do not continue past it on your own").
+  const awaitBlock =
+    'Plan written.\n```await-choices\n' +
+    '{ "title": "Approve?", "file": "PLAN_x.agent.md", "options": [{ "id": "approve", "label": "Approve" }, { "id": "decline", "label": "Decline" }] }\n```'
+  let resumedWith = ''
   const driver = new FakeDriver({
     respond: (prompt: string): string => {
       if (/Build this app end to end/.test(prompt)) return awaitBlock
-      if (/You paused to ask/.test(prompt)) resumed = true
-      return 'done'
+      if (/You paused to ask/.test(prompt)) resumedWith = prompt
+      return 'Understood — waiting for your instructions.'
     },
     sessionId: 'decline358',
   })
 
   const events: FrameworkEvent[] = []
-  await assert.rejects(
-    runSession({
-      prompt: FAKE_INTENT,
-      driver,
-      cwd: '/tmp/ws',
-      onEvent: e => events.push(e),
-      requestChoice: async req => ({ picked: req.confirm ? 'decline' : 'proceed', by: 'user' }),
-    }),
-  )
-  assert.equal(resumed, false)
-  assert.ok(events.some(e => e.kind === 'log' && /Plan declined, awaiting user instructions/.test(e.message)))
-  // A decline is a clean stop, not a failure.
+  await runSession({
+    prompt: FAKE_INTENT,
+    driver,
+    cwd: '/tmp/ws',
+    onEvent: e => events.push(e),
+    requestChoice: async () => ({ picked: 'decline', by: 'user' }),
+  })
+
+  assert.match(resumedWith, /chose: Decline/, 'the agent was told what the user picked')
+  // And the run finished on its own terms rather than being aborted underneath it.
   const end = events.find(e => e.kind === 'end')
   assert.ok(end && end.kind === 'end')
-  assert.equal(end.ok, false)
-  assert.equal(end.stopped, true)
-  assert.equal(end.detail, 'plan declined')
+  assert.equal(end.ok, true)
+  assert.notEqual(end.stopped, true)
 })
 
 test('with nobody to ask, a session takes the recommended option and carries on (#337/#846)', async () => {
@@ -547,8 +549,9 @@ test('runSession runs the backlog loop after the build when opted in (#323)', as
 const choicesGate = (title: string): string =>
   `${title}\n\`\`\`await-choices\n${JSON.stringify({ title, options: [{ id: 'a', label: 'Option A' }, { id: 'b', label: 'Option B' }] })}\n\`\`\``
 
-const confirmGate = (title: string): string =>
-  `${title}\n\`\`\`await-confirmation\n${JSON.stringify({ title })}\n\`\`\``
+/** An approval, which since D6 is an ordinary gate with two options rather than its own kind. */
+const approvalGate = (title: string): string =>
+  `${title}\n\`\`\`await-choices\n${JSON.stringify({ title, options: [{ id: 'approve', label: 'Approve' }, { id: 'decline', label: 'Decline' }], recommended: 'approve' })}\n\`\`\``
 
 test('runAwaitRounds resolves a gate, re-prompts with the answer, and emits every turn signal', async () => {
   const events: FrameworkEvent[] = []
@@ -569,7 +572,7 @@ test('runAwaitRounds resolves a gate, re-prompts with the answer, and emits ever
     emit: e => void events.push(e),
   })
 
-  assert.deepEqual(result, { text: 'All done.', declined: false, exhausted: false })
+  assert.deepEqual(result, { text: 'All done.', exhausted: false })
   // One shared continuation wording for every path (#570), built from the gate title + pick.
   assert.deepEqual(prompts, ['open', continuationPrompt('Which way?', 'Option B')])
   assert.ok(events.some(e => e.kind === 'log' && e.message === 'Continuing with your choice: Option B'))
@@ -579,10 +582,13 @@ test('runAwaitRounds resolves a gate, re-prompts with the answer, and emits ever
   assert.equal(signalled[1], 'All done.')
 })
 
-test('runAwaitRounds reports a declined plan and stops instead of re-prompting (#358)', async () => {
+test('runAwaitRounds re-prompts with whatever was picked, a decline included (#358/D6)', async () => {
   const events: FrameworkEvent[] = []
   const prompts: string[] = []
-  const driver = new FakeDriver({ respond: prompt => (prompts.push(prompt), confirmGate('Plan ok?')) })
+  let asked = 0
+  const driver = new FakeDriver({
+    respond: prompt => (prompts.push(prompt), asked++ === 0 ? approvalGate('Plan ok?') : 'Understood.'),
+  })
   const session = await driver.start({ cwd: '/tmp/ws' })
   const result = await runAwaitRounds({
     session,
@@ -592,10 +598,10 @@ test('runAwaitRounds reports a declined plan and stops instead of re-prompting (
     emit: e => void events.push(e),
   })
 
-  assert.equal(result.declined, true)
   assert.equal(result.exhausted, false)
-  assert.deepEqual(prompts, ['open']) // it stopped rather than continuing
-  assert.ok(events.some(e => e.kind === 'log' && e.message === PLAN_DECLINED_MESSAGE))
+  assert.equal(prompts.length, 2, 'the decline continued the exchange rather than ending it')
+  assert.match(prompts[1]!, /chose: Decline/)
+  assert.ok(events.some(e => e.kind === 'log' && e.message === 'Continuing with your choice: Decline'))
 })
 
 test('runAwaitRounds gives up after MAX_AWAIT_ROUNDS and reports it exhausted', async () => {
@@ -612,7 +618,6 @@ test('runAwaitRounds gives up after MAX_AWAIT_ROUNDS and reports it exhausted', 
   })
 
   assert.equal(result.exhausted, true)
-  assert.equal(result.declined, false)
   assert.equal(prompts.length, MAX_AWAIT_ROUNDS + 1) // the opener, then one per round
 })
 
@@ -666,7 +671,6 @@ test('runAwaitRounds does not report exhausted when a chat phase follows the ope
   })
 
   assert.equal(result.exhausted, false)
-  assert.equal(result.declined, false)
 })
 
 /**

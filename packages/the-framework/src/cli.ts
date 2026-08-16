@@ -1146,7 +1146,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   const browserAttached = opts.browser && !fake && opts.agent === 'claude' && localRun
 
   // The preview of that browser (#802): the agent's Chrome is headless, so when it parks on an
-  // `await-browser` gate (#796) there is nothing for a human to click. This serves it. Opening
+  // browser hand-off gate (#796) there is nothing for a human to click. This serves it. Opening
   // the stream costs nothing while the page is still — Chrome only emits a frame on a change.
   const browserStream = sharedBrowser
     ? await startBrowserStream({

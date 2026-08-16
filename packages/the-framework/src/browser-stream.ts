@@ -4,7 +4,7 @@ import { AddressInfo } from 'node:net'
 /**
  * The run's browser, streamed to a human (#802, part of #609).
  *
- * The `await-browser` gate (#796) parks a run and asks someone to deal with a login wall or a
+ * The browser hand-off gate (#796) parks a run and asks someone to deal with a login wall or a
  * captcha. The browser it is parked on is headless and owned by the run (#793), so there is
  * nothing for that person to click. This serves it: the latest screencast frame as MJPEG, and
  * clicks/keys back in over POST.

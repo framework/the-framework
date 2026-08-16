@@ -35,15 +35,15 @@ const AWAIT_CHOICES_TURN: FakeTurn = {
 }
 const AWAIT_MULTISELECT_TURN: FakeTurn = {
   text:
-    'Rated the problems by how clear the optimal solution is.\n```await-multiselect\n' +
-    '{ "title": "Which problems should I deep-dive for alternatives?", "options": [{ "label": "auth model", "detail": "rated 3/10", "default": true }, { "label": "pagination", "detail": "rated 7/10" }, { "label": "orders schema", "detail": "rated 2/10", "default": true }] }\n```',
+    'Rated the problems by how clear the optimal solution is.\n```await-choices\n' +
+    '{ "title": "Which problems should I deep-dive for alternatives?", "multi": true, "options": [{ "label": "auth model", "detail": "rated 3/10", "default": true }, { "label": "pagination", "detail": "rated 7/10" }, { "label": "orders schema", "detail": "rated 2/10", "default": true }] }\n```',
   actions: ['Read', 'Grep'],
   usage: FAKE_USAGE,
 }
 const AWAIT_CONFIRMATION_TURN: FakeTurn = {
   text:
-    'The scope is large, so I wrote a plan first.\n```await-confirmation\n' +
-    '{ "title": "Approve the plan for the orders app?", "file": "PLAN_fake-orders-app.agent.md" }\n```',
+    'The scope is large, so I wrote a plan first.\n```await-choices\n' +
+    '{ "title": "Approve the plan for the orders app?", "file": "PLAN_fake-orders-app.agent.md", "options": [{ "label": "Approve" }, { "label": "Decline" }], "recommended": "Approve" }\n```',
   actions: ['Write'],
   usage: FAKE_USAGE,
 }

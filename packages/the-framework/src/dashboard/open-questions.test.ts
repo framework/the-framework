@@ -28,10 +28,9 @@ const CHOICE: FrameworkEvent = {
     { id: 'no', label: 'Decline' },
   ],
   recommended: 'yes',
-  confirm: true,
 }
 
-test('openChoiceRequest keeps the whole request — options, recommended, confirm', () => {
+test('openChoiceRequest keeps the whole request — options and recommended', () => {
   const open = openChoiceRequest([CHOICE], 'gate-1')
   assert.deepEqual(open, {
     id: 'gate-1',
@@ -41,7 +40,6 @@ test('openChoiceRequest keeps the whole request — options, recommended, confir
       { id: 'no', label: 'Decline' },
     ],
     recommended: 'yes',
-    confirm: true,
   })
 })
 

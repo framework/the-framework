@@ -1,15 +1,4 @@
-import {
-  BROWSER_HANDLED,
-  BROWSER_NOT_HANDLED,
-  CONFIRM_APPROVED,
-  CONFIRM_DECLINED,
-  MAX_AWAIT_ROUNDS,
-  PLAN_DECLINED_MESSAGE,
-  continuationPrompt,
-  isDeclinedConfirmation,
-  parseAwaitGate,
-  type ParsedAwaitGate,
-} from './turn-gate.js'
+import { MAX_AWAIT_ROUNDS, continuationPrompt, parseAwaitGate, type ParsedAwaitGate } from './turn-gate.js'
 import { pickedIds, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import type { DriverSession, DriverTurn } from './driver/index.js'
 import type { ChatMessage, RunMessages } from './run-messages.js'
@@ -20,21 +9,17 @@ import type { ChatMessage, RunMessages } from './run-messages.js'
 // what removed the run <-> todo-loop cycle. run.ts composes these primitives into a lifecycle;
 // it does not own them.
 
-/** The gate-id stems by kind, so a POST-back is matched to the gate that asked (round 0 keeps it). */
-const GATE_BASE_ID: Record<ParsedAwaitGate['kind'], string> = {
-  choices: 'await-choices',
-  multi: 'await-multiselect',
-  confirm: 'await-confirmation',
-  browser: 'await-browser',
-}
-
 /**
- * Resolve one parsed await gate (#337/#339) to the user's answer text, ready to
- * seed the continuation prompt: emits the `choice`, parks for the pick (or the
- * headless/abort fallback), and maps the picked id(s) back to label(s). Round 0
- * keeps a stable gate id; later rounds get a unique one so a dashboard never
- * confuses a re-ask with the answer it just resolved. Shared by the build's
+ * Resolve one parsed await gate (#337) to the user's answer text, ready to seed the continuation
+ * prompt: emits the `choice`, parks for the pick (or the headless/abort fallback), and maps the
+ * picked id(s) back to label(s). Round 0 keeps a stable gate id; later rounds get a unique one so
+ * a dashboard never confuses a re-ask with the answer it just resolved. Shared by the build's
  * `agentAwaitGate`, the direct prompt path, and the backlog loop (#323).
+ *
+ * One path, where there were four. A gate that takes several picks answers with the labels it got
+ * (or `(none)`); every other gate answers with the one label picked. What used to distinguish an
+ * approval or a browser hand-off from an ordinary question was the options the agent wrote, and
+ * that is all it is again.
  */
 export async function resolveAwaitGate(
   gate: ParsedAwaitGate,
@@ -47,50 +32,8 @@ export async function resolveAwaitGate(
 ): Promise<string> {
   const signalOpt = deps.signal ? { signal: deps.signal } : {}
   const choiceOpt = deps.requestChoice ? { requestChoice: deps.requestChoice } : {}
-  const baseId = GATE_BASE_ID[gate.kind]
-  const id = round === 0 ? baseId : `${baseId}-${round}`
-  if (gate.kind === 'browser') {
-    // The agent is stuck on a page and needs a human to act on it (#796). Rides the same
-    // choice plumbing as every other gate, so the CLI and the dashboard render it today.
-    //
-    // Recommended is "could not handle it" — the opposite of the confirmation gate's default.
-    // A headless run has nobody at the browser, and telling the agent a human cleared the
-    // login wall when none did sends it back to a page that is still blocked.
-    const picked = await requestChoices({
-      id,
-      title: gate.url ? `${gate.title} (${gate.url})` : gate.title,
-      options: [
-        { id: 'handled', label: BROWSER_HANDLED },
-        { id: 'not-handled', label: BROWSER_NOT_HANDLED },
-      ],
-      recommended: 'not-handled',
-      confirm: true,
-      emit: deps.emit,
-      ...choiceOpt,
-      ...signalOpt,
-    })
-    return picked === 'handled' ? BROWSER_HANDLED : BROWSER_NOT_HANDLED
-  }
-  if (gate.kind === 'confirm') {
-    // The plan-approval confirmation (#358): a fixed Approve / Decline pair, recommended
-    // Approve so a headless (or aborted) run proceeds — the same semantics as the other gates.
-    const picked = await requestChoices({
-      id,
-      title: gate.title,
-      options: [
-        { id: 'approve', label: CONFIRM_APPROVED },
-        { id: 'decline', label: CONFIRM_DECLINED },
-      ],
-      recommended: 'approve',
-      confirm: true,
-      ...(gate.file ? { file: gate.file } : {}),
-      emit: deps.emit,
-      ...choiceOpt,
-      ...signalOpt,
-    })
-    return picked === 'decline' ? CONFIRM_DECLINED : CONFIRM_APPROVED
-  }
-  if (gate.kind === 'multi') {
+  const id = round === 0 ? 'await-choices' : `await-choices-${round}`
+  if (gate.multi) {
     const picked = await requestMultiSelect({ id, title: gate.title, options: gate.options, emit: deps.emit, ...choiceOpt, ...signalOpt })
     const labels = gate.options.filter(o => picked.includes(o.id)).map(o => o.label)
     return labels.length ? labels.join(', ') : '(none)'
@@ -100,6 +43,7 @@ export async function resolveAwaitGate(
     title: gate.title,
     options: gate.options,
     ...(gate.recommended ? { recommended: gate.recommended } : {}),
+    ...(gate.file ? { file: gate.file } : {}),
     emit: deps.emit,
     ...choiceOpt,
     ...signalOpt,
@@ -111,8 +55,6 @@ export async function resolveAwaitGate(
 export interface AwaitRoundsResult {
   /** The last turn's text. */
   text: string
-  /** A confirmation gate was declined (#358): the caller stops rather than build on it. */
-  declined: boolean
   /** The agent was still asking when the round cap ran out. */
   exhausted: boolean
 }
@@ -156,10 +98,9 @@ export interface AwaitTurnDeps {
 }
 
 /**
- * Resolve the await gates (#337/#339) a turn ended on: pick the answer, continue with
- * it, repeat until the agent stops asking or the {@link MAX_AWAIT_ROUNDS} cap trips. A
- * declined plan (#358) stops here. Returns the settled turn plus whether it declined /
- * was still asking at the cap.
+ * Resolve the await gates (#337) a turn ended on: pick the answer, continue with it, repeat until
+ * the agent stops asking or the {@link MAX_AWAIT_ROUNDS} cap trips. Returns the settled turn plus
+ * whether the agent was still asking at the cap.
  *
  * Every path that runs gates shares this loop: the opening prompt, each chat message, and
  * the build's `agentAwaitGate`. They differ only in how a turn is continued — a raw
@@ -171,20 +112,16 @@ export async function drainGates<T extends { text: string }>(
   turn: T,
   deps: AwaitTurnDeps,
   continueWith: (question: string, answer: string) => Promise<T>,
-): Promise<{ turn: T; declined: boolean; exhausted: boolean }> {
+): Promise<{ turn: T; exhausted: boolean }> {
   let gate = parseAwaitGate(turn.text)
   for (let round = 0; round < MAX_AWAIT_ROUNDS && gate; round++) {
     const answer = await resolveAwaitGate(gate, round, deps)
-    if (isDeclinedConfirmation(gate, answer)) {
-      deps.emit({ kind: 'log', message: PLAN_DECLINED_MESSAGE })
-      return { turn, declined: true, exhausted: false }
-    }
     deps.emit({ kind: 'log', message: `Continuing with your choice: ${answer}` })
     turn = await continueWith(gate.title, answer)
     deps.emitTurnSignals(turn.text)
     gate = parseAwaitGate(turn.text)
   }
-  return { turn, declined: false, exhausted: gate !== undefined }
+  return { turn, exhausted: gate !== undefined }
 }
 
 /** Continue a plain driver session from a gate answer: the raw-prompt half of {@link drainGates}. */
@@ -234,16 +171,14 @@ export async function runChatPhase(session: DriverSession, messages: RunMessages
     const drained = await drainGates(turn, deps, promptContinuation(session, deps))
     turn = drained.turn
     exhausted = drained.exhausted
-    if (drained.declined) return { turn, exhausted }
   }
 }
 
 /**
- * Prompt the agent and honor its await gates (#337/#339) until it stops asking: resolve each
- * gate to the user's answer, re-prompt with it, and repeat up to {@link MAX_AWAIT_ROUNDS}.
- * A declined plan (#358) ends the exchange rather than re-prompting. When a live-chat
- * {@link AwaitRoundsOptions.messages} source is wired, the run then stays open for the
- * user's own messages (#714) rather than finishing.
+ * Prompt the agent and honor its await gates (#337) until it stops asking: resolve each gate to
+ * the user's answer, re-prompt with it, and repeat up to {@link MAX_AWAIT_ROUNDS}. When a live-chat
+ * {@link AwaitRoundsOptions.messages} source is wired, the run then stays open for the user's own
+ * messages (#714) rather than finishing.
  *
  * Every turn here is a turn like any other, so each one's signals are emitted. That is the
  * point of sharing this: the direct prompt path and the backlog loop each had their own copy
@@ -264,7 +199,6 @@ export async function runAwaitRounds(opts: AwaitRoundsOptions): Promise<AwaitRou
   const opening = await session.prompt(opts.prompt, { ...signalOpt, ...(opts.resume ? { resume: true } : {}) })
   emitTurnSignals(opening.text)
   const drained = await drainGates(opening, deps, promptContinuation(session, deps))
-  if (drained.declined) return { text: drained.turn.text, declined: true, exhausted: false }
 
   // Live chat (#714): take the user's messages — draining what queued and ending on idle, or
   // parked until Stop for a terminal-dashboard run (#1390). Headless leaves it unset,
@@ -273,9 +207,9 @@ export async function runAwaitRounds(opts: AwaitRoundsOptions): Promise<AwaitRou
   // reported "exhausted" and log a spurious await-limit notice.
   if (messages) {
     const chat = await runChatPhase(session, messages, drained.turn, deps, opts.stayOpenChat === true)
-    return { text: chat.turn.text, declined: false, exhausted: chat.exhausted }
+    return { text: chat.turn.text, exhausted: chat.exhausted }
   }
-  return { text: drained.turn.text, declined: false, exhausted: drained.exhausted }
+  return { text: drained.turn.text, exhausted: drained.exhausted }
 }
 
 /** The recommended fallback pick when a single-select gate cannot get a real answer. */
@@ -325,8 +259,6 @@ export interface ChoicesDeps {
   options: readonly ChoicesOption[]
   /** The option id pre-selected (autopilot auto-accepts it) and used as the headless/abort fallback. Default = the first option. */
   recommended?: string
-  /** Render as an Approve/Decline confirmation (#358): buttons instead of an option list. */
-  confirm?: boolean
   /** The markdown file under approval; the dashboard's doc sidebar renders it. */
   file?: string
   /** The interactive handler (the CLI wires it to the dashboard); omit for a headless run. */
@@ -353,7 +285,6 @@ export async function requestChoices(deps: ChoicesDeps): Promise<string> {
     title: deps.title,
     options: options.map(o => ({ id: o.id, label: o.label, ...(o.detail ? { detail: o.detail } : {}) })),
     ...(recommended ? { recommended } : {}),
-    ...(deps.confirm ? { confirm: true } : {}),
     ...(deps.file ? { file: deps.file } : {}),
   }
   emit({ kind: 'choice', ...req })

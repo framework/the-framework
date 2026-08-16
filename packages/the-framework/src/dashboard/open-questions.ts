@@ -38,7 +38,7 @@ export interface OpenQuestionsDeps {
  * The full {@link ChoiceRequest} still open under this id: its `choice` event with no later
  * `choice-resolved` for the same id. The sibling of live-run.ts's `openGate`, which slims the
  * gate down to what chat can render — an answering *panel* needs everything the event carried
- * (multi, recommended, confirm, detail lines), so this keeps the request whole.
+ * (multi, recommended, detail lines), so this keeps the request whole.
  */
 export function openChoiceRequest(events: FrameworkEvent[], gateId: string): ChoiceRequest | undefined {
   let open: ChoiceRequest | undefined

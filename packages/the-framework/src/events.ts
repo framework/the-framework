@@ -38,12 +38,6 @@ export interface ChoiceRequest {
   multi?: boolean
   /** Auto-accept the recommended option after this many ms when autopilot is on. Default 10000. */
   autoAcceptMs?: number
-  /**
-   * Render as an Approve/Decline confirmation (#358): the dashboard shows a green
-   * Approve and a red Decline button instead of the option list. The options still
-   * carry the two ids, so the pick machinery is unchanged.
-   */
-  confirm?: boolean
   /** The markdown file under approval (e.g. `PLAN_<slug>.agent.md`); the doc sidebar renders it. */
   file?: string
 }

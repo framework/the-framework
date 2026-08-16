@@ -1,4 +1,4 @@
-Covers the turn-signal parsing: each ask-gate kind with tolerant defaults and latest-block-wins (falling back past a malformed block), markdown views, session-name slugging (a session legitimately named "view" is kept), ready-for-merge detection, and the single continuation wording shared by every path.
+Covers the turn-signal parsing: the one ask-gate block with its tolerant defaults and latest-block-wins (falling back past a malformed block, and refusing a block with nothing pickable in it), the several-picks and plan-file variants that used to be gate kinds of their own, markdown views, session-name slugging (a session legitimately named "view" is kept), ready-for-merge detection, and the single continuation wording shared by every path.
 
 ## Before writing SPEC.md files
 

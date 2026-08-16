@@ -1,4 +1,4 @@
-The static shell the daemon serves for every address: the root element the app mounts into, the product's typefaces and tab icon, and the module script that boots it.
+The static shell the daemon serves for every address: the root element the app mounts into, the product's typefaces and tab icon, and the module script that boots it. It is a plain Vite entry — the framework that used to sit between this file and the app was doing nothing that a static page and a client-side router do not.
 
 ## TLDR
 

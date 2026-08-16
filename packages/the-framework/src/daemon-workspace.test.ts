@@ -384,7 +384,7 @@ test('a run that fails on its own terms is not retried (#1281)', async () => {
  * #1326: an agent must not spend a branch and a worktree on a driver that can never start.
  *
  * This is what #1323 looked like from outside: every session died before writing its agent.json,
- * on both agents, across six projects, and the only visible trace was run branches piling up
+ * on both agents, across six projects, and the only visible trace was agent branches piling up
  * while the dashboard sat on "Waiting for the session to start...". The failure was a logged-out
  * CLI, which resolves and answers `--version` exactly like a working one.
  */
@@ -411,7 +411,7 @@ test('a start on a logged-out agent is refused, and spends no branch or worktree
     assert.match(result.error!, /not logged in/)
     assert.match(result.error!, /auth login/)
 
-    // Nothing was spent: no worktrees directory, and no run branch on the repo.
+    // Nothing was spent: no worktrees directory, and no agent branch on the repo.
     const worktrees = await stat(join(cwd, FRAMEWORK_DIR, WORKTREES_DIR)).then(() => true, () => false)
     assert.equal(worktrees, false, 'a refused start creates no worktree')
     const branches = await git(['branch', '--list', 'the-framework/agent-*'], cwd)

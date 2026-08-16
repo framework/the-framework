@@ -56,7 +56,7 @@ export interface AgentTail {
 /**
  * Everything one story test stands up: the daemon runtime on a temp home, the dashboard context
  * the daemon would wire, and factories for registered projects. `close()` is the
- * whole teardown — it stops spawned runs the way daemon shutdown does, then removes the state.
+ * whole teardown — it stops spawned agents the way daemon shutdown does, then removes the state.
  */
 export interface StoryWorld {
   /** The daemon's home workspace (a plain temp dir, not a registered project). */

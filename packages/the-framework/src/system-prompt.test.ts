@@ -197,7 +197,7 @@ test('systemPromptBlock adds no knowledge docs when vanilla is on (#537/#547)', 
 
 test('systemPromptBlock is the built-in system prompt (#326) and the user prompt, in that order, and nothing else (#457)', () => {
   // The bootstrap preamble was the last text here that was neither the built-in prompt doc (#326) nor the
-  // user's own. Measured on four live runs: #326 alone already stops an empty-dir build
+  // user's own. Measured on four live agents: #326 alone already stops an empty-dir build
   // for a plan, so the override earned nothing and outranked the doc.
   // The knowledge docs (#537) join the Context line, which is paths, not prompt text.
   const block = systemPromptBlock({ user: 'Ship small PRs.', context: ['/work/api'] })

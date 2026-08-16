@@ -42,7 +42,7 @@ export const NO_CHECKS_GRACE_MS = 3 * 60 * 1000
 const MAX_CI_FIX_ATTEMPTS = 2
 
 /**
- * The marker a CI-fix agent's prompt opens with, so attempts are discoverable from run metas. The
+ * The marker a CI-fix agent's prompt opens with, so attempts are discoverable from agent metas. The
  * `@` is always there, sha or not: it is what stops "PR #12" reading as a prefix of "PR #123"
  * when the metas are scanned for prior attempts.
  */

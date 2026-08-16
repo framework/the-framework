@@ -5,7 +5,7 @@ import { nodeStoreFs, ARCHIVE_DIR, type StoreFs } from './store/index.js'
 import { nodeGitRunner, type GitRunner } from './project.js'
 
 /**
- * Committed session history (#1179): where a project's finished runs are archived so they survive
+ * Committed session history (#1179): where a project's finished agents are archived so they survive
  * the repo being cleaned.
  *
  * The bug this exists for: agent state was written to `.the-framework/agents/`, which the install-time
@@ -13,7 +13,7 @@ import { nodeGitRunner, type GitRunner } from './project.js'
  * every session a project had ever run. Nothing was recoverable, because nothing had ever been
  * committed.
  *
- * Scoped per user, as `.the-framework/<user>/sessions/`, rather than one shared directory. Two
+ * Scoped per user, as `.the-framework/<user>/agents/`, rather than one shared directory. Two
  * people working the same repo would otherwise write the same paths from different machines and
  * conflict on every merge; under their own directory their histories simply sit side by side. The
  * list being visible to the whole team is the intended outcome, not a leak — see the issue.
@@ -22,7 +22,7 @@ import { nodeGitRunner, type GitRunner } from './project.js'
  * set up and the directory matches the name on the commits.
  */
 
-/** The directory, under a user's own directory, that holds their archived runs. */
+/** The directory, under a user's own directory, that holds their archived agents. */
 export { ARCHIVE_DIR }
 
 /** Where an agent's history goes when git has no identity configured. */
@@ -51,7 +51,7 @@ export function userDirName(email: string | undefined): string {
     : ANONYMOUS_USER_DIR
 }
 
-/** The `.the-framework/<user>/sessions` directory under a project root. */
+/** The `.the-framework/<user>/agents` directory under a project root. */
 export function agentArchiveDir(cwd: string, user: string): string {
   return join(cwd, THE_FRAMEWORK_DIR, user, ARCHIVE_DIR)
 }

@@ -44,7 +44,7 @@ export interface MergedSweepDeps {
   worktrees?: (cwd: string) => Promise<WorktreeRow[]>
   /** Removes one worktree (default {@link removeProjectWorktree}). */
   remove?: (cwd: string, agentId: string) => Promise<RemoveResult>
-  /** Run ids whose checkouts the daemon is still responsible for; see {@link MergedSweepOptions.busy}. */
+  /** Agent ids whose checkouts the daemon is still responsible for; see {@link MergedSweepOptions.busy}. */
   busy?: ReadonlySet<string>
 }
 
@@ -97,7 +97,7 @@ export interface MergedSweepOptions {
    * "Not live" on disk is not "the daemon is finished with it": an agent's meta flips to `done` a
    * beat before its teardown archives the history and reclaims the checkout, and a sweep landing
    * in that window races the teardown for the same directory. Absent means nothing is busy, which
-   * is right for a caller that spawns no runs.
+   * is right for a caller that spawns no agents.
    */
   busy?: () => ReadonlySet<string>
   /** The per-project sweep (default {@link removeMergedWorktrees}). */

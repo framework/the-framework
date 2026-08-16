@@ -169,7 +169,7 @@ export function isMetaPublishing(meta: AgentMeta): boolean {
 
 /**
  * The GitHub Actions run's live URL, from the `action` event the ActionsDriver emits once it
- * finds its workflow run (#1053): its label is `run <html_url>`. Lets the run view link through
+ * finds its workflow run (#1053): its label is `run <html_url>`. Lets the agent view link through
  * to the live Actions run while the transcript is still burst-replaying at the end. The last
  * match wins, so a multi-turn session points at its most recent agent. Absent until the driver has
  * found the agent (and for any non-Actions target).

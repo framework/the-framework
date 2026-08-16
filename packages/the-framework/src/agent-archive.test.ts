@@ -72,9 +72,11 @@ test('sessions live under the user, inside .the-framework (#1179)', () => {
 
 test('the ignore rules re-include every directory on the way down (#1179)', () => {
   // The seeded allow-list ignores everything with `*`, and git never descends into an ignored
-  // directory — so un-ignoring only the files would never be reached.
+  // directory — so un-ignoring only the files would never be reached. Both names the archive has
+  // had are re-included: a repo whose history predates D5's rename would otherwise have it ignored
+  // the moment this file is rewritten, and the archive exists precisely to not be lost.
   const rules = archiveGitignore()
-  assert.equal(rules, '!*/\n!*/agents/\n!*/agents/**\n')
+  assert.equal(rules, '!*/\n!*/agents/\n!*/agents/**\n!*/sessions/\n!*/sessions/**\n')
 })
 
 test('a repo with no ignore file gets the whole file, transient state and all (#1179)', async () => {

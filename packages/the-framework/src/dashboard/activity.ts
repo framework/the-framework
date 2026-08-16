@@ -14,7 +14,7 @@ export { activityKey, pickNewActivity } from './keys.js'
 // hook and the Discord watcher fold it into a baseline on first look and then notify once per
 // transition — you hear an agent kick off and an agent land, nothing when the page/daemon starts.
 
-/** How many recent runs per project to consider. Bounds the finished-set — older runs rolled off
+/** How many recent agents per project to consider. Bounds the finished-set — older agents rolled off
  * long ago and were already baselined, so they never fire. A running agent is always newest (live
  * meta is prepended), so it is always in range. */
 const RECENT_RUNS = 20
@@ -60,9 +60,9 @@ function activityFor(project: ProjectSummary, agent: AgentMeta): Activity {
 }
 
 /**
- * Build the cross-project activity feed: for each registered project's most recent runs, one
+ * Build the cross-project activity feed: for each registered project's most recent agents, one
  * item per agent reflecting where it is now (`started` while it runs, `finished` once it lands),
- * newest first. Forgiving — a project whose runs cannot be read simply contributes nothing.
+ * newest first. Forgiving — a project whose agents cannot be read simply contributes nothing.
  *
  * The `started` and `finished` items for one agent carry distinct keys ({@link activityKey}), so a
  * run that is still going notifies once (started) and again when it lands (finished). An agent that

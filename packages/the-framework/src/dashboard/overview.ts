@@ -69,7 +69,7 @@ export interface RecentAgentsDeps {
  * Every project's sessions pooled and sorted newest-first (capped), so the shared sidebar (#shared-
  * shell) can show recents on the home/Overview where no single project is selected. Each row carries
  * the project it belongs to, so selecting it jumps into that project's session. Forgiving — a project
- * whose runs cannot be read simply contributes nothing.
+ * whose agents cannot be read simply contributes nothing.
  */
 export async function buildRecentAgents(projects: ProjectSummary[], deps: RecentAgentsDeps = {}): Promise<RecentAgent[]> {
   const readAgents = deps.agents ?? readAllAgents
@@ -194,7 +194,7 @@ const HOT_TICKETS_LIMIT = 60
 /** Injectable readers so {@link buildHotTickets} is unit-testable off disk. */
 export interface HotTicketsDeps {
   tickets?: (cwd: string) => Promise<WorkspaceTicket[]>
-  /** The project's live runs, read for the ticket each one recorded (#1117). */
+  /** The project's live agents, read for the ticket each one recorded (#1117). */
   liveAgents?: (cwd: string) => Promise<LiveAgent[]>
   /** The cross-project TODO queue, for the AI-Queue lane (#1139). Defaults to {@link collectQueue}. */
   queue?: (projects: ProjectSummary[]) => Promise<ProjectQueue[]>
@@ -224,7 +224,7 @@ export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicke
   }
   const all: HotTicket[] = []
   for (const project of projects) {
-    // Which of this project's tickets are being implemented right now, by run id (#1117). Built
+    // Which of this project's tickets are being implemented right now, by agent id (#1117). Built
     // per project because a ticket path is only unique within its own repo.
     const implementing = new Map<string, string>()
     for (const meta of await readAgents(project.path).catch(() => [])) {

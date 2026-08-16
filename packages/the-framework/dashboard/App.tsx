@@ -126,7 +126,7 @@ export function App() {
   const preferences = usePreferences()
   useInterventionNotifications(interventions, humanInterventionEnabled(preferences) && notificationsEnabled(preferences))
 
-  // The "New activity" category (#627): the default-off feed of runs starting/finishing. Its only
+  // The "New activity" category (#627): the default-off feed of agents starting/finishing. Its only
   // client consumer is the browser notification below, so it is polled exactly when that will fire —
   // both the category (`notifyNewActivity`) and the browser method (`notifyBrowser`) on. (Discord
   // delivery, if enabled, is the daemon's own watcher, independent of this poll.)

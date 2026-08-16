@@ -55,9 +55,9 @@ export interface InterventionsDeps {
   /** Reads a branch's state (default {@link readAgentHandoff}); drives the `unpushed` source (#860). */
   handoff?: (cwd: string, branch: string) => Promise<AgentHandoff | undefined>
   /**
-   * How many of a project's most recent finished runs to inspect for unpushed work. Each one costs
+   * How many of a project's most recent finished agents to inspect for unpushed work. Each one costs
    * a handful of git reads, and this runs on a poll, so old history is not re-walked every minute:
-   * work that has sat unpushed for dozens of runs is not news, and the agent list stays the record.
+   * work that has sat unpushed for dozens of agents is not news, and the agent list stays the record.
    */
   handoffLimit?: number
   /**
@@ -68,7 +68,7 @@ export interface InterventionsDeps {
   dashboardUrl?: string
 }
 
-/** How many recent finished runs are inspected per project by default. */
+/** How many recent finished agents are inspected per project by default. */
 const HANDOFF_LIMIT = 5
 
 /**
@@ -140,7 +140,7 @@ export async function buildInterventions(
 /**
  * The finished agents of a project whose branch still holds unpushed, unmerged commits (#860).
  *
- * Only the most recent {@link InterventionsDeps.handoffLimit} finished runs are inspected: each
+ * Only the most recent {@link InterventionsDeps.handoffLimit} finished agents are inspected: each
  * costs several git reads and this runs on a poll.
  */
 async function unpushedFor(project: ProjectSummary, deps: InterventionsDeps): Promise<Intervention[]> {

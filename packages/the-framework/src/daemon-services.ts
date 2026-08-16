@@ -96,7 +96,7 @@ export interface BackgroundServiceDeps {
   quota: QuotaSource
   /** Start an agent in a project. */
   startAgent: (prompt: string, options: StartAgentOptions, projectId: string) => Promise<StartAgentResult>
-  /** How many runs are live on a project, so a background job can tell idle from busy. */
+  /** How many agents are live on a project, so a background job can tell idle from busy. */
   activeAgentCount: (projectId: string) => number
   /**
    * The agents this daemon is still responsible for, whose checkouts the worktree sweep must leave
@@ -364,7 +364,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   const clock = startDaemonTick({
     log,
     // Order matters on the start-up tick, which runs before anything else the daemon does: the
-    // worktree sweep goes first, so its start-up turn lands while the daemon owns no runs at all.
+    // worktree sweep goes first, so its start-up turn lands while the daemon owns no agents at all.
     // Behind a slow job it would instead land in the middle of the first session, racing that
     // session's teardown for the same checkout — which the `busy` guard then has to catch.
     jobs: [

@@ -80,7 +80,7 @@ test('installProject seeds .the-framework/.gitignore so only the archive is comm
 
   await installProject(CWD, { git, fs })
   const ignore = fs.files.get(gitignorePath(CWD)) ?? ''
-  // Run state (events.jsonl / agent.json / agents/) stays untracked...
+  // Agent state (events.jsonl / agent.json / agents/) stays untracked...
   assert.match(ignore, /^\*$/m)
   // ...and the session archive is un-ignored all the way down, since git never descends into an
   // ignored directory. Written whole at install (B3): with one record there is one content, so
@@ -88,6 +88,9 @@ test('installProject seeds .the-framework/.gitignore so only the archive is comm
   assert.match(ignore, /^!\*\/$/m)
   assert.match(ignore, /^!\*\/agents\/$/m)
   assert.match(ignore, /^!\*\/agents\/\*\*$/m)
+  // The name D5 renamed away from, still un-ignored: a repo whose archive predates the rename
+  // would otherwise have its committed history ignored the moment this file is rewritten.
+  assert.match(ignore, /^!\*\/sessions\/\*\*$/m)
 })
 
 test('installProject on a dirty repo commits the pre-existing changes first', async () => {

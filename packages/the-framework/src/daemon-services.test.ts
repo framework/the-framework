@@ -17,7 +17,7 @@ import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
  * that a real checkout with a real `TODO_AGENTS.md` fans out to that many starts, one pinned entry
  * each. Both halves are real here — the registry is read off disk by `readPreferences`, the queue
  * off disk by `findTodoBacklog` — and only the daemon's own spawn is stubbed, because the assertion
- * is about how many runs are asked for and with what, not about the child processes.
+ * is about how many agents are asked for and with what, not about the child processes.
  */
 
 /** A reading with room to spare, so the quota gate is never the reason a start did not happen. */

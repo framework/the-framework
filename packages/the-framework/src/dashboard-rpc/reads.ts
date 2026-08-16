@@ -64,7 +64,7 @@ async function withProjects<T>(build: (projects: Awaited<ReturnType<ReturnType<t
  * from `agents/`, plus every live agent prepended — so the sidebar shows an in-progress
  * run with a `running` status the moment it starts, not only after it closes.
  *
- * Since #736 a project has any number of live runs, each in its own worktree, so this reads
+ * Since #736 a project has any number of live agents, each in its own worktree, so this reads
  * them all (#738) instead of the single one that used to sit at the project path. They come
  * back as {@link LiveAgent}s, carrying the `cwd` of the checkout that agent is editing.
  *
@@ -95,7 +95,7 @@ export async function onAgents(projectId: string): Promise<AgentMeta[]> {
 /**
  * The agent ids that still have a worktree on disk (#737). An agent that failed or was stopped keeps
  * its checkout so you can go look at what it was holding; this is how the dashboard knows which
- * finished run has one to offer removing. Live runs are excluded — their worktree is in use.
+ * finished run has one to offer removing. Live agents are excluded — their worktree is in use.
  */
 export async function onRetainedWorktrees(projectId: string): Promise<string[]> {
   const cwd = await resolveProjectPath(projectId)
@@ -228,7 +228,7 @@ export async function onActivity(): Promise<Activity[]> {
   return withProjects(buildActivity)
 }
 
-/** The Overview dashboard page (#471): the {@link onOverview} rollup plus run counts, run-status totals, and activity. */
+/** The Overview dashboard page (#471): the {@link onOverview} rollup plus agent counts, run-status totals, and activity. */
 export async function onDashboard(): Promise<DashboardData> {
   return withProjects(buildDashboard)
 }
@@ -374,7 +374,7 @@ export async function onSystemPromptUser(projectId: string): Promise<string | nu
 /**
  * The question a Claude web session is parked on, as reported by the browser bridge (#1237).
  *
- * Keyed by cloud session id rather than run id because that is what the bridge can see: it reads
+ * Keyed by cloud session id rather than agent id because that is what the bridge can see: it reads
  * a claude.ai page, which knows its session and nothing about our runs. The agent view already
  * derives that id from the agent's own `cloud <url>` event, so the join happens on the client
  * without the daemon having to index runs by session.

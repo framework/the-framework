@@ -492,7 +492,7 @@ async function resolvePromptConfig(
 /**
  * Whether this agent can be steered over `.the-framework/control.jsonl` (#344): Stop, a choice pick,
  * a live message. True when its own dashboard is up (#427), or when whoever spawned it handed it a
- * run id — the dashboard spawns each session with one in its spec, and steers it
+ * agent id — the dashboard spawns each session with one in its spec, and steers it
  * from its own process.
  *
  * This used to have a third clause, "a daemon is alive somewhere on this machine", read from a

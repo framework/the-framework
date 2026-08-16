@@ -72,7 +72,7 @@ export interface Preferences {
   /** Fire a browser notification when a new item lands on the "needs you" queue (#627). Absent = on. */
   notifyBrowser?: boolean
   /**
-   * Also notify on plain run activity — an agent started, an agent finished (#627). The default-off
+   * Also notify on plain agent activity — an agent started, an agent finished (#627). The default-off
    * counterpart to the always-on "needs you" notifications: it keeps you loosely informed of the
    * pipeline moving even when nothing needs you. A *category* toggle: it composes with the method
    * toggles ({@link notifyBrowser} / {@link notifyDiscord}), so activity reaches whichever are on.

@@ -5,7 +5,7 @@ import { DRIVER_SPECS, type DriverName } from './driver-cli.js'
  * Preflight checks for a live agent. A turnkey tool should fail *early and
  * clearly* when a prerequisite is missing, not spawn a broken process mid-run.
  * The main one: is the wrapped driver's CLI actually installed and runnable?
- * A fake session needs none of this, so preflight only gates live runs.
+ * A fake session needs none of this, so preflight only gates live agents.
  *
  * It probes the driver the session actually picked (#542), so a `codex` session is
  * checked against `codex` and fails on `codex` being missing, not `claude`.

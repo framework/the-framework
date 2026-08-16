@@ -110,7 +110,7 @@ export async function registerReposDirectory(env: NodeJS.ProcessEnv = process.en
 export { isPidAlive as isProcessAlive } from './store/index.js'
 
 /**
- * Tails the append-only `.the-framework/events.jsonl` run log. The generic tailing
+ * Tails the append-only `.the-framework/events.jsonl` agent log. The generic tailing
  * lives in {@link JsonlTailer}; this keeps the event-typed name the daemon (and
  * public API) always had.
  */

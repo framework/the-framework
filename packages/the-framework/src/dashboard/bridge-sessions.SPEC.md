@@ -1,4 +1,4 @@
-Decides which cloud sessions the browser extension should keep a tab open for: the few most recent web runs that carry a cloud session.
+Decides which cloud sessions the browser extension should keep a tab open for: the few most recent web agents that carry a cloud session.
 
 ## Rationales
 

@@ -95,7 +95,7 @@ test('sendMessage and sendChoice address the run too (#749)', async () => {
 test('an unknown or absent run id falls back to the project root, as before #736 (#749)', async () => {
   const ctx = await projectWithWorktreeAgent()
   try {
-    // No run id at all: the pre-#736 addressing, still right for an agent with no worktree.
+    // No agent id at all: the pre-#736 addressing, still right for an agent with no worktree.
     await sendStop(ctx.projectId)
     // An agent that has since finished and had its worktree removed must not throw or vanish.
     await sendStop(ctx.projectId, 'a-run-that-is-gone')

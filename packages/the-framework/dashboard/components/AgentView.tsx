@@ -155,7 +155,7 @@ export function AgentView({
   // How the agent ended (#948) — read once for the composer's note and the Resume offer below.
   const outcome = live ? undefined : agentOutcome(shown)
   // What the session hands back when it ends (#1102), folded from its own events, seeded from the
-  // run record's mirror (#1376): the opening `handoff-armed` event is written before the live
+  // agent record's mirror (#1376): the opening `handoff-armed` event is written before the live
   // channel attaches, so a live tab misses it and the fold alone re-arms what the launcher
   // disarmed — the record's snapshot is how the boxes read the same whether this tab watched the
   // run start or was opened halfway through.

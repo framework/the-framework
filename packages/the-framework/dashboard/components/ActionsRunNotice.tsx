@@ -2,7 +2,7 @@ import { Github, ExternalLink } from 'lucide-react'
 import type { FrameworkEvent } from '../../dist/index.js'
 import { actionsRunUrl } from '../lib/live-state.js'
 
-// The run view's affordance for a GitHub Actions target (#1053). An Actions run replays its
+// The agent view's affordance for a GitHub Actions target (#1053). An Actions run replays its
 // transcript in a burst at the end (fresh runner per turn), so a live feed looks stalled with
 // nothing streaming. This says the wait is expected and links through to the live Actions run.
 // Renders nothing for a local/remote/web run, so the agent view can mount it unconditionally.

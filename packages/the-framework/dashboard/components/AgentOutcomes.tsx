@@ -1,6 +1,6 @@
 import type { AgentStatus } from '../../dist/index.js'
 
-// How past runs ended (#471). These are the reserved status colours (good / warning /
+// How past agents ended (#471). These are the reserved status colours (good / warning /
 // critical), so every segment ships with a written label and count — identity is never
 // carried by colour alone. Zero-count outcomes are dropped from the bar but still listed.
 const OUTCOMES: { key: Exclude<AgentStatus, 'running'>; label: string; fill: string; dot: string }[] = [

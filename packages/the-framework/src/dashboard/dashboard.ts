@@ -7,7 +7,7 @@ import { buildOverview, type ActiveAgent, type RecentProject, type OverviewDeps 
 // The Overview dashboard page (#471): the cross-project rollup that used to live cramped in
 // the first sidebar, promoted to a real at-a-glance page. It reuses buildOverview for the
 // "working now" / recent / queue-size facts and adds the numbers a landing page wants —
-// per-project run counts and open TODOs, how past runs ended, and run activity over the last
+// per-project agent counts and open TODOs, how past agents ended, and agent activity over the last
 // two weeks. Still a pure projection of the same files (agent.json + runs/ + LOGS.md + TODO).
 
 /** One project's rollup row for the dashboard's projects table. */
@@ -40,12 +40,12 @@ export interface DashboardData {
     projects: number
     activeAgents: number
     openTodos: number
-    /** Archived runs across every project. */
+    /** Archived agents across every project. */
     totalAgents: number
   }
-  /** How past runs ended, across every project (archived runs only). */
+  /** How past agents ended, across every project (archived agents only). */
   agentsByStatus: Record<AgentStatus, number>
-  /** Finished runs per day over the last {@link ACTIVITY_DAYS} days, oldest-first. */
+  /** Finished agents per day over the last {@link ACTIVITY_DAYS} days, oldest-first. */
   activity: ActivityDay[]
   /** Runs going right now, most-recently-updated first (from {@link buildOverview}). */
   active: ActiveAgent[]
@@ -57,12 +57,12 @@ export interface DashboardData {
   queue: ProjectQueue[]
 }
 
-/** How many days of run activity the chart covers. */
+/** How many days of agent activity the chart covers. */
 const ACTIVITY_DAYS = 14
 
 /** Injectable readers/clock so {@link buildDashboard} is unit-testable off disk. */
 export interface DashboardDeps extends OverviewDeps {
-  /** Archived runs for a project path. Defaults to {@link listAgents} (forgiving of a missing dir). */
+  /** Archived agents for a project path. Defaults to {@link listAgents} (forgiving of a missing dir). */
   agents?: (cwd: string) => Promise<AgentMeta[]>
   /** Whether a project has tickets (#958). Defaults to {@link hasTickets} (false on any error). */
   tickets?: (cwd: string) => Promise<boolean>
@@ -80,7 +80,7 @@ function localDateKey(d: Date): string {
 
 /**
  * Build the Overview dashboard: the {@link buildOverview} rollup (working now / recent /
- * queue size) plus per-project run counts, how past runs ended, and a two-week activity
+ * queue size) plus per-project agent counts, how past agents ended, and a two-week activity
  * window. Forgiving — a project whose `agents/` is missing simply contributes nothing.
  */
 export async function buildDashboard(projects: ProjectSummary[], deps: DashboardDeps = {}): Promise<DashboardData> {

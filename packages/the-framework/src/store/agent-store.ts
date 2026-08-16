@@ -38,7 +38,7 @@ export const EVENTS_FILE = 'events.jsonl'
 export const META_FILE = 'agent.json'
 
 /**
- * Where finished runs are archived, so the dashboard can list a project's run
+ * Where finished agents are archived, so the dashboard can list a project's run
  * history (#303). The live agent stays at `events.jsonl`/`agent.json` (the daemon
  * tails it); on {@link AgentStore.close} a copy lands here as `<id>.jsonl` +
  * `<id>.json`, giving the history sidebar a per-agent log to replay.
@@ -46,7 +46,7 @@ export const META_FILE = 'agent.json'
 export const AGENTS_DIR = 'agents'
 
 /**
- * Where a project's finished runs are archived now (#1179): `.the-framework/<user>/sessions/`,
+ * Where a project's finished agents are archived now (#1179): `.the-framework/<user>/agents/`,
  * which the install-time ignore un-ignores so the history is committed and survives a
  * `git clean -fdx`. {@link AGENTS_DIR} stays the transient location — an agent worktree still archives
  * into its own throwaway checkout there, and it is where every agent archived before this shipped
@@ -57,7 +57,18 @@ export const AGENTS_DIR = 'agents'
  */
 export const ARCHIVE_DIR = 'agents'
 
-/** Filesystem-safe, lexicographically-sortable run id from an ISO start time. */
+/**
+ * What {@link ARCHIVE_DIR} was called before D5 renamed the unit of work: `<user>/sessions/`.
+ *
+ * Read, never written. The whole point of #1179 was that a project's history is committed and
+ * team-visible, so it survives `git clean -fdx` — renaming the directory it lives in would have
+ * made every archive written before the rename simply stop appearing, in the surface whose reason
+ * to exist is that it does not lose them. Same reason the transient {@link AGENTS_DIR} is still
+ * read: the old scheme is in the wild, so both are.
+ */
+export const LEGACY_ARCHIVE_DIR = 'sessions'
+
+/** Filesystem-safe, lexicographically-sortable agent id from an ISO start time. */
 export function agentIdFromStartedAt(startedAt: string): string {
   // ISO is fixed-width, so replacing the `:`/`.` separators keeps lexical order
   // in step with chronological order — the history list sorts by id alone.
@@ -200,7 +211,7 @@ export interface AgentMeta {
   /**
    * Where this run executes (#1050/#1053/#610): `actions` for a GitHub Actions run, `web` for a
    * Claude Code cloud session, `remote` when relayed to a connected device (#1067), absent for a
-   * local run. Persisted so the run view can tell a burst-mode Actions run from a stalled live
+   * local run. Persisted so the agent view can tell a burst-mode Actions run from a stalled live
    * feed, show a cloud agent's session link after a reload, and gate the browser pane off (#1053).
    */
   target?: 'local' | 'actions' | 'remote' | 'web'
@@ -648,7 +659,7 @@ export class AgentStore {
 }
 
 /**
- * The directory an agent's archive lives in: this user's committed `sessions/` when a caller named
+ * The directory an agent's archive lives in: this user's committed `agents/` when a caller named
  * one (#1179), else the transient `agents/`. Callers pass a user only where the archive is meant to
  * be kept — the project's copy — never for the copy an agent leaves inside its own worktree.
  */
@@ -663,15 +674,15 @@ function archivePaths(dir: string, id: string, user?: string): { events: string;
 }
 
 /**
- * Every directory a project's archived runs may sit in, newest scheme first: each user's
- * `<user>/sessions/`, then the legacy `agents/`.
+ * Every directory a project's archived agents may sit in, newest scheme first: each user's
+ * `<user>/agents/` (and the `sessions/` it was called before D5), then the transient top-level `agents/`.
  *
  * Both are read because both exist in the wild: `agents/` holds everything archived before #1179,
- * and a user directory is only created once that user has run something. Every user's sessions are
+ * and a user directory is only created once that user has run something. Every user's archive is
  * listed, not just the reader's — the history is a team-visible record of what the agent has done
  * to the repo, which is the point of committing it.
  *
- * A directory is recognized by having a readable `sessions/` child, so a stray file in
+ * A directory is recognized by having a readable archive child, so a stray file in
  * `.the-framework/` is simply not one (readdir yields `[]` for anything that is not a directory).
  */
 /**
@@ -690,8 +701,13 @@ async function findArchive(fs: StoreFs, dir: string, agentId: string): Promise<{
 async function archiveDirs(fs: StoreFs, dir: string): Promise<string[]> {
   const dirs: string[] = []
   for (const name of await fs.readdir(dir)) {
-    const candidate = join(dir, name, ARCHIVE_DIR)
-    if ((await fs.readdir(candidate)).length > 0) dirs.push(candidate)
+    // Both spellings of the per-user archive: the current one, and the `sessions/` D5 renamed
+    // away from. A reader that only knew the new name would lose every archive committed before
+    // the rename — which is the one thing this directory exists to prevent.
+    for (const scheme of [ARCHIVE_DIR, LEGACY_ARCHIVE_DIR]) {
+      const candidate = join(dir, name, scheme)
+      if ((await fs.readdir(candidate)).length > 0) dirs.push(candidate)
+    }
   }
   dirs.push(join(dir, AGENTS_DIR))
   return dirs
@@ -769,7 +785,7 @@ export async function listWorktreeDirs(cwd: string, fs: StoreFs = nodeStoreFs())
  * worktree would delete the agent's history with it. This copies it into the repo, which is the one
  * place the dashboard's history reads from, so teardown becomes safe.
  *
- * `user` files the copy under that user's committed `sessions/` (#1179) instead of the transient
+ * `user` files the copy under that user's committed `agents/` (#1179) instead of the transient
  * `agents/`. It is this copy, not the one the agent left in its own worktree, that is meant to last:
  * every agent in a git repo gets a worktree, so this is the only archive of it that outlives the
  * checkout, and committing it is what makes the history survive `git clean -fdx`. The worktree's
@@ -850,7 +866,7 @@ function isDeadRunningAgent(meta: AgentMeta | undefined, isAlive: (pid: number) 
 
 /**
  * Every archived meta a project has, across all of {@link archiveDirs}, with the path it came from.
- * De-duplicated by run id, first directory winning: an agent archived before #1179 and re-archived
+ * De-duplicated by agent id, first directory winning: an agent archived before #1179 and re-archived
  * into its user's sessions afterwards exists in both places, and the history must show it once.
  * The user directories are searched before `agents/`, so the committed copy is the one that wins.
  */
@@ -868,7 +884,7 @@ async function readAllArchivedMetaEntries(fs: StoreFs, dir: string): Promise<Arr
 }
 
 /**
- * List a project's archived runs, most-recent first: every user's committed `sessions/` plus the
+ * List a project's archived agents, most-recent first: every user's committed archive plus the
  * legacy `agents/`. The id sorts chronologically so no timestamp parse is needed. Missing or
  * unreadable dir/entries are skipped, never thrown.
  */
@@ -900,7 +916,7 @@ function ownerLiveness(meta: AgentMeta, isAlive: (pid: number) => boolean): 'liv
  *
  * An agent whose pid is alive on this host is left alone (#926). This used to flip every `running`
  * meta on the assumption that a fresh dashboard drives no in-flight run, which holds only while
- * exactly one is ever booted: a second one marked genuinely live runs as finished, giving them a
+ * exactly one is ever booted: a second one marked genuinely live agents as finished, giving them a
  * no-op Stop in the dashboard. A meta with no `pid` keeps the old behaviour, since there is
  * nothing better to go on.
  */
@@ -911,7 +927,7 @@ export async function reconcileOrphanedAgents(
 ): Promise<number> {
   const dir = join(cwd, FRAMEWORK_DIR)
   let fixed = 0
-  // Archived runs stuck at `running` (e.g. a prior live agent the next agent never rescued), wherever
+  // Archived agents stuck at `running` (e.g. a prior live agent the next agent never rescued), wherever
   // they are archived. Done before the live agent so its fresh archive isn't re-counted here.
   for (const { path, meta } of await readAllArchivedMetaEntries(fs, dir)) {
     if (!isDeadRunningAgent(meta, isAlive)) continue

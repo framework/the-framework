@@ -57,7 +57,7 @@ export function openChoiceRequest(events: FrameworkEvent[], gateId: string): Cho
  * Every project's parked questions, longest-waiting first (#1455): an agent that has been blocked
  * on its human the longest is the one to unblock first.
  *
- * Forgiving throughout, like every cross-project rollup: an unreadable project, run list or
+ * Forgiving throughout, like every cross-project rollup: an unreadable project, agent list or
  * event log contributes nothing rather than failing the read. A pending gate whose log no
  * longer shows it open (already resolved, log unreadable) is skipped — offering an answer the
  * daemon would refuse is worse than one card fewer.

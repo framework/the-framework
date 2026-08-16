@@ -42,7 +42,7 @@ export interface Route {
   view?: 'settings' | 'tickets'
   /** The selected project, or null for the Overview — and for the cross-project Tickets list. */
   projectId: string | null
-  /** The selected session (run id), or null for the project's home/launcher. */
+  /** The selected session (agent id), or null for the project's home/launcher. */
   agentId: string | null
   /** One ticket's own page (#1144), by filename — the same slug as `WorkspaceTicket.file`. Only
    *  meaningful with `view: 'tickets'` and a `projectId`; a ticket belongs to one project, so the

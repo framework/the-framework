@@ -359,7 +359,7 @@ export interface ProjectRuntime {
   /** The device side of the relay (#1067 slice 2): run one whitelisted read/steer/handoff RPC against
    *  this daemon's own home checkout, for a daemon that relayed an agent here. */
   onRelayRpc: (fn: string, args: unknown[]) => Promise<unknown>
-  /** Live runs on a project (#685), so a background job can tell an idle project from a busy one. */
+  /** Live agents on a project (#685), so a background job can tell an idle project from a busy one. */
   activeAgentCount: (targetProjectId: string) => number
   /**
    * The agent ids this daemon is still responsible for: spawning, running, or mid-retirement.
@@ -693,7 +693,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     }
 
     // An agent must not spend a branch and a worktree on a driver that can never start (#1326).
-    // That is what #1323 looked like from outside: six projects' worth of run branches piling up
+    // That is what #1323 looked like from outside: six projects' worth of agent branches piling up
     // while every session died before writing agent.json, with the dashboard stuck on "Waiting for
     // the session to start...". Probed here, above the allocation, because this is the one place
     // a daemon-started agent is born; the CLI's own path has gated on preflight since #542.
@@ -790,7 +790,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   }
 
   /**
-   * How many runs are live on a project (#685). Run keys are `<projectKey>::<agentId>`, or the
+   * How many agents are live on a project (#685). Agent keys are `<projectKey>::<agentId>`, or the
    * bare project key for an agent that got no worktree, so both spellings count. The pid is
    * re-checked rather than trusted: `settle` clears the entry on exit, but an agent whose exit
    * event never arrived would otherwise keep a project looking busy forever.

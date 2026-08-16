@@ -45,7 +45,7 @@ test('autoPmDecision does nothing while the preference is off (#685)', () => {
 })
 
 test('autoPmDecision leaves a project at its concurrency cap alone (#685/#1204)', () => {
-  // Live runs are already spending the quota; one more started unasked would race them. Before
+  // Live agents are already spending the quota; one more started unasked would race them. Before
   // #1204 the cap was hardwired at one, which is what `concurrency: 1` still asks for here.
   const decision = autoPmDecision({ ...IDLE, activeAgents: 1, concurrency: 1 })
   assert.equal(decision.start, false)

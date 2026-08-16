@@ -444,6 +444,22 @@ const RUNS = join(CWD, '.the-framework', 'agents')
 const runningAgentMeta = (id: string): string =>
   JSON.stringify({ version: AGENT_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT })
 
+test('listAgents still reads the archive under the name D5 renamed away from (#1179)', async () => {
+  // The committed archive is the one thing under `.the-framework/` that survives `git clean -fdx`,
+  // which is the whole reason it exists. Renaming its directory to `agents/` without reading the
+  // old `sessions/` would have made every archive written before the rename stop appearing — the
+  // history quietly shorter after an upgrade, in the surface whose reason to exist is not losing it.
+  const meta = (id: string): string =>
+    JSON.stringify({ version: AGENT_META_VERSION, status: 'done', id, startedAt: AT, updatedAt: AT, intent: id })
+  const user = join(CWD, '.the-framework', 'dev@example.com')
+  const fs = memFs({
+    [join(user, 'sessions', '2026-old.json')]: meta('2026-old'),
+    [join(user, 'agents', '2026-new.json')]: meta('2026-new'),
+  })
+  const agents = await listAgents(CWD, fs)
+  assert.deepEqual(agents.map(r => r.id).sort(), ['2026-new', '2026-old'])
+})
+
 test('reconcileOrphanedAgents flips archived runs stuck at running to stopped (#642)', async () => {
   const fs = memFs({
     [join(RUNS, 'a.json')]: runningAgentMeta('a'),
@@ -468,7 +484,7 @@ test('reconcileOrphanedAgents flips a live run and archives it, counting it once
 })
 
 // #926: it used to flip every `running` meta, on the assumption that a fresh daemon drives no
-// in-flight run. A second daemon boot then marked genuinely live runs as finished.
+// in-flight run. A second daemon boot then marked genuinely live agents as finished.
 test('reconcileOrphanedAgents leaves a run whose pid is alive on this host (#926)', async () => {
   const owned = (id: string, over: Record<string, unknown> = {}): string =>
     JSON.stringify({ version: AGENT_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT, pid: 42, host: hostname(), ...over })
@@ -552,7 +568,7 @@ test('fresh open adopts the id the daemon allocated, ignoring an unsafe one (#73
   assert.equal((await unsafe.readMeta())?.id, agentIdFromStartedAt(AT))
 })
 
-// #738: since #736 an agent lives in its own worktree, so a project's live runs are spread across
+// #738: since #736 an agent lives in its own worktree, so a project's live agents are spread across
 // `.the-framework/worktrees/*` rather than sitting at the project path.
 const worktreeMeta = (agentId: string, over: Partial<AgentMeta> = {}): string =>
   JSON.stringify({ version: 1, status: 'running', id: agentId, startedAt: AT, updatedAt: AT, ...over })

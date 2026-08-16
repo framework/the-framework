@@ -14,7 +14,7 @@ import type { WorktreeRow } from './worktrees.js'
 // different "landed" signals), each asking how the session ended rather than whether the work is
 // safe. The branch, the session's row and its replayable log are kept either way.
 
-/** A sweep over fixed rows, recording which run ids removal was asked for. */
+/** A sweep over fixed rows, recording which agent ids removal was asked for. */
 function fakeSweep(rows: WorktreeRow[]) {
   const asked: string[] = []
   const agent = (over: { remove?: (cwd: string, agentId: string) => Promise<{ ok: true } | { ok: false; error: string }> } = {}) =>

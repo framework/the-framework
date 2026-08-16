@@ -1,11 +1,11 @@
 import { join } from 'node:path'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
-import { ARCHIVE_DIR } from './store/index.js'
+import { ARCHIVE_DIR, LEGACY_ARCHIVE_DIR } from './store/index.js'
 
 /**
  * The `.the-framework/.gitignore` (#313/#1179): one file, one content, written at install.
  *
- * Run state is transient — `events.jsonl`, `agent.json`, `agents/`, the worktrees — and would
+ * Agent state is transient — `events.jsonl`, `agent.json`, `agents/`, the worktrees — and would
  * otherwise turn every session into a dirty checkout. The one thing under here that is committed
  * is the session archive (#1179), because `git clean -fdx` is an ordinary thing to do to a repo
  * and it used to delete every session a project had ever run.
@@ -26,19 +26,24 @@ export function gitignorePath(cwd: string): string {
 }
 
 /**
- * The sessions rules, user-agnostic (#1312).
+ * The archive rules, user-agnostic (#1312).
  *
- * Naming each user meant every person who ever ran a session in the repo appended their own lines
+ * Naming each user meant every person who ever ran an agent in the repo appended their own lines
  * to a *tracked* file: their checkout went dirty, the next safety commit swept the edit into a
  * branch, and two machines doing it near each other conflicted. A glob covers everyone, including
  * people who have not run anything yet.
  *
- * A star matches one path segment and never a slash, so this reaches exactly `<user>/sessions/`
- * and not `worktrees/<run>/sessions/`. The transient siblings stay ignored either way: un-ignoring
+ * A star matches one path segment and never a slash, so this reaches exactly `<user>/agents/`
+ * and not `worktrees/<agent>/agents/`. The transient siblings stay ignored either way: un-ignoring
  * a directory only lets git descend into it, and the bare `*` still ignores every file it finds.
+ *
+ * Both spellings are un-ignored: D5 renamed the directory, and a repo carrying archives under the
+ * old `sessions/` name would otherwise have them ignored the moment this file is rewritten — still
+ * tracked, since git does not un-track what it already knows, but invisible to every later add.
  */
 export function archiveGitignore(): string {
-  return `!*/\n!*/${ARCHIVE_DIR}/\n!*/${ARCHIVE_DIR}/**\n`
+  const rules = (name: string) => `!*/${name}/\n!*/${name}/**\n`
+  return `!*/\n${rules(ARCHIVE_DIR)}${rules(LEGACY_ARCHIVE_DIR)}`
 }
 
 /** The whole file: ignore the transient state, keep the session archive. */

@@ -1,6 +1,6 @@
 import type { AutoHandoffSkip, FrameworkEvent } from './events.js'
 
-// Derived run state for the dashboard's overview cards (#431): the production-grade
+// Derived agent state for the dashboard's overview cards (#431): the production-grade
 // loop status, the deploy plan, and the live session link — each a pure projection of
 // the same FrameworkEvent stream the log renders, so the live dashboard and a past-agent
 // replay show the identical summary. Kept here (not in the dashboard) so it is

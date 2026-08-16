@@ -1,4 +1,4 @@
-The session options as one table with every rule between them already applied, so the launcher and the settings page render the same options and can never disagree.
+An agent's options as one table with every rule between them already applied, so the launcher and the settings page render the same options and can never disagree.
 
 ## TLDR
 

@@ -24,6 +24,15 @@ If it isn't clear what you should do (e.g. unclear scope, unclear user prompt), 
 
 Do the following before applying your first change.
 
+### Workspace
+
+Your working directory is the whole of your workspace. Every file you read or write is under it.
+
+- Address files relative to it. An absolute path is how you leave it without noticing
+- It may sit *inside* another checkout of the same repo. That outer copy is the user's own working tree — not another view of your files, and never yours to edit
+- The same file can therefore exist twice. The one under your working directory is yours; editing the other one puts your work somewhere your branch and your commits cannot reach it
+- If something you need is genuinely outside, say so and stop — do not reach for it
+
 ### Session name
 
 1. Create a <SESSION_NAME> as a string [a-z0-9-]+ that succinctly represents the intention of the user prompt

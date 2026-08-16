@@ -83,6 +83,7 @@ test('SYSTEM_PROMPT_TEMPLATE carries the built-in prompt sections (#326) verbati
     '### Ambiguous prompt',
     '### Scope',
     '## Before starting changes',
+    '### Workspace',
     '### Session name',
     '## Before applying changes',
     '### Alternatives',
@@ -99,6 +100,11 @@ test('SYSTEM_PROMPT_TEMPLATE carries the built-in prompt sections (#326) verbati
   // The analysis artifact is gone (B2): every run wrote `ANALYSIS_RESULT.md` into the repo and
   // nothing ever read it back, so the prompt no longer asks for one.
   assert.equal(SYSTEM_PROMPT_TEMPLATE.includes('ANALYSIS_RESULT'), false)
+  // #1276: an agent edited the user's own checkout through absolute paths while committing
+  // relative ones in its worktree, and finished `done` with a commit holding none of the work.
+  // The worktree is nested inside the repo, so the user's tree is a path prefix of the agent's
+  // cwd — nothing else in the prompt tells it where its workspace ends.
+  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('Your working directory is the whole of your workspace'))
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('${{tf.prompt}}'))
   // The whole block is the branch-free doc now: #326 moved the one `tf.params.autopilot`
   // ternary out with the maintenance section, so `tf.prompt` is the only fragment left.

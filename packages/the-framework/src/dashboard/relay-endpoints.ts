@@ -5,7 +5,7 @@ import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'
 /**
  * The device-side of the remote-run relay (#1067): the two endpoints a daemon exposes so another
  * daemon (holding this device's token) can run a session here and watch it. They live under
- * `/_relay`, behind the #1051 token guard in {@link startDashboard}. The guard admits a matching
+ * `/_relay`, behind the shared-token guard (#1051) in {@link startDashboard}. The guard admits a matching
  * `fw_daemon` cookie without the browser-only `?token=` 302, so a daemon-to-daemon call passes with
  * a cookie and a token-less caller is already 401'd before it reaches here.
  *
@@ -15,7 +15,7 @@ import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'
  *   ends or the caller disconnects.
  * - `GET  /_relay/ping` (#1072) a cookie-guarded reachability probe: 200 and an empty body, starts
  *   nothing. The online/offline status the dashboard shows is the local daemon calling this on each
- *   saved device with its token; a token-less caller is already 401'd by the #1051 guard above.
+ *   saved device with its token; a token-less caller is already 401'd by the shared-token guard (#1051) above.
  * - `POST /_relay/rpc` (#1067 slice 2) runs one whitelisted run-scoped RPC (a read/diff/steer/handoff/
  *   push/PR) against this device's own checkout for the daemon relaying a run here, answering {result}.
  */
@@ -57,7 +57,7 @@ export async function handleRelayRequest(
 }
 
 /** `GET /_relay/ping` (#1072): answer 200 with an empty body. Starts nothing; only proves this
- * daemon is reachable and the caller's cookie is valid (the #1051 guard already enforced that). */
+ * daemon is reachable and the caller's cookie is valid (the shared-token guard (#1051) already enforced that). */
 function handlePing(req: IncomingMessage, res: ServerResponse): void {
   if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
   res.writeHead(200, { 'content-type': 'text/plain' })

@@ -225,7 +225,7 @@ export function StartRunForm({
         </p>
       ))}
       {/* The Haiku warning (#1439): never block, always teach. Haiku skips the session-finish
-          protocol so reliably (0/5 in the #1334 tier test, every stronger tier 1/1) that a
+          protocol so reliably (0/5 in the tier (#1334) test, every stronger tier 1/1) that a
           merge-armed run ends withheld as a draft PR — say so before the session is spent. */}
       {options.model === 'haiku' && (
         <p role="alert" className="mt-2 text-xs text-warning">

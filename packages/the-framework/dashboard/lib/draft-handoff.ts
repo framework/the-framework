@@ -1,5 +1,5 @@
 // The composer draft carried across a device hop (#1066). connectTo() appends `?draft=` alongside
-// the token; the #1051 bootstrap 302 strips only `?token=`, so the draft lands on the remote SPA as
+// the token; the shared-token bootstrap 302 (#1051) strips only `?token=`, so the draft lands on the remote SPA as
 // `/?draft=…`. This moves it out of the URL into sessionStorage at boot so the typed prompt never
 // sits in the address bar, history, or a Referer header, and the launcher rehydrates from it once.
 

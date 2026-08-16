@@ -86,7 +86,7 @@ export const MAX_SPEND_OFFSET = 50
  *
  * Landing exactly on the boundary reads as generous on paper but stops unattended work the moment
  * the account is precisely on pace, which is normal jitter rather than overspending. A half-day
- * cushion gives it room to breathe without meaningfully loosening the #879 policy.
+ * cushion gives it room to breathe without meaningfully loosening the spend-boundary policy (#879).
  */
 export const DEFAULT_SPEND_OFFSET = 100 / (7 * 2)
 

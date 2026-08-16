@@ -218,7 +218,7 @@ test('ghRepoAutoMerge reads the repo setting, and an unreadable answer is unknow
   assert.deepEqual(await ghRepoAutoMerge('/repo', allowed), { known: true, allowed: true })
 
   // gh missing / unauthenticated / not a GitHub repo: "could not say" renders nothing on the
-  // launcher — the #1318 no-crying-wolf stance — so it must never masquerade as a real "off".
+  // launcher — the no-crying-wolf (#1318) stance — so it must never masquerade as a real "off".
   const { gh: broken } = fakeGh(new Error('gh: command not found'))
   assert.deepEqual(await ghRepoAutoMerge('/repo', broken), { known: false, allowed: false })
   const { gh: junk } = fakeGh('not json')

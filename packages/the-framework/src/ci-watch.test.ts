@@ -80,7 +80,7 @@ test('pending checks wait for the next tick: no merge, no fix', async () => {
   assert.deepEqual(result, { merged: [], failed: [], fixes: [] })
 })
 
-test('a check-less PR younger than the attach grace is not merged — the #1406 window', async () => {
+test('a check-less PR younger than the attach grace is not merged — the stale-check window (#1406)', async () => {
   const justOpened = openPr({ createdAt: new Date(NOW - NO_CHECKS_GRACE_MS + 1000).toISOString() })
   const { deps, merges } = sweepDeps(justOpened, { checks: 'none', failed: [] })
   await sweepProjectCi('/p', deps)

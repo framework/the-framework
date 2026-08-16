@@ -189,7 +189,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
     onEvent: onDriverEvent,
   })
 
-  // Non-blocking signals the agent emits per turn: markdown views (#441) and the #326 lifecycle
+  // Non-blocking signals the agent emits per turn: markdown views (#441) and the session-lifecycle (#326)
   // signals (session name, ready-for-merge). None stop the turn.
   const emitTurnSignals = createTurnSignalEmitter(emit)
 

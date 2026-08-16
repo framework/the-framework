@@ -11,7 +11,7 @@ import { errorMessage } from '../error-message.js'
  * {@link EventStream}, which the dashboard reads over its normal same-origin `onEvents` channel. So
  * the browser never talks cross-origin and the token never leaves the two daemons (issue #1067 (b)).
  *
- * Authentication is the #1051 cookie, sent daemon-to-daemon: `Cookie: fw_daemon=<token>` with no
+ * Authentication is the shared-token cookie (#1051), sent daemon-to-daemon: `Cookie: fw_daemon=<token>` with no
  * `Origin` header. The remote's guard admits a matching cookie without the browser-only `?token=`
  * 302, and its `/_rpc` CSRF check (absent Origin passes) is not even on these raw routes.
  */
@@ -52,7 +52,7 @@ export async function pingRemote(target: RemoteTarget): Promise<boolean> {
   }
 }
 
-/** The two headers every relay request carries: JSON, and the #1051 cookie. No Origin on purpose. */
+/** The two headers every relay request carries: JSON, and the shared-token cookie (#1051). No Origin on purpose. */
 function relayHeaders(token: string): Record<string, string> {
   return { 'content-type': 'application/json', cookie: `fw_daemon=${token}` }
 }
@@ -82,7 +82,7 @@ const RPC_TIMEOUT_MS = 60_000 // a relayed git push/PR runs over the network on 
 /**
  * Relay one run-scoped RPC to the device that owns a remote run (#1067 slice 2). The local daemon
  * holds the device token, so a read/diff/handoff/push/PR for a relayed run runs ON the device: POST
- * {fn, args} to the remote's /_relay/rpc over the #1051 cookie (no Origin), returning the device's
+ * {fn, args} to the remote's /_relay/rpc over the shared-token cookie (#1051) (no Origin), returning the device's
  * result. Throws on an unreachable device or a non-2xx so the caller falls back to its own empty/error
  * shape, the same way a failed local read does.
  */

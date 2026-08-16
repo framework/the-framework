@@ -41,8 +41,8 @@ export const DEFAULT_DAEMON_HOST = '127.0.0.1'
 
 /**
  * True when `host` is a loopback address the browser reaches without leaving the machine (#1051).
- * Defined in its own leaf module so the dashboard's Telefunc mount can share the one definition
- * without importing this one back (a cycle); re-exported here for the callers that already had it.
+ * Defined in its own leaf module so the dashboard's RPC mount can share the one definition without
+ * importing this one back (a cycle); re-exported here for the callers that already had it.
  */
 export { isLoopbackHost }
 
@@ -136,10 +136,10 @@ export interface RunDaemonOptions {
 }
 
 /**
- * The daemon body, run in the foreground by bare `framework`. Serves the prerendered Vike +
- * Telefunc dashboard (#405/#426): the SPA reads each project's `.the-framework/events.jsonl`
- * over a Telefunc Channel and steers over control.jsonl, so the daemon just serves the bundle
- * and spawns sessions. Resolves on SIGINT/SIGTERM after tearing the dashboard down.
+ * The daemon body, run in the foreground by bare `framework`. Serves the built dashboard bundle
+ * (#405/#426): the SPA reads each project's `.the-framework/events.jsonl` over an event stream and
+ * steers over control.jsonl, so the daemon just serves the files and spawns sessions. Resolves on
+ * SIGINT/SIGTERM after tearing the dashboard down.
  */
 export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promise<void> {
   const port = opts.port ?? DEFAULT_DAEMON_PORT
@@ -150,7 +150,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // loopback bind needs none, so the local zero-config path stays byte-identical.
   const token = isLoopbackHost(host) ? undefined : await ensureDaemonToken(undefined, env)
   // The browser bridge (#1237). Opt-in, because it opens the daemon's one route reachable from
-  // another origin. It reuses the #1051 shared secret rather than minting a second one: the two
+  // another origin. It reuses the same shared token (#1051) rather than minting a second one: the two
   // guard the same daemon, so a second secret would be another thing to rotate and leak without
   // narrowing anything. On a loopback bind that secret may not exist yet, hence ensure, not read.
   const bridgeOn = (await readPreferences(undefined, env).catch((): Preferences => ({}))).bridge === true

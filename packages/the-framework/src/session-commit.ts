@@ -32,7 +32,7 @@ import { errorMessage } from './error-message.js'
  * {@link SessionCommitterOptions.maxWaitMs} caps that, so a project that never goes idle still
  * lands instead of being starved forever.
  *
- * Tolerates not being alone (the #605 question this waited on). One daemon per machine is the rule
+ * Tolerates not being alone (the question (#605) this waited on). One daemon per machine is the rule
  * today (#393), but the committer never assumes it: a locked index or a rebase/merge in progress
  * means somebody else is mid-operation, so it skips rather than commits into their work, and a
  * failed commit is swallowed and retried on the next window.

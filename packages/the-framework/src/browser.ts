@@ -191,7 +191,7 @@ export const BROWSER_MCP_SERVERS: Record<string, McpServerSpec> = {
 
 /**
  * The same server, pointed at a Chrome the run already launched (#793). `--browserUrl` makes
- * it attach instead of launching, which is what lets a second client (the #609 screencast)
+ * it attach instead of launching, which is what lets a second client (the screencast (#609))
  * watch the very page the agent is on. Without a URL this is the old spec unchanged.
  */
 export function browserMcpServers(browserUrl?: string | undefined): Record<string, McpServerSpec> {

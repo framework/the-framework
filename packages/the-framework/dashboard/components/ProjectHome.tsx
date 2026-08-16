@@ -11,7 +11,7 @@ import { ScrollArea } from './ui/scroll-area.js'
 // the rail and adds that run's own view (RunView) alongside — this page stays put, so you can
 // launch again. (Actually running several at once lands with git worktrees, #453.)
 //
-// Below the form, the #1455 sections: every session's open questions in one answerable
+// Below the form, the sections (#1455): every session's open questions in one answerable
 // place (item 4 + bonuses 1/2 — the launcher's main event now that tickets are gone), and
 // the Docs + History panels moved out of the right rail into this column (items 2/3 — the
 // rail hides them while this page shows, see RightRail's docsInMain). The tickets section

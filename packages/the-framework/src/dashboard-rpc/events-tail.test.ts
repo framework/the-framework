@@ -171,7 +171,7 @@ test('tailRunEvents does not replay a fully-consumed journal after the move', as
     assert.deepEqual(seen, ['one', 'two'])
     await sleep(20) // let the copy's mtime land visibly later than the seeding read
     // The archive path: a same-content copy with a NEWER mtime and the SAME length as what was
-    // consumed — the exact shape the #567 same-length-rewrite detection resets on. The retarget
+    // consumed — the exact shape the same-length-rewrite (#567) detection resets on. The retarget
     // must adopt the copy's mtime instead, or every line would be delivered twice.
     await copyFile(live, archive)
     await rmFile(live)

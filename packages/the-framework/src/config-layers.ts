@@ -15,9 +15,9 @@ import { BOOLEAN_CONFIG_KEYS, CONFIG_KEYS, type FrameworkFileConfig } from './co
 
 /** The run settings a config layer can carry. Keys left `undefined` mean "this layer said nothing". */
 export interface RunConfigValues {
-  /** Open Loop domain preset name. */
+  /** Preset name. */
   preset?: string | undefined
-  /** Build event kind the preset's review loop fires for (#265). */
+  /** Build event kind the preset applies to (#265). */
   event?: string | undefined
   /** Remove the built-in #326 system prompt, keeping the session controls (#314/C3). */
   vanilla?: boolean | undefined

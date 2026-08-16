@@ -12,7 +12,7 @@ test('renderTemplate substitutes a simple context read', () => {
   assert.equal(out, 'User: build a todo app')
 })
 
-test('renderTemplate evaluates the #326 maintenance ternary both ways', () => {
+test('renderTemplate evaluates the maintenance-prompt (#326) ternary both ways', () => {
   const template = '${{ tf.params.autopilot ? "minimal ok" : "minimal for humans" }}'
   assert.equal(renderTemplate(template, { tf: { params: { autopilot: true } } }), 'minimal ok')
   assert.equal(renderTemplate(template, { tf: { params: { autopilot: false } } }), 'minimal for humans')

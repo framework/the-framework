@@ -200,7 +200,7 @@ export interface SessionOptions {
   transparent?: boolean | undefined
   /** `--context <dir>` (repeatable): in-context directories added as one `Context:` line (#439). */
   context: string[]
-  /** `--on-before-mergeable`: fire the #326 on-before-mergeable prompt when the run signals setReadyForMerge(), queueing the quality follow-ups as TODO entries. */
+  /** `--on-before-mergeable`: fire the built-in on-before-mergeable (#326) prompt when the run signals setReadyForMerge(), queueing the quality follow-ups as TODO entries. */
   onBeforeMergeable: boolean
   /** `--browser`: give the agent a real browser via chrome-devtools-mcp (navigate, console, network, DOM, screenshot) during the run (#452). */
   browser: boolean
@@ -691,7 +691,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
 
   const cwd = opts.cwd ?? (fake ? join(tmpdir(), 'framework-fake-workspace') : process.cwd())
 
-  // The project can carry its own Open Loop defaults in the-framework.yml (#258):
+  // The project can carry its own defaults in the-framework.yml (#258):
   // which domain preset + modes to build under. CLI flags override the file; a bad
   // file is a warning, never a failed run. Read from the run's own workspace, so a
   // The fake demo (empty tmp cwd) stays deterministic unless pointed at a config dir.
@@ -819,7 +819,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // The one thing that raises it after this line is the user's own Merge action (#1391), which
   // also records the human authorization below.
   let armedHandoff: HandoffLevel = config.handoff
-  // The user pressed Merge (#1391): a human authorized the merge, so the #1363 gate must not also
+  // The user pressed Merge (#1391): a human authorized the merge, so the human-authorized merge gate (#1363) must not also
   // demand the agent's ready-for-merge signal — a human's word outranks it.
   let mergeAuthorized = false
   // Assigned once the journal exists, which is after the control watcher is wired: a change that
@@ -937,7 +937,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // checkout (a non-repo project), and then nothing is recorded.
   const startBranch = await currentBranch(cwd)
   if (startBranch) onEvent({ kind: 'branch', branch: startBranch })
-  // Fire the #326 on-before-mergeable prompt once a --on-before-mergeable run has settled and the agent
+  // Fire the built-in on-before-mergeable (#326) prompt once a --on-before-mergeable run has settled and the agent
   // signalled setReadyForMerge(). Skipped for a fake/offline run and when the run was stopped —
   // and every outcome, including each skip, is emitted as an event so the dashboard can show it (#835).
   const maybeFireOnBeforeMergeable = async (): Promise<void> => {
@@ -1050,7 +1050,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   }
 
   // The run owns the browser (#793): launching it here, rather than letting chrome-devtools-mcp
-  // launch its own, is what lets the #609 preview attach to the same page. Undefined when the
+  // launch its own, is what lets the preview (#609) attach to the same page. Undefined when the
   // machine has no Chrome, which leaves `--browser` on its old path rather than failing the run.
   // Local runs only: the browser tools are wired on this machine, so a `--run-on web`/`actions`
   // session could never reach them — launching Chrome here would leak a headless browser per
@@ -1331,7 +1331,7 @@ export function promptRunSpec(prompt: string, cwd: string, vanilla = false): Ses
     kind: 'prompt',
     cwd,
     options: {
-      // The on-before-mergeable follow-up runs vanilla so it skips the #326 prompt's `### Session
+      // The on-before-mergeable follow-up runs vanilla so it skips the built-in system prompt (#326)'s `### Session
       // name` step: it is a follow-up to a session, not a session of its own, so it must not
       // commit + branch + checkout a new `the-framework/<name>` branch. That stranded its output
       // (the #556 TODO entries and #537 knowledge docs) on a branch nothing merges (#560). Vanilla
@@ -1365,7 +1365,7 @@ async function spawnPromptRun(prompt: string, cwd: string, binPath: string, vani
 export type PromptRunner = (prompt: string, cwd: string, binPath: string) => Promise<boolean>
 
 /**
- * Fire the #326 on-before-mergeable prompt after a run signalled setReadyForMerge(): one
+ * Fire the built-in on-before-mergeable (#326) prompt after a run signalled setReadyForMerge(): one
  * `framework prompt` child on the same workspace that appends the quality follow-ups to the
  * session's TODO file, for the backlog loop (#323/#538) to pick up.
  *

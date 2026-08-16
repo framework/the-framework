@@ -36,7 +36,7 @@ test('parseTodoEntries reads open list items and skips checked/blank/prose lines
   ])
 })
 
-test('the #880 priority sections need no parser support: headings are skipped, so a sorted file drains in priority order', () => {
+test('the priority (#880) sections need no parser support: headings are skipped, so a sorted file drains in priority order', () => {
   const md = [
     '## Priority 10 (critical — act immediately)',
     '- restore checkout',

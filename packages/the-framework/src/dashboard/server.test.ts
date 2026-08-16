@@ -418,7 +418,7 @@ test('/_relay/start needs the cookie: 401 without it, starts the run with it (#1
   try {
     const body = JSON.stringify({ prompt: 'do it', kind: 'build', options: { autopilot: true } })
     const unauth = await postAuth(`${base}/_relay/start`, body)
-    assert.equal(unauth.status, 401) // the #1051 guard fronts the relay too
+    assert.equal(unauth.status, 401) // the shared-token guard (#1051) fronts the relay too
     assert.equal(starts.length, 0)
 
     const ok = await postAuth(`${base}/_relay/start`, body, `fw_daemon=${TOKEN}`)
@@ -463,7 +463,7 @@ test('/_relay/ping is 401 without the cookie, 200 with it, and starts nothing (#
   const { base, starts, close } = await relayDashboard()
   try {
     const unauth = await fetchAuth(`${base}/_relay/ping`)
-    assert.equal(unauth.status, 401) // the #1051 guard fronts the ping too
+    assert.equal(unauth.status, 401) // the shared-token guard (#1051) fronts the ping too
 
     const ok = await fetchAuth(`${base}/_relay/ping`, `fw_daemon=${TOKEN}`)
     assert.equal(ok.status, 200)

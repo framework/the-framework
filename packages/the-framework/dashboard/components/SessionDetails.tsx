@@ -4,7 +4,7 @@ import { AGENT_LABELS, agentForDriver, sessionInfo } from '../../dist/client.js'
 // The session-details strip behind the action bar's disclosure (always available now, so the
 // chevron no longer pops in and out with the git/handoff data). It shows the "about this run"
 // facts the wrapped agent's own chat does not: which agent ran it, and what it has spent so far
-// (folded from the #322 usage events). The git branch / PR / changes sit in the bar row right
+// (folded from the usage (#322) events). The git branch / PR / changes sit in the bar row right
 // above this, so they are not repeated here.
 
 type UsageEvent = Extract<FrameworkEvent, { kind: 'usage' }>

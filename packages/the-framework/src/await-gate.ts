@@ -273,7 +273,7 @@ export interface ChoicesDeps {
  * The single-select gate (#304): show the options with the recommended one
  * pre-selected, pause, and resolve to the *one* option id the user picked. The twin
  * of {@link requestMultiSelect} for "pick one" — the agent-facing `showChoices()`
- * from the #326 system prompt and the [Research] preset (#331) both build on it.
+ * from the built-in system (#326) prompt and the [Research] preset (#331) both build on it.
  * A headless run (no `requestChoice`), or one aborted mid-await, falls back to the
  * recommended option without hanging, so a programmatic run stays deterministic.
  */

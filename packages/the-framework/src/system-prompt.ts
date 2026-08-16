@@ -232,11 +232,11 @@ export type RunSystemOptions = SystemPromptOptions
 /**
  * Assemble a run's full system channel — the single place it is composed (#501), so the
  * build path ({@link ./run.runFramework}) and the direct-prompt path ({@link ./prompt-run.runPrompt})
- * cannot drift. That drift is exactly what dropped the #326 action layer from `--vanilla`
+ * cannot drift. That drift is exactly what dropped the session-action (#326) layer from `--vanilla`
  * builds (#500): the two sites each inlined the composition and one nested the protocols
  * inside the built-in-prompt branch.
  *
- * Order is fixed: the #326 prompt block (context / built-in prompt / user SYSTEM.md)
+ * Order is fixed: the built-in system prompt (#326) block (context / built-in prompt / user SYSTEM.md)
  * first, then the emit protocols. Nothing else is appended — a build run's system channel
  * is exactly this (#547), which is what lets the dashboard show the whole prompt before a run
  * starts (#520). The protocols are otherwise unconditional — they are the *emit contract* (how

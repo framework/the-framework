@@ -146,7 +146,7 @@ export async function preflight(opts: PreflightOptions = {}): Promise<PreflightR
     }
   }
 
-  // Root is the #1323 trap, and it fails every agent identically: `sudo` moves `HOME`, the CLI
+  // Root is the sudo-HOME trap (#1323), and it fails every agent identically: `sudo` moves `HOME`, the CLI
   // looks for its credentials under root's home instead of the user's, finds none, and every run
   // dies the same way with the same empty log. Named here because the failure it causes says
   // nothing at all about its cause.

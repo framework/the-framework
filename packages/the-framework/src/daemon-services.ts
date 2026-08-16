@@ -197,7 +197,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // A draining run works one open queue entry, and since #1164 that entry links back to the
       // ticket it was queued from — so this is the one moment the framework knows what a run is
       // about to implement, and can say so on the run's meta (#1117). A sweep-built drain names its
-      // own pinned entry (#1204), so the #1117 lane keeps working with several drains in flight;
+      // own pinned entry (#1204), so the drain-lane (#1117) keeps working with several drains in flight;
       // the first-open-entry read is the fallback for a drain job wired without one. Every other
       // job puts work on the queue rather than taking it off, so there is nothing to name.
       const ticket = job.drains

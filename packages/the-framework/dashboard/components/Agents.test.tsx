@@ -39,7 +39,7 @@ describe('Agents (#1139)', () => {
     const onSelectRun = vi.fn()
     render(<Agents working={[active('r1')]} loading={false} onSelectRun={onSelectRun} />)
     fireEvent.click(screen.getByText('working on r1'))
-    // Project *and* run: a project alone would land on the launcher, which is the #1189 regression.
+    // Project *and* run: a project alone would land on the launcher, which is the regression (#1189).
     expect(onSelectRun).toHaveBeenCalledWith('p1', 'r1')
   })
 

@@ -112,7 +112,7 @@ export interface RunHandoffDeps {
 /**
  * The branch a run's work is on.
  *
- * Prefers what was recorded while the worktree existed (#799), because the #326 prompt lets the
+ * Prefers what was recorded while the worktree existed (#799), because the built-in system prompt (#326) lets the
  * agent name its own branch, which makes both derivations below a guess. They stay as a fallback
  * for runs archived before the branch was recorded.
  */
@@ -160,7 +160,7 @@ export interface RunPrRun {
  * one integer nobody had written down — the same lesson the `branch` event (#1277) already learned.
  *
  * The *state* is still read live, because it changes without this run doing anything: a PR merges,
- * a human closes it. That read rides the #1028 cache, and `pending` while it is warming means the
+ * a human closes it. That read rides the PR-lookup cache (#1028), and `pending` while it is warming means the
  * caller can ask again rather than render "no PR".
  */
 export async function resolveRunPr(
@@ -335,7 +335,7 @@ export async function readRunHandoff(
     deletions: files.reduce((sum, f) => sum + f.deletions, 0),
     // A session that changed nothing is a real outcome, not an error: it gets said, not shown as
     // an empty branch with buttons that would push nothing. Bookkeeping-only counts as nothing
-    // (#1291): every run's branch carries the framework's own records — the #326 pre-work commit
+    // (#1291): every run's branch carries the framework's own records — the pre-work (#326) commit
     // sweeps in the conversation file the daemon just wrote — and publishing those alone produced
     // junk PRs of pure paper trail. The files decide, not the commits: a branch of bookkeeping
     // sweeps has commits and still nothing to hand off.

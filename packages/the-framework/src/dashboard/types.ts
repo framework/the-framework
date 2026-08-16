@@ -52,7 +52,7 @@ export interface AgentReady {
  * default off, i.e. today's behavior.
  */
 export interface StartRunOptions {
-  /** Auto-accept mode; also steers the #326 maintenance stance. */
+  /** Auto-accept mode; also steers the maintenance-prompt (#326) stance. */
   autopilot?: boolean
   /** Technical mode: expose technical detail (preset-scoped). */
   technical?: boolean

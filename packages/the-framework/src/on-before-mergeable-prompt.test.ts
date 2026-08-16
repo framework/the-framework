@@ -5,7 +5,7 @@ import { TemplateFragmentError } from './prompt-template.js'
 import { BUSINESS_KNOWLEDGE_DOCS } from './system-prompt.js'
 import { FLAT_TODO_FILE } from './tickets.js'
 
-test('ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE carries the #326 on-before-mergeable block', () => {
+test('ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE carries the built-in on-before-mergeable (#326) block', () => {
   // Derived from the constant, not a literal (#885) — see the same assertion in
   // system-prompt.test.ts. Both blocks declare TODO_FILE, so both can drift from the code.
   assert.ok(ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE.includes(`TODO_FILE: \`${FLAT_TODO_FILE}\``))

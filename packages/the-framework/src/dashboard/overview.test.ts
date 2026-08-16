@@ -206,7 +206,7 @@ test('ticketBucket: a run implementing it is in-progress, whatever the plan says
   // otherwise fall through to a non-shown lane on the strength of a plan file alone.
   assert.equal(ticketBucket(ticket('a'), { implementing: true }), 'in-progress')
   assert.equal(ticketBucket(ticket('b', { priority: '8' }), { implementing: true }), 'in-progress')
-  // Absent evidence, the #1112 inference is untouched.
+  // Absent evidence, the inference (#1112) is untouched.
   assert.equal(ticketBucket(ticket('c', { planned: true }), { implementing: false }), 'in-progress')
   assert.equal(ticketBucket(ticket('d'), { implementing: false }), null)
 })

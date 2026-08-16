@@ -204,7 +204,7 @@ const TRANSIENT_RETRY_DELAY_MS = 15_000
 /** How long a continuation waits for its finished previous leg to exit and retire (#1529). */
 const FINISHED_LEG_EXIT_GRACE_MS = 15_000
 
-/** What the continued session is told (#1281), in the #923 resume prompt's shape. */
+/** What the continued session is told (#1281), in the resume (#923) prompt's shape. */
 const RETRY_PROMPT =
   'This session died to a transient connection error, not because anyone asked it to stop. Look at what you had already done, then carry on from there and finish the work.'
 
@@ -616,7 +616,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
   // streams into the page via its tailed event log, and its gates + Stop steer through the
   // control channel (#344).
   //
-  // Concurrency is per run, not per project (#736): the #393 one-run-per-project refusal
+  // Concurrency is per run, not per project (#736): the one-run-per-project (#393) refusal
   // existed because two runs shared one working tree, and worktrees remove that collision.
   // Rom's call on the cap is unbounded ("the best solution for the user unless/until we
   // stumble upon issues"), so the guard now only refuses a duplicate of the *same* checkout —

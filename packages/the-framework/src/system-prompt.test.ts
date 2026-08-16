@@ -23,7 +23,7 @@ const KNOWLEDGE_CONTEXT = `Context:\n${KNOWLEDGE_LINES}`
 /** That block plus the two format specs it names, which travel in the channel with it (#1163). */
 const CONTEXT_BLOCK = [KNOWLEDGE_CONTEXT, TICKETING_FORMAT, TODO_FORMAT].join('\n\n')
 
-test('CONTEXT_DOCS is the #683 fragment: business knowledge plus the roadmap/queue pointers', () => {
+test('CONTEXT_DOCS is the repo-context fragment (#683): business knowledge plus the roadmap/queue pointers', () => {
   const paths = CONTEXT_DOCS.map(d => d.path)
   assert.deepEqual(paths, [
     'knowledge-base/DECISIONS.md',
@@ -77,7 +77,7 @@ test('loadUserSystemPrompt is undefined when the file is absent or empty', async
   }
 })
 
-test('SYSTEM_PROMPT_TEMPLATE carries the #326 sections verbatim', () => {
+test('SYSTEM_PROMPT_TEMPLATE carries the built-in prompt sections (#326) verbatim', () => {
   for (const section of [
     '## Analyze the user prompt',
     '### Ambiguous prompt',
@@ -189,8 +189,8 @@ test('systemPromptBlock adds no knowledge docs when vanilla is on (#537/#547)', 
   assert.equal(systemPromptBlock({ vanilla: true, context: ['/work/api'] }), 'Context: /work/api')
 })
 
-test('systemPromptBlock is the #326 prompt and the user prompt, in that order, and nothing else (#457)', () => {
-  // The bootstrap preamble was the last text here that was neither the #326 doc nor the
+test('systemPromptBlock is the built-in system prompt (#326) and the user prompt, in that order, and nothing else (#457)', () => {
+  // The bootstrap preamble was the last text here that was neither the built-in prompt doc (#326) nor the
   // user's own. Measured on four live runs: #326 alone already stops an empty-dir build
   // for a plan, so the override earned nothing and outranked the doc.
   // The knowledge docs (#537) join the Context line, which is paths, not prompt text.
@@ -211,16 +211,16 @@ test('systemPromptBlock threads tf through to the template', () => {
   assert.ok(!block.includes('a very distinctive prompt'), 'the prompt itself stays in the user half')
 })
 
-test('composeRunSystem is exactly the #326 block + both emit protocols, and nothing else (#547)', () => {
+test('composeRunSystem is exactly the built-in prompt block (#326) + both emit protocols, and nothing else (#547)', () => {
   // The one assembly path both runFramework and runPrompt go through. Exact equality is
   // the point: no persona, skill, or memory framing may ever be appended again. The #537
-  // knowledge docs are in front of that, on the #439 context line: paths, not prompt text.
+  // knowledge docs are in front of that, on the context (#439) line: paths, not prompt text.
   const system = composeRunSystem()
   assert.equal(system, [CONTEXT_BLOCK, renderSystemPrompt().system, AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n'))
 })
 
 test('composeRunSystem appends nothing after the protocols, whatever the options (#547)', () => {
-  // Every supported option feeds the #326 block; none of them can add a trailing section.
+  // Every supported option feeds the built-in prompt block (#326); none of them can add a trailing section.
   const system = composeRunSystem({
     user: 'Ship small PRs.',
     context: ['/work/api'],

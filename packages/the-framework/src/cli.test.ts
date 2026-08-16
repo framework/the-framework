@@ -182,7 +182,7 @@ test('promptRunSpec runs a headless prompt and carries NO onBeforeMergeable (rec
 })
 
 test('promptRunSpec goes vanilla so the on-before-mergeable follow-up skips the session-name branch step (#560)', () => {
-  // The follow-up is not a session; vanilla drops the #326 prompt (and its `### Session
+  // The follow-up is not a session; vanilla drops the built-in system prompt (#326) (and its `### Session
   // name` step), so the run stays on the session branch instead of stranding its output.
   assert.equal(promptRunSpec('queue follow-ups', '/work/app', true).options.vanilla, true)
 })

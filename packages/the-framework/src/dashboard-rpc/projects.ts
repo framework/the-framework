@@ -65,7 +65,7 @@ export async function onClaudeTrust(projectId: string): Promise<(ClaudeTrust & {
  * rung is armed on a repo that does not, because the armed merge silently degrades to an immediate
  * direct merge (#1216) — the PR lands before CI has run (#1406). Read-only and cached (#1028).
  * `null` when the project is unknown here; `known: false` when `gh` could not say (not installed,
- * not a GitHub repo), which renders nothing rather than crying wolf — the #1318 stance.
+ * not a GitHub repo), which renders nothing rather than crying wolf — the no-crying-wolf stance (#1318).
  */
 export async function onRepoAutoMerge(projectId: string): Promise<RepoAutoMerge | null> {
   const projects = await contextProjects().list()

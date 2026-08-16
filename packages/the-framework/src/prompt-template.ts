@@ -1,7 +1,7 @@
 import { errorMessage } from './error-message.js'
 
 /**
- * The `${{ ... }}` markdown-fragment layer (#350): the #326 system prompt embeds
+ * The `${{ ... }}` markdown-fragment layer (#350): the built-in system (#326) prompt embeds
  * JS expressions (e.g. a ternary on `tf.params.autopilot`), so the verbatim
  * template renders against a context at run time. Each fragment is a real JS
  * expression evaluated with `new Function` — that is arbitrary code execution,

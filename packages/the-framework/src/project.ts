@@ -7,7 +7,7 @@ import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 /**
  * Project-level repo helpers (#380): the `.the-framework/` activation marker
  * check, a `git ls-files` crawl, and the project's detection signals. Read-only
- * building blocks for the #314 sidebars; activation/install (creating the dir,
+ * building blocks for the sidebars (#314); activation/install (creating the dir,
  * the install commit) is a separate, deferred concern.
  */
 

@@ -5,12 +5,11 @@ import { errorMessage } from './error-message.js'
 import { isHandoffLevel, HANDOFF_LEVELS, type HandoffLevel } from './handoff-level.js'
 
 /**
- * The per-repo run defaults persisted in `the-framework.yml` (#204): which Open
- * Loop domain preset and modes a project builds under, so its config travels with
- * the code instead of being retyped as flags each run.
+ * The per-repo session defaults persisted in `the-framework.yml`: which preset and modes a project
+ * works under, so its config travels with the code instead of being chosen again every session.
  */
 export interface FrameworkFileConfig {
-  /** Domain preset to run under, by name (e.g. `software-development`). */
+  /** Preset to work under, by name. */
   preset?: string
   /** Build event kind the preset's review loop fires for, e.g. `bug-fix` (#265). */
   event?: string

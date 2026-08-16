@@ -30,7 +30,7 @@ export const CI_WATCH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 /**
  * How old a check-less PR must be before "no checks" is believed to mean "this repo has no CI"
  * rather than "the suite has not attached yet" — GitHub takes seconds to attach one after a push,
- * and merging inside that window is the #1406 hazard wearing a different face.
+ * and merging inside that window is the stale-check hazard (#1406) wearing a different face.
  */
 export const NO_CHECKS_GRACE_MS = 3 * 60 * 1000
 
@@ -111,7 +111,7 @@ export interface CiSweepResult {
 export interface CiSweepDeps {
   /** Every run meta worth scanning — live and archived (default: both stores). */
   runs?: (cwd: string) => Promise<RunMeta[]>
-  /** The PR that belongs to a run (default {@link resolveRunPr}, which rides the #1028 cache). */
+  /** The PR that belongs to a run (default {@link resolveRunPr}, which rides the PR-lookup cache (#1028)). */
   pr?: (cwd: string, run: RunPrRun) => Promise<Cached<LinkedPr | undefined>>
   /** A PR's combined check state (default {@link ghPrCiStatus}). */
   ci?: (cwd: string, number: number) => Promise<PrCiStatus>

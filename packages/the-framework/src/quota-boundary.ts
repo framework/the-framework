@@ -200,7 +200,7 @@ export function quotaBoundaryStatus(input: {
   model?: string
   /**
    * How far the automatic-consumption limit sits from the boundary, in percentage points (#960).
-   * Omitted or `0` is the #879 policy: the limit *is* the boundary.
+   * Omitted or `0` is the spend-boundary policy (#879): the limit *is* the boundary.
    */
   limitOffset?: number
 }): QuotaBoundaryStatus | undefined {

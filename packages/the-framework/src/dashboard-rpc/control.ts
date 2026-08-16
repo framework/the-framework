@@ -288,7 +288,7 @@ export async function sendOpenPullRequest(projectId: string, runId: string): Pro
  * The user's Merge action (#1391): one button, two states of the session it addresses.
  *
  * A live run gets a `merge` control entry — the run arms the full publish ladder, records the
- * human authorization (which the #1363 gate honors instead of demanding the agent's signal), and
+ * human authorization (which the human-authorized merge gate (#1363) honors instead of demanding the agent's signal), and
  * merges at its own natural end (#1390). A finished run has no process to steer, so its open PR
  * is merged directly — the answer to the withheld-merge ending, where an agent that never
  * signalled left a draft behind. If the run ends between the check and the write, the entry lands

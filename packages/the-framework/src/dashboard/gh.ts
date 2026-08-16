@@ -325,7 +325,7 @@ export interface RepoAutoMerge {
  * {@link DIRECT_MERGE_FALLBACK} half of #1216) — the PR lands before CI has run (#1406) — so the
  * launcher warns with the fix instead of leaving the degradation silent. `known: false` (gh
  * missing, unauthenticated, not a GitHub repo) is "could not say", which renders nothing: no
- * crying wolf, same stance as the #1318 trust read.
+ * crying wolf, same stance as the trust (#1318) read.
  *
  * The probe is the REST endpoint, not `gh repo view --json autoMergeAllowed`: `repo view` has no
  * such field (any gh version), so that spelling always errored into "could not say". REST omits

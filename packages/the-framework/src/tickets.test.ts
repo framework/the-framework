@@ -20,7 +20,7 @@ test('the flat backlog lives at the root TODO_AGENTS.md (#674/#682)', () => {
 })
 
 test('the ticket-format spec ships in the package (not materialized), with priority/topics (#684/#674)', () => {
-  // Per the #674 call it is not written into the repo, so the format versions with the package.
+  // Per the decision (#674) it is not written into the repo, so the format versions with the package.
   // How the agent reads it is system-prompt.ts's job now (#1163): the content rides in the channel.
   // The spec teaches the file shapes and the revised #684 optional priority/topics fields.
   // #1420 folded the spike into the plan (Effort/Uncertainty 0-10) and added the .lock.md claim.

@@ -12,7 +12,7 @@ export const TICKETS_DIR = 'tickets'
 
 /**
  * The flat, durable backlog/roadmap file — the confirmed-task queue (the "AI task queue"
- * the #683 context fragment names). Lives at the repo root as `TODO_AGENTS.md` (#682):
+ * the repo-context (#683) fragment names). Lives at the repo root as `TODO_AGENTS.md` (#682):
  * moved out of `tickets/` so that directory holds only tickets. This is the file a run
  * drains and the dashboard surfaces — the only backlog kind since the session-scoped
  * `TODO_<slug>.agent.md` files were retired (#1369).
@@ -21,7 +21,7 @@ export const FLAT_TODO_FILE = 'TODO_AGENTS.md'
 
 // The format specs for {@link TICKETS_DIR} and {@link FLAT_TODO_FILE} (#684/#880) are no longer
 // named here as a path. They used to be the two `node_modules/@gemstack/the-framework/prompts/*.md`
-// pointers the #683 context fragment handed the agent, which only resolve when the framework is a
+// pointers the repo-context (#683) fragment handed the agent, which only resolve when the framework is a
 // root dependency of the repo it works on — so the agent could not open them and both files drifted
 // from the format (#1163). The spec content now travels in the system channel itself; see
 // `CONTEXT_FORMATS` in system-prompt.ts. The priority sections that spec describes need no parser

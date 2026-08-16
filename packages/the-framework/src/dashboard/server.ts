@@ -171,7 +171,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
     : undefined
 
   // The browser bridge (#1237). Off unless a token was supplied, and it carries that token itself
-  // rather than riding the #1051 guard, which a loopback daemon does not have.
+  // rather than riding the shared-token guard (#1051), which a loopback daemon does not have.
   const bridgeHandlers: BridgeHandlers | undefined = opts.bridgeToken
     ? {
         token: opts.bridgeToken,
@@ -195,7 +195,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
       res.writeHead(400, { 'content-type': 'text/plain' }).end('bad request')
       return
     }
-    // The browser bridge (#1237) is checked BEFORE the #1051 guard, and is the only route that is.
+    // The browser bridge (#1237) is checked BEFORE the shared-token guard (#1051), and is the only route that is.
     // That guard's browser affordance is a `?token=` redirect meant for a human following a link,
     // which is meaningless to an extension posting JSON; the bridge presents its own bearer token
     // instead, so letting it past here costs nothing and skips a 302 it could not follow.
@@ -273,7 +273,7 @@ function authorizeDaemonRequest(req: IncomingMessage, res: ServerResponse, token
     url.searchParams.delete('token')
     const query = url.searchParams.toString()
     res.writeHead(302, {
-      // Lax, not Strict: the #1052 device-hop is a cross-origin top-level nav, and a Strict cookie set on it is withheld from the redirect right after, so the clean path 401s. Lax still rides top-level GET navs; CSRF stays covered by the same-origin check on /_rpc.
+      // Lax, not Strict: the device-hop (#1052) is a cross-origin top-level nav, and a Strict cookie set on it is withheld from the redirect right after, so the clean path 401s. Lax still rides top-level GET navs; CSRF stays covered by the same-origin check on /_rpc.
       'set-cookie': `${DAEMON_COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/`,
       location: url.pathname + (query ? `?${query}` : ''),
     })

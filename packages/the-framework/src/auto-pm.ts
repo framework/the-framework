@@ -765,7 +765,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         lastStart.set(project.id, now())
         const started: AutoPmJob[] = []
         for (const item of batch) {
-          // Re-checked per spawn, for the #983 reason above: a stop mid-batch must not spawn the rest.
+          // Re-checked per spawn, for the reason (#983) above: a stop mid-batch must not spawn the rest.
           if (stopped) break
           deps.log(`[framework] auto PM: ${doing(item)} in ${project.path}`)
           // A pinned-name job aborts itself when its branch already exists (#1293); a branch

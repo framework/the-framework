@@ -677,7 +677,7 @@ function archivePaths(dir: string, id: string, user?: string): { events: string;
 /**
  * Where one run's archive actually sits, searched across {@link archiveDirs}, or `undefined` when
  * it is nowhere. A run id alone no longer names a path: which user archived it decides that, and a
- * reader (the #762 continue, a removal) only has the id.
+ * reader (the continue (#762), a removal) only has the id.
  */
 async function findArchive(fs: StoreFs, dir: string, runId: string): Promise<{ events: string; meta: string } | undefined> {
   for (const runsDir of await archiveDirs(fs, dir)) {

@@ -21,7 +21,7 @@ interface Answered {
 
 /**
  * Every session's open question, answerable in one place (#1455 item 4) — now the launcher's
- * main event (bonus 1, the #299 shape): all choices at once in one big view with its own
+ * main event (bonus 1, the shape (#299)): all choices at once in one big view with its own
  * scroll area, and a sticky jump-nav on the right instead of pagination. Longest-waiting
  * first, from the server.
  *

@@ -46,7 +46,7 @@ test('collectQueue skips a project whose docs read throws', async () => {
 })
 
 test('link-style entries with no checkbox are open items, like the sweep reads them (#1296)', () => {
-  // The observed blocker: a triage-written queue in the #1164 link style read as "Nothing queued"
+  // The observed blocker: a triage-written queue in the ticket-link (#1164) style read as "Nothing queued"
   // while the sweep drained it happily.
   const md = [
     '# TODO_AGENTS',

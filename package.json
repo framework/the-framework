@@ -1,9 +1,9 @@
 {
-  "name": "gemstack",
+  "name": "the-framework",
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "GemStack: a collection of high-quality, framework-agnostic tools. Home of @gemstack/ai-sdk.",
+  "description": "The Framework: autonomous AI programming — coding agents work your repos unattended and hand the result off as pull requests.",
   "packageManager": "pnpm@11.5.3",
   "scripts": {
     "build": "pnpm -C packages/the-framework build",

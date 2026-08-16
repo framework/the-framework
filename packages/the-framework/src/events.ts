@@ -43,7 +43,7 @@ export interface ChoiceRequest {
 }
 
 /**
- * Why the #326 post-merge cleanup step declined to run (#835). Every decline carries one,
+ * Why the post-merge (#326) cleanup step declined to run (#835). Every decline carries one,
  * so "I turned it on and nothing happened" has an answer in the log.
  */
 export type OnBeforeMergeableSkip =
@@ -308,7 +308,7 @@ export type FrameworkEvent =
       turns: number
     }
   /**
-   * The run's active Open Loop modes (#272), emitted once when a domain preset is
+   * The run's active modes (#272), emitted once when a preset is
    * in effect. `all` is every mode the run knows about (stable order); `active` is
    * the subset switched on for this run. The dashboard renders them as read-only
    * checkboxes so the policy driving the build is visible.
@@ -330,7 +330,7 @@ export type FrameworkEvent =
   | { kind: 'end'; ok: boolean; stopped?: boolean; detail?: string }
 
 /**
- * The Open Loop modes a run can activate, in the order the dashboard shows them.
+ * The modes a run can activate, in the order the dashboard shows them.
  * The single source of truth for the mode checkboxes (#272).
  */
 export const OPEN_LOOP_MODES = ['autopilot', 'technical'] as const

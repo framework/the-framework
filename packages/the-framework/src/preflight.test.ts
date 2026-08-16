@@ -144,7 +144,7 @@ test('the auth answer is read off stderr too (#1326)', async () => {
   assert.equal(result.checks.find(c => c.name === 'codex auth')?.ok, false)
 })
 
-// #1326: root is the #1323 trap. sudo moves HOME, so the CLI reads root's credentials, finds
+// #1326: root is the sudo-HOME trap (#1323). sudo moves HOME, so the CLI reads root's credentials, finds
 // none, and every run dies identically with a log that says nothing about why.
 
 test('running as root warns without blocking the run (#1326)', async () => {

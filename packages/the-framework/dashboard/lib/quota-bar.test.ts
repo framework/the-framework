@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { weekDays, quotaTone, limitPercent, projectedRange, paceDeviationMs } from './quota-bar.js'
+import { weekDays, quotaTone, limitPercent, projectedRange, paceDeviationMs, consumedQuotaMs, paceSharePercent } from './quota-bar.js'
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -114,5 +114,42 @@ describe('projectedRange', () => {
 
   test('clamps both ends to the bar itself', () => {
     expect(projectedRange(-10, 130)).toEqual({ start: 0, end: 100 })
+  })
+})
+
+describe('consumedQuotaMs (#1367)', () => {
+  // Consumption as quota *time*, so it shares a unit with the pace figure beside it rather than
+  // asking a reader to convert a percentage of the week in their head.
+  test('a share of the week becomes that much of the week', () => {
+    expect(consumedQuotaMs(50, WEEK_MS)).toBe(WEEK_MS / 2)
+    expect(consumedQuotaMs(100 / 7, WEEK_MS)).toBeCloseTo(WEEK_MS / 7, 5)
+  })
+
+  test('nothing used is no time consumed', () => {
+    expect(consumedQuotaMs(0, WEEK_MS)).toBe(0)
+  })
+
+  test('a window reporting past full has spent its week, not more than one', () => {
+    expect(consumedQuotaMs(130, WEEK_MS)).toBe(WEEK_MS)
+    expect(consumedQuotaMs(-5, WEEK_MS)).toBe(0)
+  })
+})
+
+describe('paceSharePercent (#1367)', () => {
+  // Against the allowance elapsed so far, not against the week: "how much is left" and "is this
+  // rate sustainable" are different questions, and the pro-rata line is the one that parks work.
+  test('exactly on pace reads 100', () => {
+    expect(paceSharePercent(57, 57)).toBe(100)
+  })
+
+  test('above and below pace read either side of it', () => {
+    expect(paceSharePercent(60, 50)).toBe(120)
+    expect(paceSharePercent(25, 50)).toBe(50)
+  })
+
+  test('no allowance elapsed yet is no reading, rather than infinite over-consumption', () => {
+    // The first minutes of the week: every amount is infinitely above nothing.
+    expect(paceSharePercent(3, 0)).toBeUndefined()
+    expect(paceSharePercent(0, 0)).toBeUndefined()
   })
 })

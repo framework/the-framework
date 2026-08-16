@@ -5,7 +5,17 @@ import { MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '../../dist/client.js'
 import { useQuota } from '../lib/quota.js'
 import { formatRelative, formatResetDay, formatResetTooltip, formatDuration, formatDurationLong } from '../lib/format-date.js'
 import { updatePreferences } from '../lib/preferences.js'
-import { weekDays, quotaTone, limitPercent, projectedRange, paceDeviationMs, ONE_DAY_PERCENT, type QuotaTone } from '../lib/quota-bar.js'
+import {
+  weekDays,
+  quotaTone,
+  limitPercent,
+  projectedRange,
+  paceDeviationMs,
+  consumedQuotaMs,
+  paceSharePercent,
+  ONE_DAY_PERCENT,
+  type QuotaTone,
+} from '../lib/quota-bar.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
@@ -95,9 +105,16 @@ function WeekBar({
   const label = `${Math.round(percentUsed)}% of the week used, against a boundary of ${Math.round(boundary.percent)}% on day ${boundary.day} of 7`
   // How far ahead of or behind the boundary's own pace consumption is, as a duration (#960 Edit):
   // "53% used" said almost nothing about whether today's pace was being kept; "2h" does.
-  const deviationMs = paceDeviationMs(percentUsed, boundary.percent, boundary.resetsAt - boundary.startsAt)
+  const weekMs = boundary.resetsAt - boundary.startsAt
+  const deviationMs = paceDeviationMs(percentUsed, boundary.percent, weekMs)
   const over = deviationMs >= 0
   const consuming = over ? 'Over-consuming' : 'Under-consuming'
+  // The two readings #1367 asked for, beside the deviation rather than instead of it: what has
+  // been spent as quota *time*, and what it is as a share of the allowance elapsed so far. The
+  // dollar figure alone says nothing about whether today's rate is sustainable, and a share of the
+  // week answers "how much is left" rather than "am I burning it too fast".
+  const consumedMs = consumedQuotaMs(percentUsed, weekMs)
+  const paceShare = paceSharePercent(percentUsed, boundary.percent)
 
   return (
     <div className="space-y-1.5">
@@ -180,6 +197,32 @@ function WeekBar({
             {over ? 'over-consuming' : 'under-consuming'}: you spend {over ? 'faster' : 'slower'} than the week's pace allows.
           </TooltipContent>
         </Tooltip>
+        {SEP}
+        <Tooltip>
+          <TooltipTrigger render={<span className="cursor-default" />}>
+            <span className="font-medium">{formatDuration(consumedMs)}</span> spent
+          </TooltipTrigger>
+          <TooltipContent className="max-w-64">
+            {formatDurationLong(consumedMs)} of the week's allowance has been consumed — {Math.round(percentUsed)}% of it, said
+            in the same unit as the pace figure beside it.
+          </TooltipContent>
+        </Tooltip>
+        {/* Absent for the first moments of the week, where the allowance so far is zero and every
+            amount is infinitely above it. */}
+        {paceShare !== undefined && (
+          <>
+            {SEP}
+            <Tooltip>
+              <TooltipTrigger render={<span className="cursor-default" />}>
+                <span className={cn('font-medium', TONE_TEXT[tone])}>{Math.round(paceShare)}%</span> of pace
+              </TooltipTrigger>
+              <TooltipContent className="max-w-64">
+                Against the {Math.round(boundary.percent)}% of the week allowed by day {boundary.day} of 7 — 100% is exactly on
+                pace. This is the line that parks unattended work, not the week's total.
+              </TooltipContent>
+            </Tooltip>
+          </>
+        )}
         {SEP}
         <Tooltip>
           <TooltipTrigger render={<span className="cursor-default" />}>resets {formatResetDay(boundary.resetsAt)}</TooltipTrigger>

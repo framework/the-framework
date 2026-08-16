@@ -348,6 +348,37 @@ describe('Quota (#960)', () => {
     expect(mainFigureTrigger().textContent).toMatch(/^Over-consuming: \d+d$/)
   })
 
+  test('the footer also says what was spent, as quota time (#1367)', () => {
+    // Half the week used is half the week's allowance consumed — the same unit as the pace figure
+    // beside it, rather than a percentage a reader has to convert.
+    view = reading(50)
+    render(<Quota />)
+    expect(screen.getByText(/^resets /).closest('p')!.textContent).toMatch(/3d spent/)
+  })
+
+  test('the footer says consumption as a share of the pace, not of the week (#1367)', () => {
+    // Boundary at day 4 of 7 (~57%), 60% used: a little over pace, so a little over 100%.
+    view = reading(60)
+    render(<Quota />)
+    expect(screen.getByText(/^resets /).closest('p')!.textContent).toMatch(/105% of pace/)
+  })
+
+  test('the pace share is coloured to match the bar, since it is the same comparison (#1367)', () => {
+    view = reading(20) // well under pace: the bar reads green, and so does this
+    render(<Quota />)
+    const share = [...screen.getByText(/^resets /).closest('p')!.querySelectorAll('span')].find(s =>
+      /^\d+%$/.test(s.textContent ?? ''),
+    )!
+    expect(share.className).toMatch(/text-success/)
+  })
+
+  test('no pace share at the very start of the week, rather than an infinite one (#1367)', () => {
+    // Day zero: nothing is allowed yet, so every amount is infinitely above the allowance.
+    view = readingAt(0, 3, 0)
+    render(<Quota />)
+    expect(screen.getByText(/^resets /).closest('p')!.textContent).not.toMatch(/of pace/)
+  })
+
   test('the main figure has its own tooltip naming the deviation against the quota boundary (#960 Edit)', async () => {
     view = reading(20)
     render(<Quota />)

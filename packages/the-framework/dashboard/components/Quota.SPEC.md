@@ -4,6 +4,7 @@ The Usage panel: the account's quota week as one bar, so "am I ahead or behind?"
 
 - The bar splits into the used fill and, dimmed, the budget left for autonomous AI; dragging the dimmed segment's own edge sets where unattended work stops, and the legend says whether autonomous AI currently has room (enabled) or none (disabled).
 - The headline is a duration, not a percentage: how far ahead of or behind the week's pace consumption runs.
+- Beside it, two readings of the same spend: how much quota *time* it consumed, and what share of the pro-rata allowance elapsed so far that is — 100% being exactly on pace. The dollar figure says nothing about whether today's rate is sustainable, and a share of the week answers how much is left rather than how fast it is going. The share is absent at the very start of the week, where the allowance so far is zero and every amount is infinitely above it.
 - Setting the stop more than a full day ahead of pace earns an eager-consumption warning; the other limits (the session, a model's own week) tuck behind "show all limits".
 
 ## Rationales

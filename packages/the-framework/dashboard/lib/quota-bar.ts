@@ -124,6 +124,36 @@ export function paceDeviationMs(percentUsed: number, boundaryPercent: number, we
 }
 
 /**
+ * What has been consumed, as quota *time* rather than a share (#1367): 53% of a seven-day week is
+ * three and a half days' worth of allowance.
+ *
+ * The same unit the pace figure beside it already uses, which is the point — "53%" and "2h ahead"
+ * are two scales in one line, and a reader converting between them in their head is doing the
+ * panel's job. Clamped, because a window that reports over 100% used has spent its week, not more
+ * than one.
+ */
+export function consumedQuotaMs(percentUsed: number, weekMs: number): number {
+  return (Math.min(Math.max(percentUsed, 0), 100) / 100) * weekMs
+}
+
+/**
+ * Consumption against the pro-rata allowance elapsed so far (#1367), as a percentage: 100 is
+ * exactly on pace, 118 is spending at nearly a fifth above it.
+ *
+ * The bar's own figure is a share of the *week*, which answers "how much is left" and not "is
+ * today's rate sustainable" — the question the panel exists for, since the pro-rata line is what
+ * actually parks unattended work.
+ *
+ * `undefined` at the very start of the week, where the allowance so far is zero: every amount is
+ * infinitely above nothing, and "∞% of pace" for the first minutes of a Monday is noise rather
+ * than a reading.
+ */
+export function paceSharePercent(percentUsed: number, boundaryPercent: number): number | undefined {
+  if (boundaryPercent <= 0) return undefined
+  return (percentUsed / boundaryPercent) * 100
+}
+
+/**
  * The bar's second, dimmer segment (#960 Edit): the room between what has actually been used and
  * where unattended work is allowed to stop. Drawn at reduced opacity, right after the solid "used"
  * fill, so the two read as one bar split in two rather than a separate mark floating over it.

@@ -6,7 +6,8 @@ The arithmetic behind the usage bar — purely about drawing the week; where the
 - Day labels are a fixed two-letter notation, not the viewer's locale — two letters of a localized weekday do not distinguish the days in every language.
 - The bar's colour compares consumption to the boundary with a tolerance band, so on-pace jitter does not flicker it; a fully spent week reads "full", not "over".
 - The auto-work limit line is computed locally so it moves the instant the slider does; the room between used and limit draws as a dimmer projected stretch.
-- The pace gap converts to real time ("2h ahead", "1d behind"), which says more than a share of the week.
+- The pace gap converts to real time ("2h ahead", "1d behind"), which says more than a share of the week; consumption converts the same way, so the two figures beside each other share a unit rather than asking a reader to convert one into the other.
+- Consumption also reads against the allowance elapsed so far rather than against the week, because that is the line which actually parks unattended work — and it declines to read at all while that allowance is still zero.
 
 ## Before writing SPEC.md files
 

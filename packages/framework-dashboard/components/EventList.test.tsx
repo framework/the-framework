@@ -271,3 +271,34 @@ describe('EventList inline browser rows (#1455 item 6b)', () => {
     expect(screen.getByText('browser').className).toContain('text-primary')
   })
 })
+
+// The background wash (#1508): a tint across the whole line for the rows the eye hunts for —
+// the reader's own turns, failures, the clean landing — while the bulk of the log stays plain.
+describe('EventList row wash (#1508)', () => {
+  test("the reader's own turn gets the blue wash", () => {
+    const { container } = render(
+      <EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'add a search box' } }]} stick={false} />,
+    )
+    expect(container.querySelector('[class*="bg-info/10"]')).toBeTruthy()
+  })
+
+  test('a failure gets the red wash', () => {
+    const { container } = render(<EventList events={[{ kind: 'end', ok: false, detail: 'exited 1' }]} stick={false} />)
+    expect(container.querySelector('[class*="bg-danger/10"]')).toBeTruthy()
+  })
+
+  test('a clean end gets the green wash; a stopped one gets none', () => {
+    const { container } = render(<EventList events={[{ kind: 'end', ok: true }]} stick={false} />)
+    expect(container.querySelector('[class*="bg-success/10"]')).toBeTruthy()
+    cleanup()
+    const { container: stopped } = render(<EventList events={[{ kind: 'end', ok: false, stopped: true }]} stick={false} />)
+    expect(stopped.querySelector('[class*="bg-info"], [class*="bg-danger"], [class*="bg-success"]')).toBeNull()
+  })
+
+  test("an agent reply stays plain canvas — the log's bulk must not shout", () => {
+    const { container } = render(
+      <EventList events={[{ kind: 'driver', event: { type: 'text', text: 'working on it' } }]} stick={false} />,
+    )
+    expect(container.querySelector('[class*="bg-info"], [class*="bg-danger"], [class*="bg-success"]')).toBeNull()
+  })
+})

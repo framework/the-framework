@@ -83,6 +83,16 @@ test('a gate with no file omits it rather than carrying an empty string (#358)',
   assert.equal('file' in gate!, false)
 })
 
+test('an option can say that picking it ends the session (#358)', () => {
+  // Which answers mean "stop, I will take it from here" is a property of the question, so the
+  // agent marks them. It used to be inferred from the gate's kind, which is what made a plan
+  // approval a special case instead of one question among many.
+  const gate = parseAwaitGate(
+    block('{ "title": "Approve?", "options": [{ "label": "Approve" }, { "label": "Decline", "stop": true }] }'),
+  )
+  assert.deepEqual(gate?.options, [{ id: 'opt:0', label: 'Approve' }, { id: 'opt:1', label: 'Decline', stop: true }])
+})
+
 test('parseMarkdownViews returns [] when the turn has no show-markdown block (#441)', () => {
   assert.deepEqual(parseMarkdownViews('Built the app, nothing to show.'), [])
 })

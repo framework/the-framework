@@ -43,7 +43,7 @@ const AWAIT_MULTISELECT_TURN: FakeTurn = {
 const AWAIT_CONFIRMATION_TURN: FakeTurn = {
   text:
     'The scope is large, so I wrote a plan first.\n```await-choices\n' +
-    '{ "title": "Approve the plan for the orders app?", "file": "PLAN_fake-orders-app.agent.md", "options": [{ "label": "Approve" }, { "label": "Decline" }], "recommended": "Approve" }\n```',
+    '{ "title": "Approve the plan for the orders app?", "file": "PLAN_fake-orders-app.agent.md", "options": [{ "label": "Approve" }, { "label": "Decline", "stop": true }], "recommended": "Approve" }\n```',
   actions: ['Write'],
   usage: FAKE_USAGE,
 }

@@ -52,6 +52,16 @@ export interface AwaitOption {
   detail?: string
   /** Starts checked. Only meaningful on a {@link ParsedAwaitGate.multi} gate. */
   default?: boolean
+  /**
+   * Picking this ends the session rather than resuming the agent with it (#358).
+   *
+   * Some answers are not instructions to carry on, they are "stop, I will take it from here" —
+   * declining a plan being the one that matters, because the user's next move is fresh
+   * instructions and building on a plan they rejected is the single worst thing to do with the
+   * interval. Which answers those are is a property of the question, so the agent marks them,
+   * rather than the framework inferring it from a gate kind that no longer exists.
+   */
+  stop?: boolean
 }
 
 /**
@@ -97,6 +107,16 @@ export const MAX_AWAIT_ROUNDS = 5
  */
 export function continuationPrompt(question: string, answer: string): string {
   return `You paused to ask: "${question}". The user chose: ${answer}. Continue with that decision.`
+}
+
+/**
+ * The log line for the other outcome: the user picked a `stop` option, so there is no
+ * continuation prompt and the session ends here (#358). Addressed to the user rather than to the
+ * agent — the agent is not told anything, which is the point — and it names the answer, because
+ * "stopped" on its own reads like a failure when it was a decision.
+ */
+export function stopMessage(answer: string): string {
+  return `Stopped at your answer: ${answer}. Awaiting your instructions.`
 }
 
 /** A non-blocking markdown view the agent pushed via a `show-markdown` block (#441). */
@@ -227,6 +247,7 @@ function parseGateBody(body: string): ParsedAwaitGate | undefined {
       label,
       ...(detail ? { detail } : {}),
       ...(o?.default === true ? { default: true } : {}),
+      ...(o?.stop === true ? { stop: true } : {}),
     })
   })
   if (options.length === 0) return undefined

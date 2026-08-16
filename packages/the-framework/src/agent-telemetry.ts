@@ -105,42 +105,52 @@ export interface RunControlsOptions {
 
 /** The run's abort plumbing plus its driver-event sink. */
 export interface RunControls extends DriverEventHandler {
-  /** The signal every driver turn runs under: the caller's, and nothing else. */
+  /** The composed signal every driver turn runs under: the caller's, or the answer's. */
   runSignal: AbortSignal
+  /** Trips a clean stop when the user answers a gate with a `stop` option (#358). */
+  answerController: AbortController
 }
 
 /**
- * Wire the run's signal and its driver-event handler in one place.
+ * Compose the run's signal and wire its driver-event handler in one place. The caller's signal is
+ * OR'd (via {@link AbortSignal.any}) with the one self-stop left — an answer that says to stop
+ * (#358) — so anything downstream that watches `runSignal` stops the same way regardless of which
+ * fired.
  *
- * There were three self-stops (E1), then one (D6), now none — so this composes nothing and the
- * caller's signal *is* the run's signal. A per-run USD cap and a mid-run quota gate used to abort
- * a session that was already going, which is the worst moment to economise: the tokens are already
- * spent, the work is half-done, and what is saved is the cheap part while what is lost is the
- * expensive part. Spending is decided once, before a session starts. The last one left, a declined
- * plan, went with the gate kind that raised it: a decline is now an answer the agent is given,
- * like any other, rather than a process the framework kills out from under it.
+ * There were three (E1). A per-run USD cap and a mid-run quota gate also aborted a session that
+ * was already going, which is the worst moment to economise: the tokens are already spent, the
+ * work is half-done, and what is saved is the cheap part while what is lost is the expensive part.
+ * Spending is decided once, before a session starts.
+ *
+ * What survives is the one a *person* asked for. It used to be reached through the gate's kind —
+ * a decline of an `await-confirmation` — and now through the option the agent marked, which is
+ * the same stop with the plan-approval special case taken out of it (D6).
  */
 export function createRunControls(opts: RunControlsOptions): RunControls {
+  const answerController = new AbortController()
+  const runSignal = AbortSignal.any([...(opts.signal ? [opts.signal] : []), answerController.signal])
   const handler = createDriverEventHandler({ emit: opts.emit, sessionLink: opts.sessionLink })
-  return { ...handler, runSignal: opts.signal ?? new AbortController().signal }
+  return { ...handler, runSignal, answerController }
 }
 
 /** Inputs to {@link endStopDetail}. */
 export interface StopDetailOptions {
   /** The error the run's turn loop threw. */
   err: unknown
-  /** The caller's own signal: an interrupt through it is a stop, not a failure. */
+  /** The caller's own signal, to tell a caller stop from a self-stop. */
   signal?: AbortSignal | undefined
+  /** The gate-answer stop (#358), which is a stop rather than a failure however it surfaced. */
+  answerController: AbortController
 }
 
 /**
  * Classify why a run's turn loop threw and render the `end` event's `detail`. A caller interrupt
- * is a clean stop; anything else is a real failure. Shared so the two run paths can never disagree
- * on what "stopped" means.
+ * or an answer that said to stop (#358) are clean stops; anything else is a real failure. Shared
+ * so the two run paths can never disagree on what "stopped" means.
  */
 export function endStopDetail(opts: StopDetailOptions): { stopped: boolean; detail: string } {
-  return {
-    stopped: opts.signal?.aborted === true,
-    detail: opts.err instanceof Error ? opts.err.message : String(opts.err),
-  }
+  const callerAborted = opts.signal?.aborted === true
+  const answered = opts.answerController.signal.aborted
+  const detail = answered ? 'stopped by your answer' : opts.err instanceof Error ? opts.err.message : String(opts.err)
+  return { stopped: callerAborted || answered, detail }
 }

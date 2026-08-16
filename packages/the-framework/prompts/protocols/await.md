@@ -6,10 +6,11 @@ Tag it `await-choices`:
 { "title": "<the question>", "options": [{ "label": "<option>", "detail": "<optional one-liner>" }], "recommended": "<the label to default to>" }
 ```
 Every question you stop to ask is this one block, whatever it is about:
-- An approval is two options: `{ "title": "Ship this?", "options": [{ "label": "Approve" }, { "label": "Decline" }], "recommended": "Approve" }`.
+- An approval is two options: `{ "title": "Ship this?", "options": [{ "label": "Approve" }, { "label": "Decline", "stop": true }], "recommended": "Approve" }`.
 - A plan or document you wrote and want signed off adds `"file": "PLAN_<slug>.agent.md"`, and the framework shows that file beside the question.
 - Several answers at once (showMultiSelect) adds `"multi": true`, and `"default": true` on the entries that start checked.
-- `recommended` is what the framework picks when nobody is there to answer, so name the option that is safe to take unattended.
+- `recommended` is what the framework picks when nobody is there to answer, so name the option that is safe to take unattended — never an option marked `stop`.
+- `"stop": true` marks an answer that ends the session instead of resuming you: the user is taking over and will come back with fresh instructions. Mark the option that rejects your work — declining a plan, saying no to the approach — and leave it off everything else. You are not re-prompted with that answer, so do not plan around being told it.
 
 The framework shows it, waits for the user, and re-prompts you with their answer. Do not continue past it on your own.
 

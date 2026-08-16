@@ -38,7 +38,7 @@ function asTurn(value: FakeTurn | string): FakeTurn {
  * `FakeRunner`, so the whole flow runs offline with no CLI and no model.
  */
 export class FakeDriver implements Driver {
-  readonly name = 'fake'
+  readonly id = 'fake'
   constructor(private readonly opts: FakeDriverOptions = {}) {}
 
   // Narrowed to the concrete session so callers can read `prompts` for assertions.

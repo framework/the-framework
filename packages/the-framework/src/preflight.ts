@@ -1,13 +1,13 @@
 import { execFile } from 'node:child_process'
-import { AGENT_SPECS, type AgentName } from './agent.js'
+import { DRIVER_SPECS, type DriverName } from './driver-cli.js'
 
 /**
  * Preflight checks for a live run. A turnkey tool should fail *early and
  * clearly* when a prerequisite is missing, not spawn a broken process mid-run.
- * The main one: is the wrapped agent's CLI actually installed and runnable?
+ * The main one: is the wrapped driver's CLI actually installed and runnable?
  * A fake session needs none of this, so preflight only gates live runs.
  *
- * It probes the agent the run actually picked (#542), so `--agent codex` is
+ * It probes the driver the session actually picked (#542), so a `codex` session is
  * checked against `codex` and fails on `codex` being missing, not `claude`.
  *
  * Installed is not the same as usable (#1326). Our first external-user report (#1323) was a
@@ -66,7 +66,7 @@ function runningAsRoot(): boolean {
 /** Options for {@link preflight}. */
 export interface PreflightOptions {
   /** The agent to check for. Default `"claude"`. */
-  agent?: AgentName
+  driver?: DriverName
   /** The CLI binary to probe. Default the agent's own. */
   bin?: string
   /** CLI probe override (tests). Default runs the real binary. */
@@ -84,7 +84,7 @@ export interface PreflightOptions {
 }
 
 /**
- * Run the preflight checks: Node is implicit (we are running), the picked agent's CLI must be
+ * Run the preflight checks: Node is implicit (we are running), the picked driver's CLI must be
  * installed, and it must be logged in. Returns every check plus an overall `ok`, which counts
  * failures only, so a warning travels without blocking anything.
  *
@@ -92,8 +92,8 @@ export interface PreflightOptions {
  * answer a second question, and one "not found" beats two lines saying the same thing.
  */
 export async function preflight(opts: PreflightOptions = {}): Promise<PreflightResult> {
-  const agent = opts.agent ?? 'claude'
-  const spec = AGENT_SPECS[agent]
+  const agent = opts.driver ?? 'claude'
+  const spec = DRIVER_SPECS[agent]
   const bin = opts.bin ?? spec.bin
   const probe = opts.probe ?? defaultProbe
   const checks: PreflightCheck[] = [{ name: 'node', ok: true, detail: process.version }]

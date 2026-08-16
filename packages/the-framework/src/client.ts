@@ -2,7 +2,7 @@
 // here — `formatFrameworkEvent` and the run-view derivations — with no Node imports, so
 // the client can import these at runtime without dragging the server barrel (relay,
 // sandbox, node:fs/http, …) into the browser bundle. Types come from the root entry.
-export { AGENTS, AGENT_LABELS, isAgentName, agentForDriver, type AgentName } from './agent-names.js'
+export { DRIVERS, DRIVER_LABELS, isDriverName, driverFromImpl, type DriverName } from './driver-names.js'
 export { formatFrameworkEvent } from './terminal.js'
 export { formatBytes } from './format-bytes.js'
 export { errorMessage } from './error-message.js'

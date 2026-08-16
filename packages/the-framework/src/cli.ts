@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { type ClaudeCodeDriverOptions, type Driver, type DriverSession, type PermissionMode } from './driver/index.js'
-import { AGENTS, AGENT_SPECS, isAgentName, type AgentName } from './agent.js'
+import { DRIVERS, DRIVER_SPECS, isDriverName, type DriverName } from './driver-cli.js'
 import { createRunDriver } from './run-driver.js'
 import { githubSlugFor } from './dashboard/github.js'
 import { githubToken } from './dashboard/gh.js'
@@ -84,9 +84,9 @@ export const CLAUDE_CODE_SESSION_LIST = CLAUDE_CODE_SESSION_LINK
  * to somewhere their run isn't. Codex keeps its sessions locally with nothing
  * equivalent to open, so another agent gets no default link at all (#542).
  */
-export function chooseSessionLink(opts: Pick<SessionOptions, 'sessionLink' | 'agent'>, fake: boolean): string | undefined {
+export function chooseSessionLink(opts: Pick<SessionOptions, 'sessionLink' | 'driver'>, fake: boolean): string | undefined {
   if (opts.sessionLink) return opts.sessionLink
-  return fake || opts.agent !== 'claude' ? undefined : CLAUDE_CODE_SESSION_LIST
+  return fake || opts.driver !== 'claude' ? undefined : CLAUDE_CODE_SESSION_LIST
 }
 
 /** Where the CLI writes. Injectable so tests capture output. */
@@ -158,8 +158,8 @@ export interface SessionOptions {
   fake: boolean
   /** What the session was asked to do. */
   intent: string
-  /** `--agent <claude|codex>`: which agent CLI drives the run (#542). Default `claude`. */
-  agent: AgentName
+  /** Which coding-agent CLI does the work (#542). Default `claude`. */
+  driver: DriverName
   /** `--run-on <local|actions|web>` (#1050/#610): where the run executes. `actions` drives it on a
    * GitHub Actions runner via ActionsDriver (#934); `web` hands it to a Claude Code cloud session
    * via CloudDriver (#610); absent / `local` runs on this device as before. */
@@ -291,7 +291,7 @@ export function parseArgs(argv: string[]): CliArgs {
 
 /** The session defaults nothing sets any more, shared by {@link sessionOptions} and the tests. */
 const SESSION_DEFAULTS = {
-  agent: 'claude',
+  driver: 'claude',
   scope: 'full',
   context: [],
   onBeforeMergeable: false,
@@ -321,7 +321,7 @@ export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = proce
     cwd: spec.cwd,
     ...(spec.runId ? { runId: spec.runId } : {}),
     ...(spec.continueRun ? { continueRun: true } : {}),
-    ...(isAgentName(o.agent) ? { agent: o.agent } : {}),
+    ...(isDriverName(o.driver) ? { driver: o.driver } : {}),
     ...(isRunLocation(o.target) ? { target: o.target } : {}),
     ...(o.model?.trim() ? { model: o.model.trim() } : {}),
     ...(o.resumeSession?.trim() ? { resumeSession: o.resumeSession.trim() } : {}),
@@ -355,15 +355,15 @@ export function claudeDriverOptions(): ClaudeCodeDriverOptions {
 }
 
 /**
- * The settings the picked agent cannot honor (#542), as lines to print at startup.
+ * The settings the picked driver cannot honor (#542), as lines to print at startup.
  *
  * A setting that silently does nothing is worse than one that errors. So the session says which
  * settings are not in force, rather than letting them imply they are.
  */
-export function unguardedNotices(opts: Pick<SessionOptions, 'agent' | 'browser'>): string[] {
-  const spec = AGENT_SPECS[opts.agent]
+export function unguardedNotices(opts: Pick<SessionOptions, 'driver' | 'browser'>): string[] {
+  const spec = DRIVER_SPECS[opts.driver]
   const notices: string[] = []
-  if (opts.agent !== 'claude' && opts.browser) {
+  if (opts.driver !== 'claude' && opts.browser) {
     notices.push(`the browser has no effect on ${spec.label}: the browser tools are wired through Claude Code's MCP config.`)
   }
   return notices
@@ -721,7 +721,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   }
 
   // No preflight here. The dashboard already ran it before spawning this session (#1326,
-  // `daemon-runtime`'s `agentPreflight`) and refused the start outright if the picked agent could
+  // `daemon-runtime`'s `driverPreflight`) and refused the start outright if the picked agent could
   // not run, so a doomed session spends no branch and no worktree — and the report lands on the
   // surface the user is looking at, rather than in a log they have to go and find. Re-running it
   // here was the same check a second time, and it was wrong for a session that runs somewhere else
@@ -731,7 +731,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // Which agent is about to spend the user's subscription, and which settings are not in force
   // while it does — said *before* the first turn (#542).
   if (!fake) {
-    if (opts.agent !== 'claude') io.out(`◆ agent: ${AGENT_SPECS[opts.agent].label}`)
+    if (opts.driver !== 'claude') io.out(`◆ driver: ${DRIVER_SPECS[opts.driver].label}`)
     for (const note of unguardedNotices(opts)) io.err(`note: ${note}`)
   }
 
@@ -1133,7 +1133,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   const driver: Driver = fake
     ? fakeDriver()
     : createRunDriver({
-        agent: opts.agent,
+        driver: opts.driver,
         claudeOpts: withBrowser(claudeOpts, opts.browser, sharedBrowser?.browserUrl),
         ...(opts.target ? { target: opts.target } : {}),
         ...(actionsConfig ? { actionsConfig } : {}),
@@ -1143,7 +1143,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // ride Claude Code's MCP config, so `--browser` on another agent wires nothing (see
   // `unguardedNotices`), the fake driver has no tools at all, and a remote target never sees
   // this machine's MCP config. The system channel must only claim a browser the run really has (#824).
-  const browserAttached = opts.browser && !fake && opts.agent === 'claude' && localRun
+  const browserAttached = opts.browser && !fake && opts.driver === 'claude' && localRun
 
   // The preview of that browser (#802): the agent's Chrome is headless, so when it parks on an
   // browser hand-off gate (#796) there is nothing for a human to click. This serves it. Opening
@@ -1168,7 +1168,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // it has, the session runs to its own end. Interrupting mid-flight is the worst moment to
   // economise: the tokens are already spent, the work is half-done, and what is saved is the cheap
   // part while what is lost is the expensive part.
-  if (transparent) io.out(`◆ transparent: on — raw ${AGENT_SPECS[opts.agent].label}, no framework prompt, dashboard, or TODO loop`)
+  if (transparent) io.out(`◆ transparent: on — raw ${DRIVER_SPECS[opts.driver].label}, no framework prompt, dashboard, or TODO loop`)
 
   // A user SYSTEM.md + the anti-lazy-pill toggle shape the system prompt (#301), and the eco
   // flags trim the built-in one (#314). Resolve and echo once, shared by both run paths.

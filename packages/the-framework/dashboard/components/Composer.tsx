@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { ArrowUp, Loader2 } from 'lucide-react'
 import type { ProjectSummary } from '../../dist/index.js'
-import { AGENTS, AGENT_LABELS, LAUNCHER_PRESETS, type AgentName } from '../../dist/client.js'
+import { DRIVERS, DRIVER_LABELS, LAUNCHER_PRESETS, type DriverName } from '../../dist/client.js'
 import {
   usePreferences,
   updatePreferences,
@@ -17,7 +17,7 @@ import { onProjects } from '../rpc/projects.js'
 import { PromptEditor, type PromptEditorHandle } from './PromptEditor.js'
 import { PresetCreatePanel } from './PresetCreatePanel.js'
 import { PresetsMenu } from './PresetsMenu.js'
-import { AgentModelMenu, type AgentOption } from './AgentModelMenu.js'
+import { DriverModelMenu, type DriverOption } from './DriverModelMenu.js'
 import { OptionsMenu, type RunTarget } from './OptionsMenu.js'
 import { resumeOptionRows, runOptionRows } from '../lib/run-option-rows.js'
 import { AddDeviceDialog } from './AddDeviceDialog.js'
@@ -26,7 +26,7 @@ import { useSelectedRemoteDeviceId, selectRemoteDevice } from '../lib/remote-tar
 import { useDeviceStatus } from '../lib/use-device-status.js'
 import { stashDraftFromUrl, takePendingDraft } from '../lib/draft-handoff.js'
 import { ResolvedOptions } from './ResolvedOptions.js'
-import { ClaudeLogo, CodexLogo } from './agent-logos.js'
+import { ClaudeLogo, CodexLogo } from './driver-logos.js'
 import { Button } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
@@ -39,9 +39,9 @@ import { cn } from '../lib/utils.js'
 // passes straight through to that agent's CLI. Picking a model in an agent's submenu sets both, so
 // an incompatible pair can't be chosen. Empty value = the agent's own default (no `--model` flag).
 // The names and labels are the framework's own vocabulary (browser-safe via /client); only the
-// icons and model lists are UI data, and the Record<AgentName, ...> shape means a new agent
+// icons and model lists are UI data, and the Record<DriverName, ...> shape means a new agent
 // framework-side is a compile error here rather than a silently missing menu entry.
-const AGENT_UI: Record<AgentName, { icon: AgentOption['icon']; models: AgentOption['models'] }> = {
+const DRIVER_UI: Record<DriverName, { icon: DriverOption['icon']; models: DriverOption['models'] }> = {
   claude: {
     icon: <ClaudeLogo className="h-4 w-4" />,
     models: [
@@ -62,7 +62,7 @@ const AGENT_UI: Record<AgentName, { icon: AgentOption['icon']; models: AgentOpti
     ],
   },
 }
-const AGENT_OPTIONS: AgentOption[] = AGENTS.map(name => ({ value: name, label: AGENT_LABELS[name], ...AGENT_UI[name] }))
+const DRIVER_OPTIONS: DriverOption[] = DRIVERS.map(name => ({ value: name, label: DRIVER_LABELS[name], ...DRIVER_UI[name] }))
 
 export interface ComposerHandle {
   clear: () => void
@@ -102,7 +102,7 @@ export const Composer = forwardRef<ComposerHandle, {
   compact?: boolean | undefined
   /** Off inside a session (#831): a session is bound to the agent it started with, so the select
    *  would only ever rewrite the *next* session's default. Chosen at the launcher instead. */
-  showAgentModel?: boolean | undefined
+  showDriverModel?: boolean | undefined
   /** Inside a running/finished session (#833): every run option is baked in at spawn, so the
    *  gear drops them (keeping the genuinely global editor pick) and the "In play" strip goes —
    *  both would otherwise read as controls over *this* session that only rewrite the next one. */
@@ -129,7 +129,7 @@ export const Composer = forwardRef<ComposerHandle, {
    *  without one the slot keeps its collapse-when-empty behavior for the launcher. */
   idleControl?: ReactNode
 }>(function Composer(
-  { files, addContext, removeContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showAgentModel = true, inSession = false, sessionEnded = false, sessionName, contextControl, resolvedRowStart, idleControl },
+  { files, addContext, removeContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inSession = false, sessionEnded = false, sessionName, contextControl, resolvedRowStart, idleControl },
   ref,
 ) {
   const [prompt, setPrompt] = useState('')
@@ -174,7 +174,7 @@ export const Composer = forwardRef<ComposerHandle, {
   const transparent = preferences.transparent ?? false // #625: the master off-switch (raw Claude Code)
   const browser = preferences.browser ?? false
   const model = preferences.model ?? '' // #628: empty = the driver's default model
-  const agent = preferences.agent ?? 'claude' // #650: which coding agent drives the run
+  const driver = preferences.driver ?? 'claude' // which coding-agent CLI does the work (#650)
   const target = preferences.target ?? 'local' // #1050: where the run executes (this device / GitHub Actions)
   // The stored agent as a display name; an unknown stored value falls back to Claude Code.
   const customPresets = preferences.customPresets ?? [] // #626: the user's own saved prompts
@@ -285,12 +285,12 @@ export const Composer = forwardRef<ComposerHandle, {
   // one real omission: a run started from the navbar used the stored agent, model and options with
   // nothing on screen saying which. Every value is preferences-backed and global, so the same
   // controls in either place read and write the same state.
-  const agentModelEl = showAgentModel && (
-    <AgentModelMenu
-      agents={AGENT_OPTIONS}
-      agent={agent}
+  const driverModelEl = showDriverModel && (
+    <DriverModelMenu
+      drivers={DRIVER_OPTIONS}
+      driver={driver}
       model={model}
-      onChange={(a, m) => updatePreferences({ agent: a, model: m })}
+      onChange={(a, m) => updatePreferences({ driver: a, model: m })}
       busy={busy}
     />
   )
@@ -410,7 +410,7 @@ export const Composer = forwardRef<ComposerHandle, {
     return (
       <div className="flex items-start gap-1.5">
         <div className="min-w-0 flex-1">{editorEl}</div>
-        {agentModelEl}
+        {driverModelEl}
         {optionsGearEl}
         {slotEl}
         {deviceDialog}
@@ -431,7 +431,7 @@ export const Composer = forwardRef<ComposerHandle, {
           {presetsEl}
           {contextControl}
           <div className="ml-auto flex items-center gap-1.5">
-            {agentModelEl}
+            {driverModelEl}
             {optionsGearEl}
             {slotEl}
           </div>

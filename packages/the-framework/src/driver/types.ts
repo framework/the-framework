@@ -1,3 +1,4 @@
+import type { DriverImplId } from '../driver-names.js'
 /**
  * The **driver** seam: the one abstraction The Framework wraps a coding-agent
  * CLI behind. A driver treats the agent (Claude Code today, Codex / opencode
@@ -21,8 +22,12 @@
 
 /** A wrapped coding-agent CLI. Boots {@link DriverSession}s bound to a workspace. */
 export interface Driver {
-  /** Stable name for the wrapped agent, e.g. `"claude-code"`. */
-  readonly name: string
+  /**
+   * Stable id for this concrete implementation, e.g. `"claude-code"`. Not the driver's *name*
+   * (`claude`), which is the user's choice: one driver has an implementation per place it can run
+   * (D5). {@link driverFromImpl} maps this back to the choice.
+   */
+  readonly id: DriverImplId
   /** Boot a session bound to a workspace directory. */
   start(opts: DriverStartOptions): Promise<DriverSession>
   /**

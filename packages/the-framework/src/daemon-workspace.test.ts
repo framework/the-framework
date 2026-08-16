@@ -100,7 +100,7 @@ test('a repo whose worktree could not be created fails the run instead of borrow
     await writeFile(join(cwd, FRAMEWORK_DIR, WORKTREES_DIR), '')
 
     const log = join(cwd, 'started.log')
-    const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd, env: {}, binPath: await writeStub(cwd, log) })
+    const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeStub(cwd, log) })
     const result = await runtime.onStart('build a thing', 'build')
 
     assert.equal(result.ok, false, 'the Start is refused rather than downgraded into the main checkout')
@@ -117,7 +117,7 @@ test('a project that is not a git repo still falls back to the main checkout, an
   const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-alloc-nogit-')))
   try {
     const log = join(cwd, 'started.log')
-    const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd, env: {}, binPath: await writeStub(cwd, log) })
+    const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeStub(cwd, log) })
     let result: { ok: boolean; runId?: string } | undefined
     const logged = await withCapturedLog(async () => {
       result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; runId?: string }
@@ -231,7 +231,7 @@ async function waitForSpecs(log: string, expected: number): Promise<SessionSpec[
 
 test('a worktree run whose child dies at boot is marked failed instead of waiting forever (#1261)', async () => {
   const cwd = await initRepo('framework-bootfail-')
-  const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd, env: {}, binPath: await writeDyingStub(cwd) })
+  const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeDyingStub(cwd) })
   try {
     const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; runId?: string }
     assert.equal(result.ok, true, 'the Start itself succeeds; the death is asynchronous')
@@ -338,7 +338,7 @@ async function waitForSpawns(worktree: string, expected: number): Promise<string
 test('a run that dies to a transient API error is continued, at most twice (#1281)', async () => {
   const cwd = await initRepo('framework-transient-')
   const detail = '[framework] claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'
-  const runtime = createProjectRuntime({ agentPreflight: agentReady, cwd, env: {}, binPath: await writeFailingRunStub(cwd, detail), retryDelayMs: 25 })
+  const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeFailingRunStub(cwd, detail), retryDelayMs: 25 })
   try {
     const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; runId?: string }
     assert.equal(result.ok, true)
@@ -358,7 +358,7 @@ test('a run that dies to a transient API error is continued, at most twice (#128
 
 test('a run that fails on its own terms is not retried (#1281)', async () => {
   const cwd = await initRepo('framework-nontransient-')
-  const runtime = createProjectRuntime({ agentPreflight: agentReady,
+  const runtime = createProjectRuntime({ driverPreflight: agentReady,
     cwd,
     env: {},
     binPath: await writeFailingRunStub(cwd, 'AssertionError: expected 2 to equal 3'),
@@ -390,19 +390,19 @@ test('a run that fails on its own terms is not retried (#1281)', async () => {
  */
 
 /** A preflight seam that reports a logged-out CLI, as `claude auth status` would. */
-const loggedOut = (agent: 'claude' | 'codex'): Promise<PreflightResult> =>
+const loggedOut = (driver: 'claude' | 'codex'): Promise<PreflightResult> =>
   Promise.resolve({
     ok: false,
     checks: [
       { name: 'node', ok: true, detail: process.version },
-      { name: `${agent} auth`, ok: false, detail: `\`${agent}\` is not logged in. Run \`${agent} auth login\`, then start the session again.` },
+      { name: `${driver} auth`, ok: false, detail: `\`${driver}\` is not logged in. Run \`${driver} auth login\`, then start the session again.` },
     ],
   })
 
 test('a start on a logged-out agent is refused, and spends no branch or worktree (#1326)', async () => {
   const cwd = await initRepo('framework-preflight-')
   const log = join(cwd, 'spawned.log')
-  const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeStub(cwd, log), agentPreflight: loggedOut })
+  const runtime = createProjectRuntime({ cwd, env: {}, binPath: await writeStub(cwd, log), driverPreflight: loggedOut })
   const git = nodeGitRunner()
   try {
     const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; error?: string }
@@ -436,7 +436,7 @@ test('an actions run starts without a local agent CLI at all (#1326)', async () 
     cwd,
     env: {},
     binPath: await writeStub(cwd, log),
-    agentPreflight: agent => {
+    driverPreflight: agent => {
       probed = true
       return loggedOut(agent)
     },
@@ -460,7 +460,7 @@ test('a passing preflight is probed once for a burst of starts (#1326)', async (
     cwd,
     env: {},
     binPath: await writeStub(cwd, log),
-    agentPreflight: () => {
+    driverPreflight: () => {
       probes++
       return Promise.resolve({ ok: true, checks: [{ name: 'claude', ok: true, detail: '1.2.3' }] })
     },
@@ -484,7 +484,7 @@ test('a logged-out agent is re-probed on every start, so logging in is picked up
     cwd,
     env: {},
     binPath: await writeStub(cwd, log),
-    agentPreflight: agent => {
+    driverPreflight: agent => {
       probes++
       // Logged out, then logged in: the fix must land on the next Start, not after a timeout.
       return probes === 1 ? loggedOut(agent) : Promise.resolve({ ok: true, checks: [] })

@@ -1,4 +1,4 @@
-What the framework knows about each agent it can drive — a whole coding-agent CLI the user already pays for, driven on their own subscription with no API key — and the one place a run turns the picked agent into a live driver.
+What the framework knows about each driver it can run — a whole coding-agent CLI the user already pays for, driven on their own subscription with no API key — and the one place a session turns the picked driver into a live implementation.
 
 ## TLDR
 

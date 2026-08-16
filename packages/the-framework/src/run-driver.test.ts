@@ -10,24 +10,24 @@ import { ActionsDriver, ClaudeCodeDriver, CloudDriver, CodexDriver } from './dri
 const ACTIONS = { owner: 'gemstack-land', repo: 'gemstack', token: 't' }
 
 test('createRunDriver returns an ActionsDriver for target "actions"', () => {
-  const driver = createRunDriver({ agent: 'claude', target: 'actions', actionsConfig: ACTIONS })
+  const driver = createRunDriver({ driver: 'claude', target: 'actions', actionsConfig: ACTIONS })
   assert.ok(driver instanceof ActionsDriver)
 })
 
 test('createRunDriver falls through to the local agent driver otherwise', () => {
-  assert.ok(createRunDriver({ agent: 'claude' }) instanceof ClaudeCodeDriver)
-  assert.ok(createRunDriver({ agent: 'claude', target: 'local' }) instanceof ClaudeCodeDriver)
-  assert.ok(createRunDriver({ agent: 'codex', target: 'local' }) instanceof CodexDriver)
+  assert.ok(createRunDriver({ driver: 'claude' }) instanceof ClaudeCodeDriver)
+  assert.ok(createRunDriver({ driver: 'claude', target: 'local' }) instanceof ClaudeCodeDriver)
+  assert.ok(createRunDriver({ driver: 'codex', target: 'local' }) instanceof CodexDriver)
 })
 
 test('createRunDriver requires the Actions config when target is "actions"', () => {
-  assert.throws(() => createRunDriver({ agent: 'claude', target: 'actions' }), /needs the repo owner/)
+  assert.throws(() => createRunDriver({ driver: 'claude', target: 'actions' }), /needs the repo owner/)
 })
 
 test('createRunDriver returns a CloudDriver for target "web"', () => {
-  assert.ok(createRunDriver({ agent: 'claude', target: 'web' }) instanceof CloudDriver)
+  assert.ok(createRunDriver({ driver: 'claude', target: 'web' }) instanceof CloudDriver)
 })
 
 test('the web target needs no configuration: the CLI already holds the account', () => {
-  assert.doesNotThrow(() => createRunDriver({ agent: 'claude', target: 'web' }))
+  assert.doesNotThrow(() => createRunDriver({ driver: 'claude', target: 'web' }))
 })

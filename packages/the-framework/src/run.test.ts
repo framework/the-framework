@@ -19,7 +19,7 @@ function recordingDriver(): { driver: Driver; system: () => string } {
   let captured = ''
   // Name it 'fake' so the workspace-verify stays off (no fs access in this unit test).
   const driver: Driver = {
-    name: 'fake',
+    id: 'fake',
     start: opts => {
       captured = opts.system ?? ''
       return fd.start(opts)
@@ -160,7 +160,7 @@ function promptRecordingDriver(): { driver: Driver; prompts: () => string[] } {
     sessionId: 'test',
   })
   const driver: Driver = {
-    name: 'fake',
+    id: 'fake',
     start: async opts => {
       const session = await inner.start(opts)
       const wrapped: DriverSession = {
@@ -687,7 +687,7 @@ function handsOffDriver(): { driver: Driver; prompts: () => readonly string[] } 
     },
     sessionId: 'session_01ABC',
   })
-  return { driver: { name: 'fake', start: opts => inner.start(opts) }, prompts: () => prompts }
+  return { driver: { id: 'fake', start: opts => inner.start(opts) }, prompts: () => prompts }
 }
 
 test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1225)', async () => {
@@ -765,7 +765,7 @@ test('runSession resumes a stopped leg: session resumed, message sent verbatim (
   let startedWith: { resumeSessionId?: string } | undefined
   const prompts: string[] = []
   const driver: Driver = {
-    name: 'fake',
+    id: 'fake',
     start: async opts => {
       startedWith = opts
       const session = await fd.start(opts)
@@ -808,7 +808,7 @@ function realNamedDriver(turns: { text: string }[]): { driver: Driver; prompts: 
   const prompts: string[] = []
   const inner = new FakeDriver({ turns })
   const driver: Driver = {
-    name: 'claude-code',
+    id: 'claude-code',
     start: async opts => {
       const session = await inner.start(opts)
       const wrapped: DriverSession = {

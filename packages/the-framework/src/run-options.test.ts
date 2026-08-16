@@ -48,9 +48,9 @@ test('a repo yml sits over the user tier, key by key (#842)', () => {
 })
 
 test('the agent is sent only when it is not the default (#858)', () => {
-  // The daemon spells this out as a flag, and `--agent claude` is the default anyway.
-  assert.equal(runOptionsFromPreferences({ agent: 'claude' }).agent, undefined)
-  assert.equal(runOptionsFromPreferences({ agent: 'codex' }).agent, 'codex')
+  // `claude` is the default anyway, so only a non-default driver needs sending.
+  assert.equal(runOptionsFromPreferences({ driver: 'claude' }).driver, undefined)
+  assert.equal(runOptionsFromPreferences({ driver: 'codex' }).driver, 'codex')
 })
 
 test('the model passes through, and an empty one does not (#858)', () => {
@@ -66,7 +66,7 @@ test('the run target is sent only when it is not the default local (#1050)', () 
 
 test('browser is dropped for an agent that cannot use it (#801)', () => {
   assert.equal(runOptionsFromPreferences({ browser: true }).browser, true)
-  assert.equal(runOptionsFromPreferences({ browser: true, agent: 'codex' }).browser, undefined)
+  assert.equal(runOptionsFromPreferences({ browser: true, driver: 'codex' }).browser, undefined)
 })
 
 test("the repo's file beats your own settings (#842/#858)", () => {

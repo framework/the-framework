@@ -32,11 +32,11 @@ export interface OnboardingSuggestion {
 }
 
 /**
- * Whether the picked agent's CLI can start a run (#1326), as the launcher needs to hear it:
+ * Whether the picked driver's CLI can start a run (#1326), as the launcher needs to hear it:
  * what is wrong and what fixes it, never what is right. Both lists are already written for a
  * human, so the warning renders them rather than mapping codes to copy.
  */
-export interface AgentReady {
+export interface DriverReady {
   /** False when a Start would die before the session exists. */
   ok: boolean
   /** Blocking problems, each naming its own fix. Empty when {@link ok}. */
@@ -76,7 +76,7 @@ export interface StartRunOptions {
   /** The model to run the wrapped agent on (#628); maps to `--model`. Absent = the driver's own default. */
   model?: string
   /** Which coding agent drives the run (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
-  agent?: string
+  driver?: string
   /** Where this run executes (#1050/#610): `local` (this device, the default), `actions` (a fresh GitHub Actions runner via ActionsDriver) or `web` (a Claude Code cloud session via CloudDriver); maps to `--run-on`. Absent = local, i.e. today's behavior. */
   target?: RunLocation
   /**

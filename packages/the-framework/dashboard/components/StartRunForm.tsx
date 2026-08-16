@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ProjectSummary } from '../../dist/index.js'
 import { DEFAULT_HANDOFF, handoffReaches, runOptionsFromPreferences } from '../../dist/client.js'
-import { onAgentReady, onClaudeTrust, onProjects, onRepoAutoMerge } from '../rpc/projects.js'
+import { onDriverReady, onClaudeTrust, onProjects, onRepoAutoMerge } from '../rpc/projects.js'
 import { onSystemPromptUser } from '../rpc/reads.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
@@ -98,18 +98,18 @@ export function StartRunForm({
   )
   const untrusted = web && trust !== null && trust.known && !trust.trusted
 
-  // Can the picked agent's CLI start a run at all (#1326)? An `actions` run needs nothing local,
+  // Can the picked driver's CLI start a run at all (#1326)? An `actions` run needs nothing local,
   // and a remote run executes on its own device, so neither is probed here. Re-read when the agent
   // changes, since the answer is per CLI: `claude` being logged in says nothing about `codex`.
   // An armed PR/merge rung adds the `gh` half (#1419): the handoff publishes through the GitHub
   // CLI, so a missing or logged-out `gh` is said now, not hours later as a silently unopened PR.
-  const localAgent = options.target !== 'actions' && !remoteDevice
-  const agent = options.agent ?? 'claude'
-  const publishArmed = localAgent && handoffReaches(options.handoff ?? DEFAULT_HANDOFF, 'pr')
-  const ready = useLoaded<Awaited<ReturnType<typeof onAgentReady>> | null>(
-    () => (localAgent ? onAgentReady(agent, publishArmed) : Promise.resolve(null)),
+  const localDriver = options.target !== 'actions' && !remoteDevice
+  const driver = options.driver ?? 'claude'
+  const publishArmed = localDriver && handoffReaches(options.handoff ?? DEFAULT_HANDOFF, 'pr')
+  const ready = useLoaded<Awaited<ReturnType<typeof onDriverReady>> | null>(
+    () => (localDriver ? onDriverReady(driver, publishArmed) : Promise.resolve(null)),
     null,
-    [agent, localAgent, publishArmed],
+    [driver, localDriver, publishArmed],
   )
 
   // An armed merge on a repo with GitHub auto-merge disabled silently degrades to an immediate

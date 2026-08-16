@@ -36,7 +36,7 @@ import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverSta
  * machine never sees.
  */
 export class CloudDriver implements Driver {
-  readonly name = 'claude-web'
+  readonly id = 'claude-web'
   constructor(private readonly opts: CloudDriverOptions = {}) {}
 
   start(opts: DriverStartOptions): Promise<DriverSession> {

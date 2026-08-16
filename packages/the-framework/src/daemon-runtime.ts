@@ -47,14 +47,14 @@ import { isCliTimeout } from './cli-exec.js'
 import { withRunLock } from './run-locks.js'
 import { errorMessage } from './error-message.js'
 import { preflight, preflightProblems, type PreflightResult } from './preflight.js'
-import { isAgentName, type AgentName } from './agent-names.js'
+import { isDriverName, type DriverName } from './driver-names.js'
 
 /**
  * How long a passing agent preflight (#1326) is trusted before it is probed again. Short enough
  * that logging out mid-session is noticed within a session's worth of starts, long enough that a
  * burst of starts pays for the probes once.
  */
-const AGENT_READY_TTL_MS = 30_000
+const DRIVER_READY_TTL_MS = 30_000
 
 /**
  * The daemon's per-project business logic (#393/#736): spawning runs into worktrees, installing
@@ -340,7 +340,7 @@ export interface ProjectRuntimeOptions {
   /** The pause before a transient-death retry (#1281); undefined uses {@link TRANSIENT_RETRY_DELAY_MS}. A test seam. */
   retryDelayMs?: number | undefined
   /** How a start checks the agent can run (#1326); undefined runs the real {@link preflight}. A test seam. */
-  agentPreflight?: ((agent: AgentName) => Promise<PreflightResult>) | undefined
+  driverPreflight?: ((driver: DriverName) => Promise<PreflightResult>) | undefined
 }
 
 /** The per-project run + preview surface the dashboard drives, plus its teardown. */
@@ -386,7 +386,7 @@ export interface ProjectRuntime {
  * with no project id (or the home id) resolves to it without a registry lookup. Split out of
  * {@link runDaemon} so the daemon body reads as lifecycle and this reads as business logic.
  */
-export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPreflight }: ProjectRuntimeOptions): ProjectRuntime {
+export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPreflight }: ProjectRuntimeOptions): ProjectRuntime {
   const homeId = projectId(resolve(cwd))
   // Live run pids, keyed per run rather than per project (#736) — see onStart for the key.
   const activeRuns = new Map<string, number>()
@@ -471,14 +471,14 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
    * a daemon restart, so a broken setup is re-probed every time and costs only the user who
    * already cannot run anything.
    */
-  const readyUntil = new Map<AgentName, number>()
+  const readyUntil = new Map<DriverName, number>()
   const checkAgentReady = async (options: StartRunOptions): Promise<string | undefined> => {
     if (options.target === 'actions') return undefined
-    const agent = isAgentName(options.agent) ? options.agent : 'claude'
-    if ((readyUntil.get(agent) ?? 0) > Date.now()) return undefined
-    const result = await (agentPreflight ? agentPreflight(agent) : preflight({ agent }))
+    const driver = isDriverName(options.driver) ? options.driver : 'claude'
+    if ((readyUntil.get(driver) ?? 0) > Date.now()) return undefined
+    const result = await (driverPreflight ? driverPreflight(driver) : preflight({ driver }))
     if (!result.ok) return preflightProblems(result).join('; ')
-    readyUntil.set(agent, Date.now() + AGENT_READY_TTL_MS)
+    readyUntil.set(driver, Date.now() + DRIVER_READY_TTL_MS)
     return undefined
   }
 

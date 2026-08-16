@@ -110,7 +110,7 @@ async function isFile(cwd: string, rel: string): Promise<boolean> {
 
 /**
  * The workspace's flat backlog file: the root `TODO_AGENTS.md`, or `undefined` when it does not
- * exist. The pre-#682 spellings (`TODO-AGENTS.md`, `tickets/TODO.md`, root `TODO.md`) are no
+ * exist. The pre-#682 spellings (`TODO-DRIVERS.md`, `tickets/TODO.md`, root `TODO.md`) are no
  * longer read — one convention, one location.
  */
 export async function findFlatTodo(cwd: string): Promise<string | undefined> {

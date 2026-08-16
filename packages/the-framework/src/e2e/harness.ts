@@ -143,7 +143,7 @@ export async function makeWorld(): Promise<StoryWorld> {
     cwd: home,
     env: process.env,
     binPath: fileURLToPath(new URL('./fake-agent-bin.js', import.meta.url)),
-    agentPreflight: agentReady,
+    driverPreflight: agentReady,
   })
 
   const quota = { view: { windows: [] } as QuotaView }

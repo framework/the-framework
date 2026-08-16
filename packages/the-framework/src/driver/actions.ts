@@ -32,7 +32,7 @@ import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverSta
  * API rather than from disk.
  */
 export class ActionsDriver implements Driver {
-  readonly name = 'github-actions'
+  readonly id = 'github-actions'
   constructor(private readonly opts: ActionsDriverOptions) {}
 
   start(opts: DriverStartOptions): Promise<DriverSession> {

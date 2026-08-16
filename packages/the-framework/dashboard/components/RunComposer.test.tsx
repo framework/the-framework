@@ -33,7 +33,7 @@ vi.mock('./Composer.js', async () => {
         submit-new-session
       </button>
       <span data-testid="composer-props">
-        {JSON.stringify({ showAgentModel: props.showAgentModel, busyLabel: props.submitBusyLabel, placeholder: props.placeholder, sessionEnded: props.sessionEnded })}
+        {JSON.stringify({ showDriverModel: props.showDriverModel, busyLabel: props.submitBusyLabel, placeholder: props.placeholder, sessionEnded: props.sessionEnded })}
       </span>
       {/* The empty-box slot control (#1455), rendered so the Stop/Resume tests can press it. */}
       {props.idleControl}
@@ -52,7 +52,7 @@ function renderComposer(over: Partial<Parameters<typeof RunComposer>[0]> = {}) {
   return { onRunStarted }
 }
 
-const props = (): { showAgentModel: boolean; busyLabel: string; placeholder: string } =>
+const props = (): { showDriverModel: boolean; busyLabel: string; placeholder: string } =>
   JSON.parse(screen.getByTestId('composer-props').textContent ?? '{}')
 
 beforeEach(() => {
@@ -207,27 +207,27 @@ describe('RunComposer, finished (#720)', () => {
     sendStart.mockResolvedValue({ ok: true })
     // The pref says Codex, but this run ran under Claude. Handing its session id to `codex --resume`
     // would be meaningless, so the run's driver wins.
-    prefs = { agent: 'codex', model: 'gpt-5' }
+    prefs = { driver: 'codex', model: 'gpt-5' }
     renderComposer({ ...ended, driver: 'claude-code' })
     fireEvent.click(screen.getByText('submit-normal'))
     await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(1))
     const options = sendStart.mock.calls[0]![3]
-    expect(options.agent).toBeUndefined() // claude is the default, so no --agent flag
+    expect(options.driver).toBeUndefined() // claude is the default, so no --agent flag
     expect(options.model).toBeUndefined() // the resumed transcript keeps the model it had
   })
 
   test('a codex run resumes on codex (#831)', async () => {
     sendStart.mockResolvedValue({ ok: true })
-    prefs = { agent: 'claude' }
+    prefs = { driver: 'claude' }
     renderComposer({ ...ended, driver: 'codex' })
     fireEvent.click(screen.getByText('submit-normal'))
     await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(1))
-    expect(sendStart.mock.calls[0]![3].agent).toBe('codex')
+    expect(sendStart.mock.calls[0]![3].driver).toBe('codex')
   })
 
-  test('offers no agent/model select, since a session cannot change agent (#831)', () => {
+  test('offers no driver/model select, since a session cannot change driver (#831)', () => {
     renderComposer({ ...ended, driver: 'claude-code' })
-    expect(props().showAgentModel).toBe(false)
+    expect(props().showDriverModel).toBe(false)
   })
 
   test('surfaces the busy guard instead of jumping', async () => {

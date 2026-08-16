@@ -163,7 +163,7 @@ test('runDaemon serves the dashboard, and shuts down when the signal aborts', as
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
+    const { done, state } = await startDaemon(cwd, { driverPreflight: agentReady, port: 0, signal: ac.signal, env })
     assert.equal(state.pid, process.pid)
     assert.match(state.url, /^http:\/\/127\.0\.0\.1:\d+$/)
 
@@ -187,7 +187,7 @@ test('runDaemon comes up on a fresh workspace with no .the-framework yet', async
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
+    const { done, state } = await startDaemon(cwd, { driverPreflight: agentReady, port: 0, signal: ac.signal, env })
     assert.equal((await fetch(state.url)).status, 200)
     ac.abort()
     await done
@@ -224,7 +224,7 @@ setTimeout(() => {}, 800)
 `,
     )
     const env = await configEnv(cwd)
-    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
+    const { done, state } = await startDaemon(cwd, { driverPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
 
     // The whole point of #736: the second Start is no longer refused as busy while the
     // first child is alive, because the two no longer share a working tree.
@@ -302,7 +302,7 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
 `,
     )
     const env = await configEnv(cwd)
-    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
+    const { done, state } = await startDaemon(cwd, { driverPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
 
     /** Start a run whose stub reports `status`, and resolve once its worktree has settled. */
     const runWith = async (status: string, nth: number): Promise<string> => {
@@ -394,7 +394,7 @@ setTimeout(() => {}, 600)
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
+    const { done, state } = await startDaemon(cwd, { driverPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
 
     const post = (prompt: string) => sendStart(state.url, cwd, prompt)
 
@@ -446,7 +446,7 @@ fs.appendFileSync(path.join(spec.cwd, 'started.log'), JSON.stringify(spec) + '\\
   const env = await configEnv(cwd)
   const ac = new AbortController()
   try {
-    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
+    const { done, state } = await startDaemon(cwd, { driverPreflight: agentReady, port: 0, signal: ac.signal, binPath: stub, env })
 
     const post = (prompt: string, kind: string) => sendStart(state.url, cwd, prompt, kind)
 
@@ -503,7 +503,7 @@ test('sendStart refuses to re-exec a test entry as the run (#345)', async () => 
   const ac = new AbortController()
   try {
     // No binPath: argv[1] here is this test file — the fork-bomb guard must trip.
-    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
+    const { done, state } = await startDaemon(cwd, { driverPreflight: agentReady, port: 0, signal: ac.signal, env })
     const result = await sendStart(state.url, cwd, 'a blog')
     assert.ok(result.ok === false && /test entry/.test(result.error), 'the fork-bomb guard refuses a test entry')
     ac.abort()
@@ -524,7 +524,7 @@ test('runDaemon steers through the control log: sendStop / sendChoice append ent
   const prevXdg = process.env['XDG_CONFIG_HOME']
   process.env['XDG_CONFIG_HOME'] = env['XDG_CONFIG_HOME']
   try {
-    const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
+    const { done, state } = await startDaemon(cwd, { driverPreflight: agentReady, port: 0, signal: ac.signal, env })
 
     // The dashboard steers over the RPC mount: sendStop / sendChoice append to control.jsonl.
     const id = homeId(cwd)

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Plus, ChevronDown, Cloud, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Ticket } from 'lucide-react'
 import type { RunMeta, RunStatus, RecentRun, ProjectSummary } from '../../dist/index.js'
-import { AGENT_LABELS, agentForDriver } from '../../dist/client.js'
+import { DRIVER_LABELS, driverFromImpl } from '../../dist/client.js'
 import { Button, buttonVariants } from './ui/button.js'
 import { Badge } from './ui/badge.js'
 import { cn } from '../lib/utils.js'
@@ -9,7 +9,7 @@ import { isMetaPublishing } from '../lib/live-state.js'
 import { formatRelative } from '../lib/format-date.js'
 import { STATUS_TONE } from '../lib/status-tone.js'
 import { runLabel } from '../lib/run-label.js'
-import { AgentLogo } from './agent-logos.js'
+import { DriverLogo } from './driver-logos.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -540,7 +540,7 @@ function RunRow({
 }) {
   // Only a live run can be waiting on you; a finished one is just finished.
   const parked = waiting && status === 'running'
-  const agent = agentForDriver(driver)
+  const picked = driverFromImpl(driver)
   // A web run's local process ends at the hand-off by design, so its `done` is about this
   // machine, not the session (#1264): the cloud side keeps working and opens its own PR. Saying
   // "done" under ten working cloud agents is the lie the demo would put on camera.
@@ -585,10 +585,10 @@ function RunRow({
         </Badge>
         <span className="truncate text-xs font-normal text-muted-foreground">{subtitle}</span>
         {/* Right cluster: a device glyph when the run is relayed to a connected device (#1067),
-            a cloud glyph for a Claude Code cloud session (#1263), then the agent logo. The logo
-            is the only thing naming the agent on this row, so it carries a title rather than
+            a cloud glyph for a Claude Code cloud session (#1263), then the driver logo. The logo
+            is the only thing naming the driver on this row, so it carries a title rather than
             being decorative. */}
-        {(remote || cloud || agent) && (
+        {(remote || cloud || picked) && (
           <span className="ml-auto flex shrink-0 items-center gap-1.5">
             {remote && (
               <Tooltip>
@@ -606,14 +606,14 @@ function RunRow({
                 <TooltipContent>Runs as a Claude Code cloud session; it works and opens its PR over there.</TooltipContent>
               </Tooltip>
             )}
-            {agent && (
-              // The logo is the only thing naming the agent on this row, so the trigger carries the
+            {picked && (
+              // The logo is the only thing naming the driver on this row, so the trigger carries the
               // accessible name and the logo itself stays decorative.
               <Tooltip>
-                <TooltipTrigger render={<span className="flex items-center" role="img" aria-label={AGENT_LABELS[agent]} />}>
-                  <AgentLogo agent={agent} className="h-3 w-3 text-muted-foreground" />
+                <TooltipTrigger render={<span className="flex items-center" role="img" aria-label={DRIVER_LABELS[picked]} />}>
+                  <DriverLogo driver={picked} className="h-3 w-3 text-muted-foreground" />
                 </TooltipTrigger>
-                <TooltipContent>{AGENT_LABELS[agent]}</TooltipContent>
+                <TooltipContent>{DRIVER_LABELS[picked]}</TooltipContent>
               </Tooltip>
             )}
           </span>

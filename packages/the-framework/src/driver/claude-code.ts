@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { readClaudeQuota } from './claude-code-quota.js'
 import { combineFraming, combineSignals, makeEmit, readWorkspaceFile } from './session-support.js'
-import { runAgentCli, type RunAgentCliOptions, type SpawnLike } from './agent-cli.js'
+import { runCliSession, type RunCliSessionOptions, type SpawnLike } from './cli-session.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverQuota, DriverRateLimit, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
 
 /** Claude Code permission modes we pass through to the CLI. */
@@ -56,7 +56,7 @@ export interface ClaudeCodeDriverOptions {
  * `Driver` interface without touching the orchestration above it.
  */
 export class ClaudeCodeDriver implements Driver {
-  readonly name = 'claude-code'
+  readonly id = 'claude-code'
   constructor(private readonly opts: ClaudeCodeDriverOptions = {}) {}
 
   start(opts: DriverStartOptions): Promise<DriverSession> {
@@ -120,7 +120,7 @@ export class ClaudeCodeSession implements DriverSession {
     let turn: DriverTurn
     // On a resume attempt, hold the failure's `error` event back until the conversation-gone
     // case (#778) is ruled out: a turn that recovers on the retry must not show a failed row.
-    // Safe to hold — runAgentCli emits `error` exactly once, right before it rejects.
+    // Safe to hold — runCliSession emits `error` exactly once, right before it rejects.
     let heldError: DriverEvent | undefined
     try {
       turn = await run(resumeId, resumeId === undefined ? emit : event => {
@@ -211,12 +211,12 @@ function isConversationGone(err: unknown): boolean {
   return CONVERSATION_GONE.test(err instanceof Error ? err.message : String(err))
 }
 
-/** @deprecated Use {@link RunAgentCliOptions}. */
-export type RunClaudeOptions = Omit<RunAgentCliOptions, 'parser' | 'agent'>
+/** @deprecated Use {@link RunCliSessionOptions}. */
+export type RunClaudeOptions = Omit<RunCliSessionOptions, 'parser' | 'driver'>
 
 /** Spawn one Claude Code invocation and resolve with its final turn. */
 export function runClaude(opts: RunClaudeOptions): Promise<DriverTurn> {
-  return runAgentCli({ ...opts, parser: new StreamJsonParser() })
+  return runCliSession({ ...opts, parser: new StreamJsonParser() })
 }
 
 /**

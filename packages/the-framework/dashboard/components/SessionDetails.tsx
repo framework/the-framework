@@ -1,5 +1,5 @@
 import type { FrameworkEvent } from '../../dist/index.js'
-import { AGENT_LABELS, agentForDriver, sessionInfo } from '../../dist/client.js'
+import { DRIVER_LABELS, driverFromImpl, sessionInfo } from '../../dist/client.js'
 
 // The session-details strip behind the action bar's disclosure (always available now, so the
 // chevron no longer pops in and out with the git/handoff data). It shows the "about this run"
@@ -36,8 +36,8 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 export function SessionDetails({ events }: { events: FrameworkEvent[] }) {
   const session = sessionInfo(events)
-  const agent = agentForDriver(session?.driver)
-  const agentLabel = agent ? AGENT_LABELS[agent] : (session?.driver ?? 'Agent')
+  const agent = driverFromImpl(session?.driver)
+  const agentLabel = agent ? DRIVER_LABELS[agent] : (session?.driver ?? 'Agent')
   const usage = lastUsage(events)
 
   return (

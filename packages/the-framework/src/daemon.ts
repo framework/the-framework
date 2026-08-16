@@ -130,7 +130,7 @@ export interface RunDaemonOptions {
   /** Env the registry is read from. Default `process.env`; injectable for tests. */
   env?: NodeJS.ProcessEnv
   /** How a start checks the picked agent can run (#1326); default the real `preflight`. For tests. */
-  agentPreflight?: ProjectRuntimeOptions['agentPreflight']
+  driverPreflight?: ProjectRuntimeOptions['driverPreflight']
   /** Called once the server has bound, before it blocks. The only way a caller learns the port. */
   onListening?: (state: DaemonState) => void
 }
@@ -183,7 +183,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     cwd,
     env,
     ...(opts.binPath !== undefined ? { binPath: opts.binPath } : {}),
-    ...(opts.agentPreflight !== undefined ? { agentPreflight: opts.agentPreflight } : {}),
+    ...(opts.driverPreflight !== undefined ? { driverPreflight: opts.driverPreflight } : {}),
   })
 
   // The daemon serves the prerendered Vike + Telefunc dashboard (#405/#426): the SPA reads

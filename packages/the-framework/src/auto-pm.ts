@@ -466,7 +466,7 @@ export interface AutoPmDeps {
    * The tickets open for planning (#1327): no plan or `.lock.md` claim yet (#1420) — most
    * important first, as filenames inside `tickets/`. Asked only when the tick lands on a
    * {@link AutoPmJob.fansOut} job. Unreadable means none, and no seam at all means the stock
-   * single agent: the fan-out is an addition, not a precondition, and a loop wired without it
+   * single driver: the fan-out is an addition, not a precondition, and a loop wired without it
    * behaves exactly as before #1327.
    */
   planCandidates?(project: AutoPmProject): Promise<readonly string[]>

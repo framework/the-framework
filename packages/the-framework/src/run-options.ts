@@ -8,7 +8,7 @@ import type { FrameworkFileConfig } from './config.js'
  *
  * This lived in the dashboard client, which was fine while the browser was the only thing that
  * started runs. Auto PM (#685) starts them too, and passed nothing at all — so an unattended run
- * ignored the agent, the model and every other per-project setting (#840) that a run started from
+ * ignored the driver, the model and every other per-project setting (#840) that a run started from
  * the launcher would have honoured.
  *
  * It lives here, in pure code with no Node imports, so both callers share one mapping rather than
@@ -63,7 +63,7 @@ export function runOptionsFromPreferences(preferences: Preferences, context: str
   const browser = preferences.browser ?? false
   const handoff = handoffFromPreferences(preferences)
   const model = preferences.model ?? ''
-  const agent = preferences.agent ?? 'claude'
+  const driver = preferences.driver ?? 'claude'
   const target = preferences.target ?? 'local'
   return {
     // The two toggles `the-framework.yml` also owns go out explicitly, `false` included (#842):
@@ -76,11 +76,11 @@ export function runOptionsFromPreferences(preferences: Preferences, context: str
     // Stated explicitly, every rung included: it defaults to `pr` (#1102), so sending nothing
     // would let the session's own default publish more than the launcher just showed.
     handoff,
-    // Claude-only (#801): another agent's driver takes no MCP servers, so sending it would only earn
+    // Claude-only (#801): another driver takes no MCP servers, so sending it would only earn
     // the CLI's "no effect" notice. Matches the box being disabled off Claude Code.
-    ...(browser && agent === 'claude' ? { browser: true } : {}),
+    ...(browser && driver === 'claude' ? { browser: true } : {}),
     ...(model ? { model } : {}),
-    ...(agent !== 'claude' ? { agent } : {}),
+    ...(driver !== 'claude' ? { driver } : {}),
     // Run target (#1050/#610): only a non-local target travels; `local` is the default the CLI
     // already assumes, so a local run's options stay byte-identical to before either target existed.
     ...(target && target !== 'local' ? { target } : {}),

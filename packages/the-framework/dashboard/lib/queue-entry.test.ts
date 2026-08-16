@@ -13,7 +13,7 @@ describe('queueEntryLabel (#1164)', () => {
   test("the agent's note after the link is dropped from the label, not the title", () => {
     // Agents append their findings to the entry. Keeping them inline pushed the title out of a
     // one-line list entirely; the full text still goes in the tooltip.
-    const entry = '[Let Fable be picked](tickets/2026-07-25_fable.md) — the model menu filters it out in AgentModelMenu.tsx:65'
+    const entry = '[Let Fable be picked](tickets/2026-07-25_fable.md) — the model menu filters it out in DriverModelMenu.tsx:65'
     expect(queueEntryLabel(entry).text).toBe('Let Fable be picked')
   })
 

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import type { Preferences } from '../../dist/index.js'
-import { AGENTS, AGENT_LABELS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '../../dist/client.js'
+import { DRIVERS, DRIVER_LABELS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '../../dist/client.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { usePreferences, updatePreferences, themePreference, type ThemePreference } from '../lib/preferences.js'
 import { runOptionRows, type OptionRow } from '../lib/run-option-rows.js'
@@ -89,9 +89,9 @@ export function SettingsPage({
           <SelectRow
             label="Agent"
             description="Which coding agent runs the work."
-            value={preferences.agent ?? AGENTS[0]}
-            options={AGENTS.map(a => ({ value: a, label: AGENT_LABELS[a] }))}
-            onChange={value => updatePreferences({ agent: value })}
+            value={preferences.driver ?? DRIVERS[0]}
+            options={DRIVERS.map(a => ({ value: a, label: DRIVER_LABELS[a] }))}
+            onChange={value => updatePreferences({ driver: value })}
           />
           <TextRow
             label="Model"

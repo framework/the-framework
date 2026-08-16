@@ -40,7 +40,7 @@ test('preflight probes the picked agent, not always claude (#542)', async () => 
   const probed: string[] = []
   const result = await preflight({
     ...notRoot,
-    agent: 'codex',
+    driver: 'codex',
     probe: (bin, args) => {
       if (args[0] === '--version') probed.push(bin)
       return Promise.resolve({ ok: true, output: 'codex-cli 0.144.4' })
@@ -53,7 +53,7 @@ test('preflight probes the picked agent, not always claude (#542)', async () => 
 })
 
 test('a missing codex points at the codex install, not the claude one (#542)', async () => {
-  const result = await preflight({ ...notRoot, agent: 'codex', probe: probeFor({ version: { ok: false, output: '' } }) })
+  const result = await preflight({ ...notRoot, driver: 'codex', probe: probeFor({ version: { ok: false, output: '' } }) })
   assert.equal(result.ok, false)
   const cli = result.checks.find(c => c.name === 'codex')
   assert.equal(cli?.ok, false)
@@ -95,7 +95,7 @@ test('a logged-in claude passes and says so (#1326)', async () => {
 test('a logged-out codex fails preflight, naming its own fix (#1326)', async () => {
   const result = await preflight({
     ...notRoot,
-    agent: 'codex',
+    driver: 'codex',
     probe: probeFor({ auth: { ok: false, output: 'Not logged in' } }),
   })
   assert.equal(result.ok, false)
@@ -106,12 +106,12 @@ test('a logged-out codex fails preflight, naming its own fix (#1326)', async () 
 
 test('"Not logged in" is not read as logged in (#1326)', async () => {
   // The positive is a substring of the negative, so a naive test order would invert the answer.
-  const result = await preflight({ ...notRoot, agent: 'codex', probe: probeFor({ auth: { ok: true, output: 'Not logged in' } }) })
+  const result = await preflight({ ...notRoot, driver: 'codex', probe: probeFor({ auth: { ok: true, output: 'Not logged in' } }) })
   assert.equal(result.ok, false)
 })
 
 test('a logged-in codex passes (#1326)', async () => {
-  const result = await preflight({ ...notRoot, agent: 'codex', probe: probeFor({ auth: { ok: true, output: 'Logged in using ChatGPT' } }) })
+  const result = await preflight({ ...notRoot, driver: 'codex', probe: probeFor({ auth: { ok: true, output: 'Logged in using ChatGPT' } }) })
   assert.equal(result.ok, true)
   assert.equal(result.checks.find(c => c.name === 'codex auth')?.ok, true)
 })
@@ -140,7 +140,7 @@ test('auth is not probed when the CLI itself is missing (#1326)', async () => {
 
 test('the auth answer is read off stderr too (#1326)', async () => {
   // The default probe merges the streams because the two CLIs disagree about where status goes.
-  const result = await preflight({ ...notRoot, agent: 'codex', probe: probeFor({ auth: { ok: false, output: 'Not logged in' } }) })
+  const result = await preflight({ ...notRoot, driver: 'codex', probe: probeFor({ auth: { ok: false, output: 'Not logged in' } }) })
   assert.equal(result.checks.find(c => c.name === 'codex auth')?.ok, false)
 })
 

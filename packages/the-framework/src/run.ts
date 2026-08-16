@@ -214,7 +214,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
     // (e.g. sanity-checking the stack), so re-prompt once with a hard "create it from scratch"
     // directive. Only for a real driver — the fake one writes nothing, so its workspace always
     // reads empty — and only when the agent is not mid-question, which the gates just drained.
-    if (kind === 'build' && !resuming && opts.driver.name !== 'fake' && isWorkspaceEmpty(opts.cwd)) {
+    if (kind === 'build' && !resuming && opts.driver.id !== 'fake' && isWorkspaceEmpty(opts.cwd)) {
       const scaffolded = await session.prompt(scaffoldPrompt(opts.prompt), { signal: runSignal })
       emitTurnSignals(scaffolded.text)
       text = scaffolded.text
@@ -230,7 +230,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
     // backlog one gated entry per turn until it is empty. The session signal (Stop / budget cap
     // #322) and the item cap bound it for unattended sessions.
     let todo: TodoLoopResult | undefined
-    if (kind === 'build' && !handsOff && (opts.todoLoop ?? opts.driver.name !== 'fake')) {
+    if (kind === 'build' && !handsOff && (opts.todoLoop ?? opts.driver.id !== 'fake')) {
       todo = await runTodoLoop({
         session,
         cwd: opts.cwd,
@@ -280,7 +280,7 @@ function openingPrompt(opts: RunSessionOptions, kind: SessionKind, resuming: boo
   }
   // Gated on a real driver, so the fake one (which writes nothing, so its workspace always reads
   // empty) always takes the greenfield path and stays deterministic.
-  return opts.driver.name !== 'fake' && !isWorkspaceEmpty(cwd) ? extendPrompt(opts.prompt) : buildPrompt(opts.prompt)
+  return opts.driver.id !== 'fake' && !isWorkspaceEmpty(cwd) ? extendPrompt(opts.prompt) : buildPrompt(opts.prompt)
 }
 
 /** The live-chat phase a build reaches after its backlog, sharing the rounds' own loop. */

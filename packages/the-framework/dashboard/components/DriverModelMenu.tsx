@@ -13,50 +13,50 @@ import {
   DropdownMenuSubContent,
 } from './ui/dropdown-menu.js'
 
-// The run's agent + model as one tree (#650/#656/#658): the top level is the coding agents, and
-// each agent's submenu holds only its own models. Picking a model sets both the agent and the
+// The run's driver + model as one tree (#650/#656/#658): the top level is the coding drivers, and
+// each driver's submenu holds only its own models. Picking a model sets both the driver and the
 // model together, so an incompatible pair (e.g. Codex + a Claude model) can't be chosen. The
-// trigger shows the current agent's logo then the model.
+// trigger shows the current driver's logo then the model.
 
 export interface ModelOption {
   value: string
   label: string
 }
 
-export interface AgentOption {
+export interface DriverOption {
   value: string
   label: string
-  /** The agent's logo, shown on the trigger and beside its name (#656). */
+  /** The driver's logo, shown on the trigger and beside its name (#656). */
   icon?: ReactNode
-  /** The models this agent offers; the first is its default. */
+  /** The models this driver offers; the first is its default. */
   models: ModelOption[]
 }
 
-function agentOf(agents: AgentOption[], value: string): AgentOption | undefined {
-  return agents.find(a => a.value === value) ?? agents[0]
+function driverOf(drivers: DriverOption[], value: string): DriverOption | undefined {
+  return drivers.find(a => a.value === value) ?? drivers[0]
 }
 
-/** The label for the current model within an agent's own list, falling back to its default. */
-function modelLabel(agent: AgentOption | undefined, model: string): string {
-  if (!agent) return ''
-  return (agent.models.find(m => m.value === model) ?? agent.models[0])?.label ?? ''
+/** The label for the current model within an driver's own list, falling back to its default. */
+function modelLabel(driver: DriverOption | undefined, model: string): string {
+  if (!driver) return ''
+  return (driver.models.find(m => m.value === model) ?? driver.models[0])?.label ?? ''
 }
 
-export function AgentModelMenu({
-  agents,
-  agent,
+export function DriverModelMenu({
+  drivers,
+  driver,
   model,
   onChange,
   busy,
 }: {
-  agents: AgentOption[]
-  agent: string
+  drivers: DriverOption[]
+  driver: string
   model: string
-  /** Set the agent and model together (a model is always picked within its agent). */
-  onChange: (agent: string, model: string) => void
+  /** Set the driver and model together (a model is always picked within its driver). */
+  onChange: (driver: string, model: string) => void
   busy: boolean
 }) {
-  const current = agentOf(agents, agent)
+  const current = driverOf(drivers, driver)
   const currentModelLabel = modelLabel(current, model)
   return (
     <DropdownMenu>
@@ -81,10 +81,10 @@ export function AgentModelMenu({
         <TooltipContent>{`Agent: ${current?.label ?? ''} · Model: ${currentModelLabel}`}</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end">
-        {agents.map(a => (
+        {drivers.map(a => (
           <DropdownMenuSub key={a.value}>
             <DropdownMenuSubTrigger>
-              <Check className={cn('h-3.5 w-3.5 shrink-0', a.value === agent ? 'opacity-100' : 'opacity-0')} />
+              <Check className={cn('h-3.5 w-3.5 shrink-0', a.value === driver ? 'opacity-100' : 'opacity-0')} />
               {a.icon && <span className="flex h-4 w-4 items-center justify-center">{a.icon}</span>}
               <span className="flex-1">{a.label}</span>
             </DropdownMenuSubTrigger>
@@ -94,7 +94,7 @@ export function AgentModelMenu({
                   <Check
                     className={cn(
                       'h-3.5 w-3.5 shrink-0',
-                      a.value === agent && m.value === model ? 'opacity-100' : 'opacity-0',
+                      a.value === driver && m.value === model ? 'opacity-100' : 'opacity-0',
                     )}
                   />
                   {m.label}

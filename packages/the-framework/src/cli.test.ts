@@ -28,7 +28,7 @@ import {
   isInteractive,
 } from './cli.js'
 import { writeSessionSpec, type SessionSpec } from './session-spec.js'
-import { createDriver } from './agent.js'
+import { createDriver } from './driver-cli.js'
 import { FakeDriver } from './driver/index.js'
 import type { FrameworkEvent } from './events.js'
 
@@ -322,9 +322,9 @@ test('parseArgs flags unknown options and bad values', () => {
 })
 
 test('the driver defaults to claude, and an unknown one is ignored rather than trusted (#542)', () => {
-  assert.equal(opts().agent, 'claude')
-  assert.equal(opts({ options: { agent: 'codex' } }).agent, 'codex')
-  assert.equal(opts({ options: { agent: 'nonesuch' } }).agent, 'claude')
+  assert.equal(opts().driver, 'claude')
+  assert.equal(opts({ options: { driver: 'codex' } }).driver, 'codex')
+  assert.equal(opts({ options: { driver: 'nonesuch' } }).driver, 'claude')
 })
 
 test('the run target is absent by default (#1050)', () => {
@@ -333,18 +333,18 @@ test('the run target is absent by default (#1050)', () => {
   assert.equal(opts({ options: { target: 'actions' } }).target, 'actions')
 })
 
-test('createDriver builds the agent --agent picked (#542)', () => {
-  assert.equal(createDriver({ agent: 'claude' }).name, 'claude-code')
-  assert.equal(createDriver({ agent: 'codex' }).name, 'codex')
+test('createDriver builds the implementation the picked driver names (#542)', () => {
+  assert.equal(createDriver({ driver: 'claude' }).id, 'claude-code')
+  assert.equal(createDriver({ driver: 'codex' }).id, 'codex')
 })
 
 test('unguardedNotices is silent when the settings really do apply (#542)', () => {
-  assert.deepEqual(unguardedNotices({ agent: 'claude', browser: true }), [])
-  assert.deepEqual(unguardedNotices({ agent: 'codex', browser: false }), [])
+  assert.deepEqual(unguardedNotices({ driver: 'claude', browser: true }), [])
+  assert.deepEqual(unguardedNotices({ driver: 'codex', browser: false }), [])
 })
 
 test('unguardedNotices flags the Claude-only browser on another agent (#542)', () => {
-  const notes = unguardedNotices({ agent: 'codex', browser: true })
+  const notes = unguardedNotices({ driver: 'codex', browser: true })
   assert.equal(notes.length, 1)
   assert.match(notes[0]!, /browser has no effect/)
 })
@@ -415,22 +415,22 @@ test('runCli honors a resumed agent session on the prompt path it belongs to (#7
 })
 
 test('chooseSessionLink defaults a live run to the claude.ai/code session list (#212)', () => {
-  assert.equal(chooseSessionLink({ sessionLink: undefined, agent: 'claude' }, false), CLAUDE_CODE_SESSION_LIST)
+  assert.equal(chooseSessionLink({ sessionLink: undefined, driver: 'claude' }, false), CLAUDE_CODE_SESSION_LIST)
   assert.equal(CLAUDE_CODE_SESSION_LIST, 'https://claude.ai/code')
 })
 
 test('chooseSessionLink honors an explicit --session-link over the default', () => {
-  assert.equal(chooseSessionLink({ sessionLink: 'https://x/s/{sessionId}', agent: 'claude' }, false), 'https://x/s/{sessionId}')
+  assert.equal(chooseSessionLink({ sessionLink: 'https://x/s/{sessionId}', driver: 'claude' }, false), 'https://x/s/{sessionId}')
   // An explicit link is the user's own, so it stands whatever agent runs.
-  assert.equal(chooseSessionLink({ sessionLink: 'https://x/s/{sessionId}', agent: 'codex' }, false), 'https://x/s/{sessionId}')
+  assert.equal(chooseSessionLink({ sessionLink: 'https://x/s/{sessionId}', driver: 'codex' }, false), 'https://x/s/{sessionId}')
 })
 
 test('chooseSessionLink gives no link for a fake run (no real session)', () => {
-  assert.equal(chooseSessionLink({ sessionLink: undefined, agent: 'claude' }, true), undefined)
+  assert.equal(chooseSessionLink({ sessionLink: undefined, driver: 'claude' }, true), undefined)
 })
 
 test('chooseSessionLink does not point a non-Claude session at claude.ai (#542)', () => {
-  assert.equal(chooseSessionLink({ sessionLink: undefined, agent: 'codex' }, false), undefined)
+  assert.equal(chooseSessionLink({ sessionLink: undefined, driver: 'codex' }, false), undefined)
 })
 
 test('runCli --help prints usage and exits 0', async () => {

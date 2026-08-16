@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2, Play, Square } from 'lucide-react'
-import { agentForDriver } from '../../dist/client.js'
+import { driverFromImpl } from '../../dist/client.js'
 import { Composer, type ComposerHandle } from './Composer.js'
 import { sendMessage, sendStop } from '../rpc/control.js'
 import { useAction } from '../lib/use-action.js'
@@ -128,8 +128,8 @@ export function RunComposer({
     // A continuation is a `prompt` run seeded with the finished run's session id (#720). It
     // resumes on the run's own agent; the model and the system-prompt options are moot here, since
     // the resumed transcript keeps the framing and model it already had.
-    // The run's driver reports itself by driver name; `--agent` takes the agent name (#831).
-    const agent = agentForDriver(driver)
+    // The session records the implementation that ran it; the option takes the driver name (#831).
+    const picked = driverFromImpl(driver)
     const result = await start(
       projectId,
       text,
@@ -139,7 +139,7 @@ export function RunComposer({
         // Continue this run rather than opening a new row (#762): the follow-up writes into the
         // same run, on the same branch, so one thing you asked for stays one entry.
         ...(runId ? { continueRunId: runId } : {}),
-        ...(agent && agent !== 'claude' ? { agent } : {}),
+        ...(picked && picked !== 'claude' ? { driver: picked } : {}),
       },
       'Failed to continue the session.',
     )
@@ -159,7 +159,7 @@ export function RunComposer({
   // the stock RESUME_MESSAGE instead of typed text.
   const resume = async () => {
     if (starting || !sessionId) return
-    const agent = agentForDriver(driver)
+    const picked = driverFromImpl(driver)
     const result = await start(
       projectId,
       RESUME_MESSAGE,
@@ -167,7 +167,7 @@ export function RunComposer({
       {
         resumeSession: sessionId,
         ...(runId ? { continueRunId: runId } : {}),
-        ...(agent && agent !== 'claude' ? { agent } : {}),
+        ...(picked && picked !== 'claude' ? { driver: picked } : {}),
       },
       'Failed to resume the session.',
     )
@@ -233,7 +233,7 @@ export function RunComposer({
         busy={busy || starting}
         submitLabel="Send"
         submitBusyLabel={live ? 'Sending…' : resumable ? 'Resuming…' : 'Starting…'}
-        showAgentModel={false}
+        showDriverModel={false}
         inSession
         // Ended → the next message starts a new leg, whose options the gear can shape (#1172);
         // live → nothing is adjustable and the gear is dropped rather than opening empty.

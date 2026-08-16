@@ -144,8 +144,8 @@ describe('Composer (#721)', () => {
     expect(onSubmit).toHaveBeenCalledWith('quick run', 'build', { newSession: false })
   })
 
-  test('showAgentModel={false} (#831) drops the agent/model select, keeping the rest of the row', () => {
-    const { onSubmit } = renderComposer({ showAgentModel: false })
+  test('showDriverModel={false} (#831) drops the agent/model select, keeping the rest of the row', () => {
+    const { onSubmit } = renderComposer({ showDriverModel: false })
     // An in-session composer: the session is bound to the agent it started with, so offering the
     // select there would only ever rewrite the next session's default.
     expect(screen.queryByRole('button', { name: 'Default' })).toBeNull()
@@ -168,7 +168,7 @@ describe('Composer (#721)', () => {
   })
 
   test('Browser is disabled with a reason off Claude Code (#801)', () => {
-    prefs = { agent: 'codex', browser: true }
+    prefs = { driver: 'codex', browser: true }
     renderComposer()
     fireEvent.click(screen.getByRole('button', { name: 'Session options' }))
     // The browser rides Claude Code's MCP config, so under Codex the box was checkable and inert.

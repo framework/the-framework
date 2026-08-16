@@ -1,6 +1,6 @@
 import { spawn as nodeSpawn } from 'node:child_process'
 import type { DriverQuota, DriverQuotaWindow } from './types.js'
-import type { SpawnLike } from './agent-cli.js'
+import type { SpawnLike } from './cli-session.js'
 
 /** How long we wait for the readout before calling it a timeout. */
 const READ_TIMEOUT_MS = 20_000

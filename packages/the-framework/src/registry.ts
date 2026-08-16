@@ -2,7 +2,7 @@ import { isRunLocation, type RunLocation } from './run-location.js'
 import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { isAgentName } from './agent-names.js'
+import { isDriverName } from './driver-names.js'
 import { nodeFs } from './node-fs.js'
 import { MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, MAX_AUTO_PM_CONCURRENCY } from './preference-defaults.js'
 
@@ -88,7 +88,7 @@ export interface Preferences {
   /** The model to run on (#628), e.g. `opus` / `sonnet`; maps to a run's `--model`. Absent = the driver's default. */
   model?: string
   /** Which coding agent drives the run (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
-  agent?: string
+  driver?: string
   /** Preferred editor for "Open in editor" (#727): an editor CLI (e.g. `code`, `cursor`, `zed`).
    * Absent falls back to `$FRAMEWORK_EDITOR`, then `code`. */
   editor?: string
@@ -360,7 +360,7 @@ function sanitizePreferences(value: unknown): Preferences {
   if (typeof input['model'] === 'string' && input['model'].trim()) preferences.model = input['model'].trim()
   // `agent` (#650) is constrained to the known set so junk never reaches the run; the set is
   // the shared node-free vocabulary (agent-names.ts). Default = claude.
-  if (isAgentName(input['agent'] as string | undefined)) preferences.agent = input['agent'] as string
+  if (isDriverName(input['driver'] as string | undefined)) preferences.driver = input['driver'] as string
   // `editor` (#727) is a free-form CLI name, trimmed and length-capped so junk / a huge string
   // never lands in the file. A blank string is "no choice" (fall back to env / `code`), so dropped.
   if (typeof input['editor'] === 'string' && input['editor'].trim())

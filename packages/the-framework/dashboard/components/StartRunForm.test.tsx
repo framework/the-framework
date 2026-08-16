@@ -5,9 +5,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 // unmocked `*.telefunc.js` in the import graph fails as an assertIsNotBrowser bug report.
 const onProjects = vi.hoisted(() => vi.fn())
 const onClaudeTrust = vi.hoisted(() => vi.fn())
-const onAgentReady = vi.hoisted(() => vi.fn())
+const onDriverReady = vi.hoisted(() => vi.fn())
 const onRepoAutoMerge = vi.hoisted(() => vi.fn())
-vi.mock('../rpc/projects.js', () => ({ onProjects, onClaudeTrust, onAgentReady, onRepoAutoMerge }))
+vi.mock('../rpc/projects.js', () => ({ onProjects, onClaudeTrust, onDriverReady, onRepoAutoMerge }))
 
 const onSystemPromptUser = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onSystemPromptUser }))
@@ -51,14 +51,14 @@ const { StartRunForm } = await import('./StartRunForm.js')
 // A ready agent by default (#1326), so every other test renders the form it means to test
 // rather than the "your CLI cannot start a run" warning.
 beforeEach(() => {
-  onAgentReady.mockResolvedValue({ ok: true, problems: [], warnings: [] })
+  onDriverReady.mockResolvedValue({ ok: true, problems: [], warnings: [] })
 })
 
 afterEach(() => {
   cleanup()
   start.mockReset()
   onClaudeTrust.mockReset()
-  onAgentReady.mockReset()
+  onDriverReady.mockReset()
   onRepoAutoMerge.mockReset()
   prefs.current = {}
 })
@@ -141,7 +141,7 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
   test('a logged-out agent is named in the launcher, with the command that fixes it', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
-    onAgentReady.mockResolvedValue({
+    onDriverReady.mockResolvedValue({
       ok: false,
       problems: ['claude auth: `claude` is not logged in. Run `claude auth login`, then start the session again.'],
       warnings: [],
@@ -154,7 +154,7 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
   test('a root daemon warns without claiming the start will fail', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
-    onAgentReady.mockResolvedValue({
+    onDriverReady.mockResolvedValue({
       ok: true,
       problems: [],
       warnings: ['running as root, so the agent looks for credentials under root’s home and will not find yours.'],
@@ -167,7 +167,7 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
     render(<StartRunForm {...props} />)
-    await waitFor(() => expect(onAgentReady).toHaveBeenCalled())
+    await waitFor(() => expect(onDriverReady).toHaveBeenCalled())
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
@@ -175,12 +175,12 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
     const first = render(<StartRunForm {...props} />)
-    await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('claude', true))
+    await waitFor(() => expect(onDriverReady).toHaveBeenCalledWith('claude', true))
     first.unmount()
 
-    prefs.current = { agent: 'codex' }
+    prefs.current = { driver: 'codex' }
     render(<StartRunForm {...props} />)
-    await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('codex', true))
+    await waitFor(() => expect(onDriverReady).toHaveBeenCalledWith('codex', true))
   })
 
   // #1419: the handoff opens and merges PRs through `gh`, so a launcher with those rungs armed
@@ -191,12 +191,12 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
     onSystemPromptUser.mockResolvedValue(null)
     prefs.current = { handoff: 'push' }
     const pushOnly = render(<StartRunForm {...props} />)
-    await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('claude', false))
+    await waitFor(() => expect(onDriverReady).toHaveBeenCalledWith('claude', false))
     pushOnly.unmount()
 
     prefs.current = { handoff: 'pr' }
     render(<StartRunForm {...props} />)
-    await waitFor(() => expect(onAgentReady).toHaveBeenCalledWith('claude', true))
+    await waitFor(() => expect(onDriverReady).toHaveBeenCalledWith('claude', true))
   })
 
   test('an actions run is not gated on a local CLI it never uses', async () => {
@@ -205,7 +205,7 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
     prefs.current = { target: 'actions' }
     render(<StartRunForm {...props} />)
     await waitFor(() => expect(onProjects).toHaveBeenCalled())
-    expect(onAgentReady).not.toHaveBeenCalled()
+    expect(onDriverReady).not.toHaveBeenCalled()
   })
 })
 

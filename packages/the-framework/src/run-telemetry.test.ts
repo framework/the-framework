@@ -17,7 +17,7 @@ function handler(events: FrameworkEvent[], sessionLink?: string) {
 
 test('the opening session event records the model the driver was started with (#1438)', () => {
   const events: FrameworkEvent[] = []
-  const driver = { name: 'claude' } as Driver
+  const driver = { id: 'claude' } as unknown as Driver
   emitSessionStart({ emit: e => events.push(e), driver, cwd: '/w', model: 'fable' })
   assert.deepEqual(events, [{ kind: 'session', driver: 'claude', workspace: '/w', fake: false, model: 'fable' }])
   // No model configured -> none recorded: the agent's own default is not knowable here.

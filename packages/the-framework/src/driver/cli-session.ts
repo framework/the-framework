@@ -31,7 +31,7 @@ export interface SpawnedProcess {
 }
 
 /**
- * The slice of a driver's output parser {@link runAgentCli} drives: fed one line
+ * The slice of a driver's output parser {@link runCliSession} drives: fed one line
  * at a time, asked for the turn at the end. Each wrapped agent speaks its own
  * dialect ({@link StreamJsonParser} for Claude Code, `CodexJsonParser` for
  * Codex), but the process handling around it is identical.
@@ -44,7 +44,7 @@ export interface AgentCliParser {
 }
 
 /** How to run one agent-CLI invocation. */
-export interface RunAgentCliOptions {
+export interface RunCliSessionOptions {
   bin: string
   args: string[]
   cwd: string
@@ -56,24 +56,24 @@ export interface RunAgentCliOptions {
   /** The agent's own output dialect. */
   parser: AgentCliParser
   /** The agent's name, for error messages. Default `"claude-code"`. */
-  agent?: string
+  driver?: string
 }
 
 /**
  * Spawn one agent-CLI invocation and resolve with its final turn.
  *
- * Everything here is about the *process*, not the agent: its own process group
+ * Everything here is about the *process*, not the driver: its own process group
  * so an interrupt kills the whole tree rather than orphaning it, a SIGTERM/
  * SIGKILL grace window, abort wiring, and a non-zero exit failing the turn even
- * when text was streamed first. Only {@link RunAgentCliOptions.parser} knows
- * which agent is on the other end — a second agent gets all of this for free
+ * when text was streamed first. Only {@link RunCliSessionOptions.parser} knows
+ * which CLI is on the other end — a second driver gets all of this for free
  * rather than a second copy of it.
  */
-export function runAgentCli(opts: RunAgentCliOptions): Promise<DriverTurn> {
+export function runCliSession(opts: RunCliSessionOptions): Promise<DriverTurn> {
   return new Promise<DriverTurn>((resolvePromise, rejectPromise) => {
     for (const s of opts.signals) {
       if (s.aborted) {
-        rejectPromise(new Error(`[framework] ${opts.agent ?? 'claude-code'} prompt aborted`))
+        rejectPromise(new Error(`[framework] ${opts.driver ?? 'claude-code'} prompt aborted`))
         return
       }
     }
@@ -86,7 +86,7 @@ export function runAgentCli(opts: RunAgentCliOptions): Promise<DriverTurn> {
     const pid = child.pid
     if (pid != null) registerChild(pid)
     const parser = opts.parser
-    const agent = opts.agent ?? 'claude-code'
+    const agent = opts.driver ?? 'claude-code'
     let settled = false
     let hardKillTimer: ReturnType<typeof setTimeout> | undefined
     // Raw bytes, decoded once at close: a per-chunk `String(chunk)` corrupts a multibyte

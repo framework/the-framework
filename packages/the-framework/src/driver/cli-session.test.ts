@@ -2,10 +2,10 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { spawn } from 'node:child_process'
 import { Readable, Writable } from 'node:stream'
-import { runAgentCli, type AgentCliParser, type SpawnLike, type SpawnedProcess } from './agent-cli.js'
+import { runCliSession, type AgentCliParser, type SpawnLike, type SpawnedProcess } from './cli-session.js'
 import type { DriverEvent } from './types.js'
 
-test('runAgentCli streams the parser events and resolves the final turn', async () => {
+test('runCliSession streams the parser events and resolves the final turn', async () => {
   const events: DriverEvent[] = []
   const parser: AgentCliParser = {
     push: line => (line === 'hi' ? [{ type: 'text', text: 'hi' }] : []),
@@ -25,7 +25,7 @@ test('runAgentCli streams the parser events and resolves the final turn', async 
     }
     return proc
   }
-  const turn = await runAgentCli({
+  const turn = await runCliSession({
     bin: 'agent',
     args: [],
     cwd: '/ws',
@@ -59,7 +59,7 @@ test('an stdin write error fails the turn cleanly, not as an uncaught exception 
     }
     return proc
   }
-  const promise = runAgentCli({
+  const promise = runCliSession({
     bin: 'agent',
     args: [],
     cwd: '/ws',
@@ -79,7 +79,7 @@ test('an stdin write error fails the turn cleanly, not as an uncaught exception 
 test('a real CLI that exits before reading stdin does not crash the process (#943)', async () => {
   // A prompt larger than the pipe buffer, so the write is still pending when the child dies
   // and the kernel answers with a real EPIPE.
-  const turn = await runAgentCli({
+  const turn = await runCliSession({
     bin: process.execPath,
     args: ['-e', 'process.exit(0)'],
     cwd: process.cwd(),
@@ -95,7 +95,7 @@ test('a real CLI that exits before reading stdin does not crash the process (#94
   await new Promise(resolvePromise => setTimeout(resolvePromise, 100))
 })
 
-test('runAgentCli emits no telemetry when the process closes after an abort', async () => {
+test('runCliSession emits no telemetry when the process closes after an abort', async () => {
   const events: DriverEvent[] = []
   const controller = new AbortController()
   // A process whose `close` fires only when the test triggers it, so we can order
@@ -114,7 +114,7 @@ test('runAgentCli emits no telemetry when the process closes after an abort', as
     }
     return proc
   }
-  const promise = runAgentCli({
+  const promise = runCliSession({
     bin: 'agent',
     args: [],
     cwd: '/ws',

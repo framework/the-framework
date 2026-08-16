@@ -1,5 +1,5 @@
 import { ClaudeCodeDriver, CodexDriver, type ClaudeCodeDriverOptions, type Driver } from './driver/index.js'
-import { AGENT_LABELS, type AgentName } from './agent-names.js'
+import { DRIVER_LABELS, type DriverName } from './driver-names.js'
 
 /**
  * Which agent drives a run (#542). Each is a whole coding-agent CLI the user
@@ -9,7 +9,7 @@ import { AGENT_LABELS, type AgentName } from './agent-names.js'
  * the same list without touching the driver layer; this module adds what only the node side
  * needs (binaries, drivers). Historical import sites keep working via these re-exports.
  */
-export { AGENTS, isAgentName, agentForDriver, AGENT_LABELS, type AgentName } from './agent-names.js'
+export { DRIVERS, isDriverName, driverFromImpl, DRIVER_LABELS, type DriverName } from './driver-names.js'
 
 /**
  * How an agent CLI answers "am I logged in?", and what fixes it when the answer is no (#1326).
@@ -30,7 +30,7 @@ export interface AgentAuthSpec {
 }
 
 /** What we know about an agent before we run it. */
-export interface AgentSpec {
+export interface DriverSpec {
   /** How to say it in a sentence, e.g. "Claude Code". */
   label: string
   /** The CLI binary, resolved on PATH. */
@@ -42,9 +42,9 @@ export interface AgentSpec {
 }
 
 /** The agents we can drive, and what each can tell us about itself. */
-export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
+export const DRIVER_SPECS: Record<DriverName, DriverSpec> = {
   claude: {
-    label: AGENT_LABELS.claude,
+    label: DRIVER_LABELS.claude,
     bin: 'claude',
     installHint: 'install Claude Code and make sure `claude` is on your PATH: https://claude.com/claude-code',
     auth: {
@@ -65,7 +65,7 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
     },
   },
   codex: {
-    label: AGENT_LABELS.codex,
+    label: DRIVER_LABELS.codex,
     bin: 'codex',
     installHint: 'install the Codex CLI and make sure `codex` is on your PATH: https://developers.openai.com/codex/cli',
     auth: {
@@ -80,14 +80,14 @@ export const AGENT_SPECS: Record<AgentName, AgentSpec> = {
 
 /** Options for {@link createDriver}. */
 export interface CreateDriverOptions {
-  agent: AgentName
+  driver: DriverName
   /** Claude Code driver options. Ignored by any other agent, which has its own. */
   claudeOpts?: ClaudeCodeDriverOptions
 }
 
 /**
- * Build the {@link Driver} for the picked agent — the one place a run path turns
- * `--agent` into a real agent.
+ * Build the {@link Driver} for the picked driver name — the one place a session turns
+ * the choice into a live implementation.
  *
  * Codex takes none of the Claude options: its sandbox is its own flag rather
  * than a permission mode, and it has no MCP config for `--browser`. Those are
@@ -95,7 +95,7 @@ export interface CreateDriverOptions {
  * so rather than looking honored.
  */
 export function createDriver(opts: CreateDriverOptions): Driver {
-  switch (opts.agent) {
+  switch (opts.driver) {
     case 'codex':
       return new CodexDriver()
     case 'claude':

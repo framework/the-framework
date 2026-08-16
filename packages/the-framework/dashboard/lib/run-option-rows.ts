@@ -1,5 +1,5 @@
 import type { Preferences } from '../../dist/index.js'
-import { AGENTS, AGENT_LABELS, handoffFromPreferences, handoffReaches, type AgentName } from '../../dist/client.js'
+import { DRIVERS, DRIVER_LABELS, handoffFromPreferences, handoffReaches, type DriverName } from '../../dist/client.js'
 
 // The Global options as one table (#314), and the rules between them.
 //
@@ -59,9 +59,9 @@ export function runOptionRows(preferences: Preferences): RunOptionRows {
   // Default-on (#1102), so it reads through `handoffFromPreferences` rather than `?? false` like
   // the rest. One rung (B5), which is what makes PR imply push without anyone saying so.
   const handoff = handoffFromPreferences(preferences)
-  const agent = preferences.agent ?? 'claude' // #650: which coding agent drives the run
+  const agent = preferences.driver ?? 'claude' // #650: which coding agent drives the run
   // The stored agent as a display name; an unknown stored value falls back to Claude Code.
-  const agentLabel = AGENT_LABELS[AGENTS.includes(agent as AgentName) ? (agent as AgentName) : 'claude']
+  const agentLabel = DRIVER_LABELS[DRIVERS.includes(agent as DriverName) ? (agent as DriverName) : 'claude']
 
 
   const main: OptionRow[] = [

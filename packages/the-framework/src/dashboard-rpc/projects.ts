@@ -2,8 +2,8 @@ import { contextAddProject, contextProjects } from './context.js'
 import { readClaudeTrust, type ClaudeTrust } from '../claude-trust.js'
 import { cachedRepoAutoMerge, type RepoAutoMerge } from '../dashboard/gh.js'
 import { preflight, preflightProblems } from '../preflight.js'
-import { isAgentName } from '../agent-names.js'
-import type { AgentReady } from '../dashboard/types.js'
+import { isDriverName } from '../driver-names.js'
+import type { DriverReady } from '../dashboard/types.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
 import type { AddProjectResult, OnboardingSuggestion } from '../dashboard/types.js'
 import type { DashboardContext } from '../dashboard/rpc-serve.js'
@@ -76,7 +76,7 @@ export async function onRepoAutoMerge(projectId: string): Promise<RepoAutoMerge 
 }
 
 /**
- * Whether the picked agent's CLI can start a run at all (#1326): installed, logged in, and not
+ * Whether the picked driver's CLI can start a session at all (#1326): installed, logged in, and not
  * running as root. The launcher says so before the Start, the way #1318 warns about folder trust,
  * rather than leaving the user with a spent branch and a dashboard stuck on "Waiting for the
  * session to start..." (#1323).
@@ -89,8 +89,8 @@ export async function onRepoAutoMerge(projectId: string): Promise<RepoAutoMerge 
  * about a missing or logged-out GitHub CLI now, not discover it hours later as a session whose
  * publishing silently stopped at the pushed branch.
  */
-export async function onAgentReady(agent: string, publish?: boolean): Promise<AgentReady> {
-  const result = await preflight({ agent: isAgentName(agent) ? agent : 'claude', publish: publish === true })
+export async function onDriverReady(driver: string, publish?: boolean): Promise<DriverReady> {
+  const result = await preflight({ driver: isDriverName(driver) ? driver : 'claude', publish: publish === true })
   return {
     ok: result.ok,
     problems: preflightProblems(result),

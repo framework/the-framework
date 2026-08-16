@@ -28,9 +28,9 @@ export { ActionsDriver, ActionsSession, replayTranscript, type ActionsDriverOpti
 export { CloudDriver, CloudSession, type CloudDriverOptions, type RunPty, type RunPtyOptions } from './cloud.js'
 export { readZip, type ZipEntry } from './actions-zip.js'
 export {
-  runAgentCli,
+  runCliSession,
   type AgentCliParser,
-  type RunAgentCliOptions,
+  type RunCliSessionOptions,
   type SpawnLike,
   type SpawnedProcess,
-} from './agent-cli.js'
+} from './cli-session.js'

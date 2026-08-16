@@ -1,5 +1,5 @@
 import type { RunLocation } from './run-location.js'
-import { createDriver, type CreateDriverOptions } from './agent.js'
+import { createDriver, type CreateDriverOptions } from './driver-cli.js'
 import { ActionsDriver, CloudDriver, type ActionsDriverOptions, type CloudDriverOptions, type Driver } from './driver/index.js'
 
 /**

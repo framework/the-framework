@@ -83,7 +83,7 @@ test('findTodoBacklog no longer reads the retired backlog locations', async () =
   const cwd = await tmpWorkspace()
   try {
     await writeFile(join(cwd, 'TODO.md'), '- [ ] old root entry\n')
-    await writeFile(join(cwd, 'TODO-AGENTS.md'), '- [ ] hyphen entry\n')
+    await writeFile(join(cwd, 'TODO-DRIVERS.md'), '- [ ] hyphen entry\n')
     await mkdir(join(cwd, 'tickets'))
     await writeFile(join(cwd, 'tickets/TODO.md'), '- [ ] tickets entry\n')
     assert.equal(await findTodoBacklog(cwd), undefined)

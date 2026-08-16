@@ -1,4 +1,4 @@
-import type { AgentName } from '../../dist/client.js'
+import type { DriverName } from '../../dist/client.js'
 
 // Monochrome brand logomarks for the coding agents (#656), so the run picker can show a logo
 // instead of the agent's name. They inherit the text colour (`fill="currentColor"`) and take a
@@ -36,8 +36,8 @@ function labelProps(title: string | undefined) {
   return title ? ({ role: 'img' } as const) : ({ 'aria-hidden': 'true' } as const)
 }
 
-/** The logo for an agent, so a caller with an `AgentName` does not repeat the mapping. */
-export function AgentLogo({ agent, className, title }: LogoProps & { agent: AgentName }) {
-  const Logo = agent === 'codex' ? CodexLogo : ClaudeLogo
+/** The logo for a driver, so a caller with a `DriverName` does not repeat the mapping. */
+export function DriverLogo({ driver, className, title }: LogoProps & { driver: DriverName }) {
+  const Logo = driver === 'codex' ? CodexLogo : ClaudeLogo
   return <Logo className={className} {...(title ? { title } : {})} />
 }

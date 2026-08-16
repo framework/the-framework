@@ -31,9 +31,9 @@ export function emitSessionStart(opts: SessionStartOptions): void {
   const literal = opts.sessionLink && !hasSessionIdPlaceholder(opts.sessionLink) ? opts.sessionLink : undefined
   opts.emit({
     kind: 'session',
-    driver: opts.driver.name,
+    driver: opts.driver.id,
     workspace: opts.cwd,
-    fake: opts.driver.name === 'fake',
+    fake: opts.driver.id === 'fake',
     ...(literal ? { sessionLink: literal } : {}),
     ...(opts.model ? { model: opts.model } : {}),
   })

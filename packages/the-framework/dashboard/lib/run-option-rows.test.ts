@@ -82,12 +82,12 @@ describe('runOptionRows', () => {
   })
 
   test('Browser is Claude-only, because it rides Claude Code’s MCP config (#801)', () => {
-    const onCodex = find(rows({ browser: true, agent: 'codex' }).main, 'browser')
+    const onCodex = find(rows({ browser: true, driver: 'codex' }).main, 'browser')
     expect(onCodex.checked).toBe(false)
     expect(onCodex.disabled).toBe(true)
     expect(onCodex.disabledReason).toMatch(/only on Claude Code/)
 
-    const onClaude = find(rows({ browser: true, agent: 'claude' }).main, 'browser')
+    const onClaude = find(rows({ browser: true, driver: 'claude' }).main, 'browser')
     expect(onClaude.checked).toBe(true)
     expect(onClaude.disabled).toBeUndefined()
   })
@@ -96,13 +96,13 @@ describe('runOptionRows', () => {
     // The *label* falls back to Claude Code, but the Browser rule tests the stored value directly.
     // Carried over from the launcher deliberately: the fallback is cosmetic, and treating an
     // unrecognised agent as Claude would offer a browser its driver cannot wire up.
-    const row = find(rows({ browser: true, agent: 'nope' }).main, 'browser')
+    const row = find(rows({ browser: true, driver: 'nope' }).main, 'browser')
     expect(row.checked).toBe(false)
     expect(row.disabled).toBe(true)
   })
 
   test('Transparent names the agent actually selected, so the label is never a lie (#948)', () => {
-    expect(find(rows({ agent: 'codex' }).main, 'transparent').description).toMatch(/Codex/)
-    expect(find(rows({ agent: 'claude' }).main, 'transparent').description).toMatch(/Claude/)
+    expect(find(rows({ driver: 'codex' }).main, 'transparent').description).toMatch(/Codex/)
+    expect(find(rows({ driver: 'claude' }).main, 'transparent').description).toMatch(/Claude/)
   })
 })

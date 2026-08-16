@@ -279,11 +279,11 @@ test('reposDirectoryAutoGrant is a boolean preference, off by default (#1123)', 
 test('patchPreferences merges only the keys it is given (#1148)', async () => {
   // The dashboard used to send its whole cached object, so a tab that had been open since before
   // someone else's change wrote the old value back over it. A patch touches only what it names.
-  const fs = memFs({ [FILE]: JSON.stringify({ projects: [], preferences: { theme: 'dark', agent: 'codex' } }) })
+  const fs = memFs({ [FILE]: JSON.stringify({ projects: [], preferences: { theme: 'dark', driver: 'codex' } }) })
 
   const stored = await patchPreferences({ notifyBrowser: true }, fs, ENV)
 
-  assert.deepEqual(stored, { theme: 'dark', agent: 'codex', notifyBrowser: true })
+  assert.deepEqual(stored, { theme: 'dark', driver: 'codex', notifyBrowser: true })
   assert.deepEqual(await readPreferences(fs, ENV), stored)
 })
 
@@ -303,15 +303,15 @@ test('a patched key still clears the way it always has (#1148)', async () => {
 test('patchPreferences sanitizes the merged result, not just the patch (#1148)', async () => {
   // The one rule, applied once to the merge: an unknown key never lands, and a value outside the
   // known set drops the key rather than being stored — the same answer `writePreferences` gives.
-  const fs = memFs({ [FILE]: JSON.stringify({ projects: [], preferences: { theme: 'dark', agent: 'codex' } }) })
-  assert.deepEqual(await patchPreferences({ theme: 'moon', bogus: 3 } as never, fs, ENV), { agent: 'codex' })
+  const fs = memFs({ [FILE]: JSON.stringify({ projects: [], preferences: { theme: 'dark', driver: 'codex' } }) })
+  assert.deepEqual(await patchPreferences({ theme: 'moon', bogus: 3 } as never, fs, ENV), { driver: 'codex' })
 })
 
 test('the preferences store exposes the patch the dashboard writes through (#1148)', async () => {
   const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A], preferences: { theme: 'dark' } }) })
   const store = registryPreferencesStore(fs, ENV)
 
-  assert.deepEqual(await store.patch!({ agent: 'codex' }), { theme: 'dark', agent: 'codex' })
+  assert.deepEqual(await store.patch!({ driver: 'codex' }), { theme: 'dark', driver: 'codex' })
 })
 
 test('readPreferences on a missing / legacy file is {}', async () => {
@@ -405,9 +405,9 @@ test('writePreferences keeps the model string but drops a blank one (#628)', asy
 
 test('writePreferences keeps a known agent and drops an unknown one (#650)', async () => {
   const fs = memFs({ [FILE]: JSON.stringify([APP_A]) })
-  await writePreferences({ agent: 'codex' }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { agent: 'codex' })
-  await writePreferences({ agent: 'gpt-9000' } as never, fs, ENV) // not in the known set
+  await writePreferences({ driver: 'codex' }, fs, ENV)
+  assert.deepEqual(await readPreferences(fs, ENV), { driver: 'codex' })
+  await writePreferences({ driver: 'gpt-9000' } as never, fs, ENV) // not in the known set
   assert.deepEqual(await readPreferences(fs, ENV), {}) // dropped
 })
 

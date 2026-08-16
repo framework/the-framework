@@ -247,13 +247,24 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
         signal: agentSignal,
         maxItems: opts.todoMaxItems,
       })
+      // A plan declined mid-backlog with a stop-marked answer ends the session, the same as #217.
+      if (todo.sessionStopped) answerController.abort(new Error('[framework] stopped by your answer'))
     }
 
     // Live chat (#714) for a build, once its backlog is worked: a prompt session already took it
     // inside the rounds above, where there is nothing to come between.
-    if (opts.messages && kind === 'build' && !handsOff) {
+    if (opts.messages && kind === 'build' && !handsOff && !agentSignal.aborted) {
       const chat = await runChatAfterBacklog(session, opts, emit, emitTurnSignals, agentSignal)
-      text = chat
+      text = chat.text
+      // Same as #217, for the chat leg: a stop here ends the session rather than publishing.
+      if (chat.stopped) answerController.abort(new Error('[framework] stopped by your answer'))
+    }
+
+    // The backlog and chat legs abort the same signal a Stop does, but neither observes it itself
+    // (as the opening rounds do not, #233). Look before settling as a success, or a stopped session
+    // reaches `end ok:true` below and publishes the very work its answer declined.
+    if (agentSignal.aborted) {
+      throw agentSignal.reason instanceof Error ? agentSignal.reason : new Error('[framework] run stopped')
     }
 
     // Say why a hand-off stops here, so a finished one does not read as a session that gave up a
@@ -298,7 +309,7 @@ async function runChatAfterBacklog(
   emit: (event: FrameworkEvent) => void,
   emitTurnSignals: (text: string) => void,
   signal: AbortSignal,
-): Promise<string> {
+): Promise<{ text: string; stopped: boolean }> {
   const { runChatPhase } = await import('./await-gate.js')
   const chat = await runChatPhase(
     session,
@@ -312,5 +323,7 @@ async function runChatAfterBacklog(
     },
     opts.stayOpenChat === true,
   )
-  return chat.turn.text
+  // `stopped` carries through, not just the text: an answer marked `stop` here must end the session
+  // the same way it does in the opening rounds, or a stopped chat settles as a clean, published run.
+  return { text: chat.turn.text, stopped: chat.stopped }
 }

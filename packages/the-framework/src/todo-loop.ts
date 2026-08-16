@@ -274,6 +274,12 @@ export interface TodoLoopResult {
   reason: TodoLoopReason
   /** The backlog filename, when one was found. */
   file?: string
+  /**
+   * An answer marked `stop` (#358) inside an item's turn — a plan the user declined — ends the
+   * whole session, not just the loop. Distinct from the benign `reason: 'stopped'` per-item gate,
+   * which only stops draining the backlog. The caller aborts the session on this.
+   */
+  sessionStopped?: boolean
 }
 
 /** Options for {@link runTodoLoop}. */
@@ -368,10 +374,16 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
 
     emit({ kind: 'log', message: `Backlog item ${completed + 1}: ${preview}` })
     // Complete exactly the first open entry and check it off, honoring await gates.
-    // A declined plan (#358) ends the item turn; the loop's stall check takes it from there.
     const prompt = `Open \`${backlog.name}\` in the workspace and work on the FIRST open entry only. Complete it fully and verify your work. Then update \`${backlog.name}\`: check the entry off (or remove it). Do not start any other entry.`
-    await runAwaitRounds({ session, prompt, ...gateDeps })
+    const rounds = await runAwaitRounds({ session, prompt, ...gateDeps })
     completed++
+    // A plan the user declined with a stop-marked answer (#358) ends the whole session, not just
+    // this loop — so the session does not go on to publish work that was just rejected. The caller
+    // aborts on `sessionStopped`; `reason` stays descriptive of the loop itself.
+    if (rounds.stopped) {
+      emit({ kind: 'log', message: `Session stopped by your answer (${backlog.entries.length} item(s) left in ${backlog.name}).` })
+      return { completed, reason: 'stopped', file, sessionStopped: true }
+    }
 
     // Progress check: the item turn must have retired the entry it was given
     // (checked off, removed, or reworded). New entries appended by the work

@@ -461,6 +461,45 @@ test('an unmarked option is an ordinary answer, whatever it is labelled (#358)',
   assert.notEqual(end.stopped, true)
 })
 
+test('a stop-marked answer in the live-chat phase stops the session, so it does not publish (#358)', async () => {
+  // The opening rounds' stop is honored (#217); the chat leg after a build's backlog is the other
+  // path an answer can arrive on, and it used to drop the flag — the session settled `ok:true` and
+  // published the very work the answer declined. The stop must end it there too.
+  const approvalBlock =
+    'Plan written.\n```await-choices\n' +
+    '{ "title": "Approve?", "options": [{ "id": "approve", "label": "Approve" }, { "id": "decline", "label": "Decline", "stop": true }] }\n```'
+  const driver = new FakeDriver({
+    respond: (prompt: string): string => {
+      // The opening build turn settles; the chat message then draws the stop-marked gate.
+      if (/dark mode/.test(prompt)) return approvalBlock
+      return 'built it'
+    },
+    sessionId: 'chat-stop',
+  })
+  const messages = new AgentMessageQueue()
+  const events: FrameworkEvent[] = []
+  const run = assert.rejects(
+    runAgent({
+      prompt: FAKE_INTENT,
+      driver,
+      cwd: '/tmp/ws',
+      messages,
+      onEvent: e => events.push(e),
+      requestChoice: async () => ({ picked: 'decline', by: 'user' }),
+    }),
+  )
+  messages.push('now add dark mode')
+  await new Promise(resolve => setImmediate(resolve))
+  messages.close()
+  await run
+
+  const end = events.find(e => e.kind === 'end')
+  assert.ok(end && end.kind === 'end')
+  assert.equal(end.ok, false)
+  assert.equal(end.stopped, true) // a stop, not a published success
+  assert.equal(end.detail, 'stopped by your answer')
+})
+
 test('with nobody to ask, a session takes the recommended option and carries on (#337/#846)', async () => {
   // One path means one answer to "what does a headless session do at a gate" (D2). The build path
   // used to leave the turn standing, so an unattended build stopped at its first question; the

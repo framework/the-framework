@@ -617,19 +617,54 @@ test('a routine the user unticked is left out of the rotation (#1209)', async ()
   assert.deepEqual(ran, ['second', 'second'])
 })
 
-test('an unticked drain routine stands the sweep down, it does not fall through to the rotation (#1209)', async () => {
-  // The queue has work waiting. Answering "do not work it automatically" by inventing more work
-  // is the opposite of what the checkbox asked for.
+test('an unticked drain routine falls through to the rotation rather than standing down (#1432)', async () => {
+  // #1209 means "do not *work* the queue", and the rotation does not work it: triage and planning
+  // put entries *on* it. Standing down here read that switch as "do nothing at all", which made
+  // every inventing routine unreachable for as long as the queue had anything on it — and since
+  // the queue is auto-populated, that is most of the time.
   const { loop, ran, logs } = harness({
     cooldownMs: 0,
     queue: async () => ['entry a'],
     optedOut: async () => [AUTO_PM_DRAIN_JOB.name],
   })
   await loop.tick()
+  await loop.tick()
+  loop.stop()
+  // The rotation ran, and advanced — a fall-through tick is a rotation turn like any other.
+  assert.deepEqual(ran, ['first', 'second'])
+  assert.ok(!logs.some(line => line.includes('draining')), 'and nothing worked the queue')
+})
+
+test('a drain-only sweep still stands down when the drain routine is off (#1204/#1432)', async () => {
+  // The fall-through above is for the scheduled sweep. This click asked for the queue by name, so
+  // borrowing it for a rotation job is exactly what drain-only exists to prevent.
+  const { loop, ran, logs } = harness({
+    cooldownMs: 0,
+    queue: async () => ['entry a'],
+    optedOut: async () => [AUTO_PM_DRAIN_JOB.name],
+  })
+  await loop.tick({ onDemand: true, drainOnly: true })
   loop.stop()
   assert.deepEqual(ran, [])
   assert.equal(loop.report().outcomes[0]?.message, 'the queue has work waiting and its routine is switched off')
-  assert.ok(!logs.some(line => line.includes('draining')))
+  assert.ok(logs.some(line => line.includes('its routine is switched off')))
+})
+
+test('the maintenance sweep stays out while entries are waiting, fall-through or not (#882/#1432)', async () => {
+  // The fall-through makes the tick a rotation turn, but the sweep asks a different question —
+  // is the queue empty — and the answer is still no.
+  const stamped: string[] = []
+  const { loop, ran } = harness({
+    cooldownMs: 0,
+    queue: async () => ['entry a'],
+    optedOut: async () => [AUTO_PM_DRAIN_JOB.name],
+    maintenanceDue: async () => true,
+    recordMaintenance: async project => void stamped.push(project.id),
+  })
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(stamped, [])
+  assert.deepEqual(ran, ['first'])
 })
 
 test('an unticked maintenance routine leaves its calendar alone (#1209)', async () => {

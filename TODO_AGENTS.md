@@ -5,7 +5,6 @@
 
 ## Priority 4
 
-- [Spike & plan rotation unreachable with a standing backlog](tickets/2026-07-31_spike-plan-blocked-by-queue.md) — implement the ticket's preferred option (a): when the drain routine is switched off, fall through to the rotation instead of standing down (`auto-pm.ts:134`, `auto-pm.ts:676`). Directly supports the P9 autonomy goal (#1334).
 
 ## Priority 3
 

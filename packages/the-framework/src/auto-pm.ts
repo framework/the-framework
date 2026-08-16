@@ -654,23 +654,36 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           note(project, false, decision.reason)
           continue
         }
+        const drainJob = wanted(deps.drainJob ?? AUTO_PM_DRAIN_JOB)
         // A drain-only sweep (#1204) works the queue or says why not — it never borrows the
         // click for a rotation job the user did not ask for. Logged like every other stand-down
         // (#855/#1433): these two used to be the only silent ones.
-        if (opts?.drainOnly && decision.mode !== 'drain') {
-          deps.log(`[framework] auto PM: standing down for ${project.path} — the queue is empty, so there is nothing to drain`)
-          note(project, false, 'the queue is empty, so there is nothing to drain')
-          continue
+        if (opts?.drainOnly) {
+          if (decision.mode !== 'drain') {
+            deps.log(`[framework] auto PM: standing down for ${project.path} — the queue is empty, so there is nothing to drain`)
+            note(project, false, 'the queue is empty, so there is nothing to drain')
+            continue
+          }
+          if (!drainJob) {
+            deps.log(`[framework] auto PM: standing down for ${project.path} — the queue has work waiting and its routine is switched off`)
+            note(project, false, 'the queue has work waiting and its routine is switched off')
+            continue
+          }
         }
-        // Switching the draining routine off (#1209) stands the sweep down rather than falling
-        // through to the rotation: the queue has work waiting, and answering "do not work it
-        // automatically" by inventing more work is the opposite of what was asked.
-        const drainJob = wanted(deps.drainJob ?? AUTO_PM_DRAIN_JOB)
-        if (decision.mode === 'drain' && !drainJob) {
-          deps.log(`[framework] auto PM: standing down for ${project.path} — the queue has work waiting and its routine is switched off`)
-          note(project, false, 'the queue has work waiting and its routine is switched off')
-          continue
-        }
+        /**
+         * What this tick does, which is the queue-picked mode (#855) unless the draining routine
+         * is switched off — then the rotation gets the tick instead of the sweep standing down.
+         *
+         * #1209 means "do not *work* the queue", and the rotation does not work it: triage and
+         * planning put entries *on* it. Standing down here read that switch as "do nothing at
+         * all", which made every inventing routine unreachable for as long as the queue had
+         * anything on it — and since the queue is auto-populated, that is most of the time. The
+         * only way to reach `Spike & plan` was to empty the queue by hand (#1432).
+         *
+         * A drain-only sweep never gets here: it has already stood down above, because the click
+         * that fires it asked for the queue specifically.
+         */
+        const mode: 'pm' | 'drain' = decision.mode === 'drain' && !drainJob ? 'pm' : decision.mode
         const index = nextJob.get(project.id) ?? 0
         // A due codebase sweep (#882) outranks the rotation: the rotation invents work, and the
         // sweep is a standing instruction to go find some. Only ever while the queue is empty --
@@ -679,12 +692,15 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // Asked before the schedule is read, so a switched-off sweep costs no disk read and,
         // more importantly, leaves its calendar untouched: it must come due normally once it is
         // switched back on, rather than having been silently ticked past while it was off.
+        // `decision.mode`, not the effective `mode` above: the question here is whether the queue
+        // is genuinely empty, and a tick that fell through to the rotation because draining is
+        // switched off still has entries waiting — exactly the case this sweep stays out of.
         const maintenanceJob = wanted(deps.maintenanceJob ?? AUTO_PM_MAINTENANCE_JOB)
         const sweep =
           decision.mode === 'pm' &&
           maintenanceJob !== undefined &&
           (await deps.maintenanceDue?.(project).catch(() => false)) === true
-        const job = sweep ? maintenanceJob : decision.mode === 'drain' ? drainJob : rotation[index % rotation.length]
+        const job = sweep ? maintenanceJob : mode === 'drain' ? drainJob : rotation[index % rotation.length]
         if (!job) {
           // Told apart on purpose: a rotation emptied by the checkboxes is a setting the user can
           // see and undo, and reads nothing like a daemon wired without jobs at all.
@@ -702,7 +718,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // edits. Every other rotation job rewrites the whole queue document from the same fork
         // point, so two at once would revert each other's promotion; those stay one per tick.
         const batch: AutoPmJob[] = [job]
-        if (decision.mode === 'drain') {
+        if (mode === 'drain') {
           // An entry a run still in flight was pinned to is not offered again.
           const assigned = new Set(
             (pending.get(project.id) ?? []).flatMap(agent => (agent.entry !== undefined ? [agent.entry] : [])),
@@ -799,7 +815,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           // turn. Stamped after the start took for the same reason the rotation is -- a sweep the
           // daemon refused should be retried next tick, not postponed a whole interval.
           if (sweep) await deps.recordMaintenance?.(project).catch(() => {})
-          else if (decision.mode === 'pm') nextJob.set(project.id, index + 1)
+          else if (mode === 'pm') nextJob.set(project.id, index + 1)
           // One line per project however many agents went out, and a single start keeps the old
           // wording exactly.
           const described = started.map(item => doing(item)).join('; ')

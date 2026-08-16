@@ -10,7 +10,7 @@ Answers the live view's questions purely from an agent's event stream — the da
 
 ## Rationales
 
-- A resumed session appends a new segment to the same journal, and a long-lived feed can span run boundaries — so liveness, outcome, and publishing are judged on the newest segment only; otherwise a resumed run reads as stopped for ever and a fresh run shows its predecessor's log.
+- A resumed agent appends a new segment to the same journal, and a long-lived feed can span those boundaries — so liveness, outcome, and publishing are judged on the newest segment only; otherwise a resumed agent reads as stopped for ever and a fresh one shows its predecessor's log.
 
 ## Before writing SPEC.md files
 

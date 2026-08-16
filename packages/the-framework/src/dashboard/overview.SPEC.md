@@ -1,4 +1,4 @@
-The cross-project glance: what the agent is working on right now, how much is queued, which projects and sessions were recently active, and which tickets are hot.
+The cross-project glance: what the agent is working on right now, how much is queued, which projects and agents were recently active, and which tickets are hot.
 
 ## TLDR
 

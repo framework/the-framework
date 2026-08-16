@@ -1,4 +1,4 @@
-The device side of the remote-session relay: executes a forwarded call against this device's own home project, and only calls on a fixed allowlist.
+The device side of the remote-agent relay: executes a forwarded call against this device's own home project, and only calls on a fixed allowlist.
 
 ## TLDR
 

@@ -1,4 +1,4 @@
-What the run view shows when the work was handed to a Claude web cloud session: where it went and how to reach it, plus — through the browser bridge — the question it is parked on and a mirror of its conversation.
+What the agent view shows when the work was handed to a Claude web cloud session: where it went and how to reach it, plus — through the browser bridge — the question it is parked on and a mirror of its conversation.
 
 ## TLDR
 

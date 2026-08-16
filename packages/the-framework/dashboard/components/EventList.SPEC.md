@@ -1,4 +1,4 @@
-The session transcript, shared by the live stream and past-run replay: every event as a human-readable line, with the conversation and the agent's interactive surfaces rendered as themselves.
+The agent's transcript, shared by the live stream and the replay of a finished one: every event as a human-readable line, with the conversation and the agent's interactive surfaces rendered as themselves.
 
 ## TLDR
 

@@ -7,7 +7,7 @@ Everything the dashboard asks or tells GitHub — pull request lookups, merging,
 - Merging prefers GitHub's auto-merge, so the PR lands when its checks pass; where the repo refuses, a human-requested merge goes through directly, while the automatic path merges only on green checks and otherwise hands the PR to the daemon's CI watch — unverified work never lands.
 - A draft in the way is marked ready and retried: asking for the merge says its review already happened.
 - CI status boils down to passing, failing (naming the failures), pending, or none; an unreadable status is never green.
-- A cloud run authenticates with a token from the environment or, failing that, the user's existing GitHub login.
+- A cloud agent authenticates with a token from the environment or, failing that, the user's existing GitHub login.
 
 ## Before writing SPEC.md files
 

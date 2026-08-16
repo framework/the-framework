@@ -1,5 +1,12 @@
 # @gemstack/ai-autopilot
 
+## 0.12.1
+
+### Patch Changes
+
+- Updated dependencies [56e1cca]
+  - @gemstack/ai-sdk@0.7.0
+
 ## 0.12.0
 
 ### Minor Changes

@@ -15,7 +15,7 @@ import { forwardStream } from '../dashboard-rpc/stream-forward.js'
 import { projectId } from '../registry.js'
 import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'
 import type { FrameworkEvent } from '../events.js'
-import type { HandoffResult } from './run-handoff.js'
+import type { HandoffResult } from './agent-handoff.js'
 
 // The real two-daemon proof for "run on a connected device" (#1067). Two HTTP servers stand up on
 // loopback: daemon A (the browser's local daemon, a real project runtime) relays a run to daemon B
@@ -60,9 +60,9 @@ test('a run submitted with options.remote is created on the other daemon and its
     stream.push({ kind: 'end', ok: true } as FrameworkEvent)
     stream.close()
     bStreams.set(B_RUN, stream)
-    return { ok: true, runId: B_RUN }
+    return { ok: true, agentId: B_RUN }
   }
-  const bTail = (runId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => forwardStream(bStreams.get(runId), onEvent)
+  const bTail = (agentId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => forwardStream(bStreams.get(agentId), onEvent)
   const bundle = await fakeBundle()
   // B's own home checkout, whose id the device-side dispatch forces every relayed RPC onto (slice 2), so
   // a relayed read can only ever address B's own project. A plain temp dir (no repo, not registered), which
@@ -98,7 +98,7 @@ test('a run submitted with options.remote is created on the other daemon and its
 
     // The run was created on B, and A returned B's own run id (not a locally allocated one).
     assert.equal(result.ok, true)
-    assert.equal(result.ok && result.runId, B_RUN)
+    assert.equal(result.ok && result.agentId, B_RUN)
     assert.equal(bStarts.length, 1)
     assert.equal(bStarts[0]!.prompt, 'build the thing')
     assert.equal(bStarts[0]!.options.remote, undefined) // stripped before forwarding, no onward relay

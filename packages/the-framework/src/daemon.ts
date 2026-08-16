@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises'
 import { basename, join, relative, resolve, isAbsolute } from 'node:path'
 import type { FrameworkEvent } from './events.js'
-import { FRAMEWORK_DIR, isPidAlive, reconcileOrphanedRuns } from './store/index.js'
+import { FRAMEWORK_DIR, isPidAlive, reconcileOrphanedAgents } from './store/index.js'
 import { startDashboard, type Dashboard, type StartRunOptions } from './dashboard/index.js'
 import { createProjectRuntime, type ProjectRuntimeOptions } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
@@ -173,7 +173,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // process left marked `running` is orphaned — it would show as active forever with a
   // no-op Stop. Reconcile them to `stopped` across every registered project at boot.
   for (const record of await listProjects(undefined, env).catch(() => [])) {
-    const fixed = await reconcileOrphanedRuns(record.path).catch(() => 0)
+    const fixed = await reconcileOrphanedAgents(record.path).catch(() => 0)
     if (fixed > 0) console.log(`[framework] reconciled ${fixed} orphaned session(s) in ${basename(record.path)}`)
   }
 
@@ -310,6 +310,6 @@ function waitForShutdown(signal?: AbortSignal): Promise<void> {
  */
 async function listBridgeSessions(env: NodeJS.ProcessEnv): Promise<BridgeSession[]> {
   const projects = await listProjects(undefined, env).catch(() => [])
-  const runs = (await Promise.all(projects.map(p => readAllRuns(p.path).catch(() => [])))).flat()
-  return bridgeSessionsFrom(runs, new Date())
+  const agents = (await Promise.all(projects.map(p => readAllRuns(p.path).catch(() => [])))).flat()
+  return bridgeSessionsFrom(agents, new Date())
 }

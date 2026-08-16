@@ -51,7 +51,7 @@ export async function installProject(cwd: string, deps: InstallDeps = {}): Promi
     }
 
     await fs.mkdir(join(cwd, THE_FRAMEWORK_DIR))
-    // Keep the transient run state (events.jsonl / run.json / runs/) out of git and the session
+    // Keep the transient run state (events.jsonl / agent.json / agents/) out of git and the session
     // archive in it (#313/#1179). The early return above established the file is absent.
     await fs.write(gitignorePath(cwd), frameworkGitignore())
 

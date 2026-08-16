@@ -1,5 +1,5 @@
-import { listRuns, readLiveMetas, type RunMeta } from './store/index.js'
-import { mergeSessionPr, resolveRunPr, type HandoffResult, type RunPrRun } from './dashboard/run-handoff.js'
+import { listAgents, readLiveMetas, type AgentMeta } from './store/index.js'
+import { mergeSessionPr, resolveRunPr, type HandoffResult, type RunPrRun } from './dashboard/agent-handoff.js'
 import { ghPrCiStatus, type LinkedPr, type PrCiStatus } from './dashboard/gh.js'
 import type { Cached } from './dashboard/cache.js'
 
@@ -85,7 +85,7 @@ export function ciFixPrompt(fix: CiFixRequest): string {
 
 /** One PR the sweep merged. */
 export interface CiMerged {
-  runId: string
+  agentId: string
   number: number
   url?: string
 }
@@ -94,7 +94,7 @@ export interface CiMerged {
 export interface CiFixOutcome {
   number: number
   /** The started session, when one was. */
-  runId?: string
+  agentId?: string
   /** Why no session was started: the wiring declined (gate/quota), or the attempts cap is spent. */
   reason?: 'declined' | 'attempts-exhausted'
 }
@@ -103,20 +103,20 @@ export interface CiFixOutcome {
 export interface CiSweepResult {
   merged: CiMerged[]
   /** Merges that should have happened and did not, with the refusal. */
-  failed: { runId: string; number: number; error: string }[]
+  failed: { agentId: string; number: number; error: string }[]
   fixes: CiFixOutcome[]
 }
 
 /** Injectable seams so the sweep is unit-testable off disk and off `gh`. */
 export interface CiSweepDeps {
   /** Every run meta worth scanning — live and archived (default: both stores). */
-  runs?: (cwd: string) => Promise<RunMeta[]>
+  agents?: (cwd: string) => Promise<AgentMeta[]>
   /** The PR that belongs to a run (default {@link resolveRunPr}, which rides the PR-lookup cache (#1028)). */
-  pr?: (cwd: string, run: RunPrRun) => Promise<Cached<LinkedPr | undefined>>
+  pr?: (cwd: string, agent: RunPrRun) => Promise<Cached<LinkedPr | undefined>>
   /** A PR's combined check state (default {@link ghPrCiStatus}). */
   ci?: (cwd: string, number: number) => Promise<PrCiStatus>
   /** Merge a run's open PR (default {@link mergeSessionPr}, which also forgets the PR caches). */
-  merge?: (cwd: string, run: RunPrRun) => Promise<HandoffResult>
+  merge?: (cwd: string, agent: RunPrRun) => Promise<HandoffResult>
   /**
    * Start a CI-fix session for a red PR (#1418's fix half), resolving the run id or undefined
    * when the wiring declined (preference off, no quota headroom, start failed). Absent = the fix
@@ -137,16 +137,16 @@ export interface CiSweepDeps {
 }
 
 /** Both stores' metas: the live runs (their conversation is still going) and the archive. */
-async function allRunMetas(cwd: string): Promise<RunMeta[]> {
+async function allRunMetas(cwd: string): Promise<AgentMeta[]> {
   const [live, archived] = await Promise.all([
-    readLiveMetas(cwd).catch((): RunMeta[] => []),
-    listRuns(cwd).catch((): RunMeta[] => []),
+    readLiveMetas(cwd).catch((): AgentMeta[] => []),
+    listAgents(cwd).catch((): AgentMeta[] => []),
   ])
   return [...live, ...archived]
 }
 
 /** Whether a meta is one of this sweep's candidates: an ended run with a merge the CI decides. */
-function watchable(meta: RunMeta, now: number): boolean {
+function watchable(meta: AgentMeta, now: number): boolean {
   if (meta.status === 'running') return false
   if (meta.mergeOutcome !== 'watched' && meta.mergeOutcome !== 'auto-armed') return false
   const updated = Date.parse(meta.updatedAt ?? '')
@@ -164,14 +164,14 @@ function watchable(meta: RunMeta, now: number): boolean {
  * GitHub holds that promise — but its checks going red still starts a fix.
  */
 export async function sweepProjectCi(cwd: string, deps: CiSweepDeps = {}): Promise<CiSweepResult> {
-  const runs = deps.runs ?? allRunMetas
+  const agents = deps.agents ?? allRunMetas
   const pr = deps.pr ?? resolveRunPr
   const ci = deps.ci ?? ghPrCiStatus
   const merge = deps.merge ?? mergeSessionPr
   const now = deps.now ?? Date.now
 
   const result: CiSweepResult = { merged: [], failed: [], fixes: [] }
-  const metas = await runs(cwd).catch((): RunMeta[] => [])
+  const metas = await agents(cwd).catch((): AgentMeta[] => [])
   const candidates = metas.filter(meta => watchable(meta, now()))
   if (candidates.length === 0) return result
 
@@ -197,10 +197,10 @@ export async function sweepProjectCi(cwd: string, deps: CiSweepDeps = {}): Promi
     const attemptKey = `${cwd}\u0000${linked.number}\u0000${status.headSha ?? ''}`
     if (deps.attemptedMerges?.has(attemptKey)) continue
     const outcome = await merge(cwd, meta)
-    if (outcome.ok) result.merged.push({ runId: meta.id, number: linked.number, ...(outcome.url ? { url: outcome.url } : {}) })
+    if (outcome.ok) result.merged.push({ agentId: meta.id, number: linked.number, ...(outcome.url ? { url: outcome.url } : {}) })
     else {
       deps.attemptedMerges?.add(attemptKey)
-      result.failed.push({ runId: meta.id, number: linked.number, error: outcome.error })
+      result.failed.push({ agentId: meta.id, number: linked.number, error: outcome.error })
     }
   }
   return result
@@ -220,7 +220,7 @@ function pastNoChecksGrace(pr: LinkedPr, now: number): boolean {
  */
 async function requestFix(
   cwd: string,
-  metas: RunMeta[],
+  metas: AgentMeta[],
   pr: LinkedPr,
   status: PrCiStatus,
   deps: CiSweepDeps,
@@ -233,7 +233,7 @@ async function requestFix(
   if (attempts.some(meta => meta.intent?.startsWith(ciFixMarker(pr.number, status.headSha)))) return undefined
   if (attempts.some(meta => meta.status === 'running')) return undefined
   if (attempts.length >= MAX_CI_FIX_ATTEMPTS) return { number: pr.number, reason: 'attempts-exhausted' }
-  const runId = await deps.fix(cwd, {
+  const agentId = await deps.fix(cwd, {
     number: pr.number,
     title: pr.title,
     url: pr.url,
@@ -241,7 +241,7 @@ async function requestFix(
     headSha: status.headSha,
     failed: status.failed,
   })
-  return runId ? { number: pr.number, runId } : { number: pr.number, reason: 'declined' }
+  return agentId ? { number: pr.number, agentId } : { number: pr.number, reason: 'declined' }
 }
 
 /** A running watch, in the shape the daemon's other background services use. */
@@ -291,13 +291,13 @@ export function startCiWatch(opts: CiWatchOptions): CiWatch {
         (): CiSweepResult => ({ merged: [], failed: [], fixes: [] }),
       )
       for (const item of result.merged) {
-        opts.log(`[framework] CI watch: checks passed on PR #${item.number}, merged it${item.url ? ` (${item.url})` : ''} (session ${item.runId})`)
+        opts.log(`[framework] CI watch: checks passed on PR #${item.number}, merged it${item.url ? ` (${item.url})` : ''} (session ${item.agentId})`)
       }
       for (const item of result.failed) {
         sayOnce(`[framework] CI watch: could not merge PR #${item.number}: ${item.error}`)
       }
       for (const item of result.fixes) {
-        if (item.runId) opts.log(`[framework] CI watch: checks failed on PR #${item.number}, started fix session ${item.runId}`)
+        if (item.agentId) opts.log(`[framework] CI watch: checks failed on PR #${item.number}, started fix session ${item.agentId}`)
         else if (item.reason === 'attempts-exhausted') sayOnce(`[framework] CI watch: PR #${item.number} is still red after ${MAX_CI_FIX_ATTEMPTS} fix sessions; leaving it for a human`)
       }
     }

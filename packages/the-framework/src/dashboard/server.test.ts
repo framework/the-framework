@@ -392,7 +392,7 @@ async function relayDashboard(): Promise<{
   const starts: Array<{ prompt: string; kind: StartRunKind; options: StartRunOptions; projectId?: string }> = []
   const onStart = (prompt: string, kind: StartRunKind, options: StartRunOptions, projectId?: string): StartRunResult => {
     starts.push({ prompt, kind, options, ...(projectId ? { projectId } : {}) })
-    return { ok: true, runId: 'srv-run' }
+    return { ok: true, agentId: 'srv-run' }
   }
   const events: FrameworkEvent[] = [
     { kind: 'log', message: 'e1' } as FrameworkEvent,
@@ -423,7 +423,7 @@ test('/_relay/start needs the cookie: 401 without it, starts the run with it (#1
 
     const ok = await postAuth(`${base}/_relay/start`, body, `fw_daemon=${TOKEN}`)
     assert.equal(ok.status, 200)
-    assert.deepEqual(JSON.parse(ok.body), { ok: true, runId: 'srv-run' })
+    assert.deepEqual(JSON.parse(ok.body), { ok: true, agentId: 'srv-run' })
     assert.equal(starts.length, 1)
     assert.equal(starts[0]!.prompt, 'do it')
     assert.equal(starts[0]!.projectId, undefined) // slice 1 runs in the device's own home checkout

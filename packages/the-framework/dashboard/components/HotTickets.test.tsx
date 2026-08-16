@@ -48,7 +48,7 @@ describe('HotTickets (#1112)', () => {
 
   test('a ticket a run is implementing right now says so, over its plan/spike (#1117)', async () => {
     onHotTickets.mockResolvedValue([
-      { ...ht('a.md', 'alpha', 'in-progress', { planned: true }), runId: 'run-7' },
+      { ...ht('a.md', 'alpha', 'in-progress', { planned: true }), agentId: 'run-7' },
       ht('b.md', 'alpha', 'in-progress', { planned: true }),
     ])
     render(<HotTickets onSelectProject={() => {}} onSelectRun={vi.fn()} />)
@@ -61,7 +61,7 @@ describe('HotTickets (#1112)', () => {
   test('a ticket being implemented with no plan or spike still gets a tag (#1117)', async () => {
     // The gap the run link opens up: in-progress used to imply planned-or-spiked, so a bare
     // implementing ticket would have shown an unexplained row.
-    onHotTickets.mockResolvedValue([{ ...ht('a.md', 'alpha', 'in-progress'), runId: 'run-7' }])
+    onHotTickets.mockResolvedValue([{ ...ht('a.md', 'alpha', 'in-progress'), agentId: 'run-7' }])
     render(<HotTickets onSelectProject={() => {}} onSelectRun={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('implementing')).toBeTruthy())
   })
@@ -71,7 +71,7 @@ describe('a hot ticket that names a run opens that run', () => {
   test('an implemented ticket goes to its session, not its project home', async () => {
     // The in-progress lane exists because a run said it is implementing this ticket (#1117), so
     // the session it names is what the row is reporting on.
-    onHotTickets.mockResolvedValue([{ ...ht('a.md', 'alpha', 'in-progress'), runId: 'run-9' }])
+    onHotTickets.mockResolvedValue([{ ...ht('a.md', 'alpha', 'in-progress'), agentId: 'run-9' }])
     const onSelectRun = vi.fn()
     const onSelectProject = vi.fn()
     render(<HotTickets onSelectProject={onSelectProject} onSelectRun={onSelectRun} />)
@@ -107,7 +107,7 @@ describe('a hot ticket with no run prefills the launcher it lands on', () => {
   })
 
   test('a ticket that opens a live session leaves no draft behind', async () => {
-    onHotTickets.mockResolvedValue([{ ...ht('a.md', 'alpha', 'in-progress'), runId: 'run-9' }])
+    onHotTickets.mockResolvedValue([{ ...ht('a.md', 'alpha', 'in-progress'), agentId: 'run-9' }])
     render(<HotTickets onSelectProject={vi.fn()} onSelectRun={vi.fn()} />)
     fireEvent.click(await screen.findByText('a'))
     // That click goes to a session, not a launcher, so a draft stashed here would surface later

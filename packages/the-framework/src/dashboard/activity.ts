@@ -1,4 +1,4 @@
-import { readAllRuns, type RunMeta, type RunStatus } from '../store/index.js'
+import { readAllRuns, type AgentMeta, type AgentStatus } from '../store/index.js'
 import { postDiscordWebhook } from './discord-webhook.js'
 import type { ProjectSummary } from './projects.js'
 
@@ -28,13 +28,13 @@ export interface Activity {
   projectId: string
   projectName: string
   /** The run this is about. */
-  runId: string
+  agentId: string
   /** `started` = the run entered `running`; `finished` = it reached a terminal status. */
   kind: 'started' | 'finished'
   /** What the run is building (its `intent`), for the notification body; may be absent. */
   title?: string
   /** The finished run's terminal status (`finished` only), so a stop reads differently from a done. */
-  status?: RunStatus
+  status?: AgentStatus
   /** When the run last changed, ISO, for ordering and the baseline diff. */
   updatedAt?: string
 }
@@ -42,20 +42,20 @@ export interface Activity {
 /** Injectable seam so {@link buildActivity} is unit-testable off disk. */
 export interface ActivityDeps {
   /** A project's runs, live prepended to the archived history, newest-first. Defaults to disk. */
-  readRuns?: (cwd: string) => Promise<RunMeta[]>
+  readRuns?: (cwd: string) => Promise<AgentMeta[]>
 }
 
 /** Map one run to its current activity item: `started` while running, else `finished`. */
-function activityFor(project: ProjectSummary, run: RunMeta): Activity {
-  const kind = run.status === 'running' ? 'started' : 'finished'
+function activityFor(project: ProjectSummary, agent: AgentMeta): Activity {
+  const kind = agent.status === 'running' ? 'started' : 'finished'
   return {
     projectId: project.id,
     projectName: project.name,
-    runId: run.id,
+    agentId: agent.id,
     kind,
-    ...(run.intent ? { title: run.intent } : {}),
-    ...(kind === 'finished' ? { status: run.status } : {}),
-    ...(run.updatedAt ? { updatedAt: run.updatedAt } : {}),
+    ...(agent.intent ? { title: agent.intent } : {}),
+    ...(kind === 'finished' ? { status: agent.status } : {}),
+    ...(agent.updatedAt ? { updatedAt: agent.updatedAt } : {}),
   }
 }
 
@@ -73,8 +73,8 @@ export async function buildActivity(projects: ProjectSummary[], deps: ActivityDe
   const readRuns = deps.readRuns ?? readAllRuns
   const items: Activity[] = []
   for (const project of projects) {
-    const runs = (await readRuns(project.path).catch(() => [])).slice(0, RECENT_RUNS)
-    for (const run of runs) items.push(activityFor(project, run))
+    const agents = (await readRuns(project.path).catch(() => [])).slice(0, RECENT_RUNS)
+    for (const agent of agents) items.push(activityFor(project, agent))
   }
   items.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
   return items

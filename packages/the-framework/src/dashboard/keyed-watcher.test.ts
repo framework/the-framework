@@ -14,8 +14,8 @@ const pr = (n: number, url: string, project = 'p'): Intervention => ({
   url,
 })
 
-const started = (runId: string): Activity => ({ projectId: 'p', projectName: 'p', kind: 'started', runId })
-const finished = (runId: string): Activity => ({ projectId: 'p', projectName: 'p', kind: 'finished', runId, status: 'done' })
+const started = (agentId: string): Activity => ({ projectId: 'p', projectName: 'p', kind: 'started', agentId })
+const finished = (agentId: string): Activity => ({ projectId: 'p', projectName: 'p', kind: 'finished', agentId, status: 'done' })
 
 test('SeenTracker seeds a baseline on the first poll, then returns only new items', () => {
   const tracker = new SeenTracker(interventionKey)

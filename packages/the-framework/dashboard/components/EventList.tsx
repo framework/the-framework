@@ -258,7 +258,7 @@ export function EventList({
   openAt,
   tail,
   projectId,
-  runId,
+  agentId: agentId,
 }: {
   events: FrameworkEvent[]
   stick?: boolean
@@ -272,12 +272,12 @@ export function EventList({
    *  read-only relay watch), every row keeps the formatter's text. */
   projectId?: string | undefined
   /** Which run an inline pick resolves (#749), forwarded to the panel with projectId. */
-  runId?: string | null | undefined
+  agentId?: string | null | undefined
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
   // The inline pane needs both halves of the proxy path, so the read-only relay watch (no
-  // projectId/runId) keeps every browser row as formatter text.
-  const browserRows = useMemo(() => (projectId && runId ? foldBrowserRows(events) : undefined), [projectId, runId, events])
+  // projectId/agentId) keeps every browser row as formatter text.
+  const browserRows = useMemo(() => (projectId && agentId ? foldBrowserRows(events) : undefined), [projectId, agentId, events])
   const shown = promptFirst(events).filter(e => !choiceRows?.hidden.has(e) && !browserRows?.hidden.has(e))
   return (
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>
@@ -318,7 +318,7 @@ export function EventList({
                           key={choiceRow.choice.id}
                           inline
                           projectId={projectId}
-                          runId={runId}
+                          agentId={agentId}
                           choice={choiceRow.choice}
                           active={choiceRow.active}
                         />
@@ -326,12 +326,12 @@ export function EventList({
                         <AnsweredChoice choice={choiceRow.choice} pick={choiceRow.pick} />
                       )}
                     </div>
-                  ) : e.kind === 'browser' && e === browserRows?.pane && projectId && runId ? (
+                  ) : e.kind === 'browser' && e === browserRows?.pane && projectId && agentId ? (
                     // The latest browser row IS the preview (#1455 item 6b) — the same proxied
                     // stream the rail's Browser tab shows, at the point of use. font-sans for
                     // the same reason the choice rows drop the log's mono: a surface, not text.
                     <div className="min-w-0 flex-1 font-sans">
-                      <InlineBrowser projectId={projectId} runId={runId} url={e.url} live={browserRows.live} />
+                      <InlineBrowser projectId={projectId} agentId={agentId} url={e.url} live={browserRows.live} />
                     </div>
                   ) : (
                     <span className={`min-w-0 flex-1 whitespace-pre-wrap break-words ${rowTone(e) || 'text-foreground'}`}>

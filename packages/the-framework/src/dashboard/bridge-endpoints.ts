@@ -25,7 +25,7 @@ export const BRIDGE_PREFIX = '/_bridge'
 
 /** A question a cloud session is parked on, as reported by the bridge. */
 export interface BridgeQuestion {
-  /** The cloud session that asked, which joins back to a run through `RunMeta.sessionId`. */
+  /** The cloud session that asked, which joins back to a run through `AgentMeta.sessionId`. */
   sessionId: string
   title: string
   options: { label: string; detail?: string }[]

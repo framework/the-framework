@@ -13,12 +13,12 @@ import { Button } from './ui/button.js'
  */
 export function BrowserPanel({
   projectId,
-  runId,
+  agentId: agentId,
   inline,
   onFrame,
 }: {
   projectId: string
-  runId: string
+  agentId: string
   /** Transcript-row variant (#1455 item 6b): fill and letterbox into the box the row provides
    *  instead of the rail's scroll column, and drop the footer help text — container styles
    *  only, the same split ChoicePanel's `inline` makes. */
@@ -37,7 +37,7 @@ export function BrowserPanel({
   // starts clean instead of inheriting a latched "not reachable" until remount (#946): one
   // early onError (the tab opened before the run's stream endpoint was up) must not be terminal.
   const [failedKey, setFailedKey] = useState<string | undefined>(undefined)
-  const base = `/browser/${encodeURIComponent(projectId)}/${encodeURIComponent(runId)}`
+  const base = `/browser/${encodeURIComponent(projectId)}/${encodeURIComponent(agentId)}`
   // Coming back to a run whose earlier stream failed must try again, not replay the stale
   // failure: the stream may have come up since. Adjust-during-render is the sanctioned way
   // to reset state on a prop change without a remount.

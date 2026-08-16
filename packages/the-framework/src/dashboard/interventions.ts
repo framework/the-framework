@@ -1,6 +1,6 @@
-import { listRuns, readLiveMetas, type LiveRun, type RunMeta } from '../store/index.js'
+import { listAgents, readLiveMetas, type LiveRun, type AgentMeta } from '../store/index.js'
 import type { ProjectSummary } from './projects.js'
-import { isSessionBranch, readRunHandoff, runBranchFor, type RunHandoff } from './run-handoff.js'
+import { isSessionBranch, readRunHandoff, agentBranchFor, type AgentHandoff } from './agent-handoff.js'
 import { ghPrList, type OpenPr, type PrLister } from './gh.js'
 import { interventionKey } from './keys.js'
 import { postDiscordWebhook } from './discord-webhook.js'
@@ -36,7 +36,7 @@ export interface Intervention {
   /** The parked gate's id (`awaiting` only) — its stable identity, so it notifies exactly once. */
   awaitId?: string
   /** Which run this is about (`awaiting` #738 / `unpushed`): a project has several runs. */
-  runId?: string
+  agentId?: string
   /** The branch the work is sitting on (`unpushed` only). */
   branch?: string
   /** How many commits are waiting (`unpushed` only). */
@@ -50,10 +50,10 @@ export interface InterventionsDeps {
   prs?: PrLister
   /** The live-run reader (default {@link readLiveMetas}); drives the `awaiting` source (#636). */
   liveRuns?: (cwd: string) => Promise<LiveRun[]>
-  /** The finished-run reader (default {@link listRuns}); drives the `unpushed` source (#860). */
-  runs?: (cwd: string) => Promise<RunMeta[]>
+  /** The finished-run reader (default {@link listAgents}); drives the `unpushed` source (#860). */
+  agents?: (cwd: string) => Promise<AgentMeta[]>
   /** Reads a branch's state (default {@link readRunHandoff}); drives the `unpushed` source (#860). */
-  handoff?: (cwd: string, branch: string) => Promise<RunHandoff | undefined>
+  handoff?: (cwd: string, branch: string) => Promise<AgentHandoff | undefined>
   /**
    * How many of a project's most recent finished runs to inspect for unpushed work. Each one costs
    * a handful of git reads, and this runs on a poll, so old history is not re-walked every minute:
@@ -116,7 +116,7 @@ export async function buildInterventions(
         title: meta.pendingChoice.title,
         url: deps.dashboardUrl ?? '',
         awaitId: meta.pendingChoice.id,
-        runId: meta.id,
+        agentId: meta.id,
         ...(meta.updatedAt ? { createdAt: meta.updatedAt } : {}),
       })
     }
@@ -144,7 +144,7 @@ export async function buildInterventions(
  * costs several git reads and this runs on a poll.
  */
 async function unpushedFor(project: ProjectSummary, deps: InterventionsDeps): Promise<Intervention[]> {
-  const runs = deps.runs ?? listRuns
+  const agents = deps.agents ?? listAgents
   const handoff =
     deps.handoff ??
     // The default skips the `gh` PR lookup `readRunHandoff` would otherwise do per branch: an open
@@ -153,14 +153,14 @@ async function unpushedFor(project: ProjectSummary, deps: InterventionsDeps): Pr
     // would be the most expensive part of this whole queue.
     ((cwd: string, branch: string) => readRunHandoff(cwd, branch, { pr: async () => undefined }))
 
-  const finished = (await runs(project.path))
-    .filter(run => run.status !== 'running')
+  const finished = (await agents(project.path))
+    .filter(agent => agent.status !== 'running')
     .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''))
     .slice(0, deps.handoffLimit ?? HANDOFF_LIMIT)
 
   const items: Intervention[] = []
-  for (const run of finished) {
-    const branch = runBranchFor(run)
+  for (const agent of finished) {
+    const branch = agentBranchFor(agent)
     const state = await handoff(project.path, branch).catch(() => undefined)
     // Every condition is a reason this is *not* waiting on anyone: the branch is gone, the session
     // wrote nothing, it already landed, it is already on the remote, or there is nowhere to push.
@@ -169,12 +169,12 @@ async function unpushedFor(project: ProjectSummary, deps: InterventionsDeps): Pr
       projectId: project.id,
       projectName: project.name,
       kind: 'unpushed',
-      title: run.intent?.trim() || branch,
+      title: agent.intent?.trim() || branch,
       url: deps.dashboardUrl ?? '',
-      runId: run.id,
+      agentId: agent.id,
       branch,
       commits: state.commits.length,
-      ...(run.updatedAt ? { createdAt: run.updatedAt } : {}),
+      ...(agent.updatedAt ? { createdAt: agent.updatedAt } : {}),
     })
   }
   return items

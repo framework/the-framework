@@ -1,14 +1,14 @@
 import { join } from 'node:path'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { frameworkGitignore, gitignorePath, sessionsGitignore, SESSIONS_RULE } from './framework-gitignore.js'
-import { nodeStoreFs, SESSIONS_DIR, type StoreFs } from './store/index.js'
+import { nodeStoreFs, ARCHIVE_DIR, type StoreFs } from './store/index.js'
 import { nodeGitRunner, type GitRunner } from './project.js'
 
 /**
  * Committed session history (#1179): where a project's finished runs are archived so they survive
  * the repo being cleaned.
  *
- * The bug this exists for: run state was written to `.the-framework/runs/`, which the install-time
+ * The bug this exists for: agent state was written to `.the-framework/agents/`, which the install-time
  * `.gitignore` keeps untracked, so `git clean -fdx` — an ordinary thing to do to a repo — deleted
  * every session a project had ever run. Nothing was recoverable, because nothing had ever been
  * committed.
@@ -23,7 +23,7 @@ import { nodeGitRunner, type GitRunner } from './project.js'
  */
 
 /** The directory, under a user's own directory, that holds their archived runs. */
-export { SESSIONS_DIR }
+export { ARCHIVE_DIR }
 
 /** Where a run's history goes when git has no identity configured. */
 export const ANONYMOUS_USER_DIR = 'anonymous'
@@ -53,7 +53,7 @@ export function userDirName(email: string | undefined): string {
 
 /** The `.the-framework/<user>/sessions` directory under a project root. */
 export function sessionsDir(cwd: string, user: string): string {
-  return join(cwd, THE_FRAMEWORK_DIR, user, SESSIONS_DIR)
+  return join(cwd, THE_FRAMEWORK_DIR, user, ARCHIVE_DIR)
 }
 
 /**

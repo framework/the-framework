@@ -43,9 +43,9 @@ describe('runStatusPill', () => {
 
   test('publishing outranks ready-for-merge — the merge itself is part of the handoff still running (#1431)', () => {
     const armedMerge = { kind: 'handoff-armed', push: true, pr: true, merge: true } as FrameworkEvent
-    const run = [armedMerge, named, readyForMerge, ended({ ok: true })]
-    expect(runStatusPill(run)).toMatchObject({ label: 'publishing…' })
-    expect(runStatusPill([...run, handoffDone])).toMatchObject({ label: 'ready for merge' })
+    const agent = [armedMerge, named, readyForMerge, ended({ ok: true })]
+    expect(runStatusPill(agent)).toMatchObject({ label: 'publishing…' })
+    expect(runStatusPill([...agent, handoffDone])).toMatchObject({ label: 'ready for merge' })
   })
 
   test('no publishing window when disarmed, never armed, or not cleanly ended (#1431)', () => {

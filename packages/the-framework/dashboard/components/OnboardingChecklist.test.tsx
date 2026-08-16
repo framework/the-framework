@@ -85,7 +85,7 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
   test('the started run id is handed up, with the project it runs in', async () => {
     onDashboard.mockResolvedValue(WITH_PROJECT)
     onOnboarding.mockResolvedValue(null)
-    startRun.start.mockResolvedValue({ runId: 'run-7' })
+    startRun.start.mockResolvedValue({ agentId: 'run-7' })
     const onRunStarted = vi.fn()
     render(<OnboardingChecklist onRunStarted={onRunStarted} />)
     await clickImport()

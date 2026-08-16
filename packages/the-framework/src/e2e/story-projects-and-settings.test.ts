@@ -75,8 +75,8 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
     assert.equal((await rpc(onPreferences)()).model, 'fable-e2e')
 
     // First leg: a plain run, finished.
-    const runId = await world.startRun(project, 'Build the settings page')
-    await world.waitRun(project, runId, 'done')
+    const agentId = await world.startRun(project, 'Build the settings page')
+    await world.waitRun(project, agentId, 'done')
 
     // The composer's Resume sends only its seed (#1467); the daemon overlays the project's
     // resolved options, so the model chosen in Settings reaches the continued session's argv.
@@ -84,10 +84,10 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
     // guard waits out the still-exiting first leg instead of refusing (#1529), and the run
     // lock makes the continuation wait out the archive it is about to reopen, where it used
     // to reuse a checkout mid-retirement.
-    const resumed = await rpc(sendStart)(project.id, 'Keep going', 'prompt', { continueRunId: runId })
+    const resumed = await rpc(sendStart)(project.id, 'Keep going', 'prompt', { continueRunId: agentId })
     assert.equal(resumed.ok, true, `the resume was refused: ${JSON.stringify(resumed)}`)
-    await world.waitRun(project, runId, 'done')
-    await world.waitRetired(project, runId)
+    await world.waitRun(project, agentId, 'done')
+    await world.waitRetired(project, agentId)
     const sent = await waitFor(async () => {
       const spawns = await world.spawnedSpecs()
       return spawns.length >= 2 ? spawns[1] : undefined
@@ -97,7 +97,7 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
 
     // One row throughout: the continuation is the same run, not a second history entry.
     const rows = await rpc(onRuns)(project.id)
-    assert.equal(rows.filter(r => r.id === runId).length, 1)
+    assert.equal(rows.filter(r => r.id === agentId).length, 1)
   } finally {
     await world.close()
   }

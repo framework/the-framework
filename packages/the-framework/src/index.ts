@@ -26,7 +26,7 @@
 export * from './driver/index.js'
 export { buildPrompt, extendPrompt, scaffoldPrompt, isWorkspaceEmpty } from './steps.js'
 export { runSession, type SessionKind, type RunSessionOptions, type RunSessionResult } from './run.js'
-export { isHandsOff, isRunLocation, RUN_LOCATIONS, type RunLocation } from './run-location.js'
+export { isHandsOff, isRunLocation, RUN_LOCATIONS, type AgentLocation } from './agent-location.js'
 export {
   requestChoices,
   requestMultiSelect,
@@ -67,12 +67,12 @@ export { formatFrameworkEvent } from './terminal.js'
 export { resolveSessionLink, hasSessionIdPlaceholder, SESSION_ID_PLACEHOLDER } from './session-link.js'
 export {
   sessionInfo,
-  runProgress,
+  agentProgress,
   handoffState,
   type SessionInfo,
   type RunProgress,
   type HandoffState,
-} from './run-view.js'
+} from './agent-view.js'
 export {
   assessRepo,
   planMaintenanceSweep,
@@ -91,24 +91,24 @@ export {
   type SweepDeps,
   type MaintenanceFs,
 } from './maintenance.js'
-export { startDashboard, summarizeProject, defaultProjectsProvider, readDocs, type Dashboard, type DashboardOptions, type StartRunKind, type StartRunResult, type AddProjectResult, type OnboardingSuggestion, type DriverReady, type PreviewResult, type PreviewStatus, type RunWorktree, type ProjectSummary, type ProjectsProvider, type SummarizeDeps, type WorkspaceDoc, readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta, type TicketGithubLink, type ProjectQueue, type QueueItem, type Overview, type ActiveRun, type RecentProject, type RecentRun, buildRecentRuns, type HotTicket, type HotBucket, buildHotTickets, collectAllTickets, type ProjectTickets, type AllTicketsDeps, type DashboardData, type ProjectStat, type ActivityDay, type GitStatus, type LinkedPr, type FileDiff, type FileChange, type FileContent, type RunHandoff, type HandoffCommit, type HandoffFile, type HandoffResult, buildInterventions, type Intervention, type OpenPr, type PrLister, type InterventionsDeps, buildOpenQuestions, openChoiceRequest, type OpenQuestion, type OpenQuestionsDeps, buildActivity, activityKey, pickNewActivity, type Activity, type ActivityDeps, type BridgeQuestion, type BridgeEvent, type BridgeAnswer } from './dashboard/index.js'
+export { startDashboard, summarizeProject, defaultProjectsProvider, readDocs, type Dashboard, type DashboardOptions, type StartRunKind, type StartRunResult, type AddProjectResult, type OnboardingSuggestion, type DriverReady, type PreviewResult, type PreviewStatus, type AgentWorktree, type ProjectSummary, type ProjectsProvider, type SummarizeDeps, type WorkspaceDoc, readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta, type TicketGithubLink, type ProjectQueue, type QueueItem, type Overview, type ActiveRun, type RecentProject, type RecentRun, buildRecentRuns, type HotTicket, type HotBucket, buildHotTickets, collectAllTickets, type ProjectTickets, type AllTicketsDeps, type DashboardData, type ProjectStat, type ActivityDay, type GitStatus, type LinkedPr, type FileDiff, type FileChange, type FileContent, type AgentHandoff, type HandoffCommit, type HandoffFile, type HandoffResult, buildInterventions, type Intervention, type OpenPr, type PrLister, type InterventionsDeps, buildOpenQuestions, openChoiceRequest, type OpenQuestion, type OpenQuestionsDeps, buildActivity, activityKey, pickNewActivity, type Activity, type ActivityDeps, type BridgeQuestion, type BridgeEvent, type BridgeAnswer } from './dashboard/index.js'
 export {
-  RunStore,
+  AgentStore,
   nodeStoreFs,
   applyEventToMeta,
   metaFromEvents,
-  listRuns,
+  listAgents,
   loadRunEvents,
-  runIdFromStartedAt,
+  agentIdFromStartedAt,
   isSafeRunId,
   FRAMEWORK_DIR,
   EVENTS_FILE,
   META_FILE,
-  RUNS_DIR,
-  RUN_META_VERSION,
+  AGENTS_DIR,
+  AGENT_META_VERSION,
   type StoreFs,
-  type RunMeta,
-  type RunStatus,
+  type AgentMeta,
+  type AgentStatus,
   type OpenStoreOptions,
 } from './store/index.js'
 export { THE_FRAMEWORK_DIR } from './framework-dir.js'
@@ -212,7 +212,7 @@ export {
   describeResolvedConfig,
   RUN_CONFIG_DEFAULTS,
   type ConfigLayer,
-  type RunConfigValues,
+  type AgentConfigValues,
   type ResolvedRunConfig,
 } from './config-layers.js'
 export {
@@ -246,7 +246,7 @@ export {
   type ControlEntry,
   type ControlWatcher,
 } from './control.js'
-export { RunMessageQueue, type RunMessages } from './run-messages.js'
+export { AgentMessageQueue, type AgentMessages } from './agent-messages.js'
 export {
   runTodoLoop,
   findTodoBacklog,
@@ -261,7 +261,7 @@ export {
   type TodoLoopResult,
   type TodoLoopReason,
 } from './todo-loop.js'
-export { runOptionsFromPreferences, preferencesFromFileConfig } from './run-options.js'
+export { agentOptionsFromPreferences, preferencesFromFileConfig } from './agent-options.js'
 export {
   startAutoPm,
   AUTO_PM_JOBS,

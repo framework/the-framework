@@ -10,7 +10,7 @@ import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from './quota.js'
 import type { AutoPmReporter } from '../auto-pm.js'
 import type { AddProjectResult, StartRunKind, StartRunOptions, StartRunResult } from './types.js'
-import type { RunMeta } from '../store/index.js'
+import type { AgentMeta } from '../store/index.js'
 
 /** Wired by the daemon so `sendStart` can reach the daemon's own `startRun` closure. */
 export type StartRunHandler = (
@@ -26,15 +26,15 @@ export type AddProjectHandler = (path: string, directory: boolean) => AddProject
 /** Resolve a run to its live event stream: the relay feeds `onEvents` from its own in-memory stream
  * rather than a file on disk (#426), and the daemon feeds a run it is relaying from a device (#1067).
  * Returns undefined when there is no in-memory stream, so `onEvents` falls back to tailing the log. */
-export type EventsSource = (projectId: string, runId?: string) => AsyncIterable<FrameworkEvent> | undefined
+export type EventsSource = (projectId: string, agentId?: string) => AsyncIterable<FrameworkEvent> | undefined
 
 /** Look up the device a relayed run (#1067) executes on, or undefined for an ordinary local run. The
  *  daemon wires this from its live relayed-run map; a run-scoped RPC uses it to forward a remote run's
  *  read/steer/handoff to that device instead of resolving a (nonexistent) local checkout. */
 export interface RemoteRuns {
-  target(runId: string | undefined): { url: string; token: string } | undefined
+  target(agentId: string | undefined): { url: string; token: string } | undefined
   /** A project's relayed run stubs (#1077), so `onRuns` can show a remote run in the list and re-open it after a reload. */
-  list(projectId: string): RunMeta[]
+  list(projectId: string): AgentMeta[]
 }
 
 /**
@@ -147,7 +147,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
  */
 async function serveEventStream(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
   const projectId = url.searchParams.get('projectId') ?? ''
-  const runId = url.searchParams.get('runId') ?? undefined
+  const agentId = url.searchParams.get('agentId') ?? undefined
   res.writeHead(200, {
     'content-type': 'text/event-stream',
     'cache-control': 'no-store',
@@ -158,7 +158,7 @@ async function serveEventStream(req: IncomingMessage, res: ServerResponse, url: 
   let finished = false
   const stop = await RPC_EVENT_STREAM(
     projectId,
-    runId,
+    agentId,
     value => {
       res.write(`data: ${JSON.stringify(value)}\n\n`)
     },

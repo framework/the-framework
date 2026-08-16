@@ -52,7 +52,7 @@ describe('TicketsPanel (#697/#1144)', () => {
   })
 
   test('the plan column starts a session to write the plan when the ticket has none (#685)', async () => {
-    sendStart.mockResolvedValue({ ok: true, runId: 'r3' })
+    sendStart.mockResolvedValue({ ok: true, agentId: 'r3' })
     const onRunStarted = vi.fn()
     render(<TicketsPanel projectId="p1" tickets={[ticket({ planned: false })]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /create a plan for do the thing/i }))
@@ -68,7 +68,7 @@ describe('TicketsPanel (#697/#1144)', () => {
   })
 
   test('the start column spins up an agent working on the ticket, unattended and with the ticket named (#1117/#1279)', async () => {
-    sendStart.mockResolvedValue({ ok: true, runId: 'r4' })
+    sendStart.mockResolvedValue({ ok: true, agentId: 'r4' })
     const onRunStarted = vi.fn()
     const onOpen = vi.fn()
     render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={onOpen} onRunStarted={onRunStarted} />)
@@ -207,7 +207,7 @@ describe('TicketsPanel (#697/#1144)', () => {
   })
 
   test('an empty tickets/ offers the GitHub import instead of a dead end', async () => {
-    sendStart.mockResolvedValue({ ok: true, runId: 'r1' })
+    sendStart.mockResolvedValue({ ok: true, agentId: 'r1' })
     const onRunStarted = vi.fn()
     render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
@@ -234,7 +234,7 @@ describe('TicketsPanel (#697/#1144)', () => {
   })
 
   test('a filled tickets/ offers the update, and sends the update preset verbatim (#1208)', async () => {
-    sendStart.mockResolvedValue({ ok: true, runId: 'r2' })
+    sendStart.mockResolvedValue({ ok: true, agentId: 'r2' })
     const onRunStarted = vi.fn()
     render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))

@@ -49,7 +49,7 @@ beforeEach(() => {
   startError = null
   onProjects.mockResolvedValue([project('p1', 'gemstack')])
   start.mockReset()
-  start.mockResolvedValue({ ok: true, runId: 'run-1' })
+  start.mockResolvedValue({ ok: true, agentId: 'run-1' })
   updatePreferences.mockReset()
   sendAutoPmSweep.mockReset()
   sendAutoPmSweep.mockResolvedValue({ ok: true })

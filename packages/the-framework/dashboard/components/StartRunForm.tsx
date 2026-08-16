@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { ProjectSummary } from '../../dist/index.js'
-import { DEFAULT_HANDOFF, handoffReaches, runOptionsFromPreferences } from '../../dist/client.js'
+import { DEFAULT_HANDOFF, handoffReaches, agentOptionsFromPreferences } from '../../dist/client.js'
 import { onDriverReady, onClaudeTrust, onProjects, onRepoAutoMerge } from '../rpc/projects.js'
 import { onSystemPromptUser } from '../rpc/reads.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
@@ -28,7 +28,7 @@ export function StartRunForm({
 }: {
   projectId: string
   /** `runsOn` names the device a remote run executes on (#1067), for the "runs on <device>" marker. */
-  onRunStarted?: ((intent: string, runId?: string, runsOn?: string) => void) | undefined
+  onRunStarted?: ((intent: string, agentId?: string, runsOn?: string) => void) | undefined
   /** The project's files for the `#` picker (#504), owned by the shell. */
   files: string[]
   /** The run Context set, shared with the right-rail file tree (#492) — owned by the shell. */
@@ -82,7 +82,7 @@ export function StartRunForm({
   // submit and the system-prompt preview below cannot disagree with the run they describe. A picked
   // device adds the relay target (#1067); absent, this is byte-identical to a local start.
   const options = {
-    ...runOptionsFromPreferences(preferences, [...context]),
+    ...agentOptionsFromPreferences(preferences, [...context]),
     ...(remoteDevice ? { remote: { url: remoteDevice.url, token: remoteDevice.token, label: remoteDevice.label } } : {}),
   }
 
@@ -136,7 +136,7 @@ export function StartRunForm({
       // Show the run in the Runs rail immediately (#405): the spawned process writes its run.json
       // a beat later, so seed an optimistic row with the typed prompt until the real meta takes over.
       // A remote run (#1067) carries the device label so the view can mark where it executes.
-      onRunStarted?.(text, result.runId, remoteDevice?.label) // select the run we just started (#761)
+      onRunStarted?.(text, result.agentId, remoteDevice?.label) // select the run we just started (#761)
       composerRef.current?.clear()
       setPrompt('')
     }

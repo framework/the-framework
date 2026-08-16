@@ -136,7 +136,7 @@ test('the event stream sends one SSE frame per event', async () => {
   }
   const server = await mounted({ eventsSource: () => source() })
   try {
-    const res = await fetch(`${server.url}/_rpc/events?projectId=p1&runId=r1`)
+    const res = await fetch(`${server.url}/_rpc/events?projectId=p1&agentId=r1`)
     const text = await res.text()
     const events = text
       .split('\n\n')

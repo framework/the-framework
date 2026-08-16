@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { deleteProjectRun, removeProjectWorktree } from './worktrees.js'
-import { addWorktree, listRuns, runBranchName } from './store/index.js'
+import { addWorktree, listAgents, agentBranchName } from './store/index.js'
 import { nodeGitRunner } from './project.js'
 
 // #982/E5: one rule decides every removal — the work is committed to the session's branch, the
@@ -32,7 +32,7 @@ async function repoWithDirtyWorktree(opts: { remote?: boolean } = {}): Promise<{
     await git(['init', '-q', '--bare', join(repo, 'origin.git')], repo)
     await git(['remote', 'add', 'origin', join(repo, 'origin.git')], repo)
   }
-  const { path, branch } = await addWorktree(repo, { runId: RUN_ID, branch: runBranchName(RUN_ID) }, git)
+  const { path, branch } = await addWorktree(repo, { agentId: RUN_ID, branch: agentBranchName(RUN_ID) }, git)
   await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
   return { repo, path, branch }
 }
@@ -110,10 +110,10 @@ test('an unknown session is refused before any git runs (#982)', async () => {
 
 /** Write an archived run's meta + log, the two files that put its row in the rail. */
 async function archiveRun(repo: string, id: string): Promise<{ meta: string; log: string }> {
-  const runs = join(repo, '.the-framework', 'runs')
-  await mkdir(runs, { recursive: true })
-  const meta = join(runs, `${id}.json`)
-  const log = join(runs, `${id}.jsonl`)
+  const agents = join(repo, '.the-framework', 'agents')
+  await mkdir(agents, { recursive: true })
+  const meta = join(agents, `${id}.json`)
+  const log = join(agents, `${id}.jsonl`)
   await writeFile(meta, JSON.stringify({ version: 1, status: 'stopped', id, startedAt: '2026-01-01T00:00:00.000Z' }))
   await writeFile(log, '{"kind":"end"}\n')
   return { meta, log }
@@ -123,14 +123,14 @@ test('deleting a session removes its records and worktree but keeps the branch (
   const { repo, path, branch } = await repoWithDirtyWorktree()
   try {
     const { meta, log } = await archiveRun(repo, RUN_ID)
-    assert.equal((await listRuns(repo)).some(r => r.id === RUN_ID), true, 'the row is listed to begin with')
+    assert.equal((await listAgents(repo)).some(r => r.id === RUN_ID), true, 'the row is listed to begin with')
 
     assert.deepEqual(await deleteProjectRun(repo, RUN_ID), { ok: true })
 
     await assert.rejects(() => stat(path), 'the worktree is gone')
     await assert.rejects(() => stat(meta), 'the run meta is gone')
     await assert.rejects(() => stat(log), 'the event log is gone')
-    assert.equal((await listRuns(repo)).some(r => r.id === RUN_ID), false, 'the row has left the list')
+    assert.equal((await listAgents(repo)).some(r => r.id === RUN_ID), false, 'the row has left the list')
     // The branch and its commits are git history, deliberately left behind.
     const shown = await nodeGitRunner()(['rev-parse', '--verify', branch], repo)
     assert.match(shown, /^[0-9a-f]{40}/, 'the branch still exists')

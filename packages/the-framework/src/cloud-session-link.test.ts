@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { CloudDriver } from './driver/cloud.js'
-import { createDriverEventHandler, emitSessionStart } from './run-telemetry.js'
+import { createDriverEventHandler, emitSessionStart } from './agent-telemetry.js'
 import { metaFromEvents } from './store/index.js'
 import { CLAUDE_CODE_SESSION_LINK } from './session-link.js'
 import type { FrameworkEvent } from './events.js'
@@ -28,7 +28,7 @@ test('a cloud run meta ends with the real session URL, not the generic entry poi
     sessionLink: CLAUDE_CODE_SESSION_LINK,
   })
   const driver = new CloudDriver({
-    runTag: () => 'tag',
+    agentTag: () => 'tag',
     timeoutMs: 1000,
     runPty: async opts => {
       opts.onData(CREATED)

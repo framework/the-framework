@@ -6,9 +6,9 @@ import { join } from 'node:path'
 import { runSession } from './run.js'
 import { requestChoices, requestMultiSelect, runAwaitRounds, type ChoicesOption, type MultiSelectOption } from './await-gate.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
-import { RunMessageQueue } from './run-messages.js'
+import { AgentMessageQueue } from './agent-messages.js'
 import { FakeDriver, type Driver, type DriverSession } from './driver/index.js'
-import type { RunLocation } from './run-location.js'
+import type { AgentLocation } from './agent-location.js'
 import { composeRunSystem } from './system-prompt.js'
 import type { ChoiceRequest, FrameworkEvent } from './events.js'
 import { MAX_AWAIT_ROUNDS, continuationPrompt } from './turn-gate.js'
@@ -629,7 +629,7 @@ test('a stay-open run says it is parked each time it waits for the user (#785/#1
   const prompts: string[] = []
   const driver = new FakeDriver({ respond: prompt => (prompts.push(prompt), 'built it') })
   const session = await driver.start({ cwd: '/tmp/ws' })
-  const messages = new RunMessageQueue()
+  const messages = new AgentMessageQueue()
   const events: FrameworkEvent[] = []
 
   const done = runAwaitRounds({
@@ -659,7 +659,7 @@ test('runAwaitRounds does not report exhausted when a chat phase follows the ope
   // before #742 the opening drain's `exhausted: true` leaked through into a spurious end log.
   const driver = new FakeDriver({ respond: () => choicesGate('Again?') })
   const session = await driver.start({ cwd: '/tmp/ws' })
-  const messages = new RunMessageQueue()
+  const messages = new AgentMessageQueue()
   messages.close() // no messages: the stay-open phase ends immediately.
   const result = await runAwaitRounds({
     session,
@@ -733,7 +733,7 @@ test('a hand-off run is told the await gates are unavailable, a local one is not
   // Our own prompt says "ambiguous prompt: showChoices + AWAIT". A cloud session that obeys it
   // parks forever on a question nobody attached can answer. The hands-off block amends the
   // await protocol for exactly these runs, and only these.
-  const systemOf = async (driver: Driver, location: RunLocation): Promise<string> => {
+  const systemOf = async (driver: Driver, location: AgentLocation): Promise<string> => {
     const events: FrameworkEvent[] = []
     await runSession({ prompt: FAKE_INTENT, driver, location, cwd: '/tmp/ws', onEvent: e => events.push(e) })
     const prompt = events.find(e => e.kind === 'system-prompt')
@@ -747,8 +747,8 @@ test('a hand-off run does not stay open for messages (#1225)', async () => {
   const { driver } = handsOffDriver()
   // Left open on purpose: a run that still waited on it would never resolve, since the
   // composer it waits for cannot reach the session it handed to.
-  const messages = new RunMessageQueue()
-  const run = runSession({
+  const messages = new AgentMessageQueue()
+  const agent = runSession({
     prompt: FAKE_INTENT,
     driver,
     location: 'web',
@@ -757,7 +757,7 @@ test('a hand-off run does not stay open for messages (#1225)', async () => {
     onEvent: () => {},
   })
   const timer = new Promise<'waited'>(resolve => setTimeout(() => resolve('waited'), 2000).unref())
-  assert.notEqual(await Promise.race([run.then(() => 'ended' as const), timer]), 'waited')
+  assert.notEqual(await Promise.race([agent.then(() => 'ended' as const), timer]), 'waited')
 })
 
 test('runSession resumes a stopped leg: session resumed, message sent verbatim (#1467)', async () => {

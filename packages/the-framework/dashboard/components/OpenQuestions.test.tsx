@@ -28,7 +28,7 @@ afterEach(cleanup)
 const question = (overrides: Partial<OpenQuestion> = {}): OpenQuestion => ({
   projectId: 'p1',
   projectName: 'alpha',
-  runId: 'run-1',
+  agentId: 'run-1',
   sessionName: 'triage-queue',
   updatedAt: '2026-08-01T10:00:00.000Z',
   choice: {
@@ -64,7 +64,7 @@ describe('OpenQuestions (#1455 item 4)', () => {
   test('questions from several projects sit side by side, each answerable', async () => {
     onOpenQuestions.mockResolvedValue([
       question(),
-      question({ projectId: 'p2', projectName: 'beta', runId: 'run-9', sessionName: 'fix-ci', choice: { id: 'gate-2', title: 'Approve the fix?', options: [{ id: 'ok', label: 'Approve it' }], recommended: 'ok' } }),
+      question({ projectId: 'p2', projectName: 'beta', agentId: 'run-9', sessionName: 'fix-ci', choice: { id: 'gate-2', title: 'Approve the fix?', options: [{ id: 'ok', label: 'Approve it' }], recommended: 'ok' } }),
     ])
     render(<OpenQuestions onOpenSession={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Waiting on you · 2')).toBeTruthy())
@@ -99,7 +99,7 @@ describe('OpenQuestions (#1455 item 4)', () => {
 
 describe('OpenQuestions jump-nav (#1455 bonus 1)', () => {
   const second = () =>
-    question({ projectId: 'p2', projectName: 'beta', runId: 'run-9', sessionName: 'fix-ci', choice: { id: 'gate-2', title: 'Approve the fix?', options: [{ id: 'ok', label: 'Approve it' }], recommended: 'ok' } })
+    question({ projectId: 'p2', projectName: 'beta', agentId: 'run-9', sessionName: 'fix-ci', choice: { id: 'gate-2', title: 'Approve the fix?', options: [{ id: 'ok', label: 'Approve it' }], recommended: 'ok' } })
 
   test('one question needs no map to it: no nav', async () => {
     onOpenQuestions.mockResolvedValue([question()])

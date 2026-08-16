@@ -43,8 +43,8 @@ export type QueuePromotion =
     }
 
 /** The commit message a promotion writes. Names the run so the history says where it came from. */
-function promotionMessage(runId: string): string {
-  return `[The Framework] queue updates from ${runId}`
+function promotionMessage(agentId: string): string {
+  return `[The Framework] queue updates from ${agentId}`
 }
 
 /**
@@ -60,11 +60,11 @@ function promotionMessage(runId: string): string {
  */
 export async function promoteQueue(
   projectCwd: string,
-  run: { id: string; branch?: string | undefined; entry?: string | undefined },
+  agent: { id: string; branch?: string | undefined; entry?: string | undefined },
   git: GitRunner = nodeGitRunner(),
   write: (path: string, content: string) => Promise<void> = (path, content) => writeFile(path, content, 'utf8'),
 ): Promise<QueuePromotion> {
-  const branch = run.branch
+  const branch = agent.branch
   if (!branch) return { promoted: false, reason: 'the run recorded no branch' }
 
   try {
@@ -83,7 +83,7 @@ export async function promoteQueue(
     // A run pinned to one entry (#1204) lands that entry, not its whole file: with several drains
     // in flight the wholesale copy below would carry each run's stale view of every *other* entry,
     // and the last promotion of the tick would un-check whatever the earlier ones had just retired.
-    if (run.entry !== undefined) {
+    if (agent.entry !== undefined) {
       // The queue where the run forked, so an entry it *added* can be told from one somebody
       // *removed* while it worked. Both look alike from the branch alone — present there, absent
       // here — and `todo_format.md` makes removal the way to retire an entry, so guessing wrong
@@ -93,11 +93,11 @@ export async function promoteQueue(
       const atBase = mergeBase
         ? await git(['show', `${mergeBase}:${FLAT_TODO_FILE}`], projectCwd).catch(() => undefined)
         : undefined
-      const landed = landPinnedEntry(inCheckout, fromBranch, run.entry, atBase)
+      const landed = landPinnedEntry(inCheckout, fromBranch, agent.entry, atBase)
       if (landed === inCheckout) return { promoted: false, reason: 'the run left nothing to land on the queue' }
       await write(join(projectCwd, FLAT_TODO_FILE), landed)
       await git(['add', '--', FLAT_TODO_FILE], projectCwd)
-      await git(['commit', '-m', promotionMessage(run.id), '--', FLAT_TODO_FILE], projectCwd)
+      await git(['commit', '-m', promotionMessage(agent.id), '--', FLAT_TODO_FILE], projectCwd)
       return { promoted: true, branch }
     }
 
@@ -105,7 +105,7 @@ export async function promoteQueue(
     // else in the tree. The commit is pathspec-scoped for the same reason: whatever else is
     // staged in the user's checkout is theirs and must not ride along.
     await git(['checkout', branch, '--', FLAT_TODO_FILE], projectCwd)
-    await git(['commit', '-m', promotionMessage(run.id), '--', FLAT_TODO_FILE], projectCwd)
+    await git(['commit', '-m', promotionMessage(agent.id), '--', FLAT_TODO_FILE], projectCwd)
     return { promoted: true, branch }
   } catch (err) {
     return { promoted: false, reason: errorMessage(err) }

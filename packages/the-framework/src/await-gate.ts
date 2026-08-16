@@ -1,7 +1,7 @@
 import { MAX_AWAIT_ROUNDS, continuationPrompt, parseAwaitGate, type ParsedAwaitGate } from './turn-gate.js'
 import { pickedIds, type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
 import type { DriverSession, DriverTurn } from './driver/index.js'
-import type { ChatMessage, RunMessages } from './run-messages.js'
+import type { ChatMessage, AgentMessages } from './agent-messages.js'
 
 // The shared await/choice/chat machinery (#304/#337/#339/#714), lifted out of the run
 // lifecycle so the build path (run.ts), the direct prompt path (prompt-run.ts), and the
@@ -74,7 +74,7 @@ export interface AwaitRoundsOptions {
    * each resuming the same session. Unset for a headless run, which then
    * ends when the agent stops asking — byte-identical to before this existed.
    */
-  messages?: RunMessages | undefined
+  messages?: AgentMessages | undefined
   /**
    * Keep the chat parked for the next message instead of ending on an idle queue (#1390).
    * Only for a run whose own terminal dashboard is the single surface — everything else
@@ -147,7 +147,7 @@ function promptContinuation(session: DriverSession, deps: AwaitTurnDeps): (quest
  * opening prompt's await-round cap is no longer the run's end reason, and a phase that ends
  * on Stop / close is not exhausted at all.
  */
-export async function runChatPhase(session: DriverSession, messages: RunMessages, seed: DriverTurn, deps: AwaitTurnDeps, stayOpen = false): Promise<{ turn: DriverTurn; exhausted: boolean }> {
+export async function runChatPhase(session: DriverSession, messages: AgentMessages, seed: DriverTurn, deps: AwaitTurnDeps, stayOpen = false): Promise<{ turn: DriverTurn; exhausted: boolean }> {
   const signalOpt = deps.signal ? { signal: deps.signal } : {}
   let turn = seed
   let exhausted = false

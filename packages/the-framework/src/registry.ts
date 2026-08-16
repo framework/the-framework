@@ -1,4 +1,4 @@
-import { isRunLocation, type RunLocation } from './run-location.js'
+import { isRunLocation, type AgentLocation } from './agent-location.js'
 import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
@@ -95,7 +95,7 @@ export interface Preferences {
   /** Dashboard color theme (#725): `system` (follow the OS, the default), `light`, or `dark`. Absent = system. */
   theme?: 'system' | 'light' | 'dark'
   /** Where a run executes (#1050/#610): `local` (this device, the default), `actions` (a fresh GitHub Actions runner) or `web` (a Claude Code cloud session); maps to `--run-on`. Absent = local. */
-  target?: RunLocation
+  target?: AgentLocation
   /**
    * Post a Discord message when a new item lands on the "needs you" queue (#627). Absent = off:
    * unlike the in-browser toggle, Discord reaches you when no dashboard is open, so it is opt-in.

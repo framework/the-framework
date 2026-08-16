@@ -10,7 +10,7 @@ import { parseBrowserRoute, handleBrowserProxy, type BrowserPortLookup } from '.
 test('parseBrowserRoute reads a project, a run, and a leg', () => {
   assert.deepEqual(parseBrowserRoute('/browser/proj/2026-07-19T10-00-00-000Z/stream'), {
     projectId: 'proj',
-    runId: '2026-07-19T10-00-00-000Z',
+    agentId: '2026-07-19T10-00-00-000Z',
     leg: 'stream',
   })
   assert.equal(parseBrowserRoute('/browser/proj/run/input')?.leg, 'input')

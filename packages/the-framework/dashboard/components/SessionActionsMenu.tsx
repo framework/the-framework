@@ -45,7 +45,7 @@ import {
 // confirm dialog (a menu item cannot also be the dialog's trigger, so the dialog is controlled).
 export function SessionActionsMenu({
   projectId,
-  runId,
+  agentId: agentId,
   events,
   label,
   retainedWorktree = false,
@@ -53,7 +53,7 @@ export function SessionActionsMenu({
   onDeleted,
 }: {
   projectId: string
-  runId?: string | null | undefined
+  agentId?: string | null | undefined
   events: FrameworkEvent[]
   label?: string | undefined
   retainedWorktree?: boolean
@@ -67,7 +67,7 @@ export function SessionActionsMenu({
   // Whether this session still has a checkout of its own. A live run is working in one; a finished
   // run only keeps one while its work has not reached the remote (#737/E5), since that is what
   // teardown waits for before reclaiming it. Without this the folder item promised the session's
-  // folder and silently opened the project root instead, because `resolveRunCheckout` falls back
+  // folder and silently opened the project root instead, because `resolveAgentCheckout` falls back
   // there once the worktree is gone.
   const hasOwnFolder = active || retainedWorktree
 
@@ -101,35 +101,35 @@ export function SessionActionsMenu({
 
   // A landed Stop stays "Stopping…" until the end event flips `active`, so it can't be re-fired.
   const [stopRequested, setStopRequested] = useState(false)
-  useEffect(() => setStopRequested(false), [runId])
+  useEffect(() => setStopRequested(false), [agentId])
   const stopping = busy || (stopRequested && active)
 
   // A landed Merge stays "Merge armed" (#1391): the authorization is a pre-commitment the session
   // honors when it ends, so there is nothing to press twice.
   const [mergeRequested, setMergeRequested] = useState(false)
-  useEffect(() => setMergeRequested(false), [runId])
+  useEffect(() => setMergeRequested(false), [agentId])
 
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const openApp = (target: 'files' | 'editor') => run(() => sendOpenInApp(projectId, target, runId ?? undefined), 'Failed to open.')
+  const openApp = (target: 'files' | 'editor') => run(() => sendOpenInApp(projectId, target, agentId ?? undefined), 'Failed to open.')
   const stopSession = () =>
-    void run(() => sendStop(projectId, runId ?? undefined).then(() => true), 'Could not stop the session.').then(result => {
+    void run(() => sendStop(projectId, agentId ?? undefined).then(() => true), 'Could not stop the session.').then(result => {
       if (result) setStopRequested(true)
     })
   const mergeSession = () => {
-    if (!runId) return
-    void run(() => sendMerge(projectId, runId), 'Could not arm the merge.').then(result => {
+    if (!agentId) return
+    void run(() => sendMerge(projectId, agentId), 'Could not arm the merge.').then(result => {
       if (result?.ok) setMergeRequested(true)
     })
   }
   const removeWorktree = () => {
-    if (!runId) return
-    void run(() => sendRemoveWorktree(projectId, runId), 'Could not remove the worktree.').then(result => {
+    if (!agentId) return
+    void run(() => sendRemoveWorktree(projectId, agentId), 'Could not remove the worktree.').then(result => {
       if (result !== undefined) onWorktreeRemoved?.()
     })
   }
 
-  const name = label?.trim() || runId
+  const name = label?.trim() || agentId
 
   return (
     <>
@@ -160,10 +160,10 @@ export function SessionActionsMenu({
           <DropdownMenuItem
             disabled={busy}
             onClick={() => void openApp('files')}
-            title={runId && !hasOwnFolder ? 'This session no longer has its own checkout' : undefined}
+            title={agentId && !hasOwnFolder ? 'This session no longer has its own checkout' : undefined}
           >
             <FolderOpen className="h-3.5 w-3.5 shrink-0" />{' '}
-            {runId ? (hasOwnFolder ? "Open session's folder" : 'Open project folder') : 'Open folder'}
+            {agentId ? (hasOwnFolder ? "Open session's folder" : 'Open project folder') : 'Open folder'}
           </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger disabled={busy}>
@@ -171,7 +171,7 @@ export function SessionActionsMenu({
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="min-w-[15rem]">
               <DropdownMenuItem disabled={busy} onClick={() => void openApp('editor')}>
-                <Code className="h-3.5 w-3.5 shrink-0" /> {runId ? "Open this session's checkout" : 'Open in your editor'}
+                <Code className="h-3.5 w-3.5 shrink-0" /> {agentId ? "Open this session's checkout" : 'Open in your editor'}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
@@ -235,19 +235,19 @@ export function SessionActionsMenu({
           {/* The user's Merge (#1391): the human authorization the merge gate (#1363) otherwise
               collects from the agent's signal. A pre-commitment, not an abort — the session still
               ends at its own natural end (#1390) and merges there. */}
-          {active && runId && (
+          {active && agentId && (
             <DropdownMenuItem disabled={mergeRequested || busy} onClick={() => mergeSession()}>
               <GitMerge className="h-3.5 w-3.5 shrink-0" /> {mergeRequested ? 'Merge armed' : 'Merge when finished'}
             </DropdownMenuItem>
           )}
 
-          {((retainedWorktree && !active) || (onDeleted && !active)) && runId && <DropdownMenuSeparator />}
-          {retainedWorktree && !active && runId && (
+          {((retainedWorktree && !active) || (onDeleted && !active)) && agentId && <DropdownMenuSeparator />}
+          {retainedWorktree && !active && agentId && (
             <DropdownMenuItem disabled={busy} onClick={() => removeWorktree()}>
               <FolderX className="h-3.5 w-3.5 shrink-0" /> Remove worktree
             </DropdownMenuItem>
           )}
-          {onDeleted && !active && runId && (
+          {onDeleted && !active && agentId && (
             <DropdownMenuItem onClick={() => setConfirmDelete(true)} className="text-danger">
               <Trash2 className="h-3.5 w-3.5 shrink-0" /> Delete session
             </DropdownMenuItem>
@@ -257,7 +257,7 @@ export function SessionActionsMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {onDeleted && runId && (
+      {onDeleted && agentId && (
         <ConfirmDialog
           open={confirmDelete}
           onOpenChange={setConfirmDelete}
@@ -271,7 +271,7 @@ export function SessionActionsMenu({
           confirmLabel="Delete"
           confirmBusyLabel="Deleting…"
           fallbackError="Could not delete the session."
-          onConfirm={() => sendDeleteSession(projectId, runId).then(result => (result.ok ? result : Promise.reject(new Error(result.error))))}
+          onConfirm={() => sendDeleteSession(projectId, agentId).then(result => (result.ok ? result : Promise.reject(new Error(result.error))))}
           onSuccess={onDeleted}
         />
       )}

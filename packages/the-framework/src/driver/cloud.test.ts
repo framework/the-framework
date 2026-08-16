@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { isHandsOff } from '../run-location.js'
-import { CLOUD_COMMAND, CLOUD_PROMPT_SEPARATOR, CloudDriver, cloudHandOffPrompt, trustRootOf, type RunPtyOptions } from './cloud.js'
+import { isHandsOff } from '../agent-location.js'
+import { CLOUD_COMMAND, CLOUD_PROMPT_SEPARATOR, CloudDriver, cloudHandOffPrompt, trustRootOf, type AgentPtyOptions } from './cloud.js'
 import type { DriverEvent } from './types.js'
 
 /**
@@ -21,10 +21,10 @@ const URL = 'https://claude.ai/code/session_01ABCdefGHIjklMNO?from=cli&m=0'
 const SESSION = 'session_01ABCdefGHIjklMNO'
 
 /** A pty runner that replays a fixed transcript, recording how it was called. */
-function fakePty(output: string, calls: RunPtyOptions[] = []) {
+function fakePty(output: string, calls: AgentPtyOptions[] = []) {
   return {
     calls,
-    run: async (opts: RunPtyOptions) => {
+    run: async (opts: AgentPtyOptions) => {
       calls.push(opts)
       opts.onData(output)
       // A real invocation keeps holding the terminal until the caller aborts, so only
@@ -34,9 +34,9 @@ function fakePty(output: string, calls: RunPtyOptions[] = []) {
   }
 }
 
-function driverWith(output: string, calls: RunPtyOptions[] = []) {
+function driverWith(output: string, calls: AgentPtyOptions[] = []) {
   const pty = fakePty(output, calls)
-  return new CloudDriver({ runPty: pty.run, runTag: () => 'tag', timeoutMs: 1000 })
+  return new CloudDriver({ runPty: pty.run, agentTag: () => 'tag', timeoutMs: 1000 })
 }
 
 test('a prompt creates a cloud session and returns its id', async () => {
@@ -58,7 +58,7 @@ test('the session link rides an `action` event, the way the Actions run link doe
 })
 
 test('the task leads the prompt; framing and per-call system follow behind labeled rules (#1497)', async () => {
-  const calls: RunPtyOptions[] = []
+  const calls: AgentPtyOptions[] = []
   const session = await driverWith(CREATED, calls).start({ cwd: '/repo', system: 'FRAMING' })
   await session.prompt('do the thing', { system: 'EXTRA' })
   assert.equal(
@@ -80,16 +80,16 @@ test('cloudHandOffPrompt with nothing injected is the bare task — no rule, no 
 })
 
 test('the invocation is stopped as soon as the session link lands', async () => {
-  const calls: RunPtyOptions[] = []
+  const calls: AgentPtyOptions[] = []
   const session = await driverWith(CREATED, calls).start({ cwd: '/repo' })
   await session.prompt('go')
   assert.equal(calls[0]?.signal.aborted, true, 'the CLI would otherwise sit holding the terminal')
 })
 
 test('output split across chunks still yields the session', async () => {
-  const calls: RunPtyOptions[] = []
+  const calls: AgentPtyOptions[] = []
   const driver = new CloudDriver({
-    runTag: () => 'tag',
+    agentTag: () => 'tag',
     timeoutMs: 1000,
     runPty: async opts => {
       calls.push(opts)
@@ -105,7 +105,7 @@ test('output split across chunks still yields the session', async () => {
 
 test('a run that created no session fails with what the CLI said', async () => {
   const driver = new CloudDriver({
-    runTag: () => 'tag',
+    agentTag: () => 'tag',
     timeoutMs: 1000,
     runPty: async opts => opts.onData('Invalid API key · Fix external API key\r\n'),
   })
@@ -118,7 +118,7 @@ test('an untrusted workspace fails fast and says how to fix it, rather than hang
   // between them — matching has to survive that, which is why this fixture looks like this.
   const events: DriverEvent[] = []
   const driver = new CloudDriver({
-    runTag: () => 'tag',
+    agentTag: () => 'tag',
     timeoutMs: 1000,
     runPty: async opts => {
       opts.onData('\x1b[2KQuick\x1b[Csafety\x1b[Ccheck\r\n1.\x1b[CYes,\x1b[CI\x1b[Ctrust\x1b[Cthis\x1b[Cfolder\r\n')
@@ -140,7 +140,7 @@ test('trust advice for a run worktree names the project root, which outlives the
   // the ephemeral worktree path, which is gone before anyone could follow it.
   const events: DriverEvent[] = []
   const driver = new CloudDriver({
-    runTag: () => 'tag',
+    agentTag: () => 'tag',
     timeoutMs: 1000,
     runPty: async opts => {
       opts.onData('Quick\x1b[Csafety\x1b[Ccheck\r\n1.\x1b[CYes,\x1b[CI\x1b[Ctrust\x1b[Cthis\x1b[Cfolder\r\n')
@@ -183,14 +183,14 @@ test('the shell command never interpolates the prompt or the model as syntax', (
 })
 
 test('an unsafe model id never reaches the shell', async () => {
-  const calls: RunPtyOptions[] = []
+  const calls: AgentPtyOptions[] = []
   const session = await driverWith(CREATED, calls).start({ cwd: '/repo', model: 'opus"; rm -rf /' })
   await assert.rejects(session.prompt('go'), /unsafe model id/)
   assert.equal(calls.length, 0, 'nothing should have been spawned')
 })
 
 test('a safe model id is passed through', async () => {
-  const calls: RunPtyOptions[] = []
+  const calls: AgentPtyOptions[] = []
   const session = await driverWith(CREATED, calls).start({ cwd: '/repo', model: 'claude-opus-5' })
   await session.prompt('go')
   assert.equal(calls[0]?.model, 'claude-opus-5')
@@ -199,7 +199,7 @@ test('a safe model id is passed through', async () => {
 test('a run hands off ONCE, however many times the loop prompts', async () => {
   // The regression this exists for: a run is not one prompt. The loop prompts per pass, and
   // spawning a session each time turned one run into six of them racing on the same repo.
-  const calls: RunPtyOptions[] = []
+  const calls: AgentPtyOptions[] = []
   const session = await driverWith(CREATED, calls).start({ cwd: '/repo' })
   const first = await session.prompt('build the thing')
   const second = await session.prompt('now review it')
@@ -243,7 +243,7 @@ test('a disposed session refuses further prompts', async () => {
 })
 
 test('an already-aborted signal stops the prompt before spawning anything', async () => {
-  const calls: RunPtyOptions[] = []
+  const calls: AgentPtyOptions[] = []
   const controller = new AbortController()
   controller.abort()
   const session = await driverWith(CREATED, calls).start({ cwd: '/repo', signal: controller.signal })

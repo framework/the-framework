@@ -53,7 +53,7 @@ export function OnboardingChecklist({
    * travels with it: this renders on the Overview and the settings page, neither of which has
    * one selected. Required, so a new mounting surface cannot quietly drop the navigation.
    */
-  onRunStarted: (projectId: string, intent: string, runId?: string) => void
+  onRunStarted: (projectId: string, intent: string, agentId?: string) => void
 }) {
   // Slower than the Overview's own 5s poll: onboarding state changes at human speed, and this
   // read fans out over every project to answer the tickets question.
@@ -106,7 +106,7 @@ export function OnboardingChecklist({
     const started = await start(targetProjectId, intent, 'prompt', { unattended: true })
     // Land on the session doing the import, not the project's launcher (#1169): its id is what
     // the shell needs to show the live output. A refusal keeps you here, with `startError` shown.
-    if (started) onRunStarted(targetProjectId, intent, started.runId)
+    if (started) onRunStarted(targetProjectId, intent, started.agentId)
   }
 
   const steps: Step[] = [

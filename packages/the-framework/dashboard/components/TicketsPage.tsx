@@ -48,7 +48,7 @@ export function TicketsPage({
   /** Told when an import/update session starts, so the shell can show it (#948) — which project
    *  started it is not implied the way it is for a single-project page, so each section binds
    *  its own id below rather than this prop guessing. */
-  onRunStarted?: ((projectId: string, intent: string, runId?: string) => void) | undefined
+  onRunStarted?: ((projectId: string, intent: string, agentId?: string) => void) | undefined
 }) {
   const { value: groups, loaded } = usePolled<ProjectTickets[]>(onAllTickets, EMPTY_GROUPS, 10_000, [])
   const [view, setViewState] = useState<TicketsView>(initialView)
@@ -83,7 +83,7 @@ export function TicketsPage({
   const startPlan = async (projectId: string, file: string) => {
     const prompt = planPrompt(file)
     const result = await run(() => sendStart(projectId, prompt, 'prompt'), 'The planning session could not be started.')
-    if (result?.ok) onRunStarted?.(projectId, prompt, result.runId)
+    if (result?.ok) onRunStarted?.(projectId, prompt, result.agentId)
   }
   // Unattended with the ticket named on the options, exactly as the panel's own start column does.
   const startWork = async (projectId: string, file: string) => {
@@ -92,7 +92,7 @@ export function TicketsPage({
       () => sendStart(projectId, prompt, 'prompt', { unattended: true, ticket: `tickets/${file}` }),
       'The work session could not be started.',
     )
-    if (result?.ok) onRunStarted?.(projectId, prompt, result.runId)
+    if (result?.ok) onRunStarted?.(projectId, prompt, result.agentId)
   }
 
   // A project deselected in the Project facet disappears entirely — its section would otherwise
@@ -191,7 +191,7 @@ export function TicketsPage({
                       hiddenByFilter={g.tickets.length - groupRows.length}
                       onOpen={file => onOpenTicket(g.projectId, file)}
                       onOpenPlan={onOpenTicketPlan ? file => onOpenTicketPlan(g.projectId, file) : undefined}
-                      onRunStarted={(intent, runId) => onRunStarted?.(g.projectId, intent, runId)}
+                      onRunStarted={(intent, agentId) => onRunStarted?.(g.projectId, intent, agentId)}
                       onTopicClick={addTopic}
                       onClaimedClick={filterClaimed}
                       onClearFilters={filtered ? clearFilters : undefined}

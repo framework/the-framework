@@ -115,7 +115,7 @@ function recordingDeps(outcome: (path: string) => boolean): {
     ran,
     recorded,
     deps: {
-      run: async (review: RepoReview) => {
+      agent: async (review: RepoReview) => {
         ran.push(review.path)
         return outcome(review.path)
       },

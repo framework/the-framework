@@ -1,4 +1,4 @@
-import { resolveRunCheckout } from '../store/index.js'
+import { resolveAgentCheckout } from '../store/index.js'
 import { defaultProjectsProvider, type ProjectsProvider } from '../dashboard/projects.js'
 import type { DashboardContext, EventsSource, RemoteRuns } from '../dashboard/rpc-serve.js'
 import type { PreferencesStore } from '../registry.js'
@@ -50,16 +50,16 @@ export function resolveProjectPath(projectId: string): Promise<string | undefine
 }
 
 /**
- * The checkout a call should act on: a live run's own worktree when `runId` names one (#738/#749),
+ * The checkout a call should act on: a live run's own worktree when `agentId` names one (#738/#749),
  * else the project root. Since #736 a run reads and writes inside its worktree — its event log,
  * its control log, its working tree — so anything addressed at a *run* has to resolve here, not
  * at the project path, or it reads an empty log and steers a run that is not listening. The
  * resolution itself (and its #766 first-seconds subtlety) lives in the store's
- * {@link resolveRunCheckout}, shared with the daemon; this adds only the project-id lookup.
+ * {@link resolveAgentCheckout}, shared with the daemon; this adds only the project-id lookup.
  */
-export async function resolveRunPath(projectId: string, runId?: string): Promise<string | undefined> {
+export async function resolveRunPath(projectId: string, agentId?: string): Promise<string | undefined> {
   const cwd = await resolveProjectPath(projectId)
-  return cwd ? resolveRunCheckout(cwd, runId) : undefined
+  return cwd ? resolveAgentCheckout(cwd, agentId) : undefined
 }
 
 /**

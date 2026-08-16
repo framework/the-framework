@@ -16,7 +16,7 @@ import { randomUUID } from 'node:crypto'
 import { formatFrameworkEvent, mergeWithheldWhy } from './terminal.js'
 import { CLAUDE_CODE_SESSION_LINK } from './session-link.js'
 import { type AutoHandoffSkip, type ChoicePick, type ChoiceRequest, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
-import { runAutoHandoff, withheldMerge } from './dashboard/run-handoff.js'
+import { runAutoHandoff, withheldMerge } from './dashboard/agent-handoff.js'
 import {
   runSession,
   type RunSessionOptions,
@@ -24,7 +24,7 @@ import {
 } from './run.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
-import { isHandsOff, isRunLocation, type RunLocation } from './run-location.js'
+import { isHandsOff, isRunLocation, type AgentLocation } from './agent-location.js'
 import { handoffStages, isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { readSessionSpec, writeSessionSpec, type SessionSpec } from './session-spec.js'
 import { sessionTodoPending } from './todo-loop.js'
@@ -38,11 +38,11 @@ import {
 } from './config-layers.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
-import { RunStore, commitPendingWork, currentBranch, nodeStoreFs, renameRunBranch, runBranchName, type StoreFs } from './store/index.js'
+import { AgentStore, commitPendingWork, currentBranch, nodeStoreFs, renameRunBranch, agentBranchName, type StoreFs } from './store/index.js'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { appendControl, resetControl, watchControl, type ControlWatcher } from './control.js'
-import { RunMessageQueue } from './run-messages.js'
+import { AgentMessageQueue } from './agent-messages.js'
 import { createGateKeepalive } from './gate-keepalive.js'
 import { nodeGitRunner } from './project.js'
 import { ensureDaemonToken, readDaemonToken, readPreferences } from './registry.js'
@@ -163,7 +163,7 @@ export interface SessionOptions {
   /** `--run-on <local|actions|web>` (#1050/#610): where the run executes. `actions` drives it on a
    * GitHub Actions runner via ActionsDriver (#934); `web` hands it to a Claude Code cloud session
    * via CloudDriver (#610); absent / `local` runs on this device as before. */
-  target?: RunLocation | undefined
+  target?: AgentLocation | undefined
   cwd?: string | undefined
   /**
    * `--run-id <id>` (#736): the id the daemon allocated for this run before spawning it. Its
@@ -171,7 +171,7 @@ export interface SessionOptions {
    * created on a `the-framework/run-<id>` branch, which the run renames once the agent names
    * the session. Absent for a plain `framework "..."`, which runs in the user's own checkout.
    */
-  runId?: string | undefined
+  agentId?: string | undefined
   /**
    * `--continue-run` (#762): this run continues the run `--run-id` names rather than starting a new
    * one. The store reopens that run's log instead of truncating it, so messaging a stopped run
@@ -319,7 +319,7 @@ export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = proce
     research: spec.kind === 'research',
     directPrompt: spec.kind === 'prompt',
     cwd: spec.cwd,
-    ...(spec.runId ? { runId: spec.runId } : {}),
+    ...(spec.agentId ? { agentId: spec.agentId } : {}),
     ...(spec.continueRun ? { continueRun: true } : {}),
     ...(isDriverName(o.driver) ? { driver: o.driver } : {}),
     ...(isRunLocation(o.target) ? { target: o.target } : {}),
@@ -403,7 +403,7 @@ export function mergeRunConfig(opts: RunConfigFlags, file: FrameworkFileConfig):
 /** The run-scoped state {@link settleRun} needs to close out either run path. */
 interface RunEpilogue {
   io: CliIO
-  store: RunStore | undefined
+  store: AgentStore | undefined
   control: ControlWatcher | undefined
   /** The run's Chrome (#793), stopped with the run so no headless browser outlives it. */
   sharedBrowser: SharedBrowser | undefined
@@ -432,7 +432,7 @@ async function settleRun(ctx: RunEpilogue, run: () => Promise<{ successLine: str
     const { successLine } = await run()
     ctx.clearInterrupt()
     io.out(successLine)
-    // Before the close, not after (#835): close() archives the log into `runs/`, so an
+    // Before the close, not after (#835): close() archives the log into `agents/`, so an
     // outcome appended afterwards would miss the copy the dashboard's history reads.
     await ctx.maybeFireOnBeforeMergeable()
     // After the quality step, so whatever it committed is in what gets pushed; before the close,
@@ -501,8 +501,8 @@ async function resolvePromptConfig(
  * (#922), and every Stop press then landed in control.jsonl and was read by nobody, in silence
  * (#905). A run id holds when a file about another process does not.
  */
-export function isSteerable(opts: { persist: boolean; runId?: string | undefined }): boolean {
-  return opts.persist && opts.runId !== undefined
+export function isSteerable(opts: { persist: boolean; agentId?: string | undefined }): boolean {
+  return opts.persist && opts.agentId !== undefined
 }
 
 /**
@@ -517,8 +517,8 @@ export function isSteerable(opts: { persist: boolean; runId?: string | undefined
  * So: the dashboard started it (a run id) and therefore has a UI to carry on the conversation in.
  * Stop and gate picks keep working either way.
  */
-export function isInteractive(opts: { runId?: string | undefined }): boolean {
-  return opts.runId !== undefined
+export function isInteractive(opts: { agentId?: string | undefined }): boolean {
+  return opts.agentId !== undefined
 }
 
 /**
@@ -573,8 +573,8 @@ export interface RunJournal {
 export function createRunJournal(deps: {
   io: CliIO
   cwd: string
-  store: RunStore | undefined
-  runId: string | undefined
+  store: AgentStore | undefined
+  agentId: string | undefined
 }): RunJournal {
   const { io, cwd, store } = deps
   // The framework's own verdict that the run stopped cleanly rather than failed — set by a
@@ -603,9 +603,9 @@ export function createRunJournal(deps: {
       // name existed; put the readable name on it now. No-ops when the agent branched itself,
       // and only a rename that happened is recorded (#1277) — a guessed name on the meta is
       // exactly what the branch event exists to end.
-      if (deps.runId) {
+      if (deps.agentId) {
         const renamed = `the-framework/${event.name}`
-        void renameRunBranch(cwd, runBranchName(deps.runId), renamed).then(didRename => {
+        void renameRunBranch(cwd, agentBranchName(deps.agentId), renamed).then(didRename => {
           if (didRename) onEvent({ kind: 'branch', branch: renamed })
         })
       }
@@ -756,7 +756,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   const pendingChoices = new Map<string, (pick: ChoicePick) => void>()
   // Live-chat messages the user sends to the running run (#714). The control watcher
   // pushes each here; the run loop drains them between turns and waits here when idle.
-  const messages = new RunMessageQueue()
+  const messages = new AgentMessageQueue()
   controller.signal.addEventListener('abort', () => {
     for (const resolve of pendingChoices.values()) resolve({ picked: 'proceed', by: 'auto' })
     pendingChoices.clear()
@@ -771,17 +771,17 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // is the dashboard's own event stream, appended to .the-framework/ in the workspace.
   // Best-effort: a store that fails to open just means no persistence, never a
   // failed run. --no-persist opts out entirely.
-  let store: RunStore | undefined
+  let store: AgentStore | undefined
   if (opts.persist) {
     try {
       // Seed the run's intent (its prompt) so the dashboard's Runs list labels it instead of
       // showing "(no prompt)". A build run refines this via its scope event; a prompt/research
       // run keeps it. Research with no "what" uses the same preset default the log title uses.
-      store = await RunStore.open(cwd, {
+      store = await AgentStore.open(cwd, {
         fresh: true,
         intent: intent || (opts.research ? defaultWhat() : ''),
         // Adopt the daemon's id (#736) so the run and the worktree it lives in share one.
-        ...(opts.runId ? { id: opts.runId } : {}),
+        ...(opts.agentId ? { id: opts.agentId } : {}),
         // Continuing (#762): keep the existing log rather than starting this run's history over.
         ...(opts.continueRun ? { continueRun: true } : {}),
         // The flow this run starts under (#1467), so a later continuation can re-enter it. A
@@ -906,7 +906,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
             next: (signal?: AbortSignal) => gateKeepalive.hold(messages.next(signal)),
             takeQueued: () => messages.takeQueued(),
           },
-          ...(opts.runId === undefined ? { stayOpenChat: true } : {}),
+          ...(opts.agentId === undefined ? { stayOpenChat: true } : {}),
         }
       : {}
 
@@ -917,7 +917,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // Everything the run reports that its epilogue needs — the settle flags, the deferred
   // browser-port announcement — plus the fan-out of every event to the terminal and the store,
   // lives in the journal. runCli reads its getters below.
-  const journal = createRunJournal({ io, cwd, store, runId: opts.runId })
+  const journal = createRunJournal({ io, cwd, store, agentId: opts.agentId })
   const onEvent = journal.onEvent
 
   // Put the armed state on the run's meta (#1102), and keep it there as the checkboxes change it.
@@ -984,7 +984,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     // teardown's identical commit landed seconds later, stranding real work on a local branch
     // nobody was told about. A failed commit is now its own skip, said out loud, and the
     // teardown still rescues the work onto the branch afterwards.
-    if (opts.runId && !(await commitPendingWork(cwd))) return skip('commit-failed')
+    if (opts.agentId && !(await commitPendingWork(cwd))) return skip('commit-failed')
 
     // The merge half is authorized, not just configured (#1363; rule settled on #1390): the
     // agent's setReadyForMerge() — the same signal maybeFireOnBeforeMergeable requires above —
@@ -1018,14 +1018,14 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     const fixes = opts.ticket && isTicketPath(opts.ticket) && !opts.planRun
       ? ticketIssueRef(await readFile(join(cwd, opts.ticket), 'utf8').catch(() => ''))
       : undefined
-    const run = {
-      id: opts.runId ?? '',
+    const agent = {
+      id: opts.agentId ?? '',
       branch,
       ...(sessionName ? { sessionName } : {}),
       ...(intent ? { intent } : {}),
       ...(fixes ? { fixes } : {}),
     }
-    const handedOff = await runAutoHandoff(cwd, run, armed)
+    const handedOff = await runAutoHandoff(cwd, agent, armed)
     const outcome =
       mergeGate && handedOff.outcome !== 'failed'
         ? { ...handedOff, merge: { outcome: 'withheld' as const, reason: mergeGate } }
@@ -1066,7 +1066,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   /**
    * Give up before a driver exists, on a config fault the run cannot recover from.
    *
-   * These aborts sit in an awkward window: `run.json` already says `running` (it is written back
+   * These aborts sit in an awkward window: `agent.json` already says `running` (it is written back
    * at :1433), but {@link settleRun} — which owns the `end` event and the handle cleanup — does
    * not wrap anything until its `ctx` is built further down. Returning raw therefore left the run
    * recorded as `running` forever with nobody to correct it, and the dashboard showed a session
@@ -1383,7 +1383,7 @@ export async function runOnBeforeMergeable(
   io: CliIO,
   tf: OnBeforeMergeableContext,
   // Vanilla by default: the follow-up must not run the session-name step and branch (#560).
-  run: PromptRunner = (prompt, cwd, binPath) => spawnPromptRun(prompt, cwd, binPath, true),
+  agent: PromptRunner = (prompt, cwd, binPath) => spawnPromptRun(prompt, cwd, binPath, true),
   fs: StoreFs = nodeStoreFs(),
 ): Promise<'queued' | 'incomplete'> {
   // Ensure the presets exist so the queued entries' filePaths resolve, even in a repo
@@ -1395,7 +1395,7 @@ export async function runOnBeforeMergeable(
     io.out(`  ! on-before-mergeable: could not materialize presets (${errorMessage(err)})`)
   }
   io.out(`\n◆ on-before-mergeable: queueing quality follow-ups for ${tf.session_name}`)
-  const ok = await run(renderOnBeforeMergeablePrompt(tf), cwd, binPath)
+  const ok = await agent(renderOnBeforeMergeablePrompt(tf), cwd, binPath)
   if (!ok) io.out(`  ! on-before-mergeable queueing did not complete cleanly.`)
   return ok ? 'queued' : 'incomplete'
 }

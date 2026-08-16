@@ -25,8 +25,8 @@ export interface SessionSpec {
   /** The checkout the session runs in: a worktree, or the project itself. */
   cwd: string
   /** The id its worktree is named with, so the directory and the run recorded inside it are one string. */
-  runId?: string
-  /** Reopen `runId`'s log instead of truncating it: the follow-up IS that run (#762). */
+  agentId?: string
+  /** Reopen `agentId`'s log instead of truncating it: the follow-up IS that run (#762). */
   continueRun?: boolean
   /** Everything the launcher's options gear and Settings decide about the session. */
   options: StartRunOptions

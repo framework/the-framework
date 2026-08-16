@@ -7,10 +7,10 @@ import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
 import { isTicketFile } from '../dashboard/tickets.js'
 import { releaseTicketLock } from '../ticket-locks.js'
-import { findRun, isSafeRunId, recordRunPr, worktreePath, type RunMeta } from '../store/index.js'
-import { withRunLock } from '../run-locks.js'
+import { findAgent, isSafeRunId, recordRunPr, worktreePath, type AgentMeta } from '../store/index.js'
+import { withAgentLock } from '../agent-locks.js'
 import { removeProjectWorktree, deleteProjectRun } from '../worktrees.js'
-import { commitSessionWork, mergeSessionPr, openSessionPullRequest, pushRunBranch, runBranchFor, type HandoffResult } from '../dashboard/run-handoff.js'
+import { commitSessionWork, mergeSessionPr, openSessionPullRequest, pushRunBranch, agentBranchFor, type HandoffResult } from '../dashboard/agent-handoff.js'
 import type { ChoiceBy } from '../events.js'
 import { isHandoffLevel, type HandoffLevel } from '../handoff-level.js'
 import type {
@@ -36,19 +36,19 @@ import type { Preferences } from '../registry.js'
  * there is no local path (the read-only relay), so the run channel is only ever written by a
  * host that owns the workspace.
  *
- * The `runId` is what makes steering land (#749): a run tails the control log inside its own
+ * The `agentId` is what makes steering land (#749): a run tails the control log inside its own
  * worktree, so an entry written to the project root reaches nothing. Absent, it addresses the
  * project root, which is still right for a run that has no worktree (the non-git fallback).
  */
-async function appendControlFor(projectId: string, entry: ControlEntry, runId?: string): Promise<void> {
-  const cwd = await resolveRunPath(projectId, runId)
+async function appendControlFor(projectId: string, entry: ControlEntry, agentId?: string): Promise<void> {
+  const cwd = await resolveRunPath(projectId, agentId)
   if (cwd) await appendControl(cwd, entry)
 }
 
 /** Stop a live run (the Stop button): append a stop entry to the run's control log. */
-export async function sendStop(projectId: string, runId?: string): Promise<void> {
-  return relayOr(runId, 'sendStop', [projectId, runId], async () => {
-    await appendControlFor(projectId, { kind: 'stop' }, runId)
+export async function sendStop(projectId: string, agentId?: string): Promise<void> {
+  return relayOr(agentId, 'sendStop', [projectId, agentId], async () => {
+    await appendControlFor(projectId, { kind: 'stop' }, agentId)
   }, undefined)
 }
 
@@ -65,10 +65,10 @@ export async function sendStop(projectId: string, runId?: string): Promise<void>
  * as separate boxes resolves them on its own side, where an impossible answer settles *down* to the
  * rung actually asked for instead of being repaired upward into a push nobody ticked.
  */
-export async function sendSetHandoff(projectId: string, runId: string, level: HandoffLevel): Promise<void> {
-  return relayOr(runId, 'sendSetHandoff', [projectId, runId, level], async () => {
+export async function sendSetHandoff(projectId: string, agentId: string, level: HandoffLevel): Promise<void> {
+  return relayOr(agentId, 'sendSetHandoff', [projectId, agentId, level], async () => {
     if (!isHandoffLevel(level)) return
-    await appendControlFor(projectId, { kind: 'handoff', level }, runId)
+    await appendControlFor(projectId, { kind: 'handoff', level }, agentId)
   }, undefined)
 }
 
@@ -82,10 +82,10 @@ export async function sendChoice(
   id: string,
   pick: string | string[],
   by: ChoiceBy = 'user',
-  runId?: string,
+  agentId?: string,
 ): Promise<void> {
-  return relayOr(runId, 'sendChoice', [projectId, id, pick, by, runId], async () => {
-    await appendControlFor(projectId, { kind: 'choice', id, pick, by }, runId)
+  return relayOr(agentId, 'sendChoice', [projectId, id, pick, by, agentId], async () => {
+    await appendControlFor(projectId, { kind: 'choice', id, pick, by }, agentId)
   }, undefined)
 }
 
@@ -116,11 +116,11 @@ export async function sendBridgeAnswerCancel(sessionId: string): Promise<void> {
  * that the run drains between turns, continuing the same session via `--resume`. Empty
  * messages are dropped.
  */
-export async function sendMessage(projectId: string, text: string, runId?: string): Promise<void> {
+export async function sendMessage(projectId: string, text: string, agentId?: string): Promise<void> {
   const message = text.trim()
   if (!message) return
-  return relayOr(runId, 'sendMessage', [projectId, text, runId], async () => {
-    await appendControlFor(projectId, { kind: 'message', text: message }, runId)
+  return relayOr(agentId, 'sendMessage', [projectId, text, agentId], async () => {
+    await appendControlFor(projectId, { kind: 'message', text: message }, agentId)
   }, undefined)
 }
 
@@ -134,8 +134,8 @@ export async function sendMessage(projectId: string, text: string, runId?: strin
  * holds the tree being removed, so it is stopped rather than having the directory pulled out
  * from under it.
  */
-export async function sendRemoveWorktree(projectId: string, runId: string): Promise<RemoveWorktreeResult> {
-  return withWorktreeRemoval(projectId, runId, (cwd, opts) => removeProjectWorktree(cwd, runId, opts))
+export async function sendRemoveWorktree(projectId: string, agentId: string): Promise<RemoveWorktreeResult> {
+  return withWorktreeRemoval(projectId, agentId, (cwd, opts) => removeProjectWorktree(cwd, agentId, opts))
 }
 
 /**
@@ -144,7 +144,7 @@ export async function sendRemoveWorktree(projectId: string, runId: string): Prom
  */
 async function withWorktreeRemoval<T>(
   projectId: string,
-  runId: string,
+  agentId: string,
   remove: (cwd: string, opts: { beforeRemove: (id: string) => Promise<void> }) => Promise<T>,
 ): Promise<T | { ok: false; error: string }> {
   const cwd = await resolveProjectPath(projectId)
@@ -152,7 +152,7 @@ async function withWorktreeRemoval<T>(
   // Under the run lock: a Remove/Delete clicked the moment a run ends races teardown's own
   // archive-commit-remove of the same checkout; serialized, whichever runs second finds the
   // state the first one left and acts on that.
-  return withRunLock(worktreePath(cwd, runId), () => remove(cwd, { beforeRemove: async () => {} }))
+  return withAgentLock(worktreePath(cwd, agentId), () => remove(cwd, { beforeRemove: async () => {} }))
 }
 
 /**
@@ -162,8 +162,8 @@ async function withWorktreeRemoval<T>(
  * `LOGS.md` line, the conversation record) are all {@link deleteProjectRun}'s; this adds only the
  * daemon step of stopping a preview that may be serving the worktree before it comes off disk.
  */
-export async function sendDeleteSession(projectId: string, runId: string): Promise<DeleteSessionResult> {
-  return withWorktreeRemoval(projectId, runId, (cwd, opts) => deleteProjectRun(cwd, runId, opts))
+export async function sendDeleteSession(projectId: string, agentId: string): Promise<DeleteSessionResult> {
+  return withWorktreeRemoval(projectId, agentId, (cwd, opts) => deleteProjectRun(cwd, agentId, opts))
 }
 
 /**
@@ -204,11 +204,11 @@ async function ticketForStart(projectId: string, prompt: string): Promise<string
  * spawns a local command against the project's own registered path. A public host has no
  * local path to resolve, so it returns an error rather than spawning anything.
  *
- * With a `runId` it opens that session's own checkout instead (#798) — the whole point of
+ * With a `agentId` it opens that session's own checkout instead (#798) — the whole point of
  * opening it is to look at what the agent is doing, which is not in the project's tree.
  */
-export async function sendOpenInApp(projectId: string, target: OpenTarget, runId?: string): Promise<OpenResult> {
-  const cwd = runId ? await resolveRunPath(projectId, runId) : await resolveProjectPath(projectId)
+export async function sendOpenInApp(projectId: string, target: OpenTarget, agentId?: string): Promise<OpenResult> {
+  const cwd = agentId ? await resolveRunPath(projectId, agentId) : await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
   // #727: honour the stored editor preference; absent falls back to $FRAMEWORK_EDITOR, then `code`.
   const editor =
@@ -222,15 +222,15 @@ export async function sendOpenInApp(projectId: string, target: OpenTarget, runId
  */
 async function handoffTargetFor(
   projectId: string,
-  runId: string,
-): Promise<{ cwd: string; run: RunMeta; checkout: string } | undefined> {
+  agentId: string,
+): Promise<{ cwd: string; agent: AgentMeta; checkout: string } | undefined> {
   const cwd = await resolveProjectPath(projectId)
-  if (!cwd || !isSafeRunId(runId)) return undefined
-  const run = await findRun(cwd, runId).catch(() => undefined)
+  if (!cwd || !isSafeRunId(agentId)) return undefined
+  const agent = await findAgent(cwd, agentId).catch(() => undefined)
   // The branch is read from the project repo; the tree the agent edited is its own checkout (#453),
   // and for a session that has not committed, that is the only place its work exists.
-  const checkout = (await resolveRunPath(projectId, runId)) ?? cwd
-  return run ? { cwd, run, checkout } : undefined
+  const checkout = (await resolveRunPath(projectId, agentId)) ?? cwd
+  return agent ? { cwd, agent, checkout } : undefined
 }
 
 /**
@@ -239,16 +239,16 @@ async function handoffTargetFor(
  * A click rather than something the run does on its way out: pushing publishes the agent's work
  * to a shared remote under the user's name, which is the user's call.
  */
-export async function sendPushBranch(projectId: string, runId: string): Promise<HandoffResult> {
-  return relayOr(runId, 'sendPushBranch', [projectId, runId], async () => {
-    const target = await handoffTargetFor(projectId, runId)
+export async function sendPushBranch(projectId: string, agentId: string): Promise<HandoffResult> {
+  return relayOr(agentId, 'sendPushBranch', [projectId, agentId], async () => {
+    const target = await handoffTargetFor(projectId, agentId)
     if (!target) return { ok: false, error: 'unknown session' }
-    const branch = runBranchFor(target.run)
+    const branch = agentBranchFor(target.agent)
     // The commit step holds the run lock: clicked the moment a session flips `done`, this used
     // to commit against the checkout teardown was committing in and lose. Serialized, whichever
     // side runs first commits everything pending; the other finds a clean tree — or no checkout
     // at all, which commitSessionWork already reads as "the branch is authoritative".
-    if (!(await withRunLock(target.checkout, () => commitSessionWork(target.checkout, target.cwd, branch)))) {
+    if (!(await withAgentLock(target.checkout, () => commitSessionWork(target.checkout, target.cwd, branch)))) {
       return { ok: false, error: 'could not commit the work this session left uncommitted' }
     }
     return pushRunBranch(target.cwd, branch)
@@ -262,23 +262,23 @@ export async function sendPushBranch(projectId: string, runId: string): Promise<
  * and the intent the user asked for. Nothing new is invented and nothing extra is asked of the
  * user, which is the point of "offer the next step rather than describe it".
  */
-export async function sendOpenPullRequest(projectId: string, runId: string): Promise<HandoffResult> {
-  return relayOr(runId, 'sendOpenPullRequest', [projectId, runId], async () => {
-    const target = await handoffTargetFor(projectId, runId)
+export async function sendOpenPullRequest(projectId: string, agentId: string): Promise<HandoffResult> {
+  return relayOr(agentId, 'sendOpenPullRequest', [projectId, agentId], async () => {
+    const target = await handoffTargetFor(projectId, agentId)
     if (!target) return { ok: false, error: 'unknown session' }
     // Same run lock as sendPushBranch, for the same click-at-`done` race.
-    const committed = await withRunLock(target.checkout, () =>
-      commitSessionWork(target.checkout, target.cwd, runBranchFor(target.run)),
+    const committed = await withAgentLock(target.checkout, () =>
+      commitSessionWork(target.checkout, target.cwd, agentBranchFor(target.agent)),
     )
     if (!committed) {
       return { ok: false, error: 'could not commit the work this session left uncommitted' }
     }
-    const opened = await openSessionPullRequest(target.cwd, target.run)
+    const opened = await openSessionPullRequest(target.cwd, target.agent)
     // Record it on the run (E6). The session's own process is gone by now, so there is no event
     // stream to carry the fact — but it is the same fact, and every surface reads it from the same
     // place either way rather than re-deriving it from branch names.
     if (opened.ok && opened.number !== undefined && opened.url) {
-      await recordRunPr(target.cwd, runId, { number: opened.number, url: opened.url })
+      await recordRunPr(target.cwd, agentId, { number: opened.number, url: opened.url })
     }
     return opened
   }, { ok: false, error: 'could not reach the device' })
@@ -294,15 +294,15 @@ export async function sendOpenPullRequest(projectId: string, runId: string): Pro
  * signalled left a draft behind. If the run ends between the check and the write, the entry lands
  * unread; the ended view then offers the direct merge, so the second click still gets there.
  */
-export async function sendMerge(projectId: string, runId: string): Promise<HandoffResult> {
-  return relayOr(runId, 'sendMerge', [projectId, runId], async () => {
-    const target = await handoffTargetFor(projectId, runId)
+export async function sendMerge(projectId: string, agentId: string): Promise<HandoffResult> {
+  return relayOr(agentId, 'sendMerge', [projectId, agentId], async () => {
+    const target = await handoffTargetFor(projectId, agentId)
     if (!target) return { ok: false, error: 'unknown session' }
-    if (target.run.status === 'running') {
-      await appendControlFor(projectId, { kind: 'merge' }, runId)
+    if (target.agent.status === 'running') {
+      await appendControlFor(projectId, { kind: 'merge' }, agentId)
       return { ok: true }
     }
-    return mergeSessionPr(target.cwd, target.run)
+    return mergeSessionPr(target.cwd, target.agent)
   }, { ok: false, error: 'could not reach the device' })
 }
 

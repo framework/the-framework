@@ -3,9 +3,9 @@ import { listProjects, projectId, readPreferences, readSecrets, type Preferences
 import { resolveDiscordCredentials, type DiscordCredentials } from './discord-credentials.js'
 import { errorMessage } from './error-message.js'
 import { notifies, notifyCategoryEnabled } from './preference-defaults.js'
-import { runOptionsFromPreferences, preferencesFromFileConfig } from './run-options.js'
+import { agentOptionsFromPreferences, preferencesFromFileConfig } from './agent-options.js'
 import { loadFrameworkConfig } from './config.js'
-import { readLiveMetas, listRuns, type LiveRun } from './store/index.js'
+import { readLiveMetas, listAgents, type LiveRun } from './store/index.js'
 import { startKeyedWatcher, type KeyedWatcher } from './dashboard/keyed-watcher.js'
 import { buildInterventions, interventionKey, postInterventionsDiscord } from './dashboard/interventions.js'
 import { buildActivity, activityKey, postActivityDiscord } from './dashboard/activity.js'
@@ -21,7 +21,7 @@ import { readTickets } from './dashboard/tickets.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { startSessionCommitter } from './session-commit.js'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
-import { resolveRunPr } from './dashboard/run-handoff.js'
+import { resolveRunPr } from './dashboard/agent-handoff.js'
 import { sendChoice, sendMessage, sendStop } from './dashboard-rpc/control.js'
 import type { ProjectSummary } from './dashboard/projects.js'
 import type { QuotaSource } from './dashboard/quota.js'
@@ -131,7 +131,7 @@ export async function resolveProjectRunOptions(id: string, env: NodeJS.ProcessEn
   const global = await readPrefs(env)
   const path = (await listProjects(undefined, env).catch(() => [])).find(p => p.id === id)?.path
   const file = path ? await loadFrameworkConfig(path).catch(() => ({})) : {}
-  return runOptionsFromPreferences({ ...global, ...preferencesFromFileConfig(file) })
+  return agentOptionsFromPreferences({ ...global, ...preferencesFromFileConfig(file) })
 }
 
 export function startBackgroundServices(deps: BackgroundServiceDeps): BackgroundServices {
@@ -162,7 +162,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // The queue's open entries rather than a bare emptiness bit: a batch of concurrent drains is
     // pinned one entry each (#1204), so the sweep needs the entries the decision was made on.
     queue: async project => (await findTodoBacklog(project.path))?.entries ?? [],
-    activeRuns: project => deps.activeRunCount(project.id),
+    activeAgents: project => deps.activeRunCount(project.id),
     // How many agents the routine may keep going per project (#1204). Global like the opt-outs;
     // the sweep applies the default when it is unset.
     concurrency: async () => (await prefs()).autoPmConcurrency,
@@ -221,18 +221,18 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         // review already happened on the queue. Rides to the run as the ladder's top rung.
         ...(job.autoMerge ? { handoff: 'merge' as const } : {}),
       })
-      return result.ok ? result.runId : undefined
+      return result.ok ? result.agentId : undefined
     },
     // The daemon promotes the queue, never the agent (#852): the run stays sandboxed in its
     // worktree, and one known file is copied across once it has finished cleanly.
-    promote: async (project, { runId, entry }) => {
-      const run = (await listRuns(project.path).catch(() => [])).find(r => r.id === runId)
+    promote: async (project, { agentId, entry }) => {
+      const agent = (await listAgents(project.path).catch(() => [])).find(r => r.id === agentId)
       // Unknown or still going: not settled, so it is tried again next tick.
-      if (!run || run.status === 'running') return { settled: false, promoted: false }
+      if (!agent || agent.status === 'running') return { settled: false, promoted: false }
       // The entry it was pinned to travels with it (#1204), so the promotion lands that one entry
       // rather than the run's whole view of the queue.
-      const outcome = await promoteQueue(project.path, { ...run, ...(entry !== undefined ? { entry } : {}) })
-      if (!outcome.promoted) log(`[framework] auto PM: ${outcome.reason} (${runId})`)
+      const outcome = await promoteQueue(project.path, { ...agent, ...(entry !== undefined ? { entry } : {}) })
+      if (!outcome.promoted) log(`[framework] auto PM: ${outcome.reason} (${agentId})`)
       // A finished run is settled either way — one that wrote no queue is not going to start.
       // The exception (a checkout busy with the user's own queue edits) is the callee's to flag.
       const retry = !outcome.promoted && outcome.retry === true
@@ -266,7 +266,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         // The fix lands on the red PR's own branch, so this run's handoff must not push or open
         // anything of its own.
         const result = await startUnattended(project.id, ciFixPrompt(request), { handoff: 'local' })
-        return result.ok ? result.runId : undefined
+        return result.ok ? result.agentId : undefined
       },
     },
   })

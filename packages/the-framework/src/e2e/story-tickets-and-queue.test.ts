@@ -85,24 +85,24 @@ test('queue a ticket, then a drain run claims it and the boards show it in progr
 
     // A hand-fired drain resolves the queue's next entry to its ticket (#1117) — the run's meta
     // names it while the run is live, which is what flips the boards to "implementing".
-    const runId = await withFakeAwait('choices', () => world.startRun(project, presets.drainQueue.render()))
-    const tail = await world.tailRun(project, runId)
+    const agentId = await withFakeAwait('choices', () => world.startRun(project, presets.drainQueue.render()))
+    const tail = await world.tailRun(project, agentId)
     const gate = await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the drain run to park')
 
     const sent = (await world.spawnedSpecs())[0]!
     assert.equal(sent.options.ticket, `tickets/${TICKET_FILE}`, 'the drain child carries its ticket')
 
     const running = await waitFor(async () => {
-      const run = (await rpc(onRuns)(project.id)).find(r => r.id === runId)
-      return run?.ticket ? run : undefined
+      const agent = (await rpc(onRuns)(project.id)).find(r => r.id === agentId)
+      return agent?.ticket ? agent : undefined
     }, 'the run meta to name the claimed ticket')
     assert.equal(running.ticket, `tickets/${TICKET_FILE}`)
     const hot = await rpc(onHotTickets)()
-    const implementing = hot.find(h => h.ticket.file === TICKET_FILE && h.runId === runId)
+    const implementing = hot.find(h => h.ticket.file === TICKET_FILE && h.agentId === agentId)
     assert.ok(implementing, 'the hot rail links the ticket to the run implementing it')
 
-    if (gate.kind === 'choice') await rpc(sendChoice)(project.id, gate.id, gate.recommended!, 'user', runId)
-    await world.waitRun(project, runId, 'done')
+    if (gate.kind === 'choice') await rpc(sendChoice)(project.id, gate.id, gate.recommended!, 'user', agentId)
+    await world.waitRun(project, agentId, 'done')
   } finally {
     await world.close()
   }
@@ -118,10 +118,10 @@ test('any other prompt claims nothing: the queue is only worked by a drain (#111
     })
     await rpc(sendQueueTicket)(project.id, 'Login page', { file: TICKET_FILE, priority: '8' })
 
-    const runId = await world.startRun(project, 'Look into the flaky CI job')
-    await world.waitRun(project, runId, 'done')
-    const run = (await rpc(onRuns)(project.id)).find(r => r.id === runId)
-    assert.equal(run?.ticket, undefined, 'an unrelated prompt must not wear the queued ticket')
+    const agentId = await world.startRun(project, 'Look into the flaky CI job')
+    await world.waitRun(project, agentId, 'done')
+    const agent = (await rpc(onRuns)(project.id)).find(r => r.id === agentId)
+    assert.equal(agent?.ticket, undefined, 'an unrelated prompt must not wear the queued ticket')
     // The queue entry is still open: nothing consumed it.
     const projectQueue = (await rpc(onQueue)()).find(q => q.projectId === project.id)
     assert.equal(projectQueue?.open, 1)

@@ -1,11 +1,11 @@
 import { join } from 'node:path'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
-import { SESSIONS_DIR } from './store/index.js'
+import { ARCHIVE_DIR } from './store/index.js'
 
 /**
  * The `.the-framework/.gitignore` (#313/#1179): one file, one content, written at install.
  *
- * Run state is transient — `events.jsonl`, `run.json`, `runs/`, the worktrees — and would
+ * Run state is transient — `events.jsonl`, `agent.json`, `agents/`, the worktrees — and would
  * otherwise turn every session into a dirty checkout. The one thing under here that is committed
  * is the session archive (#1179), because `git clean -fdx` is an ordinary thing to do to a repo
  * and it used to delete every session a project had ever run.
@@ -38,7 +38,7 @@ export function gitignorePath(cwd: string): string {
  * a directory only lets git descend into it, and the bare `*` still ignores every file it finds.
  */
 export function sessionsGitignore(): string {
-  return `!*/\n!*/${SESSIONS_DIR}/\n!*/${SESSIONS_DIR}/**\n`
+  return `!*/\n!*/${ARCHIVE_DIR}/\n!*/${ARCHIVE_DIR}/**\n`
 }
 
 /** The whole file: ignore the transient state, keep the session archive. */
@@ -47,4 +47,4 @@ export function frameworkGitignore(): string {
 }
 
 /** The rule whose presence means the file already un-ignores the session archive. */
-export const SESSIONS_RULE = `!*/${SESSIONS_DIR}/**`
+export const SESSIONS_RULE = `!*/${ARCHIVE_DIR}/**`

@@ -67,14 +67,14 @@ test('no identity still gets a directory, rather than dropping the history (#117
 })
 
 test('sessions live under the user, inside .the-framework (#1179)', () => {
-  assert.equal(sessionsDir('/repo', 'git@brillout.com'), join('/repo', '.the-framework', 'git@brillout.com', 'sessions'))
+  assert.equal(sessionsDir('/repo', 'git@brillout.com'), join('/repo', '.the-framework', 'git@brillout.com', 'agents'))
 })
 
 test('the ignore rules re-include every directory on the way down (#1179)', () => {
   // The seeded allow-list ignores everything with `*`, and git never descends into an ignored
   // directory — so un-ignoring only the files would never be reached.
   const rules = sessionsGitignore()
-  assert.equal(rules, '!*/\n!*/sessions/\n!*/sessions/**\n')
+  assert.equal(rules, '!*/\n!*/agents/\n!*/agents/**\n')
 })
 
 test('a repo with no ignore file gets the whole file, transient state and all (#1179)', async () => {
@@ -90,7 +90,7 @@ test('a repo that predates the rules is repaired, once (#1179)', async () => {
   assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), true)
   assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), false, 'already there, so nothing written')
   const written = fs.files.get(IGNORE)!
-  assert.equal(written.match(/!\*\/sessions\/\*\*/g)?.length, 1)
+  assert.equal(written.match(/!\*\/agents\/\*\*/g)?.length, 1)
 })
 
 test('a second user writes nothing: the rules already cover them (#1312)', async () => {
@@ -109,7 +109,7 @@ test('a hand-edited file keeps every line it has (#1179)', async () => {
   const written = fs.files.get(IGNORE)!
   assert.ok(written.includes('# mine'), 'comments survive')
   assert.ok(written.includes('!keep-me/'), 'an unrelated rule survives')
-  assert.ok(written.includes('!*/sessions/**'), 'and the archive is un-ignored')
+  assert.ok(written.includes('!*/agents/**'), 'and the archive is un-ignored')
 })
 
 test('the identity comes from git, and is read once per repo (#1179)', async () => {
@@ -149,28 +149,28 @@ test('against real git: a committed session survives git clean -fdx, and nothing
     git('config', 'user.name', 'Test')
 
     const fw = join(repo, '.the-framework')
-    await mkdir(join(fw, 'git@example.com', 'sessions'), { recursive: true })
-    await mkdir(join(fw, 'runs'), { recursive: true })
+    await mkdir(join(fw, 'git@example.com', 'agents'), { recursive: true })
+    await mkdir(join(fw, 'agents'), { recursive: true })
     await mkdir(join(fw, 'worktrees', 'r9'), { recursive: true })
     await writeFile(join(fw, '.gitignore'), '# The Framework\n*\n!.gitignore\n')
-    await writeFile(join(fw, 'git@example.com', 'sessions', 'r1.json'), '{"id":"r1"}\n')
-    await writeFile(join(fw, 'runs', 'old.json'), '{}\n')
+    await writeFile(join(fw, 'git@example.com', 'agents', 'r1.json'), '{"id":"r1"}\n')
+    await writeFile(join(fw, 'agents', 'old.json'), '{}\n')
     await writeFile(join(fw, 'events.jsonl'), '\n')
     await writeFile(join(fw, 'worktrees', 'r9', 'file.txt'), 'x\n')
 
     await ensureSessionsIgnored(repo, 'git@example.com')
     const status = git('status', '--porcelain', '-uall')
-    assert.ok(status.includes('.the-framework/git@example.com/sessions/r1.json'), 'the session is visible to git')
-    assert.ok(!status.includes('.the-framework/runs/'), 'the transient archive stays ignored')
+    assert.ok(status.includes('.the-framework/git@example.com/agents/r1.json'), 'the session is visible to git')
+    assert.ok(!status.includes('.the-framework/agents/'), 'the transient archive stays ignored')
     assert.ok(!status.includes('.the-framework/events.jsonl'), 'the live log stays ignored')
     assert.ok(!status.includes('.the-framework/worktrees/'), 'a run checkout stays ignored')
     assert.ok((await readFile(join(fw, '.gitignore'), 'utf8')).includes('# The Framework'), 'the allow-list is kept')
 
     git('add', '--', SESSIONS_PATHSPEC)
-    git('commit', '-q', '-m', 'sessions')
+    git('commit', '-q', '-m', 'agents')
     git('clean', '-fdx')
-    assert.ok(existsSync(join(fw, 'git@example.com', 'sessions', 'r1.json')), 'the session survives the clean')
-    assert.ok(!existsSync(join(fw, 'runs', 'old.json')), 'and the transient state is still swept, as before')
+    assert.ok(existsSync(join(fw, 'git@example.com', 'agents', 'r1.json')), 'the session survives the clean')
+    assert.ok(!existsSync(join(fw, 'agents', 'old.json')), 'and the transient state is still swept, as before')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

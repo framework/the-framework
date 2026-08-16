@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { appendControl } from './control.js'
 import { BROWSER_MCP_SERVERS, withBrowser } from './browser.js'
-import { EVENTS_FILE, FRAMEWORK_DIR, RUNS_DIR, type StoreFs } from './store/index.js'
+import { EVENTS_FILE, FRAMEWORK_DIR, AGENTS_DIR, type StoreFs } from './store/index.js'
 import { nodeGitRunner } from './project.js'
 import {
   chooseSessionLink,
@@ -102,10 +102,10 @@ test('parseArgs keeps four options and no verbs (D4)', () => {
 })
 
 test('the session spec is what carries a session, and it round-trips through sessionOptions (D4)', () => {
-  const o = opts({ prompt: 'a blog app', kind: 'prompt', cwd: '/work/api', runId: 'r1', continueRun: true })
+  const o = opts({ prompt: 'a blog app', kind: 'prompt', cwd: '/work/api', agentId: 'r1', continueRun: true })
   assert.equal(o.intent, 'a blog app')
   assert.equal(o.cwd, '/work/api')
-  assert.equal(o.runId, 'r1')
+  assert.equal(o.agentId, 'r1')
   assert.equal(o.continueRun, true)
   assert.equal(o.directPrompt, true)
   assert.equal(o.research, false)
@@ -190,11 +190,11 @@ test('promptRunSpec goes vanilla so the on-before-mergeable follow-up skips the 
 test('runOnBeforeMergeable queues the follow-ups in ONE run instead of running the presets (#326/#556)', async () => {
   const { io } = capture()
   const seen: string[] = []
-  const run = (prompt: string) => {
+  const agent = (prompt: string) => {
     seen.push(prompt)
     return Promise.resolve(true)
   }
-  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, run, memFs())
+  await runOnBeforeMergeable('/work/app', '/bin/framework', io, { session_name: 'add-oauth' }, agent, memFs())
   // One child run, not three: it asks for TODO entries rather than doing the passes.
   assert.equal(seen.length, 1)
   const prompt = seen[0]!
@@ -508,7 +508,7 @@ test('the dashboard steers a dashboard-less run through its gates via control.js
     let settled = false
     // --run-id is what the dashboard passes when it spawns, and what makes this run steerable
     // (#905): the dashboard drives the control file on the other end.
-    const done = runSessionCli({ cwd, runId: 'r-steer' }, io).finally(
+    const done = runSessionCli({ cwd, agentId: 'r-steer' }, io).finally(
       () => (settled = true),
     )
 
@@ -576,10 +576,10 @@ test('a declined post-merge cleanup lands in the archived event log, not on stdo
     // decline is *reported*: it has to survive into runs/, which close() copies the log into.
     const code = await runSessionCli({ prompt: 'review the auth flow', kind: 'prompt', cwd: dir, options: { onBeforeMergeable: true } }, io)
     assert.equal(code, 0)
-    const runs = join(dir, FRAMEWORK_DIR, RUNS_DIR)
-    const archived = (await readdir(runs)).filter(f => f.endsWith('.jsonl'))
+    const agents = join(dir, FRAMEWORK_DIR, AGENTS_DIR)
+    const archived = (await readdir(agents)).filter(f => f.endsWith('.jsonl'))
     assert.equal(archived.length, 1, 'the run was archived')
-    const events = (await readFile(join(runs, archived[0]!), 'utf8'))
+    const events = (await readFile(join(agents, archived[0]!), 'utf8'))
       .split('\n')
       .filter(Boolean)
       .map(l => JSON.parse(l) as FrameworkEvent)
@@ -613,7 +613,7 @@ test('a run that never asked for the post-merge cleanup stays quiet about it (#8
 test('a dashboard-spawned session is steerable through its run id (#905)', () => {
   // This is the case where every Stop press was dropped in silence: written to control.jsonl,
   // tailed by nobody.
-  assert.equal(isSteerable({ persist: true, runId: '2026-07-20T20-20-14-026Z' }), true)
+  assert.equal(isSteerable({ persist: true, agentId: '2026-07-20T20-20-14-026Z' }), true)
 })
 
 test('with no run id, nothing can reach the session', () => {
@@ -621,7 +621,7 @@ test('with no run id, nothing can reach the session', () => {
 })
 
 test('a session that does not persist is never steerable: there is no control file to tail', () => {
-  assert.equal(isSteerable({ persist: false, runId: 'r1' }), false)
+  assert.equal(isSteerable({ persist: false, agentId: 'r1' }), false)
 })
 
 test('a session nobody started from the dashboard does not stay open for chat (#905/#714)', () => {
@@ -631,7 +631,7 @@ test('a session nobody started from the dashboard does not stay open for chat (#
 })
 
 test('a session the dashboard started stays open for chat (#714)', () => {
-  assert.equal(isInteractive({ runId: 'r1' }), true)
+  assert.equal(isInteractive({ agentId: 'r1' }), true)
 })
 
 test('the startup footer prints the commands and the version (#312)', async () => {
@@ -685,7 +685,7 @@ test('naming the session renames the run-id branch and records it as a branch ev
     io,
     cwd: repo,
     store: undefined,
-    runId: 'r1',
+    agentId: 'r1',
   })
   journal.onEvent({ kind: 'session-name', name: 'cool-name' })
   // The rename runs off the event asynchronously; wait for the recorded branch to come through.
@@ -705,7 +705,7 @@ test('a browser URL is held until the session opens, then re-said after every la
     io,
     cwd: '/tmp',
     store: undefined,
-    runId: undefined,
+    agentId: undefined,
   })
   journal.announceBrowserUrl('https://early.test/')
   assert.ok(
@@ -728,7 +728,7 @@ test('a browser URL is held until the session opens, then re-said after every la
 /**
  * A `--run-on actions` run with no token must end as `failed`, and must end at all.
  *
- * Both halves regressed together. The config check sits after `run.json` is written but before
+ * Both halves regressed together. The config check sits after `agent.json` is written but before
  * `settleRun` owns the run, so returning raw left the status at `running` with nobody to correct
  * it; and the control tail it had already wired held the event loop open, so the process never
  * exited either. From the dashboard that was a session stuck on "running" forever, with the real
@@ -762,7 +762,7 @@ test('a --run-on actions run with no token anywhere ends failed instead of hangi
   // past the very branch under test.
   const { GH_TOKEN: _gh, GITHUB_TOKEN: _gathub, ...rest } = process.env
   const env = { ...rest, PATH: `${stubBin}:${rest.PATH ?? ''}` }
-  const specPath = await writeSessionSpec(spec({ prompt: 'hi', cwd: repo, runId: 'r-actions', options: { target: 'actions' } }))
+  const specPath = await writeSessionSpec(spec({ prompt: 'hi', cwd: repo, agentId: 'r-actions', options: { target: 'actions' } }))
   const exit = await new Promise<number | null>((resolvePromise, rejectPromise) => {
     const child = spawn(process.execPath, [bin.pathname, '--session', specPath], { cwd: repo, env, stdio: 'ignore' })
     const timer = setTimeout(() => {
@@ -777,7 +777,7 @@ test('a --run-on actions run with no token anywhere ends failed instead of hangi
   })
   assert.equal(exit, 2)
 
-  const meta = JSON.parse(await readFile(join(repo, FRAMEWORK_DIR, 'run.json'), 'utf8')) as {
+  const meta = JSON.parse(await readFile(join(repo, FRAMEWORK_DIR, 'agent.json'), 'utf8')) as {
     status: string
   }
   assert.equal(meta.status, 'failed')
@@ -798,7 +798,7 @@ test('runCli continues a build run through the build flow, not the prompt path (
   try {
     const first = capture()
     assert.equal(await runSessionCli({ prompt: 'build a thing', cwd: dir }, first.io), 0)
-    const metaPath = join(dir, FRAMEWORK_DIR, 'run.json')
+    const metaPath = join(dir, FRAMEWORK_DIR, 'agent.json')
     assert.equal((JSON.parse(await readFile(metaPath, 'utf8')) as { kind?: string }).kind, 'build')
 
     const second = capture()

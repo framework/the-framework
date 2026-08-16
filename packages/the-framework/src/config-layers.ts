@@ -14,7 +14,7 @@ import { BOOLEAN_CONFIG_KEYS, CONFIG_KEYS, type FrameworkFileConfig } from './co
  */
 
 /** The run settings a config layer can carry. Keys left `undefined` mean "this layer said nothing". */
-export interface RunConfigValues {
+export interface AgentConfigValues {
   /** Preset name. */
   preset?: string | undefined
   /** Build event kind the preset applies to (#265). */
@@ -31,7 +31,7 @@ export interface RunConfigValues {
 export interface ConfigLayer {
   /** Where these values came from, e.g. `flag` or `the-framework.yml`. */
   name: string
-  values: RunConfigValues
+  values: AgentConfigValues
 }
 
 /** What a key resolves to when no layer set it. */
@@ -48,13 +48,13 @@ export const RUN_CONFIG_DEFAULTS = {
  * The nearest layer that set `key`, or `undefined` when none did. Layers are ordered
  * nearest-first: run flags > project user > repo yml > global.
  */
-export function resolveConfigKey<K extends keyof RunConfigValues>(
+export function resolveConfigKey<K extends keyof AgentConfigValues>(
   layers: readonly ConfigLayer[],
   key: K,
-): { value: NonNullable<RunConfigValues[K]>; from: string } | undefined {
+): { value: NonNullable<AgentConfigValues[K]>; from: string } | undefined {
   for (const layer of layers) {
     const value = layer.values[key]
-    if (value !== undefined) return { value: value as NonNullable<RunConfigValues[K]>, from: layer.name }
+    if (value !== undefined) return { value: value as NonNullable<AgentConfigValues[K]>, from: layer.name }
   }
   return undefined
 }
@@ -68,13 +68,13 @@ export interface ResolvedRunConfig {
   /** How far this session publishes itself (#1102/#1216/B5). */
   handoff: HandoffLevel
   /** Winning layer name per key; a key left to its default is absent here. */
-  sources: Partial<Record<keyof RunConfigValues, string>>
+  sources: Partial<Record<keyof AgentConfigValues, string>>
 }
 
 /** Resolve every run setting over `layers` (nearest first), falling back to {@link RUN_CONFIG_DEFAULTS}. */
 export function resolveRunConfig(layers: readonly ConfigLayer[]): ResolvedRunConfig {
-  const sources: Partial<Record<keyof RunConfigValues, string>> = {}
-  const pick = <K extends keyof RunConfigValues>(key: K): NonNullable<RunConfigValues[K]> | undefined => {
+  const sources: Partial<Record<keyof AgentConfigValues, string>> = {}
+  const pick = <K extends keyof AgentConfigValues>(key: K): NonNullable<AgentConfigValues[K]> | undefined => {
     const hit = resolveConfigKey(layers, key)
     if (!hit) return undefined
     sources[key] = hit.from
@@ -95,7 +95,7 @@ export function resolveRunConfig(layers: readonly ConfigLayer[]): ResolvedRunCon
 
 /** The repo tier: `the-framework.yml` as a layer. */
 export function fileConfigLayer(file: FrameworkFileConfig, name = 'the-framework.yml'): ConfigLayer {
-  const values: RunConfigValues = {}
+  const values: AgentConfigValues = {}
   for (const key of CONFIG_KEYS) {
     if (file[key] !== undefined) Object.assign(values, { [key]: file[key] })
   }
@@ -108,9 +108,9 @@ export function fileConfigLayer(file: FrameworkFileConfig, name = 'the-framework
  * left out, so a run with no config anywhere narrates nothing.
  */
 export function describeResolvedConfig(config: ResolvedRunConfig): string {
-  const shown: [keyof RunConfigValues, string][] = [
+  const shown: [keyof AgentConfigValues, string][] = [
     ['preset', config.presetName ?? ''],
-    ...BOOLEAN_CONFIG_KEYS.map((key): [keyof RunConfigValues, string] => [key, onOff(config[key])]),
+    ...BOOLEAN_CONFIG_KEYS.map((key): [keyof AgentConfigValues, string] => [key, onOff(config[key])]),
     ['handoff', config.handoff],
     ['event', config.buildEvent ?? ''],
   ]

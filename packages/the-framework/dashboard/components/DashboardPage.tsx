@@ -33,11 +33,11 @@ export function DashboardPage({
 }: {
   onSelectProject: (id: string) => void
   /** Open one session (project + run): the Agents and hot-ticket rows link straight to a session. */
-  onSelectRun: (projectId: string, runId: string) => void
+  onSelectRun: (projectId: string, agentId: string) => void
   /** Open one ticket's own page (#1144): a queued entry links to its ticket, so its row does too. */
   onOpenTicket: (projectId: string, file: string) => void
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
-  onRunStarted: (projectId: string, intent: string, runId?: string) => void
+  onRunStarted: (projectId: string, intent: string, agentId?: string) => void
   interventions: Intervention[]
 }) {
   const { value: data } = usePolled<DashboardData | null>(onDashboard, null, 5000, [])
@@ -87,13 +87,13 @@ function HumanQueue({
 }: {
   items: Intervention[]
   onSelectProject: (id: string) => void
-  onSelectRun: (projectId: string, runId: string) => void
+  onSelectRun: (projectId: string, agentId: string) => void
 }) {
   // Awaiting and unpushed both name a run (#636/#860), so the row opens that session — which is what
   // its "Open the session" promise says. Only if the id is somehow absent does it fall back to the
   // project, rather than doing nothing.
   const openSession = (item: Intervention) =>
-    item.runId ? onSelectRun(item.projectId, item.runId) : onSelectProject(item.projectId)
+    item.agentId ? onSelectRun(item.projectId, item.agentId) : onSelectProject(item.projectId)
   return (
     <Card>
       <CardHeader>

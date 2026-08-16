@@ -13,14 +13,14 @@ import { Agents } from './Agents.js'
 
 afterEach(cleanup)
 
-const active = (runId: string, over: Partial<ActiveRun> = {}): ActiveRun => ({
+const active = (agentId: string, over: Partial<ActiveRun> = {}): ActiveRun => ({
   projectId: 'p1',
   projectName: 'gemstack',
-  runId,
-  cwd: `/repos/gemstack/.the-framework/worktrees/${runId}`,
+  agentId: agentId,
+  cwd: `/repos/gemstack/.the-framework/worktrees/${agentId}`,
   status: 'running',
   updatedAt: '2026-07-25T10:00:00.000Z',
-  intent: `working on ${runId}`,
+  intent: `working on ${agentId}`,
   ...over,
 })
 

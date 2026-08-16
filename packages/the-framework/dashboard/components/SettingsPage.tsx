@@ -31,7 +31,7 @@ export function SettingsPage({
   onRunStarted,
 }: {
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
-  onRunStarted: (projectId: string, intent: string, runId?: string) => void
+  onRunStarted: (projectId: string, intent: string, agentId?: string) => void
   onDone?: () => void
 }) {
   const preferences = usePreferences()

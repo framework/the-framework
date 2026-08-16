@@ -33,7 +33,7 @@ function status(weekPercent: number): QuotaBoundaryStatus {
 }
 
 /** The happy inputs, so each test names only the condition it is about. */
-const IDLE = { enabled: true, backlogEmpty: true, activeRuns: 0, quota: status(1) } as const
+const IDLE = { enabled: true, backlogEmpty: true, activeAgents: 0, quota: status(1) } as const
 
 test('autoPmDecision starts when the queue is dry and the budget is barely touched (#685)', () => {
   assert.deepEqual(autoPmDecision(IDLE), { start: true, mode: 'pm' })
@@ -47,27 +47,27 @@ test('autoPmDecision does nothing while the preference is off (#685)', () => {
 test('autoPmDecision leaves a project at its concurrency cap alone (#685/#1204)', () => {
   // Live runs are already spending the quota; one more started unasked would race them. Before
   // #1204 the cap was hardwired at one, which is what `concurrency: 1` still asks for here.
-  const decision = autoPmDecision({ ...IDLE, activeRuns: 1, concurrency: 1 })
+  const decision = autoPmDecision({ ...IDLE, activeAgents: 1, concurrency: 1 })
   assert.equal(decision.start, false)
   assert.match(decision.start === false ? decision.reason : '', /already going/)
 })
 
 test('autoPmDecision tops a project up to its concurrency (#1204)', () => {
   // The point of the setting: one run going is no longer a reason to stand down.
-  assert.deepEqual(autoPmDecision({ ...IDLE, activeRuns: 1, concurrency: 2 }), { start: true, mode: 'pm' })
+  assert.deepEqual(autoPmDecision({ ...IDLE, activeAgents: 1, concurrency: 2 }), { start: true, mode: 'pm' })
   // At the cap it refuses, and the refusal names the cap so a raised setting does not read as a bug.
-  const capped = autoPmDecision({ ...IDLE, activeRuns: 2, concurrency: 2 })
+  const capped = autoPmDecision({ ...IDLE, activeAgents: 2, concurrency: 2 })
   assert.equal(capped.start, false)
   assert.match(capped.start === false ? capped.reason : '', /at most 2 at once/)
 })
 
 test('autoPmDecision defaults to the shipped concurrency, and floors it at one (#1204)', () => {
   // Unset means the default, not one: the absence of the setting has never meant "less".
-  assert.equal(autoPmDecision({ ...IDLE, activeRuns: DEFAULT_AUTO_PM_CONCURRENCY - 1 }).start, true)
-  assert.equal(autoPmDecision({ ...IDLE, activeRuns: DEFAULT_AUTO_PM_CONCURRENCY }).start, false)
+  assert.equal(autoPmDecision({ ...IDLE, activeAgents: DEFAULT_AUTO_PM_CONCURRENCY - 1 }).start, true)
+  assert.equal(autoPmDecision({ ...IDLE, activeAgents: DEFAULT_AUTO_PM_CONCURRENCY }).start, false)
   // Zero agents is what the master switch spells, so a hand-edited nought cannot wedge the routine.
-  assert.equal(autoPmDecision({ ...IDLE, activeRuns: 0, concurrency: 0 }).start, true)
-  assert.equal(autoPmDecision({ ...IDLE, activeRuns: 1, concurrency: 0 }).start, false)
+  assert.equal(autoPmDecision({ ...IDLE, activeAgents: 0, concurrency: 0 }).start, true)
+  assert.equal(autoPmDecision({ ...IDLE, activeAgents: 1, concurrency: 0 }).start, false)
 })
 
 test('autoPmDecision drains the queue before filling it again (#855)', () => {
@@ -136,7 +136,7 @@ test('a restarted daemon is no longer blind (#848/#879)', () => {
   // nothing to diff it against, and honestly reported 0 consumed while the account sat at 95%
   // of its week. The boundary reads the account's own absolute figure, which owes nothing to
   // how long this process has been up, so the restart is simply not a case any more.
-  const decision = autoPmDecision({ enabled: true, backlogEmpty: true, activeRuns: 0, quota: status(95) })
+  const decision = autoPmDecision({ enabled: true, backlogEmpty: true, activeAgents: 0, quota: status(95) })
   assert.equal(decision.start, false)
 })
 
@@ -159,7 +159,7 @@ function harness(overrides: Partial<AutoPmDeps> = {}) {
     // Pinned at one so every test written before #1204 keeps asserting against the behaviour it
     // was written for; the fan-out tests set it explicitly.
     concurrency: async () => 1,
-    activeRuns: () => 0,
+    activeAgents: () => 0,
     quota: async () => status(1),
     start: async (p, job) => {
       started.push(p.id)
@@ -200,7 +200,7 @@ test('an on-demand tick sweeps with the preference off: the click is the ask (#1
 })
 
 test('on demand skips only the master switch: every other stand-down still holds (#1210)', async () => {
-  const { loop, started } = harness({ enabled: async () => false, activeRuns: () => 1 })
+  const { loop, started } = harness({ enabled: async () => false, activeAgents: () => 1 })
   await loop.tick({ onDemand: true })
   loop.stop()
   assert.deepEqual(started, [])
@@ -301,8 +301,8 @@ test('a promoted queue ends the tick, so the sweep re-reads it next time (#852)'
   const promoted: string[] = []
   const { loop, ran } = harness({
     cooldownMs: 0,
-    promote: async (_p, { runId }) => {
-      promoted.push(runId)
+    promote: async (_p, { agentId }) => {
+      promoted.push(agentId)
       return { settled: true, promoted: true }
     },
   })
@@ -318,8 +318,8 @@ test('a finished run that wrote no queue stops being retried (#852)', async () =
   const asked: string[] = []
   const { loop, ran } = harness({
     cooldownMs: 0,
-    promote: async (_p, { runId }) => {
-      asked.push(runId)
+    promote: async (_p, { agentId }) => {
+      asked.push(agentId)
       return { settled: true, promoted: false }
     },
   })
@@ -526,7 +526,7 @@ test('the report names what a sweep started (#1161)', async () => {
 test('the report carries the reason a sweep stood down (#1161)', async () => {
   // The whole point: standing down for a reason must not look like quietly working. The reason
   // was already logged, but the log is the daemon's stdout and the toggle is in a browser.
-  const { loop } = harness({ activeRuns: () => 2 })
+  const { loop } = harness({ activeAgents: () => 2 })
   await loop.tick()
   loop.stop()
   const [outcome] = loop.report().outcomes
@@ -746,7 +746,7 @@ test('live runs count against the concurrency, so the sweep tops up rather than 
   const { loop, started } = harness({
     cooldownMs: 0,
     concurrency: async () => 3,
-    activeRuns: () => 2,
+    activeAgents: () => 2,
     queue: async () => ['entry a', 'entry b', 'entry c'],
   })
   await loop.tick()

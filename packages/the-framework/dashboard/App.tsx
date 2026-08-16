@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Intervention, Activity, ProjectSummary, RecentRun } from '../dist/index.js'
 import { onProjectFiles, onInterventions, onActivity, onRecentRuns } from './rpc/reads.js'
 import { onProjects } from './rpc/projects.js'
-import { RunHistory } from './components/RunHistory.js'
+import { AgentHistory } from './components/AgentHistory.js'
 import { SidebarProvider } from './components/ui/sidebar.js'
 import { ProjectHome } from './components/ProjectHome.js'
 import { DashboardPage } from './components/DashboardPage.js'
@@ -10,13 +10,13 @@ import { SettingsPage } from './components/SettingsPage.js'
 import { TicketsPage } from './components/TicketsPage.js'
 import { TicketDetailPage } from './components/TicketDetailPage.js'
 import { TicketPlanPage } from './components/TicketPlanPage.js'
-import { RunView } from './components/RunView.js'
+import { AgentView } from './components/AgentView.js'
 import { runLabel } from './lib/run-label.js'
 import { RightRail } from './components/RightRail.js'
 import { RelayView } from './components/RelayView.js'
 import { NotFound } from './components/NotFound.js'
 import { useLiveEvents } from './lib/use-live-events.js'
-import { useRuns } from './lib/use-runs.js'
+import { useRuns } from './lib/use-agents.js'
 import { useLoaded, usePolled } from './lib/use-async.js'
 import { useRoute } from './lib/use-route.js'
 import { useContextSet } from './lib/use-context-set.js'
@@ -47,7 +47,7 @@ const EMPTY_RECENT: RecentRun[] = []
 // The dashboard shell (#405 phase 2): Sessions | main | Docs/History rail, with the project
 // selection in the top nav as a dropdown since #772 (it used to be a rail of its own). The main pane
 // is one of three views chosen by the selection: the project home/launcher (Live, the default —
-// Start form + cards) or one session's own view (RunView), live or finished — the same frame
+// Start form + cards) or one session's own view (AgentView), live or finished — the same frame
 // either way (#1026). Everything over the wire is Telefunc. A projection of the same .the-framework
 // files the daemon writes.
 //
@@ -60,7 +60,7 @@ const EMPTY_RECENT: RecentRun[] = []
 // what the remembered-project state (#475) was for.
 export function App() {
   const { route, go } = useRoute()
-  const { view, projectId, runId, ticketSlug, plan } = route
+  const { view, projectId, agentId: agentId, ticketSlug, plan } = route
 
   // A just-started run: bump the tick so the Sessions rail shows an optimistic "starting…" row
   // with the typed prompt at once, before the spawned process writes its run.json. `id` is the
@@ -76,7 +76,7 @@ export function App() {
   // be known.
   const [adopting, setAdopting] = useState(false)
 
-  const { runs, reload, loaded: runsLoaded } = useRuns(projectId)
+  const { agents: agents, reload, loaded: runsLoaded } = useRuns(projectId)
 
   // The run Context set lives in the shell (#492/#504) so the two surfaces that feed it share
   // one source of truth: the `#` file chips + whole-repo Context selector in the Start form
@@ -96,10 +96,10 @@ export function App() {
   // worktree (#815), the same checkout the action bar's branch, Serve and open-folder act on;
   // polled so a file the run creates shows up rather than waiting for a reload.
   const { value: files } = usePolled<string[]>(
-    projectId ? () => onProjectFiles(projectId, runId ?? undefined) : null,
+    projectId ? () => onProjectFiles(projectId, agentId ?? undefined) : null,
     EMPTY_FILES,
     10_000,
-    [projectId, runId],
+    [projectId, agentId],
   )
 
   // The cross-project "needs you" queue (#632): open PRs to review. Polled here in the shell so
@@ -145,7 +145,7 @@ export function App() {
     // Continuing the run already on screen (#762) appends to its journal — nothing truncates, so
     // nothing would re-replay after a reset. Bumping the tick here is what blanked the transcript
     // the moment a message resumed an ended session; a continuation keeps the feed instead.
-    const continued = startedId !== undefined && startedId === runId && inProject === projectId
+    const continued = startedId !== undefined && startedId === agentId && inProject === projectId
     setRunStart(prev => ({ tick: continued ? prev.tick : prev.tick + 1, intent, id: startedId ?? null, ...(runsOn ? { runsOn } : {}) }))
     setAdopting(startedId === undefined)
     // The picked context went with that run; the next launch starts from a clean focus (#948).
@@ -154,7 +154,7 @@ export function App() {
     // from. Its row does not exist yet; the main pane shows it live on the strength of the id.
     // With no id yet, land on its project so the effect below can adopt the running one; `go`
     // no-ops when that is already the URL.
-    go({ projectId: inProject, runId: startedId ?? null })
+    go({ projectId: inProject, agentId: startedId ?? null })
     // The new run just appends to the rail; reload so its real row shows up quickly.
     reload()
   }
@@ -166,33 +166,33 @@ export function App() {
   // A correction rather than a step, so it replaces the history entry.
   useEffect(() => {
     if (!adopting) return
-    const running = runs.find(run => run.status === 'running')
+    const running = agents.find(agent => agent.status === 'running')
     if (!running) return
     setAdopting(false)
-    go({ projectId, runId: running.id }, { replace: true })
+    go({ projectId, agentId: running.id }, { replace: true })
     // `go` is a fresh closure each render; the route it needs is in the deps below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adopting, runs, projectId])
+  }, [adopting, agents, projectId])
 
   // Selecting a session (or the Live/Home row) is always an explicit choice, so it ends the
   // just-started follow.
   const selectRun = (id: string | null) => {
     setAdopting(false)
-    go({ projectId, runId: id })
+    go({ projectId, agentId: id })
   }
 
   const selectProject = (id: string) => {
     setAdopting(false)
-    go({ projectId: id, runId: null }) // switching projects always returns to the home launcher
+    go({ projectId: id, agentId: null }) // switching projects always returns to the home launcher
   }
 
   // Naming a session in another project. The Overview's cross-project rows — the sidebar recents,
   // the Agents view (#1139), and the hot tickets — know which run they are about, and going through
   // selectProject drops that on the way, landing on the launcher instead of the session the row was
   // describing.
-  const selectRunInProject = (id: string, runId: string) => {
+  const selectRunInProject = (id: string, agentId: string) => {
     setAdopting(false)
-    go({ projectId: id, runId })
+    go({ projectId: id, agentId: agentId })
   }
 
   // "New" in the sidebar: start a fresh session in a named project (the sidebar decides which —
@@ -201,20 +201,20 @@ export function App() {
   const newSessionInProject = (id: string) => {
     setAdopting(false)
     resetContext()
-    go({ projectId: id, runId: null })
+    go({ projectId: id, agentId: null })
   }
 
   // The Overview dashboard (#471): no project selected.
   const showDashboard = () => {
     setAdopting(false)
-    go({ projectId: null, runId: null })
+    go({ projectId: null, agentId: null })
   }
 
   // The settings page (#958): every setting in one place, plus the Onboarding checklist, which is
   // where dismissing it from the Overview says you can pick it back up.
   const showSettings = () => {
     setAdopting(false)
-    go({ view: 'settings', projectId: null, runId: null })
+    go({ view: 'settings', projectId: null, agentId: null })
   }
 
   // Tickets (#1144): every registered project's backlog, one section each — required reading for a
@@ -222,28 +222,28 @@ export function App() {
   // like the Overview, not scoped to whichever project happened to be selected.
   const showTickets = () => {
     setAdopting(false)
-    go({ view: 'tickets', projectId: null, runId: null })
+    go({ view: 'tickets', projectId: null, agentId: null })
   }
 
   // One ticket's own page (#1144), by the same slug as its filename — what a one-liner row opens
   // into, since Queue and the rest of its detail no longer fit on the list row.
   const openTicket = (id: string, slug: string) => {
     setAdopting(false)
-    go({ view: 'tickets', projectId: id, runId: null, ticketSlug: slug })
+    go({ view: 'tickets', projectId: id, agentId: null, ticketSlug: slug })
   }
 
   // One ticket's plan view (#685), the plan column's link: the ticket's `.plan.md` rendered on its
   // own page, addressed by the same slug as the ticket it belongs to.
   const openTicketPlan = (id: string, slug: string) => {
     setAdopting(false)
-    go({ view: 'tickets', projectId: id, runId: null, ticketSlug: slug, plan: true })
+    go({ view: 'tickets', projectId: id, agentId: null, ticketSlug: slug, plan: true })
   }
 
   // The live run feed is owned here so both the main view and the right rail's views tab read
   // one shared Telefunc Channel. Hooks run before the relay early return below.
   // The run whose feed and controls are in play is simply the one in the URL; in the no-id
   // fallback there is none yet, and a null id resolves to the project root, as before.
-  const { events, lost } = useLiveEvents(projectId, runId, runStart.tick)
+  const { events, lost } = useLiveEvents(projectId, agentId, runStart.tick)
   // The rail's views stay scoped to the newest `session` segment even though a run's feed no
   // longer is (a resumed session appends a second segment to the same journal). Choice gates
   // are no longer folded here: they live inline in the transcript (#1455 items 6/7), where
@@ -251,7 +251,7 @@ export function App() {
   const current = currentRunEvents(events)
   const views = projectId ? agentViews(current) : []
   // The selected session's loop verdict, for the rail's pinned block under the tabs. It comes up
-  // from RunView rather than being folded here: a finished run's events live in its archived log,
+  // from AgentView rather than being folded here: a finished run's events live in its archived log,
   // which that view is the one to read.
 
   // On the relay (#426), the URL carries `?run=<id>` and there is no local registry or
@@ -272,12 +272,12 @@ export function App() {
   const healthy = useDaemonHealth(local)
 
   // Hooks above run unconditionally (rules of hooks); this early return is safe after them.
-  if (relayRun) return <RelayView runId={relayRun} />
+  if (relayRun) return <RelayView agentId={relayRun} />
 
   // Route the main pane: the Overview dashboard when no project is selected (#471); else the
   // project home/launcher, a running run's live output, or a finished run's replay. Each live
   // run streams its own feed and is steered by its own id (#749).
-  const selectedRun = runId ? runs.find(run => run.id === runId) : undefined
+  const selectedRun = agentId ? agents.find(agent => agent.id === agentId) : undefined
   const renderMain = () => {
     if (view === 'settings') return <SettingsPage onRunStarted={runStarted} onDone={showDashboard} />
     // A ticket's plan view is the same shape plus the `plan` flag (#685): its `.plan.md` on its own
@@ -308,10 +308,10 @@ export function App() {
           onAction={showDashboard}
         />
       )
-    if (runId === null) {
+    if (agentId === null) {
       // Just pressed Start on a project with no worktree: follow the live output until the poll
       // surfaces the run and the effect above adopts its id.
-      if (adopting) return <RunView projectId={projectId} runId={null} events={events} live label={runStart.intent || undefined} projectName={projectName} remoteLabel={runStart.runsOn} files={files} addContext={addContext} removeContext={removeContext} lost={lost} onRunStarted={onRunStarted} />
+      if (adopting) return <AgentView projectId={projectId} agentId={null} events={events} live label={runStart.intent || undefined} projectName={projectName} remoteLabel={runStart.runsOn} files={files} addContext={addContext} removeContext={removeContext} lost={lost} onRunStarted={onRunStarted} />
       return (
         <ProjectHome
           projectId={projectId}
@@ -330,8 +330,8 @@ export function App() {
       // Not in the list: either the run we just started (its run.json lands a beat later) or a
       // list we have not read yet. Both are live views; only a session that is genuinely absent
       // from a list we did read is gone.
-      if (runId === runStart.id || !runsLoaded)
-        return <RunView projectId={projectId} runId={runId} events={events} live label={runStart.intent || undefined} projectName={projectName} remoteLabel={runId === runStart.id ? runStart.runsOn : undefined} files={files} addContext={addContext} removeContext={removeContext} lost={lost} onRunStarted={onRunStarted} />
+      if (agentId === runStart.id || !runsLoaded)
+        return <AgentView projectId={projectId} agentId={agentId} events={events} live label={runStart.intent || undefined} projectName={projectName} remoteLabel={agentId === runStart.id ? runStart.runsOn : undefined} files={files} addContext={addContext} removeContext={removeContext} lost={lost} onRunStarted={onRunStarted} />
       return (
         <NotFound
           title="This session is gone"
@@ -344,9 +344,9 @@ export function App() {
     // Live and finished are the same view (#1026): only `live` changes, so a run ending swaps
     // what the bar, feed and composer say without remounting any of them.
     return (
-      <RunView
+      <AgentView
         projectId={projectId}
-        runId={runId}
+        agentId={agentId}
         events={events}
         live={selectedRun.status === 'running'}
         label={runLabel(selectedRun)}
@@ -376,7 +376,7 @@ export function App() {
     // the column that used to be a plain div.
     <SidebarProvider className="h-screen flex-col overflow-hidden">
       {/* The top navbar is gone (#772 follow-up): its brand, global nav and utility controls moved
-          into the sidebar (RunHistory), so the workspace and right rail get the full height. */}
+          into the sidebar (AgentHistory), so the workspace and right rail get the full height. */}
       {!healthy && (
         <div role="alert" className="flex items-center gap-2 border-b border-border bg-warning/10 px-4 py-2 text-xs text-warning">
           <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -391,10 +391,10 @@ export function App() {
           the scrolled content, and give the document a phantom scrollbar that slides the whole
           app off-screen. */}
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <RunHistory
+        <AgentHistory
           projectId={projectId}
-          runs={runs}
-          selectedRunId={runId}
+          agents={agents}
+          selectedRunId={agentId}
           onSelect={selectRun}
           recentRuns={recentRuns}
           onSelectRecent={selectRunInProject}
@@ -421,7 +421,7 @@ export function App() {
         {view !== 'tickets' && (
           <RightRail
             projectId={projectId}
-            runId={runId}
+            agentId={agentId}
             views={views}
             files={files}
             context={context}
@@ -431,7 +431,7 @@ export function App() {
             // The launcher shows Docs/History in its main column (#1455 items 2/3): exactly when
             // renderMain resolves to ProjectHome — a project selected, no run (and not adopting
             // one), on the default view. Session views keep the full rail.
-            docsInMain={view !== 'settings' && !!projectId && !unknownProject && runId === null && !adopting}
+            docsInMain={view !== 'settings' && !!projectId && !unknownProject && agentId === null && !adopting}
           />
         )}
       </div>

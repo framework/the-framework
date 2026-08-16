@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { summarizeProject, type SummarizeDeps } from './projects.js'
 import type { ProjectRecord } from '../registry.js'
-import { RUN_META_VERSION, type RunMeta } from '../store/index.js'
+import { AGENT_META_VERSION, type AgentMeta } from '../store/index.js'
 
 const RECORD: ProjectRecord = { id: 'app-a-1', path: '/repos/app-a', addedAt: '2026-07-11T00:00:00.000Z' }
 
@@ -15,8 +15,8 @@ function deps(over: SummarizeDeps): SummarizeDeps {
   }
 }
 
-const run = (id: string, updatedAt: string): RunMeta => ({
-  version: RUN_META_VERSION,
+const agent = (id: string, updatedAt: string): AgentMeta => ({
+  version: AGENT_META_VERSION,
   status: 'stopped',
   id,
   startedAt: updatedAt,
@@ -35,7 +35,7 @@ test('lastActivityAt is the newest run (#645)', async () => {
   // entry — a committed markdown re-narration of the same sessions, always the older of the two.
   const summary = await summarizeProject(
     RECORD,
-    deps({ readRuns: async () => [run('b', '2026-07-12T00:00:00.000Z'), run('a', '2026-07-10T00:00:00.000Z')] }),
+    deps({ readRuns: async () => [agent('b', '2026-07-12T00:00:00.000Z'), agent('a', '2026-07-10T00:00:00.000Z')] }),
   )
   assert.equal(summary.lastActivityAt, '2026-07-12T00:00:00.000Z')
 })

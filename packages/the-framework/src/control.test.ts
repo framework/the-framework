@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { FRAMEWORK_DIR } from './store/run-store.js'
+import { FRAMEWORK_DIR } from './store/agent-store.js'
 import {
   appendControl,
   controlPath,
@@ -165,14 +165,14 @@ function isCommittedFrameworkFile(path: string): boolean {
   if (rest === '.gitignore' || rest === 'LOGS.md') return true
   if (rest.startsWith('conversations/')) return true
   const [, sessions] = rest.split('/')
-  return sessions === 'sessions'
+  return sessions === 'agents'
 }
 
 test('no runtime state under .the-framework is tracked in git (#1298/#1311)', async () => {
   // #1311 untracked `control.jsonl` and added nothing to keep it untracked, so eighteen hours
   // later a run's own branch committed an empty one straight back onto main (#1309). The rule is
   // wider than that one file: `.the-framework/` is transient except the committed DB, and a
-  // tracked run.json or events.jsonl would churn every checkout the same way.
+  // tracked agent.json or events.jsonl would churn every checkout the same way.
   const { execFileSync } = await import('node:child_process')
   const git = (args: string[], cwd: string): string => execFileSync('git', args, { cwd, encoding: 'utf8' })
 

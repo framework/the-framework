@@ -9,7 +9,7 @@ const SPEC: SessionSpec = {
   prompt: 'fix the login bug',
   kind: 'build',
   cwd: '/work/app',
-  runId: '2026-08-15T10-00-00-000Z',
+  agentId: '2026-08-15T10-00-00-000Z',
   options: { handoff: 'local', model: 'opus', browser: true },
 }
 

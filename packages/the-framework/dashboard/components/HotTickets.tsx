@@ -58,7 +58,7 @@ export function HotTickets({
 }: {
   onSelectProject: (id: string) => void
   /** A ticket a run is implementing knows which run (#1117), so its row opens that session. */
-  onSelectRun: (id: string, runId: string) => void
+  onSelectRun: (id: string, agentId: string) => void
 }) {
   const { value: tickets } = usePolled<HotTicket[]>(onHotTickets, EMPTY, 10_000, [])
 
@@ -105,7 +105,7 @@ function Lane({
   lane: LaneDef
   tickets: HotTicket[]
   onSelectProject: (id: string) => void
-  onSelectRun: (id: string, runId: string) => void
+  onSelectRun: (id: string, agentId: string) => void
 }) {
   const empty = tickets.length === 0
   return (
@@ -130,7 +130,7 @@ function Lane({
                       type="button"
                       // A ticket being implemented names its run, and that session is what the row is
                       // reporting; one with no run yet opens its project's launcher, asking for it.
-                      onClick={() => (t.runId ? onSelectRun(t.projectId, t.runId) : openTicket(t, onSelectProject))}
+                      onClick={() => (t.agentId ? onSelectRun(t.projectId, t.agentId) : openTicket(t, onSelectProject))}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
                     />
                   }
@@ -157,7 +157,7 @@ function Lane({
 // that describes something happening as you read it: `planned` is a mark work left behind, and a
 // lane holding both should not read as though they were the same claim.
 function TicketTag({ ticket: t }: { ticket: HotTicket }) {
-  if (t.runId) {
+  if (t.agentId) {
     return (
       <span className="shrink-0 rounded border border-primary/40 px-1 text-[10px] uppercase tracking-wide text-primary">
         implementing

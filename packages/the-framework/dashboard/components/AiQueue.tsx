@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ProjectQueue } from '../../dist/index.js'
-import { runOptionsFromPreferences } from '../../dist/client.js'
+import { agentOptionsFromPreferences } from '../../dist/client.js'
 import { ListTodo, Loader2, Play } from 'lucide-react'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import { usePreferences } from '../lib/preferences.js'
@@ -48,7 +48,7 @@ export function AiQueue({
    * Told which run the play button just started (#1191). The project-carrying form, because the
    * Overview has no project selected — each entry knows its own — so the shell cannot supply it.
    */
-  onRunStarted: (projectId: string, intent: string, runId?: string) => void
+  onRunStarted: (projectId: string, intent: string, agentId?: string) => void
 }) {
   const preferences = usePreferences()
   const { busy, error, start } = useStartRun()
@@ -64,12 +64,12 @@ export function AiQueue({
     // Unattended (#1279): starting a queue entry from the card is the same work the drain sweep
     // starts, so it runs the same way — gates auto-answer, the run ends at settle, and the armed
     // handoff fires, instead of parking in the stay-open chat loop with its PR never opened.
-    const result = await start(projectId, prompt, 'prompt', { ...runOptionsFromPreferences(preferences), unattended: true })
+    const result = await start(projectId, prompt, 'prompt', { ...agentOptionsFromPreferences(preferences), unattended: true })
     setStarting(null)
     // Go to the run itself (#1191): one agent on one named entry is a session to watch, unlike the
     // sweep's fan-out, which lands in the Agents card. With no id yet the shell lands on the
     // project and adopts the running run once the poll surfaces it.
-    if (result) onRunStarted(projectId, prompt, result.runId)
+    if (result) onRunStarted(projectId, prompt, result.agentId)
   }
 
   const withOpen = queue.filter(q => q.open > 0)

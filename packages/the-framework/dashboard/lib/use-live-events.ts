@@ -40,7 +40,7 @@ function retryDelay(attempt: number): number {
  */
 const SYNC_GRACE_MS = 1500
 
-export function useLiveEvents(projectId: string | null, runId?: string | null, resetKey?: unknown): LiveEvents {
+export function useLiveEvents(projectId: string | null, agentId?: string | null, resetKey?: unknown): LiveEvents {
   const [events, setEvents] = useState<FrameworkEvent[]>([])
   const [lost, setLost] = useState(false)
   const [done, setDone] = useState(false)
@@ -88,7 +88,7 @@ export function useLiveEvents(projectId: string | null, runId?: string | null, r
       // shows less than it already showed (#1402's rule, applied to the live channel).
       const reconnect = !first
       first = false
-      void onEvents(projectId, runId ?? undefined).then(ch => {
+      void onEvents(projectId, agentId ?? undefined).then(ch => {
         if (cancelled) {
           void ch.close()
           return
@@ -132,8 +132,8 @@ export function useLiveEvents(projectId: string | null, runId?: string | null, r
       if (graceTimer) clearTimeout(graceTimer)
       void channel?.close()
     }
-    // runId is a dependency: selecting another run must resubscribe to that run's log (#749).
-  }, [projectId, runId])
+    // agentId is a dependency: selecting another run must resubscribe to that run's log (#749).
+  }, [projectId, agentId])
 
   // Scope the accumulated feed to the run in progress — but only for the project-root fallback:
   // that subscription lives across run boundaries (it only resets on a project switch), so
@@ -141,6 +141,6 @@ export function useLiveEvents(projectId: string | null, runId?: string | null, r
   // own tail (#749) holds nothing but that run — including the second `session` boundary a
   // resumed session (#762) appends to the SAME journal, where slicing is exactly wrong: it hid
   // everything before the resume for as long as the run was live. See {@link currentRunEvents}.
-  const scoped = useMemo(() => (runId ? events : currentRunEvents(events)), [events, runId])
+  const scoped = useMemo(() => (agentId ? events : currentRunEvents(events)), [events, agentId])
   return { events: scoped, lost, done }
 }

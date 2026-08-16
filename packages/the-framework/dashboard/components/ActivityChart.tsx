@@ -21,14 +21,14 @@ export function ActivityChart({ data }: { data: ActivityDay[] }) {
   const total = data.reduce((sum, d) => sum + d.count, 0)
   const active = hover !== null ? data[hover] : null
 
-  const runs = (n: number) => `${n} session${n === 1 ? '' : 's'}`
+  const agents = (n: number) => `${n} session${n === 1 ? '' : 's'}`
   // Say "today" only when the last column is actually today — a stale board must not claim it.
   const lastDate = data[data.length - 1]?.date
   const endLabel = lastDate === localDateKey(new Date()) ? 'today' : lastDate?.slice(5)
 
   return (
     <div>
-      <div role="img" aria-label={`Session activity: ${runs(total)} in ${data.length} days`} className="flex h-32 items-end gap-[3px]">
+      <div role="img" aria-label={`Session activity: ${agents(total)} in ${data.length} days`} className="flex h-32 items-end gap-[3px]">
         {data.map((d, i) => (
           <div
             key={d.date}
@@ -48,7 +48,7 @@ export function ActivityChart({ data }: { data: ActivityDay[] }) {
       <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
         <span>{data[0]?.date.slice(5)}</span>
         <span className="font-medium text-foreground">
-          {active ? `${active.date.slice(5)} · ${runs(active.count)}` : `${runs(total)} in ${data.length} days`}
+          {active ? `${active.date.slice(5)} · ${agents(active.count)}` : `${agents(total)} in ${data.length} days`}
         </span>
         <span>{endLabel}</span>
       </div>

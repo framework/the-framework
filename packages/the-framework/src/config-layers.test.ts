@@ -10,8 +10,8 @@ import {
 } from './config-layers.js'
 
 // The #800 chain, nearest first.
-const chain = (run = {}, project = {}, repo = {}, global = {}): ConfigLayer[] => [
-  { name: 'run', values: run },
+const chain = (agent = {}, project = {}, repo = {}, global = {}): ConfigLayer[] => [
+  { name: 'run', values: agent },
   { name: 'project', values: project },
   { name: 'the-framework.yml', values: repo },
   { name: 'global', values: global },

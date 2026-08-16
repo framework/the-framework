@@ -110,14 +110,14 @@ const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompar
 
 export function FileTree({
   projectId,
-  runId,
+  agentId: agentId,
   files,
   selected,
   onToggle,
 }: {
   projectId: string
   /** The selected run, so the dots describe its worktree and not the project root (#815). */
-  runId?: string | null | undefined
+  agentId?: string | null | undefined
   files: string[]
   selected: Set<string>
   onToggle: (path: string) => void
@@ -128,10 +128,10 @@ export function FileTree({
   // the selected run's worktree (#815) so the dots agree with the branch and Serve in the action
   // bar right above, which have resolved the worktree since #738.
   const { value: status } = usePolled<Record<string, FileGitStatus>>(
-    () => onProjectFileStatus(projectId, runId ?? undefined),
+    () => onProjectFileStatus(projectId, agentId ?? undefined),
     EMPTY_STATUS,
     8_000,
-    [projectId, runId],
+    [projectId, agentId],
   )
 
   const folderStatus = useMemo(() => foldersFromStatus(status), [status])
@@ -189,7 +189,7 @@ export function FileTree({
           // its contents (#828). `git` picks which read the card makes, so the tree's own status
           // map answers that rather than a second server lookup.
           return (
-            <FilePreviewHover key={path} projectId={projectId} runId={runId} path={path} changed={Boolean(git)}>
+            <FilePreviewHover key={path} projectId={projectId} agentId={agentId} path={path} changed={Boolean(git)}>
               {item}
             </FilePreviewHover>
           )

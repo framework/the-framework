@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import type { GitStatus, RunWorktree } from '../../dist/index.js'
+import type { GitStatus, AgentWorktree } from '../../dist/index.js'
 import { ChevronRight, GitBranch } from 'lucide-react'
 import { onGitStatus, onRunWorktree } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
@@ -11,7 +11,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 // Polled, so it tracks a run committing or branching. Hidden when there is no git repo (or on
 // the relay, which has no local checkout).
 //
-// One component for both pages (#809). With a `runId` it reads that session's own worktree, which
+// One component for both pages (#809). With a `agentId` it reads that session's own worktree, which
 // also carries its size on disk and the path it lives at; without one it reads the project's
 // checkout. A session used to have its own differently-styled chip, so the same facts wore two
 // looks depending on the page, and either could drift with an edit to the other.
@@ -23,7 +23,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 // instead of a second card underneath repeating the branch name.
 export function GitStatusBar({
   projectId,
-  runId,
+  agentId: agentId,
   inline = false,
   label,
   projectName,
@@ -34,7 +34,7 @@ export function GitStatusBar({
 }: {
   projectId: string
   /** The session whose worktree to report; absent reports the project's checkout. */
-  runId?: string | null | undefined
+  agentId?: string | null | undefined
   inline?: boolean
   /** The session's name (#1030). Given, it leads as the bold identity and the branch drops to
    * muted git context beside it; absent (the project home), the branch stays the identity. */
@@ -57,11 +57,11 @@ export function GitStatusBar({
   // Resting cadence is ten seconds, but a PR lookup still in flight (#1028) is an answer that
   // lands in under a second — worth asking again for rather than showing a gap for ten.
   const [everyMs, setEveryMs] = useState(10_000)
-  const { value: status } = usePolled<GitStatus | RunWorktree | null>(
-    () => (runId ? onRunWorktree(projectId, runId) : onGitStatus(projectId)),
+  const { value: status } = usePolled<GitStatus | AgentWorktree | null>(
+    () => (agentId ? onRunWorktree(projectId, agentId) : onGitStatus(projectId)),
     null,
     everyMs,
-    [projectId, runId, everyMs],
+    [projectId, agentId, everyMs],
     // Keep the previous status visible while the next session's loads, so the whole left cluster
     // (branch/dirty/PR/chevron) updates in place instead of vanishing to null and popping back.
     true,

@@ -36,7 +36,7 @@ beforeEach(() => {
   busy = false
   startError = null
   start.mockReset()
-  start.mockResolvedValue({ ok: true, runId: 'run-1' })
+  start.mockResolvedValue({ ok: true, agentId: 'run-1' })
 })
 afterEach(cleanup)
 

@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { buildDashboard } from './dashboard.js'
 import type { ProjectSummary } from './projects.js'
 import type { ProjectQueue } from './queue.js'
-import type { RunMeta } from '../store/index.js'
+import type { AgentMeta } from '../store/index.js'
 
 const project = (id: string, path: string, lastActivityAt?: string): ProjectSummary => ({
   id,
@@ -13,49 +13,49 @@ const project = (id: string, path: string, lastActivityAt?: string): ProjectSumm
   ...(lastActivityAt ? { lastActivityAt } : {}),
 })
 
-const run = (status: RunMeta['status'], startedAt: string): RunMeta =>
-  ({ version: 1, status, id: startedAt, startedAt, updatedAt: startedAt }) as RunMeta
+const agent = (status: AgentMeta['status'], startedAt: string): AgentMeta =>
+  ({ version: 1, status, id: startedAt, startedAt, updatedAt: startedAt }) as AgentMeta
 
 // A fixed clock so the 14-day activity window is deterministic.
 const NOW = () => new Date('2026-07-14T12:00:00Z')
 
 test('buildDashboard rolls up totals, run-status, and per-project counts', async () => {
   const projects = [project('a', '/a', '2026-07-13T00:00:00Z'), project('b', '/b', '2026-07-10T00:00:00Z')]
-  const runsByPath: Record<string, RunMeta[]> = {
-    '/a': [run('done', '2026-07-14T09:00:00Z'), run('failed', '2026-07-13T09:00:00Z')],
-    '/b': [run('done', '2026-07-12T09:00:00Z')],
+  const runsByPath: Record<string, AgentMeta[]> = {
+    '/a': [agent('done', '2026-07-14T09:00:00Z'), agent('failed', '2026-07-13T09:00:00Z')],
+    '/b': [agent('done', '2026-07-12T09:00:00Z')],
   }
   const queues: ProjectQueue[] = [
     { projectId: 'a', projectName: 'a', open: 2, total: 3, items: [] },
     { projectId: 'b', projectName: 'b', open: 0, total: 1, items: [] },
   ]
   const data = await buildDashboard(projects, {
-    liveRuns: async cwd => (cwd === '/a' ? [{ ...run('running', '2026-07-14T11:00:00Z'), cwd }] : []),
-    runs: async cwd => runsByPath[cwd] ?? [],
+    liveRuns: async cwd => (cwd === '/a' ? [{ ...agent('running', '2026-07-14T11:00:00Z'), cwd }] : []),
+    agents: async cwd => runsByPath[cwd] ?? [],
     queue: async () => queues,
     now: NOW,
   })
 
-  assert.deepEqual(data.totals, { projects: 2, activeRuns: 1, openTodos: 2, totalRuns: 3 })
+  assert.deepEqual(data.totals, { projects: 2, activeAgents: 1, openTodos: 2, totalRuns: 3 })
   assert.deepEqual(data.runsByStatus, { running: 0, done: 2, stopped: 0, failed: 1 })
   assert.equal(data.projects.length, 2)
   const a = data.projects.find(p => p.projectId === 'a')!
-  assert.equal(a.runs, 2)
+  assert.equal(a.agents, 2)
   assert.equal(a.openTodos, 2)
   assert.equal(a.running, true)
   assert.equal(data.projects.find(p => p.projectId === 'b')!.running, false)
 })
 
 test('buildDashboard buckets run activity across a 14-day window, oldest-first', async () => {
-  const runs = [
-    run('done', '2026-07-14T09:00:00Z'), // today
-    run('done', '2026-07-14T20:00:00Z'), // today (second)
-    run('failed', '2026-07-08T09:00:00Z'), // within window
-    run('done', '2026-06-01T09:00:00Z'), // older than 14 days -> dropped
+  const agents = [
+    agent('done', '2026-07-14T09:00:00Z'), // today
+    agent('done', '2026-07-14T20:00:00Z'), // today (second)
+    agent('failed', '2026-07-08T09:00:00Z'), // within window
+    agent('done', '2026-06-01T09:00:00Z'), // older than 14 days -> dropped
   ]
   const data = await buildDashboard([project('a', '/a')], {
     liveRuns: async () => [],
-    runs: async () => runs,
+    agents: async () => agents,
     queue: async () => [],
     now: NOW,
   })
@@ -71,7 +71,7 @@ test('buildDashboard buckets run activity across a 14-day window, oldest-first',
 
 test('buildDashboard reports per-project ticket presence, which onboarding reads (#958)', async () => {
   const data = await buildDashboard([project('a', '/a'), project('b', '/b')], {
-    runs: async () => [],
+    agents: async () => [],
     queue: async () => [],
     tickets: async cwd => cwd === '/a',
     now: NOW,

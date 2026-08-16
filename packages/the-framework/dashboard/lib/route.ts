@@ -2,7 +2,7 @@
 // `/{projectId}/{sessionId}` one session. The URL is the selection — what used to be three pieces
 // of React state guessing at each other, which is where the #761/#766/#768/#774 bugs came from.
 //
-// `sessionId` is the run id (`RunMeta.id`), not the agent's conversation id: only the run id is
+// `sessionId` is the run id (`AgentMeta.id`), not the agent's conversation id: only the run id is
 // ours, stable, and already the name of the run's worktree directory. The URL-facing spelling is
 // "session" because that is the user-facing word for a run (#771).
 //
@@ -24,7 +24,7 @@ export const SETTINGS_SEGMENT = 'settings'
  *
  * Safe to reserve in both spots for the same reason as {@link SETTINGS_SEGMENT}: a project id
  * always carries a `-<hash>` suffix, and a run id is derived from its start time
- * (`runIdFromStartedAt`) — neither is ever this bare word.
+ * (`agentIdFromStartedAt`) — neither is ever this bare word.
  */
 export const TICKETS_SEGMENT = 'tickets'
 
@@ -42,7 +42,7 @@ export interface Route {
   /** The selected project, or null for the Overview — and for the cross-project Tickets list. */
   projectId: string | null
   /** The selected session (run id), or null for the project's home/launcher. */
-  runId: string | null
+  agentId: string | null
   /** One ticket's own page (#1144), by filename — the same slug as `WorkspaceTicket.file`. Only
    *  meaningful with `view: 'tickets'` and a `projectId`; a ticket belongs to one project, so the
    *  cross-project list (no `projectId`) never carries one. */
@@ -55,23 +55,23 @@ export interface Route {
 /** Read the route out of a path. Anything unparseable is the Overview, and extra segments are ignored. */
 export function parseRoute(pathname: string): Route {
   const [first, second, third, fourth] = pathname.split('/').filter(Boolean).map(decodeSegment)
-  if (first === SETTINGS_SEGMENT) return { view: 'settings', projectId: null, runId: null }
-  if (first === TICKETS_SEGMENT) return { view: 'tickets', projectId: null, runId: null }
-  if (!first) return { projectId: null, runId: null }
+  if (first === SETTINGS_SEGMENT) return { view: 'settings', projectId: null, agentId: null }
+  if (first === TICKETS_SEGMENT) return { view: 'tickets', projectId: null, agentId: null }
+  if (!first) return { projectId: null, agentId: null }
   if (second === TICKETS_SEGMENT)
     return {
       view: 'tickets',
       projectId: first,
-      runId: null,
+      agentId: null,
       ticketSlug: third ?? null,
       // The plan flag rides only on a real slug: `/tickets/plan` with no ticket names nothing.
       ...(third && fourth === PLAN_SEGMENT ? { plan: true } : {}),
     }
-  return { projectId: first, runId: second ?? null }
+  return { projectId: first, agentId: second ?? null }
 }
 
 /** The path for a route — the inverse of {@link parseRoute}. */
-export function formatRoute({ view, projectId, runId, ticketSlug, plan }: Route): string {
+export function formatRoute({ view, projectId, agentId: agentId, ticketSlug, plan }: Route): string {
   if (view === 'settings') return `/${SETTINGS_SEGMENT}`
   if (view === 'tickets' && !projectId) return `/${TICKETS_SEGMENT}`
   if (!projectId) return '/'
@@ -83,7 +83,7 @@ export function formatRoute({ view, projectId, runId, ticketSlug, plan }: Route)
     // The plan hangs off its ticket's detail path; without a slug there is no plan to point at.
     return plan ? `${detail}/${PLAN_SEGMENT}` : detail
   }
-  return runId ? `/${project}/${encodeURIComponent(runId)}` : `/${project}`
+  return agentId ? `/${project}/${encodeURIComponent(agentId)}` : `/${project}`
 }
 
 /** A percent-encoded segment, or the raw one when it is malformed (a hand-typed URL is input). */

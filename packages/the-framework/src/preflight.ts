@@ -12,7 +12,7 @@ import { DRIVER_SPECS, type DriverName } from './driver-cli.js'
  *
  * Installed is not the same as usable (#1326). Our first external-user report (#1323) was a
  * CLI that resolved fine and was logged out, under a daemon started with `sudo`: every session
- * died before writing its run.json, on both agents, across six projects, while the daemon went
+ * died before writing its agent.json, on both agents, across six projects, while the daemon went
  * on spending a branch and a worktree per attempt. So preflight also asks the CLI whether it is
  * authenticated, and says so when the daemon runs as root.
  */

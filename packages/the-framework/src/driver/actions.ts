@@ -77,7 +77,7 @@ export interface ActionsDriverOptions {
    * a stable id. Without it a fresh driver process restarts the session counter at 1, so
    * every run's first turn is `actions-1-turn-1` and runs collide (see {@link ActionsSession}).
    */
-  runTag?: () => string
+  agentTag?: () => string
   /**
    * Prefix for the branch each run pushes its work to (#1085). Default `"claude/"`. The
    * driver names the branch (prefix + session id) and passes it to the workflow, rather than
@@ -114,7 +114,7 @@ export class ActionsSession implements DriverSession {
     this.cwd = startOpts.cwd
     // The counter reads well in logs within one process; the random tag is what keeps the
     // correlation id unique across processes, since the daemon spawns a fresh one per run.
-    this.id = `actions-${++sessionCounter}-${(config.runTag ?? randomRunTag)()}`
+    this.id = `actions-${++sessionCounter}-${(config.agentTag ?? randomRunTag)()}`
     this.runBranch = `${config.branchPrefix ?? 'claude/'}framework-${this.id}`
     this.lastSessionId = startOpts.resumeSessionId
   }
@@ -138,8 +138,8 @@ export class ActionsSession implements DriverSession {
     await this.dispatch(prompt, correlationId, resume)
     emit({ type: 'notice', message: `Dispatched ${correlationId} to ${this.config.owner}/${this.config.repo}; waiting for the runner.` })
 
-    const run = await this.awaitRun(correlationId, emit, opts.signal)
-    const artifact = await this.readRunArtifact(run.id, correlationId)
+    const agent = await this.awaitRun(correlationId, emit, opts.signal)
+    const artifact = await this.readRunArtifact(agent.id, correlationId)
     if (artifact.branch) this.branch = artifact.branch
 
     const turn = replayTranscript(artifact.execution, emit)
@@ -193,7 +193,7 @@ export class ActionsSession implements DriverSession {
     let announced = false
 
     for (;;) {
-      const found = await this.findRun(correlationId)
+      const found = await this.findAgent(correlationId)
       if (found) {
         if (!announced) {
           announced = true
@@ -212,16 +212,16 @@ export class ActionsSession implements DriverSession {
   }
 
   /** Our run among the workflow's recent ones, or undefined while GitHub is still creating it. */
-  private async findRun(correlationId: string): Promise<WorkflowRun | undefined> {
+  private async findAgent(correlationId: string): Promise<WorkflowRun | undefined> {
     const body = await this.api<{ workflow_runs?: WorkflowRun[] }>(`/repos/${this.owner}/actions/runs?event=workflow_dispatch&per_page=50`)
-    return (body.workflow_runs ?? []).find(run => typeof run.name === 'string' && run.name.includes(correlationId))
+    return (body.workflow_runs ?? []).find(agent => typeof agent.name === 'string' && agent.name.includes(correlationId))
   }
 
   /** Download the run's artifact and pull the transcript and the pushed branch out of it. */
-  private async readRunArtifact(runId: number, correlationId: string): Promise<{ execution: string; branch?: string }> {
-    const list = await this.api<{ artifacts?: { id: number; name: string }[] }>(`/repos/${this.owner}/actions/runs/${runId}/artifacts`)
+  private async readRunArtifact(agentId: number, correlationId: string): Promise<{ execution: string; branch?: string }> {
+    const list = await this.api<{ artifacts?: { id: number; name: string }[] }>(`/repos/${this.owner}/actions/runs/${agentId}/artifacts`)
     const artifact = (list.artifacts ?? []).find(a => a.name.includes(correlationId)) ?? list.artifacts?.[0]
-    if (!artifact) throw new Error(`Run ${runId} uploaded no artifact; the workflow's collect step did not run.`)
+    if (!artifact) throw new Error(`Run ${agentId} uploaded no artifact; the workflow's collect step did not run.`)
 
     const res = await this.request(`/repos/${this.owner}/actions/artifacts/${artifact.id}/zip`)
     const entries = readZip(Buffer.from(await res.arrayBuffer()))

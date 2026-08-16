@@ -1,5 +1,5 @@
 import type { FrameworkEvent } from '../../dist/index.js'
-import { runProgress } from '../../dist/client.js'
+import { agentProgress } from '../../dist/client.js'
 import { isPublishing, isRunActive, runOutcome } from './live-state.js'
 
 /** How a run's one status pill is drawn: its dot colour, its word, and the word's tone. */
@@ -17,7 +17,7 @@ export type RunStatusPill = { dot: string; label: string; tone: string }
  * Shared so the session toolbar and the overview cannot drift apart on what a run is.
  */
 export function runStatusPill(events: FrameworkEvent[]): RunStatusPill | null {
-  const progress = runProgress(events)
+  const progress = agentProgress(events)
   const outcome = runOutcome(events)
   const failed = outcome !== undefined && !outcome.ok && !outcome.stopped
   const stopped = outcome?.stopped === true

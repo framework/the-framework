@@ -73,7 +73,7 @@ async function services(preferences: Record<string, unknown>) {
     quota: spareQuota(),
     startRun: async (prompt, options, projectId): Promise<StartRunResult> => {
       starts.push({ prompt, options, projectId })
-      return { ok: true, runId: `run-${starts.length}` }
+      return { ok: true, agentId: `run-${starts.length}` }
     },
     // What the daemon's own counter reports: the runs this sweep has asked for are live, so the
     // cap is measured against them rather than against a constant zero.

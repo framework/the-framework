@@ -25,7 +25,7 @@ export {
   type PermissionMode,
 } from './claude-code.js'
 export { ActionsDriver, ActionsSession, replayTranscript, type ActionsDriverOptions, type FetchLike } from './actions.js'
-export { CloudDriver, CloudSession, type CloudDriverOptions, type RunPty, type RunPtyOptions } from './cloud.js'
+export { CloudDriver, CloudSession, type CloudDriverOptions, type RunPty, type AgentPtyOptions } from './cloud.js'
 export { readZip, type ZipEntry } from './actions-zip.js'
 export {
   runCliSession,

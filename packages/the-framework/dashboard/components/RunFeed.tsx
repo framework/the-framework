@@ -2,10 +2,10 @@ import type { ReactNode } from 'react'
 import type { FrameworkEvent } from '../../dist/index.js'
 import { TriangleAlert } from 'lucide-react'
 import { EventList } from './EventList.js'
-import { RunOverview } from './RunOverview.js'
+import { AgentOverview } from './AgentOverview.js'
 
 // One run's feed: the run overview plus the live/replayed event log, or a waiting placeholder
-// before anything has streamed. Shared by the run's own view (RunView, which shows the session
+// before anything has streamed. Shared by the run's own view (AgentView, which shows the session
 // link in its action bar instead — `showSessionLink={false}`) and the read-only relay watch view
 // (RelayView, which keeps it since it has no action bar). `lost` is the live channel's health
 // (#948): while the stream is down the feed is behind reality, and saying so beats letting
@@ -21,13 +21,13 @@ export function RunFeed({
   emptyLabel = 'Waiting for the session to start…',
   tail,
   projectId,
-  runId,
+  agentId: agentId,
 }: {
   events: FrameworkEvent[]
   /** The feed's own project/run (#1455 item 6): with a projectId the log's `choice` rows become
    *  the interaction (inline panels/answered cards). The relay watch passes nothing — read-only. */
   projectId?: string | undefined
-  runId?: string | null | undefined
+  agentId?: string | null | undefined
   showSessionLink?: boolean
   /** The run's own view sets this false: its action bar's breadcrumb already names the session. */
   showName?: boolean
@@ -60,13 +60,13 @@ export function RunFeed({
   return (
     <>
       {lostBanner}
-      <RunOverview events={events} showSessionLink={showSessionLink} showName={showName} showStatus={showStatus} />
+      <AgentOverview events={events} showSessionLink={showSessionLink} showName={showName} showStatus={showStatus} />
       <EventList
         events={events}
         stick={stick}
         {...(openAt ? { openAt } : {})}
         {...(tail ? { tail } : {})}
-        {...(projectId ? { projectId, runId } : {})}
+        {...(projectId ? { projectId, agentId: agentId } : {})}
       />
     </>
   )

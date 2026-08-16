@@ -28,11 +28,11 @@ import {
 // that was the one page where you could not.
 export function WorkspaceActions({
   projectId,
-  runId,
+  agentId: agentId,
 }: {
   projectId: string
   /** The session to act on; absent acts on the project's checkout. */
-  runId?: string | null | undefined
+  agentId?: string | null | undefined
 }) {
   // The repo link is the project's either way: a session is a branch of that same repo, and its
   // branch may not be pushed anywhere yet. Its PR, when there is one, shows in the git status.
@@ -52,10 +52,10 @@ export function WorkspaceActions({
 
   // `error` belongs to open(), not to the read, so clearing it on a switch is its own effect:
   // otherwise the last checkout's failure stays on screen next to the new one's actions.
-  useEffect(() => reset(), [projectId, runId, reset])
+  useEffect(() => reset(), [projectId, agentId, reset])
 
   const open = (target: 'files' | 'editor') =>
-    run(() => sendOpenInApp(projectId, target, runId ?? undefined), 'Failed to open.')
+    run(() => sendOpenInApp(projectId, target, agentId ?? undefined), 'Failed to open.')
 
   return (
     <>
@@ -82,7 +82,7 @@ export function WorkspaceActions({
         >
           <FolderOpen className="h-3.5 w-3.5" />
         </TooltipTrigger>
-        <TooltipContent>{runId ? "Open this session's folder" : 'Open folder'} (Finder / Explorer)</TooltipContent>
+        <TooltipContent>{agentId ? "Open this session's folder" : 'Open folder'} (Finder / Explorer)</TooltipContent>
       </Tooltip>
       <DropdownMenu>
         <Tooltip>
@@ -103,7 +103,7 @@ export function WorkspaceActions({
         <DropdownMenuContent align="end" className="min-w-[15rem]">
           <DropdownMenuItem disabled={busy} onClick={() => void open('editor')}>
             <Code className="h-3.5 w-3.5 shrink-0" />
-            {runId ? "Open this session's checkout" : 'Open in your editor'}
+            {agentId ? "Open this session's checkout" : 'Open in your editor'}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>

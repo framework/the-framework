@@ -1,4 +1,4 @@
-import { readAllRuns, readLiveMetas, type LiveRun, type RunMeta, type RunStatus } from '../store/index.js'
+import { readAllRuns, readLiveMetas, type LiveRun, type AgentMeta, type AgentStatus } from '../store/index.js'
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
 import { readTickets, type WorkspaceTicket } from './tickets.js'
@@ -7,18 +7,18 @@ import { TICKETS_DIR } from '../tickets.js'
 // The first-sidebar Overview (#437, part of #314): a cross-project glance at what the agent
 // is working on right now, the size of the backlog, and the recently active projects. It
 // rolls up three existing file projections across the whole registry — the live run meta
-// (`.the-framework/run.json`, kept current per event), the TODO queue (queue.ts), and each
+// (`.the-framework/agent.json`, kept current per event), the TODO queue (queue.ts), and each
 // project's last activity (ProjectSummary.lastActivityAt from LOGS.md).
 
 /** One project's in-flight run, surfaced in the Overview's "working now" list. */
-export interface ActiveRun {
+export interface ActiveAgent {
   projectId: string
   projectName: string
   /** Which run this is (#738): a project can have several in flight, one per worktree. */
-  runId: string
+  agentId: string
   /** The run's own checkout, so its git/file status is read from the worktree it edits (#738). */
   cwd: string
-  status: RunStatus
+  status: AgentStatus
   /** What the user asked to build (the run's `scope` event). */
   intent?: string
   scope?: string
@@ -40,7 +40,7 @@ export interface RecentProject {
 /** The cross-project Overview payload. */
 export interface Overview {
   /** Projects with a running run, most-recently-updated first. */
-  active: ActiveRun[]
+  active: ActiveAgent[]
   /** Total open TODO items across every project. */
   queueOpen: number
   /** The most recently active projects (capped). */
@@ -48,10 +48,10 @@ export interface Overview {
 }
 
 /** One recent session, tagged with the project it belongs to, for the cross-project rail. */
-export interface RecentRun {
+export interface RecentAgent {
   projectId: string
   projectName: string
-  run: RunMeta
+  agent: AgentMeta
 }
 
 /** How many recent projects the Overview surfaces. */
@@ -62,7 +62,7 @@ const RECENT_RUNS_LIMIT = 30
 
 /** Injectable reader so {@link buildRecentRuns} is unit-testable off disk. */
 export interface RecentRunsDeps {
-  runs?: (cwd: string) => Promise<RunMeta[]>
+  agents?: (cwd: string) => Promise<AgentMeta[]>
 }
 
 /**
@@ -71,15 +71,15 @@ export interface RecentRunsDeps {
  * the project it belongs to, so selecting it jumps into that project's session. Forgiving — a project
  * whose runs cannot be read simply contributes nothing.
  */
-export async function buildRecentRuns(projects: ProjectSummary[], deps: RecentRunsDeps = {}): Promise<RecentRun[]> {
-  const readRuns = deps.runs ?? readAllRuns
-  const all: RecentRun[] = []
+export async function buildRecentRuns(projects: ProjectSummary[], deps: RecentRunsDeps = {}): Promise<RecentAgent[]> {
+  const readRuns = deps.agents ?? readAllRuns
+  const all: RecentAgent[] = []
   for (const project of projects) {
-    for (const run of await readRuns(project.path).catch(() => [])) {
-      all.push({ projectId: project.id, projectName: project.name, run })
+    for (const agent of await readRuns(project.path).catch(() => [])) {
+      all.push({ projectId: project.id, projectName: project.name, agent })
     }
   }
-  all.sort((a, b) => (b.run.startedAt ?? '').localeCompare(a.run.startedAt ?? ''))
+  all.sort((a, b) => (b.agent.startedAt ?? '').localeCompare(a.agent.startedAt ?? ''))
   return all.slice(0, RECENT_RUNS_LIMIT)
 }
 
@@ -128,9 +128,9 @@ export interface HotTicket {
    *
    * The difference between "someone planned this at some point" and "this is being coded as you
    * look at it", which the plan/spike proxy could not tell apart. Only set for a ticket a live run
-   * actually recorded (`RunMeta.ticket`), so absent still means the lane was inferred.
+   * actually recorded (`AgentMeta.ticket`), so absent still means the lane was inferred.
    */
-  runId?: string
+  agentId?: string
 }
 
 /** Where the ticket format's 10-0 scale starts reading as high. */
@@ -233,8 +233,8 @@ export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicke
     }
     const queued = queuedByProject.get(project.id) ?? new Set<string>()
     for (const ticket of await readT(project.path).catch(() => [])) {
-      const runId = implementing.get(`${TICKETS_DIR}/${ticket.file}`)
-      const bucket = ticketBucket(ticket, { implementing: runId !== undefined, queued: queued.has(ticket.file) })
+      const agentId = implementing.get(`${TICKETS_DIR}/${ticket.file}`)
+      const bucket = ticketBucket(ticket, { implementing: agentId !== undefined, queued: queued.has(ticket.file) })
       // A ticket in none of the three shown lanes is left off the card entirely.
       if (!bucket) continue
       all.push({
@@ -242,7 +242,7 @@ export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicke
         projectName: project.name,
         bucket,
         ticket,
-        ...(runId ? { runId } : {}),
+        ...(agentId ? { agentId } : {}),
       })
     }
   }
@@ -267,7 +267,7 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
   const liveRuns = deps.liveRuns ?? readLiveMetas
   const queue = deps.queue ?? (p => collectQueue(p))
 
-  const active: ActiveRun[] = []
+  const active: ActiveAgent[] = []
   for (const project of projects) {
     // Every live run of the project (#738), not just the one that used to sit at its path.
     for (const meta of await liveRuns(project.path).catch(() => [])) {
@@ -275,7 +275,7 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
       active.push({
         projectId: project.id,
         projectName: project.name,
-        runId: meta.id,
+        agentId: meta.id,
         cwd: meta.cwd,
         status: meta.status,
         ...(meta.intent ? { intent: meta.intent } : {}),

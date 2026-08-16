@@ -63,7 +63,7 @@ test('a parked run yields its question with the full gate, read from the run own
   assert.deepEqual(questions[0], {
     projectId: 'p1',
     projectName: 'one',
-    runId: 'run-1',
+    agentId: 'run-1',
     sessionName: 'triage',
     intent: 'triage the queue',
     updatedAt: '2026-08-01T11:00:00.000Z',
@@ -96,7 +96,7 @@ test('longest-waiting first: the run blocked longest is the one to unblock first
     ],
     events: async () => [CHOICE],
   })
-  assert.deepEqual(questions.map(q => q.runId), ['stale', 'fresh'])
+  assert.deepEqual(questions.map(q => q.agentId), ['stale', 'fresh'])
 })
 
 test('an unreadable project or log contributes nothing rather than failing the read', async () => {

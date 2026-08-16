@@ -28,7 +28,7 @@ afterEach(cleanup)
 describe('FilePreviewHover (#816/#828)', () => {
   test('nothing is read until the card opens', () => {
     render(
-      <FilePreviewHover projectId="p1" runId="run-1" path="src/a.ts">
+      <FilePreviewHover projectId="p1" agentId="run-1" path="src/a.ts">
         <span>a.ts</span>
       </FilePreviewHover>,
     )
@@ -40,7 +40,7 @@ describe('FilePreviewHover (#816/#828)', () => {
 
 describe('FilePreviewCard (#816)', () => {
   test("reads the selected run's worktree and renders the diff", async () => {
-    render(<FilePreviewCard projectId="p1" runId="run-1" path="src/a.ts" />)
+    render(<FilePreviewCard projectId="p1" agentId="run-1" path="src/a.ts" />)
     await waitFor(() => expect(onFileDiff).toHaveBeenCalledWith('p1', 'src/a.ts', 'run-1'))
     await waitFor(() => expect(screen.getByText('+const b = 3')).toBeTruthy())
     expect(screen.getByText('-const b = 2')).toBeTruthy()
@@ -81,7 +81,7 @@ describe('FilePreviewCard (#816)', () => {
 
 describe('FilePreviewCard on an unchanged file (#828)', () => {
   test('reads the contents rather than a diff, and numbers the lines', async () => {
-    render(<FilePreviewCard projectId="p1" runId="run-1" path="src/a.ts" changed={false} />)
+    render(<FilePreviewCard projectId="p1" agentId="run-1" path="src/a.ts" changed={false} />)
     await waitFor(() => expect(onFileContent).toHaveBeenCalledWith('p1', 'src/a.ts', 'run-1'))
     // The status the tree already holds picks the read, so an unchanged file costs no git diff.
     expect(onFileDiff).not.toHaveBeenCalled()
@@ -92,7 +92,7 @@ describe('FilePreviewCard on an unchanged file (#828)', () => {
   })
 
   test('a changed file still reads the diff', async () => {
-    render(<FilePreviewCard projectId="p1" runId="run-1" path="src/a.ts" changed />)
+    render(<FilePreviewCard projectId="p1" agentId="run-1" path="src/a.ts" changed />)
     await waitFor(() => expect(onFileDiff).toHaveBeenCalled())
     expect(onFileContent).not.toHaveBeenCalled()
   })

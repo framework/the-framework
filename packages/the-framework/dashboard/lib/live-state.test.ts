@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { FrameworkEvent, RunMeta } from '../../dist/index.js'
+import type { FrameworkEvent, AgentMeta } from '../../dist/index.js'
 import { agentSettled, agentViews, pendingChoices, isPublishing, isMetaPublishing, isRunActive, currentRunEvents, runOutcome, actionsRunUrl } from './live-state.js'
 
 const view = (id: string, title: string, markdown: string): FrameworkEvent => ({ kind: 'view', id, title, markdown })
@@ -123,7 +123,7 @@ describe('isPublishing', () => {
 })
 
 describe('isMetaPublishing', () => {
-  const meta = (over: Partial<RunMeta>): RunMeta => ({
+  const meta = (over: Partial<AgentMeta>): AgentMeta => ({
     version: 2,
     status: 'done',
     id: 'r1',
@@ -146,7 +146,7 @@ describe('isMetaPublishing', () => {
     expect(isMetaPublishing(meta({ status: 'failed' }))).toBe(false)
     expect(isMetaPublishing(meta({ handoff: { push: false, pr: false } }))).toBe(false)
     const { handoff: _handoff, ...unarmed } = meta({})
-    expect(isMetaPublishing(unarmed as RunMeta)).toBe(false)
+    expect(isMetaPublishing(unarmed as AgentMeta)).toBe(false)
   })
 
   test('a pre-fold record (version 1) never reads as publishing — its report just never landed', () => {

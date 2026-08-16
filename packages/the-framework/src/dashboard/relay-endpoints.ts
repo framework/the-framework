@@ -24,7 +24,7 @@ export const RELAY_PREFIX = '/_relay'
 /** What the daemon wires behind the relay endpoints: its own start closure and an events tail. */
 export interface RelayHandlers {
   start: (prompt: string, kind: StartRunKind, options: StartRunOptions, projectId?: string) => StartRunResult | Promise<StartRunResult>
-  tailEvents: (runId: string, onEvent: (event: FrameworkEvent) => void) => () => void
+  tailEvents: (agentId: string, onEvent: (event: FrameworkEvent) => void) => () => void
   /** Run one whitelisted read/steer/handoff RPC against THIS device's own checkout, for the daemon
    *  relaying a run here (#1067 slice 2); the caller wraps the result as {result}. */
   rpc?: (fn: string, args: unknown[]) => Promise<unknown>
@@ -91,10 +91,10 @@ async function handleStart(req: IncomingMessage, res: ServerResponse, handlers: 
 /** `GET /_relay/events?run=<id>`: stream the run's events as newline-delimited JSON. */
 function handleEvents(req: IncomingMessage, res: ServerResponse, handlers: RelayHandlers): void {
   if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
-  const runId = new URL(req.url ?? '/', 'http://localhost').searchParams.get('run')
-  if (!runId) return end(res, 400, 'missing run id')
+  const agentId = new URL(req.url ?? '/', 'http://localhost').searchParams.get('run')
+  if (!agentId) return end(res, 400, 'missing run id')
   res.writeHead(200, { 'content-type': 'application/x-ndjson', 'cache-control': 'no-cache' })
-  const stop = handlers.tailEvents(runId, event => {
+  const stop = handlers.tailEvents(agentId, event => {
     // A dropped write (the caller went away mid-line) must not throw out of the tail callback.
     try {
       res.write(`${JSON.stringify(event)}\n`)

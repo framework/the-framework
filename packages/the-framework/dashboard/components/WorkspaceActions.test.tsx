@@ -29,7 +29,7 @@ const { WorkspaceActions } = await import('./WorkspaceActions.js')
 
 // No TooltipProvider: every tooltip carries its own (zero) delay since #1149, so the component
 // renders standalone exactly as the bars render it.
-const renderActions = (runId?: string) => render(<WorkspaceActions projectId="p1" runId={runId} />)
+const renderActions = (agentId?: string) => render(<WorkspaceActions projectId="p1" agentId={agentId} />)
 
 // The folder and editor buttons are icon-only; find them by their position among the buttons
 // (GitHub is an anchor, so the buttons are: folder, editor, serve).

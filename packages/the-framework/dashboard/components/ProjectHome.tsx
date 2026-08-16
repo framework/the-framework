@@ -1,14 +1,14 @@
 import type { FrameworkEvent } from '../../dist/index.js'
 import { StartRunForm } from './StartRunForm.js'
 import { ProjectActions } from './ProjectActions.js'
-import { RunOverview } from './RunOverview.js'
+import { AgentOverview } from './AgentOverview.js'
 import { OpenQuestions } from './OpenQuestions.js'
 import { ProjectDocs } from './ProjectDocs.js'
 import { ScrollArea } from './ui/scroll-area.js'
 
 // The project home / launcher — what "Live" selects. Always the Start form + preset cards +
 // the current stack overview; it is never consumed by a run. Starting one appends a run to
-// the rail and adds that run's own view (RunView) alongside — this page stays put, so you can
+// the rail and adds that run's own view (AgentView) alongside — this page stays put, so you can
 // launch again. (Actually running several at once lands with git worktrees, #453.)
 //
 // Below the form, the sections (#1455): every session's open questions in one answerable
@@ -32,14 +32,14 @@ export function ProjectHome({
   projectId: string
   events: FrameworkEvent[]
   /** Carries the started run's id through to the shell; dropping it is what #1169 was. */
-  onRunStarted?: ((intent: string, runId?: string, runsOn?: string) => void) | undefined
+  onRunStarted?: ((intent: string, agentId?: string, runsOn?: string) => void) | undefined
   files: string[]
   context: Set<string>
   addContext: (path: string) => void
   removeContext: (path: string) => void
   toggleContext: (path: string) => void
   /** Jump into a parked session (#1455 item 4) — possibly another project's. */
-  onOpenSession: (projectId: string, runId: string) => void
+  onOpenSession: (projectId: string, agentId: string) => void
 }) {
   return (
     <ScrollArea className="min-h-0 flex-1">
@@ -53,7 +53,7 @@ export function ProjectHome({
         removeContext={removeContext}
         toggleContext={toggleContext}
       />
-      {events.length > 0 && <RunOverview events={events} />}
+      {events.length > 0 && <AgentOverview events={events} />}
       <OpenQuestions onOpenSession={onOpenSession} />
       <ProjectDocs projectId={projectId} />
     </ScrollArea>

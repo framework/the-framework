@@ -189,7 +189,7 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
   const resolved = (id = 'gate-1'): FrameworkEvent => ({ kind: 'choice-resolved', id, picked: 'work', by: 'user' })
 
   test('an open gate renders the interactive panel, and a pick posts against the run', () => {
-    render(<EventList events={[gate()]} stick={false} projectId="p1" runId="r1" />)
+    render(<EventList events={[gate()]} stick={false} projectId="p1" agentId="r1" />)
     fireEvent.click(screen.getByText('Work on it'))
     expect(sendChoice).toHaveBeenCalledWith('p1', 'gate-1', 'work', 'user', 'r1')
   })
@@ -201,7 +201,7 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
   })
 
   test('a resolved gate collapses to a ✓ line and hides its "chose" row', () => {
-    render(<EventList events={[gate(), resolved()]} stick={false} projectId="p1" runId="r1" />)
+    render(<EventList events={[gate(), resolved()]} stick={false} projectId="p1" agentId="r1" />)
     const line = screen.getByRole('button', { name: /Start the next backlog item\?/ })
     expect(line.getAttribute('aria-expanded')).toBe('false')
     // The card says it better than the "✓ chose" formatter line, which is hidden with it there.
@@ -211,7 +211,7 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
   })
 
   test('the collapsed line expands to what was picked', () => {
-    render(<EventList events={[gate(), resolved()]} stick={false} projectId="p1" runId="r1" />)
+    render(<EventList events={[gate(), resolved()]} stick={false} projectId="p1" agentId="r1" />)
     fireEvent.click(screen.getByRole('button', { name: /Start the next backlog item\?/ }))
     expect(screen.getByText('Work on it')).toBeTruthy()
     expect(screen.getByText('Stop the loop')).toBeTruthy()
@@ -219,14 +219,14 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
 
   test('a gate closed by end without an answer stays text — its audience is gone (#1359)', () => {
     render(
-      <EventList events={[gate(), { kind: 'end', ok: false, stopped: true }]} stick={false} projectId="p1" runId="r1" />,
+      <EventList events={[gate(), { kind: 'end', ok: false, stopped: true }]} stick={false} projectId="p1" agentId="r1" />,
     )
     expect(screen.queryByRole('button', { name: /Work on it/ })).toBeNull()
     expect(screen.getByText(/Start the next backlog item\?/)).toBeTruthy()
   })
 
   test('only the latest firing of a re-fired gate is interactive', () => {
-    render(<EventList events={[gate(), gate()]} stick={false} projectId="p1" runId="r1" />)
+    render(<EventList events={[gate(), gate()]} stick={false} projectId="p1" agentId="r1" />)
     expect(screen.getAllByText('Work on it')).toHaveLength(1)
   })
 })
@@ -238,7 +238,7 @@ describe('EventList inline browser rows (#1455 item 6b)', () => {
 
   test('the latest browser row hosts the pane; an earlier one keeps its one-liner', () => {
     render(
-      <EventList events={[browser('https://a.test/'), browser('https://b.test/')]} stick={false} projectId="p1" runId="r1" />,
+      <EventList events={[browser('https://a.test/'), browser('https://b.test/')]} stick={false} projectId="p1" agentId="r1" />,
     )
     expect(screen.getAllByAltText("The session's browser")).toHaveLength(1)
     expect(screen.getByText(/browser: https:\/\/a\.test\//)).toBeTruthy()
@@ -246,7 +246,7 @@ describe('EventList inline browser rows (#1455 item 6b)', () => {
 
   test('a re-said URL replaces its earlier row instead of stacking (the view re-show rule)', () => {
     render(
-      <EventList events={[browser('https://a.test/'), browser('https://a.test/')]} stick={false} projectId="p1" runId="r1" />,
+      <EventList events={[browser('https://a.test/'), browser('https://a.test/')]} stick={false} projectId="p1" agentId="r1" />,
     )
     expect(screen.getAllByAltText("The session's browser")).toHaveLength(1)
     expect(screen.queryByText(/browser: https:\/\/a\.test\//)).toBeNull()
@@ -254,13 +254,13 @@ describe('EventList inline browser rows (#1455 item 6b)', () => {
 
   test('after end, a pane with no captured frame degrades to the one-liner (#1359)', () => {
     render(
-      <EventList events={[browser('https://a.test/'), { kind: 'end', ok: true }]} stick={false} projectId="p1" runId="r1" />,
+      <EventList events={[browser('https://a.test/'), { kind: 'end', ok: true }]} stick={false} projectId="p1" agentId="r1" />,
     )
     expect(screen.queryByAltText("The session's browser")).toBeNull()
     expect(screen.getByText(/browser · https:\/\/a\.test\//)).toBeTruthy()
   })
 
-  test('without a runId the row keeps the formatter text (the read-only relay watch)', () => {
+  test('without a agentId the row keeps the formatter text (the read-only relay watch)', () => {
     render(<EventList events={[browser()]} stick={false} projectId="p1" />)
     expect(screen.queryByAltText("The session's browser")).toBeNull()
     expect(screen.getByText(/browser: https:\/\/app\.test\//)).toBeTruthy()

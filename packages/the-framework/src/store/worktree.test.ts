@@ -13,7 +13,7 @@ import {
   removeWorktree,
   pruneWorktrees,
   worktreePath,
-  runBranchName,
+  agentBranchName,
   currentBranch,
   renameRunBranch,
   FRAMEWORK_DIR,
@@ -24,11 +24,11 @@ const REPO = '/repo'
 /** A {@link GitRunner} that records its calls and returns a canned stdout. */
 function recordingGit(stdout = ''): GitRunner & { calls: { args: string[]; cwd: string }[] } {
   const calls: { args: string[]; cwd: string }[] = []
-  const run: GitRunner = async (args, cwd) => {
+  const agent: GitRunner = async (args, cwd) => {
     calls.push({ args, cwd })
     return stdout
   }
-  return Object.assign(run, { calls })
+  return Object.assign(agent, { calls })
 }
 
 const failingGit: GitRunner = async () => {
@@ -41,7 +41,7 @@ test('worktreePath nests the run under .the-framework/worktrees', () => {
 
 test('addWorktree builds `worktree add -b <branch> <path>` and returns the path + branch', async () => {
   const git = recordingGit()
-  const added = await addWorktree(REPO, { runId: 'run1', branch: 'the-framework/run-run1' }, git)
+  const added = await addWorktree(REPO, { agentId: 'run1', branch: 'the-framework/run-run1' }, git)
   const path = worktreePath(REPO, 'run1')
   assert.deepEqual(added, { path, branch: 'the-framework/run-run1' })
   assert.deepEqual(git.calls, [{ args: ['worktree', 'add', '-b', 'the-framework/run-run1', path], cwd: REPO }])
@@ -49,13 +49,13 @@ test('addWorktree builds `worktree add -b <branch> <path>` and returns the path 
 
 test('addWorktree appends the base ref when given', async () => {
   const git = recordingGit()
-  await addWorktree(REPO, { runId: 'run1', branch: 'b', base: 'origin/main' }, git)
+  await addWorktree(REPO, { agentId: 'run1', branch: 'b', base: 'origin/main' }, git)
   assert.deepEqual(git.calls[0]?.args, ['worktree', 'add', '-b', 'b', worktreePath(REPO, 'run1'), 'origin/main'])
 })
 
 test('addWorktree rejects an unsafe run id before touching git (no traversal out of worktrees/)', async () => {
   const git = recordingGit()
-  await assert.rejects(() => addWorktree(REPO, { runId: '../evil', branch: 'b' }, git), /unsafe run id/)
+  await assert.rejects(() => addWorktree(REPO, { agentId: '../evil', branch: 'b' }, git), /unsafe run id/)
   assert.equal(git.calls.length, 0)
 })
 
@@ -121,7 +121,7 @@ test('add/list/remove round-trips against a real git repo', async () => {
     await git(['add', '-A'], repo)
     await git(['commit', '-m', 'init'], repo)
 
-    const { path, branch } = await addWorktree(repo, { runId: 'run1', branch: 'the-framework/run-run1' }, git)
+    const { path, branch } = await addWorktree(repo, { agentId: 'run1', branch: 'the-framework/run-run1' }, git)
     assert.equal((await stat(path)).isDirectory(), true, 'worktree checkout dir exists')
     assert.equal((await stat(join(path, 'README.md'))).isFile(), true, 'checkout has the repo content')
 
@@ -207,7 +207,7 @@ test('a dirty run worktree keeps its work on the branch after removal (#786)', a
     await git(['add', '-A'], repo)
     await git(['commit', '-m', 'init'], repo)
 
-    const { path, branch } = await addWorktree(repo, { runId: 'run1', branch: 'the-framework/run-run1' }, git)
+    const { path, branch } = await addWorktree(repo, { agentId: 'run1', branch: 'the-framework/run-run1' }, git)
     // The agent edits and stops without committing, exactly as the system prompt leaves it.
     await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
 
@@ -223,8 +223,8 @@ test('a dirty run worktree keeps its work on the branch after removal (#786)', a
   }
 })
 
-test('runBranchName names the branch after the run id (#736)', () => {
-  assert.equal(runBranchName('2026-07-19T10-00-00-000Z'), 'the-framework/run-2026-07-19T10-00-00-000Z')
+test('agentBranchName names the branch after the run id (#736)', () => {
+  assert.equal(agentBranchName('2026-07-19T10-00-00-000Z'), 'the-framework/run-2026-07-19T10-00-00-000Z')
 })
 
 test('currentBranch reads the checked-out branch, and reads detached/non-repo as undefined', async () => {

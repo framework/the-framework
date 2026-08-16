@@ -61,14 +61,14 @@ export interface CloudDriverOptions {
    * driver: a fresh `framework run` process restarts the counter, so without it every
    * run's first session would carry the same id.
    */
-  runTag?: () => string
+  agentTag?: () => string
 }
 
 /** One pty-hosted invocation: stream its output, resolve when it ends. */
-export type RunPty = (opts: RunPtyOptions) => Promise<void>
+export type RunPty = (opts: AgentPtyOptions) => Promise<void>
 
 /** What {@link RunPty} needs to run one invocation. */
-export interface RunPtyOptions {
+export interface AgentPtyOptions {
   /** Claude Code binary to run under the pty. */
   bin: string
   /** The prompt, handed over through the environment rather than the command line. */
@@ -173,7 +173,7 @@ export class CloudSession implements DriverSession {
     private readonly config: CloudDriverOptions,
     private readonly startOpts: DriverStartOptions,
   ) {
-    const tag = (config.runTag ?? (() => randomUUID().slice(0, 8)))()
+    const tag = (config.agentTag ?? (() => randomUUID().slice(0, 8)))()
     this.id = `cloud-${++sessionCounter}-${tag}`
     this.cwd = startOpts.cwd
     this.emit = makeEmit(startOpts.onEvent, 'claude-web')
@@ -324,7 +324,7 @@ export const CLOUD_COMMAND = 'exec "$FW_CLOUD_BIN" --cloud "$FW_CLOUD_PROMPT" ${
  * as argv, util-linux (Linux) takes `-c <command>` then the file. Both get the same fixed
  * command string, so the difference is confined to argv order.
  */
-function runPtyWithScript(opts: RunPtyOptions): Promise<void> {
+function runPtyWithScript(opts: AgentPtyOptions): Promise<void> {
   return new Promise<void>((resolvePromise, rejectPromise) => {
     const env: NodeJS.ProcessEnv = {
       ...process.env,

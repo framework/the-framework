@@ -52,8 +52,8 @@ describe('useInterventionNotifications (#627)', () => {
 })
 
 describe('useActivityNotifications (#627)', () => {
-  const startedRun = (runId: string, title?: string): Activity => ({ projectId: 'p', projectName: 'p', runId, kind: 'started', ...(title ? { title } : {}) })
-  const finishedRun = (runId: string, title?: string): Activity => ({ projectId: 'p', projectName: 'p', runId, kind: 'finished', ...(title ? { title } : {}) })
+  const startedRun = (agentId: string, title?: string): Activity => ({ projectId: 'p', projectName: 'p', agentId: agentId, kind: 'started', ...(title ? { title } : {}) })
+  const finishedRun = (agentId: string, title?: string): Activity => ({ projectId: 'p', projectName: 'p', agentId: agentId, kind: 'finished', ...(title ? { title } : {}) })
 
   const render = (enabled: boolean) =>
     renderHook(({ items }) => useActivityNotifications(items, enabled), { initialProps: { items: [] as Activity[] } })

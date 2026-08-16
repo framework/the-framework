@@ -68,7 +68,7 @@ describe('TicketsPage (#1144)', () => {
   test('an import/update session started in one project\'s section reports that project (#948)', async () => {
     onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets: [] }])
     const { sendStart } = await import('../rpc/control.js')
-    vi.mocked(sendStart).mockResolvedValue({ ok: true, runId: 'r1' })
+    vi.mocked(sendStart).mockResolvedValue({ ok: true, agentId: 'r1' })
     const onRunStarted = vi.fn()
     render(<TicketsPage onOpenTicket={() => {}} onRunStarted={onRunStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
@@ -238,7 +238,7 @@ describe('TicketsPage grouping (#1144)', () => {
     ])
     window.history.replaceState(null, '', '/tickets?group=none')
     const { sendStart } = await import('../rpc/control.js')
-    vi.mocked(sendStart).mockResolvedValue({ ok: true, runId: 'r9' })
+    vi.mocked(sendStart).mockResolvedValue({ ok: true, agentId: 'r9' })
     const onRunStarted = vi.fn()
     render(<TicketsPage onOpenTicket={() => {}} onRunStarted={onRunStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /start work on beta ticket/i }))

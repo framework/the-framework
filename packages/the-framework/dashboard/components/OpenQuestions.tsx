@@ -11,7 +11,7 @@ import { cn } from '../lib/utils.js'
 const EMPTY_QUESTIONS: OpenQuestion[] = []
 
 /** One key per gate; also keys the answered memory, so a re-fired gate is a fresh card. */
-const keyOf = (q: OpenQuestion) => `${q.projectId} ${q.runId} ${q.choice.id}`
+const keyOf = (q: OpenQuestion) => `${q.projectId} ${q.agentId} ${q.choice.id}`
 
 /** What the hub remembers about a gate answered from here (#1455 bonus 2). */
 interface Answered {
@@ -36,7 +36,7 @@ export function OpenQuestions({
   onOpenSession,
 }: {
   /** Jump into the session a question belongs to — it may be another project's. */
-  onOpenSession: (projectId: string, runId: string) => void
+  onOpenSession: (projectId: string, agentId: string) => void
 }) {
   const { value: questions, loaded } = usePolled<OpenQuestion[]>(onOpenQuestions, EMPTY_QUESTIONS, 5000, [])
   const [answered, setAnswered] = useState<Map<string, Answered>>(() => new Map())
@@ -88,7 +88,7 @@ export function OpenQuestions({
                     footer={
                       <button
                         type="button"
-                        onClick={() => onOpenSession(question.projectId, question.runId)}
+                        onClick={() => onOpenSession(question.projectId, question.agentId)}
                         className="mt-3 text-xs text-muted-foreground hover:text-foreground"
                       >
                         Open session →
@@ -99,7 +99,7 @@ export function OpenQuestions({
                   <div className="overflow-hidden rounded-md border border-border">
                     <button
                       type="button"
-                      onClick={() => onOpenSession(question.projectId, question.runId)}
+                      onClick={() => onOpenSession(question.projectId, question.agentId)}
                       className="flex w-full items-baseline gap-2 px-4 py-2 text-left text-xs text-muted-foreground hover:bg-accent/40"
                       title="Open this session"
                     >
@@ -109,7 +109,7 @@ export function OpenQuestions({
                     </button>
                     <ChoicePanel
                       projectId={question.projectId}
-                      runId={question.runId}
+                      agentId={question.agentId}
                       choice={question.choice}
                       countdown={false}
                       onAnswered={pick =>
@@ -149,5 +149,5 @@ export function OpenQuestions({
 
 /** The card's label for its session: its chosen name, else the intent's first line, else the id. */
 function sessionLabel(q: OpenQuestion): string {
-  return q.sessionName ?? q.intent?.split('\n')[0]?.slice(0, 80) ?? q.runId
+  return q.sessionName ?? q.intent?.split('\n')[0]?.slice(0, 80) ?? q.agentId
 }

@@ -9,9 +9,9 @@ import { Logo } from './Logo.js'
 // `/?run=<id>`, it shows one run read-only, streamed from the relay's in-memory event
 // feed over the same Telefunc `onEvents` Channel the daemon uses. No Projects/Runs/Docs
 // rails and no steering — a teammate with the link watches, they do not drive.
-export function RelayView({ runId }: { runId: string }) {
+export function RelayView({ agentId: agentId }: { agentId: string }) {
   // The run id rides in the projectId slot: the relay keys `onEvents` by it (no registry).
-  const { events, lost, done } = useLiveEvents(runId)
+  const { events, lost, done } = useLiveEvents(agentId)
   // The mark and the tab icon (#875) follow the one run being watched, since that is all the
   // relay knows about — it has no project registry to ask.
   const working = isRunActive(events)

@@ -1,13 +1,13 @@
 import type { Driver, DriverSession } from './driver/index.js'
 import { composeRunSystem, renderSystemPrompt, type TfContext } from './system-prompt.js'
-import { createRunControls, emitSessionStart, endStopDetail } from './run-telemetry.js'
+import { createRunControls, emitSessionStart, endStopDetail } from './agent-telemetry.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
 import { runAwaitRounds } from './await-gate.js'
 import { runTodoLoop, type TodoLoopResult } from './todo-loop.js'
 import { buildPrompt, extendPrompt, isWorkspaceEmpty, scaffoldPrompt } from './steps.js'
 import { type ChoicePick, type ChoiceRequest, type FrameworkEvent } from './events.js'
-import type { RunMessages } from './run-messages.js'
-import { isHandsOff, type RunLocation } from './run-location.js'
+import type { AgentMessages } from './agent-messages.js'
+import { isHandsOff, type AgentLocation } from './agent-location.js'
 
 /**
  * One session: frame the wrapped agent, send it a prompt, honor the gates it answers with, and
@@ -40,7 +40,7 @@ export interface RunSessionOptions {
    * somewhere this machine cannot follow, which makes the opening prompt the whole session —
    * see {@link isHandsOff}.
    */
-  location?: RunLocation
+  location?: AgentLocation
   /** The wrapped coding agent. */
   driver: Driver
   /** Absolute workspace path the agent works in. */
@@ -99,7 +99,7 @@ export interface RunSessionOptions {
    * unless {@link stayOpenChat} parks it. Unset for a headless session, which ends when the agent
    * stops asking.
    */
-  messages?: RunMessages
+  messages?: AgentMessages
   /**
    * Keep the chat parked for the next message instead of ending on an idle queue (#1390).
    * Only for a session whose own surface is the single one — it has no dashboard to resume

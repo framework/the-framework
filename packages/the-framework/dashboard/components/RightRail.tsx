@@ -31,7 +31,7 @@ const TABS: Record<Tab, { label: string; help: string }> = {
 // transcript now (#1455 items 6/7), so nothing here pulls focus for them.
 export function RightRail({
   projectId,
-  runId,
+  agentId: agentId,
   views,
   files,
   context,
@@ -42,7 +42,7 @@ export function RightRail({
 }: {
   projectId: string | null
   /** The selected run: scopes the file tree to its worktree (#815) and keys the browser preview. */
-  runId?: string | null | undefined
+  agentId?: string | null | undefined
   views: AgentView[]
   /** The project's files for the Files tab tree (#492); empty on the relay. */
   files: string[]
@@ -106,7 +106,7 @@ export function RightRail({
     ...(hasFiles ? ['files' as const] : []),
     ...(hasViews ? ['views' as const] : []),
     // Only when the run actually has one (#813) — a dead tab teaches people the preview is broken.
-    ...(showBrowser && runId ? ['browser' as const] : []),
+    ...(showBrowser && agentId ? ['browser' as const] : []),
     ...(hasDocs ? ['docs' as const] : []),
   ]
   if (tabs.length === 0) return null
@@ -154,11 +154,11 @@ export function RightRail({
           directly under the last row rather than at the foot of an empty column. */}
       <div className="flex min-h-0 flex-col overflow-hidden">
         {active === 'files' && hasFiles ? (
-          <FileTree projectId={projectId} runId={runId} files={files} selected={context} onToggle={toggleContext} />
+          <FileTree projectId={projectId} agentId={agentId} files={files} selected={context} onToggle={toggleContext} />
         ) : active === 'views' && hasViews ? (
           <ViewsRail views={views} />
-        ) : active === 'browser' && showBrowser && runId ? (
-          <BrowserPanel projectId={projectId} runId={runId} />
+        ) : active === 'browser' && showBrowser && agentId ? (
+          <BrowserPanel projectId={projectId} agentId={agentId} />
         ) : (
           <DocsPanel docs={docs} loaded={docsLoaded} />
         )}

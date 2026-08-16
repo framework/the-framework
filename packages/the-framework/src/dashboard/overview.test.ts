@@ -4,7 +4,7 @@ import { buildOverview, buildRecentRuns, buildHotTickets, collectAllTickets, tic
 import type { ProjectSummary } from './projects.js'
 import type { ProjectQueue } from './queue.js'
 import type { WorkspaceTicket } from './tickets.js'
-import type { RunMeta } from '../store/index.js'
+import type { AgentMeta } from '../store/index.js'
 
 const project = (id: string, path: string, lastActivityAt?: string): ProjectSummary => ({
   id,
@@ -14,11 +14,11 @@ const project = (id: string, path: string, lastActivityAt?: string): ProjectSumm
   ...(lastActivityAt ? { lastActivityAt } : {}),
 })
 
-const meta = (status: RunMeta['status'], intent: string, updatedAt: string): RunMeta =>
-  ({ version: 1, status, id: 'r', startedAt: updatedAt, updatedAt, intent }) as RunMeta
+const meta = (status: AgentMeta['status'], intent: string, updatedAt: string): AgentMeta =>
+  ({ version: 1, status, id: 'r', startedAt: updatedAt, updatedAt, intent }) as AgentMeta
 
 test('buildOverview surfaces only running runs, most-recently-updated first', async () => {
-  const metas: Record<string, RunMeta> = {
+  const metas: Record<string, AgentMeta> = {
     '/a': meta('running', 'build the API', '2026-07-13T10:00:00Z'),
     '/b': meta('done', 'finished thing', '2026-07-13T11:00:00Z'),
     '/c': meta('running', 'build the UI', '2026-07-13T12:00:00Z'),
@@ -62,19 +62,19 @@ test('buildOverview omits projects with no activity from recent', async () => {
   assert.deepEqual(overview.recent.map(r => r.projectId), ['b'])
 })
 
-const run = (id: string, startedAt: string): RunMeta =>
-  ({ version: 1, status: 'done', id, startedAt, updatedAt: startedAt }) as RunMeta
+const agent = (id: string, startedAt: string): AgentMeta =>
+  ({ version: 1, status: 'done', id, startedAt, updatedAt: startedAt }) as AgentMeta
 
 test('buildRecentRuns pools every project newest-first and tags each with its project', async () => {
-  const runs: Record<string, RunMeta[]> = {
-    '/a': [run('a2', '2026-07-13T12:00:00Z'), run('a1', '2026-07-13T09:00:00Z')],
-    '/b': [run('b1', '2026-07-13T11:00:00Z')],
+  const agents: Record<string, AgentMeta[]> = {
+    '/a': [agent('a2', '2026-07-13T12:00:00Z'), agent('a1', '2026-07-13T09:00:00Z')],
+    '/b': [agent('b1', '2026-07-13T11:00:00Z')],
   }
   const recent = await buildRecentRuns([project('alpha', '/a'), project('beta', '/b')], {
-    runs: async cwd => runs[cwd] ?? [],
+    agents: async cwd => agents[cwd] ?? [],
   })
   assert.deepEqual(
-    recent.map(r => ({ project: r.projectName, id: r.run.id })),
+    recent.map(r => ({ project: r.projectName, id: r.agent.id })),
     [
       { project: 'alpha', id: 'a2' },
       { project: 'beta', id: 'b1' },
@@ -85,12 +85,12 @@ test('buildRecentRuns pools every project newest-first and tags each with its pr
 
 test('buildRecentRuns tolerates a project whose runs cannot be read', async () => {
   const recent = await buildRecentRuns([project('ok', '/ok'), project('bad', '/bad')], {
-    runs: async cwd => {
+    agents: async cwd => {
       if (cwd === '/bad') throw new Error('unreadable')
-      return [run('x', '2026-07-13T10:00:00Z')]
+      return [agent('x', '2026-07-13T10:00:00Z')]
     },
   })
-  assert.deepEqual(recent.map(r => r.run.id), ['x'])
+  assert.deepEqual(recent.map(r => r.agent.id), ['x'])
 })
 
 const ticket = (file: string, over: Partial<WorkspaceTicket> = {}): WorkspaceTicket => ({
@@ -198,7 +198,7 @@ test('buildHotTickets tolerates a project whose tickets cannot be read', async (
 })
 
 /** A live run meta carrying the ticket it is implementing (#1117). */
-const runOn = (id: string, ticket: string, status: RunMeta['status'] = 'running') =>
+const runOn = (id: string, ticket: string, status: AgentMeta['status'] = 'running') =>
   ({ version: 1, status, id, startedAt: 't', updatedAt: 't', ticket, cwd: '/w' }) as never
 
 test('ticketBucket: a run implementing it is in-progress, whatever the plan says (#1117)', () => {
@@ -219,7 +219,7 @@ test('buildHotTickets marks the ticket a live run is implementing, with its run 
   })
   const login = hot.find(h => h.ticket.file === '2026-07-25_login.md')
   assert.equal(login?.bucket, 'in-progress', 'the ticket being coded is in progress')
-  assert.equal(login?.runId, 'run-7', 'and carries the run, so the card can link into it')
+  assert.equal(login?.agentId, 'run-7', 'and carries the run, so the card can link into it')
   // The ticket nobody is on and nothing queues is in no lane, so it drops off the card (#1139).
   const other = hot.find(h => h.ticket.file === '2026-07-26_other.md')
   assert.equal(other, undefined)
@@ -227,13 +227,13 @@ test('buildHotTickets marks the ticket a live run is implementing, with its run 
 
 test('buildHotTickets ignores a finished run and another project\'s ticket (#1117)', async () => {
   // A run that has ended is not implementing anything, however recently it stopped — so x.md carries
-  // no runId and sits in the AI Queue by its link alone.
+  // no agentId and sits in the AI Queue by its link alone.
   const finished = await buildHotTickets([project('alpha', '/a')], {
     tickets: async () => [ticket('x.md')],
     liveRuns: async () => [runOn('run-7', 'tickets/x.md', 'done')],
     queue: async () => [{ projectId: 'alpha', projectName: 'alpha', open: 1, total: 1, items: [{ text: '[x](tickets/x.md)', done: false }] }],
   })
-  assert.equal(finished[0]?.runId, undefined)
+  assert.equal(finished[0]?.agentId, undefined)
   assert.equal(finished[0]?.bucket, 'ai-queue')
 
   // A ticket path is only unique inside its own repo, so beta's run must not light up alpha's
@@ -245,8 +245,8 @@ test('buildHotTickets ignores a finished run and another project\'s ticket (#111
     queue: async () => [],
   })
   assert.deepEqual(
-    twoProjects.map(h => ({ p: h.projectName, run: h.runId })),
-    [{ p: 'beta', run: 'run-9' }],
+    twoProjects.map(h => ({ p: h.projectName, agent: h.agentId })),
+    [{ p: 'beta', agent: 'run-9' }],
     'only beta reads as implementing; alpha\'s same-named ticket is in no lane and drops off',
   )
 })

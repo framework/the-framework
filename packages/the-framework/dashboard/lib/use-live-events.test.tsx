@@ -28,8 +28,8 @@ function fakeChannel() {
   }
 }
 
-function Probe({ projectId, runId }: { projectId: string | null; runId?: string | null }) {
-  const { lost } = useLiveEvents(projectId, runId)
+function Probe({ projectId, agentId: agentId }: { projectId: string | null; agentId?: string | null }) {
+  const { lost } = useLiveEvents(projectId, agentId)
   return <span>{lost ? 'lost' : 'live'}</span>
 }
 
@@ -40,15 +40,15 @@ function Probe({ projectId, runId }: { projectId: string | null; runId?: string 
 describe('useLiveEvents addressing (#770)', () => {
   test('subscribes to the run it was given', async () => {
     onEvents.mockResolvedValue(fakeChannel().channel)
-    render(<Probe projectId="p1" runId="2026-07-19T13-00-00-000Z" />)
+    render(<Probe projectId="p1" agentId="2026-07-19T13-00-00-000Z" />)
     await waitFor(() => expect(onEvents).toHaveBeenCalledWith('p1', '2026-07-19T13-00-00-000Z'))
   })
 
   test('resubscribes when the selected run changes, so two runs never share a feed', async () => {
     onEvents.mockResolvedValue(fakeChannel().channel)
-    const { rerender } = render(<Probe projectId="p1" runId="run-a" />)
+    const { rerender } = render(<Probe projectId="p1" agentId="run-a" />)
     await waitFor(() => expect(onEvents).toHaveBeenCalledWith('p1', 'run-a'))
-    rerender(<Probe projectId="p1" runId="run-b" />)
+    rerender(<Probe projectId="p1" agentId="run-b" />)
     await waitFor(() => expect(onEvents).toHaveBeenCalledWith('p1', 'run-b'))
   })
 
@@ -66,7 +66,7 @@ describe('useLiveEvents stream loss (#948)', () => {
   test('an errored close reports the stream lost and resubscribes', async () => {
     const first = fakeChannel()
     onEvents.mockResolvedValue(first.channel)
-    render(<Probe projectId="p1" runId="run-a" />)
+    render(<Probe projectId="p1" agentId="run-a" />)
     await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
     first.dropWith(new Error('connection reset'))
     await waitFor(() => expect(screen.getByText('lost')).toBeTruthy())
@@ -78,7 +78,7 @@ describe('useLiveEvents stream loss (#948)', () => {
   test('a clean close neither alarms nor retries', async () => {
     const first = fakeChannel()
     onEvents.mockResolvedValue(first.channel)
-    render(<Probe projectId="p1" runId="run-a" />)
+    render(<Probe projectId="p1" agentId="run-a" />)
     await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
     first.dropWith()
     // Give a would-be retry room to fire, then assert it did not.
@@ -89,7 +89,7 @@ describe('useLiveEvents stream loss (#948)', () => {
 
   test('a failed subscribe reports the stream lost and keeps trying', async () => {
     onEvents.mockRejectedValueOnce(new Error('daemon down')).mockResolvedValue(fakeChannel().channel)
-    render(<Probe projectId="p1" runId="run-a" />)
+    render(<Probe projectId="p1" agentId="run-a" />)
     await waitFor(() => expect(screen.getByText('lost')).toBeTruthy())
     await waitFor(() => expect(screen.getByText('live')).toBeTruthy(), { timeout: 3000 })
   })
@@ -102,8 +102,8 @@ describe('useLiveEvents stream loss (#948)', () => {
 describe('useLiveEvents run scoping', () => {
   const log = (message: string) => ({ kind: 'log', message })
 
-  function FeedProbe({ projectId, runId }: { projectId: string | null; runId?: string | null }) {
-    const { events } = useLiveEvents(projectId, runId)
+  function FeedProbe({ projectId, agentId: agentId }: { projectId: string | null; agentId?: string | null }) {
+    const { events } = useLiveEvents(projectId, agentId)
     return <span data-testid="feed">{events.map(e => (e.kind === 'log' ? e.message : e.kind)).join(',')}</span>
   }
   const feed = () => screen.getByTestId('feed').textContent
@@ -111,7 +111,7 @@ describe('useLiveEvents run scoping', () => {
   test("a run's own feed keeps the transcript from before a resume's session boundary", async () => {
     const ch = fakeChannel()
     onEvents.mockResolvedValue(ch.channel)
-    render(<FeedProbe projectId="p1" runId="run-a" />)
+    render(<FeedProbe projectId="p1" agentId="run-a" />)
     await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
     ch.push(log('a'))
     ch.push({ kind: 'session' })
@@ -138,8 +138,8 @@ describe('useLiveEvents run scoping', () => {
 describe('useLiveEvents reconnect keeps the feed (#1383)', () => {
   const log = (message: string) => ({ kind: 'log', message })
 
-  function FeedProbe({ projectId, runId }: { projectId: string | null; runId?: string | null }) {
-    const { events } = useLiveEvents(projectId, runId)
+  function FeedProbe({ projectId, agentId: agentId }: { projectId: string | null; agentId?: string | null }) {
+    const { events } = useLiveEvents(projectId, agentId)
     return <span data-testid="feed">{events.map(e => (e.kind === 'log' ? e.message : e.kind)).join(',')}</span>
   }
   const feed = () => screen.getByTestId('feed').textContent
@@ -147,7 +147,7 @@ describe('useLiveEvents reconnect keeps the feed (#1383)', () => {
   test('the first subscribe streams straight in, and the sync marker is swallowed', async () => {
     const ch = fakeChannel()
     onEvents.mockResolvedValue(ch.channel)
-    render(<FeedProbe projectId="p1" runId="run-a" />)
+    render(<FeedProbe projectId="p1" agentId="run-a" />)
     await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
     ch.push(log('a'))
     ch.push({ kind: 'stream-sync' })
@@ -159,7 +159,7 @@ describe('useLiveEvents reconnect keeps the feed (#1383)', () => {
     const first = fakeChannel()
     const second = fakeChannel()
     onEvents.mockResolvedValueOnce(first.channel).mockResolvedValue(second.channel)
-    render(<FeedProbe projectId="p1" runId="run-a" />)
+    render(<FeedProbe projectId="p1" agentId="run-a" />)
     await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
     first.push(log('a'))
     first.push({ kind: 'stream-sync' })
@@ -184,7 +184,7 @@ describe('useLiveEvents reconnect keeps the feed (#1383)', () => {
     const first = fakeChannel()
     const second = fakeChannel()
     onEvents.mockResolvedValueOnce(first.channel).mockResolvedValue(second.channel)
-    render(<FeedProbe projectId="p1" runId="run-a" />)
+    render(<FeedProbe projectId="p1" agentId="run-a" />)
     await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
     first.push(log('a'))
     await waitFor(() => expect(feed()).toBe('a'))
@@ -203,7 +203,7 @@ describe('useLiveEvents reconnect keeps the feed (#1383)', () => {
     const second = fakeChannel()
     const third = fakeChannel()
     onEvents.mockResolvedValueOnce(first.channel).mockResolvedValueOnce(second.channel).mockResolvedValue(third.channel)
-    render(<FeedProbe projectId="p1" runId="run-a" />)
+    render(<FeedProbe projectId="p1" agentId="run-a" />)
     await waitFor(() => expect(onEvents).toHaveBeenCalledTimes(1))
     first.push(log('a'))
     first.push(log('b'))

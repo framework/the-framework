@@ -23,12 +23,12 @@ function isDiff(value: FileDiff | FileContent): value is FileDiff {
 
 export function FilePreviewCard({
   projectId,
-  runId,
+  agentId: agentId,
   path,
   changed = true,
 }: {
   projectId: string
-  runId?: string | null | undefined
+  agentId?: string | null | undefined
   path: string
   /** The tree saw a git status for this file, so there is a diff rather than only contents. */
   changed?: boolean
@@ -38,11 +38,11 @@ export function FilePreviewCard({
   const { value, loaded } = usePolled<FileDiff | FileContent | null>(
     () =>
       changed
-        ? onFileDiff(projectId, path, runId ?? undefined)
-        : onFileContent(projectId, path, runId ?? undefined),
+        ? onFileDiff(projectId, path, agentId ?? undefined)
+        : onFileContent(projectId, path, agentId ?? undefined),
     null,
     5_000,
-    [projectId, runId, path, changed],
+    [projectId, agentId, path, changed],
   )
 
   return (
@@ -66,13 +66,13 @@ export function FilePreviewCard({
 
 export function FilePreviewHover({
   projectId,
-  runId,
+  agentId: agentId,
   path,
   changed = true,
   children,
 }: {
   projectId: string
-  runId?: string | null | undefined
+  agentId?: string | null | undefined
   path: string
   changed?: boolean
   children: React.ReactNode
@@ -87,7 +87,7 @@ export function FilePreviewHover({
       <PreviewCard.Portal>
         <PreviewCard.Positioner side="left" align="start" sideOffset={8}>
           <PreviewCard.Popup className="z-50 flex max-h-[70vh] w-[42rem] max-w-[80vw] flex-col overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-lg">
-            <FilePreviewCard projectId={projectId} runId={runId} path={path} changed={changed} />
+            <FilePreviewCard projectId={projectId} agentId={agentId} path={path} changed={changed} />
           </PreviewCard.Popup>
         </PreviewCard.Positioner>
       </PreviewCard.Portal>

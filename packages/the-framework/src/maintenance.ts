@@ -197,7 +197,7 @@ export interface SweepSummary {
 /** Injected effects for {@link maintainSweep}, so the orchestration is testable off disk/process. */
 export interface SweepDeps {
   /** Run the maintenance loop on a repo; resolves true on success. */
-  run(review: RepoReview): Promise<boolean>
+  agent(review: RepoReview): Promise<boolean>
   /** Persist a repo's review state (called after a baseline or a successful review). */
   record(path: string, state: MaintenanceState): Promise<void>
   /** Progress line. */
@@ -239,7 +239,7 @@ export async function maintainSweep(reviews: readonly RepoReview[], deps: SweepD
       continue
     }
     deps.log(`▶ maintaining ${review.path} (${review.newCommits} new commit${review.newCommits === 1 ? '' : 's'})…`)
-    const ok = await deps.run(review)
+    const ok = await deps.agent(review)
     if (ok && review.headSha) {
       await deps.record(review.path, { reviewedSha: review.headSha, reviewedAt: deps.now() })
       summary.reviewed++

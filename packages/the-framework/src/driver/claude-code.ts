@@ -105,7 +105,7 @@ export class ClaudeCodeSession implements DriverSession {
     const resumeId = opts.resume ? this.lastSessionId : undefined
     const emit = makeEmit(this.startOpts.onEvent, 'claude-code')
     const signals = combineSignals(this.startOpts.signal, opts.signal)
-    const run = (id: string | undefined, emitFn: (event: DriverEvent) => void): Promise<DriverTurn> =>
+    const agent = (id: string | undefined, emitFn: (event: DriverEvent) => void): Promise<DriverTurn> =>
       runClaude({
         bin: this.config.bin ?? 'claude',
         args: this.buildArgs(system, id),
@@ -123,7 +123,7 @@ export class ClaudeCodeSession implements DriverSession {
     // Safe to hold — runCliSession emits `error` exactly once, right before it rejects.
     let heldError: DriverEvent | undefined
     try {
-      turn = await run(resumeId, resumeId === undefined ? emit : event => {
+      turn = await agent(resumeId, resumeId === undefined ? emit : event => {
         if (event.type === 'error') heldError = event
         else emit(event)
       })
@@ -141,7 +141,7 @@ export class ClaudeCodeSession implements DriverSession {
       // The retry re-sends the same prompt; swallow its duplicate `start` so the user's
       // message appears once in the transcript, not twice.
       let startSeen = false
-      turn = await run(undefined, event => {
+      turn = await agent(undefined, event => {
         if (event.type === 'start' && !startSeen) startSeen = true
         else emit(event)
       })

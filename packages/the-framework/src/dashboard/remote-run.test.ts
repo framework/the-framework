@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { startRemoteRun, streamRemoteEvents, pingRemote, relayRpc, RelayedRuns } from './remote-run.js'
-import { RUN_META_VERSION, type RunMeta } from '../store/index.js'
+import { AGENT_META_VERSION, type AgentMeta } from '../store/index.js'
 import type { FrameworkEvent } from '../events.js'
 
 // A throwaway loopback server; the handler decides how it answers. Returns its base url + close.
@@ -14,25 +14,25 @@ async function server(handler: (req: IncomingMessage, res: ServerResponse) => vo
   return { url: `http://127.0.0.1:${port}`, close: () => new Promise<void>(r => srv.close(() => r())) }
 }
 
-// A minimal running RunMeta stub, the local list row RelayedRuns keeps for a relayed run (#1077).
-function stubMeta(id: string, overrides: Partial<RunMeta> = {}): RunMeta {
+// A minimal running AgentMeta stub, the local list row RelayedRuns keeps for a relayed run (#1077).
+function stubMeta(id: string, overrides: Partial<AgentMeta> = {}): AgentMeta {
   const now = new Date().toISOString()
-  return { version: RUN_META_VERSION, status: 'running', id, startedAt: now, updatedAt: now, target: 'remote', ...overrides }
+  return { version: AGENT_META_VERSION, status: 'running', id, startedAt: now, updatedAt: now, target: 'remote', ...overrides }
 }
 
 // Drain a RelayedRuns stream to completion, so both its `end`-driven settle and its close flip have run.
-async function drainRun(runs: RelayedRuns, runId: string): Promise<void> {
-  const stream = runs.get(runId)
+async function drainRun(agents: RelayedRuns, agentId: string): Promise<void> {
+  const stream = agents.get(agentId)
   assert.ok(stream)
   for await (const _e of stream!) { /* consume until the device closes the body */ }
 }
 
 /** Wait until the stream ends (its `onEnd` fires) or a timeout trips, collecting events meanwhile. */
-function drain(target: { url: string; token: string }, runId: string, timeoutMs = 4000): Promise<{ events: FrameworkEvent[]; ended: boolean }> {
+function drain(target: { url: string; token: string }, agentId: string, timeoutMs = 4000): Promise<{ events: FrameworkEvent[]; ended: boolean }> {
   return new Promise(resolvePromise => {
     const events: FrameworkEvent[] = []
     const timer = setTimeout(() => resolvePromise({ events, ended: false }), timeoutMs)
-    streamRemoteEvents(target, runId, e => events.push(e), () => {
+    streamRemoteEvents(target, agentId, e => events.push(e), () => {
       clearTimeout(timer)
       resolvePromise({ events, ended: true })
     })
@@ -47,12 +47,12 @@ test('startRemoteRun posts to /_relay/start with the fw_daemon cookie, no Origin
     req.on('end', () => {
       captured = { method: req.method, url: req.url, cookie: req.headers.cookie, origin: req.headers.origin, body: JSON.parse(raw) }
       res.writeHead(200, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({ ok: true, runId: 'r1' }))
+      res.end(JSON.stringify({ ok: true, agentId: 'r1' }))
     })
   })
   try {
     const result = await startRemoteRun({ url: srv.url, token: 'sekret' }, { prompt: 'do it', kind: 'build', options: { autopilot: true } })
-    assert.deepEqual(result, { ok: true, runId: 'r1' })
+    assert.deepEqual(result, { ok: true, agentId: 'r1' })
     assert.equal(captured.method, 'POST')
     assert.equal(captured.url, '/_relay/start')
     assert.equal(captured.cookie, 'fw_daemon=sekret') // the shared-token cookie (#1051), daemon to daemon
@@ -165,14 +165,14 @@ test('RelayedRuns feeds a run stream from the device and drops its token when th
     res.end()
   })
   try {
-    const runs = new RelayedRuns()
-    runs.register('r1', { url: srv.url, token: 't' }, stubMeta('r1'), 'proj-1')
-    const stream = runs.get('r1') // grabbed synchronously, before the remote stream ends
+    const agents = new RelayedRuns()
+    agents.register('r1', { url: srv.url, token: 't' }, stubMeta('r1'), 'proj-1')
+    const stream = agents.get('r1') // grabbed synchronously, before the remote stream ends
     assert.ok(stream)
     const got: FrameworkEvent[] = []
     for await (const e of stream!) got.push(e) // replays, then ends when the device closes the body
     assert.deepEqual(got.map(e => (e as { message?: string }).message), ['hi'])
-    assert.equal(runs.get('r1'), undefined) // dropped: the token no longer lives here
+    assert.equal(agents.get('r1'), undefined) // dropped: the token no longer lives here
   } finally {
     await srv.close()
   }
@@ -184,9 +184,9 @@ test('RelayedRuns closes cleanly on a 401 with no events (#1067)', async () => {
     res.end()
   })
   try {
-    const runs = new RelayedRuns()
-    runs.register('r1', { url: srv.url, token: 'stale' }, stubMeta('r1'), 'proj-1')
-    const stream = runs.get('r1')
+    const agents = new RelayedRuns()
+    agents.register('r1', { url: srv.url, token: 'stale' }, stubMeta('r1'), 'proj-1')
+    const stream = agents.get('r1')
     assert.ok(stream)
     const got: FrameworkEvent[] = []
     for await (const e of stream!) got.push(e)
@@ -237,16 +237,16 @@ test('RelayedRuns.list surfaces a relayed run as a remote row, scoped to its pro
   // we read it synchronously; dispose() aborts the fetch on the way out.
   const srv = await server((_req, res) => res.writeHead(200, { 'content-type': 'application/x-ndjson' }))
   try {
-    const runs = new RelayedRuns()
-    runs.register('r1', { url: srv.url, token: 't' }, stubMeta('r1', { intent: 'do it' }), 'proj-1')
-    const rows = runs.list('proj-1') // read before the fetch does anything: the stub is set synchronously
+    const agents = new RelayedRuns()
+    agents.register('r1', { url: srv.url, token: 't' }, stubMeta('r1', { intent: 'do it' }), 'proj-1')
+    const rows = agents.list('proj-1') // read before the fetch does anything: the stub is set synchronously
     assert.equal(rows.length, 1)
     assert.equal(rows[0]?.id, 'r1')
     assert.equal(rows[0]?.target, 'remote')
     assert.equal(rows[0]?.status, 'running')
     assert.equal(rows[0]?.intent, 'do it')
-    assert.deepEqual(runs.list('other'), []) // another project sees none of it
-    runs.dispose()
+    assert.deepEqual(agents.list('other'), []) // another project sees none of it
+    agents.dispose()
   } finally {
     await srv.close()
   }
@@ -262,10 +262,10 @@ async function relayEndStatus(endEvent: FrameworkEvent | null): Promise<string |
     res.end()
   })
   try {
-    const runs = new RelayedRuns()
-    runs.register('r1', { url: srv.url, token: 't' }, stubMeta('r1'), 'proj-1')
-    await drainRun(runs, 'r1')
-    return runs.list('proj-1')[0]?.status
+    const agents = new RelayedRuns()
+    agents.register('r1', { url: srv.url, token: 't' }, stubMeta('r1'), 'proj-1')
+    await drainRun(agents, 'r1')
+    return agents.list('proj-1')[0]?.status
   } finally {
     await srv.close()
   }
@@ -286,13 +286,13 @@ test('a relayed run reads as waiting while the device has it parked on the user 
     res.write(`${JSON.stringify({ kind: 'settled' })}\n`) // stays open: parked, not finished
   })
   try {
-    const runs = new RelayedRuns()
-    runs.register('r1', { url: srv.url, token: 't' }, stubMeta('r1'), 'proj-1')
-    for (let i = 0; i < 40 && !runs.list('proj-1')[0]?.settledAt; i++) await new Promise(r => setTimeout(r, 25))
-    const row = runs.list('proj-1')[0]
+    const agents = new RelayedRuns()
+    agents.register('r1', { url: srv.url, token: 't' }, stubMeta('r1'), 'proj-1')
+    for (let i = 0; i < 40 && !agents.list('proj-1')[0]?.settledAt; i++) await new Promise(r => setTimeout(r, 25))
+    const row = agents.list('proj-1')[0]
     assert.ok(row?.settledAt, 'a parked remote run carries settledAt, so its row reads waiting')
     assert.equal(row?.status, 'running') // still live, so waiting (not a terminal status)
-    runs.dispose()
+    agents.dispose()
   } finally {
     await srv.close()
   }
@@ -304,12 +304,12 @@ test('dispose clears the relayed run list and its device target (#1077)', async 
     res.end()
   })
   try {
-    const runs = new RelayedRuns()
-    runs.register('r1', { url: srv.url, token: 't' }, stubMeta('r1'), 'proj-1')
-    assert.equal(runs.list('proj-1').length, 1) // present before shutdown
-    runs.dispose()
-    assert.deepEqual(runs.list('proj-1'), []) // and gone after
-    assert.equal(runs.target('r1'), undefined)
+    const agents = new RelayedRuns()
+    agents.register('r1', { url: srv.url, token: 't' }, stubMeta('r1'), 'proj-1')
+    assert.equal(agents.list('proj-1').length, 1) // present before shutdown
+    agents.dispose()
+    assert.deepEqual(agents.list('proj-1'), []) // and gone after
+    assert.equal(agents.target('r1'), undefined)
   } finally {
     await srv.close()
   }
@@ -322,16 +322,16 @@ test('RelayedRuns.target outlives the event stream and dispose clears it (#1067 
     res.end()
   })
   try {
-    const runs = new RelayedRuns()
+    const agents = new RelayedRuns()
     const target = { url: srv.url, token: 't' }
-    runs.register('r1', target, stubMeta('r1'), 'proj-1')
-    const stream = runs.get('r1')
+    agents.register('r1', target, stubMeta('r1'), 'proj-1')
+    const stream = agents.get('r1')
     assert.ok(stream)
     for await (const _e of stream!) { /* drain until the device closes the body, ending the pump */ }
-    assert.equal(runs.get('r1'), undefined) // the event stream is gone once the device closes
-    assert.deepEqual(runs.target('r1'), target) // but the device target outlives it, for a post-run push/PR
-    runs.dispose()
-    assert.equal(runs.target('r1'), undefined) // cleared on shutdown
+    assert.equal(agents.get('r1'), undefined) // the event stream is gone once the device closes
+    assert.deepEqual(agents.target('r1'), target) // but the device target outlives it, for a post-run push/PR
+    agents.dispose()
+    assert.equal(agents.target('r1'), undefined) // cleared on shutdown
   } finally {
     await srv.close()
   }

@@ -37,23 +37,23 @@ test('the sessions pathspec is glob-magic and reaches the files, not just the di
   // Two properties, and the second one failed silently: glob magic stops `*` at a separator, but it
   // also matches whole file paths instead of treating a directory as a prefix — so without the
   // trailing `/**` this names no file and `git add` commits nothing at all.
-  assert.equal(SESSIONS_PATHSPEC, ':(glob).the-framework/*/sessions/**')
+  assert.equal(SESSIONS_PATHSPEC, ':(glob).the-framework/*/agents/**')
 })
 
 test('the commit message counts sessions by run, not by file (#1179)', () => {
   // One archived run is two files, so counting files would have a single session commit say "2".
-  const run = ['.the-framework/git@example.com/sessions/r1.json', '.the-framework/git@example.com/sessions/r1.jsonl']
-  assert.equal(commitMessage(run), '[The Framework] a session')
-  assert.equal(commitMessage([...run, '.the-framework/git@example.com/sessions/r2.json']), '[The Framework] 2 sessions')
+  const agent = ['.the-framework/git@example.com/agents/r1.json', '.the-framework/git@example.com/agents/r1.jsonl']
+  assert.equal(commitMessage(agent), '[The Framework] a session')
+  assert.equal(commitMessage([...agent, '.the-framework/git@example.com/agents/r2.json']), '[The Framework] 2 sessions')
 })
 
 test('pending archives are parsed from porcelain and sorted (#912)', async () => {
   const { git, calls } = fakeGit({
-    status: ['?? .the-framework/u/sessions/b.json', ' M .the-framework/u/sessions/a.json', ''].join('\n'),
+    status: ['?? .the-framework/u/agents/b.json', ' M .the-framework/u/agents/a.json', ''].join('\n'),
   })
   assert.deepEqual(await pendingSessions('/repo', git), [
-    '.the-framework/u/sessions/a.json',
-    '.the-framework/u/sessions/b.json',
+    '.the-framework/u/agents/a.json',
+    '.the-framework/u/agents/b.json',
   ])
   assert.deepEqual(
     calls[0],
@@ -73,13 +73,13 @@ test('-uall is passed, or an untracked dir collapses to one unchanging entry (#9
 test('a rename reports the destination, and a quoted path is unquoted (#912)', async () => {
   const { git } = fakeGit({
     status: [
-      'R  .the-framework/u/sessions/old.json -> .the-framework/u/sessions/new.json',
-      '?? ".the-framework/u/sessions/sp ace.json"',
+      'R  .the-framework/u/agents/old.json -> .the-framework/u/agents/new.json',
+      '?? ".the-framework/u/agents/sp ace.json"',
     ].join('\n'),
   })
   assert.deepEqual(await pendingSessions('/repo', git), [
-    '.the-framework/u/sessions/new.json',
-    '.the-framework/u/sessions/sp ace.json',
+    '.the-framework/u/agents/new.json',
+    '.the-framework/u/agents/sp ace.json',
   ])
 })
 
@@ -127,10 +127,10 @@ test('a non-repo is busy rather than committed into (#912)', async () => {
 test('a commit stages and commits the pathspec, and never add -A (#912)', async () => {
   const { git, calls } = fakeGit({
     'rev-parse': '/repo/.git\n',
-    status: '?? .the-framework/git@example.com/sessions/r1.json',
+    status: '?? .the-framework/git@example.com/agents/r1.json',
   })
   const outcome = await commitSessions('/repo', git, noLocks)
-  assert.deepEqual(outcome, { committed: true, files: ['.the-framework/git@example.com/sessions/r1.json'] })
+  assert.deepEqual(outcome, { committed: true, files: ['.the-framework/git@example.com/agents/r1.json'] })
 
   assert.deepEqual(
     calls.find(args => args[0] === 'add'),
@@ -163,12 +163,12 @@ test('a commit stages and commits the pathspec, and never add -A (#912)', async 
     await mkdir(fw, { recursive: true })
     assert.deepEqual(await commitSessions(repo, real), { committed: false, reason: 'no session changes' })
 
-    await mkdir(join(fw, 'git@example.com', 'sessions'), { recursive: true })
-    await writeFile(join(fw, 'git@example.com', 'sessions', 'r1.json'), '{"id":"r1"}\n')
+    await mkdir(join(fw, 'git@example.com', 'agents'), { recursive: true })
+    await writeFile(join(fw, 'git@example.com', 'agents', 'r1.json'), '{"id":"r1"}\n')
     await writeFile(join(repo, 'user-work.txt'), 'not ours\n')
     assert.deepEqual(await commitSessions(repo, real), {
       committed: true,
-      files: ['.the-framework/git@example.com/sessions/r1.json'],
+      files: ['.the-framework/git@example.com/agents/r1.json'],
     })
     const status = await real(['status', '--porcelain', '-uall'], repo)
     assert.equal(status.trim(), '?? user-work.txt', "the user's own work is left where it was")
@@ -178,7 +178,7 @@ test('a commit stages and commits the pathspec, and never add -A (#912)', async 
 })
 
 test('a busy repo is skipped without staging anything (#912)', async () => {
-  const { git, calls } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/sessions/a.json' })
+  const { git, calls } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/agents/a.json' })
   const locked: PathProbe = async path => path.endsWith('index.lock')
   const outcome = await commitSessions('/repo', git, locked)
   assert.deepEqual(outcome, { committed: false, reason: 'another git process holds the index lock' })
@@ -197,7 +197,7 @@ test('a clean checkout commits nothing (#912)', async () => {
 test('a failed commit is swallowed and reported, not thrown (#912)', async () => {
   const git: GitRunner = async args => {
     if (args[0] === 'rev-parse') return '/repo/.git\n'
-    if (args[0] === 'status') return '?? .the-framework/u/sessions/a.json'
+    if (args[0] === 'status') return '?? .the-framework/u/agents/a.json'
     if (args[0] === 'commit') throw new Error('nothing to commit')
     return ''
   }
@@ -213,7 +213,7 @@ test('the commit message counts the batch (#912)', () => {
 })
 
 test('an archive still being written is not committed until it settles (#912)', async () => {
-  let listing = '?? .the-framework/u/sessions/a.json'
+  let listing = '?? .the-framework/u/agents/a.json'
   const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: () => listing })
   const committer = startSessionCommitter({
     projects: async () => [project('/repo')],
@@ -224,7 +224,7 @@ test('an archive still being written is not committed until it settles (#912)', 
     await settle() // the constructor's baseline poll opens the idle window on {a}
     assert.equal(commits(), 0, 'the first sighting only starts the idle window')
 
-    listing = ['?? .the-framework/u/sessions/a.json', '?? .the-framework/u/sessions/b.json'].join('\n')
+    listing = ['?? .the-framework/u/agents/a.json', '?? .the-framework/u/agents/b.json'].join('\n')
     await committer.poll()
     assert.equal(commits(), 0, 'a changed pending set restarts the window rather than committing mid-burst')
 
@@ -270,7 +270,7 @@ test('a project that never goes idle still commits once max wait lapses (#912)',
 
 test('a busy repo keeps its place, so the next window retries it (#912)', async () => {
   let locked = true
-  const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/sessions/a.json' })
+  const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/agents/a.json' })
   const exists: PathProbe = async path => locked && path.endsWith('index.lock')
   const committer = startSessionCommitter({
     projects: async () => [project('/repo')],
@@ -293,7 +293,7 @@ test('a busy repo keeps its place, so the next window retries it (#912)', async 
 test('a failing commit logs its reason once, not once per poll', async () => {
   const { git } = fakeGit({
     'rev-parse': '/repo/.git\n',
-    status: '?? .the-framework/u/sessions/a.json',
+    status: '?? .the-framework/u/agents/a.json',
     commit: () => {
       throw new Error('nothing added to commit')
     },
@@ -326,7 +326,7 @@ test('a changed failure reason is announced again', async () => {
   let reason = 'first failure'
   const { git } = fakeGit({
     'rev-parse': '/repo/.git\n',
-    status: '?? .the-framework/u/sessions/a.json',
+    status: '?? .the-framework/u/agents/a.json',
     commit: () => {
       throw new Error(reason)
     },
@@ -356,7 +356,7 @@ test('a changed failure reason is announced again', async () => {
 test('the ordinary idle case is not announced as a failure', async () => {
   // The poll sees a pending file, but the commit's own re-read finds it already gone: an
   // everyday race, not something to log.
-  const file = '?? .the-framework/u/sessions/a.json'
+  const file = '?? .the-framework/u/agents/a.json'
   let reads = 0
   const { git, commits } = fakeGit({
     'rev-parse': '/repo/.git\n',
@@ -382,7 +382,7 @@ test('the ordinary idle case is not announced as a failure', async () => {
 })
 
 test('a project scan that throws costs one window rather than the committer (#912)', async () => {
-  const { git } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/sessions/a.json' })
+  const { git } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/agents/a.json' })
   const committer = startSessionCommitter({
     projects: async () => {
       throw new Error('registry unreadable')
@@ -399,7 +399,7 @@ test('a project scan that throws costs one window rather than the committer (#91
 })
 
 test('flush commits immediately, skipping the idle window, and counts projects (#912)', async () => {
-  const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/sessions/a.json' })
+  const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/agents/a.json' })
   const committer = startSessionCommitter({
     projects: async () => [project('/a'), project('/b')],
     git,
@@ -416,7 +416,7 @@ test('flush commits immediately, skipping the idle window, and counts projects (
 })
 
 test('a stopped committer does not poll again (#912)', async () => {
-  const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/sessions/a.json' })
+  const { git, commits } = fakeGit({ 'rev-parse': '/repo/.git\n', status: '?? .the-framework/u/agents/a.json' })
   const committer = startSessionCommitter({
     projects: async () => [project('/repo')],
     git,

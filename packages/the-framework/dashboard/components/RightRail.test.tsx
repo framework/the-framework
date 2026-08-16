@@ -26,7 +26,7 @@ const view: AgentView = { id: 'v1', title: 'Plan', markdown: '# hello' } as Agen
 
 const baseProps = {
   projectId: 'p1',
-  runId: 'r1',
+  agentId: 'r1',
   views: [],
   files: [],
   context: new Set<string>(),

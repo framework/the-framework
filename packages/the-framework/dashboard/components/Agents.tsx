@@ -21,7 +21,7 @@ export function Agents({
 }: {
   working: ActiveRun[]
   loading: boolean
-  onSelectRun: (projectId: string, runId: string) => void
+  onSelectRun: (projectId: string, agentId: string) => void
 }) {
   return (
     <Card>
@@ -44,11 +44,11 @@ export function Agents({
           <ul className="space-y-0.5">
             {working.map(a => (
               <AgentRow
-                key={`${a.projectId}:${a.runId}`}
+                key={`${a.projectId}:${a.agentId}`}
                 label={activeLabel(a)}
                 at={a.updatedAt}
                 projectName={a.projectName}
-                onOpen={() => onSelectRun(a.projectId, a.runId)}
+                onOpen={() => onSelectRun(a.projectId, a.agentId)}
               />
             ))}
           </ul>

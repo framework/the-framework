@@ -20,7 +20,7 @@ import { defaultProjectsProvider } from './projects.js'
 /** Where a proxied request is headed, once the URL has been understood. */
 export interface BrowserRoute {
   projectId: string
-  runId: string
+  agentId: string
   /** `stream` renders in an `<img>`; `input` carries a click or a key back. */
   leg: 'stream' | 'input'
 }
@@ -29,7 +29,7 @@ export interface BrowserRoute {
 export const BROWSER_PROXY_PREFIX = '/browser'
 
 /**
- * Parse `/browser/<projectId>/<runId>/stream|input`, or undefined for anything else — an
+ * Parse `/browser/<projectId>/<agentId>/stream|input`, or undefined for anything else — an
  * unrecognized shape must fall through to the bundle rather than be guessed at. Ids are taken
  * verbatim and only ever used to look a run up, never as a path.
  */
@@ -44,30 +44,30 @@ export function parseBrowserRoute(url: string | undefined): BrowserRoute | undef
     if (!pathname.startsWith(`${BROWSER_PROXY_PREFIX}/`)) return undefined
     const parts = pathname.slice(BROWSER_PROXY_PREFIX.length + 1).split('/')
     if (parts.length !== 3) return undefined
-    const [projectId, runId, leg] = parts
-    if (!projectId || !runId) return undefined
+    const [projectId, agentId, leg] = parts
+    if (!projectId || !agentId) return undefined
     if (leg !== 'stream' && leg !== 'input') return undefined
-    return { projectId, runId: decodeURIComponent(runId), leg }
+    return { projectId, agentId: decodeURIComponent(agentId), leg }
   } catch {
     return undefined
   }
 }
 
 /** How the proxy finds the run's bridge. Injectable so a test needs no registry and no run. */
-export type BrowserPortLookup = (projectId: string, runId: string) => Promise<number | undefined>
+export type BrowserPortLookup = (projectId: string, agentId: string) => Promise<number | undefined>
 
 /**
  * The real lookup: the port the run recorded on its own meta. A run with no browser, a finished
  * run, or an unknown id all read as undefined, which the caller turns into a 404.
  */
-const defaultBrowserPortLookup: BrowserPortLookup = async (projectId, runId) => {
+const defaultBrowserPortLookup: BrowserPortLookup = async (projectId, agentId) => {
   const cwd = await defaultProjectsProvider().resolvePath(projectId)
   if (!cwd) return undefined
   const live = await readLiveMetas(cwd).catch(() => [])
-  const run = live.find(meta => meta.id === runId)
+  const agent = live.find(meta => meta.id === agentId)
   // Only a live run: the bridge is torn down with the run, so a port off a finished one would
   // reach whatever the OS handed that number next.
-  return run?.status === 'running' ? run.browserStreamPort : undefined
+  return agent?.status === 'running' ? agent.browserStreamPort : undefined
 }
 
 /**
@@ -85,7 +85,7 @@ export async function handleBrowserProxy(
   const route = parseBrowserRoute(req.url)
   if (!route) return false
 
-  const port = await lookup(route.projectId, route.runId).catch(() => undefined)
+  const port = await lookup(route.projectId, route.agentId).catch(() => undefined)
   if (!port) {
     // The pane polls this while a run is starting, and a run may never have a browser at all,
     // so a miss is ordinary rather than an error worth logging.

@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { errorMessage } from './error-message.js'
 import {
   listWorktreeDirs,
-  listRuns,
+  listAgents,
   readLiveMetas,
   branchPushed,
   commitPendingWork,
@@ -12,20 +12,20 @@ import {
   worktreePath,
   worktreeSize,
   isSafeRunId,
-  archivedRunPaths,
+  archivedAgentPaths,
   FRAMEWORK_DIR,
-  type RunStatus,
+  type AgentStatus,
 } from './store/index.js'
-import { pushRunBranch } from './dashboard/run-handoff.js'
+import { pushRunBranch } from './dashboard/agent-handoff.js'
 
 /** A retained worktree and the run that left it behind (#752). */
 export interface WorktreeRow {
   /** The run id, which is also the worktree's directory name. */
-  runId: string
+  agentId: string
   /** The branch the run's work landed on, when its meta recorded one (#799). */
   branch?: string
   /** How the run that left this checkout ended, or `running` while it is still going. */
-  status?: RunStatus
+  status?: AgentStatus
   /** Size on disk in bytes, absent for a live run (its tree is still changing) or when unreadable. */
   sizeBytes?: number
   /** True while the run owning this checkout is still going: it is in use, not retained. */
@@ -34,7 +34,7 @@ export interface WorktreeRow {
 
 /** Why a worktree was left in place by {@link pruneProjectWorktrees}. */
 export interface SkippedWorktree {
-  runId: string
+  agentId: string
   reason: string
 }
 
@@ -53,7 +53,7 @@ export interface RemoveWorktreeOptions {
    * Run after the safety checks pass and the work is committed, just before the checkout goes.
    * The dashboard stops the preview serving that tree here (#797); the CLI has none to stop.
    */
-  beforeRemove?: (runId: string) => Promise<void>
+  beforeRemove?: (agentId: string) => Promise<void>
 }
 
 /**
@@ -68,27 +68,27 @@ export async function listProjectWorktrees(cwd: string, opts: { sizes?: boolean 
   const [names, live, archived] = await Promise.all([
     listWorktreeDirs(cwd).catch(() => []),
     readLiveMetas(cwd).catch(() => []),
-    listRuns(cwd).catch(() => []),
+    listAgents(cwd).catch(() => []),
   ])
   const rows: WorktreeRow[] = []
-  for (const runId of names) {
-    const meta = live.find(run => run.id === runId) ?? archived.find(run => run.id === runId)
+  for (const agentId of names) {
+    const meta = live.find(agent => agent.id === agentId) ?? archived.find(agent => agent.id === agentId)
     const isLive = meta?.status === 'running'
     rows.push({
-      runId,
+      agentId,
       live: isLive,
       ...(meta?.branch ? { branch: meta.branch } : {}),
       ...(meta?.status ? { status: meta.status } : {}),
       // Sizing a tree an agent is writing to gives a number that is wrong by the time it prints;
       // a caller that only wants the rows (the dashboard's retained list) skips the du entirely.
-      ...(isLive || opts.sizes === false ? {} : await sizeOf(cwd, runId)),
+      ...(isLive || opts.sizes === false ? {} : await sizeOf(cwd, agentId)),
     })
   }
-  return rows.sort((a, b) => (a.runId < b.runId ? 1 : a.runId > b.runId ? -1 : 0))
+  return rows.sort((a, b) => (a.agentId < b.agentId ? 1 : a.agentId > b.agentId ? -1 : 0))
 }
 
-async function sizeOf(cwd: string, runId: string): Promise<{ sizeBytes?: number }> {
-  const bytes = await worktreeSize(worktreePath(cwd, runId)).catch(() => undefined)
+async function sizeOf(cwd: string, agentId: string): Promise<{ sizeBytes?: number }> {
+  const bytes = await worktreeSize(worktreePath(cwd, agentId)).catch(() => undefined)
   return bytes === undefined ? {} : { sizeBytes: bytes }
 }
 
@@ -110,28 +110,28 @@ async function sizeOf(cwd: string, runId: string): Promise<{ sizeBytes?: number 
  */
 export async function removeProjectWorktree(
   cwd: string,
-  runId: string,
+  agentId: string,
   opts: RemoveWorktreeOptions = {},
 ): Promise<RemoveResult> {
-  if (!isSafeRunId(runId)) return { ok: false, error: `invalid session id: ${runId}` }
+  if (!isSafeRunId(agentId)) return { ok: false, error: `invalid session id: ${agentId}` }
   const names = await listWorktreeDirs(cwd).catch((): string[] => [])
-  if (!names.includes(runId)) return { ok: false, error: `no worktree for session ${runId}` }
+  if (!names.includes(agentId)) return { ok: false, error: `no worktree for session ${agentId}` }
   const live = await readLiveMetas(cwd).catch(() => [])
-  if (live.some(run => run.id === runId && run.status === 'running')) {
+  if (live.some(agent => agent.id === agentId && agent.status === 'running')) {
     return { ok: false, error: 'that session is still going; stop it before removing its worktree' }
   }
-  const path = worktreePath(cwd, runId)
+  const path = worktreePath(cwd, agentId)
   try {
     // `removeWorktree` forces past a dirty tree, so an uncommitted edit has to be on the branch
     // before the checkout can go — otherwise the very diff the checkout held is what is deleted.
     if (!(await commitPendingWork(path))) {
       return {
         ok: false,
-        error: `session ${runId} has uncommitted work that could not be committed; its worktree was kept`,
+        error: `session ${agentId} has uncommitted work that could not be committed; its worktree was kept`,
       }
     }
     const branch = await currentBranch(path)
-    if (!branch) return { ok: false, error: `session ${runId} is on no branch; its worktree was kept` }
+    if (!branch) return { ok: false, error: `session ${agentId} is on no branch; its worktree was kept` }
     if (!(await branchPushed(cwd, branch))) {
       // Pushing is what makes the removal recoverable, so it is attempted here rather than
       // required of the caller. A repo with no remote never gets past this, which is the honest
@@ -141,7 +141,7 @@ export async function removeProjectWorktree(
         return { ok: false, error: `${branch} is not on the remote (${pushed.error}); its worktree was kept` }
       }
     }
-    await opts.beforeRemove?.(runId)
+    await opts.beforeRemove?.(agentId)
     await removeWorktree(cwd, path)
     await pruneWorktrees(cwd)
     return { ok: true }
@@ -156,7 +156,7 @@ export type DeleteRunResult = { ok: true } | { ok: false; error: string }
 /** Surface-specific work {@link deleteProjectRun} does, and the file-removal seam for tests. */
 export interface DeleteRunOptions {
   /** Run before the worktree comes off disk (stop a preview serving it, as removal does). */
-  beforeRemove?: (runId: string) => Promise<void>
+  beforeRemove?: (agentId: string) => Promise<void>
   /** Remove one file, tolerant of an absent one. Defaults to `rm(path, { force: true })`. */
   removeFile?: (path: string) => Promise<void>
 }
@@ -187,10 +187,10 @@ async function rmFile(path: string): Promise<void> {
  * worktree is discarded with it, which is the intent here (the session is being thrown away),
  * unlike remove-worktree, which commits that work to the kept branch first.
  */
-export async function deleteProjectRun(cwd: string, runId: string, opts: DeleteRunOptions = {}): Promise<DeleteRunResult> {
-  if (!isSafeRunId(runId)) return { ok: false, error: `invalid session id: ${runId}` }
+export async function deleteProjectRun(cwd: string, agentId: string, opts: DeleteRunOptions = {}): Promise<DeleteRunResult> {
+  if (!isSafeRunId(agentId)) return { ok: false, error: `invalid session id: ${agentId}` }
   const live = await readLiveMetas(cwd).catch(() => [])
-  if (live.some(run => run.id === runId && run.status === 'running')) {
+  if (live.some(agent => agent.id === agentId && agent.status === 'running')) {
     return { ok: false, error: 'that session is still going; stop it before deleting it' }
   }
   const removeFile = opts.removeFile ?? rmFile
@@ -198,16 +198,16 @@ export async function deleteProjectRun(cwd: string, runId: string, opts: DeleteR
     // The worktree first, if one is on disk: force-removed (its uncommitted work goes with the
     // session), where remove-worktree would have committed it to the kept branch.
     const names = await listWorktreeDirs(cwd).catch((): string[] => [])
-    if (names.includes(runId)) {
-      await opts.beforeRemove?.(runId)
-      await removeWorktree(cwd, worktreePath(cwd, runId))
+    if (names.includes(agentId)) {
+      await opts.beforeRemove?.(agentId)
+      await removeWorktree(cwd, worktreePath(cwd, agentId))
       await pruneWorktrees(cwd)
     }
     // Then the records that put the row in the list. Looked up rather than derived from the id: a
     // session is archived under whichever user ran it (#1179), so the id alone no longer names its
     // path. Tolerant of an absent file, so a half-deleted session (its worktree already gone)
     // still finishes cleanly.
-    for (const path of await archivedRunPaths(cwd, runId)) await removeFile(path)
+    for (const path of await archivedAgentPaths(cwd, agentId)) await removeFile(path)
     return { ok: true }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
@@ -223,12 +223,12 @@ export async function pruneProjectWorktrees(cwd: string): Promise<PruneResult> {
   const result: PruneResult = { removed: [], skipped: [] }
   for (const row of await listProjectWorktrees(cwd)) {
     if (row.live) {
-      result.skipped.push({ runId: row.runId, reason: 'still running' })
+      result.skipped.push({ agentId: row.agentId, reason: 'still running' })
       continue
     }
-    const outcome = await removeProjectWorktree(cwd, row.runId)
-    if (outcome.ok) result.removed.push(row.runId)
-    else result.skipped.push({ runId: row.runId, reason: outcome.error })
+    const outcome = await removeProjectWorktree(cwd, row.agentId)
+    if (outcome.ok) result.removed.push(row.agentId)
+    else result.skipped.push({ agentId: row.agentId, reason: outcome.error })
   }
   return result
 }

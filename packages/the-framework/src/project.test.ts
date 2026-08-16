@@ -39,12 +39,12 @@ test('isActivated is false when the marker dir is absent', async () => {
 
 test('crawlRepoFiles parses NUL-separated output, deduped + sorted', async () => {
   const calls: { args: string[]; cwd: string }[] = []
-  const run: GitRunner = async (args, cwd) => {
+  const agent: GitRunner = async (args, cwd) => {
     calls.push({ args, cwd })
     // git -z output ends with a trailing NUL.
     return 'src/b.ts\0README.md\0src/a.ts\0'
   }
-  const files = await crawlRepoFiles(CWD, run)
+  const files = await crawlRepoFiles(CWD, agent)
   assert.deepEqual(files, ['README.md', 'src/a.ts', 'src/b.ts'])
   assert.deepEqual(calls, [
     { args: ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd: CWD },

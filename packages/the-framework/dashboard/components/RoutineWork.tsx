@@ -4,7 +4,7 @@ import {
   AUTO_PM_ROUTINES,
   DEFAULT_AUTO_PM_CONCURRENCY,
   MAX_AUTO_PM_CONCURRENCY,
-  runOptionsFromPreferences,
+  agentOptionsFromPreferences,
 } from '../../dist/client.js'
 import { CalendarClock, Play } from 'lucide-react'
 import { onProjects } from '../rpc/projects.js'
@@ -60,7 +60,7 @@ export function RoutineWork({
    * Told which run the button just started (#1191). The project-carrying form, because the
    * Overview has no project selected — each row picks one — so the shell cannot supply it.
    */
-  onRunStarted: (projectId: string, intent: string, runId?: string) => void
+  onRunStarted: (projectId: string, intent: string, agentId?: string) => void
 }) {
   const projects = useLoaded<ProjectSummary[]>(onProjects, NO_PROJECTS, [])
   const preferences = usePreferences()
@@ -132,14 +132,14 @@ export function RoutineWork({
     // Unattended (#1279): a routine fired by a card is the same work the sweep starts, so it runs
     // the same way — gates auto-answer, the run ends at settle, and the armed handoff fires,
     // instead of parking in the stay-open chat loop with its PR never opened.
-    const result = await start(projectId, job.prompt, 'prompt', { ...runOptionsFromPreferences(preferences), unattended: true })
+    const result = await start(projectId, job.prompt, 'prompt', { ...agentOptionsFromPreferences(preferences), unattended: true })
     setStarting(null)
     // Go to the run itself, not merely to its project (#1191): selecting the project renders the
     // launcher, so the button that says "Run now" landed you on an empty composer and the session
     // it had just started was nowhere on screen. Handing the id over is what makes it the
     // selection; with no id yet the shell lands on the project and adopts the running run once the
     // poll surfaces it, which is the same fallback every other start path uses.
-    if (result) onRunStarted(projectId, job.prompt, result.runId)
+    if (result) onRunStarted(projectId, job.prompt, result.agentId)
   }
 
   return (

@@ -17,12 +17,12 @@ import { BrowserPanel } from './BrowserPanel.js'
  */
 export function InlineBrowser({
   projectId,
-  runId,
+  agentId: agentId,
   url,
   live,
 }: {
   projectId: string
-  runId: string
+  agentId: string
   /** The page this row announced — what the one-liner names when there is nothing to show. */
   url: string
   /** Whether the run (and so the stream) is still going; false degrades the pane in place. */
@@ -35,7 +35,7 @@ export function InlineBrowser({
   return (
     <div className="relative aspect-[16/10] max-h-96 w-full overflow-hidden rounded-md border border-border bg-muted">
       {live ? (
-        <BrowserPanel inline projectId={projectId} runId={runId} onFrame={setFrame} />
+        <BrowserPanel inline projectId={projectId} agentId={agentId} onFrame={setFrame} />
       ) : (
         <>
           <img src={frame} alt="The browser's last frame" className="h-full w-full object-contain" />

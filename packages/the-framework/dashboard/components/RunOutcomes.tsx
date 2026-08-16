@@ -1,15 +1,15 @@
-import type { RunStatus } from '../../dist/index.js'
+import type { AgentStatus } from '../../dist/index.js'
 
 // How past runs ended (#471). These are the reserved status colours (good / warning /
 // critical), so every segment ships with a written label and count — identity is never
 // carried by colour alone. Zero-count outcomes are dropped from the bar but still listed.
-const OUTCOMES: { key: Exclude<RunStatus, 'running'>; label: string; fill: string; dot: string }[] = [
+const OUTCOMES: { key: Exclude<AgentStatus, 'running'>; label: string; fill: string; dot: string }[] = [
   { key: 'done', label: 'Done', fill: 'bg-success', dot: 'bg-success' },
   { key: 'failed', label: 'Failed', fill: 'bg-danger', dot: 'bg-danger' },
   { key: 'stopped', label: 'Stopped', fill: 'bg-warning', dot: 'bg-warning' },
 ]
 
-export function RunOutcomes({ counts }: { counts: Record<RunStatus, number> }) {
+export function RunOutcomes({ counts }: { counts: Record<AgentStatus, number> }) {
   const total = OUTCOMES.reduce((sum, o) => sum + counts[o.key], 0)
 
   if (total === 0) {

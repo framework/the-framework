@@ -25,7 +25,7 @@ export const RELAY_RPC_NAMES: readonly string[] = Object.keys(RELAY_FNS)
 /**
  * Dispatch one relayed RPC against `homeId` (this device's own project). `args[0]` from the caller is
  * the remote daemon's project id and is meaningless here, so it is replaced with `homeId`; the rest
- * (path, runId, ...) carry through unchanged. Throws on an unknown name.
+ * (path, agentId, ...) carry through unchanged. Throws on an unknown name.
  */
 export async function dispatchRelayRpc(homeId: string, fn: string, args: unknown[]): Promise<unknown> {
   const impl = RELAY_FNS[fn]

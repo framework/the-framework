@@ -1,6 +1,6 @@
 import { EventStream } from '../event-stream.js'
 import type { FrameworkEvent } from '../events.js'
-import { applyEventToMeta, type RunMeta } from '../store/index.js'
+import { applyEventToMeta, type AgentMeta } from '../store/index.js'
 import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'
 import { errorMessage } from '../error-message.js'
 
@@ -106,7 +106,7 @@ export async function relayRpc(target: RemoteTarget, fn: string, args: unknown[]
  */
 export function streamRemoteEvents(
   target: RemoteTarget,
-  runId: string,
+  agentId: string,
   onEvent: (event: FrameworkEvent) => void,
   onEnd?: () => void,
 ): () => void {
@@ -119,7 +119,7 @@ export function streamRemoteEvents(
   }
   void (async () => {
     try {
-      const url = `${trimSlashes(target.url)}/_relay/events?run=${encodeURIComponent(runId)}`
+      const url = `${trimSlashes(target.url)}/_relay/events?run=${encodeURIComponent(agentId)}`
       const res = await fetch(url, { headers: relayHeaders(target.token), signal: controller.signal })
       // 401 = the device rotated its token. Nothing more will stream; end cleanly (a done, not a loss).
       if (!res.ok || !res.body) return end()
@@ -178,43 +178,43 @@ interface RelayedRun {
  * push and open-PR still have to reach the device after its event stream has ended, so the device
  * target is kept until {@link dispose} clears it, not dropped when the stream closes.
  *
- * The `metas` map (#1077) holds a local {@link RunMeta} stub per relayed run so `onRuns` can show a
+ * The `metas` map (#1077) holds a local {@link AgentMeta} stub per relayed run so `onRuns` can show a
  * remote run in the session list and re-open it after a dashboard reload; {@link list} projects it
  * per project. Same lifetime as `targets`: it outlives the event stream and is cleared on dispose.
  */
 export class RelayedRuns {
-  private readonly runs = new Map<string, RelayedRun>()
+  private readonly agents = new Map<string, RelayedRun>()
   private readonly targets = new Map<string, RemoteTarget>()
-  // The local RunMeta stub for each relayed run, so onRuns can show a remote run in the session list
+  // The local AgentMeta stub for each relayed run, so onRuns can show a remote run in the session list
   // and re-open it after a reload; outlives the event stream, cleared on dispose (same lifetime as targets).
-  private readonly metas = new Map<string, { meta: RunMeta; projectId: string }>()
+  private readonly metas = new Map<string, { meta: AgentMeta; projectId: string }>()
 
   /** Open a local stream for a remote run and start pumping the remote's events into it. */
-  register(runId: string, target: RemoteTarget, meta: RunMeta, projectId: string): void {
-    this.targets.set(runId, target) // kept past the stream, for post-run reads/push/PR (slice 2)
-    this.metas.set(runId, { meta, projectId }) // the local list row, so a reload re-opens the run (#1077)
-    this.runs.get(runId)?.cancel() // a re-register (same id) replaces the old pump
+  register(agentId: string, target: RemoteTarget, meta: AgentMeta, projectId: string): void {
+    this.targets.set(agentId, target) // kept past the stream, for post-run reads/push/PR (slice 2)
+    this.metas.set(agentId, { meta, projectId }) // the local list row, so a reload re-opens the run (#1077)
+    this.agents.get(agentId)?.cancel() // a re-register (same id) replaces the old pump
     const stream = new EventStream<FrameworkEvent>()
-    const cancel = streamRemoteEvents(target, runId, event => {
+    const cancel = streamRemoteEvents(target, agentId, event => {
       stream.push(event)
-      this.apply(runId, event) // fold the event into the run's list row, mirroring the device
-    }, () => this.endStream(runId))
-    this.runs.set(runId, { target, stream, cancel })
+      this.apply(agentId, event) // fold the event into the run's list row, mirroring the device
+    }, () => this.endStream(agentId))
+    this.agents.set(agentId, { target, stream, cancel })
   }
 
   /** The live event stream for a relayed run, or undefined when this daemon is not relaying it. */
-  get(runId: string | undefined): EventStream<FrameworkEvent> | undefined {
-    return runId ? this.runs.get(runId)?.stream : undefined
+  get(agentId: string | undefined): EventStream<FrameworkEvent> | undefined {
+    return agentId ? this.agents.get(agentId)?.stream : undefined
   }
 
   /** The device a relayed run runs on, kept past the event stream so post-run push/PR still reach it. */
-  target(runId: string | undefined): RemoteTarget | undefined {
-    return runId ? this.targets.get(runId) : undefined
+  target(agentId: string | undefined): RemoteTarget | undefined {
+    return agentId ? this.targets.get(agentId) : undefined
   }
 
   /** A project's relayed run stubs (#1077), newest-first, so `onRuns` can surface them in the list. */
-  list(projectId: string): RunMeta[] {
-    const rows: RunMeta[] = []
+  list(projectId: string): AgentMeta[] {
+    const rows: AgentMeta[] = []
     for (const entry of this.metas.values()) if (entry.projectId === projectId) rows.push(entry.meta)
     // Newest first: startedAt is ISO, so a string compare is the time order (no parse).
     return rows.sort((a, b) => (a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0))
@@ -223,29 +223,29 @@ export class RelayedRuns {
   /** Fold each relayed event into the run's list row via the store's own reducer (#1077), so the
    *  local stub mirrors the device: the terminal status on `end`, the waiting flag while it is parked
    *  (#785), the driver once its session starts. Events carry no write time, so this stamps its own. */
-  private apply(runId: string, event: FrameworkEvent): void {
-    const entry = this.metas.get(runId)
+  private apply(agentId: string, event: FrameworkEvent): void {
+    const entry = this.metas.get(agentId)
     if (!entry) return
     entry.meta = applyEventToMeta(entry.meta, event, new Date().toISOString())
   }
 
   /** Close a relayed run's event stream (not its target). Idempotent. */
-  private endStream(runId: string): void {
-    const run = this.runs.get(runId)
-    if (!run) return
-    this.runs.delete(runId)
-    run.stream.close() // a clean close surfaces as `done` in the browser, not a lost stream
+  private endStream(agentId: string): void {
+    const agent = this.agents.get(agentId)
+    if (!agent) return
+    this.agents.delete(agentId)
+    agent.stream.close() // a clean close surfaces as `done` in the browser, not a lost stream
     // The stream dropped with no terminal event: the run is no longer live, so stop showing it as such.
-    const entry = this.metas.get(runId)
+    const entry = this.metas.get(agentId)
     if (entry && entry.meta.status === 'running') entry.meta.status = 'stopped'
   }
 
   /** Stop every pump, close every stream, and forget every device target + list stub, on daemon shutdown. */
   dispose(): void {
-    for (const [runId, run] of this.runs) {
-      run.cancel()
-      run.stream.close()
-      this.runs.delete(runId)
+    for (const [agentId, agent] of this.agents) {
+      agent.cancel()
+      agent.stream.close()
+      this.agents.delete(agentId)
     }
     this.targets.clear()
     this.metas.clear()

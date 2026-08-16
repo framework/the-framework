@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { sendStop, sendMessage, sendChoice, sendRemoveWorktree } from './control.js'
 import { onRetainedWorktrees, onRuns } from './reads.js'
 import { addProject, projectId as idFor } from '../registry.js'
-import { FRAMEWORK_DIR, WORKTREES_DIR, addWorktree, runBranchName } from '../store/index.js'
+import { FRAMEWORK_DIR, WORKTREES_DIR, addWorktree, agentBranchName } from '../store/index.js'
 import { CONTROL_FILE } from '../control.js'
 import { nodeGitRunner } from '../project.js'
 import { provideTestContext } from './test-context.js'
@@ -22,19 +22,19 @@ import { provideTestContext } from './test-context.js'
 async function projectWithWorktreeRun(): Promise<{
   dir: string
   projectId: string
-  runId: string
+  agentId: string
   runControl: string
   rootControl: string
   restore: () => void
 }> {
   const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-addressing-')))
-  const runId = '2026-07-19T10-00-00-000Z'
-  const worktree = join(dir, FRAMEWORK_DIR, WORKTREES_DIR, runId)
+  const agentId = '2026-07-19T10-00-00-000Z'
+  const worktree = join(dir, FRAMEWORK_DIR, WORKTREES_DIR, agentId)
   await mkdir(join(worktree, FRAMEWORK_DIR), { recursive: true })
   // The live meta is what readLiveMetas discovers, and its id is what the caller addresses.
   await writeFile(
-    join(worktree, FRAMEWORK_DIR, 'run.json'),
-    JSON.stringify({ version: 1, status: 'running', id: runId, startedAt: runId, updatedAt: runId }),
+    join(worktree, FRAMEWORK_DIR, 'agent.json'),
+    JSON.stringify({ version: 1, status: 'running', id: agentId, startedAt: agentId, updatedAt: agentId }),
   )
 
   const previous = process.env.XDG_CONFIG_HOME
@@ -48,7 +48,7 @@ async function projectWithWorktreeRun(): Promise<{
   return {
     dir,
     projectId: idFor(dir),
-    runId,
+    agentId,
     runControl: join(worktree, FRAMEWORK_DIR, CONTROL_FILE),
     rootControl: join(dir, FRAMEWORK_DIR, CONTROL_FILE),
     restore: () => {
@@ -67,7 +67,7 @@ const entries = async (path: string): Promise<unknown[]> =>
 test('sendStop with a run id writes to that run worktree control log, not the project root (#749)', async () => {
   const ctx = await projectWithWorktreeRun()
   try {
-    await sendStop(ctx.projectId, ctx.runId)
+    await sendStop(ctx.projectId, ctx.agentId)
     assert.deepEqual(await entries(ctx.runControl), [{ kind: 'stop' }], 'the run gets the stop it is tailing for')
     assert.deepEqual(await entries(ctx.rootControl), [], 'and nothing is written where nothing is listening')
   } finally {
@@ -79,8 +79,8 @@ test('sendStop with a run id writes to that run worktree control log, not the pr
 test('sendMessage and sendChoice address the run too (#749)', async () => {
   const ctx = await projectWithWorktreeRun()
   try {
-    await sendMessage(ctx.projectId, 'also add tests', ctx.runId)
-    await sendChoice(ctx.projectId, 'gate-1', 'option-b', 'user', ctx.runId)
+    await sendMessage(ctx.projectId, 'also add tests', ctx.agentId)
+    await sendChoice(ctx.projectId, 'gate-1', 'option-b', 'user', ctx.agentId)
     assert.deepEqual(await entries(ctx.runControl), [
       { kind: 'message', text: 'also add tests' },
       { kind: 'choice', id: 'gate-1', pick: 'option-b', by: 'user' },
@@ -111,9 +111,9 @@ test('an unknown or absent run id falls back to the project root, as before #736
 // and must never yank the checkout out from under a run that is still going.
 
 test('sendRemoveWorktree refuses while that run is still live (#737)', async () => {
-  const ctx = await projectWithWorktreeRun() // its run.json says `running`
+  const ctx = await projectWithWorktreeRun() // its agent.json says `running`
   try {
-    const result = await sendRemoveWorktree(ctx.projectId, ctx.runId)
+    const result = await sendRemoveWorktree(ctx.projectId, ctx.agentId)
     assert.equal(result.ok, false)
     assert.match(result.ok === false ? result.error : '', /still going/)
     assert.equal(await entries(ctx.runControl).then(() => true), true, 'the worktree is untouched')
@@ -144,7 +144,7 @@ test('sendRemoveWorktree rejects an unsafe run id before touching anything (#737
 async function projectWithDirtyWorktree(): Promise<{
   dir: string
   projectId: string
-  runId: string
+  agentId: string
   worktree: string
   branch: string
   restore: () => void
@@ -162,8 +162,8 @@ async function projectWithDirtyWorktree(): Promise<{
   await git(['init', '-q', '--bare', join(dir, 'origin.git')], dir)
   await git(['remote', 'add', 'origin', join(dir, 'origin.git')], dir)
 
-  const runId = 'run1'
-  const { path, branch } = await addWorktree(dir, { runId, branch: runBranchName(runId) }, git)
+  const agentId = 'run1'
+  const { path, branch } = await addWorktree(dir, { agentId, branch: agentBranchName(agentId) }, git)
   await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
 
   const previous = process.env.XDG_CONFIG_HOME
@@ -177,7 +177,7 @@ async function projectWithDirtyWorktree(): Promise<{
   return {
     dir,
     projectId: idFor(dir),
-    runId,
+    agentId,
     worktree: path,
     branch,
     restore: () => {
@@ -190,7 +190,7 @@ async function projectWithDirtyWorktree(): Promise<{
 test('the dashboard Remove commits and pushes the checkout it takes away (#982/E5)', async () => {
   const ctx = await projectWithDirtyWorktree()
   try {
-    assert.deepEqual(await sendRemoveWorktree(ctx.projectId, ctx.runId), { ok: true })
+    assert.deepEqual(await sendRemoveWorktree(ctx.projectId, ctx.agentId), { ok: true })
     const git = nodeGitRunner()
     assert.match(await git(['show', `${ctx.branch}:index.html`], ctx.dir), /Welcome!/, 'the uncommitted edit survived on the run branch')
     assert.match(
@@ -222,17 +222,17 @@ test('onRetainedWorktrees hides a live run, and lists one that has finished (#73
     assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [], 'a running run has nothing to offer removing')
     // Once it is no longer running, its retained checkout is listed.
     await writeFile(
-      join(ctx.dir, FRAMEWORK_DIR, WORKTREES_DIR, ctx.runId, FRAMEWORK_DIR, 'run.json'),
-      JSON.stringify({ version: 1, status: 'failed', id: ctx.runId, startedAt: ctx.runId, updatedAt: ctx.runId }),
+      join(ctx.dir, FRAMEWORK_DIR, WORKTREES_DIR, ctx.agentId, FRAMEWORK_DIR, 'agent.json'),
+      JSON.stringify({ version: 1, status: 'failed', id: ctx.agentId, startedAt: ctx.agentId, updatedAt: ctx.agentId }),
     )
-    assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [ctx.runId])
+    assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [ctx.agentId])
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })
   }
 })
 
-// #766: for the first seconds of a run there is a worktree but no `run.json` yet. Resolving by run
+// #766: for the first seconds of a run there is a worktree but no `agent.json` yet. Resolving by run
 // state misses it and falls back to the project root, and because a Telefunc Channel resolves its
 // path once at subscribe time, the feed then tails the root's log — a previous run's output — for
 // the life of the subscription. Resolve by the directory, which the daemon creates before it spawns.
@@ -274,13 +274,13 @@ test('a continued run reads as running, not as its archived first leg (#768)', a
   const ctx = await projectWithWorktreeRun() // its worktree meta says `running`
   try {
     // Its first leg was archived when it finished, exactly as teardown (#737) leaves things.
-    await mkdir(join(ctx.dir, FRAMEWORK_DIR, 'runs'), { recursive: true })
+    await mkdir(join(ctx.dir, FRAMEWORK_DIR, 'agents'), { recursive: true })
     await writeFile(
-      join(ctx.dir, FRAMEWORK_DIR, 'runs', `${ctx.runId}.json`),
-      JSON.stringify({ version: 1, status: 'done', id: ctx.runId, startedAt: ctx.runId, updatedAt: ctx.runId }),
+      join(ctx.dir, FRAMEWORK_DIR, 'agents', `${ctx.agentId}.json`),
+      JSON.stringify({ version: 1, status: 'done', id: ctx.agentId, startedAt: ctx.agentId, updatedAt: ctx.agentId }),
     )
-    const runs = (await onRuns(ctx.projectId)) as { id: string; status: string }[]
-    const mine = runs.filter(run => run.id === ctx.runId)
+    const agents = (await onRuns(ctx.projectId)) as { id: string; status: string }[]
+    const mine = agents.filter(agent => agent.id === ctx.agentId)
     assert.equal(mine.length, 1, 'still one row, not two')
     assert.equal(mine[0]?.status, 'running', 'and it reads as live, not as the archived first leg')
   } finally {

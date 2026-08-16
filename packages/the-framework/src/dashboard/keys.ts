@@ -22,7 +22,7 @@ import type { Intervention } from './interventions.js'
  */
 export function interventionKey(item: Intervention): string {
   if (item.kind === 'awaiting') return `awaiting:${item.projectId}:${item.awaitId ?? ''}`
-  if (item.kind === 'unpushed') return `unpushed:${item.projectId}:${item.runId ?? ''}`
+  if (item.kind === 'unpushed') return `unpushed:${item.projectId}:${item.agentId ?? ''}`
   return item.url
 }
 
@@ -40,7 +40,7 @@ export function pickNewInterventions(seen: ReadonlySet<string>, current: Interve
  * when it lands), each firing exactly once.
  */
 export function activityKey(item: Activity): string {
-  return `${item.kind}:${item.projectId}:${item.runId}`
+  return `${item.kind}:${item.projectId}:${item.agentId}`
 }
 
 /**

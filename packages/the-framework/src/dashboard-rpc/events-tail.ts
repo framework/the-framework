@@ -49,7 +49,7 @@ export function tailEvents<T = unknown>(path: string, onEvent: (event: T) => voi
  * whose file was retired went silent *without the final lines* whenever the last `fs.watch`
  * signal was lost — the 1s poll then found the file gone and had nothing to read, so the feed
  * never learned the run ended. This tail treats "the file existed and is now gone" as the
- * relocation it is: it asks `resolvePath` where the journal lives now (`resolveRunEventsPath`
+ * relocation it is: it asks `resolvePath` where the journal lives now (`resolveAgentEventsPath`
  * already answers the archive once the worktree is gone, #1472), retargets the same tailer —
  * the copy is content-identical, so the offset carries and nothing is replayed — and follows
  * the new home.

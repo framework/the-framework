@@ -19,7 +19,7 @@ import { cn } from '../lib/utils.js'
 // `active` (the first gate in the right rail, #440) binds Ctrl+Enter to Accept.
 export function ChoicePanel({
   projectId,
-  runId,
+  agentId: agentId,
   choice,
   active = false,
   countdown = true,
@@ -28,7 +28,7 @@ export function ChoicePanel({
 }: {
   projectId: string
   /** Which run the pick resolves (#749); absent falls back to the project's control log. */
-  runId?: string | null | undefined
+  agentId?: string | null | undefined
   choice: ChoiceRequest
   active?: boolean
   /** Inline in the transcript (#1455 item 6): a rounded card in the flow rather than a
@@ -66,7 +66,7 @@ export function ChoicePanel({
   const parked = busy || sent
 
   const post = (pick: string | string[], by: 'user' | 'autopilot' = 'user') => {
-    void run(() => sendChoice(projectId, choice.id, pick, by, runId ?? undefined), 'Could not send your choice — try again.').then(
+    void run(() => sendChoice(projectId, choice.id, pick, by, agentId ?? undefined), 'Could not send your choice — try again.').then(
       result => {
         if (result !== undefined) {
           setSent(true)

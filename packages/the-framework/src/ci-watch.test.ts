@@ -10,13 +10,13 @@ import {
   type CiFixRequest,
   type CiSweepDeps,
 } from './ci-watch.js'
-import type { RunMeta } from './store/index.js'
+import type { AgentMeta } from './store/index.js'
 import type { LinkedPr, PrCiStatus } from './dashboard/gh.js'
-import type { HandoffResult } from './dashboard/run-handoff.js'
+import type { HandoffResult } from './dashboard/agent-handoff.js'
 
 const NOW = Date.parse('2026-08-01T12:00:00Z')
 
-function meta(overrides: Partial<RunMeta> = {}): RunMeta {
+function meta(overrides: Partial<AgentMeta> = {}): AgentMeta {
   return {
     version: 2,
     status: 'done',
@@ -36,16 +36,16 @@ function openPr(overrides: Partial<LinkedPr> = {}): LinkedPr {
 function sweepDeps(
   pr: LinkedPr | undefined,
   ci: PrCiStatus,
-  opts: { merge?: HandoffResult; fix?: string; metas?: RunMeta[] } = {},
+  opts: { merge?: HandoffResult; fix?: string; metas?: AgentMeta[] } = {},
 ): { deps: CiSweepDeps; merges: string[]; fixes: CiFixRequest[] } {
   const merges: string[] = []
   const fixes: CiFixRequest[] = []
   const deps: CiSweepDeps = {
-    runs: async () => opts.metas ?? [meta()],
+    agents: async () => opts.metas ?? [meta()],
     pr: async () => ({ value: pr, pending: false }),
     ci: async () => ci,
-    merge: async (_cwd, run) => {
-      merges.push(run.id)
+    merge: async (_cwd, agent) => {
+      merges.push(agent.id)
       return opts.merge ?? (pr?.url ? { ok: true, url: pr.url } : { ok: true })
     },
     fix: async (_cwd, request) => {
@@ -61,7 +61,7 @@ test('a watched PR whose checks pass is merged (#1418)', async () => {
   const { deps, merges } = sweepDeps(openPr(), { checks: 'passing', failed: [] })
   const result = await sweepProjectCi('/p', deps)
   assert.deepEqual(merges, ['run-1'])
-  assert.deepEqual(result.merged, [{ runId: 'run-1', number: 5, url: 'https://x/pull/5' }])
+  assert.deepEqual(result.merged, [{ agentId: 'run-1', number: 5, url: 'https://x/pull/5' }])
   assert.deepEqual(result.failed, [])
 })
 
@@ -114,7 +114,7 @@ test('runs still running, without a merge outcome, or older than the window are 
   const { mergeOutcome: _none, ...plain } = meta({ id: 'plain' })
   const metas = [
     meta({ id: 'live', status: 'running' }),
-    plain as RunMeta,
+    plain as AgentMeta,
     meta({ id: 'merged-directly', mergeOutcome: 'merged' }),
     meta({ id: 'old', updatedAt: stale }),
   ]
@@ -137,7 +137,7 @@ test('a failed merge is recorded and not retried while the daemon remembers it',
   const { deps, merges } = sweepDeps(openPr(), { checks: 'passing', failed: [] }, { merge: { ok: false, error: 'review required' } })
   deps.attemptedMerges = attempted
   const first = await sweepProjectCi('/p', deps)
-  assert.deepEqual(first.failed, [{ runId: 'run-1', number: 5, error: 'review required' }])
+  assert.deepEqual(first.failed, [{ agentId: 'run-1', number: 5, error: 'review required' }])
   assert.equal(attempted.size, 1)
   const second = await sweepProjectCi('/p', deps)
   assert.deepEqual(second.failed, [])
@@ -174,7 +174,7 @@ test('failing checks start one fix session, told the branch, head sha and failed
     headSha: 'abc1234',
     failed: ['build'],
   })
-  assert.deepEqual(result.fixes, [{ number: 5, runId: 'fix-run-1' }])
+  assert.deepEqual(result.fixes, [{ number: 5, agentId: 'fix-run-1' }])
 })
 
 test('an auto-armed PR going red still gets a fix: GitHub merges on green, nobody else fixes red', async () => {
@@ -254,7 +254,7 @@ test('startCiWatch sweeps immediately, logs merges every time and repeated refus
     projects: async () => [{ path: '/p' }],
     log: line => lines.push(line),
     deps: {
-      runs: async () => [meta()],
+      agents: async () => [meta()],
       pr: async () => ({ value: openPr(), pending: false }),
       ci: async () => ({ checks: 'passing', failed: [] }) as PrCiStatus,
       merge: async () => mergeResult,

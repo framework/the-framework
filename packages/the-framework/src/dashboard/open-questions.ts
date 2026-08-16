@@ -16,7 +16,7 @@ import type { ProjectSummary } from './projects.js'
 export interface OpenQuestion {
   projectId: string
   projectName: string
-  runId: string
+  agentId: string
   /** The session's name (#326) when it chose one — the card's label; else fall back to {@link intent}. */
   sessionName?: string
   /** What the run was asked to do, for a card whose session never named itself. */
@@ -78,7 +78,7 @@ export async function buildOpenQuestions(
       items.push({
         projectId: project.id,
         projectName: project.name,
-        runId: meta.id,
+        agentId: meta.id,
         ...(meta.sessionName ? { sessionName: meta.sessionName } : {}),
         ...(meta.intent ? { intent: meta.intent } : {}),
         ...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {}),

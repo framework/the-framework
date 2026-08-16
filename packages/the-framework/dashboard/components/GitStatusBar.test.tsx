@@ -30,7 +30,7 @@ describe('GitStatusBar (#809)', () => {
       branch: 'the-framework/dark-mode',
       sizeBytes: 5 * 1024 * 1024,
     })
-    render(<GitStatusBar projectId="p1" runId="run-1" inline />)
+    render(<GitStatusBar projectId="p1" agentId="run-1" inline />)
     await waitFor(() => expect(screen.getByText('the-framework/dark-mode')).toBeTruthy())
     expect(screen.getByText('dirty')).toBeTruthy()
     expect(screen.getByText('5 MB')).toBeTruthy()
@@ -47,7 +47,7 @@ describe('GitStatusBar (#809)', () => {
       branch: 'the-framework/dark-mode',
       pr: { number: 42, url: 'https://github.com/o/r/pull/42', state: 'OPEN', title: 'Dark mode' },
     })
-    render(<GitStatusBar projectId="p1" runId="run-1" inline />)
+    render(<GitStatusBar projectId="p1" agentId="run-1" inline />)
     await waitFor(() => expect(screen.getByText('PR #42')).toBeTruthy())
     expect(screen.getByText('open')).toBeTruthy()
   })
@@ -56,14 +56,14 @@ describe('GitStatusBar (#809)', () => {
     // A live session is being written to, so the server does not price it; the row must not
     // show a stray placeholder where the number would go.
     onRunWorktree.mockResolvedValue({ path: '/repo/wt', own: true, dirty: false, branch: 'b' })
-    const { container } = render(<GitStatusBar projectId="p1" runId="run-1" inline />)
+    const { container } = render(<GitStatusBar projectId="p1" agentId="run-1" inline />)
     await waitFor(() => expect(screen.getByText('b')).toBeTruthy())
     expect(container.textContent).not.toContain('–')
   })
 
   test('nothing renders when there is no checkout to report', async () => {
     onRunWorktree.mockResolvedValue(null)
-    const { container } = render(<GitStatusBar projectId="p1" runId="gone" inline />)
+    const { container } = render(<GitStatusBar projectId="p1" agentId="gone" inline />)
     await waitFor(() => expect(onRunWorktree).toHaveBeenCalled())
     expect(container.textContent).toBe('')
   })

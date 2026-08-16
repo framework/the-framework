@@ -1,5 +1,5 @@
 import { listProjectWorktrees, removeProjectWorktree, type RemoveResult, type WorktreeRow } from './worktrees.js'
-import { withRunLock } from './run-locks.js'
+import { withAgentLock } from './agent-locks.js'
 import { worktreePath } from './store/index.js'
 
 // Reclaim a session's checkout once its work is on the remote (#1036/E5).
@@ -22,12 +22,12 @@ import { worktreePath } from './store/index.js'
 /** One worktree this sweep removed. */
 export interface RemovedWorktree {
   /** The run id, which is also the worktree's directory name. */
-  runId: string
+  agentId: string
 }
 
 /** A worktree the sweep tried to reclaim and could not, and why. */
 export interface FailedRemoval {
-  runId: string
+  agentId: string
   error: string
 }
 
@@ -43,7 +43,7 @@ export interface MergedSweepDeps {
   /** The worktrees on disk (default {@link listProjectWorktrees}). */
   worktrees?: (cwd: string) => Promise<WorktreeRow[]>
   /** Removes one worktree (default {@link removeProjectWorktree}). */
-  remove?: (cwd: string, runId: string) => Promise<RemoveResult>
+  remove?: (cwd: string, agentId: string) => Promise<RemoveResult>
   /** Run ids whose checkouts the daemon is still responsible for; see {@link MergedSweepOptions.busy}. */
   busy?: ReadonlySet<string>
 }
@@ -70,10 +70,10 @@ export async function removeMergedWorktrees(cwd: string, deps: MergedSweepDeps =
 
   const result: MergedSweepResult = { removed: [], failed: [] }
   for (const row of await worktrees(cwd).catch((): WorktreeRow[] => [])) {
-    if (row.live || deps.busy?.has(row.runId)) continue
-    const outcome = await withRunLock(worktreePath(cwd, row.runId), () => remove(cwd, row.runId))
-    if (outcome.ok) result.removed.push({ runId: row.runId })
-    else result.failed.push({ runId: row.runId, error: outcome.error })
+    if (row.live || deps.busy?.has(row.agentId)) continue
+    const outcome = await withAgentLock(worktreePath(cwd, row.agentId), () => remove(cwd, row.agentId))
+    if (outcome.ok) result.removed.push({ agentId: row.agentId })
+    else result.failed.push({ agentId: row.agentId, error: outcome.error })
   }
   return result
 }
@@ -120,11 +120,11 @@ export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktr
       const { removed, failed } = await sweep(project.path).catch((): MergedSweepResult => ({ removed: [], failed: [] }))
       for (const item of removed) {
         opts.log(
-          `[framework] removed the worktree for session ${item.runId}: its branch is on the remote. The branch and the session are kept.`,
+          `[framework] removed the worktree for session ${item.agentId}: its branch is on the remote. The branch and the session are kept.`,
         )
       }
       for (const item of failed) {
-        opts.log(`[framework] kept the worktree for session ${item.runId}: ${item.error}`)
+        opts.log(`[framework] kept the worktree for session ${item.agentId}: ${item.error}`)
       }
     }
   }

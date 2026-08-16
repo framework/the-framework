@@ -1,7 +1,7 @@
 import { join, relative, isAbsolute } from 'node:path'
 import { nodeFs, type NodeFs } from '../node-fs.js'
 import { nodeGitRunner, type GitRunner } from '../project.js'
-import { FRAMEWORK_DIR } from './run-store.js'
+import { FRAMEWORK_DIR } from './agent-store.js'
 
 /**
  * Give a fresh worktree a dependency tree (#736). `node_modules` is gitignored, so
@@ -135,10 +135,10 @@ const EXCLUDE_RULE = NODE_MODULES
 export async function excludeDependencyLinks(
   repo: string,
   fs: NodeFs = nodeFs(),
-  run: GitRunner = nodeGitRunner(),
+  agent: GitRunner = nodeGitRunner(),
 ): Promise<void> {
   try {
-    const common = (await run(['rev-parse', '--git-common-dir'], repo)).trim()
+    const common = (await agent(['rev-parse', '--git-common-dir'], repo)).trim()
     if (!common) return
     const infoDir = join(isAbsolute(common) ? common : join(repo, common), 'info')
     const path = join(infoDir, 'exclude')

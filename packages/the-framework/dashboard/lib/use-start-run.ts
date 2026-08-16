@@ -18,7 +18,7 @@ export function useStartRun(): {
     kind: StartArgs[2],
     options: StartArgs[3],
     fallback?: string,
-  ) => Promise<{ runId?: string | undefined } | undefined>
+  ) => Promise<{ agentId?: string | undefined } | undefined>
 } {
   const { busy, error, reset, run } = useAction()
   const start = async (

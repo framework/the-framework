@@ -29,8 +29,8 @@ function useAsyncValue<T>(
   // token, so an imperative refetch can't write back after either.
   const liveRef = useRef({ live: false })
 
-  const apply = useCallback((token: { live: boolean }, run: () => Promise<T>) => {
-    void run()
+  const apply = useCallback((token: { live: boolean }, agent: () => Promise<T>) => {
+    void agent()
       .then(next => {
         if (!token.live) return
         setValue(next)
@@ -50,10 +50,10 @@ function useAsyncValue<T>(
     if (!keepPrevious) setValue(initialRef.current)
     setLoaded(false)
     if (!load) return () => void (token.live = false)
-    const run = (): void => apply(token, load)
-    run()
+    const agent = (): void => apply(token, load)
+    agent()
     if (everyMs === null) return () => void (token.live = false)
-    const timer = setInterval(run, everyMs)
+    const timer = setInterval(agent, everyMs)
     return () => {
       token.live = false
       clearInterval(timer)

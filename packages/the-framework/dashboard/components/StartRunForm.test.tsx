@@ -76,7 +76,7 @@ describe('StartRunForm submit (#1279)', () => {
   test('a preset run starts unattended, so it ends at settle and its handoff fires', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
-    start.mockResolvedValue({ runId: 'r1' })
+    start.mockResolvedValue({ agentId: 'r1' })
     render(<StartRunForm {...props} />)
     fireEvent.click(screen.getByText('submit-preset'))
     await waitFor(() => expect(start).toHaveBeenCalled())
@@ -87,7 +87,7 @@ describe('StartRunForm submit (#1279)', () => {
   test('a typed prompt stays attended: the stay-open chat (#714) is for conversations', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
-    start.mockResolvedValue({ runId: 'r1' })
+    start.mockResolvedValue({ agentId: 'r1' })
     render(<StartRunForm {...props} />)
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(start).toHaveBeenCalled())
@@ -136,7 +136,7 @@ describe('StartRunForm web-run trust warning (#1318)', () => {
 })
 
 describe('StartRunForm agent preflight warning (#1326)', () => {
-  // #1323: every session died before writing run.json and the only visible trace was run
+  // #1323: every session died before writing agent.json and the only visible trace was run
   // branches piling up. The launcher says why before the Start, the way #1318 does for trust.
   test('a logged-out agent is named in the launcher, with the command that fixes it', async () => {
     onProjects.mockResolvedValue([])

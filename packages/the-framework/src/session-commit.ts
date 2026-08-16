@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import type { ProjectSummary } from './dashboard/projects.js'
-import { SESSIONS_DIR } from './store/index.js'
+import { ARCHIVE_DIR } from './store/index.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { GitRunner } from './project.js'
 import { nodeGitRunner } from './project.js'
@@ -49,7 +49,7 @@ import { errorMessage } from './error-message.js'
  * `.the-framework/*​/sessions` matches no *file* and `git add` fails with "did not match any files"
  * — a committer that commits nothing, every time. Only a real repo shows this.
  */
-export const SESSIONS_PATHSPEC = `:(glob)${THE_FRAMEWORK_DIR}/*/${SESSIONS_DIR}/**`
+export const SESSIONS_PATHSPEC = `:(glob)${THE_FRAMEWORK_DIR}/*/${ARCHIVE_DIR}/**`
 
 /** How long writes may keep arriving before the batch is committed anyway. */
 export const COMMIT_MAX_WAIT_MS = 5 * 60_000
@@ -80,8 +80,8 @@ export function nodePathProbe(): PathProbe {
  * "2 sessions" for a single session would be a lie told by the batch's own commit message.
  */
 export function commitMessage(files: string[]): string {
-  const runs = new Set(files.map(file => file.replace(/\.[^./]+$/, ''))).size
-  return `[The Framework] ${runs === 1 ? 'a session' : `${runs} sessions`}`
+  const agents = new Set(files.map(file => file.replace(/\.[^./]+$/, ''))).size
+  return `[The Framework] ${agents === 1 ? 'a session' : `${agents} sessions`}`
 }
 
 /**

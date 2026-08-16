@@ -39,7 +39,7 @@ async function harness(): Promise<{ cwd: string; id: string; started: () => Star
   const id = await registerProject(cwd, {
     startRun: async (_text: string, _kind: string, options: StartRunOptions) => {
       seen = options
-      return { ok: true, runId: 'r1' }
+      return { ok: true, agentId: 'r1' }
     },
   })
   return { cwd, id, started: () => seen }

@@ -21,13 +21,13 @@ afterEach(cleanup)
 
 describe('InlineBrowser (#1455 item 6b)', () => {
   test('a live row hosts the pane inside the 16:10 box', () => {
-    render(<InlineBrowser projectId="p1" runId="r1" url="https://a.test/" live />)
+    render(<InlineBrowser projectId="p1" agentId="r1" url="https://a.test/" live />)
     expect(screen.getByTestId('live-pane')).toBeTruthy()
   })
 
   test('the run ending under the reader degrades to the last still with the overlay (#1359)', () => {
-    const view = render(<InlineBrowser projectId="p1" runId="r1" url="https://a.test/" live />)
-    view.rerender(<InlineBrowser projectId="p1" runId="r1" url="https://a.test/" live={false} />)
+    const view = render(<InlineBrowser projectId="p1" agentId="r1" url="https://a.test/" live />)
+    view.rerender(<InlineBrowser projectId="p1" agentId="r1" url="https://a.test/" live={false} />)
     const still = screen.getByAltText("The browser's last frame")
     expect(still.getAttribute('src')).toContain('data:image/jpeg')
     expect(screen.getByText('preview ended — session finished')).toBeTruthy()
@@ -35,7 +35,7 @@ describe('InlineBrowser (#1455 item 6b)', () => {
   })
 
   test('dead with no still is just the one-liner — never a dead stream or a spinner', () => {
-    render(<InlineBrowser projectId="p1" runId="r1" url="https://a.test/" live={false} />)
+    render(<InlineBrowser projectId="p1" agentId="r1" url="https://a.test/" live={false} />)
     expect(screen.getByText(/browser · https:\/\/a\.test\//)).toBeTruthy()
     expect(screen.queryByAltText("The browser's last frame")).toBeNull()
   })

@@ -2,9 +2,9 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { buildInterventions, interventionKey } from './interventions.js'
 import type { OpenPr } from './gh.js'
-import type { RunHandoff } from './run-handoff.js'
+import type { AgentHandoff } from './agent-handoff.js'
 import type { ProjectSummary } from './projects.js'
-import type { LiveRun, RunMeta } from '../store/index.js'
+import type { LiveRun, AgentMeta } from '../store/index.js'
 
 const project = (id: string, path: string): ProjectSummary => ({ id, path, name: id, activated: true })
 
@@ -12,9 +12,9 @@ const project = (id: string, path: string): ProjectSummary => ({ id, path, name:
 const noRuns = async (): Promise<LiveRun[]> => []
 
 /** A live run in its own worktree (#738), which is what the reader now returns. */
-const live = (meta: RunMeta, cwd = '/a/.the-framework/worktrees/r1'): LiveRun => ({ ...meta, cwd })
+const live = (meta: AgentMeta, cwd = '/a/.the-framework/worktrees/r1'): LiveRun => ({ ...meta, cwd })
 
-const runningMeta = (over: Partial<RunMeta> = {}): RunMeta => ({
+const runningMeta = (over: Partial<AgentMeta> = {}): AgentMeta => ({
   version: 1,
   status: 'running',
   id: 'r1',
@@ -117,7 +117,7 @@ test('interventionKey is the url for a PR and project+gate for an awaiting run',
 
 // #860: a finished run whose branch still holds unpushed, unmerged commits.
 
-const doneMeta = (over: Partial<RunMeta> = {}): RunMeta => ({
+const doneMeta = (over: Partial<AgentMeta> = {}): AgentMeta => ({
   version: 1,
   status: 'done',
   id: 'r1',
@@ -129,7 +129,7 @@ const doneMeta = (over: Partial<RunMeta> = {}): RunMeta => ({
 })
 
 /** A branch with work on it that never left the machine. */
-const waiting = (over: Partial<RunHandoff> = {}): RunHandoff => ({
+const waiting = (over: Partial<AgentHandoff> = {}): AgentHandoff => ({
   branch: 'the-framework/add-cart',
   exists: true,
   base: 'main',
@@ -145,10 +145,10 @@ const waiting = (over: Partial<RunHandoff> = {}): RunHandoff => ({
 })
 
 /** Only the unpushed source: no PRs, no paused runs. */
-const onlyUnpushed = (runs: RunMeta[], handoff: (cwd: string, branch: string) => Promise<RunHandoff | undefined>) => ({
+const onlyUnpushed = (agents: AgentMeta[], handoff: (cwd: string, branch: string) => Promise<AgentHandoff | undefined>) => ({
   prs: async () => [],
   liveRuns: noRuns,
-  runs: async () => runs,
+  agents: async () => agents,
   handoff,
 })
 
@@ -163,12 +163,12 @@ test('a finished run with unpushed commits lands on the queue (#860)', async () 
   assert.equal(items[0]?.title, 'add the cart', 'what was asked, not the branch name')
   assert.equal(items[0]?.branch, 'the-framework/add-cart')
   assert.equal(items[0]?.commits, 1)
-  assert.equal(items[0]?.runId, 'r1')
+  assert.equal(items[0]?.agentId, 'r1')
 })
 
 test('nothing is waiting when the work already went somewhere (#860)', async () => {
   // Each of these is a reason it is NOT waiting on a human.
-  const cases: [string, Partial<RunHandoff>][] = [
+  const cases: [string, Partial<AgentHandoff>][] = [
     ['already pushed', { pushed: true }],
     ['already merged', { merged: true }],
     ['the session wrote nothing', { empty: true, commits: [] }],
@@ -206,13 +206,13 @@ test('an unreadable branch is skipped rather than throwing (#860)', async () => 
 test('only the most recent finished runs are inspected (#860)', async () => {
   // Each inspection costs several git reads on a poll, and work sitting unpushed for dozens of
   // runs is not news.
-  const runs = Array.from({ length: 12 }, (_, i) =>
+  const agents = Array.from({ length: 12 }, (_, i) =>
     doneMeta({ id: `r${i}`, startedAt: `2026-07-${String(i + 1).padStart(2, '0')}T00:00:00Z`, branch: `b${i}` }),
   )
   const inspected: string[] = []
   const items = await buildInterventions(
     [project('a', '/a')],
-    { ...onlyUnpushed(runs, async (_cwd, branch) => (inspected.push(branch), waiting({ branch }))), handoffLimit: 3 },
+    { ...onlyUnpushed(agents, async (_cwd, branch) => (inspected.push(branch), waiting({ branch }))), handoffLimit: 3 },
   )
 
   assert.equal(inspected.length, 3)
@@ -222,11 +222,11 @@ test('only the most recent finished runs are inspected (#860)', async () => {
 
 test('unpushed items key on the run, so each notifies once (#860)', () => {
   const base = { projectId: 'p', projectName: 'p', kind: 'unpushed' as const, title: 't', url: '' }
-  assert.equal(interventionKey({ ...base, runId: 'r1' }), 'unpushed:p:r1')
-  assert.notEqual(interventionKey({ ...base, runId: 'r1' }), interventionKey({ ...base, runId: 'r2' }))
+  assert.equal(interventionKey({ ...base, agentId: 'r1' }), 'unpushed:p:r1')
+  assert.notEqual(interventionKey({ ...base, agentId: 'r1' }), interventionKey({ ...base, agentId: 'r2' }))
   // And never collides with the other kinds, whose url is the same shared dashboard URL.
   assert.notEqual(
-    interventionKey({ ...base, runId: 'r1' }),
+    interventionKey({ ...base, agentId: 'r1' }),
     interventionKey({ ...base, kind: 'awaiting', awaitId: 'r1' }),
   )
 })
@@ -238,7 +238,7 @@ test("a session's own draft PR still reaches the queue; a hand-made draft does n
     { number: 9, title: 'session work', url: 'u9', isDraft: true, headRefName: 'the-framework/x', createdAt: '2026-07-16T00:00:00Z' },
     { number: 10, title: 'my own wip', url: 'u10', isDraft: true, headRefName: 'feat/mine', createdAt: '2026-07-17T00:00:00Z' },
   ]
-  const items = await buildInterventions([project('a', '/a')], { prs, liveRuns: noRuns, runs: async () => [] })
+  const items = await buildInterventions([project('a', '/a')], { prs, liveRuns: noRuns, agents: async () => [] })
   assert.deepEqual(items.map(i => i.number), [9])
 })
 
@@ -246,6 +246,6 @@ test('a draft with no branch recorded is still treated as hand-made (#1102)', as
   // `headRefName` is new: an older gh, or a lookup that did not ask for it, must not turn every
   // draft in the repo into a "needs you".
   const prs = async (): Promise<OpenPr[]> => [{ number: 11, title: 'wip', url: 'u11', isDraft: true }]
-  const items = await buildInterventions([project('a', '/a')], { prs, liveRuns: noRuns, runs: async () => [] })
+  const items = await buildInterventions([project('a', '/a')], { prs, liveRuns: noRuns, agents: async () => [] })
   assert.deepEqual(items, [])
 })

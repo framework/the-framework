@@ -21,8 +21,8 @@ test('start a session, watch it live, and read the archived row when it ends', a
   const rpc = world.rpc
   try {
     const project = await world.addProject()
-    const runId = await world.startRun(project, 'Add a login page', { handoff: 'local' })
-    const tail = await world.tailRun(project, runId)
+    const agentId = await world.startRun(project, 'Add a login page', { handoff: 'local' })
+    const tail = await world.tailRun(project, agentId)
 
     // The live feed narrates the run the way the session view renders it: the session banner
     // first (naming the fake driver, so no real agent is running), then the agent's own turn.
@@ -38,7 +38,7 @@ test('start a session, watch it live, and read the archived row when it ends', a
     // nothing" is one named rung (B5) rather than a set of falses that each reader has to add up.
     const sent = (await world.spawnedSpecs())[0]!
     assert.equal(sent.options.handoff, 'local')
-    assert.equal(sent.runId, runId, 'the child was handed its worktree run id')
+    assert.equal(sent.agentId, agentId, 'the child was handed its worktree run id')
 
     // The agent's turn reaches the feed: its tool actions, its reply, the accounted usage, and
     // the end marker — the exact sequence the transcript pane draws.
@@ -53,31 +53,31 @@ test('start a session, watch it live, and read the archived row when it ends', a
 
     // The sidebar row settles to done, carrying what the list renders: the prompt as the label,
     // the branch the work is on, and the driver that ran it.
-    const meta = await world.waitRun(project, runId, 'done')
+    const meta = await world.waitRun(project, agentId, 'done')
     assert.equal(meta.intent, 'Add a login page')
-    assert.equal(meta.branch, `the-framework/run-${runId}`)
+    assert.equal(meta.branch, `the-framework/run-${agentId}`)
     assert.equal(meta.driver, 'fake')
 
     // A cleanly finished session retires its worktree (#737): nothing left to inspect, so the
     // checkout is gone from disk, the Remove list is empty, and the run addresses the project root.
-    await world.waitRetired(project, runId)
+    await world.waitRetired(project, agentId)
     assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [])
-    const worktree = await rpc(onRunWorktree)(project.id, runId)
+    const worktree = await rpc(onRunWorktree)(project.id, agentId)
     assert.equal(worktree?.own, false)
 
     // The archived history replays the same story the live tail told (#1472 reads the run's own
     // journal, not another run's), and the cross-project surfaces list the session.
-    const replay = await rpc(onRun)(project.id, runId)
+    const replay = await rpc(onRun)(project.id, agentId)
     assert.ok(replay.some(e => e.kind === 'session') && replay.some(e => e.kind === 'end'), 'replay has the whole journal')
     const activity = await rpc(onActivity)()
-    assert.ok(activity.some(a => a.runId === runId && a.kind === 'finished' && a.status === 'done'))
+    assert.ok(activity.some(a => a.agentId === agentId && a.kind === 'finished' && a.status === 'done'))
     const recent = await rpc(onRecentRuns)()
-    assert.ok(recent.some(r => r.projectId === project.id && r.run.id === runId))
+    assert.ok(recent.some(r => r.projectId === project.id && r.agent.id === agentId))
 
     // The session's record rides its branch, not main: teardown commits the archive to the run
     // branch, so the handoff panel sees a branch of pure bookkeeping — #1291 calls that `empty`,
     // meaning nothing publishable.
-    const handoff = await rpc(onRunHandoff)(project.id, runId)
+    const handoff = await rpc(onRunHandoff)(project.id, agentId)
     assert.equal(handoff?.exists, true)
     assert.equal(handoff?.empty, true)
   } finally {
@@ -106,8 +106,8 @@ test('two sessions run concurrently, each in its own worktree (#736)', async () 
 
     // Both rows are live in the sidebar, and each names its own checkout under the project's
     // worktrees dir — the user's checkout is neither.
-    const runs = await rpc(onRuns)(project.id)
-    assert.equal(runs.filter(r => [runA, runB].includes(r.id) && r.status === 'running').length, 2)
+    const agents = await rpc(onRuns)(project.id)
+    assert.equal(agents.filter(r => [runA, runB].includes(r.id) && r.status === 'running').length, 2)
     const [wtA, wtB] = [await rpc(onRunWorktree)(project.id, runA), await rpc(onRunWorktree)(project.id, runB)]
     assert.equal(wtA?.own, true)
     assert.equal(wtB?.own, true)
@@ -115,14 +115,14 @@ test('two sessions run concurrently, each in its own worktree (#736)', async () 
     assert.equal(world.runtime.activeRunCount(project.id), 2)
 
     // Answering each question lets each session finish independently.
-    for (const [runId, gate] of [
+    for (const [agentId, gate] of [
       [runA, gateA],
       [runB, gateB],
     ] as const) {
       assert.equal(gate.kind, 'choice')
       if (gate.kind !== 'choice') continue
-      await rpc(sendChoice)(project.id, gate.id, gate.recommended ?? gate.options[0]!.id, 'user', runId)
-      const meta = await world.waitRun(project, runId, 'done')
+      await rpc(sendChoice)(project.id, gate.id, gate.recommended ?? gate.options[0]!.id, 'user', agentId)
+      const meta = await world.waitRun(project, agentId, 'done')
       assert.equal(meta.status, 'done')
     }
     // Eventually, not instantly: the meta flips to done a beat before the daemon reaps the
@@ -144,26 +144,26 @@ test("publish a finished session: push its branch from the handoff panel (#799)"
     // The fixture already carries a bare `origin` (the harness gives every project one, since the
     // retention rule is about the remote), so the push here is a real git push and the handoff
     // panel's pushed flag comes from the remote rather than from a stub.
-    const runId = await world.startRun(project, 'Ship the settings page', { handoff: 'local' })
-    await world.waitRun(project, runId, 'done')
+    const agentId = await world.startRun(project, 'Ship the settings page', { handoff: 'local' })
+    await world.waitRun(project, agentId, 'done')
 
     // Pushed the instant the row flips done — deliberately INSIDE teardown's window. This used
     // to race teardown's own commits in the same checkout: the click failed with "could not
     // commit the work this session left uncommitted" and teardown stranded the worktree. The
     // run lock serializes the two, so the first click works and teardown still retires cleanly.
-    const pushed = await rpc(sendPushBranch)(project.id, runId)
+    const pushed = await rpc(sendPushBranch)(project.id, agentId)
     assert.equal(pushed.ok, true, `push failed: ${'error' in pushed ? pushed.error : ''}`)
     const remoteBranches = await git(project.cwd, 'ls-remote', '--heads', 'origin')
-    assert.ok(remoteBranches.includes(`the-framework/run-${runId}`), 'the run branch is on origin')
-    await world.waitRetired(project, runId)
+    assert.ok(remoteBranches.includes(`the-framework/run-${agentId}`), 'the run branch is on origin')
+    await world.waitRetired(project, agentId)
     assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [], 'the concurrent push must not strand the worktree')
 
     // The handoff panel agrees: branch on the remote, session record included.
     const after = await waitFor(async () => {
-      const handoff = await rpc(onRunHandoff)(project.id, runId)
+      const handoff = await rpc(onRunHandoff)(project.id, agentId)
       return handoff?.pushed ? handoff : undefined
     }, 'the panel to report the branch pushed')
-    assert.equal(after.branch, `the-framework/run-${runId}`)
+    assert.equal(after.branch, `the-framework/run-${agentId}`)
     assert.equal(after.exists, true)
     assert.equal(after.hasRemote, true)
   } finally {

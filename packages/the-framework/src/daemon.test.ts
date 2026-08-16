@@ -47,7 +47,7 @@ async function startDaemon(cwd: string, opts: RunDaemonOptions): Promise<{ done:
   )
   return { done, state: await listening }
 }
-import { listRuns } from './store/index.js'
+import { listAgents } from './store/index.js'
 import { EVENTS_FILE, FRAMEWORK_DIR, addWorktree } from './store/index.js'
 import { controlPath } from './control.js'
 import { projectId, listProjects, addProject, writePreferences } from './registry.js'
@@ -243,18 +243,18 @@ setTimeout(() => {}, 800)
     }
     assert.equal(lines.length, 2, 'both children spawned')
 
-    const runs = lines.map(line => JSON.parse(line) as { cwd: string; runId: string })
-    for (const run of runs) {
-      assert.equal(run.cwd, join(cwd, FRAMEWORK_DIR, 'worktrees', run.runId), 'ran in the worktree named by its run id')
-      assert.equal((await stat(run.cwd)).isDirectory(), true, 'the worktree checkout exists')
-      assert.equal((await stat(join(run.cwd, 'README.md'))).isFile(), true, 'with the repo content in it')
+    const agents = lines.map(line => JSON.parse(line) as { cwd: string; agentId: string })
+    for (const agent of agents) {
+      assert.equal(agent.cwd, join(cwd, FRAMEWORK_DIR, 'worktrees', agent.agentId), 'ran in the worktree named by its run id')
+      assert.equal((await stat(agent.cwd)).isDirectory(), true, 'the worktree checkout exists')
+      assert.equal((await stat(join(agent.cwd, 'README.md'))).isFile(), true, 'with the repo content in it')
     }
-    assert.notEqual(runs[0]!.cwd, runs[1]!.cwd, 'the two runs got different checkouts')
+    assert.notEqual(agents[0]!.cwd, agents[1]!.cwd, 'the two runs got different checkouts')
 
     // Each run is on its own `the-framework/run-<id>` branch, and the user's own checkout
     // was never moved off the branch it was sitting on.
     const branches = await git(['branch', '--format=%(refname:short)'], cwd)
-    for (const run of runs) assert.ok(branches.includes(`the-framework/run-${run.runId}`), `branch for ${run.runId}`)
+    for (const agent of agents) assert.ok(branches.includes(`the-framework/run-${agent.agentId}`), `branch for ${agent.agentId}`)
     const head = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd)).trim()
     assert.equal(head.startsWith('the-framework/run-'), false, 'the main checkout stayed on its own branch')
 
@@ -292,13 +292,13 @@ test('a run loses its worktree once its work is on the remote, whatever the run 
 const argv = process.argv.slice(2)
 const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8'))
 const runCwd = spec.cwd
-const runId = spec.runId
+const agentId = spec.agentId
 const status = fs.readFileSync(${JSON.stringify(join(cwd, 'status.txt'))}, 'utf8').trim()
 const dir = path.join(runCwd, '.the-framework')
 fs.mkdirSync(dir, { recursive: true })
 fs.writeFileSync(path.join(dir, 'events.jsonl'), JSON.stringify({ kind: 'log', message: 'worked' }) + '\\n')
-fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify({ version: 1, status, id: runId, startedAt: runId, updatedAt: runId }))
-fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
+fs.writeFileSync(path.join(dir, 'agent.json'), JSON.stringify({ version: 1, status, id: agentId, startedAt: agentId, updatedAt: agentId }))
+fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
 `,
     )
     const env = await configEnv(cwd)
@@ -319,27 +319,27 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
 
     /**
      * Poll for the archived history to appear, which is the teardown having run. Asked through
-     * `listRuns` rather than by stat'ing a path: since #1179 a run is archived under whichever
+     * `listAgents` rather than by stat'ing a path: since #1179 a run is archived under whichever
      * user ran it, and what this test cares about is that the project's history has it.
      */
-    const archivedMeta = async (runId: string): Promise<{ branch?: string } | undefined> => {
+    const archivedMeta = async (agentId: string): Promise<{ branch?: string } | undefined> => {
       for (let i = 0; i < 600; i++) {
-        const found = (await listRuns(cwd).catch(() => [])).find(run => run.id === runId)
+        const found = (await listAgents(cwd).catch(() => [])).find(agent => agent.id === agentId)
         if (found) return found
         await new Promise(r => setTimeout(r, 20))
       }
       return undefined
     }
-    const archived = async (runId: string): Promise<boolean> => (await archivedMeta(runId)) !== undefined
+    const archived = async (agentId: string): Promise<boolean> => (await archivedMeta(agentId)) !== undefined
 
     /**
      * Poll until the run's checkout is off disk. Generous, because teardown now commits *and
      * pushes* the branch before it can remove anything (E5), and a loaded CI box running the
      * suite's files in parallel makes that several seconds of real git.
      */
-    const worktreeGone = async (runId: string): Promise<boolean> => {
+    const worktreeGone = async (agentId: string): Promise<boolean> => {
       for (let i = 0; i < 600; i++) {
-        const gone = await stat(join(cwd, FRAMEWORK_DIR, 'worktrees', runId)).then(() => false, () => true)
+        const gone = await stat(join(cwd, FRAMEWORK_DIR, 'worktrees', agentId)).then(() => false, () => true)
         if (gone) return true
         await new Promise(r => setTimeout(r, 20))
       }

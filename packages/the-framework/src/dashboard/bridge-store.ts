@@ -25,7 +25,7 @@ const MAX_SESSION_EVENTS = 300
  *
  * A cloud run has no live local session to hang a choice gate on: #1231 ends the run at the
  * hand-off, so by the time the agent asks anything the run is already `done`. The join back to
- * a run is `RunMeta.sessionId`, which a web run already carries because `CloudSession` reports
+ * a run is `AgentMeta.sessionId`, which a web run already carries because `CloudSession` reports
  * the cloud id on its result.
  *
  * In memory on purpose. A question is only answerable while the session that asked it is still

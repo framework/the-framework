@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { mkdtemp, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { removeMergedWorktrees, startMergedWorktreeSweep, type MergedSweepResult } from './merged-worktrees.js'
-import { addWorktree, runBranchName } from './store/index.js'
+import { addWorktree, agentBranchName } from './store/index.js'
 import { nodeGitRunner } from './project.js'
 import type { WorktreeRow } from './worktrees.js'
 
@@ -17,26 +17,26 @@ import type { WorktreeRow } from './worktrees.js'
 /** A sweep over fixed rows, recording which run ids removal was asked for. */
 function fakeSweep(rows: WorktreeRow[]) {
   const asked: string[] = []
-  const run = (over: { remove?: (cwd: string, runId: string) => Promise<{ ok: true } | { ok: false; error: string }> } = {}) =>
+  const agent = (over: { remove?: (cwd: string, agentId: string) => Promise<{ ok: true } | { ok: false; error: string }> } = {}) =>
     removeMergedWorktrees('/repo', {
       worktrees: async () => rows,
-      remove: async (cwd, runId) => {
-        asked.push(runId)
-        return over.remove ? over.remove(cwd, runId) : { ok: true }
+      remove: async (cwd, agentId) => {
+        asked.push(agentId)
+        return over.remove ? over.remove(cwd, agentId) : { ok: true }
       },
     })
-  return { asked, run }
+  return { asked, agent: agent }
 }
 
-const row = (over: Partial<WorktreeRow> & { runId: string }): WorktreeRow => ({ live: false, ...over })
+const row = (over: Partial<WorktreeRow> & { agentId: string }): WorktreeRow => ({ live: false, ...over })
 
 test('every retained checkout is offered to the one rule, whatever its run did (E5)', async () => {
   // No pre-filter by outcome: "failed" and "stopped" are not reasons to keep a checkout whose work
   // is already on the remote, and the removal itself is what refuses when it is not.
-  const { asked, run } = fakeSweep([row({ runId: 'done1', status: 'done' }), row({ runId: 'failed1', status: 'failed' })])
-  const result = await run()
+  const { asked, agent: agent } = fakeSweep([row({ agentId: 'done1', status: 'done' }), row({ agentId: 'failed1', status: 'failed' })])
+  const result = await agent()
   assert.deepEqual(asked, ['done1', 'failed1'])
-  assert.deepEqual(result.removed, [{ runId: 'done1' }, { runId: 'failed1' }])
+  assert.deepEqual(result.removed, [{ agentId: 'done1' }, { agentId: 'failed1' }])
   assert.deepEqual(result.failed, [])
 })
 
@@ -46,28 +46,28 @@ test('a checkout the daemon has not finished with is left alone (E5)', async () 
   // window would race the teardown for the same directory.
   const asked: string[] = []
   const result = await removeMergedWorktrees('/repo', {
-    worktrees: async () => [row({ runId: 'retiring', status: 'done' }), row({ runId: 'settled', status: 'done' })],
+    worktrees: async () => [row({ agentId: 'retiring', status: 'done' }), row({ agentId: 'settled', status: 'done' })],
     busy: new Set(['retiring']),
-    remove: async (_cwd, runId) => (asked.push(runId), { ok: true }),
+    remove: async (_cwd, agentId) => (asked.push(agentId), { ok: true }),
   })
   assert.deepEqual(asked, ['settled'])
-  assert.deepEqual(result.removed, [{ runId: 'settled' }])
+  assert.deepEqual(result.removed, [{ agentId: 'settled' }])
 })
 
 test('a live session keeps its checkout: its agent is working in there (#1036)', async () => {
   // Stop is how a run ends, not pulling the floor out from under it.
-  const { asked, run } = fakeSweep([row({ runId: 'live', live: true, status: 'running' })])
-  const { removed } = await run()
+  const { asked, agent: agent } = fakeSweep([row({ agentId: 'live', live: true, status: 'running' })])
+  const { removed } = await agent()
   assert.deepEqual(removed, [])
   assert.deepEqual(asked, [])
 })
 
 test('a checkout that could not be reclaimed is reported with its reason (E5)', async () => {
   // The one failure mode the rule has: the push did not land, so the checkout stays and says why.
-  const { run } = fakeSweep([row({ runId: 'stuck' })])
-  const result = await run({ remove: async () => ({ ok: false, error: 'the-framework/run-stuck is not on the remote' }) })
+  const { agent: agent } = fakeSweep([row({ agentId: 'stuck' })])
+  const result = await agent({ remove: async () => ({ ok: false, error: 'the-framework/run-stuck is not on the remote' }) })
   assert.deepEqual(result.removed, [])
-  assert.deepEqual(result.failed, [{ runId: 'stuck', error: 'the-framework/run-stuck is not on the remote' }])
+  assert.deepEqual(result.failed, [{ agentId: 'stuck', error: 'the-framework/run-stuck is not on the remote' }])
 })
 
 test('an unlisted project sweeps nothing rather than failing (#1036)', async () => {
@@ -84,8 +84,8 @@ test('an unlisted project sweeps nothing rather than failing (#1036)', async () 
 test('the sweep says what it removed and what it kept, per project (#1036)', async () => {
   const lines: string[] = []
   const results: Record<string, MergedSweepResult> = {
-    '/a': { removed: [{ runId: 'r1' }], failed: [] },
-    '/b': { removed: [{ runId: 'r2' }], failed: [{ runId: 'r3', error: 'not on the remote' }] },
+    '/a': { removed: [{ agentId: 'r1' }], failed: [] },
+    '/b': { removed: [{ agentId: 'r2' }], failed: [{ agentId: 'r3', error: 'not on the remote' }] },
   }
   const sweep = startMergedWorktreeSweep({
     projects: async () => [{ path: '/a' }, { path: '/b' }],
@@ -152,7 +152,7 @@ async function repoWithSessionWork(opts: { remote?: boolean } = {}): Promise<{ r
     await git(['init', '-q', '--bare', origin], repo)
     await git(['remote', 'add', 'origin', origin], repo)
   }
-  const { path, branch } = await addWorktree(repo, { runId: RUN_ID, branch: runBranchName(RUN_ID) }, git)
+  const { path, branch } = await addWorktree(repo, { agentId: RUN_ID, branch: agentBranchName(RUN_ID) }, git)
   await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
   await git(['add', '-A'], path)
   await git(['commit', '-m', 'the session did this'], path)
@@ -166,7 +166,7 @@ test('a session whose work reaches the remote loses its checkout and keeps its b
     const result = await removeMergedWorktrees(repo)
 
     assert.deepEqual(result.failed, [])
-    assert.deepEqual(result.removed, [{ runId: RUN_ID }])
+    assert.deepEqual(result.removed, [{ agentId: RUN_ID }])
     await assert.rejects(() => stat(path), 'the checkout is gone')
     // The half that makes this safe to do automatically: the work is in two places, not none.
     assert.equal((await git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], repo)).trim().length, 40, 'the branch is kept')
@@ -221,7 +221,7 @@ test("a checkout already pushed is not re-pushed, and still goes (E5)", async ()
   const git = nodeGitRunner()
   try {
     await git(['push', '--set-upstream', 'origin', branch], path)
-    assert.deepEqual((await removeMergedWorktrees(repo)).removed, [{ runId: RUN_ID }])
+    assert.deepEqual((await removeMergedWorktrees(repo)).removed, [{ agentId: RUN_ID }])
     await assert.rejects(() => stat(path), 'the checkout is gone')
   } finally {
     await rm(repo, { recursive: true, force: true })

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from '../project.js'
-import { FRAMEWORK_DIR, WORKTREES_DIR, isSafeRunId } from './run-store.js'
+import { FRAMEWORK_DIR, WORKTREES_DIR, isSafeRunId } from './agent-store.js'
 
 /**
  * Git-worktree lifecycle for concurrent runs (#453/#735): give each run its own
@@ -10,9 +10,9 @@ import { FRAMEWORK_DIR, WORKTREES_DIR, isSafeRunId } from './run-store.js'
  * how to add, list, remove, and prune worktrees.
  */
 
-/** The path a run's worktree gets: `<repo>/.the-framework/worktrees/<runId>`. */
-export function worktreePath(repo: string, runId: string): string {
-  return join(repo, FRAMEWORK_DIR, WORKTREES_DIR, runId)
+/** The path a run's worktree gets: `<repo>/.the-framework/worktrees/<agentId>`. */
+export function worktreePath(repo: string, agentId: string): string {
+  return join(repo, FRAMEWORK_DIR, WORKTREES_DIR, agentId)
 }
 
 /**
@@ -20,8 +20,8 @@ export function worktreePath(repo: string, runId: string): string {
  * before the session name does, so the branch is created from the id and renamed
  * by {@link renameRunBranch} once the agent picks a name.
  */
-export function runBranchName(runId: string): string {
-  return `the-framework/run-${runId}`
+export function agentBranchName(agentId: string): string {
+  return `the-framework/run-${agentId}`
 }
 
 /** One entry parsed from `git worktree list --porcelain`. */
@@ -36,7 +36,7 @@ export interface WorktreeInfo {
 
 /** Inputs to {@link addWorktree}. The caller owns branch naming (#736). */
 export interface AddWorktreeOptions {
-  runId: string
+  agentId: string
   /** The branch to create for the run. */
   branch: string
   /** Base ref to branch from; defaults to the repo's current HEAD. */
@@ -52,18 +52,18 @@ export interface AddedWorktree {
 /**
  * Create a worktree for a run on a fresh branch: `git worktree add -b <branch>
  * <path> [base]`. Git makes the leaf dir (and any missing parents) itself. The
- * `runId` is validated as path-safe first so a caller can never traverse out of
+ * `agentId` is validated as path-safe first so a caller can never traverse out of
  * `.the-framework/worktrees/`. Rejects on any git failure (a caller that wants a
  * run needs its checkout, so failure must surface, not be swallowed).
  */
 export async function addWorktree(
   repo: string,
   opts: AddWorktreeOptions,
-  run: GitRunner = nodeGitRunner(),
+  agent: GitRunner = nodeGitRunner(),
 ): Promise<AddedWorktree> {
-  if (!isSafeRunId(opts.runId)) throw new Error(`unsafe run id: ${opts.runId}`)
-  const path = worktreePath(repo, opts.runId)
-  await run(['worktree', 'add', '-b', opts.branch, path, ...(opts.base ? [opts.base] : [])], repo)
+  if (!isSafeRunId(opts.agentId)) throw new Error(`unsafe run id: ${opts.agentId}`)
+  const path = worktreePath(repo, opts.agentId)
+  await agent(['worktree', 'add', '-b', opts.branch, path, ...(opts.base ? [opts.base] : [])], repo)
   return { path, branch: opts.branch }
 }
 
@@ -76,12 +76,12 @@ export async function addWorktree(
  */
 export async function attachWorktree(
   repo: string,
-  opts: { runId: string; branch: string },
-  run: GitRunner = nodeGitRunner(),
+  opts: { agentId: string; branch: string },
+  agent: GitRunner = nodeGitRunner(),
 ): Promise<AddedWorktree> {
-  if (!isSafeRunId(opts.runId)) throw new Error(`unsafe run id: ${opts.runId}`)
-  const path = worktreePath(repo, opts.runId)
-  await run(['worktree', 'add', path, opts.branch], repo)
+  if (!isSafeRunId(opts.agentId)) throw new Error(`unsafe run id: ${opts.agentId}`)
+  const path = worktreePath(repo, opts.agentId)
+  await agent(['worktree', 'add', path, opts.branch], repo)
   return { path, branch: opts.branch }
 }
 
@@ -89,9 +89,9 @@ export async function attachWorktree(
  * Every worktree registered for the repo (the main checkout included). Forgiving:
  * a non-repo / git failure yields `[]` so a reconcile scan never throws.
  */
-export async function listWorktrees(repo: string, run: GitRunner = nodeGitRunner()): Promise<WorktreeInfo[]> {
+export async function listWorktrees(repo: string, agent: GitRunner = nodeGitRunner()): Promise<WorktreeInfo[]> {
   try {
-    return parseWorktreeList(await run(['worktree', 'list', '--porcelain'], repo))
+    return parseWorktreeList(await agent(['worktree', 'list', '--porcelain'], repo))
   } catch {
     return []
   }
@@ -141,18 +141,18 @@ export function parseWorktreeList(porcelain: string): WorktreeInfo[] {
  */
 export async function commitPendingWork(
   path: string,
-  run: GitRunner = nodeGitRunner(),
+  agent: GitRunner = nodeGitRunner(),
   retry: { attempts?: number; delayMs?: number } = {},
 ): Promise<boolean> {
   const attempts = Math.max(1, retry.attempts ?? 3)
   const delayMs = retry.delayMs ?? 300
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      const status = await run(['status', '--porcelain'], path)
+      const status = await agent(['status', '--porcelain'], path)
       if (!status.trim()) return true
-      await run(['add', '-A'], path)
+      await agent(['add', '-A'], path)
       // Same wording as the install-time safety commit (install.ts), for one vocabulary.
-      await run(['commit', '-m', '[The Framework] uncommitted changes'], path)
+      await agent(['commit', '-m', '[The Framework] uncommitted changes'], path)
       return true
     } catch {
       if (attempt < attempts) await new Promise(resolve => setTimeout(resolve, delayMs))
@@ -171,15 +171,15 @@ export async function commitPendingWork(
  * worktree forever), but it says so, because forcing past unknown state is exactly
  * how uncommitted work got deleted in the first place.
  */
-export async function removeWorktree(repo: string, path: string, run: GitRunner = nodeGitRunner()): Promise<void> {
+export async function removeWorktree(repo: string, path: string, agent: GitRunner = nodeGitRunner()): Promise<void> {
   try {
-    await run(['worktree', 'remove', path], repo)
+    await agent(['worktree', 'remove', path], repo)
     return
   } catch {
     // Unclean by git's reckoning, already removed, or never registered: try forcing.
   }
   try {
-    await run(['worktree', 'remove', '--force', path], repo)
+    await agent(['worktree', 'remove', '--force', path], repo)
     console.log(`[framework] forced removal of worktree ${path} (git called it unclean)`)
   } catch {
     // Already removed, or never registered: nothing to do.
@@ -190,9 +190,9 @@ export async function removeWorktree(repo: string, path: string, run: GitRunner 
  * The branch checked out at `path`, or `undefined` when detached / not a repo.
  * Forgiving, like {@link listWorktrees}: callers use it to decide, not to fail.
  */
-export async function currentBranch(path: string, run: GitRunner = nodeGitRunner()): Promise<string | undefined> {
+export async function currentBranch(path: string, agent: GitRunner = nodeGitRunner()): Promise<string | undefined> {
   try {
-    const name = (await run(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim()
+    const name = (await agent(['rev-parse', '--abbrev-ref', 'HEAD'], path)).trim()
     return name && name !== 'HEAD' ? name : undefined
   } catch {
     return undefined
@@ -201,7 +201,7 @@ export async function currentBranch(path: string, run: GitRunner = nodeGitRunner
 
 /**
  * Rename a run's branch once the agent names the session (#736): the worktree is
- * created on `the-framework/run-<runId>` before a name exists, and this puts the
+ * created on `the-framework/run-<agentId>` before a name exists, and this puts the
  * readable `the-framework/<sessionName>` on it.
  *
  * Only renames when `path` is still on `from`. The #326 system prompt currently
@@ -215,11 +215,11 @@ export async function renameRunBranch(
   path: string,
   from: string,
   to: string,
-  run: GitRunner = nodeGitRunner(),
+  agent: GitRunner = nodeGitRunner(),
 ): Promise<boolean> {
-  if ((await currentBranch(path, run)) !== from) return false
+  if ((await currentBranch(path, agent)) !== from) return false
   try {
-    await run(['branch', '-m', from, to], path)
+    await agent(['branch', '-m', from, to], path)
     return true
   } catch {
     // Target name taken, or an invalid slug: keep the run-id branch.
@@ -231,9 +231,9 @@ export async function renameRunBranch(
  * `git worktree prune`: drop administrative entries for worktree dirs a crash left
  * behind. Never removes a live worktree, so it is always safe. Forgiving.
  */
-export async function pruneWorktrees(repo: string, run: GitRunner = nodeGitRunner()): Promise<void> {
+export async function pruneWorktrees(repo: string, agent: GitRunner = nodeGitRunner()): Promise<void> {
   try {
-    await run(['worktree', 'prune'], repo)
+    await agent(['worktree', 'prune'], repo)
   } catch {
     // Not a repo / nothing to prune: no-op.
   }
@@ -260,9 +260,9 @@ export function nodeSizeRunner(): SizeRunner {
  * throw or a hang would cost the panel it sits in. `du` is absent on Windows, which reads as
  * unknown like any other failure.
  */
-export async function worktreeSize(path: string, run: SizeRunner = nodeSizeRunner()): Promise<number | undefined> {
+export async function worktreeSize(path: string, agent: SizeRunner = nodeSizeRunner()): Promise<number | undefined> {
   try {
-    const kb = Number.parseInt((await run(path)).trim().split(/\s+/)[0] ?? '', 10)
+    const kb = Number.parseInt((await agent(path)).trim().split(/\s+/)[0] ?? '', 10)
     return Number.isFinite(kb) ? kb * 1024 : undefined
   } catch {
     return undefined
@@ -289,15 +289,15 @@ export async function worktreeSize(path: string, run: SizeRunner = nodeSizeRunne
 export async function branchPushed(
   repo: string,
   branch: string,
-  run: GitRunner = nodeGitRunner(),
+  agent: GitRunner = nodeGitRunner(),
 ): Promise<boolean> {
   try {
-    const local = (await run(['rev-parse', '--verify', `refs/heads/${branch}`], repo)).trim()
-    const remote = (await run(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo)).trim()
+    const local = (await agent(['rev-parse', '--verify', `refs/heads/${branch}`], repo)).trim()
+    const remote = (await agent(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo)).trim()
     if (!local || !remote) return false
     if (local === remote) return true
     // The remote may be ahead (someone pushed on top): what matters is that our tip is in it.
-    await run(['merge-base', '--is-ancestor', local, remote], repo)
+    await agent(['merge-base', '--is-ancestor', local, remote], repo)
     return true
   } catch {
     return false

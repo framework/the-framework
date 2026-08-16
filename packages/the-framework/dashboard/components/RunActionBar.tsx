@@ -9,11 +9,11 @@ import { cn } from '../lib/utils.js'
 // left, and what you can DO to it on the right. The doing is a single ⋮ overflow menu
 // (SessionActionsMenu) instead of a row of icon buttons that came and went with the run's state;
 // only the handoff's next step (Push / Open PR) stays out as a visible button, since it moves the
-// work forward. One bar for the session whether running or finished (RunView), so the controls stay
+// work forward. One bar for the session whether running or finished (AgentView), so the controls stay
 // put when a run reaches Done.
 export function RunActionBar({
   projectId,
-  runId,
+  agentId: agentId,
   events,
   retainedWorktree = false,
   onWorktreeRemoved,
@@ -27,7 +27,7 @@ export function RunActionBar({
 }: {
   projectId: string
   /** Which run Stop addresses (#749); absent falls back to the project's own control log. */
-  runId?: string | null | undefined
+  agentId?: string | null | undefined
   events: FrameworkEvent[]
   /** The session's name — leads the bar, so the branch is git context, not the identity (#1030). */
   label?: string | undefined
@@ -60,7 +60,7 @@ export function RunActionBar({
           its size on disk, and the PR its branch has — read from this session's own worktree. */}
       <GitStatusBar
         projectId={projectId}
-        runId={runId}
+        agentId={agentId}
         inline
         label={label}
         projectName={projectName}
@@ -89,7 +89,7 @@ export function RunActionBar({
         {actions}
         <SessionActionsMenu
           projectId={projectId}
-          runId={runId}
+          agentId={agentId}
           events={events}
           label={label}
           retainedWorktree={retainedWorktree}

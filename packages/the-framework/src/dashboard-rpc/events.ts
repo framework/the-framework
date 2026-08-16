@@ -1,4 +1,4 @@
-import { resolveRunEventsPath } from '../store/index.js'
+import { resolveAgentEventsPath } from '../store/index.js'
 import { contextEventsSource, resolveProjectPath } from './context.js'
 import type { FrameworkEvent } from '../events.js'
 import { tailRunEvents } from './events-tail.js'
@@ -10,15 +10,15 @@ import { forwardStream } from './stream-forward.js'
 // come over the read-model RPCs (reads.ts).
 
 /**
- * The events file to tail, or undefined when the project is unknown. With a `runId` this is
+ * The events file to tail, or undefined when the project is unknown. With a `agentId` this is
  * that run's own log inside its worktree (#749): since #736 a run appends there, not to the
  * project root, so streaming the project path would follow a file nothing writes to. Once the
  * run has ended and its worktree is gone, the run's archived `<id>.jsonl` is that log (#1472) —
  * tailing the project root there would stream a foreign run's journal.
  */
-async function resolveEventsPath(projectId: string, runId?: string): Promise<string | undefined> {
+async function resolveEventsPath(projectId: string, agentId?: string): Promise<string | undefined> {
   const cwd = await resolveProjectPath(projectId)
-  return cwd ? resolveRunEventsPath(cwd, runId) : undefined
+  return cwd ? resolveAgentEventsPath(cwd, agentId) : undefined
 }
 
 /**
@@ -38,7 +38,7 @@ export type LiveFeedEvent = FrameworkEvent | StreamSync
  * Returns undefined when there is nothing to stream (an unknown project), which the mount ends as
  * a clean close — mirroring the read model's empty results rather than throwing at the client.
  *
- * Pass the `runId` to follow that run's own log (#749). A project has several concurrent runs
+ * Pass the `agentId` to follow that run's own log (#749). A project has several concurrent runs
  * since #736, each writing inside its worktree, so the run id is what makes the feed that run's
  * rather than a mix — and without it the feed for a worktree run is empty. Omitting it keeps the
  * pre-#736 behavior of tailing the project root.
@@ -53,11 +53,11 @@ export type LiveFeedEvent = FrameworkEvent | StreamSync
  */
 export async function streamRunEvents(
   projectId: string,
-  runId: string | undefined,
+  agentId: string | undefined,
   send: (value: LiveFeedEvent) => void,
   onDone?: () => void,
 ): Promise<(() => void) | undefined> {
-  const stream = contextEventsSource()(projectId, runId)
+  const stream = contextEventsSource()(projectId, agentId)
   // An in-memory run: replay + follow it, and end when it ends — a relayed run that finished has
   // nothing more to say, and leaving the response open would read as a live feed gone quiet.
   if (stream) return forwardStream(stream, send, onDone)
@@ -67,17 +67,17 @@ export async function streamRunEvents(
   // archive and removes the worktree, and a fixed-path tail whose fs.watch missed the final
   // appends went silent without the run's `end`. On the move it re-resolves (the archive, #1472)
   // and carries its offset, so the feed gets exactly the lines the move would have swallowed.
-  const path = await resolveEventsPath(projectId, runId)
+  const path = await resolveEventsPath(projectId, agentId)
   if (!path) return undefined
   // The one place a run-scoped feed must NOT relocate to: the project-root journal, which is
-  // resolveRunEventsPath's last-resort fallback once a Delete has removed worktree and archive
+  // resolveAgentEventsPath's last-resort fallback once a Delete has removed worktree and archive
   // alike — it is another run's feed (#1472). A deleted session's tab goes quiet instead. The
   // initial attach stays permissive: a fallback run (non-git project) legitimately lives there.
-  const rootJournal = runId === undefined ? undefined : await resolveEventsPath(projectId, undefined)
+  const rootJournal = agentId === undefined ? undefined : await resolveEventsPath(projectId, undefined)
   let initial = true
   return tailRunEvents(
     async () => {
-      const next = await resolveEventsPath(projectId, runId)
+      const next = await resolveEventsPath(projectId, agentId)
       if (initial) {
         initial = false
         return next

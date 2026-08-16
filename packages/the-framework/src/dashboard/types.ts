@@ -1,5 +1,5 @@
 import type { HandoffLevel } from '../handoff-level.js'
-import type { RunLocation } from '../run-location.js'
+import type { AgentLocation } from '../agent-location.js'
 import type { LinkedPr } from './gh.js'
 
 // The dashboard's request/result vocabulary (#345/#396/#475): the shapes the Start / Add /
@@ -78,7 +78,7 @@ export interface StartRunOptions {
   /** Which coding agent drives the run (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
   driver?: string
   /** Where this run executes (#1050/#610): `local` (this device, the default), `actions` (a fresh GitHub Actions runner via ActionsDriver) or `web` (a Claude Code cloud session via CloudDriver); maps to `--run-on`. Absent = local, i.e. today's behavior. */
-  target?: RunLocation
+  target?: AgentLocation
   /**
    * Nobody is watching this run (#846): its choice gates take the recommended option instead of
    * parking for an answer, which is the fallback a fully headless run already uses and the one
@@ -134,12 +134,12 @@ export type StartRunKind = 'build' | 'research' | 'prompt'
 /** The outcome of a Start attempt (#345). */
 export type StartRunResult =
   /**
-   * `runId` is the id the daemon allocated for the run (#761), present whenever it got its own
+   * `agentId` is the id the daemon allocated for the run (#761), present whenever it got its own
    * worktree. The dashboard needs it to select the run it just started: with concurrent runs
    * (#736) it can no longer find that run by looking for "the running one", because the previous
-   * run is still running and the new one has not written its `run.json` yet.
+   * run is still running and the new one has not written its `agent.json` yet.
    */
-  | { ok: true; runId?: string }
+  | { ok: true; agentId?: string }
   | { ok: false; busy?: boolean; error: string }
 
 /** The outcome of a Preview attempt (#475): the live URL, or why not. */
@@ -159,7 +159,7 @@ export interface PreviewStatus {
  * the dashboard so a session's action bar can say which worktree it has, rather than leaving the
  * user to infer it from a run id.
  */
-export interface RunWorktree {
+export interface AgentWorktree {
   /** Absolute path of the checkout this run works in. */
   path: string
   /** True when it is the run's own worktree; false when it fell back to the project's checkout. */

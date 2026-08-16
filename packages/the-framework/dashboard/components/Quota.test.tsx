@@ -112,6 +112,25 @@ describe('Quota (#960)', () => {
     expect(screen.queryByLabelText('Unattended work stops at')).toBeNull()
   })
 
+  test('a readout with no week at all names the missing line and what came instead (#1367 follow-up)', () => {
+    // The readout is prose from another program, so when the week is simply absent the labels that
+    // *did* arrive are the whole diagnosis — this used to say only "no week this version can
+    // place", which nobody can act on or paste into an issue.
+    view = {
+      windows: [
+        { label: 'Current session', kind: 'session', percentUsed: 3 },
+        { label: 'Current week (Fable)', kind: 'week-model', percentUsed: 15 },
+      ],
+      readAt: Date.now(),
+    }
+    render(<Quota />)
+    const alert = screen.getByRole('alert').textContent ?? ''
+    expect(alert).toMatch(/Couldn't parse quota/)
+    expect(alert).toMatch(/Current week \(all models\)/) // the line the parser wanted
+    expect(alert).toMatch(/“Current session”/) // and the ones it got
+    expect(alert).toMatch(/“Current week \(Fable\)”/)
+  })
+
   test('a week it cannot place is an error, not a quietly plainer panel', () => {
     // The failure this test exists for: Claude Code rephrased its reset times and the parser
     // missed, so the boundary vanished — and the panel just showed the week as a plain figure,

@@ -411,14 +411,22 @@ export function Quota() {
         {/* Without a placeable week there is no axis to draw. Say so, loudly — no fallback (Rom):
             this used to degrade to the week as a plain figure, which hid a real defect for weeks —
             a reset phrasing the parser didn't know just made the panel quietly plainer, and nothing
-            anywhere said the boundary was gone. Quote the text that failed: it is the bug report. */}
+            anywhere said the boundary was gone. Quote the text that failed: it is the bug report.
+
+            Both arms quote, which is the point: a week whose *reset* text is unreadable quotes that
+            text, and a readout with no week at all names the line that is missing and lists the
+            labels that came instead. The second arm used to say only "no week this version can
+            place", which tells whoever reads it nothing they can act on or paste into an issue —
+            and the readout is prose from another program, so the labels are the whole diagnosis. */}
         {view?.boundary && week ? (
           <WeekBar status={view.boundary} percentUsed={week.percentUsed} offset={offset} onChangeOffset={setOffset} others={others} />
         ) : view && view.windows.length ? (
           <p role="alert" className="text-sm text-danger">
             {week?.resetsAtText
               ? `Couldn't parse quota: the week resets “${week.resetsAtText}”, which isn't a phrasing this version recognizes.`
-              : `Couldn't parse quota: the readout has no week this version can place.`}
+              : `Couldn't parse quota: no “Current week (all models)” line in the readout — it reported ${others
+                  .map(w => `“${w.label}”`)
+                  .join(', ')}.`}
           </p>
         ) : null}
 

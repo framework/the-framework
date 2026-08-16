@@ -1,23 +1,23 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FrameworkEvent } from '../../dist/index.js'
 import { handoffState, agentProgress, sessionInfo, } from '../../dist/client.js'
-import { onRun, onRetainedWorktrees } from '../rpc/reads.js'
+import { onAgent, onRetainedWorktrees } from '../rpc/reads.js'
 import { useLoaded } from '../lib/use-async.js'
-import { useRunHandoff } from '../lib/use-agent-handoff.js'
-import { agentSettled, isRunActive, runOutcome } from '../lib/live-state.js'
-import { RunActionBar } from './RunActionBar.js'
+import { useAgentHandoff } from '../lib/use-agent-handoff.js'
+import { agentSettled, isAgentActive, agentOutcome } from '../lib/live-state.js'
+import { AgentActionBar } from './AgentActionBar.js'
 import { AgentComposer } from './AgentComposer.js'
-import { RunFeed } from './RunFeed.js'
+import { AgentFeed } from './AgentFeed.js'
 import { ActionsRunNotice } from './ActionsRunNotice.js'
-import { CloudMirrorRow, CloudRunNotice } from './CloudRunNotice.js'
-import { RemoteRunNotice } from './RemoteRunNotice.js'
+import { CloudMirrorRow, CloudAgentNotice } from './CloudAgentNotice.js'
+import { RemoteAgentNotice } from './RemoteAgentNotice.js'
 import { ChangesSummary, AgentChanges } from './AgentChanges.js'
-import { HandoffActions, HandoffArm, HandoffSummary, RunHandoffDetails } from './AgentHandoff.js'
-import { SessionDetails } from './SessionDetails.js'
+import { HandoffActions, HandoffArm, HandoffSummary, AgentHandoffDetails } from './AgentHandoff.js'
+import { AgentDetails } from './AgentDetails.js'
 
 // One session's view, whether it is running or finished (#1026).
 //
-// This used to be two components — RunLive and RunReplay — and the page swapped one for the other
+// This used to be two components — AgentLive and AgentReplay — and the page swapped one for the other
 // the instant a run's status flipped. Everything remounted at once: the action bar blanked while
 // its git read went out again, the output was replaced by "Loading session…" while the archived
 // log was fetched, the run overview disappeared, and the composer was rebuilt. A session ending is
@@ -41,7 +41,7 @@ export function AgentView({
   removeContext,
   lost = false,
   armedDefault,
-  onRunStarted,
+  onAgentStarted,
   onDeleted,
 }: {
   projectId: string
@@ -73,7 +73,7 @@ export function AgentView({
   /** The live channel's health (#948) — surfaced as a banner over the feed. */
   lost?: boolean
   /** Jump to the run a preset or a continuation started (#959). */
-  onRunStarted?: ((intent: string, agentId?: string) => void) | undefined
+  onAgentStarted?: ((intent: string, agentId?: string) => void) | undefined
   /** Leave this session after it is deleted (#1032) — back to the project home. */
   onDeleted?: (() => void) | undefined
   /** The loop's verdict, handed up so the right rail can pin it under its tabs. It is reported from
@@ -87,7 +87,7 @@ export function AgentView({
   // with the worktree — so without this the PR line waited for a manual refresh.
   const [archiveBehind, setArchiveBehind] = useState(0)
   const archived = useLoaded<FrameworkEvent[] | null>(
-    !live && agentId ? () => onRun(projectId, agentId) : null,
+    !live && agentId ? () => onAgent(projectId, agentId) : null,
     null,
     [projectId, agentId, live, archiveBehind],
   )
@@ -111,7 +111,7 @@ export function AgentView({
   // What the branch holds (#1023), read once for both the bar and the detail it opens. Read once
   // the agent stops rather than once the process does: while it is still writing to the branch
   // there is nothing to hand off yet, but a parked session's branch is finished work.
-  const handoff = useRunHandoff(projectId, agentId ?? null, !working)
+  const handoff = useAgentHandoff(projectId, agentId ?? null, !working)
   const [changes, setChanges] = useState({ count: 0, added: 0, removed: 0 })
   const [open, setOpen] = useState(false)
   const onChangesSummary = useCallback((count: number, added: number, removed: number) => {
@@ -121,7 +121,7 @@ export function AgentView({
 
   // The events already on screen keep their place while the archived copy is read, so a run
   // ending swaps the source without blanking the output. An EMPTY archive never replaces them
-  // either (#1383): `onRun` answers `[]` both for "gone" and for "not archived yet", and a Stop
+  // either (#1383): `onAgent` answers `[]` both for "gone" and for "not archived yet", and a Stop
   // races the archive write — swapping the live feed for that `[]` blanked the view to "This
   // session has no events." until a manual refresh.
   //
@@ -149,11 +149,11 @@ export function AgentView({
   // but its events are already streaming. The feed's own verdict drives the scroll contract and
   // the composer slot, so the continuation renders (and Stop takes over from Resume) the moment
   // the first event lands rather than when the poll does.
-  const feedLive = live || (feedAhead && isRunActive(events))
+  const feedLive = live || (feedAhead && isAgentActive(events))
   const session = sessionInfo(shown)
   const progress = agentProgress(shown)
   // How the run ended (#948) — read once for the composer's note and the Resume offer below.
-  const outcome = live ? undefined : runOutcome(shown)
+  const outcome = live ? undefined : agentOutcome(shown)
   // What the session hands back when it ends (#1102), folded from its own events, seeded from the
   // run record's mirror (#1376): the opening `handoff-armed` event is written before the live
   // channel attaches, so a live tab misses it and the fold alone re-arms what the launcher
@@ -167,7 +167,7 @@ export function AgentView({
 
   return (
     <>
-      <RunActionBar
+      <AgentActionBar
         projectId={projectId}
         agentId={agentId}
         events={shown}
@@ -207,23 +207,23 @@ export function AgentView({
       />
       {/* The always-available session-details strip: agent + spend (#322). Sits above the changes/
           handoff detail, so the disclosure holds the "about this run" facts plus what it touched. */}
-      {open && <SessionDetails events={shown} />}
+      {open && <AgentDetails events={shown} />}
       {/* What the session has touched, behind the branch row's disclosure. While it runs that is
           its worktree; once it ends, the branch it left behind. The live read needs the run's id:
           without one it falls back to the project root and would report the user's own dirty
           files as the run's. A remote run's worktree lives on the device, but the diff now relays
           there (#1067 slice 2), so it is shown like a local run's, not suppressed. */}
       {working && agentId && <AgentChanges projectId={projectId} agentId={agentId} open={open} onSummary={onChangesSummary} />}
-      {!working && open && <RunHandoffDetails handoff={handoff.handoff} />}
+      {!working && open && <AgentHandoffDetails handoff={handoff.handoff} />}
       {/* A GitHub Actions run replays in a burst at the end (#1053), so the live feed looks stalled:
           say the wait is expected and link through to the live Actions run. */}
       <ActionsRunNotice target={target} events={shown} live={live} />
       {/* A run handed to Claude Code on the web (#610): the work is happening in a cloud session
           this machine cannot stream, so point at where it is rather than show an empty feed. */}
-      <CloudRunNotice target={target} events={shown} />
+      <CloudAgentNotice target={target} events={shown} />
       {/* A run relayed to a connected device (#1067): its diff, handoff, and push/PR now relay to the
           device (slice 2), so this notice only flags that the browser preview stays local-only for now. */}
-      <RemoteRunNotice device={remoteLabel} />
+      <RemoteAgentNotice device={remoteLabel} />
       {/* Nothing to show yet is not the same thing in both states: a live run is waiting for its
           first event, a finished one is still reading its log. */}
       {!live && archived === null && shown.length === 0 ? (
@@ -235,7 +235,7 @@ export function AgentView({
         // its new leg up to two seconds before `live` flips, and entering follow mode with the
         // first streamed row absorbs the continuation one event at a time instead of jolting the
         // scroller when the poll lands.
-        <RunFeed
+        <AgentFeed
           events={shown}
           projectId={projectId}
           agentId={agentId}
@@ -259,7 +259,7 @@ export function AgentView({
         addContext={addContext}
         removeContext={removeContext}
         sessionName={progress.sessionName}
-        onRunStarted={onRunStarted}
+        onAgentStarted={onAgentStarted}
         outcome={outcome}
       />
     </>

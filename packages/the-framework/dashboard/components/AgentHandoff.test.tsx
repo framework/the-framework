@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-const onRunHandoff = vi.fn(async () => null as unknown)
+const onAgentHandoff = vi.fn(async () => null as unknown)
 const sendPushBranch = vi.fn(async () => ({ ok: true }) as unknown)
 const sendOpenPullRequest = vi.fn(async () => ({ ok: true }) as unknown)
 const sendSetHandoff = vi.fn(async () => undefined as unknown)
 const sendMerge = vi.fn(async () => ({ ok: true }) as unknown)
-vi.mock('../rpc/reads.js', () => ({ onRunHandoff }))
+vi.mock('../rpc/reads.js', () => ({ onAgentHandoff }))
 vi.mock('../rpc/control.js', () => ({ sendPushBranch, sendOpenPullRequest, sendSetHandoff, sendMerge }))
 
-const { HandoffActions, HandoffArm, HandoffSummary, RunHandoffDetails, handoffExpandable } = await import('./AgentHandoff.js')
-const { useRunHandoff } = await import('../lib/use-agent-handoff.js')
+const { HandoffActions, HandoffArm, HandoffSummary, AgentHandoffDetails, handoffExpandable } = await import('./AgentHandoff.js')
+const { useAgentHandoff } = await import('../lib/use-agent-handoff.js')
 
 /** A handoff for a session that did real work, on a repo with a remote and no PR yet. */
 const worked = {
@@ -30,19 +30,19 @@ const worked = {
 // The same composition AgentView uses: the verdict and the next step in the action bar, the
 // commits and files behind the bar's disclosure.
 function Harness({ open = true }: { open?: boolean }) {
-  const state = useRunHandoff('p1', 'run-1')
+  const state = useAgentHandoff('p1', 'run-1')
   return (
     <>
       <HandoffSummary handoff={state.handoff} />
       {state.error && <span>{state.error}</span>}
       <HandoffActions projectId="p1" agentId="run-1" state={state} />
-      {open && handoffExpandable(state.handoff) && <RunHandoffDetails handoff={state.handoff} />}
+      {open && handoffExpandable(state.handoff) && <AgentHandoffDetails handoff={state.handoff} />}
     </>
   )
 }
 
 beforeEach(() => {
-  onRunHandoff.mockClear()
+  onAgentHandoff.mockClear()
   sendPushBranch.mockClear()
   sendOpenPullRequest.mockClear()
   sendOpenPullRequest.mockResolvedValue({ ok: true })
@@ -55,7 +55,7 @@ afterEach(cleanup)
 
 describe('run handoff (#799)', () => {
   test('summarises what a finished session produced, and lists it when expanded', async () => {
-    onRunHandoff.mockResolvedValue(worked)
+    onAgentHandoff.mockResolvedValue(worked)
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('1 commit')).toBeTruthy())
     expect(screen.getByText('1 file')).toBeTruthy()
@@ -64,7 +64,7 @@ describe('run handoff (#799)', () => {
   })
 
   test('collapsed, it still says what the branch holds — without the lists (#1023)', async () => {
-    onRunHandoff.mockResolvedValue(worked)
+    onAgentHandoff.mockResolvedValue(worked)
     render(<Harness open={false} />)
     await waitFor(() => expect(screen.getByText('1 commit')).toBeTruthy())
     expect(screen.queryByText('add dark mode')).toBeNull()
@@ -74,14 +74,14 @@ describe('run handoff (#799)', () => {
   })
 
   test('the branch name is not repeated — the action bar it sits in already says it (#1023)', async () => {
-    onRunHandoff.mockResolvedValue(worked)
+    onAgentHandoff.mockResolvedValue(worked)
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('1 commit')).toBeTruthy())
     expect(screen.queryByText('the-framework/dark-mode')).toBeNull()
   })
 
   test('a session that changed nothing says so, and has nothing to expand', async () => {
-    onRunHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true })
+    onAgentHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true })
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('no changes')).toBeTruthy())
     expect(handoffExpandable({ ...worked, empty: true } as never)).toBe(false)
@@ -92,7 +92,7 @@ describe('run handoff (#799)', () => {
   })
 
   test('an empty branch with work waiting in the tree names the work, never a button (#1173)', async () => {
-    onRunHandoff.mockResolvedValue({
+    onAgentHandoff.mockResolvedValue({
       ...worked,
       commits: [],
       files: [],
@@ -113,14 +113,14 @@ describe('run handoff (#799)', () => {
 
   test('past two uncommitted files the rest are counted, and the hover carries them all (#1173)', async () => {
     const pendingFiles = ['a.ts', 'b.ts', 'c.ts', 'd.ts']
-    onRunHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true, pendingFiles })
+    onAgentHandoff.mockResolvedValue({ ...worked, commits: [], files: [], insertions: 0, deletions: 0, empty: true, pendingFiles })
     render(<Harness open={false} />)
     const reason = await screen.findByText('Nothing committed — a.ts, b.ts and 2 more left uncommitted.')
     expect(reason.getAttribute('title')).toBe(pendingFiles.join('\n'))
   })
 
   test('a branch that is gone is reported, not shown as work', async () => {
-    onRunHandoff.mockResolvedValue({ ...worked, exists: false, commits: [], files: [], empty: true })
+    onAgentHandoff.mockResolvedValue({ ...worked, exists: false, commits: [], files: [], empty: true })
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('branch gone')).toBeTruthy())
     expect(screen.queryByText('Open PR')).toBeNull()
@@ -128,7 +128,7 @@ describe('run handoff (#799)', () => {
   })
 
   test('push is offered only while the branch is unpushed', async () => {
-    onRunHandoff.mockResolvedValue({ ...worked, pushed: true })
+    onAgentHandoff.mockResolvedValue({ ...worked, pushed: true })
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('Open PR')).toBeTruthy())
     expect(screen.queryByText('Push branch')).toBeNull()
@@ -138,7 +138,7 @@ describe('run handoff (#799)', () => {
     // "Push branch" and "Open PR" used to sit side by side as equals, and pushing without opening
     // a PR is a step neither of us could put a purpose to. Opening a PR pushes on the way, so the
     // one that names the outcome is the one that is offered.
-    onRunHandoff.mockResolvedValue(worked)
+    onAgentHandoff.mockResolvedValue(worked)
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('Open PR')).toBeTruthy())
     expect(screen.queryByText('Push branch')).toBeNull()
@@ -148,7 +148,7 @@ describe('run handoff (#799)', () => {
   })
 
   test('a failed action surfaces its reason rather than doing nothing', async () => {
-    onRunHandoff.mockResolvedValue(worked)
+    onAgentHandoff.mockResolvedValue(worked)
     sendOpenPullRequest.mockResolvedValue({ ok: false, error: 'gh: not logged in' })
     render(<Harness />)
     await waitFor(() => expect(screen.getByText('Open PR')).toBeTruthy())
@@ -157,7 +157,7 @@ describe('run handoff (#799)', () => {
   })
 
   test('an existing open PR withdraws the offer and becomes the Merge (#632/#1391)', async () => {
-    onRunHandoff.mockResolvedValue({
+    onAgentHandoff.mockResolvedValue({
       ...worked,
       pushed: true,
       pr: { number: 42, url: 'https://example.test/42', state: 'OPEN', title: 'Add dark mode' },
@@ -173,7 +173,7 @@ describe('run handoff (#799)', () => {
   })
 
   test('a merged or closed PR offers nothing — landed is an answer, not an action (#1391)', async () => {
-    onRunHandoff.mockResolvedValue({
+    onAgentHandoff.mockResolvedValue({
       ...worked,
       pushed: true,
       merged: true,
@@ -186,14 +186,14 @@ describe('run handoff (#799)', () => {
   })
 
   test('a repo with no remote says why instead of offering a dead button', async () => {
-    onRunHandoff.mockResolvedValue({ ...worked, hasRemote: false })
+    onAgentHandoff.mockResolvedValue({ ...worked, hasRemote: false })
     render(<Harness />)
     await waitFor(() => expect(screen.getByText(/No remote to push to/)).toBeTruthy())
     expect(screen.queryByText('Push branch')).toBeNull()
   })
 
   test('nothing is rendered before the first read, so no wrong empty state flashes', () => {
-    onRunHandoff.mockReturnValue(new Promise(() => {}) as never)
+    onAgentHandoff.mockReturnValue(new Promise(() => {}) as never)
     const { container } = render(<Harness />)
     expect(container.textContent).toBe('')
   })

@@ -57,7 +57,7 @@ export function tailEvents<T = unknown>(path: string, onEvent: (event: T) => voi
  * `onReplayed` keeps {@link tailEvents}' once-per-subscription contract: a relocation is not a
  * new replay boundary, so it never fires twice.
  */
-export function tailRunEvents<T = unknown>(
+export function tailAgentEvents<T = unknown>(
   resolvePath: () => Promise<string | undefined>,
   onEvent: (event: T) => void,
   onReplayed?: () => void,

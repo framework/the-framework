@@ -1,9 +1,9 @@
 import type { FrameworkEvent } from '../../dist/index.js'
 import { agentProgress } from '../../dist/client.js'
-import { isPublishing, isRunActive, runOutcome } from './live-state.js'
+import { isPublishing, isAgentActive, agentOutcome } from './live-state.js'
 
 /** How a run's one status pill is drawn: its dot colour, its word, and the word's tone. */
-export type RunStatusPill = { dot: string; label: string; tone: string }
+export type AgentStatusPill = { dot: string; label: string; tone: string }
 
 /**
  * The single status a run is in, ranked, or null while it has said nothing worth a pill.
@@ -16,9 +16,9 @@ export type RunStatusPill = { dot: string; label: string; tone: string }
  *
  * Shared so the session toolbar and the overview cannot drift apart on what a run is.
  */
-export function runStatusPill(events: FrameworkEvent[]): RunStatusPill | null {
+export function agentStatusPill(events: FrameworkEvent[]): AgentStatusPill | null {
   const progress = agentProgress(events)
-  const outcome = runOutcome(events)
+  const outcome = agentOutcome(events)
   const failed = outcome !== undefined && !outcome.ok && !outcome.stopped
   const stopped = outcome?.stopped === true
   // Nothing to say yet: a run that has not named itself, reached a state, or ended.
@@ -36,6 +36,6 @@ export function runStatusPill(events: FrameworkEvent[]): RunStatusPill | null {
   }
   if (progress.readyForMerge) return { dot: 'bg-success', label: 'ready for merge', tone: 'text-muted-foreground' }
   // A run only pulses "building…" while it is live (#695/U20): once `end` lands the pill settles.
-  if (isRunActive(events)) return { dot: 'animate-pulse bg-warning', label: 'building…', tone: 'text-muted-foreground' }
+  if (isAgentActive(events)) return { dot: 'animate-pulse bg-warning', label: 'building…', tone: 'text-muted-foreground' }
   return { dot: 'bg-muted-foreground', label: 'finished', tone: 'text-muted-foreground' }
 }

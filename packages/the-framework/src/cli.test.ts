@@ -11,14 +11,14 @@ import {
   chooseSessionLink,
   claudeDriverOptions,
   CLAUDE_CODE_SESSION_LIST,
-  createRunJournal,
+  createAgentJournal,
   frameworkVersion,
-  mergeRunConfig,
+  mergeAgentConfig,
   parseArgs,
   printStartupFooter,
-  promptRunSpec,
+  promptAgentSpec,
   runCli,
-  runLogKind,
+  agentLogKind,
   runOnBeforeMergeable,
   sessionOptions,
   unguardedNotices,
@@ -27,7 +27,7 @@ import {
   isSteerable,
   isInteractive,
 } from './cli.js'
-import { writeSessionSpec, type SessionSpec } from './session-spec.js'
+import { writeAgentSpec, type AgentSpec } from './agent-spec.js'
 import { createDriver } from './driver-cli.js'
 import { FakeDriver } from './driver/index.js'
 import type { FrameworkEvent } from './events.js'
@@ -39,17 +39,17 @@ function capture(): { io: CliIO; out: string[]; err: string[] } {
 }
 
 /** A session spec with the fields a test does not care about filled in (D4). */
-function spec(fields: Partial<SessionSpec> = {}): SessionSpec {
+function spec(fields: Partial<AgentSpec> = {}): AgentSpec {
   return { prompt: 'x', kind: 'build', cwd: '/work/app', options: {}, ...fields }
 }
 
 /** A session's resolved options, straight off a spec — the shape `parseArgs` used to return. */
-function opts(fields: Partial<SessionSpec> = {}): SessionOptions {
+function opts(fields: Partial<AgentSpec> = {}): SessionOptions {
   return sessionOptions(spec(fields))
 }
 
 /**
- * Run one session the way the dashboard does: write its spec, hand the path over as `--session`.
+ * Run one session the way the dashboard does: write its spec, hand the path over as `--agent`.
  *
  * A caller that does not name a checkout gets a throwaway one, never `spec()`'s placeholder: this
  * actually runs, so the cwd has to be a directory the session may write into on any machine.
@@ -59,14 +59,14 @@ function opts(fields: Partial<SessionSpec> = {}): SessionOptions {
  * before forwarding to `runCli`. Set and restored around the call, which is safe because
  * `node --test` runs a file's tests one at a time.
  */
-async function runSessionCli(fields: Partial<SessionSpec>, io: CliIO, fake = true): Promise<number> {
+async function runAgentCli(fields: Partial<AgentSpec>, io: CliIO, fake = true): Promise<number> {
   const cwd = fields.cwd ?? (await mkdtemp(join(tmpdir(), 'framework-session-cwd-')))
-  const path = await writeSessionSpec(spec({ ...fields, cwd }))
+  const path = await writeAgentSpec(spec({ ...fields, cwd }))
   const previous = process.env['FRAMEWORK_FAKE']
   if (fake) process.env['FRAMEWORK_FAKE'] = '1'
   else delete process.env['FRAMEWORK_FAKE']
   try {
-    return await runCli(['--session', path], io)
+    return await runCli(['--agent', path], io)
   } finally {
     if (previous === undefined) delete process.env['FRAMEWORK_FAKE']
     else process.env['FRAMEWORK_FAKE'] = previous
@@ -93,7 +93,7 @@ test('parseArgs keeps four options and no verbs (D4)', () => {
   assert.equal(parseArgs(['-v']).version, true)
   assert.equal(parseArgs(['--port', '0']).port, 0)
   assert.equal(parseArgs(['--host', '0.0.0.0']).host, '0.0.0.0')
-  assert.equal(parseArgs(['--session', '/tmp/s.json']).session, '/tmp/s.json')
+  assert.equal(parseArgs(['--agent', '/tmp/s.json']).session, '/tmp/s.json')
   // Every setting used to be a flag here. They travel as a session spec now, so both an unknown
   // option and a bare word — what used to be an intent or a verb — are usage errors.
   assert.match(parseArgs(['--autopilot']).error!, /unknown option/)
@@ -102,11 +102,11 @@ test('parseArgs keeps four options and no verbs (D4)', () => {
 })
 
 test('the session spec is what carries a session, and it round-trips through sessionOptions (D4)', () => {
-  const o = opts({ prompt: 'a blog app', kind: 'prompt', cwd: '/work/api', agentId: 'r1', continueRun: true })
+  const o = opts({ prompt: 'a blog app', kind: 'prompt', cwd: '/work/api', agentId: 'r1', continueAgent: true })
   assert.equal(o.intent, 'a blog app')
   assert.equal(o.cwd, '/work/api')
   assert.equal(o.agentId, 'r1')
-  assert.equal(o.continueRun, true)
+  assert.equal(o.continueAgent, true)
   assert.equal(o.directPrompt, true)
   assert.equal(o.research, false)
 })
@@ -142,18 +142,18 @@ test('the handoff resolves to the PR rung, which is what makes it zero-config (#
   assert.equal(opts({ options: { handoff: 'local' } }).handoff, 'local')
   // A rung nobody defines is not a rung: a spec is not trusted input, it is a file on disk.
   assert.equal(opts({ options: { handoff: 'nonsense' as 'local' } }).handoff, undefined)
-  assert.equal(mergeRunConfig(opts(), {}).handoff, 'pr')
+  assert.equal(mergeAgentConfig(opts(), {}).handoff, 'pr')
 })
 
 test('the-framework.yml can move the handoff, and the spec overrides the file (#1173)', () => {
   // Nearest layer wins, like every other yml key.
-  const fromFile = mergeRunConfig(opts(), { handoff: 'push' })
+  const fromFile = mergeAgentConfig(opts(), { handoff: 'push' })
   assert.equal(fromFile.handoff, 'push')
   assert.equal(fromFile.sources.handoff, 'the-framework.yml')
-  const overridden = mergeRunConfig(opts({ options: { handoff: 'merge' } }), { handoff: 'push' })
+  const overridden = mergeAgentConfig(opts({ options: { handoff: 'merge' } }), { handoff: 'push' })
   assert.equal(overridden.handoff, 'merge')
   assert.equal(overridden.sources.handoff, 'flag')
-  assert.equal(mergeRunConfig(opts(), { handoff: 'local' }).handoff, 'local')
+  assert.equal(mergeAgentConfig(opts(), { handoff: 'local' }).handoff, 'local')
 })
 
 test('the spec carries the agent session a follow-up continues (#720)', () => {
@@ -172,8 +172,8 @@ test('withBrowser folds chrome-devtools-mcp into driver options only when enable
   assert.equal(base.mcpServers, undefined)
 })
 
-test('promptRunSpec runs a headless prompt and carries NO onBeforeMergeable (recursion guard, #326)', () => {
-  assert.deepEqual(promptRunSpec('audit this', '/work/app'), {
+test('promptAgentSpec runs a headless prompt and carries NO onBeforeMergeable (recursion guard, #326)', () => {
+  assert.deepEqual(promptAgentSpec('audit this', '/work/app'), {
     prompt: 'audit this',
     kind: 'prompt',
     cwd: '/work/app',
@@ -181,10 +181,10 @@ test('promptRunSpec runs a headless prompt and carries NO onBeforeMergeable (rec
   })
 })
 
-test('promptRunSpec goes vanilla so the on-before-mergeable follow-up skips the session-name branch step (#560)', () => {
+test('promptAgentSpec goes vanilla so the on-before-mergeable follow-up skips the session-name branch step (#560)', () => {
   // The follow-up is not a session; vanilla drops the built-in system prompt (#326) (and its `### Session
   // name` step), so the run stays on the session branch instead of stranding its output.
-  assert.equal(promptRunSpec('queue follow-ups', '/work/app', true).options.vanilla, true)
+  assert.equal(promptAgentSpec('queue follow-ups', '/work/app', true).options.vanilla, true)
 })
 
 test('runOnBeforeMergeable queues the follow-ups in ONE run instead of running the presets (#326/#556)', async () => {
@@ -229,33 +229,33 @@ test('the ticket a session implements is re-checked, since it comes off a file a
   }
   // A planning run says so (#1327): it is what keeps its PR title from inheriting the ticket's
   // issue as `(fix #42)` and closing it with the work still undone.
-  assert.equal(opts({ options: { planRun: true } }).planRun, true)
+  assert.equal(opts({ options: { planAgent: true } }).planAgent, true)
 })
 
 test('transparent is unset by default (#625)', () => {
   assert.equal(opts().transparent, undefined) // unset, so the repo file decides (#841)
   assert.equal(opts({ options: { transparent: true } }).transparent, true)
   // Unset resolves to off, so a session with nothing said and no file is still a normal one.
-  assert.equal(mergeRunConfig(opts(), {}).transparent, false)
+  assert.equal(mergeAgentConfig(opts(), {}).transparent, false)
 })
 
 test('the built-in prompt is off for a vanilla session or the-framework.yml vanilla:true (#314/C3)', () => {
   // One name and one polarity across the session, the file and the run option (C3). The file used
   // to spell this `antiLazyPill` — and the other way round — so every layer boundary was also an
   // inversion, which is what three apologising comments were for.
-  assert.equal(mergeRunConfig(opts(), {}).vanilla, false)
-  assert.equal(mergeRunConfig(opts({ options: { vanilla: true } }), {}).vanilla, true)
-  assert.equal(mergeRunConfig(opts(), { vanilla: true }).vanilla, true)
+  assert.equal(mergeAgentConfig(opts(), {}).vanilla, false)
+  assert.equal(mergeAgentConfig(opts({ options: { vanilla: true } }), {}).vanilla, true)
+  assert.equal(mergeAgentConfig(opts(), { vanilla: true }).vanilla, true)
   // #841: an explicit `vanilla: false` puts the prompt back over a file that removed it.
-  assert.equal(mergeRunConfig(opts({ options: { vanilla: false } }), { vanilla: true }).vanilla, false)
+  assert.equal(mergeAgentConfig(opts({ options: { vanilla: false } }), { vanilla: true }).vanilla, false)
 })
 
-test('runLogKind maps the run path to the flow recorded on the meta (#379/#1467)', () => {
-  assert.equal(runLogKind({ directPrompt: false, research: false }), 'build')
-  assert.equal(runLogKind({ directPrompt: true, research: false }), 'prompt')
-  assert.equal(runLogKind({ directPrompt: false, research: true }), 'prompt')
+test('agentLogKind maps the run path to the flow recorded on the meta (#379/#1467)', () => {
+  assert.equal(agentLogKind({ directPrompt: false, research: false }), 'build')
+  assert.equal(agentLogKind({ directPrompt: true, research: false }), 'prompt')
+  assert.equal(agentLogKind({ directPrompt: false, research: true }), 'prompt')
   // Transparent (#625) routes a build-kind run through the raw prompt path, so it records as one.
-  assert.equal(runLogKind({ directPrompt: false, research: false }, true), 'prompt')
+  assert.equal(agentLogKind({ directPrompt: false, research: false }, true), 'prompt')
 })
 
 test('the spec kind picks the path: research, verbatim prompt, or build (#331/#353)', () => {
@@ -290,20 +290,20 @@ test('runCli --version prints the real version (#312)', async () => {
 
 test('runCli errors on a session spec with nothing to run (#353)', async () => {
   const { io, err } = capture()
-  const code = await runSessionCli({ prompt: '', kind: 'prompt' }, io, false)
+  const code = await runAgentCli({ prompt: '', kind: 'prompt' }, io, false)
   assert.equal(code, 2)
   assert.ok(err.some(l => /no prompt to run/.test(l)))
 })
 
 test('runCli refuses a session spec it cannot read, rather than running something else (D4)', async () => {
   const { io, err } = capture()
-  assert.equal(await runCli(['--session', join(tmpdir(), 'framework-no-such-spec.json')], io), 2)
+  assert.equal(await runCli(['--agent', join(tmpdir(), 'framework-no-such-spec.json')], io), 2)
   assert.ok(err.some(l => /could not read the session spec/.test(l)))
 })
 
 test('runCli prompt runs the text through the direct path (#353)', async () => {
   const { io, out } = capture()
-  const code = await runSessionCli({ prompt: 'say hi', kind: 'prompt' }, io)
+  const code = await runAgentCli({ prompt: 'say hi', kind: 'prompt' }, io)
   assert.equal(code, 0)
   assert.ok(out.some(l => /prompt session done/.test(l)))
 })
@@ -313,10 +313,10 @@ test('parseArgs flags unknown options and bad values', () => {
   assert.match(parseArgs(['--port', '-1']).error!, /--port/)
   assert.match(parseArgs(['--port']).error!, /--port/)
   assert.match(parseArgs(['--host']).error!, /--host/)
-  assert.match(parseArgs(['--session']).error!, /--session/)
+  assert.match(parseArgs(['--agent']).error!, /--agent/)
   // Every settings flag that used to be validated here is gone with the flag tier (D4). The
   // dashboard is the only writer of a spec, so an invalid combination is never constructed.
-  for (const gone of ['--scope', '--max-passes', '--max-cost', '--permission-mode', '--agent', '--run-on']) {
+  for (const gone of ['--scope', '--max-passes', '--max-cost', '--permission-mode', '--driver', '--run-on']) {
     assert.match(parseArgs([gone]).error!, /unknown option/, gone)
   }
 })
@@ -364,44 +364,44 @@ test('a session persists itself, and the modes stay unset until the spec names t
   assert.equal(on.transparent, true)
 })
 
-test('mergeRunConfig: the-framework.yml supplies defaults, flags override (#258)', () => {
+test('mergeAgentConfig: the-framework.yml supplies defaults, flags override (#258)', () => {
   const flags = {}
   const modes = (config: { vanilla: boolean; transparent: boolean }) => [config.vanilla, config.transparent]
   // file-only: the repo config drives the run
-  const fromFile = mergeRunConfig(flags, { preset: 'software-development', transparent: true })
+  const fromFile = mergeAgentConfig(flags, { preset: 'software-development', transparent: true })
   assert.equal(fromFile.presetName, 'software-development')
   assert.deepEqual(modes(fromFile), [false, true])
   // a --preset flag wins over the file's preset
-  assert.equal(mergeRunConfig({ preset: 'web-dev' }, { preset: 'software-development' }).presetName, 'web-dev')
+  assert.equal(mergeAgentConfig({ preset: 'web-dev' }, { preset: 'software-development' }).presetName, 'web-dev')
   // a mode set by either layer is on; the flag layer says nothing about the mode it did not set
-  assert.deepEqual(modes(mergeRunConfig({ vanilla: true }, { transparent: true })), [true, true])
+  assert.deepEqual(modes(mergeAgentConfig({ vanilla: true }, { transparent: true })), [true, true])
   // nothing set anywhere: no preset, no modes
-  assert.deepEqual(modes(mergeRunConfig(flags, {})), [false, false])
-  assert.equal(mergeRunConfig(flags, {}).presetName, undefined)
+  assert.deepEqual(modes(mergeAgentConfig(flags, {})), [false, false])
+  assert.equal(mergeAgentConfig(flags, {}).presetName, undefined)
   // build event: the file's `event` supplies a default, --kind overrides it (#265)
-  assert.equal(mergeRunConfig(flags, { event: 'bug-fix' }).buildEvent, 'bug-fix')
-  assert.equal(mergeRunConfig({ buildEvent: 'major-change' }, { event: 'bug-fix' }).buildEvent, 'major-change')
-  assert.equal(mergeRunConfig(flags, {}).buildEvent, undefined)
+  assert.equal(mergeAgentConfig(flags, { event: 'bug-fix' }).buildEvent, 'bug-fix')
+  assert.equal(mergeAgentConfig({ buildEvent: 'major-change' }, { event: 'bug-fix' }).buildEvent, 'major-change')
+  assert.equal(mergeAgentConfig(flags, {}).buildEvent, undefined)
 })
 
-test('mergeRunConfig: a nearer layer can turn a mode off, not just on (#841)', () => {
+test('mergeAgentConfig: a nearer layer can turn a mode off, not just on (#841)', () => {
   // The bug: with OR, a session could only ever enable. Now an explicit off beats a file that
   // enabled it — and with the spec that is a plain `false`, not a second `--no-*` spelling.
-  assert.equal(mergeRunConfig(opts({ options: { transparent: false } }), { transparent: true }).transparent, false)
-  assert.equal(mergeRunConfig(opts({ options: { vanilla: false } }), { vanilla: true }).vanilla, false)
+  assert.equal(mergeAgentConfig(opts({ options: { transparent: false } }), { transparent: true }).transparent, false)
+  assert.equal(mergeAgentConfig(opts({ options: { vanilla: false } }), { vanilla: true }).vanilla, false)
   // And the file still supplies the value when this session says nothing.
-  assert.equal(mergeRunConfig(opts(), { transparent: true }).transparent, true)
+  assert.equal(mergeAgentConfig(opts(), { transparent: true }).transparent, true)
   // The session still wins when it says "on" over a file that says "off".
-  assert.equal(mergeRunConfig(opts({ options: { transparent: true } }), { transparent: false }).transparent, true)
+  assert.equal(mergeAgentConfig(opts({ options: { transparent: true } }), { transparent: false }).transparent, true)
   // A layer that set nothing does not participate: absent stays absent, defaults hold.
-  const bare = mergeRunConfig(opts(), {})
+  const bare = mergeAgentConfig(opts(), {})
   assert.deepEqual({ transparent: bare.transparent, vanilla: bare.vanilla }, { transparent: false, vanilla: false })
   assert.deepEqual(bare.sources, {})
 })
 
 test('runCli rejects a resumed agent session on a build run rather than dropping it (#782)', async () => {
   const { io, err } = capture()
-  const code = await runSessionCli({ options: { resumeSession: 'sess-42' } }, io)
+  const code = await runAgentCli({ options: { resumeSession: 'sess-42' } }, io)
   assert.equal(code, 2)
   assert.ok(err.some(l => /only applies to a prompt session/.test(l)))
 })
@@ -409,7 +409,7 @@ test('runCli rejects a resumed agent session on a build run rather than dropping
 test('runCli honors a resumed agent session on the prompt path it belongs to (#782)', async () => {
   const { io, err } = capture()
   // The dashboard's continuation always runs here, so the guard must never fire on it.
-  const code = await runSessionCli({ prompt: 'keep going', kind: 'prompt', options: { resumeSession: 'sess-42' } }, io)
+  const code = await runAgentCli({ prompt: 'keep going', kind: 'prompt', options: { resumeSession: 'sess-42' } }, io)
   assert.notEqual(code, 2)
   assert.ok(!err.some(l => /only applies to a prompt session/.test(l)))
 })
@@ -419,7 +419,7 @@ test('chooseSessionLink defaults a live run to the claude.ai/code session list (
   assert.equal(CLAUDE_CODE_SESSION_LIST, 'https://claude.ai/code')
 })
 
-test('chooseSessionLink honors an explicit --session-link over the default', () => {
+test('chooseSessionLink honors an explicit session link over the default', () => {
   assert.equal(chooseSessionLink({ sessionLink: 'https://x/s/{sessionId}', driver: 'claude' }, false), 'https://x/s/{sessionId}')
   // An explicit link is the user's own, so it stands whatever agent runs.
   assert.equal(chooseSessionLink({ sessionLink: 'https://x/s/{sessionId}', driver: 'codex' }, false), 'https://x/s/{sessionId}')
@@ -462,12 +462,12 @@ test('a session runs no preflight of its own: the dashboard already did (#1326)'
   // Nothing here probes for the agent CLI, so this succeeds regardless of what is installed —
   // which is the point: the dashboard refused the start if the agent could not run, and a
   // `--run-on actions` session needs no local agent at all.
-  assert.equal(await runSessionCli({}, io), 0)
+  assert.equal(await runAgentCli({}, io), 0)
 })
 
 test('runCli runs a whole session offline', async () => {
   const { io, out } = capture()
-  const code = await runSessionCli({ prompt: 'a blog' }, io)
+  const code = await runAgentCli({ prompt: 'a blog' }, io)
   assert.equal(code, 0)
   const text = out.join('\n')
   assert.match(text, /▶ "a blog"/) // what it was asked for, said once as the session opens
@@ -481,7 +481,7 @@ test('runCli --transparent runs a bare prompt raw, skipping the build flow + wra
   const dir = await mkdtemp(join(tmpdir(), 'framework-transparent-'))
   try {
     const { io, out } = capture()
-    const code = await runSessionCli({ prompt: 'make it blue', cwd: dir, options: { transparent: true } }, io)
+    const code = await runAgentCli({ prompt: 'make it blue', cwd: dir, options: { transparent: true } }, io)
     assert.equal(code, 0)
     const text = out.join('\n')
     // Transparent = raw Claude Code: the build path's markers must NOT appear (contrast the test above).
@@ -508,7 +508,7 @@ test('the dashboard steers a dashboard-less run through its gates via control.js
     let settled = false
     // --run-id is what the dashboard passes when it spawns, and what makes this run steerable
     // (#905): the dashboard drives the control file on the other end.
-    const done = runSessionCli({ cwd, agentId: 'r-steer' }, io).finally(
+    const done = runAgentCli({ cwd, agentId: 'r-steer' }, io).finally(
       () => (settled = true),
     )
 
@@ -574,7 +574,7 @@ test('a declined post-merge cleanup lands in the archived event log, not on stdo
     const { io } = capture()
     // A fake run never signals ready-for-merge, so the step declines. The point is that the
     // decline is *reported*: it has to survive into runs/, which close() copies the log into.
-    const code = await runSessionCli({ prompt: 'review the auth flow', kind: 'prompt', cwd: dir, options: { onBeforeMergeable: true } }, io)
+    const code = await runAgentCli({ prompt: 'review the auth flow', kind: 'prompt', cwd: dir, options: { onBeforeMergeable: true } }, io)
     assert.equal(code, 0)
     const agents = join(dir, FRAMEWORK_DIR, AGENTS_DIR)
     const archived = (await readdir(agents)).filter(f => f.endsWith('.jsonl'))
@@ -596,7 +596,7 @@ test('a run that never asked for the post-merge cleanup stays quiet about it (#8
   const dir = await mkdtemp(join(tmpdir(), 'framework-obm-off-'))
   try {
     const { io } = capture()
-    assert.equal(await runSessionCli({ prompt: 'review the auth flow', kind: 'prompt', cwd: dir }, io), 0)
+    assert.equal(await runAgentCli({ prompt: 'review the auth flow', kind: 'prompt', cwd: dir }, io), 0)
     const events = (await readFile(join(dir, FRAMEWORK_DIR, EVENTS_FILE), 'utf8'))
       .split('\n')
       .filter(Boolean)
@@ -679,9 +679,9 @@ test('naming the session renames the run-id branch and records it as a branch ev
   git('config', 'user.name', 'Test')
   git('commit', '--allow-empty', '-q', '-m', 'seed')
   // The state allocateWorkspace leaves a run in: checked out on its run-id branch (#736).
-  git('checkout', '-q', '-b', 'the-framework/run-r1')
+  git('checkout', '-q', '-b', 'the-framework/agent-r1')
   const { io, out } = capture()
-  const journal = createRunJournal({
+  const journal = createAgentJournal({
     io,
     cwd: repo,
     store: undefined,
@@ -701,7 +701,7 @@ test('naming the session renames the run-id branch and records it as a branch ev
 
 test('a browser URL is held until the session opens, then re-said after every later session (#1455 item 6b)', () => {
   const { io, out } = capture()
-  const journal = createRunJournal({
+  const journal = createAgentJournal({
     io,
     cwd: '/tmp',
     store: undefined,
@@ -729,7 +729,7 @@ test('a browser URL is held until the session opens, then re-said after every la
  * A `--run-on actions` run with no token must end as `failed`, and must end at all.
  *
  * Both halves regressed together. The config check sits after `agent.json` is written but before
- * `settleRun` owns the run, so returning raw left the status at `running` with nobody to correct
+ * `settleAgent` owns the run, so returning raw left the status at `running` with nobody to correct
  * it; and the control tail it had already wired held the event loop open, so the process never
  * exited either. From the dashboard that was a session stuck on "running" forever, with the real
  * reason sitting unread in stderr.log.
@@ -762,9 +762,9 @@ test('a --run-on actions run with no token anywhere ends failed instead of hangi
   // past the very branch under test.
   const { GH_TOKEN: _gh, GITHUB_TOKEN: _gathub, ...rest } = process.env
   const env = { ...rest, PATH: `${stubBin}:${rest.PATH ?? ''}` }
-  const specPath = await writeSessionSpec(spec({ prompt: 'hi', cwd: repo, agentId: 'r-actions', options: { target: 'actions' } }))
+  const specPath = await writeAgentSpec(spec({ prompt: 'hi', cwd: repo, agentId: 'r-actions', options: { target: 'actions' } }))
   const exit = await new Promise<number | null>((resolvePromise, rejectPromise) => {
-    const child = spawn(process.execPath, [bin.pathname, '--session', specPath], { cwd: repo, env, stdio: 'ignore' })
+    const child = spawn(process.execPath, [bin.pathname, '--agent', specPath], { cwd: repo, env, stdio: 'ignore' })
     const timer = setTimeout(() => {
       child.kill('SIGKILL')
       rejectPromise(new Error('the run never exited; it hung with its status left at running'))
@@ -797,13 +797,13 @@ test('runCli continues a build run through the build flow, not the prompt path (
   const dir = await mkdtemp(join(tmpdir(), 'framework-continue-build-'))
   try {
     const first = capture()
-    assert.equal(await runSessionCli({ prompt: 'build a thing', cwd: dir }, first.io), 0)
+    assert.equal(await runAgentCli({ prompt: 'build a thing', cwd: dir }, first.io), 0)
     const metaPath = join(dir, FRAMEWORK_DIR, 'agent.json')
     assert.equal((JSON.parse(await readFile(metaPath, 'utf8')) as { kind?: string }).kind, 'build')
 
     const second = capture()
-    const code = await runSessionCli(
-      { prompt: 'keep going', kind: 'prompt', cwd: dir, continueRun: true, options: { resumeSession: 'sess-42' } },
+    const code = await runAgentCli(
+      { prompt: 'keep going', kind: 'prompt', cwd: dir, continueAgent: true, options: { resumeSession: 'sess-42' } },
       second.io,
     )
     assert.equal(code, 0)
@@ -828,10 +828,10 @@ test('runCli keeps a prompt run continuation on the prompt path (#1467)', async 
   const dir = await mkdtemp(join(tmpdir(), 'framework-continue-prompt-'))
   try {
     const first = capture()
-    assert.equal(await runSessionCli({ prompt: 'say hi', kind: 'prompt', cwd: dir }, first.io), 0)
+    assert.equal(await runAgentCli({ prompt: 'say hi', kind: 'prompt', cwd: dir }, first.io), 0)
     const second = capture()
-    const code = await runSessionCli(
-      { prompt: 'keep going', kind: 'prompt', cwd: dir, continueRun: true, options: { resumeSession: 'sess-42' } },
+    const code = await runAgentCli(
+      { prompt: 'keep going', kind: 'prompt', cwd: dir, continueAgent: true, options: { resumeSession: 'sess-42' } },
       second.io,
     )
     assert.equal(code, 0)

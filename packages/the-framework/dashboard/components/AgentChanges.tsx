@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { FileChange } from '../../dist/index.js'
-import { onRunChanges } from '../rpc/reads.js'
+import { onAgentChanges } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { FilePreviewCard } from './FilePreview.js'
 import { DiffStat } from './DiffView.js'
@@ -82,7 +82,7 @@ export function ChangesSummary({ count, added, removed }: { count: number; added
 
 /**
  * `agentId` is required, and the caller must only render this for a session whose worktree is still
- * there. Once a worktree is gone `resolveRunPath` falls back to the project root, and the panel
+ * there. Once a worktree is gone `resolveAgentPath` falls back to the project root, and the panel
  * would present the user's own uncommitted files as the session's work.
  *
  * The caller owns `open` and renders the count in the action bar, so the section carries no header
@@ -102,7 +102,7 @@ export function AgentChanges({
   onSummary?: ((count: number, added: number, removed: number) => void) | undefined
 }) {
   const { value: changes } = usePolled<FileChange[]>(
-    () => onRunChanges(projectId, agentId),
+    () => onAgentChanges(projectId, agentId),
     EMPTY,
     8_000,
     [projectId, agentId],

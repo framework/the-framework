@@ -41,10 +41,10 @@ export interface DashboardData {
     activeAgents: number
     openTodos: number
     /** Archived runs across every project. */
-    totalRuns: number
+    totalAgents: number
   }
   /** How past runs ended, across every project (archived runs only). */
-  runsByStatus: Record<AgentStatus, number>
+  agentsByStatus: Record<AgentStatus, number>
   /** Finished runs per day over the last {@link ACTIVITY_DAYS} days, oldest-first. */
   activity: ActivityDay[]
   /** Runs going right now, most-recently-updated first (from {@link buildOverview}). */
@@ -84,7 +84,7 @@ function localDateKey(d: Date): string {
  * window. Forgiving — a project whose `agents/` is missing simply contributes nothing.
  */
 export async function buildDashboard(projects: ProjectSummary[], deps: DashboardDeps = {}): Promise<DashboardData> {
-  const listRunsFor = deps.agents ?? (cwd => listAgents(cwd).catch(() => []))
+  const listAgentsFor = deps.agents ?? (cwd => listAgents(cwd).catch(() => []))
   const hasTicketsFor = deps.tickets ?? (cwd => hasTickets(cwd).catch(() => false))
   const now = deps.now ? deps.now() : new Date()
 
@@ -105,14 +105,14 @@ export async function buildDashboard(projects: ProjectSummary[], deps: Dashboard
     buckets.set(key, 0)
   }
 
-  const runsByStatus: Record<AgentStatus, number> = { running: 0, done: 0, stopped: 0, failed: 0 }
+  const agentsByStatus: Record<AgentStatus, number> = { running: 0, done: 0, stopped: 0, failed: 0 }
   const projectStats: ProjectStat[] = []
-  let totalRuns = 0
+  let totalAgents = 0
   for (const project of projects) {
-    const agents = await listRunsFor(project.path)
-    totalRuns += agents.length
+    const agents = await listAgentsFor(project.path)
+    totalAgents += agents.length
     for (const agent of agents) {
-      runsByStatus[agent.status] += 1
+      agentsByStatus[agent.status] += 1
       const key = localDateKey(new Date(agent.startedAt))
       if (buckets.has(key)) buckets.set(key, buckets.get(key)! + 1)
     }
@@ -134,9 +134,9 @@ export async function buildDashboard(projects: ProjectSummary[], deps: Dashboard
       projects: projects.length,
       activeAgents: overview.active.length,
       openTodos: overview.queueOpen,
-      totalRuns,
+      totalAgents,
     },
-    runsByStatus,
+    agentsByStatus,
     activity: dayKeys.map(date => ({ date, count: buckets.get(date) ?? 0 })),
     active: overview.active,
     recent: overview.recent,

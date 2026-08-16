@@ -12,7 +12,7 @@ import { ActionsDriver, CloudDriver, type ActionsDriverOptions, type CloudDriver
  * Kept off {@link createDriver} on purpose: ActionsDriver's owner/repo/token do not fit
  * {@link CreateDriverOptions}, and folding them in would push GitHub config onto every local run.
  */
-export interface CreateRunDriverOptions extends CreateDriverOptions {
+export interface CreateAgentDriverOptions extends CreateDriverOptions {
   /**
    * Where the run executes: `local` (this device, the default), `actions` (a GitHub Actions
    * runner, #1050) or `web` (a Claude Code cloud session, #610).
@@ -25,7 +25,7 @@ export interface CreateRunDriverOptions extends CreateDriverOptions {
 }
 
 /** The one place a run path turns `--run-on` into a real driver. */
-export function createRunDriver(opts: CreateRunDriverOptions): Driver {
+export function createAgentDriver(opts: CreateAgentDriverOptions): Driver {
   if (opts.target === 'actions') {
     if (!opts.actionsConfig) {
       throw new Error('run target "actions" needs the repo owner/repo and a GitHub token; set a GitHub origin remote and GH_TOKEN')

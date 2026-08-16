@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, mkdir, writeFile, readFile, rm, stat, realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { createProjectRuntime, cleanupTimedOutWorktree, markFailedStart, runStderrPath, isTransientRunFailure, lastRunFailureDetail, MAX_TRANSIENT_RETRIES } from './daemon-runtime.js'
+import { createProjectRuntime, cleanupTimedOutWorktree, markFailedStart, agentStderrPath, isTransientAgentFailure, lastAgentFailureDetail, MAX_TRANSIENT_RETRIES } from './daemon-runtime.js'
 import { CliTimeoutError } from './cli-exec.js'
 import type { PreflightResult } from './preflight.js'
 
@@ -14,10 +14,10 @@ import type { PreflightResult } from './preflight.js'
  */
 const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
 
-import { FRAMEWORK_DIR, WORKTREES_DIR, EVENTS_FILE, META_FILE, worktreePath, agentBranchName, AGENT_META_VERSION, startedAtFromRunId, type AgentMeta } from './store/index.js'
+import { FRAMEWORK_DIR, WORKTREES_DIR, EVENTS_FILE, META_FILE, worktreePath, agentBranchName, AGENT_META_VERSION, startedAtFromAgentId, type AgentMeta } from './store/index.js'
 import { addProject, projectId } from './registry.js'
 import { nodeGitRunner } from './project.js'
-import type { SessionSpec } from './session-spec.js'
+import type { AgentSpec } from './agent-spec.js'
 
 /**
  * Where a run is allowed to land (#997). A run gets its own worktree (#736); the pre-#736
@@ -42,7 +42,7 @@ async function writeStub(dir: string, log: string): Promise<string> {
     stub,
     `const fs = require('node:fs')\n` +
       `const argv = process.argv.slice(2)\n` +
-      `fs.appendFileSync(${JSON.stringify(log)}, fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8').replace(/\\s*\\n\\s*/g, '') + '\\n')\n`,
+      `fs.appendFileSync(${JSON.stringify(log)}, fs.readFileSync(argv[argv.indexOf('--agent') + 1], 'utf8').replace(/\\s*\\n\\s*/g, '') + '\\n')\n`,
   )
   return stub
 }
@@ -58,13 +58,13 @@ async function writeStub(dir: string, log: string): Promise<string> {
 const POLL_ATTEMPTS = 500
 
 /** The stub's recorded starts, waited for (a start spawns detached). */
-async function startedSpecs(log: string, expected: number): Promise<SessionSpec[]> {
+async function startedSpecs(log: string, expected: number): Promise<AgentSpec[]> {
   let lines: string[] = []
   for (let i = 0; i < POLL_ATTEMPTS && lines.length < expected; i++) {
     await new Promise(r => setTimeout(r, 20))
     lines = await readFile(log, 'utf8').then(s => s.split('\n').filter(Boolean), () => [])
   }
-  return lines.map(line => JSON.parse(line) as SessionSpec)
+  return lines.map(line => JSON.parse(line) as AgentSpec)
 }
 
 /** Capture `console.log` for the duration of `body`. */
@@ -139,7 +139,7 @@ test('a project that is not a git repo still falls back to the main checkout, an
 })
 
 /** Write a run's live meta into a checkout, so a teardown/read has a status to act on. */
-async function writeRunMeta(checkout: string, status: AgentMeta['status'], extra: Partial<AgentMeta> = {}): Promise<void> {
+async function writeAgentMeta(checkout: string, status: AgentMeta['status'], extra: Partial<AgentMeta> = {}): Promise<void> {
   const dir = join(checkout, FRAMEWORK_DIR)
   await mkdir(dir, { recursive: true })
   const meta: AgentMeta = {
@@ -220,13 +220,13 @@ async function waitForLogLine(cwd: string, pattern: RegExp): Promise<string> {
  *
  * The loop returns the moment the starts land, so the cap only ever costs time on a real failure.
  */
-async function waitForSpecs(log: string, expected: number): Promise<SessionSpec[]> {
+async function waitForSpecs(log: string, expected: number): Promise<AgentSpec[]> {
   let lines: string[] = []
   for (let i = 0; i < POLL_ATTEMPTS && lines.length < expected; i++) {
     await new Promise(r => setTimeout(r, 20))
     lines = await readFile(log, 'utf8').then(s => s.split('\n').filter(Boolean), () => [])
   }
-  return lines.map(line => JSON.parse(line) as SessionSpec)
+  return lines.map(line => JSON.parse(line) as AgentSpec)
 }
 
 test('a worktree run whose child dies at boot is marked failed instead of waiting forever (#1261)', async () => {
@@ -243,14 +243,14 @@ test('a worktree run whose child dies at boot is marked failed instead of waitin
     assert.ok(meta, 'the daemon wrote a agent.json for the dead child')
     assert.equal(meta.status, 'failed', 'marked failed, so the page stops saying "Waiting for the session to start"')
     assert.equal(meta.id, agentId, 'under the run id the worktree is named with')
-    assert.equal(meta.startedAt, startedAtFromRunId(agentId), 'dated by its run id, not by when the daemon noticed')
+    assert.equal(meta.startedAt, startedAtFromAgentId(agentId), 'dated by its run id, not by when the daemon noticed')
     assert.equal(meta.intent, 'build a thing', 'carrying the prompt, so the run row is identifiable')
 
     // The cause is visible: the child's stderr was captured and its tail is in the run log.
     const events = await waitForLogLine(worktree, /failed to start/)
     assert.match(events, /The session failed to start: its process exited with code 1/)
     assert.match(events, /Cannot find package 'some-workspace-dep'/, 'the stderr tail names the actual boot error')
-    assert.match(await readFile(runStderrPath(worktree), 'utf8'), /ERR_MODULE_NOT_FOUND/, 'the full stderr file is kept')
+    assert.match(await readFile(agentStderrPath(worktree), 'utf8'), /ERR_MODULE_NOT_FOUND/, 'the full stderr file is kept')
 
     // Failed, so the teardown's retention rule keeps the checkout for inspection.
     assert.equal(await stat(worktree).then(s => s.isDirectory(), () => false), true, 'the worktree is retained')
@@ -263,7 +263,7 @@ test('a worktree run whose child dies at boot is marked failed instead of waitin
 test('a child that wrote its own lifecycle is left alone by the failed-start marker (#1261)', async () => {
   const base = await realpath(await mkdtemp(join(tmpdir(), 'framework-bootfail-skip-')))
   try {
-    await writeRunMeta(base, 'done')
+    await writeAgentMeta(base, 'done')
     assert.equal(await markFailedStart(base, 'run1', 'build a thing', 'its process exited with code 0'), false)
     const meta = JSON.parse(await readFile(join(base, FRAMEWORK_DIR, META_FILE), 'utf8')) as AgentMeta
     assert.equal(meta.status, 'done', 'the run reported its own end; the marker does not rewrite history')
@@ -273,44 +273,44 @@ test('a child that wrote its own lifecycle is left alone by the failed-start mar
   }
 })
 
-test('isTransientRunFailure names transport deaths, not work failures (#1281)', () => {
+test('isTransientAgentFailure names transport deaths, not work failures (#1281)', () => {
   assert.equal(
-    isTransientRunFailure('[framework] claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'),
+    isTransientAgentFailure('[framework] claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'),
     true,
   )
-  assert.equal(isTransientRunFailure('read ECONNRESET'), true)
-  assert.equal(isTransientRunFailure('API Error: 529 overloaded'), true)
+  assert.equal(isTransientAgentFailure('read ECONNRESET'), true)
+  assert.equal(isTransientAgentFailure('API Error: 529 overloaded'), true)
   // A boot death (#1261) or a real failure is not a retry candidate.
-  assert.equal(isTransientRunFailure('its process exited with code 1 before reporting anything'), false)
-  assert.equal(isTransientRunFailure('AssertionError: expected 2 to equal 3'), false)
-  assert.equal(isTransientRunFailure(undefined), false)
+  assert.equal(isTransientAgentFailure('its process exited with code 1 before reporting anything'), false)
+  assert.equal(isTransientAgentFailure('AssertionError: expected 2 to equal 3'), false)
+  assert.equal(isTransientAgentFailure(undefined), false)
 })
 
-test('lastRunFailureDetail reads the child-written end, and only a failed one (#1281)', () => {
+test('lastAgentFailureDetail reads the child-written end, and only a failed one (#1281)', () => {
   const line = (event: object) => JSON.stringify(event) + '\n'
-  assert.equal(lastRunFailureDetail(line({ kind: 'session' }) + line({ kind: 'end', ok: false, detail: 'boom' })), 'boom')
-  assert.equal(lastRunFailureDetail(line({ kind: 'end', ok: true })), undefined)
-  assert.equal(lastRunFailureDetail('not json\n' + line({ kind: 'end', ok: false, detail: 'boom' })), 'boom')
-  assert.equal(lastRunFailureDetail(''), undefined)
+  assert.equal(lastAgentFailureDetail(line({ kind: 'session' }) + line({ kind: 'end', ok: false, detail: 'boom' })), 'boom')
+  assert.equal(lastAgentFailureDetail(line({ kind: 'end', ok: true })), undefined)
+  assert.equal(lastAgentFailureDetail('not json\n' + line({ kind: 'end', ok: false, detail: 'boom' })), 'boom')
+  assert.equal(lastAgentFailureDetail(''), undefined)
   // A continued log whose last end succeeded: the earlier failure no longer counts.
-  assert.equal(lastRunFailureDetail(line({ kind: 'end', ok: false, detail: 'boom' }) + line({ kind: 'end', ok: true })), undefined)
+  assert.equal(lastAgentFailureDetail(line({ kind: 'end', ok: false, detail: 'boom' }) + line({ kind: 'end', ok: true })), undefined)
 })
 
 /**
  * A stub CLI that behaves like a run whose driver died mid-work: it writes its own lifecycle
  * (agent.json + a failed `end` carrying `detail`), records each spawn, and exits 1.
  */
-async function writeFailingRunStub(dir: string, detail: string): Promise<string> {
+async function writeFailingAgentStub(dir: string, detail: string): Promise<string> {
   const stub = join(dir, 'failing-run-stub.cjs')
   await writeFile(
     stub,
     `const fs = require('node:fs')
 const path = require('node:path')
 const argv = process.argv.slice(2)
-const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8'))
+const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--agent') + 1], 'utf8'))
 const cwd = spec.cwd
 const agentId = spec.agentId
-fs.appendFileSync(path.join(cwd, 'spawned.log'), (spec.continueRun ? 'continue' : 'start') + '\\n')
+fs.appendFileSync(path.join(cwd, 'spawned.log'), (spec.continueAgent ? 'continue' : 'start') + '\\n')
 const dir = path.join(cwd, '.the-framework')
 fs.mkdirSync(dir, { recursive: true })
 const now = new Date().toISOString()
@@ -338,7 +338,7 @@ async function waitForSpawns(worktree: string, expected: number): Promise<string
 test('a run that dies to a transient API error is continued, at most twice (#1281)', async () => {
   const cwd = await initRepo('framework-transient-')
   const detail = '[framework] claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'
-  const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeFailingRunStub(cwd, detail), retryDelayMs: 25 })
+  const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeFailingAgentStub(cwd, detail), retryDelayMs: 25 })
   try {
     const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; agentId?: string }
     assert.equal(result.ok, true)
@@ -361,7 +361,7 @@ test('a run that fails on its own terms is not retried (#1281)', async () => {
   const runtime = createProjectRuntime({ driverPreflight: agentReady,
     cwd,
     env: {},
-    binPath: await writeFailingRunStub(cwd, 'AssertionError: expected 2 to equal 3'),
+    binPath: await writeFailingAgentStub(cwd, 'AssertionError: expected 2 to equal 3'),
     retryDelayMs: 25,
   })
   try {
@@ -414,7 +414,7 @@ test('a start on a logged-out agent is refused, and spends no branch or worktree
     // Nothing was spent: no worktrees directory, and no run branch on the repo.
     const worktrees = await stat(join(cwd, FRAMEWORK_DIR, WORKTREES_DIR)).then(() => true, () => false)
     assert.equal(worktrees, false, 'a refused start creates no worktree')
-    const branches = await git(['branch', '--list', 'the-framework/run-*'], cwd)
+    const branches = await git(['branch', '--list', 'the-framework/agent-*'], cwd)
     assert.equal(branches.trim(), '', 'a refused start creates no run branch')
 
     // And no agent was spawned, so there is no dead run to explain afterwards.

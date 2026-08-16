@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { startBackgroundServices } from './daemon-services.js'
 import { quotaBoundaryStatus } from './quota-boundary.js'
 import type { QuotaSource, QuotaView } from './dashboard/quota.js'
-import type { StartRunOptions, StartRunResult } from './dashboard/types.js'
+import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
 
 /**
  * The concurrent-agents setting, end to end (#1204).
@@ -65,20 +65,20 @@ async function services(preferences: Record<string, unknown>) {
     join(project, 'TODO_AGENTS.md'),
     ['# TODO_AGENTS', '', '## Priority 9', '', ...QUEUE_ENTRIES.map(entry => `- ${entry}`), ''].join('\n'),
   )
-  const starts: { prompt: string; options: StartRunOptions; projectId: string }[] = []
+  const starts: { prompt: string; options: StartAgentOptions; projectId: string }[] = []
   const started = startBackgroundServices({
     cwd: project,
     env: { XDG_CONFIG_HOME: config },
     dashboardUrl: 'http://localhost:4000',
     quota: spareQuota(),
-    startRun: async (prompt, options, projectId): Promise<StartRunResult> => {
+    startAgent: async (prompt, options, projectId): Promise<StartAgentResult> => {
       starts.push({ prompt, options, projectId })
       return { ok: true, agentId: `run-${starts.length}` }
     },
     // What the daemon's own counter reports: the runs this sweep has asked for are live, so the
     // cap is measured against them rather than against a constant zero.
-    activeRunCount: () => starts.length,
-    busyRunIds: () => new Set<string>(),
+    activeAgentCount: () => starts.length,
+    busyAgentIds: () => new Set<string>(),
     log: () => {},
   })
   const stop = async () => {
@@ -115,9 +115,9 @@ test('the concurrency setting on disk is the number of agents the routine spins 
       // The drain job lands its own PRs (#1216): the job's flag rides the start as the ladder's
       // top rung, so it reaches the run already meaning "push, open, merge".
       assert.equal(start.options.handoff, 'merge')
-      // A drain implements its ticket, so its PR title may close the issue — planRun is only
+      // A drain implements its ticket, so its PR title may close the issue — planAgent is only
       // for the fanned-out planners (#1327), whose merge must not.
-      assert.equal(start.options.planRun, undefined)
+      assert.equal(start.options.planAgent, undefined)
       assert.equal(start.projectId, 'proj-1')
     }
     // The ticket the entry links to rides along, so the four agents land in four lanes (#1117).

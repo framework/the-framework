@@ -4,7 +4,7 @@ import {
   describeResolvedConfig,
   fileConfigLayer,
   resolveConfigKey,
-  resolveRunConfig,
+  resolveAgentConfig,
   RUN_CONFIG_DEFAULTS,
   type ConfigLayer,
 } from './config-layers.js'
@@ -38,16 +38,16 @@ test('resolveConfigKey ignores layers that left the key unset (#841)', () => {
   })
 })
 
-test('resolveRunConfig: each layer can win, and each can be absent (#841)', () => {
+test('resolveAgentConfig: each layer can win, and each can be absent (#841)', () => {
   for (const layer of ['run', 'project', 'the-framework.yml', 'global']) {
     const layers = chain().map(l => (l.name === layer ? { ...l, values: { transparent: true, preset: layer } } : l))
-    const resolved = resolveRunConfig(layers)
+    const resolved = resolveAgentConfig(layers)
     assert.equal(resolved.transparent, true, `${layer} should win autopilot`)
     assert.equal(resolved.presetName, layer)
     assert.equal(resolved.sources.transparent, layer)
   }
   // Every layer absent: the defaults hold and nothing claims a source.
-  const bare = resolveRunConfig(chain())
+  const bare = resolveAgentConfig(chain())
   assert.equal(bare.transparent, RUN_CONFIG_DEFAULTS.transparent)
   assert.equal(bare.vanilla, RUN_CONFIG_DEFAULTS.vanilla)
   assert.equal(bare.transparent, RUN_CONFIG_DEFAULTS.transparent)
@@ -58,11 +58,11 @@ test('resolveRunConfig: each layer can win, and each can be absent (#841)', () =
   assert.equal(bare.buildEvent, undefined)
   assert.deepEqual(bare.sources, {})
   // No layers at all resolves the same way as layers that set nothing.
-  assert.deepEqual(resolveRunConfig([]), bare)
+  assert.deepEqual(resolveAgentConfig([]), bare)
 })
 
-test('resolveRunConfig: a nearer false beats a farther true (#841)', () => {
-  const resolved = resolveRunConfig(chain({}, { transparent: false }, { transparent: true }))
+test('resolveAgentConfig: a nearer false beats a farther true (#841)', () => {
+  const resolved = resolveAgentConfig(chain({}, { transparent: false }, { transparent: true }))
   assert.equal(resolved.transparent, false)
   assert.equal(resolved.sources.transparent, 'project')
 })
@@ -79,13 +79,13 @@ test('fileConfigLayer carries only the keys the-framework.yml set', () => {
 })
 
 test('describeResolvedConfig narrates which layer won each key (#841)', () => {
-  assert.equal(describeResolvedConfig(resolveRunConfig(chain())), '')
+  assert.equal(describeResolvedConfig(resolveAgentConfig(chain())), '')
   assert.equal(
-    describeResolvedConfig(resolveRunConfig(chain({ transparent: false }, {}, { transparent: true, preset: 'software-development' }))),
+    describeResolvedConfig(resolveAgentConfig(chain({ transparent: false }, {}, { transparent: true, preset: 'software-development' }))),
     'preset=software-development (the-framework.yml), transparent=off (run)',
   )
   assert.equal(
-    describeResolvedConfig(resolveRunConfig(chain({}, {}, { event: 'bug-fix', transparent: true }))),
+    describeResolvedConfig(resolveAgentConfig(chain({}, {}, { event: 'bug-fix', transparent: true }))),
     'transparent=on (the-framework.yml), event=bug-fix (the-framework.yml)',
   )
 })

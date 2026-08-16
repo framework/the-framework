@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-const onRunChanges = vi.fn(async () => [] as unknown)
+const onAgentChanges = vi.fn(async () => [] as unknown)
 const onFileDiff = vi.fn(async () => null as unknown)
-vi.mock('../rpc/reads.js', () => ({ onRunChanges, onFileDiff }))
+vi.mock('../rpc/reads.js', () => ({ onAgentChanges, onFileDiff }))
 
 const { ChangesSummary, AgentChanges } = await import('./AgentChanges.js')
 
@@ -13,9 +13,9 @@ const CHANGES = [
 ]
 
 beforeEach(() => {
-  onRunChanges.mockClear()
+  onAgentChanges.mockClear()
   onFileDiff.mockClear()
-  onRunChanges.mockResolvedValue(CHANGES)
+  onAgentChanges.mockResolvedValue(CHANGES)
   onFileDiff.mockResolvedValue({
     path: 'src/a.ts',
     status: 'modified',
@@ -31,7 +31,7 @@ afterEach(cleanup)
 describe('AgentChanges (#817)', () => {
   test("lists the session's changed files with their counts, from its own worktree", async () => {
     render(<AgentChanges projectId="p1" agentId="run-1" />)
-    await waitFor(() => expect(onRunChanges).toHaveBeenCalledWith('p1', 'run-1'))
+    await waitFor(() => expect(onAgentChanges).toHaveBeenCalledWith('p1', 'run-1'))
     await waitFor(() => expect(screen.getByText('a.ts')).toBeTruthy())
     expect(screen.getByText('new.ts')).toBeTruthy()
     expect(screen.getByText('modified')).toBeTruthy()
@@ -52,9 +52,9 @@ describe('AgentChanges (#817)', () => {
   })
 
   test('a session that changed nothing renders nothing, rather than an empty panel', async () => {
-    onRunChanges.mockResolvedValue([])
+    onAgentChanges.mockResolvedValue([])
     const { container } = render(<AgentChanges projectId="p1" agentId="run-1" />)
-    await waitFor(() => expect(onRunChanges).toHaveBeenCalled())
+    await waitFor(() => expect(onAgentChanges).toHaveBeenCalled())
     expect(container.textContent).toBe('')
   })
 
@@ -70,7 +70,7 @@ describe('AgentChanges (#817)', () => {
   })
 
   test('a session that changed nothing reports zero, so no disclosure is offered', async () => {
-    onRunChanges.mockResolvedValue([])
+    onAgentChanges.mockResolvedValue([])
     const onSummary = vi.fn()
     render(<AgentChanges projectId="p1" agentId="run-1" onSummary={onSummary} />)
     await waitFor(() => expect(onSummary).toHaveBeenCalledWith(0, 0, 0))
@@ -78,9 +78,9 @@ describe('AgentChanges (#817)', () => {
   })
 
   test('a failed read leaves the panel silent instead of throwing', async () => {
-    onRunChanges.mockRejectedValue(new Error('daemon restarted'))
+    onAgentChanges.mockRejectedValue(new Error('daemon restarted'))
     const { container } = render(<AgentChanges projectId="p1" agentId="run-1" />)
-    await waitFor(() => expect(onRunChanges).toHaveBeenCalled())
+    await waitFor(() => expect(onAgentChanges).toHaveBeenCalled())
     expect(container.textContent).toBe('')
   })
 })

@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import type { FrameworkEvent } from '../../dist/index.js'
 
-const onRun = vi.fn(async () => [] as unknown)
+const onAgent = vi.fn(async () => [] as unknown)
 const onRetainedWorktrees = vi.fn(async () => [] as unknown)
-const onRunHandoff = vi.fn(async () => null as unknown)
-const onRunChanges = vi.fn(async () => [] as unknown)
+const onAgentHandoff = vi.fn(async () => null as unknown)
+const onAgentChanges = vi.fn(async () => [] as unknown)
 const onBridgeQuestion = vi.fn(async () => null as unknown)
 const onBridgeEvents = vi.fn(async () => [] as unknown)
 const onBridgeAnswer = vi.fn(async () => null as unknown)
-vi.mock('../rpc/reads.js', () => ({ onRun, onRetainedWorktrees, onRunHandoff, onRunChanges, onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
+vi.mock('../rpc/reads.js', () => ({ onAgent, onRetainedWorktrees, onAgentHandoff, onAgentChanges, onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
 vi.mock('../rpc/control.js', () => ({
   sendOpenPullRequest: vi.fn(async () => null),
   sendSetHandoff: vi.fn(async () => null),
@@ -29,7 +29,7 @@ vi.mock('../lib/preferences.js', () => ({
 // The frame around the feed is not under test: the bar and composer reach for git and session
 // state of their own, and the swap decision this file cares about is visible in the feed alone.
 // The bar's `actions` slot IS rendered, so the handoff cluster stays reachable.
-vi.mock('./RunActionBar.js', () => ({ RunActionBar: ({ actions }: { actions?: unknown }) => <>{actions}</> }))
+vi.mock('./AgentActionBar.js', () => ({ AgentActionBar: ({ actions }: { actions?: unknown }) => <>{actions}</> }))
 vi.mock('./AgentComposer.js', () => ({ AgentComposer: () => null }))
 
 const { AgentView } = await import('./AgentView.js')
@@ -44,34 +44,34 @@ const view = (over: Partial<Parameters<typeof AgentView>[0]> = {}) => (
 beforeEach(() => {
   vi.clearAllMocks()
   onRetainedWorktrees.mockResolvedValue([])
-  onRunHandoff.mockResolvedValue(null)
+  onAgentHandoff.mockResolvedValue(null)
 })
 afterEach(cleanup)
 
 describe('AgentView event source (#1026/#1383)', () => {
   test('a finished run swaps to its archived log once it has events', async () => {
-    onRun.mockResolvedValue(ARCHIVED)
+    onAgent.mockResolvedValue(ARCHIVED)
     render(view())
-    await waitFor(() => expect(onRun).toHaveBeenCalledWith('p1', 'run-1'))
+    await waitFor(() => expect(onAgent).toHaveBeenCalledWith('p1', 'run-1'))
     await waitFor(() => expect(screen.getByText(/the archive delivered this line/)).toBeTruthy())
     expect(screen.queryByText(/the channel delivered this line/)).toBeNull()
   })
 
   test('an empty archive never replaces the events already on screen (#1383)', async () => {
-    // `onRun` answers `[]` for "not archived yet" as well as "gone", and a Stop races the archive
+    // `onAgent` answers `[]` for "not archived yet" as well as "gone", and a Stop races the archive
     // write: swapping a populated live feed for that `[]` blanked the view to "This session has
     // no events." until a manual refresh.
-    onRun.mockResolvedValue([])
+    onAgent.mockResolvedValue([])
     render(view())
-    await waitFor(() => expect(onRun).toHaveBeenCalledWith('p1', 'run-1'))
+    await waitFor(() => expect(onAgent).toHaveBeenCalledWith('p1', 'run-1'))
     expect(screen.getByText(/the channel delivered this line/)).toBeTruthy()
     expect(screen.queryByText('This agent has no events.')).toBeNull()
   })
 
   test('a finished run with nothing anywhere still says it has no events', async () => {
-    onRun.mockResolvedValue([])
+    onAgent.mockResolvedValue([])
     render(view({ events: [] }))
-    await waitFor(() => expect(onRun).toHaveBeenCalledWith('p1', 'run-1'))
+    await waitFor(() => expect(onAgent).toHaveBeenCalledWith('p1', 'run-1'))
     await waitFor(() => expect(screen.getByText('This agent has no events.')).toBeTruthy())
   })
 
@@ -79,7 +79,7 @@ describe('AgentView event source (#1026/#1383)', () => {
     // On Resume the new leg streams over the channel while `live` waits on the 2s runs poll.
     // Serving the frozen archive for that window rendered nothing of the continuation — or, when
     // the poll lost the race outright, nothing until a manual refresh.
-    onRun.mockResolvedValue(ARCHIVED)
+    onAgent.mockResolvedValue(ARCHIVED)
     const resumed = [
       ...ARCHIVED,
       { kind: 'session', driver: 'claude-code', workspace: '/w' },
@@ -93,7 +93,7 @@ describe('AgentView event source (#1026/#1383)', () => {
     // The live channel is not guaranteed to be this run's journal: an ended run whose worktree is
     // gone resolves to the project ROOT journal server-side, which holds whatever root run wrote
     // it last. "The channel knows more" must not let that longer foreign feed replace the archive.
-    onRun.mockResolvedValue(ARCHIVED)
+    onAgent.mockResolvedValue(ARCHIVED)
     const foreign = [
       { kind: 'log', message: 'a different run wrote this line' },
       { kind: 'session', driver: 'claude-code', workspace: '/w' },
@@ -110,9 +110,9 @@ describe('AgentView event source (#1026/#1383)', () => {
     // re-read is how the PR line reaches the screen without a manual refresh.
     const ahead = [...ARCHIVED, { kind: 'session', driver: 'claude-code', workspace: '/w' }, { kind: 'end', ok: true }] as FrameworkEvent[]
     const full = [...ahead, { kind: 'handoff', outcome: 'done', pushed: true }] as FrameworkEvent[]
-    onRun.mockResolvedValueOnce(ARCHIVED).mockResolvedValue(full)
+    onAgent.mockResolvedValueOnce(ARCHIVED).mockResolvedValue(full)
     render(view({ events: ahead }))
-    await waitFor(() => expect(onRun.mock.calls.length).toBeGreaterThanOrEqual(2))
+    await waitFor(() => expect(onAgent.mock.calls.length).toBeGreaterThanOrEqual(2))
     await waitFor(() => expect(screen.getByText(/branch pushed/)).toBeTruthy())
   })
 })

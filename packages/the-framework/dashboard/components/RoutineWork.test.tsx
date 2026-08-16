@@ -28,8 +28,8 @@ vi.mock('../lib/quota.js', () => ({ useAutoPm: () => autoPm, useQuota: () => und
 const start = vi.hoisted(() => vi.fn())
 let busy = false
 let startError: string | null = null
-vi.mock('../lib/use-start-run.js', () => ({
-  useStartRun: () => ({ busy, error: startError, reset: () => {}, start }),
+vi.mock('../lib/use-start-agent.js', () => ({
+  useStartAgent: () => ({ busy, error: startError, reset: () => {}, start }),
 }))
 
 const { RoutineWork } = await import('./RoutineWork.js')
@@ -58,13 +58,13 @@ afterEach(cleanup)
 
 describe('RoutineWork (#1159)', () => {
   test('lists every routine the sweep can fire, by its preset label', async () => {
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
     for (const job of AUTO_PM_ROUTINES) expect(screen.getByText(job.label ?? job.name)).toBeTruthy()
   })
 
   test('a routine that describes itself gets a line under its name; the rest are just their label', async () => {
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
     // Today that is the maintenance sweep alone, whose label does not say what it does.
     expect(screen.getByText(AUTO_PM_MAINTENANCE_JOB.describe!)).toBeTruthy()
@@ -81,7 +81,7 @@ describe('RoutineWork (#1159)', () => {
 
   test('Run now starts the routine prompt verbatim and selects the run it started (#1191)', async () => {
     const started: unknown[][] = []
-    render(<RoutineWork onRunStarted={(...args) => started.push(args)} />)
+    render(<RoutineWork onAgentStarted={(...args) => started.push(args)} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByText('Run now')[1]!)
     await waitFor(() => expect(start).toHaveBeenCalled())
@@ -103,7 +103,7 @@ describe('RoutineWork (#1159)', () => {
     // one agent per entry. A plain start could only ever be one agent on the first entry.
     sendAutoPmSweep.mockResolvedValue({ ok: true })
     const started: unknown[][] = []
-    render(<RoutineWork onRunStarted={(...args) => started.push(args)} />)
+    render(<RoutineWork onAgentStarted={(...args) => started.push(args)} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByText('Run now')[0]!)
     await waitFor(() => expect(sendAutoPmSweep).toHaveBeenCalledWith({ drainOnly: true }))
@@ -114,7 +114,7 @@ describe('RoutineWork (#1159)', () => {
 
   test("the drain's Run now on a host with no sweep says so instead of failing silently (#1204)", async () => {
     sendAutoPmSweep.mockResolvedValue({ ok: false })
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByText('Run now')[0]!)
     await waitFor(() => expect(screen.getByText(/not running the sweep/).textContent).toMatch(/nothing to trigger/))
@@ -123,7 +123,7 @@ describe('RoutineWork (#1159)', () => {
   test('a start that reports no run id still hands the project over, for the adopt fallback (#1191)', async () => {
     start.mockResolvedValue({ ok: true })
     const started: unknown[][] = []
-    render(<RoutineWork onRunStarted={(...args) => started.push(args)} />)
+    render(<RoutineWork onAgentStarted={(...args) => started.push(args)} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByText('Run now')[1]!)
     await waitFor(() => expect(started).toHaveLength(1))
@@ -134,7 +134,7 @@ describe('RoutineWork (#1159)', () => {
     start.mockResolvedValue(undefined)
     startError = 'A session is already active for this project.'
     const started: unknown[][] = []
-    render(<RoutineWork onRunStarted={(...args) => started.push(args)} />)
+    render(<RoutineWork onAgentStarted={(...args) => started.push(args)} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByText('Run now')[1]!)
     await waitFor(() => expect(start).toHaveBeenCalled())
@@ -146,23 +146,23 @@ describe('RoutineWork (#1159)', () => {
   test('with auto-run on and a reported sweep, the box says when it next runs', async () => {
     prefs = { autoPm: true }
     autoPm = { enabled: true, sweptAt: Date.now(), nextSweepAt: Date.now() + 2 * 60 * 60_000, outcomes: [] }
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getByText('Auto-runs in 2 hr')).toBeTruthy())
   })
 
   test('with auto-run off, or before the daemon has reported, it says only what it does', async () => {
     prefs = { autoPm: true }
     autoPm = undefined
-    const { rerender } = render(<RoutineWork onRunStarted={() => {}} />)
+    const { rerender } = render(<RoutineWork onAgentStarted={() => {}} />)
     // On, but no sweep has reported yet: a countdown here would be invented.
     await waitFor(() => expect(screen.getByText('Auto-run')).toBeTruthy())
     prefs = {}
-    rerender(<RoutineWork onRunStarted={() => {}} />)
+    rerender(<RoutineWork onAgentStarted={() => {}} />)
     expect(screen.getByText('Auto-run')).toBeTruthy()
   })
 
   test('the checkbox is the one global preference, and carries the tooltip', async () => {
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getByText('Auto-run')).toBeTruthy())
     // One box per routine (#1209), plus the master at the foot.
     expect(screen.getAllByRole('checkbox')).toHaveLength(AUTO_PM_ROUTINES.length + 1)
@@ -173,7 +173,7 @@ describe('RoutineWork (#1159)', () => {
   })
 
   test('every routine starts ticked, and unticking one records only that one (#1209)', async () => {
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
     // Nothing saved means nothing opted out: the schedule is whole until it is edited.
     for (const job of AUTO_PM_ROUTINES) expect(routineBox(job).getAttribute('aria-checked')).toBe('true')
@@ -184,7 +184,7 @@ describe('RoutineWork (#1159)', () => {
   test('an opted-out routine shows unticked, and re-ticking it drops only it (#1209)', async () => {
     const other = AUTO_PM_ROUTINES[1]!.name
     prefs = { autoPmOptOut: [AUTO_PM_DRAIN_JOB.name, other] }
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
     expect(routineBox(AUTO_PM_DRAIN_JOB).getAttribute('aria-checked')).toBe('false')
     fireEvent.click(screen.getByText(routineName(AUTO_PM_DRAIN_JOB)))
@@ -194,7 +194,7 @@ describe('RoutineWork (#1159)', () => {
 
   test('Run now ignores the checkbox: it fires the routine once, on demand (#1209)', async () => {
     prefs = { autoPmOptOut: AUTO_PM_ROUTINES.map(job => job.name) }
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
     for (const button of screen.getAllByText('Run now')) expect((button as HTMLButtonElement).disabled).toBe(false)
     fireEvent.click(screen.getAllByText('Run now')[1]!)
@@ -204,19 +204,19 @@ describe('RoutineWork (#1159)', () => {
 
   test('auto-run on with nothing ticked says so, rather than counting down to nothing (#1209)', async () => {
     prefs = { autoPm: true, autoPmOptOut: AUTO_PM_ROUTINES.map(job => job.name) }
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getByText(/Every routine is unticked/)).toBeTruthy())
     cleanup()
     // One routine back on and the warning goes: the schedule has something to do again.
     prefs = { autoPm: true, autoPmOptOut: AUTO_PM_ROUTINES.slice(1).map(job => job.name) }
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getByText('Auto-run')).toBeTruthy())
     expect(screen.queryByText(/Every routine is unticked/)).toBeNull()
   })
 
   test('several projects get a picker, and Run now honours it', async () => {
     onProjects.mockResolvedValue([project('p1', 'gemstack'), project('p2', 'rudder')])
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     const select = await screen.findByLabelText('Run in')
     fireEvent.change(select, { target: { value: 'p2' } })
     fireEvent.click(screen.getAllByText('Run now')[1]!)
@@ -226,7 +226,7 @@ describe('RoutineWork (#1159)', () => {
 
   test('Trigger routine now fires the sweep instead of waiting out the countdown (#1210)', async () => {
     prefs = { autoPm: true }
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     const button = await screen.findByText('Trigger routine now')
     fireEvent.click(button)
     await waitFor(() => expect(sendAutoPmSweep).toHaveBeenCalledTimes(1))
@@ -234,7 +234,7 @@ describe('RoutineWork (#1159)', () => {
 
   test('with auto-run off the trigger still sweeps once: the click is the ask (#1210)', async () => {
     prefs = { autoPm: false }
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     const button = (await screen.findByText('Trigger routine now')).closest('button')!
     expect(button.disabled).toBe(false)
     // The tooltip carries the one thing worth saying here: this is a one-shot, not an enrolment.
@@ -246,7 +246,7 @@ describe('RoutineWork (#1159)', () => {
   test('a host with no sweep says so rather than looking like it worked (#1210)', async () => {
     prefs = { autoPm: true }
     sendAutoPmSweep.mockResolvedValue({ ok: false })
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     fireEvent.click(await screen.findByText('Trigger routine now'))
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/not running the sweep/i))
   })
@@ -259,7 +259,7 @@ describe('RoutineWork (#1159)', () => {
       ok: true,
       outcomes: [{ projectId: 'p1', path: '/home/me/repo', started: false, message: 'the queue has work waiting and its routine is switched off' }],
     })
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     fireEvent.click(await screen.findByText('Trigger routine now'))
     await waitFor(() =>
       expect(screen.getByRole('status').textContent).toBe('the queue has work waiting and its routine is switched off'),
@@ -275,7 +275,7 @@ describe('RoutineWork (#1159)', () => {
         { projectId: 'p2', path: '/home/me/beta', started: false, message: 'a run is already active' },
       ],
     })
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     fireEvent.click(await screen.findByText('Trigger routine now'))
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/alpha: started a drain/))
     expect(screen.getByRole('status').textContent).toMatch(/beta: a run is already active/)
@@ -286,7 +286,7 @@ describe('RoutineWork (#1159)', () => {
       ok: true,
       outcomes: [{ projectId: 'p1', path: '/home/me/repo', started: false, message: 'the queue is empty, so there is nothing to drain' }],
     })
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByText('Run now')[0]!)
     await waitFor(() =>
@@ -295,14 +295,14 @@ describe('RoutineWork (#1159)', () => {
   })
 
   test('one project needs no picker', async () => {
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
     expect(screen.queryByLabelText('Run in')).toBeNull()
   })
 
   test('with no project there is nothing to run a routine in, and it says so', async () => {
     onProjects.mockResolvedValue([])
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getByText('Add a project to run a routine.')).toBeTruthy())
     expect(screen.queryByText('Run now')).toBeNull()
   })
@@ -310,7 +310,7 @@ describe('RoutineWork (#1159)', () => {
   // #1204: how many agents the routine keeps going at once.
 
   test('the concurrent-agents box shows the daemon default until it is set', async () => {
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     const box = (await screen.findByLabelText('Concurrent agents')) as HTMLInputElement
     // The default rather than 1, so the number on screen is the number the sweep would use.
     expect(box.value).toBe(String(DEFAULT_AUTO_PM_CONCURRENCY))
@@ -318,7 +318,7 @@ describe('RoutineWork (#1159)', () => {
   })
 
   test('typing a concurrency writes it, clamped to the cap', async () => {
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     const box = await screen.findByLabelText('Concurrent agents')
     fireEvent.change(box, { target: { value: '5' } })
     expect(updatePreferences).toHaveBeenCalledWith({ autoPmConcurrency: 5 })
@@ -335,13 +335,13 @@ describe('RoutineWork (#1159)', () => {
 
   test('the fine print follows the setting rather than promising an idle machine', async () => {
     prefs = { autoPmConcurrency: 4 }
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getByText(/Keeps up to 4 agents going at once/)).toBeTruthy())
   })
 
   test('a start already in flight disables every Run now', async () => {
     busy = true
-    render(<RoutineWork onRunStarted={() => {}} />)
+    render(<RoutineWork onAgentStarted={() => {}} />)
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
     for (const button of screen.getAllByText('Run now')) expect((button as HTMLButtonElement).disabled).toBe(true)
   })

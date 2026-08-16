@@ -267,7 +267,7 @@ function parseGateBody(body: string): ParsedAwaitGate | undefined {
 /**
  * Emit the {@link PROTOCOLS_SIGNAL} signals an agent turn carries: markdown views, the
  * session name, and `setReadyForMerge()`. Every turn the framework prompts goes through
- * one of these, because the protocols are unconditional (see `composeRunSystem`) — the
+ * one of these, because the protocols are unconditional (see `composeAgentSystem`) — the
  * agent is told it can signal on any turn, so any turn we don't parse drops the signal.
  *
  * The returned function holds the dedupe state for the turns it covers: `ready-for-merge`

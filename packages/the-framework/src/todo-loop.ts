@@ -206,7 +206,7 @@ export async function findTodoBacklog(cwd: string): Promise<TodoBacklog | undefi
  * otherwise. When the agent's word is deemed enough, delete this function and its single call
  * site in `maybeAutoHandoff`.
  */
-export async function sessionTodoPending(cwd: string, sessionName: string | undefined): Promise<boolean> {
+export async function agentTodoPending(cwd: string, sessionName: string | undefined): Promise<boolean> {
   // The prompt asks for [a-z0-9-]+; anything wider (a path separator above all) names no file.
   if (!sessionName || !/^[A-Za-z0-9._-]+$/.test(sessionName)) return false
   const md = await readFile(join(cwd, `TODO_${sessionName}.agent.md`), 'utf8').catch(() => undefined)

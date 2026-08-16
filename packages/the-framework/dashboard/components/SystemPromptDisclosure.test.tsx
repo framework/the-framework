@@ -27,7 +27,7 @@ describe('SystemPromptDisclosure transparent mode (#625)', () => {
   test('with the built-in prompt on, the preview shows the wrapped system prompt', () => {
     render(<SystemPromptDisclosure {...baseProps} disabled={false} />)
     openDisclosure()
-    // The real composeRunSystem output is shown; it is a non-empty system channel.
+    // The real composeAgentSystem output is shown; it is a non-empty system channel.
     expect(screen.queryByText(/No extra system prompt/)).toBeNull()
     expect(screen.getByText(/whole system prompt/)).toBeTruthy()
   })

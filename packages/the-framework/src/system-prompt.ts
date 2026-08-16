@@ -176,7 +176,7 @@ export interface SystemPromptOptions {
    * empty system channel, byte-identical to raw `claude -p <prompt>`. This is stronger than
    * `--vanilla` (which keeps the AWAIT/SIGNAL emit contract so the agent can still drive the
    * dashboard's gates); transparent means there is no framework behavior left to signal to.
-   * Short-circuits {@link composeRunSystem}, so it overrides every other option here.
+   * Short-circuits {@link composeAgentSystem}, so it overrides every other option here.
    */
   transparent?: boolean | undefined
   /**
@@ -226,8 +226,8 @@ export function systemPromptBlock(opts: SystemPromptOptions = {}): string {
   return parts.join('\n\n')
 }
 
-/** Inputs to {@link composeRunSystem}. */
-export type RunSystemOptions = SystemPromptOptions
+/** Inputs to {@link composeAgentSystem}. */
+export type AgentSystemOptions = SystemPromptOptions
 
 /**
  * Assemble a run's full system channel — the single place it is composed (#501), so the
@@ -246,7 +246,7 @@ export type RunSystemOptions = SystemPromptOptions
  * The one exception is transparent mode (#625): there is no framework behavior to signal to, so
  * the whole channel is empty and the agent runs as raw `claude -p`.
  */
-export function composeRunSystem(opts: RunSystemOptions = {}): string {
+export function composeAgentSystem(opts: AgentSystemOptions = {}): string {
   if (opts.transparent) return ''
   const promptBlock = systemPromptBlock(opts)
   // The browser section rides with the protocols, not with the built-in prompt: like them it

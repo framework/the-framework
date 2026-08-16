@@ -11,8 +11,8 @@ import { serveClientBundle } from './static.js'
 import { BROWSER_PROXY_PREFIX, handleBrowserProxy } from './browser-proxy.js'
 import { makeRpcMount, RPC_PREFIX } from './rpc-serve.js'
 import { requestPathname } from '../request-path.js'
-import type { AddProjectResult, PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from './types.js'
-import type { EventsSource, RemoteRuns } from './rpc-serve.js'
+import type { AddProjectResult, PreviewResult, PreviewStatus, StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
+import type { EventsSource, RemoteAgents } from './rpc-serve.js'
 import { handleRelayRequest, RELAY_PREFIX, type RelayHandlers } from './relay-endpoints.js'
 import { BRIDGE_PREFIX, handleBridgeRequest, type BridgeHandlers } from './bridge-endpoints.js'
 import { bridgeQuestions } from './bridge-store.js'
@@ -30,10 +30,10 @@ export interface DashboardOptions {
    */
   onStart: (
     prompt: string,
-    kind: StartRunKind,
-    options: StartRunOptions,
+    kind: StartAgentKind,
+    options: StartAgentOptions,
     projectId?: string,
-  ) => StartRunResult | Promise<StartRunResult>
+  ) => StartAgentResult | Promise<StartAgentResult>
   /**
    * Called when the browser adds a project (#396): the `sendAddProject` telefunction reaches this
    * through the request context. Wire it to install the repo (or every git repo under a
@@ -83,7 +83,7 @@ export interface DashboardOptions {
    * The relayed-run lookup the read RPCs consult (#1067 slice 2). A run-scoped RPC uses it to
    * forward a remote run's read/steer/handoff to the device that owns it.
    */
-  remote: RemoteRuns
+  remote: RemoteAgents
   /**
    * Serve a relay-started run's events back to the daemon that relayed it here (#1067): the
    * `/_relay/*` endpoints (start + events, plus the slice-2 `rpc`). All are fronted by the same
@@ -149,7 +149,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
   const quota = opts.quota
   const rpcMount = makeRpcMount(
     {
-      startRun: opts.onStart,
+      startAgent: opts.onStart,
       addProject: opts.onAddProject,
       eventsSource: opts.eventsSource,
       remote: opts.remote,

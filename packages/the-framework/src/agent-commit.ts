@@ -29,7 +29,7 @@ import { errorMessage } from './error-message.js'
  * Debounced on an idle window rather than committed per write. Archives land seconds apart, and a
  * commit each would bury the project's real history under noise. A poll that sees the same pending
  * set twice running treats it as settled and commits the batch; a burst keeps resetting it.
- * {@link SessionCommitterOptions.maxWaitMs} caps that, so a project that never goes idle still
+ * {@link AgentCommitterOptions.maxWaitMs} caps that, so a project that never goes idle still
  * lands instead of being starved forever.
  *
  * Tolerates not being alone (the question (#605) this waited on). One daemon per machine is the rule
@@ -49,7 +49,7 @@ import { errorMessage } from './error-message.js'
  * `.the-framework/*​/sessions` matches no *file* and `git add` fails with "did not match any files"
  * — a committer that commits nothing, every time. Only a real repo shows this.
  */
-export const SESSIONS_PATHSPEC = `:(glob)${THE_FRAMEWORK_DIR}/*/${ARCHIVE_DIR}/**`
+export const ARCHIVE_PATHSPEC = `:(glob)${THE_FRAMEWORK_DIR}/*/${ARCHIVE_DIR}/**`
 
 /** How long writes may keep arriving before the batch is committed anyway. */
 export const COMMIT_MAX_WAIT_MS = 5 * 60_000
@@ -98,8 +98,8 @@ export function commitMessage(files: string[]): string {
  * window could never see a burst and would commit straight through the middle of one. Only a real
  * repo shows this; a per-file fake does not.
  */
-export async function pendingSessions(cwd: string, git: GitRunner = nodeGitRunner()): Promise<string[]> {
-  const out = await git(['status', '--porcelain', '-uall', '--', SESSIONS_PATHSPEC], cwd).catch(() => '')
+export async function pendingAgents(cwd: string, git: GitRunner = nodeGitRunner()): Promise<string[]> {
+  const out = await git(['status', '--porcelain', '-uall', '--', ARCHIVE_PATHSPEC], cwd).catch(() => '')
   const files = new Set<string>()
   for (const line of out.split('\n')) {
     if (line.length < 4) continue
@@ -161,7 +161,7 @@ export async function gitBusy(
 const NOTHING_PENDING = 'no session changes'
 
 /**
- * Stage and commit the pending session archives under `cwd`, scoped to {@link SESSIONS_PATHSPEC}.
+ * Stage and commit the pending session archives under `cwd`, scoped to {@link ARCHIVE_PATHSPEC}.
  *
  * `add` before `commit` because a brand-new archive is untracked, and `git commit -- <path>` only
  * knows paths git already knows. Both are pathspec-scoped, so the staging is as narrow as the
@@ -171,7 +171,7 @@ const NOTHING_PENDING = 'no session changes'
  *
  * Never throws: this runs on a background tick with nothing to catch it.
  */
-export async function commitSessions(
+export async function commitAgents(
   cwd: string,
   git: GitRunner = nodeGitRunner(),
   exists: PathProbe = nodePathProbe(),
@@ -179,20 +179,20 @@ export async function commitSessions(
   const busy = await gitBusy(cwd, git, exists)
   if (busy) return { committed: false, reason: busy }
 
-  const files = await pendingSessions(cwd, git)
+  const files = await pendingAgents(cwd, git)
   if (files.length === 0) return { committed: false, reason: NOTHING_PENDING }
 
   try {
-    await git(['add', '--', SESSIONS_PATHSPEC], cwd)
-    await git(['commit', '-m', commitMessage(files), '--', SESSIONS_PATHSPEC], cwd)
+    await git(['add', '--', ARCHIVE_PATHSPEC], cwd)
+    await git(['commit', '-m', commitMessage(files), '--', ARCHIVE_PATHSPEC], cwd)
     return { committed: true, files }
   } catch (err) {
     return { committed: false, reason: errorMessage(err) }
   }
 }
 
-/** A running committer; call {@link SessionCommitter.stop} to end it. */
-export interface SessionCommitter {
+/** A running committer; call {@link AgentCommitter.stop} to end it. */
+export interface AgentCommitter {
   stop: () => void
   /** Run one poll now. Exposed so the daemon and tests can drive it deterministically. */
   poll: () => Promise<void>
@@ -204,8 +204,8 @@ export interface SessionCommitter {
   flush: () => Promise<number>
 }
 
-/** Options for {@link startSessionCommitter}. */
-export interface SessionCommitterOptions {
+/** Options for {@link startAgentCommitter}. */
+export interface AgentCommitterOptions {
   /** The projects to sweep each poll (the daemon passes the registry, mapped to summaries). */
   projects: () => Promise<ProjectSummary[]>
   /** Commit anyway once a project has been pending this long, ms. Default {@link COMMIT_MAX_WAIT_MS}. */
@@ -242,9 +242,9 @@ interface Pending {
  *
  * Forgiving throughout — a failed project scan, a busy repo or a rejected commit costs one window
  * and is retried, never a throw. Owns no timer (E4): the daemon's one clock calls {@link
- * SessionCommitter.poll}, and the window it debounces on is that cadence.
+ * AgentCommitter.poll}, and the window it debounces on is that cadence.
  */
-export function startSessionCommitter(opts: SessionCommitterOptions): SessionCommitter {
+export function startAgentCommitter(opts: AgentCommitterOptions): AgentCommitter {
   const git = opts.git ?? nodeGitRunner()
   const exists = opts.exists ?? nodePathProbe()
   const now = opts.now ?? Date.now
@@ -262,7 +262,7 @@ export function startSessionCommitter(opts: SessionCommitterOptions): SessionCom
       for (const project of projects) {
         if (stopped) break
         seen.add(project.path)
-        const files = await pendingSessions(project.path, git).catch((): string[] => [])
+        const files = await pendingAgents(project.path, git).catch((): string[] => [])
         if (files.length === 0) {
           pending.delete(project.path)
           continue
@@ -278,7 +278,7 @@ export function startSessionCommitter(opts: SessionCommitterOptions): SessionCom
           pending.set(project.path, { fingerprint, since, loggedReason })
           continue
         }
-        const outcome = await commitSessions(project.path, git, exists)
+        const outcome = await commitAgents(project.path, git, exists)
         if (outcome.committed) {
           pending.delete(project.path)
           opts.log?.(`[framework] committed ${outcome.files.length} session file(s) in ${project.name}`)
@@ -304,7 +304,7 @@ export function startSessionCommitter(opts: SessionCommitterOptions): SessionCom
   const flush = async (): Promise<number> => {
     let committed = 0
     for (const project of await opts.projects().catch(() => [])) {
-      const outcome = await commitSessions(project.path, git, exists)
+      const outcome = await commitAgents(project.path, git, exists)
       if (outcome.committed) {
         pending.delete(project.path)
         committed++

@@ -1,7 +1,7 @@
-import { RunFeed } from './RunFeed.js'
+import { AgentFeed } from './AgentFeed.js'
 import { Badge } from './ui/badge.js'
 import { useLiveEvents } from '../lib/use-live-events.js'
-import { isRunActive } from '../lib/live-state.js'
+import { isAgentActive } from '../lib/live-state.js'
 import { useFavicon } from '../lib/favicon.js'
 import { Logo } from './Logo.js'
 
@@ -14,7 +14,7 @@ export function RelayView({ agentId: agentId }: { agentId: string }) {
   const { events, lost, done } = useLiveEvents(agentId)
   // The mark and the tab icon (#875) follow the one run being watched, since that is all the
   // relay knows about — it has no project registry to ask.
-  const working = isRunActive(events)
+  const working = isAgentActive(events)
   useFavicon(working)
   return (
     <div className="flex h-screen flex-col">
@@ -32,7 +32,7 @@ export function RelayView({ agentId: agentId }: { agentId: string }) {
             This shared session isn&rsquo;t available — it may have ended, or the link may be wrong.
           </div>
         ) : (
-          <RunFeed events={events} lost={lost} />
+          <AgentFeed events={events} lost={lost} />
         )}
       </main>
     </div>

@@ -8,7 +8,7 @@ import type { AutoHandoffSkip, FrameworkEvent } from './events.js'
 // carries the structured data; we surface it as cards.
 
 /** The run's lifecycle progress (#326): the session name it chose and whether it is ready for merge. */
-export interface RunProgress {
+export interface AgentProgress {
   /** The `[a-z0-9-]` session name (also the branch), once the agent set one via `setSessionName()`. */
   sessionName?: string
   /** True once the agent signalled `setReadyForMerge()`: building (false) -> ready (true). */
@@ -20,8 +20,8 @@ export interface RunProgress {
  * a `ready-for-merge` has fired. Drives the dashboard status label + dot (orange building,
  * green ready). Always returns a value — an untouched run is `{ readyForMerge: false }`.
  */
-export function agentProgress(events: readonly FrameworkEvent[]): RunProgress {
-  const progress: RunProgress = { readyForMerge: false }
+export function agentProgress(events: readonly FrameworkEvent[]): AgentProgress {
+  const progress: AgentProgress = { readyForMerge: false }
   for (const event of events) {
     if (event.kind === 'session-name') progress.sessionName = event.name
     else if (event.kind === 'ready-for-merge') progress.readyForMerge = true
@@ -55,7 +55,7 @@ export interface HandoffState {
  * `initial` seeds the armed pair for a reader whose event stream missed the opening
  * `handoff-armed` (#1376): the run writes it as its very first event, before the live channel has
  * attached, so a live tab can only learn the real state from the run record's mirror
- * (`RunRecord.handoff`) — without it, a session the launcher armed push-only reads as "Open PR".
+ * (`AgentRecord.handoff`) — without it, a session the launcher armed push-only reads as "Open PR".
  * A `handoff-armed` event in the stream still wins: it is newer than any record snapshot.
  */
 export function handoffState(

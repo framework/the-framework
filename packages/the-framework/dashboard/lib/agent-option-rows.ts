@@ -40,7 +40,7 @@ export type OptionRow = {
 }
 
 /** The run options, with every rule between them already applied. */
-export interface RunOptionRows {
+export interface AgentOptionRows {
   main: OptionRow[]
 }
 
@@ -51,7 +51,7 @@ export interface RunOptionRows {
  * as off, because that is what the run will do. So a surface that renders this can never claim an
  * option is on while the run ignores it.
  */
-export function runOptionRows(preferences: Preferences): RunOptionRows {
+export function agentOptionRows(preferences: Preferences): AgentOptionRows {
   const transparent = preferences.transparent ?? false // #625: the master off-switch
   const vanilla = preferences.vanilla ?? false
   const onBeforeMergeableQuality = preferences.onBeforeMergeableQuality ?? false
@@ -191,5 +191,5 @@ const RESUME_OPTION_KEYS: ReadonlySet<string> = new Set(['push', 'pr', 'merge', 
  * here truthful. Same rows, same rules (ladder gating, effective values) — just filtered.
  */
 export function resumeOptionRows(preferences: Preferences): OptionRow[] {
-  return runOptionRows(preferences).main.filter(row => RESUME_OPTION_KEYS.has(row.key))
+  return agentOptionRows(preferences).main.filter(row => RESUME_OPTION_KEYS.has(row.key))
 }

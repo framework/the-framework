@@ -4,7 +4,7 @@ import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { makeWorld, waitFor } from './harness.js'
 import { onProjects, sendAddProject } from '../dashboard-rpc/projects.js'
-import { onGitStatus, onRuns, onDocs } from '../dashboard-rpc/reads.js'
+import { onGitStatus, onAgents, onDocs } from '../dashboard-rpc/reads.js'
 import { onPreferences, patchPreferences } from '../dashboard-rpc/preferences.js'
 import { onQuota, onAutoPm, sendAutoPmSweep } from '../dashboard-rpc/quota.js'
 import { sendStart } from '../dashboard-rpc/control.js'
@@ -32,7 +32,7 @@ test('add a project: it is installed, registered, and readable like the sidebar 
     const status = await rpc(onGitStatus)(project.id)
     assert.equal(status?.branch, 'main')
     assert.deepEqual(await rpc(onDocs)(project.id), [])
-    assert.deepEqual(await rpc(onRuns)(project.id), [])
+    assert.deepEqual(await rpc(onAgents)(project.id), [])
 
     // Adding the same repo again is a no-op the dialog can explain, not a duplicate.
     const again = await rpc(sendAddProject)(project.cwd, false)
@@ -52,7 +52,7 @@ test('unknown projects degrade quietly: reads are empty, writes are refused (#42
   const rpc = world.rpc
   try {
     await world.addProject()
-    assert.deepEqual(await rpc(onRuns)('no-such-project'), [])
+    assert.deepEqual(await rpc(onAgents)('no-such-project'), [])
     assert.equal(await rpc(onGitStatus)('no-such-project'), null)
     const refused = await rpc(sendStart)('no-such-project', 'do something')
     assert.equal(refused.ok, false)
@@ -75,8 +75,8 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
     assert.equal((await rpc(onPreferences)()).model, 'fable-e2e')
 
     // First leg: a plain run, finished.
-    const agentId = await world.startRun(project, 'Build the settings page')
-    await world.waitRun(project, agentId, 'done')
+    const agentId = await world.startAgent(project, 'Build the settings page')
+    await world.waitAgent(project, agentId, 'done')
 
     // The composer's Resume sends only its seed (#1467); the daemon overlays the project's
     // resolved options, so the model chosen in Settings reaches the continued session's argv.
@@ -84,19 +84,19 @@ test('settings written in the dashboard reach the next resumed run (#858/#1467)'
     // guard waits out the still-exiting first leg instead of refusing (#1529), and the run
     // lock makes the continuation wait out the archive it is about to reopen, where it used
     // to reuse a checkout mid-retirement.
-    const resumed = await rpc(sendStart)(project.id, 'Keep going', 'prompt', { continueRunId: agentId })
+    const resumed = await rpc(sendStart)(project.id, 'Keep going', 'prompt', { continueAgentId: agentId })
     assert.equal(resumed.ok, true, `the resume was refused: ${JSON.stringify(resumed)}`)
-    await world.waitRun(project, agentId, 'done')
+    await world.waitAgent(project, agentId, 'done')
     await world.waitRetired(project, agentId)
     const sent = await waitFor(async () => {
       const spawns = await world.spawnedSpecs()
       return spawns.length >= 2 ? spawns[1] : undefined
     }, 'the resumed child to be spawned')
     assert.equal(sent.options.model, 'fable-e2e', 'the resumed run carries the project model')
-    assert.equal(sent.continueRun, true, 'the resumed run reopens the same session row')
+    assert.equal(sent.continueAgent, true, 'the resumed run reopens the same session row')
 
     // One row throughout: the continuation is the same run, not a second history entry.
-    const rows = await rpc(onRuns)(project.id)
+    const rows = await rpc(onAgents)(project.id)
     assert.equal(rows.filter(r => r.id === agentId).length, 1)
   } finally {
     await world.close()

@@ -11,12 +11,12 @@ import {
   pruneWorktrees,
   worktreePath,
   worktreeSize,
-  isSafeRunId,
+  isSafeAgentId,
   archivedAgentPaths,
   FRAMEWORK_DIR,
   type AgentStatus,
 } from './store/index.js'
-import { pushRunBranch } from './dashboard/agent-handoff.js'
+import { pushAgentBranch } from './dashboard/agent-handoff.js'
 
 /** A retained worktree and the run that left it behind (#752). */
 export interface WorktreeRow {
@@ -113,7 +113,7 @@ export async function removeProjectWorktree(
   agentId: string,
   opts: RemoveWorktreeOptions = {},
 ): Promise<RemoveResult> {
-  if (!isSafeRunId(agentId)) return { ok: false, error: `invalid session id: ${agentId}` }
+  if (!isSafeAgentId(agentId)) return { ok: false, error: `invalid session id: ${agentId}` }
   const names = await listWorktreeDirs(cwd).catch((): string[] => [])
   if (!names.includes(agentId)) return { ok: false, error: `no worktree for session ${agentId}` }
   const live = await readLiveMetas(cwd).catch(() => [])
@@ -136,7 +136,7 @@ export async function removeProjectWorktree(
       // Pushing is what makes the removal recoverable, so it is attempted here rather than
       // required of the caller. A repo with no remote never gets past this, which is the honest
       // answer: there is nowhere for the work to be recoverable from.
-      const pushed = await pushRunBranch(cwd, branch)
+      const pushed = await pushAgentBranch(cwd, branch)
       if (!pushed.ok) {
         return { ok: false, error: `${branch} is not on the remote (${pushed.error}); its worktree was kept` }
       }
@@ -150,11 +150,11 @@ export async function removeProjectWorktree(
   }
 }
 
-/** The outcome of {@link deleteProjectRun}. */
-export type DeleteRunResult = { ok: true } | { ok: false; error: string }
+/** The outcome of {@link deleteProjectAgent}. */
+export type DeleteAgentResult = { ok: true } | { ok: false; error: string }
 
-/** Surface-specific work {@link deleteProjectRun} does, and the file-removal seam for tests. */
-export interface DeleteRunOptions {
+/** Surface-specific work {@link deleteProjectAgent} does, and the file-removal seam for tests. */
+export interface DeleteAgentOptions {
   /** Run before the worktree comes off disk (stop a preview serving it, as removal does). */
   beforeRemove?: (agentId: string) => Promise<void>
   /** Remove one file, tolerant of an absent one. Defaults to `rm(path, { force: true })`. */
@@ -177,7 +177,7 @@ async function rmFile(path: string): Promise<void> {
  * why the surfaces that call it confirm first. Since #1179 that archive is committed, so the files
  * go but the deletion is itself a change git will record.
  *
- * What it deliberately leaves is git's, not the dashboard's: the branch `the-framework/run-<id>`
+ * What it deliberately leaves is git's, not the dashboard's: the branch `the-framework/agent-<id>`
  * (or the name the agent gave it) and its commits, the committed `LOGS.md` line, and the
  * conversation record. Deleting a branch that may carry merged work or an open PR is not a thing a
  * dashboard action should do silently, so the branch stays and delete means "remove from the
@@ -187,8 +187,8 @@ async function rmFile(path: string): Promise<void> {
  * worktree is discarded with it, which is the intent here (the session is being thrown away),
  * unlike remove-worktree, which commits that work to the kept branch first.
  */
-export async function deleteProjectRun(cwd: string, agentId: string, opts: DeleteRunOptions = {}): Promise<DeleteRunResult> {
-  if (!isSafeRunId(agentId)) return { ok: false, error: `invalid session id: ${agentId}` }
+export async function deleteProjectAgent(cwd: string, agentId: string, opts: DeleteAgentOptions = {}): Promise<DeleteAgentResult> {
+  if (!isSafeAgentId(agentId)) return { ok: false, error: `invalid session id: ${agentId}` }
   const live = await readLiveMetas(cwd).catch(() => [])
   if (live.some(agent => agent.id === agentId && agent.status === 'running')) {
     return { ok: false, error: 'that session is still going; stop it before deleting it' }

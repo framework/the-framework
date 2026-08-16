@@ -5,14 +5,14 @@ import type { GitRunner } from './project.js'
 import type { StoreFs } from './store/index.js'
 import {
   userDirName,
-  sessionsDir,
-  ensureSessionsIgnored,
+  agentArchiveDir,
+  ensureArchiveIgnored,
   resolveUserDir,
   forgetUserDirs,
   ANONYMOUS_USER_DIR,
-} from './sessions.js'
-import { frameworkGitignore, sessionsGitignore } from './framework-gitignore.js'
-import { SESSIONS_PATHSPEC } from './session-commit.js'
+} from './agent-archive.js'
+import { frameworkGitignore, archiveGitignore } from './framework-gitignore.js'
+import { ARCHIVE_PATHSPEC } from './agent-commit.js'
 
 /** A minimal in-memory {@link StoreFs}: this module only reads and writes one file. */
 function memFs(seed: Record<string, string> = {}): StoreFs & { files: Map<string, string> } {
@@ -67,19 +67,19 @@ test('no identity still gets a directory, rather than dropping the history (#117
 })
 
 test('sessions live under the user, inside .the-framework (#1179)', () => {
-  assert.equal(sessionsDir('/repo', 'git@brillout.com'), join('/repo', '.the-framework', 'git@brillout.com', 'agents'))
+  assert.equal(agentArchiveDir('/repo', 'git@brillout.com'), join('/repo', '.the-framework', 'git@brillout.com', 'agents'))
 })
 
 test('the ignore rules re-include every directory on the way down (#1179)', () => {
   // The seeded allow-list ignores everything with `*`, and git never descends into an ignored
   // directory — so un-ignoring only the files would never be reached.
-  const rules = sessionsGitignore()
+  const rules = archiveGitignore()
   assert.equal(rules, '!*/\n!*/agents/\n!*/agents/**\n')
 })
 
 test('a repo with no ignore file gets the whole file, transient state and all (#1179)', async () => {
   const fs = memFs()
-  assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), true)
+  assert.equal(await ensureArchiveIgnored('/repo', 'me@example.com', fs), true)
   assert.equal(fs.files.get(IGNORE), frameworkGitignore())
 })
 
@@ -87,8 +87,8 @@ test('a repo that predates the rules is repaired, once (#1179)', async () => {
   // Install writes the whole file, so this only fires for a repo activated before the archive
   // existed. Idempotent after that: the rule is already there, so nothing is written again.
   const fs = memFs({ [IGNORE]: '# The Framework\n*\n!.gitignore\n' })
-  assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), true)
-  assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), false, 'already there, so nothing written')
+  assert.equal(await ensureArchiveIgnored('/repo', 'me@example.com', fs), true)
+  assert.equal(await ensureArchiveIgnored('/repo', 'me@example.com', fs), false, 'already there, so nothing written')
   const written = fs.files.get(IGNORE)!
   assert.equal(written.match(/!\*\/agents\/\*\*/g)?.length, 1)
 })
@@ -97,15 +97,15 @@ test('a second user writes nothing: the rules already cover them (#1312)', async
   // The whole point of the glob. Under the per-user form this was two writes to a tracked file,
   // one per person, each dirtying its own checkout.
   const fs = memFs()
-  assert.equal(await ensureSessionsIgnored('/repo', 'a@example.com', fs), true)
-  assert.equal(await ensureSessionsIgnored('/repo', 'b@example.com', fs), false, 'the glob already covers them')
+  assert.equal(await ensureArchiveIgnored('/repo', 'a@example.com', fs), true)
+  assert.equal(await ensureArchiveIgnored('/repo', 'b@example.com', fs), false, 'the glob already covers them')
   assert.ok(!fs.files.get(IGNORE)!.includes('@example.com'), 'no user is named')
 })
 
 test('a hand-edited file keeps every line it has (#1179)', async () => {
   // Repairing means adding what is missing, never rewriting what is there.
   const fs = memFs({ [IGNORE]: '# mine\n*\n!keep-me/\n' })
-  assert.equal(await ensureSessionsIgnored('/repo', 'me@example.com', fs), true)
+  assert.equal(await ensureArchiveIgnored('/repo', 'me@example.com', fs), true)
   const written = fs.files.get(IGNORE)!
   assert.ok(written.includes('# mine'), 'comments survive')
   assert.ok(written.includes('!keep-me/'), 'an unrelated rule survives')
@@ -158,7 +158,7 @@ test('against real git: a committed session survives git clean -fdx, and nothing
     await writeFile(join(fw, 'events.jsonl'), '\n')
     await writeFile(join(fw, 'worktrees', 'r9', 'file.txt'), 'x\n')
 
-    await ensureSessionsIgnored(repo, 'git@example.com')
+    await ensureArchiveIgnored(repo, 'git@example.com')
     const status = git('status', '--porcelain', '-uall')
     assert.ok(status.includes('.the-framework/git@example.com/agents/r1.json'), 'the session is visible to git')
     assert.ok(!status.includes('.the-framework/agents/'), 'the transient archive stays ignored')
@@ -166,7 +166,7 @@ test('against real git: a committed session survives git clean -fdx, and nothing
     assert.ok(!status.includes('.the-framework/worktrees/'), 'a run checkout stays ignored')
     assert.ok((await readFile(join(fw, '.gitignore'), 'utf8')).includes('# The Framework'), 'the allow-list is kept')
 
-    git('add', '--', SESSIONS_PATHSPEC)
+    git('add', '--', ARCHIVE_PATHSPEC)
     git('commit', '-q', '-m', 'agents')
     git('clean', '-fdx')
     assert.ok(existsSync(join(fw, 'git@example.com', 'agents', 'r1.json')), 'the session survives the clean')

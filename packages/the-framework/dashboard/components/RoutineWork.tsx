@@ -11,7 +11,7 @@ import { onProjects } from '../rpc/projects.js'
 import { sendAutoPmSweep } from '../rpc/quota.js'
 import { useAutoPm } from '../lib/quota.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
-import { useStartRun } from '../lib/use-start-run.js'
+import { useStartAgent } from '../lib/use-start-agent.js'
 import { useLoaded } from '../lib/use-async.js'
 import { formatUntil } from '../lib/format-date.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
@@ -54,18 +54,18 @@ function describeOutcomes(outcomes: AutoPmOutcome[] | undefined): string {
 }
 
 export function RoutineWork({
-  onRunStarted,
+  onAgentStarted,
 }: {
   /**
    * Told which run the button just started (#1191). The project-carrying form, because the
    * Overview has no project selected — each row picks one — so the shell cannot supply it.
    */
-  onRunStarted: (projectId: string, intent: string, agentId?: string) => void
+  onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
 }) {
   const projects = useLoaded<ProjectSummary[]>(onProjects, NO_PROJECTS, [])
   const preferences = usePreferences()
   const report = useAutoPm()
-  const { busy, error, start } = useStartRun()
+  const { busy, error, start } = useStartAgent()
   const [picked, setPicked] = useState<string | null>(null)
   // Which routine is in flight, so only its own button says "Starting…".
   const [starting, setStarting] = useState<string | null>(null)
@@ -77,7 +77,7 @@ export function RoutineWork({
   // the selection is validated against what is actually there rather than trusted.
   const projectId = (picked !== null && projects.some(p => p.id === picked) ? picked : projects[0]?.id) ?? null
 
-  const autoRun = preferences.autoPm ?? false
+  const autoAgent = preferences.autoPm ?? false
   // Absent = nothing opted out, which is also what the store saves an empty list back as.
   const optedOut = preferences.autoPmOptOut ?? []
   // Written as the whole list rather than a delta: `updatePreferences` patches by key, and this
@@ -91,8 +91,8 @@ export function RoutineWork({
   const concurrency = preferences.autoPmConcurrency ?? DEFAULT_AUTO_PM_CONCURRENCY
   // The countdown is the sweep's, and the sweep only reports once the daemon has run one. With
   // auto-run off, or before that first report, the box says what it does instead of when.
-  const autoRunLabel =
-    autoRun && report?.nextSweepAt !== undefined ? `Auto-runs ${formatUntil(report.nextSweepAt)}` : 'Auto-run'
+  const autoAgentLabel =
+    autoAgent && report?.nextSweepAt !== undefined ? `Auto-runs ${formatUntil(report.nextSweepAt)}` : 'Auto-run'
 
   // Firing the sweep on demand (#1210). The RPC awaits the sweep and returns its per-project
   // outcomes (#1433), so the click's own answer lands on the card the moment the tick resolves —
@@ -139,7 +139,7 @@ export function RoutineWork({
     // it had just started was nowhere on screen. Handing the id over is what makes it the
     // selection; with no id yet the shell lands on the project and adopts the running run once the
     // poll surfaces it, which is the same fallback every other start path uses.
-    if (result) onRunStarted(projectId, job.prompt, result.agentId)
+    if (result) onAgentStarted(projectId, job.prompt, result.agentId)
   }
 
   return (
@@ -220,8 +220,8 @@ export function RoutineWork({
               <div className="flex items-center justify-between gap-2">
                 <Tooltip>
                   <TooltipTrigger render={<label className="flex cursor-pointer items-center gap-1.5 text-sm" />}>
-                    <Checkbox checked={autoRun} onCheckedChange={checked => updatePreferences({ autoPm: checked })} />
-                    <span className="font-medium text-foreground">{autoRunLabel}</span>
+                    <Checkbox checked={autoAgent} onCheckedChange={checked => updatePreferences({ autoPm: checked })} />
+                    <span className="font-medium text-foreground">{autoAgentLabel}</span>
                   </TooltipTrigger>
                   <TooltipContent>Automatically run the ticked routines on a regular schedule.</TooltipContent>
                 </Tooltip>
@@ -244,7 +244,7 @@ export function RoutineWork({
                     {sweeping ? 'Triggering…' : 'Trigger routine now'}
                   </TooltipTrigger>
                   <TooltipContent>
-                    {autoRun
+                    {autoAgent
                       ? 'Run the scheduled sweep now instead of waiting for the countdown.'
                       : 'Run the sweep once now. Auto-run stays off, so nothing further is scheduled.'}
                   </TooltipContent>
@@ -292,7 +292,7 @@ export function RoutineWork({
               </p>
               {/* Auto-run on with every routine unticked is a schedule with nothing on it, and
                   from the countdown alone it looks like work is coming (#1209). */}
-              {autoRun && AUTO_PM_ROUTINES.every(job => optedOut.includes(job.name)) && (
+              {autoAgent && AUTO_PM_ROUTINES.every(job => optedOut.includes(job.name)) && (
                 <p className="mt-1 text-xs text-warning">
                   Every routine is unticked, so the schedule has nothing to run.
                 </p>

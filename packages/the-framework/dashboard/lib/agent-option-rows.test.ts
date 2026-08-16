@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'vitest'
 import type { Preferences } from '../../dist/index.js'
-import { runOptionRows, type OptionRow } from './run-option-rows.js'
+import { agentOptionRows, type OptionRow } from './agent-option-rows.js'
 
 // The rules between the run options (#314/#625/#801/#958). They live in one table because two
 // surfaces render them (the launcher gear and the settings page); these pin the rules themselves,
 // so neither surface can quietly disagree with the other.
 
-const rows = (preferences: Preferences) => runOptionRows(preferences)
+const rows = (preferences: Preferences) => agentOptionRows(preferences)
 const find = (list: OptionRow[], key: string) => list.find(r => r.key === key)!
 
-describe('runOptionRows', () => {
+describe('agentOptionRows', () => {
   test('the publish ladder shows all three rungs, in order, up to PR by default (#1379)', () => {
     // The pair this replaced showed only Open PR, so "Open PR: off" silently meant push-only — the
     // launcher said publishing was off while the session header armed "Push branch: on".

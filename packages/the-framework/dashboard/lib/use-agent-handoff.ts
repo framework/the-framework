@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { AgentHandoff } from '../../dist/index.js'
-import { onRunHandoff } from '../rpc/reads.js'
+import { onAgentHandoff } from '../rpc/reads.js'
 import { usePolled } from './use-async.js'
 import { useAction } from './use-action.js'
 
 /** What the run view knows about the session's branch, and how it acts on it. */
-export type RunHandoffState = {
+export type AgentHandoffState = {
   handoff: AgentHandoff | null
   /** True once the read has answered, so an empty state isn't flashed before then. */
   loaded: boolean
@@ -19,7 +19,7 @@ export type RunHandoffState = {
 // The handoff read lifted out of its panel: the same answer now feeds two places — the summary and
 // the actions in the run's action bar, and the commits/files detail the bar expands. Reading it
 // once keeps them from disagreeing and halves the polling.
-export function useRunHandoff(projectId: string, agentId: string | null | undefined, enabled = true): RunHandoffState {
+export function useAgentHandoff(projectId: string, agentId: string | null | undefined, enabled = true): AgentHandoffState {
   // Polled rather than read once: a push or a PR opened from here (or from a terminal) changes
   // what to offer, and `reload` makes the bar's own actions land immediately. Not read while the
   // run is live (#1026): a branch still being written to has nothing to hand off yet.
@@ -27,7 +27,7 @@ export function useRunHandoff(projectId: string, agentId: string | null | undefi
   // holds the Push / Open PR offer back, so that one is worth asking again for straight away.
   const [everyMs, setEveryMs] = useState(15_000)
   const { value: handoff, reload, loaded } = usePolled<AgentHandoff | null>(
-    enabled && agentId ? () => onRunHandoff(projectId, agentId) : null,
+    enabled && agentId ? () => onAgentHandoff(projectId, agentId) : null,
     null,
     everyMs,
     [projectId, agentId, enabled, everyMs],

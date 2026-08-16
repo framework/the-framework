@@ -53,8 +53,8 @@ describe('TicketsPanel (#697/#1144)', () => {
 
   test('the plan column starts a session to write the plan when the ticket has none (#685)', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'r3' })
-    const onRunStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket({ planned: false })]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
+    const onAgentStarted = vi.fn()
+    render(<TicketsPanel projectId="p1" tickets={[ticket({ planned: false })]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /create a plan for do the thing/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     // A fixed prompt, so it takes the verbatim-text path rather than a build, and it is exactly the
@@ -64,14 +64,14 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(sendStart.mock.calls[0]?.[1]).toBe('Create tickets/2026-07-20_do-the-thing.plan.md')
     // Attended, unlike the import/update buttons: a per-ticket plan is a session you land in.
     expect(sendStart.mock.calls[0]?.[3]).toEqual({})
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith(expect.any(String), 'r3'))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r3'))
   })
 
   test('the start column spins up an agent working on the ticket, unattended and with the ticket named (#1117/#1279)', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'r4' })
-    const onRunStarted = vi.fn()
+    const onAgentStarted = vi.fn()
     const onOpen = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={onOpen} onRunStarted={onRunStarted} />)
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={onOpen} onAgentStarted={onAgentStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /start work on do the thing/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     // A fixed prompt on the verbatim-text path, and exactly the exported ask — no second, hidden
@@ -83,7 +83,7 @@ describe('TicketsPanel (#697/#1144)', () => {
     // the run's meta names what it implements (#1117) — the prompt is not the drain preset, so
     // the daemon would not infer it.
     expect(sendStart.mock.calls[0]?.[3]).toEqual({ unattended: true, ticket: 'tickets/2026-07-20_do-the-thing.md' })
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith(expect.any(String), 'r4'))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r4'))
     // A sibling of the row's open button, like the plan cell: starting must not also navigate.
     expect(onOpen).not.toHaveBeenCalled()
   })
@@ -208,8 +208,8 @@ describe('TicketsPanel (#697/#1144)', () => {
 
   test('an empty tickets/ offers the GitHub import instead of a dead end', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'r1' })
-    const onRunStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
+    const onAgentStarted = vi.fn()
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     // A fixed prompt, so it takes the verbatim-text path rather than a build.
@@ -221,29 +221,29 @@ describe('TicketsPanel (#697/#1144)', () => {
     // Unattended (#1279): a button-fired import ends at settle instead of parking in the chat loop.
     expect(sendStart.mock.calls[0]?.[3]).toEqual({ unattended: true })
     // The run id is what lands you on the import session rather than the project home (#1169).
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith(expect.any(String), 'r1'))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r1'))
   })
 
   test('a refused import says why and moves you nowhere (#1169)', async () => {
     sendStart.mockResolvedValue({ ok: false, error: 'a session is already active' })
-    const onRunStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
+    const onAgentStarted = vi.fn()
+    render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
     expect(await screen.findByText(/already active/i)).toBeTruthy()
-    expect(onRunStarted).not.toHaveBeenCalled()
+    expect(onAgentStarted).not.toHaveBeenCalled()
   })
 
   test('a filled tickets/ offers the update, and sends the update preset verbatim (#1208)', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'r2' })
-    const onRunStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
+    const onAgentStarted = vi.fn()
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
     // Its own preset, not the import's: the two ask for different work on a full directory.
     expect(sendStart.mock.calls[0]?.[1]).toBe(presets.updateTickets.render())
     expect(sendStart.mock.calls[0]?.[1]).not.toBe(presets.importTickets.render())
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith(expect.any(String), 'r2'))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r2'))
   })
 
   test('the update is not offered on an empty tickets/, where importing is the word (#1208)', async () => {
@@ -265,11 +265,11 @@ describe('TicketsPanel (#697/#1144)', () => {
 
   test('a refused update says why and moves you nowhere (#1208)', async () => {
     sendStart.mockResolvedValue({ ok: false, error: 'a session is already active' })
-    const onRunStarted = vi.fn()
-    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onRunStarted={onRunStarted} />)
+    const onAgentStarted = vi.fn()
+    render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
     expect(await screen.findByText(/already active/i)).toBeTruthy()
-    expect(onRunStarted).not.toHaveBeenCalled()
+    expect(onAgentStarted).not.toHaveBeenCalled()
   })
 
   test('an empty list with hiddenByFilter says so, rather than offering an import for work already done (#1144/#1230)', async () => {

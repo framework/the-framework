@@ -1,5 +1,5 @@
 export { startDashboard, type Dashboard, type DashboardOptions } from './server.js'
-export type { StartRunKind, StartRunOptions, StartRunResult, AddProjectResult, OnboardingSuggestion, DriverReady, PreviewResult, PreviewStatus, AgentWorktree } from './types.js'
+export type { StartAgentKind, StartAgentOptions, StartAgentResult, AddProjectResult, OnboardingSuggestion, DriverReady, PreviewResult, PreviewStatus, AgentWorktree } from './types.js'
 export {
   summarizeProject,
   defaultProjectsProvider,
@@ -13,23 +13,24 @@ export { serveClientBundle } from './static.js'
 export { readDocs, DOC_CATEGORIES, type WorkspaceDoc } from './docs.js'
 export { readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta, type TicketGithubLink } from './tickets.js'
 export { collectQueue, parseTodoItems, type ProjectQueue, type QueueItem } from './queue.js'
-export { buildOverview, buildRecentRuns, buildHotTickets, collectAllTickets, ticketBucket, type Overview, type ActiveAgent as ActiveRun, type RecentProject, type RecentAgent as RecentRun, type HotTicket, type HotBucket, type OverviewDeps, type ProjectTickets, type AllTicketsDeps } from './overview.js'
+export { buildOverview, buildRecentAgents, buildHotTickets, collectAllTickets, ticketBucket, type Overview, type ActiveAgent as ActiveAgent, type RecentProject, type RecentAgent as RecentAgent, type HotTicket, type HotBucket, type OverviewDeps, type ProjectTickets, type AllTicketsDeps } from './overview.js'
 export { buildDashboard, type DashboardData, type ProjectStat, type ActivityDay, type DashboardDeps } from './dashboard.js'
 export { readGitStatus, type GitStatus } from './git-status.js'
 export { ghPrView, ghPrList, ghJson, nodeGhRunner, type LinkedPr, type OpenPr, type PrLookup, type BranchPrLookup, type PrLister, type GhRunner } from './gh.js'
 export { readFileDiff, readFileChanges, safeRepoPath, type FileDiff, type FileChange } from './file-diff.js'
 export { readFileContent, type FileContent } from './file-read.js'
 export {
-  readRunHandoff,
+  readAgentHandoff,
   agentBranchFor,
-  pushRunBranch,
-  openRunPullRequest,
+  pushAgentBranch,
+  openBranchPullRequest,
+  openAgentPullRequest,
   type AgentHandoff,
   type HandoffCommit,
   type HandoffFile,
   type HandoffResult,
   type PullRequestDraft,
-  type RunHandoffDeps,
+  type AgentHandoffDeps,
 } from './agent-handoff.js'
 export {
   buildInterventions,

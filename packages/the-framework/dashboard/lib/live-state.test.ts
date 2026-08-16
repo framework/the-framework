@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { FrameworkEvent, AgentMeta } from '../../dist/index.js'
-import { agentSettled, agentViews, pendingChoices, isPublishing, isMetaPublishing, isRunActive, currentRunEvents, runOutcome, actionsRunUrl } from './live-state.js'
+import { agentSettled, agentViews, pendingChoices, isPublishing, isMetaPublishing, isAgentActive, currentAgentEvents, agentOutcome, actionsRunUrl } from './live-state.js'
 
 const view = (id: string, title: string, markdown: string): FrameworkEvent => ({ kind: 'view', id, title, markdown })
 const choice = (id: string, title: string): FrameworkEvent => ({
@@ -65,11 +65,11 @@ describe('pendingChoices', () => {
   })
 })
 
-describe('isRunActive', () => {
+describe('isAgentActive', () => {
   test('empty is not active; streamed-but-unended is; ended is not', () => {
-    expect(isRunActive([])).toBe(false)
-    expect(isRunActive([{ kind: 'log', message: 'go' }])).toBe(true)
-    expect(isRunActive([{ kind: 'log', message: 'go' }, { kind: 'end', ok: true }])).toBe(false)
+    expect(isAgentActive([])).toBe(false)
+    expect(isAgentActive([{ kind: 'log', message: 'go' }])).toBe(true)
+    expect(isAgentActive([{ kind: 'log', message: 'go' }, { kind: 'end', ok: true }])).toBe(false)
   })
 
   test('a resumed session is active again: the stopped segment\'s end does not count (#762)', () => {
@@ -81,7 +81,7 @@ describe('isRunActive', () => {
       { kind: 'session' },
       { kind: 'log', message: 'back at it' },
     ] as FrameworkEvent[]
-    expect(isRunActive(resumed)).toBe(true)
+    expect(isAgentActive(resumed)).toBe(true)
   })
 })
 
@@ -154,17 +154,17 @@ describe('isMetaPublishing', () => {
   })
 })
 
-describe('currentRunEvents', () => {
+describe('currentAgentEvents', () => {
   const session = (workspace: string): FrameworkEvent => ({ kind: 'session', driver: 'claude', workspace, fake: false })
 
   test('returns the feed whole when no run has opened yet', () => {
     const events: FrameworkEvent[] = [{ kind: 'log', message: 'warming up' }]
-    expect(currentRunEvents(events)).toEqual(events)
+    expect(currentAgentEvents(events)).toEqual(events)
   })
 
   test('keeps a single run intact, session-first', () => {
     const events: FrameworkEvent[] = [session('/repo'), { kind: 'log', message: 'go' }, { kind: 'end', ok: true }]
-    expect(currentRunEvents(events)).toEqual(events)
+    expect(currentAgentEvents(events)).toEqual(events)
   })
 
   test('drops a previous run once a new run opens (the bug)', () => {
@@ -175,7 +175,7 @@ describe('currentRunEvents', () => {
       session('/repo'),
       { kind: 'log', message: 'run 2' },
     ]
-    expect(currentRunEvents(events)).toEqual([session('/repo'), { kind: 'log', message: 'run 2' }])
+    expect(currentAgentEvents(events)).toEqual([session('/repo'), { kind: 'log', message: 'run 2' }])
   })
 
   test('a just-finished second run keeps its own end, not the first run', () => {
@@ -187,7 +187,7 @@ describe('currentRunEvents', () => {
       { kind: 'log', message: 'run 2' },
       { kind: 'end', ok: false, stopped: true },
     ]
-    expect(currentRunEvents(events)).toEqual([
+    expect(currentAgentEvents(events)).toEqual([
       session('/repo'),
       { kind: 'log', message: 'run 2' },
       { kind: 'end', ok: false, stopped: true },
@@ -196,17 +196,17 @@ describe('currentRunEvents', () => {
 })
 
 // #948: the overview pill must tell a crash, a user stop, and a clean finish apart.
-describe('runOutcome', () => {
+describe('agentOutcome', () => {
   test('undefined while the run is still going', () => {
-    expect(runOutcome([{ kind: 'log', message: 'hi' }])).toBeUndefined()
+    expect(agentOutcome([{ kind: 'log', message: 'hi' }])).toBeUndefined()
   })
 
   test('a clean end', () => {
-    expect(runOutcome([{ kind: 'end', ok: true }])).toEqual({ ok: true, stopped: false })
+    expect(agentOutcome([{ kind: 'end', ok: true }])).toEqual({ ok: true, stopped: false })
   })
 
   test('a failure carries its detail', () => {
-    expect(runOutcome([{ kind: 'end', ok: false, detail: 'driver exited 1' }])).toEqual({
+    expect(agentOutcome([{ kind: 'end', ok: false, detail: 'driver exited 1' }])).toEqual({
       ok: false,
       stopped: false,
       detail: 'driver exited 1',
@@ -214,7 +214,7 @@ describe('runOutcome', () => {
   })
 
   test('a user stop is a stop, not a failure', () => {
-    expect(runOutcome([{ kind: 'end', ok: false, stopped: true }])).toEqual({ ok: false, stopped: true })
+    expect(agentOutcome([{ kind: 'end', ok: false, stopped: true }])).toEqual({ ok: false, stopped: true })
   })
 
   test('a resumed session has no outcome until ITS segment ends (#762)', () => {
@@ -222,9 +222,9 @@ describe('runOutcome', () => {
     // after it later finished clean. The ending is the current segment's, or nothing yet.
     const stopped = { kind: 'end', ok: false, stopped: true }
     const midResume = [{ kind: 'session' }, stopped, { kind: 'session' }, { kind: 'log', message: 'go' }] as FrameworkEvent[]
-    expect(runOutcome(midResume)).toBeUndefined()
+    expect(agentOutcome(midResume)).toBeUndefined()
     const finishedClean = [...midResume, { kind: 'end', ok: true }] as FrameworkEvent[]
-    expect(runOutcome(finishedClean)).toEqual({ ok: true, stopped: false })
+    expect(agentOutcome(finishedClean)).toEqual({ ok: true, stopped: false })
   })
 })
 

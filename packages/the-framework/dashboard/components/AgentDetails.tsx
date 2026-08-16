@@ -34,7 +34,7 @@ function Fact({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function SessionDetails({ events }: { events: FrameworkEvent[] }) {
+export function AgentDetails({ events }: { events: FrameworkEvent[] }) {
   const session = sessionInfo(events)
   const agent = driverFromImpl(session?.driver)
   const agentLabel = agent ? DRIVER_LABELS[agent] : (session?.driver ?? 'Agent')

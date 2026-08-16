@@ -12,7 +12,7 @@ export {
   agentProgress,
   handoffState,
   type SessionInfo,
-  type RunProgress,
+  type AgentProgress,
   type HandoffState,
 } from './agent-view.js'
 // The Start-a-run presets (#433): pure prompt builders (no Node imports) the dashboard
@@ -23,11 +23,11 @@ export {
 // out of here, which is what keeps this importable in a browser.
 export {
   systemPromptBlock,
-  composeRunSystem,
+  composeAgentSystem,
   renderSystemPrompt,
   SYSTEM_PROMPT_TEMPLATE,
   type SystemPromptOptions,
-  type RunSystemOptions,
+  type AgentSystemOptions,
   type TfContext,
   type RenderedSystemPrompt,
 } from './system-prompt.js'

@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
-import { deleteProjectRun, removeProjectWorktree } from './worktrees.js'
+import { deleteProjectAgent, removeProjectWorktree } from './worktrees.js'
 import { addWorktree, listAgents, agentBranchName } from './store/index.js'
 import { nodeGitRunner } from './project.js'
 
@@ -109,7 +109,7 @@ test('an unknown session is refused before any git runs (#982)', async () => {
 // keeps it. Against real git, because "did the branch survive" is the whole distinction.
 
 /** Write an archived run's meta + log, the two files that put its row in the rail. */
-async function archiveRun(repo: string, id: string): Promise<{ meta: string; log: string }> {
+async function archiveAgent(repo: string, id: string): Promise<{ meta: string; log: string }> {
   const agents = join(repo, '.the-framework', 'agents')
   await mkdir(agents, { recursive: true })
   const meta = join(agents, `${id}.json`)
@@ -122,10 +122,10 @@ async function archiveRun(repo: string, id: string): Promise<{ meta: string; log
 test('deleting a session removes its records and worktree but keeps the branch (#1032)', async () => {
   const { repo, path, branch } = await repoWithDirtyWorktree()
   try {
-    const { meta, log } = await archiveRun(repo, RUN_ID)
+    const { meta, log } = await archiveAgent(repo, RUN_ID)
     assert.equal((await listAgents(repo)).some(r => r.id === RUN_ID), true, 'the row is listed to begin with')
 
-    assert.deepEqual(await deleteProjectRun(repo, RUN_ID), { ok: true })
+    assert.deepEqual(await deleteProjectAgent(repo, RUN_ID), { ok: true })
 
     await assert.rejects(() => stat(path), 'the worktree is gone')
     await assert.rejects(() => stat(meta), 'the run meta is gone')
@@ -142,10 +142,10 @@ test('deleting a session removes its records and worktree but keeps the branch (
 test('deleting discards uncommitted worktree work rather than committing it (#1032)', async () => {
   const { repo, path, branch } = await repoWithDirtyWorktree()
   try {
-    await archiveRun(repo, RUN_ID)
+    await archiveAgent(repo, RUN_ID)
     // The worktree holds an uncommitted "Welcome!" edit. remove-worktree would commit it to the
     // branch; delete throws the session away, so the branch keeps only what it had committed.
-    assert.deepEqual(await deleteProjectRun(repo, RUN_ID), { ok: true })
+    assert.deepEqual(await deleteProjectAgent(repo, RUN_ID), { ok: true })
     await assert.rejects(() => stat(path))
     const shown = await nodeGitRunner()(['show', `${branch}:index.html`], repo)
     assert.match(shown, /Hello, world!/, 'the branch keeps its committed content, not the discarded edit')
@@ -158,9 +158,9 @@ test('deleting discards uncommitted worktree work rather than committing it (#10
 test('deleting a record-only session (its worktree already gone) still clears the row (#1032)', async () => {
   const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-del-')))
   try {
-    const { meta } = await archiveRun(repo, 'run-x')
+    const { meta } = await archiveAgent(repo, 'run-x')
     // No worktree on disk — a clean finished run, or one already removed. Delete must not need one.
-    assert.deepEqual(await deleteProjectRun(repo, 'run-x'), { ok: true })
+    assert.deepEqual(await deleteProjectAgent(repo, 'run-x'), { ok: true })
     await assert.rejects(() => stat(meta), 'the record is gone')
   } finally {
     await rm(repo, { recursive: true, force: true })
@@ -168,7 +168,7 @@ test('deleting a record-only session (its worktree already gone) still clears th
 })
 
 test('an invalid session id is refused before anything is touched (#1032)', async () => {
-  const result = await deleteProjectRun('/nowhere', '../etc/passwd')
+  const result = await deleteProjectAgent('/nowhere', '../etc/passwd')
   assert.equal(result.ok, false)
   assert.match(result.ok === false ? result.error : '', /invalid session id/)
 })

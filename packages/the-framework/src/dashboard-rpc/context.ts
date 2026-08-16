@@ -1,6 +1,6 @@
 import { resolveAgentCheckout } from '../store/index.js'
 import { defaultProjectsProvider, type ProjectsProvider } from '../dashboard/projects.js'
-import type { DashboardContext, EventsSource, RemoteRuns } from '../dashboard/rpc-serve.js'
+import type { DashboardContext, EventsSource, RemoteAgents } from '../dashboard/rpc-serve.js'
 import type { PreferencesStore } from '../registry.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from '../dashboard/quota.js'
@@ -37,7 +37,7 @@ function fromContext<K extends keyof DashboardContext>(key: K): DashboardContext
 }
 
 /** No run is relayed from here — see {@link contextRemote}. */
-const NO_RELAYED_RUNS: RemoteRuns = { target: () => undefined, list: () => [] }
+const NO_RELAYED_RUNS: RemoteAgents = { target: () => undefined, list: () => [] }
 
 /** The projects every telefunction resolves a project id against: the global registry. */
 export function contextProjects(): ProjectsProvider {
@@ -57,7 +57,7 @@ export function resolveProjectPath(projectId: string): Promise<string | undefine
  * resolution itself (and its #766 first-seconds subtlety) lives in the store's
  * {@link resolveAgentCheckout}, shared with the daemon; this adds only the project-id lookup.
  */
-export async function resolveRunPath(projectId: string, agentId?: string): Promise<string | undefined> {
+export async function resolveAgentPath(projectId: string, agentId?: string): Promise<string | undefined> {
   const cwd = await resolveProjectPath(projectId)
   return cwd ? resolveAgentCheckout(cwd, agentId) : undefined
 }
@@ -80,7 +80,7 @@ export function contextEventsSource(): EventsSource {
  * local to that device. Forwarding it onward would be a loop, so the honest answer there is that
  * nothing is relayed from here.
  */
-export function contextRemote(): RemoteRuns {
+export function contextRemote(): RemoteAgents {
   return wired?.remote ?? NO_RELAYED_RUNS
 }
 
@@ -112,9 +112,9 @@ export function contextAutoPmSweep(): (opts?: { drainOnly?: boolean }) => void |
   return fromContext('autoPmSweep')
 }
 
-/** The daemon's own `startRun`, so a start from the dashboard is the same start the CLI makes. */
-export function contextStartRun(): DashboardContext['startRun'] {
-  return fromContext('startRun')
+/** The daemon's own `startAgent`, so a start from the dashboard is the same start the CLI makes. */
+export function contextStartAgent(): DashboardContext['startAgent'] {
+  return fromContext('startAgent')
 }
 
 /** Install + register a repo (#433), which only the daemon can do. */

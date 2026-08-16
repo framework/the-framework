@@ -1,6 +1,6 @@
-import { listAgents, readLiveMetas, type LiveRun, type AgentMeta } from '../store/index.js'
+import { listAgents, readLiveMetas, type LiveAgent, type AgentMeta } from '../store/index.js'
 import type { ProjectSummary } from './projects.js'
-import { isSessionBranch, readRunHandoff, agentBranchFor, type AgentHandoff } from './agent-handoff.js'
+import { isAgentBranch, readAgentHandoff, agentBranchFor, type AgentHandoff } from './agent-handoff.js'
 import { ghPrList, type OpenPr, type PrLister } from './gh.js'
 import { interventionKey } from './keys.js'
 import { postDiscordWebhook } from './discord-webhook.js'
@@ -49,10 +49,10 @@ export interface Intervention {
 export interface InterventionsDeps {
   prs?: PrLister
   /** The live-run reader (default {@link readLiveMetas}); drives the `awaiting` source (#636). */
-  liveRuns?: (cwd: string) => Promise<LiveRun[]>
+  liveAgents?: (cwd: string) => Promise<LiveAgent[]>
   /** The finished-run reader (default {@link listAgents}); drives the `unpushed` source (#860). */
   agents?: (cwd: string) => Promise<AgentMeta[]>
-  /** Reads a branch's state (default {@link readRunHandoff}); drives the `unpushed` source (#860). */
+  /** Reads a branch's state (default {@link readAgentHandoff}); drives the `unpushed` source (#860). */
   handoff?: (cwd: string, branch: string) => Promise<AgentHandoff | undefined>
   /**
    * How many of a project's most recent finished runs to inspect for unpushed work. Each one costs
@@ -83,7 +83,7 @@ export async function buildInterventions(
   deps: InterventionsDeps = {},
 ): Promise<Intervention[]> {
   const prs = deps.prs ?? ghPrList
-  const liveRuns = deps.liveRuns ?? readLiveMetas
+  const liveAgents = deps.liveAgents ?? readLiveMetas
   const items: Intervention[] = []
   for (const project of projects) {
     const open = await prs(project.path).catch(() => [])
@@ -92,7 +92,7 @@ export async function buildInterventions(
       // framework opened for a session is the opposite (#1102): auto-handoff opens it as a draft
       // precisely so it does not ping reviewers, and if the queue then dropped it too, nothing
       // would tell anyone the work exists — which is the whole of #860 again.
-      if (pr.isDraft && !isSessionBranch(pr.headRefName)) continue
+      if (pr.isDraft && !isAgentBranch(pr.headRefName)) continue
       items.push({
         projectId: project.id,
         projectName: project.name,
@@ -107,7 +107,7 @@ export async function buildInterventions(
     // still `running` and has an unresolved choice gate. A run parks on one gate at a time, but
     // a project now has several concurrent runs (#736), so each parked run contributes its own
     // item — keyed on the gate id, plus the run id so two runs are told apart.
-    for (const meta of await liveRuns(project.path).catch(() => [])) {
+    for (const meta of await liveAgents(project.path).catch(() => [])) {
       if (meta.status !== 'running' || !meta.pendingChoice) continue
       items.push({
         projectId: project.id,
@@ -147,11 +147,11 @@ async function unpushedFor(project: ProjectSummary, deps: InterventionsDeps): Pr
   const agents = deps.agents ?? listAgents
   const handoff =
     deps.handoff ??
-    // The default skips the `gh` PR lookup `readRunHandoff` would otherwise do per branch: an open
+    // The default skips the `gh` PR lookup `readAgentHandoff` would otherwise do per branch: an open
     // PR means the branch was pushed, so `pushed` already excludes it, and the `pr` kind above is
     // what surfaces it. Paying an 8s-timeout network call per run on every poll to learn that
     // would be the most expensive part of this whole queue.
-    ((cwd: string, branch: string) => readRunHandoff(cwd, branch, { pr: async () => undefined }))
+    ((cwd: string, branch: string) => readAgentHandoff(cwd, branch, { pr: async () => undefined }))
 
   const finished = (await agents(project.path))
     .filter(agent => agent.status !== 'running')

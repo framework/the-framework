@@ -276,7 +276,7 @@ export function TicketsPanel({
   hiddenByFilter = 0,
   onOpen,
   onOpenPlan,
-  onRunStarted,
+  onAgentStarted,
   onTopicClick,
   onClaimedClick,
   onClearFilters,
@@ -295,7 +295,7 @@ export function TicketsPanel({
   onOpenPlan?: ((file: string) => void) | undefined
   /** Told when the import session starts, so the shell can show it (#948) — the button used
    *  to flip "Starting…" and leave you staring at the still-empty panel. */
-  onRunStarted?: ((intent: string, agentId?: string) => void) | undefined
+  onAgentStarted?: ((intent: string, agentId?: string) => void) | undefined
   /** Click-to-filter (#1144), threaded to every row; absent on a page with no filters. */
   onTopicClick?: ((topic: string) => void) | undefined
   onClaimedClick?: (() => void) | undefined
@@ -315,7 +315,7 @@ export function TicketsPanel({
     const result = await run(() => sendStart(projectId, prompt, 'prompt', options), failure)
     // Jump to the session doing the work, so its progress is watchable instead of the panel
     // sitting on stale rows until files land.
-    if (result?.ok) onRunStarted?.(prompt, result.agentId)
+    if (result?.ok) onAgentStarted?.(prompt, result.agentId)
   }
 
   // Unattended (#1279): an import/update fired by a button is routine work, not a conversation — it

@@ -9,16 +9,16 @@ import type { PreferencesStore } from '../registry.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from './quota.js'
 import type { AutoPmReporter } from '../auto-pm.js'
-import type { AddProjectResult, StartRunKind, StartRunOptions, StartRunResult } from './types.js'
+import type { AddProjectResult, StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
 import type { AgentMeta } from '../store/index.js'
 
-/** Wired by the daemon so `sendStart` can reach the daemon's own `startRun` closure. */
-export type StartRunHandler = (
+/** Wired by the daemon so `sendStart` can reach the daemon's own `startAgent` closure. */
+export type StartAgentHandler = (
   prompt: string,
-  kind: StartRunKind,
-  options: StartRunOptions,
+  kind: StartAgentKind,
+  options: StartAgentOptions,
   projectId?: string,
-) => StartRunResult | Promise<StartRunResult>
+) => StartAgentResult | Promise<StartAgentResult>
 
 /** Wired by the daemon so `sendAddProject` can install + register a repo (#433). */
 export type AddProjectHandler = (path: string, directory: boolean) => AddProjectResult | Promise<AddProjectResult>
@@ -31,9 +31,9 @@ export type EventsSource = (projectId: string, agentId?: string) => AsyncIterabl
 /** Look up the device a relayed run (#1067) executes on, or undefined for an ordinary local run. The
  *  daemon wires this from its live relayed-run map; a run-scoped RPC uses it to forward a remote run's
  *  read/steer/handoff to that device instead of resolving a (nonexistent) local checkout. */
-export interface RemoteRuns {
+export interface RemoteAgents {
   target(agentId: string | undefined): { url: string; token: string } | undefined
-  /** A project's relayed run stubs (#1077), so `onRuns` can show a remote run in the list and re-open it after a reload. */
+  /** A project's relayed run stubs (#1077), so `onAgents` can show a remote run in the list and re-open it after a reload. */
   list(projectId: string): AgentMeta[]
 }
 
@@ -46,13 +46,13 @@ export interface RemoteRuns {
  * degradation matrix. There is one host now, and it wires all of it.
  */
 export interface DashboardContext {
-  startRun: StartRunHandler
+  startAgent: StartAgentHandler
   addProject: AddProjectHandler
   /** The in-memory event stream for a run relayed from a connected device (#1067), else undefined. */
   eventsSource: EventsSource
   /** The relayed-run lookup (#1067 slice 2), so a run-scoped RPC can tell a local run from one
    *  running on a connected device and forward the call there. */
-  remote: RemoteRuns
+  remote: RemoteAgents
   /** The user-preferences store (#410), over the registry file. */
   preferences: PreferencesStore
   /** The quota source behind the usage panel (#533). */
@@ -185,7 +185,7 @@ async function serveEventStream(req: IncomingMessage, res: ServerResponse, url: 
 /**
  * Mount the dashboard's RPC surface (#405) on the daemon's `node:http` server: `POST /_rpc/<name>`
  * for the calls, `GET /_rpc/events` for the live stream. It runs in the daemon process, so
- * `sendStart` reaches the daemon's own `startRun` through the wired {@link DashboardContext}.
+ * `sendStart` reaches the daemon's own `startAgent` through the wired {@link DashboardContext}.
  *
  * Cross-origin POSTs are rejected (CSRF: a page on evil.com must not steer or start a session), as
  * are requests carrying someone else's `Host` when we are bound to loopback (DNS rebinding: the

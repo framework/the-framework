@@ -8,14 +8,14 @@ import {
   sendStop,
   sendMerge,
   sendRemoveWorktree,
-  sendDeleteSession,
+  sendDeleteAgent,
 } from '../rpc/control.js'
 import type { EditorInfo } from '../rpc/preferences.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { useDetectedEditors } from '../lib/editors.js'
-import { isRunActive } from '../lib/live-state.js'
+import { isAgentActive } from '../lib/live-state.js'
 import { describeSessionLink } from '../lib/session-link.js'
 import { buildResumeCommand } from '../lib/resume-command.js'
 import { cn } from '../lib/utils.js'
@@ -43,7 +43,7 @@ import {
 // forward, not just open it somewhere. Serve keeps its state (Serve → Open/Stop, or a picker
 // submenu in a multi-app repo); the editor keeps its preferred-editor submenu; Delete opens its
 // confirm dialog (a menu item cannot also be the dialog's trigger, so the dialog is controlled).
-export function SessionActionsMenu({
+export function AgentActionsMenu({
   projectId,
   agentId: agentId,
   events,
@@ -60,7 +60,7 @@ export function SessionActionsMenu({
   onWorktreeRemoved?: (() => void) | undefined
   onDeleted?: (() => void) | undefined
 }) {
-  const active = isRunActive(events)
+  const active = isAgentActive(events)
   const info = sessionInfo(events)
   const session = describeSessionLink(info)
 
@@ -271,7 +271,7 @@ export function SessionActionsMenu({
           confirmLabel="Delete"
           confirmBusyLabel="Deleting…"
           fallbackError="Could not delete the agent."
-          onConfirm={() => sendDeleteSession(projectId, agentId).then(result => (result.ok ? result : Promise.reject(new Error(result.error))))}
+          onConfirm={() => sendDeleteAgent(projectId, agentId).then(result => (result.ok ? result : Promise.reject(new Error(result.error))))}
           onSuccess={onDeleted}
         />
       )}

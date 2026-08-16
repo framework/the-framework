@@ -4,7 +4,7 @@ import { agentOptionsFromPreferences } from '../../dist/client.js'
 import { ListTodo, Loader2, Play } from 'lucide-react'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import { usePreferences } from '../lib/preferences.js'
-import { useStartRun } from '../lib/use-start-run.js'
+import { useStartAgent } from '../lib/use-start-agent.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Button } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -38,7 +38,7 @@ export function AiQueue({
   queue,
   loading,
   onOpenTicket,
-  onRunStarted,
+  onAgentStarted,
 }: {
   queue: ProjectQueue[]
   loading: boolean
@@ -48,15 +48,15 @@ export function AiQueue({
    * Told which run the play button just started (#1191). The project-carrying form, because the
    * Overview has no project selected — each entry knows its own — so the shell cannot supply it.
    */
-  onRunStarted: (projectId: string, intent: string, agentId?: string) => void
+  onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
 }) {
   const preferences = usePreferences()
-  const { busy, error, start } = useStartRun()
+  const { busy, error, start } = useStartAgent()
   // Which entry is in flight, keyed by content rather than index: the list is polled and can
   // shift under a click, and only the clicked row's button should spin.
   const [starting, setStarting] = useState<string | null>(null)
 
-  const runEntry = async (projectId: string, entry: string) => {
+  const agentEntry = async (projectId: string, entry: string) => {
     if (busy) return
     const key = `${projectId}\n${entry}`
     const prompt = workOnEntryPrompt(entry)
@@ -69,7 +69,7 @@ export function AiQueue({
     // Go to the run itself (#1191): one agent on one named entry is a session to watch, unlike the
     // sweep's fan-out, which lands in the Agents card. With no id yet the shell lands on the
     // project and adopts the running run once the poll surfaces it.
-    if (result) onRunStarted(projectId, prompt, result.agentId)
+    if (result) onAgentStarted(projectId, prompt, result.agentId)
   }
 
   const withOpen = queue.filter(q => q.open > 0)
@@ -142,7 +142,7 @@ export function AiQueue({
                                   size="icon-sm"
                                   aria-label="Spin up an agent working on this entry"
                                   disabled={busy}
-                                  onClick={() => void runEntry(q.projectId, item.text)}
+                                  onClick={() => void agentEntry(q.projectId, item.text)}
                                   className="shrink-0 text-muted-foreground hover:text-foreground"
                                 />
                               }

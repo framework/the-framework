@@ -1,4 +1,4 @@
-import { readAllRuns, type AgentMeta, type AgentStatus } from '../store/index.js'
+import { readAllAgents, type AgentMeta, type AgentStatus } from '../store/index.js'
 import { postDiscordWebhook } from './discord-webhook.js'
 import type { ProjectSummary } from './projects.js'
 
@@ -42,7 +42,7 @@ export interface Activity {
 /** Injectable seam so {@link buildActivity} is unit-testable off disk. */
 export interface ActivityDeps {
   /** A project's runs, live prepended to the archived history, newest-first. Defaults to disk. */
-  readRuns?: (cwd: string) => Promise<AgentMeta[]>
+  readAgents?: (cwd: string) => Promise<AgentMeta[]>
 }
 
 /** Map one run to its current activity item: `started` while running, else `finished`. */
@@ -70,10 +70,10 @@ function activityFor(project: ProjectSummary, agent: AgentMeta): Activity {
  * (finished) — one quick run, one line.
  */
 export async function buildActivity(projects: ProjectSummary[], deps: ActivityDeps = {}): Promise<Activity[]> {
-  const readRuns = deps.readRuns ?? readAllRuns
+  const readAgents = deps.readAgents ?? readAllAgents
   const items: Activity[] = []
   for (const project of projects) {
-    const agents = (await readRuns(project.path).catch(() => [])).slice(0, RECENT_RUNS)
+    const agents = (await readAgents(project.path).catch(() => [])).slice(0, RECENT_RUNS)
     for (const agent of agents) items.push(activityFor(project, agent))
   }
   items.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))

@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { archivedAgentPaths, isSafeRunId, readLiveMetas, EVENTS_FILE, FRAMEWORK_DIR } from './agent-store.js'
+import { archivedAgentPaths, isSafeAgentId, readLiveMetas, EVENTS_FILE, FRAMEWORK_DIR } from './agent-store.js'
 import { worktreePath } from './worktree.js'
 import { nodeFs } from '../node-fs.js'
 
@@ -21,7 +21,7 @@ import { nodeFs } from '../node-fs.js'
  * targets and previews, and each dashboard RPC — so the fallback rules cannot drift apart.
  */
 export async function resolveAgentCheckout(projectCwd: string, agentId: string | undefined): Promise<string> {
-  if (!agentId || !isSafeRunId(agentId)) return projectCwd
+  if (!agentId || !isSafeAgentId(agentId)) return projectCwd
   const live = await readLiveMetas(projectCwd).catch(() => [])
   const running = live.find(agent => agent.id === agentId)?.cwd
   if (running) return running
@@ -44,7 +44,7 @@ export async function resolveAgentCheckout(projectCwd: string, agentId: string |
  */
 export async function resolveAgentEventsPath(projectCwd: string, agentId: string | undefined): Promise<string> {
   const rootJournal = join(projectCwd, FRAMEWORK_DIR, EVENTS_FILE)
-  if (!agentId || !isSafeRunId(agentId)) return rootJournal
+  if (!agentId || !isSafeAgentId(agentId)) return rootJournal
   const live = await readLiveMetas(projectCwd).catch(() => [])
   const running = live.find(agent => agent.id === agentId)?.cwd
   if (running) return join(running, FRAMEWORK_DIR, EVENTS_FILE)

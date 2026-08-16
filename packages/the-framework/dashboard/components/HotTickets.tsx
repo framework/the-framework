@@ -54,11 +54,11 @@ const RIGHT_LANES: LaneDef[] = [{ key: 'high-priority', label: 'High priority', 
 
 export function HotTickets({
   onSelectProject,
-  onSelectRun,
+  onSelectAgent,
 }: {
   onSelectProject: (id: string) => void
   /** A ticket a run is implementing knows which run (#1117), so its row opens that session. */
-  onSelectRun: (id: string, agentId: string) => void
+  onSelectAgent: (id: string, agentId: string) => void
 }) {
   const { value: tickets } = usePolled<HotTicket[]>(onHotTickets, EMPTY, 10_000, [])
 
@@ -68,7 +68,7 @@ export function HotTickets({
       lane={lane}
       tickets={tickets.filter(t => t.bucket === lane.key)}
       onSelectProject={onSelectProject}
-      onSelectRun={onSelectRun}
+      onSelectAgent={onSelectAgent}
     />
   )
 
@@ -100,12 +100,12 @@ function Lane({
   lane,
   tickets,
   onSelectProject,
-  onSelectRun,
+  onSelectAgent,
 }: {
   lane: LaneDef
   tickets: HotTicket[]
   onSelectProject: (id: string) => void
-  onSelectRun: (id: string, agentId: string) => void
+  onSelectAgent: (id: string, agentId: string) => void
 }) {
   const empty = tickets.length === 0
   return (
@@ -130,7 +130,7 @@ function Lane({
                       type="button"
                       // A ticket being implemented names its run, and that session is what the row is
                       // reporting; one with no run yet opens its project's launcher, asking for it.
-                      onClick={() => (t.agentId ? onSelectRun(t.projectId, t.agentId) : openTicket(t, onSelectProject))}
+                      onClick={() => (t.agentId ? onSelectAgent(t.projectId, t.agentId) : openTicket(t, onSelectProject))}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
                     />
                   }

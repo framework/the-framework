@@ -93,7 +93,7 @@ export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>
 let sessionCounter = 0
 
 /** A short random tag so correlation ids stay unique across driver processes. */
-const randomRunTag = (): string => randomUUID().slice(0, 8)
+const randomAgentTag = (): string => randomUUID().slice(0, 8)
 
 /** One Actions-backed session. Each `prompt` is one workflow run. */
 export class ActionsSession implements DriverSession {
@@ -102,7 +102,7 @@ export class ActionsSession implements DriverSession {
   /** The branch the last run pushed; set once the run reports it, and the next turn builds on it. */
   private branch: string | undefined
   /** The branch this session asks each run to push to. Stable across turns, so they chain. */
-  private readonly runBranch: string
+  private readonly agentBranch: string
   /** The agent's own session id, carried across turns so `resume` can continue it. */
   private lastSessionId: string | undefined
   private turnCounter = 0
@@ -114,8 +114,8 @@ export class ActionsSession implements DriverSession {
     this.cwd = startOpts.cwd
     // The counter reads well in logs within one process; the random tag is what keeps the
     // correlation id unique across processes, since the daemon spawns a fresh one per run.
-    this.id = `actions-${++sessionCounter}-${(config.agentTag ?? randomRunTag)()}`
-    this.runBranch = `${config.branchPrefix ?? 'claude/'}framework-${this.id}`
+    this.id = `actions-${++sessionCounter}-${(config.agentTag ?? randomAgentTag)()}`
+    this.agentBranch = `${config.branchPrefix ?? 'claude/'}framework-${this.id}`
     this.lastSessionId = startOpts.resumeSessionId
   }
 
@@ -138,7 +138,7 @@ export class ActionsSession implements DriverSession {
     await this.dispatch(prompt, correlationId, resume)
     emit({ type: 'notice', message: `Dispatched ${correlationId} to ${this.config.owner}/${this.config.repo}; waiting for the runner.` })
 
-    const agent = await this.awaitRun(correlationId, emit, opts.signal)
+    const agent = await this.awaitAgent(correlationId, emit, opts.signal)
     const artifact = await this.readRunArtifact(agent.id, correlationId)
     if (artifact.branch) this.branch = artifact.branch
 
@@ -169,7 +169,7 @@ export class ActionsSession implements DriverSession {
   /** Fire the workflow. Returns nothing useful: dispatch is 204 with no body, hence the correlation id. */
   private async dispatch(prompt: string, correlationId: string, resume: string | undefined): Promise<void> {
     const workflow = this.config.workflow ?? 'framework-agent.yml'
-    const inputs: Record<string, string> = { prompt, correlation_id: correlationId, branch: this.runBranch }
+    const inputs: Record<string, string> = { prompt, correlation_id: correlationId, branch: this.agentBranch }
     // These reach a shell on the runner as environment variables. They are ids and
     // model names, so anything outside that alphabet is a bug or an attack.
     if (this.startOpts.model) inputs['model'] = assertToken(this.startOpts.model, 'model')
@@ -181,7 +181,7 @@ export class ActionsSession implements DriverSession {
   }
 
   /** Poll until our run appears and finishes. Identified by the correlation id in its `run-name`. */
-  private async awaitRun(
+  private async awaitAgent(
     correlationId: string,
     emit: (event: DriverEvent) => void,
     promptSignal?: AbortSignal,

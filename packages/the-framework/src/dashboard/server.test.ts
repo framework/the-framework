@@ -11,7 +11,7 @@ import { registryPreferencesStore } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
 import { defaultQuotaSource } from './quota.js'
 import type { FrameworkEvent } from '../events.js'
-import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'
+import type { StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
 import type { IncomingMessage } from 'node:http'
 
 /**
@@ -385,12 +385,12 @@ function readNdjson(url: string, cookie: string, count: number): Promise<{ statu
 // an events tail backed by a fixed list. Mirrors what the daemon wires, minus a real spawn.
 async function relayDashboard(): Promise<{
   base: string
-  starts: Array<{ prompt: string; kind: StartRunKind; options: StartRunOptions; projectId?: string }>
+  starts: Array<{ prompt: string; kind: StartAgentKind; options: StartAgentOptions; projectId?: string }>
   close: () => Promise<void>
 }> {
   const bundle = await fakeBundle()
-  const starts: Array<{ prompt: string; kind: StartRunKind; options: StartRunOptions; projectId?: string }> = []
-  const onStart = (prompt: string, kind: StartRunKind, options: StartRunOptions, projectId?: string): StartRunResult => {
+  const starts: Array<{ prompt: string; kind: StartAgentKind; options: StartAgentOptions; projectId?: string }> = []
+  const onStart = (prompt: string, kind: StartAgentKind, options: StartAgentOptions, projectId?: string): StartAgentResult => {
     starts.push({ prompt, kind, options, ...(projectId ? { projectId } : {}) })
     return { ok: true, agentId: 'srv-run' }
   }

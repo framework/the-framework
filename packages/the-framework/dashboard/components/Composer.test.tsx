@@ -141,7 +141,7 @@ describe('Composer (#721)', () => {
     // The editor + submit still work (so `/` `<` `@` `#` triggers remain live in the editor).
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'quick run' } })
     fireEvent.click(screen.getByRole('button', { name: 'Start' }))
-    expect(onSubmit).toHaveBeenCalledWith('quick run', 'build', { newSession: false })
+    expect(onSubmit).toHaveBeenCalledWith('quick run', 'build', { newAgent: false })
   })
 
   test('showDriverModel={false} (#831) drops the agent/model select, keeping the rest of the row', () => {
@@ -152,7 +152,7 @@ describe('Composer (#721)', () => {
     expect(screen.getByRole('button', { name: 'Session options' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'follow-up' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-    expect(onSubmit).toHaveBeenCalledWith('follow-up', 'build', { newSession: false })
+    expect(onSubmit).toHaveBeenCalledWith('follow-up', 'build', { newAgent: false })
   })
 
   test('option labels promise only what the code delivers (#801)', async () => {
@@ -183,14 +183,14 @@ describe('Composer (#721)', () => {
     const submit = screen.getByRole('button', { name: 'Send' })
     expect(submit.hasAttribute('disabled')).toBe(false)
     fireEvent.click(submit)
-    expect(onSubmit).toHaveBeenCalledWith('ship it', 'build', { newSession: false })
+    expect(onSubmit).toHaveBeenCalledWith('ship it', 'build', { newAgent: false })
   })
 
   test('the editor shortcut (Cmd/Ctrl+Enter) submits too', () => {
     const { onSubmit } = renderComposer()
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'go' } })
     fireEvent.click(screen.getByText('editor-submit'))
-    expect(onSubmit).toHaveBeenCalledWith('go', 'build', { newSession: false })
+    expect(onSubmit).toHaveBeenCalledWith('go', 'build', { newAgent: false })
   })
 
   test('mirrors prompt changes out via onPromptChange', () => {
@@ -210,14 +210,14 @@ describe('Composer (#721)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     // The menu row is the label; what is submitted is the preset's prompt. They used to be the same
     // string, which is how the import shipped asking for nothing in particular (#697).
-    expect(onSubmit).toHaveBeenCalledWith(presets.importTickets.render(), 'prompt', { newSession: true })
+    expect(onSubmit).toHaveBeenCalledWith(presets.importTickets.render(), 'prompt', { newAgent: true })
 
     cleanup()
     const second = renderComposer()
     fireEvent.click(screen.getByRole('button', { name: /Presets/ }))
     fireEvent.click(screen.getByText('Security audit'))
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-    expect(second.onSubmit).toHaveBeenCalledWith(expect.stringContaining('Security audit'), 'prompt', { newSession: false })
+    expect(second.onSubmit).toHaveBeenCalledWith(expect.stringContaining('Security audit'), 'prompt', { newAgent: false })
   })
 
   // #1066: a draft carried across a device hop lands in sessionStorage; the launcher seeds it into
@@ -226,7 +226,7 @@ describe('Composer (#721)', () => {
     sessionStorage.setItem('fw.pending-draft', 'carried from the studio box')
     const { onSubmit } = renderComposer({ submitLabel: 'Start session' })
     fireEvent.click(screen.getByRole('button', { name: /Start session/ }))
-    expect(onSubmit).toHaveBeenCalledWith('carried from the studio box', 'build', { newSession: false })
+    expect(onSubmit).toHaveBeenCalledWith('carried from the studio box', 'build', { newAgent: false })
     expect(sessionStorage.getItem('fw.pending-draft')).toBeNull() // taken once
   })
 
@@ -243,7 +243,7 @@ describe('Composer (#721)', () => {
 
   test('an in-session composer does not rehydrate a carried draft (#1066)', () => {
     sessionStorage.setItem('fw.pending-draft', 'not for here')
-    renderComposer({ inSession: true })
+    renderComposer({ inAgent: true })
     expect(sessionStorage.getItem('fw.pending-draft')).toBe('not for here') // launcher-only
     expect(screen.queryByRole('button', { name: 'Send' })).toBeNull() // nothing seeded
   })
@@ -259,7 +259,7 @@ describe('Composer (#721)', () => {
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: '' } })
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'just a question' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-    expect(onSubmit).toHaveBeenCalledWith('just a question', 'build', { newSession: false })
+    expect(onSubmit).toHaveBeenCalledWith('just a question', 'build', { newAgent: false })
   })
 
   // #1073: pressing Start on an offline "Run on" device would silently attempt the ~15s relay, so
@@ -290,13 +290,13 @@ describe('Composer (#721)', () => {
     const submit = screen.getByRole('button', { name: 'Send' })
     expect(submit.hasAttribute('disabled')).toBe(false)
     fireEvent.click(submit)
-    expect(onSubmit).toHaveBeenCalledWith('ship it', 'build', { newSession: false })
+    expect(onSubmit).toHaveBeenCalledWith('ship it', 'build', { newAgent: false })
   })
 })
 
 describe('the in-session options gear (#1172)', () => {
   test('a live session drops the gear entirely instead of opening an empty dropdown', () => {
-    renderComposer({ inSession: true })
+    renderComposer({ inAgent: true })
     expect(screen.queryByRole('button', { name: 'Session options' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Resume options' })).toBeNull()
     // The old half-measure: a "Preferences" trigger whose menu had zero rows.
@@ -304,7 +304,7 @@ describe('the in-session options gear (#1172)', () => {
   })
 
   test('an ended session offers exactly the options the Resume leg will arm (#1469)', () => {
-    renderComposer({ inSession: true, sessionEnded: true })
+    renderComposer({ inAgent: true, agentEnded: true })
     fireEvent.click(screen.getByRole('button', { name: 'Resume options' }))
     const menu = screen.getByRole('menu')
     for (const label of ['Push branch', 'Open PR', 'Auto-merge', 'Browser']) {
@@ -319,7 +319,7 @@ describe('the in-session options gear (#1172)', () => {
   })
 
   test('the resume gear writes the shared preference the continuation resolves at start (#1469)', () => {
-    renderComposer({ inSession: true, sessionEnded: true })
+    renderComposer({ inAgent: true, agentEnded: true })
     fireEvent.click(screen.getByRole('button', { name: 'Resume options' }))
     const menu = screen.getByRole('menu')
     fireEvent.click(within(menu).getByText('Browser').closest('[role="menuitemcheckbox"]')!)

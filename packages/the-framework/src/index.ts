@@ -18,14 +18,14 @@
  * - {@link FakeDriver} — deterministic offline driver for `FRAMEWORK_FAKE` / tests
  *
  * ## Session + product shell
- * - {@link runSession} — frame the agent, send it one prompt, honor the gates it answers with,
+ * - {@link runAgent} — frame the agent, send it one prompt, honor the gates it answers with,
  *   and stream {@link FrameworkEvent}s
  * - {@link startDashboard} — the localhost UI over the event stream
  * - {@link runCli} / {@link parseArgs} — the `framework` command
  */
 export * from './driver/index.js'
 export { buildPrompt, extendPrompt, scaffoldPrompt, isWorkspaceEmpty } from './steps.js'
-export { runSession, type SessionKind, type RunSessionOptions, type RunSessionResult } from './run.js'
+export { runAgent, type SessionKind, type RunAgentOptions, type RunAgentResult } from './agent.js'
 export { isHandsOff, isRunLocation, RUN_LOCATIONS, type AgentLocation } from './agent-location.js'
 export {
   requestChoices,
@@ -70,7 +70,7 @@ export {
   agentProgress,
   handoffState,
   type SessionInfo,
-  type RunProgress,
+  type AgentProgress,
   type HandoffState,
 } from './agent-view.js'
 export {
@@ -91,16 +91,16 @@ export {
   type SweepDeps,
   type MaintenanceFs,
 } from './maintenance.js'
-export { startDashboard, summarizeProject, defaultProjectsProvider, readDocs, type Dashboard, type DashboardOptions, type StartRunKind, type StartRunResult, type AddProjectResult, type OnboardingSuggestion, type DriverReady, type PreviewResult, type PreviewStatus, type AgentWorktree, type ProjectSummary, type ProjectsProvider, type SummarizeDeps, type WorkspaceDoc, readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta, type TicketGithubLink, type ProjectQueue, type QueueItem, type Overview, type ActiveRun, type RecentProject, type RecentRun, buildRecentRuns, type HotTicket, type HotBucket, buildHotTickets, collectAllTickets, type ProjectTickets, type AllTicketsDeps, type DashboardData, type ProjectStat, type ActivityDay, type GitStatus, type LinkedPr, type FileDiff, type FileChange, type FileContent, type AgentHandoff, type HandoffCommit, type HandoffFile, type HandoffResult, buildInterventions, type Intervention, type OpenPr, type PrLister, type InterventionsDeps, buildOpenQuestions, openChoiceRequest, type OpenQuestion, type OpenQuestionsDeps, buildActivity, activityKey, pickNewActivity, type Activity, type ActivityDeps, type BridgeQuestion, type BridgeEvent, type BridgeAnswer } from './dashboard/index.js'
+export { startDashboard, summarizeProject, defaultProjectsProvider, readDocs, type Dashboard, type DashboardOptions, type StartAgentKind, type StartAgentResult, type AddProjectResult, type OnboardingSuggestion, type DriverReady, type PreviewResult, type PreviewStatus, type AgentWorktree, type ProjectSummary, type ProjectsProvider, type SummarizeDeps, type WorkspaceDoc, readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta, type TicketGithubLink, type ProjectQueue, type QueueItem, type Overview, type ActiveAgent, type RecentProject, type RecentAgent, buildRecentAgents, type HotTicket, type HotBucket, buildHotTickets, collectAllTickets, type ProjectTickets, type AllTicketsDeps, type DashboardData, type ProjectStat, type ActivityDay, type GitStatus, type LinkedPr, type FileDiff, type FileChange, type FileContent, type AgentHandoff, type HandoffCommit, type HandoffFile, type HandoffResult, buildInterventions, type Intervention, type OpenPr, type PrLister, type InterventionsDeps, buildOpenQuestions, openChoiceRequest, type OpenQuestion, type OpenQuestionsDeps, buildActivity, activityKey, pickNewActivity, type Activity, type ActivityDeps, type BridgeQuestion, type BridgeEvent, type BridgeAnswer } from './dashboard/index.js'
 export {
   AgentStore,
   nodeStoreFs,
   applyEventToMeta,
   metaFromEvents,
   listAgents,
-  loadRunEvents,
+  loadAgentEvents,
   agentIdFromStartedAt,
-  isSafeRunId,
+  isSafeAgentId,
   FRAMEWORK_DIR,
   EVENTS_FILE,
   META_FILE,
@@ -112,21 +112,21 @@ export {
   type OpenStoreOptions,
 } from './store/index.js'
 export { THE_FRAMEWORK_DIR } from './framework-dir.js'
-export { gitignorePath, frameworkGitignore, sessionsGitignore, SESSIONS_RULE } from './framework-gitignore.js'
+export { gitignorePath, frameworkGitignore, archiveGitignore, SESSIONS_RULE } from './framework-gitignore.js'
 export {
-  startSessionCommitter,
-  commitSessions,
-  pendingSessions,
+  startAgentCommitter,
+  commitAgents,
+  pendingAgents,
   gitBusy,
   commitMessage,
   nodePathProbe,
-  SESSIONS_PATHSPEC,
+  ARCHIVE_PATHSPEC,
   COMMIT_MAX_WAIT_MS,
-  type SessionCommitter,
-  type SessionCommitterOptions,
+  type AgentCommitter,
+  type AgentCommitterOptions,
   type CommitOutcome,
   type PathProbe,
-} from './session-commit.js'
+} from './agent-commit.js'
 export {
   theFrameworkDir,
   isActivated,
@@ -191,13 +191,13 @@ export {
   parseArgs,
   sessionOptions,
   runOnBeforeMergeable,
-  promptRunSpec,
+  promptAgentSpec,
   type PromptRunner,
   type CliIO,
   type CliArgs,
   type SessionOptions,
 } from './cli.js'
-export { readSessionSpec, writeSessionSpec, type SessionSpec } from './session-spec.js'
+export { readAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
 export { renderOnBeforeMergeablePrompt, ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE, type OnBeforeMergeableContext } from './on-before-mergeable-prompt.js'
 export {
   loadFrameworkConfig,
@@ -207,21 +207,21 @@ export {
 } from './config.js'
 export {
   resolveConfigKey,
-  resolveRunConfig,
+  resolveAgentConfig,
   fileConfigLayer,
   describeResolvedConfig,
   RUN_CONFIG_DEFAULTS,
   type ConfigLayer,
   type AgentConfigValues,
-  type ResolvedRunConfig,
+  type ResolvedAgentConfig,
 } from './config-layers.js'
 export {
   systemPromptBlock,
-  composeRunSystem,
+  composeAgentSystem,
   renderSystemPrompt,
   SYSTEM_PROMPT_TEMPLATE,
   type SystemPromptOptions,
-  type RunSystemOptions,
+  type AgentSystemOptions,
   type TfContext,
   type RenderedSystemPrompt,
 } from './system-prompt.js'

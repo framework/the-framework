@@ -9,7 +9,7 @@ const OUTCOMES: { key: Exclude<AgentStatus, 'running'>; label: string; fill: str
   { key: 'stopped', label: 'Stopped', fill: 'bg-warning', dot: 'bg-warning' },
 ]
 
-export function RunOutcomes({ counts }: { counts: Record<AgentStatus, number> }) {
+export function AgentOutcomes({ counts }: { counts: Record<AgentStatus, number> }) {
   const total = OUTCOMES.reduce((sum, o) => sum + counts[o.key], 0)
 
   if (total === 0) {

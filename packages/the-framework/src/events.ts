@@ -127,7 +127,7 @@ export type AutoMergeOutcome =
 /** Who resolved a {@link ChoiceRequest}: a human, the autopilot countdown, or a headless auto-accept. */
 export type ChoiceBy = 'user' | 'autopilot' | 'auto'
 
-/** What a {@link import('./run.js').RunFrameworkOptions.requestChoice} handler resolves with. */
+/** What a {@link import('./agent.js').RunFrameworkOptions.requestChoice} handler resolves with. */
 export interface ChoicePick {
   /** The picked option id, or (for a {@link ChoiceRequest.multi} select) the selected subset of ids. */
   picked: string | readonly string[]

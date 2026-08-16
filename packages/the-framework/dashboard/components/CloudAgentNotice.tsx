@@ -14,7 +14,7 @@ const POLL_MS = 4000
 // its own PR, and there is no read-back API we can use to follow it with, so the honest thing to
 // show is where the work went and how to reach it rather than an empty feed that looks stalled.
 // Renders nothing for any other target, so the run view can mount it unconditionally.
-export function CloudRunNotice({
+export function CloudAgentNotice({
   target,
   events,
 }: {

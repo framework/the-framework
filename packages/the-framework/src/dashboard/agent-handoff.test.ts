@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { readRunHandoff, resolveRunPr, mergeSessionPr, agentBranchFor, pushRunBranch, openRunPullRequest, gitReason, runAutoHandoff, isSessionBranch, prBaseName, commitSessionWork, withheldMerge } from './agent-handoff.js'
-import { pickRunPr } from './gh.js'
+import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, pushAgentBranch, openBranchPullRequest, openAgentPullRequest, gitReason, agentAutoHandoff, isAgentBranch, prBaseName, commitAgentWork, withheldMerge } from './agent-handoff.js'
+import { pickAgentPr } from './gh.js'
 import { nodeGitRunner, GIT_SLOW_TIMEOUT_MS, type GitRunner } from '../project.js'
 import { CliTimeoutError, isCliTimeout } from '../cli-exec.js'
 
@@ -31,17 +31,17 @@ const REPO = { 'rev-parse --git-dir': '.git' }
 test('the recorded branch wins over both derivations (#799)', () => {
   assert.equal(agentBranchFor({ id: 'r1', branch: 'feat/mine', sessionName: 'named' }), 'feat/mine')
   assert.equal(agentBranchFor({ id: 'r1', sessionName: 'named' }), 'the-framework/named')
-  assert.equal(agentBranchFor({ id: 'r1' }), 'the-framework/run-r1')
+  assert.equal(agentBranchFor({ id: 'r1' }), 'the-framework/agent-r1')
 })
 
 test('a non-repo yields no handoff at all', async () => {
   const { git } = fakeGit({})
-  assert.equal(await readRunHandoff('/nowhere', 'b', { git }), undefined)
+  assert.equal(await readAgentHandoff('/nowhere', 'b', { git }), undefined)
 })
 
 test('a branch that no longer exists reports exists:false rather than failing', async () => {
   const { git } = fakeGit({ ...REPO, 'rev-parse --verify --quiet refs/heads/gone': '', remote: 'origin\n' })
-  const handoff = await readRunHandoff('/repo', 'gone', { git, pr: async () => undefined })
+  const handoff = await readAgentHandoff('/repo', 'gone', { git, pr: async () => undefined })
   assert.equal(handoff?.exists, false)
   assert.equal(handoff?.empty, true)
   assert.equal(handoff?.hasRemote, true)
@@ -58,7 +58,7 @@ test('a session that changed nothing is reported empty, not as an empty branch',
     'rev-parse --verify --quiet refs/remotes': '',
     branch: '',
   })
-  const handoff = await readRunHandoff('/repo', 'the-framework/quiet', { git, pr: async () => undefined })
+  const handoff = await readAgentHandoff('/repo', 'the-framework/quiet', { git, pr: async () => undefined })
   assert.equal(handoff?.empty, true)
   assert.deepEqual(handoff?.commits, [])
   assert.equal(handoff?.insertions, 0)
@@ -75,7 +75,7 @@ test('commits, files and line counts come back for a branch with work', async ()
     'rev-parse --verify --quiet refs/remotes/origin/the-framework/work': 'tip\n',
     branch: '',
   })
-  const handoff = await readRunHandoff('/repo', 'the-framework/work', { git, pr: async () => undefined })
+  const handoff = await readAgentHandoff('/repo', 'the-framework/work', { git, pr: async () => undefined })
   assert.equal(handoff?.empty, false)
   assert.equal(handoff?.base, 'origin/main')
   assert.deepEqual(
@@ -102,14 +102,14 @@ test('an unpushed branch and a repo with no remote are distinguished', async () 
     diff: '1\t0\ta.ts\n',
     branch: '',
   }
-  const unpushed = await readRunHandoff('/repo', 'b', {
+  const unpushed = await readAgentHandoff('/repo', 'b', {
     git: fakeGit({ ...base, remote: 'origin\n', 'rev-parse --verify --quiet refs/remotes': '' }).git,
     pr: async () => undefined,
   })
   assert.equal(unpushed?.hasRemote, true)
   assert.equal(unpushed?.pushed, false)
 
-  const noRemote = await readRunHandoff('/repo', 'b', {
+  const noRemote = await readAgentHandoff('/repo', 'b', {
     git: fakeGit({ ...base, remote: '' }).git,
     pr: async () => undefined,
   })
@@ -129,7 +129,7 @@ test('the PR is looked up for the session branch, not the checkout HEAD (#799)',
     branch: '',
   })
   const asked: string[] = []
-  const handoff = await readRunHandoff('/repo', 'the-framework/x', {
+  const handoff = await readAgentHandoff('/repo', 'the-framework/x', {
     git,
     pr: async (_cwd, branch) => {
       asked.push(branch)
@@ -144,7 +144,7 @@ test('a failed push comes back as an error rather than throwing', async () => {
   const git: GitRunner = async () => {
     throw new Error('no upstream configured')
   }
-  const result = await pushRunBranch('/repo', 'b', git)
+  const result = await pushAgentBranch('/repo', 'b', git)
   assert.deepEqual(result, { ok: false, error: 'no upstream configured' })
 })
 
@@ -152,7 +152,7 @@ test('a timed-out push says so instead of reading like a rejected push (#997)', 
   const git: GitRunner = async args => {
     throw new CliTimeoutError('git', args, GIT_SLOW_TIMEOUT_MS)
   }
-  const result = await pushRunBranch('/repo', 'b', git)
+  const result = await pushAgentBranch('/repo', 'b', git)
   assert.equal(result.ok, false)
   const error = result.ok === false ? result.error : ''
   // A SIGTERM'd push has empty stderr, so this used to surface as a bare 'Command failed: git push'.
@@ -175,7 +175,7 @@ test("a push failure shows git's reason, not the command echoed back", () => {
 test('opening a PR pushes first and returns the URL gh printed', async () => {
   const pushes: string[][] = []
   const ghCalls: string[][] = []
-  const result = await openRunPullRequest(
+  const result = await openBranchPullRequest(
     '/repo',
     'the-framework/x',
     { title: 'A title', body: 'A body', base: 'main' },
@@ -201,7 +201,7 @@ test('opening a PR pushes first and returns the URL gh printed', async () => {
 
 test('a PR is not opened when the push fails', async () => {
   let ghRan = false
-  const result = await openRunPullRequest(
+  const result = await openBranchPullRequest(
     '/repo',
     'b',
     { title: 't', body: 'b' },
@@ -239,7 +239,7 @@ test('a real repo: the branch outlives its worktree and still reports its work (
     await exec('git', ['checkout', 'main'], { cwd: dir })
 
     // Read from the project checkout, which is on main, about the session's branch.
-    const handoff = await readRunHandoff(dir, 'the-framework/demo', { git, pr: async () => undefined })
+    const handoff = await readAgentHandoff(dir, 'the-framework/demo', { git, pr: async () => undefined })
     assert.equal(handoff?.exists, true)
     assert.equal(handoff?.empty, false)
     assert.equal(handoff?.base, 'main')
@@ -251,7 +251,7 @@ test('a real repo: the branch outlives its worktree and still reports its work (
 
     // And a branch already merged into the base says so.
     await exec('git', ['merge', '--no-ff', '-m', 'merge', 'the-framework/demo'], { cwd: dir })
-    const merged = await readRunHandoff(dir, 'the-framework/demo', { git, pr: async () => undefined })
+    const merged = await readAgentHandoff(dir, 'the-framework/demo', { git, pr: async () => undefined })
     assert.equal(merged?.merged, true)
   } finally {
     await rm(dir, { recursive: true, force: true })
@@ -280,7 +280,7 @@ test('a real repo: a branch whose work is already in the base reports empty (#11
     await writeFile(join(dir, 'README.md'), 'base, moved on\n')
     await exec('git', ['commit', '-am', 'someone else landed this'], { cwd: dir })
 
-    const handoff = await readRunHandoff(dir, 'the-framework/demo', { git, pr: async () => undefined })
+    const handoff = await readAgentHandoff(dir, 'the-framework/demo', { git, pr: async () => undefined })
     assert.equal(handoff?.exists, true)
     assert.deepEqual(handoff?.commits, [], 'the base\'s own commits are not this session\'s work')
     assert.equal(handoff?.empty, true, 'so there is nothing to open a PR for, and the bar says so')
@@ -307,7 +307,7 @@ const READY = {
 test('an armed session opens a DRAFT PR, and pushes on the way (#1102)', async () => {
   const gh: string[][] = []
   const { git } = fakeGit({ ...READY, push: '' })
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x', sessionName: 'x', intent: 'build it' },
     { push: true, pr: true },
@@ -330,7 +330,7 @@ test('an armed session opens a DRAFT PR, and pushes on the way (#1102)', async (
 test('push armed alone pushes and opens nothing (#1102)', async () => {
   const pushes: string[][] = []
   const { git: read } = fakeGit(READY)
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: true, pr: false },
@@ -351,7 +351,7 @@ test('push armed alone pushes and opens nothing (#1102)', async () => {
 })
 
 test('a disarmed session hands off nothing at all (#1102)', async () => {
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: false, pr: false },
@@ -362,7 +362,7 @@ test('a disarmed session hands off nothing at all (#1102)', async () => {
 
 test('a branch that already has a PR is never given a second one (#1102)', async () => {
   const { git } = fakeGit(READY)
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: true, pr: true },
@@ -380,7 +380,7 @@ test('a session that kept working after its PR merged gets a fresh PR (#1512)', 
   // the merged head. "The branch already has a pull request" was how that work reached nobody.
   const gh: string[][] = []
   const { git } = fakeGit({ ...READY, push: '' })
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: true, pr: true },
@@ -398,7 +398,7 @@ test('a merged PR whose head is still the branch tip means everything landed (#1
   // READY's branch tip is abc123: a merged PR carrying that head covered all of the session's
   // work, so there is nothing left to publish — and the skip says landed, not "already has a PR".
   const { git } = fakeGit(READY)
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: true, pr: true },
@@ -413,7 +413,7 @@ test('a merged PR whose head is still the branch tip means everything landed (#1
 
 test('a merged PR without a head to compare never risks a duplicate (#1512)', async () => {
   const { git } = fakeGit(READY)
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: true, pr: true },
@@ -429,7 +429,7 @@ test('a merged PR without a head to compare never risks a duplicate (#1512)', as
 test('an armed merge follows the PR it just opened (#1216)', async () => {
   const gh: string[][] = []
   const { git } = fakeGit({ ...READY, push: '' })
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x', sessionName: 'x', intent: 'build it' },
     { push: true, pr: true, merge: true },
@@ -459,7 +459,7 @@ test('an armed merge follows the PR it just opened (#1216)', async () => {
 test('without the merge flag the PR is left alone, exactly as before (#1216)', async () => {
   const gh: string[][] = []
   const { git } = fakeGit({ ...READY, push: '' })
-  await runAutoHandoff(
+  await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: true, pr: true },
@@ -472,7 +472,7 @@ test('a merge that fails is reported on a handoff that still succeeded (#1216)',
   // The PR exists either way; a human can still merge it by hand. Turning the refusal into a
   // failed handoff would misreport the half that worked.
   const { git } = fakeGit({ ...READY, push: '' })
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: true, pr: true, merge: true },
@@ -497,7 +497,7 @@ test('an armed merge takes the already-open PR a predecessor left (#1216)', asyn
   // has not happened yet, and the skip reason still says why no second PR was opened.
   const gh: string[][] = []
   const { git } = fakeGit(READY)
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: true, pr: true, merge: true },
@@ -513,7 +513,7 @@ test('an armed merge takes the already-open PR a predecessor left (#1216)', asyn
 
 test('a session that committed nothing is not published (#1102)', async () => {
   const { git } = fakeGit({ ...READY, log: '', diff: '' })
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: true, pr: true },
@@ -531,9 +531,9 @@ test('a branch of pure framework bookkeeping is empty, and is not published (#12
     diff: '21\t0\t.the-framework/conversations/2026-07-27T14-21-36-276Z.md\n2\t0\t.the-framework/LOGS.md',
   }
   const { git } = fakeGit(bookkeeping)
-  const handoff = await readRunHandoff('/repo', 'the-framework/x', { git, pr: async () => undefined })
+  const handoff = await readAgentHandoff('/repo', 'the-framework/x', { git, pr: async () => undefined })
   assert.equal(handoff?.empty, true, 'paper trail is provenance, not work')
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: true, pr: true },
@@ -547,13 +547,13 @@ test('bookkeeping alongside real work does not make a branch empty (#1291)', asy
     ...READY,
     diff: '21\t0\t.the-framework/conversations/r1.md\n3\t1\tsrc/app.ts',
   })
-  const handoff = await readRunHandoff('/repo', 'the-framework/x', { git, pr: async () => undefined })
+  const handoff = await readAgentHandoff('/repo', 'the-framework/x', { git, pr: async () => undefined })
   assert.equal(handoff?.empty, false)
 })
 
 test('a repo with no remote is a skip, not a failure (#1102)', async () => {
   const { git } = fakeGit({ ...READY, remote: '' })
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: true, pr: true },
@@ -564,7 +564,7 @@ test('a repo with no remote is a skip, not a failure (#1102)', async () => {
 
 test('a failed push is reported with git’s own reason, so the bar can offer the retry (#1102)', async () => {
   const { git: read } = fakeGit(READY)
-  const outcome = await runAutoHandoff(
+  const outcome = await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x' },
     { push: true, pr: false },
@@ -580,9 +580,9 @@ test('a failed push is reported with git’s own reason, so the bar can offer th
 })
 
 test('a session branch is recognised by its prefix, a hand-made one is not (#1102)', () => {
-  assert.equal(isSessionBranch('the-framework/x'), true)
-  assert.equal(isSessionBranch('feat/mine'), false)
-  assert.equal(isSessionBranch(undefined), false)
+  assert.equal(isAgentBranch('the-framework/x'), true)
+  assert.equal(isAgentBranch('feat/mine'), false)
+  assert.equal(isAgentBranch(undefined), false)
 })
 
 test('the PR base is the remote branch name, not the tracking ref (#1102)', async () => {
@@ -595,7 +595,7 @@ test('the PR base is the remote branch name, not the tracking ref (#1102)', asyn
   assert.equal(prBaseName('origin/release/2.x'), 'release/2.x')
 
   const ghCalls: string[][] = []
-  await openRunPullRequest(
+  await openBranchPullRequest(
     '/repo',
     'the-framework/x',
     { title: 't', body: 'b', base: 'origin/main' },
@@ -624,7 +624,7 @@ test('uncommitted work is counted from the session checkout, not the project (#1
     branch: '',
     status: ' M src/app.ts\n?? src/new.ts\n',
   })
-  const handoff = await readRunHandoff('/repo', 'the-framework/dirty', {
+  const handoff = await readAgentHandoff('/repo', 'the-framework/dirty', {
     git,
     pr: async () => undefined,
     checkout: '/repo/.the-framework/worktrees/r1',
@@ -647,32 +647,32 @@ test('pending is absent, not zero, when no session checkout was given (#1173)', 
     'rev-parse --verify --quiet refs/remotes': '',
     branch: '',
   })
-  const handoff = await readRunHandoff('/repo', 'the-framework/quiet', { git, pr: async () => undefined })
+  const handoff = await readAgentHandoff('/repo', 'the-framework/quiet', { git, pr: async () => undefined })
   // "Nobody asked" must not read as "asked, tree clean": only the second may be shown as a dead end.
   assert.equal(handoff?.pendingFiles, undefined)
   assert.ok(!calls.some(args => args[0] === 'status'), 'no checkout means no status read')
 })
 
-test('commitSessionWork leaves the project checkout and other branches alone (#1173)', async () => {
+test('commitAgentWork leaves the project checkout and other branches alone (#1173)', async () => {
   const onBranch = fakeGit({ 'rev-parse --abbrev-ref HEAD': 'main\n' })
   // The checkout IS the project root: the dirt there is the user's, whatever branch it is on. This
   // is what `resolveAgentCheckout` falls back to once a session's worktree is gone.
-  assert.equal(await commitSessionWork('/repo', '/repo', 'the-framework/x', onBranch.git), true)
+  assert.equal(await commitAgentWork('/repo', '/repo', 'the-framework/x', onBranch.git), true)
   assert.equal(onBranch.calls.length, 0, 'the project root should not even be inspected')
 
   // Its own checkout, but parked on another branch: not this session's work to commit.
   const elsewhere = fakeGit({ 'rev-parse --abbrev-ref HEAD': 'main\n' })
-  assert.equal(await commitSessionWork('/wt', '/repo', 'the-framework/x', elsewhere.git), true)
+  assert.equal(await commitAgentWork('/wt', '/repo', 'the-framework/x', elsewhere.git), true)
   assert.ok(!elsewhere.calls.some(args => args[0] === 'commit'), 'nothing should be committed')
 })
 
 test('a real repo: the finishing step commits what the agent left in its worktree (#1173)', async () => {
   // Rom's dead-end session, reproduced end to end: the agent edited a file, never committed, and
   // the branch was 0 commits ahead, so `gh pr create` could only answer "No commits between main
-  // and the-framework/run-r1".
+  // and the-framework/agent-r1".
   const dir = await mkdtemp(join(tmpdir(), 'handoff-settle-'))
   const git = nodeGitRunner()
-  const branch = 'the-framework/run-r1'
+  const branch = 'the-framework/agent-r1'
   try {
     await exec('git', ['init', '-b', 'main', dir])
     await exec('git', ['config', 'user.email', 'test@example.com'], { cwd: dir })
@@ -686,28 +686,28 @@ test('a real repo: the finishing step commits what the agent left in its worktre
     await exec('git', ['worktree', 'add', '-b', branch, checkout], { cwd: dir })
     await writeFile(join(checkout, 'index.html'), '<h1>hi</h1>\n')
 
-    const before = await readRunHandoff(dir, branch, { git, pr: async () => undefined, checkout })
+    const before = await readAgentHandoff(dir, branch, { git, pr: async () => undefined, checkout })
     assert.equal(before?.empty, true, 'the branch carries nothing yet')
     assert.deepEqual(before?.pendingFiles, ['index.html'], 'and the work is sitting in the checkout, by name')
 
-    assert.equal(await commitSessionWork(checkout, dir, branch, git), true)
+    assert.equal(await commitAgentWork(checkout, dir, branch, git), true)
 
-    const after = await readRunHandoff(dir, branch, { git, pr: async () => undefined, checkout })
+    const after = await readAgentHandoff(dir, branch, { git, pr: async () => undefined, checkout })
     assert.equal(after?.empty, false, 'the work is on the branch now, so a PR has something to say')
     assert.deepEqual(after?.pendingFiles, [])
     assert.deepEqual(after?.commits.map(c => c.subject), ['[The Framework] uncommitted changes'])
     assert.deepEqual(after?.files.map(f => f.path), ['index.html'])
 
     // Idempotent: pressing the button twice must not make an empty commit.
-    assert.equal(await commitSessionWork(checkout, dir, branch, git), true)
-    const again = await readRunHandoff(dir, branch, { git, pr: async () => undefined, checkout })
+    assert.equal(await commitAgentWork(checkout, dir, branch, git), true)
+    const again = await readAgentHandoff(dir, branch, { git, pr: async () => undefined, checkout })
     assert.equal(again?.commits.length, 1)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
 })
 
-test('pickRunPr trusts an open PR, and otherwise only one created after the run started (#1251)', () => {
+test('pickAgentPr trusts an open PR, and otherwise only one created after the run started (#1251)', () => {
   const stale = { number: 1177, url: 'u1177', state: 'MERGED', title: 'old triage', createdAt: '2026-07-25T16:55:18Z' }
   const own = { number: 1249, url: 'u1249', state: 'MERGED', title: 'this triage', createdAt: '2026-07-26T21:35:13Z' }
   const later = { number: 1300, url: 'u1300', state: 'MERGED', title: 'even later', createdAt: '2026-07-26T23:00:00Z' }
@@ -715,24 +715,24 @@ test('pickRunPr trusts an open PR, and otherwise only one created after the run 
   const since = '2026-07-26T21:17:39.507Z'
 
   // The predecessor's merged PR is not this run's, however recently gh lists it.
-  assert.equal(pickRunPr([stale], since), undefined)
+  assert.equal(pickAgentPr([stale], since), undefined)
   // The run's own PR still counts after it merges, and the oldest post-start entry is the one
   // this run opened.
-  assert.equal(pickRunPr([later, own, stale], since)?.number, 1249)
+  assert.equal(pickAgentPr([later, own, stale], since)?.number, 1249)
   // An open PR on the branch is where pushed commits land, whatever its age.
-  assert.equal(pickRunPr([stale, open], since)?.number, 1301)
+  assert.equal(pickAgentPr([stale, open], since)?.number, 1301)
   // Without a start time only an open PR is trusted.
-  assert.equal(pickRunPr([stale, own, later]), undefined)
-  assert.equal(pickRunPr([stale, open])?.number, 1301)
+  assert.equal(pickAgentPr([stale, own, later]), undefined)
+  assert.equal(pickAgentPr([stale, open])?.number, 1301)
   // `latest` order (#1512): the handoff decision wants the PR that last saw the branch, so a
   // second PR's landed head is not mistaken for work the first PR never carried.
-  assert.equal(pickRunPr([later, own, stale], since, 'latest')?.number, 1300)
-  assert.equal(pickRunPr([stale, open], since, 'latest')?.number, 1301)
+  assert.equal(pickAgentPr([later, own, stale], since, 'latest')?.number, 1300)
+  assert.equal(pickAgentPr([stale, open], since, 'latest')?.number, 1301)
 })
 
 test('a gone branch still reports its PR: it is a remote question (#1255)', async () => {
-  const { git } = fakeGit({ ...REPO, 'rev-parse --verify --quiet refs/heads/the-framework/run-r1': '', remote: 'origin\n' })
-  const handoff = await readRunHandoff('/repo', 'the-framework/run-r1', {
+  const { git } = fakeGit({ ...REPO, 'rev-parse --verify --quiet refs/heads/the-framework/agent-r1': '', remote: 'origin\n' })
+  const handoff = await readAgentHandoff('/repo', 'the-framework/agent-r1', {
     git,
     pr: async () => ({ number: 1254, url: 'u1254', state: 'MERGED', title: 'web run', createdAt: '2026-07-26T21:52:58Z' }),
   })
@@ -740,7 +740,7 @@ test('a gone branch still reports its PR: it is a remote question (#1255)', asyn
   assert.equal(handoff?.pr?.number, 1254)
 })
 
-test('resolveRunPr reads the PR the run recorded, and asks gh only for its state (E6)', async () => {
+test('resolveAgentPr reads the PR the run recorded, and asks gh only for its state (E6)', async () => {
   // The number is a fact about the run, written down when the PR was opened. It used to be
   // re-derived from three candidate branch names filtered by the run's start time — a guess
   // assembled at read time, standing in for one integer nobody had recorded.
@@ -749,15 +749,15 @@ test('resolveRunPr reads the PR the run recorded, and asks gh only for its state
     asked.push(branch)
     return { value: { number: 1249, url: 'u1249', state: 'MERGED', title: 'this triage' }, pending: false }
   }
-  const found = await resolveRunPr('/repo', { id: 'r1', branch: 'feat/mine', pr: { number: 1249, url: 'u1249' } }, prs)
+  const found = await resolveAgentPr('/repo', { id: 'r1', branch: 'feat/mine', pr: { number: 1249, url: 'u1249' } }, prs)
   assert.equal(found.value?.number, 1249)
   assert.equal(found.value?.state, 'MERGED', 'the state is read live, since it changes without the run doing anything')
   assert.deepEqual(asked, ['feat/mine'], 'one branch, not a ladder of candidates')
 })
 
-test('resolveRunPr answers nothing for a run that recorded no PR (E6)', async () => {
+test('resolveAgentPr answers nothing for a run that recorded no PR (E6)', async () => {
   let asked = 0
-  const found = await resolveRunPr('/repo', { id: 'r1', sessionName: 'named' }, async () => {
+  const found = await resolveAgentPr('/repo', { id: 'r1', sessionName: 'named' }, async () => {
     asked++
     return { value: undefined, pending: false }
   })
@@ -769,7 +769,7 @@ test('resolveRunPr answers nothing for a run that recorded no PR (E6)', async ()
 test('a recorded PR the live read cannot confirm still answers with its number and url (E6)', async () => {
   // A branch this machine cannot see — a hands-off web run's, or one already deleted after merge.
   // The recorded fact is the answer; only its state is unknown.
-  const found = await resolveRunPr('/repo', { id: 'r1', pr: { number: 42, url: 'u42' } }, async () => ({
+  const found = await resolveAgentPr('/repo', { id: 'r1', pr: { number: 42, url: 'u42' } }, async () => ({
     value: undefined,
     pending: false,
   }))
@@ -779,7 +779,7 @@ test('a recorded PR the live read cannot confirm still answers with its number a
 })
 
 test('a different PR on the branch is not this run’s answer (E6)', async () => {
-  const found = await resolveRunPr('/repo', { id: 'r1', pr: { number: 42, url: 'u42' } }, async () => ({
+  const found = await resolveAgentPr('/repo', { id: 'r1', pr: { number: 42, url: 'u42' } }, async () => ({
     value: { number: 99, url: 'u99', state: 'OPEN', title: 'someone else’s' },
     pending: false,
   }))
@@ -790,12 +790,12 @@ test('withheldMerge authorizes only a declared-done session with an empty sessio
   // The rule settled on #1390: config arms the merge, the agent authorizes it. No signal means
   // no merge, whatever else is true — this is what row 3 of the live matrix proved was missing
   // (the daemon merged 3s after the PR opened, with setReadyForMerge never called).
-  assert.equal(withheldMerge({ readyForMerge: false, sessionTodoOpen: false }), 'not-ready-for-merge')
-  assert.equal(withheldMerge({ readyForMerge: false, sessionTodoOpen: true }), 'not-ready-for-merge')
+  assert.equal(withheldMerge({ readyForMerge: false, agentTodoOpen: false }), 'not-ready-for-merge')
+  assert.equal(withheldMerge({ readyForMerge: false, agentTodoOpen: true }), 'not-ready-for-merge')
   // The temporary safety belt: the agent said done but its own session file says otherwise.
-  assert.equal(withheldMerge({ readyForMerge: true, sessionTodoOpen: true }), 'session-todo-open')
+  assert.equal(withheldMerge({ readyForMerge: true, agentTodoOpen: true }), 'session-todo-open')
   // Declared done, nothing pending in this session: the merge may run.
-  assert.equal(withheldMerge({ readyForMerge: true, sessionTodoOpen: false }), undefined)
+  assert.equal(withheldMerge({ readyForMerge: true, agentTodoOpen: false }), undefined)
 })
 
 test("a run implementing a ticket carries its issue as `(fix #42)` in the PR title (#1334)", async () => {
@@ -803,7 +803,7 @@ test("a run implementing a ticket carries its issue as `(fix #42)` in the PR tit
   // merge; without it an auto-merged quick-win leaves its ticket open.
   const gh: string[][] = []
   const { git } = fakeGit({ ...READY, push: '' })
-  await runAutoHandoff(
+  await agentAutoHandoff(
     '/repo',
     { id: 'r1', branch: 'the-framework/x', sessionName: 'fix-login', fixes: '#42' },
     { push: true, pr: true },
@@ -822,7 +822,7 @@ test("a run implementing a ticket carries its issue as `(fix #42)` in the PR tit
 
 test("the Merge action merges the session's open PR, marking a draft ready on the way (#1391)", async () => {
   const gh: string[][] = []
-  const result = await mergeSessionPr(
+  const result = await mergeAgentPr(
     '/repo',
     { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'https://github.com/o/r/pull/7' } },
     {
@@ -837,10 +837,10 @@ test("the Merge action merges the session's open PR, marking a draft ready on th
 })
 
 test('the Merge action refuses a session with no PR, or one already landed (#1391)', async () => {
-  const none = await mergeSessionPr('/repo', { id: 'r1' }, { prs: async () => ({ value: undefined, pending: false }) })
+  const none = await mergeAgentPr('/repo', { id: 'r1' }, { prs: async () => ({ value: undefined, pending: false }) })
   assert.deepEqual(none, { ok: false, error: 'this session has no pull request to merge' })
   // A closed/merged PR is an answer, not an action: nothing to press twice.
-  const landed = await mergeSessionPr(
+  const landed = await mergeAgentPr(
     '/repo',
     { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'u' } },
     { prs: async () => ({ value: { number: 7, url: 'u', state: 'MERGED', title: 'x' }, pending: false }) },
@@ -849,7 +849,7 @@ test('the Merge action refuses a session with no PR, or one already landed (#139
 })
 
 test('a Merge the remote refuses comes back as the error, not a success (#1391)', async () => {
-  const result = await mergeSessionPr(
+  const result = await mergeAgentPr(
     '/repo',
     { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'u' } },
     {

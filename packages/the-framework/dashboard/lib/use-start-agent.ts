@@ -7,7 +7,7 @@ type StartArgs = Parameters<typeof sendStart>
 // second run on the same checkout with `busy`. Both composers that start runs (the launcher
 // and the finished-run continuation) route through here, so the refusal reads the same on
 // either surface and neither hand-rolls the busy/error/finally scaffold useAction owns.
-export function useStartRun(): {
+export function useStartAgent(): {
   busy: boolean
   error: string | null
   reset: () => void

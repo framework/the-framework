@@ -33,10 +33,10 @@ interface Answered {
  * once must not auto-accept them all ten seconds after the launcher opens.
  */
 export function OpenQuestions({
-  onOpenSession,
+  onOpenAgent,
 }: {
   /** Jump into the session a question belongs to — it may be another project's. */
-  onOpenSession: (projectId: string, agentId: string) => void
+  onOpenAgent: (projectId: string, agentId: string) => void
 }) {
   const { value: questions, loaded } = usePolled<OpenQuestion[]>(onOpenQuestions, EMPTY_QUESTIONS, 5000, [])
   const [answered, setAnswered] = useState<Map<string, Answered>>(() => new Map())
@@ -84,11 +84,11 @@ export function OpenQuestions({
                   <AnsweredChoice
                     choice={question.choice}
                     pick={done.pick}
-                    meta={<span className="truncate">{sessionLabel(question)}</span>}
+                    meta={<span className="truncate">{agentLabel(question)}</span>}
                     footer={
                       <button
                         type="button"
-                        onClick={() => onOpenSession(question.projectId, question.agentId)}
+                        onClick={() => onOpenAgent(question.projectId, question.agentId)}
                         className="mt-3 text-xs text-muted-foreground hover:text-foreground"
                       >
                         Open session →
@@ -99,11 +99,11 @@ export function OpenQuestions({
                   <div className="overflow-hidden rounded-md border border-border">
                     <button
                       type="button"
-                      onClick={() => onOpenSession(question.projectId, question.agentId)}
+                      onClick={() => onOpenAgent(question.projectId, question.agentId)}
                       className="flex w-full items-baseline gap-2 px-4 py-2 text-left text-xs text-muted-foreground hover:bg-accent/40"
                       title="Open this session"
                     >
-                      <span className="truncate font-medium text-foreground">{sessionLabel(question)}</span>
+                      <span className="truncate font-medium text-foreground">{agentLabel(question)}</span>
                       <span className="truncate">{question.projectName}</span>
                       <span className="ml-auto shrink-0">Open session →</span>
                     </button>
@@ -137,7 +137,7 @@ export function OpenQuestions({
                 )}
               >
                 {done && <span className="shrink-0 text-success">✓</span>}
-                <span className="truncate">{sessionLabel(question)}</span>
+                <span className="truncate">{agentLabel(question)}</span>
               </button>
             ))}
           </nav>
@@ -148,6 +148,6 @@ export function OpenQuestions({
 }
 
 /** The card's label for its session: its chosen name, else the intent's first line, else the id. */
-function sessionLabel(q: OpenQuestion): string {
+function agentLabel(q: OpenQuestion): string {
   return q.sessionName ?? q.intent?.split('\n')[0]?.slice(0, 80) ?? q.agentId
 }

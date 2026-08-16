@@ -2,7 +2,7 @@ import { basename } from 'node:path'
 import { listProjects, type ProjectRecord } from '../registry.js'
 import { isActivated } from '../project.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from '../config.js'
-import { readAllRuns, type AgentMeta } from '../store/index.js'
+import { readAllAgents, type AgentMeta } from '../store/index.js'
 
 /**
  * The multi-project read side (#392): projects the daemon serves come from the
@@ -36,8 +36,8 @@ export interface ProjectSummary {
 /** Injectable readers so {@link summarizeProject} is unit-testable off disk. */
 export interface SummarizeDeps {
   isActivated?: (path: string) => Promise<boolean>
-  /** The project's runs (live + archived), newest-first. Defaults to {@link readAllRuns}. */
-  readRuns?: (path: string) => Promise<AgentMeta[]>
+  /** The project's runs (live + archived), newest-first. Defaults to {@link readAllAgents}. */
+  readAgents?: (path: string) => Promise<AgentMeta[]>
   /** The repo's `the-framework.yml` (#842). Defaults to {@link loadFrameworkConfig}. */
   readFileConfig?: (path: string) => Promise<FrameworkFileConfig>
 }
@@ -54,16 +54,16 @@ export interface SummarizeDeps {
  */
 export async function summarizeProject(record: ProjectRecord, deps: SummarizeDeps = {}): Promise<ProjectSummary> {
   const checkActivated = deps.isActivated ?? isActivated
-  const loadRuns = deps.readRuns ?? readAllRuns
+  const loadAgents = deps.readAgents ?? readAllAgents
   const loadFileConfig = deps.readFileConfig ?? (path => loadFrameworkConfig(path))
   const activated = await checkActivated(record.path).catch(() => false)
   const [agents, fileConfig] = await Promise.all([
-    loadRuns(record.path).catch(() => [] as AgentMeta[]),
+    loadAgents(record.path).catch(() => [] as AgentMeta[]),
     loadFileConfig(record.path).catch(() => ({}) as FrameworkFileConfig),
   ])
   // ISO timestamps sort chronologically.
-  const runActivity = agents.map(r => r.updatedAt || r.startedAt).filter(Boolean)
-  const lastActivityAt = runActivity.filter((a): a is string => !!a).sort().at(-1)
+  const agentActivity = agents.map(r => r.updatedAt || r.startedAt).filter(Boolean)
+  const lastActivityAt = agentActivity.filter((a): a is string => !!a).sort().at(-1)
   const summary: ProjectSummary = {
     id: record.id,
     path: record.path,

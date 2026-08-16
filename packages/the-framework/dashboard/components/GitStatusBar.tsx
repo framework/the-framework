@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { GitStatus, AgentWorktree } from '../../dist/index.js'
 import { ChevronRight, GitBranch } from 'lucide-react'
-import { onGitStatus, onRunWorktree } from '../rpc/reads.js'
+import { onGitStatus, onAgentWorktree } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { formatBytes } from '../../dist/client.js'
 import { cn } from '../lib/utils.js'
@@ -28,7 +28,7 @@ export function GitStatusBar({
   label,
   projectName,
   summary,
-  runState,
+  agentState,
   expanded = false,
   onToggle,
 }: {
@@ -47,7 +47,7 @@ export function GitStatusBar({
   /** What state the run itself is in (stopped, ready for merge, …), said beside the tree's own
    *  clean/dirty rather than at the far end of the bar: they are one line of facts about the
    *  session, where the bar's end is where its controls live. */
-  runState?: ReactNode
+  agentState?: ReactNode
   expanded?: boolean
   /** Given, the branch reads as a disclosure for the detail the caller renders below. */
   onToggle?: (() => void) | undefined
@@ -58,7 +58,7 @@ export function GitStatusBar({
   // lands in under a second — worth asking again for rather than showing a gap for ten.
   const [everyMs, setEveryMs] = useState(10_000)
   const { value: status } = usePolled<GitStatus | AgentWorktree | null>(
-    () => (agentId ? onRunWorktree(projectId, agentId) : onGitStatus(projectId)),
+    () => (agentId ? onAgentWorktree(projectId, agentId) : onGitStatus(projectId)),
     null,
     everyMs,
     [projectId, agentId, everyMs],
@@ -147,7 +147,7 @@ export function GitStatusBar({
         </TooltipTrigger>
         <TooltipContent>{status.dirty ? dirtyLabel : 'Clean'}</TooltipContent>
       </Tooltip>
-      {runState}
+      {agentState}
       {/* Only a worktree has a size worth showing, and only once nothing is writing to it (#798). */}
       {size && (
         <Tooltip>

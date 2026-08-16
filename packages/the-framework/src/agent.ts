@@ -1,6 +1,6 @@
 import type { Driver, DriverSession } from './driver/index.js'
-import { composeRunSystem, renderSystemPrompt, type TfContext } from './system-prompt.js'
-import { createRunControls, emitSessionStart, endStopDetail } from './agent-telemetry.js'
+import { composeAgentSystem, renderSystemPrompt, type TfContext } from './system-prompt.js'
+import { createAgentControls, emitSessionStart, endStopDetail } from './agent-telemetry.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
 import { runAwaitRounds } from './await-gate.js'
 import { runTodoLoop, type TodoLoopResult } from './todo-loop.js'
@@ -15,7 +15,7 @@ import { isHandsOff, type AgentLocation } from './agent-location.js'
  * without touching this wiring.
  *
  * There used to be two of these. `runFramework` drove a build through ai-autopilot's `Bootstrap`
- * spine, and `runPrompt` ran one prompt verbatim; `composeRunSystem` exists specifically because
+ * spine, and `runPrompt` ran one prompt verbatim; `composeAgentSystem` exists specifically because
  * the two each inlined the system composition and drifted apart (#500/#501). Once the review loop
  * (A5) and the `Bootstrap` spine (A3) went, the build path *was* "one prompt, honoring gates" —
  * which is what the prompt path already was. What is left of the difference is two options rather
@@ -26,8 +26,8 @@ import { isHandsOff, type AgentLocation } from './agent-location.js'
 /** What a session is: an intent to build from, or a prompt to run verbatim. */
 export type SessionKind = 'build' | 'prompt'
 
-/** Options for {@link runSession}. */
-export interface RunSessionOptions {
+/** Options for {@link runAgent}. */
+export interface RunAgentOptions {
   /**
    * What the session is asked to do. For `build`, the intent the opening prompt is composed
    * around; for `prompt`, the text sent as-is (modulo the system template's user slot).
@@ -111,7 +111,7 @@ export interface RunSessionOptions {
 }
 
 /** What a session returns. */
-export interface RunSessionResult {
+export interface RunAgentResult {
   /** The final turn's text. */
   text: string
   /** Every event emitted, in order. */
@@ -129,7 +129,7 @@ export interface RunSessionResult {
  * `choice`, `usage`, `intent`, `end` — so the dashboard, the store, and the control channel (#344)
  * read one shape regardless of what opened the session.
  */
-export async function runSession(opts: RunSessionOptions): Promise<RunSessionResult> {
+export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
   const events: FrameworkEvent[] = []
   const emit = (event: FrameworkEvent): void => {
     events.push(event)
@@ -151,7 +151,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
   const handsOff = isHandsOff(opts.location)
   // The built-in #326 system prompt + any user SYSTEM.md frame the session (#301).
   const tf: TfContext = { prompt: opts.prompt }
-  const system = composeRunSystem({
+  const system = composeAgentSystem({
     vanilla: opts.vanilla,
     browser: opts.browser,
     handsOff,
@@ -172,7 +172,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
   // Usage accounting plus the one self-stop left (#358): the session signal composes the caller's
   // abort with the one an answer trips. Nothing stops a session for spending (E1) — that is
   // decided before it starts.
-  const { runSignal, onDriverEvent, answerController } = createRunControls({
+  const { agentSignal, onDriverEvent, answerController } = createAgentControls({
     emit,
     signal: opts.signal,
     sessionLink: opts.sessionLink,
@@ -186,7 +186,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
     system,
     ...(opts.model ? { model: opts.model } : {}),
     ...(resuming ? { resumeSessionId: opts.resumeSessionId } : {}),
-    signal: runSignal,
+    signal: agentSignal,
     onEvent: onDriverEvent,
   })
 
@@ -201,7 +201,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
       emitTurnSignals,
       requestChoice: opts.requestChoice,
       emit,
-      signal: runSignal,
+      signal: agentSignal,
       ...(resuming ? { resume: true } : {}),
       // Chat comes after the backlog for a build, so it is wired below rather than here.
       ...(opts.messages && (kind === 'prompt' || handsOff) ? { messages: opts.messages } : {}),
@@ -222,7 +222,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
     // directive. Only for a real driver — the fake one writes nothing, so its workspace always
     // reads empty — and only when the agent is not mid-question, which the gates just drained.
     if (kind === 'build' && !resuming && opts.driver.id !== 'fake' && !rounds.stopped && isWorkspaceEmpty(opts.cwd)) {
-      const scaffolded = await session.prompt(scaffoldPrompt(opts.prompt), { signal: runSignal })
+      const scaffolded = await session.prompt(scaffoldPrompt(opts.prompt), { signal: agentSignal })
       emitTurnSignals(scaffolded.text)
       text = scaffolded.text
     }
@@ -230,8 +230,8 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
     // The session controls (a Stop, an answer that said stop #358) abort between turns, and the
     // opening rounds do not observe the abort themselves, so look before treating this as a
     // success — otherwise an aborted session settles as done.
-    if (runSignal.aborted) {
-      throw runSignal.reason instanceof Error ? runSignal.reason : new Error('[framework] run stopped')
+    if (agentSignal.aborted) {
+      throw agentSignal.reason instanceof Error ? agentSignal.reason : new Error('[framework] run stopped')
     }
 
     // The backlog loop (#323): with the opening work settled, consume the agent's own TODO
@@ -244,7 +244,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
         cwd: opts.cwd,
         emit,
         requestChoice: opts.requestChoice,
-        signal: runSignal,
+        signal: agentSignal,
         maxItems: opts.todoMaxItems,
       })
     }
@@ -252,7 +252,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
     // Live chat (#714) for a build, once its backlog is worked: a prompt session already took it
     // inside the rounds above, where there is nothing to come between.
     if (opts.messages && kind === 'build' && !handsOff) {
-      const chat = await runChatAfterBacklog(session, opts, emit, emitTurnSignals, runSignal)
+      const chat = await runChatAfterBacklog(session, opts, emit, emitTurnSignals, agentSignal)
       text = chat
     }
 
@@ -281,7 +281,7 @@ export async function runSession(opts: RunSessionOptions): Promise<RunSessionRes
  * "raw `claude -p`" means. A build is framed for the workspace it lands in: an existing codebase
  * is *extended*, not rebuilt from scratch (#185).
  */
-function openingPrompt(opts: RunSessionOptions, kind: SessionKind, resuming: boolean, cwd: string): string {
+function openingPrompt(opts: RunAgentOptions, kind: SessionKind, resuming: boolean, cwd: string): string {
   if (resuming || opts.transparent) return opts.prompt
   if (kind === 'prompt') {
     return opts.vanilla ? opts.prompt : renderSystemPrompt({ prompt: opts.prompt }).user
@@ -294,7 +294,7 @@ function openingPrompt(opts: RunSessionOptions, kind: SessionKind, resuming: boo
 /** The live-chat phase a build reaches after its backlog, sharing the rounds' own loop. */
 async function runChatAfterBacklog(
   session: DriverSession,
-  opts: RunSessionOptions,
+  opts: RunAgentOptions,
   emit: (event: FrameworkEvent) => void,
   emitTurnSignals: (text: string) => void,
   signal: AbortSignal,

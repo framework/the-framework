@@ -4,8 +4,8 @@ import { driverFromImpl } from '../../dist/client.js'
 import { Composer, type ComposerHandle } from './Composer.js'
 import { sendMessage, sendStop } from '../rpc/control.js'
 import { useAction } from '../lib/use-action.js'
-import { useStartRun } from '../lib/use-start-run.js'
-import type { RunOutcome } from '../lib/live-state.js'
+import { useStartAgent } from '../lib/use-start-agent.js'
+import type { AgentOutcome } from '../lib/live-state.js'
 import { Button } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
@@ -21,7 +21,7 @@ export const RESUME_MESSAGE =
 
 // One composer for a session, live or finished (#1026).
 //
-// There used to be two: RunChat while the run was running, RunResumeChat once it ended. They
+// There used to be two: AgentChat while the run was running, AgentResumeChat once it ended. They
 // looked identical and differed only in what submit did, but the session view swapped one for the
 // other the moment a run stopped — so the editor remounted under the user, taking any half-typed
 // message with it, and for a run that never reported a session id the composer vanished entirely
@@ -47,7 +47,7 @@ export function AgentComposer({
   addContext,
   removeContext,
   sessionName,
-  onRunStarted,
+  onAgentStarted,
   outcome,
 }: {
   projectId: string
@@ -65,13 +65,13 @@ export function AgentComposer({
   removeContext?: ((path: string) => void) | undefined
   /** This session's name (#874), so a preset launched here targets it by default. */
   sessionName?: string | undefined
-  onRunStarted?: ((intent: string, agentId?: string) => void) | undefined
+  onAgentStarted?: ((intent: string, agentId?: string) => void) | undefined
   /** How the run ended (#948), so the note does not call a crash "ended". */
-  outcome?: RunOutcome | undefined
+  outcome?: AgentOutcome | undefined
 }) {
   const composerRef = useRef<ComposerHandle>(null)
   const { busy, error, run } = useAction()
-  const { busy: starting, error: startError, start } = useStartRun()
+  const { busy: starting, error: startError, start } = useStartAgent()
   // The slot's Stop (#1455), its own action so a message send's busy beat cannot read as
   // "stopping". A landed Stop stays "Stopping…" until the end event flips `live`, so it cannot
   // be re-fired — the same latch the ⋮ menu's Stop keeps. Released the moment `live` drops, not
@@ -98,15 +98,15 @@ export function AgentComposer({
   const [queued, setQueued] = useState<string | null>(null)
   const resumable = !live && sessionId !== undefined
 
-  const send = async (text: string, _kind: 'build' | 'prompt', opts: { newSession: boolean }): Promise<void> => {
+  const send = async (text: string, _kind: 'build' | 'prompt', opts: { newAgent: boolean }): Promise<void> => {
     if (busy || starting) return
     // A new-session preset is not a continuation (#959): it drops the resume seed and the run id,
     // so it opens its own run with its own worktree, branch and transcript.
-    if (opts.newSession || (!live && !resumable)) {
+    if (opts.newAgent || (!live && !resumable)) {
       const started = await start(projectId, text, 'prompt', {})
       if (started) {
         composerRef.current?.clear()
-        onRunStarted?.(text, started.agentId)
+        onAgentStarted?.(text, started.agentId)
       }
       composerRef.current?.focus()
       return
@@ -138,14 +138,14 @@ export function AgentComposer({
         resumeSession: sessionId as string,
         // Continue this run rather than opening a new row (#762): the follow-up writes into the
         // same run, on the same branch, so one thing you asked for stays one entry.
-        ...(agentId ? { continueRunId: agentId } : {}),
+        ...(agentId ? { continueAgentId: agentId } : {}),
         ...(picked && picked !== 'claude' ? { driver: picked } : {}),
       },
       'Failed to continue the agent.',
     )
     if (result) {
       composerRef.current?.clear()
-      onRunStarted?.(text, result.agentId) // select the run we just started (#761)
+      onAgentStarted?.(text, result.agentId) // select the run we just started (#761)
     }
   }
 
@@ -166,14 +166,14 @@ export function AgentComposer({
       'prompt',
       {
         resumeSession: sessionId,
-        ...(agentId ? { continueRunId: agentId } : {}),
+        ...(agentId ? { continueAgentId: agentId } : {}),
         ...(picked && picked !== 'claude' ? { driver: picked } : {}),
       },
       'Failed to resume the agent.',
     )
     if (result) {
       setResuming(true)
-      onRunStarted?.(RESUME_MESSAGE, result.agentId)
+      onAgentStarted?.(RESUME_MESSAGE, result.agentId)
     }
   }
 
@@ -234,10 +234,10 @@ export function AgentComposer({
         submitLabel="Send"
         submitBusyLabel={live ? 'Sending…' : resumable ? 'Resuming…' : 'Starting…'}
         showDriverModel={false}
-        inSession
+        inAgent
         // Ended → the next message starts a new leg, whose options the gear can shape (#1172);
         // live → nothing is adjustable and the gear is dropped rather than opening empty.
-        sessionEnded={!live}
+        agentEnded={!live}
         sessionName={sessionName}
         idleControl={idleControl}
         placeholder={
@@ -270,7 +270,7 @@ function Note({
 }: {
   live: boolean
   resumable: boolean
-  outcome: RunOutcome | undefined
+  outcome: AgentOutcome | undefined
   queued: string | null
   muted: boolean
 }) {

@@ -1,5 +1,5 @@
 import type { Preferences } from '../../dist/index.js'
-import type { OptionRow } from '../lib/run-option-rows.js'
+import type { OptionRow } from '../lib/agent-option-rows.js'
 import { Settings, Check, MonitorSmartphone, Plus, X } from 'lucide-react'
 import { updatePreferences } from '../lib/preferences.js'
 import type { ConnectionProfile } from '../lib/profiles.js'
@@ -25,7 +25,7 @@ import {
 
 /** One Global-option row. Defined with the rules that build it (#958), and re-exported here so the
  * menu's existing importers do not have to care where the table moved to. */
-export type { OptionRow } from '../lib/run-option-rows.js'
+export type { OptionRow } from '../lib/agent-option-rows.js'
 
 
 // Moved to ui/option-label.tsx (#948) so menus without preference wiring can share it;
@@ -37,12 +37,12 @@ export { OptionLabel }
  * Where a run executes (#1050/#610). `local` runs on this device; `actions` on a GitHub Actions
  * runner; `web` hands it to a Claude Code cloud session on the user's own account.
  */
-export type RunTarget = 'local' | 'actions' | 'web'
+export type AgentTarget = 'local' | 'actions' | 'web'
 
 /** The single-select "Run on" control (#1050): the driver axis, at the top of the gear. */
-export type RunTargetControl = {
-  value: RunTarget
-  onChange: (value: RunTarget) => void
+export type AgentTargetControl = {
+  value: AgentTarget
+  onChange: (value: AgentTarget) => void
 }
 
 /**
@@ -90,7 +90,7 @@ function StatusDot({ status }: { status: DeviceStatus | undefined }) {
 // The run targets the gear offers (#1050/#610). A single-select modeled on the agent tree
 // (Check-marked rows), not the boolean OptionRow. "Claude web" describes the hand-off it is
 // rather than promising a streamed run: the session runs on claude.ai and opens its own PR.
-const RUN_TARGET_ROWS: { value: RunTarget; label: string; description: string }[] = [
+const RUN_TARGET_ROWS: { value: AgentTarget; label: string; description: string }[] = [
   { value: 'local', label: 'This machine', description: 'Run on this machine, as today.' },
   { value: 'actions', label: 'GitHub Actions', description: 'Run on a fresh GitHub Actions runner.' },
   { value: 'web', label: 'Claude web', description: 'Hand off to a Claude Code cloud session, which opens its own PR.' },
@@ -100,7 +100,7 @@ const RUN_TARGET_ROWS: { value: RunTarget; label: string; description: string }[
 // with a single checkmark. Selecting a device makes it the run target in place (#1067), so the
 // checkmark can sit on a device while the dashboard stays on the local daemon (no navigation).
 // When genuinely on a remote daemon (a manual connection), that device carries the mark instead.
-function RunTargetSub({ control, connection, busy }: { control: RunTargetControl; connection?: ConnectionControl | undefined; busy: boolean }) {
+function AgentTargetSub({ control, connection, busy }: { control: AgentTargetControl; connection?: ConnectionControl | undefined; busy: boolean }) {
   // No connection control means only the driver axis exists, so treat it as the local daemon.
   const onLocalDaemon = connection ? connection.isLocal : true
   // The selected device (#1067), meaningful only on the local daemon; on a remote daemon the
@@ -118,7 +118,7 @@ function RunTargetSub({ control, connection, busy }: { control: RunTargetControl
         ? selectedDevice.label
         : RUN_TARGET_ROWS.find(r => r.value === control.value)?.label ?? RUN_TARGET_ROWS[0]!.label
   // A driver row is checked only when no device is the target, so the one checkmark never doubles up.
-  const driverChecked = (value: RunTarget): boolean => onLocalDaemon && !selectedDevice && value === control.value
+  const driverChecked = (value: AgentTarget): boolean => onLocalDaemon && !selectedDevice && value === control.value
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={busy}>
@@ -220,7 +220,7 @@ export function OptionsMenu({
   options,
   busy,
   label = 'Session options',
-  runTarget,
+  agentTarget,
   connection,
 }: {
   options: OptionRow[]
@@ -230,9 +230,9 @@ export function OptionsMenu({
   label?: string
   /** The "Run on" driver axis (#1050), at the top of the gear. Omitted in-session, where the
    *  target is baked in at spawn — same as the agent select. */
-  runTarget?: RunTargetControl | undefined
+  agentTarget?: AgentTargetControl | undefined
   /** The saved-devices connection section (#1052), rendered inside the "Run on" sub under the
-   *  driver rows. Rides the same sub as runTarget, so it shows only where that does. */
+   *  driver rows. Rides the same sub as agentTarget, so it shows only where that does. */
   connection?: ConnectionControl | undefined
 }) {
   const activeCount = options.filter(o => o.checked && !o.disabled).length
@@ -259,9 +259,9 @@ export function OptionsMenu({
         <TooltipContent>{activeCount > 0 ? `${label} — ${activeCount} on` : label}</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end" className="min-w-[19rem] max-w-[22rem]">
-        {runTarget && (
+        {agentTarget && (
           <>
-            <RunTargetSub control={runTarget} connection={connection} busy={busy} />
+            <AgentTargetSub control={agentTarget} connection={connection} busy={busy} />
             {options.length > 0 && <DropdownMenuSeparator />}
           </>
         )}

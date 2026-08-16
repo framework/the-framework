@@ -45,14 +45,14 @@ const question = (overrides: Partial<OpenQuestion> = {}): OpenQuestion => ({
 
 describe('OpenQuestions (#1455 item 4)', () => {
   test('renders nothing while empty: no section, no headline', async () => {
-    const { container } = render(<OpenQuestions onOpenSession={vi.fn()} />)
+    const { container } = render(<OpenQuestions onOpenAgent={vi.fn()} />)
     await waitFor(() => expect(onOpenQuestions).toHaveBeenCalled())
     expect(container.textContent).toBe('')
   })
 
   test('a parked session renders its question, and answering posts against its run', async () => {
     onOpenQuestions.mockResolvedValue([question()])
-    render(<OpenQuestions onOpenSession={vi.fn()} />)
+    render(<OpenQuestions onOpenAgent={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Start the next backlog item?')).toBeTruthy())
     expect(screen.getByText('Waiting on you · 1')).toBeTruthy()
     expect(screen.getByText('triage-queue')).toBeTruthy()
@@ -66,7 +66,7 @@ describe('OpenQuestions (#1455 item 4)', () => {
       question(),
       question({ projectId: 'p2', projectName: 'beta', agentId: 'run-9', sessionName: 'fix-ci', choice: { id: 'gate-2', title: 'Approve the fix?', options: [{ id: 'ok', label: 'Approve it' }], recommended: 'ok' } }),
     ])
-    render(<OpenQuestions onOpenSession={vi.fn()} />)
+    render(<OpenQuestions onOpenAgent={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Waiting on you · 2')).toBeTruthy())
     fireEvent.click(screen.getByText('Approve it'))
     await waitFor(() => expect(sendChoice).toHaveBeenCalledWith('p2', 'gate-2', 'ok', 'user', 'run-9'))
@@ -74,22 +74,22 @@ describe('OpenQuestions (#1455 item 4)', () => {
 
   test('the card header jumps into the question session, project and all', async () => {
     onOpenQuestions.mockResolvedValue([question()])
-    const onOpenSession = vi.fn()
-    render(<OpenQuestions onOpenSession={onOpenSession} />)
+    const onOpenAgent = vi.fn()
+    render(<OpenQuestions onOpenAgent={onOpenAgent} />)
     await waitFor(() => expect(screen.getByTitle('Open this session')).toBeTruthy())
     fireEvent.click(screen.getByTitle('Open this session'))
-    expect(onOpenSession).toHaveBeenCalledWith('p1', 'run-1')
+    expect(onOpenAgent).toHaveBeenCalledWith('p1', 'run-1')
   })
 
   test('a session that never named itself falls back to its intent line', async () => {
     onOpenQuestions.mockResolvedValue([question({ sessionName: undefined as unknown as string, intent: 'fix the flaky test\nmore detail' })])
-    render(<OpenQuestions onOpenSession={vi.fn()} />)
+    render(<OpenQuestions onOpenAgent={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('fix the flaky test')).toBeTruthy())
   })
 
   test('the autopilot countdown never runs in the hub, even with autopilot on', async () => {
     onOpenQuestions.mockResolvedValue([question()])
-    render(<OpenQuestions onOpenSession={vi.fn()} />)
+    render(<OpenQuestions onOpenAgent={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Start the next backlog item?')).toBeTruthy())
     // ChoicePanel with a countdown shows "● Auto accept in Ns…"; the hub must not (#1455): it
     // renders every parked gate at once, and a page that answers them all is a mass auto-accept.
@@ -103,7 +103,7 @@ describe('OpenQuestions jump-nav (#1455 bonus 1)', () => {
 
   test('one question needs no map to it: no nav', async () => {
     onOpenQuestions.mockResolvedValue([question()])
-    render(<OpenQuestions onOpenSession={vi.fn()} />)
+    render(<OpenQuestions onOpenAgent={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Start the next backlog item?')).toBeTruthy())
     expect(screen.queryByRole('navigation', { name: 'Jump to a question' })).toBeNull()
   })
@@ -112,7 +112,7 @@ describe('OpenQuestions jump-nav (#1455 bonus 1)', () => {
     onOpenQuestions.mockResolvedValue([question(), second()])
     const scrolled = vi.fn()
     Element.prototype.scrollIntoView = scrolled
-    render(<OpenQuestions onOpenSession={vi.fn()} />)
+    render(<OpenQuestions onOpenAgent={vi.fn()} />)
     await waitFor(() => expect(screen.getByRole('navigation', { name: 'Jump to a question' })).toBeTruthy())
     const nav = screen.getByRole('navigation', { name: 'Jump to a question' })
     // One row per card, labelled by session.
@@ -129,7 +129,7 @@ describe('OpenQuestions answered collapse (#1455 bonus 2)', () => {
     // fires onAnswered — the default undefined models a failed post and must not collapse.
     sendChoice.mockResolvedValue(null)
     onOpenQuestions.mockResolvedValue([question()])
-    render(<OpenQuestions onOpenSession={vi.fn()} />)
+    render(<OpenQuestions onOpenAgent={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Work on it')).toBeTruthy())
     fireEvent.click(screen.getByText('Work on it'))
     // The live panel is gone, the single-line card is there, the count dropped to zero.
@@ -142,8 +142,8 @@ describe('OpenQuestions answered collapse (#1455 bonus 2)', () => {
   test('expanding an answered card shows the options with the pick marked, and still opens the session', async () => {
     sendChoice.mockResolvedValue(null)
     onOpenQuestions.mockResolvedValue([question()])
-    const onOpenSession = vi.fn()
-    render(<OpenQuestions onOpenSession={onOpenSession} />)
+    const onOpenAgent = vi.fn()
+    render(<OpenQuestions onOpenAgent={onOpenAgent} />)
     await waitFor(() => expect(screen.getByText('Work on it')).toBeTruthy())
     fireEvent.click(screen.getByText('Work on it'))
     await waitFor(() => expect(screen.getByText('Expand')).toBeTruthy())
@@ -152,7 +152,7 @@ describe('OpenQuestions answered collapse (#1455 bonus 2)', () => {
     expect(screen.getByText('Work on it')).toBeTruthy()
     expect(screen.getByText('Stop the loop')).toBeTruthy()
     fireEvent.click(screen.getByText('Open session →'))
-    expect(onOpenSession).toHaveBeenCalledWith('p1', 'run-1')
+    expect(onOpenAgent).toHaveBeenCalledWith('p1', 'run-1')
     fireEvent.click(screen.getByText('Collapse'))
     expect(screen.queryByText('Stop the loop')).toBeNull()
   })
@@ -160,7 +160,7 @@ describe('OpenQuestions answered collapse (#1455 bonus 2)', () => {
   test('a failed post does not collapse: the gate is still open', async () => {
     sendChoice.mockRejectedValue(new Error('boom'))
     onOpenQuestions.mockResolvedValue([question()])
-    render(<OpenQuestions onOpenSession={vi.fn()} />)
+    render(<OpenQuestions onOpenAgent={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Work on it')).toBeTruthy())
     fireEvent.click(screen.getByText('Work on it'))
     // useAction surfaces the thrown Error's own message.

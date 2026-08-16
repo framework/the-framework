@@ -3,7 +3,7 @@ import type { Preferences } from '../../dist/index.js'
 import { DRIVERS, DRIVER_LABELS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '../../dist/client.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { usePreferences, updatePreferences, themePreference, type ThemePreference } from '../lib/preferences.js'
-import { runOptionRows, type OptionRow } from '../lib/run-option-rows.js'
+import { agentOptionRows, type OptionRow } from '../lib/agent-option-rows.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
 import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.js'
 import { OnboardingChecklist } from './OnboardingChecklist.js'
@@ -28,17 +28,17 @@ import { cn } from '../lib/utils.js'
 // only ever mean "the default" — which is what a settings page should mean.
 
 export function SettingsPage({
-  onRunStarted,
+  onAgentStarted,
 }: {
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
-  onRunStarted: (projectId: string, intent: string, agentId?: string) => void
+  onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
   onDone?: () => void
 }) {
   const preferences = usePreferences()
   const editors = useDetectedEditors()
   const theme = themePreference(preferences)
   // One shared table with the launcher (#958), rules already applied.
-  const { main: runOptions } = runOptionRows(preferences)
+  const { main: agentOptions } = agentOptionRows(preferences)
   // A notification toggle is a preference; whether it can deliver is a capability (#948). Both are
   // shown, the same way the bell does, so a row cannot promise delivery that will not happen.
   const permission = useNotificationPermission()
@@ -59,7 +59,7 @@ export function SettingsPage({
           </p>
         </div>
 
-        <OnboardingChecklist onRunStarted={onRunStarted} />
+        <OnboardingChecklist onAgentStarted={onAgentStarted} />
 
         <Section title="Appearance">
           <SelectRow
@@ -124,7 +124,7 @@ export function SettingsPage({
           title="Run options"
           description="What a new agent starts with. The launcher's gear shows the same options, and an agent's own action bar can still change its ending."
         >
-          {runOptions.map(row => (
+          {agentOptions.map(row => (
             <OptionToggleRow key={row.key} row={row} />
           ))}
         </Section>

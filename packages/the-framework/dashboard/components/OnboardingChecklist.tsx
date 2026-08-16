@@ -8,7 +8,7 @@ import { usePolled } from '../lib/use-async.js'
 import { usePreferences, updatePreferences, notificationsEnabled } from '../lib/preferences.js'
 import { useNotifyChannels, reloadNotifyChannels } from '../lib/notify-channels.js'
 import { useNotificationPermission } from '../lib/notification-permission.js'
-import { useStartRun } from '../lib/use-start-run.js'
+import { useStartAgent } from '../lib/use-start-agent.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
 import { DiscordWebhookDialog, DISCORD_WEBHOOK_DESCRIPTION } from './DiscordDialogs.js'
 import { Button } from './ui/button.js'
@@ -44,7 +44,7 @@ interface Step {
 
 export function OnboardingChecklist({
   dismissible = false,
-  onRunStarted,
+  onAgentStarted,
 }: {
   /** The Overview offers to hide it; the settings page always shows it. */
   dismissible?: boolean
@@ -53,7 +53,7 @@ export function OnboardingChecklist({
    * travels with it: this renders on the Overview and the settings page, neither of which has
    * one selected. Required, so a new mounting surface cannot quietly drop the navigation.
    */
-  onRunStarted: (projectId: string, intent: string, agentId?: string) => void
+  onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
 }) {
   // Slower than the Overview's own 5s poll: onboarding state changes at human speed, and this
   // read fans out over every project to answer the tickets question.
@@ -64,7 +64,7 @@ export function OnboardingChecklist({
   const channels = useNotifyChannels()
   const preferences = usePreferences()
   const permission = useNotificationPermission()
-  const { start, busy: starting, error: startError } = useStartRun()
+  const { start, busy: starting, error: startError } = useStartAgent()
 
   const [addingProject, setAddingProject] = useState(false)
   const [addingCwd, setAddingCwd] = useState(false)
@@ -106,7 +106,7 @@ export function OnboardingChecklist({
     const started = await start(targetProjectId, intent, 'prompt', { unattended: true })
     // Land on the session doing the import, not the project's launcher (#1169): its id is what
     // the shell needs to show the live output. A refusal keeps you here, with `startError` shown.
-    if (started) onRunStarted(targetProjectId, intent, started.agentId)
+    if (started) onAgentStarted(targetProjectId, intent, started.agentId)
   }
 
   const steps: Step[] = [

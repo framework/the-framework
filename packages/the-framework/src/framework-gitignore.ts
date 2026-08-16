@@ -37,13 +37,13 @@ export function gitignorePath(cwd: string): string {
  * and not `worktrees/<run>/sessions/`. The transient siblings stay ignored either way: un-ignoring
  * a directory only lets git descend into it, and the bare `*` still ignores every file it finds.
  */
-export function sessionsGitignore(): string {
+export function archiveGitignore(): string {
   return `!*/\n!*/${ARCHIVE_DIR}/\n!*/${ARCHIVE_DIR}/**\n`
 }
 
 /** The whole file: ignore the transient state, keep the session archive. */
 export function frameworkGitignore(): string {
-  return `# The Framework: session state is transient; the session archive is committed.\n*\n!.gitignore\n${sessionsGitignore()}`
+  return `# The Framework: session state is transient; the session archive is committed.\n*\n!.gitignore\n${archiveGitignore()}`
 }
 
 /** The rule whose presence means the file already un-ignores the session archive. */

@@ -80,11 +80,11 @@ export const presets = {
    * triage and planning presets have a backlog to read. One line of prompt, because the system
    * prompt already tells the agent what a ticket is and where it goes.
    *
-   * Marked {@link PresetSpec.newSession}, like its update sibling: importing is repo work, not a
+   * Marked {@link PresetSpec.newAgent}, like its update sibling: importing is repo work, not a
    * reply, so it opens its own session rather than appending to whichever one the user happens to
    * be reading.
    */
-  importTickets: definePreset({ name: 'import-tickets', template: PRESETS_IMPORT_TICKETS, label: 'Import tickets from GitHub', newSession: true, tooltip: 'Fill `tickets/` from the GitHub issues. Always runs in a new session.' }),
+  importTickets: definePreset({ name: 'import-tickets', template: PRESETS_IMPORT_TICKETS, label: 'Import tickets from GitHub', newAgent: true, tooltip: 'Fill `tickets/` from the GitHub issues. Always runs in a new session.' }),
 
   /**
    * [Update from GitHub] (#1208): the second and every later import. It resumes from the
@@ -96,7 +96,7 @@ export const presets = {
    * file travels in the same commit as the tickets it describes, so a run whose work never landed
    * cannot leave behind a stamp claiming those issues were imported.
    */
-  updateTickets: definePreset({ name: 'update-tickets', template: PRESETS_UPDATE_TICKETS, label: 'Update from GitHub', newSession: true, tooltip: 'Bring `tickets/` up to date with the issues and comments changed since the last import.' }),
+  updateTickets: definePreset({ name: 'update-tickets', template: PRESETS_UPDATE_TICKETS, label: 'Update from GitHub', newAgent: true, tooltip: 'Bring `tickets/` up to date with the issues and comments changed since the last import.' }),
 
   /** [Plan tickets] (#685): turn tickets into costed plans. */
   planTickets: definePreset({ name: 'plan-tickets', template: PRESETS_PLAN_TICKETS, label: 'Plan tickets (aka spike)' }),

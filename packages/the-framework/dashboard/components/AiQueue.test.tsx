@@ -11,8 +11,8 @@ vi.mock('../lib/preferences.js', () => ({ usePreferences: () => prefs }))
 const start = vi.hoisted(() => vi.fn())
 let busy = false
 let startError: string | null = null
-vi.mock('../lib/use-start-run.js', () => ({
-  useStartRun: () => ({ busy, error: startError, reset: () => {}, start }),
+vi.mock('../lib/use-start-agent.js', () => ({
+  useStartAgent: () => ({ busy, error: startError, reset: () => {}, start }),
 }))
 
 const { AiQueue, workOnEntryPrompt } = await import('./AiQueue.js')
@@ -49,7 +49,7 @@ describe('AiQueue', () => {
         queue={[queue([{ text: entry }])]}
         loading={false}
         onOpenTicket={(...args) => opened.push(args)}
-        onRunStarted={() => {}}
+        onAgentStarted={() => {}}
       />,
     )
     const row = screen.getByRole('button', { name: 'Improve tooltip' })
@@ -67,7 +67,7 @@ describe('AiQueue', () => {
         queue={[queue([{ text: `[Fix the publish job](${url})` }])]}
         loading={false}
         onOpenTicket={() => {}}
-        onRunStarted={() => {}}
+        onAgentStarted={() => {}}
       />,
     )
     const link = screen.getByText('Fix the publish job') as HTMLAnchorElement
@@ -82,7 +82,7 @@ describe('AiQueue', () => {
         queue={[queue([{ text: 'Apply the maintainability preset' }])]}
         loading={false}
         onOpenTicket={() => {}}
-        onRunStarted={() => {}}
+        onAgentStarted={() => {}}
       />,
     )
     const label = screen.getByText('Apply the maintainability preset')
@@ -99,7 +99,7 @@ describe('AiQueue', () => {
         queue={[queue([{ text: 'first entry' }, { text: entry }])]}
         loading={false}
         onOpenTicket={() => {}}
-        onRunStarted={(...args) => started.push(args)}
+        onAgentStarted={(...args) => started.push(args)}
       />,
     )
     // The second row's button, so the prompt provably carries the clicked entry, not the first.
@@ -119,7 +119,7 @@ describe('AiQueue', () => {
 
   test('the play button says what it does on hover', async () => {
     render(
-      <AiQueue queue={[queue([{ text: 'entry' }])]} loading={false} onOpenTicket={() => {}} onRunStarted={() => {}} />,
+      <AiQueue queue={[queue([{ text: 'entry' }])]} loading={false} onOpenTicket={() => {}} onAgentStarted={() => {}} />,
     )
     const button = screen.getByRole('button', { name: RUN_LABEL })
     expect((await hoverTooltip(button)).textContent).toBe(RUN_LABEL)
@@ -133,7 +133,7 @@ describe('AiQueue', () => {
         queue={[queue([{ text: 'entry' }])]}
         loading={false}
         onOpenTicket={() => {}}
-        onRunStarted={(...args) => started.push(args)}
+        onAgentStarted={(...args) => started.push(args)}
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: RUN_LABEL }))
@@ -150,7 +150,7 @@ describe('AiQueue', () => {
         queue={[queue([{ text: 'entry' }])]}
         loading={false}
         onOpenTicket={() => {}}
-        onRunStarted={(...args) => started.push(args)}
+        onAgentStarted={(...args) => started.push(args)}
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: RUN_LABEL }))
@@ -166,7 +166,7 @@ describe('AiQueue', () => {
         queue={[queue([{ text: 'one' }, { text: 'two' }])]}
         loading={false}
         onOpenTicket={() => {}}
-        onRunStarted={() => {}}
+        onAgentStarted={() => {}}
       />,
     )
     for (const button of screen.getAllByRole('button', { name: RUN_LABEL })) {
@@ -183,7 +183,7 @@ describe('AiQueue', () => {
         ]}
         loading={false}
         onOpenTicket={() => {}}
-        onRunStarted={() => {}}
+        onAgentStarted={() => {}}
       />,
     )
     expect(screen.getByText('open entry')).toBeTruthy()
@@ -193,10 +193,10 @@ describe('AiQueue', () => {
 
   test('loading and empty read as themselves', () => {
     const { rerender } = render(
-      <AiQueue queue={[]} loading={true} onOpenTicket={() => {}} onRunStarted={() => {}} />,
+      <AiQueue queue={[]} loading={true} onOpenTicket={() => {}} onAgentStarted={() => {}} />,
     )
     expect(screen.getByText('Loading…')).toBeTruthy()
-    rerender(<AiQueue queue={[]} loading={false} onOpenTicket={() => {}} onRunStarted={() => {}} />)
+    rerender(<AiQueue queue={[]} loading={false} onOpenTicket={() => {}} onAgentStarted={() => {}} />)
     expect(screen.getByText('Nothing queued.')).toBeTruthy()
   })
 })

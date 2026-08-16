@@ -8,7 +8,7 @@ import { defineConfig, type Plugin, type UserConfig } from 'vite'
 //
 // `pnpm dev` alone is the Vite dev server with no Telefunc context, so `sendStart` reports "starting
 // a session is not enabled on this server" (same gap that leaves preferences unpersisted in dev).
-// Only the daemon has the `startRun` handler. This plugin brings that daemon up *inside the dev
+// Only the daemon has the `startAgent` handler. This plugin brings that daemon up *inside the dev
 // server's own process* and proxies `/_rpc` (the calls and the SSE stream) to it, so the
 // live-reload UI gets the full backend, run-starting included.
 //

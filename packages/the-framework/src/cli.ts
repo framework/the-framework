@@ -6,7 +6,7 @@ import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { type ClaudeCodeDriverOptions, type Driver, type DriverSession, type PermissionMode } from './driver/index.js'
 import { DRIVERS, DRIVER_SPECS, isDriverName, type DriverName } from './driver-cli.js'
-import { createRunDriver } from './run-driver.js'
+import { createAgentDriver } from './agent-driver.js'
 import { githubSlugFor } from './dashboard/github.js'
 import { githubToken } from './dashboard/gh.js'
 import type { ActionsDriverOptions } from './driver/index.js'
@@ -16,29 +16,29 @@ import { randomUUID } from 'node:crypto'
 import { formatFrameworkEvent, mergeWithheldWhy } from './terminal.js'
 import { CLAUDE_CODE_SESSION_LINK } from './session-link.js'
 import { type AutoHandoffSkip, type ChoicePick, type ChoiceRequest, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
-import { runAutoHandoff, withheldMerge } from './dashboard/agent-handoff.js'
+import { agentAutoHandoff, withheldMerge } from './dashboard/agent-handoff.js'
 import {
-  runSession,
-  type RunSessionOptions,
+  runAgent,
+  type RunAgentOptions,
   type SessionKind,
-} from './run.js'
+} from './agent.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
 import { isHandsOff, isRunLocation, type AgentLocation } from './agent-location.js'
 import { handoffStages, isHandoffLevel, type HandoffLevel } from './handoff-level.js'
-import { readSessionSpec, writeSessionSpec, type SessionSpec } from './session-spec.js'
-import { sessionTodoPending } from './todo-loop.js'
+import { readAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
+import { agentTodoPending } from './todo-loop.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from './config.js'
 import {
   describeResolvedConfig,
   fileConfigLayer,
-  resolveRunConfig,
+  resolveAgentConfig,
   type ConfigLayer,
-  type ResolvedRunConfig,
+  type ResolvedAgentConfig,
 } from './config-layers.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
-import { AgentStore, commitPendingWork, currentBranch, nodeStoreFs, renameRunBranch, agentBranchName, type StoreFs } from './store/index.js'
+import { AgentStore, commitPendingWork, currentBranch, nodeStoreFs, renameAgentBranch, agentBranchName, type StoreFs } from './store/index.js'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { appendControl, resetControl, watchControl, type ControlWatcher } from './control.js'
@@ -69,13 +69,13 @@ import { errorMessage } from './error-message.js'
  * The default link shown for a live run: the generic Claude Code entry point,
  * surfaced as "Open Claude Code" (not a per-run live session). We drive Claude
  * Code headless, which is not Remote-Controlled, so there is no per-session deep
- * link to construct (#214). Pass `--session-link "...{sessionId}..."` if you
+ * link to construct (#214). Set `sessionLink: "...{sessionId}..."` on the spec if you
  * wire up a real one.
  */
 export const CLAUDE_CODE_SESSION_LIST = CLAUDE_CODE_SESSION_LINK
 
 /**
- * The session link to show for a run: the user's `--session-link` if given, else
+ * The session link to show for a run: the spec's `sessionLink` if given, else
  * the generic Claude Code entry point for a live run (nothing for a fake one, which
  * has no real session). Pure, so the default is unit-testable without a live run.
  *
@@ -149,7 +149,7 @@ session.`
  * One session's resolved configuration, as the run reads it (D4).
  *
  * These used to be command-line flags, which made every one of them a human surface as well as
- * the dashboard's process API. They arrive as a {@link SessionSpec} now — one JSON blob on a temp
+ * the dashboard's process API. They arrive as a {@link AgentSpec} now — one JSON blob on a temp
  * file — so what is left here is a plain options object with no argv semantics: no tri-state
  * `--no-*` spellings, no mutual validation, no help text.
  */
@@ -168,7 +168,7 @@ export interface SessionOptions {
   /**
    * `--run-id <id>` (#736): the id the daemon allocated for this run before spawning it. Its
    * presence says the framework owns this run's checkout — `--cwd` is a worktree the daemon
-   * created on a `the-framework/run-<id>` branch, which the run renames once the agent names
+   * created on a `the-framework/agent-<id>` branch, which the run renames once the agent names
    * the session. Absent for a plain `framework "..."`, which runs in the user's own checkout.
    */
   agentId?: string | undefined
@@ -177,14 +177,14 @@ export interface SessionOptions {
    * one. The store reopens that run's log instead of truncating it, so messaging a stopped run
    * stays one row in the history.
    */
-  continueRun?: boolean | undefined
+  continueAgent?: boolean | undefined
   model?: string | undefined
   /** `--resume-session <id>` (#720): continue a finished run's agent session — the prompt resumes that conversation (full prior context). Set by the dashboard when you message a run that has ended. */
   resumeSession?: string | undefined
   /** `--ticket <path>` (#1117): the `tickets/<file>.md` this run is implementing. Set by the daemon when it starts a drain run, from the ticket its queue entry links to; recorded on the run's meta. */
   ticket?: string | undefined
   /** `--plan-run` (#1327): the `--ticket` is being planned, not implemented, so the PR title must not inherit its issue as `(fix #42)` (#1334) — the plan's merge would close the issue with the work still undone. */
-  planRun?: boolean
+  planAgent?: boolean
   /** `--unattended`: no human is watching, so choice gates take the recommended option (#846). */
   unattended?: boolean
   scope: 'prototype' | 'full'
@@ -216,9 +216,9 @@ export interface SessionOptions {
   sessionLink?: string | undefined
   /** Whether the session records itself to `.the-framework/`. Always true outside tests. */
   persist: boolean
-  /** {@link SessionSpec.kind} `research`: run the Research preset as a direct prompt (#331). */
+  /** {@link AgentSpec.kind} `research`: run the Research preset as a direct prompt (#331). */
   research: boolean
-  /** {@link SessionSpec.kind} `prompt`: run one prompt verbatim through the direct path (#353). */
+  /** {@link AgentSpec.kind} `prompt`: run one prompt verbatim through the direct path (#353). */
   directPrompt: boolean
 }
 
@@ -234,7 +234,7 @@ export interface CliArgs {
    */
   host?: string
   /**
-   * `--session <path>`: run the session described by the JSON spec at `path` (D4). The dashboard's
+   * `--agent <path>`: run the session described by the JSON spec at `path` (D4). The dashboard's
    * process API, not a human option — it is how one session is spawned, and the file is consumed.
    */
   session?: string
@@ -246,7 +246,7 @@ export interface CliArgs {
  *
  * Four options and nothing else. Everything a session needs used to be a flag here — sixty-seven
  * of them, twenty-seven with no human user at all, because the dashboard serialized
- * `StartRunOptions` onto a command line. Those travel as a {@link SessionSpec} now. `--host` and
+ * `StartAgentOptions` onto a command line. Those travel as a {@link AgentSpec} now. `--host` and
  * `--port` survive because they are the two things a browser cannot be asked and a dashboard
  * cannot serve about itself; `--help` and `--version` because a command with options owes the
  * user both.
@@ -276,9 +276,9 @@ export function parseArgs(argv: string[]): CliArgs {
         else opts.host = value
         break
       }
-      case '--session': {
+      case '--agent': {
         const value = argv[++i]
-        if (value === undefined) opts.error = 'invalid --session: missing path'
+        if (value === undefined) opts.error = 'invalid --agent: missing path'
         else opts.session = value
         break
       }
@@ -308,7 +308,7 @@ const SESSION_DEFAULTS = {
  * resolving to on (#1102/#841). JSON distinguishes "absent" from `false` without needing a
  * `--no-*` spelling for each, which is the whole reason this stopped being an argv.
  */
-export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = process.env): SessionOptions {
+export function sessionOptions(spec: AgentSpec, env: NodeJS.ProcessEnv = process.env): SessionOptions {
   const o = spec.options
   const defined = <T>(value: T | undefined): value is T => value !== undefined
   return {
@@ -320,7 +320,7 @@ export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = proce
     directPrompt: spec.kind === 'prompt',
     cwd: spec.cwd,
     ...(spec.agentId ? { agentId: spec.agentId } : {}),
-    ...(spec.continueRun ? { continueRun: true } : {}),
+    ...(spec.continueAgent ? { continueAgent: true } : {}),
     ...(isDriverName(o.driver) ? { driver: o.driver } : {}),
     ...(isRunLocation(o.target) ? { target: o.target } : {}),
     ...(o.model?.trim() ? { model: o.model.trim() } : {}),
@@ -328,7 +328,7 @@ export function sessionOptions(spec: SessionSpec, env: NodeJS.ProcessEnv = proce
     // The ticket comes off a queue file an agent writes, so it is re-checked here rather than
     // trusted: a path that is not a ticket never reaches the run (#1117).
     ...(o.ticket && isTicketPath(o.ticket) ? { ticket: o.ticket } : {}),
-    ...(o.planRun ? { planRun: true } : {}),
+    ...(o.planAgent ? { planAgent: true } : {}),
     ...(o.unattended ? { unattended: true } : {}),
     ...(defined(o.vanilla) ? { vanilla: o.vanilla } : {}),
     ...(defined(o.transparent) ? { transparent: o.transparent } : {}),
@@ -372,12 +372,12 @@ export function unguardedNotices(opts: Pick<SessionOptions, 'driver' | 'browser'
 /** Which flow a run starts under (#1467), recorded on its meta: the direct paths are prompts, a
  * build run is a build. Transparent (#625) routes a build-kind run through the raw prompt path too,
  * so it records as a prompt. */
-export function runLogKind(opts: Pick<SessionOptions, 'directPrompt' | 'research'>, transparent = false): SessionKind {
+export function agentLogKind(opts: Pick<SessionOptions, 'directPrompt' | 'research'>, transparent = false): SessionKind {
   return opts.directPrompt || opts.research || transparent ? 'prompt' : 'build'
 }
 
 /** This run's own flags as the nearest config layer (#841). A flag left off says nothing. */
-function flagConfigLayer(opts: RunConfigFlags): ConfigLayer {
+function flagConfigLayer(opts: AgentConfigFlags): ConfigLayer {
   return {
     name: 'flag',
     values: {
@@ -390,18 +390,18 @@ function flagConfigLayer(opts: RunConfigFlags): ConfigLayer {
   }
 }
 
-type RunConfigFlags = Pick<SessionOptions, 'preset' | 'buildEvent' | 'vanilla' | 'transparent' | 'handoff'>
+type AgentConfigFlags = Pick<SessionOptions, 'preset' | 'buildEvent' | 'vanilla' | 'transparent' | 'handoff'>
 
 /**
  * Resolve a run's config over its layers, nearest wins (#841): the run's flags, then the repo's
  * `the-framework.yml`. #800 slots the project-user and global tiers in between and at the end.
  */
-export function mergeRunConfig(opts: RunConfigFlags, file: FrameworkFileConfig): ResolvedRunConfig {
-  return resolveRunConfig([flagConfigLayer(opts), fileConfigLayer(file)])
+export function mergeAgentConfig(opts: AgentConfigFlags, file: FrameworkFileConfig): ResolvedAgentConfig {
+  return resolveAgentConfig([flagConfigLayer(opts), fileConfigLayer(file)])
 }
 
-/** The run-scoped state {@link settleRun} needs to close out either run path. */
-interface RunEpilogue {
+/** The run-scoped state {@link settleAgent} needs to close out either run path. */
+interface AgentEpilogue {
   io: CliIO
   store: AgentStore | undefined
   control: ControlWatcher | undefined
@@ -426,7 +426,7 @@ interface RunEpilogue {
  * Returns the exit code (0 on success or a clean stop, 1 on a failure). Shared by both run paths
  * so their epilogues cannot drift.
  */
-async function settleRun(ctx: RunEpilogue, run: () => Promise<{ successLine: string }>): Promise<number> {
+async function settleAgent(ctx: AgentEpilogue, run: () => Promise<{ successLine: string }>): Promise<number> {
   const { io } = ctx
   try {
     const { successLine } = await run()
@@ -467,7 +467,7 @@ async function settleRun(ctx: RunEpilogue, run: () => Promise<{ successLine: str
  */
 async function resolvePromptConfig(
   opts: SessionOptions,
-  config: ResolvedRunConfig,
+  config: ResolvedAgentConfig,
   cwd: string,
   io: CliIO,
   transparent: boolean,
@@ -545,8 +545,8 @@ function armInterrupt(controller: AbortController, io: CliIO): () => void {
   }
 }
 
-/** What the run journal exposes to the epilogue. See {@link createRunJournal}. */
-export interface RunJournal {
+/** What the run journal exposes to the epilogue. See {@link createAgentJournal}. */
+export interface AgentJournal {
   onEvent: (event: FrameworkEvent) => void
   /** The session name the agent chose via setSessionName() (#326), once it has. */
   sessionName: () => string | undefined
@@ -570,12 +570,12 @@ export interface RunJournal {
  * mutable locals; the journal is their one owner, and runCli reads the getters. Exported for the
  * rename-records-the-branch test (#1277).
  */
-export function createRunJournal(deps: {
+export function createAgentJournal(deps: {
   io: CliIO
   cwd: string
   store: AgentStore | undefined
   agentId: string | undefined
-}): RunJournal {
+}): AgentJournal {
   const { io, cwd, store } = deps
   // The framework's own verdict that the run stopped cleanly rather than failed — set by a
   // user interrupt or a budget cap (#322). Trusted over which signal aborted, since a budget
@@ -593,19 +593,19 @@ export function createRunJournal(deps: {
   // starts a fresh rendered slice, and without the re-say its transcript would have no browser
   // row to host the pane.
   let latestBrowserUrl: string | undefined
-  let sessionOpen = false
+  let agentOpen = false
 
   const onEvent = (event: FrameworkEvent) => {
     if (event.kind === 'ready-for-merge') sawReadyForMerge = true
     if (event.kind === 'session-name') {
       sessionName = event.name
-      // The framework-owned checkout (#736) was branched as `the-framework/run-<id>` before a
+      // The framework-owned checkout (#736) was branched as `the-framework/agent-<id>` before a
       // name existed; put the readable name on it now. No-ops when the agent branched itself,
       // and only a rename that happened is recorded (#1277) — a guessed name on the meta is
       // exactly what the branch event exists to end.
       if (deps.agentId) {
         const renamed = `the-framework/${event.name}`
-        void renameRunBranch(cwd, agentBranchName(deps.agentId), renamed).then(didRename => {
+        void renameAgentBranch(cwd, agentBranchName(deps.agentId), renamed).then(didRename => {
           if (didRename) onEvent({ kind: 'branch', branch: renamed })
         })
       }
@@ -616,7 +616,7 @@ export function createRunJournal(deps: {
 
     // Right after the session opens, so it lands inside the slice the dashboard renders.
     if (event.kind === 'session') {
-      sessionOpen = true
+      agentOpen = true
       if (pendingBrowserPort !== undefined) {
         const port = pendingBrowserPort
         pendingBrowserPort = undefined
@@ -636,7 +636,7 @@ export function createRunJournal(deps: {
     },
     announceBrowserUrl: url => {
       latestBrowserUrl = url
-      if (sessionOpen) onEvent({ kind: 'browser', url })
+      if (agentOpen) onEvent({ kind: 'browser', url })
     },
   }
 }
@@ -656,13 +656,13 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
     io.out(frameworkVersion())
     return 0
   }
-  // `--session <path>`: the dashboard's process API (D4). One session, described entirely by the
+  // `--agent <path>`: the dashboard's process API (D4). One session, described entirely by the
   // JSON spec at that path — which is consumed as it is read, so a device token in its options
   // does not outlive the session that used it.
   if (args.session !== undefined) {
-    let spec: SessionSpec
+    let spec: AgentSpec
     try {
-      spec = await readSessionSpec(args.session)
+      spec = await readAgentSpec(args.session)
     } catch (err) {
       io.err(`could not read the session spec (${errorMessage(err)}).`)
       return 2
@@ -674,9 +674,9 @@ export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<num
 }
 
 /**
- * Everything the CLI wires around one session before {@link runSession} drives it: config
+ * Everything the CLI wires around one session before {@link runAgent} drives it: config
  * resolved over the layers, the store, the control channel, the browser and the journal — then
- * handed to {@link settleRun}. Returns the process exit code. Split out of
+ * handed to {@link settleAgent}. Returns the process exit code. Split out of
  * {@link runCli} so the top reads as a dispatch table and this reads as one session's lifecycle.
  */
 async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
@@ -698,7 +698,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   const fileConfig = await loadFrameworkConfig(cwd, msg => io.err(msg))
   // One resolve over the layers (#841): the nearest layer that set a key wins, so this run's
   // flags beat the repo file and an explicit `--no-autopilot` can turn off what the file set.
-  const config = mergeRunConfig(opts, fileConfig)
+  const config = mergeAgentConfig(opts, fileConfig)
   const fromConfig = describeResolvedConfig(config)
   if (fromConfig) io.out(`◆ config: ${fromConfig}`)
 
@@ -714,7 +714,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // from is the worst outcome, so say so and stop rather than run a fresh session that looks
   // like a resumed one. The exception is a continuation (#1467): `--continue-run` re-enters an
   // existing run, whose recorded flow decides the path — there the session id is the point.
-  if (opts.resumeSession && !(opts.research || opts.directPrompt || transparent || opts.continueRun)) {
+  if (opts.resumeSession && !(opts.research || opts.directPrompt || transparent || opts.continueAgent)) {
     io.err('a resumed agent session only applies to a prompt session, not a build.')
     io.err('Run `framework --help` for usage.')
     return 2
@@ -783,10 +783,10 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
         // Adopt the daemon's id (#736) so the run and the worktree it lives in share one.
         ...(opts.agentId ? { id: opts.agentId } : {}),
         // Continuing (#762): keep the existing log rather than starting this run's history over.
-        ...(opts.continueRun ? { continueRun: true } : {}),
+        ...(opts.continueAgent ? { continueAgent: true } : {}),
         // The flow this run starts under (#1467), so a later continuation can re-enter it. A
         // continuation itself keeps the prior meta's record — this seed only lands on a fresh run.
-        kind: runLogKind(opts, transparent) === 'build' ? 'build' : 'prompt',
+        kind: agentLogKind(opts, transparent) === 'build' ? 'build' : 'prompt',
         // Where the run executes (#1053): the run view reads it to switch to the Actions affordance.
         ...(opts.target ? { target: opts.target } : {}),
       })
@@ -802,7 +802,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // downgrade a resumed build run. Runs from before the meta recorded a kind stay on the prompt
   // path, exactly as they did.
   const continueBuild =
-    opts.continueRun === true && !!opts.resumeSession && !transparent && store?.snapshot().kind === 'build'
+    opts.continueAgent === true && !!opts.resumeSession && !transparent && store?.snapshot().kind === 'build'
 
   // Steer this run through .the-framework/control.jsonl (#344): a Stop button or choice
   // pick appends an entry, we tail the file and abort / resolve the parked gate. Reset
@@ -910,14 +910,14 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
         }
       : {}
 
-  // The session link shown on the dashboard: --session-link, else Claude Code's own entry for
+  // The session link shown on the dashboard: the spec's `sessionLink`, else Claude Code's own entry for
   // a live Claude run, else nothing (#212/#542). Same for both run paths.
   const sessionLink = chooseSessionLink(opts, fake)
 
   // Everything the run reports that its epilogue needs — the settle flags, the deferred
   // browser-port announcement — plus the fan-out of every event to the terminal and the store,
   // lives in the journal. runCli reads its getters below.
-  const journal = createRunJournal({ io, cwd, store, agentId: opts.agentId })
+  const journal = createAgentJournal({ io, cwd, store, agentId: opts.agentId })
   const onEvent = journal.onEvent
 
   // Put the armed state on the run's meta (#1102), and keep it there as the checkboxes change it.
@@ -1000,7 +1000,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
       const ready = journal.sawReadyForMerge()
       mergeGate = withheldMerge({
         readyForMerge: ready,
-        sessionTodoOpen: ready && (await sessionTodoPending(cwd, journal.sessionName())),
+        agentTodoOpen: ready && (await agentTodoPending(cwd, journal.sessionName())),
       })
       if (mergeGate) armed.merge = false
     }
@@ -1015,7 +1015,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
     // quick-win leaves its ticket open. Not on a plan run (#1327): its PR lands the plan, not
     // the work, so the merge must not close the issue. Best-effort: a ticket that cannot be
     // read fixes nothing.
-    const fixes = opts.ticket && isTicketPath(opts.ticket) && !opts.planRun
+    const fixes = opts.ticket && isTicketPath(opts.ticket) && !opts.planAgent
       ? ticketIssueRef(await readFile(join(cwd, opts.ticket), 'utf8').catch(() => ''))
       : undefined
     const agent = {
@@ -1025,7 +1025,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
       ...(intent ? { intent } : {}),
       ...(fixes ? { fixes } : {}),
     }
-    const handedOff = await runAutoHandoff(cwd, agent, armed)
+    const handedOff = await agentAutoHandoff(cwd, agent, armed)
     const outcome =
       mergeGate && handedOff.outcome !== 'failed'
         ? { ...handedOff, merge: { outcome: 'withheld' as const, reason: mergeGate } }
@@ -1055,9 +1055,9 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // Local runs only: the browser tools are wired on this machine, so a `--run-on web`/`actions`
   // session could never reach them — launching Chrome here would leak a headless browser per
   // run, and the system channel must only claim a browser the run really has (#824).
-  const localRun = opts.target === undefined || opts.target === 'local'
-  const sharedBrowser = opts.browser && !fake && localRun ? await launchSharedBrowser() : undefined
-  if (opts.browser && !fake && !localRun) {
+  const localAgent = opts.target === undefined || opts.target === 'local'
+  const sharedBrowser = opts.browser && !fake && localAgent ? await launchSharedBrowser() : undefined
+  if (opts.browser && !fake && !localAgent) {
     io.err(`note: --browser has no effect with --run-on ${opts.target}: the browser tools are wired on this machine, and the session runs elsewhere.`)
   } else if (opts.browser && !fake && !sharedBrowser) {
     io.err('note: no Chrome found, so --browser falls back to its own browser (no preview).')
@@ -1067,10 +1067,10 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
    * Give up before a driver exists, on a config fault the run cannot recover from.
    *
    * These aborts sit in an awkward window: `agent.json` already says `running` (it is written back
-   * at :1433), but {@link settleRun} — which owns the `end` event and the handle cleanup — does
+   * at :1433), but {@link settleAgent} — which owns the `end` event and the handle cleanup — does
    * not wrap anything until its `ctx` is built further down. Returning raw therefore left the run
    * recorded as `running` forever with nobody to correct it, and the dashboard showed a session
-   * that never moved. So close it out here the same way settleRun would: say why, record the
+   * that never moved. So close it out here the same way settleAgent would: say why, record the
    * failure, release the handles.
    *
    * Best-effort throughout, like every other persistence call on this path: a store that cannot
@@ -1078,7 +1078,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
    */
   const abortBeforeDriver = async (reason: string): Promise<number> => {
     io.err(reason)
-    // Release every handle settleRun would: the armed interrupt trap, the run's own dashboard
+    // Release every handle settleAgent would: the armed interrupt trap, the run's own dashboard
     // server, and the LOGS.md entry — leaving any of them behind kept the process alive with a
     // swallowed first Ctrl+C, exactly the hang this helper exists to prevent.
     clearInterrupt()
@@ -1132,7 +1132,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
 
   const driver: Driver = fake
     ? fakeDriver()
-    : createRunDriver({
+    : createAgentDriver({
         driver: opts.driver,
         claudeOpts: withBrowser(claudeOpts, opts.browser, sharedBrowser?.browserUrl),
         ...(opts.target ? { target: opts.target } : {}),
@@ -1143,7 +1143,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // ride Claude Code's MCP config, so `--browser` on another agent wires nothing (see
   // `unguardedNotices`), the fake driver has no tools at all, and a remote target never sees
   // this machine's MCP config. The system channel must only claim a browser the run really has (#824).
-  const browserAttached = opts.browser && !fake && opts.driver === 'claude' && localRun
+  const browserAttached = opts.browser && !fake && opts.driver === 'claude' && localAgent
 
   // The preview of that browser (#802): the agent's Chrome is headless, so when it parks on an
   // browser hand-off gate (#796) there is nothing for a human to click. This serves it. Opening
@@ -1174,9 +1174,9 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // flags trim the built-in one (#314). Resolve and echo once, shared by both run paths.
   const promptConfig = await resolvePromptConfig(opts, config, cwd, io, transparent)
 
-  // The run-scoped state both run paths hand to settleRun to close out. stoppedCleanly is a
+  // The run-scoped state both run paths hand to settleAgent to close out. stoppedCleanly is a
   // getter because the onEvent sink sets it as the `end` event arrives.
-  const epilogue = (failLabel: string): RunEpilogue => ({
+  const epilogue = (failLabel: string): AgentEpilogue => ({
     io,
     store,
     control,
@@ -1193,7 +1193,7 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   // it reads, and who can answer it. They were written out twice, thirteen conditional spreads
   // each, so a new one had to be added to both by hand — and a run started as a build and a run
   // started as a prompt are the same run in every respect but the scaffolding around the prompt.
-  const sharedRunOptions = {
+  const sharedAgentOptions = {
     driver,
     cwd,
     onEvent,
@@ -1219,20 +1219,20 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
   const kind: SessionKind = (opts.research || opts.directPrompt || transparent) && !continueBuild ? 'prompt' : 'build'
   const label = kind === 'build' ? 'session' : isResearch ? 'research' : 'prompt session'
 
-  const runOpts: RunSessionOptions = {
-    ...sharedRunOptions,
+  const agentOpts: RunAgentOptions = {
+    ...sharedAgentOptions,
     kind,
     ...(opts.target ? { location: opts.target } : {}),
     prompt: isResearch ? presets.research.render(intent) : intent,
     // Resume the stopped leg's conversation (#720/#1467); the prompt above is the continuation
-    // message, which `runSession` then sends verbatim.
+    // message, which `runAgent` then sends verbatim.
     ...(opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
     ...(opts.todoLoop && !transparent ? {} : { todoLoop: false }),
     ...(opts.todoMaxItems ? { todoMaxItems: opts.todoMaxItems } : {}),
   }
 
-  return settleRun(epilogue(label), async () => {
-    await runSession(runOpts)
+  return settleAgent(epilogue(label), async () => {
+    await runAgent(agentOpts)
     // A hand-off ends at the hand-off (#1225): "done" would claim this machine built something
     // it never saw.
     const successLine = isHandsOff(opts.target)
@@ -1325,7 +1325,7 @@ export function printStartupFooter(io: CliIO, opts: { fetchLatest?: VersionFetch
  * it: note it carries **no** `onBeforeMergeable`, which is the recursion guard — a quality pass
  * must not trigger its own suite.
  */
-export function promptRunSpec(prompt: string, cwd: string, vanilla = false): SessionSpec {
+export function promptAgentSpec(prompt: string, cwd: string, vanilla = false): AgentSpec {
   return {
     prompt,
     kind: 'prompt',
@@ -1343,19 +1343,19 @@ export function promptRunSpec(prompt: string, cwd: string, vanilla = false): Ses
 }
 
 /**
- * Run one direct prompt by spawning `framework --session <spec>`, reusing the whole run path
+ * Run one direct prompt by spawning `framework --agent <spec>`, reusing the whole run path
  * (preflight, driver, budget cap, LOGS.md). The child inherits stdio so its run streams to the
  * terminal. Note the spec carries no `onBeforeMergeable`, so a quality pass never triggers its own
  * on-before-mergeable prompt (the recursion guard). Resolves true on a clean exit (0). Never
  * re-execs a test entry (fork-bomb guard).
  */
-async function spawnPromptRun(prompt: string, cwd: string, binPath: string, vanilla = false): Promise<boolean> {
+async function spawnPromptAgent(prompt: string, cwd: string, binPath: string, vanilla = false): Promise<boolean> {
   if (process.env.NODE_TEST_CONTEXT || /\.test\.[cm]?[jt]s$/.test(binPath)) {
     return false // refuse to spawn from a test entry
   }
-  const specPath = await writeSessionSpec(promptRunSpec(prompt, cwd, vanilla))
+  const specPath = await writeAgentSpec(promptAgentSpec(prompt, cwd, vanilla))
   return new Promise<boolean>(resolvePromise => {
-    const child = spawn(process.execPath, [binPath, '--session', specPath], { stdio: 'inherit' })
+    const child = spawn(process.execPath, [binPath, '--agent', specPath], { stdio: 'inherit' })
     child.once('error', () => resolvePromise(false))
     child.once('exit', code => resolvePromise(code === 0))
   })
@@ -1383,7 +1383,7 @@ export async function runOnBeforeMergeable(
   io: CliIO,
   tf: OnBeforeMergeableContext,
   // Vanilla by default: the follow-up must not run the session-name step and branch (#560).
-  agent: PromptRunner = (prompt, cwd, binPath) => spawnPromptRun(prompt, cwd, binPath, true),
+  agent: PromptRunner = (prompt, cwd, binPath) => spawnPromptAgent(prompt, cwd, binPath, true),
   fs: StoreFs = nodeStoreFs(),
 ): Promise<'queued' | 'incomplete'> {
   // Ensure the presets exist so the queued entries' filePaths resolve, even in a repo

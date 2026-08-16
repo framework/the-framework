@@ -69,10 +69,10 @@ describe('TicketsPage (#1144)', () => {
     onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets: [] }])
     const { sendStart } = await import('../rpc/control.js')
     vi.mocked(sendStart).mockResolvedValue({ ok: true, agentId: 'r1' })
-    const onRunStarted = vi.fn()
-    render(<TicketsPage onOpenTicket={() => {}} onRunStarted={onRunStarted} />)
+    const onAgentStarted = vi.fn()
+    render(<TicketsPage onOpenTicket={() => {}} onAgentStarted={onAgentStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('p1', expect.any(String), 'r1'))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', expect.any(String), 'r1'))
   })
 })
 
@@ -239,8 +239,8 @@ describe('TicketsPage grouping (#1144)', () => {
     window.history.replaceState(null, '', '/tickets?group=none')
     const { sendStart } = await import('../rpc/control.js')
     vi.mocked(sendStart).mockResolvedValue({ ok: true, agentId: 'r9' })
-    const onRunStarted = vi.fn()
-    render(<TicketsPage onOpenTicket={() => {}} onRunStarted={onRunStarted} />)
+    const onAgentStarted = vi.fn()
+    render(<TicketsPage onOpenTicket={() => {}} onAgentStarted={onAgentStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /start work on beta ticket/i }))
     // The row's own project, not a panel-bound one — the flat list carries one per row.
     await waitFor(() =>
@@ -249,6 +249,6 @@ describe('TicketsPage grouping (#1144)', () => {
         ticket: 'tickets/b.md',
       }),
     )
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('p2', expect.any(String), 'r9'))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p2', expect.any(String), 'r9'))
   })
 })

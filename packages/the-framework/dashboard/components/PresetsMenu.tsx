@@ -21,7 +21,7 @@ export interface PresetEntry {
   render: () => string
   tooltip?: string | undefined
   /** Runs in a session of its own, even when loaded from inside one (#959). */
-  newSession?: boolean | undefined
+  newAgent?: boolean | undefined
 }
 
 // The visible face of the presets (#948). Loading used to live only behind typing `/` in the
@@ -83,9 +83,9 @@ export function PresetsMenu({
   /** The open project's shared presets, committed in its `.the-framework/` (#1025). */
   projectPresets: CustomPreset[]
   busy: boolean
-  /** Load a preset's prompt into the editor. `newSession` marks the ones that never append to
+  /** Load a preset's prompt into the editor. `newAgent` marks the ones that never append to
    *  the open session (#959); a saved preset is always a plain load. */
-  onLoad: (text: string, label: string, newSession?: boolean) => void
+  onLoad: (text: string, label: string, newAgent?: boolean) => void
   /** Open the create panel; absent where no panel renders. */
   onNew?: (() => void) | undefined
   /** Delete a saved user preset by id. */
@@ -116,7 +116,7 @@ export function PresetsMenu({
           {presets.map(p => {
             const itemProps = {
               disabled: busy,
-              onClick: () => onLoad(p.render(), p.label, p.newSession),
+              onClick: () => onLoad(p.render(), p.label, p.newAgent),
               className: 'items-start',
             }
             const label = <OptionLabel label={p.label} description={`/${p.id}`} />

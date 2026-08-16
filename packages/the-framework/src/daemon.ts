@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { basename, join, relative, resolve, isAbsolute } from 'node:path'
 import type { FrameworkEvent } from './events.js'
 import { FRAMEWORK_DIR, isPidAlive, reconcileOrphanedAgents } from './store/index.js'
-import { startDashboard, type Dashboard, type StartRunOptions } from './dashboard/index.js'
+import { startDashboard, type Dashboard, type StartAgentOptions } from './dashboard/index.js'
 import { createProjectRuntime, type ProjectRuntimeOptions } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
 import { startBackgroundServices, type BackgroundServices } from './daemon-services.js'
@@ -14,7 +14,7 @@ import { registryDiscordCredentialsStore } from './discord-credentials-store.js'
 import { JsonlTailer } from './jsonl-tail.js'
 import { isLoopbackHost } from './loopback-host.js'
 import { bridgeSessionsFrom } from './dashboard/bridge-sessions.js'
-import { readAllRuns } from './store/index.js'
+import { readAllAgents } from './store/index.js'
 import type { BridgeSession } from './dashboard/index.js'
 
 /**
@@ -208,7 +208,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     // is relaying, `remote` lets the read RPCs forward a remote run's reads/steer/push to its device
     // (slice 2), and the `/_relay/*` endpoints let another daemon run + read + steer a session here.
     eventsSource: runtime.remoteEventsSource,
-    remote: runtime.remoteRuns,
+    remote: runtime.remoteAgents,
     relay: { tailEvents: runtime.tailRelayEvents, rpc: runtime.onRelayRpc },
     // The browser bridge (#1237): absent unless the preference is on, which 404s every route.
     ...(bridgeToken ? { bridgeToken, bridgeSessions: () => listBridgeSessions(env) } : {}),
@@ -245,7 +245,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
 
   // Every background start is a verbatim prompt run (#353): these are preset prompts and chat
   // text, not build intents to scaffold from.
-  const startRun = (prompt: string, options: StartRunOptions, id: string) => runtime.onStart(prompt, 'prompt', options, id)
+  const startAgent = (prompt: string, options: StartAgentOptions, id: string) => runtime.onStart(prompt, 'prompt', options, id)
 
   // Everything that runs in the background beside serving the dashboard: the Discord watchers,
   // auto PM, and the conversation committer.
@@ -259,9 +259,9 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     env,
     dashboardUrl: dashboard.url,
     quota,
-    startRun,
-    activeRunCount: runtime.activeRunCount,
-    busyRunIds: runtime.busyRunIds,
+    startAgent,
+    activeAgentCount: runtime.activeAgentCount,
+    busyAgentIds: runtime.busyAgentIds,
     log: console.log,
   })
 
@@ -273,11 +273,11 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // Stop the runs this daemon spawned, before the previews they may be serving. Left running they
   // are orphans nothing tracks; stopped here they keep their worktree and branch, so the dashboard
   // can continue them on the next start.
-  const stopped = await runtime.stopRuns().catch(() => 0)
+  const stopped = await runtime.stopAgents().catch(() => 0)
   if (stopped > 0) console.log(`[framework] stopped ${stopped} agent(s)`)
   // Now that the runs' last events are on disk, commit their archives (#912/#1179) — otherwise an
   // uncommitted session sits until a human notices, which is the gap that service exists to close.
-  const committed = await services.flushSessions()
+  const committed = await services.flushAgents()
   if (committed > 0) console.log(`[framework] committed agent archives in ${committed} project(s)`)
   // Stopped here as well as by the dashboard: a broken install serves 503s without ever taking
   // ownership of the source we handed in, and that poller would go on reading by itself.
@@ -310,6 +310,6 @@ function waitForShutdown(signal?: AbortSignal): Promise<void> {
  */
 async function listBridgeSessions(env: NodeJS.ProcessEnv): Promise<BridgeSession[]> {
   const projects = await listProjects(undefined, env).catch(() => [])
-  const agents = (await Promise.all(projects.map(p => readAllRuns(p.path).catch(() => [])))).flat()
+  const agents = (await Promise.all(projects.map(p => readAllAgents(p.path).catch(() => [])))).flat()
   return bridgeSessionsFrom(agents, new Date())
 }

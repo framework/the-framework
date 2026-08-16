@@ -139,7 +139,7 @@ function prCacheKey(cwd: string, branch?: string): string {
  *
  * `gh pr view <branch>` answers with the newest PR for that head *in any state*, so a session
  * whose prompt pins its branch name (`the-framework/triage-quick`) inherits a predecessor's
- * merged PR as its own. The list form keeps the whole history so {@link pickRunPr} can decide
+ * merged PR as its own. The list form keeps the whole history so {@link pickAgentPr} can decide
  * which entry, if any, belongs to the run asking. Resolves `[]` when gh is missing/unauthed —
  * indistinguishable from "no PRs", which is what every caller would do with a failure anyway.
  */
@@ -379,7 +379,7 @@ function branchPrsCacheKey(cwd: string, branch: string): string {
  * past it" is readable off that PR's `headRefOid`; there the oldest entry would call work that a
  * second PR already landed unlanded.
  */
-export function pickRunPr(prs: LinkedPr[], since?: string, order: 'first' | 'latest' = 'first'): LinkedPr | undefined {
+export function pickAgentPr(prs: LinkedPr[], since?: string, order: 'first' | 'latest' = 'first'): LinkedPr | undefined {
   const open = prs.find(pr => pr.state === 'OPEN')
   if (open) return open
   if (!since) return undefined

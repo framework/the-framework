@@ -1,24 +1,24 @@
 import { appendControl, type ControlEntry } from '../control.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
 import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
-import { contextPreferences, contextStartRun, resolveProjectPath, resolveRunPath } from './context.js'
-import { relayOr } from './relay-run.js'
+import { contextPreferences, contextStartAgent, resolveProjectPath, resolveAgentPath } from './context.js'
+import { relayOr } from './relay-agent.js'
 import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
 import { isTicketFile } from '../dashboard/tickets.js'
 import { releaseTicketLock } from '../ticket-locks.js'
-import { findAgent, isSafeRunId, recordRunPr, worktreePath, type AgentMeta } from '../store/index.js'
+import { findAgent, isSafeAgentId, recordAgentPr, worktreePath, type AgentMeta } from '../store/index.js'
 import { withAgentLock } from '../agent-locks.js'
-import { removeProjectWorktree, deleteProjectRun } from '../worktrees.js'
-import { commitSessionWork, mergeSessionPr, openSessionPullRequest, pushRunBranch, agentBranchFor, type HandoffResult } from '../dashboard/agent-handoff.js'
+import { removeProjectWorktree, deleteProjectAgent } from '../worktrees.js'
+import { commitAgentWork, mergeAgentPr, openAgentPullRequest, pushAgentBranch, agentBranchFor, type HandoffResult } from '../dashboard/agent-handoff.js'
 import type { ChoiceBy } from '../events.js'
 import { isHandoffLevel, type HandoffLevel } from '../handoff-level.js'
 import type {
-  DeleteSessionResult,
+  DeleteAgentResult,
   RemoveWorktreeResult,
-  StartRunKind,
-  StartRunOptions,
-  StartRunResult,
+  StartAgentKind,
+  StartAgentOptions,
+  StartAgentResult,
 } from '../dashboard/types.js'
 import type { DashboardContext } from '../dashboard/rpc-serve.js'
 import type { Preferences } from '../registry.js'
@@ -41,7 +41,7 @@ import type { Preferences } from '../registry.js'
  * project root, which is still right for a run that has no worktree (the non-git fallback).
  */
 async function appendControlFor(projectId: string, entry: ControlEntry, agentId?: string): Promise<void> {
-  const cwd = await resolveRunPath(projectId, agentId)
+  const cwd = await resolveAgentPath(projectId, agentId)
   if (cwd) await appendControl(cwd, entry)
 }
 
@@ -159,29 +159,29 @@ async function withWorktreeRemoval<T>(
  * Delete a session (#1032): remove it from the dashboard, records and all — the sibling of
  * {@link sendRemoveWorktree}, and the one destructive-of-history action, so its surface confirms
  * first. The checks, the worktree removal and what it leaves behind (the branch, the committed
- * `LOGS.md` line, the conversation record) are all {@link deleteProjectRun}'s; this adds only the
+ * `LOGS.md` line, the conversation record) are all {@link deleteProjectAgent}'s; this adds only the
  * daemon step of stopping a preview that may be serving the worktree before it comes off disk.
  */
-export async function sendDeleteSession(projectId: string, agentId: string): Promise<DeleteSessionResult> {
-  return withWorktreeRemoval(projectId, agentId, (cwd, opts) => deleteProjectRun(cwd, agentId, opts))
+export async function sendDeleteAgent(projectId: string, agentId: string): Promise<DeleteAgentResult> {
+  return withWorktreeRemoval(projectId, agentId, (cwd, opts) => deleteProjectAgent(cwd, agentId, opts))
 }
 
 /**
  * Start a run in the project (#405, #345): the one write that needs the daemon, since
- * spawning goes through the daemon's own `startRun` closure (with its one-run-per-
- * project busy guard). The daemon provides `startRun` on the Telefunc request context,
+ * spawning goes through the daemon's own `startAgent` closure (with its one-run-per-
+ * project busy guard). The daemon provides `startAgent` on the Telefunc request context,
  * so this runs in-process. `kind` defaults to a plain build run; a `build`/`prompt`
  * needs a non-empty prompt, `research` may be empty (its "what" defaults server-side).
- * Returns the daemon's {@link StartRunResult} — `busy` when a run is already active.
+ * Returns the daemon's {@link StartAgentResult} — `busy` when a run is already active.
  */
 export async function sendStart(
   projectId: string,
   prompt: string,
-  kind: StartRunKind = 'build',
-  options: StartRunOptions = {},
-): Promise<StartRunResult> {
-  const startRun = contextStartRun()
-  if (!startRun) return { ok: false, error: 'starting a session is not enabled on this server' }
+  kind: StartAgentKind = 'build',
+  options: StartAgentOptions = {},
+): Promise<StartAgentResult> {
+  const startAgent = contextStartAgent()
+  if (!startAgent) return { ok: false, error: 'starting a session is not enabled on this server' }
   const text = prompt.trim()
   if (!text && kind !== 'research') return { ok: false, error: 'a non-empty prompt is required' }
   // A drain fired by hand is the same work the sweep does, so it says the same thing about itself
@@ -189,7 +189,7 @@ export async function sendStart(
   // rendered, so it is read off the queue on this side instead of trusted from a browser. An
   // explicit ticket on the options wins, since a caller that names one knows better than a guess.
   const ticket = options.ticket ?? (await ticketForStart(projectId, text))
-  return startRun(text, kind, ticket ? { ...options, ticket } : options, projectId)
+  return startAgent(text, kind, ticket ? { ...options, ticket } : options, projectId)
 }
 
 /** The queue entry a hand-fired drain is about to work, or undefined for any other prompt (#1117). */
@@ -208,7 +208,7 @@ async function ticketForStart(projectId: string, prompt: string): Promise<string
  * opening it is to look at what the agent is doing, which is not in the project's tree.
  */
 export async function sendOpenInApp(projectId: string, target: OpenTarget, agentId?: string): Promise<OpenResult> {
-  const cwd = agentId ? await resolveRunPath(projectId, agentId) : await resolveProjectPath(projectId)
+  const cwd = agentId ? await resolveAgentPath(projectId, agentId) : await resolveProjectPath(projectId)
   if (!cwd) return { ok: false, error: 'this project has no local path on this server' }
   // #727: honour the stored editor preference; absent falls back to $FRAMEWORK_EDITOR, then `code`.
   const editor =
@@ -218,18 +218,18 @@ export async function sendOpenInApp(projectId: string, target: OpenTarget, agent
 
 /**
  * The session's own branch, or undefined when the run/project is unknown. Shared by the two
- * handoff actions so they address exactly what {@link onRunHandoff} reports on.
+ * handoff actions so they address exactly what {@link onAgentHandoff} reports on.
  */
 async function handoffTargetFor(
   projectId: string,
   agentId: string,
 ): Promise<{ cwd: string; agent: AgentMeta; checkout: string } | undefined> {
   const cwd = await resolveProjectPath(projectId)
-  if (!cwd || !isSafeRunId(agentId)) return undefined
+  if (!cwd || !isSafeAgentId(agentId)) return undefined
   const agent = await findAgent(cwd, agentId).catch(() => undefined)
   // The branch is read from the project repo; the tree the agent edited is its own checkout (#453),
   // and for a session that has not committed, that is the only place its work exists.
-  const checkout = (await resolveRunPath(projectId, agentId)) ?? cwd
+  const checkout = (await resolveAgentPath(projectId, agentId)) ?? cwd
   return agent ? { cwd, agent, checkout } : undefined
 }
 
@@ -247,11 +247,11 @@ export async function sendPushBranch(projectId: string, agentId: string): Promis
     // The commit step holds the run lock: clicked the moment a session flips `done`, this used
     // to commit against the checkout teardown was committing in and lose. Serialized, whichever
     // side runs first commits everything pending; the other finds a clean tree — or no checkout
-    // at all, which commitSessionWork already reads as "the branch is authoritative".
-    if (!(await withAgentLock(target.checkout, () => commitSessionWork(target.checkout, target.cwd, branch)))) {
+    // at all, which commitAgentWork already reads as "the branch is authoritative".
+    if (!(await withAgentLock(target.checkout, () => commitAgentWork(target.checkout, target.cwd, branch)))) {
       return { ok: false, error: 'could not commit the work this session left uncommitted' }
     }
-    return pushRunBranch(target.cwd, branch)
+    return pushAgentBranch(target.cwd, branch)
   }, { ok: false, error: 'could not reach the device' })
 }
 
@@ -268,17 +268,17 @@ export async function sendOpenPullRequest(projectId: string, agentId: string): P
     if (!target) return { ok: false, error: 'unknown session' }
     // Same run lock as sendPushBranch, for the same click-at-`done` race.
     const committed = await withAgentLock(target.checkout, () =>
-      commitSessionWork(target.checkout, target.cwd, agentBranchFor(target.agent)),
+      commitAgentWork(target.checkout, target.cwd, agentBranchFor(target.agent)),
     )
     if (!committed) {
       return { ok: false, error: 'could not commit the work this session left uncommitted' }
     }
-    const opened = await openSessionPullRequest(target.cwd, target.agent)
+    const opened = await openAgentPullRequest(target.cwd, target.agent)
     // Record it on the run (E6). The session's own process is gone by now, so there is no event
     // stream to carry the fact — but it is the same fact, and every surface reads it from the same
     // place either way rather than re-deriving it from branch names.
     if (opened.ok && opened.number !== undefined && opened.url) {
-      await recordRunPr(target.cwd, agentId, { number: opened.number, url: opened.url })
+      await recordAgentPr(target.cwd, agentId, { number: opened.number, url: opened.url })
     }
     return opened
   }, { ok: false, error: 'could not reach the device' })
@@ -302,7 +302,7 @@ export async function sendMerge(projectId: string, agentId: string): Promise<Han
       await appendControlFor(projectId, { kind: 'merge' }, agentId)
       return { ok: true }
     }
-    return mergeSessionPr(target.cwd, target.agent)
+    return mergeAgentPr(target.cwd, target.agent)
   }, { ok: false, error: 'could not reach the device' })
 }
 

@@ -6,20 +6,20 @@ import { onSystemPromptUser } from '../rpc/reads.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId } from '../lib/remote-target.js'
-import { useStartRun } from '../lib/use-start-run.js'
+import { useStartAgent } from '../lib/use-start-agent.js'
 import { useLoaded } from '../lib/use-async.js'
 import { Composer, type ComposerHandle } from './Composer.js'
 import { ContextMenu } from './ContextMenu.js'
 import { SystemPromptDisclosure } from './SystemPromptDisclosure.js'
 
 // Start a run in the selected project (#405): the one write that goes through the daemon's own
-// `startRun` (with its one-run-per-project busy guard), posted over Telefunc. The editor + control
+// `startAgent` (with its one-run-per-project busy guard), posted over Telefunc. The editor + control
 // row are the shared Composer (#721); this form owns the submit (sendStart with the collected
 // Global options), the system-prompt preview, and the Context selector. Shown when no run is active;
 // a `busy` result means one already is.
-export function StartRunForm({
+export function StartAgentForm({
   projectId,
-  onRunStarted,
+  onAgentStarted,
   files,
   context,
   addContext,
@@ -28,7 +28,7 @@ export function StartRunForm({
 }: {
   projectId: string
   /** `runsOn` names the device a remote run executes on (#1067), for the "runs on <device>" marker. */
-  onRunStarted?: ((intent: string, agentId?: string, runsOn?: string) => void) | undefined
+  onAgentStarted?: ((intent: string, agentId?: string, runsOn?: string) => void) | undefined
   /** The project's files for the `#` picker (#504), owned by the shell. */
   files: string[]
   /** The run Context set, shared with the right-rail file tree (#492) — owned by the shell. */
@@ -42,7 +42,7 @@ export function StartRunForm({
 }) {
   const [prompt, setPrompt] = useState('')
   const [note, setNote] = useState<string | null>(null)
-  const { busy, error, reset, start } = useStartRun()
+  const { busy, error, reset, start } = useStartAgent()
   const composerRef = useRef<ComposerHandle>(null)
 
   // The Global options persist daemon-side (#410).
@@ -136,7 +136,7 @@ export function StartRunForm({
       // Show the run in the Runs rail immediately (#405): the spawned process writes its run.json
       // a beat later, so seed an optimistic row with the typed prompt until the real meta takes over.
       // A remote run (#1067) carries the device label so the view can mark where it executes.
-      onRunStarted?.(text, result.agentId, remoteDevice?.label) // select the run we just started (#761)
+      onAgentStarted?.(text, result.agentId, remoteDevice?.label) // select the run we just started (#761)
       composerRef.current?.clear()
       setPrompt('')
     }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { Intervention, Activity, ProjectSummary, RecentRun } from '../dist/index.js'
-import { onProjectFiles, onInterventions, onActivity, onRecentRuns } from './rpc/reads.js'
+import type { Intervention, Activity, ProjectSummary, RecentAgent } from '../dist/index.js'
+import { onProjectFiles, onInterventions, onActivity, onRecentAgents } from './rpc/reads.js'
 import { onProjects } from './rpc/projects.js'
 import { AgentHistory } from './components/AgentHistory.js'
 import { SidebarProvider } from './components/ui/sidebar.js'
@@ -11,18 +11,18 @@ import { TicketsPage } from './components/TicketsPage.js'
 import { TicketDetailPage } from './components/TicketDetailPage.js'
 import { TicketPlanPage } from './components/TicketPlanPage.js'
 import { AgentView } from './components/AgentView.js'
-import { runLabel } from './lib/run-label.js'
+import { agentLabel } from './lib/agent-label.js'
 import { RightRail } from './components/RightRail.js'
 import { RelayView } from './components/RelayView.js'
 import { NotFound } from './components/NotFound.js'
 import { useLiveEvents } from './lib/use-live-events.js'
-import { useRuns } from './lib/use-agents.js'
+import { useAgents } from './lib/use-agents.js'
 import { useLoaded, usePolled } from './lib/use-async.js'
 import { useRoute } from './lib/use-route.js'
 import { useContextSet } from './lib/use-context-set.js'
 import { useActivityNotifications, useInterventionNotifications } from './lib/use-notifications.js'
 import { usePreferences, notificationsEnabled, newActivityEnabled, humanInterventionEnabled } from './lib/preferences.js'
-import { agentViews, currentRunEvents } from './lib/live-state.js'
+import { agentViews, currentAgentEvents } from './lib/live-state.js'
 import { useDocumentTitle } from './lib/document-title.js'
 import { useWorking } from './lib/use-working.js'
 import { useFavicon } from './lib/favicon.js'
@@ -42,7 +42,7 @@ const EMPTY_INTERVENTIONS: Intervention[] = []
 const EMPTY_ACTIVITY: Activity[] = []
 
 /** Stable initial for the cross-project recents poll, so it does not churn on every render. */
-const EMPTY_RECENT: RecentRun[] = []
+const EMPTY_RECENT: RecentAgent[] = []
 
 // The dashboard shell (#405 phase 2): Sessions | main | Docs/History rail, with the project
 // selection in the top nav as a dropdown since #772 (it used to be a rail of its own). The main pane
@@ -68,7 +68,7 @@ export function App() {
   // the main pane that a session missing from the list is starting, not gone.
   // `runsOn` names the device a just-started remote run executes on (#1067), so the live view can
   // mark where it runs and degrade the panels that are local-only. Undefined for a local run.
-  const [runStart, setRunStart] = useState<{ tick: number; intent: string; id: string | null; runsOn?: string }>({ tick: 0, intent: '', id: null })
+  const [agentStart, setAgentStart] = useState<{ tick: number; intent: string; id: string | null; runsOn?: string }>({ tick: 0, intent: '', id: null })
   // A project with no git checkout gets no worktree, so Start hands back no id and there is
   // nothing to navigate to yet. That fallback is one run at a time (daemon.ts keys the busy guard
   // by project there), so "the running one" is still a safe guess — adopt it the moment the poll
@@ -76,7 +76,7 @@ export function App() {
   // be known.
   const [adopting, setAdopting] = useState(false)
 
-  const { agents: agents, reload, loaded: runsLoaded } = useRuns(projectId)
+  const { agents: agents, reload, loaded: agentsLoaded } = useAgents(projectId)
 
   // The run Context set lives in the shell (#492/#504) so the two surfaces that feed it share
   // one source of truth: the `#` file chips + whole-repo Context selector in the Start form
@@ -137,16 +137,16 @@ export function App() {
   // The shared sidebar's recents on the Overview (#shared-shell): with no project selected the rail
   // has no project runs to show, so it pools every project's sessions here. Polled only on the home
   // route — a selected project's own `runs` (above) carry its rail.
-  const { value: recentRuns } = usePolled<RecentRun[]>(projectId === null ? onRecentRuns : null, EMPTY_RECENT, 10_000, [projectId])
+  const { value: recentAgents } = usePolled<RecentAgent[]>(projectId === null ? onRecentAgents : null, EMPTY_RECENT, 10_000, [projectId])
 
   // A run just started in `inProject`, which is not always the selected one: the onboarding
   // checklist starts one from the Overview and the settings page, where nothing is selected (#1169).
-  const runStarted = (inProject: string | null, intent: string, startedId?: string, runsOn?: string) => {
+  const agentStarted = (inProject: string | null, intent: string, startedId?: string, runsOn?: string) => {
     // Continuing the run already on screen (#762) appends to its journal — nothing truncates, so
     // nothing would re-replay after a reset. Bumping the tick here is what blanked the transcript
     // the moment a message resumed an ended session; a continuation keeps the feed instead.
     const continued = startedId !== undefined && startedId === agentId && inProject === projectId
-    setRunStart(prev => ({ tick: continued ? prev.tick : prev.tick + 1, intent, id: startedId ?? null, ...(runsOn ? { runsOn } : {}) }))
+    setAgentStart(prev => ({ tick: continued ? prev.tick : prev.tick + 1, intent, id: startedId ?? null, ...(runsOn ? { runsOn } : {}) }))
     setAdopting(startedId === undefined)
     // The picked context went with that run; the next launch starts from a clean focus (#948).
     resetContext()
@@ -160,7 +160,7 @@ export function App() {
   }
 
   /** The same, for the surfaces that start a run inside the selected project. */
-  const onRunStarted = (intent: string, startedId?: string, runsOn?: string) => runStarted(projectId, intent, startedId, runsOn)
+  const onAgentStarted = (intent: string, startedId?: string, runsOn?: string) => agentStarted(projectId, intent, startedId, runsOn)
 
   // The no-id fallback only: adopt the running run as the selection once the poll surfaces it.
   // A correction rather than a step, so it replaces the history entry.
@@ -176,7 +176,7 @@ export function App() {
 
   // Selecting a session (or the Live/Home row) is always an explicit choice, so it ends the
   // just-started follow.
-  const selectRun = (id: string | null) => {
+  const selectAgent = (id: string | null) => {
     setAdopting(false)
     go({ projectId, agentId: id })
   }
@@ -190,7 +190,7 @@ export function App() {
   // the Agents view (#1139), and the hot tickets — know which run they are about, and going through
   // selectProject drops that on the way, landing on the launcher instead of the session the row was
   // describing.
-  const selectRunInProject = (id: string, agentId: string) => {
+  const selectAgentInProject = (id: string, agentId: string) => {
     setAdopting(false)
     go({ projectId: id, agentId: agentId })
   }
@@ -198,7 +198,7 @@ export function App() {
   // "New" in the sidebar: start a fresh session in a named project (the sidebar decides which —
   // the current one, the only one, or a picked one). resetContext explicitly, since staying in the
   // same project would not trip the project-change effect above.
-  const newSessionInProject = (id: string) => {
+  const newAgentInProject = (id: string) => {
     setAdopting(false)
     resetContext()
     go({ projectId: id, agentId: null })
@@ -243,12 +243,12 @@ export function App() {
   // one shared Telefunc Channel. Hooks run before the relay early return below.
   // The run whose feed and controls are in play is simply the one in the URL; in the no-id
   // fallback there is none yet, and a null id resolves to the project root, as before.
-  const { events, lost } = useLiveEvents(projectId, agentId, runStart.tick)
+  const { events, lost } = useLiveEvents(projectId, agentId, agentStart.tick)
   // The rail's views stay scoped to the newest `session` segment even though a run's feed no
   // longer is (a resumed session appends a second segment to the same journal). Choice gates
   // are no longer folded here: they live inline in the transcript (#1455 items 6/7), where
   // EventList derives open/answered state from the same events it renders.
-  const current = currentRunEvents(events)
+  const current = currentAgentEvents(events)
   const views = projectId ? agentViews(current) : []
   // The selected session's loop verdict, for the rail's pinned block under the tabs. It comes up
   // from AgentView rather than being folded here: a finished run's events live in its archived log,
@@ -257,12 +257,12 @@ export function App() {
   // On the relay (#426), the URL carries `?run=<id>` and there is no local registry or
   // files — show that one run read-only. `window` is absent during prerender (ssr:false),
   // so this resolves to the full shell at build time and only flips in the browser.
-  const relayRun = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('run')
+  const relayAgent = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('run')
 
   // Is an agent working (#875)? Drives the mark and the tab icon. Both off on the relay: there is
   // no project registry behind it, so the cross-project read cannot answer, and RelayView owns
   // both from its one run's feed instead.
-  const local = relayRun === null
+  const local = relayAgent === null
   const working = useWorking(local)
   useFavicon(working, local)
 
@@ -272,14 +272,14 @@ export function App() {
   const healthy = useDaemonHealth(local)
 
   // Hooks above run unconditionally (rules of hooks); this early return is safe after them.
-  if (relayRun) return <RelayView agentId={relayRun} />
+  if (relayAgent) return <RelayView agentId={relayAgent} />
 
   // Route the main pane: the Overview dashboard when no project is selected (#471); else the
   // project home/launcher, a running run's live output, or a finished run's replay. Each live
   // run streams its own feed and is steered by its own id (#749).
-  const selectedRun = agentId ? agents.find(agent => agent.id === agentId) : undefined
+  const selectedAgent = agentId ? agents.find(agent => agent.id === agentId) : undefined
   const renderMain = () => {
-    if (view === 'settings') return <SettingsPage onRunStarted={runStarted} onDone={showDashboard} />
+    if (view === 'settings') return <SettingsPage onAgentStarted={agentStarted} onDone={showDashboard} />
     // A ticket's plan view is the same shape plus the `plan` flag (#685): its `.plan.md` on its own
     // page, checked before the detail page since the flag only rides alongside a slug.
     if (view === 'tickets' && projectId && ticketSlug && plan)
@@ -288,14 +288,14 @@ export function App() {
     // bare cross-project route) is the list — every registered project, one section each.
     if (view === 'tickets' && projectId && ticketSlug)
       return <TicketDetailPage projectId={projectId} slug={ticketSlug} onBack={showTickets} />
-    if (view === 'tickets') return <TicketsPage onOpenTicket={openTicket} onOpenTicketPlan={openTicketPlan} onRunStarted={runStarted} />
+    if (view === 'tickets') return <TicketsPage onOpenTicket={openTicket} onOpenTicketPlan={openTicketPlan} onAgentStarted={agentStarted} />
     if (!projectId)
       return (
         <DashboardPage
           onSelectProject={selectProject}
-          onSelectRun={selectRunInProject}
+          onSelectAgent={selectAgentInProject}
           onOpenTicket={openTicket}
-          onRunStarted={runStarted}
+          onAgentStarted={agentStarted}
           interventions={interventions}
         />
       )
@@ -311,33 +311,33 @@ export function App() {
     if (agentId === null) {
       // Just pressed Start on a project with no worktree: follow the live output until the poll
       // surfaces the run and the effect above adopts its id.
-      if (adopting) return <AgentView projectId={projectId} agentId={null} events={events} live label={runStart.intent || undefined} projectName={projectName} remoteLabel={runStart.runsOn} files={files} addContext={addContext} removeContext={removeContext} lost={lost} onRunStarted={onRunStarted} />
+      if (adopting) return <AgentView projectId={projectId} agentId={null} events={events} live label={agentStart.intent || undefined} projectName={projectName} remoteLabel={agentStart.runsOn} files={files} addContext={addContext} removeContext={removeContext} lost={lost} onAgentStarted={onAgentStarted} />
       return (
         <ProjectHome
           projectId={projectId}
           events={events}
-          onRunStarted={onRunStarted}
+          onAgentStarted={onAgentStarted}
           files={files}
           context={context}
           addContext={addContext}
           removeContext={removeContext}
           toggleContext={toggleContext}
-          onOpenSession={selectRunInProject}
+          onOpenAgent={selectAgentInProject}
         />
       )
     }
-    if (!selectedRun) {
+    if (!selectedAgent) {
       // Not in the list: either the run we just started (its run.json lands a beat later) or a
       // list we have not read yet. Both are live views; only a session that is genuinely absent
       // from a list we did read is gone.
-      if (agentId === runStart.id || !runsLoaded)
-        return <AgentView projectId={projectId} agentId={agentId} events={events} live label={runStart.intent || undefined} projectName={projectName} remoteLabel={agentId === runStart.id ? runStart.runsOn : undefined} files={files} addContext={addContext} removeContext={removeContext} lost={lost} onRunStarted={onRunStarted} />
+      if (agentId === agentStart.id || !agentsLoaded)
+        return <AgentView projectId={projectId} agentId={agentId} events={events} live label={agentStart.intent || undefined} projectName={projectName} remoteLabel={agentId === agentStart.id ? agentStart.runsOn : undefined} files={files} addContext={addContext} removeContext={removeContext} lost={lost} onAgentStarted={onAgentStarted} />
       return (
         <NotFound
           title="This agent is gone"
           detail="It is not in this project's agents. An agent disappears when its worktree is removed."
           actionLabel="Back to the project"
-          onAction={() => selectRun(null)}
+          onAction={() => selectAgent(null)}
         />
       )
     }
@@ -348,22 +348,22 @@ export function App() {
         projectId={projectId}
         agentId={agentId}
         events={events}
-        live={selectedRun.status === 'running'}
-        label={runLabel(selectedRun)}
+        live={selectedAgent.status === 'running'}
+        label={agentLabel(selectedAgent)}
         projectName={projectName}
         files={files}
         addContext={addContext}
         removeContext={removeContext}
         lost={lost}
-        target={selectedRun.target}
-        remoteLabel={selectedRun.remoteLabel}
-        armedDefault={selectedRun.handoff}
-        onRunStarted={onRunStarted}
+        target={selectedAgent.target}
+        remoteLabel={selectedAgent.remoteLabel}
+        armedDefault={selectedAgent.handoff}
+        onAgentStarted={onAgentStarted}
        
         onDeleted={() => {
           // Its view is about to point at a session that no longer exists; go home and refresh
           // the rail so the row is gone (#1032).
-          selectRun(null)
+          selectAgent(null)
           reload()
         }}
       />
@@ -394,18 +394,18 @@ export function App() {
         <AgentHistory
           projectId={projectId}
           agents={agents}
-          selectedRunId={agentId}
-          onSelect={selectRun}
-          recentRuns={recentRuns}
-          onSelectRecent={selectRunInProject}
+          selectedAgentId={agentId}
+          onSelect={selectAgent}
+          recentAgents={recentAgents}
+          onSelectRecent={selectAgentInProject}
           projects={projects}
-          onNewSessionInProject={newSessionInProject}
+          onNewAgentInProject={newAgentInProject}
           onProjectAdded={() => {
             setProjectsKey(k => k + 1)
             reload()
           }}
-          startTick={runStart.tick}
-          startIntent={runStart.intent}
+          startTick={agentStart.tick}
+          startIntent={agentStart.intent}
           followLive={adopting}
           working={working}
           onDashboard={showDashboard}
@@ -426,8 +426,8 @@ export function App() {
             files={files}
             context={context}
             toggleContext={toggleContext}
-            hasBrowser={selectedRun?.status === 'running' && selectedRun.browserStreamPort !== undefined}
-            target={selectedRun?.target}
+            hasBrowser={selectedAgent?.status === 'running' && selectedAgent.browserStreamPort !== undefined}
+            target={selectedAgent?.target}
             // The launcher shows Docs/History in its main column (#1455 items 2/3): exactly when
             // renderMain resolves to ProjectHome — a project selected, no run (and not adopting
             // one), on the default view. Session views keep the full rail.

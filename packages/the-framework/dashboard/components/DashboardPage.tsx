@@ -26,18 +26,18 @@ import { ScrollArea } from './ui/scroll-area.js'
 // return later.
 export function DashboardPage({
   onSelectProject,
-  onSelectRun,
+  onSelectAgent,
   onOpenTicket,
-  onRunStarted,
+  onAgentStarted,
   interventions,
 }: {
   onSelectProject: (id: string) => void
   /** Open one session (project + run): the Agents and hot-ticket rows link straight to a session. */
-  onSelectRun: (projectId: string, agentId: string) => void
+  onSelectAgent: (projectId: string, agentId: string) => void
   /** Open one ticket's own page (#1144): a queued entry links to its ticket, so its row does too. */
   onOpenTicket: (projectId: string, file: string) => void
   /** Where a session the onboarding checklist starts lands (#1169): on that session. */
-  onRunStarted: (projectId: string, intent: string, agentId?: string) => void
+  onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
   interventions: Intervention[]
 }) {
   const { value: data } = usePolled<DashboardData | null>(onDashboard, null, 5000, [])
@@ -49,7 +49,7 @@ export function DashboardPage({
   return (
     <ScrollArea className="min-h-0 flex-1">
       <div className="mx-auto max-w-6xl space-y-6 p-6">
-        {!onboardingDismissed && <OnboardingChecklist dismissible onRunStarted={onRunStarted} />}
+        {!onboardingDismissed && <OnboardingChecklist dismissible onAgentStarted={onAgentStarted} />}
 
         {/* Usage first (#1139): the one figure that governs everything the agent may do next. */}
         <Quota />
@@ -58,18 +58,18 @@ export function DashboardPage({
             Queue's right on top of the AI Queue: what needs you, who is on it, and what the AI
             takes up next. */}
         <div className="grid items-start gap-4 lg:grid-cols-2">
-          <HumanQueue items={interventions} onSelectProject={onSelectProject} onSelectRun={onSelectRun} />
+          <HumanQueue items={interventions} onSelectProject={onSelectProject} onSelectAgent={onSelectAgent} />
           <div className="space-y-4">
-            <Agents working={data?.active ?? []} loading={loading} onSelectRun={onSelectRun} />
-            <AiQueue queue={data?.queue ?? []} loading={loading} onOpenTicket={onOpenTicket} onRunStarted={onRunStarted} />
+            <Agents working={data?.active ?? []} loading={loading} onSelectAgent={onSelectAgent} />
+            <AiQueue queue={data?.queue ?? []} loading={loading} onOpenTicket={onOpenTicket} onAgentStarted={onAgentStarted} />
           </div>
         </div>
 
         {/* Routine work sits below the AI Queue (#1139/#1159): the scheduled jobs and the button
             that fires one now. */}
-        <RoutineWork onRunStarted={onRunStarted} />
+        <RoutineWork onAgentStarted={onAgentStarted} />
 
-        <HotTickets onSelectProject={onSelectProject} onSelectRun={onSelectRun} />
+        <HotTickets onSelectProject={onSelectProject} onSelectAgent={onSelectAgent} />
       </div>
     </ScrollArea>
   )
@@ -83,17 +83,17 @@ export function DashboardPage({
 function HumanQueue({
   items,
   onSelectProject,
-  onSelectRun,
+  onSelectAgent,
 }: {
   items: Intervention[]
   onSelectProject: (id: string) => void
-  onSelectRun: (projectId: string, agentId: string) => void
+  onSelectAgent: (projectId: string, agentId: string) => void
 }) {
   // Awaiting and unpushed both name a run (#636/#860), so the row opens that session — which is what
   // its "Open the session" promise says. Only if the id is somehow absent does it fall back to the
   // project, rather than doing nothing.
-  const openSession = (item: Intervention) =>
-    item.agentId ? onSelectRun(item.projectId, item.agentId) : onSelectProject(item.projectId)
+  const openAgent = (item: Intervention) =>
+    item.agentId ? onSelectAgent(item.projectId, item.agentId) : onSelectProject(item.projectId)
   return (
     <Card>
       <CardHeader>
@@ -121,7 +121,7 @@ function HumanQueue({
                       render={
                         <button
                           type="button"
-                          onClick={() => openSession(item)}
+                          onClick={() => openAgent(item)}
                           className="flex w-full items-center gap-2.5 py-2 text-left hover:opacity-80"
                         />
                       }
@@ -139,7 +139,7 @@ function HumanQueue({
                       render={
                         <button
                           type="button"
-                          onClick={() => openSession(item)}
+                          onClick={() => openAgent(item)}
                           className="flex w-full items-center gap-2.5 py-2 text-left hover:opacity-80"
                         />
                       }

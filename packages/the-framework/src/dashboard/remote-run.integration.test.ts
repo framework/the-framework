@@ -13,7 +13,7 @@ import { createProjectRuntime, delay } from '../daemon-runtime.js'
 import { dispatchRelayRpc } from '../dashboard-rpc/relay-dispatch.js'
 import { forwardStream } from '../dashboard-rpc/stream-forward.js'
 import { projectId } from '../registry.js'
-import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'
+import type { StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
 import type { FrameworkEvent } from '../events.js'
 import type { HandoffResult } from './agent-handoff.js'
 
@@ -50,10 +50,10 @@ async function collectUntil(stream: AsyncIterable<FrameworkEvent>, stopKind: str
 test('a run submitted with options.remote is created on the other daemon and its events stream back (#1067)', async () => {
   // Daemon B: the device. Its Start is stubbed to record the call and emit a short event stream,
   // so the relay path is exercised without spawning a real agent.
-  const bStarts: Array<{ prompt: string; kind: StartRunKind; options: StartRunOptions; projectId?: string }> = []
+  const bStarts: Array<{ prompt: string; kind: StartAgentKind; options: StartAgentOptions; projectId?: string }> = []
   const bStreams = new Map<string, EventStream<FrameworkEvent>>()
   const B_RUN = 'remote-run-1'
-  const bStart = (prompt: string, kind: StartRunKind, options: StartRunOptions, pid?: string): StartRunResult => {
+  const bStart = (prompt: string, kind: StartAgentKind, options: StartAgentOptions, pid?: string): StartAgentResult => {
     bStarts.push({ prompt, kind, options, ...(pid ? { projectId: pid } : {}) })
     const stream = new EventStream<FrameworkEvent>()
     stream.push({ kind: 'log', message: 'hello from B' } as FrameworkEvent)
@@ -105,12 +105,12 @@ test('a run submitted with options.remote is created on the other daemon and its
     assert.equal(bStarts[0]!.projectId, undefined) // slice 1: the device's own home checkout
 
     // A's own busy guard never fired: it allocated no worktree and spawned nothing.
-    assert.equal(runtimeA.activeRunCount(homeIdA), 0)
+    assert.equal(runtimeA.activeAgentCount(homeIdA), 0)
 
     // The relayed run keeps a local list row on A (#1077), so a dashboard reload re-opens it instead of
     // losing it: a remote stub carrying B's run id, the device label, and the prompt, running until the
     // relay stream ends. Read before draining, while it is still live.
-    const listed = runtimeA.remoteRuns.list(homeIdA)
+    const listed = runtimeA.remoteAgents.list(homeIdA)
     assert.equal(listed.length, 1)
     assert.equal(listed[0]!.id, B_RUN)
     assert.equal(listed[0]!.target, 'remote')
@@ -129,7 +129,7 @@ test('a run submitted with options.remote is created on the other daemon and its
 
     // B's stubbed start pushed `{kind:'end', ok:true}` and closed, so once A has drained the relayed
     // stream the list row settles to done (#1077): the state a reload would now read off the list.
-    assert.equal(runtimeA.remoteRuns.list(homeIdA)[0]!.status, 'done')
+    assert.equal(runtimeA.remoteAgents.list(homeIdA)[0]!.status, 'done')
 
     // Slice 2: a run-scoped read relays to B over /_relay/rpc and comes back. The caller's arg[0] is
     // A's local project id; B's dispatch drops it and reads against its own home, which has no repo

@@ -21,7 +21,7 @@ const NOW = () => new Date('2026-07-14T12:00:00Z')
 
 test('buildDashboard rolls up totals, run-status, and per-project counts', async () => {
   const projects = [project('a', '/a', '2026-07-13T00:00:00Z'), project('b', '/b', '2026-07-10T00:00:00Z')]
-  const runsByPath: Record<string, AgentMeta[]> = {
+  const agentsByPath: Record<string, AgentMeta[]> = {
     '/a': [agent('done', '2026-07-14T09:00:00Z'), agent('failed', '2026-07-13T09:00:00Z')],
     '/b': [agent('done', '2026-07-12T09:00:00Z')],
   }
@@ -30,14 +30,14 @@ test('buildDashboard rolls up totals, run-status, and per-project counts', async
     { projectId: 'b', projectName: 'b', open: 0, total: 1, items: [] },
   ]
   const data = await buildDashboard(projects, {
-    liveRuns: async cwd => (cwd === '/a' ? [{ ...agent('running', '2026-07-14T11:00:00Z'), cwd }] : []),
-    agents: async cwd => runsByPath[cwd] ?? [],
+    liveAgents: async cwd => (cwd === '/a' ? [{ ...agent('running', '2026-07-14T11:00:00Z'), cwd }] : []),
+    agents: async cwd => agentsByPath[cwd] ?? [],
     queue: async () => queues,
     now: NOW,
   })
 
-  assert.deepEqual(data.totals, { projects: 2, activeAgents: 1, openTodos: 2, totalRuns: 3 })
-  assert.deepEqual(data.runsByStatus, { running: 0, done: 2, stopped: 0, failed: 1 })
+  assert.deepEqual(data.totals, { projects: 2, activeAgents: 1, openTodos: 2, totalAgents: 3 })
+  assert.deepEqual(data.agentsByStatus, { running: 0, done: 2, stopped: 0, failed: 1 })
   assert.equal(data.projects.length, 2)
   const a = data.projects.find(p => p.projectId === 'a')!
   assert.equal(a.agents, 2)
@@ -54,7 +54,7 @@ test('buildDashboard buckets run activity across a 14-day window, oldest-first',
     agent('done', '2026-06-01T09:00:00Z'), // older than 14 days -> dropped
   ]
   const data = await buildDashboard([project('a', '/a')], {
-    liveRuns: async () => [],
+    liveAgents: async () => [],
     agents: async () => agents,
     queue: async () => [],
     now: NOW,

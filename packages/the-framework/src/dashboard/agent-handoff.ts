@@ -7,7 +7,7 @@ import {
   ghMergePr,
   ghPrsForBranch,
   nodeGhRunner,
-  pickRunPr,
+  pickAgentPr,
   type GhRunner,
   type LinkedPr,
   type BranchPrLookup,
@@ -17,7 +17,7 @@ import { parseNumstat } from './file-diff.js'
 import { parsePorcelain } from './file-status.js'
 import { errorMessage } from '../error-message.js'
 import type { AutoHandoffSkip, AutoMergeOutcome, MergeWithheldReason } from '../events.js'
-import { commitPendingWork, currentBranch, startedAtFromRunId, FRAMEWORK_DIR, type AgentMeta } from '../store/index.js'
+import { agentBranchName, commitPendingWork, currentBranch, startedAtFromAgentId, FRAMEWORK_DIR, type AgentMeta } from '../store/index.js'
 
 // What a finished session produced, and what is left to do with it (#799).
 //
@@ -26,7 +26,7 @@ import { commitPendingWork, currentBranch, startedAtFromRunId, FRAMEWORK_DIR, ty
 // the work on a branch. Nothing pushed, nothing opened, and the dashboard showed none of it.
 //
 // The read is deliberately *branch*-addressed, not worktree-addressed: the common end state has
-// no worktree left, so a checkout-based read (`onRunWorktree`) falls back to the project root and
+// no worktree left, so a checkout-based read (`onAgentWorktree`) falls back to the project root and
 // reports the project's own branch as if it were the session's. Here the branch is the subject and
 // the project repo is only where it is read from, so a finished session reads the same whether or
 // not its checkout still exists.
@@ -94,7 +94,7 @@ export interface AgentHandoff {
 }
 
 /** Injectable seams so the reader is unit-testable off disk, plus the checkout the session worked in. */
-export interface RunHandoffDeps {
+export interface AgentHandoffDeps {
   git?: GitRunner
   pr?: BranchPrLookup
   /**
@@ -118,26 +118,28 @@ export interface RunHandoffDeps {
  */
 export function agentBranchFor(agent: { id: string; branch?: string; sessionName?: string }): string {
   if (agent.branch) return agent.branch
-  return agent.sessionName ? `${SESSION_BRANCH_PREFIX}${agent.sessionName}` : `${SESSION_BRANCH_PREFIX}run-${agent.id}`
+  // The id fallback goes through the store's own builder rather than assembling the same name a
+  // second time here — two spellings of one branch name is how the prefix went stale under D5.
+  return agent.sessionName ? `${AGENT_BRANCH_PREFIX}${agent.sessionName}` : agentBranchName(agent.id)
 }
 
-/** What every branch a session creates for itself is named under. */
-const SESSION_BRANCH_PREFIX = 'the-framework/'
+/** What every branch an agent creates for itself is named under. */
+const AGENT_BRANCH_PREFIX = 'the-framework/'
 
 /**
  * The branch's PR as it applies to *this* run: the injected seam when the caller gave one, else
- * the cached history filtered through {@link pickRunPr} with the run's start time (#1251).
+ * the cached history filtered through {@link pickAgentPr} with the run's start time (#1251).
  */
-async function lookupRunPr(cwd: string, branch: string, deps: RunHandoffDeps): Promise<Cached<LinkedPr | undefined>> {
+async function lookupAgentPr(cwd: string, branch: string, deps: AgentHandoffDeps): Promise<Cached<LinkedPr | undefined>> {
   if (deps.pr) return { value: await deps.pr(cwd, branch).catch(() => undefined), pending: false }
   const prs = await cachedPrsForBranch(cwd, branch).catch(() => ({ value: undefined, pending: false }))
-  return { value: prs.value ? pickRunPr(prs.value, deps.since) : undefined, pending: prs.pending }
+  return { value: prs.value ? pickAgentPr(prs.value, deps.since) : undefined, pending: prs.pending }
 }
 
-/** The cached single-PR read {@link resolveRunPr} asks for the recorded PR's current state. */
+/** The cached single-PR read {@link resolveAgentPr} asks for the recorded PR's current state. */
 export type CachedBranchPrLookup = (cwd: string, branch?: string) => Promise<Cached<LinkedPr | undefined>>
 
-/** What {@link resolveRunPr} needs to know about a run: structurally satisfied by {@link AgentMeta}. */
+/** What {@link resolveAgentPr} needs to know about a run: structurally satisfied by {@link AgentMeta}. */
 export interface RunPrRun {
   id: string
   branch?: string
@@ -163,7 +165,7 @@ export interface RunPrRun {
  * a human closes it. That read rides the PR-lookup cache (#1028), and `pending` while it is warming means the
  * caller can ask again rather than render "no PR".
  */
-export async function resolveRunPr(
+export async function resolveAgentPr(
   cwd: string,
   agent: RunPrRun,
   prs: CachedBranchPrLookup = cachedPrView,
@@ -187,12 +189,12 @@ export async function resolveRunPr(
  * `ghMergePr` marks a draft ready on the way, for exactly that case. Refuses when the run has no
  * PR or it is no longer open — "already merged" is an answer, not an action.
  */
-export async function mergeSessionPr(
+export async function mergeAgentPr(
   cwd: string,
   agent: RunPrRun,
   deps: { gh?: GhRunner; prs?: CachedBranchPrLookup } = {},
 ): Promise<HandoffResult> {
-  const pr = (await resolveRunPr(cwd, agent, deps.prs)).value
+  const pr = (await resolveAgentPr(cwd, agent, deps.prs)).value
   if (!pr) return { ok: false, error: 'this session has no pull request to merge' }
   if (pr.state !== 'OPEN') return { ok: false, error: `this session's PR is already ${pr.state.toLowerCase()}` }
   const merged = await ghMergePr(cwd, pr.number, deps.gh)
@@ -211,8 +213,8 @@ export async function mergeSessionPr(
  * Only a naming convention, so it is a guess for the case #326 allows — the agent picking its own
  * branch name. Every caller uses it to decide how loudly to surface something, never to act.
  */
-export function isSessionBranch(branch: string | undefined): boolean {
-  return Boolean(branch?.startsWith(SESSION_BRANCH_PREFIX))
+export function isAgentBranch(branch: string | undefined): boolean {
+  return Boolean(branch?.startsWith(AGENT_BRANCH_PREFIX))
 }
 
 /** `git` that resolves to '' instead of rejecting, for reads where "no answer" is a fine answer. */
@@ -261,10 +263,10 @@ function isBookkeepingPath(path: string): boolean {
  * still returns a handoff (with `exists: false`), because "that branch is gone" is itself the
  * answer the dashboard needs to show.
  */
-export async function readRunHandoff(
+export async function readAgentHandoff(
   cwd: string,
   branch: string,
-  deps: RunHandoffDeps = {},
+  deps: AgentHandoffDeps = {},
 ): Promise<AgentHandoff | undefined> {
   const git = deps.git ?? nodeGitRunner()
   const agent = soft(git, cwd)
@@ -279,7 +281,7 @@ export async function readRunHandoff(
     // The branch being gone locally does not mean the work is: a hands-off web run pushes its
     // branch and opens its PR remotely, and a merged branch gets deleted. The PR is a remote
     // question, so it is still answerable — and it is the one thing left worth showing (#1255).
-    const pr = await lookupRunPr(cwd, branch, deps)
+    const pr = await lookupAgentPr(cwd, branch, deps)
     return {
       branch,
       exists: false,
@@ -323,7 +325,7 @@ export async function readRunHandoff(
   const files = parseHandoffFiles(numstatOut)
   // Read through the cache and allowed to arrive late (#1028): the commits, the files and
   // whether the branch is pushed are all local git, and none of them should wait on `gh`.
-  const pr = await lookupRunPr(cwd, branch, deps)
+  const pr = await lookupAgentPr(cwd, branch, deps)
 
   return {
     branch,
@@ -381,7 +383,7 @@ async function countPendingWork(git: GitRunner, checkout: string | undefined): P
  * Returns whether the handoff may go ahead: true when there was nothing to do, when the guards say
  * this is not ours to commit, or when the commit succeeded.
  */
-export async function commitSessionWork(
+export async function commitAgentWork(
   checkout: string,
   projectCwd: string,
   branch: string,
@@ -408,7 +410,7 @@ export type HandoffResult = { ok: true; url?: string; number?: number } | { ok: 
  * the end of every session. The click is still here for a session that opted out, and it is what
  * a failed auto-push falls back to.
  */
-export async function pushRunBranch(
+export async function pushAgentBranch(
   cwd: string,
   branch: string,
   git: GitRunner = nodeGitRunner(),
@@ -430,7 +432,7 @@ export async function pushRunBranch(
  * *branch on the remote*, and rejects `origin/main` with "Base ref must be a branch".
  *
  * So the conversion belongs at the `gh` boundary rather than in the field. Stripping `origin/`
- * matches what the rest of this module already assumes: the remote is `origin` (`pushRunBranch`
+ * matches what the rest of this module already assumes: the remote is `origin` (`pushAgentBranch`
  * pushes there, `detectBase` reads its HEAD).
  */
 export function prBaseName(base: string): string {
@@ -471,7 +473,7 @@ export interface PullRequestDraft {
  * The button opens it ready for review, because a PR a human asked for by name is asking for
  * review. {@link PullRequestDraft.draft} is the auto-handoff case, which is not.
  */
-export async function openRunPullRequest(
+export async function openBranchPullRequest(
   cwd: string,
   branch: string,
   draft: PullRequestDraft,
@@ -481,7 +483,7 @@ export async function openRunPullRequest(
   const gh = deps.gh ?? nodeGhRunner()
   // gh refuses to open a PR for a branch the remote has never seen, so the push is part of the
   // action rather than a thing the user has to remember to do first.
-  const pushed = await pushRunBranch(cwd, branch, git)
+  const pushed = await pushAgentBranch(cwd, branch, git)
   if (!pushed.ok) return pushed
   try {
     const args = ['pr', 'create', '--head', branch, '--title', draft.title, '--body', draft.body]
@@ -522,13 +524,13 @@ function movedPastPr(state: Pick<AgentHandoff, 'pr' | 'commits'>): boolean {
  * is the intent plus which session did it. This is the handoff decision the dashboard's
  * open-PR button offers; the RPC layer only resolves which run it is about.
  */
-export async function openSessionPullRequest(
+export async function openAgentPullRequest(
   cwd: string,
   agent: AgentMeta,
   options: { draft?: boolean } = {},
 ): Promise<HandoffResult> {
   const branch = agentBranchFor(agent)
-  const handoff = await readRunHandoff(cwd, branch, { since: agent.startedAt }).catch(() => undefined)
+  const handoff = await readAgentHandoff(cwd, branch, { since: agent.startedAt }).catch(() => undefined)
   // The run's PR first, even when its branch is gone locally: a hands-off web run's branch only
   // ever existed on the remote, and its PR is the answer the button exists to give (#1255).
   // Unless the session demonstrably kept committing after that PR merged or closed (#1512) —
@@ -537,9 +539,9 @@ export async function openSessionPullRequest(
   if (handoff && !handoff.exists) return { ok: false, error: `branch ${branch} no longer exists` }
   // Refuse rather than open an empty PR: a session that changed nothing has nothing to hand off.
   if (handoff?.empty) return { ok: false, error: 'this session produced no commits to open a PR for' }
-  return openRunPullRequest(cwd, branch, {
-    title: sessionPrTitle(agent),
-    body: sessionPrBody(agent),
+  return openBranchPullRequest(cwd, branch, {
+    title: agentPrTitle(agent),
+    body: agentPrBody(agent),
     ...(handoff?.base ? { base: handoff.base } : {}),
     ...(options.draft ? { draft: true } : {}),
   })
@@ -576,11 +578,11 @@ const ARMED_HANDOFF: HandoffIntent = { push: true, pr: true }
  * push and PR go ahead, the PR just opens as a draft for a human.
  *
  * (b) is a temporary safety belt: the agent's word should ultimately be enough. Deleting it means
- * deleting `sessionTodoOpen` here and `sessionTodoPending` in todo-loop.ts.
+ * deleting `agentTodoOpen` here and `agentTodoPending` in todo-loop.ts.
  */
-export function withheldMerge(deps: { readyForMerge: boolean; sessionTodoOpen: boolean }): MergeWithheldReason | undefined {
+export function withheldMerge(deps: { readyForMerge: boolean; agentTodoOpen: boolean }): MergeWithheldReason | undefined {
   if (!deps.readyForMerge) return 'not-ready-for-merge'
-  if (deps.sessionTodoOpen) return 'session-todo-open'
+  if (deps.agentTodoOpen) return 'session-todo-open'
   return undefined
 }
 
@@ -610,15 +612,15 @@ export type AutoHandoffOutcome =
  * review request in anyone's inbox, and the interventions queue keeps listing a session's draft
  * so the work still comes back to the human.
  */
-export async function runAutoHandoff(
+export async function agentAutoHandoff(
   cwd: string,
-  agent: HandoffRun,
+  agent: HandoffAgent,
   intent: HandoffIntent,
-  deps: RunHandoffDeps & { gh?: GhRunner } = {},
+  deps: AgentHandoffDeps & { gh?: GhRunner } = {},
 ): Promise<AutoHandoffOutcome> {
   if (!intent.push && !intent.pr) return { outcome: 'skipped', reason: 'not-armed' }
   const branch = agentBranchFor(agent)
-  const since = agent.startedAt ?? startedAtFromRunId(agent.id)
+  const since = agent.startedAt ?? startedAtFromAgentId(agent.id)
   const { gh, ...readDeps } = deps
   // The UNcached PR lookup, deliberately. The dashboard's cache answers `prPending` rather than
   // yes-or-no (#1028), which is right for a panel repainting every 15s and wrong here: "not known
@@ -629,8 +631,8 @@ export async function runAutoHandoff(
   // `latest` order (#1512): the decision below compares the branch tip against the PR's head, and
   // only the last PR that saw the branch answers that — against the first, work a second PR
   // already landed would read as unlanded and reopen.
-  const runPr: BranchPrLookup = async (c, b) => pickRunPr(await ghPrsForBranch(c, b), since, 'latest')
-  const state = await readRunHandoff(cwd, branch, { pr: runPr, ...readDeps }).catch(() => undefined)
+  const agentPr: BranchPrLookup = async (c, b) => pickAgentPr(await ghPrsForBranch(c, b), since, 'latest')
+  const state = await readAgentHandoff(cwd, branch, { pr: agentPr, ...readDeps }).catch(() => undefined)
   if (!state || !state.exists) return { outcome: 'skipped', reason: 'branch-gone' }
   if (state.empty) return { outcome: 'skipped', reason: 'no-commits' }
   if (!state.hasRemote) return { outcome: 'skipped', reason: 'no-remote' }
@@ -655,13 +657,13 @@ export async function runAutoHandoff(
   }
 
   if (intent.pr) {
-    // `openRunPullRequest` pushes first, so the PR half subsumes the push half.
-    const opened = await openRunPullRequest(
+    // `openBranchPullRequest` pushes first, so the PR half subsumes the push half.
+    const opened = await openBranchPullRequest(
       cwd,
       branch,
       {
-        title: sessionPrTitle(agent),
-        body: sessionPrBody(agent),
+        title: agentPrTitle(agent),
+        body: agentPrBody(agent),
         // GitHub refuses to merge or auto-merge a draft, so an armed merge (#1216) opens the PR
         // ready: its review happened on the queue before the run, which is the same reason the
         // merge is armed at all. Draft stays the default for PRs a human is meant to look at.
@@ -676,7 +678,7 @@ export async function runAutoHandoff(
     // resolve a number is a reported merge failure, never a failed handoff — the PR is there.
     const merge = intent.merge
       ? await (async (): Promise<AutoMergeOutcome> => {
-          const lookup = readDeps.pr ?? runPr
+          const lookup = readDeps.pr ?? agentPr
           const number = prNumberFromUrl(opened.url) ?? (await lookup(cwd, branch).catch(() => undefined))?.number
           // `watch` mode (#1418): where GitHub cannot arm the merge, a just-opened PR defers to
           // the daemon's CI watch instead of the direct fallback that landed it before its first
@@ -696,7 +698,7 @@ export async function runAutoHandoff(
   }
 
   if (state.pushed) return { outcome: 'skipped', reason: 'already-pushed' }
-  const pushed = await pushRunBranch(cwd, branch, readDeps.git)
+  const pushed = await pushAgentBranch(cwd, branch, readDeps.git)
   if (!pushed.ok) return { outcome: 'failed', step: 'push', error: pushed.error }
   return { outcome: 'done', pushed: true }
 }
@@ -706,7 +708,7 @@ export async function runAutoHandoff(
  * the PR. Narrower than {@link AgentMeta} so the run process can call this before its meta is
  * final, and so a caller cannot quietly start depending on the rest of the run's state.
  */
-export type HandoffRun = Pick<AgentMeta, 'id' | 'branch' | 'sessionName' | 'intent'> &
+export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'sessionName' | 'intent'> &
   Partial<Pick<AgentMeta, 'startedAt'>> & {
     /**
      * The GitHub issue the run's ticket tracks (`#42`), when it implements one (#1334). Carried
@@ -717,7 +719,7 @@ export type HandoffRun = Pick<AgentMeta, 'id' | 'branch' | 'sessionName' | 'inte
   }
 
 /** The PR title for a session (#1102), with the ticket's issue reference riding along (#1334). */
-function sessionPrTitle(agent: Pick<HandoffRun, 'id' | 'sessionName' | 'intent' | 'fixes'>): string {
+function agentPrTitle(agent: Pick<HandoffAgent, 'id' | 'sessionName' | 'intent' | 'fixes'>): string {
   const title = agent.sessionName ?? agent.intent?.split('\n')[0]?.slice(0, 72) ?? `Session ${agent.id}`
   return agent.fixes ? `${title} (fix ${agent.fixes})` : title
 }
@@ -734,7 +736,7 @@ function prNumberFromUrl(url: string | undefined): number | undefined {
 }
 
 /** The PR body: what was asked for, and which session did it. */
-function sessionPrBody(agent: HandoffRun): string {
+function agentPrBody(agent: HandoffAgent): string {
   const lines: string[] = []
   if (agent.intent) lines.push(agent.intent.trim(), '')
   lines.push(`Opened from The Framework session \`${agent.sessionName ?? agent.id}\`.`)

@@ -65,7 +65,7 @@ export function agentIdFromStartedAt(startedAt: string): string {
 }
 
 /** A run id is path-safe: no separators or traversal, only our own charset. */
-export function isSafeRunId(id: string): boolean {
+export function isSafeAgentId(id: string): boolean {
   return /^[A-Za-z0-9_-]+$/.test(id)
 }
 
@@ -293,7 +293,7 @@ export interface OpenStoreOptions {
    *
    * Falls back to a fresh run when there is nothing to reopen.
    */
-  continueRun?: boolean
+  continueAgent?: boolean
   /** Where this run executes (#1053/#610): recorded on the meta so the run view can read it. */
   target?: AgentLocation
   /** The flow this run started under (#1467): recorded on the meta so a continuation can re-enter it. */
@@ -393,7 +393,7 @@ function freshMeta(
   return {
     version: AGENT_META_VERSION,
     status: 'running',
-    id: id && isSafeRunId(id) ? id : agentIdFromStartedAt(startedAt),
+    id: id && isSafeAgentId(id) ? id : agentIdFromStartedAt(startedAt),
     startedAt,
     updatedAt: startedAt,
     ...(owner ? { pid: owner.pid, host: owner.host } : {}),
@@ -508,7 +508,7 @@ async function recordOrphanEnd(fs: StoreFs, dir: string, meta: AgentMeta): Promi
  */
 async function stopAndArchiveLive(fs: StoreFs, dir: string, meta: AgentMeta): Promise<AgentMeta> {
   const stopped = await recordOrphanEnd(fs, dir, meta)
-  await archivePriorRun(fs, dir).catch(() => {})
+  await archivePriorAgent(fs, dir).catch(() => {})
   return stopped
 }
 
@@ -568,7 +568,7 @@ export class AgentStore {
     const owner = opts.owner ?? { pid: process.pid, host: hostname() }
     const clock = opts.clock ?? (() => new Date().toISOString())
     const store = new AgentStore(fs, dir, clock, freshMeta(now, opts.intent, owner, opts.id, opts.target, opts.kind))
-    if (opts.continueRun) {
+    if (opts.continueAgent) {
       // Reopen: the log stays, the row keeps its original intent, and this process takes ownership
       // so a liveness probe (#716) reads the run as alive rather than as an orphan.
       const prior = await readMetaFile(fs, store.metaPath)
@@ -582,7 +582,7 @@ export class AgentStore {
     if (opts.fresh) {
       // A new run truncates the live log. First rescue the prior run if it never
       // got archived (e.g. a crash exited before close), so no history is lost.
-      await archivePriorRun(fs, dir).catch(() => {})
+      await archivePriorAgent(fs, dir).catch(() => {})
       await fs.write(store.eventsPath, '')
       await store.writeMeta()
     }
@@ -616,7 +616,7 @@ export class AgentStore {
   async close(): Promise<void> {
     await this.tail
     try {
-      await archiveRun(this.fs, this.dir, this.meta, this.eventsPath)
+      await archiveAgent(this.fs, this.dir, this.meta, this.eventsPath)
     } catch (err) {
       console.error('[framework] failed to archive run history:', err)
     }
@@ -702,8 +702,8 @@ async function archiveDirs(fs: StoreFs, dir: string): Promise<string[]> {
  * put (the daemon keeps tailing them until the next run); this is a durable snapshot for the
  * history list. Idempotent per id. `user` files it under that user's committed sessions (#1179).
  */
-async function archiveRun(fs: StoreFs, dir: string, meta: AgentMeta, eventsPath: string, user?: string): Promise<void> {
-  if (!isSafeRunId(meta.id)) return
+async function archiveAgent(fs: StoreFs, dir: string, meta: AgentMeta, eventsPath: string, user?: string): Promise<void> {
+  if (!isSafeAgentId(meta.id)) return
   await fs.mkdir(archiveDir(dir, user))
   const out = archivePaths(dir, meta.id, user)
   const events = (await fs.exists(eventsPath)) ? await fs.read(eventsPath) : ''
@@ -716,11 +716,11 @@ async function archiveRun(fs: StoreFs, dir: string, meta: AgentMeta, eventsPath:
  * `agents/`. Used at the start of a fresh run so a crash that skipped
  * {@link AgentStore.close} still leaves its history behind.
  */
-async function archivePriorRun(fs: StoreFs, dir: string): Promise<void> {
+async function archivePriorAgent(fs: StoreFs, dir: string): Promise<void> {
   const meta = await readMetaFile(fs, join(dir, META_FILE))
-  if (!meta?.id || !isSafeRunId(meta.id)) return
+  if (!meta?.id || !isSafeAgentId(meta.id)) return
   if (await fs.exists(archivePaths(dir, meta.id).meta)) return
-  await archiveRun(fs, dir, meta, join(dir, EVENTS_FILE))
+  await archiveAgent(fs, dir, meta, join(dir, EVENTS_FILE))
 }
 
 /**
@@ -738,7 +738,7 @@ export async function restoreArchivedAgent(
   fs: StoreFs = nodeStoreFs(),
 ): Promise<boolean> {
   try {
-    if (!isSafeRunId(agentId)) return false
+    if (!isSafeAgentId(agentId)) return false
     const dir = join(worktree, FRAMEWORK_DIR)
     if (await fs.exists(join(dir, META_FILE))) return false
     const archive = await findArchive(fs, join(repo, FRAMEWORK_DIR), agentId)
@@ -759,7 +759,7 @@ export async function restoreArchivedAgent(
  */
 export async function listWorktreeDirs(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<string[]> {
   const names = await fs.readdir(join(cwd, FRAMEWORK_DIR, WORKTREES_DIR)).catch(() => [])
-  return names.filter(isSafeRunId)
+  return names.filter(isSafeAgentId)
 }
 
 /**
@@ -791,7 +791,7 @@ export async function archiveWorktreeAgent(
   try {
     const worktreeDir = join(worktree, FRAMEWORK_DIR)
     const live = await readMetaFile(fs, join(worktreeDir, META_FILE))
-    if (!live?.id || !isSafeRunId(live.id)) return undefined
+    if (!live?.id || !isSafeAgentId(live.id)) return undefined
     // The flip writes the worktree's own log + meta too (#1359): the death gains its `end`
     // event before the archive copies the log, so no reader — live tail or archived replay —
     // is left holding an open gate for a dead run.
@@ -799,7 +799,7 @@ export async function archiveWorktreeAgent(
     // The branch is read from the checkout by the caller and stamped here, because this is the
     // last moment it can be observed: the worktree is about to go (#799).
     const meta: AgentMeta = branch ? { ...stopped, branch } : stopped
-    await archiveRun(fs, join(repo, FRAMEWORK_DIR), meta, join(worktreeDir, EVENTS_FILE), user)
+    await archiveAgent(fs, join(repo, FRAMEWORK_DIR), meta, join(worktreeDir, EVENTS_FILE), user)
     return meta
   } catch {
     return undefined
@@ -812,7 +812,7 @@ export async function archiveWorktreeAgent(
  * user archived it — before #1179 the path was derivable from the id alone, and now it is not.
  */
 export async function archivedAgentPaths(cwd: string, agentId: string, fs: StoreFs = nodeStoreFs()): Promise<string[]> {
-  if (!isSafeRunId(agentId)) return []
+  if (!isSafeAgentId(agentId)) return []
   const archive = await findArchive(fs, join(cwd, FRAMEWORK_DIR), agentId).catch(() => undefined)
   return archive ? [archive.meta, archive.events] : []
 }
@@ -844,7 +844,7 @@ async function readArchivedMetaEntries(fs: StoreFs, agentsDir: string): Promise<
  * {@link reconcileOrphanedAgents} flips to `stopped`. A live pid on this host, or a non-running
  * meta, is left be. The narrowing lets a caller use the meta as present in the true branch.
  */
-function isDeadRunning(meta: AgentMeta | undefined, isAlive: (pid: number) => boolean): meta is AgentMeta {
+function isDeadRunningAgent(meta: AgentMeta | undefined, isAlive: (pid: number) => boolean): meta is AgentMeta {
   return meta?.status === 'running' && ownerLiveness(meta, isAlive) !== 'live'
 }
 
@@ -914,7 +914,7 @@ export async function reconcileOrphanedAgents(
   // Archived runs stuck at `running` (e.g. a prior live run the next run never rescued), wherever
   // they are archived. Done before the live run so its fresh archive isn't re-counted here.
   for (const { path, meta } of await readAllArchivedMetaEntries(fs, dir)) {
-    if (!isDeadRunning(meta, isAlive)) continue
+    if (!isDeadRunningAgent(meta, isAlive)) continue
     try {
       // The archived pair sits side by side (`<id>.json` + `<id>.jsonl`), so the surrogate end
       // (#1359) lands in both: the replayed log sees the run finish, and the meta fold drops
@@ -930,7 +930,7 @@ export async function reconcileOrphanedAgents(
   // The live run: flip it, then archive so a crash that skipped close() still
   // leaves the stopped run in the history list.
   const live = await readMetaFile(fs, join(dir, META_FILE))
-  if (isDeadRunning(live, isAlive)) {
+  if (isDeadRunningAgent(live, isAlive)) {
     await stopAndArchiveLive(fs, dir, live)
     fixed++
   }
@@ -941,10 +941,10 @@ export async function reconcileOrphanedAgents(
   // it into the repo's history. The worktree itself is left on disk: a run that ended this way did
   // not end cleanly, and those are kept for inspection. Removing one is an explicit action.
   for (const name of await fs.readdir(join(dir, WORKTREES_DIR))) {
-    if (!isSafeRunId(name)) continue
+    if (!isSafeAgentId(name)) continue
     const worktreeDir = join(dir, WORKTREES_DIR, name, FRAMEWORK_DIR)
     const meta = await readMetaFile(fs, join(worktreeDir, META_FILE))
-    if (!isDeadRunning(meta, isAlive)) continue
+    if (!isDeadRunningAgent(meta, isAlive)) continue
     // recordOrphanEnd rather than a bare status flip (#1359): the worktree's log gains the
     // `end` event first, so the archive below copies a stream that actually ends.
     await recordOrphanEnd(fs, worktreeDir, meta)
@@ -1026,8 +1026,8 @@ export async function readLiveMetas(
 ): Promise<LiveAgent[]> {
   const worktreesDir = join(cwd, FRAMEWORK_DIR, WORKTREES_DIR)
   const names = await fs.readdir(worktreesDir).catch(() => [])
-  // isSafeRunId: the directory name is the run id, and anything else in there is not ours.
-  const candidates = [cwd, ...names.filter(isSafeRunId).map(name => join(worktreesDir, name))]
+  // isSafeAgentId: the directory name is the run id, and anything else in there is not ours.
+  const candidates = [cwd, ...names.filter(isSafeAgentId).map(name => join(worktreesDir, name))]
   const agents: LiveAgent[] = []
   for (const candidate of candidates) {
     const meta = await readLiveMeta(candidate, fs, isAlive).catch(() => undefined)
@@ -1041,12 +1041,12 @@ export async function readLiveMetas(
  * unknown or unsafe id; a torn trailing line is dropped (same rule as the live
  * {@link AgentStore.loadEvents}).
  */
-export async function loadRunEvents(
+export async function loadAgentEvents(
   cwd: string,
   id: string,
   fs: StoreFs = nodeStoreFs(),
 ): Promise<FrameworkEvent[] | undefined> {
-  if (!isSafeRunId(id)) return undefined
+  if (!isSafeAgentId(id)) return undefined
   const archive = await findArchive(fs, join(cwd, FRAMEWORK_DIR), id)
   if (!archive || !(await fs.exists(archive.events))) return undefined
   return parseEventLog(await fs.read(archive.events))
@@ -1117,13 +1117,13 @@ export async function readEventLog(cwd: string, fs: StoreFs = nodeStoreFs()): Pr
  * simply leaves the record as it was. The cost of missing it is one surface having to ask `gh`,
  * which is what all of them used to do.
  */
-export async function recordRunPr(
+export async function recordAgentPr(
   cwd: string,
   agentId: string,
   pr: { number: number; url: string },
   fs: StoreFs = nodeStoreFs(),
 ): Promise<boolean> {
-  if (!isSafeRunId(agentId)) return false
+  if (!isSafeAgentId(agentId)) return false
   try {
     const archive = await findArchive(fs, join(cwd, FRAMEWORK_DIR), agentId)
     if (!archive) return false

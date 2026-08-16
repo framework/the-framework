@@ -52,17 +52,17 @@ describe('useInterventionNotifications (#627)', () => {
 })
 
 describe('useActivityNotifications (#627)', () => {
-  const startedRun = (agentId: string, title?: string): Activity => ({ projectId: 'p', projectName: 'p', agentId: agentId, kind: 'started', ...(title ? { title } : {}) })
-  const finishedRun = (agentId: string, title?: string): Activity => ({ projectId: 'p', projectName: 'p', agentId: agentId, kind: 'finished', ...(title ? { title } : {}) })
+  const startedAgent = (agentId: string, title?: string): Activity => ({ projectId: 'p', projectName: 'p', agentId: agentId, kind: 'started', ...(title ? { title } : {}) })
+  const finishedAgent = (agentId: string, title?: string): Activity => ({ projectId: 'p', projectName: 'p', agentId: agentId, kind: 'finished', ...(title ? { title } : {}) })
 
   const render = (enabled: boolean) =>
     renderHook(({ items }) => useActivityNotifications(items, enabled), { initialProps: { items: [] as Activity[] } })
 
   test('stays quiet for runs already present at load, then fires when a run starts', () => {
     const { rerender } = render(true)
-    rerender({ items: [finishedRun('r1', 'seed')] }) // first fetch of an existing run -> baseline, no notify
+    rerender({ items: [finishedAgent('r1', 'seed')] }) // first fetch of an existing run -> baseline, no notify
     expect(ctor).not.toHaveBeenCalled()
-    rerender({ items: [startedRun('r2', 'add cart'), finishedRun('r1', 'seed')] }) // a run just started -> notify
+    rerender({ items: [startedAgent('r2', 'add cart'), finishedAgent('r1', 'seed')] }) // a run just started -> notify
     expect(ctor).toHaveBeenCalledTimes(1)
     expect(ctor.mock.calls[0]![0]).toContain('Agent started')
     expect(ctor.mock.calls[0]![1]?.body).toContain('add cart')
@@ -71,16 +71,16 @@ describe('useActivityNotifications (#627)', () => {
   test('fires again when the same run finishes (distinct key)', () => {
     const { rerender } = render(true)
     rerender({ items: [] }) // baseline
-    rerender({ items: [startedRun('r1', 'work')] }) // started
-    rerender({ items: [finishedRun('r1', 'work')] }) // finished -> a new key
+    rerender({ items: [startedAgent('r1', 'work')] }) // started
+    rerender({ items: [finishedAgent('r1', 'work')] }) // finished -> a new key
     expect(ctor).toHaveBeenCalledTimes(2)
     expect(ctor.mock.calls[1]![0]).toContain('Agent finished')
   })
 
   test('never fires when disabled', () => {
     const { rerender } = render(false)
-    rerender({ items: [startedRun('r1')] })
-    rerender({ items: [startedRun('r1'), startedRun('r2')] })
+    rerender({ items: [startedAgent('r1')] })
+    rerender({ items: [startedAgent('r1'), startedAgent('r2')] })
     expect(ctor).not.toHaveBeenCalled()
   })
 })

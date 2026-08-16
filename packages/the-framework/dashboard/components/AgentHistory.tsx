@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Plus, ChevronDown, Cloud, MonitorSmartphone, Settings, LayoutDashboard, FolderGit2, Ticket } from 'lucide-react'
-import type { AgentMeta, AgentStatus, RecentRun, ProjectSummary } from '../../dist/index.js'
+import type { AgentMeta, AgentStatus, RecentAgent, ProjectSummary } from '../../dist/index.js'
 import { DRIVER_LABELS, driverFromImpl } from '../../dist/client.js'
 import { Button, buttonVariants } from './ui/button.js'
 import { Badge } from './ui/badge.js'
@@ -8,7 +8,7 @@ import { cn } from '../lib/utils.js'
 import { isMetaPublishing } from '../lib/live-state.js'
 import { formatRelative } from '../lib/format-date.js'
 import { STATUS_TONE } from '../lib/status-tone.js'
-import { runLabel } from '../lib/run-label.js'
+import { agentLabel } from '../lib/agent-label.js'
 import { DriverLogo } from './driver-logos.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu.js'
@@ -42,19 +42,19 @@ type Row = { key: string; agent: AgentMeta; project?: string; active: boolean; o
 // the rail vanishing the moment no project is selected. "New" is the permanent home/launcher —
 // selecting it shows the Start form + cards (ProjectHome), and it is never consumed by a run. Below
 // it sit the recent sessions: a project's own agents when one is selected, and — on the Overview,
-// where no project is — every project's sessions pooled newest-first (`recentRuns`), each row
-// naming its project and jumping into it when selected. `agents`/`recentRuns` are owned by the shell
+// where no project is — every project's sessions pooled newest-first (`recentAgents`), each row
+// naming its project and jumping into it when selected. `agents`/`recentAgents` are owned by the shell
 // so the rail and the main pane share one list. `startTick`/`startIntent` seed an optimistic
 // "starting…" row the instant Start is clicked, until the real run.json lands.
 export function AgentHistory({
   projectId,
   agents,
-  selectedRunId,
+  selectedAgentId,
   onSelect,
-  recentRuns,
+  recentAgents,
   onSelectRecent,
   projects = [],
-  onNewSessionInProject,
+  onNewAgentInProject,
   onProjectAdded,
   startTick = 0,
   startIntent = '',
@@ -69,7 +69,7 @@ export function AgentHistory({
 }: {
   projectId: string | null
   agents: AgentMeta[]
-  selectedRunId: string | null
+  selectedAgentId: string | null
   onSelect: (agentId: string | null) => void
   /** The brand mark animates while any agent is working (moved off the navbar with the brand). */
   working?: boolean
@@ -89,13 +89,13 @@ export function AgentHistory({
   /** Human Queue count, shown on the Overview item and the picker (#632). */
   interventionCount?: number
   /** Cross-project recents for the Overview (no project selected): every project's sessions pooled. */
-  recentRuns?: RecentRun[]
+  recentAgents?: RecentAgent[]
   /** Select a pooled recent: jump into its project's session (project + run both change). */
   onSelectRecent?: (projectId: string, agentId: string) => void
   /** Every registered project, so "New" knows whether to add one, start in the only one, or pick. */
   projects?: ProjectSummary[]
   /** Start a new session in a project (its launcher). */
-  onNewSessionInProject?: (projectId: string) => void
+  onNewAgentInProject?: (projectId: string) => void
   /** A project was just added, so the shell can refresh its list. */
   onProjectAdded?: () => void
   startTick?: number
@@ -115,7 +115,7 @@ export function AgentHistory({
   }, [startTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasRunning = agents.some(agent => agent.status === 'running')
-  const newestRunningId = agents.find(agent => agent.status === 'running')?.id
+  const newestRunningAgentId = agents.find(agent => agent.status === 'running')?.id
   // The handover: the row this one stands in for has landed once a run appears that was not in the
   // list when Start was clicked — whatever its status.
   //
@@ -142,7 +142,7 @@ export function AgentHistory({
   }, [optimistic, hasRunning])
 
   // The Overview pools every project's sessions; a selected project shows just its own.
-  const crossProject = projectId === null && recentRuns !== undefined
+  const crossProject = projectId === null && recentAgents !== undefined
   // On the Overview the optimistic launch row belongs to a project, so it only applies in-project.
   // `landed` is checked here as well as in its effect so the stand-in and the real row are never
   // painted together for a frame while the effect is still queued.
@@ -151,10 +151,10 @@ export function AgentHistory({
   // A session selected but not in the list is one just started, whose row lands with its run.json
   // a beat later (#784): the optimistic row is standing in for it, so highlight that. Following a
   // just-started run (#705) counts too, before its id is known.
-  const starting = followLive || (selectedRunId !== null && !agents.some(agent => agent.id === selectedRunId))
+  const starting = followLive || (selectedAgentId !== null && !agents.some(agent => agent.id === selectedAgentId))
 
   const rows: Row[] = crossProject
-    ? recentRuns!.map(rr => ({
+    ? recentAgents!.map(rr => ({
         key: `${rr.projectId}:${rr.agent.id}`,
         agent: rr.agent,
         project: rr.projectName,
@@ -166,14 +166,14 @@ export function AgentHistory({
         agent: agent,
         // Following live highlights the newest running run, not every one of them (#738):
         // `agents` is newest-first, so that is the first with a running status.
-        active: agent.id === selectedRunId || (followLive && agent.id === newestRunningId),
+        active: agent.id === selectedAgentId || (followLive && agent.id === newestRunningAgentId),
         onClick: () => onSelect(agent.id),
       }))
 
   // New is the active view when a project is open on its launcher (its "New" / Start-a-session
   // screen: a project selected, no run picked, not following a live one). On the Overview that role
   // belongs to the Overview item instead, so the two are never active at once.
-  const atProjectLauncher = projectId !== null && selectedRunId === null && !followLive
+  const atProjectLauncher = projectId !== null && selectedAgentId === null && !followLive
 
   const hasRecents = rows.length > 0 || showOptimistic
 
@@ -197,7 +197,7 @@ export function AgentHistory({
           projectId={projectId}
           projects={projects}
           active={atProjectLauncher}
-          onNewSessionInProject={onNewSessionInProject}
+          onNewAgentInProject={onNewAgentInProject}
           onSelect={onSelect}
           onProjectAdded={onProjectAdded}
         />
@@ -239,15 +239,15 @@ export function AgentHistory({
                 {/* A just-started run, before its run.json exists — highlighted while following it. */}
                 {showOptimistic && (
                   <SidebarMenuItem>
-                    <RunRow status="running" intent={optimistic?.intent ?? undefined} subtitle="starting…" active={starting} dim onClick={() => onSelect(null)} />
+                    <AgentHistoryRow status="running" intent={optimistic?.intent ?? undefined} subtitle="starting…" active={starting} dim onClick={() => onSelect(null)} />
                   </SidebarMenuItem>
                 )}
                 {rows.map(row => (
                   <SidebarMenuItem key={row.key}>
-                    <RunRow
+                    <AgentHistoryRow
                       status={row.agent.status}
                       publishing={isMetaPublishing(row.agent)}
-                      intent={runLabel(row.agent)}
+                      intent={agentLabel(row.agent)}
                       driver={row.agent.driver}
                       // On the Overview the project is what tells the rows apart, so it leads the meta
                       // line; a project's own rail already knows its project, so it shows just the time.
@@ -428,7 +428,7 @@ function NewButton({
   projectId,
   projects,
   active = false,
-  onNewSessionInProject,
+  onNewAgentInProject,
   onSelect,
   onProjectAdded,
 }: {
@@ -437,7 +437,7 @@ function NewButton({
   /** On a project's launcher (its "New" screen), so New reads as the current view. Off on the
    *  Overview, where the Overview item is the active one instead — the two are never both active. */
   active?: boolean
-  onNewSessionInProject?: ((projectId: string) => void) | undefined
+  onNewAgentInProject?: ((projectId: string) => void) | undefined
   onSelect: (agentId: string | null) => void
   onProjectAdded?: (() => void) | undefined
 }) {
@@ -449,7 +449,7 @@ function NewButton({
     'h-auto w-full justify-start gap-2 px-2 py-1.5 font-normal',
     active && 'bg-sidebar-accent text-sidebar-accent-foreground',
   )
-  const start = (id: string) => (onNewSessionInProject ? onNewSessionInProject(id) : onSelect(null))
+  const start = (id: string) => (onNewAgentInProject ? onNewAgentInProject(id) : onSelect(null))
 
   // In a project, or on the Overview with exactly one: start a session straight away.
   if (projectId !== null || projects.length === 1) {
@@ -504,7 +504,7 @@ function NewButton({
 
 // One run row: a pulsing dot + RUNNING badge for a working run, a still dot + WAITING for one
 // parked on the user (#785), else the terminal-status badge.
-function RunRow({
+function AgentHistoryRow({
   status,
   intent,
   subtitle,

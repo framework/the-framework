@@ -26,14 +26,14 @@ vi.mock('./Composer.js', async () => {
   const { forwardRef } = await import('react')
   const Composer = forwardRef((props: any, _ref: any) => (
     <div>
-      <button type="button" disabled={props.busy} onClick={() => props.onSubmit('hello', 'build', { newSession: false })}>
+      <button type="button" disabled={props.busy} onClick={() => props.onSubmit('hello', 'build', { newAgent: false })}>
         submit-normal
       </button>
-      <button type="button" disabled={props.busy} onClick={() => props.onSubmit('Import tickets from GitHub', 'prompt', { newSession: true })}>
+      <button type="button" disabled={props.busy} onClick={() => props.onSubmit('Import tickets from GitHub', 'prompt', { newAgent: true })}>
         submit-new-session
       </button>
       <span data-testid="composer-props">
-        {JSON.stringify({ showDriverModel: props.showDriverModel, busyLabel: props.submitBusyLabel, placeholder: props.placeholder, sessionEnded: props.sessionEnded })}
+        {JSON.stringify({ showDriverModel: props.showDriverModel, busyLabel: props.submitBusyLabel, placeholder: props.placeholder, agentEnded: props.agentEnded })}
       </span>
       {/* The empty-box slot control (#1455), rendered so the Stop/Resume tests can press it. */}
       {props.idleControl}
@@ -45,11 +45,11 @@ vi.mock('./Composer.js', async () => {
 const { AgentComposer, RESUME_MESSAGE } = await import('./AgentComposer.js')
 
 function renderComposer(over: Partial<Parameters<typeof AgentComposer>[0]> = {}) {
-  const onRunStarted = vi.fn()
+  const onAgentStarted = vi.fn()
   render(
-    <AgentComposer projectId="p1" agentId="run-1" live files={[]} addContext={vi.fn()} onRunStarted={onRunStarted} {...over} />,
+    <AgentComposer projectId="p1" agentId="run-1" live files={[]} addContext={vi.fn()} onAgentStarted={onAgentStarted} {...over} />,
   )
-  return { onRunStarted }
+  return { onAgentStarted }
 }
 
 const props = (): { showDriverModel: boolean; busyLabel: string; placeholder: string } =>
@@ -94,7 +94,7 @@ describe('AgentComposer slot control (#1455)', () => {
 
   test('a stopped session offers Resume, sending the stock continuation of this run (#1391)', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'run-1' })
-    const { onRunStarted } = renderComposer({ live: false, sessionId: 'sess-1', outcome: { ok: false, stopped: true } })
+    const { onAgentStarted } = renderComposer({ live: false, sessionId: 'sess-1', outcome: { ok: false, stopped: true } })
     fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
     await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(1))
     const [projectId, text, kind, options] = sendStart.mock.calls[0]!
@@ -102,16 +102,16 @@ describe('AgentComposer slot control (#1455)', () => {
     expect(text).toBe(RESUME_MESSAGE)
     expect(kind).toBe('prompt')
     expect(options.resumeSession).toBe('sess-1')
-    expect(options.continueRunId).toBe('run-1')
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith(RESUME_MESSAGE, 'run-1'))
+    expect(options.continueAgentId).toBe('run-1')
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(RESUME_MESSAGE, 'run-1'))
   })
 
   test('a refused Resume surfaces its error instead of pretending to resume (#1391)', async () => {
     sendStart.mockResolvedValue({ ok: false, busy: true })
-    const { onRunStarted } = renderComposer({ live: false, sessionId: 'sess-1', outcome: { ok: false, stopped: true } })
+    const { onAgentStarted } = renderComposer({ live: false, sessionId: 'sess-1', outcome: { ok: false, stopped: true } })
     fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
     await waitFor(() => expect(screen.getByText(/agent is already active/i)).toBeTruthy())
-    expect(onRunStarted).not.toHaveBeenCalled()
+    expect(onAgentStarted).not.toHaveBeenCalled()
   })
 
   test('a run that finished on its own offers neither — there is nothing to pick back up', () => {
@@ -146,16 +146,16 @@ describe('AgentComposer slot control (#1455)', () => {
 describe('AgentComposer, live (#714)', () => {
   test('an ordinary submit goes into the open session as a message', async () => {
     sendMessage.mockResolvedValue(undefined)
-    const { onRunStarted } = renderComposer()
+    const { onAgentStarted } = renderComposer()
     fireEvent.click(screen.getByText('submit-normal'))
     await waitFor(() => expect(sendMessage).toHaveBeenCalledWith('p1', 'hello', 'run-1'))
     expect(sendStart).not.toHaveBeenCalled()
-    expect(onRunStarted).not.toHaveBeenCalled()
+    expect(onAgentStarted).not.toHaveBeenCalled()
   })
 
   test('a new-session preset starts its own run instead of messaging this one (#959)', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'run-2' })
-    const { onRunStarted } = renderComposer()
+    const { onAgentStarted } = renderComposer()
     fireEvent.click(screen.getByText('submit-new-session'))
     await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(1))
     // Not a message: the open session never sees it.
@@ -164,19 +164,19 @@ describe('AgentComposer, live (#714)', () => {
     expect(projectId).toBe('p1')
     expect(text).toBe('Import tickets from GitHub')
     expect(kind).toBe('prompt')
-    // No continueRunId: a continuation would put it back on this session's branch (#762).
-    expect(options.continueRunId).toBeUndefined()
+    // No continueAgentId: a continuation would put it back on this session's branch (#762).
+    expect(options.continueAgentId).toBeUndefined()
     expect(options.resumeSession).toBeUndefined()
     // And the view follows the run it just started, or the user would be left watching the old one.
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('Import tickets from GitHub', 'run-2'))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('Import tickets from GitHub', 'run-2'))
   })
 
   test('a refused start surfaces the reason and does not navigate (#959)', async () => {
     sendStart.mockResolvedValue({ ok: false, busy: true })
-    const { onRunStarted } = renderComposer()
+    const { onAgentStarted } = renderComposer()
     fireEvent.click(screen.getByText('submit-new-session'))
     await waitFor(() => expect(screen.getByText(/agent is already active/i)).toBeTruthy())
-    expect(onRunStarted).not.toHaveBeenCalled()
+    expect(onAgentStarted).not.toHaveBeenCalled()
   })
 })
 
@@ -190,7 +190,7 @@ describe('AgentComposer, finished (#720)', () => {
 
   test('sending spins a resumed prompt run carrying the captured session id, then jumps to it', async () => {
     sendStart.mockResolvedValue({ ok: true })
-    const { onRunStarted } = renderComposer(ended)
+    const { onAgentStarted } = renderComposer(ended)
     fireEvent.click(screen.getByText('submit-normal'))
     await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(1))
     const [projectId, text, kind, options] = sendStart.mock.calls[0]!
@@ -198,9 +198,9 @@ describe('AgentComposer, finished (#720)', () => {
     expect(text).toBe('hello')
     expect(kind).toBe('prompt') // a continuation is a prompt run
     expect(options.resumeSession).toBe('sess-42') // seeded with the finished run's session
-    expect(options.continueRunId).toBe('run-1') // and written into the same run (#762)
+    expect(options.continueAgentId).toBe('run-1') // and written into the same run (#762)
     expect(sendMessage).not.toHaveBeenCalled() // there is no process left to message
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('hello', undefined))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('hello', undefined))
   })
 
   test("resumes on the run's own agent, not the global pref (#831)", async () => {
@@ -232,10 +232,10 @@ describe('AgentComposer, finished (#720)', () => {
 
   test('surfaces the busy guard instead of jumping', async () => {
     sendStart.mockResolvedValue({ ok: false, busy: true })
-    const { onRunStarted } = renderComposer(ended)
+    const { onAgentStarted } = renderComposer(ended)
     fireEvent.click(screen.getByText('submit-normal'))
     await waitFor(() => expect(screen.getByText(/agent is already active/i)).toBeTruthy())
-    expect(onRunStarted).not.toHaveBeenCalled()
+    expect(onAgentStarted).not.toHaveBeenCalled()
   })
 })
 
@@ -255,25 +255,25 @@ describe('AgentComposer, finished with no session id (#1026)', () => {
 
   test('sending starts a fresh run with the text, since there is nothing to resume', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'run-9' })
-    const { onRunStarted } = renderComposer({ live: false })
+    const { onAgentStarted } = renderComposer({ live: false })
     fireEvent.click(screen.getByText('submit-normal'))
     await waitFor(() => expect(sendStart).toHaveBeenCalledTimes(1))
     const options = sendStart.mock.calls[0]![3]
     expect(options.resumeSession).toBeUndefined()
-    expect(options.continueRunId).toBeUndefined()
+    expect(options.continueAgentId).toBeUndefined()
     expect(sendMessage).not.toHaveBeenCalled()
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('hello', 'run-9'))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('hello', 'run-9'))
   })
 })
 
 describe('the options gear follows the run state (#1172)', () => {
   test('a live run tells the composer the session has not ended (gear hidden)', () => {
     renderComposer({ live: true })
-    expect(JSON.parse(screen.getByTestId('composer-props').textContent ?? '{}').sessionEnded).toBe(false)
+    expect(JSON.parse(screen.getByTestId('composer-props').textContent ?? '{}').agentEnded).toBe(false)
   })
 
   test('an ended run tells the composer so, bringing the Resume-options gear back', () => {
     renderComposer({ live: false, sessionId: 'sess-1' })
-    expect(JSON.parse(screen.getByTestId('composer-props').textContent ?? '{}').sessionEnded).toBe(true)
+    expect(JSON.parse(screen.getByTestId('composer-props').textContent ?? '{}').agentEnded).toBe(true)
   })
 })

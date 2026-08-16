@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
-import { frameworkGitignore, gitignorePath, sessionsGitignore, SESSIONS_RULE } from './framework-gitignore.js'
+import { frameworkGitignore, gitignorePath, archiveGitignore, SESSIONS_RULE } from './framework-gitignore.js'
 import { nodeStoreFs, ARCHIVE_DIR, type StoreFs } from './store/index.js'
 import { nodeGitRunner, type GitRunner } from './project.js'
 
@@ -52,7 +52,7 @@ export function userDirName(email: string | undefined): string {
 }
 
 /** The `.the-framework/<user>/sessions` directory under a project root. */
-export function sessionsDir(cwd: string, user: string): string {
+export function agentArchiveDir(cwd: string, user: string): string {
   return join(cwd, THE_FRAMEWORK_DIR, user, ARCHIVE_DIR)
 }
 
@@ -66,7 +66,7 @@ export function sessionsDir(cwd: string, user: string): string {
  * `user` no longer selects the rules (#1312) — the glob covers everyone — but it stays because the
  * caller has it and a future rule may need it again.
  */
-export async function ensureSessionsIgnored(cwd: string, _user: string, fs: StoreFs = nodeStoreFs()): Promise<boolean> {
+export async function ensureArchiveIgnored(cwd: string, _user: string, fs: StoreFs = nodeStoreFs()): Promise<boolean> {
   const path = gitignorePath(cwd)
   if (!(await fs.exists(path))) {
     await fs.write(path, frameworkGitignore())
@@ -74,7 +74,7 @@ export async function ensureSessionsIgnored(cwd: string, _user: string, fs: Stor
   }
   const current = await fs.read(path)
   if (current.includes(SESSIONS_RULE)) return false
-  await fs.write(path, current.endsWith('\n') ? current + sessionsGitignore() : current + '\n' + sessionsGitignore())
+  await fs.write(path, current.endsWith('\n') ? current + archiveGitignore() : current + '\n' + archiveGitignore())
   return true
 }
 

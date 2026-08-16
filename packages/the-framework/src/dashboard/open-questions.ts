@@ -1,4 +1,4 @@
-import { readEventLog, readLiveMetas, type LiveRun } from '../store/index.js'
+import { readEventLog, readLiveMetas, type LiveAgent } from '../store/index.js'
 import type { ChoiceRequest, FrameworkEvent } from '../events.js'
 import type { ProjectSummary } from './projects.js'
 
@@ -29,7 +29,7 @@ export interface OpenQuestion {
 /** Injectable seams so {@link buildOpenQuestions} is unit-testable off disk. */
 export interface OpenQuestionsDeps {
   /** The live-run reader (default {@link readLiveMetas}). */
-  liveRuns?: (cwd: string) => Promise<LiveRun[]>
+  liveAgents?: (cwd: string) => Promise<LiveAgent[]>
   /** A run checkout's event log (default {@link readEventLog}). */
   events?: (cwd: string) => Promise<FrameworkEvent[]>
 }
@@ -66,11 +66,11 @@ export async function buildOpenQuestions(
   projects: ProjectSummary[],
   deps: OpenQuestionsDeps = {},
 ): Promise<OpenQuestion[]> {
-  const liveRuns = deps.liveRuns ?? readLiveMetas
+  const liveAgents = deps.liveAgents ?? readLiveMetas
   const events = deps.events ?? readEventLog
   const items: OpenQuestion[] = []
   for (const project of projects) {
-    for (const meta of await liveRuns(project.path).catch((): LiveRun[] => [])) {
+    for (const meta of await liveAgents(project.path).catch((): LiveAgent[] => [])) {
       if (meta.status !== 'running' || !meta.pendingChoice) continue
       // The run's own checkout, not the project root: a daemon-spawned run logs in its worktree.
       const choice = openChoiceRequest(await events(meta.cwd).catch((): FrameworkEvent[] => []), meta.pendingChoice.id)

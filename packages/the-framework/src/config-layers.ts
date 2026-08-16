@@ -60,7 +60,7 @@ export function resolveConfigKey<K extends keyof AgentConfigValues>(
 }
 
 /** A run's settled config, plus which layer supplied each key a layer actually set. */
-export interface ResolvedRunConfig {
+export interface ResolvedAgentConfig {
   presetName?: string | undefined
   buildEvent?: string | undefined
   vanilla: boolean
@@ -72,7 +72,7 @@ export interface ResolvedRunConfig {
 }
 
 /** Resolve every run setting over `layers` (nearest first), falling back to {@link RUN_CONFIG_DEFAULTS}. */
-export function resolveRunConfig(layers: readonly ConfigLayer[]): ResolvedRunConfig {
+export function resolveAgentConfig(layers: readonly ConfigLayer[]): ResolvedAgentConfig {
   const sources: Partial<Record<keyof AgentConfigValues, string>> = {}
   const pick = <K extends keyof AgentConfigValues>(key: K): NonNullable<AgentConfigValues[K]> | undefined => {
     const hit = resolveConfigKey(layers, key)
@@ -107,7 +107,7 @@ export function fileConfigLayer(file: FrameworkFileConfig, name = 'the-framework
  * `preset=software-development (the-framework.yml), vanilla=off (flag)`. Keys nobody set are
  * left out, so a run with no config anywhere narrates nothing.
  */
-export function describeResolvedConfig(config: ResolvedRunConfig): string {
+export function describeResolvedConfig(config: ResolvedAgentConfig): string {
   const shown: [keyof AgentConfigValues, string][] = [
     ['preset', config.presetName ?? ''],
     ...BOOLEAN_CONFIG_KEYS.map((key): [keyof AgentConfigValues, string] => [key, onOff(config[key])]),

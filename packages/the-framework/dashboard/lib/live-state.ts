@@ -70,11 +70,11 @@ export function agentViews(events: readonly FrameworkEvent[]): AgentView[] {
  * Whether the run is still going, i.e. worth showing a Stop button. A run ends with a
  * single `end` event; until one arrives (and once anything has streamed) it is live.
  */
-export function isRunActive(events: readonly FrameworkEvent[]): boolean {
+export function isAgentActive(events: readonly FrameworkEvent[]): boolean {
   // Asked of the CURRENT segment, not the whole feed: a resumed session (#762) appends a second
   // `session` boundary after its `end` to the same journal, and "was there ever an end" read a
   // resumed-live run as inactive — hiding Stop and settling the pill while the agent worked.
-  const current = currentRunEvents(events)
+  const current = currentAgentEvents(events)
   return current.length > 0 && !current.some(event => event.kind === 'end')
 }
 
@@ -102,7 +102,7 @@ export function agentSettled(events: readonly FrameworkEvent[]): boolean {
 }
 
 /** How a run ended, off its single `end` event. */
-export interface RunOutcome {
+export interface AgentOutcome {
   ok: boolean
   stopped: boolean
   detail?: string
@@ -113,12 +113,12 @@ export interface RunOutcome {
  * about a finished run used to live only in one small `✗ failed` feed line — the overview
  * pill said "finished" for a crash and a clean pass alike.
  */
-export function runOutcome(events: readonly FrameworkEvent[]): RunOutcome | undefined {
+export function agentOutcome(events: readonly FrameworkEvent[]): AgentOutcome | undefined {
   // The ending of the CURRENT segment: a resumed session (#762) carries its stopped segment's
   // `end` in the same journal, and the first-end-wins read kept a resumed run "stopped" for
   // ever — while it was live again, and even after it later finished clean. Mid-resume there is
   // no end in the newest segment yet, and "undefined while it is still going" is the truth.
-  const end = currentRunEvents(events).find(event => event.kind === 'end')
+  const end = currentAgentEvents(events).find(event => event.kind === 'end')
   if (!end || end.kind !== 'end') return undefined
   return { ok: end.ok, stopped: end.stopped === true, ...(end.detail !== undefined ? { detail: end.detail } : {}) }
 }
@@ -139,7 +139,7 @@ export function runOutcome(events: readonly FrameworkEvent[]): RunOutcome | unde
  * for ever.
  */
 export function isPublishing(events: readonly FrameworkEvent[]): boolean {
-  const current = currentRunEvents(events)
+  const current = currentAgentEvents(events)
   const end = current.find(event => event.kind === 'end')
   if (end?.kind !== 'end' || !end.ok) return false
   if (current.some(event => event.kind === 'handoff')) return false
@@ -210,7 +210,7 @@ export function cloudSession(events: readonly FrameworkEvent[]): { url: string; 
  * event — that is the run in progress; a feed with no `session` yet is returned whole. This
  * stops a fresh run's live view (and the right-rail choices/views) from showing the prior run.
  */
-export function currentRunEvents(events: readonly FrameworkEvent[]): FrameworkEvent[] {
+export function currentAgentEvents(events: readonly FrameworkEvent[]): FrameworkEvent[] {
   let start = 0
   for (let i = events.length - 1; i >= 0; i--) {
     if (events[i]?.kind === 'session') {

@@ -12,7 +12,7 @@ import { defaultQuotaSource } from './quota.js'
 // through the whole dashboard; these pin the dispatch itself.
 
 const context: DashboardContext = {
-  startRun: () => ({ ok: false, error: 'not wired in this test' }),
+  startAgent: () => ({ ok: false, error: 'not wired in this test' }),
   addProject: () => ({ ok: false, error: 'not wired in this test' }),
   eventsSource: () => undefined,
   remote: { target: () => undefined, list: () => [] },
@@ -56,7 +56,7 @@ test('every RPC the modules export is dispatchable by its own name', () => {
   // The registry is built from the modules' exports rather than a hand-written list, which is what
   // makes "exported but never registered" impossible — the failure that shipped per-project
   // preferences broken (#866) as a 400 with nothing else to go on.
-  for (const name of ['onRuns', 'onProjects', 'sendStop', 'onPreferences', 'onQuota', 'checkDevices']) {
+  for (const name of ['onAgents', 'onProjects', 'sendStop', 'onPreferences', 'onQuota', 'checkDevices']) {
     assert.equal(typeof RPC_HANDLERS[name], 'function', name)
   }
 })
@@ -88,7 +88,7 @@ test('an RPC that throws answers 500 and the daemon stays up', async () => {
   // A rejected promise inside the mount used to be an unhandled rejection, which takes the process
   // with it. A failing call is a failing call.
   const server = await mounted({
-    startRun: () => {
+    startAgent: () => {
       throw new Error('the disk is on fire')
     },
   })

@@ -16,7 +16,7 @@ import type { DashboardContext } from '../dashboard/rpc-serve.js'
  */
 export function provideTestContext(over: Partial<DashboardContext> = {}): void {
   setDashboardContext({
-    startRun: () => ({ ok: false, error: 'not wired in this test' }),
+    startAgent: () => ({ ok: false, error: 'not wired in this test' }),
     addProject: () => ({ ok: false, error: 'not wired in this test' }),
     eventsSource: () => undefined,
     remote: { target: () => undefined, list: () => [] },

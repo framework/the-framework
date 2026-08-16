@@ -1,4 +1,4 @@
-import type { ActiveRun } from '../../dist/index.js'
+import type { ActiveAgent } from '../../dist/index.js'
 import { Bot } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -17,11 +17,11 @@ import { formatAge, formatDateTime } from '../lib/format-date.js'
 export function Agents({
   working,
   loading,
-  onSelectRun,
+  onSelectAgent,
 }: {
-  working: ActiveRun[]
+  working: ActiveAgent[]
   loading: boolean
-  onSelectRun: (projectId: string, agentId: string) => void
+  onSelectAgent: (projectId: string, agentId: string) => void
 }) {
   return (
     <Card>
@@ -48,7 +48,7 @@ export function Agents({
                 label={activeLabel(a)}
                 at={a.updatedAt}
                 projectName={a.projectName}
-                onOpen={() => onSelectRun(a.projectId, a.agentId)}
+                onOpen={() => onSelectAgent(a.projectId, a.agentId)}
               />
             ))}
           </ul>
@@ -99,9 +99,9 @@ function AgentRow({
   )
 }
 
-// A working session's one-liner: what the sidebar would show for it. ActiveRun carries no branch or
+// A working session's one-liner: what the sidebar would show for it. ActiveAgent carries no branch or
 // start time to fall back to, but a live session almost always has an intent or a chosen name; its
 // project is the last resort.
-function activeLabel(a: ActiveRun): string {
+function activeLabel(a: ActiveAgent): string {
   return a.intent?.trim() || a.sessionName?.trim() || a.scope?.trim() || a.projectName
 }

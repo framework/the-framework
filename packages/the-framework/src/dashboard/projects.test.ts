@@ -9,7 +9,7 @@ const RECORD: ProjectRecord = { id: 'app-a-1', path: '/repos/app-a', addedAt: '2
 function deps(over: SummarizeDeps): SummarizeDeps {
   return {
     isActivated: async () => true,
-    readRuns: async () => [],
+    readAgents: async () => [],
     readFileConfig: async () => ({}),
     ...over,
   }
@@ -35,13 +35,13 @@ test('lastActivityAt is the newest run (#645)', async () => {
   // entry — a committed markdown re-narration of the same sessions, always the older of the two.
   const summary = await summarizeProject(
     RECORD,
-    deps({ readRuns: async () => [agent('b', '2026-07-12T00:00:00.000Z'), agent('a', '2026-07-10T00:00:00.000Z')] }),
+    deps({ readAgents: async () => [agent('b', '2026-07-12T00:00:00.000Z'), agent('a', '2026-07-10T00:00:00.000Z')] }),
   )
   assert.equal(summary.lastActivityAt, '2026-07-12T00:00:00.000Z')
 })
 
 test('no runs means no lastActivityAt key at all', async () => {
-  const summary = await summarizeProject(RECORD, deps({ readRuns: async () => [] }))
+  const summary = await summarizeProject(RECORD, deps({ readAgents: async () => [] }))
   assert.equal('lastActivityAt' in summary, false)
 })
 
@@ -57,7 +57,7 @@ test('a throwing reader is forgiving: inactive, no activity, never throws', asyn
       isActivated: async () => {
         throw new Error('stat failed')
       },
-      readRuns: async () => {
+      readAgents: async () => {
         throw new Error('read failed')
       },
     }),

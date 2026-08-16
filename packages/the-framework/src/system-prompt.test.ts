@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  composeRunSystem,
+  composeAgentSystem,
   BUSINESS_KNOWLEDGE_DOCS,
   CONTEXT_DOCS,
   renderSystemPrompt,
@@ -211,17 +211,17 @@ test('systemPromptBlock threads tf through to the template', () => {
   assert.ok(!block.includes('a very distinctive prompt'), 'the prompt itself stays in the user half')
 })
 
-test('composeRunSystem is exactly the built-in prompt block (#326) + both emit protocols, and nothing else (#547)', () => {
+test('composeAgentSystem is exactly the built-in prompt block (#326) + both emit protocols, and nothing else (#547)', () => {
   // The one assembly path both runFramework and runPrompt go through. Exact equality is
   // the point: no persona, skill, or memory framing may ever be appended again. The #537
   // knowledge docs are in front of that, on the context (#439) line: paths, not prompt text.
-  const system = composeRunSystem()
+  const system = composeAgentSystem()
   assert.equal(system, [CONTEXT_BLOCK, renderSystemPrompt().system, AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n'))
 })
 
-test('composeRunSystem appends nothing after the protocols, whatever the options (#547)', () => {
+test('composeAgentSystem appends nothing after the protocols, whatever the options (#547)', () => {
   // Every supported option feeds the built-in prompt block (#326); none of them can add a trailing section.
-  const system = composeRunSystem({
+  const system = composeAgentSystem({
     user: 'Ship small PRs.',
     context: ['/work/api'],
     tf: { prompt: 'build a todo app' },
@@ -235,16 +235,16 @@ test('composeRunSystem appends nothing after the protocols, whatever the options
   assert.ok(system.endsWith(SIGNAL_PROTOCOL), 'the signal protocol is the last thing in the channel')
 })
 
-test('composeRunSystem says nothing about a browser unless the run has one (#824)', () => {
+test('composeAgentSystem says nothing about a browser unless the run has one (#824)', () => {
   // The default: no browser wired, so no claim of one. An agent told it has tools it does not
   // have is worse than one that reaches for WebFetch.
-  assert.ok(!composeRunSystem().includes(BROWSER_PROTOCOL))
+  assert.ok(!composeAgentSystem().includes(BROWSER_PROTOCOL))
 })
 
-test('composeRunSystem tells the agent it has a browser when the run does (#824)', () => {
+test('composeAgentSystem tells the agent it has a browser when the run does (#824)', () => {
   // Without this the chrome-devtools tools are wired but never mentioned, so the agent uses
   // WebFetch and the browser (and its preview) sits on about:blank for the whole run.
-  const system = composeRunSystem({ browser: true })
+  const system = composeAgentSystem({ browser: true })
   assert.ok(system.includes(BROWSER_PROTOCOL))
   assert.ok(system.endsWith(SIGNAL_PROTOCOL), 'the signal protocol is still last (#547)')
 })
@@ -252,21 +252,21 @@ test('composeRunSystem tells the agent it has a browser when the run does (#824)
 test('the browser section survives --vanilla but not transparent (#824)', () => {
   // It describes what the run can do, like the emit protocols, so dropping the built-in prompt
   // keeps it. Transparent means an empty channel, so nothing at all.
-  assert.ok(composeRunSystem({ vanilla: true, browser: true }).includes(BROWSER_PROTOCOL))
-  assert.equal(composeRunSystem({ transparent: true, browser: true }), '')
+  assert.ok(composeAgentSystem({ vanilla: true, browser: true }).includes(BROWSER_PROTOCOL))
+  assert.equal(composeAgentSystem({ transparent: true, browser: true }), '')
 })
 
-test('composeRunSystem stays quiet about hands-off unless the run is one (#1234)', () => {
+test('composeAgentSystem stays quiet about hands-off unless the run is one (#1234)', () => {
   // A local run's gates work; telling it they do not would auto-answer questions a human is
   // sitting right there to take.
-  assert.ok(!composeRunSystem().includes(HANDS_OFF_PROTOCOL))
+  assert.ok(!composeAgentSystem().includes(HANDS_OFF_PROTOCOL))
 })
 
-test('composeRunSystem declares the await gates unavailable on a hands-off run (#1234)', () => {
+test('composeAgentSystem declares the await gates unavailable on a hands-off run (#1234)', () => {
   // A cloud session that obeys "ambiguous prompt: showChoices + AWAIT" parks forever on a
   // question nobody attached can answer, and the session is spent for nothing. The block rides
   // right after the await protocol it amends, and the signal protocol stays last (#547).
-  const system = composeRunSystem({ handsOff: true })
+  const system = composeAgentSystem({ handsOff: true })
   assert.ok(system.includes(HANDS_OFF_PROTOCOL))
   assert.ok(system.indexOf(HANDS_OFF_PROTOCOL) > system.indexOf(AWAIT_PROTOCOL))
   assert.ok(system.endsWith(SIGNAL_PROTOCOL), 'the signal protocol is still last (#547)')
@@ -275,24 +275,24 @@ test('composeRunSystem declares the await gates unavailable on a hands-off run (
 test('the hands-off block survives --vanilla but not transparent (#1234)', () => {
   // Availability is a property of the session, not of the built-in prompt: --vanilla still
   // teaches the gates, so it still has to say they cannot be answered here.
-  assert.ok(composeRunSystem({ vanilla: true, handsOff: true }).includes(HANDS_OFF_PROTOCOL))
-  assert.equal(composeRunSystem({ transparent: true, handsOff: true }), '')
+  assert.ok(composeAgentSystem({ vanilla: true, handsOff: true }).includes(HANDS_OFF_PROTOCOL))
+  assert.equal(composeAgentSystem({ transparent: true, handsOff: true }), '')
 })
 
-test('composeRunSystem keeps the emit protocols even with the built-in prompt off (#500/#501)', () => {
+test('composeAgentSystem keeps the emit protocols even with the built-in prompt off (#500/#501)', () => {
   // The drift that #500 fixed, now pinned at the single assembly point: --vanilla drops the
   // #326 block, but the agent still gets the AWAIT + SIGNAL emit contract.
-  const system = composeRunSystem({ vanilla: true })
+  const system = composeAgentSystem({ vanilla: true })
   assert.ok(!system.includes('# System prompt'), 'built-in #326 prompt is off')
   assert.equal(system, [AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n'))
 })
 
-test('composeRunSystem is empty under transparent mode — no prompt, no emit protocols (#625)', () => {
+test('composeAgentSystem is empty under transparent mode — no prompt, no emit protocols (#625)', () => {
   // Transparent (#625) is stronger than --vanilla: the whole system channel is dropped, protocols
   // included, so the agent runs as raw `claude -p`. It overrides every other option.
-  assert.equal(composeRunSystem({ transparent: true }), '')
+  assert.equal(composeAgentSystem({ transparent: true }), '')
   assert.equal(
-    composeRunSystem({ transparent: true, vanilla: false, user: 'ignored', context: ['/work/api'] }),
+    composeAgentSystem({ transparent: true, vanilla: false, user: 'ignored', context: ['/work/api'] }),
     '',
   )
 })

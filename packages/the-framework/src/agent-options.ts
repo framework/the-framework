@@ -1,6 +1,6 @@
 import { DEFAULT_HANDOFF, type HandoffLevel } from './handoff-level.js'
 import type { Preferences } from './registry.js'
-import type { StartRunOptions } from './dashboard/types.js'
+import type { StartAgentOptions } from './dashboard/types.js'
 import type { FrameworkFileConfig } from './config.js'
 
 /**
@@ -56,7 +56,7 @@ export function handoffFromPreferences(preferences: Preferences): HandoffLevel {
  * Takes the merged view, not the two tiers: who wins between the global and the project setting is
  * `resolvePreferences`' job, and this stays a pure mapping of one settled answer.
  */
-export function agentOptionsFromPreferences(preferences: Preferences, context: string[] = []): StartRunOptions {
+export function agentOptionsFromPreferences(preferences: Preferences, context: string[] = []): StartAgentOptions {
   const vanilla = preferences.vanilla ?? false
   const transparent = preferences.transparent ?? false
   const onBeforeMergeableQuality = preferences.onBeforeMergeableQuality ?? false

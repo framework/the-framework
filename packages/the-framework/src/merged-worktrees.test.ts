@@ -65,9 +65,9 @@ test('a live session keeps its checkout: its agent is working in there (#1036)',
 test('a checkout that could not be reclaimed is reported with its reason (E5)', async () => {
   // The one failure mode the rule has: the push did not land, so the checkout stays and says why.
   const { agent: agent } = fakeSweep([row({ agentId: 'stuck' })])
-  const result = await agent({ remove: async () => ({ ok: false, error: 'the-framework/run-stuck is not on the remote' }) })
+  const result = await agent({ remove: async () => ({ ok: false, error: 'the-framework/agent-stuck is not on the remote' }) })
   assert.deepEqual(result.removed, [])
-  assert.deepEqual(result.failed, [{ agentId: 'stuck', error: 'the-framework/run-stuck is not on the remote' }])
+  assert.deepEqual(result.failed, [{ agentId: 'stuck', error: 'the-framework/agent-stuck is not on the remote' }])
 })
 
 test('an unlisted project sweeps nothing rather than failing (#1036)', async () => {
@@ -137,7 +137,7 @@ const RUN_ID = 'run1'
  * A repo with a session worktree that has a commit of its own on the run branch, and a bare repo
  * standing in for `origin` — which is the whole subject here, so it is real rather than stubbed.
  */
-async function repoWithSessionWork(opts: { remote?: boolean } = {}): Promise<{ repo: string; path: string; branch: string }> {
+async function repoWithAgentWork(opts: { remote?: boolean } = {}): Promise<{ repo: string; path: string; branch: string }> {
   const git = nodeGitRunner()
   // realpath so the mkdtemp path matches what git reports (the /var -> /private/var symlink).
   const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-merged-')))
@@ -160,7 +160,7 @@ async function repoWithSessionWork(opts: { remote?: boolean } = {}): Promise<{ r
 }
 
 test('a session whose work reaches the remote loses its checkout and keeps its branch (E5)', async () => {
-  const { repo, path, branch } = await repoWithSessionWork()
+  const { repo, path, branch } = await repoWithAgentWork()
   const git = nodeGitRunner()
   try {
     const result = await removeMergedWorktrees(repo)
@@ -184,7 +184,7 @@ test('a session whose work reaches the remote loses its checkout and keeps its b
 test('a session with nowhere to push keeps its checkout (E5)', async () => {
   // No remote configured: nothing is recoverable, so nothing is deleted. The honest outcome, and
   // the reason the rule is "is it pushed" rather than "did it finish cleanly".
-  const { repo, path } = await repoWithSessionWork({ remote: false })
+  const { repo, path } = await repoWithAgentWork({ remote: false })
   try {
     const result = await removeMergedWorktrees(repo)
     assert.deepEqual(result.removed, [])
@@ -197,7 +197,7 @@ test('a session with nowhere to push keeps its checkout (E5)', async () => {
 })
 
 test('uncommitted work is committed and pushed before the checkout goes, never destroyed (#982/E5)', async () => {
-  const { repo, path, branch } = await repoWithSessionWork()
+  const { repo, path, branch } = await repoWithAgentWork()
   const git = nodeGitRunner()
   try {
     await writeFile(join(path, 'notes.txt'), 'something the agent had not committed\n')
@@ -217,7 +217,7 @@ test('uncommitted work is committed and pushed before the checkout goes, never d
 })
 
 test("a checkout already pushed is not re-pushed, and still goes (E5)", async () => {
-  const { repo, path, branch } = await repoWithSessionWork()
+  const { repo, path, branch } = await repoWithAgentWork()
   const git = nodeGitRunner()
   try {
     await git(['push', '--set-upstream', 'origin', branch], path)

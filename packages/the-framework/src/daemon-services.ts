@@ -5,7 +5,7 @@ import { errorMessage } from './error-message.js'
 import { notifies, notifyCategoryEnabled } from './preference-defaults.js'
 import { agentOptionsFromPreferences, preferencesFromFileConfig } from './agent-options.js'
 import { loadFrameworkConfig } from './config.js'
-import { readLiveMetas, listAgents, type LiveRun } from './store/index.js'
+import { readLiveMetas, listAgents, type LiveAgent } from './store/index.js'
 import { startKeyedWatcher, type KeyedWatcher } from './dashboard/keyed-watcher.js'
 import { buildInterventions, interventionKey, postInterventionsDiscord } from './dashboard/interventions.js'
 import { buildActivity, activityKey, postActivityDiscord } from './dashboard/activity.js'
@@ -19,13 +19,13 @@ import { FLAT_TODO_FILE, TICKETS_DIR } from './tickets.js'
 import { acquireTicketLocks } from './ticket-locks.js'
 import { readTickets } from './dashboard/tickets.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
-import { startSessionCommitter } from './session-commit.js'
+import { startAgentCommitter } from './agent-commit.js'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
-import { resolveRunPr } from './dashboard/agent-handoff.js'
+import { resolveAgentPr } from './dashboard/agent-handoff.js'
 import { sendChoice, sendMessage, sendStop } from './dashboard-rpc/control.js'
 import type { ProjectSummary } from './dashboard/projects.js'
 import type { QuotaSource } from './dashboard/quota.js'
-import type { StartRunOptions, StartRunResult } from './dashboard/types.js'
+import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
 
 /**
  * Everything the daemon runs in the background beside serving the dashboard: the two Discord
@@ -61,7 +61,7 @@ export interface BackgroundServices {
    * Commit whatever the shutdown just archived (#912/#1179), after the runs have been stopped so
    * their last events are on disk. Returns how many projects were committed.
    */
-  flushSessions: () => Promise<number>
+  flushAgents: () => Promise<number>
   /**
    * Rebuild the Discord services against freshly-read credentials (#1095), so a token pasted into
    * the dashboard takes effect now rather than at the next daemon start. Idempotent and safe to
@@ -95,14 +95,14 @@ export interface BackgroundServiceDeps {
   /** The long-lived quota meter the usage panel draws; auto PM gates on the same reading. */
   quota: QuotaSource
   /** Start a run in a project. */
-  startRun: (prompt: string, options: StartRunOptions, projectId: string) => Promise<StartRunResult>
+  startAgent: (prompt: string, options: StartAgentOptions, projectId: string) => Promise<StartAgentResult>
   /** How many runs are live on a project, so a background job can tell idle from busy. */
-  activeRunCount: (projectId: string) => number
+  activeAgentCount: (projectId: string) => number
   /**
    * The runs this daemon is still responsible for, whose checkouts the worktree sweep must leave
    * alone. See {@link MergedSweepOptions.busy}.
    */
-  busyRunIds: () => ReadonlySet<string>
+  busyAgentIds: () => ReadonlySet<string>
   log: (message: string) => void
 }
 
@@ -125,9 +125,9 @@ function readPrefs(env: NodeJS.ProcessEnv): Promise<Preferences> {
  * run would have used anyway.
  *
  * Exported for the daemon's continuation starts (#1467): a dashboard Resume sends only its seed
- * (`resumeSession` + `continueRunId`), so these are the base its options overlay.
+ * (`resumeSession` + `continueAgentId`), so these are the base its options overlay.
  */
-export async function resolveProjectRunOptions(id: string, env: NodeJS.ProcessEnv): Promise<StartRunOptions> {
+export async function resolveProjectAgentOptions(id: string, env: NodeJS.ProcessEnv): Promise<StartAgentOptions> {
   const global = await readPrefs(env)
   const path = (await listProjects(undefined, env).catch(() => [])).find(p => p.id === id)?.path
   const file = path ? await loadFrameworkConfig(path).catch(() => ({})) : {}
@@ -145,9 +145,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
    * preference, and without it every choice gate parks forever on an answer that is not coming
    * (#846). All three background starters go through here, so none can forget either half.
    */
-  const startUnattended = async (projectId: string, prompt: string, extra: StartRunOptions = {}) => {
-    const options = await resolveProjectRunOptions(projectId, env)
-    return deps.startRun(prompt, { ...options, ...extra, unattended: true }, projectId)
+  const startUnattended = async (projectId: string, prompt: string, extra: StartAgentOptions = {}) => {
+    const options = await resolveProjectAgentOptions(projectId, env)
+    return deps.startAgent(prompt, { ...options, ...extra, unattended: true }, projectId)
   }
 
   // Auto PM (#685/#773): while the queue is dry and there is quota to spare, triage and
@@ -162,7 +162,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // The queue's open entries rather than a bare emptiness bit: a batch of concurrent drains is
     // pinned one entry each (#1204), so the sweep needs the entries the decision was made on.
     queue: async project => (await findTodoBacklog(project.path))?.entries ?? [],
-    activeAgents: project => deps.activeRunCount(project.id),
+    activeAgents: project => deps.activeAgentCount(project.id),
     // How many agents the routine may keep going per project (#1204). Global like the opt-outs;
     // the sweep applies the default when it is unset.
     concurrency: async () => (await prefs()).autoPmConcurrency,
@@ -216,7 +216,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
         // A fanned-out plan agent plans its ticket rather than implementing it (#1327), so its PR
         // title must not inherit the issue as `(fix #42)` — the plan's merge would close the
         // issue with the work still undone (#1334).
-        ...(ticket && !job.drains ? { planRun: true } : {}),
+        ...(ticket && !job.drains ? { planAgent: true } : {}),
         // The job says its PRs may land themselves (#1216): the drain implements work whose
         // review already happened on the queue. Rides to the run as the ladder's top rung.
         ...(job.autoMerge ? { handoff: 'merge' as const } : {}),
@@ -245,7 +245,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   // sweeps its archive on teardown; nothing did the same for one held in the checkout itself, so it
   // sat as an uncommitted change until a human noticed. Path-scoped and debounced, and it skips a
   // repo that is mid-rebase or index-locked rather than committing into someone's work.
-  const sessionCommitter = startSessionCommitter({ projects, log })
+  const agentCommitter = startAgentCommitter({ projects, log })
 
   // Watch the PRs the framework is waiting to land (#1418): merge a `watched` PR once its checks
   // pass (the #1417/#1406 answer for repos without GitHub auto-merge), and put an agent on a
@@ -274,7 +274,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   // Reclaim the checkout of a session whose work is on the remote (#1036/E5): the branch and the
   // session's row are kept, so this frees disk rather than throwing work away. It is the retry for
   // a push that could not land at teardown.
-  const mergedWorktrees = startMergedWorktreeSweep({ projects, log, busy: deps.busyRunIds })
+  const mergedWorktrees = startMergedWorktreeSweep({ projects, log, busy: deps.busyAgentIds })
 
   // `resolve` matters: projectId hashes the path string, and `--cwd` reaches us verbatim, so a
   // relative path would hash to an id no project lookup can resolve. Same derivation the runtime uses.
@@ -373,7 +373,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       { name: 'worktree sweep', every: AUTO_PM_EVERY, run: () => mergedWorktrees.tick() },
       // The finest cadence, and what the base tick is set by: the committer's idle window is a
       // poll seeing the same pending set twice, so its window *is* one tick.
-      { name: 'session commit', run: () => sessionCommitter.poll() },
+      { name: 'session commit', run: () => agentCommitter.poll() },
       // ~1 min, the CI latency agreed on #1418.
       { name: 'CI watch', every: 2, run: () => ciWatch.tick() },
       // The watched things change slowly and a poll costs a read per project. Their first turn is
@@ -394,11 +394,11 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // The CI watch can start fix runs, so it stops with the other run-starters.
       ciWatch.stop()
       mergedWorktrees.stop()
-      // Stopped before `flushSessions` below, so that is a single flush past the idle window
+      // Stopped before `flushAgents` below, so that is a single flush past the idle window
       // rather than a wait for a turn that is no longer coming.
-      sessionCommitter.stop()
+      agentCommitter.stop()
     },
-    flushSessions: () => sessionCommitter.flush().catch(() => 0),
+    flushAgents: () => agentCommitter.flush().catch(() => 0),
     reloadDiscord,
     // Awaitable (#1433) so the trigger button can wait for the sweep's answer; a caller that
     // does not care simply drops the promise. The plain wake is safe to call when the preference

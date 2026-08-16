@@ -1,24 +1,24 @@
-import { findAgent, readLiveMetas, readAllRuns, loadRunEvents, worktreeSize, isSafeRunId, startedAtFromRunId, type AgentMeta } from '../store/index.js'
+import { findAgent, readLiveMetas, readAllAgents, loadAgentEvents, worktreeSize, isSafeAgentId, startedAtFromAgentId, type AgentMeta } from '../store/index.js'
 import { loadUserSystemPrompt } from '../system-prompt-file.js'
 import { listProjectWorktrees } from '../worktrees.js'
 import { readDocs, type WorkspaceDoc } from '../dashboard/docs.js'
 import { readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta } from '../dashboard/tickets.js'
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
-import { buildOverview, buildRecentRuns, buildHotTickets, collectAllTickets, type Overview, type RecentAgent, type HotTicket, type ProjectTickets } from '../dashboard/overview.js'
+import { buildOverview, buildRecentAgents, buildHotTickets, collectAllTickets, type Overview, type RecentAgent, type HotTicket, type ProjectTickets } from '../dashboard/overview.js'
 import { buildInterventions, type Intervention } from '../dashboard/interventions.js'
 import { buildOpenQuestions, type OpenQuestion } from '../dashboard/open-questions.js'
 import { buildActivity, type Activity } from '../dashboard/activity.js'
 import { buildDashboard, type DashboardData } from '../dashboard/dashboard.js'
 import { githubUrlFor } from '../dashboard/github.js'
 import { readGitStatus, type GitStatus } from '../dashboard/git-status.js'
-import { readRunHandoff, resolveRunPr, agentBranchFor, type AgentHandoff } from '../dashboard/agent-handoff.js'
+import { readAgentHandoff, resolveAgentPr, agentBranchFor, type AgentHandoff } from '../dashboard/agent-handoff.js'
 import type { AgentWorktree } from '../dashboard/types.js'
 import { crawlRepoFiles } from '../project.js'
 import { readFileStatuses, type FileGitStatus } from '../dashboard/file-status.js'
 import { readFileDiff, readFileChanges, type FileDiff, type FileChange } from '../dashboard/file-diff.js'
 import { readFileContent, type FileContent } from '../dashboard/file-read.js'
-import { contextProjects, contextRemote, resolveProjectPath, resolveRunPath } from './context.js'
-import { relayOr } from './relay-run.js'
+import { contextProjects, contextRemote, resolveProjectPath, resolveAgentPath } from './context.js'
+import { relayOr } from './relay-agent.js'
 import type { FrameworkEvent } from '../events.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
 import type { BridgeEvent, BridgeHello, BridgeQuestion } from '../dashboard/bridge-endpoints.js'
@@ -49,8 +49,8 @@ async function withProject<T>(projectId: string, read: (cwd: string) => Promise<
  * worktree while live, else the project root, #738), then read forgivingly. An absent project
  * or a failing read both fall back to `empty`.
  */
-async function withRunPath<T>(projectId: string, agentId: string | undefined, read: (cwd: string) => Promise<T>, empty: T): Promise<T> {
-  const cwd = await resolveRunPath(projectId, agentId)
+async function withAgentPath<T>(projectId: string, agentId: string | undefined, read: (cwd: string) => Promise<T>, empty: T): Promise<T> {
+  const cwd = await resolveAgentPath(projectId, agentId)
   return cwd ? read(cwd).catch(() => empty) : empty
 }
 
@@ -67,7 +67,7 @@ async function withProjects<T>(build: (projects: Awaited<ReturnType<ReturnType<t
  *
  * Since #736 a project has any number of live runs, each in its own worktree, so this reads
  * them all (#738) instead of the single one that used to sit at the project path. They come
- * back as {@link LiveRun}s, carrying the `cwd` of the checkout that run is editing.
+ * back as {@link LiveAgent}s, carrying the `cwd` of the checkout that run is editing.
  *
  * One row per id, and where both a live and an archived copy exist the live one wins (#768): a
  * continued run (#762) has an archive from its first leg while being live again, and the archive
@@ -79,13 +79,13 @@ async function withProjects<T>(build: (projects: Awaited<ReturnType<ReturnType<t
  * its in-memory stub is merged in too (#1077): that is what re-opens it after a dashboard reload
  * instead of losing it.
  */
-export async function onRuns(projectId: string): Promise<AgentMeta[]> {
+export async function onAgents(projectId: string): Promise<AgentMeta[]> {
   // Read the relayed-run stubs BEFORE any await (#1077): telefunc only exposes getContext()
   // synchronously at the top of a telefunction, so calling contextRemote() after an await loses
   // the request context and drops every remote run from the list on a reload.
   const remote = contextRemote()?.list(projectId) ?? []
   const cwd = await resolveProjectPath(projectId)
-  const local = cwd ? await readAllRuns(cwd) : []
+  const local = cwd ? await readAllAgents(cwd) : []
   if (remote.length === 0) return local
   // A relayed run (#1067) lives only in the daemon's memory, not on disk; surface it in the list so
   // a reload re-opens it instead of losing it. Remote wins an id tie (it is the live authority).
@@ -116,16 +116,16 @@ export async function onRetainedWorktrees(projectId: string): Promise<string[]> 
  * project with no git repo): "uncommitted changes" means something different there, since that
  * working tree is the user's, not the agent's.
  */
-export async function onRunWorktree(projectId: string, agentId: string): Promise<AgentWorktree | null> {
-  return relayOr(agentId, 'onRunWorktree', [projectId, agentId], async () => {
+export async function onAgentWorktree(projectId: string, agentId: string): Promise<AgentWorktree | null> {
+  return relayOr(agentId, 'onAgentWorktree', [projectId, agentId], async () => {
     const root = await resolveProjectPath(projectId)
-    if (!root || !isSafeRunId(agentId)) return null
-    const path = await resolveRunPath(projectId, agentId)
+    if (!root || !isSafeAgentId(agentId)) return null
+    const path = await resolveAgentPath(projectId, agentId)
     if (!path) return null
     const own = path !== root
     // Since-filtered like every run-scoped PR read (#1255): in the run's own worktree the
     // checkout's branch is the run's, but a reused pinned branch has a predecessor's PR history.
-    const since = startedAtFromRunId(agentId)
+    const since = startedAtFromAgentId(agentId)
     const [status, live] = await Promise.all([
       readGitStatus(path, since !== undefined ? { since } : {}).catch(() => undefined),
       readLiveMetas(root).catch(() => []),
@@ -142,7 +142,7 @@ export async function onRunWorktree(projectId: string, agentId: string): Promise
     const pr = own
       ? { value: status?.pr, pending: status?.prPending ?? false }
       : agent
-        ? await resolveRunPr(root, agent).catch(() => ({ value: undefined, pending: false }))
+        ? await resolveAgentPr(root, agent).catch(() => ({ value: undefined, pending: false }))
         : { value: undefined, pending: false }
     return {
       path,
@@ -160,11 +160,11 @@ export async function onRunWorktree(projectId: string, agentId: string): Promise
 }
 
 /** One archived run's event log for replay (or `[]` when the run or project is gone). */
-export async function onRun(projectId: string, agentId: string): Promise<FrameworkEvent[]> {
-  return relayOr(agentId, 'onRun', [projectId, agentId], async () => {
+export async function onAgent(projectId: string, agentId: string): Promise<FrameworkEvent[]> {
+  return relayOr(agentId, 'onAgent', [projectId, agentId], async () => {
     const cwd = await resolveProjectPath(projectId)
     if (!cwd) return []
-    return (await loadRunEvents(cwd, agentId).catch(() => undefined)) ?? []
+    return (await loadAgentEvents(cwd, agentId).catch(() => undefined)) ?? []
   }, [])
 }
 
@@ -204,8 +204,8 @@ export async function onOverview(): Promise<Overview> {
 }
 
 /** Recent sessions pooled across every project (#shared-shell), newest first, for the home rail. */
-export async function onRecentRuns(): Promise<RecentAgent[]> {
-  return withProjects(projects => buildRecentRuns(projects))
+export async function onRecentAgents(): Promise<RecentAgent[]> {
+  return withProjects(projects => buildRecentAgents(projects))
 }
 
 /** Hot tickets across every project (#1112): being worked on, likely next, and queued. */
@@ -240,7 +240,7 @@ export async function onDashboard(): Promise<DashboardData> {
  * Pass a live `agentId` to list that run's worktree instead of the project root (#738).
  */
 export async function onProjectFiles(projectId: string, agentId?: string): Promise<string[]> {
-  return relayOr(agentId, 'onProjectFiles', [projectId, agentId], () => withRunPath(projectId, agentId, crawlRepoFiles, []), [])
+  return relayOr(agentId, 'onProjectFiles', [projectId, agentId], () => withAgentPath(projectId, agentId, crawlRepoFiles, []), [])
 }
 
 /**
@@ -253,7 +253,7 @@ export async function onProjectFileStatus(projectId: string, agentId?: string): 
     agentId,
     'onProjectFileStatus',
     [projectId, agentId],
-    () => withRunPath<Record<string, FileGitStatus>>(projectId, agentId, readFileStatuses, {}),
+    () => withAgentPath<Record<string, FileGitStatus>>(projectId, agentId, readFileStatuses, {}),
     {},
   )
 }
@@ -268,7 +268,7 @@ export async function onProjectFileStatus(projectId: string, agentId?: string): 
  */
 export async function onFileDiff(projectId: string, path: string, agentId?: string): Promise<FileDiff | null> {
   return relayOr(agentId, 'onFileDiff', [projectId, path, agentId], async () => {
-    const cwd = await resolveRunPath(projectId, agentId)
+    const cwd = await resolveAgentPath(projectId, agentId)
     if (!cwd) return null
     const statuses = await readFileStatuses(cwd).catch((): Record<string, FileGitStatus> => ({}))
     const status = statuses[path]
@@ -286,9 +286,9 @@ export async function onFileDiff(projectId: string, path: string, agentId?: stri
  * which tool the agent reached for — so reading git is both the honest source and the one that
  * works for every agent, not just the ones whose stream carries an edit payload.
  */
-export async function onRunChanges(projectId: string, agentId?: string): Promise<FileChange[]> {
-  return relayOr(agentId, 'onRunChanges', [projectId, agentId], async () => {
-    const cwd = await resolveRunPath(projectId, agentId)
+export async function onAgentChanges(projectId: string, agentId?: string): Promise<FileChange[]> {
+  return relayOr(agentId, 'onAgentChanges', [projectId, agentId], async () => {
+    const cwd = await resolveAgentPath(projectId, agentId)
     if (!cwd) return []
     const statuses = await readFileStatuses(cwd).catch((): Record<string, FileGitStatus> => ({}))
     return readFileChanges(cwd, statuses).catch(() => [])
@@ -308,7 +308,7 @@ export async function onFileContent(projectId: string, path: string, agentId?: s
     agentId,
     'onFileContent',
     [projectId, path, agentId],
-    () => withRunPath<FileContent | null>(projectId, agentId, cwd => readFileContent(cwd, path), null),
+    () => withAgentPath<FileContent | null>(projectId, agentId, cwd => readFileContent(cwd, path), null),
     null,
   )
 }
@@ -328,9 +328,9 @@ export async function onGithubUrl(projectId: string): Promise<string | null> {
  */
 export async function onGitStatus(projectId: string, agentId?: string): Promise<GitStatus | null> {
   return relayOr(agentId, 'onGitStatus', [projectId, agentId], async () => {
-    const cwd = await resolveRunPath(projectId, agentId)
+    const cwd = await resolveAgentPath(projectId, agentId)
     if (!cwd) return null
-    const since = agentId !== undefined ? startedAtFromRunId(agentId) : undefined
+    const since = agentId !== undefined ? startedAtFromAgentId(agentId) : undefined
     return (await readGitStatus(cwd, since !== undefined ? { since } : {})) ?? null
   }, null)
 }
@@ -340,23 +340,23 @@ export async function onGitStatus(projectId: string, agentId?: string): Promise<
  * committed, what it changed, and whether that has been pushed or opened as a PR.
  *
  * Read from the *project* checkout against the session's branch, not from the session's worktree.
- * A clean run's worktree is removed when it finishes, and `resolveRunPath` then falls back to the
+ * A clean run's worktree is removed when it finishes, and `resolveAgentPath` then falls back to the
  * project root — so a worktree-addressed read reports the project's own branch and the user's own
  * uncommitted changes as though they were the session's. The branch is what outlives the run, so
  * the branch is what this asks about.
  */
-export async function onRunHandoff(projectId: string, agentId: string): Promise<AgentHandoff | null> {
-  return relayOr(agentId, 'onRunHandoff', [projectId, agentId], async () => {
+export async function onAgentHandoff(projectId: string, agentId: string): Promise<AgentHandoff | null> {
+  return relayOr(agentId, 'onAgentHandoff', [projectId, agentId], async () => {
     const cwd = await resolveProjectPath(projectId)
-    if (!cwd || !isSafeRunId(agentId)) return null
+    if (!cwd || !isSafeAgentId(agentId)) return null
     const agent = await findAgent(cwd, agentId).catch(() => undefined)
     if (!agent) return null
     // Uncommitted work is the one thing the branch cannot answer (#1173), and it lives in the tree
     // the agent edited. Only when that is a checkout of the session's own: per the note above,
-    // `resolveRunPath` falls back to the project root, whose dirt belongs to the user.
-    const checkout = await resolveRunPath(projectId, agentId)
+    // `resolveAgentPath` falls back to the project root, whose dirt belongs to the user.
+    const checkout = await resolveAgentPath(projectId, agentId)
     const deps = { since: agent.startedAt, ...(checkout && checkout !== cwd ? { checkout } : {}) }
-    return (await readRunHandoff(cwd, agentBranchFor(agent), deps).catch(() => undefined)) ?? null
+    return (await readAgentHandoff(cwd, agentBranchFor(agent), deps).catch(() => undefined)) ?? null
   }, null)
 }
 

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from '../project.js'
-import { FRAMEWORK_DIR, WORKTREES_DIR, isSafeRunId } from './agent-store.js'
+import { FRAMEWORK_DIR, WORKTREES_DIR, isSafeAgentId } from './agent-store.js'
 
 /**
  * Git-worktree lifecycle for concurrent runs (#453/#735): give each run its own
@@ -18,10 +18,10 @@ export function worktreePath(repo: string, agentId: string): string {
 /**
  * The branch a framework-allocated worktree starts on (#736). The run id exists
  * before the session name does, so the branch is created from the id and renamed
- * by {@link renameRunBranch} once the agent picks a name.
+ * by {@link renameAgentBranch} once the agent picks a name.
  */
 export function agentBranchName(agentId: string): string {
-  return `the-framework/run-${agentId}`
+  return `the-framework/agent-${agentId}`
 }
 
 /** One entry parsed from `git worktree list --porcelain`. */
@@ -61,7 +61,7 @@ export async function addWorktree(
   opts: AddWorktreeOptions,
   agent: GitRunner = nodeGitRunner(),
 ): Promise<AddedWorktree> {
-  if (!isSafeRunId(opts.agentId)) throw new Error(`unsafe run id: ${opts.agentId}`)
+  if (!isSafeAgentId(opts.agentId)) throw new Error(`unsafe run id: ${opts.agentId}`)
   const path = worktreePath(repo, opts.agentId)
   await agent(['worktree', 'add', '-b', opts.branch, path, ...(opts.base ? [opts.base] : [])], repo)
   return { path, branch: opts.branch }
@@ -79,7 +79,7 @@ export async function attachWorktree(
   opts: { agentId: string; branch: string },
   agent: GitRunner = nodeGitRunner(),
 ): Promise<AddedWorktree> {
-  if (!isSafeRunId(opts.agentId)) throw new Error(`unsafe run id: ${opts.agentId}`)
+  if (!isSafeAgentId(opts.agentId)) throw new Error(`unsafe run id: ${opts.agentId}`)
   const path = worktreePath(repo, opts.agentId)
   await agent(['worktree', 'add', path, opts.branch], repo)
   return { path, branch: opts.branch }
@@ -201,7 +201,7 @@ export async function currentBranch(path: string, agent: GitRunner = nodeGitRunn
 
 /**
  * Rename a run's branch once the agent names the session (#736): the worktree is
- * created on `the-framework/run-<agentId>` before a name exists, and this puts the
+ * created on `the-framework/agent-<agentId>` before a name exists, and this puts the
  * readable `the-framework/<sessionName>` on it.
  *
  * Only renames when `path` is still on `from`. The #326 system prompt currently
@@ -211,7 +211,7 @@ export async function currentBranch(path: string, agent: GitRunner = nodeGitRunn
  * which case it named the branch itself and there is nothing to rename. Returns
  * whether it renamed, and never throws: a run must not die over a branch name.
  */
-export async function renameRunBranch(
+export async function renameAgentBranch(
   path: string,
   from: string,
   to: string,

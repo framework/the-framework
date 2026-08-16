@@ -1,7 +1,7 @@
 import { EventStream } from '../event-stream.js'
 import type { FrameworkEvent } from '../events.js'
 import { applyEventToMeta, type AgentMeta } from '../store/index.js'
-import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'
+import type { StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
 import { errorMessage } from '../error-message.js'
 
 /**
@@ -25,8 +25,8 @@ export interface RemoteTarget {
 /** The body a relay start forwards to the remote's `/_relay/start`. */
 export interface RelayStartBody {
   prompt: string
-  kind: StartRunKind
-  options: StartRunOptions
+  kind: StartAgentKind
+  options: StartAgentOptions
 }
 
 const START_TIMEOUT_MS = 15_000
@@ -37,7 +37,7 @@ const PING_TIMEOUT_MS = 3_000
 /**
  * Health-check a saved device (#1072): a cookie'd `GET /_relay/ping`, true on any 2xx, false on a
  * non-2xx, an unreachable host, or the timeout. The token stays in memory for the check only, never
- * persisted, same as {@link startRemoteRun}. This is how the browser's status dots learn reachable
+ * persisted, same as {@link startRemoteAgent}. This is how the browser's status dots learn reachable
  * from not: it has the tokens, the daemon does the cross-origin request.
  */
 export async function pingRemote(target: RemoteTarget): Promise<boolean> {
@@ -58,11 +58,11 @@ function relayHeaders(token: string): Record<string, string> {
 }
 
 /**
- * Start a run on the remote daemon and return its {@link StartRunResult} (with the remote's own run
+ * Start a run on the remote daemon and return its {@link StartAgentResult} (with the remote's own run
  * id). A non-2xx or a transport failure surfaces as an `ok: false` result the dashboard shows, the
  * same shape a local refusal has, so the caller does not special-case remote errors.
  */
-export async function startRemoteRun(target: RemoteTarget, body: RelayStartBody): Promise<StartRunResult> {
+export async function startRemoteAgent(target: RemoteTarget, body: RelayStartBody): Promise<StartAgentResult> {
   try {
     const res = await fetch(`${trimSlashes(target.url)}/_relay/start`, {
       method: 'POST',
@@ -71,7 +71,7 @@ export async function startRemoteRun(target: RemoteTarget, body: RelayStartBody)
       signal: AbortSignal.timeout(START_TIMEOUT_MS),
     })
     if (!res.ok) return { ok: false, error: `the device refused the run (${res.status})` }
-    return (await res.json()) as StartRunResult
+    return (await res.json()) as StartAgentResult
   } catch (err) {
     return { ok: false, error: `could not reach the device: ${errorMessage(err)}` }
   }
@@ -162,7 +162,7 @@ function emitLine(line: string, onEvent: (event: FrameworkEvent) => void): void 
   }
 }
 
-interface RelayedRun {
+interface RelayedAgent {
   target: RemoteTarget
   stream: EventStream<FrameworkEvent>
   cancel: () => void
@@ -178,14 +178,14 @@ interface RelayedRun {
  * push and open-PR still have to reach the device after its event stream has ended, so the device
  * target is kept until {@link dispose} clears it, not dropped when the stream closes.
  *
- * The `metas` map (#1077) holds a local {@link AgentMeta} stub per relayed run so `onRuns` can show a
+ * The `metas` map (#1077) holds a local {@link AgentMeta} stub per relayed run so `onAgents` can show a
  * remote run in the session list and re-open it after a dashboard reload; {@link list} projects it
  * per project. Same lifetime as `targets`: it outlives the event stream and is cleared on dispose.
  */
-export class RelayedRuns {
-  private readonly agents = new Map<string, RelayedRun>()
+export class RelayedAgents {
+  private readonly agents = new Map<string, RelayedAgent>()
   private readonly targets = new Map<string, RemoteTarget>()
-  // The local AgentMeta stub for each relayed run, so onRuns can show a remote run in the session list
+  // The local AgentMeta stub for each relayed run, so onAgents can show a remote run in the session list
   // and re-open it after a reload; outlives the event stream, cleared on dispose (same lifetime as targets).
   private readonly metas = new Map<string, { meta: AgentMeta; projectId: string }>()
 
@@ -212,7 +212,7 @@ export class RelayedRuns {
     return agentId ? this.targets.get(agentId) : undefined
   }
 
-  /** A project's relayed run stubs (#1077), newest-first, so `onRuns` can surface them in the list. */
+  /** A project's relayed run stubs (#1077), newest-first, so `onAgents` can surface them in the list. */
   list(projectId: string): AgentMeta[] {
     const rows: AgentMeta[] = []
     for (const entry of this.metas.values()) if (entry.projectId === projectId) rows.push(entry.meta)

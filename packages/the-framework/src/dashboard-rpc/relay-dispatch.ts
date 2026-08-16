@@ -1,4 +1,4 @@
-import { onProjectFiles, onProjectFileStatus, onFileDiff, onRunChanges, onFileContent, onGitStatus, onRunWorktree, onRunHandoff, onRun } from './reads.js'
+import { onProjectFiles, onProjectFileStatus, onFileDiff, onAgentChanges, onFileContent, onGitStatus, onAgentWorktree, onAgentHandoff, onAgent } from './reads.js'
 import { sendStop, sendChoice, sendMessage, sendSetHandoff, sendPushBranch, sendOpenPullRequest, sendMerge } from './control.js'
 
 // The device side of the remote-run relay (#1067 slice 2). A daemon that relayed a run here asks this
@@ -14,8 +14,8 @@ import { sendStop, sendChoice, sendMessage, sendSetHandoff, sendPushBranch, send
 
 type RelayFn = (...args: unknown[]) => Promise<unknown>
 const RELAY_FNS = {
-  onProjectFiles, onProjectFileStatus, onFileDiff, onRunChanges, onFileContent,
-  onGitStatus, onRunWorktree, onRunHandoff, onRun,
+  onProjectFiles, onProjectFileStatus, onFileDiff, onAgentChanges, onFileContent,
+  onGitStatus, onAgentWorktree, onAgentHandoff, onAgent,
   sendStop, sendChoice, sendMessage, sendSetHandoff, sendPushBranch, sendOpenPullRequest, sendMerge,
 } as unknown as Record<string, RelayFn>
 

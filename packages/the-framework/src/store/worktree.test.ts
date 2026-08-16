@@ -15,7 +15,7 @@ import {
   worktreePath,
   agentBranchName,
   currentBranch,
-  renameRunBranch,
+  renameAgentBranch,
   FRAMEWORK_DIR,
 } from './index.js'
 
@@ -41,10 +41,10 @@ test('worktreePath nests the run under .the-framework/worktrees', () => {
 
 test('addWorktree builds `worktree add -b <branch> <path>` and returns the path + branch', async () => {
   const git = recordingGit()
-  const added = await addWorktree(REPO, { agentId: 'run1', branch: 'the-framework/run-run1' }, git)
+  const added = await addWorktree(REPO, { agentId: 'run1', branch: 'the-framework/agent-run1' }, git)
   const path = worktreePath(REPO, 'run1')
-  assert.deepEqual(added, { path, branch: 'the-framework/run-run1' })
-  assert.deepEqual(git.calls, [{ args: ['worktree', 'add', '-b', 'the-framework/run-run1', path], cwd: REPO }])
+  assert.deepEqual(added, { path, branch: 'the-framework/agent-run1' })
+  assert.deepEqual(git.calls, [{ args: ['worktree', 'add', '-b', 'the-framework/agent-run1', path], cwd: REPO }])
 })
 
 test('addWorktree appends the base ref when given', async () => {
@@ -67,7 +67,7 @@ test('parseWorktreeList reads path/head/branch and strips refs/heads/, dropping 
     '',
     'worktree /repo/.the-framework/worktrees/run1',
     'HEAD bbbb',
-    'branch refs/heads/the-framework/run-run1',
+    'branch refs/heads/the-framework/agent-run1',
     '',
     'worktree /repo/detached',
     'HEAD cccc',
@@ -76,7 +76,7 @@ test('parseWorktreeList reads path/head/branch and strips refs/heads/, dropping 
   ].join('\n')
   assert.deepEqual(parseWorktreeList(porcelain), [
     { path: '/repo', head: 'aaaa', branch: 'main' },
-    { path: '/repo/.the-framework/worktrees/run1', head: 'bbbb', branch: 'the-framework/run-run1' },
+    { path: '/repo/.the-framework/worktrees/run1', head: 'bbbb', branch: 'the-framework/agent-run1' },
     { path: '/repo/detached', head: 'cccc' },
   ])
 })
@@ -121,7 +121,7 @@ test('add/list/remove round-trips against a real git repo', async () => {
     await git(['add', '-A'], repo)
     await git(['commit', '-m', 'init'], repo)
 
-    const { path, branch } = await addWorktree(repo, { agentId: 'run1', branch: 'the-framework/run-run1' }, git)
+    const { path, branch } = await addWorktree(repo, { agentId: 'run1', branch: 'the-framework/agent-run1' }, git)
     assert.equal((await stat(path)).isDirectory(), true, 'worktree checkout dir exists')
     assert.equal((await stat(join(path, 'README.md'))).isFile(), true, 'checkout has the repo content')
 
@@ -207,7 +207,7 @@ test('a dirty run worktree keeps its work on the branch after removal (#786)', a
     await git(['add', '-A'], repo)
     await git(['commit', '-m', 'init'], repo)
 
-    const { path, branch } = await addWorktree(repo, { agentId: 'run1', branch: 'the-framework/run-run1' }, git)
+    const { path, branch } = await addWorktree(repo, { agentId: 'run1', branch: 'the-framework/agent-run1' }, git)
     // The agent edits and stops without committing, exactly as the system prompt leaves it.
     await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
 
@@ -224,35 +224,35 @@ test('a dirty run worktree keeps its work on the branch after removal (#786)', a
 })
 
 test('agentBranchName names the branch after the run id (#736)', () => {
-  assert.equal(agentBranchName('2026-07-19T10-00-00-000Z'), 'the-framework/run-2026-07-19T10-00-00-000Z')
+  assert.equal(agentBranchName('2026-07-19T10-00-00-000Z'), 'the-framework/agent-2026-07-19T10-00-00-000Z')
 })
 
 test('currentBranch reads the checked-out branch, and reads detached/non-repo as undefined', async () => {
-  assert.equal(await currentBranch(REPO, recordingGit('the-framework/run-1\n')), 'the-framework/run-1')
+  assert.equal(await currentBranch(REPO, recordingGit('the-framework/agent-1\n')), 'the-framework/agent-1')
   assert.equal(await currentBranch(REPO, recordingGit('HEAD\n')), undefined, 'detached HEAD is not a branch')
   assert.equal(await currentBranch(REPO, failingGit), undefined)
 })
 
-test('renameRunBranch renames only while the worktree is still on the run-id branch (#736)', async () => {
+test('renameAgentBranch renames only while the worktree is still on the run-id branch (#736)', async () => {
   // On the run-id branch: renamed to the session name.
-  const onRunBranch = recordingGit('the-framework/run-1\n')
-  assert.equal(await renameRunBranch('/wt', 'the-framework/run-1', 'the-framework/add-auth', onRunBranch), true)
-  assert.deepEqual(onRunBranch.calls[1]?.args, ['branch', '-m', 'the-framework/run-1', 'the-framework/add-auth'])
+  const onAgentBranch = recordingGit('the-framework/agent-1\n')
+  assert.equal(await renameAgentBranch('/wt', 'the-framework/agent-1', 'the-framework/add-auth', onAgentBranch), true)
+  assert.deepEqual(onAgentBranch.calls[1]?.args, ['branch', '-m', 'the-framework/agent-1', 'the-framework/add-auth'])
 
   // The agent already made its own branch (today's #326 prompt still tells it to):
   // there is nothing to rename, and we must not touch the branch it is sitting on.
   const selfBranched = recordingGit('the-framework/add-auth\n')
-  assert.equal(await renameRunBranch('/wt', 'the-framework/run-1', 'the-framework/add-auth', selfBranched), false)
+  assert.equal(await renameAgentBranch('/wt', 'the-framework/agent-1', 'the-framework/add-auth', selfBranched), false)
   assert.equal(selfBranched.calls.length, 1, 'only the read, never a rename')
 })
 
-test('renameRunBranch never throws: a run outlives a failed rename', async () => {
+test('renameAgentBranch never throws: a run outlives a failed rename', async () => {
   // Reads the branch fine, then fails the rename (e.g. the target name is taken).
   let call = 0
   const failsOnRename: GitRunner = async () => {
-    if (call++ === 0) return 'the-framework/run-1\n'
+    if (call++ === 0) return 'the-framework/agent-1\n'
     throw new Error('a branch named the-framework/x already exists')
   }
-  assert.equal(await renameRunBranch('/wt', 'the-framework/run-1', 'the-framework/x', failsOnRename), false)
-  assert.equal(await renameRunBranch('/wt', 'a', 'b', failingGit), false)
+  assert.equal(await renameAgentBranch('/wt', 'the-framework/agent-1', 'the-framework/x', failsOnRename), false)
+  assert.equal(await renameAgentBranch('/wt', 'a', 'b', failingGit), false)
 })

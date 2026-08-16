@@ -1,5 +1,5 @@
 import { nodeGitRunner, type GitRunner } from '../project.js'
-import { cachedPrView, cachedPrsForBranch, pickRunPr, type LinkedPr, type PrLookup } from './gh.js'
+import { cachedPrView, cachedPrsForBranch, pickAgentPr, type LinkedPr, type PrLookup } from './gh.js'
 
 // The project panel's git status (#491, part of #488): the active branch, whether the tree is
 // dirty, and the linked PR. Branch + dirty are a local git read; the PR is a best-effort gh
@@ -24,7 +24,7 @@ export interface GitStatusDeps {
    * The run's start, when the status is read for a run's checkout (#1255). The default lookup is
    * `gh pr view`, which answers the newest PR for the branch *in any state* — so a run on a reused
    * pinned branch (`the-framework/triage-quick`) wears a predecessor's merged PR as its own badge.
-   * With `since` set the PR is picked from the branch's whole history by {@link pickRunPr}
+   * With `since` set the PR is picked from the branch's whole history by {@link pickAgentPr}
    * instead: an open PR, or a closed one no older than the run itself.
    */
   since?: string
@@ -61,9 +61,9 @@ async function linkedPr(
 ): Promise<{ value: LinkedPr | undefined; pending: boolean }> {
   if (deps.pr) return { value: await deps.pr(cwd).catch(() => undefined), pending: false }
   if (deps.since === undefined) return cachedPrView(cwd).catch(() => ({ value: undefined, pending: false }))
-  if (deps.prs) return { value: pickRunPr(await deps.prs(cwd, branch).catch(() => []), deps.since), pending: false }
+  if (deps.prs) return { value: pickAgentPr(await deps.prs(cwd, branch).catch(() => []), deps.since), pending: false }
   return cachedPrsForBranch(cwd, branch).then(
-    read => ({ value: pickRunPr(read.value ?? [], deps.since), pending: read.pending }),
+    read => ({ value: pickAgentPr(read.value ?? [], deps.since), pending: read.pending }),
     () => ({ value: undefined, pending: false }),
   )
 }

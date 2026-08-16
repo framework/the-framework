@@ -218,7 +218,7 @@ test('a git project starts concurrent runs, each in its own worktree (#736)', as
       stub,
       `const fs = require('node:fs')
 const argv = process.argv.slice(2)
-const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8'))
+const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--agent') + 1], 'utf8'))
 fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, JSON.stringify(spec) + '\\n')
 setTimeout(() => {}, 800)
 `,
@@ -251,12 +251,12 @@ setTimeout(() => {}, 800)
     }
     assert.notEqual(agents[0]!.cwd, agents[1]!.cwd, 'the two runs got different checkouts')
 
-    // Each run is on its own `the-framework/run-<id>` branch, and the user's own checkout
+    // Each run is on its own `the-framework/agent-<id>` branch, and the user's own checkout
     // was never moved off the branch it was sitting on.
     const branches = await git(['branch', '--format=%(refname:short)'], cwd)
-    for (const agent of agents) assert.ok(branches.includes(`the-framework/run-${agent.agentId}`), `branch for ${agent.agentId}`)
+    for (const agent of agents) assert.ok(branches.includes(`the-framework/agent-${agent.agentId}`), `branch for ${agent.agentId}`)
     const head = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd)).trim()
-    assert.equal(head.startsWith('the-framework/run-'), false, 'the main checkout stayed on its own branch')
+    assert.equal(head.startsWith('the-framework/agent-'), false, 'the main checkout stayed on its own branch')
 
     ac.abort()
     await done
@@ -290,11 +290,11 @@ test('a run loses its worktree once its work is on the remote, whatever the run 
       stub,
       `const fs = require('node:fs'), path = require('node:path')
 const argv = process.argv.slice(2)
-const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8'))
-const runCwd = spec.cwd
+const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--agent') + 1], 'utf8'))
+const agentCwd = spec.cwd
 const agentId = spec.agentId
 const status = fs.readFileSync(${JSON.stringify(join(cwd, 'status.txt'))}, 'utf8').trim()
-const dir = path.join(runCwd, '.the-framework')
+const dir = path.join(agentCwd, '.the-framework')
 fs.mkdirSync(dir, { recursive: true })
 fs.writeFileSync(path.join(dir, 'events.jsonl'), JSON.stringify({ kind: 'log', message: 'worked' }) + '\\n')
 fs.writeFileSync(path.join(dir, 'agent.json'), JSON.stringify({ version: 1, status, id: agentId, startedAt: agentId, updatedAt: agentId }))
@@ -353,9 +353,9 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
     // The branch is the only handle left on the work once the checkout goes, so it is recorded
     // while the worktree still exists (#799) — otherwise the handoff has nothing to read.
     const doneMeta = await archivedMeta(doneId)
-    assert.equal(doneMeta?.branch, `the-framework/run-${doneId}`, "the finished run's branch is recorded")
+    assert.equal(doneMeta?.branch, `the-framework/agent-${doneId}`, "the finished run's branch is recorded")
     assert.match(
-      await git(['log', '--format=%s', `refs/remotes/origin/the-framework/run-${doneId}`], cwd),
+      await git(['log', '--format=%s', `refs/remotes/origin/the-framework/agent-${doneId}`], cwd),
       /\S/,
       'the work reached the remote, which is what let the checkout go',
     )
@@ -386,7 +386,7 @@ test('sendStart spawns the run child with its session spec, one at a time when t
     stub,
     `const fs = require('node:fs'), path = require('node:path')
 const argv = process.argv.slice(2)
-const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8'))
+const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--agent') + 1], 'utf8'))
 fs.appendFileSync(path.join(spec.cwd, 'started.log'), JSON.stringify(spec) + '\\n')
 setTimeout(() => {}, 600)
 `,
@@ -439,7 +439,7 @@ test('sendStart kind=research travels as a kind, with an empty what left to the 
     stub,
     `const fs = require('node:fs'), path = require('node:path')
 const argv = process.argv.slice(2)
-const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--session') + 1], 'utf8'))
+const spec = JSON.parse(fs.readFileSync(argv[argv.indexOf('--agent') + 1], 'utf8'))
 fs.appendFileSync(path.join(spec.cwd, 'started.log'), JSON.stringify(spec) + '\\n')
 `,
   )

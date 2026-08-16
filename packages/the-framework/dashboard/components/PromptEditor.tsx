@@ -34,7 +34,7 @@ interface PromptEditorProps {
   onSubmit: () => void
   /** A preset picked from the `/` menu (so the form can flip to a `prompt` run). `replaced` says
    *  whether a typed draft was overwritten — undo brings it back, and the form's note says so. */
-  onPreset?: (label: string, replaced: boolean, newSession?: boolean) => void
+  onPreset?: (label: string, replaced: boolean, newAgent?: boolean) => void
   /** A project referenced via `@` (so the form can add it to the run context). */
   onMentionProject?: (path: string) => void
   /** A file referenced via `#` (so the form can add its repo-relative path to the run context). */
@@ -214,7 +214,7 @@ export const PromptEditor = forwardRef<PromptEditorHandle, PromptEditorProps>(fu
               // Drop the `/query` trigger first so it does not count as a replaced draft.
               ed.chain().focus().deleteRange(range).run()
               const replaced = loadTemplateInto(ed, preset.render())
-              onPresetRef.current?.(preset.label, replaced, preset.newSession)
+              onPresetRef.current?.(preset.label, replaced, preset.newAgent)
             }
             return
           }

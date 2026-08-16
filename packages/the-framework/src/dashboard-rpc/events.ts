@@ -1,7 +1,7 @@
 import { resolveAgentEventsPath } from '../store/index.js'
 import { contextEventsSource, resolveProjectPath } from './context.js'
 import type { FrameworkEvent } from '../events.js'
-import { tailRunEvents } from './events-tail.js'
+import { tailAgentEvents } from './events-tail.js'
 import { forwardStream } from './stream-forward.js'
 
 // The live event stream behind the dashboard (#405): the selected project's run, read straight
@@ -51,7 +51,7 @@ export type LiveFeedEvent = FrameworkEvent | StreamSync
  * boundary to report, so a reconnecting client falls back to a grace deadline before swapping its
  * feed (see use-live-events in the dashboard).
  */
-export async function streamRunEvents(
+export async function streamAgentEvents(
   projectId: string,
   agentId: string | undefined,
   send: (value: LiveFeedEvent) => void,
@@ -75,7 +75,7 @@ export async function streamRunEvents(
   // initial attach stays permissive: a fallback run (non-git project) legitimately lives there.
   const rootJournal = agentId === undefined ? undefined : await resolveEventsPath(projectId, undefined)
   let initial = true
-  return tailRunEvents(
+  return tailAgentEvents(
     async () => {
       const next = await resolveEventsPath(projectId, agentId)
       if (initial) {

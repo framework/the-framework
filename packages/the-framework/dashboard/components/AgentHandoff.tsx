@@ -3,7 +3,7 @@ import type { HandoffState, AgentHandoff } from '../../dist/index.js'
 import { handoffFromStages, type HandoffLevel } from '../../dist/client.js'
 import { GitMerge, GitPullRequest } from 'lucide-react'
 import { sendMerge, sendOpenPullRequest, sendSetHandoff } from '../rpc/control.js'
-import type { RunHandoffState } from '../lib/use-agent-handoff.js'
+import type { AgentHandoffState } from '../lib/use-agent-handoff.js'
 import { cn } from '../lib/utils.js'
 import { DiffStat } from './DiffView.js'
 import { Button } from './ui/button.js'
@@ -172,7 +172,7 @@ export function HandoffActions({
 }: {
   projectId: string
   agentId: string
-  state: RunHandoffState
+  state: AgentHandoffState
 }) {
   const { handoff, busy, pending, act } = state
   if (!handoff) return null
@@ -249,7 +249,7 @@ function Reason({ children, title }: { children: ReactNode; title?: string }) {
 }
 
 /** What the branch holds, revealed by the bar's disclosure. Never rendered when there is nothing. */
-export function RunHandoffDetails({ handoff }: { handoff: AgentHandoff | null }) {
+export function AgentHandoffDetails({ handoff }: { handoff: AgentHandoff | null }) {
   if (!handoffExpandable(handoff) || !handoff) return null
   // A column with no rows is a heading over nothing: a session can commit all of its work and
   // leave the tree clean, and then "Changed files" has nothing to list.

@@ -1,5 +1,5 @@
 import type { FrameworkEvent } from '../../dist/index.js'
-import { StartRunForm } from './StartRunForm.js'
+import { StartAgentForm } from './StartAgentForm.js'
 import { ProjectActions } from './ProjectActions.js'
 import { AgentOverview } from './AgentOverview.js'
 import { OpenQuestions } from './OpenQuestions.js'
@@ -21,32 +21,32 @@ import { ScrollArea } from './ui/scroll-area.js'
 export function ProjectHome({
   projectId,
   events,
-  onRunStarted,
+  onAgentStarted,
   files,
   context,
   addContext,
   removeContext,
   toggleContext,
-  onOpenSession,
+  onOpenAgent,
 }: {
   projectId: string
   events: FrameworkEvent[]
   /** Carries the started run's id through to the shell; dropping it is what #1169 was. */
-  onRunStarted?: ((intent: string, agentId?: string, runsOn?: string) => void) | undefined
+  onAgentStarted?: ((intent: string, agentId?: string, runsOn?: string) => void) | undefined
   files: string[]
   context: Set<string>
   addContext: (path: string) => void
   removeContext: (path: string) => void
   toggleContext: (path: string) => void
   /** Jump into a parked session (#1455 item 4) — possibly another project's. */
-  onOpenSession: (projectId: string, agentId: string) => void
+  onOpenAgent: (projectId: string, agentId: string) => void
 }) {
   return (
     <ScrollArea className="min-h-0 flex-1">
       <ProjectActions projectId={projectId} />
-      <StartRunForm
+      <StartAgentForm
         projectId={projectId}
-        onRunStarted={onRunStarted}
+        onAgentStarted={onAgentStarted}
         files={files}
         context={context}
         addContext={addContext}
@@ -54,7 +54,7 @@ export function ProjectHome({
         toggleContext={toggleContext}
       />
       {events.length > 0 && <AgentOverview events={events} />}
-      <OpenQuestions onOpenSession={onOpenSession} />
+      <OpenQuestions onOpenAgent={onOpenAgent} />
       <ProjectDocs projectId={projectId} />
     </ScrollArea>
   )

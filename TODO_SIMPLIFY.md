@@ -1126,46 +1126,51 @@ it exists, and the rename is step 10 of the order of work — deliberately late,
 little code as possible. Reading "session" elsewhere here is not an inconsistency with this
 decision; it is the state the rename starts from.
 
-### D5c. The rename's last tier — *open, awaiting a ruling*
-**TL;DR —** ~150 identifiers and 6 modules still say run/session for the unit of work. Everything a
-user can see now says agent; this is the residue behind it. **Not done, because two items in it are
-breaking changes nobody asked for.**
+### D5c. The rename's last tier — *done*
+**TL;DR —** The ~150 identifiers and 6 modules that still said run/session are now agent, including
+the two items that break: the spawn flag and the branch prefix.
 
 D5a took the CLI axis to `driver`. D5b took the record, the store, the disk layout and the dashboard
-views to `agent`. Two follow-ups took the SPECs (249 files) and the visible labels (dashboard, CLI,
-daemon). What is left is internal naming, and it is genuinely inconsistent — `StartRunForm.tsx`
-renders a button that says "Start agent", `SessionActionsMenu.tsx` sits beside `AgentView.tsx`.
+views to `agent`. Follow-ups took the SPECs (249 files) and the visible labels (dashboard, CLI,
+daemon). This is the residue behind them — internal naming that had gone genuinely inconsistent:
+`StartRunForm.tsx` rendered a button reading "Start agent", and `SessionActionsMenu.tsx` sat in a
+directory beside `AgentView.tsx`.
 
-The residue, with call counts:
-
-| | Now | Proposed |
+| | Was | Is |
 |---|---|---|
-| The orchestrator | `run.ts`, `runSession` (42), `RunSessionOptions` (7) | `agent.ts`, `runAgent` — keeps `run` as the verb |
-| Spawn payload | `session-spec.ts`, `SessionSpec` (29), `writeSessionSpec` (16) | `agent-spec.ts`, `AgentSpec` … |
-| Archive | `sessions.ts`, `sessionsDir` (3) | `agent-archive.ts`, `agentArchiveDir` |
-| Archive committer | `session-commit.ts`, `commitSessions` (11), `SessionCommitter` (5) | `agent-commit.ts`, `commitAgents` … |
-| Target → driver | `run-driver.ts`, `createRunDriver` (15) | `agent-driver.ts`, `createAgentDriver` |
-| Start surface | `StartRunOptions` (45), `StartRunResult` (32), `StartRunForm.tsx` | `StartAgentOptions`, `StartAgentResult`, `StartAgentForm.tsx` |
-| Components | `SessionActionsMenu`, `SessionDetails`, `RunFeed`, `RunActionBar`, `RunOutcomes`, `CloudRunNotice`, `RemoteRunNotice` | `Agent*` |
-| Leftovers | `startedAtFromRunId` (11), `isSafeRunId` (29), `LiveRun` (22), `ActiveRun` (10), `RecentRun` (7), `RunTarget` (9), `RunOutcome` (5) | `…AgentId`, `…Agent`, `AgentTarget`, `AgentOutcome` |
+| The orchestrator | `run.ts`, `runSession`, `RunSessionOptions` | `agent.ts`, `runAgent` — `run` stays the verb |
+| Spawn payload | `session-spec.ts`, `SessionSpec`, `writeSessionSpec` | `agent-spec.ts`, `AgentSpec`, `writeAgentSpec` |
+| Archive | `sessions.ts`, `sessionsDir` | `agent-archive.ts`, `agentArchiveDir` |
+| Archive committer | `session-commit.ts`, `commitSessions`, `SessionCommitter` | `agent-commit.ts`, `commitAgents`, `AgentCommitter` |
+| Target → driver | `run-driver.ts`, `createRunDriver` | `agent-driver.ts`, `createAgentDriver` |
+| Start surface | `StartRunOptions`, `StartRunResult`, `StartRunForm.tsx` | `StartAgentOptions`, `StartAgentResult`, `StartAgentForm.tsx` |
+| Components | `SessionActionsMenu`, `SessionDetails`, `RunFeed`, `RunActionBar`, `RunOutcomes`, `CloudRunNotice`, `RemoteRunNotice` | `Agent*` / `CloudAgentNotice` / `RemoteAgentNotice` |
+| Leftovers | `isSafeRunId`, `RunTarget`, `RunOutcome`, `RunJournal`, `HandoffRun`, `RelayedRun` … | `isSafeAgentId`, `AgentTarget`, `AgentOutcome` … |
 
-**Two of these are breaking changes, which is why this stopped here rather than carrying on:**
+**Five of them were not renames at all** — they were aliases D5b left behind, the new name already
+sitting beside the old one: `readAllAgents as readAllRuns`, `startedAtFromAgentId as
+startedAtFromRunId`, `LiveAgent as LiveRun`, `ActiveAgent as ActiveRun`, `RecentAgent as RecentRun`.
+Collapsed.
 
-1. **`--session <path>`** — the flag the dashboard spawns children with. Renaming it changes the
-   contract between a daemon and a child, so an in-flight upgrade would have a new daemon spawning
-   with a flag an old binary refuses. Every other item is internal.
-2. **The branch prefix.** `agentBranchName()` was renamed by D5b; the string it returns was not, so
-   every agent still branches `the-framework/run-<id>`. Changing it strands the branches created
-   between D5b and the change — recoverable (they are pushed) but real, and it is the same "break
-   or carry a compatibility branch" call already made once for the on-disk layout.
+**The two breaking items, done deliberately:**
 
-**What stays whatever is decided:** the verb (`runDaemon`, `runAwaitRounds`, `runTodoLoop`,
-`RunPty`, `runtime`, `runner`); GitHub Actions runs (`WorkflowRun`, `ActionsRunNotice`, `runsOn`);
-the driver's own conversation (`DriverSession`, `resumeSessionId`, `sessionLink`,
-`setSessionName()`); and cloud/browser/CDP sessions.
+1. **`--session <path>` → `--agent <path>`**, the flag the dashboard spawns children with. It is a
+   contract between a daemon and a child of the same binary, so the exposure is one upgrade window,
+   and it is the same call already made for the on-disk layout.
+2. **The branch prefix** is now `the-framework/agent-<id>`. `agentBranchName()` had been renamed by
+   D5b while the string it returned had not. Worse, a *second* copy of that name was assembled in
+   `agent-handoff.ts` out of a prefix constant and a bare `run-`, which is how it went stale
+   unnoticed; that fallback now calls `agentBranchName()` rather than spelling the name twice.
 
-**Cost if approved:** one mechanical pass, symbol-aware as D5b's was, ~600 files. The 1,409 node
-tests and 751 dashboard tests are the check that it landed, as they were for D5b.
+**What stayed:** the verb (`runDaemon`, `runAwaitRounds`, `runTodoLoop`, `RunPty`, `runtime`,
+`runner`); GitHub Actions runs (`WorkflowRun`, `ActionsRunNotice`, `runsOn`); the driver's own
+conversation (`DriverSession`, `resumeSessionId`, `sessionLink`, `setSessionName()`, and the URL's
+`sessionId` parameter); and cloud/browser/CDP sessions. One collision had to be split rather than
+merged: `openRunPullRequest(cwd, branch, …)` and `openSessionPullRequest(cwd, agent, …)` are two
+different functions, now `openBranchPullRequest` and `openAgentPullRequest`.
+
+Verified: both typechecks, `pnpm build`, 1,409 node tests, 751 dashboard tests, and the non-root
+CI-equivalent run.
 
 ### D6. Four gate/choice mechanisms → one
 **TL;DR —** One gate shape, one protocol block, one card. Deletes ~3 of 4 branches across 1,006 LOC.

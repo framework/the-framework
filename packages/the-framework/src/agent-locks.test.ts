@@ -4,7 +4,7 @@ import { withAgentLock } from './agent-locks.js'
 
 const tick = (): Promise<void> => new Promise(resolve => setImmediate(resolve))
 
-test('withRunLock serializes holders of the same checkout, in arrival order', async () => {
+test('withAgentLock serializes holders of the same checkout, in arrival order', async () => {
   const order: string[] = []
   let releaseFirst = (): void => {}
   const first = withAgentLock('/tmp/a', async () => {

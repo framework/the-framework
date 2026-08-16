@@ -18,8 +18,8 @@ import { PromptEditor, type PromptEditorHandle } from './PromptEditor.js'
 import { PresetCreatePanel } from './PresetCreatePanel.js'
 import { PresetsMenu } from './PresetsMenu.js'
 import { DriverModelMenu, type DriverOption } from './DriverModelMenu.js'
-import { OptionsMenu, type RunTarget } from './OptionsMenu.js'
-import { resumeOptionRows, runOptionRows } from '../lib/run-option-rows.js'
+import { OptionsMenu, type AgentTarget } from './OptionsMenu.js'
+import { resumeOptionRows, agentOptionRows } from '../lib/agent-option-rows.js'
 import { AddDeviceDialog } from './AddDeviceDialog.js'
 import { useConnectionProfiles, connectLocal, isLoopbackHost, removeProfile, type ConnectionProfile } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId, selectRemoteDevice } from '../lib/remote-target.js'
@@ -71,7 +71,7 @@ export interface ComposerHandle {
 
 // The shared run composer (#721): the Tiptap editor (`/` `<` `@` `#` triggers, presets, mentions)
 // plus the control row — agent/model select, presets menu, Global-options gear, and the submit
-// button. Factored out of the launcher (StartRunForm) so the run-view chat (AgentComposer) gets the exact
+// button. Factored out of the launcher (StartAgentForm) so the run-view chat (AgentComposer) gets the exact
 // same surface, wired to the same data (files, presets, prefs). The caller owns what happens on
 // submit: the launcher starts a run (with collected options), the chat sends a message. The `@`
 // picker's project list is Composer's own concern, so it loads it here (#743) rather than making
@@ -84,9 +84,9 @@ export const Composer = forwardRef<ComposerHandle, {
   /** Drop a path from the run Context when its `@`/`#` chip leaves the editor (#948). */
   removeContext?: ((path: string) => void) | undefined
   /** Run the composed text. `kind` is `prompt` once a preset was loaded, else `build`.
-   *  `newSession` (#959) says the loaded preset must open a session of its own, so the two
+   *  `newAgent` (#959) says the loaded preset must open a session of its own, so the two
    *  in-session hosts send it as a new run instead of into the session they sit in. */
-  onSubmit: (text: string, kind: 'build' | 'prompt', opts: { newSession: boolean }) => void | Promise<void>
+  onSubmit: (text: string, kind: 'build' | 'prompt', opts: { newAgent: boolean }) => void | Promise<void>
   /** Mirror the live prompt + kind out, so the launcher can drive its disclosure/context UI. */
   onPromptChange?: ((prompt: string, kind: 'build' | 'prompt') => void) | undefined
   /** A preset was loaded (so the launcher can flag it in its note); `replaced` says a typed
@@ -106,12 +106,12 @@ export const Composer = forwardRef<ComposerHandle, {
   /** Inside a running/finished session (#833): every run option is baked in at spawn, so the
    *  gear drops them (keeping the genuinely global editor pick) and the "In play" strip goes —
    *  both would otherwise read as controls over *this* session that only rewrite the next one. */
-  inSession?: boolean | undefined
+  inAgent?: boolean | undefined
   /** The session has ended (#1172): the next message is a Resume, i.e. a NEW leg that resolves
    *  the current preferences at start (#1469) — so the gear returns, offering just the options
    *  that shape that leg (publish ladder, Autopilot, Browser). While the run is live nothing is
    *  adjustable, and the gear is dropped entirely instead of opening empty. Only read in-session. */
-  sessionEnded?: boolean | undefined
+  agentEnded?: boolean | undefined
   /** The session this composer sits in, if any (#874): a preset launched from a run page targets
    *  that session by default, instead of the whole codebase. Absent at the launcher, where no
    *  session exists yet. */
@@ -129,13 +129,13 @@ export const Composer = forwardRef<ComposerHandle, {
    *  without one the slot keeps its collapse-when-empty behavior for the launcher. */
   idleControl?: ReactNode
 }>(function Composer(
-  { files, addContext, removeContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inSession = false, sessionEnded = false, sessionName, contextControl, resolvedRowStart, idleControl },
+  { files, addContext, removeContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inAgent = false, agentEnded = false, sessionName, contextControl, resolvedRowStart, idleControl },
   ref,
 ) {
   const [prompt, setPrompt] = useState('')
   const [kind, setKind] = useState<'build' | 'prompt'>('build')
   // Set by the loaded preset, not by the surface (#959). Cleared with the box, like `kind`.
-  const [newSession, setNewSession] = useState(false)
+  const [newAgent, setNewAgent] = useState(false)
   const [addingPreset, setAddingPreset] = useState(false)
   const [addingDevice, setAddingDevice] = useState(false) // #1052: the "Add a device" modal
   const editorRef = useRef<PromptEditorHandle>(null)
@@ -167,7 +167,7 @@ export const Composer = forwardRef<ComposerHandle, {
         label: p.label,
         ...(p.tooltip ? { tooltip: p.tooltip } : {}),
         render: () => p.render(undefined, { session_name: sessionName }),
-        ...(p.newSession ? { newSession: true } : {}),
+        ...(p.newAgent ? { newAgent: true } : {}),
       })),
     [sessionName],
   )
@@ -206,11 +206,11 @@ export const Composer = forwardRef<ComposerHandle, {
   // composer. `prompt` then arrives the normal way, through the editor's own onChange.
   const [carriedDraft, setCarriedDraft] = useState<string | undefined>(undefined)
   useEffect(() => {
-    if (compact || inSession) return
+    if (compact || inAgent) return
     stashDraftFromUrl()
     const carried = takePendingDraft()
     if (carried) setCarriedDraft(carried)
-  }, [compact, inSession])
+  }, [compact, inAgent])
 
   // A synchronous latch alongside the async `busy` prop (#948): two fast ⌘↵ presses both read
   // `busy === false` (React state lags), fired two starts, and the second surfaced a spurious
@@ -222,24 +222,24 @@ export const Composer = forwardRef<ComposerHandle, {
     // #1073: a keyboard submit must be blocked too when the target device is offline.
     if (!text || busy || submittingRef.current || targetOffline) return
     submittingRef.current = true
-    void Promise.resolve(onSubmit(text, kind, { newSession })).finally(() => {
+    void Promise.resolve(onSubmit(text, kind, { newAgent })).finally(() => {
       submittingRef.current = false
     })
   }
 
   // A preset (from the `/` menu or the Presets button) loads the rendered template into the
   // editor, which chip-ifies its tags; the run then goes verbatim as a `prompt` kind.
-  const loadPreset = (label: string, replaced: boolean, presetNewSession = false) => {
+  const loadPreset = (label: string, replaced: boolean, presetNewAgent = false) => {
     setKind('prompt')
-    setNewSession(presetNewSession)
+    setNewAgent(presetNewAgent)
     onPreset?.(label, replaced)
   }
 
   // The Presets button's load path (#948): through the imperative handle rather than the
   // suggestion plugin, then the same bookkeeping as the `/` menu.
-  const loadPresetFromMenu = (text: string, label: string, presetNewSession?: boolean) => {
+  const loadPresetFromMenu = (text: string, label: string, presetNewAgent?: boolean) => {
     const replaced = editorRef.current?.loadTemplate(text) ?? false
-    loadPreset(label, replaced, presetNewSession)
+    loadPreset(label, replaced, presetNewAgent)
   }
 
   const onPromptEdit = (value: string) => {
@@ -248,14 +248,14 @@ export const Composer = forwardRef<ComposerHandle, {
     const nextKind = !value.trim() && kind !== 'build' ? 'build' : kind
     if (nextKind !== kind) setKind(nextKind)
     // Emptying the box drops the preset, and with it its new-session rule.
-    if (nextKind === 'build' && newSession) setNewSession(false)
+    if (nextKind === 'build' && newAgent) setNewAgent(false)
     onPromptChange?.(value, nextKind)
   }
 
   // The Global options as one table (#314), with every rule between them (#958). The table lives
-  // in lib/run-option-rows.ts because the settings page renders the same options: a second copy
+  // in lib/agent-option-rows.ts because the settings page renders the same options: a second copy
   // would let a rule hold in one place and not the other.
-  const { main: mainOptions } = runOptionRows(preferences)
+  const { main: mainOptions } = agentOptionRows(preferences)
 
   const editorEl = (
     <PromptEditor
@@ -317,17 +317,17 @@ export const Composer = forwardRef<ComposerHandle, {
   // to render with an empty dropdown. Once the run has ENDED, the next message is a Resume — a new
   // leg that resolves the current preferences at start (#1469) — so the gear returns with just the
   // rows that shape that leg (`resumeOptionRows`).
-  const optionsGearEl = inSession && !sessionEnded ? null : (
+  const optionsGearEl = inAgent && !agentEnded ? null : (
     <OptionsMenu
-      options={inSession ? resumeOptionRows(preferences) : mainOptions}
+      options={inAgent ? resumeOptionRows(preferences) : mainOptions}
       busy={busy}
-      {...(inSession ? { label: 'Resume options' } : {})}
+      {...(inAgent ? { label: 'Resume options' } : {})}
       // The "Run on" driver axis (#1050) is baked in at spawn, so it is offered only at the launcher —
       // same reasoning as the agent select being hidden in-session.
-      {...(inSession ? {} : { runTarget: { value: target, onChange: (t: RunTarget) => updatePreferences({ target: t }) } })}
+      {...(inAgent ? {} : { agentTarget: { value: target, onChange: (t: AgentTarget) => updatePreferences({ target: t }) } })}
       // The saved-devices connection section (#1052) rides the same "Run on" sub, so it too is
       // launcher-only; the header indicator shows the current device everywhere.
-      {...(inSession
+      {...(inAgent
         ? {}
         : {
             connection: {
@@ -443,7 +443,7 @@ export const Composer = forwardRef<ComposerHandle, {
       {/* The "In play" row (#842/#1046): the Enhanced System Prompt dropdown at the start, the
           resolved-options strip at the end. Off in the compact row (one line) and in-session
           (#833), where the strip described the *global* options rather than this session's. */}
-      {!inSession && (
+      {!inAgent && (
         <div className="mt-2 flex items-center justify-between gap-3">
           {resolvedRowStart}
           <ResolvedOptions options={mainOptions} sources={sources} fileConfig={fileConfig} />

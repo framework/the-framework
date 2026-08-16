@@ -1,6 +1,6 @@
 // The CLI entry the E2E harness hands to createProjectRuntime as `binPath`.
 //
-// The dashboard spawns a session as `node <binPath> --session <specPath>`; this entry forwards
+// The dashboard spawns a session as `node <binPath> --agent <specPath>`; this entry forwards
 // that argv to the real CLI with `FRAMEWORK_FAKE` set on itself, so the spawned child executes the
 // complete production session lifecycle (worktree cwd, run store, events.jsonl, control watcher,
 // gates, teardown) with the deterministic offline FakeDriver where a real coding agent would be.
@@ -19,7 +19,7 @@ const args = process.argv.slice(2)
 const argvFile = process.env.FRAMEWORK_E2E_ARGV_FILE
 if (argvFile) {
   try {
-    const specPath = args[args.indexOf('--session') + 1]
+    const specPath = args[args.indexOf('--agent') + 1]
     appendFileSync(argvFile, readFileSync(specPath!, 'utf8').replace(/\s*\n\s*/g, '') + '\n')
   } catch {
     // recording is diagnostics, never a reason to fail the run

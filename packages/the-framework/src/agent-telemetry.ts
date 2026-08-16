@@ -82,7 +82,7 @@ export function createDriverEventHandler(opts: DriverEventHandlerOptions): Drive
     if (event.sessionId && event.sessionId !== lastSessionId) {
       lastSessionId = event.sessionId
       // A driver that knows its session's real URL (#1317, the cloud hand-off) beats the
-      // `--session-link` template, whose Claude default is the generic entry point.
+      // session-link template, whose Claude default is the generic entry point.
       const link = event.sessionLink ?? (opts.sessionLink ? resolveSessionLink(opts.sessionLink, event.sessionId) : undefined)
       emit({ kind: 'session-update', sessionId: event.sessionId, ...(link ? { sessionLink: link } : {}) })
     }
@@ -95,8 +95,8 @@ export function createDriverEventHandler(opts: DriverEventHandlerOptions): Drive
   return { onDriverEvent }
 }
 
-/** Inputs to {@link createRunControls}. */
-export interface RunControlsOptions {
+/** Inputs to {@link createAgentControls}. */
+export interface AgentControlsOptions {
   emit: (event: FrameworkEvent) => void
   /** The caller's abort signal (Stop button / Ctrl+C / control channel), if any. */
   signal?: AbortSignal | undefined
@@ -104,9 +104,9 @@ export interface RunControlsOptions {
 }
 
 /** The run's abort plumbing plus its driver-event sink. */
-export interface RunControls extends DriverEventHandler {
+export interface AgentControls extends DriverEventHandler {
   /** The composed signal every driver turn runs under: the caller's, or the answer's. */
-  runSignal: AbortSignal
+  agentSignal: AbortSignal
   /** Trips a clean stop when the user answers a gate with a `stop` option (#358). */
   answerController: AbortController
 }
@@ -114,7 +114,7 @@ export interface RunControls extends DriverEventHandler {
 /**
  * Compose the run's signal and wire its driver-event handler in one place. The caller's signal is
  * OR'd (via {@link AbortSignal.any}) with the one self-stop left — an answer that says to stop
- * (#358) — so anything downstream that watches `runSignal` stops the same way regardless of which
+ * (#358) — so anything downstream that watches `agentSignal` stops the same way regardless of which
  * fired.
  *
  * There were three (E1). A per-run USD cap and a mid-run quota gate also aborted a session that
@@ -126,11 +126,11 @@ export interface RunControls extends DriverEventHandler {
  * a decline of an `await-confirmation` — and now through the option the agent marked, which is
  * the same stop with the plan-approval special case taken out of it (D6).
  */
-export function createRunControls(opts: RunControlsOptions): RunControls {
+export function createAgentControls(opts: AgentControlsOptions): AgentControls {
   const answerController = new AbortController()
-  const runSignal = AbortSignal.any([...(opts.signal ? [opts.signal] : []), answerController.signal])
+  const agentSignal = AbortSignal.any([...(opts.signal ? [opts.signal] : []), answerController.signal])
   const handler = createDriverEventHandler({ emit: opts.emit, sessionLink: opts.sessionLink })
-  return { ...handler, runSignal, answerController }
+  return { ...handler, agentSignal, answerController }
 }
 
 /** Inputs to {@link endStopDetail}. */

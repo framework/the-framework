@@ -10,7 +10,7 @@ import { AgentOverview } from './AgentOverview.js'
 // (RelayView, which keeps it since it has no action bar). `lost` is the live channel's health
 // (#948): while the stream is down the feed is behind reality, and saying so beats letting
 // "the agent went quiet" and "the connection died" look identical.
-export function RunFeed({
+export function AgentFeed({
   events,
   showSessionLink = true,
   showName = true,

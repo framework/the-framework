@@ -10,7 +10,7 @@ import type { LinkedPr } from './gh.js'
 export type RemoveWorktreeResult = { ok: true } | { ok: false; error: string }
 
 /** The outcome of deleting a session — its records and worktree (#1032). */
-export type DeleteSessionResult = { ok: true } | { ok: false; error: string }
+export type DeleteAgentResult = { ok: true } | { ok: false; error: string }
 
 /** The outcome of an add-project attempt (#396). */
 export type AddProjectResult =
@@ -51,7 +51,7 @@ export interface DriverReady {
  * system prompt, and Eco to the fine-grained #326 section drops. Absent fields
  * default off, i.e. today's behavior.
  */
-export interface StartRunOptions {
+export interface StartAgentOptions {
   /** Auto-accept mode; also steers the maintenance-prompt (#326) stance. */
   autopilot?: boolean
   /** Technical mode: expose technical detail (preset-scoped). */
@@ -100,7 +100,7 @@ export interface StartRunOptions {
    * ticket still rides for the run's meta, but the PR title must not inherit the issue as
    * `(fix #42)` (#1334) — a plan's merge would close the issue with the work still undone.
    */
-  planRun?: boolean
+  planAgent?: boolean
   /** Resume a finished run's conversation (#720): its captured agent session id; maps to `--resume-session`. The run's prompt continues that session (full prior context) instead of starting fresh. Sent with `kind: 'prompt'` when you message a run that has ended. */
   resumeSession?: string
   /**
@@ -108,7 +108,7 @@ export interface StartRunOptions {
    * own log, on its own branch, so a stopped run you message again stays one row in the history
    * instead of spawning an unrelated-looking second one.
    */
-  continueRunId?: string
+  continueAgentId?: string
   /**
    * Run this session on a connected device (#1067): the local daemon relays the run to the remote
    * daemon at `url` (authenticating with `token` as the `fw_daemon` cookie) and streams its events
@@ -129,10 +129,10 @@ export interface StartRunOptions {
  * `research` renders the [Research] preset around the posted "what" server-side
  * (empty allowed, defaults to `this PR`) and remains for API callers.
  */
-export type StartRunKind = 'build' | 'research' | 'prompt'
+export type StartAgentKind = 'build' | 'research' | 'prompt'
 
 /** The outcome of a Start attempt (#345). */
-export type StartRunResult =
+export type StartAgentResult =
   /**
    * `agentId` is the id the daemon allocated for the run (#761), present whenever it got its own
    * worktree. The dashboard needs it to select the run it just started: with concurrent runs

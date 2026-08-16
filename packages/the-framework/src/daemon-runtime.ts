@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { appendFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import {
   agentIdFromStartedAt,
-  startedAtFromRunId,
+  startedAtFromAgentId,
   addWorktree,
   agentBranchName,
   linkDependencies,
@@ -28,19 +28,19 @@ import {
   type AgentMeta,
 } from './store/index.js'
 import type { FrameworkEvent } from './events.js'
-import { writeSessionSpec } from './session-spec.js'
-import type { StartRunKind, StartRunOptions, StartRunResult, AddProjectResult } from './dashboard/index.js'
-import type { EventsSource, RemoteRuns } from './dashboard/rpc-serve.js'
-import { RelayedRuns, startRemoteRun } from './dashboard/remote-run.js'
+import { writeAgentSpec } from './agent-spec.js'
+import type { StartAgentKind, StartAgentOptions, StartAgentResult, AddProjectResult } from './dashboard/index.js'
+import type { EventsSource, RemoteAgents } from './dashboard/rpc-serve.js'
+import { RelayedAgents, startRemoteAgent } from './dashboard/remote-run.js'
 import { agentBranchFor } from './dashboard/agent-handoff.js'
 import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
-import { tailEvents, tailRunEvents } from './dashboard-rpc/events-tail.js'
-import { ensureSessionsIgnored, resolveUserDir } from './sessions.js'
+import { tailEvents, tailAgentEvents } from './dashboard-rpc/events-tail.js'
+import { ensureArchiveIgnored, resolveUserDir } from './agent-archive.js'
 import { removeProjectWorktree } from './worktrees.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId } from './registry.js'
 import { isTicketPath } from './tickets.js'
-import { resolveProjectRunOptions } from './daemon-services.js'
+import { resolveProjectAgentOptions } from './daemon-services.js'
 import { installProject, enumerateGitRepos } from './install.js'
 import { isGitRepo } from './project.js'
 import { isCliTimeout } from './cli-exec.js'
@@ -95,12 +95,12 @@ export async function cleanupTimedOutWorktree(repo: string, agentId: string, err
 
 /** Best-effort append of a `log` event to a run's live stream, so a daemon-side note surfaces on a
  * run whose own process wrote every other line. Never throws. */
-async function appendRunLog(cwd: string, message: string): Promise<void> {
+async function appendAgentLog(cwd: string, message: string): Promise<void> {
   const event: FrameworkEvent = { kind: 'log', message }
   await appendFile(join(cwd, FRAMEWORK_DIR, EVENTS_FILE), JSON.stringify(event) + '\n').catch(() => {})
 }
 
-/** Spawn a detached, unref'd framework child (`node <binPath> --session <specPath>`) that outlives us. */
+/** Spawn a detached, unref'd framework child (`node <binPath> --agent <specPath>`) that outlives us. */
 export function spawnDetached(binPath: string, specPath: string, stderrFile?: string): ChildProcess {
   // stderr goes to a file, never a pipe: a detached child must not block on a dead parent's pipe
   // buffer, and the file is what makes a silent boot death diagnosable (#1261). Best-effort — a
@@ -112,7 +112,7 @@ export function spawnDetached(binPath: string, specPath: string, stderrFile?: st
       fd = openSync(stderrFile, 'w')
     } catch {}
   }
-  const child = spawn(process.execPath, [binPath, '--session', specPath], {
+  const child = spawn(process.execPath, [binPath, '--agent', specPath], {
     detached: true,
     stdio: ['ignore', 'ignore', fd ?? 'ignore'],
   })
@@ -122,7 +122,7 @@ export function spawnDetached(binPath: string, specPath: string, stderrFile?: st
 }
 
 /** Where a spawned run's stderr lands (#1261), so a child that dies at boot leaves a trace. */
-export function runStderrPath(cwd: string): string {
+export function agentStderrPath(cwd: string): string {
   return join(cwd, FRAMEWORK_DIR, 'stderr.log')
 }
 
@@ -151,14 +151,14 @@ export async function markFailedStart(cwd: string, agentId: string, intent: stri
     version: AGENT_META_VERSION,
     status: 'failed',
     id: agentId,
-    startedAt: startedAtFromRunId(agentId) ?? now,
+    startedAt: startedAtFromAgentId(agentId) ?? now,
     updatedAt: now,
     ...(intent.trim() ? { intent } : {}),
   }
-  const stderrTail = (await readFile(runStderrPath(cwd), 'utf8').catch(() => '')).trim().slice(-2000)
+  const stderrTail = (await readFile(agentStderrPath(cwd), 'utf8').catch(() => '')).trim().slice(-2000)
   await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true }).catch(() => {})
   await writeFile(metaPath, JSON.stringify(meta, null, 2) + '\n').catch(() => {})
-  await appendRunLog(cwd, `The session failed to start: ${detail}.` + (stderrTail ? `\n\n${stderrTail}` : ''))
+  await appendAgentLog(cwd, `The session failed to start: ${detail}.` + (stderrTail ? `\n\n${stderrTail}` : ''))
   console.log(`[framework] run ${agentId} failed to start: ${detail}`)
   return true
 }
@@ -172,7 +172,7 @@ const TRANSIENT_FAILURE =
   /connection closed|connection reset|connection error|econnreset|etimedout|socket hang up|overloaded|rate.?limit|api error: 5\d\d|internal server error/i
 
 /** Whether a run's failure detail names a transient transport error (#1281). */
-export function isTransientRunFailure(detail: string | undefined): boolean {
+export function isTransientAgentFailure(detail: string | undefined): boolean {
   return detail !== undefined && TRANSIENT_FAILURE.test(detail)
 }
 
@@ -181,7 +181,7 @@ export function isTransientRunFailure(detail: string | undefined): boolean {
  * undefined when the run did not fail by its own report. Only a child-written `end` counts: a
  * boot death (#1261) never writes one, and retrying a run that cannot boot would just re-crash.
  */
-export function lastRunFailureDetail(eventsJsonl: string): string | undefined {
+export function lastAgentFailureDetail(eventsJsonl: string): string | undefined {
   let detail: string | undefined
   for (const line of eventsJsonl.split('\n')) {
     if (!line.trim()) continue
@@ -257,7 +257,7 @@ async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
  * or remove its checkout) runs well past that. Without this wait, shutdown's archive commit fires
  * while a run is still being archived, and it misses that run's ending (#912/#1179).
  *
- * A slot is settled when it is in neither map: `settle` drops it from `activeRuns` and parks its
+ * A slot is settled when it is in neither map: `settle` drops it from `activeAgents` and parks its
  * teardown in `retiring`, and the teardown clears itself on the way out. A run with no worktree
  * never enters `retiring` at all, and needs no special case — it is simply already gone from both.
  *
@@ -345,7 +345,7 @@ export interface ProjectRuntimeOptions {
 
 /** The per-project run + preview surface the dashboard drives, plus its teardown. */
 export interface ProjectRuntime {
-  onStart: (prompt: string, kind: StartRunKind, options?: StartRunOptions, targetProjectId?: string) => Promise<StartRunResult>
+  onStart: (prompt: string, kind: StartAgentKind, options?: StartAgentOptions, targetProjectId?: string) => Promise<StartAgentResult>
   onAddProject: (path: string, directory: boolean) => Promise<AddProjectResult>
   /** The live event stream for a run this daemon is relaying from a device (#1067), else undefined
    *  so `onEvents` falls back to tailing the on-disk log. Wired as the dashboard's events source. */
@@ -355,12 +355,12 @@ export interface ProjectRuntime {
   tailRelayEvents: (agentId: string, onEvent: (event: FrameworkEvent) => void) => () => void
   /** The relayed-run lookup the dashboard's read RPCs consult (#1067 slice 2): which device a remote
    *  run runs on, so a run-scoped RPC forwards there instead of resolving a local checkout. */
-  remoteRuns: RemoteRuns
+  remoteAgents: RemoteAgents
   /** The device side of the relay (#1067 slice 2): run one whitelisted read/steer/handoff RPC against
    *  this daemon's own home checkout, for a daemon that relayed a run here. */
   onRelayRpc: (fn: string, args: unknown[]) => Promise<unknown>
   /** Live runs on a project (#685), so a background job can tell an idle project from a busy one. */
-  activeRunCount: (targetProjectId: string) => number
+  activeAgentCount: (targetProjectId: string) => number
   /**
    * The run ids this daemon is still responsible for: spawning, running, or mid-retirement.
    *
@@ -369,12 +369,12 @@ export interface ProjectRuntime {
    * the teardown for the same directory. "Not live" on disk is not the same as "the daemon is
    * finished with it", and this is the difference.
    */
-  busyRunIds: () => ReadonlySet<string>
+  busyAgentIds: () => ReadonlySet<string>
   /**
    * Stop the runs this daemon spawned. Returns how many were stopped. Called on shutdown, before
    * the previews go.
    */
-  stopRuns: (graceMs?: number) => Promise<number>
+  stopAgents: (graceMs?: number) => Promise<number>
   /** Stop every live preview so their dev servers do not outlive the daemon (#475). */
   dispose: () => Promise<void>
 }
@@ -401,12 +401,12 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     })
   }
   // Runs this daemon is relaying to/from a connected device (#1067): the local half of a remote run.
-  const relayedRuns = new RelayedRuns()
+  const relayedAgents = new RelayedAgents()
   // The relayed-run lookup the dashboard's read RPCs consult (#1067 slice 2): is this agentId remote, and
   // which device owns it. Outlives the event stream so a finished remote run's push/PR still reaches it.
-  const remoteRuns: RemoteRuns = {
-    target: agentId => relayedRuns.target(agentId),
-    list: projectId => relayedRuns.list(projectId),
+  const remoteAgents: RemoteAgents = {
+    target: agentId => relayedAgents.target(agentId),
+    list: projectId => relayedAgents.list(projectId),
   }
   // The device side of the relay (#1067 slice 2): run one whitelisted read/steer/handoff RPC against this
   // daemon's own home checkout, for a daemon that relayed a run here. Home id forces the addressed project.
@@ -472,7 +472,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
    * already cannot run anything.
    */
   const readyUntil = new Map<DriverName, number>()
-  const checkAgentReady = async (options: StartRunOptions): Promise<string | undefined> => {
+  const checkAgentReady = async (options: StartAgentOptions): Promise<string | undefined> => {
     if (options.target === 'actions') return undefined
     const driver = isDriverName(options.driver) ? options.driver : 'claude'
     if ((readyUntil.get(driver) ?? 0) > Date.now()) return undefined
@@ -484,7 +484,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
 
   /**
    * The checkout a run gets (#736). Each run is given its own git worktree under the project's
-   * `.the-framework/worktrees/<agentId>`, on a `the-framework/run-<agentId>` branch, so N runs on one
+   * `.the-framework/worktrees/<agentId>`, on a `the-framework/agent-<agentId>` branch, so N runs on one
    * repo never fight over the working tree — and the user's own checkout, uncommitted work
    * included, is left untouched.
    *
@@ -549,7 +549,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         // Filed under the identity this repo commits as, and the ignore rules taught to keep it, so
         // the session survives the repo being cleaned (#1179).
         const user = await resolveUserDir(projectCwd)
-        await ensureSessionsIgnored(projectCwd, user).catch(() => false)
+        await ensureArchiveIgnored(projectCwd, user).catch(() => false)
         await archiveWorktreeAgent(worktree, projectCwd, undefined, branch, user)
         // One rule (E5): the checkout goes once its work is on the remote, whatever state the run
         // ended in. `removeProjectWorktree` owns the whole sequence — commit what is pending, push
@@ -569,14 +569,14 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   // not the work, and the continue-run machinery (#762/#923) reopens the retained checkout on its
   // recorded branch (#1278). Counted in memory on purpose: a daemon restart already re-resumes
   // runs (#923), and a lost count only ever grants one extra attempt.
-  const runRetries = new Map<string, number>()
+  const agentRetries = new Map<string, number>()
   const retryTransientDeath = async (
     projectCwd: string,
     targetProjectId: string | undefined,
     agentId: string,
-    options: StartRunOptions,
+    options: StartAgentOptions,
   ): Promise<void> => {
-    const attempts = runRetries.get(agentId) ?? 0
+    const attempts = agentRetries.get(agentId) ?? 0
     if (attempts >= MAX_TRANSIENT_RETRIES) return
     const meta = (await listAgents(projectCwd).catch((): AgentMeta[] => [])).find(agent => agent.id === agentId)
     // Only a run that failed by its own report, and only a local one: a web/actions run's
@@ -584,9 +584,9 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     if (meta?.status !== 'failed') return
     if (meta.target !== undefined && meta.target !== 'local') return
     const jsonl = (await archivedAgentPaths(projectCwd, agentId).catch((): string[] => [])).find(path => path.endsWith('.jsonl'))
-    const detail = jsonl ? lastRunFailureDetail(await readFile(jsonl, 'utf8').catch(() => '')) : undefined
-    if (!isTransientRunFailure(detail)) return
-    runRetries.set(agentId, attempts + 1)
+    const detail = jsonl ? lastAgentFailureDetail(await readFile(jsonl, 'utf8').catch(() => '')) : undefined
+    if (!isTransientAgentFailure(detail)) return
+    agentRetries.set(agentId, attempts + 1)
     console.log(
       `[framework] agent ${agentId} died to a transient error (${detail}); continuing it in ${(retryDelayMs ?? TRANSIENT_RETRY_DELAY_MS) / 1000}s, attempt ${attempts + 1} of ${MAX_TRANSIENT_RETRIES}`,
     )
@@ -600,7 +600,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
           ...options,
           // Unattended like #923's resume: nobody is watching a retry, and the run must end.
           unattended: true,
-          continueRunId: agentId,
+          continueAgentId: agentId,
           ...(meta.sessionId ? { resumeSession: meta.sessionId } : {}),
         },
         targetProjectId,
@@ -611,7 +611,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     timer.unref?.()
   }
 
-  // Start-from-dashboard (#345): spawn `framework --session <spec>` for the checkout
+  // Start-from-dashboard (#345): spawn `framework --agent <spec>` for the checkout
   // as a detached child — the same spawn ensureDaemon uses for the daemon itself. The run
   // streams into the page via its tailed event log, and its gates + Stop steer through the
   // control channel (#344).
@@ -623,20 +623,20 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   // which in practice means the fallback path above.
   const onStart = async (
     prompt: string,
-    kind: StartRunKind,
-    options: StartRunOptions = {},
+    kind: StartAgentKind,
+    options: StartAgentOptions = {},
     targetProjectId?: string,
-  ): Promise<StartRunResult> => {
+  ): Promise<StartAgentResult> => {
     // Run on a connected device (#1067): forward the run to the remote daemon and relay its events
     // back, without allocating a worktree or touching this daemon's busy guard; the remote owns
     // both. `remote` is stripped so the remote starts an ordinary local run and does not relay on.
     // Slice 1 runs in the device's own home checkout; which remote project it targets is a later slice.
     if (options.remote) {
       const { remote, ...forwarded } = options
-      const result = await startRemoteRun(remote, { prompt, kind, options: forwarded })
+      const result = await startRemoteAgent(remote, { prompt, kind, options: forwarded })
       if (result.ok && result.agentId) {
         // A relayed run has no local worktree or pid, so its list row is a memory-only stub (#1077):
-        // registered here so onRuns can show it and a dashboard reload re-opens it. Never written to disk.
+        // registered here so onAgents can show it and a dashboard reload re-opens it. Never written to disk.
         const now = new Date().toISOString()
         const meta: AgentMeta = {
           version: AGENT_META_VERSION,
@@ -648,7 +648,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
           ...(prompt ? { intent: prompt } : {}),
           ...(remote.label ? { remoteLabel: remote.label } : {}),
         }
-        relayedRuns.register(result.agentId, remote, meta, targetProjectId ?? homeId)
+        relayedAgents.register(result.agentId, remote, meta, targetProjectId ?? homeId)
       }
       return result
     }
@@ -663,28 +663,28 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     }
 
     // A continuation start carries only its seed (#1467): the composer's Resume sends
-    // `{resumeSession, continueRunId, agent}` and nothing else, so the run's armed handoff fell
+    // `{resumeSession, continueAgentId, agent}` and nothing else, so the run's armed handoff fell
     // back to bare defaults — a session that ran its first leg merge-armed resumed with the merge
     // silently disarmed and ended in a draft PR. The project's resolved options are the base and
     // the caller's explicit ones stay on top. A fresh start is untouched — the launcher resolves
     // its options client-side and sends them whole.
-    if (options.continueRunId) {
-      options = { ...(await resolveProjectRunOptions(projectKey, env)), ...options }
+    if (options.continueAgentId) {
+      options = { ...(await resolveProjectAgentOptions(projectKey, env)), ...options }
       // A Resume fired the instant its run flips `done` can also land while the child that wrote
       // that ending is still mid-exit (#1529): the slot then still holds a live pid, and the busy
       // guard below refused a continuation of a session that is over by its own account. Wait the
       // exit and its queued retirement out, so the guard judges only real collisions and the
       // checkout reuse reads a settled archive.
-      const { continueRunId } = options
+      const { continueAgentId } = options
       await waitOutFinishedLeg(
-        scopedKey(projectKey, continueRunId),
+        scopedKey(projectKey, continueAgentId),
         { starting, activeAgents: activeAgents, retiring },
         async () => {
           // The composed read (live meta wins over archive): the leg just wrote `done` into its
           // worktree and teardown has not archived it yet, so the archive-only list cannot see it.
           // No row at all is `unknown`, never `ended` (#1540): the leg is mid-teardown, or its
           // meta was caught mid-rewrite, and neither says anything about whether it is still up.
-          const meta = continueRunId ? await findAgent(projectCwd, continueRunId).catch(() => undefined) : undefined
+          const meta = continueAgentId ? await findAgent(projectCwd, continueAgentId).catch(() => undefined) : undefined
           if (!meta) return 'unknown'
           return meta.status === 'running' ? 'running' : 'ended'
         },
@@ -701,7 +701,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     if (preflightError) return { ok: false, error: preflightError }
 
     // Continuing an existing run (#762) reuses its id, checkout and log; anything else is new.
-    const continued = options.continueRunId ? await continueWorkspace(projectCwd, options.continueRunId) : undefined
+    const continued = options.continueAgentId ? await continueWorkspace(projectCwd, options.continueAgentId) : undefined
     // A repo that could not be given a worktree fails the Start rather than borrowing the user's
     // own checkout (#997); the dashboard shows the reason, and starting again is the retry.
     const allocated = continued
@@ -725,16 +725,16 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
       // run recorded inside it are one string — and tells it the framework owns its branch.
       const child = spawnDetached(
         realBin,
-        await writeSessionSpec({
+        await writeAgentSpec({
           prompt,
           kind,
           cwd: workspace.cwd,
           ...(workspace.agentId ? { agentId: workspace.agentId } : {}),
           // Reopen the run's log instead of truncating it: the follow-up IS that run.
-          ...(continued ? { continueRun: true } : {}),
+          ...(continued ? { continueAgent: true } : {}),
           options,
         }, env),
-        ...(workspace.agentId ? [runStderrPath(workspace.cwd)] : []),
+        ...(workspace.agentId ? [agentStderrPath(workspace.cwd)] : []),
       )
       // The run narrates itself through its own `.the-framework/events.jsonl`, which the
       // dashboard streams over a Telefunc Channel; the daemon just tracks liveness.
@@ -795,7 +795,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
    * re-checked rather than trusted: `settle` clears the entry on exit, but a run whose exit
    * event never arrived would otherwise keep a project looking busy forever.
    */
-  const activeRunCount = (targetProjectId: string): number => {
+  const activeAgentCount = (targetProjectId: string): number => {
     let live = 0
     for (const [key, pid] of activeAgents) {
       if (!keyBelongsTo(key, targetProjectId)) continue
@@ -804,8 +804,8 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     return live + [...starting].filter(key => keyBelongsTo(key, targetProjectId)).length
   }
 
-  /** See {@link ProjectRuntime.busyRunIds}: every slot the daemon has not finished with. */
-  const busyRunIds = (): ReadonlySet<string> => {
+  /** See {@link ProjectRuntime.busyAgentIds}: every slot the daemon has not finished with. */
+  const busyAgentIds = (): ReadonlySet<string> => {
     const ids = new Set<string>()
     for (const key of [...activeAgents.keys(), ...starting, ...retiring.keys()]) {
       const { agentId } = parseScopedKey(key)
@@ -822,7 +822,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
    * daemon that owns it: left alone it becomes an orphan on `ppid 1`, holding a worktree and a
    * headless browser, with no daemon left that knows about it. So each gets a SIGTERM, which the
    * run already handles by aborting cleanly and group-killing its agent, and a SIGKILL if it will
-   * not go. Only runs in `activeRuns` — a run this daemon merely steers is not its to stop.
+   * not go. Only runs in `activeAgents` — a run this daemon merely steers is not its to stop.
    *
    * What is stopped here is not lost, it is just not restarted for you: the run keeps its branch,
    * and its checkout too until the work reaches the remote (E5), so the next start continues the
@@ -831,7 +831,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
    * Resolving means the daemon has let go of the repo, not merely that the processes are dead —
    * see {@link waitOutSlots}. The archive commit that runs right behind this depends on it.
    */
-  const stopRuns = async (graceMs = 5000): Promise<number> => {
+  const stopAgents = async (graceMs = 5000): Promise<number> => {
     const stopping = [...activeAgents.entries()]
     let stopped = 0
     for (const [, pid] of stopping) if (await terminate(pid, graceMs)) stopped++
@@ -844,7 +844,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
 
   // The dashboard's events source (#1067): a stream for a run this daemon is relaying from a device,
   // else undefined so `onEvents` tails the on-disk log as usual for an ordinary local run.
-  const remoteEventsSource: EventsSource = (_projectId, agentId) => relayedRuns.get(agentId)
+  const remoteEventsSource: EventsSource = (_projectId, agentId) => relayedAgents.get(agentId)
 
   // Tail a relay-started run's own log (#1067) for the `/_relay/events` endpoint. The relocating
   // tail, for the same reason as the dashboard's onEvents: teardown moves the journal into the
@@ -854,7 +854,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   const rootJournal = join(cwd, FRAMEWORK_DIR, EVENTS_FILE)
   const tailRelayEvents = (agentId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => {
     let initial = true
-    return tailRunEvents<FrameworkEvent>(async () => {
+    return tailAgentEvents<FrameworkEvent>(async () => {
       const next = await resolveAgentEventsPath(cwd, agentId)
       if (initial) {
         initial = false
@@ -865,7 +865,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   }
 
   const dispose = async (): Promise<void> => {
-    relayedRuns.dispose()
+    relayedAgents.dispose()
   }
 
   return {
@@ -873,11 +873,11 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     onAddProject,
     remoteEventsSource,
     tailRelayEvents,
-    remoteRuns,
+    remoteAgents,
     onRelayRpc,
-    activeRunCount,
-    busyRunIds,
-    stopRuns,
+    activeAgentCount,
+    busyAgentIds,
+    stopAgents,
     dispose,
   }
 }

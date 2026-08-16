@@ -3,13 +3,13 @@ import { test } from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { makeWorld, waitFor, withFakeAwait } from './harness.js'
 import { archivedAgentPaths } from '../store/index.js'
-import { onOpenQuestions, onRuns, onRetainedWorktrees, onRunWorktree } from '../dashboard-rpc/reads.js'
+import { onOpenQuestions, onAgents, onRetainedWorktrees, onAgentWorktree } from '../dashboard-rpc/reads.js'
 import {
   sendChoice,
   sendMessage,
   sendStop,
   sendSetHandoff,
-  sendDeleteSession,
+  sendDeleteAgent,
 } from '../dashboard-rpc/control.js'
 
 // The steering stories (README.md): everything the user does TO a live session — answer its
@@ -21,8 +21,8 @@ test('answer a parked session’s question from the questions hub (#304/#1455)',
   const rpc = world.rpc
   try {
     const project = await world.addProject()
-    const agentId = await withFakeAwait('choices', () => world.startRun(project, 'Wire up auth'))
-    const tail = await world.tailRun(project, agentId)
+    const agentId = await withFakeAwait('choices', () => world.startAgent(project, 'Wire up auth'))
+    const tail = await world.tailAgent(project, agentId)
 
     // The run parks: the full gate (title, options, recommendation) reaches the feed, and the
     // cross-project questions hub lists it against this session.
@@ -44,7 +44,7 @@ test('answer a parked session’s question from the questions hub (#304/#1455)',
     const resolved = await waitFor(() => tail.events.find(e => e.kind === 'choice-resolved'), 'the resolution event')
     assert.equal(resolved.kind === 'choice-resolved' && resolved.picked, gate.recommended)
     assert.equal(resolved.kind === 'choice-resolved' && resolved.by, 'user')
-    await world.waitRun(project, agentId, 'done')
+    await world.waitAgent(project, agentId, 'done')
 
     // Answered means gone from the hub.
     assert.equal((await rpc(onOpenQuestions)()).some(q => q.agentId === agentId), false)
@@ -58,8 +58,8 @@ test('chat with a live session: a message becomes the next agent turn (#714)', a
   const rpc = world.rpc
   try {
     const project = await world.addProject()
-    const agentId = await withFakeAwait('choices', () => world.startRun(project, 'Build the dashboard page'))
-    const tail = await world.tailRun(project, agentId)
+    const agentId = await withFakeAwait('choices', () => world.startAgent(project, 'Build the dashboard page'))
+    const tail = await world.tailAgent(project, agentId)
     const gate = await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the parked gate')
     if (gate.kind !== 'choice') return
 
@@ -76,7 +76,7 @@ test('chat with a live session: a message becomes the next agent turn (#714)', a
         ),
       'the chat message to become an agent turn',
     )
-    await world.waitRun(project, agentId, 'done')
+    await world.waitAgent(project, agentId, 'done')
     await world.waitRetired(project, agentId)
 
     // What was said survives the session (#1179): teardown archives the run's event log into the
@@ -99,8 +99,8 @@ test('rearm the handoff mid-run; the meta a reloaded tab reads follows (#1102)',
   const rpc = world.rpc
   try {
     const project = await world.addProject()
-    const agentId = await withFakeAwait('choices', () => world.startRun(project, 'Refactor the config layer'))
-    const tail = await world.tailRun(project, agentId)
+    const agentId = await withFakeAwait('choices', () => world.startAgent(project, 'Refactor the config layer'))
+    const tail = await world.tailAgent(project, agentId)
     const gate = await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the parked gate')
     if (gate.kind !== 'choice') return
 
@@ -112,14 +112,14 @@ test('rearm the handoff mid-run; the meta a reloaded tab reads follows (#1102)',
       'the disarmed announcement',
     )
     const meta = await waitFor(async () => {
-      const agent = (await rpc(onRuns)(project.id)).find(r => r.id === agentId)
+      const agent = (await rpc(onAgents)(project.id)).find(r => r.id === agentId)
       return agent?.handoff && !agent.handoff.push && !agent.handoff.pr ? agent : undefined
     }, 'the disarmed state to reach the run meta')
     assert.equal(meta.handoff?.push, false)
     assert.equal(meta.handoff?.pr, false)
 
     await rpc(sendChoice)(project.id, gate.id, gate.recommended!, 'user', agentId)
-    await world.waitRun(project, agentId, 'done')
+    await world.waitAgent(project, agentId, 'done')
   } finally {
     await world.close()
   }
@@ -130,8 +130,8 @@ test('stop a session; its checkout is reclaimed once the work is on the remote, 
   const rpc = world.rpc
   try {
     const project = await world.addProject()
-    const agentId = await withFakeAwait('choices', () => world.startRun(project, 'Long experiment'))
-    const tail = await world.tailRun(project, agentId)
+    const agentId = await withFakeAwait('choices', () => world.startAgent(project, 'Long experiment'))
+    const tail = await world.tailAgent(project, agentId)
     await waitFor(() => tail.events.find(e => e.kind === 'choice'), 'the parked gate')
 
     // Stop while parked: the run ends `stopped`, not failed — the user interrupted it.
@@ -139,7 +139,7 @@ test('stop a session; its checkout is reclaimed once the work is on the remote, 
     const end = await waitFor(() => tail.events.find(e => e.kind === 'end'), 'the end event')
     assert.equal(end.kind === 'end' && end.stopped, true)
     tail.stop()
-    await world.waitRun(project, agentId, 'stopped')
+    await world.waitAgent(project, agentId, 'stopped')
 
     // One rule (E5): the checkout goes once its work is on the remote, whatever the session did.
     // A stopped run used to keep it "for inspection", and nothing ever took those back — so a
@@ -147,13 +147,13 @@ test('stop a session; its checkout is reclaimed once the work is on the remote, 
     // stopped is not lost: the branch is on the remote, and `git worktree add` brings it back.
     await world.waitRetired(project, agentId)
     assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [])
-    assert.equal((await rpc(onRunWorktree)(project.id, agentId))?.own, false, 'no checkout of its own is left')
-    assert.ok((await rpc(onRuns)(project.id)).some(r => r.id === agentId && r.status === 'stopped'), 'the session row survives')
+    assert.equal((await rpc(onAgentWorktree)(project.id, agentId))?.own, false, 'no checkout of its own is left')
+    assert.ok((await rpc(onAgents)(project.id)).some(r => r.id === agentId && r.status === 'stopped'), 'the session row survives')
 
     // Delete is the destructive sibling: the row itself disappears from the dashboard.
-    const deleted = await rpc(sendDeleteSession)(project.id, agentId)
+    const deleted = await rpc(sendDeleteAgent)(project.id, agentId)
     assert.equal(deleted.ok, true, `delete failed: ${'error' in deleted ? deleted.error : ''}`)
-    assert.equal((await rpc(onRuns)(project.id)).some(r => r.id === agentId), false)
+    assert.equal((await rpc(onAgents)(project.id)).some(r => r.id === agentId), false)
   } finally {
     await world.close()
   }

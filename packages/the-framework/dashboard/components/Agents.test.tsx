@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { ActiveRun } from '../../dist/index.js'
+import type { ActiveAgent } from '../../dist/index.js'
 import { Agents } from './Agents.js'
 
 // The Overview's Agents card (#1139), which replaced Working now — since trimmed to the sessions
@@ -13,7 +13,7 @@ import { Agents } from './Agents.js'
 
 afterEach(cleanup)
 
-const active = (agentId: string, over: Partial<ActiveRun> = {}): ActiveRun => ({
+const active = (agentId: string, over: Partial<ActiveAgent> = {}): ActiveAgent => ({
   projectId: 'p1',
   projectName: 'gemstack',
   agentId: agentId,
@@ -26,7 +26,7 @@ const active = (agentId: string, over: Partial<ActiveRun> = {}): ActiveRun => ({
 
 describe('Agents (#1139)', () => {
   test('lists the working sessions under the "currently working" description, with no Current/Recent split', () => {
-    render(<Agents working={[active('r1')]} loading={false} onSelectRun={vi.fn()} />)
+    render(<Agents working={[active('r1')]} loading={false} onSelectAgent={vi.fn()} />)
     expect(screen.getByText('Agents currently working')).toBeTruthy()
     expect(screen.getByText('working on r1')).toBeTruthy()
     // The columns are gone: no "Current" eyebrow, and no "Recent" list — the sidebar's session
@@ -36,33 +36,33 @@ describe('Agents (#1139)', () => {
   })
 
   test('clicking a working agent opens that session', () => {
-    const onSelectRun = vi.fn()
-    render(<Agents working={[active('r1')]} loading={false} onSelectRun={onSelectRun} />)
+    const onSelectAgent = vi.fn()
+    render(<Agents working={[active('r1')]} loading={false} onSelectAgent={onSelectAgent} />)
     fireEvent.click(screen.getByText('working on r1'))
     // Project *and* run: a project alone would land on the launcher, which is the regression (#1189).
-    expect(onSelectRun).toHaveBeenCalledWith('p1', 'r1')
+    expect(onSelectAgent).toHaveBeenCalledWith('p1', 'r1')
   })
 
   test('says so when nothing is working, rather than the card vanishing', () => {
-    render(<Agents working={[]} loading={false} onSelectRun={vi.fn()} />)
+    render(<Agents working={[]} loading={false} onSelectAgent={vi.fn()} />)
     expect(screen.getByText('No agents working right now.')).toBeTruthy()
   })
 
   test('loading is not the same as empty', () => {
     // The card polls, so "nothing yet" before the first read would read as "no agents working".
-    render(<Agents working={[]} loading onSelectRun={vi.fn()} />)
+    render(<Agents working={[]} loading onSelectAgent={vi.fn()} />)
     expect(screen.queryByText('No agents working right now.')).toBeNull()
     expect(screen.getByText('Loading…')).toBeTruthy()
   })
 
   test('a working session with no intent still gets a label', () => {
-    // ActiveRun carries no branch or start time to fall back on, so an unlabelled row would be a
+    // ActiveAgent carries no branch or start time to fall back on, so an unlabelled row would be a
     // blank line you cannot tell apart from its neighbours.
     render(
       <Agents
         working={[active('r1', { intent: '   ', sessionName: 'oauth-work' })]}
         loading={false}
-        onSelectRun={vi.fn()}
+        onSelectAgent={vi.fn()}
       />,
     )
     expect(screen.getByText('oauth-work')).toBeTruthy()

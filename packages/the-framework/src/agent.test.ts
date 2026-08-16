@@ -3,13 +3,13 @@ import { test } from 'node:test'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { runSession } from './run.js'
+import { runAgent } from './agent.js'
 import { requestChoices, requestMultiSelect, resolveAwaitGate, runAwaitRounds, type ChoicesOption, type MultiSelectOption } from './await-gate.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { AgentMessageQueue } from './agent-messages.js'
 import { FakeDriver, type Driver, type DriverSession } from './driver/index.js'
 import type { AgentLocation } from './agent-location.js'
-import { composeRunSystem } from './system-prompt.js'
+import { composeAgentSystem } from './system-prompt.js'
 import type { ChoiceRequest, FrameworkEvent } from './events.js'
 import { MAX_AWAIT_ROUNDS, continuationPrompt, stopMessage } from './turn-gate.js'
 
@@ -30,7 +30,7 @@ function recordingDriver(): { driver: Driver; system: () => string } {
 
 test('a session drives the whole flow through the driver, offline', async () => {
   const events: FrameworkEvent[] = []
-  await runSession({
+  await runAgent({
     prompt: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
@@ -47,9 +47,9 @@ test('a session drives the whole flow through the driver, offline', async () => 
   assert.equal(events.at(-1)!.kind, 'end')
 })
 
-test('runSession surfaces the wrapped agent real session id via session-update', async () => {
+test('runAgent surfaces the wrapped agent real session id via session-update', async () => {
   const events: FrameworkEvent[] = []
-  await runSession({
+  await runAgent({
     prompt: FAKE_INTENT,
     driver: fakeDriver(), // reports sessionId "fake-orders-app"
     cwd: '/tmp/ws',
@@ -68,9 +68,9 @@ test('runSession surfaces the wrapped agent real session id via session-update',
   assert.ok(sessionIdx >= 0 && updateIdx > sessionIdx)
 })
 
-test('runSession resolves a {sessionId} link template once the id is known', async () => {
+test('runAgent resolves a {sessionId} link template once the id is known', async () => {
   const events: FrameworkEvent[] = []
-  await runSession({
+  await runAgent({
     prompt: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
@@ -89,9 +89,9 @@ test('runSession resolves a {sessionId} link template once the id is known', asy
   assert.equal(update.sessionLink, 'https://code.example.com/s/fake-orders-app')
 })
 
-test('runSession accumulates per-turn usage and emits a running total (#322)', async () => {
+test('runAgent accumulates per-turn usage and emits a running total (#322)', async () => {
   const events: FrameworkEvent[] = []
-  await runSession({
+  await runAgent({
     prompt: FAKE_INTENT,
     driver: fakeDriver(), // every scripted turn reports $0.02 usage
     cwd: '/tmp/ws',
@@ -112,9 +112,9 @@ test('runSession accumulates per-turn usage and emits a running total (#322)', a
   assert.equal(end.kind === 'end' && end.ok, true)
 })
 
-test('runSession shows a literal session link immediately (no template)', async () => {
+test('runAgent shows a literal session link immediately (no template)', async () => {
   const events: FrameworkEvent[] = []
-  await runSession({
+  await runAgent({
     prompt: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
@@ -128,22 +128,22 @@ test('runSession shows a literal session link immediately (no template)', async 
   assert.equal(session.sessionLink, 'https://code.example.com/live')
 })
 
-test('the run system channel is exactly composeRunSystem, with nothing appended (#547)', async () => {
+test('the run system channel is exactly composeAgentSystem, with nothing appended (#547)', async () => {
   const { driver, system } = recordingDriver()
-  await runSession({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: () => {} })
-  // runSession composes no framing of its own.
-  assert.equal(system(), composeRunSystem({ tf: { prompt: FAKE_INTENT } }))
+  await runAgent({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: () => {} })
+  // runAgent composes no framing of its own.
+  assert.equal(system(), composeAgentSystem({ tf: { prompt: FAKE_INTENT } }))
 })
 
 test('transparent empties the build-path system channel (#625)', async () => {
   const { driver, system } = recordingDriver()
-  await runSession({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', transparent: true, onEvent: () => {} })
+  await runAgent({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', transparent: true, onEvent: () => {} })
   assert.equal(system(), '') // raw claude: no #326 block, no emit protocols
 })
 
 test('the project never frames the agent (#547)', async () => {
   const { driver, system } = recordingDriver()
-  await runSession({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: () => {} })
+  await runAgent({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: () => {} })
   // Nothing about the project reaches the prompt — no skill, persona or memory framing.
   assert.doesNotMatch(system(), /vike-auth|llms\.txt|Skill:|Persona:|Project memory/)
 })
@@ -276,7 +276,7 @@ test('a build turn that stops to ask fires a live gate and resumes on the pick (
 
   const events: FrameworkEvent[] = []
   const prompts: string[] = []
-  await runSession({
+  await runAgent({
     prompt: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
@@ -307,7 +307,7 @@ test('a run with no preset and no serve config reviews nothing (#1372)', async (
     },
     sessionId: 'blackbox1372',
   })
-  await runSession({
+  await runAgent({
     prompt: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
@@ -334,7 +334,7 @@ test('a build turn that stops to showMultiSelect fires a checklist gate and resu
 
   const events: FrameworkEvent[] = []
   const prompts: string[] = []
-  await runSession({
+  await runAgent({
     prompt: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
@@ -370,7 +370,7 @@ test('a build turn that stops for plan approval resumes on Approve (#358)', asyn
 
   const events: FrameworkEvent[] = []
   const prompts: string[] = []
-  await runSession({
+  await runAgent({
     prompt: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
@@ -411,7 +411,7 @@ test('a declined plan stops the session cleanly instead of building on it (#358)
 
   const events: FrameworkEvent[] = []
   await assert.rejects(
-    runSession({
+    runAgent({
       prompt: FAKE_INTENT,
       driver,
       cwd: '/tmp/ws',
@@ -446,7 +446,7 @@ test('an unmarked option is an ordinary answer, whatever it is labelled (#358)',
   })
 
   const events: FrameworkEvent[] = []
-  await runSession({
+  await runAgent({
     prompt: FAKE_INTENT,
     driver,
     cwd: '/tmp/ws',
@@ -476,7 +476,7 @@ test('with nobody to ask, a session takes the recommended option and carries on 
     sessionId: 'headless337',
   })
   const events: FrameworkEvent[] = []
-  await runSession({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: e => events.push(e) })
+  await runAgent({ prompt: FAKE_INTENT, driver, cwd: '/tmp/ws', onEvent: e => events.push(e) })
   assert.equal(resumed, true, 'the session continued from the recommended pick')
   const resolved = events.find(e => e.kind === 'choice-resolved')
   assert.ok(resolved && resolved.kind === 'choice-resolved')
@@ -555,7 +555,7 @@ test('requestChoices resolves to the recommended option if the run aborts while 
 
 test('a fake run skips the backlog loop by default; the demo stays deterministic (#323)', async () => {
   const events: FrameworkEvent[] = []
-  const result = await runSession({
+  const result = await runAgent({
     prompt: FAKE_INTENT,
     driver: fakeDriver(),
     cwd: '/tmp/ws',
@@ -565,7 +565,7 @@ test('a fake run skips the backlog loop by default; the demo stays deterministic
   assert.equal(events.some(e => e.kind === 'log' && /Backlog/.test(e.message)), false)
 })
 
-test('runSession runs the backlog loop after the build when opted in (#323)', async () => {
+test('runAgent runs the backlog loop after the build when opted in (#323)', async () => {
   const { mkdtemp, rm, writeFile } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
@@ -575,7 +575,7 @@ test('runSession runs the backlog loop after the build when opted in (#323)', as
     const events: FrameworkEvent[] = []
     // The fake script never edits the backlog, so the loop stall-stops after two
     // attempts — proving the wiring runs post-build with the run's own session.
-    const result = await runSession({
+    const result = await runAgent({
       prompt: FAKE_INTENT,
       driver: fakeDriver(),
       cwd,
@@ -771,7 +771,7 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
     const events: FrameworkEvent[] = []
     const asked: ChoiceRequest[] = []
     const { driver, prompts } = handsOffDriver()
-    const { todo } = await runSession({
+    const { todo } = await runAgent({
       prompt: FAKE_INTENT,
       driver,
       location: 'web',
@@ -809,7 +809,7 @@ test('a hand-off run is told the await gates are unavailable, a local one is not
   // await protocol for exactly these runs, and only these.
   const systemOf = async (driver: Driver, location: AgentLocation): Promise<string> => {
     const events: FrameworkEvent[] = []
-    await runSession({ prompt: FAKE_INTENT, driver, location, cwd: '/tmp/ws', onEvent: e => events.push(e) })
+    await runAgent({ prompt: FAKE_INTENT, driver, location, cwd: '/tmp/ws', onEvent: e => events.push(e) })
     const prompt = events.find(e => e.kind === 'system-prompt')
     return prompt?.kind === 'system-prompt' ? prompt.text : ''
   }
@@ -822,7 +822,7 @@ test('a hand-off run does not stay open for messages (#1225)', async () => {
   // Left open on purpose: a run that still waited on it would never resolve, since the
   // composer it waits for cannot reach the session it handed to.
   const messages = new AgentMessageQueue()
-  const agent = runSession({
+  const agent = runAgent({
     prompt: FAKE_INTENT,
     driver,
     location: 'web',
@@ -834,7 +834,7 @@ test('a hand-off run does not stay open for messages (#1225)', async () => {
   assert.notEqual(await Promise.race([agent.then(() => 'ended' as const), timer]), 'waited')
 })
 
-test('runSession resumes a stopped leg: session resumed, message sent verbatim (#1467)', async () => {
+test('runAgent resumes a stopped leg: session resumed, message sent verbatim (#1467)', async () => {
   const fd = fakeDriver()
   let startedWith: { resumeSessionId?: string } | undefined
   const prompts: string[] = []
@@ -859,7 +859,7 @@ test('runSession resumes a stopped leg: session resumed, message sent verbatim (
   }
   const events: FrameworkEvent[] = []
   const RESUME = 'Resume: continue where the previous leg stopped.'
-  await runSession({
+  await runAgent({
     prompt: RESUME,
     driver,
     cwd: '/tmp/ws',
@@ -905,7 +905,7 @@ test('a build extends an existing project instead of rebuilding it (#185)', asyn
   await writeFile(join(cwd, 'src/index.ts'), 'export {}')
   try {
     const { driver, prompts } = realNamedDriver([{ text: 'added the feature' }])
-    await runSession({ prompt: 'add a search box', driver, cwd, todoLoop: false })
+    await runAgent({ prompt: 'add a search box', driver, cwd, todoLoop: false })
     assert.match(prompts[0]!, /existing codebase/i)
     assert.doesNotMatch(prompts[0]!, /scaffold the whole project|workspace may be empty/i)
   } finally {
@@ -917,7 +917,7 @@ test('a build uses greenfield framing for an empty workspace (#185)', async () =
   const cwd = await mkdtemp(join(tmpdir(), 'fw-greenfield-'))
   try {
     const { driver, prompts } = realNamedDriver([{ text: 'scaffolded it' }, { text: 'scaffolded it properly' }])
-    await runSession({ prompt: 'a blog', driver, cwd, todoLoop: false })
+    await runAgent({ prompt: 'a blog', driver, cwd, todoLoop: false })
     assert.match(prompts[0]!, /Build this app end to end/i)
     assert.doesNotMatch(prompts[0]!, /existing codebase/i)
   } finally {
@@ -932,7 +932,7 @@ test('a build re-prompts to scaffold from scratch when the workspace stays empty
       { text: 'thinking about the stack' },
       { text: 'scaffolded the whole app' },
     ])
-    const { text } = await runSession({ prompt: 'a blog', driver, cwd, todoLoop: false })
+    const { text } = await runAgent({ prompt: 'a blog', driver, cwd, todoLoop: false })
     // Two turns: the build, then the hard from-scratch retry once nothing landed on disk.
     assert.equal(prompts.length, 2)
     assert.match(prompts[1]!, /from scratch|empty/i)
@@ -947,7 +947,7 @@ test('a build does not re-prompt when it produced files (#182)', async () => {
   await writeFile(join(cwd, 'package.json'), '{}')
   try {
     const { driver, prompts } = realNamedDriver([{ text: 'built it' }])
-    await runSession({ prompt: 'a blog', driver, cwd, todoLoop: false })
+    await runAgent({ prompt: 'a blog', driver, cwd, todoLoop: false })
     assert.equal(prompts.length, 1)
   } finally {
     await rm(cwd, { recursive: true, force: true })
@@ -959,7 +959,7 @@ test('a prompt session runs its text without build framing, and works no backlog
   await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] leftover task\n')
   try {
     const { driver, prompts } = realNamedDriver([{ text: 'reviewed it' }])
-    const { todo } = await runSession({ prompt: 'review the auth flow', kind: 'prompt', driver, cwd, vanilla: true })
+    const { todo } = await runAgent({ prompt: 'review the auth flow', kind: 'prompt', driver, cwd, vanilla: true })
     assert.equal(prompts.length, 1, 'one prompt, and no backlog turns after it')
     assert.equal(prompts[0], 'review the auth flow')
     assert.equal(todo, undefined)

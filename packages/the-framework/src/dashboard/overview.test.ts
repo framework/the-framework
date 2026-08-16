@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { buildOverview, buildRecentRuns, buildHotTickets, collectAllTickets, ticketBucket } from './overview.js'
+import { buildOverview, buildRecentAgents, buildHotTickets, collectAllTickets, ticketBucket } from './overview.js'
 import type { ProjectSummary } from './projects.js'
 import type { ProjectQueue } from './queue.js'
 import type { WorkspaceTicket } from './tickets.js'
@@ -24,7 +24,7 @@ test('buildOverview surfaces only running runs, most-recently-updated first', as
     '/c': meta('running', 'build the UI', '2026-07-13T12:00:00Z'),
   }
   const overview = await buildOverview([project('a', '/a'), project('b', '/b'), project('c', '/c')], {
-    liveRuns: async cwd => (metas[cwd] ? [{ ...metas[cwd]!, cwd }] : []),
+    liveAgents: async cwd => (metas[cwd] ? [{ ...metas[cwd]!, cwd }] : []),
     queue: async () => [],
   })
   assert.deepEqual(
@@ -44,7 +44,7 @@ test('buildOverview sums the open queue and lists recent projects newest-first (
     { projectId: 'p0', projectName: 'p0', open: 3, total: 4, items: [] },
     { projectId: 'p1', projectName: 'p1', open: 2, total: 2, items: [] },
   ]
-  const overview = await buildOverview(projects, { liveRuns: async () => [], queue: async () => queues })
+  const overview = await buildOverview(projects, { liveAgents: async () => [], queue: async () => queues })
   assert.equal(overview.active.length, 0)
   assert.equal(overview.queueOpen, 5)
   assert.equal(overview.recent.length, 5)
@@ -56,7 +56,7 @@ test('buildOverview sums the open queue and lists recent projects newest-first (
 
 test('buildOverview omits projects with no activity from recent', async () => {
   const overview = await buildOverview([project('a', '/a'), project('b', '/b', '2026-07-13T00:00:00Z')], {
-    liveRuns: async () => [],
+    liveAgents: async () => [],
     queue: async () => [],
   })
   assert.deepEqual(overview.recent.map(r => r.projectId), ['b'])
@@ -65,12 +65,12 @@ test('buildOverview omits projects with no activity from recent', async () => {
 const agent = (id: string, startedAt: string): AgentMeta =>
   ({ version: 1, status: 'done', id, startedAt, updatedAt: startedAt }) as AgentMeta
 
-test('buildRecentRuns pools every project newest-first and tags each with its project', async () => {
+test('buildRecentAgents pools every project newest-first and tags each with its project', async () => {
   const agents: Record<string, AgentMeta[]> = {
     '/a': [agent('a2', '2026-07-13T12:00:00Z'), agent('a1', '2026-07-13T09:00:00Z')],
     '/b': [agent('b1', '2026-07-13T11:00:00Z')],
   }
-  const recent = await buildRecentRuns([project('alpha', '/a'), project('beta', '/b')], {
+  const recent = await buildRecentAgents([project('alpha', '/a'), project('beta', '/b')], {
     agents: async cwd => agents[cwd] ?? [],
   })
   assert.deepEqual(
@@ -83,8 +83,8 @@ test('buildRecentRuns pools every project newest-first and tags each with its pr
   )
 })
 
-test('buildRecentRuns tolerates a project whose runs cannot be read', async () => {
-  const recent = await buildRecentRuns([project('ok', '/ok'), project('bad', '/bad')], {
+test('buildRecentAgents tolerates a project whose runs cannot be read', async () => {
+  const recent = await buildRecentAgents([project('ok', '/ok'), project('bad', '/bad')], {
     agents: async cwd => {
       if (cwd === '/bad') throw new Error('unreadable')
       return [agent('x', '2026-07-13T10:00:00Z')]
@@ -214,7 +214,7 @@ test('ticketBucket: a run implementing it is in-progress, whatever the plan says
 test('buildHotTickets marks the ticket a live run is implementing, with its run id (#1117)', async () => {
   const hot = await buildHotTickets([project('alpha', '/a')], {
     tickets: async () => [ticket('2026-07-25_login.md'), ticket('2026-07-26_other.md')],
-    liveRuns: async () => [runOn('run-7', 'tickets/2026-07-25_login.md')],
+    liveAgents: async () => [runOn('run-7', 'tickets/2026-07-25_login.md')],
     queue: async () => [],
   })
   const login = hot.find(h => h.ticket.file === '2026-07-25_login.md')
@@ -230,7 +230,7 @@ test('buildHotTickets ignores a finished run and another project\'s ticket (#111
   // no agentId and sits in the AI Queue by its link alone.
   const finished = await buildHotTickets([project('alpha', '/a')], {
     tickets: async () => [ticket('x.md')],
-    liveRuns: async () => [runOn('run-7', 'tickets/x.md', 'done')],
+    liveAgents: async () => [runOn('run-7', 'tickets/x.md', 'done')],
     queue: async () => [{ projectId: 'alpha', projectName: 'alpha', open: 1, total: 1, items: [{ text: '[x](tickets/x.md)', done: false }] }],
   })
   assert.equal(finished[0]?.agentId, undefined)
@@ -241,7 +241,7 @@ test('buildHotTickets ignores a finished run and another project\'s ticket (#111
   // only beta's implementing copy survives.
   const twoProjects = await buildHotTickets([project('alpha', '/a'), project('beta', '/b')], {
     tickets: async () => [ticket('x.md')],
-    liveRuns: async cwd => (cwd === '/b' ? [runOn('run-9', 'tickets/x.md')] : []),
+    liveAgents: async cwd => (cwd === '/b' ? [runOn('run-9', 'tickets/x.md')] : []),
     queue: async () => [],
   })
   assert.deepEqual(

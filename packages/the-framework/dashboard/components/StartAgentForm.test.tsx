@@ -23,8 +23,8 @@ vi.mock('../lib/profiles.js', () => ({ useConnectionProfiles: () => [] }))
 vi.mock('../lib/remote-target.js', () => ({ useSelectedRemoteDeviceId: () => null }))
 
 const start = vi.hoisted(() => vi.fn())
-vi.mock('../lib/use-start-run.js', () => ({
-  useStartRun: () => ({ busy: false, error: null, reset: vi.fn(), start }),
+vi.mock('../lib/use-start-agent.js', () => ({
+  useStartAgent: () => ({ busy: false, error: null, reset: vi.fn(), start }),
 }))
 
 // The Composer is exercised by its own tests; here it only has to hand back the two submit
@@ -33,10 +33,10 @@ vi.mock('./Composer.js', async () => {
   const { forwardRef } = await import('react')
   const Composer = forwardRef((props: any, _ref: any) => (
     <div>
-      <button type="button" onClick={() => props.onSubmit('do the thing', 'build', { newSession: false })}>
+      <button type="button" onClick={() => props.onSubmit('do the thing', 'build', { newAgent: false })}>
         submit-typed
       </button>
-      <button type="button" onClick={() => props.onSubmit('preset text', 'prompt', { newSession: false })}>
+      <button type="button" onClick={() => props.onSubmit('preset text', 'prompt', { newAgent: false })}>
         submit-preset
       </button>
     </div>
@@ -46,7 +46,7 @@ vi.mock('./Composer.js', async () => {
 vi.mock('./ContextMenu.js', () => ({ ContextMenu: () => null }))
 vi.mock('./SystemPromptDisclosure.js', () => ({ SystemPromptDisclosure: () => null }))
 
-const { StartRunForm } = await import('./StartRunForm.js')
+const { StartAgentForm } = await import('./StartAgentForm.js')
 
 // A ready agent by default (#1326), so every other test renders the form it means to test
 // rather than the "your CLI cannot start a run" warning.
@@ -72,12 +72,12 @@ const props = {
   toggleContext: () => {},
 }
 
-describe('StartRunForm submit (#1279)', () => {
+describe('StartAgentForm submit (#1279)', () => {
   test('a preset run starts unattended, so it ends at settle and its handoff fires', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
     start.mockResolvedValue({ agentId: 'r1' })
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     fireEvent.click(screen.getByText('submit-preset'))
     await waitFor(() => expect(start).toHaveBeenCalled())
     expect(start.mock.calls[0]![2]).toBe('prompt')
@@ -88,7 +88,7 @@ describe('StartRunForm submit (#1279)', () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
     start.mockResolvedValue({ agentId: 'r1' })
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     fireEvent.click(screen.getByText('submit-typed'))
     await waitFor(() => expect(start).toHaveBeenCalled())
     expect(start.mock.calls[0]![2]).toBe('build')
@@ -96,13 +96,13 @@ describe('StartRunForm submit (#1279)', () => {
   })
 })
 
-describe('StartRunForm web-run trust warning (#1318)', () => {
+describe('StartAgentForm web-run trust warning (#1318)', () => {
   test('an untrusted project warns before a web run, naming the root (#1314)', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
     prefs.current = { target: 'web' }
     onClaudeTrust.mockResolvedValue({ known: true, trusted: false, root: '/repo' })
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     await waitFor(() => expect(screen.getByText(/has not been trusted/)).toBeTruthy())
     expect(screen.getByText('/repo')).toBeTruthy()
   })
@@ -113,14 +113,14 @@ describe('StartRunForm web-run trust warning (#1318)', () => {
 
     prefs.current = { target: 'web' }
     onClaudeTrust.mockResolvedValue({ known: true, trusted: true, root: '/repo' })
-    const trusted = render(<StartRunForm {...props} />)
+    const trusted = render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onClaudeTrust).toHaveBeenCalled())
     expect(screen.queryByText(/has not been trusted/)).toBeNull()
     trusted.unmount()
 
     // Config unreadable: do not cry wolf — the run's own failure advice is the fallback.
     onClaudeTrust.mockResolvedValue({ known: false, trusted: false, root: '/repo' })
-    const unknown = render(<StartRunForm {...props} />)
+    const unknown = render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onClaudeTrust).toHaveBeenCalledTimes(2))
     expect(screen.queryByText(/has not been trusted/)).toBeNull()
     unknown.unmount()
@@ -128,14 +128,14 @@ describe('StartRunForm web-run trust warning (#1318)', () => {
     // A local run never asks the question at all.
     prefs.current = {}
     onClaudeTrust.mockClear()
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onProjects).toHaveBeenCalled())
     expect(onClaudeTrust).not.toHaveBeenCalled()
     expect(screen.queryByText(/has not been trusted/)).toBeNull()
   })
 })
 
-describe('StartRunForm agent preflight warning (#1326)', () => {
+describe('StartAgentForm agent preflight warning (#1326)', () => {
   // #1323: every session died before writing agent.json and the only visible trace was run
   // branches piling up. The launcher says why before the Start, the way #1318 does for trust.
   test('a logged-out agent is named in the launcher, with the command that fixes it', async () => {
@@ -146,7 +146,7 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
       problems: ['claude auth: `claude` is not logged in. Run `claude auth login`, then start the session again.'],
       warnings: [],
     })
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     await waitFor(() => expect(screen.getByText(/is not logged in/)).toBeTruthy())
     expect(screen.getByText(/claude auth login/)).toBeTruthy()
   })
@@ -159,14 +159,14 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
       problems: [],
       warnings: ['running as root, so the agent looks for credentials under root’s home and will not find yours.'],
     })
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     await waitFor(() => expect(screen.getByText(/running as root/)).toBeTruthy())
   })
 
   test('a ready agent shows nothing at all', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onDriverReady).toHaveBeenCalled())
     expect(screen.queryByRole('alert')).toBeNull()
   })
@@ -174,12 +174,12 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
   test('the agent is re-probed when the picked agent changes, since the answer is per CLI', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
-    const first = render(<StartRunForm {...props} />)
+    const first = render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onDriverReady).toHaveBeenCalledWith('claude', true))
     first.unmount()
 
     prefs.current = { driver: 'codex' }
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onDriverReady).toHaveBeenCalledWith('codex', true))
   })
 
@@ -190,12 +190,12 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
     prefs.current = { handoff: 'push' }
-    const pushOnly = render(<StartRunForm {...props} />)
+    const pushOnly = render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onDriverReady).toHaveBeenCalledWith('claude', false))
     pushOnly.unmount()
 
     prefs.current = { handoff: 'pr' }
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onDriverReady).toHaveBeenCalledWith('claude', true))
   })
 
@@ -203,18 +203,18 @@ describe('StartRunForm agent preflight warning (#1326)', () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
     prefs.current = { target: 'actions' }
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onProjects).toHaveBeenCalled())
     expect(onDriverReady).not.toHaveBeenCalled()
   })
 })
 
-describe('StartRunForm Haiku warning (#1439)', () => {
+describe('StartAgentForm Haiku warning (#1439)', () => {
   test('picking Haiku warns — never blocks — and teaches the stronger default', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
     prefs.current = { model: 'haiku' }
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     const alert = await screen.findByText(/Haiku consistently skips the session-finish protocol/)
     expect(alert.getAttribute('role')).toBe('alert')
     // The submit path is untouched: the warning teaches, it does not gate.
@@ -225,19 +225,19 @@ describe('StartRunForm Haiku warning (#1439)', () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
     prefs.current = { model: 'fable' }
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onProjects).toHaveBeenCalled())
     expect(screen.queryByText(/session-finish protocol/)).toBeNull()
   })
 })
 
-describe('StartRunForm auto-merge-disabled warning (#1417)', () => {
+describe('StartAgentForm auto-merge-disabled warning (#1417)', () => {
   test('an armed merge on a repo that refuses auto-merge warns, with the fix, without blocking', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
     prefs.current = { handoff: 'merge' }
     onRepoAutoMerge.mockResolvedValue({ known: true, allowed: false })
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     expect(await screen.findByText(/auto-merge disabled/)).toBeTruthy()
     expect(screen.getByText(/Allow auto-merge/)).toBeTruthy()
     // Never a block: the submit path stays untouched.
@@ -250,14 +250,14 @@ describe('StartRunForm auto-merge-disabled warning (#1417)', () => {
 
     prefs.current = { handoff: 'merge' }
     onRepoAutoMerge.mockResolvedValue({ known: true, allowed: true })
-    const allowed = render(<StartRunForm {...props} />)
+    const allowed = render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onRepoAutoMerge).toHaveBeenCalled())
     expect(screen.queryByText(/auto-merge disabled/)).toBeNull()
     allowed.unmount()
 
     // "Could not say" is not "off" — no crying wolf (#1318 stance).
     onRepoAutoMerge.mockResolvedValue({ known: false, allowed: false })
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onRepoAutoMerge).toHaveBeenCalledTimes(2))
     expect(screen.queryByText(/auto-merge disabled/)).toBeNull()
   })
@@ -265,7 +265,7 @@ describe('StartRunForm auto-merge-disabled warning (#1417)', () => {
   test('an unarmed merge never asks the question at all', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
-    render(<StartRunForm {...props} />)
+    render(<StartAgentForm {...props} />)
     await waitFor(() => expect(onProjects).toHaveBeenCalled())
     expect(onRepoAutoMerge).not.toHaveBeenCalled()
   })

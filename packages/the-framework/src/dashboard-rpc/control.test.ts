@@ -7,7 +7,7 @@ import { provideTestContext } from './test-context.js'
 import { sendStart, sendReleaseTicketLock } from './control.js'
 import { presets } from '../preset-catalog.js'
 import { addProject, projectId } from '../registry.js'
-import type { StartRunOptions } from '../dashboard/types.js'
+import type { StartAgentOptions } from '../dashboard/types.js'
 
 /**
  * Register `cwd` in a throwaway registry and provide the context these RPCs run inside.
@@ -28,16 +28,16 @@ async function registerProject(cwd: string, over: Parameters<typeof provideTestC
 // the sweep's own drain does (#1117). The daemon reads that off the `drains` flag on its job; a
 // click arrives with nothing but prompt text, so the resolution happens here.
 
-/** The options `startRun` was handed, plus a workspace with one queued ticket to resolve against. */
-async function harness(): Promise<{ cwd: string; id: string; started: () => StartRunOptions | undefined }> {
+/** The options `startAgent` was handed, plus a workspace with one queued ticket to resolve against. */
+async function harness(): Promise<{ cwd: string; id: string; started: () => StartAgentOptions | undefined }> {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-start-'))
   await writeFile(
     join(cwd, 'TODO_AGENTS.md'),
     ['## Priority 9', '', '- [ ] [Add a login page](tickets/2026-07-25_login.md)', ''].join('\n'),
   )
-  let seen: StartRunOptions | undefined
+  let seen: StartAgentOptions | undefined
   const id = await registerProject(cwd, {
-    startRun: async (_text: string, _kind: string, options: StartRunOptions) => {
+    startAgent: async (_text: string, _kind: string, options: StartAgentOptions) => {
       seen = options
       return { ok: true, agentId: 'r1' }
     },

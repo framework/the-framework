@@ -10,11 +10,11 @@ import {
   readLiveMeta,
   readLiveMetas,
   archiveWorktreeAgent,
-  recordRunPr,
+  recordAgentPr,
   restoreArchivedAgent,
   listWorktreeDirs,
   reconcileOrphanedAgents,
-  loadRunEvents,
+  loadAgentEvents,
   agentIdFromStartedAt,
   startedAtFromAgentId,
   AGENT_META_VERSION,
@@ -416,16 +416,16 @@ test('a store whose fs cannot rename still writes its meta in place', async () =
   assert.equal(live!.intent, 'a blog with comments')
 })
 
-test('loadRunEvents replays an archived run, and rejects unknown/unsafe ids (#303)', async () => {
+test('loadAgentEvents replays an archived run, and rejects unknown/unsafe ids (#303)', async () => {
   const fs = memFs()
   const store = await AgentStore.open(CWD, { fs, fresh: true, now: AT })
   for (const e of RUN) await store.append(e)
   await store.close()
   const id = store.snapshot().id
 
-  assert.deepEqual(await loadRunEvents(CWD, id, fs), RUN)
-  assert.equal(await loadRunEvents(CWD, 'nope', fs), undefined)
-  assert.equal(await loadRunEvents(CWD, '../escape', fs), undefined)
+  assert.deepEqual(await loadAgentEvents(CWD, id, fs), RUN)
+  assert.equal(await loadAgentEvents(CWD, 'nope', fs), undefined)
+  assert.equal(await loadAgentEvents(CWD, '../escape', fs), undefined)
 })
 
 test('a fresh run archives a prior run that never got closed (crash safety) (#303)', async () => {
@@ -441,13 +441,13 @@ test('a fresh run archives a prior run that never got closed (crash safety) (#30
 })
 
 const RUNS = join(CWD, '.the-framework', 'agents')
-const runningMeta = (id: string): string =>
+const runningAgentMeta = (id: string): string =>
   JSON.stringify({ version: AGENT_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT })
 
 test('reconcileOrphanedAgents flips archived runs stuck at running to stopped (#642)', async () => {
   const fs = memFs({
-    [join(RUNS, 'a.json')]: runningMeta('a'),
-    [join(RUNS, 'b.json')]: runningMeta('b'),
+    [join(RUNS, 'a.json')]: runningAgentMeta('a'),
+    [join(RUNS, 'b.json')]: runningAgentMeta('b'),
     [join(RUNS, 'c.json')]: JSON.stringify({ version: AGENT_META_VERSION, status: 'done', id: 'c', startedAt: AT, updatedAt: AT }),
   })
   const fixed = await reconcileOrphanedAgents(CWD, fs)
@@ -457,7 +457,7 @@ test('reconcileOrphanedAgents flips archived runs stuck at running to stopped (#
 })
 
 test('reconcileOrphanedAgents flips a live run and archives it, counting it once (#642)', async () => {
-  const fs = memFs({ [META]: runningMeta('2026-live') })
+  const fs = memFs({ [META]: runningAgentMeta('2026-live') })
   const fixed = await reconcileOrphanedAgents(CWD, fs)
   assert.equal(fixed, 1)
   // The live agent.json is now stopped...
@@ -530,7 +530,7 @@ test('readLiveMeta leaves a running run alone while its owning process is alive 
 })
 
 test('readLiveMeta leaves a pre-pid run untouched — the boot reconcile still catches it (#716)', async () => {
-  const fs = memFs({ [META]: runningMeta('2026-old') }) // no pid recorded
+  const fs = memFs({ [META]: runningAgentMeta('2026-old') }) // no pid recorded
   const live = await readLiveMeta(CWD, fs, () => false)
   assert.equal(live!.status, 'running')
 })
@@ -624,22 +624,22 @@ test('archiveWorktreeAgent records a run that died mid-flight as stopped, not ru
   assert.equal((JSON.parse(fs.files.get(join(CWD, '.the-framework', 'agents', 'r1.json'))!) as AgentMeta).status, 'stopped')
 })
 
-test('recordRunPr patches the archived meta, so a PR opened after the run still lands on it (E6)', async () => {
+test('recordAgentPr patches the archived meta, so a PR opened after the run still lands on it (E6)', async () => {
   // The dashboard's Open PR button runs after the session's process is gone, so there is no event
   // stream left to carry the fact — but it is the same fact, and every surface reads it from the
   // same place either way.
   const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }))
   await archiveWorktreeAgent(worktreeAt('r1'), CWD, fs)
-  assert.equal(await recordRunPr(CWD, 'r1', { number: 42, url: 'https://x/pull/42' }, fs), true)
+  assert.equal(await recordAgentPr(CWD, 'r1', { number: 42, url: 'https://x/pull/42' }, fs), true)
   assert.deepEqual((await listAgents(CWD, fs)).find(r => r.id === 'r1')?.pr, { number: 42, url: 'https://x/pull/42' })
 })
 
-test('recordRunPr leaves the record as it was when there is nothing to patch (E6)', async () => {
+test('recordAgentPr leaves the record as it was when there is nothing to patch (E6)', async () => {
   // Best-effort: the cost of missing it is one surface having to ask gh, which is what all of them
   // used to do anyway.
   const fs = memFs()
-  assert.equal(await recordRunPr(CWD, 'nope', { number: 1, url: 'u' }, fs), false)
-  assert.equal(await recordRunPr(CWD, '../escape', { number: 1, url: 'u' }, fs), false, 'and an unsafe id is refused')
+  assert.equal(await recordAgentPr(CWD, 'nope', { number: 1, url: 'u' }, fs), false)
+  assert.equal(await recordAgentPr(CWD, '../escape', { number: 1, url: 'u' }, fs), false, 'and an unsafe id is refused')
 })
 
 test('archiveWorktreeAgent is forgiving of a worktree with no run', async () => {
@@ -647,13 +647,13 @@ test('archiveWorktreeAgent is forgiving of a worktree with no run', async () => 
 })
 
 const USER = 'git@brillout.com'
-const sessionsAt = (id: string, ext: string) => join(CWD, '.the-framework', USER, 'agents', `${id}.${ext}`)
+const archiveAt = (id: string, ext: string) => join(CWD, '.the-framework', USER, 'agents', `${id}.${ext}`)
 
 test('a named user files the archive under their own sessions, not runs/ (#1179)', async () => {
   // The whole point: `agents/` is gitignored, so a `git clean -fdx` took every session with it.
   const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }, '{"kind":"log","message":"hi"}\n'))
   await archiveWorktreeAgent(worktreeAt('r1'), CWD, fs, undefined, USER)
-  assert.equal(fs.files.get(sessionsAt('r1', 'jsonl')), '{"kind":"log","message":"hi"}\n')
+  assert.equal(fs.files.get(archiveAt('r1', 'jsonl')), '{"kind":"log","message":"hi"}\n')
   assert.equal(fs.files.has(join(CWD, '.the-framework', 'agents', 'r1.json')), false, 'and not in the transient dir')
 })
 
@@ -663,7 +663,7 @@ test('the history lists every user, and the runs archived before this shipped (#
   const done = (id: string) => JSON.stringify({ version: 1, status: 'done', id, startedAt: AT, updatedAt: AT })
   const fs = memFs({
     [join(CWD, '.the-framework', 'agents', 'r1.json')]: done('r1'),
-    [sessionsAt('r2', 'json')]: done('r2'),
+    [archiveAt('r2', 'json')]: done('r2'),
     [join(CWD, '.the-framework', 'someone@else.com', 'agents', 'r3.json')]: done('r3'),
   })
   assert.deepEqual((await listAgents(CWD, fs)).map(agent => agent.id), ['r3', 'r2', 'r1'])
@@ -673,27 +673,27 @@ test('a run archived under both schemes is listed once (#1179)', async () => {
   // A run archived before #1179 and re-archived after exists in both places; the history is a list
   // of sessions, not of files.
   const meta = JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT })
-  const fs = memFs({ [join(CWD, '.the-framework', 'agents', 'r1.json')]: meta, [sessionsAt('r1', 'json')]: meta })
+  const fs = memFs({ [join(CWD, '.the-framework', 'agents', 'r1.json')]: meta, [archiveAt('r1', 'json')]: meta })
   assert.deepEqual((await listAgents(CWD, fs)).map(agent => agent.id), ['r1'])
 })
 
 test('an archived log replays wherever it is filed (#1179)', async () => {
   // The id alone no longer names a path, so every reader has to look the run up.
   const fs = memFs({
-    [sessionsAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }),
-    [sessionsAt('r1', 'jsonl')]: '{"kind":"log","message":"replayed"}\n',
+    [archiveAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }),
+    [archiveAt('r1', 'jsonl')]: '{"kind":"log","message":"replayed"}\n',
   })
-  assert.deepEqual(await loadRunEvents(CWD, 'r1', fs), [{ kind: 'log', message: 'replayed' }])
+  assert.deepEqual(await loadAgentEvents(CWD, 'r1', fs), [{ kind: 'log', message: 'replayed' }])
 })
 
 test('a committed session stuck at running is reconciled too (#1179)', async () => {
   // The boot reconcile used to sweep only `agents/`, so a crashed run archived under a user would
   // have shown as live forever, with a Stop that does nothing.
   const fs = memFs({
-    [sessionsAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT }),
+    [archiveAt('r1', 'json')]: JSON.stringify({ version: 1, status: 'running', id: 'r1', startedAt: AT, updatedAt: AT }),
   })
   assert.equal(await reconcileOrphanedAgents(CWD, fs, () => false), 1)
-  assert.equal((JSON.parse(fs.files.get(sessionsAt('r1', 'json'))!) as AgentMeta).status, 'stopped')
+  assert.equal((JSON.parse(fs.files.get(archiveAt('r1', 'json'))!) as AgentMeta).status, 'stopped')
 })
 
 test('reconcileOrphanedAgents rescues a run a crashed daemon left in a worktree (#737)', async () => {
@@ -724,12 +724,12 @@ test('listWorktreeDirs names the run of each worktree, ignoring anything else in
 // #762: messaging a stopped run continues THAT run, so the history shows one row rather than an
 // unrelated-looking second one. The follow-up is still a separate process; what makes it one run is
 // that it reopens the same log instead of truncating it.
-test('continueRun reopens the existing run: same id, same log, running again (#762)', async () => {
+test('continueAgent reopens the existing run: same id, same log, running again (#762)', async () => {
   const fs = memFs({
     [META]: JSON.stringify({ version: 1, status: 'stopped', id: 'r1', startedAt: AT, updatedAt: AT, intent: 'build a blog' }),
     [EVENTS]: '{"kind":"log","message":"first leg"}\n',
   })
-  const store = await AgentStore.open(CWD, { fs, continueRun: true, now: '2026-07-04T01:00:00.000Z' })
+  const store = await AgentStore.open(CWD, { fs, continueAgent: true, now: '2026-07-04T01:00:00.000Z' })
   const meta = await store.readMeta()
   assert.equal(meta?.id, 'r1', 'the same run, so the rail shows one row')
   assert.equal(meta?.status, 'running', 'live again')
@@ -743,8 +743,8 @@ test('continueRun reopens the existing run: same id, same log, running again (#7
   assert.match(fs.files.get(EVENTS)!, /first leg[\s\S]*second leg/, 'the second leg appends to the same log')
 })
 
-test('continueRun with nothing to reopen falls back to a fresh run (#762)', async () => {
-  const store = await AgentStore.open(CWD, { fs: memFs(), continueRun: true, fresh: true, now: AT, id: 'r9' })
+test('continueAgent with nothing to reopen falls back to a fresh run (#762)', async () => {
+  const store = await AgentStore.open(CWD, { fs: memFs(), continueAgent: true, fresh: true, now: AT, id: 'r9' })
   assert.equal((await store.readMeta())?.id, 'r9')
   assert.equal((await store.readMeta())?.status, 'running')
 })
@@ -790,7 +790,7 @@ test('updatedAt tracks the last event, not the run start (settledAt likewise)', 
   assert.equal(store.snapshot().startedAt, AT, 'the start is still the start')
 })
 
-test('startedAtFromRunId inverts agentIdFromStartedAt, and refuses foreign ids (#1251)', () => {
+test('startedAtFromAgentId inverts agentIdFromStartedAt, and refuses foreign ids (#1251)', () => {
   const startedAt = '2026-07-26T21:17:39.507Z'
   assert.equal(startedAtFromAgentId(agentIdFromStartedAt(startedAt)), startedAt)
   assert.equal(startedAtFromAgentId('not-a-run-id'), undefined)
@@ -810,8 +810,8 @@ test('applyEventToMeta records the pull request a session opened (E6)', () => {
 
 test('applyEventToMeta records the branch a branch event names (#1277)', () => {
   const base = metaFromEvents(RUN.slice(0, 3), AT)
-  const on = applyEventToMeta(base, { kind: 'branch', branch: 'the-framework/run-r1' }, AT)
-  assert.equal(on.branch, 'the-framework/run-r1')
+  const on = applyEventToMeta(base, { kind: 'branch', branch: 'the-framework/agent-r1' }, AT)
+  assert.equal(on.branch, 'the-framework/agent-r1')
   // A rename mid-run replaces it: the meta always names the branch the work is on now.
   const renamed = applyEventToMeta(on, { kind: 'branch', branch: 'the-framework/cool-name' }, AT)
   assert.equal(renamed.branch, 'the-framework/cool-name')
@@ -899,7 +899,7 @@ test('open records the run flow, and a continuation preserves the first leg\'s (
   const store = await AgentStore.open(CWD, { fs, fresh: true, now: AT, kind: 'build' })
   assert.equal(store.snapshot().kind, 'build')
   // The composer's Resume arrives as a prompt start; the reopened meta keeps the build record.
-  const reopened = await AgentStore.open(CWD, { fs, fresh: true, continueRun: true, now: AT, kind: 'prompt' })
+  const reopened = await AgentStore.open(CWD, { fs, fresh: true, continueAgent: true, now: AT, kind: 'prompt' })
   assert.equal(reopened.snapshot().kind, 'build')
 })
 
@@ -909,7 +909,7 @@ test('a continuation keeps its original label through a re-entered scope event (
   await first.append({ kind: 'end', ok: false, stopped: true })
   // A continuation's own intent event carries the resume message — the reopened session keeps its
   // original intent (#762), not the message that woke it.
-  const resumed = await AgentStore.open(CWD, { fs, fresh: true, continueRun: true, now: AT })
+  const resumed = await AgentStore.open(CWD, { fs, fresh: true, continueAgent: true, now: AT })
   await resumed.append({ kind: 'intent', text: 'Resume: keep going.' })
   assert.equal(resumed.snapshot().intent, 'build a thing')
 })

@@ -20,46 +20,46 @@ vi.mock('../lib/preferences.js', () => ({
 vi.mock('../lib/notify-channels.js', () => ({ useNotifyChannels: () => null, reloadNotifyChannels: vi.fn() }))
 vi.mock('../lib/notification-permission.js', () => ({ useNotificationPermission: () => 'default' }))
 // One stable object, so a test can steer the start and its error without a re-mock.
-const startRun = vi.hoisted(() => ({ start: vi.fn(), busy: false, error: null as string | null }))
-vi.mock('../lib/use-start-run.js', () => ({ useStartRun: () => startRun }))
+const startAgent = vi.hoisted(() => ({ start: vi.fn(), busy: false, error: null as string | null }))
+vi.mock('../lib/use-start-agent.js', () => ({ useStartAgent: () => startAgent }))
 
 const { OnboardingChecklist } = await import('./OnboardingChecklist.js')
 
 afterEach(() => {
   cleanup()
-  startRun.start.mockReset()
-  startRun.busy = false
-  startRun.error = null
+  startAgent.start.mockReset()
+  startAgent.busy = false
+  startAgent.error = null
 })
 
 /** A board with nothing set up: every row is open, which is when the marks have to be readable. */
 const EMPTY: DashboardData = {
-  totals: { projects: 0, activeRuns: 0, openTodos: 0, totalRuns: 0 },
+  totals: { projects: 0, activeAgents: 0, openTodos: 0, totalAgents: 0 },
   projects: [],
   active: [],
   queue: [],
   activity: [],
-  runsByStatus: {},
+  agentsByStatus: {},
 } as unknown as DashboardData
 
 /** One project registered, no tickets in it: the state the import step is offered in. */
 const WITH_PROJECT: DashboardData = {
   ...EMPTY,
-  totals: { projects: 1, activeRuns: 0, openTodos: 0, totalRuns: 0 },
+  totals: { projects: 1, activeAgents: 0, openTodos: 0, totalAgents: 0 },
   projects: [{ projectId: 'p1', hasTickets: false }],
 } as unknown as DashboardData
 
 /** Click the import step and wait for the start to have been attempted. */
 const clickImport = async () => {
   fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
-  await waitFor(() => expect(startRun.start).toHaveBeenCalled())
+  await waitFor(() => expect(startAgent.start).toHaveBeenCalled())
 }
 
 describe('OnboardingChecklist (#1139)', () => {
   test('the steps nothing breaks without are marked optional, and the two essentials are not', async () => {
     onDashboard.mockResolvedValue(EMPTY)
     onOnboarding.mockResolvedValue(null)
-    render(<OnboardingChecklist onRunStarted={vi.fn()} />)
+    render(<OnboardingChecklist onAgentStarted={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
 
     // Four integrations/inputs are optional; adding a project and filling the queue are not.
@@ -73,7 +73,7 @@ describe('OnboardingChecklist (#1139)', () => {
   test('an unticked step is a checkbox, not a radio button', async () => {
     onDashboard.mockResolvedValue(EMPTY)
     onOnboarding.mockResolvedValue(null)
-    const { container } = render(<OnboardingChecklist onRunStarted={vi.fn()} />)
+    const { container } = render(<OnboardingChecklist onAgentStarted={vi.fn()} />)
     await waitFor(() => expect(screen.getByText('Add a project')).toBeTruthy())
     // An outlined circle read as "pick one of these" when the rows are independent things to tick.
     expect(container.querySelector('circle')).toBeNull()
@@ -85,38 +85,38 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
   test('the started run id is handed up, with the project it runs in', async () => {
     onDashboard.mockResolvedValue(WITH_PROJECT)
     onOnboarding.mockResolvedValue(null)
-    startRun.start.mockResolvedValue({ agentId: 'run-7' })
-    const onRunStarted = vi.fn()
-    render(<OnboardingChecklist onRunStarted={onRunStarted} />)
+    startAgent.start.mockResolvedValue({ agentId: 'run-7' })
+    const onAgentStarted = vi.fn()
+    render(<OnboardingChecklist onAgentStarted={onAgentStarted} />)
     await clickImport()
 
     // The project travels with it: this surface has none selected, so an id alone cannot be routed.
     // Unattended (#1279): a checklist-fired routine ends at settle instead of parking in the chat loop.
-    expect(startRun.start).toHaveBeenCalledWith('p1', presets.importTickets.render(), 'prompt', { unattended: true })
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('p1', presets.importTickets.render(), 'run-7'))
+    expect(startAgent.start).toHaveBeenCalledWith('p1', presets.importTickets.render(), 'prompt', { unattended: true })
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', presets.importTickets.render(), 'run-7'))
   })
 
   test('a project with no worktree hands up no id, so the shell can adopt the running one', async () => {
     onDashboard.mockResolvedValue(WITH_PROJECT)
     onOnboarding.mockResolvedValue(null)
-    startRun.start.mockResolvedValue({})
-    const onRunStarted = vi.fn()
-    render(<OnboardingChecklist onRunStarted={onRunStarted} />)
+    startAgent.start.mockResolvedValue({})
+    const onAgentStarted = vi.fn()
+    render(<OnboardingChecklist onAgentStarted={onAgentStarted} />)
     await clickImport()
 
-    await waitFor(() => expect(onRunStarted).toHaveBeenCalledWith('p1', presets.importTickets.render(), undefined))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', presets.importTickets.render(), undefined))
   })
 
   test('a refused start says why and moves you nowhere', async () => {
     onDashboard.mockResolvedValue(WITH_PROJECT)
     onOnboarding.mockResolvedValue(null)
-    startRun.start.mockResolvedValue(undefined)
-    startRun.error = 'A session is already active for this project.'
-    const onRunStarted = vi.fn()
-    render(<OnboardingChecklist onRunStarted={onRunStarted} />)
+    startAgent.start.mockResolvedValue(undefined)
+    startAgent.error = 'A session is already active for this project.'
+    const onAgentStarted = vi.fn()
+    render(<OnboardingChecklist onAgentStarted={onAgentStarted} />)
     await clickImport()
 
     expect(await screen.findByText(/already active/i)).toBeTruthy()
-    expect(onRunStarted).not.toHaveBeenCalled()
+    expect(onAgentStarted).not.toHaveBeenCalled()
   })
 })

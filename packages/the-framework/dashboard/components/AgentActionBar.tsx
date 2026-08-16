@@ -1,17 +1,17 @@
 import type { ReactNode } from 'react'
 import type { FrameworkEvent } from '../../dist/index.js'
 import { GitStatusBar } from './GitStatusBar.js'
-import { SessionActionsMenu } from './SessionActionsMenu.js'
-import { runStatusPill } from '../lib/run-status.js'
+import { AgentActionsMenu } from './AgentActionsMenu.js'
+import { agentStatusPill } from '../lib/agent-status.js'
 import { cn } from '../lib/utils.js'
 
 // One run's action bar: what the session IS (its branch / PR / summary, as a disclosure) on the
 // left, and what you can DO to it on the right. The doing is a single ⋮ overflow menu
-// (SessionActionsMenu) instead of a row of icon buttons that came and went with the run's state;
+// (AgentActionsMenu) instead of a row of icon buttons that came and went with the run's state;
 // only the handoff's next step (Push / Open PR) stays out as a visible button, since it moves the
 // work forward. One bar for the session whether running or finished (AgentView), so the controls stay
 // put when a run reaches Done.
-export function RunActionBar({
+export function AgentActionBar({
   projectId,
   agentId: agentId,
   events,
@@ -49,9 +49,9 @@ export function RunActionBar({
   actions?: ReactNode
 }) {
   // What state the session is in, said once, here: it used to be a banner over the feed, which
-  // spent a full row on one word and pushed the output down. Ranked in runStatusPill, so exactly
+  // spent a full row on one word and pushed the output down. Ranked in agentStatusPill, so exactly
   // one of stopped / ready for merge / failed / building / finished is ever shown.
-  const status = runStatusPill(events)
+  const status = agentStatusPill(events)
   return (
     // One row, always (#1026). The branch and its summary give up width as the row fills; the
     // controls never drop under them, because a bar that reflows moves everything below it.
@@ -71,7 +71,7 @@ export function RunActionBar({
         // is one line of facts about the session, where the end of the row is where its controls
         // live. Capped, because one of these labels is not a word — a failure carries its reason,
         // which had a banner row to itself and would otherwise take the row from the branch.
-        runState={
+        agentState={
           status && (
             <span className="flex shrink-0 items-center gap-1.5" title={status.label}>
               <span className={cn('h-2 w-2 shrink-0 rounded-full', status.dot)} aria-hidden />
@@ -87,7 +87,7 @@ export function RunActionBar({
         {/* The handoff's next step stays visible — the one thing here that moves the session forward
             rather than just opening it somewhere. Everything else is in the ⋮ menu. */}
         {actions}
-        <SessionActionsMenu
+        <AgentActionsMenu
           projectId={projectId}
           agentId={agentId}
           events={events}

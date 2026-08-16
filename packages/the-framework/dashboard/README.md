@@ -35,7 +35,7 @@ pnpm --filter @gemstack/the-framework dev:dashboard
 Populate a project to watch: run `dev:daemon` instead of `dev:dashboard`, which brings a real
 daemon up in the dev server's own process, and start a session from the UI. The dashboard is the
 only way to start one — the CLI keeps four options and no verbs, and a session's whole
-configuration travels to it as a JSON spec (`--session <path>`), never as flags.
+configuration travels to it as a JSON spec (`--agent <path>`), never as flags.
 
 ## Tests
 

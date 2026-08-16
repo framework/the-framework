@@ -64,7 +64,7 @@ export interface PresetSpec {
    * session's branch, behind its context. The flag sits on the preset rather than on the surface
    * that fires it, because it is a property of the work, not of where the user clicked.
    */
-  newSession?: boolean
+  newAgent?: boolean
 }
 
 /** A preset's public shape: how it is declared, plus its resolved params and a renderer. */

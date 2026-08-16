@@ -206,7 +206,7 @@ test('the two GitHub-import presets, and only those, always open a session of th
   // The flag is a property of the work, not of the surface that fires it, so it is pinned here
   // rather than in the dashboard: both read GitHub and write `tickets/`, which has nothing to do
   // with whatever session the user happened to be reading when they clicked.
-  const marked = Object.values(presets).filter(p => p.newSession).map(p => p.name)
+  const marked = Object.values(presets).filter(p => p.newAgent).map(p => p.name)
   assert.deepEqual(marked.sort(), ['import-tickets', 'update-tickets'])
   assert.equal(LAUNCHER_PRESETS.includes(presets.importTickets), true)
   assert.equal(LAUNCHER_PRESETS.includes(presets.updateTickets), true)

@@ -4,17 +4,17 @@ import { buildInterventions, interventionKey } from './interventions.js'
 import type { OpenPr } from './gh.js'
 import type { AgentHandoff } from './agent-handoff.js'
 import type { ProjectSummary } from './projects.js'
-import type { LiveRun, AgentMeta } from '../store/index.js'
+import type { LiveAgent, AgentMeta } from '../store/index.js'
 
 const project = (id: string, path: string): ProjectSummary => ({ id, path, name: id, activated: true })
 
 /** No paused run anywhere — keeps the PR-only tests hermetic (no disk read). */
-const noRuns = async (): Promise<LiveRun[]> => []
+const noAgents = async (): Promise<LiveAgent[]> => []
 
 /** A live run in its own worktree (#738), which is what the reader now returns. */
-const live = (meta: AgentMeta, cwd = '/a/.the-framework/worktrees/r1'): LiveRun => ({ ...meta, cwd })
+const live = (meta: AgentMeta, cwd = '/a/.the-framework/worktrees/r1'): LiveAgent => ({ ...meta, cwd })
 
-const runningMeta = (over: Partial<AgentMeta> = {}): AgentMeta => ({
+const runningAgentMeta = (over: Partial<AgentMeta> = {}): AgentMeta => ({
   version: 1,
   status: 'running',
   id: 'r1',
@@ -33,7 +33,7 @@ test('buildInterventions rolls up open non-draft PRs across projects, newest fir
     '/c': [], // no open PRs -> contributes nothing
   }
   const prs = async (cwd: string): Promise<OpenPr[]> => prsByPath[cwd] ?? []
-  const items = await buildInterventions([project('a', '/a'), project('b', '/b'), project('c', '/c')], { prs, liveRuns: noRuns })
+  const items = await buildInterventions([project('a', '/a'), project('b', '/b'), project('c', '/c')], { prs, liveAgents: noAgents })
 
   // Newest PR first; the draft is gone.
   assert.deepEqual(
@@ -51,28 +51,28 @@ test('buildInterventions skips a project whose PR lookup throws', async () => {
     if (cwd === '/boom') throw new Error('gh exploded')
     return [{ number: 1, title: 'ok', url: 'u1', isDraft: false }]
   }
-  const items = await buildInterventions([project('boom', '/boom'), project('ok', '/ok')], { prs, liveRuns: noRuns })
+  const items = await buildInterventions([project('boom', '/boom'), project('ok', '/ok')], { prs, liveAgents: noAgents })
   assert.deepEqual(items.map(i => i.projectId), ['ok'])
 })
 
 test('buildInterventions returns [] when nothing is open anywhere', async () => {
   const prs = async (): Promise<OpenPr[]> => []
-  assert.deepEqual(await buildInterventions([project('a', '/a')], { prs, liveRuns: noRuns }), [])
+  assert.deepEqual(await buildInterventions([project('a', '/a')], { prs, liveAgents: noAgents }), [])
 })
 
 test('buildInterventions dedupes a PR shared by two registered projects (same repo), keeping one', async () => {
   const shared: OpenPr = { number: 285, title: 'release', url: 'https://gh/pr/285', isDraft: false, createdAt: '2026-07-05T00:00:00Z' }
   const prs = async (): Promise<OpenPr[]> => [shared] // both projects resolve to the same repo
-  const items = await buildInterventions([project('root', '/repo'), project('sub', '/repo/packages/x')], { prs, liveRuns: noRuns })
+  const items = await buildInterventions([project('root', '/repo'), project('sub', '/repo/packages/x')], { prs, liveAgents: noAgents })
   assert.deepEqual(items.map(i => i.number), [285])
 })
 
 const noPrs = async (): Promise<OpenPr[]> => []
 
 test('buildInterventions adds an awaiting item for a running run parked on a choice (#636)', async () => {
-  const liveRuns = async (cwd: string): Promise<LiveRun[]> =>
-    cwd === '/a' ? [live(runningMeta({ pendingChoice: { id: 'gate-1', title: 'Cache the auth store?' } }))] : []
-  const items = await buildInterventions([project('a', '/a'), project('b', '/b')], { prs: noPrs, liveRuns })
+  const liveAgents = async (cwd: string): Promise<LiveAgent[]> =>
+    cwd === '/a' ? [live(runningAgentMeta({ pendingChoice: { id: 'gate-1', title: 'Cache the auth store?' } }))] : []
+  const items = await buildInterventions([project('a', '/a'), project('b', '/b')], { prs: noPrs, liveAgents })
 
   assert.equal(items.length, 1)
   assert.deepEqual(
@@ -82,25 +82,25 @@ test('buildInterventions adds an awaiting item for a running run parked on a cho
 })
 
 test('buildInterventions ignores a pendingChoice on a run that is no longer running', async () => {
-  const liveRuns = async (): Promise<LiveRun[]> =>
-    [live(runningMeta({ status: 'done', pendingChoice: { id: 'gate-1', title: 'stale' } }))]
-  assert.deepEqual(await buildInterventions([project('a', '/a')], { prs: noPrs, liveRuns }), [])
+  const liveAgents = async (): Promise<LiveAgent[]> =>
+    [live(runningAgentMeta({ status: 'done', pendingChoice: { id: 'gate-1', title: 'stale' } }))]
+  assert.deepEqual(await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents }), [])
 })
 
 test('buildInterventions links an awaiting item to the dashboard URL when given, else empty', async () => {
-  const liveRuns = async (): Promise<LiveRun[]> => [live(runningMeta({ pendingChoice: { id: 'g', title: 'q?' } }))]
-  const withUrl = await buildInterventions([project('a', '/a')], { prs: noPrs, liveRuns, dashboardUrl: 'http://localhost:4200' })
+  const liveAgents = async (): Promise<LiveAgent[]> => [live(runningAgentMeta({ pendingChoice: { id: 'g', title: 'q?' } }))]
+  const withUrl = await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents, dashboardUrl: 'http://localhost:4200' })
   assert.equal(withUrl[0]!.url, 'http://localhost:4200')
-  const withoutUrl = await buildInterventions([project('a', '/a')], { prs: noPrs, liveRuns })
+  const withoutUrl = await buildInterventions([project('a', '/a')], { prs: noPrs, liveAgents })
   assert.equal(withoutUrl[0]!.url, '')
 })
 
 test('buildInterventions surfaces PRs and awaiting runs together, newest first', async () => {
   const prs = async (cwd: string): Promise<OpenPr[]> =>
     cwd === '/a' ? [{ number: 5, title: 'pr', url: 'u5', isDraft: false, createdAt: '2026-07-10T00:00:00Z' }] : []
-  const liveRuns = async (cwd: string): Promise<LiveRun[]> =>
-    cwd === '/b' ? [live(runningMeta({ updatedAt: '2026-07-16T00:00:00Z', pendingChoice: { id: 'g', title: 'q?' } }))] : []
-  const items = await buildInterventions([project('a', '/a'), project('b', '/b')], { prs, liveRuns })
+  const liveAgents = async (cwd: string): Promise<LiveAgent[]> =>
+    cwd === '/b' ? [live(runningAgentMeta({ updatedAt: '2026-07-16T00:00:00Z', pendingChoice: { id: 'g', title: 'q?' } }))] : []
+  const items = await buildInterventions([project('a', '/a'), project('b', '/b')], { prs, liveAgents })
   assert.deepEqual(items.map(i => i.kind), ['awaiting', 'pr']) // awaiting is newer
 })
 
@@ -147,7 +147,7 @@ const waiting = (over: Partial<AgentHandoff> = {}): AgentHandoff => ({
 /** Only the unpushed source: no PRs, no paused runs. */
 const onlyUnpushed = (agents: AgentMeta[], handoff: (cwd: string, branch: string) => Promise<AgentHandoff | undefined>) => ({
   prs: async () => [],
-  liveRuns: noRuns,
+  liveAgents: noAgents,
   agents: async () => agents,
   handoff,
 })
@@ -238,7 +238,7 @@ test("a session's own draft PR still reaches the queue; a hand-made draft does n
     { number: 9, title: 'session work', url: 'u9', isDraft: true, headRefName: 'the-framework/x', createdAt: '2026-07-16T00:00:00Z' },
     { number: 10, title: 'my own wip', url: 'u10', isDraft: true, headRefName: 'feat/mine', createdAt: '2026-07-17T00:00:00Z' },
   ]
-  const items = await buildInterventions([project('a', '/a')], { prs, liveRuns: noRuns, agents: async () => [] })
+  const items = await buildInterventions([project('a', '/a')], { prs, liveAgents: noAgents, agents: async () => [] })
   assert.deepEqual(items.map(i => i.number), [9])
 })
 
@@ -246,6 +246,6 @@ test('a draft with no branch recorded is still treated as hand-made (#1102)', as
   // `headRefName` is new: an older gh, or a lookup that did not ask for it, must not turn every
   // draft in the repo into a "needs you".
   const prs = async (): Promise<OpenPr[]> => [{ number: 11, title: 'wip', url: 'u11', isDraft: true }]
-  const items = await buildInterventions([project('a', '/a')], { prs, liveRuns: noRuns, agents: async () => [] })
+  const items = await buildInterventions([project('a', '/a')], { prs, liveAgents: noAgents, agents: async () => [] })
   assert.deepEqual(items, [])
 })

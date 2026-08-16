@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.
 import { OptionLabel } from '../components/ui/option-label.js'
 import { DisclosureToggle } from '../components/DisclosureToggle.js'
 import { ActivityChart } from '../components/ActivityChart.js'
-import { RunOutcomes } from '../components/RunOutcomes.js'
+import { AgentOutcomes } from '../components/AgentOutcomes.js'
 
 // The gallery's card registry (#DESIGN). Every entry renders the REAL component wherever the
 // component can stand alone, so a card cannot quietly drift from what ships. The few that cannot
@@ -310,7 +310,7 @@ function Charts() {
           <CardTitle>Session outcomes</CardTitle>
         </CardHeader>
         <CardContent>
-          <RunOutcomes counts={{ done: 14, failed: 3, stopped: 5, running: 0 }} />
+          <AgentOutcomes counts={{ done: 14, failed: 3, stopped: 5, running: 0 }} />
         </CardContent>
       </Card>
     </div>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FrameworkEvent } from '../../dist/index.js'
 import type { LiveFeedEvent } from '../../dist/dashboard-rpc/index.js'
 import { onEvents, type EventChannel } from '../rpc/events.js'
-import { currentRunEvents } from './live-state.js'
+import { currentAgentEvents } from './live-state.js'
 import { stampReceived } from './event-times.js'
 
 // The live run feed (#405), shared. The dashboard is a projection of the selected project's
@@ -140,7 +140,7 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
   // without the slice a second run would show the previous run's log until it finished. A run's
   // own tail (#749) holds nothing but that run — including the second `session` boundary a
   // resumed session (#762) appends to the SAME journal, where slicing is exactly wrong: it hid
-  // everything before the resume for as long as the run was live. See {@link currentRunEvents}.
-  const scoped = useMemo(() => (agentId ? events : currentRunEvents(events)), [events, agentId])
+  // everything before the resume for as long as the run was live. See {@link currentAgentEvents}.
+  const scoped = useMemo(() => (agentId ? events : currentAgentEvents(events)), [events, agentId])
   return { events: scoped, lost, done }
 }

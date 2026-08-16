@@ -1,4 +1,4 @@
-import { readAllRuns, readLiveMetas, type LiveRun, type AgentMeta, type AgentStatus } from '../store/index.js'
+import { readAllAgents, readLiveMetas, type LiveAgent, type AgentMeta, type AgentStatus } from '../store/index.js'
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
 import { readTickets, type WorkspaceTicket } from './tickets.js'
@@ -60,8 +60,8 @@ const RECENT_LIMIT = 5
 /** How many recent sessions the home rail pools across every project. */
 const RECENT_RUNS_LIMIT = 30
 
-/** Injectable reader so {@link buildRecentRuns} is unit-testable off disk. */
-export interface RecentRunsDeps {
+/** Injectable reader so {@link buildRecentAgents} is unit-testable off disk. */
+export interface RecentAgentsDeps {
   agents?: (cwd: string) => Promise<AgentMeta[]>
 }
 
@@ -71,11 +71,11 @@ export interface RecentRunsDeps {
  * the project it belongs to, so selecting it jumps into that project's session. Forgiving — a project
  * whose runs cannot be read simply contributes nothing.
  */
-export async function buildRecentRuns(projects: ProjectSummary[], deps: RecentRunsDeps = {}): Promise<RecentAgent[]> {
-  const readRuns = deps.agents ?? readAllRuns
+export async function buildRecentAgents(projects: ProjectSummary[], deps: RecentAgentsDeps = {}): Promise<RecentAgent[]> {
+  const readAgents = deps.agents ?? readAllAgents
   const all: RecentAgent[] = []
   for (const project of projects) {
-    for (const agent of await readRuns(project.path).catch(() => [])) {
+    for (const agent of await readAgents(project.path).catch(() => [])) {
       all.push({ projectId: project.id, projectName: project.name, agent })
     }
   }
@@ -195,7 +195,7 @@ const HOT_TICKETS_LIMIT = 60
 export interface HotTicketsDeps {
   tickets?: (cwd: string) => Promise<WorkspaceTicket[]>
   /** The project's live runs, read for the ticket each one recorded (#1117). */
-  liveRuns?: (cwd: string) => Promise<LiveRun[]>
+  liveAgents?: (cwd: string) => Promise<LiveAgent[]>
   /** The cross-project TODO queue, for the AI-Queue lane (#1139). Defaults to {@link collectQueue}. */
   queue?: (projects: ProjectSummary[]) => Promise<ProjectQueue[]>
 }
@@ -209,7 +209,7 @@ export interface HotTicketsDeps {
  */
 export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicketsDeps = {}): Promise<HotTicket[]> {
   const readT = deps.tickets ?? readTickets
-  const readRuns = deps.liveRuns ?? readLiveMetas
+  const readAgents = deps.liveAgents ?? readLiveMetas
   // The AI Queue: which tickets an open TODO_AGENTS.md entry links to, per project (#1139).
   const queues = await (deps.queue ?? (p => collectQueue(p)))(projects)
   const queuedByProject = new Map<string, Set<string>>()
@@ -227,7 +227,7 @@ export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicke
     // Which of this project's tickets are being implemented right now, by run id (#1117). Built
     // per project because a ticket path is only unique within its own repo.
     const implementing = new Map<string, string>()
-    for (const meta of await readRuns(project.path).catch(() => [])) {
+    for (const meta of await readAgents(project.path).catch(() => [])) {
       if (meta.status !== 'running' || !meta.ticket) continue
       implementing.set(meta.ticket, meta.id)
     }
@@ -253,7 +253,7 @@ export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicke
 
 /** Injectable readers so {@link buildOverview} is unit-testable off disk. */
 export interface OverviewDeps {
-  liveRuns?: (cwd: string) => Promise<LiveRun[]>
+  liveAgents?: (cwd: string) => Promise<LiveAgent[]>
   queue?: (projects: ProjectSummary[]) => Promise<ProjectQueue[]>
 }
 
@@ -264,13 +264,13 @@ export interface OverviewDeps {
  * with no live run, or none running, simply contributes nothing to `active`.
  */
 export async function buildOverview(projects: ProjectSummary[], deps: OverviewDeps = {}): Promise<Overview> {
-  const liveRuns = deps.liveRuns ?? readLiveMetas
+  const liveAgents = deps.liveAgents ?? readLiveMetas
   const queue = deps.queue ?? (p => collectQueue(p))
 
   const active: ActiveAgent[] = []
   for (const project of projects) {
     // Every live run of the project (#738), not just the one that used to sit at its path.
-    for (const meta of await liveRuns(project.path).catch(() => [])) {
+    for (const meta of await liveAgents(project.path).catch(() => [])) {
       if (meta.status !== 'running') continue
       active.push({
         projectId: project.id,

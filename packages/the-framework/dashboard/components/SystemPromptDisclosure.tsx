@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import { composeRunSystem } from '../../dist/client.js'
+import { composeAgentSystem } from '../../dist/client.js'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover.js'
 import { Checkbox } from './ui/checkbox.js'
 import { cn } from '../lib/utils.js'
@@ -9,7 +9,7 @@ import { cn } from '../lib/utils.js'
  * prompt, shown in full, before the run — so a user can read what The Framework wraps their
  * prompt in rather than take our word for it.
  *
- * It renders through `composeRunSystem`, the same function the run itself composes
+ * It renders through `composeAgentSystem`, the same function the run itself composes
  * with, so the toggles above it are shown doing exactly what they really do. That
  * is the whole point: no second copy of the wrapping logic to drift from the real
  * one.
@@ -50,7 +50,7 @@ export function SystemPromptDisclosure({
   user?: string | null | undefined
   busy: boolean
 }) {
-  const text = composeRunSystem({
+  const text = composeAgentSystem({
     vanilla: disabled,
     ...(transparent ? { transparent: true } : {}),
     ...(browser ? { browser: true } : {}),

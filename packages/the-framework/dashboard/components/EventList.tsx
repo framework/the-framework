@@ -119,6 +119,20 @@ function badgeTone(e: FrameworkEvent): string {
 }
 
 /**
+ * The row's BACKGROUND wash (#1508), the layer above {@link badgeTone}'s markers: a tint across
+ * the whole line, findable from the scrollbar's distance where a coloured badge word is not.
+ * Only the rows the eye actually hunts for get one — the reader's own turns (the log's natural
+ * chapter marks), failures, and the agent landing cleanly — and at a whisper of alpha, so the
+ * text keeps the contrast and the bulk of the log stays plain canvas.
+ */
+function rowWash(e: FrameworkEvent): string {
+  if (isFailure(e)) return 'bg-danger/10'
+  if (e.kind === 'driver' && e.event.type === 'start') return 'bg-info/10'
+  if ((e.kind === 'end' && e.ok) || e.kind === 'ready-for-merge') return 'bg-success/10'
+  return ''
+}
+
+/**
  * Hoist the agent's first prompt to the top of the log (#1170).
  *
  * It is emitted after the `session` and `system-prompt` events, so the one line the reader wrote
@@ -292,7 +306,9 @@ export function EventList({
               const chunkHead = !prev || rowGroup(prev) !== rowGroup(e)
               const at = receivedAt(e)
               return (
-                <MessageScrollerItem key={i} messageId={String(i)} scrollAnchor={isTurnBoundary(e)} className="flex items-start gap-2">
+                // Every row carries the same -mx/px pair so a washed row's band and a plain row's
+                // text share the exact same columns; only the background differs.
+                <MessageScrollerItem key={i} messageId={String(i)} scrollAnchor={isTurnBoundary(e)} className={`-mx-1.5 flex items-start gap-2 rounded-sm px-1.5 ${rowWash(e)}`}>
                   {/* Fixed-width badge column so the text lines up whether or not this row repeats the badge. Wide enough for the longest common label ("system prompt") to sit on one line. */}
                   <span className="w-28 shrink-0">
                     {chunkHead && (

@@ -52,6 +52,38 @@ function weekWindow(windows: DriverQuotaWindow[]): DriverQuotaWindow | undefined
   return windows.find(w => w.kind === 'week')
 }
 
+/**
+ * Why the week could not be placed, said precisely enough to act on.
+ *
+ * There are three ways to get here and they need three different sentences — the panel's own rule
+ * is that the error *is* the bug report, and a reader cannot report what the message will not name.
+ * It used to have two, so the third case borrowed the wrong one: a week line carrying no reset
+ * time fell through to "the readout has no week", which is false, and the readout below the alert
+ * plainly showed the week it had just denied having.
+ *
+ * A reset-less week line is a normal shape, not a malformed one — `parseQuotaReadout` returns it
+ * whenever Claude Code prints a window without its `· resets …` tail — and it is the shape an
+ * untouched account is most likely to print, since there is nothing yet to count down from. So it
+ * does not claim a parse failure either; it says what is missing and why that leaves nothing to draw.
+ *
+ * Deliberately no widening of the parser to make any of these cases go away. Which shape a given
+ * account actually prints is not knowable from here, and the message naming what it saw is how
+ * that gets reported back — a speculative extra label mapping would just swallow the evidence.
+ */
+function unplaceableWeek(week: DriverQuotaWindow | undefined, windows: DriverQuotaWindow[]): string {
+  const listed = windows.map(w => `“${w.label}”`).join(', ')
+  if (!week) return `Couldn't parse quota: no “Current week (all models)” line in the readout — it reported ${listed}.`
+  if (!week.resetsAtText) {
+    // Not "couldn't parse": this readout parsed exactly as printed. The week simply arrived
+    // without a reset, and the bar is a pace comparison — it needs both ends of the span.
+    return (
+      `No quota week to place: “${week.label}” reports ${week.percentUsed}% used but no reset time, ` +
+      `and the week is drawn between its start and its reset — there is no span to place it in.`
+    )
+  }
+  return `Couldn't parse quota: the week resets “${week.resetsAtText}”, which isn't a phrasing this version recognizes.`
+}
+
 /** A swatch-and-word pair for the legend below the bar. */
 function LegendItem({ swatch, children }: { swatch: ReactNode; children: ReactNode }) {
   return (
@@ -411,22 +443,12 @@ export function Quota() {
         {/* Without a placeable week there is no axis to draw. Say so, loudly — no fallback (Rom):
             this used to degrade to the week as a plain figure, which hid a real defect for weeks —
             a reset phrasing the parser didn't know just made the panel quietly plainer, and nothing
-            anywhere said the boundary was gone. Quote the text that failed: it is the bug report.
-
-            Both arms quote, which is the point: a week whose *reset* text is unreadable quotes that
-            text, and a readout with no week at all names the line that is missing and lists the
-            labels that came instead. The second arm used to say only "no week this version can
-            place", which tells whoever reads it nothing they can act on or paste into an issue —
-            and the readout is prose from another program, so the labels are the whole diagnosis. */}
+            anywhere said the boundary was gone. Quote the text that failed: it is the bug report. */}
         {view?.boundary && week ? (
           <WeekBar status={view.boundary} percentUsed={week.percentUsed} offset={offset} onChangeOffset={setOffset} others={others} />
         ) : view && view.windows.length ? (
           <p role="alert" className="text-sm text-danger">
-            {week?.resetsAtText
-              ? `Couldn't parse quota: the week resets “${week.resetsAtText}”, which isn't a phrasing this version recognizes.`
-              : `Couldn't parse quota: no “Current week (all models)” line in the readout — it reported ${others
-                  .map(w => `“${w.label}”`)
-                  .join(', ')}.`}
+            {unplaceableWeek(week, others)}
           </p>
         ) : null}
 

@@ -9,7 +9,7 @@ The Usage panel: the account's quota week as one bar, so "am I ahead or behind?"
 
 ## Rationales
 
-- A week the panel cannot place is a loud error quoting the text it could not read — a quiet fallback once hid a real defect for weeks. Both ways of failing quote: an unreadable reset phrasing shows that phrasing, and a readout with no week at all names the line that is missing and lists the labels that arrived instead. The readout is prose from another program, so those labels are the whole diagnosis.
+- A week the panel cannot place is a loud error quoting the text it could not read — a quiet fallback once hid a real defect for weeks. Each of the three ways of failing gets its own sentence: an unreadable reset phrasing shows that phrasing; a week line carrying no reset time at all says that, and does not claim a parse failure it did not have, since that readout parsed exactly as printed and simply left the week with only one end of its span; and a readout with no week names the line that is missing and lists the labels that arrived instead. The readout is prose from another program, so those labels are the whole diagnosis — and a message that borrows the wrong case is worse than none, since it denies a week the panel is listing directly below it.
 - Numbers that outlive failed refreshes are dated, since an undated bar claims to be current.
 
 ## Before writing SPEC.md files

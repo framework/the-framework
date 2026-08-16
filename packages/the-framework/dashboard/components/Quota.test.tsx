@@ -112,6 +112,26 @@ describe('Quota (#960)', () => {
     expect(screen.queryByLabelText('Unattended work stops at')).toBeNull()
   })
 
+  test('a week with no reset time says so, rather than denying the week exists', () => {
+    // The third way to be unplaceable, and the one an untouched account hits: nothing consumed, so
+    // Claude Code prints the window without its `· resets …` tail. `quotaBoundaryStatus` yields no
+    // boundary without that text, and the panel used to borrow the "no week" wording — while the
+    // list right below the alert showed the very week it claimed not to have.
+    view = {
+      windows: [
+        { label: 'Current week (all models)', kind: 'week', percentUsed: 0 },
+        { label: 'Current session', kind: 'session', percentUsed: 0 },
+      ],
+      readAt: Date.now(),
+    }
+    render(<Quota />)
+    const alert = screen.getByRole('alert').textContent ?? ''
+    expect(alert).toMatch(/no reset time/)
+    expect(alert).toMatch(/Current week \(all models\)/)
+    expect(alert).not.toMatch(/no “Current week \(all models\)” line/) // it has one; that is the point
+    expect(screen.queryByRole('img')).toBeNull()
+  })
+
   test('a readout with no week at all names the missing line and what came instead (#1367 follow-up)', () => {
     // The readout is prose from another program, so when the week is simply absent the labels that
     // *did* arrive are the whole diagnosis — this used to say only "no week this version can

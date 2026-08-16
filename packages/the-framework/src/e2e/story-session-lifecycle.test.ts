@@ -149,8 +149,11 @@ test("publish a finished session: push its branch from the handoff panel (#799)"
 
     // Pushed the instant the row flips done — deliberately INSIDE teardown's window. This used
     // to race teardown's own commits in the same checkout: the click failed with "could not
-    // commit the work this session left uncommitted" and teardown stranded the worktree. The
-    // run lock serializes the two, so the first click works and teardown still retires cleanly.
+    // commit the work this session left uncommitted" and teardown stranded the worktree. Then it
+    // raced teardown's *push* instead, once only the commit was serialized: both sides created
+    // the same ref and the loser got `cannot lock ref … reference already exists`, which when
+    // teardown lost meant the worktree was kept. The run lock spans commit and push on both
+    // sides, so the first click works and teardown still retires cleanly.
     const pushed = await rpc(sendPushBranch)(project.id, agentId)
     assert.equal(pushed.ok, true, `push failed: ${'error' in pushed ? pushed.error : ''}`)
     const remoteBranches = await git(project.cwd, 'ls-remote', '--heads', 'origin')

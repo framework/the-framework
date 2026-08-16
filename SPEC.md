@@ -10,13 +10,15 @@ Autonomous AI programming: humans make the important decisions while The Framewo
 
 ```mermaid
 graph TD
-    dash["<b>framework-dashboard</b><br/>the UI — a pure projection of<br/>the files the daemon writes"]
-    product["<b>the-framework</b><br/>the product: CLI + daemon + session lifecycle,<br/>git handoff, autonomy, chat surfaces"]
-
-    dash --> product
+    subgraph product["<b>the-framework</b> — one package"]
+        dash["<b>dashboard/</b><br/>the UI — a pure projection of<br/>the files the daemon writes"]
+        core["<b>src/</b><br/>CLI + daemon + session lifecycle,<br/>git handoff, autonomy, chat surfaces"]
+        dash --> core
+    end
 ```
 
-The arrows point one way — the dashboard renders the product — and nothing depends "up".
+The arrow points one way — the dashboard renders the product — and nothing depends "up". It used to
+be a package boundary; the dependency survived the merge, the boundary did not.
 
 ## Rationales
 

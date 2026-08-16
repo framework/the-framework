@@ -1,5 +1,5 @@
 import { createServer, type Server } from 'node:http'
-import { AddressInfo } from 'node:net'
+import type { AddressInfo } from 'node:net'
 
 /**
  * The run's browser, streamed to a human (#802, part of #609).

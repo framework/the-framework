@@ -1,6 +1,6 @@
 // The dashboard's Telefunc surface (#405), served in-process by the daemon. The
 // implementations live here in @gemstack/the-framework so `sendStart` (added with the serve
-// wiring) can reach the daemon's `startRun`; the framework-dashboard client imports
+// wiring) can reach the daemon's `startRun`; the dashboard client imports
 // these through thin re-export shims so the baked RPC keys stay `/server/*.telefunc.ts`.
 export { onRuns, onRun, onDocs, onQueue, onOverview, onRecentRuns, onHotTickets, onInterventions, onOpenQuestions, onActivity, onDashboard, onGithubUrl, onGitStatus, onProjectFiles, onProjectFileStatus, onFileDiff, onRunChanges, onFileContent, onTickets, onTicket, onTicketsMeta, onAllTickets, onRetainedWorktrees, onRunWorktree, onRunHandoff, onSystemPromptUser, onBridgeQuestion, onBridgeStatus, onBridgeToken, onBridgeEvents, onBridgeAnswer } from './reads.telefunc.js'
 export { sendStop, sendChoice, sendBridgeAnswer, sendBridgeAnswerCancel, sendMessage, sendSetHandoff, sendStart, sendOpenInApp, sendRemoveWorktree, sendDeleteSession, sendPushBranch, sendOpenPullRequest, sendMerge, sendQueueTicket, sendReleaseTicketLock, type QueueTicketResult, type QueuedTicket } from './control.telefunc.js'

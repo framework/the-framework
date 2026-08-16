@@ -50,21 +50,51 @@
     }
   },
   "scripts": {
-    "build": "node scripts/gen-prompts.mjs && tsc -p tsconfig.build.json",
+    "build": "node scripts/gen-prompts.mjs && tsc -p tsconfig.build.json && cd dashboard && vite build",
     "dev": "node scripts/gen-prompts.mjs && tsc -p tsconfig.build.json --watch",
-    "typecheck": "node scripts/gen-prompts.mjs && tsc --noEmit",
-    "test": "node scripts/gen-prompts.mjs && tsc -p tsconfig.test.json && node scripts/run-tests.mjs",
-    "bundle:dashboard": "node scripts/bundle-dashboard.mjs",
+    "dev:dashboard": "cd dashboard && vite",
+    "dev:daemon": "cd dashboard && FRAMEWORK_DEV_DAEMON=1 vite",
+    "design:build": "tsx dashboard/design/build.mts",
+    "typecheck": "node scripts/gen-prompts.mjs && tsc --noEmit && tsc --noEmit -p dashboard/tsconfig.json",
+    "test": "node scripts/gen-prompts.mjs && tsc -p tsconfig.test.json && node scripts/run-tests.mjs && cd dashboard && vitest run",
     "clean": "rm -rf dist dist-test src/prompts.generated.ts",
     "gen:prompts": "node scripts/gen-prompts.mjs"
   },
   "dependencies": {
+    "@base-ui-components/react": "1.0.0-rc.0",
+    "@shadcn/react": "^0.2.1",
+    "@tiptap/core": "^2.10.0",
+    "@tiptap/pm": "^2.10.0",
+    "@tiptap/react": "^2.10.0",
+    "@tiptap/starter-kit": "^2.10.0",
+    "@tiptap/suggestion": "^2.10.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.469.0",
+    "motion": "^12.42.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^2.6.0",
     "telefunc": "^0.2.22",
+    "tiptap-markdown": "^0.8.10",
+    "vike": "^0.4.235",
+    "vike-react": "^0.6.5",
     "yaml": "^2.5.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20.0.0",
-    "typescript": "^5.4.0"
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.3",
+    "jsdom": "^29.1.1",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.22.4",
+    "typescript": "^5.4.0",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.10"
   },
   "author": "Suleiman Shahbari"
 }

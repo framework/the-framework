@@ -269,7 +269,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
 
   // Nothing may start or steer a run from here on, so the background services go first (#923):
   // auto PM or a Discord message arriving mid-shutdown would start one while we stop the rest.
-  services.quiesce()
+  await services.quiesce()
   // Stop the runs this daemon spawned, before the previews they may be serving. Left running they
   // are orphans nothing tracks; stopped here they keep their worktree and branch, so the dashboard
   // can continue them on the next start.

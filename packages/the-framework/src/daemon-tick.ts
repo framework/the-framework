@@ -39,7 +39,12 @@ export interface TickJob {
 export interface DaemonTick {
   /** Run one tick now, awaiting it. The daemon's shutdown and the tests drive it through this. */
   tick: () => Promise<void>
-  stop: () => void
+  /**
+   * Stop the clock, and resolve when the turn already in flight has finished. Awaiting it is how
+   * a shutdown knows the sweeps have let go of the repo — clearing the interval only stops the
+   * *next* turn, and these jobs commit and push.
+   */
+  stop: () => Promise<void>
 }
 
 /** How often the clock fires. The finest cadence any job asks for; everything else is a multiple. */
@@ -98,9 +103,12 @@ export function startDaemonTick(opts: DaemonTickOptions): DaemonTick {
   timer.unref?.()
   return {
     tick,
-    stop: () => {
+    stop: async () => {
       stopped = true
       clearInterval(timer)
+      // The turn in flight stops at the next job boundary, but the job it is inside runs to the
+      // end — so wait it out rather than leaving a sweep mid-commit.
+      await inflight?.catch(() => {})
     },
   }
 }

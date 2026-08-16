@@ -82,7 +82,8 @@ async function services(preferences: Record<string, unknown>) {
     log: () => {},
   })
   const stop = async () => {
-    started.quiesce()
+    // Awaited: the sweep in flight is what the cleanup below would otherwise delete out from under.
+    await started.quiesce()
     await rm(config, { recursive: true, force: true })
     await rm(project, { recursive: true, force: true })
   }

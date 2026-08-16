@@ -25,7 +25,7 @@ test('a job runs every Nth tick, and its own turn is skipped rather than queued'
     // Ticks 0,1,2,3 for `fast`; ticks 0 and 3 for `slow`.
     assert.deepEqual(ran, ['fast', 'slow', 'fast', 'fast', 'fast', 'slow'])
   } finally {
-    tick.stop()
+    await tick.stop()
   }
 })
 
@@ -43,7 +43,7 @@ test('a job can sit out the start-up tick, which every other job takes', async (
     await tick.tick()
     assert.deepEqual(ran, ['seeds', 'seeds', 'waits'])
   } finally {
-    tick.stop()
+    await tick.stop()
   }
 })
 
@@ -65,7 +65,7 @@ test('a job that throws costs its own turn and nothing else, and is named in the
     assert.equal(logs.length, 1)
     assert.match(logs[0]!, /CI watch failed this tick: gh is down/)
   } finally {
-    tick.stop()
+    await tick.stop()
   }
 })
 
@@ -86,7 +86,7 @@ test('jobs run in order, one at a time: a slow one holds the tick rather than ov
     await tick.tick()
     assert.deepEqual(order, ['slow:start', 'slow:end', 'next'])
   } finally {
-    tick.stop()
+    await tick.stop()
   }
 })
 
@@ -108,7 +108,7 @@ test('an overlapping tick joins the one already running, so awaiting it means it
     assert.equal(peak, 1, 'never two turns of the same job at once')
     assert.equal(running, 0, 'and awaiting the tick means it finished')
   } finally {
-    tick.stop()
+    await tick.stop()
   }
 })
 
@@ -116,7 +116,26 @@ test('a stopped clock runs nothing further', async () => {
   let ran = 0
   const { tick } = clock([{ name: 'job', run: async () => void ran++ }])
   await tick.tick()
-  tick.stop()
+  await tick.stop()
   await tick.tick()
   assert.equal(ran, 1)
+})
+
+test('stopping waits out the turn already in flight, rather than only the next one', async () => {
+  // These jobs commit and push. Clearing the interval stops the *next* turn; the one inside a job
+  // runs to the end regardless, and a shutdown that does not wait for it tears down underneath it.
+  let finished = false
+  const { tick } = clock([
+    {
+      name: 'slow sweep',
+      run: async () => {
+        await new Promise(resolve => setTimeout(resolve, 20))
+        finished = true
+      },
+    },
+  ])
+  const turn = tick.tick()
+  await tick.stop()
+  assert.equal(finished, true, 'stop resolved only once the sweep had finished')
+  await turn
 })

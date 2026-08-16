@@ -8,6 +8,7 @@ The daemon's one background clock: a single interval that runs a list of jobs, e
 - A job that throws costs its own turn and nothing else, and says so with its name — a sweep failing silently is indistinguishable from one that was never scheduled.
 - The first tick fires at start-up rather than an interval later, because the case most of these jobs exist for is a machine that was off while something happened; a job that only makes sense once the daemon has been up says so.
 - Awaiting a tick means the tick finished — overlapping ones join it rather than being dropped — which is what makes the schedule testable without waiting on wall-clock time.
+- Stopping is likewise awaitable, and resolves only once the turn in flight has finished: these jobs commit and push, and clearing the interval stops the next turn, never the one already inside a job. A shutdown that did not wait for it would tear the repo down underneath a sweep.
 
 ## Before writing SPEC.md files
 

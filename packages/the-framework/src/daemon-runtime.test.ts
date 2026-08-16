@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { waitOutFinishedLeg, type FinishedLegState } from './daemon-runtime.js'
+import { waitOutFinishedLeg, waitOutSlots, type FinishedLegState } from './daemon-runtime.js'
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -123,4 +123,60 @@ test('an ended leg is not re-read: the state is settled after the first answer',
     5_000,
   )
   assert.equal(asked, 1)
+})
+
+// The seam behind shutdown's ordering: killing a pid is not letting go of the repo. The child's
+// `exit` event lands after the process is gone, and the teardown that event starts runs well past
+// that — so a shutdown that waits only on the processes commits archives that are still being
+// written, and anything cleaning up behind the daemon races its git.
+
+test('slots nothing has touched return at once: there is nothing to wait for', async () => {
+  const before = Date.now()
+  await waitOutSlots(['p::r1', 'p::r2'], emptySlots(), 5_000)
+  assert.ok(Date.now() - before < 1_000, 'no grace period was sat out')
+})
+
+test('a slot whose exit has not landed yet is waited for, not read as already settled', async () => {
+  // The gap this exists to close: the pid is gone, so the slot looks free, but `settle` has yet to
+  // run and the teardown it parks has not even been created.
+  const slots = emptySlots()
+  slots.activeRuns.set('p::r1', process.pid)
+  let torn = false
+  setTimeout(() => {
+    // What `settle` does: drop the live slot, park the teardown it starts in its place.
+    slots.activeRuns.delete('p::r1')
+    slots.retiring.set(
+      'p::r1',
+      sleep(60).then(() => {
+        torn = true
+        slots.retiring.delete('p::r1')
+      }),
+    )
+  }, 40)
+  await waitOutSlots(['p::r1'], slots, 5_000)
+  assert.equal(torn, true, 'the teardown that appeared mid-wait was waited out too')
+})
+
+test('a run with no worktree needs no special case: it parks no teardown and holds nothing up', async () => {
+  const slots = emptySlots()
+  slots.activeRuns.set('p::r1', process.pid)
+  setTimeout(() => slots.activeRuns.delete('p::r1'), 40)
+  await waitOutSlots(['p::r1'], slots, 5_000)
+  assert.equal(slots.retiring.size, 0)
+})
+
+test('a teardown that throws does not fail the shutdown waiting on it', async () => {
+  const slots = emptySlots()
+  slots.retiring.set('p::r1', Promise.reject(new Error('archive on a full disk')))
+  setTimeout(() => slots.retiring.delete('p::r1'), 40)
+  await waitOutSlots(['p::r1'], slots, 5_000)
+})
+
+test('the wait is bounded: a wedged teardown costs the grace period, not the exit', async () => {
+  const slots = emptySlots()
+  slots.activeRuns.set('p::r1', process.pid)
+  const before = Date.now()
+  await waitOutSlots(['p::r1'], slots, 120)
+  assert.ok(Date.now() - before >= 120, 'the grace period was sat out')
+  assert.ok(slots.activeRuns.has('p::r1'), 'and it gave up rather than hanging the shutdown')
 })

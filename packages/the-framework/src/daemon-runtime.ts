@@ -288,6 +288,39 @@ async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
 }
 
 /**
+ * Wait until the daemon is finished with the run slots it just stopped — the child gone *and* its
+ * teardown done — or the timeout lapses.
+ *
+ * Killing a pid is not letting go of the repo. The child's `exit` event lands a turn after the
+ * process disappears, and the teardown that event starts (archive the run, commit its work, keep
+ * or remove its checkout) runs well past that. Without this wait, shutdown's archive commit fires
+ * while a run is still being archived, and it misses that run's ending (#912/#1179).
+ *
+ * A slot is settled when it is in neither map: `settle` drops it from `activeRuns` and parks its
+ * teardown in `retiring`, and the teardown clears itself on the way out. A run with no worktree
+ * never enters `retiring` at all, and needs no special case — it is simply already gone from both.
+ *
+ * Bounded, because a wedged teardown must cost the shutdown its grace period, not the exit.
+ */
+export async function waitOutSlots(
+  keys: readonly string[],
+  slots: { activeRuns: Map<string, number>; retiring: Map<string, Promise<void>> },
+  timeoutMs: number,
+): Promise<void> {
+  const step = 25
+  const deadline = Date.now() + timeoutMs
+  const held = (): string[] => keys.filter(key => slots.activeRuns.has(key) || slots.retiring.has(key))
+  while (Date.now() < deadline) {
+    const outstanding = held()
+    if (outstanding.length === 0) return
+    // Await the teardowns that have started; poll for the slots whose `exit` has yet to land.
+    const parked = outstanding.flatMap(key => slots.retiring.get(key) ?? [])
+    if (parked.length > 0) await Promise.all(parked.map(retired => retired.catch(() => {})))
+    else await delay(step)
+  }
+}
+
+/**
  * What the previous leg of a run says about itself, for {@link waitOutFinishedLeg}. `unknown` is
  * the honest third answer — the leg has no readable state *this instant* — and is deliberately
  * not folded into either of the other two.
@@ -993,12 +1026,18 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
    * What is stopped here is not lost, it is just not restarted for you: the run keeps its branch,
    * and its checkout too until the work reaches the remote (E5), so the next start continues the
    * same conversation in the same checkout — when you ask for it.
+   *
+   * Resolving means the daemon has let go of the repo, not merely that the processes are dead —
+   * see {@link waitOutSlots}. The archive commit that runs right behind this depends on it.
    */
   const stopRuns = async (graceMs = 5000): Promise<number> => {
     const stopping = [...activeRuns.entries()]
-    activeRuns.clear()
     let stopped = 0
     for (const [, pid] of stopping) if (await terminate(pid, graceMs)) stopped++
+    // Each slot is left for its own `settle` to clear, so the wait can tell a teardown that has
+    // yet to start from one that has already finished.
+    await waitOutSlots(stopping.map(([key]) => key), { activeRuns, retiring }, graceMs)
+    for (const [key] of stopping) activeRuns.delete(key)
     return stopped
   }
 

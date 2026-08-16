@@ -52,8 +52,11 @@ export interface BackgroundServices {
    * Stop everything that could start or steer a run, before the daemon suspends the runs it owns.
    * Ordered first on purpose: auto PM or a Discord message arriving mid-shutdown would otherwise
    * start a run while we are busy stopping them.
+   *
+   * Resolves once the tick in flight has finished, so the sweeps are off the repo before the runs
+   * are torn down — these jobs commit and push, and stopping their clock does not stop their turn.
    */
-  quiesce: () => void
+  quiesce: () => Promise<void>
   /**
    * Commit whatever the shutdown just archived (#912/#1179), after the runs have been stopped so
    * their last events are on disk. Returns how many projects were committed.
@@ -383,9 +386,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   })
 
   return {
-    quiesce: () => {
+    quiesce: async () => {
       stopped = true
-      clock.stop()
+      await clock.stop()
       stopDiscord()
       autoPm.stop()
       // The CI watch can start fix runs, so it stops with the other run-starters.

@@ -1,6 +1,6 @@
 import type { HotTicket, HotBucket } from '../../dist/index.js'
 import { Flame } from 'lucide-react'
-import { onHotTickets } from '../server/reads.telefunc.js'
+import { onHotTickets } from '../rpc/reads.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { usePolled } from '../lib/use-async.js'

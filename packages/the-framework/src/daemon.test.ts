@@ -53,14 +53,13 @@ import { controlPath } from './control.js'
 import { projectId, listProjects, addProject, writePreferences } from './registry.js'
 import { nodeGitRunner } from './project.js'
 
-// The new dashboard steers + starts over Telefunc (#405/#426), not the retired /api/* HTTP
-// routes. Post an RPC to the daemon's in-process `/_telefunc` mount (same-origin), keyed by
-// the client-baked file path, and return the unwrapped `ret`.
-async function callTelefunc(url: string, file: string, name: string, args: unknown[]): Promise<unknown> {
-  const res = await fetch(`${url}/_telefunc`, {
+// The dashboard steers + starts over the daemon's in-process RPC mount (#405/#426), not the
+// retired /api/* HTTP routes. Post to `/_rpc/<name>` (same-origin) and return the unwrapped `ret`.
+async function callRpc(url: string, name: string, args: unknown[]): Promise<unknown> {
+  const res = await fetch(`${url}/_rpc/${name}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: url },
-    body: JSON.stringify({ file, name, args }),
+    body: JSON.stringify(args),
   })
   const text = await res.text()
   return text ? (JSON.parse(text) as { ret?: unknown }).ret : undefined
@@ -70,7 +69,7 @@ type StartResult = { ok: true } | { ok: false; busy?: boolean; error: string }
 // daemon resolves back to `cwd` (see `resolveProject`).
 const homeId = (cwd: string): string => projectId(resolve(cwd))
 const sendStart = (url: string, cwd: string, prompt: string, kind = 'build'): Promise<StartResult> =>
-  callTelefunc(url, '/server/control.telefunc.ts', 'sendStart', [homeId(cwd), prompt, kind]) as Promise<StartResult>
+  callRpc(url, 'sendStart', [homeId(cwd), prompt, kind]) as Promise<StartResult>
 
 const logEvent = (message: string): FrameworkEvent => ({ kind: 'log', message })
 const line = (message: string): string => JSON.stringify(logEvent(message)) + '\n'
@@ -168,7 +167,7 @@ test('runDaemon serves the dashboard, and shuts down when the signal aborts', as
     assert.equal(state.pid, process.pid)
     assert.match(state.url, /^http:\/\/127\.0\.0\.1:\d+$/)
 
-    // The new Vike + Telefunc dashboard (its prerendered SPA shell) is served.
+    // The dashboard's static shell is served.
     const res = await fetch(state.url)
     assert.equal(res.status, 200)
     assert.match(await res.text(), /id="root"/)
@@ -527,10 +526,10 @@ test('runDaemon steers through the control log: sendStop / sendChoice append ent
   try {
     const { done, state } = await startDaemon(cwd, { agentPreflight: agentReady, port: 0, signal: ac.signal, env })
 
-    // The dashboard steers over Telefunc: sendStop / sendChoice append to control.jsonl.
+    // The dashboard steers over the RPC mount: sendStop / sendChoice append to control.jsonl.
     const id = homeId(cwd)
-    await callTelefunc(state.url, '/server/control.telefunc.ts', 'sendStop', [id])
-    await callTelefunc(state.url, '/server/control.telefunc.ts', 'sendChoice', [id, 'plan-approval', 'alt:0', 'user'])
+    await callRpc(state.url, 'sendStop', [id])
+    await callRpc(state.url, 'sendChoice', [id, 'plan-approval', 'alt:0', 'user'])
 
     // Both landed in the control log (appends are async fire-and-forget: poll).
     let lines: string[] = []

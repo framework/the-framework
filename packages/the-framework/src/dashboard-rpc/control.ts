@@ -1,8 +1,7 @@
-import { getContext } from 'telefunc'
 import { appendControl, type ControlEntry } from '../control.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
 import { openInApp, type OpenTarget, type OpenResult } from '../dashboard/open-in-app.js'
-import { resolveProjectPath, resolveRunPath, contextPreferences } from './context.js'
+import { contextPreferences, contextStartRun, resolveProjectPath, resolveRunPath } from './context.js'
 import { relayOr } from './relay-run.js'
 import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
@@ -21,7 +20,7 @@ import type {
   StartRunOptions,
   StartRunResult,
 } from '../dashboard/types.js'
-import type { DashboardContext } from '../dashboard/telefunc-serve.js'
+import type { DashboardContext } from '../dashboard/rpc-serve.js'
 import type { Preferences } from '../registry.js'
 
 // The write side behind the new dashboard (#405): steering a live run. The reverse of
@@ -181,7 +180,7 @@ export async function sendStart(
   kind: StartRunKind = 'build',
   options: StartRunOptions = {},
 ): Promise<StartRunResult> {
-  const { startRun } = getContext<DashboardContext>()
+  const startRun = contextStartRun()
   if (!startRun) return { ok: false, error: 'starting a session is not enabled on this server' }
   const text = prompt.trim()
   if (!text && kind !== 'research') return { ok: false, error: 'a non-empty prompt is required' }

@@ -9,8 +9,8 @@ const sendStop = vi.fn(async () => {})
 const sendMerge = vi.fn(async () => ({ ok: true as const }))
 const sendRemoveWorktree = vi.fn(async () => ({ ok: true as const }))
 const sendDeleteSession = vi.fn(async () => ({ ok: true as const }))
-vi.mock('../server/reads.telefunc.js', () => ({ onGithubUrl }))
-vi.mock('../server/control.telefunc.js', () => ({
+vi.mock('../rpc/reads.js', () => ({ onGithubUrl }))
+vi.mock('../rpc/control.js', () => ({
   sendOpenInApp,
   sendStop,
   sendMerge,

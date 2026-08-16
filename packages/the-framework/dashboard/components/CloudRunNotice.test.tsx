@@ -7,10 +7,10 @@ import type { FrameworkEvent } from '../../dist/index.js'
 const onBridgeQuestion = vi.fn(async () => null as unknown)
 const onBridgeEvents = vi.fn(async () => [] as unknown)
 const onBridgeAnswer = vi.fn(async () => null as unknown)
-vi.mock('../server/reads.telefunc.js', () => ({ onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
+vi.mock('../rpc/reads.js', () => ({ onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
 const sendBridgeAnswer = vi.fn(async () => ({ ok: true }) as { ok: boolean; error?: string })
 const sendBridgeAnswerCancel = vi.fn(async () => undefined)
-vi.mock('../server/control.telefunc.js', () => ({ sendBridgeAnswer, sendBridgeAnswerCancel }))
+vi.mock('../rpc/control.js', () => ({ sendBridgeAnswer, sendBridgeAnswerCancel }))
 
 const { CloudRunNotice, CloudMirrorRow, scrubMirrorText } = await import('./CloudRunNotice.js')
 

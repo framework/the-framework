@@ -7,9 +7,9 @@ import { presets } from '../../dist/client.js'
 // graph stays out of telefunc and each row's "done" comes from a fixture rather than a real daemon.
 const onDashboard = vi.hoisted(() => vi.fn())
 const onOnboarding = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onDashboard }))
-vi.mock('../server/projects.telefunc.js', () => ({ onOnboarding, sendAddProject: vi.fn() }))
-vi.mock('../server/preferences.telefunc.js', () => ({ saveDiscordCredentials: vi.fn() }))
+vi.mock('../rpc/reads.js', () => ({ onDashboard }))
+vi.mock('../rpc/projects.js', () => ({ onOnboarding, sendAddProject: vi.fn() }))
+vi.mock('../rpc/preferences.js', () => ({ saveDiscordCredentials: vi.fn() }))
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => ({}),
   updatePreferences: vi.fn(),

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { sendAddProject } from '../server/projects.telefunc.js'
+import { sendAddProject } from '../rpc/projects.js'
 import { useAction } from '../lib/use-action.js'
 import { Button } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'

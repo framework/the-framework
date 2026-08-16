@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 // The device health poll (#1072) reaches the daemon over Telefunc; hoisted so the factory below can
 // close over it (a plain const is initialised after vi.mock hoists).
 const checkDevices = vi.hoisted(() => vi.fn())
-vi.mock('../server/devices.telefunc.js', () => ({ checkDevices }))
+vi.mock('../rpc/devices.js', () => ({ checkDevices }))
 
 import { DevicesSettings } from './DevicesSettings.js'
 import { addProfile, listProfiles } from '../lib/profiles.js'

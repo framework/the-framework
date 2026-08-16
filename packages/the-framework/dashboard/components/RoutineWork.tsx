@@ -7,8 +7,8 @@ import {
   runOptionsFromPreferences,
 } from '../../dist/client.js'
 import { CalendarClock, Play } from 'lucide-react'
-import { onProjects } from '../server/projects.telefunc.js'
-import { sendAutoPmSweep } from '../server/quota.telefunc.js'
+import { onProjects } from '../rpc/projects.js'
+import { sendAutoPmSweep } from '../rpc/quota.js'
 import { useAutoPm } from '../lib/quota.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { useStartRun } from '../lib/use-start-run.js'

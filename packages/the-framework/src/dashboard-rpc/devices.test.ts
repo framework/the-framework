@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { checkDevices } from './devices.telefunc.js'
+import { checkDevices } from './devices.js'
 
 // A throwaway daemon that answers /_relay/ping with a fixed status (or nothing on 000 = down).
 async function device(status: number): Promise<{ url: string; close: () => Promise<void> }> {

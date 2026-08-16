@@ -1,7 +1,6 @@
 import http from 'node:http'
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
-import { telefunc } from 'telefunc/vite'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, type Plugin, type UserConfig } from 'vite'
 
@@ -10,7 +9,7 @@ import { defineConfig, type Plugin, type UserConfig } from 'vite'
 // `pnpm dev` alone is the Vite dev server with no Telefunc context, so `sendStart` reports "starting
 // a session is not enabled on this server" (same gap that leaves preferences unpersisted in dev).
 // Only the daemon has the `startRun` handler. This plugin brings that daemon up *inside the dev
-// server's own process* and proxies `/_telefunc` (RPCs and the SSE Channel) to it, so the
+// server's own process* and proxies `/_rpc` (the calls and the SSE stream) to it, so the
 // live-reload UI gets the full backend, run-starting included.
 //
 // In-process, not spawned: the CLI is foreground-only, so there is no detached daemon to reuse and
@@ -48,14 +47,14 @@ function frameworkDevDaemon(): Plugin {
         )
       })
 
-      // Registered up front (not after the await) so it sits ahead of Telefunc's middleware; the
+      // Registered up front (not after the await) so it sits ahead of Vite's own handling; the
       // request waits on `ready` when it arrives before the daemon has come up.
       server.middlewares.use((req, res, next) => {
         const url = req.originalUrl ?? req.url ?? ''
-        if (!url.startsWith('/_telefunc')) return next()
+        if (!url.startsWith('/_rpc')) return next()
         const forward = (dest: { hostname: string; port: string }): void => {
           // Host header left as the browser sent it (localhost:<devport>), so the daemon's same-origin
-          // guard passes; the SSE Channel just rides the piped response.
+          // guard passes; the SSE stream just rides the piped response.
           const proxyReq = http.request(
             { hostname: dest.hostname, port: dest.port, method: req.method, path: url, headers: req.headers },
             proxyRes => {
@@ -73,50 +72,22 @@ function frameworkDevDaemon(): Plugin {
         }
         if (target) return forward(target)
         // Daemon still coming up, or it failed: once `ready` settles, proxy if it is up, otherwise
-        // fall through to Vite's own telefunc handling so reads keep working (sendStart just reports
-        // it is not enabled there) instead of erroring every request.
+        // fall through, which 404s the call rather than hanging it.
         void ready.then(() => (target ? forward(target) : next()))
       })
     },
   }
 }
 
-// `pnpm dev` only. Telefunc's client marks every request URL with its kind
-// (`/_telefunc?_telefunc=txt`, `sse` for a Channel) and may append an advisory `session`, but its
-// dev middleware matches with `url !== '/_telefunc'`, so it declines its own requests — and the
-// SPA fallback then answers them with `index.html`, so every read failed on `Unexpected token '<'`
-// and the UI sat behind the daemon-down banner. Dropping the query restores the exact match: the
-// request kind and the session both ride headers too, and Telefunc's own docs call the URL param
-// advisory. Registered from configureServer directly so it lands ahead of the middleware Telefunc
-// adds from its returned post-hook. The daemon is unaffected: it matches on the parsed pathname.
-function telefuncDevUrlFix(): Plugin {
-  return {
-    name: 'framework:telefunc-dev-url-fix',
-    apply: 'serve',
-    configureServer(server) {
-      server.middlewares.use((req, _res, next) => {
-        const url = req.originalUrl ?? req.url
-        if (url?.startsWith('/_telefunc?')) {
-          req.url = '/_telefunc'
-          req.originalUrl = '/_telefunc'
-        }
-        next()
-      })
-    },
-  }
-}
-
-// Dashboard (#405): a plain Vite SPA — React + Tailwind v4 + shadcn, with Telefunc for
-// everything over the wire (the read-model RPCs plus the live event stream, which is a Telefunc
-// Channel, server/events.telefunc.ts). `index.html` beside this file is the whole entry; the
-// daemon serves the built output as static files with an SPA fallback.
+// Dashboard (#405): a plain Vite SPA — React + Tailwind v4 + shadcn, talking to the daemon over
+// plain HTTP (`POST /_rpc/<name>`, plus an SSE stream for the live feed). `index.html` beside this
+// file is the whole entry; the daemon serves the built output as static files with an SPA fallback.
 export default defineConfig({
   // The dashboard is a directory inside @gemstack/the-framework rather than a package of its own
   // (A7), so `root` is pinned to this file's directory instead of inherited from the cwd — the
-  // scripts that run it live one level up. It is also what keeps the baked Telefunc keys
-  // (`/server/reads.telefunc.ts`) the paths they have always been.
+  // scripts that run it live one level up.
   root: fileURLToPath(new URL('.', import.meta.url)),
-  plugins: [frameworkDevDaemon(), telefuncDevUrlFix(), react(), telefunc(), tailwindcss()],
+  plugins: [frameworkDevDaemon(), react(), tailwindcss()],
   build: {
     // Straight into the package's own dist, where the daemon serves it from. There used to be a
     // copy step between the two — a whole turbo task — because the bundle was built in a

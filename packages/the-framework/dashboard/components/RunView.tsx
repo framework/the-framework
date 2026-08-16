@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FrameworkEvent } from '../../dist/index.js'
 import { handoffState, runProgress, sessionInfo, } from '../../dist/client.js'
-import { onRun, onRetainedWorktrees } from '../server/reads.telefunc.js'
+import { onRun, onRetainedWorktrees } from '../rpc/reads.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useRunHandoff } from '../lib/use-run-handoff.js'
 import { agentSettled, isRunActive, runOutcome } from '../lib/live-state.js'

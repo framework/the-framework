@@ -1,5 +1,5 @@
-import { onProjectFiles, onProjectFileStatus, onFileDiff, onRunChanges, onFileContent, onGitStatus, onRunWorktree, onRunHandoff, onRun } from './reads.telefunc.js'
-import { sendStop, sendChoice, sendMessage, sendSetHandoff, sendPushBranch, sendOpenPullRequest, sendMerge } from './control.telefunc.js'
+import { onProjectFiles, onProjectFileStatus, onFileDiff, onRunChanges, onFileContent, onGitStatus, onRunWorktree, onRunHandoff, onRun } from './reads.js'
+import { sendStop, sendChoice, sendMessage, sendSetHandoff, sendPushBranch, sendOpenPullRequest, sendMerge } from './control.js'
 
 // The device side of the remote-run relay (#1067 slice 2). A daemon that relayed a run here asks this
 // to read/steer/hand off THAT run against THIS device's own checkout. Every entry is a run-scoped RPC

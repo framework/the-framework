@@ -10,7 +10,7 @@ import { Button } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import { cn } from '../lib/utils.js'
 import { usePolled } from '../lib/use-async.js'
-import { onDocs } from '../server/reads.telefunc.js'
+import { onDocs } from '../rpc/reads.js'
 
 type Tab = 'files' | 'views' | 'browser' | 'docs'
 

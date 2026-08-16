@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { onProjectFiles, onProjectFileStatus, onRunWorktree } from './reads.telefunc.js'
+import { onProjectFiles, onProjectFileStatus, onRunWorktree } from './reads.js'
 import { provideTestContext } from './test-context.js'
 
 // A project id nobody registered has no local path, so these reads have no checkout to answer

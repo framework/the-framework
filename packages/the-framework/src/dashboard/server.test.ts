@@ -6,7 +6,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { startDashboard, type Dashboard, type DashboardOptions } from './server.js'
-import { isExpectedHost, isSameOriginRequest } from './telefunc-serve.js'
+import { isExpectedHost, isSameOriginRequest } from './rpc-serve.js'
 import { registryPreferencesStore } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
 import { defaultQuotaSource } from './quota.js'
@@ -209,11 +209,11 @@ test('an unparseable absolute-form request target gets a 400 and the server surv
   }
 })
 
-test('the Telefunc mount rejects a cross-origin POST (CSRF guard)', async () => {
+test('the RPC mount rejects a cross-origin POST (CSRF guard)', async () => {
   const bundle = await fakeBundle()
   const dash = await dashboard({ clientBundleDir: bundle })
   try {
-    const { status, body } = await postCrossOrigin(dash.url + '/_telefunc')
+    const { status, body } = await postCrossOrigin(dash.url + '/_rpc/onProjects')
     assert.equal(status, 403)
     assert.match(body, /cross-origin/)
   } finally {
@@ -222,18 +222,18 @@ test('the Telefunc mount rejects a cross-origin POST (CSRF guard)', async () => 
   }
 })
 
-test('the Telefunc mount rejects a rebound Host, which the Origin check alone lets through', async () => {
+test('the RPC mount rejects a rebound Host, which the Origin check alone lets through', async () => {
   const bundle = await fakeBundle()
   const dash = await dashboard({ clientBundleDir: bundle })
   try {
     // The attack: same-origin as far as the browser is concerned, so `isSameOriginRequest` passes it.
-    const rebound = await postRebound(dash.url + '/_telefunc')
+    const rebound = await postRebound(dash.url + '/_rpc/onProjects')
     assert.equal(rebound.status, 403)
     assert.match(rebound.body, /Host/)
 
     // The real thing still gets through: same request, but the Host the user actually typed.
-    // It reaches telefunc, which logs a parse error over the `{}` body — expected, not a failure.
-    const loopback = await postRebound(dash.url + '/_telefunc', new URL(dash.url).host)
+    // It reaches the mount, which answers the call.
+    const loopback = await postRebound(dash.url + '/_rpc/onProjects', new URL(dash.url).host)
     assert.notEqual(loopback.status, 403)
   } finally {
     await dash.close()
@@ -264,7 +264,7 @@ test('with a token set, every route is 401 without a cookie or ?token= (#1051)',
   const { base, close } = await guardedDashboard()
   try {
     // The static bundle, the RPC mount, and the browser proxy are all fronted uniformly.
-    for (const path of ['/', '/assets/app.js', '/_telefunc', '/browser/p/x/stream']) {
+    for (const path of ['/', '/assets/app.js', '/_rpc/onProjects', '/browser/p/x/stream']) {
       const res = await fetchAuth(base + path)
       assert.equal(res.status, 401, `${path} should be 401`)
       assert.match(res.body, /unauthorized/)
@@ -302,7 +302,7 @@ test('a wrong ?token= is 401, not admitted (timing-safe compare) (#1051)', async
   }
 })
 
-test('the fw_daemon cookie admits the bundle, /_telefunc, and /browser (#1051)', async () => {
+test('the fw_daemon cookie admits the bundle, /_rpc, and /browser (#1051)', async () => {
   const { base, close } = await guardedDashboard()
   try {
     const cookie = `fw_daemon=${TOKEN}`
@@ -310,7 +310,7 @@ test('the fw_daemon cookie admits the bundle, /_telefunc, and /browser (#1051)',
     assert.equal(root.status, 200)
     assert.match(root.body, /<div id="root">/)
     // Not 401 is the guard passing; the mount / proxy then answer on their own terms.
-    const rpc = await fetchAuth(`${base}/_telefunc`, cookie)
+    const rpc = await fetchAuth(`${base}/_rpc/onProjects`, cookie)
     assert.notEqual(rpc.status, 401)
     const browser = await fetchAuth(`${base}/browser/p/x/stream`, cookie)
     assert.notEqual(browser.status, 401)

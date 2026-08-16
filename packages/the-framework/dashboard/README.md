@@ -1,7 +1,7 @@
 # The Framework dashboard
 
-The Framework's localhost dashboard: **Vite + React + Tailwind v4 + shadcn/ui + Telefunc**,
-side-by-side with the current `page.ts` MVP page (which is untouched).
+The Framework's localhost dashboard: **Vite + React + Tailwind v4 + shadcn/ui**, talking to the
+daemon over plain HTTP.
 
 This directory used to be a package of its own, `@gemstack/framework-dashboard`. It is a directory
 now: the boundary bought a public export surface, a bundle-copying build step and a task graph to
@@ -10,19 +10,20 @@ sequence it, for a dependency that only ever pointed one way.
 It is a **projection of the same files the daemon writes** — no daemon process, no
 IPC:
 
-- **Projects sidebar** — a Telefunc RPC (`server/projects.telefunc.ts`) over the
-  global registry (`../src`'s `listProjects`).
-- **Read model** — Telefunc RPCs (`server/reads.telefunc.ts`) for run history, a
-  run's replay, the surfaced PLAN/TODO docs, and the committed `LOGS.md`.
-- **Live event stream** — a Telefunc Channel (`server/events.telefunc.ts`) tailing
-  the selected project's `.the-framework/events.jsonl`; each new line becomes one
-  `channel.send(event)`, and the client `.listen()`s. Serialization, type
-  validation, and reconnect come from Telefunc.
+- **Reads** — `POST /_rpc/<name>` (`rpc/reads.ts`, `rpc/projects.ts`, …) for run history, a run's
+  replay, the surfaced PLAN/TODO docs, and the committed `LOGS.md`.
+- **Live event stream** — Server-Sent Events at `GET /_rpc/events` (`rpc/events.ts`) tailing
+  the selected session's `.the-framework/events.jsonl`; each new line becomes one SSE frame.
 
-The `server/*.telefunc.ts` files are re-export shims: the telefunctions themselves live in
-`../src/dashboard-rpc/`, so the daemon can serve them without importing anything browser-shaped.
-The shims stay because Telefunc bakes each RPC's key from its file path, and those keys are the
-wire protocol.
+The `rpc/` modules are typed stubs: each is declared against the implementation's own signature in
+`../src/dashboard-rpc/`, so a renamed or re-shaped RPC is a type error here rather than a 404 in
+the browser. Nothing from those implementations reaches the bundle — the imports are type-only.
+
+There used to be an RPC framework in this seam (Telefunc). It required a build-time transform over
+every `.telefunc.ts` file, a registration table pinning each call to the client-baked path of the
+shim it was re-exported from, a shim per module to keep those paths stable, and a dev-server plugin
+to undo a URL its own client wrote. What it bought was type-safety across a package boundary, which
+merging the package removed.
 
 ## Run it
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { onBridgeToken } from '../server/reads.telefunc.js'
+import { onBridgeToken } from '../rpc/reads.js'
 import { Button } from './ui/button.js'
 import { CopyButton } from './ui/copy-button.js'
 

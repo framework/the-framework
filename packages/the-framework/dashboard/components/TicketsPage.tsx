@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ProjectTickets } from '../../dist/index.js'
-import { onAllTickets } from '../server/reads.telefunc.js'
-import { sendStart } from '../server/control.telefunc.js'
+import { onAllTickets } from '../rpc/reads.js'
+import { sendStart } from '../rpc/control.js'
 import { usePolled } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
 import {

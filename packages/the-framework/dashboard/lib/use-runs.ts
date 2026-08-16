@@ -1,5 +1,5 @@
 import type { RunMeta } from '../../dist/index.js'
-import { onRuns } from '../server/reads.telefunc.js'
+import { onRuns } from '../rpc/reads.js'
 import { usePolled } from './use-async.js'
 
 // The selected project's runs (live + archived), polled. Owned by the shell (+Page) so both

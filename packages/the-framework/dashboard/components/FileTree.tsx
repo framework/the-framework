@@ -1,6 +1,6 @@
 import { useMemo, useState, type ElementType, type ReactNode } from 'react'
 import { Check, FileIcon, FolderIcon, FolderOpenIcon } from 'lucide-react'
-import { onProjectFileStatus } from '../server/reads.telefunc.js'
+import { onProjectFileStatus } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { cn } from '../lib/utils.js'
 import { FilePreviewHover } from './FilePreview.js'

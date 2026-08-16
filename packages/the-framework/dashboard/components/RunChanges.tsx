@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { FileChange } from '../../dist/index.js'
-import { onRunChanges } from '../server/reads.telefunc.js'
+import { onRunChanges } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { FilePreviewCard } from './FilePreview.js'
 import { DiffStat } from './DiffView.js'

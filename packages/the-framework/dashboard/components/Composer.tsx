@@ -13,7 +13,7 @@ import {
   useActiveProjectId,
 } from '../lib/preferences.js'
 import { useLoaded } from '../lib/use-async.js'
-import { onProjects } from '../server/projects.telefunc.js'
+import { onProjects } from '../rpc/projects.js'
 import { PromptEditor, type PromptEditorHandle } from './PromptEditor.js'
 import { PresetCreatePanel } from './PresetCreatePanel.js'
 import { PresetsMenu } from './PresetsMenu.js'

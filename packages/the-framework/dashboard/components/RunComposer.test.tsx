@@ -7,7 +7,7 @@ import type { Preferences } from '../../dist/index.js'
 const sendMessage = vi.hoisted(() => vi.fn())
 const sendStart = vi.hoisted(() => vi.fn())
 const sendStop = vi.hoisted(() => vi.fn())
-vi.mock('../server/control.telefunc.js', () => ({ sendMessage, sendStart, sendStop }))
+vi.mock('../rpc/control.js', () => ({ sendMessage, sendStart, sendStop }))
 
 // The agent pref, to prove a continuation ignores it (#831).
 let prefs: Preferences = {}

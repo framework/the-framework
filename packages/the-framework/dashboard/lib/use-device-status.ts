@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { ConnectionProfile } from './profiles.js'
 import { usePolled } from './use-async.js'
-import { checkDevices } from '../server/devices.telefunc.js'
+import { checkDevices } from '../rpc/devices.js'
 
 // The saved devices' online/offline status (#1072). The daemon holds no device token (they are a
 // per-browser secret, #1052), so the browser hands it each device's {id, url, token} and the daemon

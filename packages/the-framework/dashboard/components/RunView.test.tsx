@@ -9,8 +9,8 @@ const onRunChanges = vi.fn(async () => [] as unknown)
 const onBridgeQuestion = vi.fn(async () => null as unknown)
 const onBridgeEvents = vi.fn(async () => [] as unknown)
 const onBridgeAnswer = vi.fn(async () => null as unknown)
-vi.mock('../server/reads.telefunc.js', () => ({ onRun, onRetainedWorktrees, onRunHandoff, onRunChanges, onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
-vi.mock('../server/control.telefunc.js', () => ({
+vi.mock('../rpc/reads.js', () => ({ onRun, onRetainedWorktrees, onRunHandoff, onRunChanges, onBridgeQuestion, onBridgeEvents, onBridgeAnswer }))
+vi.mock('../rpc/control.js', () => ({
   sendOpenPullRequest: vi.fn(async () => null),
   sendSetHandoff: vi.fn(async () => null),
   sendBridgeAnswer: vi.fn(async () => null),

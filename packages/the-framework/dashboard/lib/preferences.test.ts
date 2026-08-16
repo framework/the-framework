@@ -5,7 +5,7 @@ const onPreferences = vi.hoisted(() => vi.fn())
 const patchPreferences = vi.hoisted(() => vi.fn())
 const onProjectPresets = vi.hoisted(() => vi.fn())
 const saveProjectPresets = vi.hoisted(() => vi.fn())
-vi.mock('../server/preferences.telefunc.js', () => ({
+vi.mock('../rpc/preferences.js', () => ({
   onPreferences,
   patchPreferences,
   onProjectPresets,
@@ -13,7 +13,7 @@ vi.mock('../server/preferences.telefunc.js', () => ({
 }))
 // The repo tier (#842) rides on the project payload, so the store reads the projects RPC too.
 const onProjects = vi.hoisted(() => vi.fn())
-vi.mock('../server/projects.telefunc.js', () => ({ onProjects }))
+vi.mock('../rpc/projects.js', () => ({ onProjects }))
 
 const flush = () => act(async () => {
   await Promise.resolve()

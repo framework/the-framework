@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 
 // The section polls onDocs itself (the launcher-section pattern); DocsPanel renders what it is given.
 const onDocs = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onDocs }))
+vi.mock('../rpc/reads.js', () => ({ onDocs }))
 
 const { ProjectDocs } = await import('./ProjectDocs.js')
 

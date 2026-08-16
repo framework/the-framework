@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 
 // Record what the feed subscribes to. The channel never sends; we only care about addressing.
 const onEvents = vi.hoisted(() => vi.fn())
-vi.mock('../server/events.telefunc.js', () => ({ onEvents }))
+vi.mock('../rpc/events.js', () => ({ onEvents }))
 
 const { useLiveEvents } = await import('./use-live-events.js')
 

@@ -13,7 +13,7 @@ import { errorMessage } from '../error-message.js'
  *
  * Authentication is the #1051 cookie, sent daemon-to-daemon: `Cookie: fw_daemon=<token>` with no
  * `Origin` header. The remote's guard admits a matching cookie without the browser-only `?token=`
- * 302, and its `/_telefunc` CSRF check (absent Origin passes) is not even on these raw routes.
+ * 302, and its `/_rpc` CSRF check (absent Origin passes) is not even on these raw routes.
  */
 
 /** Where a relayed run executes: the remote daemon's origin and its #1051 token. Memory-only. */

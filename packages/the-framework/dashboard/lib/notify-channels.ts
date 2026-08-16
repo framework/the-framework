@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import { onNotifyChannels, type NotifyChannels } from '../server/preferences.telefunc.js'
+import { onNotifyChannels, type NotifyChannels } from '../rpc/preferences.js'
 
 // What the daemon can deliver on (#948), as one shared value rather than a read per component.
 //

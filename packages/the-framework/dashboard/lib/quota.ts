@@ -1,5 +1,5 @@
 import type { AutoPmReport, QuotaView } from '../../dist/index.js'
-import { onQuota, onAutoPm } from '../server/quota.telefunc.js'
+import { onQuota, onAutoPm } from '../rpc/quota.js'
 import { usePolled } from './use-async.js'
 
 // The usage panel's data (#535). The daemon polls the agent for us and caches the answer,

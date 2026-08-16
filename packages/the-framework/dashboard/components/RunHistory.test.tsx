@@ -10,7 +10,7 @@ import { hoverTooltip } from '../test-utils.js'
 // Resolves to an empty list: AddProjectPanel (reachable from the rail) reads projects on demand.
 const onProjects = vi.hoisted(() => vi.fn(() => Promise.resolve([])))
 const sendAddProject = vi.hoisted(() => vi.fn())
-vi.mock('../server/projects.telefunc.js', () => ({ onProjects, sendAddProject }))
+vi.mock('../rpc/projects.js', () => ({ onProjects, sendAddProject }))
 
 // The rail now also carries the app chrome moved off the top navbar (#772 follow-up). Three of
 // those pull the preferences/devices telefunc shims into jsdom, which this suite deliberately

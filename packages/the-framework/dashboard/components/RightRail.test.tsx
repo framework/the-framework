@@ -7,7 +7,7 @@ import type { AgentView } from '../lib/live-state.js'
 // tests below are about what the rail does with them. Tickets moved to its own page (#1144) and
 // is no longer one of the rail's reads.
 const onDocs = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onDocs }))
+vi.mock('../rpc/reads.js', () => ({ onDocs }))
 
 // The panels themselves are rendered elsewhere; here they are stand-ins.
 vi.mock('./DocsPanel.js', () => ({ DocsPanel: () => <div>docs</div> }))

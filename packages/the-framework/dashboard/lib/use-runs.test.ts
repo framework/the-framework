@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react'
 import type { RunMeta } from '../../dist/index.js'
 
 const onRuns = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onRuns }))
+vi.mock('../rpc/reads.js', () => ({ onRuns }))
 
 const { useRuns } = await import('./use-runs.js')
 

@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import type { NotifyChannels } from '../server/preferences.telefunc.js'
+import type { NotifyChannels } from '../rpc/preferences.js'
 
 // The shared channel state (#1095). The bug it exists for: three components showed the same fact
 // from three independent polls, so saving a credential in one settled that one and left the others
 // claiming "not configured" until their own timers came round.
 
 const onNotifyChannels = vi.hoisted(() => vi.fn())
-vi.mock('../server/preferences.telefunc.js', () => ({ onNotifyChannels }))
+vi.mock('../rpc/preferences.js', () => ({ onNotifyChannels }))
 
 const { useNotifyChannels, reloadNotifyChannels } = await import('./notify-channels.js')
 

@@ -1,6 +1,6 @@
 import type { DashboardData, Intervention } from '../../dist/index.js'
 import { GitBranch, GitPullRequest, Inbox, MessageCircleQuestion } from 'lucide-react'
-import { onDashboard } from '../server/reads.telefunc.js'
+import { onDashboard } from '../rpc/reads.js'
 import { interventionKey } from '../../dist/client.js'
 import { Quota } from './Quota.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'

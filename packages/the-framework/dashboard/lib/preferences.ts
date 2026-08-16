@@ -1,8 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import type { CustomPreset, FrameworkFileConfig, Preferences, ProjectSummary } from '../../dist/index.js'
 import { preferencesFromFileConfig, notifyMethodEnabled, notifyCategoryEnabled } from '../../dist/client.js'
-import { onPreferences, patchPreferences, onProjectPresets, saveProjectPresets } from '../server/preferences.telefunc.js'
-import { onProjects } from '../server/projects.telefunc.js'
+import { onPreferences, patchPreferences, onProjectPresets, saveProjectPresets } from '../rpc/preferences.js'
+import { onProjects } from '../rpc/projects.js'
 import { parseRoute } from './route.js'
 
 // The dashboard's Global options (#410), owned by the daemon and persisted in the same

@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import type { FrameworkEvent } from '../../dist/index.js'
 import { sessionInfo } from '../../dist/client.js'
 import { MoreVertical, Github, FolderOpen, Code, Check, Play, ExternalLink, Square, FolderX, Trash2, Copy, GitMerge } from 'lucide-react'
-import { onGithubUrl } from '../server/reads.telefunc.js'
+import { onGithubUrl } from '../rpc/reads.js'
 import {
   sendOpenInApp,
   sendStop,
   sendMerge,
   sendRemoveWorktree,
   sendDeleteSession,
-} from '../server/control.telefunc.js'
-import type { EditorInfo } from '../server/preferences.telefunc.js'
+} from '../rpc/control.js'
+import type { EditorInfo } from '../rpc/preferences.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useAction } from '../lib/use-action.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'

@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import type { ConnectionProfile } from './profiles.js'
 
 const checkDevices = vi.hoisted(() => vi.fn())
-vi.mock('../server/devices.telefunc.js', () => ({ checkDevices }))
+vi.mock('../rpc/devices.js', () => ({ checkDevices }))
 
 const { useDeviceStatus } = await import('./use-device-status.js')
 

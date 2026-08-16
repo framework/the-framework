@@ -1,6 +1,6 @@
 import type { FileContent } from '../../dist/index.js'
 import { ArrowLeft } from 'lucide-react'
-import { onFileContent } from '../server/reads.telefunc.js'
+import { onFileContent } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { Button } from './ui/button.js'
 import { Markdown } from './Markdown.js'

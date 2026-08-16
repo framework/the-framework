@@ -1,5 +1,5 @@
 import type { Overview } from '../../dist/index.js'
-import { onOverview } from '../server/reads.telefunc.js'
+import { onOverview } from '../rpc/reads.js'
 import { usePolled } from './use-async.js'
 
 // Is an agent working right now (#875)? Cross-project on purpose: the mark answers "is the AI

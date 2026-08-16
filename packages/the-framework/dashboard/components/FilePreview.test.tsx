@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 
 const onFileDiff = vi.fn(async () => null as unknown)
 const onFileContent = vi.fn(async () => null as unknown)
-vi.mock('../server/reads.telefunc.js', () => ({ onFileDiff, onFileContent }))
+vi.mock('../rpc/reads.js', () => ({ onFileDiff, onFileContent }))
 
 const { FilePreviewCard, FilePreviewHover } = await import('./FilePreview.js')
 

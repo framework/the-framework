@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 
 const onFileContent = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onFileContent }))
+vi.mock('../rpc/reads.js', () => ({ onFileContent }))
 
 const { TicketPlanPage, planPath } = await import('./TicketPlanPage.js')
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Preferences } from '../../dist/index.js'
-import type { NotifyChannels } from '../server/preferences.telefunc.js'
+import type { NotifyChannels } from '../rpc/preferences.js'
 
 // The Discord setup dialogs (#1095). What is worth pinning is the credential contract, not the
 // copy: a credential goes in and never comes back, an env-set one is reported rather than edited,
@@ -12,7 +12,7 @@ import type { NotifyChannels } from '../server/preferences.telefunc.js'
 const saveDiscordCredentials = vi.hoisted(() =>
   vi.fn<(patch: unknown) => Promise<{ ok: true } | { ok: false; error: string }>>(async () => ({ ok: true })),
 )
-vi.mock('../server/preferences.telefunc.js', () => ({ saveDiscordCredentials }))
+vi.mock('../rpc/preferences.js', () => ({ saveDiscordCredentials }))
 
 const updatePreferences = vi.hoisted(() => vi.fn())
 let prefs: Preferences = {}

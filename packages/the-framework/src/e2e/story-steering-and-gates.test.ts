@@ -3,14 +3,14 @@ import { test } from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { makeWorld, waitFor, withFakeAwait } from './harness.js'
 import { archivedRunPaths } from '../store/index.js'
-import { onOpenQuestions, onRuns, onRetainedWorktrees, onRunWorktree } from '../dashboard-rpc/reads.telefunc.js'
+import { onOpenQuestions, onRuns, onRetainedWorktrees, onRunWorktree } from '../dashboard-rpc/reads.js'
 import {
   sendChoice,
   sendMessage,
   sendStop,
   sendSetHandoff,
   sendDeleteSession,
-} from '../dashboard-rpc/control.telefunc.js'
+} from '../dashboard-rpc/control.js'
 
 // The steering stories (README.md): everything the user does TO a live session — answer its
 // question, chat with it, change its handoff, stop it — flows browser -> RPC -> control.jsonl ->

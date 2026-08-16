@@ -30,7 +30,7 @@ import {
 import type { FrameworkEvent } from './events.js'
 import { writeSessionSpec } from './session-spec.js'
 import type { StartRunKind, StartRunOptions, StartRunResult, AddProjectResult } from './dashboard/index.js'
-import type { EventsSource, RemoteRuns } from './dashboard/telefunc-serve.js'
+import type { EventsSource, RemoteRuns } from './dashboard/rpc-serve.js'
 import { RelayedRuns, startRemoteRun } from './dashboard/remote-run.js'
 import { runBranchFor } from './dashboard/run-handoff.js'
 import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'

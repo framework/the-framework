@@ -8,8 +8,8 @@ import {
   onHotTickets,
   onQueue,
   onRuns,
-} from '../dashboard-rpc/reads.telefunc.js'
-import { sendChoice, sendQueueTicket } from '../dashboard-rpc/control.telefunc.js'
+} from '../dashboard-rpc/reads.js'
+import { sendChoice, sendQueueTicket } from '../dashboard-rpc/control.js'
 import { presets } from '../preset-catalog.js'
 
 // The roadmap stories (README.md): tickets are proposals, the flat TODO queue holds confirmed

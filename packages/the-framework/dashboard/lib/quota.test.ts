@@ -5,7 +5,7 @@ import type { QuotaView } from '../../dist/index.js'
 // The RPC is a telefunc shim over the wire, so stub it: these tests are about the
 // hook's own behavior (poll, keep-last-on-failure, stop on unmount), not the daemon.
 const onQuota = vi.hoisted(() => vi.fn())
-vi.mock('../server/quota.telefunc.js', () => ({ onQuota }))
+vi.mock('../rpc/quota.js', () => ({ onQuota }))
 
 const { useQuota } = await import('./quota.js')
 

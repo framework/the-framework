@@ -8,16 +8,16 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { provideTelefuncContext } from 'telefunc'
+import { setDashboardContext } from '../dashboard-rpc/context.js'
 import { createProjectRuntime, type ProjectRuntime } from '../daemon-runtime.js'
 import { registryPreferencesStore, projectId } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
 import { resolveRunEventsPath, type RunMeta, type RunStatus } from '../store/index.js'
 import { withRunLock } from '../run-locks.js'
 import { tailRunEvents } from '../dashboard-rpc/events-tail.js'
-import { sendAddProject } from '../dashboard-rpc/projects.telefunc.js'
-import { sendStart } from '../dashboard-rpc/control.telefunc.js'
-import { onRuns } from '../dashboard-rpc/reads.telefunc.js'
+import { sendAddProject } from '../dashboard-rpc/projects.js'
+import { sendStart } from '../dashboard-rpc/control.js'
+import { onRuns } from '../dashboard-rpc/reads.js'
 import type { FrameworkEvent } from '../events.js'
 import type { StartRunKind, StartRunOptions } from '../dashboard/types.js'
 import type { SessionSpec } from '../session-spec.js'
@@ -168,7 +168,8 @@ export async function makeWorld(): Promise<StoryWorld> {
 
   const rpc: StoryWorld['rpc'] = fn => {
     return (...args) => {
-      provideTelefuncContext(context as never)
+      // Re-wired per call so a story's own overrides win over whatever ran before it.
+      setDashboardContext(context)
       return fn(...args)
     }
   }

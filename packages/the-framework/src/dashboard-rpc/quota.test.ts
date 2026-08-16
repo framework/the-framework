@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { provideTestContext } from './test-context.js'
-import { sendAutoPmSweep } from './quota.telefunc.js'
+import { sendAutoPmSweep } from './quota.js'
 import type { AutoPmOutcome } from '../auto-pm.js'
 
 // #1433: "Trigger routine now" was fire-and-forget — the RPC returned before the sweep ran, so

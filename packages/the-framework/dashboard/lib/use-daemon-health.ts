@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { onProjects } from '../server/projects.telefunc.js'
+import { onProjects } from '../rpc/projects.js'
 
 /** How often the liveness probe asks, healthy or not. */
 const PROBE_MS = 5000

@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FrameworkEvent } from '../../dist/index.js'
 import type { LiveFeedEvent } from '../../dist/dashboard-rpc/index.js'
-import type { ClientChannel } from 'telefunc'
-import { onEvents } from '../server/events.telefunc.js'
+import { onEvents, type EventChannel } from '../rpc/events.js'
 import { currentRunEvents } from './live-state.js'
 import { stampReceived } from './event-times.js'
 
 // The live run feed (#405), shared. The dashboard is a projection of the selected project's
-// `.the-framework/events.jsonl`, streamed over a Telefunc Channel that pushes one
+// `.the-framework/events.jsonl`, streamed over Server-Sent Events that push one
 // `FrameworkEvent` per new line. Both the main event view and the right rail's choice gates
 // (#440) read this same stream, so the subscription lives here and each consumer owns one
 // channel rather than opening a second.
@@ -61,7 +60,7 @@ export function useLiveEvents(projectId: string | null, runId?: string | null, r
     setLost(false)
     setDone(false)
     if (!projectId) return
-    let channel: ClientChannel<never, LiveFeedEvent> | undefined
+    let channel: EventChannel | undefined
     let cancelled = false
     let attempt = 0
     let first = true

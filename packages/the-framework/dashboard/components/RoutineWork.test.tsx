@@ -13,10 +13,10 @@ import { hoverTooltip } from '../test-utils.js'
 // Everything the card reads goes through a lib module, so the mocks stop short of telefunc: an
 // unmocked `*.telefunc.js` in the import graph fails as an assertIsNotBrowser bug report.
 const onProjects = vi.hoisted(() => vi.fn())
-vi.mock('../server/projects.telefunc.js', () => ({ onProjects }))
+vi.mock('../rpc/projects.js', () => ({ onProjects }))
 
 const sendAutoPmSweep = vi.hoisted(() => vi.fn())
-vi.mock('../server/quota.telefunc.js', () => ({ sendAutoPmSweep }))
+vi.mock('../rpc/quota.js', () => ({ sendAutoPmSweep }))
 
 const updatePreferences = vi.hoisted(() => vi.fn())
 let prefs: Preferences = {}

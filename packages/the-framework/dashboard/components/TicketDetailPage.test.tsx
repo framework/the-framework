@@ -2,10 +2,10 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const onTicket = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onTicket }))
+vi.mock('../rpc/reads.js', () => ({ onTicket }))
 const sendQueueTicket = vi.hoisted(() => vi.fn())
 const sendReleaseTicketLock = vi.hoisted(() => vi.fn())
-vi.mock('../server/control.telefunc.js', () => ({ sendQueueTicket, sendReleaseTicketLock }))
+vi.mock('../rpc/control.js', () => ({ sendQueueTicket, sendReleaseTicketLock }))
 
 const { TicketDetailPage } = await import('./TicketDetailPage.js')
 

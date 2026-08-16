@@ -5,9 +5,9 @@ import type { OpenQuestion } from '../../dist/index.js'
 // The hub polls onOpenQuestions over the telefunc shim, and its ChoicePanels post over the
 // control shim; stub both so the real telefunc client never loads into jsdom.
 const onOpenQuestions = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onOpenQuestions }))
+vi.mock('../rpc/reads.js', () => ({ onOpenQuestions }))
 const sendChoice = vi.hoisted(() => vi.fn())
-vi.mock('../server/control.telefunc.js', () => ({ sendChoice }))
+vi.mock('../rpc/control.js', () => ({ sendChoice }))
 // Preferences plumbing is not under test; autopilot reads ON so the countdown-off contract below
 // is observable (a hub must never tick down, however the preference is set).
 vi.mock('../lib/preferences.js', () => ({

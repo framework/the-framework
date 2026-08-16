@@ -8,8 +8,8 @@ const sendPreview = vi.fn(async () => ({ ok: true as const, url: 'http://localho
 const onServeTargets = vi.fn(async () => [{ id: '.', label: 'app', dir: '', script: 'dev' }])
 const onPreviewStatus = vi.fn(async () => ({ running: false }))
 const sendStopPreview = vi.fn(async () => {})
-vi.mock('../server/reads.telefunc.js', () => ({ onGithubUrl, onRunWorktree }))
-vi.mock('../server/control.telefunc.js', () => ({
+vi.mock('../rpc/reads.js', () => ({ onGithubUrl, onRunWorktree }))
+vi.mock('../rpc/control.js', () => ({
   sendOpenInApp,
   sendPreview,
   onServeTargets,

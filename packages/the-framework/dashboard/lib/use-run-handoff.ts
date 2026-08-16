@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { RunHandoff } from '../../dist/index.js'
-import { onRunHandoff } from '../server/reads.telefunc.js'
+import { onRunHandoff } from '../rpc/reads.js'
 import { usePolled } from './use-async.js'
 import { useAction } from './use-action.js'
 

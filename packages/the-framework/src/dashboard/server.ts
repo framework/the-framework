@@ -9,10 +9,10 @@ import { defaultQuotaSource, type QuotaSource } from './quota.js'
 import type { AutoPmReporter } from '../auto-pm.js'
 import { serveClientBundle } from './static.js'
 import { BROWSER_PROXY_PREFIX, handleBrowserProxy } from './browser-proxy.js'
-import { makeTelefuncMount } from './telefunc-serve.js'
+import { makeRpcMount, RPC_PREFIX } from './rpc-serve.js'
 import { requestPathname } from '../request-path.js'
 import type { AddProjectResult, PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from './types.js'
-import type { EventsSource, RemoteRuns } from './telefunc-serve.js'
+import type { EventsSource, RemoteRuns } from './rpc-serve.js'
 import { handleRelayRequest, RELAY_PREFIX, type RelayHandlers } from './relay-endpoints.js'
 import { BRIDGE_PREFIX, handleBridgeRequest, type BridgeHandlers } from './bridge-endpoints.js'
 import { bridgeQuestions } from './bridge-store.js'
@@ -63,13 +63,13 @@ export interface DashboardOptions {
   /**
    * Serve the new dashboard bundle (#405) from this directory — the prerendered Vike SPA
    * (`index.html` + `assets/**`). The daemon also mounts the dashboard's Telefunc surface
-   * at `/_telefunc` (RPCs + the live-event Channel). Omit only for a broken install with
+   * at `/_rpc` (the calls + the live-event stream). Omit only for a broken install with
    * no built bundle, where the server reports the bundle is missing.
    */
   clientBundleDir?: string
   /**
    * The shared token that guards a non-loopback bind (#1051): with it set, every route (static
-   * bundle, `/_telefunc`, `/browser`, `/_relay`) needs a valid `fw_daemon` cookie or a matching
+   * bundle, `/_rpc`, `/browser`, `/_relay`) needs a valid `fw_daemon` cookie or a matching
    * `?token=`, else 401. Omit for a loopback bind, where the guard is a no-op and local UX is
    * byte-identical. A separate concern from the CSRF origin check in telefunc-serve.ts.
    */
@@ -99,7 +99,7 @@ export interface DashboardOptions {
    * its cloud session is parked on. Absent leaves every `/_bridge/*` route 404, which is default.
    *
    * Deliberately not {@link token}. That one guards a non-loopback bind and is absent on a normal
-   * loopback daemon, where what keeps other origins out of `/_telefunc` is the same-origin check.
+   * loopback daemon, where what keeps other origins out of `/_rpc` is the same-origin check.
    * The bridge is the one route meant to be reached from another origin, so neither protects it
    * and it authenticates on its own.
    */
@@ -121,7 +121,7 @@ export interface Dashboard {
 
 /**
  * Start the localhost dashboard: a tiny `node:http` server that serves the prerendered
- * Vike SPA (#405) and mounts its Telefunc surface at `/_telefunc` — the RPCs and the
+ * SPA (#405) and mounts its RPC surface at `/_rpc` — the calls and the
  * live-event Channel. The dashboard reads the run's `.the-framework/events.jsonl` over the
  * Channel and steers it through `control.jsonl`, so there is no in-process event stream
  * here; the server is a static-bundle + RPC host. Telefunc runs in-process, so `sendStart`
@@ -147,7 +147,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
   // The usage panel polls for the dashboard's whole life, not just during a run:
   // it has to show where the account stands while nothing is running (#533).
   const quota = opts.quota
-  const telefuncMount = makeTelefuncMount(
+  const rpcMount = makeRpcMount(
     {
       startRun: opts.onStart,
       addProject: opts.onAddProject,
@@ -211,12 +211,12 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
       void handleRelayRequest(req, res, pathname, relayHandlers)
       return
     }
-    if (pathname === '/_telefunc' || pathname.startsWith('/_telefunc/')) {
-      void telefuncMount(req, res)
+    if (pathname === RPC_PREFIX || pathname.startsWith(`${RPC_PREFIX}/`)) {
+      void rpcMount(req, res)
       return
     }
-    // The browser preview (#813) is proxied, not Telefunc'd: it is an endless MJPEG body and a
-    // raw input POST, neither of which is an RPC.
+    // The browser preview (#813) is proxied, not an RPC: it is an endless MJPEG body and a
+    // raw input POST, neither of which is a call.
     if (pathname.startsWith(`${BROWSER_PROXY_PREFIX}/`)) {
       void handleBrowserProxy(req, res)
         .then(handled => {
@@ -273,7 +273,7 @@ function authorizeDaemonRequest(req: IncomingMessage, res: ServerResponse, token
     url.searchParams.delete('token')
     const query = url.searchParams.toString()
     res.writeHead(302, {
-      // Lax, not Strict: the #1052 device-hop is a cross-origin top-level nav, and a Strict cookie set on it is withheld from the redirect right after, so the clean path 401s. Lax still rides top-level GET navs; CSRF stays covered by the same-origin check on /_telefunc.
+      // Lax, not Strict: the #1052 device-hop is a cross-origin top-level nav, and a Strict cookie set on it is withheld from the redirect right after, so the clean path 401s. Lax still rides top-level GET navs; CSRF stays covered by the same-origin check on /_rpc.
       'set-cookie': `${DAEMON_COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/`,
       location: url.pathname + (query ? `?${query}` : ''),
     })

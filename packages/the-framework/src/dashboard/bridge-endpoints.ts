@@ -7,7 +7,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
  *
  * **Why this route carries its own token, unlike every other one.** The #1051 guard in
  * `startDashboard` only exists on a non-loopback bind, and what protects a loopback daemon is
- * the same-origin check on `/_telefunc`: a page on another origin is refused outright. This
+ * the same-origin check on `/_rpc`: a page on another origin is refused outright. This
  * route is the first that is *meant* to be reached from another origin, so neither of those
  * protects it, and it demands `Authorization: Bearer <daemonToken>` unconditionally instead.
  *

@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { config } from 'telefunc'
-import { Telefunc } from 'telefunc/node'
 import { hostnameFromHostHeader, isLoopbackHost } from '../loopback-host.js'
-import { registerDashboardTelefunctions } from '../dashboard-rpc/register.js'
+import { setDashboardContext } from '../dashboard-rpc/context.js'
+import { RPC_HANDLERS, RPC_EVENT_STREAM } from '../dashboard-rpc/index.js'
+import { errorMessage } from '../error-message.js'
 import type { ProjectsProvider } from './projects.js'
 import type { FrameworkEvent } from '../events.js'
 import type { PreferencesStore } from '../registry.js'
@@ -38,7 +38,7 @@ export interface RemoteRuns {
 }
 
 /**
- * What every telefunction reads off its request context.
+ * What every RPC acts through.
  *
  * Every field is required (D3). These used to be optional because three hosts served this same
  * surface — the daemon, a per-session foreground dashboard, and a public relay — each wiring a
@@ -68,23 +68,8 @@ export interface DashboardContext {
   autoPmSweep: (opts?: { drainOnly?: boolean }) => void | Promise<void>
 }
 
-let instance: Telefunc | undefined
-
-function setup(): Telefunc {
-  if (instance) return instance
-  // No Vite build runs over these functions, so there are no generated shields; the
-  // mount is localhost-only and same-origin guarded, and every write funnels through
-  // appendControl / the busy-guarded startRun. Disable shield generation and the
-  // naming convention (our names are `onX`/`sendX`, not telefunc's query/mutation hint).
-  ;(config as { shield?: unknown }).shield = { dev: false, prod: false }
-  ;(config as { disableNamingConvention?: boolean }).disableNamingConvention = true
-  registerDashboardTelefunctions()
-  instance = new Telefunc()
-  return instance
-}
-
 /**
- * CSRF guard for the state-changing Telefunc calls. A browser attaches an `Origin`
+ * CSRF guard for the state-changing RPCs. A browser attaches an `Origin`
  * header to every cross-site request, so we reject any POST whose Origin is not this
  * same server (or a loopback host) — otherwise a page on `evil.com` could `fetch()` the
  * localhost dashboard and spawn/steer a run. An absent Origin means a non-browser caller
@@ -129,23 +114,98 @@ export function isExpectedHost(req: IncomingMessage, boundHost: string | undefin
   return isLoopbackHost(hostname) || hostname === boundHost
 }
 
+/** Where the dashboard's RPCs live. One prefix, so the static handler can decline it by path. */
+export const RPC_PREFIX = '/_rpc'
+
+/** Read a request body, bounded so a bad caller cannot make the daemon buffer without limit. */
+async function readBody(req: IncomingMessage, limit = 4 * 1024 * 1024): Promise<string> {
+  let size = 0
+  const chunks: Buffer[] = []
+  for await (const chunk of req) {
+    const buf = chunk as Buffer
+    size += buf.length
+    if (size > limit) throw new Error('request body too large')
+    chunks.push(buf)
+  }
+  return Buffer.concat(chunks).toString('utf8')
+}
+
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  const text = JSON.stringify(body)
+  res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' })
+  res.end(text)
+}
+
 /**
- * Mount the dashboard's Telefunc surface (#405) on the daemon's `node:http` server: one
- * `serve()` handles both the RPCs and the Channel SSE stream at `/_telefunc`. Telefunc
- * runs in the daemon process, so a `sendStart` telefunction can call the daemon's own
- * `startRun` via the request context. The `context` is exactly what each telefunction
- * reaches through {@link getContext} (see {@link DashboardContext}): the daemon wires the
+ * Stream a run's events as Server-Sent Events (#405). One JSON value per `data:` line; the
+ * response ending IS the clean close the client distinguishes from a dropped connection.
+ *
+ * This was a Telefunc Channel. The Channel gave serialization, reconnect and typing over a
+ * WebSocket-shaped abstraction; what the dashboard actually uses is "push me lines until I go
+ * away", and it brought its own reconnect-with-backoff on top (#948/#1383) because the Channel's
+ * did not distinguish a dead daemon from a finished stream.
+ */
+async function serveEventStream(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+  const projectId = url.searchParams.get('projectId') ?? ''
+  const runId = url.searchParams.get('runId') ?? undefined
+  res.writeHead(200, {
+    'content-type': 'text/event-stream',
+    'cache-control': 'no-store',
+    connection: 'keep-alive',
+    // The daemon is behind nothing, but a proxy in front of a `--host` bind would otherwise buffer.
+    'x-accel-buffering': 'no',
+  })
+  let finished = false
+  const stop = await RPC_EVENT_STREAM(
+    projectId,
+    runId,
+    value => {
+      res.write(`data: ${JSON.stringify(value)}\n\n`)
+    },
+    () => {
+      finished = true
+      res.end()
+    },
+  )
+  if (!stop) {
+    // Nothing to stream (unknown project): end cleanly, which the client reads as "done", not
+    // "lost" — the same distinction the Channel's clean-vs-errored close carried.
+    res.end()
+    return
+  }
+  if (finished) return // the source was exhausted before it was even wired
+  const finish = (): void => {
+    stop()
+    res.end()
+  }
+  req.on('close', finish)
+  req.on('error', finish)
+}
+
+/**
+ * Mount the dashboard's RPC surface (#405) on the daemon's `node:http` server: `POST /_rpc/<name>`
+ * for the calls, `GET /_rpc/events` for the live stream. It runs in the daemon process, so
+ * `sendStart` reaches the daemon's own `startRun` through the wired {@link DashboardContext}.
+ *
  * Cross-origin POSTs are rejected (CSRF: a page on evil.com must not steer or start a session), as
  * are requests carrying someone else's `Host` when we are bound to loopback (DNS rebinding: the
  * same page must not reach us by pointing its own name at `127.0.0.1`). Pass `opts.host` — the
  * address the server is bound to — to enable that second check. Returns whether the request was
- * Telefunc's.
+ * the RPC surface's.
+ *
+ * This replaced Telefunc (F3), which required a build-time transform over every `.telefunc.ts`
+ * file, a registration table pinning each RPC to the client-baked key of the *dashboard* source
+ * path it was re-exported from, and a request-context indirection for wiring that never varied
+ * per request. What it bought over this was type-safety across a package boundary that A7 removed.
  */
-export function makeTelefuncMount(
+export function makeRpcMount(
   context: DashboardContext,
   opts: { host?: string } = {},
 ): (req: IncomingMessage, res: ServerResponse) => Promise<boolean> {
+  setDashboardContext(context)
   return async (req, res) => {
+    const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`)
+    if (url.pathname !== RPC_PREFIX && !url.pathname.startsWith(`${RPC_PREFIX}/`)) return false
     if (!isSameOriginRequest(req)) {
       res.writeHead(403, { 'content-type': 'text/plain' })
       res.end('cross-origin request forbidden')
@@ -156,20 +216,31 @@ export function makeTelefuncMount(
       res.end('unexpected Host header')
       return true
     }
-    const tf = setup()
-    // Never let a telefunc failure become an unhandled rejection that kills the daemon:
-    // telefunc 0.2.22 throws on a bare `GET /_telefunc` (it passes the request as a body,
-    // which `new Request()` rejects for GET), and a browser tab hits that on reconnect.
+
+    const name = url.pathname.slice(RPC_PREFIX.length + 1)
     try {
-      return await tf.serve({ req, res, context: context as never })
-    } catch {
-      if (!res.headersSent) {
-        res.writeHead(400, { 'content-type': 'text/plain' })
-        res.end('bad telefunc request')
-      } else {
-        res.end()
+      if (req.method === 'GET' && name === 'events') {
+        await serveEventStream(req, res, url)
+        return true
       }
-      return true
+      const handler = RPC_HANDLERS[name]
+      if (req.method !== 'POST' || !handler) {
+        sendJson(res, 404, { error: `no such RPC: ${name}` })
+        return true
+      }
+      const raw = await readBody(req)
+      const args: unknown[] = raw ? (JSON.parse(raw) as unknown[]) : []
+      if (!Array.isArray(args)) {
+        sendJson(res, 400, { error: 'the request body must be a JSON array of arguments' })
+        return true
+      }
+      sendJson(res, 200, { ret: await handler(...(args as never[])) })
+    } catch (err) {
+      // An RPC that throws is a failed call, not a dead daemon: answer it and stay up. Without
+      // this a rejected promise inside the mount became an unhandled rejection.
+      if (!res.headersSent) sendJson(res, 500, { error: errorMessage(err) })
+      else res.end()
     }
+    return true
   }
 }

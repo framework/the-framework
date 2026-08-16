@@ -1,5 +1,4 @@
-import { getContext } from 'telefunc'
-import { contextProjects } from './context.js'
+import { contextAddProject, contextProjects } from './context.js'
 import { readClaudeTrust, type ClaudeTrust } from '../claude-trust.js'
 import { cachedRepoAutoMerge, type RepoAutoMerge } from '../dashboard/gh.js'
 import { preflight, preflightProblems } from '../preflight.js'
@@ -7,7 +6,7 @@ import { isAgentName } from '../agent-names.js'
 import type { AgentReady } from '../dashboard/types.js'
 import type { ProjectSummary } from '../dashboard/projects.js'
 import type { AddProjectResult, OnboardingSuggestion } from '../dashboard/types.js'
-import type { DashboardContext } from '../dashboard/telefunc-serve.js'
+import type { DashboardContext } from '../dashboard/rpc-serve.js'
 
 // The Projects sidebar behind the new dashboard (#405): the global registry (#390) the
 // daemon and CLI write — id, path, name, activated, last activity. The per-run
@@ -25,7 +24,7 @@ export async function onProjects(): Promise<ProjectSummary[]> {
  * the daemon's {@link AddProjectResult}; a public host (the relay) leaves it unwired.
  */
 export async function sendAddProject(path: string, directory: boolean): Promise<AddProjectResult> {
-  const { addProject } = getContext<DashboardContext>()
+  const addProject = contextAddProject()
   if (!addProject) return { ok: false, error: 'adding projects is not enabled on this server' }
   const trimmed = path.trim()
   if (!trimmed) return { ok: false, error: 'a project path is required' }
@@ -40,7 +39,7 @@ export async function sendAddProject(path: string, directory: boolean): Promise<
  * cannot act on the suggestion anyway, and must not disclose where it runs, so it offers none.
  */
 export async function onOnboarding(): Promise<OnboardingSuggestion> {
-  const { addProject } = getContext<DashboardContext>()
+  const addProject = contextAddProject()
   if (!addProject) return { cwd: null, cwdProjectId: null }
   const cwd = process.cwd()
   const registered = await contextProjects().list()

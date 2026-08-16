@@ -3,11 +3,11 @@ import { test } from 'node:test'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { makeWorld, waitFor } from './harness.js'
-import { onProjects, sendAddProject } from '../dashboard-rpc/projects.telefunc.js'
-import { onGitStatus, onRuns, onDocs } from '../dashboard-rpc/reads.telefunc.js'
-import { onPreferences, patchPreferences } from '../dashboard-rpc/preferences.telefunc.js'
-import { onQuota, onAutoPm, sendAutoPmSweep } from '../dashboard-rpc/quota.telefunc.js'
-import { sendStart } from '../dashboard-rpc/control.telefunc.js'
+import { onProjects, sendAddProject } from '../dashboard-rpc/projects.js'
+import { onGitStatus, onRuns, onDocs } from '../dashboard-rpc/reads.js'
+import { onPreferences, patchPreferences } from '../dashboard-rpc/preferences.js'
+import { onQuota, onAutoPm, sendAutoPmSweep } from '../dashboard-rpc/quota.js'
+import { sendStart } from '../dashboard-rpc/control.js'
 
 // The projects & settings stories (README.md): registering a repo, what the sidebar then shows,
 // how settings written in the dashboard reach the runs the daemon starts, and the usage panel.

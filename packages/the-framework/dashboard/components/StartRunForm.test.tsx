@@ -7,10 +7,10 @@ const onProjects = vi.hoisted(() => vi.fn())
 const onClaudeTrust = vi.hoisted(() => vi.fn())
 const onAgentReady = vi.hoisted(() => vi.fn())
 const onRepoAutoMerge = vi.hoisted(() => vi.fn())
-vi.mock('../server/projects.telefunc.js', () => ({ onProjects, onClaudeTrust, onAgentReady, onRepoAutoMerge }))
+vi.mock('../rpc/projects.js', () => ({ onProjects, onClaudeTrust, onAgentReady, onRepoAutoMerge }))
 
 const onSystemPromptUser = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onSystemPromptUser }))
+vi.mock('../rpc/reads.js', () => ({ onSystemPromptUser }))
 
 // Mutable so a test can pick the run target (#1318); reset to Global defaults after each.
 const prefs = vi.hoisted(() => ({ current: {} as Record<string, unknown> }))

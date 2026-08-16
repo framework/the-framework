@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { credentialEnvVar, validateCredential } from '../../dist/client.js'
-import { saveDiscordCredentials, type NotifyChannels } from '../server/preferences.telefunc.js'
+import { saveDiscordCredentials, type NotifyChannels } from '../rpc/preferences.js'
 import { Dialog } from './ui/dialog.js'
 import { Button } from './ui/button.js'
 import { usePreferences, updatePreferences, discordEnabled } from '../lib/preferences.js'

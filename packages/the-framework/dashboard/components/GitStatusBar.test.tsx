@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 
 const onGitStatus = vi.fn(async () => null as unknown)
 const onRunWorktree = vi.fn(async () => null as unknown)
-vi.mock('../server/reads.telefunc.js', () => ({ onGitStatus, onRunWorktree }))
+vi.mock('../rpc/reads.js', () => ({ onGitStatus, onRunWorktree }))
 
 const { GitStatusBar } = await import('./GitStatusBar.js')
 

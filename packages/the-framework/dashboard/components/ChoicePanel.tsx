@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChoiceRequest } from '../../dist/index.js'
-import { sendChoice } from '../server/control.telefunc.js'
+import { sendChoice } from '../rpc/control.js'
 import { useAction } from '../lib/use-action.js'
 import { Button } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'
 import { cn } from '../lib/utils.js'
 
 // "Your call" — the interactive gate the run parks on (#304/#332), rendered from the
-// live event stream and posted back over Telefunc (server/control.telefunc.ts) to the
+// live event stream and posted back over the control RPC (rpc/control.ts) to the
 // project's control.jsonl. One shape: a question with options, picked one at a time or
 // several at once (#332). There were three — an Approve/Decline confirm got its own green and
 // red buttons — but an approval is a question with two options, and rendering it as its own

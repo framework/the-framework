@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { EventStream } from '../event-stream.js'
-import { forwardStream } from './stream-channel.js'
+import { forwardStream } from './stream-forward.js'
 
 const tick = () => new Promise(r => setImmediate(r))
 

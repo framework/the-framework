@@ -5,7 +5,7 @@ import type { HotTicket, HotBucket } from '../../dist/index.js'
 // HotTickets reads onHotTickets over the telefunc shim; stub it so the import graph stays out of
 // telefunc and the poll returns fixtures.
 const onHotTickets = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onHotTickets }))
+vi.mock('../rpc/reads.js', () => ({ onHotTickets }))
 
 const { HotTickets, workOnTicketDraft } = await import('./HotTickets.js')
 const { takePendingDraft } = await import('../lib/draft-handoff.js')

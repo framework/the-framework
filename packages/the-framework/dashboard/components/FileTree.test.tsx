@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 
 const onProjectFileStatus = vi.fn(async () => ({}) as unknown)
-vi.mock('../server/reads.telefunc.js', () => ({ onProjectFileStatus }))
+vi.mock('../rpc/reads.js', () => ({ onProjectFileStatus }))
 
 const { FileTree } = await import('./FileTree.js')
 

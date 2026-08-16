@@ -22,7 +22,7 @@ import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-
 import { startSessionCommitter } from './session-commit.js'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
 import { resolveRunPr } from './dashboard/run-handoff.js'
-import { sendChoice, sendMessage, sendStop } from './dashboard-rpc/control.telefunc.js'
+import { sendChoice, sendMessage, sendStop } from './dashboard-rpc/control.js'
 import type { ProjectSummary } from './dashboard/projects.js'
 import type { QuotaSource } from './dashboard/quota.js'
 import type { StartRunOptions, StartRunResult } from './dashboard/types.js'

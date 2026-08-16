@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { OpenQuestion } from '../../dist/index.js'
-import { onOpenQuestions } from '../server/reads.telefunc.js'
+import { onOpenQuestions } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { AnsweredChoice } from './AnsweredChoice.js'
 import { ChoicePanel } from './ChoicePanel.js'

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { GitStatus, RunWorktree } from '../../dist/index.js'
 import { ChevronRight, GitBranch } from 'lucide-react'
-import { onGitStatus, onRunWorktree } from '../server/reads.telefunc.js'
+import { onGitStatus, onRunWorktree } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { formatBytes } from '../../dist/client.js'
 import { cn } from '../lib/utils.js'

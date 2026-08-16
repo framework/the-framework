@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { provideTelefuncContext } from 'telefunc'
-import { savePreferences, patchPreferences } from './preferences.telefunc.js'
+import { savePreferences, patchPreferences } from './preferences.js'
 import type { PreferencesStore } from '../registry.js'
+import { provideTestContext } from './test-context.js'
 
 /** A store whose every method works, with only the ones a test cares about overridden. */
 function store(over: Partial<PreferencesStore> = {}): PreferencesStore {
@@ -19,7 +19,7 @@ function store(over: Partial<PreferencesStore> = {}): PreferencesStore {
 // typed error rather than rejecting the RPC, so the client renders it instead of losing the save.
 
 test('savePreferences returns the typed error when the store write fails, not a rejection', async () => {
-  provideTelefuncContext({
+  provideTestContext({
     preferences: store({
       save: async () => {
         throw new Error('disk full')
@@ -31,7 +31,7 @@ test('savePreferences returns the typed error when the store write fails, not a 
 })
 
 test('patchPreferences hands back what the store merged (#1148)', async () => {
-  provideTelefuncContext({
+  provideTestContext({
     preferences: store({
       patch: async patch => ({ theme: 'dark', ...patch }),
     }),
@@ -45,7 +45,7 @@ test('patchPreferences hands back what the store merged (#1148)', async () => {
 })
 
 test('patchPreferences returns the typed error when the merge write fails (#1148)', async () => {
-  provideTelefuncContext({
+  provideTestContext({
     preferences: store({
       patch: async () => {
         throw new Error('disk full')

@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 const onRunChanges = vi.fn(async () => [] as unknown)
 const onFileDiff = vi.fn(async () => null as unknown)
-vi.mock('../server/reads.telefunc.js', () => ({ onRunChanges, onFileDiff }))
+vi.mock('../rpc/reads.js', () => ({ onRunChanges, onFileDiff }))
 
 const { ChangesSummary, RunChanges } = await import('./RunChanges.js')
 

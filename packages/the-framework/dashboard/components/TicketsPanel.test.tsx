@@ -4,13 +4,13 @@ import type { WorkspaceTicket } from '../../dist/index.js'
 import { presets } from '../../dist/client.js'
 
 const sendStart = vi.hoisted(() => vi.fn())
-vi.mock('../server/control.telefunc.js', () => ({ sendStart }))
+vi.mock('../rpc/control.js', () => ({ sendStart }))
 
 // The last-import stamp (#1208). Mocked at the lib boundary like every other read here: an
 // unmocked `*.telefunc.js` anywhere in the import graph fails the whole file as an
 // assertIsNotBrowser "telefunc bug", which reads as anything but the missing mock it is.
 const onTicketsMeta = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onTicketsMeta }))
+vi.mock('../rpc/reads.js', () => ({ onTicketsMeta }))
 
 const { TicketsPanel, planPrompt, workOnTicketPrompt } = await import('./TicketsPanel.js')
 

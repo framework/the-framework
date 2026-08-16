@@ -9,8 +9,8 @@ import {
   onRetainedWorktrees,
   onActivity,
   onRecentRuns,
-} from '../dashboard-rpc/reads.telefunc.js'
-import { sendChoice, sendPushBranch } from '../dashboard-rpc/control.telefunc.js'
+} from '../dashboard-rpc/reads.js'
+import { sendChoice, sendPushBranch } from '../dashboard-rpc/control.js'
 
 // The session lifecycle stories (README.md): what a user sees between clicking Start and reading
 // the archived session row — through the same RPCs the dashboard calls, with real spawned run

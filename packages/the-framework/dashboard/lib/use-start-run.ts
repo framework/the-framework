@@ -1,4 +1,4 @@
-import { sendStart } from '../server/control.telefunc.js'
+import { sendStart } from '../rpc/control.js'
 import { useAction } from './use-action.js'
 
 type StartArgs = Parameters<typeof sendStart>

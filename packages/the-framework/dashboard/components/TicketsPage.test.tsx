@@ -5,8 +5,8 @@ const onAllTickets = vi.hoisted(() => vi.fn())
 // TicketsPanel (rendered per project here) reaches for these too; unmocked they pull the real
 // telefunc client into jsdom, same as TicketsPanel's own suite.
 const onTicketsMeta = vi.hoisted(() => vi.fn())
-vi.mock('../server/reads.telefunc.js', () => ({ onAllTickets, onTicketsMeta }))
-vi.mock('../server/control.telefunc.js', () => ({ sendQueueTicket: vi.fn(), sendStart: vi.fn() }))
+vi.mock('../rpc/reads.js', () => ({ onAllTickets, onTicketsMeta }))
+vi.mock('../rpc/control.js', () => ({ sendQueueTicket: vi.fn(), sendStart: vi.fn() }))
 
 const { TicketsPage } = await import('./TicketsPage.js')
 
@@ -67,7 +67,7 @@ describe('TicketsPage (#1144)', () => {
 
   test('an import/update session started in one project\'s section reports that project (#948)', async () => {
     onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets: [] }])
-    const { sendStart } = await import('../server/control.telefunc.js')
+    const { sendStart } = await import('../rpc/control.js')
     vi.mocked(sendStart).mockResolvedValue({ ok: true, runId: 'r1' })
     const onRunStarted = vi.fn()
     render(<TicketsPage onOpenTicket={() => {}} onRunStarted={onRunStarted} />)
@@ -237,7 +237,7 @@ describe('TicketsPage grouping (#1144)', () => {
       { projectId: 'p2', projectName: 'Beta', tickets: [ticket({ file: 'b.md', title: 'Beta ticket' })] },
     ])
     window.history.replaceState(null, '', '/tickets?group=none')
-    const { sendStart } = await import('../server/control.telefunc.js')
+    const { sendStart } = await import('../rpc/control.js')
     vi.mocked(sendStart).mockResolvedValue({ ok: true, runId: 'r9' })
     const onRunStarted = vi.fn()
     render(<TicketsPage onOpenTicket={() => {}} onRunStarted={onRunStarted} />)

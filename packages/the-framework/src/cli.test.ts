@@ -637,7 +637,7 @@ test('a session the dashboard started stays open for chat (#714)', () => {
 test('the startup footer prints the commands and the version (#312)', async () => {
   const { io, out } = capture()
   await printStartupFooter(io, { fetchLatest: async () => frameworkVersion() })
-  assert.ok(out.includes('Type a prompt on the dashboard to start a session, or use:'))
+  assert.ok(out.includes('Type a prompt on the dashboard to start an agent, or use:'))
   assert.ok(out.includes(`The Framework v${frameworkVersion()}`))
   assert.ok(out.includes(`✅ Up to date (v${frameworkVersion()})`))
 })

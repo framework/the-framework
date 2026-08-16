@@ -75,7 +75,7 @@ export function GitStatusBar({
   const size = formatBytes(worktree?.sizeBytes, '')
   // A session's worktree is the agent's tree, so uncommitted work there is the agent's; on the
   // project's own checkout it is the user's. Same dot, honest wording.
-  const dirtyLabel = worktree?.own ? 'Uncommitted changes in this session' : 'Uncommitted changes'
+  const dirtyLabel = worktree?.own ? 'Uncommitted changes in this agent' : 'Uncommitted changes'
 
   const branchTitle = worktree ? `${branch ?? 'no branch'}\n${worktree.path}` : `branch ${branch}`
   // Beside a session label the `the-framework/` prefix is 14 characters of noise every session
@@ -154,7 +154,7 @@ export function GitStatusBar({
           <TooltipTrigger render={<span className="hidden shrink-0 text-muted-foreground @4xl:inline" />}>
             {size}
           </TooltipTrigger>
-          <TooltipContent>This session&apos;s worktree on disk</TooltipContent>
+          <TooltipContent>This agent&apos;s worktree on disk</TooltipContent>
         </Tooltip>
       )}
       {/* The branch is the only part that gives up width (#1026): it truncates with an ellipsis

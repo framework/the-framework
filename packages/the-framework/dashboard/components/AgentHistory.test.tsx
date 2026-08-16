@@ -95,7 +95,7 @@ describe('AgentHistory (#785)', () => {
       </SidebarProvider>,
     )
     const rows = [...container.querySelectorAll('button')]
-    const home = rows.find(row => row.textContent?.trim() === 'New session')
+    const home = rows.find(row => row.textContent?.trim() === 'New agent')
     const starting = rows.find(row => row.textContent?.includes('starting…'))
     expect(starting?.className).toContain('bg-accent')
     expect(home?.className).not.toContain('bg-accent')
@@ -182,8 +182,8 @@ describe('AgentHistory rows', () => {
   // the New launcher rather than vanishing.
   test('with no project and no recents it still renders New and an empty hint', () => {
     renderRail(<AgentHistory projectId={null} agents={[]} recentRuns={[]} selectedRunId={null} onSelect={() => {}} />)
-    expect(screen.getByText('New session')).toBeTruthy()
-    expect(screen.getByText('No sessions yet.')).toBeTruthy()
+    expect(screen.getByText('New agent')).toBeTruthy()
+    expect(screen.getByText('No agents yet.')).toBeTruthy()
   })
 
   // On the Overview the rail pools every project's sessions; a row names its project and jumps in.
@@ -226,7 +226,7 @@ describe('AgentHistory New button (#new-button)', () => {
         onSelect={() => {}}
       />,
     )
-    fireEvent.click(screen.getByText('New session'))
+    fireEvent.click(screen.getByText('New agent'))
     expect(started).toBe('p1')
   })
 
@@ -242,7 +242,7 @@ describe('AgentHistory New button (#new-button)', () => {
         onSelect={() => {}}
       />,
     )
-    fireEvent.click(screen.getByText('New session'))
+    fireEvent.click(screen.getByText('New agent'))
     expect(started).toBe('p9')
   })
 
@@ -259,7 +259,7 @@ describe('AgentHistory New button (#new-button)', () => {
       />,
     )
     // The trigger opens a menu rather than starting immediately (aria-haspopup marks it).
-    expect(screen.getByLabelText('New session').getAttribute('aria-haspopup')).toBeTruthy()
+    expect(screen.getByLabelText('New agent').getAttribute('aria-haspopup')).toBeTruthy()
   })
 })
 

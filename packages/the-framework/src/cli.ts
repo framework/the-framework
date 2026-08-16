@@ -1307,7 +1307,7 @@ function printNonLoopbackAccess(io: CliIO, host: string, url: string, token: str
 export function printStartupFooter(io: CliIO, opts: { fetchLatest?: VersionFetcher } = {}): Promise<void> {
   const version = frameworkVersion()
   io.out('')
-  io.out('Type a prompt on the dashboard to start a session, or use:')
+  io.out('Type a prompt on the dashboard to start an agent, or use:')
   io.out('  framework "<what to build>"   Build (streams to the dashboard)')
   io.out('  framework --help              All options')
   io.out('')

@@ -116,7 +116,7 @@ export function AgentComposer({
       // failure `undefined`.
       const result = await run(
         () => sendMessage(projectId, text, agentId ?? undefined).then(() => true),
-        'Could not send — the session may have just ended. Your text is kept, try again.',
+        'Could not send — the agent may have just ended. Your text is kept, try again.',
       )
       if (result) {
         setQueued(text)
@@ -141,7 +141,7 @@ export function AgentComposer({
         ...(agentId ? { continueRunId: agentId } : {}),
         ...(picked && picked !== 'claude' ? { driver: picked } : {}),
       },
-      'Failed to continue the session.',
+      'Failed to continue the agent.',
     )
     if (result) {
       composerRef.current?.clear()
@@ -150,7 +150,7 @@ export function AgentComposer({
   }
 
   const stopSession = () =>
-    void runStop(() => sendStop(projectId, agentId ?? undefined).then(() => true), 'Could not stop the session.').then(result => {
+    void runStop(() => sendStop(projectId, agentId ?? undefined).then(() => true), 'Could not stop the agent.').then(result => {
       if (result) setStopRequested(true)
     })
 
@@ -169,7 +169,7 @@ export function AgentComposer({
         ...(agentId ? { continueRunId: agentId } : {}),
         ...(picked && picked !== 'claude' ? { driver: picked } : {}),
       },
-      'Failed to resume the session.',
+      'Failed to resume the agent.',
     )
     if (result) {
       setResuming(true)
@@ -189,14 +189,14 @@ export function AgentComposer({
             size="icon-sm"
             onClick={stopSession}
             disabled={stopping}
-            aria-label="Stop session"
+            aria-label="Stop agent"
             className="h-8 w-8 shrink-0 disabled:opacity-100"
           />
         }
       >
         {stopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-3 w-3 fill-current" />}
       </TooltipTrigger>
-      <TooltipContent>{stopping ? 'Stopping…' : 'Stop session'}</TooltipContent>
+      <TooltipContent>{stopping ? 'Stopping…' : 'Stop agent'}</TooltipContent>
     </Tooltip>
   ) : resumable && (outcome?.stopped || resuming) ? (
     <Tooltip>
@@ -214,7 +214,7 @@ export function AgentComposer({
       >
         {starting || resuming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-3.5 w-3.5 fill-current" />}
       </TooltipTrigger>
-      <TooltipContent>{starting || resuming ? 'Resuming…' : 'Resume the session'}</TooltipContent>
+      <TooltipContent>{starting || resuming ? 'Resuming…' : 'Resume the agent'}</TooltipContent>
     </Tooltip>
   ) : undefined
 
@@ -242,9 +242,9 @@ export function AgentComposer({
         idleControl={idleControl}
         placeholder={
           live
-            ? 'Message the session…  ( / commands · < tags · @ projects · # files )'
+            ? 'Message the agent…  ( / commands · < tags · @ projects · # files )'
             : resumable
-              ? 'Message the session to continue it…  ( / commands · < tags · @ projects · # files )'
+              ? 'Message the agent to continue it…  ( / commands · < tags · @ projects · # files )'
               : // Not a continuation at all, so the box says so itself rather than a note above it
                 // saying one thing and the box below inviting another (see {@link Note}).
                 NOT_CONTINUABLE
@@ -258,7 +258,7 @@ export function AgentComposer({
  *  where the box is not a continuation. It is the composer's own placeholder rather than a note
  *  above it: the message is about what typing here does, so it belongs where you type. */
 const NOT_CONTINUABLE =
-  'This session can’t be continued — it ended before the agent reported a session id. Your next message starts a new one.'
+  'This agent can’t be continued — it ended before reporting a session id. Your next message starts a new one.'
 
 /** What a send will do from here, in one line — it is not the same thing in all three states. */
 function Note({
@@ -290,6 +290,6 @@ function Note({
       ? 'Session failed — your next message resumes it where it stopped.'
       : outcome?.stopped
         ? 'Session stopped — your next message resumes it.'
-        : 'Session ended — your next message continues it.'
+        : 'Agent ended — your next message continues it.'
   return <p className="mb-2 px-2 text-xs text-muted-foreground">{text}</p>
 }

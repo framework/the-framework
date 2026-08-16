@@ -102,7 +102,7 @@ export function SettingsPage({
           />
           <SelectRow
             label="Run on"
-            description="Where a session executes: this machine, a fresh GitHub Actions runner, or a Claude Code cloud session."
+            description="Where an agent executes: this machine, a fresh GitHub Actions runner, or a Claude Code cloud session."
             value={preferences.target ?? 'local'}
             options={[
               { value: 'local', label: 'This device' },
@@ -122,7 +122,7 @@ export function SettingsPage({
             shown greyed with its reason rather than hidden, since this is where you come to look. */}
         <Section
           title="Run options"
-          description="What a new session starts with. The launcher's gear shows the same options, and a session's own action bar can still change its ending."
+          description="What a new agent starts with. The launcher's gear shows the same options, and an agent's own action bar can still change its ending."
         >
           {runOptions.map(row => (
             <OptionToggleRow key={row.key} row={row} />
@@ -158,13 +158,13 @@ export function SettingsPage({
           />
           <ToggleRow
             label="Human Queue"
-            description="A session awaiting your answer, or a PR ready to review."
+            description="An agent awaiting your answer, or a PR ready to review."
             checked={preferences.notifyHumanIntervention ?? true}
             onChange={next => updatePreferences({ notifyHumanIntervention: next })}
           />
           <ToggleRow
             label="New activity"
-            description="Also ping when a session starts or finishes."
+            description="Also ping when an agent starts or finishes."
             checked={preferences.notifyNewActivity ?? false}
             onChange={next => updatePreferences({ notifyNewActivity: next })}
           />
@@ -194,7 +194,7 @@ export function SettingsPage({
 
         <Section
           title="Claude web"
-          description="A Claude web run hands off and ends, so the questions its session asks never reach this dashboard. The browser bridge carries them back."
+          description="A Claude web agent hands off and ends, so the questions its session asks never reach this dashboard. The browser bridge carries them back."
         >
           <ToggleRow
             label="Browser bridge"

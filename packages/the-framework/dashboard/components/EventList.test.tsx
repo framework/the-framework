@@ -64,7 +64,7 @@ describe('EventList conversation rows', () => {
       />,
     )
     const tail = screen.getByTestId('tail-box')
-    const viewport = screen.getByLabelText('Session output')
+    const viewport = screen.getByLabelText('Agent output')
     expect(viewport.contains(tail)).toBe(true)
     const row = screen.getByText('all done')
     // The tail follows the log rather than floating over it: document order puts it after the rows.
@@ -240,7 +240,7 @@ describe('EventList inline browser rows (#1455 item 6b)', () => {
     render(
       <EventList events={[browser('https://a.test/'), browser('https://b.test/')]} stick={false} projectId="p1" agentId="r1" />,
     )
-    expect(screen.getAllByAltText("The session's browser")).toHaveLength(1)
+    expect(screen.getAllByAltText("The agent's browser")).toHaveLength(1)
     expect(screen.getByText(/browser: https:\/\/a\.test\//)).toBeTruthy()
   })
 
@@ -248,7 +248,7 @@ describe('EventList inline browser rows (#1455 item 6b)', () => {
     render(
       <EventList events={[browser('https://a.test/'), browser('https://a.test/')]} stick={false} projectId="p1" agentId="r1" />,
     )
-    expect(screen.getAllByAltText("The session's browser")).toHaveLength(1)
+    expect(screen.getAllByAltText("The agent's browser")).toHaveLength(1)
     expect(screen.queryByText(/browser: https:\/\/a\.test\//)).toBeNull()
   })
 
@@ -256,13 +256,13 @@ describe('EventList inline browser rows (#1455 item 6b)', () => {
     render(
       <EventList events={[browser('https://a.test/'), { kind: 'end', ok: true }]} stick={false} projectId="p1" agentId="r1" />,
     )
-    expect(screen.queryByAltText("The session's browser")).toBeNull()
+    expect(screen.queryByAltText("The agent's browser")).toBeNull()
     expect(screen.getByText(/browser · https:\/\/a\.test\//)).toBeTruthy()
   })
 
   test('without a agentId the row keeps the formatter text (the read-only relay watch)', () => {
     render(<EventList events={[browser()]} stick={false} projectId="p1" />)
-    expect(screen.queryByAltText("The session's browser")).toBeNull()
+    expect(screen.queryByAltText("The agent's browser")).toBeNull()
     expect(screen.getByText(/browser: https:\/\/app\.test\//)).toBeTruthy()
   })
 

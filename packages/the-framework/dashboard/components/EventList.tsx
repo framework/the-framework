@@ -282,7 +282,7 @@ export function EventList({
   return (
     <MessageScrollerProvider autoScroll={stick} defaultScrollPosition={openAt ?? (stick ? 'end' : 'start')}>
       <MessageScroller className="flex-1">
-        <MessageScrollerViewport aria-label="Session output">
+        <MessageScrollerViewport aria-label="Agent output">
           <MessageScrollerContent className="gap-1 p-4 font-mono text-xs">
             {shown.map((e, i, rows) => {
               const disclosable = disclosableText(e)

@@ -162,7 +162,7 @@ export function StartRunForm({
 
   return (
     <form onSubmit={e => e.preventDefault()} className="p-3">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Start a session</div>
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Start an agent</div>
       <Composer
         ref={composerRef}
         files={files}
@@ -184,7 +184,7 @@ export function StartRunForm({
           )
         }}
         busy={busy}
-        submitLabel="Start session"
+        submitLabel="Start agent"
         submitBusyLabel="Starting…"
         contextControl={
           <ContextMenu

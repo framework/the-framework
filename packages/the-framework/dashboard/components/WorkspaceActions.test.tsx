@@ -56,7 +56,7 @@ describe('WorkspaceActions (#809)', () => {
     fireEvent.click(buttons()[0]!)
     await waitFor(() => expect(sendOpenInApp).toHaveBeenCalledWith('p1', 'files', 'run-1'))
     openEditorMenu()
-    fireEvent.click(screen.getByText("Open this session's checkout"))
+    fireEvent.click(screen.getByText("Open this agent's checkout"))
     await waitFor(() => expect(sendOpenInApp).toHaveBeenCalledWith('p1', 'editor', 'run-1'))
   })
 

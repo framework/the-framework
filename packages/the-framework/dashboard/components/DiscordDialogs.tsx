@@ -21,7 +21,7 @@ import { usePreferences, updatePreferences, discordEnabled } from '../lib/prefer
 
 /** What the Discord webhook is, in one line. Shown on the checklist row and inside the dialog. */
 export const DISCORD_WEBHOOK_DESCRIPTION =
-  'Delivers notifications to Discord, so a session waiting on you reaches you with no dashboard open.'
+  'Delivers notifications to Discord, so an agent waiting on you reaches you with no dashboard open.'
 
 /** What both dialogs take from their host: what the daemon holds, and a reload for after a save. */
 interface DialogProps {

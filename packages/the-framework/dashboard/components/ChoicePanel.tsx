@@ -165,7 +165,7 @@ export function ChoicePanel({
 
       <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
         {parked ? (
-          <span role="status">{busy ? 'Sending your choice…' : 'Choice sent — waiting for the session to pick it up…'}</span>
+          <span role="status">{busy ? 'Sending your choice…' : 'Choice sent — waiting for the agent to pick it up…'}</span>
         ) : (
           <>{active && <span className="ml-auto">Ctrl+Enter to accept</span>}</>
         )}

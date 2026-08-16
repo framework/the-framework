@@ -229,7 +229,7 @@ export function SessionActionsMenu({
 
           {active && (
             <DropdownMenuItem disabled={stopping} onClick={() => void stopSession()}>
-              <Square className="h-3 w-3 shrink-0 fill-current" /> {stopping ? 'Stopping…' : 'Stop session'}
+              <Square className="h-3 w-3 shrink-0 fill-current" /> {stopping ? 'Stopping…' : 'Stop agent'}
             </DropdownMenuItem>
           )}
           {/* The user's Merge (#1391): the human authorization the merge gate (#1363) otherwise
@@ -261,7 +261,7 @@ export function SessionActionsMenu({
         <ConfirmDialog
           open={confirmDelete}
           onOpenChange={setConfirmDelete}
-          title="Delete this session?"
+          title="Delete this agent?"
           body={
             <>
               Deleting <span className="font-medium text-foreground">{name}</span> removes it from the dashboard for good — its
@@ -270,7 +270,7 @@ export function SessionActionsMenu({
           }
           confirmLabel="Delete"
           confirmBusyLabel="Deleting…"
-          fallbackError="Could not delete the session."
+          fallbackError="Could not delete the agent."
           onConfirm={() => sendDeleteSession(projectId, agentId).then(result => (result.ok ? result : Promise.reject(new Error(result.error))))}
           onSuccess={onDeleted}
         />

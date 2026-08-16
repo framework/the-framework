@@ -82,7 +82,7 @@ export function WorkspaceActions({
         >
           <FolderOpen className="h-3.5 w-3.5" />
         </TooltipTrigger>
-        <TooltipContent>{agentId ? "Open this session's folder" : 'Open folder'} (Finder / Explorer)</TooltipContent>
+        <TooltipContent>{agentId ? "Open this agent's folder" : 'Open folder'} (Finder / Explorer)</TooltipContent>
       </Tooltip>
       <DropdownMenu>
         <Tooltip>
@@ -103,7 +103,7 @@ export function WorkspaceActions({
         <DropdownMenuContent align="end" className="min-w-[15rem]">
           <DropdownMenuItem disabled={busy} onClick={() => void open('editor')}>
             <Code className="h-3.5 w-3.5 shrink-0" />
-            {agentId ? "Open this session's checkout" : 'Open in your editor'}
+            {agentId ? "Open this agent's checkout" : 'Open in your editor'}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>

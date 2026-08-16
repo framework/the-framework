@@ -114,10 +114,10 @@ export function HandoffArm({
         label={pushOnly ? 'Push branch' : merges ? 'Open PR & merge' : 'Open PR'}
         title={
           pushOnly
-            ? "Push this session's branch to origin when it finishes. Set to push only, so no pull request is opened."
+            ? "Push this agent's branch to origin when it finishes. Set to push only, so no pull request is opened."
             : merges
-              ? 'Open a pull request when this session finishes and merge it once it is open, pushing the branch on the way.'
-              : 'Open a draft pull request when this session finishes, pushing the branch on the way.'
+              ? 'Open a pull request when this agent finishes and merge it once it is open, pushing the branch on the way.'
+              : 'Open a draft pull request when this agent finishes, pushing the branch on the way.'
         }
         checked={shown !== 'local'}
         disabled={busy}
@@ -258,7 +258,7 @@ export function RunHandoffDetails({ handoff }: { handoff: AgentHandoff | null })
   return (
     <section
       className={cn('grid gap-3 border-b border-border px-4 py-3 text-xs', sections > 1 && 'sm:grid-cols-2')}
-      aria-label="Session handoff"
+      aria-label="Agent handoff"
     >
       {handoff.commits.length > 0 && <Commits handoff={handoff} />}
       {handoff.files.length > 0 && <Files handoff={handoff} />}

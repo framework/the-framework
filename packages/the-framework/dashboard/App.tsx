@@ -334,8 +334,8 @@ export function App() {
         return <AgentView projectId={projectId} agentId={agentId} events={events} live label={runStart.intent || undefined} projectName={projectName} remoteLabel={agentId === runStart.id ? runStart.runsOn : undefined} files={files} addContext={addContext} removeContext={removeContext} lost={lost} onRunStarted={onRunStarted} />
       return (
         <NotFound
-          title="This session is gone"
-          detail="It is not in this project's sessions. A session disappears when its worktree is removed."
+          title="This agent is gone"
+          detail="It is not in this project's agents. An agent disappears when its worktree is removed."
           actionLabel="Back to the project"
           onAction={() => selectRun(null)}
         />

@@ -82,7 +82,7 @@ export function TicketsPage({
   const { busy, error, run } = useAction()
   const startPlan = async (projectId: string, file: string) => {
     const prompt = planPrompt(file)
-    const result = await run(() => sendStart(projectId, prompt, 'prompt'), 'The planning session could not be started.')
+    const result = await run(() => sendStart(projectId, prompt, 'prompt'), 'The planning agent could not be started.')
     if (result?.ok) onRunStarted?.(projectId, prompt, result.agentId)
   }
   // Unattended with the ticket named on the options, exactly as the panel's own start column does.
@@ -90,7 +90,7 @@ export function TicketsPage({
     const prompt = workOnTicketPrompt(file)
     const result = await run(
       () => sendStart(projectId, prompt, 'prompt', { unattended: true, ticket: `tickets/${file}` }),
-      'The work session could not be started.',
+      'The work agent could not be started.',
     )
     if (result?.ok) onRunStarted?.(projectId, prompt, result.agentId)
   }

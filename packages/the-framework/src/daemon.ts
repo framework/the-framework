@@ -174,7 +174,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // no-op Stop. Reconcile them to `stopped` across every registered project at boot.
   for (const record of await listProjects(undefined, env).catch(() => [])) {
     const fixed = await reconcileOrphanedAgents(record.path).catch(() => 0)
-    if (fixed > 0) console.log(`[framework] reconciled ${fixed} orphaned session(s) in ${basename(record.path)}`)
+    if (fixed > 0) console.log(`[framework] reconciled ${fixed} orphaned agent(s) in ${basename(record.path)}`)
   }
 
   // Everything the dashboard drives per project — run spawning, project install, and app
@@ -274,11 +274,11 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // are orphans nothing tracks; stopped here they keep their worktree and branch, so the dashboard
   // can continue them on the next start.
   const stopped = await runtime.stopRuns().catch(() => 0)
-  if (stopped > 0) console.log(`[framework] stopped ${stopped} session(s)`)
+  if (stopped > 0) console.log(`[framework] stopped ${stopped} agent(s)`)
   // Now that the runs' last events are on disk, commit their archives (#912/#1179) — otherwise an
   // uncommitted session sits until a human notices, which is the gap that service exists to close.
   const committed = await services.flushSessions()
-  if (committed > 0) console.log(`[framework] committed sessions in ${committed} project(s)`)
+  if (committed > 0) console.log(`[framework] committed agent archives in ${committed} project(s)`)
   // Stopped here as well as by the dashboard: a broken install serves 503s without ever taking
   // ownership of the source we handed in, and that poller would go on reading by itself.
   quota.stop()

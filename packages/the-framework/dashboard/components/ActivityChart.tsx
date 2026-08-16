@@ -21,14 +21,14 @@ export function ActivityChart({ data }: { data: ActivityDay[] }) {
   const total = data.reduce((sum, d) => sum + d.count, 0)
   const active = hover !== null ? data[hover] : null
 
-  const agents = (n: number) => `${n} session${n === 1 ? '' : 's'}`
+  const agents = (n: number) => `${n} agent${n === 1 ? '' : 's'}`
   // Say "today" only when the last column is actually today — a stale board must not claim it.
   const lastDate = data[data.length - 1]?.date
   const endLabel = lastDate === localDateKey(new Date()) ? 'today' : lastDate?.slice(5)
 
   return (
     <div>
-      <div role="img" aria-label={`Session activity: ${agents(total)} in ${data.length} days`} className="flex h-32 items-end gap-[3px]">
+      <div role="img" aria-label={`Agent activity: ${agents(total)} in ${data.length} days`} className="flex h-32 items-end gap-[3px]">
         {data.map((d, i) => (
           <div
             key={d.date}

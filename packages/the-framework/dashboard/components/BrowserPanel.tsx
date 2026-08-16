@@ -118,7 +118,7 @@ export function BrowserPanel({
         <img
           ref={img}
           src={`${base}/stream?r=${attempt}`}
-          alt="The session's browser"
+          alt="The agent's browser"
           tabIndex={0}
           className={`cursor-crosshair focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
             inline ? 'max-h-full max-w-full' : 'w-full rounded border border-border bg-muted'

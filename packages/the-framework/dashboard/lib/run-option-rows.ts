@@ -76,9 +76,9 @@ export function runOptionRows(preferences: Preferences): RunOptionRows {
     {
       ...flag('vanilla'),
       label: 'Disable system prompt',
-      description: 'Drops the added system prompt; keeps the session controls.',
+      description: 'Drops the added system prompt; keeps the agent controls.',
       title:
-        "Remove the built-in system prompt but keep the framework's session controls. For a fully raw session, use Transparent. Expand 'Enhanced System Prompt' to read what it removes.",
+        "Remove the built-in system prompt but keep the framework's own controls. For a fully raw agent, use Transparent. Expand 'Enhanced System Prompt' to read what it removes.",
       checked: vanilla && !transparent,
       ...overriddenByTransparent(transparent),
     },
@@ -86,7 +86,7 @@ export function runOptionRows(preferences: Preferences): RunOptionRows {
       ...flag('onBeforeMergeableQuality'),
       label: 'Post-merge cleanup',
       description: 'Runs quality passes once it is ready to merge.',
-      title: "When the session signals it's ready for merge, run maintainability, readability, and security-audit passes",
+      title: "When the agent signals it's ready for merge, run maintainability, readability, and security-audit passes",
       checked: onBeforeMergeableQuality && !transparent,
       ...overriddenByTransparent(transparent),
     },
@@ -107,8 +107,8 @@ export function runOptionRows(preferences: Preferences): RunOptionRows {
     {
       key: 'push',
       label: 'Push branch',
-      description: 'Pushes the session branch when it finishes.',
-      title: "Push the session's branch to the remote when it finishes. The bottom rung: with this off the session publishes nothing, and neither PR nor merge can run",
+      description: 'Pushes the agent branch when it finishes.',
+      title: "Push the agent's branch to the remote when it finishes. The bottom rung: with this off the agent publishes nothing, and neither PR nor merge can run",
       checked: handoffReaches(handoff, 'push'),
       patch: checked => ({ handoff: checked ? 'push' : 'local' }),
     },
@@ -116,7 +116,7 @@ export function runOptionRows(preferences: Preferences): RunOptionRows {
       key: 'pr',
       label: 'Open PR',
       description: 'Opens a draft pull request when it finishes.',
-      title: 'Open a draft pull request when the session finishes, pushing the branch on the way. Draft, so it does not request review; it still shows on the needs-you queue',
+      title: 'Open a draft pull request when the agent finishes, pushing the branch on the way. Draft, so it does not request review; it still shows on the needs-you queue',
       checked: handoffReaches(handoff, 'pr'),
       patch: checked => ({ handoff: checked ? 'pr' : 'push' }),
       ...(handoffReaches(handoff, 'push')
@@ -131,7 +131,7 @@ export function runOptionRows(preferences: Preferences): RunOptionRows {
       label: 'Auto-merge',
       description: 'Merges the pull request once it is opened.',
       title:
-        'Merge the pull request the session opens: GitHub auto-merge where the repo allows it, so it lands when checks pass; merged directly otherwise',
+        'Merge the pull request the agent opens: GitHub auto-merge where the repo allows it, so it lands when checks pass; merged directly otherwise',
       checked: handoffReaches(handoff, 'merge'),
       patch: checked => ({ handoff: checked ? 'merge' : 'pr' }),
       ...(handoffReaches(handoff, 'pr')

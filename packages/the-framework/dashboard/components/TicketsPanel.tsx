@@ -239,7 +239,7 @@ export function TicketRow({
             >
               <ClipboardPlus className="h-4 w-4" aria-hidden />
             </TooltipTrigger>
-            <TooltipContent>Plan this ticket — starts a session to write its plan</TooltipContent>
+            <TooltipContent>Plan this ticket — starts an agent to write its plan</TooltipContent>
           </Tooltip>
         )}
       </div>
@@ -325,13 +325,13 @@ export function TicketsPanel({
   // Attended, unlike the imports above: a plan is written per-ticket for a human to read and act
   // on, so the session stays a conversation you land in and steer rather than one that settles and
   // hands itself off. The reader reviews the result through the plan column's link.
-  const startPlan = (file: string) => startSession(planPrompt(file), 'The planning session could not be started.')
+  const startPlan = (file: string) => startSession(planPrompt(file), 'The planning agent could not be started.')
   // The start column (#855's play button, on the backlog): one agent on this one ticket is the
   // same work the drain sweep starts, so it runs the same way — unattended (#1279), ending at
   // settle with its armed handoff. `ticket` rides on the options so the run's meta names what it
   // implements (#1117) — the prompt is not the drain preset, so the daemon would not infer it.
   const startWork = (file: string) =>
-    startSession(workOnTicketPrompt(file), 'The work session could not be started.', { unattended: true, ticket: `tickets/${file}` })
+    startSession(workOnTicketPrompt(file), 'The work agent could not be started.', { unattended: true, ticket: `tickets/${file}` })
 
   if (tickets.length === 0 && hiddenByFilter > 0) {
     // Filtered to nothing, not genuinely empty (#1144/#1230): offering an import here would ask

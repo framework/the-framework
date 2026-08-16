@@ -1,4 +1,4 @@
-The selected project's session list — live and archived — refreshed every couple of seconds and shared by the sessions rail and the main pane so both read one list, and able to tell a session that is gone from one not read yet, so a bookmarked session link never flashes "gone" while the first read is still out.
+The selected project's agent list — live and archived — refreshed every couple of seconds and shared by the agents rail and the main pane so both read one list, and able to tell an agent that is gone from one not read yet, so a bookmarked link never flashes "gone" while the first read is still out.
 
 ## Before writing SPEC.md files
 

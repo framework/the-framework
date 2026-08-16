@@ -65,14 +65,14 @@ describe('AgentView event source (#1026/#1383)', () => {
     render(view())
     await waitFor(() => expect(onRun).toHaveBeenCalledWith('p1', 'run-1'))
     expect(screen.getByText(/the channel delivered this line/)).toBeTruthy()
-    expect(screen.queryByText('This session has no events.')).toBeNull()
+    expect(screen.queryByText('This agent has no events.')).toBeNull()
   })
 
   test('a finished run with nothing anywhere still says it has no events', async () => {
     onRun.mockResolvedValue([])
     render(view({ events: [] }))
     await waitFor(() => expect(onRun).toHaveBeenCalledWith('p1', 'run-1'))
-    await waitFor(() => expect(screen.getByText('This session has no events.')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('This agent has no events.')).toBeTruthy())
   })
 
   test('a stale archive never hides a resumed leg: the channel wins the moment it knows more (#1460)', async () => {

@@ -449,7 +449,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         await restoreArchivedAgent(projectCwd, path, agentId).catch(() => false)
         return { cwd: path, agentId }
       } catch (err) {
-        console.log(`[framework] could not continue session ${agentId} (${errorMessage(err)}); starting a new one`)
+        console.log(`[framework] could not continue agent ${agentId} (${errorMessage(err)}); starting a new one`)
         return undefined
       }
     })
@@ -588,7 +588,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     if (!isTransientRunFailure(detail)) return
     runRetries.set(agentId, attempts + 1)
     console.log(
-      `[framework] session ${agentId} died to a transient error (${detail}); continuing it in ${(retryDelayMs ?? TRANSIENT_RETRY_DELAY_MS) / 1000}s, attempt ${attempts + 1} of ${MAX_TRANSIENT_RETRIES}`,
+      `[framework] agent ${agentId} died to a transient error (${detail}); continuing it in ${(retryDelayMs ?? TRANSIENT_RETRY_DELAY_MS) / 1000}s, attempt ${attempts + 1} of ${MAX_TRANSIENT_RETRIES}`,
     )
     // Unref'd: a pending retry must never hold the daemon open, and a daemon that exits first
     // simply does not retry — #923's resume owns the restart case.
@@ -605,7 +605,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         },
         targetProjectId,
       ).then(result => {
-        if (!result.ok) console.log(`[framework] could not continue session ${agentId} after its transient death: ${result.error}`)
+        if (!result.ok) console.log(`[framework] could not continue agent ${agentId} after its transient death: ${result.error}`)
       })
     }, retryDelayMs ?? TRANSIENT_RETRY_DELAY_MS)
     timer.unref?.()

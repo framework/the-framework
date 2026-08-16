@@ -2,12 +2,13 @@
 // `/{projectId}/{sessionId}` one session. The URL is the selection — what used to be three pieces
 // of React state guessing at each other, which is where the #761/#766/#768/#774 bugs came from.
 //
-// `sessionId` is the run id (`AgentMeta.id`), not the agent's conversation id: only the run id is
-// ours, stable, and already the name of the run's worktree directory. The URL-facing spelling is
-// "session" because that is the user-facing word for a run (#771).
+// `sessionId` is the agent id (`AgentMeta.id`), not the agent's conversation id with its driver:
+// only the agent id is ours, stable, and already the name of its worktree directory. The URL
+// carries the id, never the word, so the segment's name here is the last "session" left of #771 —
+// the buttons above it say agent (D5).
 //
-// Both ids are URL-safe by construction (the registry derives a project id from its path, a run id
-// from its start time), so the segments are still encoded/decoded — a URL typed by hand is input.
+// Both ids are URL-safe by construction (the registry derives a project id from its path, an agent
+// id from its start time), so the segments are still encoded/decoded — a URL typed by hand is input.
 
 /**
  * The one first segment that names a view rather than a project (#958).

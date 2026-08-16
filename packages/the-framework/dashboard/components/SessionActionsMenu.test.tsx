@@ -98,7 +98,7 @@ describe('SessionActionsMenu (#toolbar-menu)', () => {
     openMenu()
     fireEvent.click(await screen.findByText('Delete session'))
     // The confirm dialog, not a bare delete: the session and its history go for good.
-    await waitFor(() => expect(screen.getByText('Delete this session?')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Delete this agent?')).toBeTruthy())
     expect(sendDeleteSession).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(sendDeleteSession).toHaveBeenCalledWith('p1', 'run-1'))
@@ -111,7 +111,7 @@ describe('the two live-session actions: Stop and Merge (#1391)', () => {
   test('a live session offers Stop and Merge side by side', async () => {
     render(<SessionActionsMenu projectId="p1" agentId="run-1" events={liveEvents} onDeleted={vi.fn()} />)
     openMenu()
-    await waitFor(() => expect(screen.getByText('Stop session')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Stop agent')).toBeTruthy())
     expect(screen.getByText('Merge when finished')).toBeTruthy()
   })
 
@@ -128,7 +128,7 @@ describe('the two live-session actions: Stop and Merge (#1391)', () => {
     render(<SessionActionsMenu projectId="p1" agentId="run-1" events={ended} onDeleted={vi.fn()} />)
     openMenu()
     await waitFor(() => expect(screen.getByText('Open in editor')).toBeTruthy())
-    expect(screen.queryByText('Stop session')).toBeNull()
+    expect(screen.queryByText('Stop agent')).toBeNull()
     expect(screen.queryByText('Merge when finished')).toBeNull()
   })
 })

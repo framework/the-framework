@@ -92,7 +92,7 @@ const ACTIVITY: NotificationSpec<Activity> = {
   pickNew: pickNewActivity,
   keyOf: activityKey,
   title: (first, count) =>
-    count === 1 ? `${first.kind === 'started' ? 'Session started' : 'Session finished'} · ${first.projectName}` : `${count} session updates`,
+    count === 1 ? `${first.kind === 'started' ? 'Agent started' : 'Agent finished'} · ${first.projectName}` : `${count} agent updates`,
   label: item => `${item.kind === 'started' ? 'Started' : 'Finished'}: ${item.title ?? 'a session'}`,
   // Activity lives in this dashboard (no external URL like a PR) — the runs rail takes it from there.
   clickUrl: () => undefined,

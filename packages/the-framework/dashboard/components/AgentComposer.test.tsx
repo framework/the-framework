@@ -69,12 +69,12 @@ describe('AgentComposer slot control (#1455)', () => {
   test('a live session offers Stop in the slot, and pressing it stops this run', async () => {
     sendStop.mockResolvedValue(undefined)
     renderComposer()
-    const stop = screen.getByRole('button', { name: 'Stop session' })
+    const stop = screen.getByRole('button', { name: 'Stop agent' })
     fireEvent.click(stop)
     await waitFor(() => expect(sendStop).toHaveBeenCalledWith('p1', 'run-1'))
     // A landed Stop must not be re-fireable while the end event is still in flight: the button
     // stays disabled ("Stopping…") until `live` flips — the ⋮ menu's own latch.
-    await waitFor(() => expect((screen.getByRole('button', { name: 'Stop session' }) as HTMLButtonElement).disabled).toBe(true))
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Stop agent' }) as HTMLButtonElement).disabled).toBe(true))
   })
 
   test('the Stopping… latch releases when the stop lands, so a resumed run gets a working Stop again', async () => {
@@ -85,11 +85,11 @@ describe('AgentComposer slot control (#1455)', () => {
       <AgentComposer projectId="p1" agentId="run-1" live={live} files={[]} addContext={vi.fn()} />
     )
     const { rerender } = render(ui(true))
-    fireEvent.click(screen.getByRole('button', { name: 'Stop session' }))
-    await waitFor(() => expect((screen.getByRole('button', { name: 'Stop session' }) as HTMLButtonElement).disabled).toBe(true))
+    fireEvent.click(screen.getByRole('button', { name: 'Stop agent' }))
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Stop agent' }) as HTMLButtonElement).disabled).toBe(true))
     rerender(ui(false)) // the end lands: the run is no longer live
     rerender(ui(true)) // the resume brings the same run back
-    expect((screen.getByRole('button', { name: 'Stop session' }) as HTMLButtonElement).disabled).toBe(false)
+    expect((screen.getByRole('button', { name: 'Stop agent' }) as HTMLButtonElement).disabled).toBe(false)
   })
 
   test('a stopped session offers Resume, sending the stock continuation of this run (#1391)', async () => {
@@ -110,14 +110,14 @@ describe('AgentComposer slot control (#1455)', () => {
     sendStart.mockResolvedValue({ ok: false, busy: true })
     const { onRunStarted } = renderComposer({ live: false, sessionId: 'sess-1', outcome: { ok: false, stopped: true } })
     fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
-    await waitFor(() => expect(screen.getByText(/session is already active/i)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/agent is already active/i)).toBeTruthy())
     expect(onRunStarted).not.toHaveBeenCalled()
   })
 
   test('a run that finished on its own offers neither — there is nothing to pick back up', () => {
     renderComposer({ live: false, sessionId: 'sess-1', outcome: { ok: true, stopped: false } })
     expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Stop session' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Stop agent' })).toBeNull()
   })
 
   test('a stopped run that never reported a session id cannot offer Resume (#1322)', () => {
@@ -139,7 +139,7 @@ describe('AgentComposer slot control (#1455)', () => {
     // The run reads live: the latch releases and the slot hands over to Stop.
     rerender(<AgentComposer {...base} live outcome={undefined} />)
     expect(screen.queryByRole('button', { name: 'Resume' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Stop session' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Stop agent' })).toBeTruthy()
   })
 })
 
@@ -175,7 +175,7 @@ describe('AgentComposer, live (#714)', () => {
     sendStart.mockResolvedValue({ ok: false, busy: true })
     const { onRunStarted } = renderComposer()
     fireEvent.click(screen.getByText('submit-new-session'))
-    await waitFor(() => expect(screen.getByText(/session is already active/i)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/agent is already active/i)).toBeTruthy())
     expect(onRunStarted).not.toHaveBeenCalled()
   })
 })
@@ -234,7 +234,7 @@ describe('AgentComposer, finished (#720)', () => {
     sendStart.mockResolvedValue({ ok: false, busy: true })
     const { onRunStarted } = renderComposer(ended)
     fireEvent.click(screen.getByText('submit-normal'))
-    await waitFor(() => expect(screen.getByText(/session is already active/i)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText(/agent is already active/i)).toBeTruthy())
     expect(onRunStarted).not.toHaveBeenCalled()
   })
 })

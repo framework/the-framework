@@ -131,7 +131,7 @@ function HumanQueue({
                       <span className="truncate text-sm font-medium">{item.title}</span>
                       <span className="ml-auto shrink-0 text-xs text-muted-foreground">{item.projectName}</span>
                     </TooltipTrigger>
-                    <TooltipContent>Open the session to answer</TooltipContent>
+                    <TooltipContent>Open the agent to answer</TooltipContent>
                   </Tooltip>
                 ) : item.kind === 'unpushed' ? (
                   <Tooltip>

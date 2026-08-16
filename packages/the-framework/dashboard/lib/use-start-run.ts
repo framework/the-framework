@@ -26,12 +26,12 @@ export function useStartRun(): {
     text: string,
     kind: StartArgs[2],
     options: StartArgs[3],
-    fallback = 'Failed to start the session.',
+    fallback = 'Failed to start the agent.',
   ) => {
     const result = await run(async () => {
       const outcome = await sendStart(projectId, text, kind, options)
       // The daemon's refusal is phrased for its own log; give the dashboard its words.
-      if (!outcome.ok && outcome.busy) return { ...outcome, error: 'A session is already active for this project.' }
+      if (!outcome.ok && outcome.busy) return { ...outcome, error: 'An agent is already active for this project.' }
       return outcome
     }, fallback)
     return result?.ok ? result : undefined

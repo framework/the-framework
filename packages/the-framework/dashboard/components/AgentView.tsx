@@ -227,7 +227,7 @@ export function AgentView({
       {/* Nothing to show yet is not the same thing in both states: a live run is waiting for its
           first event, a finished one is still reading its log. */}
       {!live && archived === null && shown.length === 0 ? (
-        <div className="grid flex-1 place-items-center text-sm text-muted-foreground">Loading session…</div>
+        <div className="grid flex-1 place-items-center text-sm text-muted-foreground">Loading agent…</div>
       ) : (
         // A finished log is static, so it does not follow new output; it opens at the end, where
         // the outcome, the final spend and the last changes are (#948). "Live" for the scroll
@@ -243,7 +243,7 @@ export function AgentView({
           showName={false}
           showStatus={false}
           lost={lost}
-          {...(feedLive ? {} : { stick: false, openAt: 'end' as const, emptyLabel: 'This session has no events.' })}
+          {...(feedLive ? {} : { stick: false, openAt: 'end' as const, emptyLabel: 'This agent has no events.' })}
           // A web run's log dead-ends at the hand-off (#1265): the mirror box rides the tail of
           // the scroller, where "and then…" belongs. Self-nulling for every other target.
           tail={<CloudMirrorRow target={target} events={shown} />}

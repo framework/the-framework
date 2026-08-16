@@ -228,7 +228,7 @@ export function AgentHistory({
                 when the list is empty (#1147): the heading is what makes "No sessions yet." read as
                 the state of this list rather than a lonely line in the sidebar. */}
             <div className="sticky top-0 z-10">
-              <SidebarGroupLabel className="rounded-none bg-background font-normal tracking-wide text-muted-foreground">Recent sessions</SidebarGroupLabel>
+              <SidebarGroupLabel className="rounded-none bg-background font-normal tracking-wide text-muted-foreground">Recent agents</SidebarGroupLabel>
               {/* Absolute (hanging just below the label) so it does not push the first row down; it
                   still overlays the rows scrolling up under it. `rail-fade` keeps it invisible at
                   the top of the scroll (so it never dims the first row) and fades it in on scroll. */}
@@ -263,7 +263,7 @@ export function AgentHistory({
                 ))}
               </SidebarMenu>
               {!hasRecents && (
-                <p className="whitespace-nowrap px-2 py-1 text-sm text-muted-foreground">No sessions yet.</p>
+                <p className="whitespace-nowrap px-2 py-1 text-sm text-muted-foreground">No agents yet.</p>
               )}
             </SidebarGroupContent>
           </SidebarGroup>
@@ -457,7 +457,7 @@ function NewButton({
     return (
       <Button variant="ghost" className={cls} onClick={() => start(target)}>
         <Plus className="h-4 w-4 shrink-0" />
-        <span className="whitespace-nowrap">New session</span>
+        <span className="whitespace-nowrap">New agent</span>
       </Button>
     )
   }
@@ -469,9 +469,9 @@ function NewButton({
         <Tooltip>
           <TooltipTrigger render={<Button variant="ghost" className={cls} onClick={() => setAdding(true)} />}>
             <Plus className="h-4 w-4 shrink-0" />
-            <span className="whitespace-nowrap">New session</span>
+            <span className="whitespace-nowrap">New agent</span>
           </TooltipTrigger>
-          <TooltipContent>Add a project to start a session</TooltipContent>
+          <TooltipContent>Add a project to start an agent</TooltipContent>
         </Tooltip>
         {adding && <AddProjectPanel onAdded={() => onProjectAdded?.()} onClose={() => setAdding(false)} />}
       </>
@@ -481,9 +481,9 @@ function NewButton({
   // Several projects: pick which one the new session agents in.
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger aria-label="New session" className={cn(buttonVariants({ variant: 'ghost' }), cls)}>
+      <DropdownMenuTrigger aria-label="New agent" className={cn(buttonVariants({ variant: 'ghost' }), cls)}>
         <Plus className="h-4 w-4 shrink-0" />
-        <span className="whitespace-nowrap">New session</span>
+        <span className="whitespace-nowrap">New agent</span>
         <ChevronDown className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[13.5rem]">
@@ -557,7 +557,7 @@ function RunRow({
     const el = titleRef.current
     if (el) setOverflowing(el.scrollWidth > el.clientWidth + 1)
   }, [intent])
-  const titleText = intent || 'New session'
+  const titleText = intent || 'New agent'
   const titleClass = cn('rail-title w-full px-2 text-sm font-normal', overflowing && 'is-overflowing')
   return (
     <Button

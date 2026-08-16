@@ -190,7 +190,7 @@ test('opening a PR pushes first and returns the URL gh printed', async () => {
       },
     },
   )
-  assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/12' })
+  assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/12', number: 12 })
   assert.deepEqual(pushes, [['push', '--set-upstream', 'origin', 'the-framework/x']])
   const args = ghCalls[0] ?? []
   assert.deepEqual(args.slice(0, 4), ['pr', 'create', '--head', 'the-framework/x'])
@@ -320,7 +320,7 @@ test('an armed session opens a DRAFT PR, and pushes on the way (#1102)', async (
       },
     },
   )
-  assert.deepEqual(outcome, { outcome: 'done', pushed: true, url: 'https://github.com/o/r/pull/9' })
+  assert.deepEqual(outcome, { outcome: 'done', pushed: true, url: 'https://github.com/o/r/pull/9', number: 9 })
   // The draft flag is the whole reason this is safe to fire on every session: without it every
   // finished run would put a review request in someone's inbox.
   assert.ok(gh[0]?.includes('--draft'), `expected --draft in ${JSON.stringify(gh[0])}`)
@@ -391,7 +391,7 @@ test('a session that kept working after its PR merged gets a fresh PR (#1512)', 
     },
   )
   assert.equal(gh[0]?.[1], 'create')
-  assert.deepEqual(outcome, { outcome: 'done', pushed: true, url: 'https://github.com/o/r/pull/1513' })
+  assert.deepEqual(outcome, { outcome: 'done', pushed: true, url: 'https://github.com/o/r/pull/1513', number: 1513 })
 })
 
 test('a merged PR whose head is still the branch tip means everything landed (#1512)', async () => {
@@ -451,6 +451,7 @@ test('an armed merge follows the PR it just opened (#1216)', async () => {
     outcome: 'done',
     pushed: true,
     url: 'https://github.com/o/r/pull/9',
+    number: 9,
     merge: { outcome: 'auto-armed' },
   })
 })
@@ -739,38 +740,50 @@ test('a gone branch still reports its PR: it is a remote question (#1255)', asyn
   assert.equal(handoff?.pr?.number, 1254)
 })
 
-test('resolveRunPr finds a web run through its run-id branch when the session-name branch is a reused pin (#1251)', async () => {
-  const asked: string[] = []
-  const stale = { number: 1177, url: 'u1177', state: 'MERGED', title: 'old triage', createdAt: '2026-07-25T16:55:18Z' }
-  const own = { number: 1249, url: 'u1249', state: 'OPEN', title: 'this triage', createdAt: '2026-07-26T21:35:13Z' }
-  const prs = async (_cwd: string, branch: string) => {
+test('resolveRunPr reads the PR the run recorded, and asks gh only for its state (E6)', async () => {
+  // The number is a fact about the run, written down when the PR was opened. It used to be
+  // re-derived from three candidate branch names filtered by the run's start time — a guess
+  // assembled at read time, standing in for one integer nobody had recorded.
+  const asked: (string | undefined)[] = []
+  const prs = async (_cwd: string, branch?: string) => {
     asked.push(branch)
-    if (branch === 'the-framework/triage-quick') return { value: [stale], pending: false }
-    if (branch === 'the-framework/run-2026-07-26T21-17-39-507Z') return { value: [own], pending: false }
-    return { value: [], pending: false }
+    return { value: { number: 1249, url: 'u1249', state: 'MERGED', title: 'this triage' }, pending: false }
   }
-  const found = await resolveRunPr('/repo', { id: '2026-07-26T21-17-39-507Z', sessionName: 'triage-quick' }, prs)
+  const found = await resolveRunPr('/repo', { id: 'r1', branch: 'feat/mine', pr: { number: 1249, url: 'u1249' } }, prs)
   assert.equal(found.value?.number, 1249)
-  assert.deepEqual(asked, ['the-framework/triage-quick', 'the-framework/run-2026-07-26T21-17-39-507Z'])
+  assert.equal(found.value?.state, 'MERGED', 'the state is read live, since it changes without the run doing anything')
+  assert.deepEqual(asked, ['feat/mine'], 'one branch, not a ladder of candidates')
 })
 
-test('resolveRunPr prefers the recorded branch and stops at the first hit', async () => {
-  const asked: string[] = []
-  const prs = async (_cwd: string, branch: string) => {
-    asked.push(branch)
-    return { value: [{ number: 5, url: 'u5', state: 'OPEN', title: 'mine' }], pending: false }
-  }
-  const found = await resolveRunPr('/repo', { id: 'r1', branch: 'feat/mine', sessionName: 'named' }, prs)
-  assert.equal(found.value?.number, 5)
-  assert.deepEqual(asked, ['feat/mine'])
-})
-
-test('resolveRunPr reports pending only while nothing was found and a lookup is still running', async () => {
-  const prs = async (_cwd: string, branch: string) =>
-    branch === 'the-framework/run-r1' ? { value: undefined, pending: true } : { value: [], pending: false }
-  const found = await resolveRunPr('/repo', { id: 'r1', sessionName: 'named' }, prs)
+test('resolveRunPr answers nothing for a run that recorded no PR (E6)', async () => {
+  let asked = 0
+  const found = await resolveRunPr('/repo', { id: 'r1', sessionName: 'named' }, async () => {
+    asked++
+    return { value: undefined, pending: false }
+  })
   assert.equal(found.value, undefined)
-  assert.equal(found.pending, true)
+  assert.equal(found.pending, false)
+  assert.equal(asked, 0, 'and costs no gh read at all')
+})
+
+test('a recorded PR the live read cannot confirm still answers with its number and url (E6)', async () => {
+  // A branch this machine cannot see — a hands-off web run's, or one already deleted after merge.
+  // The recorded fact is the answer; only its state is unknown.
+  const found = await resolveRunPr('/repo', { id: 'r1', pr: { number: 42, url: 'u42' } }, async () => ({
+    value: undefined,
+    pending: false,
+  }))
+  assert.equal(found.value?.number, 42)
+  assert.equal(found.value?.url, 'u42')
+  assert.equal(found.value?.state, 'UNKNOWN')
+})
+
+test('a different PR on the branch is not this run’s answer (E6)', async () => {
+  const found = await resolveRunPr('/repo', { id: 'r1', pr: { number: 42, url: 'u42' } }, async () => ({
+    value: { number: 99, url: 'u99', state: 'OPEN', title: 'someone else’s' },
+    pending: false,
+  }))
+  assert.equal(found.value?.number, 42, 'the recorded number wins over whatever is on the branch now')
 })
 
 test('withheldMerge authorizes only a declared-done session with an empty session TODO (#1363)', () => {
@@ -811,31 +824,26 @@ test("the Merge action merges the session's open PR, marking a draft ready on th
   const gh: string[][] = []
   const result = await mergeSessionPr(
     '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
+    { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'https://github.com/o/r/pull/7' } },
     {
-      prs: async () => ({ value: [{ number: 7, url: 'https://github.com/o/r/pull/7', state: 'OPEN', title: 'x' }], pending: false }),
+      prs: async () => ({ value: { number: 7, url: 'https://github.com/o/r/pull/7', state: 'OPEN', title: 'x' }, pending: false }),
       gh: async args => (gh.push(args), ''),
     },
   )
   // ghMergePr's ladder: auto-merge first, so the PR lands when its checks pass. The draft case
   // (gh refuses, `pr ready`, retry) is ghMergePr's own tested behavior and rides along here.
   assert.deepEqual(gh[0], ['pr', 'merge', '7', '--squash', '--auto'])
-  assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/7' })
+  assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/7', number: 7 })
 })
 
 test('the Merge action refuses a session with no PR, or one already landed (#1391)', async () => {
-  const none = await mergeSessionPr('/repo', { id: 'r1' }, { prs: async () => ({ value: [], pending: false }) })
+  const none = await mergeSessionPr('/repo', { id: 'r1' }, { prs: async () => ({ value: undefined, pending: false }) })
   assert.deepEqual(none, { ok: false, error: 'this session has no pull request to merge' })
   // A closed/merged PR is an answer, not an action: nothing to press twice.
   const landed = await mergeSessionPr(
     '/repo',
-    { id: 'r1', branch: 'the-framework/x', startedAt: '2020-01-01T00:00:00Z' },
-    {
-      prs: async () => ({
-        value: [{ number: 7, url: 'u', state: 'MERGED', title: 'x', createdAt: '2020-01-02T00:00:00Z' }],
-        pending: false,
-      }),
-    },
+    { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'u' } },
+    { prs: async () => ({ value: { number: 7, url: 'u', state: 'MERGED', title: 'x' }, pending: false }) },
   )
   assert.deepEqual(landed, { ok: false, error: "this session's PR is already merged" })
 })
@@ -843,9 +851,9 @@ test('the Merge action refuses a session with no PR, or one already landed (#139
 test('a Merge the remote refuses comes back as the error, not a success (#1391)', async () => {
   const result = await mergeSessionPr(
     '/repo',
-    { id: 'r1', branch: 'the-framework/x' },
+    { id: 'r1', branch: 'the-framework/x', pr: { number: 7, url: 'u' } },
     {
-      prs: async () => ({ value: [{ number: 7, url: 'u', state: 'OPEN', title: 'x' }], pending: false }),
+      prs: async () => ({ value: { number: 7, url: 'u', state: 'OPEN', title: 'x' }, pending: false }),
       gh: async () => {
         throw new Error('Pull request is not mergeable: the base branch requires review')
       },

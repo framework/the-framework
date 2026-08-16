@@ -8,7 +8,7 @@ import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
 import { isTicketFile } from '../dashboard/tickets.js'
 import { releaseTicketLock } from '../ticket-locks.js'
-import { findRun, isSafeRunId, worktreePath, type RunMeta } from '../store/index.js'
+import { findRun, isSafeRunId, recordRunPr, worktreePath, type RunMeta } from '../store/index.js'
 import { withRunLock } from '../run-locks.js'
 import { removeProjectWorktree, deleteProjectRun } from '../worktrees.js'
 import { commitSessionWork, mergeSessionPr, openSessionPullRequest, pushRunBranch, runBranchFor, type HandoffResult } from '../dashboard/run-handoff.js'
@@ -293,7 +293,14 @@ export async function sendOpenPullRequest(projectId: string, runId: string): Pro
     if (!committed) {
       return { ok: false, error: 'could not commit the work this session left uncommitted' }
     }
-    return openSessionPullRequest(target.cwd, target.run)
+    const opened = await openSessionPullRequest(target.cwd, target.run)
+    // Record it on the run (E6). The session's own process is gone by now, so there is no event
+    // stream to carry the fact — but it is the same fact, and every surface reads it from the same
+    // place either way rather than re-deriving it from branch names.
+    if (opened.ok && opened.number !== undefined && opened.url) {
+      await recordRunPr(target.cwd, runId, { number: opened.number, url: opened.url })
+    }
+    return opened
   }, { ok: false, error: 'could not reach the device' })
 }
 

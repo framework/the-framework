@@ -1059,6 +1059,11 @@ async function driveSession(opts: SessionOptions, io: CliIO): Promise<number> {
         ? { ...handedOff, merge: { outcome: 'withheld' as const, reason: mergeGate } }
         : handedOff
     onEvent({ kind: 'handoff', ...outcome })
+    // Record the PR itself (E6), so every later surface reads the number off the run instead of
+    // re-deriving it from branch names and creation times.
+    if (outcome.outcome === 'done' && outcome.number !== undefined && outcome.url) {
+      onEvent({ kind: 'pull-request', number: outcome.number, url: outcome.url })
+    }
     if (outcome.outcome === 'failed') io.err(`✗ could not ${outcome.step === 'pr' ? 'open the PR' : 'push the branch'}: ${outcome.error}`)
     else if (outcome.outcome === 'done' && outcome.url) io.out(`\n◆ Opened ${outcome.url}`)
     else if (outcome.outcome === 'done') io.out(`\n◆ Pushed ${branch}.`)

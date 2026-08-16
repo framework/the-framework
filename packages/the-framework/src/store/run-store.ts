@@ -135,6 +135,11 @@ export interface RunMeta {
    * behind. Absent on every run nobody linked to a ticket.
    */
   ticket?: string
+  /**
+   * The pull request this session's work is on (E6), recorded when one is opened rather than
+   * re-derived from branch names and timestamps by every surface that wants it.
+   */
+  pr?: { number: number; url: string }
   /** Whether the agent signalled `setReadyForMerge()` (#326): building (false/absent) vs ready (true). */
   readyForMerge?: boolean
   /**
@@ -356,6 +361,9 @@ export function applyEventToMeta(meta: RunMeta, event: FrameworkEvent, at: strin
       break
     case 'ticket':
       next.ticket = event.path
+      break
+    case 'pull-request':
+      next.pr = { number: event.number, url: event.url }
       break
     case 'branch':
       next.branch = event.branch
@@ -1114,5 +1122,36 @@ export async function readEventLog(cwd: string, fs: StoreFs = nodeStoreFs()): Pr
     return parseEventLog(await fs.read(path))
   } catch {
     return []
+  }
+}
+
+/**
+ * Record the pull request a finished run's work is on (E6).
+ *
+ * A PR opened by the dashboard's button happens *after* the run's process is gone, so there is no
+ * event stream left to carry it — but the fact is exactly as worth recording as the one the run
+ * emits for itself, and every surface reads it from the same place either way. So the archived meta
+ * is patched in place.
+ *
+ * Best-effort and idempotent: a run with no archive yet, an unreadable meta, or a failed write
+ * simply leaves the record as it was. The cost of missing it is one surface having to ask `gh`,
+ * which is what all of them used to do.
+ */
+export async function recordRunPr(
+  cwd: string,
+  runId: string,
+  pr: { number: number; url: string },
+  fs: StoreFs = nodeStoreFs(),
+): Promise<boolean> {
+  if (!isSafeRunId(runId)) return false
+  try {
+    const archive = await findArchive(fs, join(cwd, FRAMEWORK_DIR), runId)
+    if (!archive) return false
+    const meta = await readMetaFile(fs, archive.meta)
+    if (!meta) return false
+    await fs.write(archive.meta, JSON.stringify({ ...meta, pr }))
+    return true
+  } catch {
+    return false
   }
 }

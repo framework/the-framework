@@ -1,5 +1,6 @@
 import { nodeGitRunner, type GitRunner } from '../project.js'
 import {
+  cachedPrView,
   cachedPrsForBranch,
   forgetBranchPrs,
   forgetPr,
@@ -133,54 +134,49 @@ async function lookupRunPr(cwd: string, branch: string, deps: RunHandoffDeps): P
   return { value: prs.value ? pickRunPr(prs.value, deps.since) : undefined, pending: prs.pending }
 }
 
+/** The cached single-PR read {@link resolveRunPr} asks for the recorded PR's current state. */
+export type CachedBranchPrLookup = (cwd: string, branch?: string) => Promise<Cached<LinkedPr | undefined>>
+
 /** What {@link resolveRunPr} needs to know about a run: structurally satisfied by {@link RunMeta}. */
 export interface RunPrRun {
   id: string
-  startedAt?: string
   branch?: string
   sessionName?: string
+  /** The pull request the run recorded when one was opened for it (E6). */
+  pr?: { number: number; url: string }
 }
 
-/** The injectable lookup seam for {@link resolveRunPr}: a branch's cached PR history. */
-export type BranchPrsLookup = (cwd: string, branch: string) => Promise<Cached<LinkedPr[]>>
-
 /**
- * The PR that belongs to a run, tried across every branch name the run may have worked under
- * (#1251/#1255): the recorded branch, the session-name branch, then the run-id branch.
+ * The pull request that belongs to a run: the one it recorded (E6), read live for its state.
  *
- * The ladder is what makes a hands-off web run resolvable: its local worktree is torn down (or
- * never existed), its meta may carry only a session name whose branch is a reused pin, but the
- * cloud session pushed the run-id branch, which no other run can ever have. Each candidate is
- * filtered through {@link pickRunPr} with the run's start time, so a predecessor's PR on a shared
- * branch name is never the answer. `pending` only when nothing was found and a lookup is still
- * running, so the caller can ask again rather than render "no PR".
+ * The number is a fact about the run, so the run writes it down — at the moment its handoff opens
+ * the PR, or when the dashboard's button does after the process is gone. Every surface then reads
+ * the same integer instead of re-deriving it.
+ *
+ * What that replaced: a three-way branch-name ladder (the recorded branch, then the session-name
+ * branch, then the run-id branch, because a hands-off web run's checkout is gone and its session
+ * name may be a reused pin) plus a timestamp heuristic on top of it, so that a predecessor's PR on
+ * a shared branch name was not mistaken for this run's. Three sources and a guess, standing in for
+ * one integer nobody had written down — the same lesson the `branch` event (#1277) already learned.
+ *
+ * The *state* is still read live, because it changes without this run doing anything: a PR merges,
+ * a human closes it. That read rides the #1028 cache, and `pending` while it is warming means the
+ * caller can ask again rather than render "no PR".
  */
 export async function resolveRunPr(
   cwd: string,
   run: RunPrRun,
-  prs: BranchPrsLookup = cachedPrsForBranch,
+  prs: CachedBranchPrLookup = cachedPrView,
 ): Promise<Cached<LinkedPr | undefined>> {
-  const since = run.startedAt ?? startedAtFromRunId(run.id)
-  const candidates = runBranchCandidates(run)
-  let pending = false
-  for (const branch of candidates) {
-    const read = await prs(cwd, branch).catch((): Cached<LinkedPr[]> => ({ value: undefined, pending: false }))
-    if (read.pending) pending = true
-    const pr = read.value ? pickRunPr(read.value, since) : undefined
-    if (pr) return { value: pr, pending: false }
-  }
-  return { value: undefined, pending }
-}
-
-/** Every branch name a run may have worked under, in trust order — {@link resolveRunPr}'s ladder. */
-function runBranchCandidates(run: RunPrRun): string[] {
-  return [
-    ...new Set([
-      ...(run.branch ? [run.branch] : []),
-      ...(run.sessionName ? [`${SESSION_BRANCH_PREFIX}${run.sessionName}`] : []),
-      `${SESSION_BRANCH_PREFIX}run-${run.id}`,
-    ]),
-  ]
+  if (!run.pr) return { value: undefined, pending: false }
+  const branch = runBranchFor(run)
+  const read = await prs(cwd, branch).catch((): Cached<LinkedPr | undefined> => ({ value: undefined, pending: false }))
+  // The live read is about the recorded PR's *state*; a different number on the branch is some
+  // other PR and never this run's answer.
+  if (read.value && read.value.number === run.pr.number) return { value: read.value, pending: false }
+  // Nothing live to say, so the recorded fact stands on its own: a run whose PR is on a branch this
+  // machine cannot see still has a PR, and its number and URL are what the surfaces need.
+  return { value: { ...run.pr, state: read.pending ? 'OPEN' : 'UNKNOWN', title: '' }, pending: read.pending }
 }
 
 /**
@@ -194,20 +190,19 @@ function runBranchCandidates(run: RunPrRun): string[] {
 export async function mergeSessionPr(
   cwd: string,
   run: RunPrRun,
-  deps: { gh?: GhRunner; prs?: BranchPrsLookup } = {},
+  deps: { gh?: GhRunner; prs?: CachedBranchPrLookup } = {},
 ): Promise<HandoffResult> {
   const pr = (await resolveRunPr(cwd, run, deps.prs)).value
   if (!pr) return { ok: false, error: 'this session has no pull request to merge' }
   if (pr.state !== 'OPEN') return { ok: false, error: `this session's PR is already ${pr.state.toLowerCase()}` }
   const merged = await ghMergePr(cwd, pr.number, deps.gh)
   if (merged.outcome === 'failed') return { ok: false, error: merged.error }
-  // The PR's cached state just changed under every branch name the lookup tries: forget them all,
-  // or the bar keeps offering a merge for a PR that landed (#1028).
-  for (const branch of runBranchCandidates(run)) {
-    forgetPr(cwd, branch)
-    forgetBranchPrs(cwd, branch)
-  }
-  return { ok: true, url: pr.url }
+  // The PR's cached state just changed, so the branch's cached read must go or the bar keeps
+  // offering a merge for a PR that landed (#1028).
+  const branch = runBranchFor(run)
+  forgetPr(cwd, branch)
+  forgetBranchPrs(cwd, branch)
+  return { ok: true, url: pr.url, number: pr.number }
 }
 
 /**
@@ -398,7 +393,12 @@ export async function commitSessionWork(
 }
 
 /** The outcome of a handoff action, in the `{ ok }` shape the dashboard's `useAction` understands. */
-export type HandoffResult = { ok: true; url?: string } | { ok: false; error: string }
+/**
+ * What a handoff action did. The PR's `number` rides along with its `url` (E6), because the number
+ * is the fact worth *recording* — every surface that wants a run's PR then reads it off the run
+ * rather than re-deriving it from branch names and timestamps.
+ */
+export type HandoffResult = { ok: true; url?: string; number?: number } | { ok: false; error: string }
 
 /**
  * Push a finished session's branch to `origin`.
@@ -492,9 +492,11 @@ export async function openRunPullRequest(
     // open one for the next minute (#1028). Both caches: the single-PR view and the history.
     forgetPr(cwd, branch)
     forgetBranchPrs(cwd, branch)
-    // gh prints the new PR's URL as its last line.
+    // gh prints the new PR's URL as its last line, and the number is its last path segment.
     const url = out.split('\n').filter(Boolean).at(-1)
-    return url ? { ok: true, url } : { ok: true }
+    if (!url) return { ok: true }
+    const number = prNumberFromUrl(url)
+    return { ok: true, url, ...(number !== undefined ? { number } : {}) }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
   }
@@ -531,7 +533,7 @@ export async function openSessionPullRequest(
   // ever existed on the remote, and its PR is the answer the button exists to give (#1255).
   // Unless the session demonstrably kept committing after that PR merged or closed (#1512) —
   // then the old PR is not the answer, the new work needs its own.
-  if (handoff?.pr && !movedPastPr(handoff)) return { ok: true, url: handoff.pr.url }
+  if (handoff?.pr && !movedPastPr(handoff)) return { ok: true, url: handoff.pr.url, number: handoff.pr.number }
   if (handoff && !handoff.exists) return { ok: false, error: `branch ${branch} no longer exists` }
   // Refuse rather than open an empty PR: a session that changed nothing has nothing to hand off.
   if (handoff?.empty) return { ok: false, error: 'this session produced no commits to open a PR for' }
@@ -591,7 +593,7 @@ export function withheldMerge(deps: { readyForMerge: boolean; sessionTodoOpen: b
  */
 export type AutoHandoffOutcome =
   | { outcome: 'skipped'; reason: AutoHandoffSkip; merge?: AutoMergeOutcome }
-  | { outcome: 'done'; pushed: boolean; url?: string; merge?: AutoMergeOutcome }
+  | { outcome: 'done'; pushed: boolean; url?: string; number?: number; merge?: AutoMergeOutcome }
   | { outcome: 'failed'; step: 'push' | 'pr'; error: string }
 
 /**
@@ -684,7 +686,13 @@ export async function runAutoHandoff(
             : { outcome: 'failed', error: 'could not resolve the PR number to merge' }
         })()
       : undefined
-    return { outcome: 'done', pushed: true, ...(opened.url ? { url: opened.url } : {}), ...(merge ? { merge } : {}) }
+    return {
+      outcome: 'done',
+      pushed: true,
+      ...(opened.url ? { url: opened.url } : {}),
+      ...(opened.number !== undefined ? { number: opened.number } : {}),
+      ...(merge ? { merge } : {}),
+    }
   }
 
   if (state.pushed) return { outcome: 'skipped', reason: 'already-pushed' }
@@ -714,7 +722,12 @@ function sessionPrTitle(run: Pick<HandoffRun, 'id' | 'sessionName' | 'intent' | 
   return run.fixes ? `${title} (fix ${run.fixes})` : title
 }
 
-/** The PR number out of the URL `gh pr create` prints, e.g. `…/pull/123` (#1216). */
+/**
+ * The PR number out of the URL `gh pr create` prints, e.g. `…/pull/123` (#1216).
+ *
+ * Parsed rather than asked for in a second `gh` call: the create already told us, and E6 is about
+ * recording the number we were told rather than re-deriving it later.
+ */
 function prNumberFromUrl(url: string | undefined): number | undefined {
   const match = url?.match(/\/pull\/(\d+)(?:$|[/?#])/)
   return match ? Number(match[1]) : undefined

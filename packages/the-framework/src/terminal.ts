@@ -39,6 +39,8 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `  implementing ${event.path}`
     case 'branch':
       return `  branch: ${event.branch}`
+    case 'pull-request':
+      return `  pull request: #${event.number}`
     case 'on-before-mergeable':
       switch (event.outcome) {
         case 'queued':

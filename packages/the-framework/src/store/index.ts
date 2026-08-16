@@ -14,6 +14,7 @@ export {
   readLiveMetas,
   archiveWorktreeRun,
   archivedRunPaths,
+  recordRunPr,
   restoreArchivedRun,
   listWorktreeDirs,
   runIdFromStartedAt,

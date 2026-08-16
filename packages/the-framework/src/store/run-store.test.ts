@@ -10,6 +10,7 @@ import {
   readLiveMeta,
   readLiveMetas,
   archiveWorktreeRun,
+  recordRunPr,
   restoreArchivedRun,
   listWorktreeDirs,
   reconcileOrphanedRuns,
@@ -623,6 +624,24 @@ test('archiveWorktreeRun records a run that died mid-flight as stopped, not runn
   assert.equal((JSON.parse(fs.files.get(join(CWD, '.the-framework', 'runs', 'r1.json'))!) as RunMeta).status, 'stopped')
 })
 
+test('recordRunPr patches the archived meta, so a PR opened after the run still lands on it (E6)', async () => {
+  // The dashboard's Open PR button runs after the session's process is gone, so there is no event
+  // stream left to carry the fact — but it is the same fact, and every surface reads it from the
+  // same place either way.
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }))
+  await archiveWorktreeRun(worktreeAt('r1'), CWD, fs)
+  assert.equal(await recordRunPr(CWD, 'r1', { number: 42, url: 'https://x/pull/42' }, fs), true)
+  assert.deepEqual((await listRuns(CWD, fs)).find(r => r.id === 'r1')?.pr, { number: 42, url: 'https://x/pull/42' })
+})
+
+test('recordRunPr leaves the record as it was when there is nothing to patch (E6)', async () => {
+  // Best-effort: the cost of missing it is one surface having to ask gh, which is what all of them
+  // used to do anyway.
+  const fs = memFs()
+  assert.equal(await recordRunPr(CWD, 'nope', { number: 1, url: 'u' }, fs), false)
+  assert.equal(await recordRunPr(CWD, '../escape', { number: 1, url: 'u' }, fs), false, 'and an unsafe id is refused')
+})
+
 test('archiveWorktreeRun is forgiving of a worktree with no run', async () => {
   assert.equal(await archiveWorktreeRun(worktreeAt('nope'), CWD, memFs()), undefined)
 })
@@ -776,6 +795,17 @@ test('startedAtFromRunId inverts runIdFromStartedAt, and refuses foreign ids (#1
   assert.equal(startedAtFromRunId(runIdFromStartedAt(startedAt)), startedAt)
   assert.equal(startedAtFromRunId('not-a-run-id'), undefined)
   assert.equal(startedAtFromRunId(''), undefined)
+})
+
+test('applyEventToMeta records the pull request a session opened (E6)', () => {
+  // The number is a fact about the run, so the run writes it down — rather than every later
+  // surface re-deriving it from branch names and creation times.
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
+  assert.equal(base.pr, undefined, 'a session with no PR says nothing')
+  const on = applyEventToMeta(base, { kind: 'pull-request', number: 42, url: 'https://x/pull/42' }, AT)
+  assert.deepEqual(on.pr, { number: 42, url: 'https://x/pull/42' })
+  // It must outlive the run: every read of it happens after the session has ended.
+  assert.deepEqual(applyEventToMeta(on, { kind: 'end', ok: true }, AT).pr, { number: 42, url: 'https://x/pull/42' })
 })
 
 test('applyEventToMeta records the branch a branch event names (#1277)', () => {

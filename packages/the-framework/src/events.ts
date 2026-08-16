@@ -259,6 +259,16 @@ export type FrameworkEvent =
    */
   | { kind: 'ticket'; path: string }
   /**
+   * The pull request this session's work is on (E6), the moment one is opened for it.
+   *
+   * An event for the same reason `ticket` and `branch` are: only an event reaches the run's meta,
+   * and the meta is what every later surface reads. Before this, each of them re-resolved the PR
+   * live from the branch — trying the recorded branch, then the session-name branch, then the
+   * run-id branch, and filtering the results by whether the PR predated the session — which is a
+   * three-way guess plus a timestamp heuristic standing in for one integer nobody had written down.
+   */
+  | { kind: 'pull-request'; number: number; url: string }
+  /**
    * The branch the run's work is on (#1277), observed off the checkout rather than guessed:
    * emitted at start with the branch the run actually begins on, and again when the framework
    * renames the run-id branch after the agent names the session. Folded to `RunMeta.branch`,
@@ -274,7 +284,7 @@ export type FrameworkEvent =
    * so an outcome that is not an event is an outcome nobody learns.
    */
   | { kind: 'handoff'; outcome: 'skipped'; reason: AutoHandoffSkip; merge?: AutoMergeOutcome }
-  | { kind: 'handoff'; outcome: 'done'; pushed: boolean; url?: string; merge?: AutoMergeOutcome }
+  | { kind: 'handoff'; outcome: 'done'; pushed: boolean; url?: string; number?: number; merge?: AutoMergeOutcome }
   | { kind: 'handoff'; outcome: 'failed'; step: 'push' | 'pr'; error: string }
   /**
    * The work has settled and the run is parked on the user (#785): it stays open as a

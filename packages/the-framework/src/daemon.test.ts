@@ -324,7 +324,7 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
      * user ran it, and what this test cares about is that the project's history has it.
      */
     const archivedMeta = async (runId: string): Promise<{ branch?: string } | undefined> => {
-      for (let i = 0; i < 150; i++) {
+      for (let i = 0; i < 600; i++) {
         const found = (await listRuns(cwd).catch(() => [])).find(run => run.id === runId)
         if (found) return found
         await new Promise(r => setTimeout(r, 20))
@@ -333,9 +333,13 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
     }
     const archived = async (runId: string): Promise<boolean> => (await archivedMeta(runId)) !== undefined
 
-    /** Poll until the run's checkout is off disk. */
+    /**
+     * Poll until the run's checkout is off disk. Generous, because teardown now commits *and
+     * pushes* the branch before it can remove anything (E5), and a loaded CI box running the
+     * suite's files in parallel makes that several seconds of real git.
+     */
     const worktreeGone = async (runId: string): Promise<boolean> => {
-      for (let i = 0; i < 150; i++) {
+      for (let i = 0; i < 600; i++) {
         const gone = await stat(join(cwd, FRAMEWORK_DIR, 'worktrees', runId)).then(() => false, () => true)
         if (gone) return true
         await new Promise(r => setTimeout(r, 20))

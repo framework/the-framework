@@ -78,6 +78,7 @@ async function services(preferences: Record<string, unknown>) {
     // What the daemon's own counter reports: the runs this sweep has asked for are live, so the
     // cap is measured against them rather than against a constant zero.
     activeRunCount: () => starts.length,
+    busyRunIds: () => new Set<string>(),
     log: () => {},
   })
   const stop = async () => {

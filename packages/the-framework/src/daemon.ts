@@ -261,6 +261,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     quota,
     startRun,
     activeRunCount: runtime.activeRunCount,
+    busyRunIds: runtime.busyRunIds,
     log: console.log,
   })
 

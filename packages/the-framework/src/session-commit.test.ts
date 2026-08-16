@@ -218,8 +218,7 @@ test('an archive still being written is not committed until it settles (#912)', 
   const committer = startSessionCommitter({
     projects: async () => [project('/repo')],
     git,
-    exists: noLocks,
-    intervalMs: 1_000_000, // effectively disable the timer; drive via poll()
+    exists: noLocks, // effectively disable the timer; drive via poll()
   })
   try {
     await settle() // the constructor's baseline poll opens the idle window on {a}
@@ -252,7 +251,6 @@ test('a project that never goes idle still commits once max wait lapses (#912)',
     projects: async () => [project('/repo')],
     git,
     exists: noLocks,
-    intervalMs: 1_000_000,
     maxWaitMs: 100,
     now: () => clock,
   })
@@ -278,7 +276,6 @@ test('a busy repo keeps its place, so the next window retries it (#912)', async 
     projects: async () => [project('/repo')],
     git,
     exists,
-    intervalMs: 1_000_000,
   })
   try {
     await settle()
@@ -306,11 +303,10 @@ test('a failing commit logs its reason once, not once per poll', async () => {
     projects: async () => [project('/repo')],
     git,
     exists: noLocks,
-    intervalMs: 1_000_000,
     log: message => logs.push(message),
   })
   try {
-    await settle() // the baseline poll only opens the idle window
+    await committer.poll() // the first turn only opens the idle window
     assert.deepEqual(logs, [], 'nothing has been attempted yet')
 
     await committer.poll() // settled, so the commit is attempted and fails
@@ -340,7 +336,6 @@ test('a changed failure reason is announced again', async () => {
     projects: async () => [project('/repo')],
     git,
     exists: noLocks,
-    intervalMs: 1_000_000,
     log: message => logs.push(message),
   })
   try {
@@ -373,7 +368,6 @@ test('the ordinary idle case is not announced as a failure', async () => {
     projects: async () => [project('/repo')],
     git,
     exists: noLocks,
-    intervalMs: 1_000_000,
     log: message => logs.push(message),
   })
   try {
@@ -395,7 +389,6 @@ test('a project scan that throws costs one window rather than the committer (#91
     },
     git,
     exists: noLocks,
-    intervalMs: 1_000_000,
   })
   try {
     await settle()
@@ -411,7 +404,6 @@ test('flush commits immediately, skipping the idle window, and counts projects (
     projects: async () => [project('/a'), project('/b')],
     git,
     exists: noLocks,
-    intervalMs: 1_000_000,
   })
   try {
     await settle()
@@ -429,7 +421,6 @@ test('a stopped committer does not poll again (#912)', async () => {
     projects: async () => [project('/repo')],
     git,
     exists: noLocks,
-    intervalMs: 1_000_000,
   })
   await settle()
   committer.stop()

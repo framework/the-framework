@@ -44,11 +44,11 @@ test('startKeyedWatcher announces only items that appear after the first poll', 
     build: async () => current,
     keyOf: interventionKey,
     onNew: items => void announced.push(items.map(i => i.number!)),
-    intervalMs: 1_000_000, // effectively disable the timer; drive via poll()
   })
   try {
-    // Construction fires an immediate baseline poll (u1 already open) — let it settle.
-    await new Promise(resolve => setTimeout(resolve, 0))
+    // The watcher owns no timer (E4): the daemon's clock drives it, and its first turn is the
+    // baseline seed — which must happen, or the whole open backlog reads as new.
+    await watcher.poll()
     assert.deepEqual(announced, []) // baseline announces nothing
     current = [pr(1, 'u1'), pr(2, 'u2')]
     await watcher.poll() // u2 is new -> announced
@@ -69,7 +69,6 @@ test('startKeyedWatcher yields no new items when the scan or the projection fail
     },
     keyOf: interventionKey,
     onNew: items => void announced.push(items),
-    intervalMs: 1_000_000,
   })
   try {
     await watcher.poll()

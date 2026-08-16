@@ -51,9 +51,6 @@ import { errorMessage } from './error-message.js'
  */
 export const SESSIONS_PATHSPEC = `:(glob)${THE_FRAMEWORK_DIR}/*/${SESSIONS_DIR}/**`
 
-/** How often the committer looks for settled archives. */
-export const COMMIT_POLL_MS = 30_000
-
 /** How long writes may keep arriving before the batch is committed anyway. */
 export const COMMIT_MAX_WAIT_MS = 5 * 60_000
 
@@ -211,8 +208,6 @@ export interface SessionCommitter {
 export interface SessionCommitterOptions {
   /** The projects to sweep each poll (the daemon passes the registry, mapped to summaries). */
   projects: () => Promise<ProjectSummary[]>
-  /** Poll cadence and idle window, ms. Default {@link COMMIT_POLL_MS}. */
-  intervalMs?: number
   /** Commit anyway once a project has been pending this long, ms. Default {@link COMMIT_MAX_WAIT_MS}. */
   maxWaitMs?: number
   /** Injectable git (tests). */
@@ -246,14 +241,13 @@ interface Pending {
  * and reconsidered next time, unless it has been dirty past `maxWaitMs`, which forces it through.
  *
  * Forgiving throughout — a failed project scan, a busy repo or a rejected commit costs one window
- * and is retried, never a throw. Runs immediately, then every `intervalMs`; the timer is unref'd so
- * it never keeps the daemon alive past shutdown.
+ * and is retried, never a throw. Owns no timer (E4): the daemon's one clock calls {@link
+ * SessionCommitter.poll}, and the window it debounces on is that cadence.
  */
 export function startSessionCommitter(opts: SessionCommitterOptions): SessionCommitter {
   const git = opts.git ?? nodeGitRunner()
   const exists = opts.exists ?? nodePathProbe()
   const now = opts.now ?? Date.now
-  const intervalMs = opts.intervalMs ?? COMMIT_POLL_MS
   const maxWaitMs = opts.maxWaitMs ?? COMMIT_MAX_WAIT_MS
   const pending = new Map<string, Pending>()
   let stopped = false
@@ -319,13 +313,9 @@ export function startSessionCommitter(opts: SessionCommitterOptions): SessionCom
     return committed
   }
 
-  void poll()
-  const timer = setInterval(() => void poll(), intervalMs)
-  timer.unref?.()
   return {
     stop: () => {
       stopped = true
-      clearInterval(timer)
     },
     poll,
     flush,

@@ -819,10 +819,11 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
     }
   }
 
-  const timer = setInterval(() => void tick(), intervalMs)
-  timer.unref?.() // a background sweep must never be the reason the process stays up
+  // No timer of its own (E4): the daemon's one clock calls `tick` every Nth turn. `intervalMs`
+  // stays as the *declared* cadence — the clock runs this at that multiple, and `nextSweepAt`
+  // below is what the usage panel reads to say when the next sweep is due.
 
-  /** When the interval next fires, counted from the anchor so an out-of-band {@link tick} cannot skew it. */
+  /** When the sweep is next due, counted from the anchor so an out-of-band {@link tick} cannot skew it. */
   const nextSweepAt = () => startedAt + (Math.floor(Math.max(0, now() - startedAt) / intervalMs) + 1) * intervalMs
 
   // The first sweep is the caller's to fire (see `startBackgroundServices`), not this
@@ -838,7 +839,6 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
     }),
     stop: () => {
       stopped = true
-      clearInterval(timer)
     },
   }
 }

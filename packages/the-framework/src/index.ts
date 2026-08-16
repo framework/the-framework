@@ -121,7 +121,6 @@ export {
   commitMessage,
   nodePathProbe,
   SESSIONS_PATHSPEC,
-  COMMIT_POLL_MS,
   COMMIT_MAX_WAIT_MS,
   type SessionCommitter,
   type SessionCommitterOptions,

@@ -368,6 +368,15 @@ export interface ProjectRuntime {
   /** Live runs on a project (#685), so a background job can tell an idle project from a busy one. */
   activeRunCount: (targetProjectId: string) => number
   /**
+   * The run ids this daemon is still responsible for: spawning, running, or mid-retirement.
+   *
+   * The background worktree sweep asks, because a run's meta flips to `done` a beat *before* its
+   * teardown archives and reclaims the checkout — so a sweep landing in that window would race
+   * the teardown for the same directory. "Not live" on disk is not the same as "the daemon is
+   * finished with it", and this is the difference.
+   */
+  busyRunIds: () => ReadonlySet<string>
+  /**
    * Stop the runs this daemon spawned. Returns how many were stopped. Called on shutdown, before
    * the previews go.
    */
@@ -557,10 +566,9 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
         // Remove button are one behaviour. A push that cannot land keeps the checkout, and the
         // sweep retries it later. It used to keep a failed or stopped run's checkout "for
         // inspection", which meant those accumulated one per session until someone noticed.
-        if (runId) {
-          const outcome = await removeProjectWorktree(projectCwd, runId)
-          if (!outcome.ok) console.log(`[framework] keeping worktree ${worktree}: ${outcome.error}`)
-        }
+        // The directory's own name is the run id, so this never depends on the caller having one.
+        const outcome = await removeProjectWorktree(projectCwd, runId ?? basename(worktree))
+        if (!outcome.ok) console.log(`[framework] keeping worktree ${worktree}: ${outcome.error}`)
       } catch {
         // A worktree we could not retire is a worktree left on disk, which is the safe direction.
       }
@@ -962,6 +970,16 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
     return live + [...starting].filter(key => keyBelongsTo(key, targetProjectId)).length
   }
 
+  /** See {@link ProjectRuntime.busyRunIds}: every slot the daemon has not finished with. */
+  const busyRunIds = (): ReadonlySet<string> => {
+    const ids = new Set<string>()
+    for (const key of [...activeRuns.keys(), ...starting, ...retiring.keys()]) {
+      const { runId } = parseScopedKey(key)
+      if (runId) ids.add(runId)
+    }
+    return ids
+  }
+
   /**
    * Stop the runs this daemon spawned. Ctrl-C closes everything: the dashboard runs in the
    * foreground, and nothing it started outlives it.
@@ -1018,6 +1036,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
     remoteRuns,
     onRelayRpc,
     activeRunCount,
+    busyRunIds,
     stopRuns,
     dispose,
   }

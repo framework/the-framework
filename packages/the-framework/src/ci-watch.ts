@@ -20,9 +20,6 @@ import type { Cached } from './dashboard/cache.js'
 // Every decision this sweep takes starts from what `gh` answers, so a hosted deployment can later
 // feed the same handlers from a webhook receiver and only the trigger changes.
 
-/** How long between sweeps: the ~1 min CI latency agreed on #1418. */
-const DEFAULT_CI_WATCH_INTERVAL_MS = 60 * 1000
-
 /**
  * How long a run's watched PR stays on the sweep's list: long enough to survive a weekend of the
  * daemon being off, short enough that the sweep's `gh` spend cannot grow with the archive. A PR
@@ -259,7 +256,6 @@ export interface CiWatchOptions {
   /** The registered projects to sweep. */
   projects: () => Promise<readonly { path: string }[]>
   log: (message: string) => void
-  intervalMs?: number
   /** The per-project sweep's seams, {@link CiSweepDeps.fix} included — the daemon wires the gates. */
   deps?: CiSweepDeps
   /** The per-project sweep (default {@link sweepProjectCi}). */
@@ -316,14 +312,11 @@ export function startCiWatch(opts: CiWatchOptions): CiWatch {
     return inflight
   }
 
-  void tick()
-  const timer = setInterval(() => void tick(), opts.intervalMs ?? DEFAULT_CI_WATCH_INTERVAL_MS)
-  timer.unref?.()
+  // No timer of its own (E4): the daemon's one clock calls `tick`.
   return {
     tick,
     stop: () => {
       stopped = true
-      clearInterval(timer)
     },
   }
 }

@@ -1,4 +1,6 @@
 import { listProjectWorktrees, removeProjectWorktree, type RemoveResult, type WorktreeRow } from './worktrees.js'
+import { withRunLock } from './run-locks.js'
+import { worktreePath } from './store/index.js'
 
 // Reclaim a session's checkout once its work is on the remote (#1036/E5).
 //
@@ -42,6 +44,8 @@ export interface MergedSweepDeps {
   worktrees?: (cwd: string) => Promise<WorktreeRow[]>
   /** Removes one worktree (default {@link removeProjectWorktree}). */
   remove?: (cwd: string, runId: string) => Promise<RemoveResult>
+  /** Run ids whose checkouts the daemon is still responsible for; see {@link MergedSweepOptions.busy}. */
+  busy?: ReadonlySet<string>
 }
 
 /**
@@ -49,9 +53,14 @@ export interface MergedSweepDeps {
  *
  * The decision is entirely {@link removeProjectWorktree}'s — commit what is pending, push the
  * branch, remove only once the remote has it — so the automatic path and the manual one (the
- * dashboard's Remove button) are one behaviour rather than two that can disagree. This adds only
- * the loop and the one thing it must never touch: a live run's checkout, which is where its agent
- * is working.
+ * dashboard's Remove button) are one behaviour rather than two that can disagree. This adds the
+ * loop, the one thing it must never touch (a live run's checkout, where its agent is working), and
+ * the run lock.
+ *
+ * The lock is load-bearing: a run's meta flips to `done` a beat before its teardown finishes
+ * archiving, so a sweep landing in that window would remove the checkout out from under the
+ * archive — which then recreates the directory it was reading from, and the removal silently
+ * un-happens. Every other actor on a checkout already takes this lock.
  */
 export async function removeMergedWorktrees(cwd: string, deps: MergedSweepDeps = {}): Promise<MergedSweepResult> {
   // Sizes off: `du` over every retained checkout is the expensive part of the listing, and a sweep
@@ -61,22 +70,13 @@ export async function removeMergedWorktrees(cwd: string, deps: MergedSweepDeps =
 
   const result: MergedSweepResult = { removed: [], failed: [] }
   for (const row of await worktrees(cwd).catch((): WorktreeRow[] => [])) {
-    if (row.live) continue
-    const outcome = await remove(cwd, row.runId)
+    if (row.live || deps.busy?.has(row.runId)) continue
+    const outcome = await withRunLock(worktreePath(cwd, row.runId), () => remove(cwd, row.runId))
     if (outcome.ok) result.removed.push({ runId: row.runId })
     else result.failed.push({ runId: row.runId, error: outcome.error })
   }
   return result
 }
-
-/**
- * How long between sweeps.
- *
- * Ten minutes, because this is about disk reclaimed over days rather than seconds: a session whose
- * push landed at teardown is already gone, and what is left here is the one whose push could not
- * land yet — a machine that was offline, or a remote that was not reachable.
- */
-const DEFAULT_MERGED_SWEEP_INTERVAL_MS = 10 * 60 * 1000
 
 /** A running sweep, in the shape the daemon's other background services use. */
 export interface MergedWorktreeSweep {
@@ -90,23 +90,28 @@ export interface MergedSweepOptions {
   /** The registered projects to sweep. */
   projects: () => Promise<readonly { path: string }[]>
   log: (message: string) => void
-  intervalMs?: number
+  /**
+   * The runs the daemon is still responsible for — spawning, running, or mid-retirement — whose
+   * checkouts this must not touch.
+   *
+   * "Not live" on disk is not "the daemon is finished with it": a run's meta flips to `done` a
+   * beat before its teardown archives the history and reclaims the checkout, and a sweep landing
+   * in that window races the teardown for the same directory. Absent means nothing is busy, which
+   * is right for a caller that spawns no runs.
+   */
+  busy?: () => ReadonlySet<string>
   /** The per-project sweep (default {@link removeMergedWorktrees}). */
   sweep?: (cwd: string) => Promise<MergedSweepResult>
 }
 
 /**
- * Sweep every registered project's reclaimable worktrees on a timer (#1036).
+ * Sweep every registered project's reclaimable worktrees (#1036), one turn per call.
  *
  * Says what it removed rather than removing it silently: a checkout vanishing from under someone
  * with no line explaining why reads as a bug, even when the work behind it is safe.
- *
- * Runs immediately on start and then every {@link DEFAULT_MERGED_SWEEP_INTERVAL_MS}; overlapping
- * ticks are dropped, and the timer is unref'd so a background sweep is never the reason the
- * process stays up.
  */
 export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktreeSweep {
-  const sweep = opts.sweep ?? removeMergedWorktrees
+  const sweep = opts.sweep ?? ((cwd: string) => removeMergedWorktrees(cwd, { ...(opts.busy ? { busy: opts.busy() } : {}) }))
   let stopped = false
 
   const sweepAll = async (): Promise<void> => {
@@ -126,7 +131,7 @@ export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktr
 
   // Overlapping ticks join the sweep already running rather than being dropped: awaiting `tick()`
   // has to mean the sweep finished, or an on-demand caller (and a test) gets a silent no-op
-  // whenever the timer or the start-up sweep happens to be mid-flight.
+  // whenever the clock's turn happens to be mid-flight.
   let inflight: Promise<void> | undefined
   const tick = (): Promise<void> => {
     if (stopped) return Promise.resolve()
@@ -136,16 +141,12 @@ export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktr
     return inflight
   }
 
-  // Swept once at start-up, not only after the first interval: the case this exists for is a
-  // machine that was off (or a daemon that was down) while the work could not be pushed.
-  void tick()
-  const timer = setInterval(() => void tick(), opts.intervalMs ?? DEFAULT_MERGED_SWEEP_INTERVAL_MS)
-  timer.unref?.()
+  // No timer of its own (E4): the daemon's one clock calls `tick`, including once at start-up —
+  // the case this exists for is a machine that was off while the work could not be pushed.
   return {
     tick,
     stop: () => {
       stopped = true
-      clearInterval(timer)
     },
   }
 }

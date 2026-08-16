@@ -40,6 +40,20 @@ test('every retained checkout is offered to the one rule, whatever its run did (
   assert.deepEqual(result.failed, [])
 })
 
+test('a checkout the daemon has not finished with is left alone (E5)', async () => {
+  // "Not live" on disk is not "the daemon is done with it": a run's meta flips to `done` a beat
+  // before its teardown archives the history and reclaims the checkout, so a sweep landing in that
+  // window would race the teardown for the same directory.
+  const asked: string[] = []
+  const result = await removeMergedWorktrees('/repo', {
+    worktrees: async () => [row({ runId: 'retiring', status: 'done' }), row({ runId: 'settled', status: 'done' })],
+    busy: new Set(['retiring']),
+    remove: async (_cwd, runId) => (asked.push(runId), { ok: true }),
+  })
+  assert.deepEqual(asked, ['settled'])
+  assert.deepEqual(result.removed, [{ runId: 'settled' }])
+})
+
 test('a live session keeps its checkout: its agent is working in there (#1036)', async () => {
   // Stop is how a run ends, not pulling the floor out from under it.
   const { asked, run } = fakeSweep([row({ runId: 'live', live: true, status: 'running' })])
@@ -77,7 +91,6 @@ test('the sweep says what it removed and what it kept, per project (#1036)', asy
     projects: async () => [{ path: '/a' }, { path: '/b' }],
     log: line => lines.push(line),
     sweep: async cwd => results[cwd] ?? { removed: [], failed: [] },
-    intervalMs: 60_000,
   })
   await sweep.tick()
   sweep.stop()
@@ -93,7 +106,6 @@ test('a stopped sweep does no further work (#1036)', async () => {
     projects: async () => [{ path: '/a' }],
     log: () => {},
     sweep: async () => (swept++, { removed: [], failed: [] }),
-    intervalMs: 60_000,
   })
   await sweep.tick()
   sweep.stop()
@@ -111,7 +123,6 @@ test('a project whose sweep throws does not stop the ones after it (#1036)', asy
       swept.push(cwd)
       return { removed: [], failed: [] }
     },
-    intervalMs: 60_000,
   })
   await sweep.tick()
   sweep.stop()

@@ -253,7 +253,6 @@ test('startCiWatch sweeps immediately, logs merges every time and repeated refus
   const watch = startCiWatch({
     projects: async () => [{ path: '/p' }],
     log: line => lines.push(line),
-    intervalMs: 60_000,
     deps: {
       runs: async () => [meta()],
       pr: async () => ({ value: openPr(), pending: false }),

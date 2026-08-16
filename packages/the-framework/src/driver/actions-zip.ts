@@ -6,7 +6,13 @@ import { inflateRawSync } from 'node:zlib'
 // adding for ~60 lines. Reading only, and only what upload-artifact writes: stored or
 // deflated entries, no zip64, no encryption.
 
-/** One file inside a zip. */
+/**
+ * One file inside a zip.
+ *
+ * @internal Implementation detail of the Actions driver, not product API. It reached the published
+ * surface once through the driver barrel, which is a one-way door: an accidental export cannot be
+ * taken back after a release without a breaking change.
+ */
 export interface ZipEntry {
   /** Path as recorded in the archive, e.g. `"execution.json"`. */
   name: string
@@ -29,6 +35,9 @@ const EOCD_SIZE = 22
  *
  * Throws on anything it does not recognize rather than returning a partial archive —
  * a silently-short transcript would read as an agent that said less than it did.
+ *
+ * @internal Implementation detail of the Actions driver, not product API. Imported by the driver
+ * and its own test, both by module path; nothing reaches it through a barrel.
  */
 export function readZip(buf: Buffer): ZipEntry[] {
   const eocd = findEocd(buf)

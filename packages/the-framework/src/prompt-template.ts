@@ -9,6 +9,17 @@ import { errorMessage } from './error-message.js'
  * user- or repo-supplied text.
  */
 
+/**
+ * One `${{ ... }}` fragment. Non-greedy, so it ends at the first *adjacent* `}}`: an expression
+ * may nest braces, but never let two of them close together — `{a:{b:1}}` ends the fragment on the
+ * inner pair, and what gets evaluated is not what was written. A space between them (`{b:1} }`) is
+ * the whole fix.
+ *
+ * A rule of this language, not a bug waiting to be fixed. Replacing the language outright was
+ * considered and declined, so the limit is permanent, and two places already bend around it (a
+ * block of the system prompt that cannot ship verbatim, and the `maintenance` preset). Written
+ * down here so the next one bends on purpose rather than debugging a truncated prompt.
+ */
 const FRAGMENT = /\$\{\{([\s\S]*?)\}\}/g
 
 /** Thrown when a `${{ ... }}` fragment fails to evaluate or evaluates to `undefined`. */

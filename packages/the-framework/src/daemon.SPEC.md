@@ -3,6 +3,7 @@ The process behind the dashboard: it serves the UI, spawns agents, and runs the 
 ## TLDR
 
 - It runs in the foreground and only in the foreground. Ctrl-C closes the dashboard and every agent it is running, so there is no liveness record, no machine-global state file, and no second process to find, reuse or stop.
+- The trade that buys: unattended work needs a window left open, the way any dev server does. The product's promise is spending idle quota while nobody is at the keyboard, and that still holds — but it is now visible and killable rather than invisible and persistent, which is the right direction for a tool that spends a subscription: nothing burns quota after you have closed it.
 - The dashboard is a projection of each project's on-disk event log, and steering flows back through an append-only control file — files are the seam, never a direct agent-to-dashboard connection.
 - Bound to localhost by default; binding to the network requires a generated shared token, because a process that spawns agents would otherwise be remote code execution for whoever finds the port.
 - At boot it registers the home project (and, when opted in, every repo in the user's repos directory), marks agents a dead process left "running" as stopped, and starts the background services. It resumes nothing: Ctrl-C was deliberate.

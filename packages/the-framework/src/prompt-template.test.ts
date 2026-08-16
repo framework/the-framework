@@ -55,3 +55,17 @@ test('renderTemplate names the failing fragment in the error message', () => {
     assert.match(err.message, /nope\(/)
   }
 })
+
+test('a fragment ends at the first adjacent `}}`, which is the rule rather than a bug', () => {
+  // Replacing this template language was considered and declined, so the non-greedy scan is
+  // permanent. It is not "no braces": nesting is fine until two of them close together, at which
+  // point the fragment ends early and evaluates something other than what was written. Pinned with
+  // the fix beside it, so the next author meets the rule here rather than in a truncated prompt.
+  assert.throws(
+    () => renderTemplate('${{ JSON.stringify({a:{b:1}}) }}', {}),
+    (err: unknown) => err instanceof TemplateFragmentError,
+    'the scan stops at the inner `}}`, so what is evaluated is not what was written',
+  )
+  // One space between the closing braces, and the same expression renders.
+  assert.equal(renderTemplate('${{ JSON.stringify({a:{b:1} }) }}', {}), '{"a":{"b":1}}')
+})

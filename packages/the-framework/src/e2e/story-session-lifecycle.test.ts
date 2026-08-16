@@ -1,6 +1,5 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { join } from 'node:path'
 import { makeWorld, waitFor, withFakeAwait, git } from './harness.js'
 import {
   onRun,
@@ -142,12 +141,9 @@ test("publish a finished session: push its branch from the handoff panel (#799)"
   const rpc = world.rpc
   try {
     const project = await world.addProject()
-    // A real remote for the story: a bare repo standing in for origin, so the push is a real
-    // git push and the handoff panel's pushed flag comes from the remote, not from a stub.
-    const remote = join(world.home, 'origin.git')
-    await git(world.home, 'init', '-q', '--bare', remote)
-    await git(project.cwd, 'remote', 'add', 'origin', remote)
-
+    // The fixture already carries a bare `origin` (the harness gives every project one, since the
+    // retention rule is about the remote), so the push here is a real git push and the handoff
+    // panel's pushed flag comes from the remote rather than from a stub.
     const runId = await world.startRun(project, 'Ship the settings page', { handoff: 'local' })
     await world.waitRun(project, runId, 'done')
 

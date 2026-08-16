@@ -64,10 +64,11 @@ export function SessionActionsMenu({
   const info = sessionInfo(events)
   const session = describeSessionLink(info)
 
-  // Whether this session still has a checkout of its own. A live run is working in one, and a
-  // finished run only keeps one when it was retained (#737) — a clean run has had it removed by
-  // teardown. Without this the folder item promised the session's folder and silently opened the
-  // project root instead, because `resolveRunCheckout` falls back there once the worktree is gone.
+  // Whether this session still has a checkout of its own. A live run is working in one; a finished
+  // run only keeps one while its work has not reached the remote (#737/E5), since that is what
+  // teardown waits for before reclaiming it. Without this the folder item promised the session's
+  // folder and silently opened the project root instead, because `resolveRunCheckout` falls back
+  // there once the worktree is gone.
   const hasOwnFolder = active || retainedWorktree
 
   // What to put on the clipboard to pick this session back up in a terminal (#1195). `mkdir -p`

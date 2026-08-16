@@ -201,6 +201,12 @@ export async function makeWorld(): Promise<StoryWorld> {
       }
       await git(cwd, 'add', '-A')
       await git(cwd, 'commit', '-q', '-m', 'seed')
+      // A bare repo standing in for `origin`, because a real project has one and the retention
+      // rule is about it (E5): a session's checkout is reclaimed once its work reaches the remote,
+      // so a fixture with nowhere to push would keep every checkout forever.
+      const origin = join(cwd, 'origin.git')
+      await git(cwd, 'init', '-q', '--bare', origin)
+      await git(cwd, 'remote', 'add', 'origin', origin)
       const added = await rpc(sendAddProject)(cwd, false)
       if (!added.ok) throw new Error(`could not register the fixture repo: ${added.error}`)
       return { id: projectId(resolve(cwd)), cwd }

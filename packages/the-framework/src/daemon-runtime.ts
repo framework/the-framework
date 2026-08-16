@@ -16,10 +16,7 @@ import {
   listRuns,
   findRun,
   archivedRunPaths,
-  commitPendingWork,
   currentBranch,
-  removeWorktree,
-  pruneWorktrees,
   readLiveMetas,
   readLiveMeta,
   resolveRunEventsPath,
@@ -39,6 +36,7 @@ import { runBranchFor } from './dashboard/run-handoff.js'
 import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
 import { tailEvents, tailRunEvents } from './dashboard-rpc/events-tail.js'
 import { ensureSessionsIgnored, resolveUserDir } from './sessions.js'
+import { removeProjectWorktree } from './worktrees.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId, topicScratchPath } from './registry.js'
 import { isTicketPath } from './tickets.js'
@@ -96,12 +94,16 @@ export async function cleanupTimedOutWorktree(repo: string, runId: string, err: 
 }
 
 /**
- * Retire a finished topic run's scratch dir (#1120), by the same retention rule as a worktree
- * ({@link createProjectRuntime}'s tearDownWorktree): a run that finished cleanly has nothing left to
- * look at, so its scratch goes; a failed or stopped run keeps it, which is when you want to see what
- * it died holding. The scratch is not a git checkout, so there is no branch to preserve and no work
- * to commit — the run's own `run.json`/`events.jsonl` live inside it and go with it. Best-effort:
- * this runs off a process-exit event with nothing to return to.
+ * Retire a finished topic run's scratch dir (#1120): a run that finished cleanly has nothing left
+ * to look at, so its scratch goes; a failed or stopped run keeps it, which is when you want to see
+ * what it died holding.
+ *
+ * Deliberately *not* the worktree rule (E5). That rule is "only remove what is on the remote",
+ * which is what makes every removal recoverable — and a scratch dir is not a git checkout, so
+ * there is no branch to push and nowhere for its `run.json`/`events.jsonl` to be recoverable from.
+ * With nothing to push, the ending it had is the only signal there is.
+ *
+ * Best-effort: this runs off a process-exit event with nothing to return to.
  */
 export async function tearDownTopicScratch(scratchCwd: string): Promise<void> {
   const meta = await readLiveMeta(scratchCwd).catch(() => undefined)
@@ -548,17 +550,17 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
         // the session survives the repo being cleaned (#1179).
         const user = await resolveUserDir(projectCwd)
         await ensureSessionsIgnored(projectCwd, user).catch(() => false)
-        const meta = await archiveWorktreeRun(worktree, projectCwd, undefined, branch, user)
-        if (meta?.status !== 'done') return // failed / stopped / unreadable: keep it for inspection
-        // A finished run can still be holding an uncommitted edit (#786), and removing the
-        // checkout would destroy it. Commit it to the run's branch, which outlives the
-        // worktree; if that cannot be done, keep the checkout rather than take the diff with it.
-        if (!(await commitPendingWork(worktree))) {
-          console.log(`[framework] keeping worktree ${worktree}: its uncommitted work could not be committed`)
-          return
+        await archiveWorktreeRun(worktree, projectCwd, undefined, branch, user)
+        // One rule (E5): the checkout goes once its work is on the remote, whatever state the run
+        // ended in. `removeProjectWorktree` owns the whole sequence — commit what is pending, push
+        // the branch, remove only if the remote has it — so teardown, the sweep and the dashboard's
+        // Remove button are one behaviour. A push that cannot land keeps the checkout, and the
+        // sweep retries it later. It used to keep a failed or stopped run's checkout "for
+        // inspection", which meant those accumulated one per session until someone noticed.
+        if (runId) {
+          const outcome = await removeProjectWorktree(projectCwd, runId)
+          if (!outcome.ok) console.log(`[framework] keeping worktree ${worktree}: ${outcome.error}`)
         }
-        await removeWorktree(projectCwd, worktree)
-        await pruneWorktrees(projectCwd)
       } catch {
         // A worktree we could not retire is a worktree left on disk, which is the safe direction.
       }
@@ -970,9 +972,9 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, agentPre
    * run already handles by aborting cleanly and group-killing its agent, and a SIGKILL if it will
    * not go. Only runs in `activeRuns` — a run this daemon merely steers is not its to stop.
    *
-   * What is stopped here is not lost, it is just not restarted for you: the run keeps its worktree
-   * and branch (a run that ends `stopped` is retained, see tearDownWorktree), so the next start
-   * continues the same conversation in the same checkout — when you ask for it.
+   * What is stopped here is not lost, it is just not restarted for you: the run keeps its branch,
+   * and its checkout too until the work reaches the remote (E5), so the next start continues the
+   * same conversation in the same checkout — when you ask for it.
    */
   const stopRuns = async (graceMs = 5000): Promise<number> => {
     const stopping = [...activeRuns.entries()]

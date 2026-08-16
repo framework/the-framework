@@ -4,7 +4,9 @@ import {
   listWorktreeDirs,
   listRuns,
   readLiveMetas,
+  branchPushed,
   commitPendingWork,
+  currentBranch,
   removeWorktree,
   pruneWorktrees,
   worktreePath,
@@ -14,6 +16,7 @@ import {
   FRAMEWORK_DIR,
   type RunStatus,
 } from './store/index.js'
+import { pushRunBranch } from './dashboard/run-handoff.js'
 
 /** A retained worktree and the run that left it behind (#752). */
 export interface WorktreeRow {
@@ -90,20 +93,20 @@ async function sizeOf(cwd: string, runId: string): Promise<{ sizeBytes?: number 
 }
 
 /**
- * Remove one retained worktree (#752/#737): the one implementation behind both surfaces that
- * offer it: the sweep and the dashboard's Remove button (#982). They were
- * two copies of the same checks and had already drifted, so a bogus session id read as a raw git
- * error on one and a plain sentence on the other.
+ * Remove one retained worktree (#752/#737/E5): the one implementation behind every surface that
+ * removes one — the sweep, teardown, and the dashboard's Remove button (#982).
+ *
+ * **One rule: only what is on the remote may go.** The work is committed to the session's branch,
+ * the branch is pushed, and the checkout is removed only once the remote has it. Every deletion is
+ * therefore recoverable, and nothing local is ever the last copy of anything. It replaced three
+ * interacting rules that each asked *what state did this session end in* — a clean finish removes
+ * the checkout, a failure or stop keeps it, a merged branch reclaims it later via two different
+ * "landed" signals — where the question that actually matters is *is this recoverable yet*. There
+ * is one failure mode now, and it is legible: the push did not land, so the checkout stays and the
+ * reason says why.
  *
  * Refuses while the run is still going — a run's checkout is where its agent is working, and Stop
- * is how you end a run, not pulling the floor out from under it. The run's history was archived
- * into the repo when it finished, so removal costs no history.
- *
- * Commits whatever the checkout is still holding before removing it, exactly as teardown does
- * (#786), and refuses when that commit fails (#982). A worktree is only *retained* when its run
- * failed or was stopped, which is precisely when it is still holding uncommitted agent work — and
- * {@link removeWorktree} forces past a dirty tree, so without this both surfaces reliably deleted
- * the very diff the checkout was kept for.
+ * is how you end a run, not pulling the floor out from under it.
  */
 export async function removeProjectWorktree(
   cwd: string,
@@ -119,10 +122,23 @@ export async function removeProjectWorktree(
   }
   const path = worktreePath(cwd, runId)
   try {
+    // `removeWorktree` forces past a dirty tree, so an uncommitted edit has to be on the branch
+    // before the checkout can go — otherwise the very diff the checkout held is what is deleted.
     if (!(await commitPendingWork(path))) {
       return {
         ok: false,
         error: `session ${runId} has uncommitted work that could not be committed; its worktree was kept`,
+      }
+    }
+    const branch = await currentBranch(path)
+    if (!branch) return { ok: false, error: `session ${runId} is on no branch; its worktree was kept` }
+    if (!(await branchPushed(cwd, branch))) {
+      // Pushing is what makes the removal recoverable, so it is attempted here rather than
+      // required of the caller. A repo with no remote never gets past this, which is the honest
+      // answer: there is nowhere for the work to be recoverable from.
+      const pushed = await pushRunBranch(cwd, branch)
+      if (!pushed.ok) {
+        return { ok: false, error: `${branch} is not on the remote (${pushed.error}); its worktree was kept` }
       }
     }
     await opts.beforeRemove?.(runId)
@@ -201,7 +217,7 @@ export async function deleteProjectRun(cwd: string, runId: string, opts: DeleteR
 /**
  * Remove every retained worktree whose run is not live (#752): the "clean all of this up" case.
  * A live run keeps its checkout and is reported as skipped, so the count always adds up to what
- * the list showed.
+ * the list showed — and so does one whose branch could not reach the remote (E5).
  */
 export async function pruneProjectWorktrees(cwd: string): Promise<PruneResult> {
   const result: PruneResult = { removed: [], skipped: [] }

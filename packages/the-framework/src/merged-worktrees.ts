@@ -1,33 +1,29 @@
 import { listProjectWorktrees, removeProjectWorktree, type RemoveResult, type WorktreeRow } from './worktrees.js'
-import { listRuns, type RunMeta } from './store/index.js'
-import { readRunHandoff, runBranchFor, type RunHandoff } from './dashboard/run-handoff.js'
 
-// Auto-remove a session's worktree once its branch has landed (#1036).
+// Reclaim a session's checkout once its work is on the remote (#1036/E5).
 //
-// A run that failed or was stopped keeps its checkout so you can look at what it was holding
-// (#752), and nothing removed those on a timer — so a machine accumulated a full checkout per
-// such session forever, and the only cure was noticing and clicking Remove. Once the work has
-// landed, the checkout is the one copy of it that costs disk and carries no information: the
-// commits are in the base, the branch is still there, and the session's row and replayable log
-// are untouched.
+// A worktree used to be kept or reclaimed by what state its run ended in: a clean finish removed
+// it, a failure or stop kept it "so you can look at what it was holding" (#752), and a merged
+// branch reclaimed it later — through two different "landed" signals, because a squash merge
+// rewrites the commits and the local ancestor check never fires. Nothing removed the rest on a
+// timer, so a machine accumulated one full checkout per failed session forever.
 //
-// It removes the *checkout*, never the history. That is `removeProjectWorktree`'s existing
-// contract (#752/#982) and the whole reason this can be automatic: the branch stays, the session
-// stays, and everything this deletes is reconstructable with `git worktree add`.
-
-/** How a branch was found to have landed. */
-export type LandedVia = 'branch' | 'pr'
+// One rule replaces all of it: **only what is on the remote may go**. Every deletion is
+// recoverable, because the remote holds a copy, and the question stops being *how did this end*
+// and becomes *is it pushed yet* — one predicate, checkable at any moment, with one failure mode.
+//
+// The sweep is what makes that rule reach the sessions it could not reach at teardown: a push that
+// failed then (offline, no auth, a rejected non-fast-forward) simply succeeds on a later pass. It
+// removes the *checkout*, never the history: the branch stays, the session's row and replayable log
+// stay, and everything it deletes is reconstructable with `git worktree add`.
 
 /** One worktree this sweep removed. */
 export interface RemovedWorktree {
   /** The run id, which is also the worktree's directory name. */
   runId: string
-  branch: string
-  /** Which signal said it landed: merged into the base locally, or a merged PR on GitHub. */
-  via: LandedVia
 }
 
-/** A landed worktree that could not be removed, and git's reason. */
+/** A worktree the sweep tried to reclaim and could not, and why. */
 export interface FailedRemoval {
   runId: string
   error: string
@@ -36,7 +32,7 @@ export interface FailedRemoval {
 /** What {@link removeMergedWorktrees} did. */
 export interface MergedSweepResult {
   removed: RemovedWorktree[]
-  /** Landed worktrees whose removal failed. A worktree that has *not* landed is not reported: it was never a candidate. */
+  /** Worktrees it tried and could not reclaim — most often a branch it could not push. */
   failed: FailedRemoval[]
 }
 
@@ -44,96 +40,30 @@ export interface MergedSweepResult {
 export interface MergedSweepDeps {
   /** The worktrees on disk (default {@link listProjectWorktrees}). */
   worktrees?: (cwd: string) => Promise<WorktreeRow[]>
-  /** The project's archived runs (default {@link listRuns}), for the branch a row did not record. */
-  runs?: (cwd: string) => Promise<RunMeta[]>
-  /** Reads a branch's state (default {@link readRunHandoff}). */
-  handoff?: (cwd: string, branch: string) => Promise<RunHandoff | undefined>
   /** Removes one worktree (default {@link removeProjectWorktree}). */
   remove?: (cwd: string, runId: string) => Promise<RemoveResult>
 }
 
 /**
- * Whether a branch's state counts as landed, and by which signal.
+ * Reclaim every retained worktree in `cwd` whose work can reach the remote (E5).
  *
- * Both signals, because either one alone is wrong here.
- *
- * `merged` (`git branch --merged <base>`) is the stronger of the two: it is proof the commits are
- * reachable from the local base, which is exactly the "still recoverable" bar this feature has to
- * clear before deleting anything. But it only holds for a merge that kept the commits — a squash
- * or rebase merge rewrites them, so the branch never becomes an ancestor of the base and this
- * signal never fires. On a repo with squash-merge on (this one included) that is most merges, and
- * a sweep gated on it alone would almost never run.
- *
- * A merged PR closes that gap: GitHub saying MERGED is a statement that the work is in the base
- * branch, however it was squashed getting there. It is the weaker signal only in that it describes
- * the remote — which is why the branch is kept either way, so a base you have not fetched yet
- * still leaves the commits sitting locally on the branch.
- *
- * Deliberately not `pr.state === 'CLOSED'`: a closed-unmerged PR means the work was *rejected*,
- * and the checkout of rejected work is the one a human is most likely to still want to read.
- */
-export function landedVia(state: RunHandoff): LandedVia | undefined {
-  if (state.merged) return 'branch'
-  if (state.pr?.state === 'MERGED') return 'pr'
-  return undefined
-}
-
-/**
- * Remove every retained worktree in `cwd` whose branch has landed (#1036).
- *
- * Conservative at every step where the answer is not clear: a live run keeps its checkout (it is
- * where its agent is working), a branch that no longer exists is left alone, and a branch whose
- * state cannot be read is skipped rather than guessed at — an unreadable repo must never be a
- * reason to delete a checkout.
- *
- * Removal itself is {@link removeProjectWorktree}, not a second copy of it, so the automatic path
- * and the manual one (the dashboard's Remove button) are one
- * behaviour. That also means uncommitted work in a landed checkout is committed to the kept branch
- * before the checkout goes, exactly as it is when a human removes it: still recoverable, just no
- * longer occupying disk.
+ * The decision is entirely {@link removeProjectWorktree}'s — commit what is pending, push the
+ * branch, remove only once the remote has it — so the automatic path and the manual one (the
+ * dashboard's Remove button) are one behaviour rather than two that can disagree. This adds only
+ * the loop and the one thing it must never touch: a live run's checkout, which is where its agent
+ * is working.
  */
 export async function removeMergedWorktrees(cwd: string, deps: MergedSweepDeps = {}): Promise<MergedSweepResult> {
   // Sizes off: `du` over every retained checkout is the expensive part of the listing, and a sweep
   // that only decides removal never reads the number.
   const worktrees = deps.worktrees ?? ((path: string) => listProjectWorktrees(path, { sizes: false }))
-  const runs = deps.runs ?? listRuns
-  const handoff = deps.handoff ?? readRunHandoff
   const remove = deps.remove ?? removeProjectWorktree
 
   const result: MergedSweepResult = { removed: [], failed: [] }
-  const rows = await worktrees(cwd).catch((): WorktreeRow[] => [])
-  if (rows.length === 0) return result
-  // Read once for the whole sweep: `runBranchFor` falls back to the session name for a run
-  // archived before the branch was recorded (#799), and the row does not carry one.
-  const metas = await runs(cwd).catch((): RunMeta[] => [])
-
-  for (const row of rows) {
-    // A run's checkout is where its agent is working. Stop is how you end a run.
+  for (const row of await worktrees(cwd).catch((): WorktreeRow[] => [])) {
     if (row.live) continue
-    const meta = metas.find(run => run.id === row.runId)
-    const branch = runBranchFor(meta ?? { id: row.runId, ...(row.branch ? { branch: row.branch } : {}) })
-    const state = await handoff(cwd, branch).catch(() => undefined)
-    // No answer, or the branch is gone: not evidence the work landed, so the checkout stays.
-    // A branch that no longer exists is the one case where the "recoverable from git" promise
-    // would be a lie, which makes it the last checkout to delete rather than the first.
-    if (!state || !state.exists) continue
-    const via = landedVia(state)
-    if (!via) continue
-    // The ancestor signal cannot tell a branch whose commits are now in the base from one that
-    // never had any (#1325): both answer `base..branch` with nothing, and a zero-commit branch is
-    // trivially reachable from the base. A run that died at boot is exactly the second case, and
-    // its checkout is the one most worth reading — so it was being destroyed for looking like the
-    // success it is the opposite of.
-    //
-    // `empty` cannot be the guard, tempting as it looks: a genuinely merged branch is empty by the
-    // same measure (`base..branch` is the branch's own commits, run-handoff.ts:276), so gating on
-    // it would switch the local signal off altogether. What separates the two is what the run did,
-    // which only its meta records. So the ancestor signal on its own reclaims a checkout for a run
-    // that finished cleanly; anything else — failed, stopped, or a run whose meta is missing
-    // entirely — needs the PR to say the work landed.
-    if (via === 'branch' && meta?.status !== 'done') continue
     const outcome = await remove(cwd, row.runId)
-    if (outcome.ok) result.removed.push({ runId: row.runId, branch, via })
+    if (outcome.ok) result.removed.push({ runId: row.runId })
     else result.failed.push({ runId: row.runId, error: outcome.error })
   }
   return result
@@ -142,10 +72,9 @@ export async function removeMergedWorktrees(cwd: string, deps: MergedSweepDeps =
 /**
  * How long between sweeps.
  *
- * Ten minutes, because merging is human-paced: nobody merges a PR and then watches for the
- * checkout to disappear, and the reason this exists is disk reclaimed over days. It is also what
- * the sweep costs — a `gh pr view` per retained worktree, behind a 60s cache — so a minute-poll
- * would spend an order of magnitude more `gh` on an answer that changes a few times a day.
+ * Ten minutes, because this is about disk reclaimed over days rather than seconds: a session whose
+ * push landed at teardown is already gone, and what is left here is the one whose push could not
+ * land yet — a machine that was offline, or a remote that was not reachable.
  */
 const DEFAULT_MERGED_SWEEP_INTERVAL_MS = 10 * 60 * 1000
 
@@ -167,7 +96,7 @@ export interface MergedSweepOptions {
 }
 
 /**
- * Sweep every registered project's landed worktrees on a timer (#1036).
+ * Sweep every registered project's reclaimable worktrees on a timer (#1036).
  *
  * Says what it removed rather than removing it silently: a checkout vanishing from under someone
  * with no line explaining why reads as a bug, even when the work behind it is safe.
@@ -186,13 +115,11 @@ export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktr
       const { removed, failed } = await sweep(project.path).catch((): MergedSweepResult => ({ removed: [], failed: [] }))
       for (const item of removed) {
         opts.log(
-          `[framework] removed the worktree for session ${item.runId}: ${item.branch} ${
-            item.via === 'pr' ? 'was merged on GitHub' : 'is merged into the base'
-          }. The branch and the session are kept.`,
+          `[framework] removed the worktree for session ${item.runId}: its branch is on the remote. The branch and the session are kept.`,
         )
       }
       for (const item of failed) {
-        opts.log(`[framework] could not remove the landed worktree for session ${item.runId}: ${item.error}`)
+        opts.log(`[framework] kept the worktree for session ${item.runId}: ${item.error}`)
       }
     }
   }
@@ -210,7 +137,7 @@ export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktr
   }
 
   // Swept once at start-up, not only after the first interval: the case this exists for is a
-  // machine that was off (or a daemon that was down) while the work was merged.
+  // machine that was off (or a daemon that was down) while the work could not be pushed.
   void tick()
   const timer = setInterval(() => void tick(), opts.intervalMs ?? DEFAULT_MERGED_SWEEP_INTERVAL_MS)
   timer.unref?.()

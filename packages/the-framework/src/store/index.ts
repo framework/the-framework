@@ -39,6 +39,7 @@ export {
   listWorktrees,
   parseWorktreeList,
   commitPendingWork,
+  branchPushed,
   removeWorktree,
   pruneWorktrees,
   worktreePath,

@@ -157,6 +157,10 @@ async function projectWithDirtyWorktree(): Promise<{
   await writeFile(join(dir, 'index.html'), '<h1>Hello, world!</h1>\n')
   await git(['add', '-A'], dir)
   await git(['commit', '-m', 'init'], dir)
+  // A real bare `origin`: the removal rule is "only what is on the remote may go" (E5), so the
+  // checkout cannot be reclaimed without somewhere to push it.
+  await git(['init', '-q', '--bare', join(dir, 'origin.git')], dir)
+  await git(['remote', 'add', 'origin', join(dir, 'origin.git')], dir)
 
   const runId = 'run1'
   const { path, branch } = await addWorktree(dir, { runId, branch: runBranchName(runId) }, git)
@@ -183,12 +187,17 @@ async function projectWithDirtyWorktree(): Promise<{
   }
 }
 
-test('the dashboard Remove commits the checkout it takes away, rather than forcing past it (#982)', async () => {
+test('the dashboard Remove commits and pushes the checkout it takes away (#982/E5)', async () => {
   const ctx = await projectWithDirtyWorktree()
   try {
     assert.deepEqual(await sendRemoveWorktree(ctx.projectId, ctx.runId), { ok: true })
-    const shown = await nodeGitRunner()(['show', `${ctx.branch}:index.html`], ctx.dir)
-    assert.match(shown, /Welcome!/, 'the uncommitted edit survived on the run branch')
+    const git = nodeGitRunner()
+    assert.match(await git(['show', `${ctx.branch}:index.html`], ctx.dir), /Welcome!/, 'the uncommitted edit survived on the run branch')
+    assert.match(
+      await git(['show', `refs/remotes/origin/${ctx.branch}:index.html`], ctx.dir),
+      /Welcome!/,
+      'and reached the remote, which is what made the removal recoverable',
+    )
   } finally {
     ctx.restore()
     await rm(ctx.dir, { recursive: true, force: true })

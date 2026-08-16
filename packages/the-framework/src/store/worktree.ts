@@ -268,3 +268,38 @@ export async function worktreeSize(path: string, run: SizeRunner = nodeSizeRunne
     return undefined
   }
 }
+
+/**
+ * Whether a branch is on the remote, with the local tip already there (E5).
+ *
+ * The one predicate the whole retention story is built on: nothing local is ever the last copy of
+ * work, so anything the remote has may be deleted and anything it does not have stays. It replaced
+ * three interacting rules — a clean finish removes the checkout, a failure keeps it, a merged
+ * branch reclaims it later — each of which asked *what state did this session end in* rather than
+ * *is this recoverable*.
+ *
+ * `git rev-parse` of the remote-tracking ref, then a merge-base check: the ref existing is not
+ * enough, because a branch pushed and then committed to again has a tip the remote has never seen.
+ * Reads only local refs (no fetch), so it is cheap enough to ask on every teardown — the remote ref
+ * is written by the push this is checking for, which is what makes that sound.
+ *
+ * Anything unreadable answers `false`. A repo with no remote configured therefore keeps every
+ * checkout, which is the honest outcome: there is nowhere for the work to be recoverable from.
+ */
+export async function branchPushed(
+  repo: string,
+  branch: string,
+  run: GitRunner = nodeGitRunner(),
+): Promise<boolean> {
+  try {
+    const local = (await run(['rev-parse', '--verify', `refs/heads/${branch}`], repo)).trim()
+    const remote = (await run(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo)).trim()
+    if (!local || !remote) return false
+    if (local === remote) return true
+    // The remote may be ahead (someone pushed on top): what matters is that our tip is in it.
+    await run(['merge-base', '--is-ancestor', local, remote], repo)
+    return true
+  } catch {
+    return false
+  }
+}

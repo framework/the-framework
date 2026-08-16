@@ -7,15 +7,18 @@ import { deleteProjectRun, removeProjectWorktree } from './worktrees.js'
 import { addWorktree, listRuns, runBranchName } from './store/index.js'
 import { nodeGitRunner } from './project.js'
 
-// #982: a worktree is only retained when its run failed or was stopped, which is exactly when it
-// is still holding uncommitted agent work — so the removal both surfaces offer has to commit
-// first, the way teardown does (#786), rather than force past a tree git calls unclean.
+// #982/E5: one rule decides every removal — the work is committed to the session's branch, the
+// branch is pushed, and the checkout goes only once the remote has it. So nothing local is ever
+// the last copy of anything, and the one failure mode is legible: the push did not land.
 // Against real git, because "was the diff actually destroyed" is not a question a fake answers.
 
 const RUN_ID = 'run1'
 
-/** A repo whose retained worktree holds an uncommitted edit, as a failed run leaves one. */
-async function repoWithDirtyWorktree(): Promise<{ repo: string; path: string; branch: string }> {
+/**
+ * A repo whose retained worktree holds an uncommitted edit, as a failed run leaves one, with a bare
+ * repo standing in for `origin` — real, since whether the work reached it is the whole subject.
+ */
+async function repoWithDirtyWorktree(opts: { remote?: boolean } = {}): Promise<{ repo: string; path: string; branch: string }> {
   const git = nodeGitRunner()
   // realpath so the mkdtemp path matches what git reports (the /var -> /private/var symlink).
   const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-worktrees-')))
@@ -25,18 +28,45 @@ async function repoWithDirtyWorktree(): Promise<{ repo: string; path: string; br
   await writeFile(join(repo, 'index.html'), '<h1>Hello, world!</h1>\n')
   await git(['add', '-A'], repo)
   await git(['commit', '-m', 'init'], repo)
+  if (opts.remote !== false) {
+    await git(['init', '-q', '--bare', join(repo, 'origin.git')], repo)
+    await git(['remote', 'add', 'origin', join(repo, 'origin.git')], repo)
+  }
   const { path, branch } = await addWorktree(repo, { runId: RUN_ID, branch: runBranchName(RUN_ID) }, git)
   await writeFile(join(path, 'index.html'), '<h1>Welcome!</h1>\n')
   return { repo, path, branch }
 }
 
-test('removing a retained worktree keeps the work it was holding, on the run branch (#982)', async () => {
+test('removing a retained worktree keeps the work it was holding, on the branch and the remote (#982/E5)', async () => {
   const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
   try {
     assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
     await assert.rejects(() => stat(path), 'the checkout is gone')
-    const shown = await nodeGitRunner()(['show', `${branch}:index.html`], repo)
-    assert.match(shown, /Welcome!/, 'the uncommitted edit survived on the branch instead of being forced away')
+    assert.match(
+      await git(['show', `${branch}:index.html`], repo),
+      /Welcome!/,
+      'the uncommitted edit survived on the branch instead of being forced away',
+    )
+    assert.match(
+      await git(['show', `refs/remotes/origin/${branch}:index.html`], repo),
+      /Welcome!/,
+      'and on the remote, which is what made the deletion recoverable',
+    )
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a worktree whose branch cannot reach the remote is kept, and says so (E5)', async () => {
+  // No remote configured: nothing is recoverable, so nothing is deleted.
+  const { repo, path } = await repoWithDirtyWorktree({ remote: false })
+  try {
+    const result = await removeProjectWorktree(repo, RUN_ID)
+    assert.equal(result.ok, false)
+    assert.match(result.ok === false ? result.error : '', /not on the remote/)
+    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
+    assert.match(await readFile(join(path, 'index.html'), 'utf8'), /Welcome!/, 'with the work still in it')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

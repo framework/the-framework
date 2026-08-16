@@ -9,7 +9,6 @@ import {
   sendMessage,
   sendStop,
   sendSetHandoff,
-  sendRemoveWorktree,
   sendDeleteSession,
 } from '../dashboard-rpc/control.telefunc.js'
 
@@ -126,7 +125,7 @@ test('rearm the handoff mid-run; the meta a reloaded tab reads follows (#1102)',
   }
 })
 
-test('stop a session; its checkout is retained for inspection, then removed and deleted (#737/#1032)', async () => {
+test('stop a session; its checkout is reclaimed once the work is on the remote, then deleted (#737/#1032/E5)', async () => {
   const world = await makeWorld()
   const rpc = world.rpc
   try {
@@ -142,21 +141,14 @@ test('stop a session; its checkout is retained for inspection, then removed and 
     tail.stop()
     await world.waitRun(project, runId, 'stopped')
 
-    // A stopped session keeps its worktree — that is exactly when the user wants to see what it
-    // was holding — and the dashboard offers removing it.
-    const retained = await waitFor(async () => {
-      const ids = await rpc(onRetainedWorktrees)(project.id)
-      return ids.includes(runId) ? ids : undefined
-    }, 'the stopped worktree to be retained')
-    assert.deepEqual(retained, [runId])
-    const worktree = await rpc(onRunWorktree)(project.id, runId)
-    assert.equal(worktree?.own, true)
-
-    // Remove keeps the session row (history), only the checkout goes.
-    const removed = await rpc(sendRemoveWorktree)(project.id, runId)
-    assert.equal(removed.ok, true, `remove failed: ${'error' in removed ? removed.error : ''}`)
+    // One rule (E5): the checkout goes once its work is on the remote, whatever the session did.
+    // A stopped run used to keep it "for inspection", and nothing ever took those back — so a
+    // machine accumulated one full checkout per stopped session until a human noticed. What was
+    // stopped is not lost: the branch is on the remote, and `git worktree add` brings it back.
+    await world.waitRetired(project, runId)
     assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [])
-    assert.ok((await rpc(onRuns)(project.id)).some(r => r.id === runId && r.status === 'stopped'))
+    assert.equal((await rpc(onRunWorktree)(project.id, runId))?.own, false, 'no checkout of its own is left')
+    assert.ok((await rpc(onRuns)(project.id)).some(r => r.id === runId && r.status === 'stopped'), 'the session row survives')
 
     // Delete is the destructive sibling: the row itself disappears from the dashboard.
     const deleted = await rpc(sendDeleteSession)(project.id, runId)

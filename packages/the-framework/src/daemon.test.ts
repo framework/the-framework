@@ -267,7 +267,7 @@ setTimeout(() => {}, 800)
   }
 })
 
-test('a finished run loses its worktree; a failed one keeps it, history saved either way (#737)', async () => {
+test('a run loses its worktree once its work is on the remote, whatever the run did (#737/E5)', async () => {
   const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-daemon-teardown-')))
   const git = nodeGitRunner()
   const ac = new AbortController()
@@ -279,6 +279,10 @@ test('a finished run loses its worktree; a failed one keeps it, history saved ei
     await writeFile(join(cwd, 'README.md'), '# t\n')
     await git(['add', '-A'], cwd)
     await git(['commit', '-m', 'init'], cwd)
+    // A real bare repo for `origin`: the rule this asserts is about the remote, so it is real
+    // rather than stubbed.
+    await git(['init', '-q', '--bare', join(cwd, 'origin.git')], cwd)
+    await git(['remote', 'add', 'origin', join(cwd, 'origin.git')], cwd)
 
     // The stub plays a run: it writes the meta a real run would leave behind, with the status
     // read from a file the test controls, then exits so the daemon's teardown fires.
@@ -329,28 +333,36 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, runId + '\\n')
     }
     const archived = async (runId: string): Promise<boolean> => (await archivedMeta(runId)) !== undefined
 
-    // A clean finish: history archived into the repo, worktree gone.
+    /** Poll until the run's checkout is off disk. */
+    const worktreeGone = async (runId: string): Promise<boolean> => {
+      for (let i = 0; i < 150; i++) {
+        const gone = await stat(join(cwd, FRAMEWORK_DIR, 'worktrees', runId)).then(() => false, () => true)
+        if (gone) return true
+        await new Promise(r => setTimeout(r, 20))
+      }
+      return false
+    }
+
+    // A clean finish: history archived into the repo, work pushed, worktree gone.
     const doneId = await runWith('done', 1)
     assert.equal(await archived(doneId), true, "a finished run's history is copied into the project")
-    let gone = false
-    for (let i = 0; i < 150 && !gone; i++) {
-      gone = await stat(join(cwd, FRAMEWORK_DIR, 'worktrees', doneId)).then(() => false, () => true)
-      if (!gone) await new Promise(r => setTimeout(r, 20))
-    }
-    assert.equal(gone, true, 'and its worktree is removed')
+    assert.equal(await worktreeGone(doneId), true, 'and its worktree is removed')
     // The branch is the only handle left on the work once the checkout goes, so it is recorded
     // while the worktree still exists (#799) — otherwise the handoff has nothing to read.
     const doneMeta = await archivedMeta(doneId)
     assert.equal(doneMeta?.branch, `the-framework/run-${doneId}`, "the finished run's branch is recorded")
+    assert.match(
+      await git(['log', '--format=%s', `refs/remotes/origin/the-framework/run-${doneId}`], cwd),
+      /\S/,
+      'the work reached the remote, which is what let the checkout go',
+    )
 
-    // A failure: history archived too, but the checkout is kept so it can be inspected.
+    // A failure goes the same way (E5): how the run ended is not what decides this, whether its
+    // work is recoverable is. It used to be kept "for inspection", which meant one full checkout
+    // accumulated per failed session until a human noticed.
     const failedId = await runWith('failed', 2)
     assert.equal(await archived(failedId), true, "a failed run's history is copied too")
-    assert.equal(
-      (await stat(join(cwd, FRAMEWORK_DIR, 'worktrees', failedId, 'README.md'))).isFile(),
-      true,
-      'and its worktree is retained, content and all, for inspection',
-    )
+    assert.equal(await worktreeGone(failedId), true, 'and its checkout goes too, since the remote has its branch')
 
     ac.abort()
     await done

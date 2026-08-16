@@ -243,6 +243,24 @@ test('sanitizePreferences keeps a valid run target and drops junk (#1050)', asyn
   assert.deepEqual(await readPreferences(fs, ENV), {})
 })
 
+test('sanitizePreferences reads a pre-B5 handoff written as three booleans', async () => {
+  // Dropping the old keys would not have left those users where they were: absent means the
+  // default, and the default publishes. Someone who stored "push nothing" would have come back from
+  // an upgrade to branches on the remote and PRs open — done under their name, by a tool they had
+  // told not to.
+  const stored = (preferences: Record<string, unknown>) =>
+    readPreferences(memFs({ [FILE]: JSON.stringify({ projects: [], preferences }) }), ENV)
+  assert.deepEqual(await stored({ autoPushBranch: false }), { handoff: 'local' })
+  assert.deepEqual(await stored({ autoPushBranch: true, autoOpenPr: false }), { handoff: 'push' })
+  assert.deepEqual(await stored({ autoMerge: true }), { handoff: 'merge' })
+  // The unreachable combination resolves down, and the new key wins wherever both were written.
+  assert.deepEqual(await stored({ autoPushBranch: false, autoOpenPr: true }), { handoff: 'local' })
+  assert.deepEqual(await stored({ handoff: 'push', autoMerge: true }), { handoff: 'push' })
+  // Saying none of them is still saying nothing: the ladder stays absent rather than being pinned
+  // to the default, so a later change of default still reaches these users.
+  assert.deepEqual(await stored({ vanilla: true }), { vanilla: true })
+})
+
 test('sanitizePreferences keeps an absolute reposDirectory and drops junk (#1123)', async () => {
   // Another string preference the boolean-only loop would eat: kept only as a non-empty absolute
   // path, so a relative or blank value never lands in the file.

@@ -41,11 +41,19 @@ export type RpcHandler = (...args: never[]) => unknown
  * Built from the modules' own exports rather than listed by hand, so a function that is exported
  * and simply never registered — the failure that shipped per-project preferences broken (#866),
  * a 400 and nothing else — cannot happen: the name IS the export name.
+ *
+ * Null-prototype, because the name is a path segment off an unauthenticated request and this table
+ * is indexed by it directly. With `Object.prototype` behind it, `POST /_rpc/constructor` found
+ * `Object` and answered 200 with whatever it was handed, and `__proto__` / `toString` / `valueOf`
+ * were reachable too — 500s rather than the 404 a name that is not an RPC has to get.
  */
-export const RPC_HANDLERS: Record<string, RpcHandler> = Object.fromEntries(
-  [reads, control, projects, preferences, quota, devices]
-    .flatMap(module => Object.entries(module))
-    .filter((entry): entry is [string, RpcHandler] => typeof entry[1] === 'function'),
+export const RPC_HANDLERS: Record<string, RpcHandler> = Object.assign(
+  Object.create(null) as Record<string, RpcHandler>,
+  Object.fromEntries(
+    [reads, control, projects, preferences, quota, devices]
+      .flatMap(module => Object.entries(module))
+      .filter((entry): entry is [string, RpcHandler] => typeof entry[1] === 'function'),
+  ),
 )
 
 /** The live event stream, which is a subscription rather than a call — see `rpc-serve.ts`. */

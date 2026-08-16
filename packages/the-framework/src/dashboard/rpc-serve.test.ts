@@ -84,6 +84,23 @@ test('an unknown RPC is a 404 naming it, not a hang or a crash', async () => {
   }
 })
 
+test('an inherited Object member is not an RPC', async () => {
+  // The name is a path segment off an unauthenticated request, indexed straight into the handler
+  // table. With `Object.prototype` behind it, `/_rpc/constructor` found `Object` and answered 200
+  // with whatever the caller sent; `__proto__` and `toString` reached members that are not
+  // handlers and 500'd. None of them is an RPC, so all of them are 404s.
+  const server = await mounted()
+  try {
+    for (const name of ['constructor', '__proto__', 'toString', 'valueOf', 'hasOwnProperty']) {
+      const { status, body } = await call(server.url, name, [{ smuggled: true }])
+      assert.equal(status, 404, `${name} answered ${status}`)
+      assert.match(body, new RegExp(`no such RPC: ${name.replace(/\W/g, '.')}`))
+    }
+  } finally {
+    await server.close()
+  }
+})
+
 test('an RPC that throws answers 500 and the daemon stays up', async () => {
   // A rejected promise inside the mount used to be an unhandled rejection, which takes the process
   // with it. A failing call is a failing call.

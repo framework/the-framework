@@ -38,6 +38,23 @@ test('parseFrameworkConfig reads the handoff rung (#1173/#1216)', () => {
   assert.throws(() => parseFrameworkConfig('handoff: true\n'), /"handoff" must be one of local \| push \| pr \| merge/)
 })
 
+test('parseFrameworkConfig reads a pre-B5 file by the three keys it replaced', () => {
+  // A committed `autoPushBranch: false` is a repo asking not to be published. Ignoring the key it
+  // says that with does not leave the repo where it was — it lands on the default, which pushes the
+  // branch and opens a PR the file declined. So the old spelling still resolves to a rung.
+  assert.deepEqual(parseFrameworkConfig('autoPushBranch: false\n'), { handoff: 'local' })
+  assert.deepEqual(parseFrameworkConfig('autoOpenPr: false\n'), { handoff: 'push' })
+  assert.deepEqual(parseFrameworkConfig('autoMerge: true\n'), { handoff: 'merge' })
+  // "PR without push" was never a state a session could honour; as a rung it resolves downward
+  // rather than turning the push back on.
+  assert.deepEqual(parseFrameworkConfig('autoPushBranch: false\nautoOpenPr: true\n'), { handoff: 'local' })
+  // Spelling both wins on the new key, and a file saying nothing still says nothing.
+  assert.deepEqual(parseFrameworkConfig('handoff: local\nautoMerge: true\n'), { handoff: 'local' })
+  assert.deepEqual(parseFrameworkConfig('vanilla: true\n'), { vanilla: true })
+  // Still typed, like every other key, and the error points at the spelling that replaced it.
+  assert.throws(() => parseFrameworkConfig('autoMerge: yes please\n'), /"autoMerge" must be a boolean/)
+})
+
 test('parseFrameworkConfig treats an empty document as {}', () => {
   assert.deepEqual(parseFrameworkConfig(''), {})
   assert.deepEqual(parseFrameworkConfig('# just a comment\n'), {})

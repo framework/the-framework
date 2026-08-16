@@ -1,5 +1,5 @@
 import { isAgentLocation, type AgentLocation } from './agent-location.js'
-import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
+import { isHandoffLevel, handoffFromStages, type HandoffLevel } from './handoff-level.js'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { isDriverName } from './driver-names.js'
@@ -347,6 +347,22 @@ const PREFERENCE_KEYS = Object.keys(BOOLEAN_PREFERENCES) as BooleanPreferenceKey
  * object never lands junk (or the wrong type) in the user's home file. */
 /** The color themes the dashboard offers (#725); anything else means the default `system`. */
 const KNOWN_THEMES = ['system', 'light', 'dark'] as const
+
+/**
+ * The rung a set of pre-B5 preferences means, or `undefined` when they say nothing about it.
+ *
+ * The defaults are the ones the three booleans carried, so preferences setting none of them land on
+ * the same `pr` an absent `handoff` lands on — this only ever changes the answer for a user who
+ * actually said something, which is exactly the case worth not losing.
+ */
+function legacyHandoffPreference(input: Record<string, unknown>): HandoffLevel | undefined {
+  const read = (key: string): boolean | undefined => (typeof input[key] === 'boolean' ? input[key] : undefined)
+  const stored = ['autoPushBranch', 'autoOpenPr', 'autoMerge'].map(read)
+  if (stored.every(v => v === undefined)) return undefined
+  const [pushed, opened, merged] = stored
+  const push = pushed ?? true
+  return handoffFromStages({ push, pr: push && (opened ?? true), merge: merged ?? false })
+}
 /** The run targets the dashboard offers (#1050/#610); anything else means the default `local`. */
 function sanitizePreferences(value: unknown): Preferences {
   if (typeof value !== 'object' || value === null) return {}
@@ -376,7 +392,15 @@ function sanitizePreferences(value: unknown): Preferences {
   // `target` (#1050) is a string, so the boolean-only PREFERENCE_KEYS loop would silently eat it;
   // it gets its own branch like `theme`, constrained to the known set (anything else = default `local`).
   if (isAgentLocation(input['target'])) preferences.target = input['target']
+  // `handoff` (B5) replaced `autoPushBranch` / `autoOpenPr` / `autoMerge`. A file written before
+  // that still spells the ladder as those three, and dropping them would read a stored "publish
+  // nothing" as the default — which pushes the branch and opens a PR. Migrated on read, so the
+  // first write back persists the rung and the old keys leave with it.
   if (isHandoffLevel(input['handoff'])) preferences.handoff = input['handoff']
+  else {
+    const legacy = legacyHandoffPreference(input)
+    if (legacy !== undefined) preferences.handoff = legacy
+  }
   // `autoSpendOffset` (#960) is the one numeric preference: a slider position in percentage
   // points, clamped so a hand-edited file cannot push the limit somewhere the slider could not.
   const offset = input['autoSpendOffset']

@@ -357,6 +357,37 @@ test('readLiveMeta gives up on an agent.json that is corrupt for good', async ()
   assert.equal(await readLiveMeta(CWD, fs), undefined)
 })
 
+const LEGACY_META = join(CWD, '.the-framework', 'run.json')
+
+test('readLiveMeta falls back to a pre-D5 run.json so an agent from before the rename is still seen (#1179)', async () => {
+  // D5 renamed the meta file agent.json; before it, the meta was run.json (the log kept its name).
+  // Without this fallback such an agent reads as absent — then the sweep archives/removes it as
+  // dead, losing a live agent's worktree or a crashed run's only history.
+  const seeded = memFs()
+  const store = await AgentStore.open(CWD, { fs: seeded, fresh: true, now: AT })
+  for (const e of RUN.slice(0, -1)) await store.append(e)
+  const fs = memFs({ [LEGACY_META]: seeded.files.get(META)!, [EVENTS]: seeded.files.get(EVENTS)! })
+
+  const live = await readLiveMeta(CWD, fs)
+  assert.ok(live, 'the pre-rename run is found, not read as absent')
+  assert.equal(live!.status, 'running')
+  assert.equal(live!.id, store.snapshot().id)
+})
+
+test('the current agent.json wins over a leftover run.json, even a torn one', async () => {
+  // Once migrated, both names can coexist. The new name is authoritative; the legacy one is only
+  // consulted when no agent.json exists at all, so a stale run.json never shadows the live meta.
+  const seeded = memFs()
+  const store = await AgentStore.open(CWD, { fs: seeded, fresh: true, now: AT })
+  for (const e of RUN.slice(0, -1)) await store.append(e)
+  const current = seeded.files.get(META)!
+  const fs = memFs({ [META]: current, [LEGACY_META]: '{ stale pre-rename junk', [EVENTS]: seeded.files.get(EVENTS)! })
+
+  const live = await readLiveMeta(CWD, fs)
+  assert.ok(live, 'the current meta is read')
+  assert.equal(live!.id, store.snapshot().id)
+})
+
 test('agent.json is renamed into place, never truncated where a reader can see it (#1540)', async () => {
   const fs = memFs()
   const written: string[] = []

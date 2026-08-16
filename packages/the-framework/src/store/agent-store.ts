@@ -38,6 +38,15 @@ export const EVENTS_FILE = 'events.jsonl'
 export const META_FILE = 'agent.json'
 
 /**
+ * The pre-D5 name of {@link META_FILE}. Read as a fallback wherever a live or worktree meta is
+ * loaded, so an agent started before the rename is still seen — healed and archived — rather than
+ * read as absent and swept away as dead. The events log ({@link EVENTS_FILE}) kept its name, so a
+ * meta under the old name still has its history beside it; the first heal rewrites the meta under
+ * the new name, migrating it. Reads only: nothing writes this name.
+ */
+export const LEGACY_META_FILE = 'run.json'
+
+/**
  * Where finished agents are archived, so the dashboard can list a project's run
  * history (#303). The live agent stays at `events.jsonl`/`agent.json` (the daemon
  * tails it); on {@link AgentStore.close} a copy lands here as `<id>.jsonl` +
@@ -471,6 +480,17 @@ async function readMetaFile(fs: StoreFs, path: string): Promise<AgentMeta | unde
 }
 
 /**
+ * Read the meta of the live/worktree agent in `dir`, preferring the current {@link META_FILE} and
+ * falling back to {@link LEGACY_META_FILE} for an agent written before the D5 rename. The new name
+ * wins even when torn (a transient re-read is right there; a stale pre-upgrade file is not), so the
+ * legacy name is consulted only when no `agent.json` exists at all.
+ */
+async function readMetaIn(fs: StoreFs, dir: string): Promise<AgentMeta | undefined> {
+  if (await fs.exists(join(dir, META_FILE))) return readMetaFile(fs, join(dir, META_FILE))
+  return readMetaFile(fs, join(dir, LEGACY_META_FILE))
+}
+
+/**
  * Write a {@link AgentMeta} file. The one owner of the on-disk encoding, symmetric to
  * {@link readMetaFile} — every meta write in this module goes through it.
  *
@@ -590,7 +610,7 @@ export class AgentStore {
     if (opts.continueAgent) {
       // Reopen: the log stays, the row keeps its original intent, and this process takes ownership
       // so a liveness probe (#716) reads the agent as alive rather than as an orphan.
-      const prior = await readMetaFile(fs, store.metaPath)
+      const prior = await readMetaIn(fs, dir)
       if (prior) {
         store.meta = { ...prior, status: 'running', pid: owner.pid, host: owner.host, updatedAt: now }
         store.pinnedIntent = prior.intent
@@ -658,7 +678,7 @@ export class AgentStore {
 
   /** Read the persisted meta snapshot, or `undefined` if none/unreadable. */
   readMeta(): Promise<AgentMeta | undefined> {
-    return readMetaFile(this.fs, this.metaPath)
+    return readMetaIn(this.fs, this.dir)
   }
 
   private writeMeta(): Promise<void> {
@@ -741,7 +761,7 @@ async function archiveAgent(fs: StoreFs, dir: string, meta: AgentMeta, eventsPat
  * {@link AgentStore.close} still leaves its history behind.
  */
 async function archivePriorAgent(fs: StoreFs, dir: string): Promise<void> {
-  const meta = await readMetaFile(fs, join(dir, META_FILE))
+  const meta = await readMetaIn(fs, dir)
   if (!meta?.id || !isSafeAgentId(meta.id)) return
   if (await fs.exists(archivePaths(dir, meta.id).meta)) return
   await archiveAgent(fs, dir, meta, join(dir, EVENTS_FILE))
@@ -814,7 +834,7 @@ export async function archiveWorktreeAgent(
 ): Promise<AgentMeta | undefined> {
   try {
     const worktreeDir = join(worktree, FRAMEWORK_DIR)
-    const live = await readMetaFile(fs, join(worktreeDir, META_FILE))
+    const live = await readMetaIn(fs, worktreeDir)
     if (!live?.id || !isSafeAgentId(live.id)) return undefined
     // The flip writes the worktree's own log + meta too (#1359): the death gains its `end`
     // event before the archive copies the log, so no reader — live tail or archived replay —
@@ -953,7 +973,7 @@ export async function reconcileOrphanedAgents(
   }
   // The live agent: flip it, then archive so a crash that skipped close() still
   // leaves the stopped agent in the history list.
-  const live = await readMetaFile(fs, join(dir, META_FILE))
+  const live = await readMetaIn(fs, dir)
   if (isDeadRunningAgent(live, isAlive)) {
     await stopAndArchiveLive(fs, dir, live)
     fixed++
@@ -967,7 +987,7 @@ export async function reconcileOrphanedAgents(
   for (const name of await fs.readdir(join(dir, WORKTREES_DIR))) {
     if (!isSafeAgentId(name)) continue
     const worktreeDir = join(dir, WORKTREES_DIR, name, FRAMEWORK_DIR)
-    const meta = await readMetaFile(fs, join(worktreeDir, META_FILE))
+    const meta = await readMetaIn(fs, worktreeDir)
     if (!isDeadRunningAgent(meta, isAlive)) continue
     // recordOrphanEnd rather than a bare status flip (#1359): the worktree's log gains the
     // `end` event first, so the archive below copies a stream that actually ends.
@@ -1014,7 +1034,7 @@ export async function readLiveMeta(
   isAlive: (pid: number) => boolean = isPidAlive,
 ): Promise<AgentMeta | undefined> {
   const dir = join(cwd, FRAMEWORK_DIR)
-  const meta = await readMetaFile(fs, join(dir, META_FILE))
+  const meta = await readMetaIn(fs, dir)
   if (!meta) return undefined
   // Only a provably dead owner heals here — 'unknown' (no pid / another host) is left alone.
   if (ownerLiveness(meta, isAlive) === 'dead') return stopAndArchiveLive(fs, dir, meta)

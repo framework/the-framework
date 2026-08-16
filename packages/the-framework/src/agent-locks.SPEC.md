@@ -1,4 +1,4 @@
-Serializes everything that touches one run's checkout, so a finishing run's cleanup and a user action on the same run (push, open a pull request, remove, resume) never run git against the same checkout at once.
+Serializes everything that touches one agent's checkout, so a finishing agent's cleanup and a user action on the same agent (push, open a pull request, remove, resume) never run git against the same checkout at once.
 
 ## TLDR
 

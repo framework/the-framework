@@ -9,7 +9,7 @@ Auto PM spends leftover subscription quota on the product's own roadmap: while t
 
 ## Rationales
 
-- An unreadable quota fails closed — the opposite of the per-run guard: quietly burning quota on work nobody asked for is worse than skipping a tick.
+- An unreadable quota fails closed — the opposite of the per-agent guard: quietly burning quota on work nobody asked for is worse than skipping a tick.
 - "Run now" skips only the master switch: the click is the consent the preference exists to record; every other stand-down holds.
 
 ## Before writing SPEC.md files

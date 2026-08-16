@@ -1,4 +1,4 @@
-Automatically commits the session archives the daemon writes into a project's main checkout into its Git history, closing the gap between "the history is recorded" and "the history reaches Git by itself".
+Automatically commits the agent archives the daemon writes into a project's main checkout into its Git history, closing the gap between "the history is recorded" and "the history reaches Git by itself".
 
 ## TLDR
 
@@ -12,7 +12,7 @@ Automatically commits the session archives the daemon writes into a project's ma
 
 - A commit per write would bury the project's real history under noise, so batches land only once a project settles.
 - Failures are values, retried on the next poll, and logged only when the reason changes — a stuck project costs one log line, not one per poll.
-- One record means one pathspec. A second one lived here — the per-run conversation markdown — and with it the machinery for deciding which of the two to pass, because passing a pattern that matches nothing fails the command for the other.
+- One record means one pathspec. A second one lived here — the per-agent conversation markdown — and with it the machinery for deciding which of the two to pass, because passing a pattern that matches nothing fails the command for the other.
 
 ## Before writing SPEC.md files
 

@@ -2,8 +2,8 @@ Decides which cloud sessions the browser extension should keep a tab open for: t
 
 ## Rationales
 
-- Recency is the whole filter because a web run's recorded status says nothing — every one reads as finished the moment it hands off to the cloud — so "recent, and not many" is the honest rule.
-- The list is capped and deduplicated: a browser that quietly accumulates tabs is worse than a bridge that misses an old run.
+- Recency is the whole filter because a web agent's recorded status says nothing — every one reads as finished the moment it hands off to the cloud — so "recent, and not many" is the honest rule.
+- The list is capped and deduplicated: a browser that quietly accumulates tabs is worse than a bridge that misses an old agent.
 
 ## Before writing SPEC.md files
 

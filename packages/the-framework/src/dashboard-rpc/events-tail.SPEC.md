@@ -1,4 +1,4 @@
-Follows a session's on-disk event journal: replay what is already logged, then deliver each appended event — even across the journal's moves.
+Follows an agent's on-disk event journal: replay what is already logged, then deliver each appended event — even across the journal's moves.
 
 ## TLDR
 

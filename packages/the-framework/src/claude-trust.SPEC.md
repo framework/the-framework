@@ -1,4 +1,4 @@
-Reads Claude Code's own record of which folders it trusts, so the dashboard can warn that a cloud run on an untrusted project would die on the CLI's interactive trust question before the run is spent.
+Reads Claude Code's own record of which folders it trusts, so the dashboard can warn that a cloud agent on an untrusted project would die on the CLI's interactive trust question before the work is spent.
 
 ## TLDR
 

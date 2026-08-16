@@ -1,4 +1,4 @@
-Covers the pick of watch-worthy cloud sessions: only recent web runs carrying a cloud session, newest first, capped, deduplicated, never filtered by run status (every web run reads as finished), and unparseable start times skipped.
+Covers the pick of watch-worthy cloud sessions: only recent web agents carrying a cloud session, newest first, capped, deduplicated, never filtered by status (every web agent reads as finished), and unparseable start times skipped.
 
 ## Before writing SPEC.md files
 

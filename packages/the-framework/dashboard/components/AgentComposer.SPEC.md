@@ -1,9 +1,9 @@
-One composer for a session, live or finished: the box stays put across the agent's whole life, and only what a send does changes.
+One composer for an agent, live or finished: the box stays put across its whole life, and only what a send does changes.
 
 ## TLDR
 
-- Live, a send queues a message the agent reads between turns — and says so, since a queued message is otherwise invisible. Ended with a session to pick up, a send continues that same session on the same branch and row, on the agent's own agent (never the global preference). Ended without one, a send starts a fresh session — the placeholder itself says so.
-- The empty box's submit slot doubles as the session's control: Stop while live, Resume once stopped — both latched so a landed press cannot re-fire or flicker while the state change is still in flight.
+- Live, a send queues a message the agent reads between turns — and says so, since a queued message is otherwise invisible. Ended with a session to pick up, a send continues that same conversation on the same branch and row, on the agent's own driver (never the global preference). Ended without one, a send starts a fresh agent — the placeholder itself says so.
+- The empty box's submit slot doubles as the agent's control: Stop while live, Resume once stopped — both latched so a landed press cannot re-fire or flicker while the state change is still in flight.
 - A preset marked new-session always opens its own run, whatever state this one is in.
 
 ## Rationales

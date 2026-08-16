@@ -1,4 +1,4 @@
-Covers the devices settings: the empty state says so, saved devices list with their origin, removing one drops it from the browser's store, and the run target is cleared only when the removed device was it.
+Covers the devices settings: the empty state says so, saved devices list with their origin, removing one drops it from the browser's store, and the target is cleared only when the removed device was it.
 
 ## Before writing SPEC.md files
 

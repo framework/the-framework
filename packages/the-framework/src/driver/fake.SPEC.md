@@ -1,4 +1,4 @@
-An in-memory driver that replays scripted turns deterministically, so the whole product — runs, gates, dashboard — works offline without spawning a process or spending a token.
+An in-memory driver that replays scripted turns deterministically, so the whole product — agents, gates, dashboard — works offline without spawning a process or spending a token.
 
 ## TLDR
 

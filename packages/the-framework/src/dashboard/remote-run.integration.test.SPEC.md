@@ -1,4 +1,4 @@
-The test drives two real daemons end to end: a run submitted with a remote target is created on the other daemon and its events stream back into the local view.
+The test drives two real daemons end to end: an agent submitted with a remote target is created on the other daemon and its events stream back into the local view.
 
 ## Before writing SPEC.md files
 

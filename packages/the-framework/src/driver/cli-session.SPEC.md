@@ -1,4 +1,4 @@
-The one way any wrapped agent CLI is run: spawn it over the workspace, hand it the prompt, stream its output through the agent's own dialect parser, and settle the turn on how the process ended.
+The one way any driver CLI is run: spawn it over the workspace, hand it the prompt, stream its output through that CLI's own dialect parser, and settle the turn on how the process ended.
 
 ## TLDR
 

@@ -1,4 +1,4 @@
-The Overview's Agents card: the sessions working right now, each row wearing the same one-liner the sidebar shows and opening that session directly — never just the project's launcher — while finished sessions stay the sidebar list's job.
+The Overview's Agents card: the agents working right now, each row wearing the same one-liner the sidebar shows and opening that agent directly — never just the project's launcher — while finished ones stay the sidebar list's job.
 
 ## Before writing SPEC.md files
 

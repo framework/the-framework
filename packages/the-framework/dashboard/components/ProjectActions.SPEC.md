@@ -1,4 +1,4 @@
-The project home's action bar: git status on the left, the workspace actions on the right — both halves shared with a session's bar, here addressed at the project's own checkout so the two pages cannot drift.
+The project home's action bar: git status on the left, the workspace actions on the right — both halves shared with an agent's bar, here addressed at the project's own checkout so the two pages cannot drift.
 
 ## Before writing SPEC.md files
 

@@ -1,4 +1,4 @@
-Monochrome brand logomarks for the coding agents, so pickers and the sessions rail can say whose session it is with a logo instead of a name — decorative by default, self-labelling only where no visible text names the agent.
+Monochrome brand logomarks for the coding agents, so pickers and the agents rail can say whose agent it is with a logo instead of a name — decorative by default, self-labelling only where no visible text names the driver.
 
 ## Before writing SPEC.md files
 

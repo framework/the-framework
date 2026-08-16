@@ -1,4 +1,4 @@
-Plumbing that pumps an in-memory event source — a session relayed from a device, replaying its buffered history then following live — into a plain callback, stopping when the viewer leaves and saying so when the source runs out on its own. Transport-agnostic on purpose: what a value becomes on the wire is the mount's business, which is what lets this be driven and tested by itself.
+Plumbing that pumps an in-memory event source — an agent relayed from a device, replaying its buffered history then following live — into a plain callback, stopping when the viewer leaves and saying so when the source runs out on its own. Transport-agnostic on purpose: what a value becomes on the wire is the mount's business, which is what lets this be driven and tested by itself.
 
 ## Before writing SPEC.md files
 

@@ -1,4 +1,4 @@
-The tests cover the announce-only-what-is-new behavior: the first poll seeds a silent baseline, identity is the caller's (a run starting and finishing are two separate announcements), and a failed scan or projection announces nothing.
+The tests cover the announce-only-what-is-new behavior: the first poll seeds a silent baseline, identity is the caller's (an agent starting and finishing are two separate announcements), and a failed scan or projection announces nothing.
 
 ## Before writing SPEC.md files
 

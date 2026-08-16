@@ -1,4 +1,4 @@
-The prompts a build session opens with, and the one check that decides between them.
+The prompts a build agent opens with, and the one check that decides between them.
 
 ## TLDR
 

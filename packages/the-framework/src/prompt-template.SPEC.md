@@ -1,4 +1,4 @@
-Renders the built-in system prompt's template by evaluating the small code expressions embedded in it, so one verbatim prompt text can adapt itself to each run's settings.
+Renders the built-in system prompt's template by evaluating the small code expressions embedded in it, so one verbatim prompt text can adapt itself to each agent's settings.
 
 ## TLDR
 

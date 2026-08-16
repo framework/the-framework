@@ -1,4 +1,4 @@
-The project list and the launcher's pre-flight answers: which projects are registered, adding new ones, and whether a session started now would get anywhere.
+The project list and the launcher's pre-flight answers: which projects are registered, adding new ones, and whether an agent started now would get anywhere.
 
 ## TLDR
 

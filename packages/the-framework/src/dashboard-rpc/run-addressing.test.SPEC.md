@@ -1,4 +1,4 @@
-Covers session addressing: steering lands in the session's own checkout — even in its first seconds, before the session has written anything — and falls back to the project root only when there is no checkout; removal refuses a live session, commits its uncommitted work first, and reports an unknown session honestly; and a continued session reads as running, not as its archived first leg.
+Covers agent addressing: steering lands in the agent's own checkout — even in its first seconds, before it has written anything — and falls back to the project root only when there is no checkout; removal refuses a live agent, commits its uncommitted work first, and reports an unknown one honestly; and a continued agent reads as running, not as its archived first leg.
 
 ## Before writing SPEC.md files
 

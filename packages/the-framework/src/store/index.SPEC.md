@@ -1,4 +1,4 @@
-The store's public doorway: re-exports session persistence, checkout resolution, and per-session worktrees with their dependency links.
+The store's public doorway: re-exports agent persistence, checkout resolution, and per-agent worktrees with their dependency links.
 
 ## Before writing SPEC.md files
 

@@ -1,4 +1,4 @@
-Covers the questions hub: answers post against the asking session's run, the card header jumps into that session, answered cards collapse to a ✓ line while failed posts leave the gate open, and the jump-nav appears only with more than one question.
+Covers the questions hub: answers post against the asking agent, the card header jumps into it, answered cards collapse to a ✓ line while failed posts leave the gate open, and the jump-nav appears only with more than one question.
 
 ## Before writing SPEC.md files
 

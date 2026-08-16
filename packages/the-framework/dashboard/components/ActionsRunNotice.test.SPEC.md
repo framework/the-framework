@@ -1,4 +1,4 @@
-Covers the Actions-run banner: the wait explanation while the run is live (dropped once finished), the link through to the Actions run once known, and that other run targets render nothing.
+Covers the Actions-run banner: the wait explanation while the agent is live (dropped once finished), the link through to the Actions run once known, and that other targets render nothing.
 
 ## Before writing SPEC.md files
 

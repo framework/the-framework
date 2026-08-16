@@ -1,4 +1,4 @@
-Covers the ready-to-merge prompt: it queues the quality reviews against the finished session's changes, and stays renderable (no nested fragments, safe defaults, a clear error on a missing session name).
+Covers the ready-to-merge prompt: it queues the quality reviews against the finished agent's changes, and stays renderable (no nested fragments, safe defaults, a clear error on a missing session name).
 
 ## Before writing SPEC.md files
 

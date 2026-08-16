@@ -1,4 +1,4 @@
-Browser notifications for the two watched feeds: something new needs you, or a session started or finished.
+Browser notifications for the two watched feeds: something new needs you, or an agent started or finished.
 
 ## TLDR
 

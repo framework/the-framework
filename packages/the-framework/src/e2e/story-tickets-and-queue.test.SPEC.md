@@ -1,4 +1,4 @@
-Covers the roadmap journeys: browsing the ticket backlog on the project and cross-project pages, queueing a ticket so a drain run claims it and the boards show it in progress, and that any other prompt leaves the queue untouched — only a drain works the queue.
+Covers the roadmap journeys: browsing the ticket backlog on the project and cross-project pages, queueing a ticket so a drain agent claims it and the boards show it in progress, and that any other prompt leaves the queue untouched — only a drain works the queue.
 
 ## Before writing SPEC.md files
 

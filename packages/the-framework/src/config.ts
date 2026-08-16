@@ -151,5 +151,15 @@ export function parseFrameworkConfig(raw: string, source = 'the-framework.yml'):
       config[key] = obj[key] as boolean
     }
   }
+  // C3 renamed `antiLazyPill` to `vanilla` and inverted it: antiLazyPill was the #326 prompt being
+  // present, vanilla is it being removed. A committed `antiLazyPill: false` is a repo opting out of
+  // the prompt; dropping the key would re-inject it (vanilla defaults false = prompt on) — the same
+  // silent flip the handoff keys had. Read it when vanilla is not set.
+  if (config.vanilla === undefined && obj['antiLazyPill'] !== undefined) {
+    if (typeof obj['antiLazyPill'] !== 'boolean') {
+      throw new Error(`${source}: "antiLazyPill" must be a boolean (and is better written as "vanilla")`)
+    }
+    config.vanilla = !obj['antiLazyPill']
+  }
   return config
 }

@@ -18,7 +18,13 @@ test('parseFrameworkConfig reads the vanilla toggle (C3)', () => {
   // it used to be `antiLazyPill: false` here for what is `vanilla: true` everywhere else.
   assert.deepEqual(parseFrameworkConfig('vanilla: true\n'), { vanilla: true })
   assert.throws(() => parseFrameworkConfig('vanilla: nope\n'), /"vanilla" must be a boolean/)
-  assert.deepEqual(parseFrameworkConfig('antiLazyPill: false\n'), {}, 'the old name is not a key')
+  // The old name is migrated, inverted: `antiLazyPill: false` is the repo opting out of the #326
+  // prompt, which is `vanilla: true`. Dropping the key would silently re-inject the prompt.
+  assert.deepEqual(parseFrameworkConfig('antiLazyPill: false\n'), { vanilla: true }, 'antiLazyPill: false → vanilla: true')
+  assert.deepEqual(parseFrameworkConfig('antiLazyPill: true\n'), { vanilla: false }, 'antiLazyPill: true → vanilla: false')
+  // The new name wins when both are present, rather than the legacy key overriding it.
+  assert.deepEqual(parseFrameworkConfig('vanilla: false\nantiLazyPill: false\n'), { vanilla: false })
+  assert.throws(() => parseFrameworkConfig('antiLazyPill: nope\n'), /"antiLazyPill" must be a boolean/)
 })
 
 test('parseFrameworkConfig reads the transparent toggle (#625)', () => {

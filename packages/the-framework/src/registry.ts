@@ -379,9 +379,13 @@ function sanitizePreferences(value: unknown): Preferences {
   // handed to the CLI as `--model Default` and fail the turn on a word nobody chose.
   const model = typeof input['model'] === 'string' ? input['model'].trim() : ''
   if (model && model.toLowerCase() !== 'default') preferences.model = model
-  // `agent` (#650) is constrained to the known set so junk never reaches the agent; the set is
-  // the shared node-free vocabulary (agent-names.ts). Default = claude.
+  // `driver` (#650) is constrained to the known set so junk never reaches the agent; the set is the
+  // shared node-free vocabulary (agent-names.ts). Default = claude. D5 renamed this stored key from
+  // `agent`; a file written before that still spells it `agent`, and dropping it would silently run
+  // the default CLI instead of the one the user chose — read it when `driver` is not set, migrated
+  // on the first write back.
   if (isDriverName(input['driver'] as string | undefined)) preferences.driver = input['driver'] as string
+  else if (isDriverName(input['agent'] as string | undefined)) preferences.driver = input['agent'] as string
   // `editor` (#727) is a free-form CLI name, trimmed and length-capped so junk / a huge string
   // never lands in the file. A blank string is "no choice" (fall back to env / `code`), so dropped.
   if (typeof input['editor'] === 'string' && input['editor'].trim())

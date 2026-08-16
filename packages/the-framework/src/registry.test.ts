@@ -261,6 +261,16 @@ test('sanitizePreferences reads a pre-B5 handoff written as three booleans', asy
   assert.deepEqual(await stored({ vanilla: true }), { vanilla: true })
 })
 
+test('sanitizePreferences reads a pre-D5 driver written under the old `agent` key (#650)', async () => {
+  // D5 renamed the stored key `agent` to `driver`. Dropping the old spelling would silently run the
+  // default CLI (claude) for a user who had chosen another — read it, migrated on the first write.
+  const stored = (preferences: Record<string, unknown>) =>
+    readPreferences(memFs({ [FILE]: JSON.stringify({ projects: [], preferences }) }), ENV)
+  assert.deepEqual(await stored({ agent: 'codex' }), { driver: 'codex' })
+  assert.deepEqual(await stored({ driver: 'codex', agent: 'gpt-9000' }), { driver: 'codex' }, 'the new key wins')
+  assert.deepEqual(await stored({ agent: 'gpt-9000' }), {}, 'an unknown legacy value is still dropped')
+})
+
 test('sanitizePreferences keeps an absolute reposDirectory and drops junk (#1123)', async () => {
   // Another string preference the boolean-only loop would eat: kept only as a non-empty absolute
   // path, so a relative or blank value never lands in the file.

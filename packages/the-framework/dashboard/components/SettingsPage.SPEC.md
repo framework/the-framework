@@ -6,6 +6,7 @@ The settings page: every setting in one findable place — appearance, driver an
 - The agent-options table is the very one the launcher renders, its rules applied identically, and a rule-disabled row stays visible, greyed with its reason — the whole point of the page is being where you come to look.
 - A toggle is a preference; whether it can deliver is a capability: blocked browser notifications and unconfigured Discord channels read as such, with their setup dialogs right beside the toggle.
 - Typed automation values are clamped to the same bounds the daemon enforces, and an untouched value shows the real default in force rather than a zero nothing is using.
+- A row with nothing to pick renders nothing at all: an empty dropdown is a control you can open and not use, which reads as broken rather than as "no choices here". Every list here is static today, so the guard is for the next dynamic one.
 
 ## Before writing SPEC.md files
 

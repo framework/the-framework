@@ -316,6 +316,14 @@ function ToggleRow({
   )
 }
 
+/**
+ * One setting picked from a list.
+ *
+ * A row with nothing to pick renders nothing at all (#1172). An empty `<select>` is a control that
+ * cannot be operated — it reads as broken rather than as "no choices here", which is exactly the
+ * paper cut this guard exists for. Every list on this page is static today, so nothing hits it;
+ * it is here because the next dynamic one will be added without thinking about the empty case.
+ */
 function SelectRow({
   label,
   description,
@@ -329,6 +337,7 @@ function SelectRow({
   options: { value: string; label: string }[]
   onChange: (next: string) => void
 }) {
+  if (options.length === 0) return null
   return (
     <Row
       label={label}

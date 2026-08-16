@@ -1,4 +1,4 @@
-import { isRunLocation, type AgentLocation } from './agent-location.js'
+import { isAgentLocation, type AgentLocation } from './agent-location.js'
 import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
@@ -371,7 +371,7 @@ function sanitizePreferences(value: unknown): Preferences {
     preferences.theme = input['theme'] as (typeof KNOWN_THEMES)[number]
   // `target` (#1050) is a string, so the boolean-only PREFERENCE_KEYS loop would silently eat it;
   // it gets its own branch like `theme`, constrained to the known set (anything else = default `local`).
-  if (isRunLocation(input['target'])) preferences.target = input['target']
+  if (isAgentLocation(input['target'])) preferences.target = input['target']
   if (isHandoffLevel(input['handoff'])) preferences.handoff = input['handoff']
   // `autoSpendOffset` (#960) is the one numeric preference: a slider position in percentage
   // points, clamped so a hand-edited file cannot push the limit somewhere the slider could not.

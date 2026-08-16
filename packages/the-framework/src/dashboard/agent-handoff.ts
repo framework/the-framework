@@ -140,7 +140,7 @@ async function lookupAgentPr(cwd: string, branch: string, deps: AgentHandoffDeps
 export type CachedBranchPrLookup = (cwd: string, branch?: string) => Promise<Cached<LinkedPr | undefined>>
 
 /** What {@link resolveAgentPr} needs to know about a run: structurally satisfied by {@link AgentMeta}. */
-export interface RunPrRun {
+export interface PrAgent {
   id: string
   branch?: string
   sessionName?: string
@@ -167,7 +167,7 @@ export interface RunPrRun {
  */
 export async function resolveAgentPr(
   cwd: string,
-  agent: RunPrRun,
+  agent: PrAgent,
   prs: CachedBranchPrLookup = cachedPrView,
 ): Promise<Cached<LinkedPr | undefined>> {
   if (!agent.pr) return { value: undefined, pending: false }
@@ -191,7 +191,7 @@ export async function resolveAgentPr(
  */
 export async function mergeAgentPr(
   cwd: string,
-  agent: RunPrRun,
+  agent: PrAgent,
   deps: { gh?: GhRunner; prs?: CachedBranchPrLookup } = {},
 ): Promise<HandoffResult> {
   const pr = (await resolveAgentPr(cwd, agent, deps.prs)).value

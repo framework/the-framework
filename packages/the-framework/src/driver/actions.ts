@@ -77,7 +77,7 @@ export interface ActionsDriverOptions {
    * a stable id. Without it a fresh driver process restarts the session counter at 1, so
    * every run's first turn is `actions-1-turn-1` and runs collide (see {@link ActionsSession}).
    */
-  agentTag?: () => string
+  runTag?: () => string
   /**
    * Prefix for the branch each run pushes its work to (#1085). Default `"claude/"`. The
    * driver names the branch (prefix + session id) and passes it to the workflow, rather than
@@ -93,7 +93,7 @@ export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>
 let sessionCounter = 0
 
 /** A short random tag so correlation ids stay unique across driver processes. */
-const randomAgentTag = (): string => randomUUID().slice(0, 8)
+const randomRunTag = (): string => randomUUID().slice(0, 8)
 
 /** One Actions-backed session. Each `prompt` is one workflow run. */
 export class ActionsSession implements DriverSession {
@@ -102,7 +102,7 @@ export class ActionsSession implements DriverSession {
   /** The branch the last run pushed; set once the run reports it, and the next turn builds on it. */
   private branch: string | undefined
   /** The branch this session asks each run to push to. Stable across turns, so they chain. */
-  private readonly agentBranch: string
+  private readonly runBranch: string
   /** The agent's own session id, carried across turns so `resume` can continue it. */
   private lastSessionId: string | undefined
   private turnCounter = 0
@@ -114,8 +114,8 @@ export class ActionsSession implements DriverSession {
     this.cwd = startOpts.cwd
     // The counter reads well in logs within one process; the random tag is what keeps the
     // correlation id unique across processes, since the daemon spawns a fresh one per run.
-    this.id = `actions-${++sessionCounter}-${(config.agentTag ?? randomAgentTag)()}`
-    this.agentBranch = `${config.branchPrefix ?? 'claude/'}framework-${this.id}`
+    this.id = `actions-${++sessionCounter}-${(config.runTag ?? randomRunTag)()}`
+    this.runBranch = `${config.branchPrefix ?? 'claude/'}framework-${this.id}`
     this.lastSessionId = startOpts.resumeSessionId
   }
 
@@ -138,8 +138,8 @@ export class ActionsSession implements DriverSession {
     await this.dispatch(prompt, correlationId, resume)
     emit({ type: 'notice', message: `Dispatched ${correlationId} to ${this.config.owner}/${this.config.repo}; waiting for the runner.` })
 
-    const agent = await this.awaitAgent(correlationId, emit, opts.signal)
-    const artifact = await this.readRunArtifact(agent.id, correlationId)
+    const run = await this.awaitWorkflowRun(correlationId, emit, opts.signal)
+    const artifact = await this.readRunArtifact(run.id, correlationId)
     if (artifact.branch) this.branch = artifact.branch
 
     const turn = replayTranscript(artifact.execution, emit)
@@ -169,7 +169,7 @@ export class ActionsSession implements DriverSession {
   /** Fire the workflow. Returns nothing useful: dispatch is 204 with no body, hence the correlation id. */
   private async dispatch(prompt: string, correlationId: string, resume: string | undefined): Promise<void> {
     const workflow = this.config.workflow ?? 'framework-agent.yml'
-    const inputs: Record<string, string> = { prompt, correlation_id: correlationId, branch: this.agentBranch }
+    const inputs: Record<string, string> = { prompt, correlation_id: correlationId, branch: this.runBranch }
     // These reach a shell on the runner as environment variables. They are ids and
     // model names, so anything outside that alphabet is a bug or an attack.
     if (this.startOpts.model) inputs['model'] = assertToken(this.startOpts.model, 'model')
@@ -181,7 +181,7 @@ export class ActionsSession implements DriverSession {
   }
 
   /** Poll until our run appears and finishes. Identified by the correlation id in its `run-name`. */
-  private async awaitAgent(
+  private async awaitWorkflowRun(
     correlationId: string,
     emit: (event: DriverEvent) => void,
     promptSignal?: AbortSignal,
@@ -193,7 +193,7 @@ export class ActionsSession implements DriverSession {
     let announced = false
 
     for (;;) {
-      const found = await this.findAgent(correlationId)
+      const found = await this.findWorkflowRun(correlationId)
       if (found) {
         if (!announced) {
           announced = true
@@ -212,16 +212,16 @@ export class ActionsSession implements DriverSession {
   }
 
   /** Our run among the workflow's recent ones, or undefined while GitHub is still creating it. */
-  private async findAgent(correlationId: string): Promise<WorkflowRun | undefined> {
+  private async findWorkflowRun(correlationId: string): Promise<WorkflowRun | undefined> {
     const body = await this.api<{ workflow_runs?: WorkflowRun[] }>(`/repos/${this.owner}/actions/runs?event=workflow_dispatch&per_page=50`)
-    return (body.workflow_runs ?? []).find(agent => typeof agent.name === 'string' && agent.name.includes(correlationId))
+    return (body.workflow_runs ?? []).find(run => typeof run.name === 'string' && run.name.includes(correlationId))
   }
 
   /** Download the run's artifact and pull the transcript and the pushed branch out of it. */
-  private async readRunArtifact(agentId: number, correlationId: string): Promise<{ execution: string; branch?: string }> {
-    const list = await this.api<{ artifacts?: { id: number; name: string }[] }>(`/repos/${this.owner}/actions/runs/${agentId}/artifacts`)
+  private async readRunArtifact(runId: number, correlationId: string): Promise<{ execution: string; branch?: string }> {
+    const list = await this.api<{ artifacts?: { id: number; name: string }[] }>(`/repos/${this.owner}/actions/runs/${runId}/artifacts`)
     const artifact = (list.artifacts ?? []).find(a => a.name.includes(correlationId)) ?? list.artifacts?.[0]
-    if (!artifact) throw new Error(`Run ${agentId} uploaded no artifact; the workflow's collect step did not run.`)
+    if (!artifact) throw new Error(`Run ${runId} uploaded no artifact; the workflow's collect step did not run.`)
 
     const res = await this.request(`/repos/${this.owner}/actions/artifacts/${artifact.id}/zip`)
     const entries = readZip(Buffer.from(await res.arrayBuffer()))

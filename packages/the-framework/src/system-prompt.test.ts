@@ -212,7 +212,7 @@ test('systemPromptBlock threads tf through to the template', () => {
 })
 
 test('composeAgentSystem is exactly the built-in prompt block (#326) + both emit protocols, and nothing else (#547)', () => {
-  // The one assembly path both runFramework and runPrompt go through. Exact equality is
+  // The one assembly path a build and a verbatim prompt both go through. Exact equality is
   // the point: no persona, skill, or memory framing may ever be appended again. The #537
   // knowledge docs are in front of that, on the context (#439) line: paths, not prompt text.
   const system = composeAgentSystem()

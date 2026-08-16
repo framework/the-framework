@@ -1,5 +1,5 @@
 import { listAgents, readLiveMetas, type AgentMeta } from './store/index.js'
-import { mergeAgentPr, resolveAgentPr, type HandoffResult, type RunPrRun } from './dashboard/agent-handoff.js'
+import { mergeAgentPr, resolveAgentPr, type HandoffResult, type PrAgent } from './dashboard/agent-handoff.js'
 import { ghPrCiStatus, type LinkedPr, type PrCiStatus } from './dashboard/gh.js'
 import type { Cached } from './dashboard/cache.js'
 
@@ -112,11 +112,11 @@ export interface CiSweepDeps {
   /** Every run meta worth scanning — live and archived (default: both stores). */
   agents?: (cwd: string) => Promise<AgentMeta[]>
   /** The PR that belongs to a run (default {@link resolveAgentPr}, which rides the PR-lookup cache (#1028)). */
-  pr?: (cwd: string, agent: RunPrRun) => Promise<Cached<LinkedPr | undefined>>
+  pr?: (cwd: string, agent: PrAgent) => Promise<Cached<LinkedPr | undefined>>
   /** A PR's combined check state (default {@link ghPrCiStatus}). */
   ci?: (cwd: string, number: number) => Promise<PrCiStatus>
   /** Merge a run's open PR (default {@link mergeAgentPr}, which also forgets the PR caches). */
-  merge?: (cwd: string, agent: RunPrRun) => Promise<HandoffResult>
+  merge?: (cwd: string, agent: PrAgent) => Promise<HandoffResult>
   /**
    * Start a CI-fix session for a red PR (#1418's fix half), resolving the run id or undefined
    * when the wiring declined (preference off, no quota headroom, start failed). Absent = the fix

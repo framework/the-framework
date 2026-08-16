@@ -398,7 +398,7 @@ async function relayDashboard(): Promise<{
     { kind: 'log', message: 'e1' } as FrameworkEvent,
     { kind: 'log', message: 'e2' } as FrameworkEvent,
   ]
-  const tailEvents = (_runId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => {
+  const tailEvents = (_agentId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => {
     for (const e of events) onEvent(e)
     return () => {}
   }

@@ -24,7 +24,7 @@ import {
 } from './agent.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
-import { isHandsOff, isRunLocation, type AgentLocation } from './agent-location.js'
+import { isHandsOff, isAgentLocation, type AgentLocation } from './agent-location.js'
 import { handoffStages, isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { readAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
 import { agentTodoPending } from './todo-loop.js'
@@ -322,7 +322,7 @@ export function sessionOptions(spec: AgentSpec, env: NodeJS.ProcessEnv = process
     ...(spec.agentId ? { agentId: spec.agentId } : {}),
     ...(spec.continueAgent ? { continueAgent: true } : {}),
     ...(isDriverName(o.driver) ? { driver: o.driver } : {}),
-    ...(isRunLocation(o.target) ? { target: o.target } : {}),
+    ...(isAgentLocation(o.target) ? { target: o.target } : {}),
     ...(o.model?.trim() ? { model: o.model.trim() } : {}),
     ...(o.resumeSession?.trim() ? { resumeSession: o.resumeSession.trim() } : {}),
     // The ticket comes off a queue file an agent writes, so it is re-checked here rather than

@@ -231,7 +231,7 @@ export type AgentSystemOptions = SystemPromptOptions
 
 /**
  * Assemble a run's full system channel — the single place it is composed (#501), so the
- * build path ({@link ./run.runFramework}) and the direct-prompt path ({@link ./prompt-run.runPrompt})
+ * build path and the direct-prompt path, before D2 collapsed them into one {@link runAgent}
  * cannot drift. That drift is exactly what dropped the session-action (#326) layer from `--vanilla`
  * builds (#500): the two sites each inlined the composition and one nested the protocols
  * inside the built-in-prompt branch.

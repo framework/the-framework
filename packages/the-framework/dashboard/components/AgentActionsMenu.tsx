@@ -116,7 +116,7 @@ export function AgentActionsMenu({
     void run(() => sendStop(projectId, agentId ?? undefined).then(() => true), 'Could not stop the session.').then(result => {
       if (result) setStopRequested(true)
     })
-  const mergeSession = () => {
+  const mergeAgent = () => {
     if (!agentId) return
     void run(() => sendMerge(projectId, agentId), 'Could not arm the merge.').then(result => {
       if (result?.ok) setMergeRequested(true)
@@ -236,7 +236,7 @@ export function AgentActionsMenu({
               collects from the agent's signal. A pre-commitment, not an abort — the session still
               ends at its own natural end (#1390) and merges there. */}
           {active && agentId && (
-            <DropdownMenuItem disabled={mergeRequested || busy} onClick={() => mergeSession()}>
+            <DropdownMenuItem disabled={mergeRequested || busy} onClick={() => mergeAgent()}>
               <GitMerge className="h-3.5 w-3.5 shrink-0" /> {mergeRequested ? 'Merge armed' : 'Merge when finished'}
             </DropdownMenuItem>
           )}

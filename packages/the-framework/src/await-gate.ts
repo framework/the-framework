@@ -120,7 +120,7 @@ export interface AwaitTurnDeps {
  *
  * Every path that runs gates shares this loop: the opening prompt, each chat message, and
  * the build's `agentAwaitGate`. They differ only in how a turn is continued — a raw
- * `session.prompt`, or a supervisor pass that carries a `SupervisorRun` — which is what
+ * `session.prompt`, or a pass that carries its own continuation — which is what
  * `continueWith` is. Keeping one loop is what stopped the per-turn signal emission from
  * having to be added to each copy by hand (#563).
  */

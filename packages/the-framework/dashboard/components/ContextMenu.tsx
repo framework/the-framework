@@ -1,4 +1,4 @@
-import type { ProjectSummary } from '../../dist/index.js'
+import type { ProjectSummary } from '../../src/index.js'
 import { Layers } from 'lucide-react'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'

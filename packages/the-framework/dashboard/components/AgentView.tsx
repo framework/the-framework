@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { FrameworkEvent } from '../../dist/index.js'
-import { handoffState, agentProgress, sessionInfo, } from '../../dist/client.js'
+import type { FrameworkEvent } from '../../src/index.js'
+import { handoffState, agentProgress, sessionInfo, } from '../../src/client.js'
 import { onAgent, onRetainedWorktrees } from '../rpc/reads.js'
 import { useLoaded } from '../lib/use-async.js'
 import { useAgentHandoff } from '../lib/use-agent-handoff.js'

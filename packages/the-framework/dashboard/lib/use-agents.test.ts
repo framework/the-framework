@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import type { AgentMeta } from '../../dist/index.js'
+import type { AgentMeta } from '../../src/index.js'
 
 const onAgents = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onAgents }))

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { FrameworkEvent } from '../../dist/index.js'
+import type { FrameworkEvent } from '../../src/index.js'
 import { TriangleAlert } from 'lucide-react'
 import { EventList } from './EventList.js'
 import { AgentOverview } from './AgentOverview.js'

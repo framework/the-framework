@@ -1,4 +1,4 @@
-import type { WorkspaceDoc } from '../../dist/index.js'
+import type { WorkspaceDoc } from '../../src/index.js'
 import { onDocs } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { DocsPanel } from './DocsPanel.js'

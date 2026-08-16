@@ -1,4 +1,4 @@
-import type { FrameworkEvent } from '../../dist/index.js'
+import type { FrameworkEvent } from '../../src/index.js'
 
 // Arrival times for the live feed (#948). A FrameworkEvent carries no timestamp, so the
 // dashboard stamps each one as it comes off the channel. A side table rather than a field:

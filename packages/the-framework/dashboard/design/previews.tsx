@@ -4,8 +4,6 @@ import { Badge } from '../components/ui/badge.js'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.js'
 import { OptionLabel } from '../components/ui/option-label.js'
 import { DisclosureToggle } from '../components/DisclosureToggle.js'
-import { ActivityChart } from '../components/ActivityChart.js'
-import { AgentOutcomes } from '../components/AgentOutcomes.js'
 
 // The gallery's card registry (#DESIGN). Every entry renders the REAL component wherever the
 // component can stand alone, so a card cannot quietly drift from what ships. The few that cannot
@@ -290,33 +288,6 @@ function Overlays() {
 
 // ---------------------------------------------------------------- data display
 
-const ACTIVITY = [
-  1, 0, 3, 2, 0, 5, 4, 2, 7, 3, 0, 1, 6, 4,
-].map((count, i) => ({ date: `2026-07-${String(i + 8).padStart(2, '0')}`, count }))
-
-function Charts() {
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle>Session activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ActivityChart data={ACTIVITY} />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Session outcomes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AgentOutcomes counts={{ done: 14, failed: 3, stopped: 5, running: 0 }} />
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
 function EmptyStates() {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -424,14 +395,6 @@ export const PREVIEWS: Preview[] = [
     width: 900,
     replica: true,
     node: <Overlays />,
-  },
-  {
-    path: 'data/charts.html',
-    group: 'Data display',
-    name: 'Activity + outcomes',
-    subtitle: 'The two Overview charts, real components',
-    width: 900,
-    node: <Charts />,
   },
   {
     path: 'patterns/empty-states.html',

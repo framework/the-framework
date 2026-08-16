@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { FrameworkEvent, AgentMeta } from '../../dist/index.js'
+import type { FrameworkEvent, AgentMeta } from '../../src/index.js'
 import { agentSettled, agentViews, pendingChoices, isPublishing, isMetaPublishing, isAgentActive, currentAgentEvents, agentOutcome, actionsRunUrl } from './live-state.js'
 
 const view = (id: string, title: string, markdown: string): FrameworkEvent => ({ kind: 'view', id, title, markdown })

@@ -1,5 +1,5 @@
-import type { TicketsMeta, WorkspaceTicket } from '../../dist/index.js'
-import { presets } from '../../dist/client.js'
+import type { TicketsMeta, WorkspaceTicket } from '../../src/index.js'
+import { presets } from '../../src/client.js'
 import { RefreshCw, Github, ClipboardPlus, ClipboardList, Hammer, Play } from 'lucide-react'
 import { sendStart } from '../rpc/control.js'
 import { onTicketsMeta } from '../rpc/reads.js'

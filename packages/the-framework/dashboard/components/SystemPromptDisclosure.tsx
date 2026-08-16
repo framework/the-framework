@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import { composeAgentSystem } from '../../dist/client.js'
+import { composeAgentSystem } from '../../src/client.js'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover.js'
 import { Checkbox } from './ui/checkbox.js'
 import { cn } from '../lib/utils.js'

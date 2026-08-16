@@ -1,5 +1,5 @@
-import type { ChoiceRequest, FrameworkEvent } from '../../dist/index.js'
-import { formatFrameworkEvent } from '../../dist/client.js'
+import type { ChoiceRequest, FrameworkEvent } from '../../src/index.js'
+import { formatFrameworkEvent } from '../../src/client.js'
 import { useMemo, useState, type ReactNode } from 'react'
 import { eventKindLabel } from '../lib/event-labels.js'
 import { receivedAt } from '../lib/event-times.js'

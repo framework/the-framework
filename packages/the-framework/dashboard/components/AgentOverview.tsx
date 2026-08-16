@@ -1,5 +1,5 @@
-import type { FrameworkEvent } from '../../dist/index.js'
-import { sessionInfo, agentProgress } from '../../dist/client.js'
+import type { FrameworkEvent } from '../../src/index.js'
+import { sessionInfo, agentProgress } from '../../src/client.js'
 import { agentStatusPill } from '../lib/agent-status.js'
 import { describeSessionLink } from '../lib/session-link.js'
 import { cn } from '../lib/utils.js'

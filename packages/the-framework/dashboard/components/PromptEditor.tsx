@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import type { ProjectSummary, CustomPreset } from '../../dist/index.js'
+import type { ProjectSummary, CustomPreset } from '../../src/index.js'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from 'tiptap-markdown'

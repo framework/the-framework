@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent } from 'react'
-import type { CustomPreset } from '../../dist/index.js'
+import type { CustomPreset } from '../../src/index.js'
 import { Button } from './ui/button.js'
 import { Dialog } from './ui/dialog.js'
 
@@ -12,7 +12,7 @@ const LABEL_MAX = 80
 /** Where a saved preset lives (#1025): private to the user, or committed into the project's repo. */
 export type PresetScope = 'user' | 'project'
 
-/** A fresh id for a saved preset. `crypto.randomUUID` is present in the browser + prerender runtime. */
+/** A fresh id for a saved preset. `crypto.randomUUID` is present in every browser this targets. */
 function newId(): string {
   return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `p-${Date.now()}`
 }

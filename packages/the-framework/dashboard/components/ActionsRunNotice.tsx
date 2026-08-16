@@ -1,5 +1,5 @@
 import { Github, ExternalLink } from 'lucide-react'
-import type { FrameworkEvent } from '../../dist/index.js'
+import type { FrameworkEvent } from '../../src/index.js'
 import { actionsRunUrl } from '../lib/live-state.js'
 
 // The agent view's affordance for a GitHub Actions target (#1053). An Actions run replays its

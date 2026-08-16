@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FrameworkEvent } from '../../dist/index.js'
-import { sessionInfo } from '../../dist/client.js'
+import type { FrameworkEvent } from '../../src/index.js'
+import { sessionInfo } from '../../src/client.js'
 import { MoreVertical, Github, FolderOpen, Code, Check, Play, ExternalLink, Square, FolderX, Trash2, Copy, GitMerge } from 'lucide-react'
 import { onGithubUrl } from '../rpc/reads.js'
 import {

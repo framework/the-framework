@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react'
-import type { CustomPreset, FrameworkFileConfig, Preferences, ProjectSummary } from '../../dist/index.js'
-import { preferencesFromFileConfig, notifyMethodEnabled, notifyCategoryEnabled } from '../../dist/client.js'
+import type { CustomPreset, FrameworkFileConfig, Preferences, ProjectSummary } from '../../src/index.js'
+import { preferencesFromFileConfig, notifyMethodEnabled, notifyCategoryEnabled } from '../../src/client.js'
 import { onPreferences, patchPreferences, onProjectPresets, saveProjectPresets } from '../rpc/preferences.js'
 import { onProjects } from '../rpc/projects.js'
 import { parseRoute } from './route.js'

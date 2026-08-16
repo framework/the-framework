@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import type { Activity, Intervention } from '../../dist/index.js'
-import { activityKey, interventionKey, pickNewActivity, pickNewInterventions } from '../../dist/client.js'
+import type { Activity, Intervention } from '../../src/index.js'
+import { activityKey, interventionKey, pickNewActivity, pickNewInterventions } from '../../src/client.js'
 
 // Browser notifications for the two feeds the shell already polls (#627): the "needs you"
 // queue and the "new activity" feed. One engine — the identity half (key + new-item pick) is

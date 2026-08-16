@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { FrameworkEvent } from '../../dist/index.js'
-import type { LiveFeedEvent } from '../../dist/dashboard-rpc/index.js'
+import type { FrameworkEvent } from '../../src/index.js'
+import type { LiveFeedEvent } from '../../src/dashboard-rpc/index.js'
 import { onEvents, type EventChannel } from '../rpc/events.js'
 import { currentAgentEvents } from './live-state.js'
 import { stampReceived } from './event-times.js'

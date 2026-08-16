@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Intervention, Activity, ProjectSummary, RecentAgent } from '../dist/index.js'
+import type { Intervention, Activity, ProjectSummary, RecentAgent } from '../src/index.js'
 import { onProjectFiles, onInterventions, onActivity, onRecentAgents } from './rpc/reads.js'
 import { onProjects } from './rpc/projects.js'
 import { AgentHistory } from './components/AgentHistory.js'
@@ -255,8 +255,8 @@ export function App() {
   // which that view is the one to read.
 
   // On the relay (#426), the URL carries `?run=<id>` and there is no local registry or
-  // files — show that one agent read-only. `window` is absent during prerender (ssr:false),
-  // so this resolves to the full shell at build time and only flips in the browser.
+  // files — show that one agent read-only. Guarded on `window` so the module can be loaded
+  // without a browser at all, where it resolves to the full shell.
   const relayAgent = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('run')
 
   // Is an agent working (#875)? Drives the mark and the tab icon. Both off on the relay: there is

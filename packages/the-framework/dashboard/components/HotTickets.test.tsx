@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { HotTicket, HotBucket } from '../../dist/index.js'
+import type { HotTicket, HotBucket } from '../../src/index.js'
 
 // HotTickets reads onHotTickets over the RPC stub; stub it so nothing fetches a daemon that is
 // not there and the poll returns fixtures.

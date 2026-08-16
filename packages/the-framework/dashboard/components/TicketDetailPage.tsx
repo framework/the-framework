@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { WorkspaceTicketDetail } from '../../dist/index.js'
+import type { WorkspaceTicketDetail } from '../../src/index.js'
 import { ArrowLeft, Check, ListPlus, Github, LockOpen } from 'lucide-react'
 import { onTicket } from '../rpc/reads.js'
 import { sendQueueTicket, sendReleaseTicketLock } from '../rpc/control.js'

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import type { Preferences } from '../../dist/index.js'
-import { DRIVERS, DRIVER_LABELS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '../../dist/client.js'
+import type { Preferences } from '../../src/index.js'
+import { DRIVERS, DRIVER_LABELS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET } from '../../src/client.js'
 import { useDetectedEditors } from '../lib/editors.js'
 import { usePreferences, updatePreferences, themePreference, type ThemePreference } from '../lib/preferences.js'
 import { agentOptionRows, type OptionRow } from '../lib/agent-option-rows.js'

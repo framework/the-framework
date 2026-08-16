@@ -1,4 +1,4 @@
-import type { FrameworkEvent } from '../../dist/index.js'
+import type { FrameworkEvent } from '../../src/index.js'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 

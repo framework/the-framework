@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { WorkspaceTicket } from '../../dist/index.js'
+import type { WorkspaceTicket } from '../../src/index.js'
 import {
   EFFORT_BUCKETS,
   PRIORITY_BUCKETS,

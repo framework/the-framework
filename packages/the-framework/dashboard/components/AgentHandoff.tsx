@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import type { HandoffState, AgentHandoff } from '../../dist/index.js'
-import { handoffFromStages, type HandoffLevel } from '../../dist/client.js'
+import type { HandoffState, AgentHandoff } from '../../src/index.js'
+import { handoffFromStages, type HandoffLevel } from '../../src/client.js'
 import { GitMerge, GitPullRequest } from 'lucide-react'
 import { sendMerge, sendOpenPullRequest, sendSetHandoff } from '../rpc/control.js'
 import type { AgentHandoffState } from '../lib/use-agent-handoff.js'

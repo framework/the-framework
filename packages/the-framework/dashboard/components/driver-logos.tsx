@@ -1,4 +1,4 @@
-import type { DriverName } from '../../dist/client.js'
+import type { DriverName } from '../../src/client.js'
 
 // Monochrome brand logomarks for the coding agents (#656), so the agent picker can show a logo
 // instead of the agent's name. They inherit the text colour (`fill="currentColor"`) and take a

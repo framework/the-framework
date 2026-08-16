@@ -114,7 +114,7 @@ function postRebound(url: string, host = 'evil.com'): Promise<{ status: number; 
   })
 }
 
-// A minimal prerendered SPA bundle: an index.html shell + one hashed asset.
+// A minimal built SPA bundle: an index.html shell + one hashed asset.
 async function fakeBundle(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'dash-bundle-'))
   await writeFile(join(dir, 'index.html'), '<!doctype html><html><body><div id="root"></div></body></html>')
@@ -134,7 +134,7 @@ test('without a bundle the server reports the dashboard is not installed (503)',
   }
 })
 
-test('serves the prerendered SPA shell at / and hashed assets, with an SPA fallback', async () => {
+test('serves the built SPA shell at / and hashed assets, with an SPA fallback', async () => {
   const bundle = await fakeBundle()
   const dash = await dashboard({ clientBundleDir: bundle })
   try {

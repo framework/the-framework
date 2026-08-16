@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { AutoPmJob, AutoPmReport, Preferences, ProjectSummary } from '../../dist/index.js'
+import type { AutoPmJob, AutoPmReport, Preferences, ProjectSummary } from '../../src/index.js'
 import {
   AUTO_PM_ROUTINES,
   AUTO_PM_DRAIN_JOB,
   AUTO_PM_MAINTENANCE_JOB,
   DEFAULT_AUTO_PM_CONCURRENCY,
   MAX_AUTO_PM_CONCURRENCY,
-} from '../../dist/client.js'
+} from '../../src/client.js'
 import { hoverTooltip } from '../test-utils.js'
 
 // Everything the card reads goes through a lib module, so the mocks stop at the `rpc/` stubs: an

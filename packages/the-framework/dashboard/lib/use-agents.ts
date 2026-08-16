@@ -1,4 +1,4 @@
-import type { AgentMeta } from '../../dist/index.js'
+import type { AgentMeta } from '../../src/index.js'
 import { onAgents } from '../rpc/reads.js'
 import { usePolled } from './use-async.js'
 

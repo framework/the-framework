@@ -1,4 +1,4 @@
-import type { FrameworkEvent } from '../../dist/index.js'
+import type { FrameworkEvent } from '../../src/index.js'
 
 type EventKind = FrameworkEvent['kind']
 

@@ -6,6 +6,7 @@ The dashboard UI: a browser app served by the daemon that renders everything the
 - The URL is the selection: the overview at `/`, a project at `/{projectId}`, one agent at `/{projectId}/{agentId}`, plus cross-project tickets, a per-ticket page and its plan page, and settings. An agent is a link you can paste, reload, and bookmark — there is no selection state to disagree with the address bar.
 - An agent's events stream live over one channel bound to its own log; everything else polls. A finished agent reads from the archive instead, catching up whenever the live channel outgrew it.
 - It is a plain client-side bundle: one static page the daemon serves for every address, and all the behaviour in the browser. There is no server rendering and no framework between the HTML and the app — plain Vite, and the calls are plain HTTP handlers.
+- What it reads out of the rest of the package comes from that package's *source*, not its build output. Nearly all of it is type-only and reaches no bundle; the runtime part is the browser-safe barrel, compiled here like any other file. Pointing at the build instead made a fresh clone fail to type-check until something had run `tsc`, and type-checked the browser against the last build rather than the current source.
 - Watch mode: opened against a shared link, the same app renders one agent read-only.
 
 ## Flows

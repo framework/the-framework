@@ -1,5 +1,5 @@
-import type { Preferences } from '../../dist/index.js'
-import { DRIVERS, DRIVER_LABELS, handoffFromPreferences, handoffReaches, type DriverName } from '../../dist/client.js'
+import type { Preferences } from '../../src/index.js'
+import { DRIVERS, DRIVER_LABELS, handoffFromPreferences, handoffReaches, type DriverName } from '../../src/client.js'
 
 // The Global options as one table (#314), and the rules between them.
 //

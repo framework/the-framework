@@ -1,4 +1,4 @@
-import type { HotTicket, HotBucket } from '../../dist/index.js'
+import type { HotTicket, HotBucket } from '../../src/index.js'
 import { Flame } from 'lucide-react'
 import { onHotTickets } from '../rpc/reads.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'

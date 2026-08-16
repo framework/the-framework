@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import type { Activity, Intervention } from '../../dist/index.js'
+import type { Activity, Intervention } from '../../src/index.js'
 import { useActivityNotifications, useInterventionNotifications } from './use-notifications.js'
 
 const ctor = vi.fn()

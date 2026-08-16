@@ -1,4 +1,4 @@
-import type { LiveFeedEvent } from '../../dist/dashboard-rpc/index.js'
+import type { LiveFeedEvent } from '../../src/dashboard-rpc/index.js'
 
 // The dashboard's whole transport (F3): `POST /_rpc/<name>` for calls, `GET /_rpc/events` for the
 // live feed. Same-origin, so the browser attaches the daemon's cookie by itself and there is

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
-import type { FileChange } from '../../dist/index.js'
+import type { FileChange } from '../../src/index.js'
 import { onAgentChanges } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { FilePreviewCard } from './FilePreview.js'

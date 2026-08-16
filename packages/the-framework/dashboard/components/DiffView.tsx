@@ -1,4 +1,4 @@
-import type { FileContent, FileDiff } from '../../dist/index.js'
+import type { FileContent, FileDiff } from '../../src/index.js'
 import { cn } from '../lib/utils.js'
 
 // What a file looks like in a card: its diff from git's unified output (#816), shared by the

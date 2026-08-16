@@ -1,7 +1,7 @@
-import type { DashboardData, Intervention } from '../../dist/index.js'
+import type { DashboardData, Intervention } from '../../src/index.js'
 import { GitBranch, GitPullRequest, Inbox, MessageCircleQuestion } from 'lucide-react'
 import { onDashboard } from '../rpc/reads.js'
-import { interventionKey } from '../../dist/client.js'
+import { interventionKey } from '../../src/client.js'
 import { Quota } from './Quota.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -21,9 +21,11 @@ import { ScrollArea } from './ui/scroll-area.js'
 // selecting a row jumps into its project or straight into a session. Shown by the shell when no
 // project is picked.
 //
-// It replaced the denser board this started as (#471) — KPI tiles, a two-week activity chart, run
-// outcomes, and a projects table — cut here as redundant (#1139); the activity chart is meant to
-// return later.
+// It replaced the denser board this started as (#471) — KPI tiles, a two-week activity chart, agent
+// outcomes, and a projects table — cut here as redundant (#1139). The chart and the outcomes dial
+// were kept as components afterwards, on the note that the chart was meant to return; they were
+// rendered only by the design gallery from then on, and the daemon went on computing their inputs
+// for nobody. Both are in the history, where a component nothing renders belongs.
 export function DashboardPage({
   onSelectProject,
   onSelectAgent,

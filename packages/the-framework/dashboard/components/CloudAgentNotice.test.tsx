@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { FrameworkEvent } from '../../dist/index.js'
+import type { FrameworkEvent } from '../../src/index.js'
 
 // The component reads the bridge over three RPCs; unmocked they fetch `/_rpc/<name>`, which no
 // daemon answers behind jsdom, so each read hangs or throws instead of returning a fixture.

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { WorkspaceTicket } from '../../dist/index.js'
-import { presets } from '../../dist/client.js'
+import type { WorkspaceTicket } from '../../src/index.js'
+import { presets } from '../../src/client.js'
 
 const sendStart = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/control.js', () => ({ sendStart }))

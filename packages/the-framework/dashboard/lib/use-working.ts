@@ -1,4 +1,4 @@
-import type { Overview } from '../../dist/index.js'
+import type { Overview } from '../../src/index.js'
 import { onOverview } from '../rpc/reads.js'
 import { usePolled } from './use-async.js'
 

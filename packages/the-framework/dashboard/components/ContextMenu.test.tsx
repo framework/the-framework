@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { ProjectSummary } from '../../dist/index.js'
+import type { ProjectSummary } from '../../src/index.js'
 import { ContextMenu } from './ContextMenu.js'
 
 afterEach(cleanup)

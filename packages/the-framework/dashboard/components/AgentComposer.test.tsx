@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { Preferences } from '../../dist/index.js'
+import type { Preferences } from '../../src/index.js'
 
 // The two writes this component chooses between: a control-log message into the open session, or
 // an agent of its own — plus the slot's Stop (#1455).

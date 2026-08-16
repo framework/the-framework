@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import type { AutoPmJob, AutoPmOutcome, ProjectSummary } from '../../dist/index.js'
+import type { AutoPmJob, AutoPmOutcome, ProjectSummary } from '../../src/index.js'
 import {
   AUTO_PM_ROUTINES,
   DEFAULT_AUTO_PM_CONCURRENCY,
   MAX_AUTO_PM_CONCURRENCY,
   agentOptionsFromPreferences,
-} from '../../dist/client.js'
+} from '../../src/client.js'
 import { CalendarClock, Play } from 'lucide-react'
 import { onProjects } from '../rpc/projects.js'
 import { sendAutoPmSweep } from '../rpc/quota.js'

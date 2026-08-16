@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { ProjectQueue } from '../../dist/index.js'
-import { agentOptionsFromPreferences } from '../../dist/client.js'
+import type { ProjectQueue } from '../../src/index.js'
+import { agentOptionsFromPreferences } from '../../src/client.js'
 import { ListTodo, Loader2, Play } from 'lucide-react'
 import { queueEntryLabel } from '../lib/queue-entry.js'
 import { usePreferences } from '../lib/preferences.js'

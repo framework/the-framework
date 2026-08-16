@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { Preferences, ProjectQueue } from '../../dist/index.js'
+import type { Preferences, ProjectQueue } from '../../src/index.js'
 import { hoverTooltip } from '../test-utils.js'
 
 // The card reads nothing of its own — the queue arrives as a prop — so the only mocks are the

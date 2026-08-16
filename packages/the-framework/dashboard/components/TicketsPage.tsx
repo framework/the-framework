@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { ProjectTickets } from '../../dist/index.js'
+import type { ProjectTickets } from '../../src/index.js'
 import { onAllTickets } from '../rpc/reads.js'
 import { sendStart } from '../rpc/control.js'
 import { usePolled } from '../lib/use-async.js'
@@ -23,7 +23,7 @@ import { TicketsPanel, TicketRow, planPrompt, workOnTicketPrompt } from './Ticke
 const EMPTY_GROUPS: ProjectTickets[] = []
 
 /** The view the page opens with: whatever the URL says (#784's doctrine — the URL is the
- *  selection, filters included), or the defaults when prerendering with no URL to read. */
+ *  selection, filters included), or the defaults where there is no URL to read. */
 function initialView(): TicketsView {
   return typeof window === 'undefined' ? defaultView() : parseTicketsView(window.location.search)
 }

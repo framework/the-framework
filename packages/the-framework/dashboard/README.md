@@ -19,6 +19,16 @@ The `rpc/` modules are typed stubs: each is declared against the implementation'
 `../src/dashboard-rpc/`, so a renamed or re-shaped RPC is a type error here rather than a 404 in
 the browser. Nothing from those implementations reaches the bundle — the imports are type-only.
 
+Everything this directory reads out of the package it lives in comes from `../src`, not from
+`../dist`. It used to be `../dist`, mechanically, because the merge rewrote a package name into the
+path that name resolved to — which left the dashboard depending on the build output of the package
+it is part of: `pnpm typecheck` failed on a fresh clone until something had run `tsc`, and editing
+`src/` type-checked the browser against the *last* build. Of the ~120 imports, all but the ones from
+`src/client.ts` are type-only and reach no bundle at all; `client.ts` is the browser-safe barrel, so
+Vite compiles that source directly the way it compiles everything else here. One import still wants
+the build, and says so: the `dev:daemon` plugin runs the real daemon in the Vite config's own Node
+process, outside any transform pipeline.
+
 There used to be an RPC framework in this seam (Telefunc). It required a build-time transform over
 every `.telefunc.ts` file, a registration table pinning each call to the client-baked path of the
 shim it was re-exported from, a shim per module to keep those paths stable, and a dev-server plugin

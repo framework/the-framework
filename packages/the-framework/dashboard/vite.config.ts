@@ -27,7 +27,12 @@ function frameworkDevDaemon(): Plugin {
       if (!process.env.FRAMEWORK_DEV_DAEMON) return
       let target: { hostname: string; port: string } | null = null
       const ready = (async () => {
-        const { runDaemon } = await import('../dist/index.js')
+        // The one place here that genuinely wants the *build*: this runs in the Vite config's own
+        // Node process, outside any transform pipeline, so plain `src/` TypeScript would not load.
+        // The specifier is a URL rather than a literal so it stays a runtime import — and the type
+        // comes from the source it is built from, so a signature change is still an error here.
+        const built = new URL('../dist/index.js', import.meta.url).href
+        const { runDaemon } = (await import(built)) as typeof import('../src/index.js')
         const cwd = process.env.FRAMEWORK_DEV_DAEMON_CWD || process.cwd()
         // Ephemeral port: the dev server owns the address the browser talks to, and binding 4200
         // would collide with a `framework` the developer is running in another terminal.
@@ -85,7 +90,7 @@ function frameworkDevDaemon(): Plugin {
 export default defineConfig({
   // The dashboard is a directory inside @gemstack/the-framework rather than a package of its own
   // (A7), so `root` is pinned to this file's directory instead of inherited from the cwd — the
-  // scripts that agent it live one level up.
+  // scripts that run it live one level up.
   root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [frameworkDevDaemon(), react(), tailwindcss()],
   build: {

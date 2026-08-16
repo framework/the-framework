@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { QuotaView } from '../../dist/index.js'
+import type { QuotaView } from '../../src/index.js'
 
 /** Opens a Base UI tooltip in a test: hover alone leaves the popup unrendered until this settles. */
 async function openTooltip(trigger: HTMLElement) {

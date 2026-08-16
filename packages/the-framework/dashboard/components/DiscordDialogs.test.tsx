@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { Preferences } from '../../dist/index.js'
+import type { Preferences } from '../../src/index.js'
 import type { NotifyChannels } from '../rpc/preferences.js'
 
 // The Discord setup dialogs (#1095). What is worth pinning is the credential contract, not the

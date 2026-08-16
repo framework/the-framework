@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { DashboardData } from '../../dist/index.js'
-import { presets } from '../../dist/client.js'
+import type { DashboardData } from '../../src/index.js'
+import { presets } from '../../src/client.js'
 
 // The checklist reads its state over several RPC stubs and hooks; stub them all so nothing reaches
 // for a daemon and each row's "done" comes from a fixture instead.

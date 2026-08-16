@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import type { GitStatus, AgentWorktree } from '../../dist/index.js'
+import type { GitStatus, AgentWorktree } from '../../src/index.js'
 import { ChevronRight, GitBranch } from 'lucide-react'
 import { onGitStatus, onAgentWorktree } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
-import { formatBytes } from '../../dist/client.js'
+import { formatBytes } from '../../src/client.js'
 import { cn } from '../lib/utils.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 

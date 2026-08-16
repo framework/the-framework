@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import type { ChoiceRequest } from '../../dist/index.js'
-import { pickedIds } from '../../dist/client.js'
+import type { ChoiceRequest } from '../../src/index.js'
+import { pickedIds } from '../../src/client.js'
 import { cn } from '../lib/utils.js'
 
 // An answered gate, collapsed to one line (#1455 bonus 2 / item 6): what was decided stays

@@ -1,4 +1,4 @@
-import type { ActiveAgent } from '../../dist/index.js'
+import type { ActiveAgent } from '../../src/index.js'
 import { Bot } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'

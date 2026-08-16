@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { AgentHandoff } from '../../dist/index.js'
+import type { AgentHandoff } from '../../src/index.js'
 import { onAgentHandoff } from '../rpc/reads.js'
 import { usePolled } from './use-async.js'
 import { useAction } from './use-action.js'

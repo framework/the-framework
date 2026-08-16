@@ -1,4 +1,4 @@
-import type { SessionInfo } from '../../dist/index.js'
+import type { SessionInfo } from '../../src/index.js'
 
 // The shell one-liner that picks a session back up in a terminal (#1195).
 //

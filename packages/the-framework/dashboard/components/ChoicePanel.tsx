@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ChoiceRequest } from '../../dist/index.js'
+import type { ChoiceRequest } from '../../src/index.js'
 import { sendChoice } from '../rpc/control.js'
 import { useAction } from '../lib/use-action.js'
 import { Button } from './ui/button.js'

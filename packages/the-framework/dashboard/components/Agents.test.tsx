@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { ActiveAgent } from '../../dist/index.js'
+import type { ActiveAgent } from '../../src/index.js'
 import { Agents } from './Agents.js'
 
 // The Overview's Agents card (#1139), which replaced Working now — since trimmed to the sessions

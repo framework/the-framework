@@ -1,4 +1,4 @@
-import type { AutoPmReport, QuotaView } from '../../dist/index.js'
+import type { AutoPmReport, QuotaView } from '../../src/index.js'
 import { onQuota, onAutoPm } from '../rpc/quota.js'
 import { usePolled } from './use-async.js'
 

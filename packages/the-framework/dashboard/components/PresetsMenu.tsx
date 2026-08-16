@@ -1,4 +1,4 @@
-import type { CustomPreset } from '../../dist/index.js'
+import type { CustomPreset } from '../../src/index.js'
 import { SquareSlash, Plus, X } from 'lucide-react'
 import { cn } from '../lib/utils.js'
 import { buttonVariants } from './ui/button.js'

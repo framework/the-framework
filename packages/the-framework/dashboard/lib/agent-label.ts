@@ -1,4 +1,4 @@
-import type { AgentMeta } from '../../dist/index.js'
+import type { AgentMeta } from '../../src/index.js'
 import { formatDateTimeShort } from './format-date.js'
 
 // What to call a session in a list.

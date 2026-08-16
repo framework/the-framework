@@ -1,4 +1,4 @@
-import type { Preferences } from '../../dist/index.js'
+import type { Preferences } from '../../src/index.js'
 import type { OptionRow } from '../lib/agent-option-rows.js'
 import { Settings, Check, MonitorSmartphone, Plus, X } from 'lucide-react'
 import { updatePreferences } from '../lib/preferences.js'

@@ -22,7 +22,7 @@ const LOCAL_ORIGIN_KEY = 'fw.local-origin'
 /** Fallback loopback origin when none was remembered — the default daemon port (daemon.ts). */
 const DEFAULT_LOCAL_ORIGIN = 'http://127.0.0.1:4200'
 
-/** localStorage, or undefined during prerender (ssr:false) where there is no browser. */
+/** localStorage, or undefined wherever this module is loaded without a browser behind it. */
 function store(): Storage | undefined {
   try {
     return globalThis.localStorage

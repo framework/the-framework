@@ -1,4 +1,4 @@
-import type { FileContent } from '../../dist/index.js'
+import type { FileContent } from '../../src/index.js'
 import { ArrowLeft } from 'lucide-react'
 import { onFileContent } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'

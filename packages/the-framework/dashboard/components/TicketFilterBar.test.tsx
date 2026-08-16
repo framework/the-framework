@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { WorkspaceTicket } from '../../dist/index.js'
+import type { WorkspaceTicket } from '../../src/index.js'
 import { defaultView, type TicketRow, type TicketsView } from '../lib/ticket-filter.js'
 import { TicketFilterBar } from './TicketFilterBar.js'
 

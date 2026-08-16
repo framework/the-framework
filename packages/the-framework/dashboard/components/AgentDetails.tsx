@@ -1,5 +1,5 @@
-import type { FrameworkEvent } from '../../dist/index.js'
-import { DRIVER_LABELS, driverFromImpl, sessionInfo } from '../../dist/client.js'
+import type { FrameworkEvent } from '../../src/index.js'
+import { DRIVER_LABELS, driverFromImpl, sessionInfo } from '../../src/client.js'
 
 // The session-details strip behind the action bar's disclosure (always available now, so the
 // chevron no longer pops in and out with the git/handoff data). It shows the "about this agent"

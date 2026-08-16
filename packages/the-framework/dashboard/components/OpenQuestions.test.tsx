@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { OpenQuestion } from '../../dist/index.js'
+import type { OpenQuestion } from '../../src/index.js'
 
 // The hub polls onOpenQuestions over the reads stub, and its ChoicePanels post over the control
 // stub; stub both so nothing fetches a daemon that is not there.

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { CustomPreset } from '../../dist/index.js'
+import type { CustomPreset } from '../../src/index.js'
 import { PresetCreatePanel } from './PresetCreatePanel.js'
 
 afterEach(cleanup)

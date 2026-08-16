@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { FrameworkEvent } from '../../dist/index.js'
+import type { FrameworkEvent } from '../../src/index.js'
 import { agentStatusPill } from './agent-status.js'
 
 const named = { kind: 'session-name', name: 'relay smoke test' } as FrameworkEvent

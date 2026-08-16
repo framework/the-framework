@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { Preferences } from '../../dist/index.js'
+import type { Preferences } from '../../src/index.js'
 import { hoverTooltip } from '../test-utils.js'
 
 const updatePreferences = vi.hoisted(() => vi.fn())

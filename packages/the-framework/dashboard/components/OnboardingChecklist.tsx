@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { DashboardData, OnboardingSuggestion } from '../../dist/index.js'
-import { presets } from '../../dist/client.js'
+import type { DashboardData, OnboardingSuggestion } from '../../src/index.js'
+import { presets } from '../../src/client.js'
 import { Square, SquareCheckBig, X } from 'lucide-react'
 import { onDashboard } from '../rpc/reads.js'
 import { onOnboarding, sendAddProject } from '../rpc/projects.js'

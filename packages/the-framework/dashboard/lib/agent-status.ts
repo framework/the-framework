@@ -1,5 +1,5 @@
-import type { FrameworkEvent } from '../../dist/index.js'
-import { agentProgress } from '../../dist/client.js'
+import type { FrameworkEvent } from '../../src/index.js'
+import { agentProgress } from '../../src/client.js'
 import { isPublishing, isAgentActive, agentOutcome } from './live-state.js'
 
 /** How an agent's one status pill is drawn: its dot colour, its word, and the word's tone. */

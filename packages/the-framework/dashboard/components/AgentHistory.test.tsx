@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import type { AgentMeta, ProjectSummary } from '../../dist/index.js'
+import type { AgentMeta, ProjectSummary } from '../../src/index.js'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SidebarProvider } from './ui/sidebar.js'

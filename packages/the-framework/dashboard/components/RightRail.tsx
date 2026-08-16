@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { WorkspaceDoc } from '../../dist/index.js'
+import type { WorkspaceDoc } from '../../src/index.js'
 import { DocsPanel } from './DocsPanel.js'
 import { ViewsRail } from './ViewsRail.js'
 import { FileTree } from './FileTree.js'

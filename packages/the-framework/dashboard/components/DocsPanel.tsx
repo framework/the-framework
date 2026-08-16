@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { WorkspaceDoc } from '../../dist/index.js'
+import type { WorkspaceDoc } from '../../src/index.js'
 import { Button } from './ui/button.js'
 import { Markdown } from './Markdown.js'
 import { cn } from '../lib/utils.js'

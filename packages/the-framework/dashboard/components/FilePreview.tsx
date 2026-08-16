@@ -1,5 +1,5 @@
 import { PreviewCard } from '@base-ui-components/react/preview-card'
-import type { FileContent, FileDiff } from '../../dist/index.js'
+import type { FileContent, FileDiff } from '../../src/index.js'
 import { onFileContent, onFileDiff } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { ContentView, DiffStat, DiffView } from './DiffView.js'

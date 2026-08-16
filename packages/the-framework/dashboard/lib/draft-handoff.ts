@@ -6,7 +6,7 @@
 /** sessionStorage key holding a draft carried from another device, until the launcher takes it. */
 const PENDING_DRAFT_KEY = 'fw.pending-draft'
 
-/** sessionStorage, or undefined during prerender (ssr:false) where there is no browser. */
+/** sessionStorage, or undefined wherever this module is loaded without a browser behind it. */
 function session(): Storage | undefined {
   try {
     return globalThis.sessionStorage

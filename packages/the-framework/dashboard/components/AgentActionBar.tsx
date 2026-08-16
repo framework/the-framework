@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { FrameworkEvent } from '../../dist/index.js'
+import type { FrameworkEvent } from '../../src/index.js'
 import { GitStatusBar } from './GitStatusBar.js'
 import { AgentActionsMenu } from './AgentActionsMenu.js'
 import { agentStatusPill } from '../lib/agent-status.js'

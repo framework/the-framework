@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Check, Cloud, ExternalLink, Loader2, MessageCircleQuestion, TriangleAlert } from 'lucide-react'
-import type { BridgeAnswer, BridgeEvent, BridgeQuestion, FrameworkEvent } from '../../dist/index.js'
+import type { BridgeAnswer, BridgeEvent, BridgeQuestion, FrameworkEvent } from '../../src/index.js'
 import { onBridgeQuestion, onBridgeEvents, onBridgeAnswer } from '../rpc/reads.js'
 import { sendBridgeAnswer, sendBridgeAnswerCancel } from '../rpc/control.js'
 import { cloudSession } from '../lib/live-state.js'

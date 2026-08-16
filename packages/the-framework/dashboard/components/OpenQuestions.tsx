@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { OpenQuestion } from '../../dist/index.js'
+import type { OpenQuestion } from '../../src/index.js'
 import { onOpenQuestions } from '../rpc/reads.js'
 import { usePolled } from '../lib/use-async.js'
 import { AnsweredChoice } from './AnsweredChoice.js'

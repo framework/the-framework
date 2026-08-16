@@ -1,4 +1,4 @@
-import type { ProjectTickets, WorkspaceTicket } from '../../dist/index.js'
+import type { ProjectTickets, WorkspaceTicket } from '../../src/index.js'
 import { parsePriority } from './ticket-priority.js'
 
 // The /tickets filter model (#1144): everything the toolbar can express, as one plain value the

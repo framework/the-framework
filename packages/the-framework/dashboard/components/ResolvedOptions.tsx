@@ -1,4 +1,4 @@
-import type { FrameworkFileConfig, Preferences } from '../../dist/index.js'
+import type { FrameworkFileConfig, Preferences } from '../../src/index.js'
 import type { PreferenceSources } from '../lib/preferences.js'
 import type { OptionRow } from './OptionsMenu.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2, Play, Square } from 'lucide-react'
-import { driverFromImpl } from '../../dist/client.js'
+import { driverFromImpl } from '../../src/client.js'
 import { Composer, type ComposerHandle } from './Composer.js'
 import { sendMessage, sendStop } from '../rpc/control.js'
 import { useAction } from '../lib/use-action.js'

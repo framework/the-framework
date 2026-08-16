@@ -1,4 +1,4 @@
-import type { FrameworkEvent, ChoiceRequest, AgentMeta } from '../../dist/index.js'
+import type { FrameworkEvent, ChoiceRequest, AgentMeta } from '../../src/index.js'
 
 // Live-run state derived from the event stream — kept pure so it can be driven and
 // tested on its own, away from React. The dashboard is a projection of the same

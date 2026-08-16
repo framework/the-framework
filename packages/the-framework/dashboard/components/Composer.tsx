@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { ArrowUp, Loader2 } from 'lucide-react'
-import type { ProjectSummary } from '../../dist/index.js'
-import { DRIVERS, DRIVER_LABELS, LAUNCHER_PRESETS, type DriverName } from '../../dist/client.js'
+import type { ProjectSummary } from '../../src/index.js'
+import { DRIVERS, DRIVER_LABELS, LAUNCHER_PRESETS, type DriverName } from '../../src/client.js'
 import {
   usePreferences,
   updatePreferences,

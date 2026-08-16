@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import type { Preferences } from '../../dist/index.js'
+import type { Preferences } from '../../src/index.js'
 import { agentOptionRows, type OptionRow } from './agent-option-rows.js'
 
 // The rules between the agent options (#314/#625/#801/#958). They live in one table because two

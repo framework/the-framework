@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import type { ProjectSummary } from '../../dist/index.js'
-import { DEFAULT_HANDOFF, handoffReaches, agentOptionsFromPreferences } from '../../dist/client.js'
+import type { ProjectSummary } from '../../src/index.js'
+import { DEFAULT_HANDOFF, handoffReaches, agentOptionsFromPreferences } from '../../src/client.js'
 import { onDriverReady, onClaudeTrust, onProjects, onRepoAutoMerge } from '../rpc/projects.js'
 import { onSystemPromptUser } from '../rpc/reads.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'

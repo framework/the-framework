@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { killTree, registerChild, unregisterChild } from './child-registry.js'
 import { makeEmit } from './session-support.js'
+import { nodeGitRunner, type GitRunner } from '../project.js'
+import { errorMessage } from '../error-message.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn } from './types.js'
 
 /**
@@ -55,6 +57,8 @@ export interface CloudDriverOptions {
   timeoutMs?: number
   /** Run one pty-hosted invocation. Injected in tests; defaults to a real `script` pty. */
   runPty?: RunPty
+  /** Runs git for the pre-hand-off push (#1320). Injected in tests; defaults to real git. */
+  git?: GitRunner
   /**
    * Unique tag mixed into the session id. Default a random token. Injected in tests for a
    * stable id, and load-bearing in production for the same reason it is in the Actions
@@ -75,6 +79,12 @@ export interface AgentPtyOptions {
   prompt: string
   /** Model id to pass through, when one was chosen. */
   model?: string | undefined
+  /**
+   * The ref the session clones at (#1320), pushed to origin just before this invocation.
+   * Absent when that push failed — the CLI then pins its own default, which is the current
+   * local branch and fails in-session when that branch is not on origin.
+   */
+  ref?: string | undefined
   /** Workspace the CLI runs in — the repo whose remote the cloud session clones. */
   cwd: string
   /** Called with each chunk of terminal output. */
@@ -211,6 +221,25 @@ export class CloudSession implements DriverSession {
       throw new Error(`[framework] claude-web: unsafe model id ${JSON.stringify(model)}`)
     }
 
+    // The pre-hand-off push (#1320): the cloud session clones the repo at a named origin ref,
+    // and its two failure modes are both local facts — the CLI's default pin is the current
+    // branch, which an agent worktree's local-only run branch fails, and a slash-carrying
+    // name (every `the-framework/...` branch) never resolves on the cloud side even when
+    // pushed (anthropics/claude-code#87235). So push HEAD under this agent's own id — unique,
+    // slash-free — and hand the session that. Best-effort: a repo with no pushable remote
+    // falls back to the CLI's default, which still works wherever it worked before, and the
+    // notice names what a stranded session will look like.
+    let ref: string | undefined = this.id
+    try {
+      await (this.config.git ?? nodeGitRunner())(['push', 'origin', `HEAD:refs/heads/${this.id}`], this.cwd)
+    } catch (err) {
+      ref = undefined
+      this.emit({
+        type: 'notice',
+        message: `[framework] claude-web: could not push ${this.id} to origin (${errorMessage(err)}) — the cloud session may not find this branch and its work would then need \`claude --teleport\` to recover.`,
+      })
+    }
+
     let output = ''
     let trusting = false
     let found: { url: string; sessionId: string } | undefined
@@ -219,6 +248,7 @@ export class CloudSession implements DriverSession {
         bin: this.config.bin ?? 'claude',
         prompt: full,
         model,
+        ref,
         cwd: this.cwd,
         signal: controller.signal,
         onData: chunk => {
@@ -314,8 +344,27 @@ function tail(text: string, max = 600): string {
  * the CLI stops with "--cloud requires a description". That is why this failed on an account
  * with a model preference and worked without one: the model flag was sitting in the slot.
  * Exported so a test can pin the order, which is load-bearing and not otherwise observable.
+ *
+ * `--ref` names the origin ref the session clones at (#1320) — undocumented in the CLI's
+ * help but real, and the only revision spelling that works: the CLI's default pin is the
+ * current local branch, which the cloud side cannot resolve when it is not on origin, and a
+ * slash-carrying name (every `the-framework/...` branch) never resolves at all
+ * (anthropics/claude-code#87235). The ref is pushed just before this runs; see the pre-push
+ * in {@link CloudSession.prompt}.
  */
-export const CLOUD_COMMAND = 'exec "$FW_CLOUD_BIN" --cloud "$FW_CLOUD_PROMPT" ${FW_CLOUD_MODEL:+--model "$FW_CLOUD_MODEL"}'
+export const CLOUD_COMMAND =
+  'exec "$FW_CLOUD_BIN" --cloud "$FW_CLOUD_PROMPT" ${FW_CLOUD_MODEL:+--model "$FW_CLOUD_MODEL"} ${FW_CLOUD_REF:+--ref "$FW_CLOUD_REF"}'
+
+/**
+ * Extra environment for the CLI invocation (#1320): with statsig disabled its gates read
+ * false, which turns off the server-side `tengu_ccr_bundle_seed_enabled` experiment — the
+ * flag that converts a failed GitHub-App preflight into a silent local-bundle upload with no
+ * remote and no push access (anthropics/claude-code#81776). With the gate off, the same
+ * failed preflight falls through to a repo-bound session that clones from GitHub and can
+ * push, which is the entire point of handing work to the cloud. Drop this once the upstream
+ * preflight accepts connected-account access.
+ */
+export const CLOUD_ENV: Readonly<Record<string, string>> = { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1' }
 
 /**
  * Run the CLI under a pty supplied by `script`, streaming its terminal output.
@@ -328,9 +377,11 @@ function runPtyWithScript(opts: AgentPtyOptions): Promise<void> {
   return new Promise<void>((resolvePromise, rejectPromise) => {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
+      ...CLOUD_ENV,
       FW_CLOUD_BIN: opts.bin,
       FW_CLOUD_PROMPT: opts.prompt,
       ...(opts.model !== undefined ? { FW_CLOUD_MODEL: opts.model } : {}),
+      ...(opts.ref !== undefined ? { FW_CLOUD_REF: opts.ref } : {}),
     }
     const args =
       process.platform === 'darwin'

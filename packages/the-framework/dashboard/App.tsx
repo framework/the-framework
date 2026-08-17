@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Intervention, Activity, ProjectSummary, RecentAgent } from '../src/index.js'
-import { onProjectFiles, onInterventions, onActivity, onRecentAgents, onRetiredProjectSettings, type RetiredProjectNotice } from './rpc/reads.js'
+import { onProjectFiles, onInterventions, onActivity, onRecentAgents } from './rpc/reads.js'
 import { onProjects } from './rpc/projects.js'
 import { AgentHistory } from './components/AgentHistory.js'
 import { SidebarProvider } from './components/ui/sidebar.js'
@@ -14,7 +14,6 @@ import { AgentView } from './components/AgentView.js'
 import { agentLabel } from './lib/agent-label.js'
 import { RightRail } from './components/RightRail.js'
 import { RelayView } from './components/RelayView.js'
-import { RetiredSettingsNotice } from './components/RetiredSettingsNotice.js'
 import { NotFound } from './components/NotFound.js'
 import { useLiveEvents } from './lib/use-live-events.js'
 import { useAgents } from './lib/use-agents.js'
@@ -44,9 +43,6 @@ const EMPTY_ACTIVITY: Activity[] = []
 
 /** Stable initial for the cross-project recents poll, so it does not churn on every render. */
 const EMPTY_RECENT: RecentAgent[] = []
-
-/** Stable initial for the retired-settings read (#840), so it does not churn on every render. */
-const EMPTY_RETIRED: RetiredProjectNotice[] = []
 
 // The dashboard shell (#405 phase 2): Sessions | main | Docs/History rail, with the project
 // selection in the top nav as a dropdown since #772 (it used to be a rail of its own). The main pane
@@ -117,11 +113,6 @@ export function App() {
   // Reloadable so adding a project from the sidebar's "New" reflects at once (bump the key).
   const [projectsKey, setProjectsKey] = useState(0)
   const projects = useLoaded<ProjectSummary[]>(onProjects, EMPTY_PROJECTS, [projectsKey])
-
-  // The per-project settings the deleted tier held (#840). A boot fact, so it is read once rather
-  // than polled: the daemon captured it before its first write erased the block, and it cannot
-  // change while this process runs.
-  const retiredSettings = useLoaded<RetiredProjectNotice[]>(onRetiredProjectSettings, EMPTY_RETIRED, [])
   const projectName = projectId ? projects.find(p => p.id === projectId)?.name : null
   useDocumentTitle(interventions.length, projectName)
   // A URL naming a project that is not registered (renamed, removed, mistyped). A non-empty list
@@ -386,7 +377,6 @@ export function App() {
     <SidebarProvider className="h-screen flex-col overflow-hidden">
       {/* The top navbar is gone (#772 follow-up): its brand, global nav and utility controls moved
           into the sidebar (AgentHistory), so the workspace and right rail get the full height. */}
-      <RetiredSettingsNotice projects={retiredSettings} />
       {!healthy && (
         <div role="alert" className="flex items-center gap-2 border-b border-border bg-warning/10 px-4 py-2 text-xs text-warning">
           <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />

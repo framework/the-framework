@@ -64,6 +64,7 @@ const GIT_READ_OPS = new Set([
   'diff',
   'log',
   'ls-files',
+  'merge-base',
   'remote',
   'rev-list',
   'rev-parse',

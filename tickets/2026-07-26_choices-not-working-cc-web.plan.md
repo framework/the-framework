@@ -1,5 +1,6 @@
 Effort: 1
 Uncertainty: 2
+Outdated: yes
 
 # [Plan] Choices no working with CC web
 

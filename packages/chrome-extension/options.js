@@ -55,9 +55,13 @@ document.getElementById('save').addEventListener('click', async () => {
     )
   }
   try {
-    const res = await fetch(`${daemonUrl}/_bridge/ping`, { headers: { authorization: `Bearer ${token}` } })
+    const version = { 'x-tf-extension-version': chrome.runtime.getManifest().version }
+    const res = await fetch(`${daemonUrl}/_bridge/ping`, { headers: { authorization: `Bearer ${token}`, ...version } })
     if (res.status === 401) return say('The dashboard is reachable but rejected the token.', true)
     if (res.status === 404) return say('Reached the dashboard, but the bridge is off. Turn it on in The Framework.', true)
+    // The daemon refuses a version-skewed extension on every route (#1519); its answer names
+    // both versions and the way out, so hand it over verbatim.
+    if (res.status === 426) return say(await res.text(), true)
     if (!res.ok) return say(`The dashboard answered ${res.status}.`, true)
     // A 200 is not enough. The dashboard serves its single-page app for any path it does not
     // recognise, so a build with no bridge route answers 200 and a page of HTML, and treating
@@ -69,7 +73,7 @@ document.getElementById('save').addEventListener('click', async () => {
     // unanswered: does the daemon actually have anything for us to watch?
     let watching = ''
     try {
-      const list = await fetch(`${daemonUrl}/_bridge/sessions`, { headers: { authorization: `Bearer ${token}` } })
+      const list = await fetch(`${daemonUrl}/_bridge/sessions`, { headers: { authorization: `Bearer ${token}`, ...version } })
       const sessions = list.ok ? ((await list.json())?.sessions ?? []) : []
       watching = sessions.length
         ? ` Watching ${sessions.length} recent cloud session${sessions.length === 1 ? '' : 's'}${autoOpenEl.checked ? ', tabs opening shortly.' : ' (tab opening is off).'}`

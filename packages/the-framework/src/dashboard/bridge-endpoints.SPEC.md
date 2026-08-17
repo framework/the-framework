@@ -6,6 +6,7 @@ The daemon's doorway for the browser extension in the user's own claude.ai tab: 
 - Payloads are tiny and validated field by field — no paths, no commands, no free text — so a stolen secret buys at worst a bogus question card.
 - The extension can also ask which cloud sessions deserve a tab, fetch a session's queued answer, and report how delivering it went.
 - With the feature off, everything answers "not found"; a daemon missing one piece degrades to "nothing" rather than an error.
+- The extension states its version on every call, and a daemon expecting another refuses every route — naming both versions and the way out — because a version-skewed extension half-works in ways that read as framework bugs; the expected version moves in lockstep with the extension's manifest.
 
 ## Rationales
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { onBridgeToken } from '../rpc/reads.js'
+import { onBridgeStatus, onBridgeToken } from '../rpc/reads.js'
 import { Button } from './ui/button.js'
 import { CopyButton } from './ui/copy-button.js'
 
@@ -19,6 +19,30 @@ import { CopyButton } from './ui/copy-button.js'
 export function BridgeSettings({ enabled, onChange }: { enabled: boolean; onChange: (next: boolean) => void }) {
   const [token, setToken] = useState<string | null>(null)
   const [shown, setShown] = useState(false)
+  const [blocked, setBlocked] = useState<{ got: string; expected: string } | null>(null)
+
+  // The version gate's visible half (#1519): a refused extension would otherwise look merely
+  // disconnected, and "the bridge stopped working" after a pull is exactly this. Polled, because
+  // the block clears on the extension's own next call, not on anything this page does.
+  useEffect(() => {
+    if (!enabled) {
+      setBlocked(null)
+      return
+    }
+    let live = true
+    const read = () =>
+      void onBridgeStatus()
+        .then(status => {
+          if (live) setBlocked(status.version?.blocked ? { got: status.version.got, expected: status.version.expected } : null)
+        })
+        .catch(() => {})
+    read()
+    const timer = setInterval(read, 5000)
+    return () => {
+      live = false
+      clearInterval(timer)
+    }
+  }, [enabled])
 
   useEffect(() => {
     if (!enabled) {
@@ -44,6 +68,12 @@ export function BridgeSettings({ enabled, onChange }: { enabled: boolean; onChan
         Install the browser extension, open its options, and paste this token. It reports the question a Claude web
         session is parked on, so it shows up here instead of only on claude.ai.
       </p>
+      {blocked && (
+        <p className="text-danger">
+          The extension is blocked: it is v{blocked.got} and this dashboard expects v{blocked.expected}. Update it —
+          pull the repo, then reload the extension at chrome://extensions.
+        </p>
+      )}
       {token === null ? (
         // A restart is genuinely required: the token is read when the daemon starts.
         <p className="text-muted-foreground">Restart the dashboard to generate the token.</p>

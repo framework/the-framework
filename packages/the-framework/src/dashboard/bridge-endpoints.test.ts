@@ -1,8 +1,16 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
+import { readFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import { AddressInfo } from 'node:net'
-import { BRIDGE_PREFIX, handleBridgeRequest, type BridgeHandlers, type BridgeQuestion } from './bridge-endpoints.js'
+import {
+  BRIDGE_PREFIX,
+  EXPECTED_EXTENSION_VERSION,
+  EXTENSION_VERSION_HEADER,
+  handleBridgeRequest,
+  type BridgeHandlers,
+  type BridgeQuestion,
+} from './bridge-endpoints.js'
 
 const TOKEN = 'a'.repeat(43)
 
@@ -224,4 +232,68 @@ test('a daemon with no answer source degrades to null rather than failing (#1237
   } finally {
     await s.close()
   }
+})
+
+test('a version-skewed or version-silent extension is refused on every route, both versions named (#1519)', async () => {
+  const seen: { got: string; blocked: boolean }[] = []
+  const s = await serve({
+    token: TOKEN,
+    record: () => {},
+    expectedExtensionVersion: '9.9.9',
+    extensionVersion: (got, blocked) => void seen.push({ got, blocked }),
+  })
+  try {
+    // No header at all is exactly the dangerous case: an extension too old to announce itself.
+    const bare = await post(s.url, QUESTION)
+    assert.equal(bare.status, 426)
+    const text = await bare.text()
+    assert.match(text, /unknown/)
+    assert.match(text, /9\.9\.9/)
+    assert.match(text, /chrome:\/\/extensions/)
+    // A wrong version is refused everywhere, ping included: no degraded mode.
+    const ping = await fetch(`${s.url}${BRIDGE_PREFIX}/ping`, {
+      headers: { authorization: `Bearer ${TOKEN}`, [EXTENSION_VERSION_HEADER]: '0.0.1' },
+    })
+    assert.equal(ping.status, 426)
+    // The matching version passes, and its claim is recorded too — that is what clears a
+    // blocked banner once the extension is updated.
+    const ok = await fetch(`${s.url}${BRIDGE_PREFIX}/ping`, {
+      headers: { authorization: `Bearer ${TOKEN}`, [EXTENSION_VERSION_HEADER]: '9.9.9' },
+    })
+    assert.equal(ok.status, 200)
+    assert.equal(s.got.length, 0)
+    assert.deepEqual(seen, [
+      { got: 'unknown', blocked: true },
+      { got: '0.0.1', blocked: true },
+      { got: '9.9.9', blocked: false },
+    ])
+  } finally {
+    await s.close()
+  }
+})
+
+test('the version gate sits behind the token, so an unauthenticated caller learns nothing (#1519)', async () => {
+  const seen: string[] = []
+  const s = await serve({
+    token: TOKEN,
+    record: () => {},
+    expectedExtensionVersion: '9.9.9',
+    extensionVersion: got => void seen.push(got),
+  })
+  try {
+    assert.equal((await post(s.url, QUESTION, null)).status, 401)
+    assert.equal((await post(s.url, QUESTION, 'b'.repeat(43))).status, 401)
+    assert.deepEqual(seen, [])
+  } finally {
+    await s.close()
+  }
+})
+
+test('the expected version and the extension manifest move in lockstep (#1519)', () => {
+  // Resolved from the compiled test's own location (dist-test/dashboard/) to the repo's
+  // extension package, so bumping one without the other fails here instead of in someone's browser.
+  const manifest = JSON.parse(readFileSync(new URL('../../../chrome-extension/manifest.json', import.meta.url), 'utf8')) as {
+    version: string
+  }
+  assert.equal(EXPECTED_EXTENSION_VERSION, manifest.version)
 })

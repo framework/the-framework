@@ -23,6 +23,18 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
  */
 export const BRIDGE_PREFIX = '/_bridge'
 
+/**
+ * The extension version this daemon speaks (#1519). The extension states its own version on
+ * every call, in this header, and a daemon expecting another refuses outright: a version-skewed
+ * extension does not fail loudly, it half-works — missed messages, silently ignored fields —
+ * which reads as a framework bug and burns a debugging session. The extension's manifest must
+ * carry the same number; a test keeps the two in lockstep.
+ */
+export const EXPECTED_EXTENSION_VERSION = '0.8.0'
+
+/** The header the extension states its version in. Lowercase, as node presents all headers. */
+export const EXTENSION_VERSION_HEADER = 'x-tf-extension-version'
+
 /** A question a cloud session is parked on, as reported by the bridge. */
 export interface BridgeQuestion {
   /** The cloud session that asked, which joins back to an agent through `AgentMeta.sessionId`. */
@@ -67,6 +79,14 @@ export interface BridgeSession {
 export interface BridgeHandlers {
   /** The shared secret every bridge call must present. */
   token: string
+  /**
+   * The extension version to insist on (#1519). When set, every route past the token demands a
+   * matching {@link EXTENSION_VERSION_HEADER} and answers 426 otherwise — no degraded mode,
+   * ping included, so the only path forward from a stale extension is updating it.
+   */
+  expectedExtensionVersion?: string
+  /** What version the caller claimed and whether it was turned away, for the dashboard. */
+  extensionVersion?: (got: string, blocked: boolean) => void
   record: (question: BridgeQuestion) => void
   /** Record what the session said, keyed by its position in the transcript. */
   recordEvent?: (event: BridgeEvent) => void
@@ -108,6 +128,20 @@ export async function handleBridgeRequest(
   if (!handlers) return end(res, 404, 'bridge not enabled')
   seen(handlers, pathname, res)
   if (!authorized(req, handlers.token)) return end(res, 401, 'unauthorized')
+  // The version gate (#1519), behind the token so an unauthenticated caller learns nothing.
+  if (handlers.expectedExtensionVersion !== undefined) {
+    const raw = req.headers[EXTENSION_VERSION_HEADER]
+    const got = (typeof raw === 'string' && raw ? raw : 'unknown').slice(0, 32)
+    const blocked = got !== handlers.expectedExtensionVersion
+    handlers.extensionVersion?.(got, blocked)
+    if (blocked) {
+      return end(
+        res,
+        426,
+        `extension v${got} does not match the v${handlers.expectedExtensionVersion} this daemon expects: update the extension (pull the repo, then reload it at chrome://extensions) and retry`,
+      )
+    }
+  }
   if (pathname === `${BRIDGE_PREFIX}/ping`) {
     if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
     return end(res, 200, 'ok')

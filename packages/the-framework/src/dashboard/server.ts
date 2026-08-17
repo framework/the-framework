@@ -14,7 +14,7 @@ import { requestPathname } from '../request-path.js'
 import type { AddProjectResult, PreviewResult, PreviewStatus, StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
 import type { EventsSource, RemoteAgents } from './rpc-serve.js'
 import { handleRelayRequest, RELAY_PREFIX, type RelayHandlers } from './relay-endpoints.js'
-import { BRIDGE_PREFIX, handleBridgeRequest, type BridgeHandlers } from './bridge-endpoints.js'
+import { BRIDGE_PREFIX, EXPECTED_EXTENSION_VERSION, handleBridgeRequest, type BridgeHandlers } from './bridge-endpoints.js'
 import { bridgeQuestions } from './bridge-store.js'
 
 /** Options for {@link startDashboard}. */
@@ -174,6 +174,9 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
   const bridgeHandlers: BridgeHandlers | undefined = opts.bridgeToken
     ? {
         token: opts.bridgeToken,
+        // The version gate (#1519): a stale extension is refused loudly rather than half-working.
+        expectedExtensionVersion: EXPECTED_EXTENSION_VERSION,
+        extensionVersion: (got, blocked) => bridgeQuestions().recordVersion(got, EXPECTED_EXTENSION_VERSION, blocked),
         record: question => bridgeQuestions().record(question),
         contact: (route, status) => bridgeQuestions().recordContact(route, status),
         recordEvent: event => bridgeQuestions().recordEvent(event),

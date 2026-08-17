@@ -39,6 +39,14 @@ export interface BridgeContact {
   status: number
 }
 
+/** The extension's last version claim, and whether the doorway turned it away (#1519). */
+export interface BridgeVersion {
+  got: string
+  expected: string
+  blocked: boolean
+  at: string
+}
+
 export class BridgeQuestions {
   private readonly bySession = new Map<string, BridgeQuestion>()
   private contact: BridgeContact | undefined
@@ -52,6 +60,23 @@ export class BridgeQuestions {
    */
   recordContact(route: string, status: number): void {
     this.contact = { at: new Date().toISOString(), route, status }
+  }
+
+  private versionState: BridgeVersion | undefined
+
+  /**
+   * What version the extension last claimed and whether it was refused for it (#1519).
+   *
+   * The accepted claims are recorded too, which is what clears a blocked banner: the moment an
+   * updated extension gets through, the last word is no longer a refusal.
+   */
+  recordVersion(got: string, expected: string, blocked: boolean): void {
+    this.versionState = { got, expected, blocked, at: new Date().toISOString() }
+  }
+
+  /** The last version claim, or undefined while nothing has stated one. */
+  version(): BridgeVersion | undefined {
+    return this.versionState
   }
 
   private helloState: BridgeHello | undefined

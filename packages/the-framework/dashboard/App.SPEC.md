@@ -7,6 +7,7 @@ The entire dashboard is this one page: it reads the selection from the address, 
 - A just-started session shows live before its record exists; with no id known yet, the page follows the output and adopts the running session once it surfaces.
 - Live and finished agents are the same view — only the "live" flag flips when an agent ends.
 - A shared watch link renders that one agent read-only; a daemon that stops answering gets a banner, so a dead backend never looks like a quiet agent.
+- A setting that was retired out from under a repo gets a banner too, naming the repo and the line that replaces it. A removal that leaves agents publishing where they did not before has to be said somewhere a person looks, and this is where they look.
 
 ## Rationales
 

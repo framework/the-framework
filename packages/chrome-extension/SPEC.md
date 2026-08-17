@@ -7,6 +7,7 @@ A Chrome extension bridging Claude Code cloud sessions on claude.ai to the local
 - Answers go the long way round: dashboard pick → daemon queue → worker → typed into the session's composer and submitted; the extension can only ever type a label the session itself offered, and the pick was confirmed in the dashboard first.
 - It keeps one pinned background tab per session the daemon watches, so the bridge works with nobody looking at claude.ai — closing tabs when watching stops, and never reopening one the user closed.
 - Reading is driven by page changes with a slow heartbeat backstop (it lives in background tabs), and every stage reports its status — on the page's panel and in the settings page's connection test — so a silent misconfiguration is visible.
+- The extension and the daemon insist on matching versions: every call states the manifest version, and a daemon expecting another blocks it with an error naming both and the update path, because a version-skewed pair half-works in ways that read as bugs.
 
 ## Before writing SPEC.md files
 

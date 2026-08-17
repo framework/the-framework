@@ -11,6 +11,11 @@
 
 const DEFAULT_DAEMON = 'http://localhost:4200'
 
+// Every daemon call states this extension's version, and a daemon expecting another refuses it
+// outright (#1519): a version-skewed extension half-works in ways that read as dashboard bugs,
+// so the daemon blocks rather than degrades, and the error it answers names both versions.
+const VERSION_HEADER = { 'x-tf-extension-version': chrome.runtime.getManifest().version }
+
 /** What we last successfully reported per session, so a re-render does not re-post. */
 const lastSent = new Map()
 
@@ -55,7 +60,7 @@ async function report(question) {
   const base = (daemonUrl || DEFAULT_DAEMON).replace(/\/+$/, '')
   const res = await fetch(`${base}/_bridge/question`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...VERSION_HEADER },
     body: JSON.stringify(question),
   })
   if (!res.ok) {
@@ -99,7 +104,7 @@ async function deliverAnswers(sessionIds) {
     let answer
     try {
       const res = await fetch(`${base}/_bridge/answer?sessionId=${sessionId}`, {
-        headers: { authorization: `Bearer ${token}` },
+        headers: { authorization: `Bearer ${token}`, ...VERSION_HEADER },
       })
       if (!res.ok) continue
       answer = (await res.json())?.answer
@@ -146,7 +151,7 @@ async function ack(base, token, body) {
   try {
     const res = await fetch(`${base}/_bridge/answered`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...VERSION_HEADER },
       body: JSON.stringify(body),
     })
     if (res.ok || res.status === 400) {
@@ -167,7 +172,7 @@ async function pollAnswers() {
   for (const body of [...pendingAcks.values()]) await ack(base, token, body)
   let sessions
   try {
-    const res = await fetch(`${base}/_bridge/sessions`, { headers: { authorization: `Bearer ${token}` } })
+    const res = await fetch(`${base}/_bridge/sessions`, { headers: { authorization: `Bearer ${token}`, ...VERSION_HEADER } })
     if (!res.ok) return
     sessions = (await res.json())?.sessions
   } catch {
@@ -184,7 +189,7 @@ async function post(path, body) {
   const base = (daemonUrl || DEFAULT_DAEMON).replace(/\/+$/, '')
   const res = await fetch(`${base}${path}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...VERSION_HEADER },
     body: JSON.stringify(body),
   })
   if (!res.ok) return { ok: false, error: `daemon answered ${res.status}: ${(await res.text()).slice(0, 200)}` }
@@ -198,7 +203,7 @@ async function postEvents({ sessionId, events }) {
   const base = (daemonUrl || DEFAULT_DAEMON).replace(/\/+$/, '')
   const res = await fetch(`${base}/_bridge/events`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...VERSION_HEADER },
     body: JSON.stringify({ sessionId, events }),
   })
   if (!res.ok) return { ok: false, error: `daemon answered ${res.status}: ${(await res.text()).slice(0, 200)}` }
@@ -254,7 +259,7 @@ async function openWatchedTabs() {
 
   let sessions
   try {
-    const res = await fetch(`${base}/_bridge/sessions`, { headers: { authorization: `Bearer ${token}` } })
+    const res = await fetch(`${base}/_bridge/sessions`, { headers: { authorization: `Bearer ${token}`, ...VERSION_HEADER } })
     if (!res.ok) return note({ ok: false, reason: `daemon answered ${res.status} listing sessions` })
     sessions = (await res.json())?.sessions
   } catch (err) {

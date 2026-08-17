@@ -228,12 +228,44 @@ function deepText() {
  * so a session shows a JSON block with `options` before the agent has asked anything. Its
  * values are the spec's placeholders. Round 3 extracted exactly that and reported
  * `<the question>` as the question, which is the decoy working as designed.
+ *
+ * Two more decoys slipped that net on a live session (#1568). The browser-handoff example's
+ * title is placeholders *plus punctuation* — `<what…> (<the page…>)` — so the whole-string
+ * placeholder test missed it, and its labels are literal. And the approval example is literal
+ * end to end (`Ship this?`, Approve/Decline), which no placeholder heuristic can catch — it is
+ * matched verbatim instead, accepting that an agent asking the doc's exact sample question
+ * word-for-word loses (it was told to put a real title there).
  */
 function isTemplate(parsed) {
   const placeholder = v => typeof v === 'string' && /^<.*>$/.test(v.trim())
-  if (placeholder(parsed.title)) return true
+  const title = typeof parsed.title === 'string' ? parsed.title : ''
+  if (placeholder(title)) return true
+  // Placeholders joined by punctuation only: strip every <…> group; a title with no letters
+  // left is the spec talking, while a real title mentioning `<SESSION_NAME>` keeps its words.
+  if (/<[^<>]+>/.test(title) && !/\p{L}/u.test(title.replace(/<[^<>]*>/g, ''))) return true
   const labels = parsed.options.map(o => (typeof o === 'string' ? o : o?.label))
-  return labels.length > 0 && labels.every(placeholder)
+  if (labels.length > 0 && labels.every(placeholder)) return true
+  const set = labels.filter(l => typeof l === 'string').join('|')
+  // The two literal examples the protocol ships, verbatim.
+  if (set === 'Handled it|Could not handle it') return true
+  if (title === 'Ship this?' && set === 'Approve|Decline') return true
+  return false
+}
+
+/**
+ * Whether an element renders inside the transcript's opening message, crossing shadow
+ * boundaries on the way up. The page opens with the run's prompt — which quotes our whole
+ * protocol, examples included — so nothing inside that first message is ever a question the
+ * session asked (#1568). Roots are walked via their host so a block inside a shadowed
+ * highlighter still resolves to the article that carries it.
+ */
+function inFirstMessage(el, first) {
+  if (!first) return false
+  // A shadow tree's top parent is its ShadowRoot, whose `host` re-enters the outer tree.
+  for (let node = el; node; node = node.parentNode ?? node.host ?? null) {
+    if (node === first) return true
+  }
+  return false
 }
 
 /** Every JSON object carrying `options` in the text, in the order they appear. */
@@ -313,15 +345,26 @@ function findPendingChoice() {
   // `code` on its own: the page has <code> blocks with no <pre> wrapper (round 1), and they
   // sit inside shadow roots (round 2). DOM order tracks transcript order, so the last real
   // question wins over both the spec and any earlier answered one.
+  // The opening message is the run's own prompt, which quotes the whole protocol — examples
+  // included — so blocks inside it are documentation, never the session asking (#1568). Only
+  // applied when the page marks messages at all; the page-text fallback has no elements to
+  // scope and leans on isTemplate alone.
+  const firstMessage = deepQueryAll('article')[0]
   const fromElements = []
   for (const el of deepQueryAll('pre code, pre, code')) {
+    if (inFirstMessage(el, firstMessage)) continue
     for (const parsed of extractChoices(el.textContent ?? '')) {
       fromElements.push({ via: el.tagName.toLowerCase(), parsed })
     }
   }
+  // The page-text fallback reads everything, opening message included, so any block that also
+  // renders inside that first message is subtracted from it by value.
+  const inPrompt = new Set(extractChoices(firstMessage?.textContent ?? '').map(p => JSON.stringify(p)))
   const candidates = fromElements.length
     ? fromElements
-    : extractChoices(deepText()).map(parsed => ({ via: 'page-text', parsed }))
+    : extractChoices(deepText())
+        .filter(parsed => !inPrompt.has(JSON.stringify(parsed)))
+        .map(parsed => ({ via: 'page-text', parsed }))
   const real = candidates.filter(c => !isTemplate(c.parsed))
   const found = real.at(-1)
   if (found) reportToDaemon(found.parsed)

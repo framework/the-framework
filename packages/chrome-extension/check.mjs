@@ -47,6 +47,20 @@ const SPEC = esc(JSON.stringify({
   recommended: '<the label to default to>',
 }, null, 2))
 
+// The two examples the protocol ships with literal text (#1568): the browser-handoff one has a
+// placeholders-plus-punctuation title and real labels, the approval one is literal end to end.
+// Both rendered on a live page and were reported as the session's question.
+const HANDOFF_EXAMPLE = esc(JSON.stringify({
+  title: '<what the human needs to do> (<the page you are stuck on>)',
+  options: [{ label: 'Handled it' }, { label: 'Could not handle it', stop: true }],
+  recommended: 'Could not handle it',
+}, null, 2))
+const APPROVAL_EXAMPLE = esc(JSON.stringify({
+  title: 'Ship this?',
+  options: [{ label: 'Approve' }, { label: 'Decline', stop: true }],
+  recommended: 'Approve',
+}, null, 2))
+
 const cases = [
   ['fenced code block', `<pre><code>${block}</code></pre><div contenteditable="true"></div>`, true],
   ['pre without code', `<pre>${block}</pre><textarea></textarea>`, true],
@@ -65,6 +79,20 @@ const cases = [
   ['protocol spec then the real question', `<pre><code>${SPEC}</code></pre><code>${block}</code><div contenteditable="true"></div>`, true],
   // And on a session that has not asked yet, the spec alone must not count as a question.
   ['protocol spec only', `<pre><code>${SPEC}</code></pre><div contenteditable="true"></div>`, false],
+  // #1568: the browser-handoff example's title is placeholders joined by punctuation and its
+  // labels are literal, so neither of the original isTemplate prongs caught it.
+  ['browser-handoff example only', `<pre><code>${HANDOFF_EXAMPLE}</code></pre><div contenteditable="true"></div>`, false],
+  // #1568: the approval example is literal end to end and can only be matched verbatim.
+  ['approval example only', `<pre><code>${APPROVAL_EXAMPLE}</code></pre><div contenteditable="true"></div>`, false],
+  // #1568: when the page marks messages, everything in the opening one is the rendered prompt —
+  // documentation, not the session asking — and the real question in a later message still wins.
+  [
+    'decoys in the opening message, real question after',
+    `<article><pre><code>${SPEC}</code><code>${HANDOFF_EXAMPLE}</code><code>${APPROVAL_EXAMPLE}</code></pre></article><article><code>${block}</code></article><div contenteditable="true"></div>`,
+    true,
+  ],
+  // #1568: a question-shaped block that only exists inside the opening message is never asked.
+  ['question-shaped block only in the opening message', `<article><code>${block}</code></article><div contenteditable="true"></div>`, false],
 ]
 
 const script = readFileSync(join(here, 'content.js'), 'utf8')

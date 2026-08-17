@@ -30,7 +30,7 @@ export const BRIDGE_PREFIX = '/_bridge'
  * which reads as a framework bug and burns a debugging session. The extension's manifest must
  * carry the same number; a test keeps the two in lockstep.
  */
-export const EXPECTED_EXTENSION_VERSION = '0.8.0'
+export const EXPECTED_EXTENSION_VERSION = '0.8.1'
 
 /** The header the extension states its version in. Lowercase, as node presents all headers. */
 export const EXTENSION_VERSION_HEADER = 'x-tf-extension-version'

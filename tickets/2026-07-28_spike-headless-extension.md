@@ -14,7 +14,7 @@ Labeled priority-high (was highest-prio at import). The extension path is the ma
 
 ## Source
 
-Imported from GitHub issue [gemstack-land/the-framework#1332](https://github.com/gemstack-land/the-framework/issues/1332), created 2026-07-28, labels: `priority: high`, `UX ✨`, 1 comment. Body is empty; TLDR above is inferred from the title and the #1328 context.
+Imported from GitHub issue [gemstack-land/the-framework#1332](https://github.com/gemstack-land/the-framework/issues/1332), created 2026-07-28, labels: `priority: high`, `UX ✨`, 1 comment. Body was empty at first import (TLDR above inferred from the title and the #1328 context); as of 2026-08-17 it cross-links #1554 (choices support in the CC web driver) as the other half of full-fledged CC web support.
 
 ### Notes from the GitHub thread
 

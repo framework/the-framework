@@ -122,7 +122,7 @@ test('linkDependencies gives a real worktree a working dependency tree', async (
 })
 
 // The regression this guards: `.gitignore` says `node_modules/`, which matches a directory and
-// NOT the symlink we create, so without an exclude the run's `git add -A` commits dangling
+// NOT the symlink we create, so without an exclude the agent's `git add -A` commits dangling
 // absolute symlinks onto its branch. Exercised against real git, since the whole claim is about
 // what git actually ignores.
 test('excludeDependencyLinks makes git ignore the linked trees in a worktree (#738)', async () => {
@@ -140,7 +140,7 @@ test('excludeDependencyLinks makes git ignore the linked trees in a worktree (#7
     await git(['commit', '-m', 'init'], repo)
 
     const wt = join(root, 'wt')
-    await git(['worktree', 'add', wt, '-b', 'the-framework/run-1'], repo)
+    await git(['worktree', 'add', wt, '-b', 'the-framework/agent-1'], repo)
     await linkDependencies(repo, wt, nodeLinkFs())
     assert.equal(
       (await git(['status', '--porcelain'], wt)).includes('node_modules'),
@@ -151,7 +151,7 @@ test('excludeDependencyLinks makes git ignore the linked trees in a worktree (#7
     await excludeDependencyLinks(repo, nodeFs(), git)
     assert.equal((await git(['status', '--porcelain'], wt)).trim(), '', 'the worktree is clean once excluded')
 
-    // Idempotent: a second run over the same repo must not append the rule again.
+    // Idempotent: a second agent over the same repo must not append the rule again.
     await excludeDependencyLinks(repo, nodeFs(), git)
     const exclude = await readFile(join(repo, '.git', 'info', 'exclude'), 'utf8')
     assert.equal(exclude.split('\n').filter(l => l.trim() === 'node_modules').length, 1)

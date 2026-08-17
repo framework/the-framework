@@ -4,7 +4,8 @@ The notification engine: a background poll over the registered projects that ann
 
 - The first look only takes a baseline — whatever already existed when the daemon started is never announced; you only hear about what happens while it watches.
 - What makes two items "the same" is the caller's decision, so one engine serves both the needs-you queue and the activity feed.
-- Forgiving: a failed scan or projection simply announces nothing that cycle, and the poll never keeps the daemon alive past shutdown.
+- Forgiving: a failed scan or projection simply announces nothing that cycle.
+- It owns no timer of its own — the daemon's one clock calls it — so its cadence is declared where every other background job's is.
 
 ## Before writing SPEC.md files
 

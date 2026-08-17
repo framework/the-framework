@@ -1,0 +1,474 @@
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { ArrowUp, Loader2 } from 'lucide-react'
+import type { ProjectSummary } from '../../src/index.js'
+import { DRIVERS, DRIVER_LABELS, LAUNCHER_PRESETS, type DriverName } from '../../src/client.js'
+import {
+  usePreferences,
+  updatePreferences,
+  themePreference,
+  usePreferenceSources,
+  useProjectFileConfig,
+  useProjectPresets,
+  saveProjectPresetList,
+  useActiveProjectId,
+} from '../lib/preferences.js'
+import { useLoaded } from '../lib/use-async.js'
+import { onProjects } from '../rpc/projects.js'
+import { PromptEditor, type PromptEditorHandle } from './PromptEditor.js'
+import { PresetCreatePanel } from './PresetCreatePanel.js'
+import { PresetsMenu } from './PresetsMenu.js'
+import { DriverModelMenu, type DriverOption } from './DriverModelMenu.js'
+import { OptionsMenu, type AgentTarget } from './OptionsMenu.js'
+import { resumeOptionRows, agentOptionRows } from '../lib/agent-option-rows.js'
+import { AddDeviceDialog } from './AddDeviceDialog.js'
+import { useConnectionProfiles, connectLocal, isLoopbackHost, removeProfile, type ConnectionProfile } from '../lib/profiles.js'
+import { useSelectedRemoteDeviceId, selectRemoteDevice } from '../lib/remote-target.js'
+import { useDeviceStatus } from '../lib/use-device-status.js'
+import { stashDraftFromUrl, takePendingDraft } from '../lib/draft-handoff.js'
+import { ResolvedOptions } from './ResolvedOptions.js'
+import { ClaudeLogo, CodexLogo } from './driver-logos.js'
+import { Button } from './ui/button.js'
+import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
+import { cn } from '../lib/utils.js'
+
+// The presets (#353/#433): each PREFILLS the editor with a rendered prompt and runs it verbatim
+// (`kind: 'prompt'`). Emptying the box falls back to a normal `build` run. The list, its order and
+// each preset's label live with the presets themselves (#874), so a preset's run-kind name and the
+// button that starts it cannot drift apart across the package boundary.
+// The driver + model tree (#650/#656/#658): each driver lists ONLY its own models, since `--model`
+// passes straight through to that CLI. Picking a model in a driver's submenu sets both, so an
+// incompatible pair can't be chosen. Every entry is a real model id: a "Default" entry used to head
+// each list, and picking it stored nothing, so the menu's own answer to "which model" was "we do
+// not know" (#1143). Not choosing is still a state — it is just no longer something to pick, and
+// the trigger says so rather than naming the first model as if it had been chosen.
+// The names and labels are the framework's own vocabulary (browser-safe via /client); only the
+// icons and model lists are UI data, and the Record<DriverName, ...> shape means a new agent
+// framework-side is a compile error here rather than a silently missing menu entry.
+const DRIVER_UI: Record<DriverName, { icon: DriverOption['icon']; models: DriverOption['models'] }> = {
+  claude: {
+    icon: <ClaudeLogo className="h-4 w-4" />,
+    models: [
+      { value: 'fable', label: 'Fable' },
+      { value: 'opus', label: 'Opus' },
+      { value: 'sonnet', label: 'Sonnet' },
+      { value: 'haiku', label: 'Haiku' },
+    ],
+  },
+  codex: {
+    icon: <CodexLogo className="h-4 w-4" />,
+    models: [
+      { value: 'gpt-5-codex', label: 'GPT-5 Codex' },
+      { value: 'gpt-5', label: 'GPT-5' },
+      { value: 'o3', label: 'o3' },
+    ],
+  },
+}
+const DRIVER_OPTIONS: DriverOption[] = DRIVERS.map(name => ({ value: name, label: DRIVER_LABELS[name], ...DRIVER_UI[name] }))
+
+export interface ComposerHandle {
+  clear: () => void
+  focus: () => void
+}
+
+// The shared agent composer (#721): the Tiptap editor (`/` `<` `@` `#` triggers, presets, mentions)
+// plus the control row — agent/model select, presets menu, Global-options gear, and the submit
+// button. Factored out of the launcher (StartAgentForm) so the run-view chat (AgentComposer) gets the exact
+// same surface, wired to the same data (files, presets, prefs). The caller owns what happens on
+// submit: the launcher starts an agent (with collected options), the chat sends a message. The `@`
+// picker's project list is Composer's own concern, so it loads it here (#743) rather than making
+// every host pass the same list down.
+export const Composer = forwardRef<ComposerHandle, {
+  /** The current project's files for the `#` picker (#504). */
+  files: string[]
+  /** Add a path to the agent Context (from an `@`/`#` mention). */
+  addContext: (path: string) => void
+  /** Drop a path from the agent Context when its `@`/`#` chip leaves the editor (#948). */
+  removeContext?: ((path: string) => void) | undefined
+  /** Run the composed text. `kind` is `prompt` once a preset was loaded, else `build`.
+   *  `newAgent` (#959) says the loaded preset must open a session of its own, so the two
+   *  in-session hosts send it as a new agent instead of into the session they sit in. */
+  onSubmit: (text: string, kind: 'build' | 'prompt', opts: { newAgent: boolean }) => void | Promise<void>
+  /** Mirror the live prompt + kind out, so the launcher can drive its disclosure/context UI. */
+  onPromptChange?: ((prompt: string, kind: 'build' | 'prompt') => void) | undefined
+  /** A preset was loaded (so the launcher can flag it in its note); `replaced` says a typed
+   *  draft was overwritten (undo brings it back). */
+  onPreset?: ((label: string, replaced: boolean) => void) | undefined
+  busy: boolean
+  submitLabel: string
+  submitBusyLabel: string
+  placeholder?: string | undefined
+  /** Compact single-row form for the navbar quick-launch (#723): editor + submit, no control row
+   *  or preset panel. The `/` `<` `@` `#` triggers still work; agent/model + options come from the
+   *  shared prefs the launcher sets. */
+  compact?: boolean | undefined
+  /** Off inside a session (#831): a session is bound to the agent it started with, so the select
+   *  would only ever rewrite the *next* session's default. Chosen at the launcher instead. */
+  showDriverModel?: boolean | undefined
+  /** Inside a running/finished session (#833): every agent option is baked in at spawn, so the
+   *  gear drops them (keeping the genuinely global editor pick) and the "In play" strip goes —
+   *  both would otherwise read as controls over *this* session that only rewrite the next one. */
+  inAgent?: boolean | undefined
+  /** The session has ended (#1172): the next message is a Resume, i.e. a NEW leg that resolves
+   *  the current preferences at start (#1469) — so the gear returns, offering just the options
+   *  that shape that leg (publish ladder, Autopilot, Browser). While the agent is live nothing is
+   *  adjustable, and the gear is dropped entirely instead of opening empty. Only read in-session. */
+  agentEnded?: boolean | undefined
+  /** The session this composer sits in, if any (#874): a preset launched from an agent page targets
+   *  that session by default, instead of the whole codebase. Absent at the launcher, where no
+   *  session exists yet. */
+  sessionName?: string | undefined
+  /** A control the launcher hangs in the composer control row (#1046): the Context picker. Only the
+   *  launcher passes one; in-session there is no launcher row. */
+  contextControl?: ReactNode
+  /** What the launcher puts at the start of the "In play" row (#1046): the Enhanced System Prompt
+   *  disclosure, so it shares that row with the resolved-options strip. Its own expandable panel
+   *  drops full-width below. Only the launcher passes one. */
+  resolvedRowStart?: ReactNode
+  /** Occupies the submit slot while the box is empty (#1455): the session page's Stop while the
+   *  run is live, its Resume once stopped — so Start/Stop/Resume and the send ↑ are one slot,
+   *  like Claude Code's composer. Typing swaps it for the arrow (a live send still queues), and
+   *  without one the slot keeps its collapse-when-empty behavior for the launcher. */
+  idleControl?: ReactNode
+}>(function Composer(
+  { files, addContext, removeContext, onSubmit, onPromptChange, onPreset, busy, submitLabel, submitBusyLabel, placeholder, compact = false, showDriverModel = true, inAgent = false, agentEnded = false, sessionName, contextControl, resolvedRowStart, idleControl },
+  ref,
+) {
+  const [prompt, setPrompt] = useState('')
+  const [kind, setKind] = useState<'build' | 'prompt'>('build')
+  // Set by the loaded preset, not by the surface (#959). Cleared with the box, like `kind`.
+  const [newAgent, setNewAgent] = useState(false)
+  const [addingPreset, setAddingPreset] = useState(false)
+  const [addingDevice, setAddingDevice] = useState(false) // #1052: the "Add a device" modal
+  const editorRef = useRef<PromptEditorHandle>(null)
+  // The saved daemons this browser can hop to (#1052). Which one we are on now comes from the URL,
+  // fixed for the page's life (a device switch reloads), so it is read once rather than as state.
+  const profiles = useConnectionProfiles()
+  const deviceStatus = useDeviceStatus(profiles) // #1072: online/offline per saved device
+  const selectedDeviceId = useSelectedRemoteDeviceId() // #1067: the device this run targets, if any
+  const selectedDevice = selectedDeviceId ? profiles.find(p => p.id === selectedDeviceId) : undefined
+  // #1073: block Start when the target device is known-offline; an absent/unknown status must not block.
+  const targetOffline = !!selectedDeviceId && deviceStatus[selectedDeviceId] === 'offline'
+  const currentUrl = typeof window === 'undefined' ? null : window.location.origin
+  const isLocalConnection = typeof window === 'undefined' ? true : isLoopbackHost(window.location.hostname)
+  // The registered projects for the `@` picker — the same list the launcher reads.
+  const projects = useLoaded<ProjectSummary[]>(onProjects, [], [])
+
+  const preferences = usePreferences()
+  const sources = usePreferenceSources() // #842: which layer won each option
+  const fileConfig = useProjectFileConfig() // #842: the repo's committed the-framework.yml
+  const vanilla = preferences.vanilla ?? false
+
+  // Presets render against the session they are launched from (#874). The agent pages pass their
+  // session name so a preset targets that session by default; the launcher passes none, and the
+  // default falls through to the whole codebase.
+  const presets = useMemo(
+    () =>
+      LAUNCHER_PRESETS.map(p => ({
+        id: p.name,
+        label: p.label,
+        ...(p.tooltip ? { tooltip: p.tooltip } : {}),
+        render: () => p.render(undefined, { session_name: sessionName }),
+        ...(p.newAgent ? { newAgent: true } : {}),
+      })),
+    [sessionName],
+  )
+  const transparent = preferences.transparent ?? false // #625: the master off-switch (raw Claude Code)
+  const browser = preferences.browser ?? false
+  const model = preferences.model ?? '' // #628: empty = the driver's default model
+  const driver = preferences.driver ?? 'claude' // which coding-agent CLI does the work (#650)
+  const target = preferences.target ?? 'local' // #1050: where the run executes (this device / GitHub Actions)
+  // The stored agent as a display name; an unknown stored value falls back to Claude Code.
+  const customPresets = preferences.customPresets ?? [] // #626: the user's own saved prompts
+  const projectPresets = useProjectPresets() // #1025: presets committed in the open project's repo
+  const activeProjectId = useActiveProjectId() // #1025: a project to commit a shared preset into
+  const theme = themePreference(preferences) // #725: system (default) / light / dark
+
+  // Vanilla removes the system prompt (nothing left for Eco to trim); Transparent turns off the
+  // whole framework, so it overrides the rest too.
+  const ecoDisabled = vanilla || transparent
+
+  useImperativeHandle(ref, () => ({
+    clear: () => {
+      editorRef.current?.clear()
+      setPrompt('')
+      setKind('build')
+    },
+    focus: () => editorRef.current?.focus(),
+  }))
+
+  // Rehydrate a draft carried in — from another device (#1066) or from the click that navigated
+  // here (#1139) — launcher-only. stashDraftFromUrl is idempotent, so calling it here is race-safe
+  // even if the SPA-entry call has not run yet. A carried draft is still a 'build', so it seeds the
+  // editor without flipping kind.
+  //
+  // Handed to the editor as `initialText` rather than pushed through the handle: the draft is taken
+  // once and cleared, while `loadTemplate` silently does nothing until Tiptap has resolved
+  // (`immediatelyRender: false`), so pushing it at mount dropped the draft and left an empty
+  // composer. `prompt` then arrives the normal way, through the editor's own onChange.
+  const [carriedDraft, setCarriedDraft] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    if (compact || inAgent) return
+    stashDraftFromUrl()
+    const carried = takePendingDraft()
+    if (carried) setCarriedDraft(carried)
+  }, [compact, inAgent])
+
+  // A synchronous latch alongside the async `busy` prop (#948): two fast ⌘↵ presses both read
+  // `busy === false` (React state lags), fired two starts, and the second surfaced a spurious
+  // "already active" error. The ref flips before any await.
+  const submittingRef = useRef(false)
+  const submit = (e?: FormEvent) => {
+    e?.preventDefault()
+    const text = prompt.trim()
+    // #1073: a keyboard submit must be blocked too when the target device is offline.
+    if (!text || busy || submittingRef.current || targetOffline) return
+    submittingRef.current = true
+    void Promise.resolve(onSubmit(text, kind, { newAgent })).finally(() => {
+      submittingRef.current = false
+    })
+  }
+
+  // A preset (from the `/` menu or the Presets button) loads the rendered template into the
+  // editor, which chip-ifies its tags; the agent then goes verbatim as a `prompt` kind.
+  const loadPreset = (label: string, replaced: boolean, presetNewAgent = false) => {
+    setKind('prompt')
+    setNewAgent(presetNewAgent)
+    onPreset?.(label, replaced)
+  }
+
+  // The Presets button's load path (#948): through the imperative handle rather than the
+  // suggestion plugin, then the same bookkeeping as the `/` menu.
+  const loadPresetFromMenu = (text: string, label: string, presetNewAgent?: boolean) => {
+    const replaced = editorRef.current?.loadTemplate(text) ?? false
+    loadPreset(label, replaced, presetNewAgent)
+  }
+
+  const onPromptEdit = (value: string) => {
+    setPrompt(value)
+    // An emptied box is a fresh start: back to a normal build agent.
+    const nextKind = !value.trim() && kind !== 'build' ? 'build' : kind
+    if (nextKind !== kind) setKind(nextKind)
+    // Emptying the box drops the preset, and with it its new-session rule.
+    if (nextKind === 'build' && newAgent) setNewAgent(false)
+    onPromptChange?.(value, nextKind)
+  }
+
+  // The Global options as one table (#314), with every rule between them (#958). The table lives
+  // in lib/agent-option-rows.ts because the settings page renders the same options: a second copy
+  // would let a rule hold in one place and not the other.
+  const { main: mainOptions } = agentOptionRows(preferences)
+
+  const editorEl = (
+    <PromptEditor
+      ref={editorRef}
+      compact={compact}
+      onChange={onPromptEdit}
+      onSubmit={submit}
+      onPreset={loadPreset}
+      onMentionProject={addContext}
+      onMentionFile={addContext}
+      {...(removeContext ? { onMentionRemoved: removeContext } : {})}
+      projects={projects}
+      files={files}
+      presets={presets}
+      customPresets={customPresets}
+      projectPresets={projectPresets}
+      // The `/` menu offers "New preset…" only in the full composer, where the create panel renders;
+      // the compact navbar launch has no panel, so it gets no callback (and no item).
+      {...(compact ? {} : { onNewPreset: () => setAddingPreset(true) })}
+      disabled={busy}
+      {...(placeholder ? { placeholder } : {})}
+      {...(carriedDraft ? { initialText: carriedDraft } : {})}
+    />
+  )
+
+  // The agent/model select and the options gear, shared by both forms (#755). They were compact's
+  // one real omission: an agent started from the navbar used the stored agent, model and options with
+  // nothing on screen saying which. Every value is preferences-backed and global, so the same
+  // controls in either place read and write the same state.
+  const driverModelEl = showDriverModel && (
+    <DriverModelMenu
+      drivers={DRIVER_OPTIONS}
+      driver={driver}
+      model={model}
+      onChange={(a, m) => updatePreferences({ driver: a, model: m })}
+      busy={busy}
+    />
+  )
+  {/* Presets get a visible surface (#948): load, create and delete in one menu, instead of
+      loading only behind typing `/` and deleting off in the options gear. Not in the compact
+      row, which has no room and no create panel. */}
+  const presetsEl = !compact && (
+    <PresetsMenu
+      presets={presets}
+      customPresets={customPresets}
+      projectPresets={projectPresets}
+      busy={busy}
+      onLoad={loadPresetFromMenu}
+      onNew={() => setAddingPreset(true)}
+      onDelete={id => updatePreferences({ customPresets: customPresets.filter(p => p.id !== id) })}
+      onDeleteProject={id => saveProjectPresetList(projectPresets.filter(p => p.id !== id))}
+    />
+  )
+  // The options gear sits with the agent/model select and submit at the end of the row (#1046), so
+  // the three agent controls read as one cluster.
+  //
+  // In-session it follows what the next action arms (#1172): while the agent is LIVE nothing is
+  // adjustable (options were baked in at spawn, #833) and the gear is dropped entirely — it used
+  // to render with an empty dropdown. Once the agent has ENDED, the next message is a Resume — a new
+  // leg that resolves the current preferences at start (#1469) — so the gear returns with just the
+  // rows that shape that leg (`resumeOptionRows`).
+  const optionsGearEl = inAgent && !agentEnded ? null : (
+    <OptionsMenu
+      options={inAgent ? resumeOptionRows(preferences) : mainOptions}
+      busy={busy}
+      {...(inAgent ? { label: 'Resume options' } : {})}
+      // The "Run on" driver axis (#1050) is baked in at spawn, so it is offered only at the launcher —
+      // same reasoning as the agent select being hidden in-session.
+      {...(inAgent ? {} : { agentTarget: { value: target, onChange: (t: AgentTarget) => updatePreferences({ target: t }) } })}
+      // The saved-devices connection section (#1052) rides the same "Run on" sub, so it too is
+      // launcher-only; the header indicator shows the current device everywhere.
+      {...(inAgent
+        ? {}
+        : {
+            connection: {
+              profiles,
+              currentUrl,
+              isLocal: isLocalConnection,
+              selectedDeviceId,
+              // #1067: selecting a device makes it the agent target in place, no navigation.
+              onSelect: (p: ConnectionProfile) => selectRemoteDevice(p.id),
+              onSelectDriver: () => selectRemoteDevice(null),
+              onConnectLocal: connectLocal,
+              onAddDevice: () => setAddingDevice(true),
+              // #1072: drop a saved device; clear the selection if it was the agent target.
+              onRemove: (p: ConnectionProfile) => {
+                if (selectedDeviceId === p.id) selectRemoteDevice(null)
+                removeProfile(p.id)
+              },
+              status: deviceStatus,
+            },
+          })}
+    />
+  )
+
+  // The submit is a single icon button that only shows once the prompt has text (#721): an empty
+  // launcher has nothing to send, and the arrow reads as "send" in either place (Start session /
+  // Send). It is always full size (never appears to grow): it fades in and slides into place, and
+  // its layout footprint is animated with a negative margin (0 <- -w) rather than its width, so the
+  // control to its left (the agent/model select) is pushed over smoothly. `aria-hidden` while empty
+  // keeps it out of the a11y tree and role queries.
+  const hasPrompt = !!prompt.trim()
+  const submitButton = (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="submit"
+            size="icon-sm"
+            onClick={submit}
+            disabled={busy || !hasPrompt || targetOffline}
+            aria-hidden={!hasPrompt}
+            tabIndex={hasPrompt ? undefined : -1}
+            aria-label={submitLabel}
+            className={cn(
+              // `disabled:opacity-*` overrides the base (the button is disabled while empty/busy), so the
+              // hidden state must force it to 0 and the shown state back to full for the busy spinner.
+              'h-8 w-8 shrink-0 transition-[margin,opacity,transform] duration-150 ease-out',
+              hasPrompt
+                ? 'ml-0 translate-x-0 opacity-100 disabled:opacity-100'
+                // -2.375rem = the button's own w-8 (2rem) plus the row's gap-1.5 (0.375rem), so a hidden
+                // submit leaves the gear flush to the box edge — bottom and right padding stay equal.
+                : 'pointer-events-none -ml-[2.375rem] translate-x-2 opacity-0 disabled:opacity-0',
+            )}
+          />
+        }
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+      </TooltipTrigger>
+      <TooltipContent>{busy ? submitBusyLabel : `${submitLabel}  (Enter · Shift+Enter for a new line)`}</TooltipContent>
+    </Tooltip>
+  )
+
+  // One slot, three states (#1455): with an idleControl, the empty box shows it (Stop / Resume)
+  // and typing swaps in the send arrow — instead of the launcher's collapse-to-nothing.
+  const slotEl = !hasPrompt && idleControl ? idleControl : submitButton
+
+  // #1073: an offline target blocks Start; say so and point back to the "Run on" gear. No auto-fallback.
+  const offlineNote = targetOffline && (
+    <p role="alert" className="mt-2 text-xs text-danger">
+      {`${selectedDevice?.label ?? 'The selected device'} is offline. Pick another target in "Run on" to start.`}
+    </p>
+  )
+
+  // The "Add a device" modal (#1052), rendered by both forms since the gear is in both. A portal, so
+  // its place in the tree does not matter.
+  const deviceDialog = addingDevice && <AddDeviceDialog onClose={() => setAddingDevice(false)} onAdded={() => editorRef.current?.focus()} />
+
+  // Compact (#723): a single row for the navbar — editor, then the same controls and submit. It
+  // stays one row on purpose (#755): the header must not grow taller to gain them.
+  if (compact) {
+    return (
+      <div className="flex items-start gap-1.5">
+        <div className="min-w-0 flex-1">{editorEl}</div>
+        {driverModelEl}
+        {optionsGearEl}
+        {slotEl}
+        {deviceDialog}
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {/* The composer box (#721): the editor and its run controls under one rounded border, so the
+          prompt and the buttons that act on it read as a single input surface. The editor is
+          borderless here (its border moved out to this box); controls sit tucked below it. */}
+      <div className="rounded-lg border border-border bg-transparent focus-within:border-muted-foreground/40">
+        {editorEl}
+        {/* Run controls (#649/#650/#654/#668): presets then the Context picker at the start (#1046),
+            the agent+model select, the options gear and submit clustered at the end. */}
+        <div className="flex flex-wrap items-center gap-1.5 px-2 pb-2">
+          {presetsEl}
+          {contextControl}
+          <div className="ml-auto flex items-center gap-1.5">
+            {driverModelEl}
+            {optionsGearEl}
+            {slotEl}
+          </div>
+        </div>
+      </div>
+
+      {offlineNote}
+
+      {/* The "In play" row (#842/#1046): the Enhanced System Prompt dropdown at the start, the
+          resolved-options strip at the end. Off in the compact row (one line) and in-session
+          (#833), where the strip described the *global* options rather than this session's. */}
+      {!inAgent && (
+        <div className="mt-2 flex items-center justify-between gap-3">
+          {resolvedRowStart}
+          <ResolvedOptions options={mainOptions} sources={sources} fileConfig={fileConfig} />
+        </div>
+      )}
+
+      {addingPreset && (
+        <PresetCreatePanel
+          currentPrompt={prompt}
+          busy={busy}
+          canSaveToProject={activeProjectId !== null}
+          onCancel={() => {
+            setAddingPreset(false)
+            editorRef.current?.focus()
+          }}
+          onSave={(preset, scope) => {
+            if (scope === 'project') saveProjectPresetList([...projectPresets, preset])
+            else updatePreferences({ customPresets: [...customPresets, preset] })
+            setAddingPreset(false)
+            editorRef.current?.focus()
+          }}
+        />
+      )}
+      {deviceDialog}
+    </>
+  )
+})

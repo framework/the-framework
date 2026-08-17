@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { readClaudeQuota } from './claude-code-quota.js'
 import { combineFraming, combineSignals, makeEmit, readWorkspaceFile } from './session-support.js'
-import { runAgentCli, type RunAgentCliOptions, type SpawnLike } from './agent-cli.js'
+import { runCliSession, type RunCliSessionOptions, type SpawnLike } from './cli-session.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverQuota, DriverRateLimit, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
 
 /** Claude Code permission modes we pass through to the CLI. */
@@ -35,7 +35,7 @@ export interface ClaudeCodeDriverOptions {
    * MCP servers to expose to the agent for this session (#452). Written to a
    * temp config file passed via `--mcp-config`, so they merge with the user's
    * own configured MCP servers rather than replacing them. Used by `--browser`
-   * to wire chrome-devtools-mcp (a real browser + DevTools tools) into the run.
+   * to wire chrome-devtools-mcp (a real browser + DevTools tools) into the agent.
    */
   mcpServers?: Record<string, McpServerSpec>
   /** Environment for the child process. Default `process.env`. */
@@ -56,7 +56,7 @@ export interface ClaudeCodeDriverOptions {
  * `Driver` interface without touching the orchestration above it.
  */
 export class ClaudeCodeDriver implements Driver {
-  readonly name = 'claude-code'
+  readonly id = 'claude-code'
   constructor(private readonly opts: ClaudeCodeDriverOptions = {}) {}
 
   start(opts: DriverStartOptions): Promise<DriverSession> {
@@ -95,7 +95,7 @@ export class ClaudeCodeSession implements DriverSession {
   ) {
     this.cwd = startOpts.cwd
     this.id = `claude-code-${++sessionCounter}`
-    // Resume a finished run (#720): seeding lastSessionId makes the very first `resume` prompt
+    // Resume a finished agent (#720): seeding lastSessionId makes the very first `resume` prompt
     // `--resume` this conversation, exactly as a mid-run chat turn continues its own session.
     this.lastSessionId = startOpts.resumeSessionId
   }
@@ -105,7 +105,7 @@ export class ClaudeCodeSession implements DriverSession {
     const resumeId = opts.resume ? this.lastSessionId : undefined
     const emit = makeEmit(this.startOpts.onEvent, 'claude-code')
     const signals = combineSignals(this.startOpts.signal, opts.signal)
-    const run = (id: string | undefined, emitFn: (event: DriverEvent) => void): Promise<DriverTurn> =>
+    const agent = (id: string | undefined, emitFn: (event: DriverEvent) => void): Promise<DriverTurn> =>
       runClaude({
         bin: this.config.bin ?? 'claude',
         args: this.buildArgs(system, id),
@@ -120,10 +120,10 @@ export class ClaudeCodeSession implements DriverSession {
     let turn: DriverTurn
     // On a resume attempt, hold the failure's `error` event back until the conversation-gone
     // case (#778) is ruled out: a turn that recovers on the retry must not show a failed row.
-    // Safe to hold — runAgentCli emits `error` exactly once, right before it rejects.
+    // Safe to hold — runCliSession emits `error` exactly once, right before it rejects.
     let heldError: DriverEvent | undefined
     try {
-      turn = await run(resumeId, resumeId === undefined ? emit : event => {
+      turn = await agent(resumeId, resumeId === undefined ? emit : event => {
         if (event.type === 'error') heldError = event
         else emit(event)
       })
@@ -141,7 +141,7 @@ export class ClaudeCodeSession implements DriverSession {
       // The retry re-sends the same prompt; swallow its duplicate `start` so the user's
       // message appears once in the transcript, not twice.
       let startSeen = false
-      turn = await run(undefined, event => {
+      turn = await agent(undefined, event => {
         if (event.type === 'start' && !startSeen) startSeen = true
         else emit(event)
       })
@@ -211,12 +211,9 @@ function isConversationGone(err: unknown): boolean {
   return CONVERSATION_GONE.test(err instanceof Error ? err.message : String(err))
 }
 
-/** @deprecated Use {@link RunAgentCliOptions}. */
-export type RunClaudeOptions = Omit<RunAgentCliOptions, 'parser' | 'agent'>
-
 /** Spawn one Claude Code invocation and resolve with its final turn. */
-export function runClaude(opts: RunClaudeOptions): Promise<DriverTurn> {
-  return runAgentCli({ ...opts, parser: new StreamJsonParser() })
+export function runClaude(opts: Omit<RunCliSessionOptions, 'parser' | 'driver'>): Promise<DriverTurn> {
+  return runCliSession({ ...opts, parser: new StreamJsonParser() })
 }
 
 /**
@@ -243,7 +240,7 @@ export class StreamJsonParser {
     }
 
     // Announced on the very first stream line, so it must not wait for `result`: a turn that is
-    // stopped or dies mid-flight would take the id — the run's `claude --resume` handle — with
+    // stopped or dies mid-flight would take the id — the agent's `claude --resume` handle — with
     // it (#1322). Emitted only when it changes; every subsequent line repeats the same id.
     const announced: DriverEvent[] = []
     if (typeof obj['session_id'] === 'string' && obj['session_id'] !== this.sessionId) {

@@ -35,7 +35,7 @@ const CHECKBOX = /^\[([ xX])\]\s*(.*)$/
  * Parse the queue entries out of a TODO doc; headings, prose and blank lines are ignored.
  *
  * Every list item is an entry, open unless its checkbox is checked — the sweep's semantics
- * (#1296). Triage agents write the #1164 link style (`- [Title](tickets/x.md) — ...`) with no
+ * (#1296). Triage agents write the ticket-link (#1164) style (`- [Title](tickets/x.md) — ...`) with no
  * checkbox, and the old checkbox-only regex read that whole queue as empty.
  */
 export function parseTodoItems(content: string): QueueItem[] {

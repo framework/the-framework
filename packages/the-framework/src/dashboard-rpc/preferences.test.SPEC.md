@@ -1,0 +1,5 @@
+Covers that a merge-write hands back the stored result for the caller to adopt, and that a failed write becomes a typed answer rather than an error.
+
+## Before writing SPEC.md files
+
+Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

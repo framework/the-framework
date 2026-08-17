@@ -31,8 +31,8 @@ test('formatFrameworkEvent renders a multi-select choice as a checklist (#332)',
 })
 
 test('formatFrameworkEvent says the armed line as what will happen, merge included (#1382)', () => {
-  // A merge-armed run opens a ready PR and lands it by itself — the line must own that, not say
-  // "draft PR" about a run that is configured to merge to main unattended.
+  // A merge-armed agent opens a ready PR and lands it by itself — the line must own that, not say
+  // "draft PR" about an agent that is configured to merge to main unattended.
   assert.equal(
     formatFrameworkEvent({ kind: 'handoff-armed', push: true, pr: true, merge: true }),
     '  when this ends: push the branch, open a PR, and merge it',
@@ -138,10 +138,10 @@ test('formatFrameworkEvent distinguishes finished / stopped / failed (#218)', ()
   assert.equal(formatFrameworkEvent({ kind: 'end', ok: false, detail: 'boom' }), '✗ failed: boom')
 })
 
-test('formatFrameworkEvent renders a usage spend line, with the cap when set (#322)', () => {
+test('formatFrameworkEvent renders a usage spend line (#322)', () => {
   const base = { kind: 'usage' as const, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 }
   assert.equal(formatFrameworkEvent({ ...base, costUsd: 0.04, turns: 2 }), '  spend: $0.0400 over 2 turns')
-  assert.equal(formatFrameworkEvent({ ...base, costUsd: 0.02, turns: 1, budgetUsd: 5 }), '  spend: $0.0200 / $5 over 1 turn')
+  assert.equal(formatFrameworkEvent({ ...base, costUsd: 0.02, turns: 1 }), '  spend: $0.0200 over 1 turn')
 })
 
 test('formatFrameworkEvent reports tokens when the agent reported no price (#540)', () => {

@@ -1,16 +1,12 @@
-Automatically reclaims a finished session's checkout once its work has landed — the branch, the commits, and the session's history are kept, so only disk is freed.
+Automatically reclaims an agent's checkout once its work is on the remote — the branch, the commits, and the agent's history are kept, so only disk is freed.
 
 ## TLDR
 
-- Landed means merged into the base locally, or the pull request was merged on GitHub; the second signal exists because a squash merge rewrites commits and hides from the first.
-- Conservative wherever the answer is unclear: a live session, a vanished branch, an unreadable repo, or a run that did not finish cleanly all keep their checkout.
-- A closed-but-unmerged pull request means rejected work — the checkout a human most wants to read — and is never removed.
-- Every project is swept every ten minutes and once at startup (for machines that were off when the merge happened), and each removal is announced so it never reads as a bug.
-
-## Rationales
-
-- Removal reuses the same operation as the manual Remove, so uncommitted leftovers are committed to the kept branch first — everything deleted stays reconstructable from git.
-- A run that died at boot leaves an empty branch that looks merged; only its recorded outcome tells it from a real success, so the local signal alone reclaims cleanly finished runs only.
+- One rule decides every removal, and it lives in the shared operation rather than here: the work is committed to the agent's branch, the branch is pushed, and the checkout goes only once the remote has it. Every deletion is therefore recoverable, because the remote holds a copy.
+- Three interacting rules used to decide this instead — a clean finish removes the checkout, a failure or stop keeps it, a merged branch reclaims it later through two different "landed" signals — each asking *how did this agent end* rather than *is the work safe yet*.
+- The sweep is what reaches the agents the teardown could not: a push that failed then (offline, no auth, a rejected non-fast-forward) simply succeeds on a later pass. There is one failure mode, and it is said out loud.
+- A live agent keeps its checkout: its driver is working in there, and Stop is how one ends. So does one the daemon has not finished retiring — an agent's records say `done` a beat before its teardown reclaims the checkout, and "not live" is not "nobody is holding this".
+- Every project is swept once at startup and every ten minutes after, on the daemon's shared clock rather than a timer of its own, and each removal is announced so it never reads as a bug.
 
 ## Before writing SPEC.md files
 

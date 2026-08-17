@@ -33,7 +33,7 @@ function status(weekPercent: number): QuotaBoundaryStatus {
 }
 
 /** The happy inputs, so each test names only the condition it is about. */
-const IDLE = { enabled: true, backlogEmpty: true, activeRuns: 0, quota: status(1) } as const
+const IDLE = { enabled: true, backlogEmpty: true, activeAgents: 0, quota: status(1) } as const
 
 test('autoPmDecision starts when the queue is dry and the budget is barely touched (#685)', () => {
   assert.deepEqual(autoPmDecision(IDLE), { start: true, mode: 'pm' })
@@ -45,34 +45,34 @@ test('autoPmDecision does nothing while the preference is off (#685)', () => {
 })
 
 test('autoPmDecision leaves a project at its concurrency cap alone (#685/#1204)', () => {
-  // Live runs are already spending the quota; one more started unasked would race them. Before
+  // Live agents are already spending the quota; one more started unasked would race them. Before
   // #1204 the cap was hardwired at one, which is what `concurrency: 1` still asks for here.
-  const decision = autoPmDecision({ ...IDLE, activeRuns: 1, concurrency: 1 })
+  const decision = autoPmDecision({ ...IDLE, activeAgents: 1, concurrency: 1 })
   assert.equal(decision.start, false)
   assert.match(decision.start === false ? decision.reason : '', /already going/)
 })
 
 test('autoPmDecision tops a project up to its concurrency (#1204)', () => {
-  // The point of the setting: one run going is no longer a reason to stand down.
-  assert.deepEqual(autoPmDecision({ ...IDLE, activeRuns: 1, concurrency: 2 }), { start: true, mode: 'pm' })
+  // The point of the setting: one agent going is no longer a reason to stand down.
+  assert.deepEqual(autoPmDecision({ ...IDLE, activeAgents: 1, concurrency: 2 }), { start: true, mode: 'pm' })
   // At the cap it refuses, and the refusal names the cap so a raised setting does not read as a bug.
-  const capped = autoPmDecision({ ...IDLE, activeRuns: 2, concurrency: 2 })
+  const capped = autoPmDecision({ ...IDLE, activeAgents: 2, concurrency: 2 })
   assert.equal(capped.start, false)
   assert.match(capped.start === false ? capped.reason : '', /at most 2 at once/)
 })
 
 test('autoPmDecision defaults to the shipped concurrency, and floors it at one (#1204)', () => {
   // Unset means the default, not one: the absence of the setting has never meant "less".
-  assert.equal(autoPmDecision({ ...IDLE, activeRuns: DEFAULT_AUTO_PM_CONCURRENCY - 1 }).start, true)
-  assert.equal(autoPmDecision({ ...IDLE, activeRuns: DEFAULT_AUTO_PM_CONCURRENCY }).start, false)
+  assert.equal(autoPmDecision({ ...IDLE, activeAgents: DEFAULT_AUTO_PM_CONCURRENCY - 1 }).start, true)
+  assert.equal(autoPmDecision({ ...IDLE, activeAgents: DEFAULT_AUTO_PM_CONCURRENCY }).start, false)
   // Zero agents is what the master switch spells, so a hand-edited nought cannot wedge the routine.
-  assert.equal(autoPmDecision({ ...IDLE, activeRuns: 0, concurrency: 0 }).start, true)
-  assert.equal(autoPmDecision({ ...IDLE, activeRuns: 1, concurrency: 0 }).start, false)
+  assert.equal(autoPmDecision({ ...IDLE, activeAgents: 0, concurrency: 0 }).start, true)
+  assert.equal(autoPmDecision({ ...IDLE, activeAgents: 1, concurrency: 0 }).start, false)
 })
 
 test('autoPmDecision drains the queue before filling it again (#855)', () => {
   // It used to refuse here, on the reasoning that the backlog loop would drain it. That loop
-  // only runs inside a run a human started, so unattended nothing ever emptied the queue.
+  // only runs inside an agent a human started, so unattended nothing ever emptied the queue.
   assert.deepEqual(autoPmDecision({ ...IDLE, backlogEmpty: false }), { start: true, mode: 'drain' })
 })
 
@@ -92,7 +92,7 @@ test('autoPmDecision holds off during the cooldown after a start (#685)', () => 
 })
 
 test('quotaHeadroom refuses to start when the quota cannot be read (#685)', () => {
-  // The inverse of the per-run guard's fail-open (#519): that one must never STOP the user's
+  // The inverse of the per-agent guard's fail-open (#519): that one must never STOP the user's
   // own work, this one must never START work nobody asked for on an unknown budget.
   const decision = quotaHeadroom(undefined)
   assert.equal(decision.start, false)
@@ -136,7 +136,7 @@ test('a restarted daemon is no longer blind (#848/#879)', () => {
   // nothing to diff it against, and honestly reported 0 consumed while the account sat at 95%
   // of its week. The boundary reads the account's own absolute figure, which owes nothing to
   // how long this process has been up, so the restart is simply not a case any more.
-  const decision = autoPmDecision({ enabled: true, backlogEmpty: true, activeRuns: 0, quota: status(95) })
+  const decision = autoPmDecision({ enabled: true, backlogEmpty: true, activeAgents: 0, quota: status(95) })
   assert.equal(decision.start, false)
 })
 
@@ -159,7 +159,7 @@ function harness(overrides: Partial<AutoPmDeps> = {}) {
     // Pinned at one so every test written before #1204 keeps asserting against the behaviour it
     // was written for; the fan-out tests set it explicitly.
     concurrency: async () => 1,
-    activeRuns: () => 0,
+    activeAgents: () => 0,
     quota: async () => status(1),
     start: async (p, job) => {
       started.push(p.id)
@@ -200,7 +200,7 @@ test('an on-demand tick sweeps with the preference off: the click is the ask (#1
 })
 
 test('on demand skips only the master switch: every other stand-down still holds (#1210)', async () => {
-  const { loop, started } = harness({ enabled: async () => false, activeRuns: () => 1 })
+  const { loop, started } = harness({ enabled: async () => false, activeAgents: () => 1 })
   await loop.tick({ onDemand: true })
   loop.stop()
   assert.deepEqual(started, [])
@@ -232,7 +232,7 @@ test('startAutoPm re-arms when the start was refused (#685)', async () => {
 })
 
 test('startAutoPm survives a project whose backlog cannot be read (#685)', async () => {
-  // An unreadable queue is not an empty one: it must not trigger a run, nor throw the sweep.
+  // An unreadable queue is not an empty one: it must not trigger an agent, nor throw the sweep.
   const { loop, started } = harness({ queue: async () => Promise.reject(new Error('nope')) })
   await loop.tick()
   loop.stop()
@@ -259,7 +259,7 @@ test('the rotation is the schedule the triage presets asked for (#891/#892)', ()
   const names = AUTO_PM_JOBS.map(j => j.name)
   assert.ok(names.includes('triage-quick'), 'quick triage must be in the rotation')
   assert.ok(names.includes('triage-consensual'), 'consensual triage must be in the rotation')
-  // The gated sibling (#698) must never be: it ends in <AWAIT> and would park a run forever.
+  // The gated sibling (#698) must never be: it ends in <AWAIT> and would park an agent forever.
   assert.equal(names.includes('suggest-tickets-to-work-on'), false)
   for (const job of AUTO_PM_JOBS) {
     assert.equal(job.prompt.includes('<AWAIT>'), false, `${job.name} must not wait on a human`)
@@ -296,13 +296,13 @@ test('startAutoPm retries the same job when the start was refused (#773)', async
 })
 
 test('a promoted queue ends the tick, so the sweep re-reads it next time (#852)', async () => {
-  // The run's queue lands in the checkout only now, so the emptiness check below it is stale.
+  // The agent's queue lands in the checkout only now, so the emptiness check below it is stale.
   // Deciding on that read is what made auto PM re-derive the same entries every cooldown.
   const promoted: string[] = []
   const { loop, ran } = harness({
     cooldownMs: 0,
-    promote: async (_p, { runId }) => {
-      promoted.push(runId)
+    promote: async (_p, { agentId }) => {
+      promoted.push(agentId)
       return { settled: true, promoted: true }
     },
   })
@@ -313,21 +313,21 @@ test('a promoted queue ends the tick, so the sweep re-reads it next time (#852)'
 })
 
 test('a finished run that wrote no queue stops being retried (#852)', async () => {
-  // Settled without promoting: nothing landed, but the run is over, so the sweep carries on
+  // Settled without promoting: nothing landed, but the agent is over, so the sweep carries on
   // rather than asking about it forever.
   const asked: string[] = []
   const { loop, ran } = harness({
     cooldownMs: 0,
-    promote: async (_p, { runId }) => {
-      asked.push(runId)
+    promote: async (_p, { agentId }) => {
+      asked.push(agentId)
       return { settled: true, promoted: false }
     },
   })
   await loop.tick()
   await loop.tick()
   await loop.tick()
-  // Each tick starts a fresh run and settles the previous one, so every run is asked about
-  // exactly once. A settled run being asked twice is the leak this guards.
+  // Each tick starts a fresh agent and settles the previous one, so every agent is asked about
+  // exactly once. A settled agent being asked twice is the leak this guards.
   assert.deepEqual(asked, [...new Set(asked)])
   assert.deepEqual(asked, ['run-1', 'run-2'])
   assert.deepEqual(ran, ['first', 'second', 'first'])
@@ -351,7 +351,7 @@ test('startAutoPm drains a standing queue, then goes back to filling it (#855)',
   const { loop } = harness({
     cooldownMs: 0,
     queue: async () => Array.from({ length: open }, (_, i) => `entry ${i + 1}`),
-    // A drain run works one entry off; a PM run puts one there.
+    // A drain agent works one entry off; a PM agent puts one there.
     start: async (_project, job) => {
       ran.push(job.name)
       open += job.name === AUTO_PM_DRAIN_JOB.name ? -1 : 1
@@ -444,7 +444,7 @@ test('a sweep does not cost the rotation its turn (#882)', async () => {
 })
 
 test('a sweep is stamped only when the run actually started (#882)', async () => {
-  // Stamping a refused sweep would postpone it a whole interval for a run that never happened.
+  // Stamping a refused sweep would postpone it a whole interval for an agent that never happened.
   const stamped: string[] = []
   const { loop } = harness({
     cooldownMs: 0,
@@ -469,9 +469,9 @@ test('a queue with work in it is drained rather than swept (#882)', async () => 
 
 test('a sweep stopped mid-flight starts nothing (#983)', async () => {
   // stop() used to only clear the timer, so a tick already inside its per-project loop kept
-  // awaiting (git calls, the queue read) and then spawned a run anyway. By then the daemon has
-  // quiesced and cleared its live-run map, so that run is tracked by nobody: an orphan holding a
-  // worktree, and quota spent on a run nobody will ever see.
+  // awaiting (git calls, the queue read) and then spawned an agent anyway. By then the daemon has
+  // quiesced and cleared its live-agent map, so that agent is tracked by nobody: an orphan holding a
+  // worktree, and quota spent on an agent nobody will ever see.
   const both: AutoPmProject[] = [
     { id: 'p1', path: '/repo' },
     { id: 'p2', path: '/other' },
@@ -526,7 +526,7 @@ test('the report names what a sweep started (#1161)', async () => {
 test('the report carries the reason a sweep stood down (#1161)', async () => {
   // The whole point: standing down for a reason must not look like quietly working. The reason
   // was already logged, but the log is the daemon's stdout and the toggle is in a browser.
-  const { loop } = harness({ activeRuns: () => 2 })
+  const { loop } = harness({ activeAgents: () => 2 })
   await loop.tick()
   loop.stop()
   const [outcome] = loop.report().outcomes
@@ -617,19 +617,54 @@ test('a routine the user unticked is left out of the rotation (#1209)', async ()
   assert.deepEqual(ran, ['second', 'second'])
 })
 
-test('an unticked drain routine stands the sweep down, it does not fall through to the rotation (#1209)', async () => {
-  // The queue has work waiting. Answering "do not work it automatically" by inventing more work
-  // is the opposite of what the checkbox asked for.
+test('an unticked drain routine falls through to the rotation rather than standing down (#1432)', async () => {
+  // #1209 means "do not *work* the queue", and the rotation does not work it: triage and planning
+  // put entries *on* it. Standing down here read that switch as "do nothing at all", which made
+  // every inventing routine unreachable for as long as the queue had anything on it — and since
+  // the queue is auto-populated, that is most of the time.
   const { loop, ran, logs } = harness({
     cooldownMs: 0,
     queue: async () => ['entry a'],
     optedOut: async () => [AUTO_PM_DRAIN_JOB.name],
   })
   await loop.tick()
+  await loop.tick()
+  loop.stop()
+  // The rotation ran, and advanced — a fall-through tick is a rotation turn like any other.
+  assert.deepEqual(ran, ['first', 'second'])
+  assert.ok(!logs.some(line => line.includes('draining')), 'and nothing worked the queue')
+})
+
+test('a drain-only sweep still stands down when the drain routine is off (#1204/#1432)', async () => {
+  // The fall-through above is for the scheduled sweep. This click asked for the queue by name, so
+  // borrowing it for a rotation job is exactly what drain-only exists to prevent.
+  const { loop, ran, logs } = harness({
+    cooldownMs: 0,
+    queue: async () => ['entry a'],
+    optedOut: async () => [AUTO_PM_DRAIN_JOB.name],
+  })
+  await loop.tick({ onDemand: true, drainOnly: true })
   loop.stop()
   assert.deepEqual(ran, [])
   assert.equal(loop.report().outcomes[0]?.message, 'the queue has work waiting and its routine is switched off')
-  assert.ok(!logs.some(line => line.includes('draining')))
+  assert.ok(logs.some(line => line.includes('its routine is switched off')))
+})
+
+test('the maintenance sweep stays out while entries are waiting, fall-through or not (#882/#1432)', async () => {
+  // The fall-through makes the tick a rotation turn, but the sweep asks a different question —
+  // is the queue empty — and the answer is still no.
+  const stamped: string[] = []
+  const { loop, ran } = harness({
+    cooldownMs: 0,
+    queue: async () => ['entry a'],
+    optedOut: async () => [AUTO_PM_DRAIN_JOB.name],
+    maintenanceDue: async () => true,
+    recordMaintenance: async project => void stamped.push(project.id),
+  })
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(stamped, [])
+  assert.deepEqual(ran, ['first'])
 })
 
 test('an unticked maintenance routine leaves its calendar alone (#1209)', async () => {
@@ -703,7 +738,7 @@ test('a standing queue fans out to the concurrency in one tick, one entry per ag
 })
 
 test('an entry a live run was pinned to is not handed out twice (#1204)', async () => {
-  // The assignment outlives the tick that made it: the first run is still working entry a when
+  // The assignment outlives the tick that made it: the first agent is still working entry a when
   // the next sweep comes round, and its queue has not landed yet, so the checkout still shows the
   // entry open. Handing it out again is exactly the duplicate work pinning exists to prevent.
   const prompts: string[] = []
@@ -726,7 +761,7 @@ test('an entry a live run was pinned to is not handed out twice (#1204)', async 
 })
 
 test('a queue whose every entry is already being worked stands the sweep down (#1204)', async () => {
-  // With nothing left to assign, the sweep says so rather than starting a run with no entry to
+  // With nothing left to assign, the sweep says so rather than starting an agent with no entry to
   // pin it to — which is what would send a second agent at work already in flight.
   const { loop, started } = harness({
     cooldownMs: 0,
@@ -746,7 +781,7 @@ test('live runs count against the concurrency, so the sweep tops up rather than 
   const { loop, started } = harness({
     cooldownMs: 0,
     concurrency: async () => 3,
-    activeRuns: () => 2,
+    activeAgents: () => 2,
     queue: async () => ['entry a', 'entry b', 'entry c'],
   })
   await loop.tick()
@@ -947,54 +982,6 @@ test('a refusal ends the batch, so the refused work is retried rather than skipp
   assert.equal(attempts, 2, 'one start took, the second was refused, and the batch stopped there')
 })
 
-test('a durably claimed entry is not re-fanned: the web hand-off and restart case (#1253)', async () => {
-  // The pin on entry a lives in a run meta (a hands-off web run, or one from before a daemon
-  // restart), not in this loop's memory. The sweep must treat it exactly like an in-flight pin.
-  const prompts: string[] = []
-  const { loop } = harness({
-    cooldownMs: 0,
-    concurrency: async () => 2,
-    queue: async () => ['entry a', 'entry b', 'entry c'],
-    claimedEntries: async (_p, candidates) => candidates.filter(entry => entry === 'entry a'),
-    start: async (_p, job) => {
-      prompts.push(job.prompt)
-      return `run-${prompts.length}`
-    },
-  })
-  await loop.tick()
-  loop.stop()
-  assert.equal(prompts.length, 2)
-  assert.match(prompts[0]!, /entry b/)
-  assert.match(prompts[1]!, /entry c/)
-  assert.ok(!prompts.some(prompt => prompt.includes('entry a')), 'the claimed entry stays off the market')
-})
-
-test('a queue whose every entry is durably claimed stands the sweep down (#1253)', async () => {
-  const { loop, started } = harness({
-    cooldownMs: 0,
-    concurrency: async () => 4,
-    queue: async () => ['entry a'],
-    claimedEntries: async () => ['entry a'],
-  })
-  await loop.tick()
-  loop.stop()
-  assert.equal(started.length, 0)
-  assert.equal(loop.report().outcomes[0]?.message, 'every open queue entry is already being worked on')
-})
-
-test('an unreadable claim list means none: the in-memory pins still guard the common case (#1253)', async () => {
-  const { loop, started } = harness({
-    cooldownMs: 0,
-    queue: async () => ['entry a'],
-    claimedEntries: async () => {
-      throw new Error('gh is down')
-    },
-  })
-  await loop.tick()
-  loop.stop()
-  assert.equal(started.length, 1, 'a gh hiccup must not stall a healthy queue')
-})
-
 test('a drain-only sweep works the queue and never borrows the tick for the rotation (#1204)', async () => {
   // The drain row's Run now: with entries waiting it fans out like any drain sweep...
   const prompts: string[] = []
@@ -1063,8 +1050,8 @@ test('an unpinned job never asks for a release, and a failing release does not s
 
 test('only the drain job lands its own PRs (#1216)', () => {
   // The drain implements queue entries whose triage a human could have vetoed, so its review
-  // happened before the run. Every other job writes tickets/plans and has nothing to merge —
-  // an autoMerge there would be a run landing unreviewed work.
+  // happened before the agent. Every other job writes tickets/plans and has nothing to merge —
+  // an autoMerge there would be an agent landing unreviewed work.
   assert.equal(AUTO_PM_DRAIN_JOB.autoMerge, true)
   for (const job of [...AUTO_PM_JOBS, AUTO_PM_MAINTENANCE_JOB]) {
     assert.equal(job.autoMerge, undefined, `${job.name} must not auto-merge`)

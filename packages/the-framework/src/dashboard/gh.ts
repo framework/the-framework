@@ -36,11 +36,11 @@ const readGh = cliRunner({ bin: 'gh', timeoutMs: 8_000 })
  * `GH_TOKEN` / `GITHUB_TOKEN` win, because CI sets them and must beat whatever `gh` happens to be
  * logged in as on the runner. With neither set, fall back to the `gh` CLI's own credential — the
  * same one every PR this framework opens is already authenticated by. A machine that can open a PR
- * could always have run an Actions session too; it just had no way to say so, and the run failed
+ * could always have run an Actions session too; it just had no way to say so, and the agent failed
  * with the credential sitting one `gh auth token` away.
  *
  * Undefined when there is no token to be had (gh missing, logged out, or refusing to hand it over),
- * which the caller turns into the run's stated reason for not starting. Deliberately quiet about
+ * which the caller turns into the agent's stated reason for not starting. Deliberately quiet about
  * *why* gh declined: the caller's message names both ways to fix it, and a keyring prompt's stderr
  * is not something to put in front of someone who simply has not set GH_TOKEN.
  */
@@ -74,7 +74,7 @@ export interface LinkedPr {
   /** OPEN / MERGED / CLOSED (as gh reports it). */
   state: string
   title: string
-  /** ISO creation time, when the read included it: what tells one run's PR from a predecessor's. */
+  /** ISO creation time, when the read included it: what tells one agent's PR from a predecessor's. */
   createdAt?: string
   /**
    * The head commit the PR covers, when the read included it (#1512): what tells "the branch's
@@ -139,8 +139,8 @@ function prCacheKey(cwd: string, branch?: string): string {
  *
  * `gh pr view <branch>` answers with the newest PR for that head *in any state*, so a session
  * whose prompt pins its branch name (`the-framework/triage-quick`) inherits a predecessor's
- * merged PR as its own. The list form keeps the whole history so {@link pickRunPr} can decide
- * which entry, if any, belongs to the run asking. Resolves `[]` when gh is missing/unauthed —
+ * merged PR as its own. The list form keeps the whole history so {@link pickAgentPr} can decide
+ * which entry, if any, belongs to the agent asking. Resolves `[]` when gh is missing/unauthed —
  * indistinguishable from "no PRs", which is what every caller would do with a failure anyway.
  */
 export async function ghPrsForBranch(cwd: string, branch: string): Promise<LinkedPr[]> {
@@ -325,7 +325,7 @@ export interface RepoAutoMerge {
  * {@link DIRECT_MERGE_FALLBACK} half of #1216) — the PR lands before CI has run (#1406) — so the
  * launcher warns with the fix instead of leaving the degradation silent. `known: false` (gh
  * missing, unauthenticated, not a GitHub repo) is "could not say", which renders nothing: no
- * crying wolf, same stance as the #1318 trust read.
+ * crying wolf, same stance as the trust (#1318) read.
  *
  * The probe is the REST endpoint, not `gh repo view --json autoMergeAllowed`: `repo view` has no
  * such field (any gh version), so that spelling always errored into "could not say". REST omits
@@ -364,22 +364,22 @@ function branchPrsCacheKey(cwd: string, branch: string): string {
 }
 
 /**
- * The PR that belongs to a run, out of every PR its branch name has had (#1251/#1255).
+ * The PR that belongs to an agent, out of every PR its branch name has had (#1251/#1255).
  *
  * An OPEN PR always counts: GitHub allows one open PR per head branch, so whatever is open on the
  * run's branch is where its pushed commits land. A closed one counts only when it was created
- * after the run started (`since`, the run's `startedAt`) — the oldest such entry, which is the one
- * this run's handoff opened. Anything older is a previous run's PR wearing the same branch name,
+ * after the agent started (`since`, the agent's `startedAt`) — the oldest such entry, which is the one
+ * this agent's handoff opened. Anything older is a previous agent's PR wearing the same branch name,
  * which is exactly what showed a merged two-day-old PR as a fresh session's own. Without `since`
  * only an open PR is trusted.
  *
  * `order` exists for the one caller asking a different question (#1512). `'first'` answers
- * identity — which PR did *this run* open, so a later run's must not be the answer. `'latest'`
+ * identity — which PR did *this agent* open, so a later agent's must not be the answer. `'latest'`
  * answers the handoff decision — which PR last saw the branch, so "did the session keep working
  * past it" is readable off that PR's `headRefOid`; there the oldest entry would call work that a
  * second PR already landed unlanded.
  */
-export function pickRunPr(prs: LinkedPr[], since?: string, order: 'first' | 'latest' = 'first'): LinkedPr | undefined {
+export function pickAgentPr(prs: LinkedPr[], since?: string, order: 'first' | 'latest' = 'first'): LinkedPr | undefined {
   const open = prs.find(pr => pr.state === 'OPEN')
   if (open) return open
   if (!since) return undefined
@@ -416,40 +416,3 @@ export async function ghPrList(cwd: string): Promise<OpenPr[]> {
 /** Lists a checkout's open PRs; resolves `[]` when there is no remote / gh is unavailable. */
 export type PrLister = (cwd: string) => Promise<OpenPr[]>
 
-/** One open PR's diff of a single file (#1313). */
-export interface OpenPrFilePatch {
-  number: number
-  patch: string
-}
-
-/**
- * The `file` diff of every open PR that touches it (#1313). One `gh api` read per open PR, so
- * callers go through {@link cachedOpenPrFilePatches}. The files endpoint belongs to the base
- * repo, so cross-fork PRs answer too. First 100 changed files per PR only — a PR burying the
- * queue file deeper than that simply contributes no claim, which is today's behavior anyway.
- * Resolves `[]` when gh is missing/unauthed.
- */
-async function ghOpenPrFilePatches(cwd: string, file: string, prs?: OpenPr[]): Promise<OpenPrFilePatch[]> {
-  const open = prs ?? (await ghPrList(cwd))
-  const patches: OpenPrFilePatch[] = []
-  for (const pr of open) {
-    const files = await ghJson<{ filename: string; patch?: string }[]>(
-      ['api', `repos/{owner}/{repo}/pulls/${pr.number}/files?per_page=100`],
-      cwd,
-      [],
-    )
-    const patch = files.find(f => f.filename === file)?.patch
-    if (patch) patches.push({ number: pr.number, patch })
-  }
-  return patches
-}
-
-/**
- * The cached form of {@link ghOpenPrFilePatches} (#1028). The cold budget is generous where the
- * PR caches' is not: the one caller is the sweep's claim check, and a drain the user just clicked
- * should wait a few seconds for the real answer rather than stand down for a whole tick.
- */
-export async function cachedOpenPrFilePatches(cwd: string, file: string): Promise<Cached<OpenPrFilePatch[]>> {
-  const key = ['pr-file-patches', cwd, file].join(KEY_SEP)
-  return cachedRead(key, () => ghOpenPrFilePatches(cwd, file), { ttlMs: 60_000, budgetMs: 5_000 })
-}

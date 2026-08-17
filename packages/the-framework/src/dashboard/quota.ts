@@ -44,7 +44,7 @@ export interface QuotaSource {
  * The boundary is computed per call rather than captured: it moves with the
  * clock, so a cached one would be stale the moment the week's day rolls over.
  * No model is passed — the panel is about the account, and a model's own week
- * only narrows the gate for a run that has chosen one (#879).
+ * only narrows the gate for an agent that has chosen one (#879).
  */
 export function pollerQuotaSource(
   poller: QuotaPoller,
@@ -71,10 +71,10 @@ export function pollerQuotaSource(
 
 /**
  * The daemon's own quota source: it polls for the whole life of the dashboard,
- * not just during a run, because the panel has to show where the account stands
+ * not just during an agent, because the panel has to show where the account stands
  * even when nothing is running.
  *
- * Separate from the per-run guard on purpose — that one exists to pause a run
+ * Separate from the per-agent guard on purpose — that one exists to pause an agent
  * and dies with it, this one exists to draw a bar.
  */
 export function defaultQuotaSource(env: NodeJS.ProcessEnv = process.env): QuotaSource {

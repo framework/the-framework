@@ -1,5 +1,5 @@
 import { spawn as nodeSpawn } from 'node:child_process'
-import { runAgentCli, type AgentCliParser, type SpawnLike } from './agent-cli.js'
+import { runCliSession, type AgentCliParser, type SpawnLike } from './cli-session.js'
 import { combineFraming, combineSignals, makeEmit, readWorkspaceFile } from './session-support.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn, DriverUsage } from './types.js'
 
@@ -47,7 +47,7 @@ export interface CodexDriverOptions {
  *   precisely so an agent that can't report one simply doesn't.
  */
 export class CodexDriver implements Driver {
-  readonly name = 'codex'
+  readonly id = 'codex'
   constructor(private readonly opts: CodexDriverOptions = {}) {}
 
   start(opts: DriverStartOptions): Promise<DriverSession> {
@@ -75,7 +75,7 @@ export class CodexSession implements DriverSession {
     // prompt. Blank-line separated, so it reads as its own block.
     const framing = combineFraming(this.startOpts.system, opts.system)
     const prompt = framing ? `${framing}\n\n${text}` : text
-    return runAgentCli({
+    return runCliSession({
       bin: this.config.bin ?? 'codex',
       args: this.buildArgs(),
       cwd: this.cwd,
@@ -85,7 +85,7 @@ export class CodexSession implements DriverSession {
       emit: makeEmit(this.startOpts.onEvent, 'codex'),
       signals: combineSignals(this.startOpts.signal, opts.signal),
       parser: new CodexJsonParser(),
-      agent: 'codex',
+      driver: 'codex',
     })
   }
 

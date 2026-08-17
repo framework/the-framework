@@ -4,7 +4,6 @@ TODO_FILE: `TODO_AGENTS.md`
 
 If the changes introduced by ${{ tf.session_name }} aren't trivial and have refactor potential, add the following to <TODO_FILE>
 - `Apply ${{ tf.presets.maintainability.filePath }} with tf.params.what set to "changes introduced by ${{ tf.session_name }}"`
-${{ tf.settings.technical_control ? '- `Apply ' + tf.presets.readability.filePath + ' with tf.params.what set to "changes introduced by ' + tf.session_name + '"`\n' : '' }}
 If the changes introduced by ${{ tf.session_name }} can potentially lead to security issues, add the following to <TODO_FILE>
 - `Apply ${{ tf.presets.security_audit.filePath }} with tf.params.what set to "changes introduced by ${{ tf.session_name }}"`
 

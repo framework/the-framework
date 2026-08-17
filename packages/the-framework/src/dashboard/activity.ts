@@ -1,4 +1,4 @@
-import { readAllRuns, type RunMeta, type RunStatus } from '../store/index.js'
+import { readAllAgents, type AgentMeta, type AgentStatus } from '../store/index.js'
 import { postDiscordWebhook } from './discord-webhook.js'
 import type { ProjectSummary } from './projects.js'
 
@@ -8,73 +8,73 @@ import type { ProjectSummary } from './projects.js'
 export { activityKey, pickNewActivity } from './keys.js'
 
 // The "New activity" feed (#627): the cross-project stream of run lifecycle transitions that
-// do NOT need the human — a run started, a run finished. It is the default-off notification
+// do NOT need the human — an agent started, an agent finished. It is the default-off notification
 // category, the counterpart to the interventions queue (which is the always-on "needs you"
 // half). Same shape and same "only genuinely new" diff as interventions.ts, so the browser
 // hook and the Discord watcher fold it into a baseline on first look and then notify once per
-// transition — you hear a run kick off and a run land, nothing when the page/daemon starts.
+// transition — you hear an agent kick off and an agent land, nothing when the page/daemon starts.
 
-/** How many recent runs per project to consider. Bounds the finished-set — older runs rolled off
- * long ago and were already baselined, so they never fire. A running run is always newest (live
+/** How many recent agents per project to consider. Bounds the finished-set — older agents rolled off
+ * long ago and were already baselined, so they never fire. A running agent is always newest (live
  * meta is prepended), so it is always in range. */
 const RECENT_RUNS = 20
 
 /**
- * One run lifecycle event worth a passing mention. Two kinds: a run `started` (entered
+ * One agent lifecycle event worth a passing mention. Two kinds: an agent `started` (entered
  * `running`) or `finished` (reached a terminal status). The card is not shown for these — they
  * only drive notifications — so the fields are just what a notification line needs.
  */
 export interface Activity {
   projectId: string
   projectName: string
-  /** The run this is about. */
-  runId: string
-  /** `started` = the run entered `running`; `finished` = it reached a terminal status. */
+  /** The agent this is about. */
+  agentId: string
+  /** `started` = the agent entered `running`; `finished` = it reached a terminal status. */
   kind: 'started' | 'finished'
-  /** What the run is building (its `intent`), for the notification body; may be absent. */
+  /** What the agent is building (its `intent`), for the notification body; may be absent. */
   title?: string
-  /** The finished run's terminal status (`finished` only), so a stop reads differently from a done. */
-  status?: RunStatus
-  /** When the run last changed, ISO, for ordering and the baseline diff. */
+  /** The finished agent's terminal status (`finished` only), so a stop reads differently from a done. */
+  status?: AgentStatus
+  /** When the agent last changed, ISO, for ordering and the baseline diff. */
   updatedAt?: string
 }
 
 /** Injectable seam so {@link buildActivity} is unit-testable off disk. */
 export interface ActivityDeps {
   /** A project's runs, live prepended to the archived history, newest-first. Defaults to disk. */
-  readRuns?: (cwd: string) => Promise<RunMeta[]>
+  readAgents?: (cwd: string) => Promise<AgentMeta[]>
 }
 
-/** Map one run to its current activity item: `started` while running, else `finished`. */
-function activityFor(project: ProjectSummary, run: RunMeta): Activity {
-  const kind = run.status === 'running' ? 'started' : 'finished'
+/** Map one agent to its current activity item: `started` while running, else `finished`. */
+function activityFor(project: ProjectSummary, agent: AgentMeta): Activity {
+  const kind = agent.status === 'running' ? 'started' : 'finished'
   return {
     projectId: project.id,
     projectName: project.name,
-    runId: run.id,
+    agentId: agent.id,
     kind,
-    ...(run.intent ? { title: run.intent } : {}),
-    ...(kind === 'finished' ? { status: run.status } : {}),
-    ...(run.updatedAt ? { updatedAt: run.updatedAt } : {}),
+    ...(agent.intent ? { title: agent.intent } : {}),
+    ...(kind === 'finished' ? { status: agent.status } : {}),
+    ...(agent.updatedAt ? { updatedAt: agent.updatedAt } : {}),
   }
 }
 
 /**
- * Build the cross-project activity feed: for each registered project's most recent runs, one
- * item per run reflecting where it is now (`started` while it runs, `finished` once it lands),
- * newest first. Forgiving — a project whose runs cannot be read simply contributes nothing.
+ * Build the cross-project activity feed: for each registered project's most recent agents, one
+ * item per agent reflecting where it is now (`started` while it runs, `finished` once it lands),
+ * newest first. Forgiving — a project whose agents cannot be read simply contributes nothing.
  *
- * The `started` and `finished` items for one run carry distinct keys ({@link activityKey}), so a
- * run that is still going notifies once (started) and again when it lands (finished). A run that
+ * The `started` and `finished` items for one agent carry distinct keys ({@link activityKey}), so a
+ * run that is still going notifies once (started) and again when it lands (finished). An agent that
  * both starts and finishes between two polls is only ever seen terminal, so it notifies once
- * (finished) — one quick run, one line.
+ * (finished) — one quick agent, one line.
  */
 export async function buildActivity(projects: ProjectSummary[], deps: ActivityDeps = {}): Promise<Activity[]> {
-  const readRuns = deps.readRuns ?? readAllRuns
+  const readAgents = deps.readAgents ?? readAllAgents
   const items: Activity[] = []
   for (const project of projects) {
-    const runs = (await readRuns(project.path).catch(() => [])).slice(0, RECENT_RUNS)
-    for (const run of runs) items.push(activityFor(project, run))
+    const agents = (await readAgents(project.path).catch(() => [])).slice(0, RECENT_RUNS)
+    for (const agent of agents) items.push(activityFor(project, agent))
   }
   items.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
   return items
@@ -82,7 +82,7 @@ export async function buildActivity(projects: ProjectSummary[], deps: ActivityDe
 
 
 /**
- * How one activity item reads on Discord: a started run, or a finished one tagged by its outcome.
+ * How one activity item reads on Discord: a started agent, or a finished one tagged by its outcome.
  * Beside {@link Activity} for the same reason {@link interventionLine} sits beside `Intervention`
  * — it switches on the kind, so it belongs with the type that declares the kinds.
  */

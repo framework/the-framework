@@ -1,30 +1,15 @@
-import type { FrameworkSignals } from '@gemstack/ai-autopilot'
 import { FakeDriver, type FakeTurn } from './driver/index.js'
-import type { DeployDecision } from './run.js'
 
 /**
- * The deterministic `--fake` scenario: a small Vike + Prisma orders app.
+ * The deterministic fake scenario: a small Vike + Prisma orders app.
  * It wires a {@link FakeDriver} whose scripted turns walk the exact prompt order
  * the flow issues — one build turn (#1372: with no preset and no serve config
- * nothing reviews the build, so the build is the whole loop) — so the
- * scope -> deploy flow runs offline with no CLI and no model, driven entirely
- * *through* the driver seam.
+ * nothing reviews the build, so the build is the whole loop) — so the flow runs
+ * offline with no CLI and no model, driven entirely *through* the driver seam.
  */
 
-/** The default intent the `--fake` demo builds. */
+/** The default intent the fake demo builds. */
 export const FAKE_INTENT = 'A paginated orders page backed by an orders table, with sign-in.'
-
-/** Deps that make the Vike preset win detection in the demo. */
-export const FAKE_SIGNALS: FrameworkSignals = {
-  dependencies: { 'vike-react': '1.0.0', react: '18.0.0', '@prisma/client': '5.0.0' },
-}
-
-/** The deploy decision narrated at the end of the demo. */
-export const FAKE_DEPLOY: DeployDecision = {
-  render: 'ssr',
-  target: 'cloudflare',
-  reason: 'per-request orders data + server-side auth',
-}
 
 // A small, plausible per-turn usage so the demo shows spend accumulating (#322).
 const FAKE_USAGE = { costUsd: 0.02, inputTokens: 1800, outputTokens: 600, cacheReadTokens: 12000, cacheCreationTokens: 800 }
@@ -39,7 +24,7 @@ const TURNS: FakeTurn[] = [BUILD_TURN]
 // Demo variants that make the build stop to ask, so the turn-boundary gates (#337
 // single-select / #339 multi-select checklist) can be seen offline. The build turn ends
 // with an await block; the framework shows the gate, waits, then re-prompts (RESUME_TURN),
-// and the run continues as usual. Needs the dashboard on (so requestChoice is
+// and the agent continues as usual. Needs the dashboard on (so requestChoice is
 // wired); selected via FRAMEWORK_FAKE_AWAIT=choices|multiselect|confirmation.
 const AWAIT_CHOICES_TURN: FakeTurn = {
   text:
@@ -50,15 +35,15 @@ const AWAIT_CHOICES_TURN: FakeTurn = {
 }
 const AWAIT_MULTISELECT_TURN: FakeTurn = {
   text:
-    'Rated the problems by how clear the optimal solution is.\n```await-multiselect\n' +
-    '{ "title": "Which problems should I deep-dive for alternatives?", "options": [{ "label": "auth model", "detail": "rated 3/10", "default": true }, { "label": "pagination", "detail": "rated 7/10" }, { "label": "orders schema", "detail": "rated 2/10", "default": true }] }\n```',
+    'Rated the problems by how clear the optimal solution is.\n```await-choices\n' +
+    '{ "title": "Which problems should I deep-dive for alternatives?", "multi": true, "options": [{ "label": "auth model", "detail": "rated 3/10", "default": true }, { "label": "pagination", "detail": "rated 7/10" }, { "label": "orders schema", "detail": "rated 2/10", "default": true }] }\n```',
   actions: ['Read', 'Grep'],
   usage: FAKE_USAGE,
 }
 const AWAIT_CONFIRMATION_TURN: FakeTurn = {
   text:
-    'The scope is large, so I wrote a plan first.\n```await-confirmation\n' +
-    '{ "title": "Approve the plan for the orders app?", "file": "PLAN_fake-orders-app.agent.md" }\n```',
+    'The scope is large, so I wrote a plan first.\n```await-choices\n' +
+    '{ "title": "Approve the plan for the orders app?", "file": "PLAN_fake-orders-app.agent.md", "options": [{ "label": "Approve" }, { "label": "Decline", "stop": true }], "recommended": "Approve" }\n```',
   actions: ['Write'],
   usage: FAKE_USAGE,
 }

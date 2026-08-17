@@ -77,7 +77,7 @@ test('a machine with no Chrome resolves to nothing, which is what makes --browse
 })
 
 test('launchSharedBrowser gives up on a binary that never opens the port', async () => {
-  // A path that cannot start: stands in for a Chrome that never listens. The run must get
+  // A path that cannot start: stands in for a Chrome that never listens. The agent must get
   // undefined (and fall back) rather than a handle to a browser nothing is behind.
   const browser = await launchSharedBrowser({ chromePath: join(tmpdir(), 'definitely-not-chrome'), timeoutMs: 400 })
   assert.equal(browser, undefined, 'a browser that never listens must not be handed to the agent')

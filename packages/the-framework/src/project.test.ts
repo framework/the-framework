@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { THE_FRAMEWORK_DIR } from './logs.js'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import {
   crawlRepoFiles,
   gitTimeoutMs,
@@ -39,12 +39,12 @@ test('isActivated is false when the marker dir is absent', async () => {
 
 test('crawlRepoFiles parses NUL-separated output, deduped + sorted', async () => {
   const calls: { args: string[]; cwd: string }[] = []
-  const run: GitRunner = async (args, cwd) => {
+  const agent: GitRunner = async (args, cwd) => {
     calls.push({ args, cwd })
     // git -z output ends with a trailing NUL.
     return 'src/b.ts\0README.md\0src/a.ts\0'
   }
-  const files = await crawlRepoFiles(CWD, run)
+  const files = await crawlRepoFiles(CWD, agent)
   assert.deepEqual(files, ['README.md', 'src/a.ts', 'src/b.ts'])
   assert.deepEqual(calls, [
     { args: ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd: CWD },
@@ -74,9 +74,9 @@ test('crawlRepoFiles yields [] when git fails', async () => {
  */
 const BUDGETS: { args: string[]; ms: number }[] = [
   // The network and a whole checkout: the two the flat 10s budget was killing.
-  { args: ['push', '--set-upstream', 'origin', 'the-framework/run-1'], ms: GIT_SLOW_TIMEOUT_MS },
-  { args: ['worktree', 'add', '-b', 'the-framework/run-1', '/wt', 'main'], ms: GIT_SLOW_TIMEOUT_MS },
-  { args: ['worktree', 'add', '/wt', 'the-framework/run-1'], ms: GIT_SLOW_TIMEOUT_MS },
+  { args: ['push', '--set-upstream', 'origin', 'the-framework/agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
+  { args: ['worktree', 'add', '-b', 'the-framework/agent-1', '/wt', 'main'], ms: GIT_SLOW_TIMEOUT_MS },
+  { args: ['worktree', 'add', '/wt', 'the-framework/agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
   { args: ['clone', 'https://example.com/repo.git', '/dest'], ms: GIT_SLOW_TIMEOUT_MS },
   { args: ['fetch', 'origin'], ms: GIT_SLOW_TIMEOUT_MS },
   // Local mutations.

@@ -1,7 +1,6 @@
 node_modules/
 dist/
 dist-test/
-.turbo/
 *.tsbuildinfo
 *.log
 .DS_Store

@@ -32,7 +32,7 @@ import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverSta
  * API rather than from disk.
  */
 export class ActionsDriver implements Driver {
-  readonly name = 'github-actions'
+  readonly id = 'github-actions'
   constructor(private readonly opts: ActionsDriverOptions) {}
 
   start(opts: DriverStartOptions): Promise<DriverSession> {
@@ -138,7 +138,7 @@ export class ActionsSession implements DriverSession {
     await this.dispatch(prompt, correlationId, resume)
     emit({ type: 'notice', message: `Dispatched ${correlationId} to ${this.config.owner}/${this.config.repo}; waiting for the runner.` })
 
-    const run = await this.awaitRun(correlationId, emit, opts.signal)
+    const run = await this.awaitWorkflowRun(correlationId, emit, opts.signal)
     const artifact = await this.readRunArtifact(run.id, correlationId)
     if (artifact.branch) this.branch = artifact.branch
 
@@ -181,7 +181,7 @@ export class ActionsSession implements DriverSession {
   }
 
   /** Poll until our run appears and finishes. Identified by the correlation id in its `run-name`. */
-  private async awaitRun(
+  private async awaitWorkflowRun(
     correlationId: string,
     emit: (event: DriverEvent) => void,
     promptSignal?: AbortSignal,
@@ -193,7 +193,7 @@ export class ActionsSession implements DriverSession {
     let announced = false
 
     for (;;) {
-      const found = await this.findRun(correlationId)
+      const found = await this.findWorkflowRun(correlationId)
       if (found) {
         if (!announced) {
           announced = true
@@ -212,7 +212,7 @@ export class ActionsSession implements DriverSession {
   }
 
   /** Our run among the workflow's recent ones, or undefined while GitHub is still creating it. */
-  private async findRun(correlationId: string): Promise<WorkflowRun | undefined> {
+  private async findWorkflowRun(correlationId: string): Promise<WorkflowRun | undefined> {
     const body = await this.api<{ workflow_runs?: WorkflowRun[] }>(`/repos/${this.owner}/actions/runs?event=workflow_dispatch&per_page=50`)
     return (body.workflow_runs ?? []).find(run => typeof run.name === 'string' && run.name.includes(correlationId))
   }

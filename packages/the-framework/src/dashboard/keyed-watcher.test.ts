@@ -14,8 +14,8 @@ const pr = (n: number, url: string, project = 'p'): Intervention => ({
   url,
 })
 
-const started = (runId: string): Activity => ({ projectId: 'p', projectName: 'p', kind: 'started', runId })
-const finished = (runId: string): Activity => ({ projectId: 'p', projectName: 'p', kind: 'finished', runId, status: 'done' })
+const started = (agentId: string): Activity => ({ projectId: 'p', projectName: 'p', kind: 'started', agentId })
+const finished = (agentId: string): Activity => ({ projectId: 'p', projectName: 'p', kind: 'finished', agentId, status: 'done' })
 
 test('SeenTracker seeds a baseline on the first poll, then returns only new items', () => {
   const tracker = new SeenTracker(interventionKey)
@@ -30,7 +30,7 @@ test('SeenTracker seeds a baseline on the first poll, then returns only new item
 test('SeenTracker keys on the caller\'s identity, so a run started and finished are two announcements', () => {
   const tracker = new SeenTracker(activityKey)
   assert.deepEqual(tracker.observe([started('r1')]), [])
-  // The same run finishing is a new key -> announced.
+  // The same agent finishing is a new key -> announced.
   assert.deepEqual(tracker.observe([finished('r1')]).map(i => i.kind), ['finished'])
   assert.deepEqual(tracker.observe([finished('r1')]), [])
 })
@@ -44,11 +44,11 @@ test('startKeyedWatcher announces only items that appear after the first poll', 
     build: async () => current,
     keyOf: interventionKey,
     onNew: items => void announced.push(items.map(i => i.number!)),
-    intervalMs: 1_000_000, // effectively disable the timer; drive via poll()
   })
   try {
-    // Construction fires an immediate baseline poll (u1 already open) — let it settle.
-    await new Promise(resolve => setTimeout(resolve, 0))
+    // The watcher owns no timer (E4): the daemon's clock drives it, and its first turn is the
+    // baseline seed — which must happen, or the whole open backlog reads as new.
+    await watcher.poll()
     assert.deepEqual(announced, []) // baseline announces nothing
     current = [pr(1, 'u1'), pr(2, 'u2')]
     await watcher.poll() // u2 is new -> announced
@@ -69,7 +69,6 @@ test('startKeyedWatcher yields no new items when the scan or the projection fail
     },
     keyOf: interventionKey,
     onNew: items => void announced.push(items),
-    intervalMs: 1_000_000,
   })
   try {
     await watcher.poll()

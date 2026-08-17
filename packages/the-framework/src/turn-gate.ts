@@ -16,7 +16,7 @@ import type { MultiSelectOption } from './await-gate.js'
 export const AWAIT_PROTOCOL = PROTOCOLS_AWAIT
 
 /**
- * Told to a hands-off run only (#1234): the await gates {@link AWAIT_PROTOCOL} just taught are
+ * Told to a hands-off agent only (#1234): the await gates {@link AWAIT_PROTOCOL} just taught are
  * not available in this session, so an ambiguous prompt takes its most plausible reading instead
  * of parking forever on a question nobody attached can answer. Worded as availability rather
  * than as a rule, so it deletes itself cleanly once choices become a per-session capability.
@@ -25,7 +25,7 @@ export const AWAIT_PROTOCOL = PROTOCOLS_AWAIT
 export const HANDS_OFF_PROTOCOL = PROTOCOLS_HANDS_OFF
 
 /**
- * Told to the agent only when the run has a browser (#824): that it has one, and that anything
+ * Told to the agent only when the agent has a browser (#824): that it has one, and that anything
  * it needs to see or act on goes through the chrome-devtools tools rather than `WebFetch`.
  * Lives in `prompts/protocols/browser.md`.
  */
@@ -42,97 +42,52 @@ export const BROWSER_PROTOCOL = PROTOCOLS_BROWSER
  */
 export const SIGNAL_PROTOCOL = PROTOCOLS_SIGNAL
 
-/** A single-select choice an agent stopped to ask, parsed from an `await-choices` block (#337). */
-export interface ParsedChoicesGate {
+/** One option of an await gate: what the user picks between. */
+export interface AwaitOption {
+  /** Stable id the pick is posted back against; synthesized from position when the agent names none. */
+  id: string
+  /** The option as shown to the user. */
+  label: string
+  /** An optional one-liner under the label. */
+  detail?: string
+  /** Starts checked. Only meaningful on a {@link ParsedAwaitGate.multi} gate. */
+  default?: boolean
+  /**
+   * Picking this ends the session rather than resuming the agent with it (#358).
+   *
+   * Some answers are not instructions to carry on, they are "stop, I will take it from here" —
+   * declining a plan being the one that matters, because the user's next move is fresh
+   * instructions and building on a plan they rejected is the single worst thing to do with the
+   * interval. Which answers those are is a property of the question, so the agent marks them,
+   * rather than the framework inferring it from a gate kind that no longer exists.
+   */
+  stop?: boolean
+}
+
+/**
+ * A question the agent stopped to ask, parsed from an `await-choices` block (#337).
+ *
+ * There were four of these — a single choice, a multi-select, a plan approval, and handing over a
+ * browser — each with its own tag, parser, resolution branch and dashboard card, for what is one
+ * question with N options every time. Approve/Decline is two options; "handled it / could not" is
+ * two options; a plan approval is that pair with a file attached. Collapsing them means the agent
+ * learns one block instead of four, and a new kind of question needs no new code at all.
+ */
+export interface ParsedAwaitGate {
   /** The question shown above the options. */
   title: string
-  /** The options to choose between (at least one). */
-  options: ChoicesOption[]
-  /** The option id to default to, when the agent named one. */
+  /** The options to pick between (at least one, or the gate does not parse). */
+  options: AwaitOption[]
+  /** The option to default to, which autopilot accepts, when the agent named one. */
   recommended?: string
-}
-
-/** A multi-select an agent stopped to ask, parsed from an `await-multiselect` block (#339). */
-export interface ParsedMultiSelectGate {
-  /** The prompt shown above the checklist. */
-  title: string
-  /** The options (each may start checked via {@link MultiSelectOption.default}). */
-  options: MultiSelectOption[]
-}
-
-/** A plan/document approval an agent stopped to ask, parsed from an `await-confirmation` block (#358). */
-export interface ParsedConfirmationGate {
-  /** The question shown above the Approve / Decline buttons. */
-  title: string
-  /** The markdown file under approval (the doc sidebar renders it), when the agent named one. */
+  /** Any number of options may be picked rather than exactly one, each starting checked per its `default`. */
+  multi?: boolean
+  /** A markdown file the question is about (a plan under approval); the doc sidebar renders it. */
   file?: string
 }
 
 /**
- * A browser the agent is stuck in, parsed from an `await-browser` block (#796).
- *
- * The other gates ask the user to decide something; this one asks them to *do* something.
- * A login wall, a captcha, an SSO redirect: work the agent must not do on its own, either
- * because it cannot or because it means handling a credential we deliberately never touch.
- * The run parks, the human acts on the page, and the agent picks up from there.
- */
-export interface ParsedBrowserGate {
-  /** What the human needs to do, shown above the buttons. */
-  title: string
-  /** The page the agent is stuck on, so the user knows where to look. */
-  url?: string
-}
-
-/**
- * A project-less topic run (#1120) asking to bind to one of the projects already registered,
- * parsed from an `await-bind-project` block (#1121). The options are not in the block: the
- * framework fills them from the registry at resolution time, so the agent never has to know
- * (or guess) which projects exist.
- */
-export interface ParsedBindProjectGate {
-  /** The question shown above the project list. */
-  title: string
-}
-
-/**
- * A project-less topic run (#1120) asking to register a new project by path and bind to it,
- * parsed from an `await-create-project` block (#1121). The confirmation IS the permission grant
- * (registering a path hands the app filesystem access to it), so resolution recommends Approve,
- * like {@link ParsedConfirmationGate}.
- */
-export interface ParsedCreateProjectGate {
-  /** The question shown above the Approve / Decline buttons. */
-  title: string
-  /** The absolute repo path to register, when the agent named one. */
-  path?: string
-}
-
-/** A parsed await gate: any kind, discriminated by `kind`. */
-export type ParsedAwaitGate =
-  | ({ kind: 'choices' } & ParsedChoicesGate)
-  | ({ kind: 'multi' } & ParsedMultiSelectGate)
-  | ({ kind: 'confirm' } & ParsedConfirmationGate)
-  | ({ kind: 'browser' } & ParsedBrowserGate)
-  | ({ kind: 'bind-project' } & ParsedBindProjectGate)
-  | ({ kind: 'create-project' } & ParsedCreateProjectGate)
-
-/** The answer a resolved confirmation gate (#358) yields: the picked button's label. */
-export const CONFIRM_APPROVED = 'Approve'
-export const CONFIRM_DECLINED = 'Decline'
-
-/** The answers a resolved browser gate (#796) yields. */
-export const BROWSER_HANDLED = 'Handled it'
-export const BROWSER_NOT_HANDLED = 'Could not handle it'
-
-/** The Approve / Decline buttons a create-project gate (#1121) shows. */
-export const CREATE_PROJECT_APPROVE = 'Register and bind'
-export const CREATE_PROJECT_DECLINE = 'Not now'
-
-/** The answer a bind-project gate yields when the registry is empty — nothing to pick (#1121). */
-export const NO_PROJECTS_TO_BIND = 'No projects are registered yet, so there is nothing to bind to.'
-
-/**
- * How many times the agent may stop to ask, and be resumed, before a run stops honoring
+ * How many times the agent may stop to ask, and be resumed, before an agent stops honoring
  * gates and just finishes. A property of the await protocol, so every path that runs gates
  * shares it: a build, a direct prompt, and the backlog loop each used to declare their own.
  */
@@ -147,19 +102,21 @@ export const MAX_AWAIT_ROUNDS = 5
  * instead of one path and not the others (#570).
  *
  * No "do not ask again" tail: a capable agent does not re-ask a settled question on
- * its own, so spelling it out is babysitting we leave off until a run shows it is
+ * its own, so spelling it out is babysitting we leave off until an agent shows it is
  * needed (#570 review).
  */
 export function continuationPrompt(question: string, answer: string): string {
   return `You paused to ask: "${question}". The user chose: ${answer}. Continue with that decision.`
 }
 
-/** The log line printed when a confirmation gate is declined (#358). */
-export const PLAN_DECLINED_MESSAGE = 'Plan declined, awaiting user instructions.'
-
-/** Whether a resolved gate was a declined confirmation (#358): the caller stops instead of re-prompting. */
-export function isDeclinedConfirmation(gate: ParsedAwaitGate, answer: string): boolean {
-  return gate.kind === 'confirm' && answer === CONFIRM_DECLINED
+/**
+ * The log line for the other outcome: the user picked a `stop` option, so there is no
+ * continuation prompt and the session ends here (#358). Addressed to the user rather than to the
+ * agent — the agent is not told anything, which is the point — and it names the answer, because
+ * "stopped" on its own reads like a failure when it was a decision.
+ */
+export function stopMessage(answer: string): string {
+  return `Stopped at your answer: ${answer}. Awaiting your instructions.`
 }
 
 /** A non-blocking markdown view the agent pushed via a `show-markdown` block (#441). */
@@ -227,18 +184,16 @@ export function parseSessionName(text: string): string | undefined {
 /**
  * Whether the agent signalled `setReadyForMerge()` this turn (#326): the presence of a
  * `ready-for-merge` block (per {@link SIGNAL_PROTOCOL}) anywhere in the text. Non-blocking
- * and body-less — it just flips the run from building to ready-for-review.
+ * and body-less — it just flips the agent from building to ready-for-review.
  */
 export function parseReadyForMerge(text: string): boolean {
   return /```ready-for-merge(?:\s[\s\S]*?)?```/.test(text)
 }
 
-/** Find the body + start index of the last fenced block with `tag` in `text`. */
-function lastBlock(text: string, tag: string): { body: string; index: number } | undefined {
+/** The bodies of every fenced `tag` block in `text`, in the order they appear. */
+function blocks(text: string, tag: string): string[] {
   const re = new RegExp('```' + tag + '\\s+([\\s\\S]*?)```', 'g')
-  let found: { body: string; index: number } | undefined
-  for (const m of text.matchAll(re)) found = { body: m[1] ?? '', index: m.index ?? 0 }
-  return found
+  return [...text.matchAll(re)].map(m => m[1] ?? '')
 }
 
 /** Parse an await block's JSON body to a record, or `undefined` — the shared first step of
@@ -254,184 +209,65 @@ function parseRecord(body: string): Record<string, unknown> | undefined {
   return raw as Record<string, unknown>
 }
 
-/** Parse the JSON body of an await block, returning its `options` array or undefined. */
-function parseBody(body: string): { record: Record<string, unknown>; options: Record<string, unknown>[] } | undefined {
-  const record = parseRecord(body)
-  if (!record || !Array.isArray(record.options)) return undefined
-  return { record, options: record.options as Record<string, unknown>[] }
-}
-
 /** Read a trimmed string field, or `''`. */
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
 
 /**
- * Parse one await option's shared fields: a synthesized id (`opt:<i>` when the
- * agent named none), the label, and an optional detail. Returns `undefined` for a
- * label-less option, which both gate parsers drop. The multi variant layers its
- * own `default` on top.
- */
-function parseOption(o: Record<string, unknown>, i: number): ChoicesOption | undefined {
-  const label = str(o?.label)
-  if (!label) return undefined
-  const detail = str(o?.detail)
-  return { id: str(o?.id) || `opt:${i}`, label, ...(detail ? { detail } : {}) }
-}
-
-/**
- * The shared skeleton of an options await block (#337/#339): find the last block for `tag`, parse
- * its body's `options` array, map each labelled option through `mapOption`, and bail when none
- * survive. Returns the resolved title, the raw record (so a caller can read a trailer field like
- * `recommended`), and the mapped options. Tolerant by design — a malformed block yields `undefined`
- * rather than throwing, since a bad parse must never crash a build.
- */
-function parseOptionsGate<T extends ChoicesOption>(
-  text: string,
-  tag: string,
-  titleFallback: string,
-  mapOption: (base: ChoicesOption, raw: Record<string, unknown>) => T,
-): { title: string; record: Record<string, unknown>; options: T[] } | undefined {
-  const block = lastBlock(text, tag)
-  if (!block) return undefined
-  const parsed = parseBody(block.body)
-  if (!parsed) return undefined
-
-  const options: T[] = []
-  parsed.options.forEach((o, i) => {
-    const opt = parseOption(o, i)
-    if (opt) options.push(mapOption(opt, o))
-  })
-  if (options.length === 0) return undefined
-
-  return { title: str(parsed.record.title) || titleFallback, record: parsed.record, options }
-}
-
-/**
- * The shared skeleton of an option-less await block (#358/#796): a record carrying a title and one
- * optional string field (`file`, `url`). Same tolerance — a blank title falls back and a malformed
- * block is ignored. A field that is not a string is dropped rather than shown as "undefined".
- */
-function parseRecordGate<F extends string>(
-  text: string,
-  tag: string,
-  field: F,
-  titleFallback: string,
-): ({ title: string } & { [K in F]?: string }) | undefined {
-  const block = lastBlock(text, tag)
-  if (!block) return undefined
-  const record = parseRecord(block.body)
-  if (!record) return undefined
-  const value = str(record[field])
-  return { title: str(record.title) || titleFallback, ...(value ? { [field]: value } : {}) } as {
-    title: string
-  } & { [K in F]?: string }
-}
-
-/**
- * Parse a trailing `await-choices` block (per {@link AWAIT_PROTOCOL}) from a turn's
- * final text (#337). Returns `undefined` when the agent did not stop to ask (the common
- * case). Tolerant by design: ids are synthesized from position, a blank title falls
- * back, `recommended` may be a label or an id, and a malformed block is ignored rather
- * than throwing — a bad parse must never crash a build.
- */
-export function parseChoicesGate(text: string): ParsedChoicesGate | undefined {
-  const gate = parseOptionsGate(text, 'await-choices', 'Which option?', opt => opt)
-  if (!gate) return undefined
-  const rec = str(gate.record.recommended)
-  const recommended = rec ? (gate.options.find(o => o.id === rec) ?? gate.options.find(o => o.label === rec))?.id : undefined
-  return { title: gate.title, options: gate.options, ...(recommended ? { recommended } : {}) }
-}
-
-/**
- * Parse a trailing `await-multiselect` block (#339), the multi twin of
- * {@link parseChoicesGate}. Each option may start checked via `default`. Same
- * tolerance: synthesized ids, blank-title fallback, malformed block ignored.
- */
-export function parseMultiSelectGate(text: string): ParsedMultiSelectGate | undefined {
-  const gate = parseOptionsGate(
-    text,
-    'await-multiselect',
-    'Select any that apply',
-    (opt, raw): MultiSelectOption => ({ ...opt, ...(raw?.default === true ? { default: true } : {}) }),
-  )
-  return gate ? { title: gate.title, options: gate.options } : undefined
-}
-
-/**
- * Parse a trailing `await-confirmation` block (#358): a plan/document approval,
- * e.g. the #326 large-scope flow's PLAN file (`showMarkdown()` + AWAIT). No
- * options — the gate is a fixed Approve / Decline. Same tolerance as the other
- * parsers: blank-title fallback, malformed block ignored.
- */
-export function parseConfirmationGate(text: string): ParsedConfirmationGate | undefined {
-  return parseRecordGate(text, 'await-confirmation', 'file', 'Approve this plan?')
-}
-
-/**
- * Parse a trailing `await-browser` block (#796): the agent is stuck on a page and needs a
- * human to act on it. Same tolerance as the other parsers — blank-title fallback, malformed
- * block ignored. A `url` that is not a string is dropped rather than shown as "undefined".
- */
-export function parseBrowserGate(text: string): ParsedBrowserGate | undefined {
-  return parseRecordGate(text, 'await-browser', 'url', 'Take over in the browser')
-}
-
-/**
- * Parse a trailing `await-bind-project` block (#1121): a project-less topic run asking to bind to
- * a registered project. The block carries only a title — the framework fills the project list from
- * the registry at resolution time — so an empty or malformed body still triggers the gate with the
- * fallback title, rather than being dropped.
- */
-export function parseBindProjectGate(text: string): ParsedBindProjectGate | undefined {
-  const block = lastBlock(text, 'await-bind-project')
-  if (!block) return undefined
-  const record = parseRecord(block.body) ?? {}
-  return { title: str(record.title) || 'Bind this run to a project' }
-}
-
-/**
- * Parse a trailing `await-create-project` block (#1121): a topic run asking to register a new
- * project by `path` and bind to it. Same tolerance as {@link parseConfirmationGate} — blank-title
- * fallback, malformed block ignored, a non-string path dropped.
- */
-export function parseCreateProjectGate(text: string): ParsedCreateProjectGate | undefined {
-  return parseRecordGate(text, 'await-create-project', 'path', 'Register and bind this project?')
-}
-
-/**
- * Parse whichever await gate a build turn ended on (#337 / #339 / #358 / #796). When more
- * than one block kind is present (an agent shouldn't emit several), the one that
- * appears latest in the text wins; a malformed later block falls back to an earlier
- * one. Returns `undefined` when the agent just finished — the common case, so a
- * normal build flows straight through.
+ * Parse the await gate a turn ended on (#337), from the last usable `await-choices` block in its
+ * text. Returns `undefined` when the agent just finished — the common case, so a normal build
+ * flows straight through.
+ *
+ * Tolerant by design, because a bad parse must never crash a build: ids are synthesized from
+ * position when the agent names none, a label-less option is dropped, a blank title falls back,
+ * `recommended` may be given as a label or an id, and a malformed block is ignored. A block whose
+ * options all fall away is not a gate — the agent carries on rather than parking on an empty question.
  */
 export function parseAwaitGate(text: string): ParsedAwaitGate | undefined {
-  const kinds = GATE_KINDS.map(k => ({ at: lastBlock(text, k.tag)?.index ?? -1, parse: k.parse }))
-  for (const kind of kinds.filter(k => k.at >= 0).sort((a, b) => b.at - a.at)) {
-    const gate = kind.parse(text)
+  // Latest first, so the newest question wins — falling back to an earlier one when the agent's
+  // last block is malformed, rather than losing a good question to a bad one after it.
+  for (const body of blocks(text, 'await-choices').reverse()) {
+    const gate = parseGateBody(body)
     if (gate) return gate
   }
   return undefined
 }
 
-/** The gate kinds, each as its tag plus a parse that stamps the discriminant. */
-const GATE_KINDS: readonly { tag: string; parse: (text: string) => ParsedAwaitGate | undefined }[] = [
-  { tag: 'await-choices', parse: text => tagged('choices', parseChoicesGate(text)) },
-  { tag: 'await-multiselect', parse: text => tagged('multi', parseMultiSelectGate(text)) },
-  { tag: 'await-confirmation', parse: text => tagged('confirm', parseConfirmationGate(text)) },
-  { tag: 'await-browser', parse: text => tagged('browser', parseBrowserGate(text)) },
-  { tag: 'await-bind-project', parse: text => tagged('bind-project', parseBindProjectGate(text)) },
-  { tag: 'await-create-project', parse: text => tagged('create-project', parseCreateProjectGate(text)) },
-]
+/** Parse one `await-choices` body, or `undefined` when there is nothing pickable in it. */
+function parseGateBody(body: string): ParsedAwaitGate | undefined {
+  const record = parseRecord(body)
+  if (!record || !Array.isArray(record.options)) return undefined
 
-/** Stamp a parsed gate with its kind, passing an unparseable one through as `undefined`. */
-function tagged<K extends ParsedAwaitGate['kind'], G extends object>(kind: K, gate: G | undefined): (G & { kind: K }) | undefined {
-  return gate ? { kind, ...gate } : undefined
+  const options: AwaitOption[] = []
+  ;(record.options as Record<string, unknown>[]).forEach((o, i) => {
+    const label = str(o?.label)
+    if (!label) return
+    const detail = str(o?.detail)
+    options.push({
+      id: str(o?.id) || `opt:${i}`,
+      label,
+      ...(detail ? { detail } : {}),
+      ...(o?.default === true ? { default: true } : {}),
+      ...(o?.stop === true ? { stop: true } : {}),
+    })
+  })
+  if (options.length === 0) return undefined
+
+  const named = str(record.recommended)
+  const recommended = named ? (options.find(o => o.id === named) ?? options.find(o => o.label === named))?.id : undefined
+  const file = str(record.file)
+  return {
+    title: str(record.title) || 'Which option?',
+    options,
+    ...(recommended ? { recommended } : {}),
+    ...(record.multi === true ? { multi: true } : {}),
+    ...(file ? { file } : {}),
+  }
 }
 
 /**
  * Emit the {@link PROTOCOLS_SIGNAL} signals an agent turn carries: markdown views, the
  * session name, and `setReadyForMerge()`. Every turn the framework prompts goes through
- * one of these, because the protocols are unconditional (see `composeRunSystem`) — the
+ * one of these, because the protocols are unconditional (see `composeAgentSystem`) — the
  * agent is told it can signal on any turn, so any turn we don't parse drops the signal.
  *
  * The returned function holds the dedupe state for the turns it covers: `ready-for-merge`

@@ -5,8 +5,8 @@ import { open } from 'node:fs/promises'
  * Tails an append-only JSONL log, calling `onLine` for each complete line as it
  * is written. Reads only the bytes appended since the last {@link pull},
  * buffering a torn trailing line until its newline arrives. A file that shrinks
- * (a fresh run truncated the log) resets to the start so the new content is
- * picked up. The generic base behind the daemon's event tail and the run's
+ * (a fresh agent truncated the log) resets to the start so the new content is
+ * picked up. The generic base behind the daemon's event tail and the agent's
  * control tail (#344) — one tailer, two directions.
  */
 export class JsonlTailer<T> {
@@ -22,7 +22,7 @@ export class JsonlTailer<T> {
 
   /**
    * Point the tailer at the journal's new home, keeping the read offset. For a log that is
-   * *relocated with its content intact* — a run's `events.jsonl` is copied verbatim into the
+   * *relocated with its content intact* — an agent's `events.jsonl` is copied verbatim into the
    * archive at teardown (and restored on a continuation) — the bytes already consumed are a
    * prefix of the new file, so the next {@link pull} delivers exactly the lines the move would
    * otherwise have swallowed, without replaying what was already delivered.
@@ -47,7 +47,7 @@ export class JsonlTailer<T> {
     }
     try {
       const { size, mtimeMs } = await fd.stat()
-      // A fresh run truncates the log in place (same inode). Detect it two ways: the
+      // A fresh agent truncates the log in place (same inode). Detect it two ways: the
       // file shrank below what we consumed, or it was rewritten to the same length
       // (size unchanged but mtime advanced). Either way, re-read from the top.
       // Suspended for the first read after a retarget, whose newer mtime is the copy's, not a rewrite's.
@@ -96,7 +96,7 @@ export interface FollowFileOptions {
  * Drive a {@link JsonlTailer} as the file grows: an `fs.watch` on `dir` for latency, plus a
  * poll backstop because `fs.watch` is unreliable across platforms. Pulls are serialized (a
  * pull already in flight swallows the next trigger) and stop for good once the returned
- * function is called. Shared by the run's control tail and the dashboard's event tail, which
+ * function is called. Shared by the agent's control tail and the dashboard's event tail, which
  * hand-rolled this separately and drifted apart.
  *
  * Nothing here may throw at the process: a failed pull and a watcher error are both survivable,
@@ -132,8 +132,8 @@ export function followFile(dir: string, pull: () => Promise<void>, opts: FollowF
     })
     // Unref the watcher, not just the poll below: an `fs.watch` handle refs the event loop on
     // its own, so unrefing only the timer left `unref: true` a half-measure that still pinned the
-    // process open. That is what wedged a run whose config check failed before its watcher had an
-    // owner to close it — the CLI returned, and the process then sat there forever with the run
+    // process open. That is what wedged an agent whose config check failed before its watcher had an
+    // owner to close it — the CLI returned, and the process then sat there forever with the agent
     // recorded as `running`.
     if (opts.unref) watcher?.unref()
   } catch {

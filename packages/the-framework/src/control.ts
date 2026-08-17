@@ -1,15 +1,15 @@
 import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { isSafeVia } from './conversations.js'
 import type { ChoiceBy } from './events.js'
+import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { FRAMEWORK_DIR } from './store/index.js'
 import { JsonlTailer, followFile } from './jsonl-tail.js'
 
 /**
- * The dashboard-to-run control channel (#344): the reverse of the event log.
+ * The dashboard-to-agent control channel (#344): the reverse of the event log.
  * Events flow run -> `.the-framework/events.jsonl` -> daemon -> browser; steering
  * flows browser -> daemon -> `.the-framework/control.jsonl` -> run. The daemon
- * appends a {@link ControlEntry} per Stop click / choice pick, and the run tails
+ * appends a {@link ControlEntry} per Stop click / choice pick, and the agent tails
  * the file, aborting or resolving its parked gate. Same file-is-the-seam design
  * as the forward direction — no run<->daemon IPC.
  */
@@ -17,35 +17,27 @@ import { JsonlTailer, followFile } from './jsonl-tail.js'
 /** The control log filename under `.the-framework/`. */
 export const CONTROL_FILE = 'control.jsonl'
 
-/** One steering instruction from the dashboard to the live run. */
+/** One steering instruction from the dashboard to the live agent. */
 export type ControlEntry =
-  /** Stop the run (the daemon dashboard's Stop button). */
+  /** Stop the agent (the daemon dashboard's Stop button). */
   | { kind: 'stop' }
   /** Resolve a parked choice gate: the pick for the pending {@link ChoiceRequest} id. */
   | { kind: 'choice'; id: string; pick: string | string[]; by: ChoiceBy }
+  /** A live-chat message the user sent to the running agent (#714). */
+  | { kind: 'message'; text: string }
   /**
-   * A live-chat message the user sent to the running run (#714).
+   * Move the end-of-session handoff (#1102): how far this session publishes itself when it
+   * finishes — keep it local, push the branch, open a PR, merge it.
    *
-   * `via` names the surface it came through (#917), so the conversation records where it happened
-   * rather than assuming the local one. Optional: entries written before this existed still parse,
-   * and a run reading one falls back to its own surface exactly as before.
-   */
-  | { kind: 'message'; text: string; via?: string }
-  /**
-   * Re-arm or disarm the end-of-session handoff (#1102): whether this session pushes its branch
-   * and opens a draft PR when it finishes.
+   * One rung rather than a pair of booleans (B5): a surface offering checkboxes converts on its
+   * side, so an impossible answer resolves *down* there instead of arriving here as "a PR with no
+   * push" for this end to repair upward.
    *
-   * Steering rather than an event because it is an instruction to the run, and it has to reach a
-   * run whose dashboard tab was opened after it started. The run echoes what it applied back as an
+   * Steering rather than an event because it is an instruction to the agent, and it has to reach a
+   * run whose dashboard tab was opened after it started. The agent echoes what it applied back as an
    * event, which is what puts it on the meta the checkboxes read.
    */
-  | { kind: 'handoff'; push: boolean; pr: boolean }
-  /**
-   * Bind a project-less topic run to a project (#1121): the await-gate resolver appends this once
-   * it registers + binds the picked project, and the run folds `projectId` onto its meta. The
-   * worktree re-home this implies is #1122.
-   */
-  | { kind: 'bind'; projectId: string }
+  | { kind: 'handoff'; level: HandoffLevel }
   /**
    * The user's Merge action on a live session (#1391): arm the full publish ladder and record that
    * a human authorized the merge, so the merge gate (#1363) does not also demand the agent's
@@ -66,7 +58,7 @@ export async function appendControl(cwd: string, entry: ControlEntry): Promise<v
 }
 
 /**
- * Truncate the control log. A run calls this at start so a previous run's picks
+ * Truncate the control log. An agent calls this at start so a previous agent's picks
  * can never fire into this one (gate ids like `plan-approval` repeat across runs).
  */
 export async function resetControl(cwd: string): Promise<void> {
@@ -83,7 +75,7 @@ export interface ControlWatcher {
  * Tail the workspace's control log, dispatching each well-formed entry as it is
  * appended. An `fs.watch` on `.the-framework/` plus a poll backstop, mirroring the
  * daemon's event tail (`fs.watch` is unreliable across platforms). Malformed or
- * unknown lines are skipped so a bad write can never crash a run.
+ * unknown lines are skipped so a bad write can never crash an agent.
  */
 export function watchControl(
   cwd: string,
@@ -104,17 +96,10 @@ function isControlEntry(value: unknown): value is ControlEntry {
   const v = value as Record<string, unknown>
   if (v['kind'] === 'stop') return true
   if (v['kind'] === 'merge') return true
-  // Both halves must be real booleans: a half-written entry would otherwise disarm by accident,
+  // The rung must be one of the four: a half-written entry would otherwise disarm by accident,
   // and this decides whether the session's work reaches the remote at all.
-  if (v['kind'] === 'handoff') return typeof v['push'] === 'boolean' && typeof v['pr'] === 'boolean'
-  // A bind needs a non-empty projectId; it decides which project the run re-homes into (#1121).
-  if (v['kind'] === 'bind') return typeof v['projectId'] === 'string' && v['projectId'].length > 0
-  // `via` is optional (older entries have none), but a present one must be a safe transport name:
-  // it is written into a line-parsed conversation heading, and a surface names itself (#917).
-  if (v['kind'] === 'message') {
-    if (typeof v['text'] !== 'string' || v['text'].length === 0) return false
-    return v['via'] === undefined || isSafeVia(v['via'])
-  }
+  if (v['kind'] === 'handoff') return isHandoffLevel(v['level'])
+  if (v['kind'] === 'message') return typeof v['text'] === 'string' && v['text'].length > 0
   if (v['kind'] !== 'choice') return false
   if (typeof v['id'] !== 'string' || !v['id']) return false
   const pick = v['pick']

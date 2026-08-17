@@ -3,48 +3,10 @@ import { test } from 'node:test'
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { resumeSuspendedRuns, startBackgroundServices } from './daemon-services.js'
-import { writeSuspendedRuns } from './store/index.js'
+import { startBackgroundServices } from './daemon-services.js'
 import { quotaBoundaryStatus } from './quota-boundary.js'
 import type { QuotaSource, QuotaView } from './dashboard/quota.js'
-import type { StartRunOptions, StartRunResult } from './dashboard/types.js'
-
-test("resume hands the drain's pin back, so the resumed run re-emits its claim (#1268)", async () => {
-  const config = await mkdtemp(join(tmpdir(), 'framework-resume-cfg-'))
-  const project = await mkdtemp(join(tmpdir(), 'framework-resume-proj-'))
-  try {
-    // A minimal registry naming the project, in an isolated XDG config.
-    await writeFile(
-      join(config, 'the-framework.json'),
-      JSON.stringify({ projects: [{ id: 'proj-1', path: project, addedAt: '2026-07-27T00:00:00.000Z' }] }),
-    )
-    await mkdir(join(project, '.the-framework'), { recursive: true })
-    await writeSuspendedRuns(project, [
-      { runId: 'run-pinned', suspendedAt: new Date().toISOString(), sessionId: 'sess-9', queueEntry: 'entry beta: fix the readme typo' },
-      { runId: 'run-plain', suspendedAt: new Date().toISOString() },
-    ])
-
-    const starts: { prompt: string; options: StartRunOptions }[] = []
-    const startRun = async (prompt: string, options: StartRunOptions): Promise<StartRunResult> => {
-      starts.push({ prompt, options })
-      return { ok: true, runId: options.continueRunId ?? 'r' }
-    }
-    await resumeSuspendedRuns({ XDG_CONFIG_HOME: config }, startRun, () => {})
-
-    assert.equal(starts.length, 2)
-    const pinned = starts.find(s => s.options.continueRunId === 'run-pinned')!
-    // The pin travels back verbatim; startOptionFlags turns it into --queue-entry, and the
-    // resumed process re-emits the queue-entry event whether or not the meta replay kept it.
-    assert.equal(pinned.options.queueEntry, 'entry beta: fix the readme typo')
-    assert.equal(pinned.options.resumeSession, 'sess-9')
-    // A run that was never pinned stays unpinned: no invented claim.
-    const plain = starts.find(s => s.options.continueRunId === 'run-plain')!
-    assert.equal(plain.options.queueEntry, undefined)
-  } finally {
-    await rm(config, { recursive: true, force: true })
-    await rm(project, { recursive: true, force: true })
-  }
-})
+import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
 
 /**
  * The concurrent-agents setting, end to end (#1204).
@@ -55,7 +17,7 @@ test("resume hands the drain's pin back, so the resumed run re-emits its claim (
  * that a real checkout with a real `TODO_AGENTS.md` fans out to that many starts, one pinned entry
  * each. Both halves are real here — the registry is read off disk by `readPreferences`, the queue
  * off disk by `findTodoBacklog` — and only the daemon's own spawn is stubbed, because the assertion
- * is about how many runs are asked for and with what, not about the child processes.
+ * is about how many agents are asked for and with what, not about the child processes.
  */
 
 /** A reading with room to spare, so the quota gate is never the reason a start did not happen. */
@@ -103,23 +65,25 @@ async function services(preferences: Record<string, unknown>) {
     join(project, 'TODO_AGENTS.md'),
     ['# TODO_AGENTS', '', '## Priority 9', '', ...QUEUE_ENTRIES.map(entry => `- ${entry}`), ''].join('\n'),
   )
-  const starts: { prompt: string; options: StartRunOptions; projectId: string }[] = []
+  const starts: { prompt: string; options: StartAgentOptions; projectId: string }[] = []
   const started = startBackgroundServices({
     cwd: project,
     env: { XDG_CONFIG_HOME: config },
     dashboardUrl: 'http://localhost:4000',
     quota: spareQuota(),
-    startRun: async (prompt, options, projectId): Promise<StartRunResult> => {
+    startAgent: async (prompt, options, projectId): Promise<StartAgentResult> => {
       starts.push({ prompt, options, projectId })
-      return { ok: true, runId: `run-${starts.length}` }
+      return { ok: true, agentId: `run-${starts.length}` }
     },
-    // What the daemon's own counter reports: the runs this sweep has asked for are live, so the
+    // What the daemon's own counter reports: the agents this sweep has asked for are live, so the
     // cap is measured against them rather than against a constant zero.
-    activeRunCount: () => starts.length,
+    activeAgentCount: () => starts.length,
+    busyAgentIds: () => new Set<string>(),
     log: () => {},
   })
   const stop = async () => {
-    started.quiesce()
+    // Awaited: the sweep in flight is what the cleanup below would otherwise delete out from under.
+    await started.quiesce()
     await rm(config, { recursive: true, force: true })
     await rm(project, { recursive: true, force: true })
   }
@@ -140,23 +104,20 @@ test('the concurrency setting on disk is the number of agents the routine spins 
     // the setting already on actually takes.
     await settle(() => starts.length >= 4)
     assert.equal(starts.length, 4, 'the batch is the setting, not the default and not the queue length')
-    // One pinned entry each, in queue order, and each prompt names its own entry: this is what
-    // makes four agents do disjoint work rather than four copies of the first entry.
-    assert.deepEqual(
-      starts.map(s => s.options.queueEntry),
-      QUEUE_ENTRIES.slice(0, 4),
-    )
-    for (const start of starts) {
+    // One entry each, in queue order: this is what makes four agents do disjoint work rather than
+    // four copies of the first entry. The prompt is where the pin lives (E2) — it used to also
+    // ride the agent's meta, so a third claim mechanism could be re-derived from it later.
+    for (const [index, start] of starts.entries()) {
       assert.match(start.prompt, /work on this one open entry only/)
-      assert.ok(start.prompt.includes(start.options.queueEntry!), 'the prompt pins the entry the claim names')
+      assert.ok(start.prompt.includes(QUEUE_ENTRIES[index]!), `the prompt pins ${QUEUE_ENTRIES[index]}`)
       // Nobody is at the keyboard, so a gate must auto-answer rather than park (#846/#1279).
       assert.equal(start.options.unattended, true)
-      // The drain job lands its own PRs (#1216): the flag rides the start so it reaches the run
-      // as --auto-merge.
-      assert.equal(start.options.autoMerge, true)
-      // A drain implements its ticket, so its PR title may close the issue — planRun is only
+      // The drain job lands its own PRs (#1216): the job's flag rides the start as the ladder's
+      // top rung, so it reaches the agent already meaning "push, open, merge".
+      assert.equal(start.options.handoff, 'merge')
+      // A drain implements its ticket, so its PR title may close the issue — planAgent is only
       // for the fanned-out planners (#1327), whose merge must not.
-      assert.equal(start.options.planRun, undefined)
+      assert.equal(start.options.planAgent, undefined)
       assert.equal(start.projectId, 'proj-1')
     }
     // The ticket the entry links to rides along, so the four agents land in four lanes (#1117).
@@ -180,14 +141,13 @@ test("the drain row's Run now fans out to the setting with auto-run off (#1204/#
     await settle(() => starts.length > 0, 300)
     assert.equal(starts.length, 0, 'auto-run off means the schedule starts nothing by itself')
     // Exactly what the card's Run now sends for the draining routine, through the same
-    // `wakeAutoPm` seam the Telefunc endpoint calls.
+    // `wakeAutoPm` seam the RPC calls.
     running.wakeAutoPm({ onDemand: true, drainOnly: true })
     await settle(() => starts.length >= 3)
     assert.equal(starts.length, 3, 'the click spins the setting up, not one agent')
-    assert.deepEqual(
-      starts.map(s => s.options.queueEntry),
-      QUEUE_ENTRIES.slice(0, 3),
-    )
+    for (const [index, start] of starts.entries()) {
+      assert.ok(start.prompt.includes(QUEUE_ENTRIES[index]!), `the prompt pins ${QUEUE_ENTRIES[index]}`)
+    }
   } finally {
     await stop()
   }

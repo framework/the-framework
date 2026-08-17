@@ -3,11 +3,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 
 /**
  * The browser bridge (#1237): the one endpoint an extension running in the user's own Claude
- * session posts to, so a question a cloud run is parked on becomes visible in the dashboard.
+ * session posts to, so a question a cloud agent is parked on becomes visible in the dashboard.
  *
  * **Why this route carries its own token, unlike every other one.** The #1051 guard in
  * `startDashboard` only exists on a non-loopback bind, and what protects a loopback daemon is
- * the same-origin check on `/_telefunc`: a page on another origin is refused outright. This
+ * the same-origin check on `/_rpc`: a page on another origin is refused outright. This
  * route is the first that is *meant* to be reached from another origin, so neither of those
  * protects it, and it demands `Authorization: Bearer <daemonToken>` unconditionally instead.
  *
@@ -25,7 +25,7 @@ export const BRIDGE_PREFIX = '/_bridge'
 
 /** A question a cloud session is parked on, as reported by the bridge. */
 export interface BridgeQuestion {
-  /** The cloud session that asked, which joins back to a run through `RunMeta.sessionId`. */
+  /** The cloud session that asked, which joins back to an agent through `AgentMeta.sessionId`. */
   sessionId: string
   title: string
   options: { label: string; detail?: string }[]
@@ -75,7 +75,7 @@ export interface BridgeHandlers {
   /** What the injected page script reports about itself. */
   hello?: (hello: BridgeHello) => void
   /**
-   * The cloud sessions worth watching, newest first. The extension cannot know a run started:
+   * The cloud sessions worth watching, newest first. The extension cannot know an agent started:
    * it only sees pages the user is already on, so without this the bridge works only when
    * somebody happens to be looking at claude.ai. This is how a tab gets opened for them.
    */
@@ -113,7 +113,7 @@ export async function handleBridgeRequest(
     return end(res, 200, 'ok')
   }
   if (pathname === `${BRIDGE_PREFIX}/question`) return handleQuestion(req, res, handlers)
-  if (pathname === `${BRIDGE_PREFIX}/sessions`) return handleSessions(req, res, handlers)
+  if (pathname === `${BRIDGE_PREFIX}/sessions`) return handleAgents(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/events`) return handleEvents(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/hello`) return handleHello(req, res, handlers)
   if (pathname === `${BRIDGE_PREFIX}/answer`) return handleAnswer(req, res, handlers)
@@ -293,7 +293,7 @@ async function handleAnswered(req: IncomingMessage, res: ServerResponse, handler
  * Answers an empty list rather than a 404 when the daemon wired no lister, so an extension
  * polling an older daemon degrades to doing nothing instead of reporting a fault.
  */
-async function handleSessions(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
+async function handleAgents(req: IncomingMessage, res: ServerResponse, handlers: BridgeHandlers): Promise<void> {
   if (req.method !== 'GET') return end(res, 405, 'method not allowed', { allow: 'GET' })
   const sessions = handlers.sessions ? await handlers.sessions().catch(() => []) : []
   res.writeHead(200, { 'content-type': 'application/json' })

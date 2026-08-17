@@ -7,12 +7,12 @@ import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 
 /**
- * The run's browser (#793, first slice of #609).
+ * The agent's browser (#793, first slice of #609).
  *
  * `--browser` (#452) used to let chrome-devtools-mcp launch its own Chrome. That is fine
  * while the agent is the only client, but #609 wants a human watching the same page over a
  * screencast, and a second client cannot attach to a browser whose port we never opened. So
- * the run launches Chrome itself with `--remote-debugging-port` and hands the MCP server a
+ * the agent launches Chrome itself with `--remote-debugging-port` and hands the MCP server a
  * `--browserUrl`. Chrome takes both CDP clients at once, which is what makes the preview and
  * the step-in relay possible at all.
  */
@@ -83,7 +83,7 @@ export function resolveChromePath(
 
 /**
  * The launch flags. Headless by default — the agent has no screen, and a screencast reads a
- * headless page fine. The profile is throwaway so a run never inherits (or dirties) the
+ * headless page fine. The profile is throwaway so an agent never inherits (or dirties) the
  * user's real Chrome session.
  */
 export function chromeLaunchArgs(port: number, userDataDir: string, headless = true): string[] {
@@ -134,9 +134,9 @@ export async function waitForDebugEndpoint(
 }
 
 /**
- * Launch the run's Chrome, or return undefined when this machine has none — in which case the
+ * Launch the agent's Chrome, or return undefined when this machine has none — in which case the
  * caller leaves `--browser` exactly as it was (chrome-devtools-mcp launches its own). A
- * missing browser should cost the run its preview, never its browser tools.
+ * missing browser should cost the agent its preview, never its browser tools.
  */
 export async function launchSharedBrowser(
   opts: { chromePath?: string | undefined; headless?: boolean; timeoutMs?: number } = {},
@@ -164,9 +164,9 @@ export async function launchSharedBrowser(
     await rm(userDataDir, { recursive: true, force: true }).catch(() => {})
   }
 
-  // A Chrome that dies on its own must not leave the run pointing at a dead port. `error`
+  // A Chrome that dies on its own must not leave the agent pointing at a dead port. `error`
   // needs its own handler or a failed spawn (bad path, no exec bit) throws unhandled and
-  // takes the run with it — a missing browser must only cost the preview.
+  // takes the agent with it — a missing browser must only cost the preview.
   child.on('exit', () => void close())
   child.on('error', () => void close())
 
@@ -190,8 +190,8 @@ export const BROWSER_MCP_SERVERS: Record<string, McpServerSpec> = {
 }
 
 /**
- * The same server, pointed at a Chrome the run already launched (#793). `--browserUrl` makes
- * it attach instead of launching, which is what lets a second client (the #609 screencast)
+ * The same server, pointed at a Chrome the agent already launched (#793). `--browserUrl` makes
+ * it attach instead of launching, which is what lets a second client (the screencast (#609))
  * watch the very page the agent is on. Without a URL this is the old spec unchanged.
  */
 export function browserMcpServers(browserUrl?: string | undefined): Record<string, McpServerSpec> {

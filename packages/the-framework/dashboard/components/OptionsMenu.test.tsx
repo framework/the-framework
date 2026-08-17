@@ -1,0 +1,256 @@
+import { afterEach, describe, expect, test, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import type { OptionRow, ConnectionControl, AgentTarget } from './OptionsMenu.js'
+import type { ConnectionProfile } from '../lib/profiles.js'
+import { hoverTooltip } from '../test-utils.js'
+
+const updatePreferences = vi.hoisted(() => vi.fn())
+vi.mock('../lib/preferences.js', () => ({ updatePreferences }))
+
+const { OptionsMenu } = await import('./OptionsMenu.js')
+
+afterEach(() => {
+  cleanup()
+  updatePreferences.mockReset()
+})
+
+const mainOptions = (): OptionRow[] => [
+  { key: 'browser', patch: checked => ({ browser: checked }), label: 'Browser', title: 't', checked: false },
+  { key: 'transparent', patch: checked => ({ transparent: checked }), label: 'Transparent', title: 't', checked: true },
+]
+
+function open() {
+  fireEvent.click(screen.getByRole('button', { name: /session options/i }))
+}
+
+describe('OptionsMenu (#654)', () => {
+  test('the trigger marks that options are on with a dot (#1046)', async () => {
+    render(<OptionsMenu options={mainOptions()} busy={false} />)
+    const trigger = screen.getByRole('button', { name: /session options/i })
+    // A presence dot now, not a number: the count is what the tooltip says, the dot in the corner.
+    expect((await hoverTooltip(trigger)).textContent).toMatch(/\bon$/)
+    expect(trigger.querySelector('span.rounded-full')).not.toBeNull()
+    expect(trigger.textContent).not.toContain('1') // no number in the badge anymore
+  })
+
+  test('toggling an item writes the new value through', () => {
+    render(<OptionsMenu options={mainOptions()} busy={false} />)
+    open()
+    fireEvent.click(screen.getByText('Browser'))
+    expect(updatePreferences).toHaveBeenCalledWith({ browser: true })
+  })
+
+  test('a disabled row is greyed out and says why, and cannot be toggled', () => {
+    const options: OptionRow[] = [
+      { key: 'browser', patch: checked => ({ browser: checked }), label: 'Browser', title: 't', description: 'Gives the agent a real browser.', checked: false, disabled: true, disabledReason: 'only on Claude Code' },
+    ]
+    render(<OptionsMenu options={options} busy={false} />)
+    open()
+    expect(screen.getByText(/only on Claude Code/)).toBeTruthy()
+    fireEvent.click(screen.getByText('Browser'))
+    expect(updatePreferences).not.toHaveBeenCalled()
+  })
+
+  test('the Run on submenu picks a target and calls back (#1050)', () => {
+    const onChange = vi.fn()
+    render(
+      <OptionsMenu
+        options={mainOptions()}
+        busy={false}
+        agentTarget={{ value: 'local', onChange }}
+      />,
+    )
+    open()
+    fireEvent.click(screen.getByText('Run on'))
+    fireEvent.click(screen.getByText('GitHub Actions'))
+    expect(onChange).toHaveBeenCalledWith('actions')
+  })
+
+  test('the Run on submenu is absent when no target control is passed (in-session) (#1050)', () => {
+    render(<OptionsMenu options={[]} busy={false} />)
+    open()
+    expect(screen.queryByText('Run on')).toBeNull()
+  })
+
+  const profiles = (): ConnectionProfile[] => [
+    { id: 'http://192.168.1.5:4200', label: 'Studio', url: 'http://192.168.1.5:4200', token: 'aaa' },
+  ]
+  const connectionControl = (over: Partial<ConnectionControl> = {}): ConnectionControl => ({
+    profiles: profiles(),
+    currentUrl: 'http://127.0.0.1:4200',
+    isLocal: true,
+    selectedDeviceId: null,
+    onSelect: vi.fn(),
+    onSelectDriver: vi.fn(),
+    onConnectLocal: vi.fn(),
+    onAddDevice: vi.fn(),
+    onRemove: vi.fn(),
+    status: {},
+    ...over,
+  })
+
+  // Rows are matched by tokens that never appear in the sub-trigger summary (unique descriptions,
+  // or the device url), so the summary echoing a driver/device label can't make a query ambiguous.
+  const THIS_MACHINE = 'Run on this machine, as today.'
+  const ACTIONS = 'Run on a fresh GitHub Actions runner.'
+  const CLAUDE_WEB = 'Hand off to a Claude Code cloud session, which opens its own PR.'
+  const STUDIO_URL = 'http://192.168.1.5:4200'
+  const rowOf = (token: string): HTMLElement => screen.getByText(token).closest('[role="menuitem"]') as HTMLElement
+  const isChecked = (token: string): boolean => !!rowOf(token).querySelector('svg')?.classList.contains('opacity-100')
+
+  function openAgentOn(connection: ConnectionControl, value: AgentTarget = 'local') {
+    render(
+      <OptionsMenu options={[]} busy={false} agentTarget={{ value, onChange: vi.fn() }} connection={connection} />,
+    )
+    open()
+    fireEvent.click(screen.getByText('Run on'))
+  }
+
+  test('Run on is one flat list, no "A device I have" header and no separate "Local" row (#1066)', () => {
+    openAgentOn(connectionControl())
+    // The old two-axis framing is gone: no section header, no redundant "Local" duplicating this machine.
+    expect(screen.queryByText('A device I have')).toBeNull()
+    expect(screen.queryByText('Local')).toBeNull()
+    // The whole list renders as one: the three driver rows, the device, and Add.
+    expect(screen.getByText(THIS_MACHINE)).toBeTruthy()
+    expect(screen.getByText(ACTIONS)).toBeTruthy()
+    expect(screen.getByText('Claude web')).toBeTruthy()
+    expect(screen.getByText(STUDIO_URL)).toBeTruthy()
+    expect(screen.getByText('Add a device…')).toBeTruthy()
+  })
+
+  test('Claude web is a real target now, not a disabled placeholder (#610)', () => {
+    openAgentOn(connectionControl())
+    expect(rowOf(CLAUDE_WEB).hasAttribute('data-disabled')).toBe(false)
+  })
+
+  test('picking Claude web selects it as the run target (#610)', () => {
+    const onChange = vi.fn()
+    const connection = connectionControl()
+    render(
+      <OptionsMenu options={[]} busy={false} agentTarget={{ value: 'local', onChange }} connection={connection} />,
+    )
+    open()
+    fireEvent.click(screen.getByText('Run on'))
+    fireEvent.click(screen.getByText('Claude web'))
+    expect(onChange).toHaveBeenCalledWith('web')
+    // Picking a driver row clears any selected device, so the one checkmark never doubles up.
+    expect(connection.onSelectDriver).toHaveBeenCalled()
+  })
+
+  test('the checkmark tracks Claude web when it is the target (#610)', () => {
+    openAgentOn(connectionControl({ isLocal: true, selectedDeviceId: null }), 'web')
+    // Keyed off the row's description: with `web` selected the label also appears as the
+    // submenu's summary, so the label alone is no longer unique.
+    expect(isChecked(CLAUDE_WEB)).toBe(true)
+    expect(isChecked(THIS_MACHINE)).toBe(false)
+  })
+
+  test('on the local daemon with no device picked, the checkmark tracks the driver target (#1066)', () => {
+    openAgentOn(connectionControl({ isLocal: true, selectedDeviceId: null }), 'actions')
+    expect(isChecked(ACTIONS)).toBe(true) // the selected driver target
+    expect(isChecked(THIS_MACHINE)).toBe(false)
+    expect(isChecked(STUDIO_URL)).toBe(false) // no device is the target
+  })
+
+  test('selecting a device puts the checkmark on it and quiets the driver rows (#1067)', () => {
+    // On the local daemon, a selected device is the agent target in place, with no navigation involved.
+    openAgentOn(connectionControl({ isLocal: true, selectedDeviceId: STUDIO_URL }), 'actions')
+    expect(isChecked(STUDIO_URL)).toBe(true)
+    expect(isChecked(THIS_MACHINE)).toBe(false)
+    expect(isChecked(ACTIONS)).toBe(false) // the driver target no longer carries the mark
+  })
+
+  test('connected to a device the checkmark is on that device, driver rows quiet (#1066)', () => {
+    openAgentOn(connectionControl({ isLocal: false, currentUrl: STUDIO_URL }), 'local')
+    expect(isChecked(STUDIO_URL)).toBe(true)
+    expect(isChecked(THIS_MACHINE)).toBe(false)
+    expect(isChecked(ACTIONS)).toBe(false)
+  })
+
+  test('clicking a device selects it as the run target (no navigation, no preference) (#1067)', () => {
+    const onSelect = vi.fn()
+    openAgentOn(connectionControl({ onSelect }))
+    fireEvent.click(rowOf(STUDIO_URL))
+    expect(onSelect).toHaveBeenCalledWith(profiles()[0])
+    // A device row is a run-target selection now, not a driver preference or a navigation.
+    expect(updatePreferences).not.toHaveBeenCalled()
+  })
+
+  test('clicking "This machine" while on a remote device goes home, not a driver write (#1066)', () => {
+    const onConnectLocal = vi.fn()
+    const onChange = vi.fn()
+    render(
+      <OptionsMenu
+        options={[]}
+        busy={false}
+        agentTarget={{ value: 'local', onChange }}
+        connection={connectionControl({ isLocal: false, currentUrl: STUDIO_URL, onConnectLocal })}
+      />,
+    )
+    open()
+    fireEvent.click(screen.getByText('Run on'))
+    fireEvent.click(rowOf(THIS_MACHINE))
+    expect(onConnectLocal).toHaveBeenCalled()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  test('clicking "This machine" on the local daemon writes the driver target and clears any device (#1066/#1067)', () => {
+    const onConnectLocal = vi.fn()
+    const onSelectDriver = vi.fn()
+    const onChange = vi.fn()
+    render(
+      <OptionsMenu
+        options={[]}
+        busy={false}
+        agentTarget={{ value: 'actions', onChange }}
+        connection={connectionControl({ isLocal: true, selectedDeviceId: STUDIO_URL, onConnectLocal, onSelectDriver })}
+      />,
+    )
+    open()
+    fireEvent.click(screen.getByText('Run on'))
+    fireEvent.click(rowOf(THIS_MACHINE))
+    expect(onChange).toHaveBeenCalledWith('local')
+    expect(onSelectDriver).toHaveBeenCalled() // a driver row clears the device selection (#1067)
+    expect(onConnectLocal).not.toHaveBeenCalled()
+  })
+
+  test('Add a device opens the add flow (#1066)', () => {
+    const onAddDevice = vi.fn()
+    openAgentOn(connectionControl({ onAddDevice }))
+    fireEvent.click(screen.getByText('Add a device…'))
+    expect(onAddDevice).toHaveBeenCalled()
+  })
+
+  test('the X removes a device without selecting it (#1072)', () => {
+    const onRemove = vi.fn()
+    const onSelect = vi.fn()
+    openAgentOn(connectionControl({ onRemove, onSelect }))
+    fireEvent.click(screen.getByRole('button', { name: /remove device Studio/i }))
+    expect(onRemove).toHaveBeenCalledWith(profiles()[0])
+    expect(onSelect).not.toHaveBeenCalled() // the row's own click stays out of it
+  })
+
+  test('an offline device row is marked offline (#1072)', () => {
+    openAgentOn(connectionControl({ status: { [STUDIO_URL]: 'offline' } }))
+    // The url carries an "offline" note and the row is muted, so an unreachable device reads as such.
+    const offlineText = screen.getByText(/offline/i)
+    expect(offlineText).toBeTruthy()
+    expect((offlineText.closest('[role="menuitem"]') as HTMLElement).className).toMatch(/opacity-60/)
+  })
+
+  test('an online device row renders a status dot and is not marked offline (#1072)', () => {
+    openAgentOn(connectionControl({ status: { [STUDIO_URL]: 'online' } }))
+    const row = rowOf(STUDIO_URL)
+    expect(row.querySelector('span.rounded-full')).not.toBeNull() // the dot renders per device
+    expect(row.className).not.toMatch(/opacity-60/)
+  })
+
+  test('the device rows are absent without a connection control (#1066)', () => {
+    render(<OptionsMenu options={[]} busy={false} agentTarget={{ value: 'local', onChange: vi.fn() }} />)
+    open()
+    fireEvent.click(screen.getByText('Run on'))
+    expect(screen.queryByText(STUDIO_URL)).toBeNull()
+    expect(screen.queryByText('Add a device…')).toBeNull()
+  })
+})

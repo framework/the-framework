@@ -6,7 +6,7 @@ import { cutToPreview, readConfinedFile, safeRepoPath } from './file-read.js'
 // Re-exported so this stays the import site it has been.
 export { safeRepoPath }
 
-// One changed file's diff for the tree's hover card (#816) and the run view's Changes section
+// One changed file's diff for the tree's hover card (#816) and the agent view's Changes section
 // (#817). The tree already says a file is M/U/D; this says what actually changed, without
 // leaving the dashboard for `git diff`. Read against whatever checkout the caller resolved, so
 // a session's hover shows its worktree and not the project root (#815).

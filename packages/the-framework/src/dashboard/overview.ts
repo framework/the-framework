@@ -1,4 +1,4 @@
-import { readAllRuns, readLiveMetas, type LiveRun, type RunMeta, type RunStatus } from '../store/index.js'
+import { readAllAgents, readLiveMetas, type LiveAgent, type AgentMeta, type AgentStatus } from '../store/index.js'
 import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
 import { readTickets, type WorkspaceTicket } from './tickets.js'
@@ -6,23 +6,23 @@ import { TICKETS_DIR } from '../tickets.js'
 
 // The first-sidebar Overview (#437, part of #314): a cross-project glance at what the agent
 // is working on right now, the size of the backlog, and the recently active projects. It
-// rolls up three existing file projections across the whole registry — the live run meta
-// (`.the-framework/run.json`, kept current per event), the TODO queue (queue.ts), and each
+// rolls up three existing file projections across the whole registry — the live agent meta
+// (`.the-framework/agent.json`, kept current per event), the TODO queue (queue.ts), and each
 // project's last activity (ProjectSummary.lastActivityAt from LOGS.md).
 
 /** One project's in-flight run, surfaced in the Overview's "working now" list. */
-export interface ActiveRun {
+export interface ActiveAgent {
   projectId: string
   projectName: string
   /** Which run this is (#738): a project can have several in flight, one per worktree. */
-  runId: string
-  /** The run's own checkout, so its git/file status is read from the worktree it edits (#738). */
+  agentId: string
+  /** The agent's own checkout, so its git/file status is read from the worktree it edits (#738). */
   cwd: string
-  status: RunStatus
-  /** What the user asked to build (the run's `scope` event). */
+  status: AgentStatus
+  /** What the user asked to build (the agent's `scope` event). */
   intent?: string
   scope?: string
-  /** ISO timestamp of the run's last event. */
+  /** ISO timestamp of the agent's last event. */
   updatedAt?: string
   /** The session name the agent chose (#326), when it set one. */
   sessionName?: string
@@ -39,8 +39,8 @@ export interface RecentProject {
 
 /** The cross-project Overview payload. */
 export interface Overview {
-  /** Projects with a running run, most-recently-updated first. */
-  active: ActiveRun[]
+  /** Projects with a running agent, most-recently-updated first. */
+  active: ActiveAgent[]
   /** Total open TODO items across every project. */
   queueOpen: number
   /** The most recently active projects (capped). */
@@ -48,10 +48,10 @@ export interface Overview {
 }
 
 /** One recent session, tagged with the project it belongs to, for the cross-project rail. */
-export interface RecentRun {
+export interface RecentAgent {
   projectId: string
   projectName: string
-  run: RunMeta
+  agent: AgentMeta
 }
 
 /** How many recent projects the Overview surfaces. */
@@ -60,26 +60,26 @@ const RECENT_LIMIT = 5
 /** How many recent sessions the home rail pools across every project. */
 const RECENT_RUNS_LIMIT = 30
 
-/** Injectable reader so {@link buildRecentRuns} is unit-testable off disk. */
-export interface RecentRunsDeps {
-  runs?: (cwd: string) => Promise<RunMeta[]>
+/** Injectable reader so {@link buildRecentAgents} is unit-testable off disk. */
+export interface RecentAgentsDeps {
+  agents?: (cwd: string) => Promise<AgentMeta[]>
 }
 
 /**
  * Every project's sessions pooled and sorted newest-first (capped), so the shared sidebar (#shared-
  * shell) can show recents on the home/Overview where no single project is selected. Each row carries
  * the project it belongs to, so selecting it jumps into that project's session. Forgiving — a project
- * whose runs cannot be read simply contributes nothing.
+ * whose agents cannot be read simply contributes nothing.
  */
-export async function buildRecentRuns(projects: ProjectSummary[], deps: RecentRunsDeps = {}): Promise<RecentRun[]> {
-  const readRuns = deps.runs ?? readAllRuns
-  const all: RecentRun[] = []
+export async function buildRecentAgents(projects: ProjectSummary[], deps: RecentAgentsDeps = {}): Promise<RecentAgent[]> {
+  const readAgents = deps.agents ?? readAllAgents
+  const all: RecentAgent[] = []
   for (const project of projects) {
-    for (const run of await readRuns(project.path).catch(() => [])) {
-      all.push({ projectId: project.id, projectName: project.name, run })
+    for (const agent of await readAgents(project.path).catch(() => [])) {
+      all.push({ projectId: project.id, projectName: project.name, agent })
     }
   }
-  all.sort((a, b) => (b.run.startedAt ?? '').localeCompare(a.run.startedAt ?? ''))
+  all.sort((a, b) => (b.agent.startedAt ?? '').localeCompare(a.agent.startedAt ?? ''))
   return all.slice(0, RECENT_RUNS_LIMIT)
 }
 
@@ -124,13 +124,13 @@ export interface HotTicket {
   bucket: HotBucket
   ticket: WorkspaceTicket
   /**
-   * A run is implementing this ticket right now (#1117): its id, for the card to link into.
+   * An agent is implementing this ticket right now (#1117): its id, for the card to link into.
    *
    * The difference between "someone planned this at some point" and "this is being coded as you
-   * look at it", which the plan/spike proxy could not tell apart. Only set for a ticket a live run
-   * actually recorded (`RunMeta.ticket`), so absent still means the lane was inferred.
+   * look at it", which the plan/spike proxy could not tell apart. Only set for a ticket a live agent
+   * actually recorded (`AgentMeta.ticket`), so absent still means the lane was inferred.
    */
-  runId?: string
+  agentId?: string
 }
 
 /** Where the ticket format's 10-0 scale starts reading as high. */
@@ -150,7 +150,7 @@ function isHighPriority(priority: string): boolean {
 
 /**
  * A ticket's lane (#1139), or null when it is in none of the three the card shows:
- * - in-progress: a run is implementing it right now (#1117), or failing that the agent has
+ * - in-progress: an agent is implementing it right now (#1117), or failing that the agent has
  *   planned it, so work is under way in the older, inferred sense.
  * - ai-queue: it sits in the AI Queue — an open `TODO_AGENTS.md` entry links to it — so the
  *   framework will pick it up on its own.
@@ -159,7 +159,7 @@ function isHighPriority(priority: string): boolean {
  * Precedence follows that order: work already under way outranks a queued ticket, which outranks a
  * bare priority flag. Everything else is dropped — the card is a shortlist, not the whole backlog.
  *
- * `implementing` is the only hard evidence and exists for a drain run only, so the plan proxy
+ * `implementing` is the only hard evidence and exists for a drain agent only, so the plan proxy
  * still carries every ticket someone is working by hand.
  */
 export function ticketBucket(
@@ -194,8 +194,8 @@ const HOT_TICKETS_LIMIT = 60
 /** Injectable readers so {@link buildHotTickets} is unit-testable off disk. */
 export interface HotTicketsDeps {
   tickets?: (cwd: string) => Promise<WorkspaceTicket[]>
-  /** The project's live runs, read for the ticket each one recorded (#1117). */
-  liveRuns?: (cwd: string) => Promise<LiveRun[]>
+  /** The project's live agents, read for the ticket each one recorded (#1117). */
+  liveAgents?: (cwd: string) => Promise<LiveAgent[]>
   /** The cross-project TODO queue, for the AI-Queue lane (#1139). Defaults to {@link collectQueue}. */
   queue?: (projects: ProjectSummary[]) => Promise<ProjectQueue[]>
 }
@@ -209,7 +209,7 @@ export interface HotTicketsDeps {
  */
 export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicketsDeps = {}): Promise<HotTicket[]> {
   const readT = deps.tickets ?? readTickets
-  const readRuns = deps.liveRuns ?? readLiveMetas
+  const readAgents = deps.liveAgents ?? readLiveMetas
   // The AI Queue: which tickets an open TODO_AGENTS.md entry links to, per project (#1139).
   const queues = await (deps.queue ?? (p => collectQueue(p)))(projects)
   const queuedByProject = new Map<string, Set<string>>()
@@ -224,17 +224,17 @@ export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicke
   }
   const all: HotTicket[] = []
   for (const project of projects) {
-    // Which of this project's tickets are being implemented right now, by run id (#1117). Built
+    // Which of this project's tickets are being implemented right now, by agent id (#1117). Built
     // per project because a ticket path is only unique within its own repo.
     const implementing = new Map<string, string>()
-    for (const meta of await readRuns(project.path).catch(() => [])) {
+    for (const meta of await readAgents(project.path).catch(() => [])) {
       if (meta.status !== 'running' || !meta.ticket) continue
       implementing.set(meta.ticket, meta.id)
     }
     const queued = queuedByProject.get(project.id) ?? new Set<string>()
     for (const ticket of await readT(project.path).catch(() => [])) {
-      const runId = implementing.get(`${TICKETS_DIR}/${ticket.file}`)
-      const bucket = ticketBucket(ticket, { implementing: runId !== undefined, queued: queued.has(ticket.file) })
+      const agentId = implementing.get(`${TICKETS_DIR}/${ticket.file}`)
+      const bucket = ticketBucket(ticket, { implementing: agentId !== undefined, queued: queued.has(ticket.file) })
       // A ticket in none of the three shown lanes is left off the card entirely.
       if (!bucket) continue
       all.push({
@@ -242,7 +242,7 @@ export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicke
         projectName: project.name,
         bucket,
         ticket,
-        ...(runId ? { runId } : {}),
+        ...(agentId ? { agentId } : {}),
       })
     }
   }
@@ -253,33 +253,32 @@ export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicke
 
 /** Injectable readers so {@link buildOverview} is unit-testable off disk. */
 export interface OverviewDeps {
-  liveRuns?: (cwd: string) => Promise<LiveRun[]>
+  liveAgents?: (cwd: string) => Promise<LiveAgent[]>
   queue?: (projects: ProjectSummary[]) => Promise<ProjectQueue[]>
 }
 
 /**
- * Build the cross-project Overview: the running runs (every live run of each project, one per
+ * Build the cross-project Overview: the running agents (every live agent of each project, one per
  * worktree since #736), the total open TODO count (from {@link collectQueue}), and the most
  * recently active projects (by {@link ProjectSummary.lastActivityAt}). Forgiving — a project
  * with no live run, or none running, simply contributes nothing to `active`.
  */
 export async function buildOverview(projects: ProjectSummary[], deps: OverviewDeps = {}): Promise<Overview> {
-  const liveRuns = deps.liveRuns ?? readLiveMetas
+  const liveAgents = deps.liveAgents ?? readLiveMetas
   const queue = deps.queue ?? (p => collectQueue(p))
 
-  const active: ActiveRun[] = []
+  const active: ActiveAgent[] = []
   for (const project of projects) {
-    // Every live run of the project (#738), not just the one that used to sit at its path.
-    for (const meta of await liveRuns(project.path).catch(() => [])) {
+    // Every live agent of the project (#738), not just the one that used to sit at its path.
+    for (const meta of await liveAgents(project.path).catch(() => [])) {
       if (meta.status !== 'running') continue
       active.push({
         projectId: project.id,
         projectName: project.name,
-        runId: meta.id,
+        agentId: meta.id,
         cwd: meta.cwd,
         status: meta.status,
         ...(meta.intent ? { intent: meta.intent } : {}),
-        ...(meta.scope ? { scope: meta.scope } : {}),
         ...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {}),
         ...(meta.sessionName ? { sessionName: meta.sessionName } : {}),
         ...(meta.readyForMerge ? { readyForMerge: true } : {}),

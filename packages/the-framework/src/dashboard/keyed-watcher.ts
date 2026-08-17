@@ -47,15 +47,14 @@ export interface KeyedWatcherOptions<T> {
   keyOf: (item: T) => string
   /** Called with the genuinely-new items each poll (empty polls are skipped). */
   onNew: (items: T[]) => void | Promise<void>
-  /** Poll cadence, ms. Default 60s: the watched things change slowly and a poll costs a read per project. */
-  intervalMs?: number
 }
 
 /**
- * Start polling a projection and hand each poll's new items to `onNew`. The first poll only
- * seeds the baseline. Forgiving — a failed project scan or projection just yields no new items
- * that cycle. Runs immediately, then every `intervalMs`; the timer is unref'd so it never keeps
- * the daemon alive past shutdown.
+ * Watch a projection and hand each poll's new items to `onNew`. The first poll only seeds the
+ * baseline. Forgiving — a failed project scan or projection just yields no new items that cycle.
+ *
+ * Owns no timer (E4): the daemon's one clock calls {@link KeyedWatcher.poll}, so the cadence is
+ * declared where every other background job's is.
  */
 export function startKeyedWatcher<T>(opts: KeyedWatcherOptions<T>): KeyedWatcher {
   const tracker = new SeenTracker(opts.keyOf)
@@ -75,13 +74,9 @@ export function startKeyedWatcher<T>(opts: KeyedWatcherOptions<T>): KeyedWatcher
     }
   }
 
-  void poll()
-  const timer = setInterval(() => void poll(), opts.intervalMs ?? 60_000)
-  timer.unref?.()
   return {
     stop: () => {
       stopped = true
-      clearInterval(timer)
     },
     poll,
   }

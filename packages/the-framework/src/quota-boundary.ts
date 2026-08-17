@@ -191,7 +191,7 @@ function windowModel(label: string): string | undefined {
  *
  * `undefined` when there is no reading, or when the week's reset cannot be
  * placed. That is "we do not know", and each caller decides what to do with it:
- * the per-run guard carries on, unattended work stands down.
+ * the per-agent guard carries on, unattended work stands down.
  */
 export function quotaBoundaryStatus(input: {
   windows: DriverQuotaWindow[]
@@ -200,7 +200,7 @@ export function quotaBoundaryStatus(input: {
   model?: string
   /**
    * How far the automatic-consumption limit sits from the boundary, in percentage points (#960).
-   * Omitted or `0` is the #879 policy: the limit *is* the boundary.
+   * Omitted or `0` is the spend-boundary policy (#879): the limit *is* the boundary.
    */
   limitOffset?: number
 }): QuotaBoundaryStatus | undefined {

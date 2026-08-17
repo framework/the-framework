@@ -113,12 +113,12 @@ export function editorCommand(path: string, editor = process.env.FRAMEWORK_EDITO
 export async function openInApp(
   cwd: string,
   target: OpenTarget,
-  run: SpawnRunner = nodeSpawnRunner(),
+  agent: SpawnRunner = nodeSpawnRunner(),
   editor?: string,
 ): Promise<OpenResult> {
   const { command, args } = target === 'editor' ? editorCommand(cwd, editor) : fileManagerCommand(cwd)
   try {
-    await run(command, args)
+    await agent(command, args)
     return { ok: true }
   } catch (err) {
     if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {

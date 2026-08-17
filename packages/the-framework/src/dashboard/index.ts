@@ -1,38 +1,37 @@
 export { startDashboard, type Dashboard, type DashboardOptions } from './server.js'
-export type { StartRunKind, StartRunOptions, StartRunResult, AddProjectResult, OnboardingSuggestion, AgentReady, PreviewResult, PreviewStatus, RunWorktree } from './types.js'
+export type { StartAgentKind, StartAgentOptions, StartAgentResult, AddProjectResult, OnboardingSuggestion, DriverReady, PreviewResult, PreviewStatus, AgentWorktree } from './types.js'
 export {
   summarizeProject,
   defaultProjectsProvider,
-  singleProjectProvider,
-  emptyProjectsProvider,
   type ProjectSummary,
   type ProjectsProvider,
   type SummarizeDeps,
 } from './projects.js'
 export { resolveDashboardBundle } from './bundle.js'
-export { makeTelefuncMount, isSameOriginRequest, isExpectedHost, type EventsSource } from './telefunc-serve.js'
+export { makeRpcMount, RPC_PREFIX, isSameOriginRequest, isExpectedHost, type EventsSource } from './rpc-serve.js'
 export { serveClientBundle } from './static.js'
 export { readDocs, DOC_CATEGORIES, type WorkspaceDoc } from './docs.js'
 export { readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta, type TicketGithubLink } from './tickets.js'
 export { collectQueue, parseTodoItems, type ProjectQueue, type QueueItem } from './queue.js'
-export { buildOverview, buildRecentRuns, buildHotTickets, collectAllTickets, ticketBucket, type Overview, type ActiveRun, type RecentProject, type RecentRun, type HotTicket, type HotBucket, type OverviewDeps, type ProjectTickets, type AllTicketsDeps } from './overview.js'
-export { buildDashboard, type DashboardData, type ProjectStat, type ActivityDay, type DashboardDeps } from './dashboard.js'
+export { buildOverview, buildRecentAgents, buildHotTickets, collectAllTickets, ticketBucket, type Overview, type ActiveAgent as ActiveAgent, type RecentProject, type RecentAgent as RecentAgent, type HotTicket, type HotBucket, type OverviewDeps, type ProjectTickets, type AllTicketsDeps } from './overview.js'
+export { buildDashboard, type DashboardData, type ProjectStat, type DashboardDeps } from './dashboard.js'
 export { readGitStatus, type GitStatus } from './git-status.js'
 export { ghPrView, ghPrList, ghJson, nodeGhRunner, type LinkedPr, type OpenPr, type PrLookup, type BranchPrLookup, type PrLister, type GhRunner } from './gh.js'
 export { readFileDiff, readFileChanges, safeRepoPath, type FileDiff, type FileChange } from './file-diff.js'
 export { readFileContent, type FileContent } from './file-read.js'
 export {
-  readRunHandoff,
-  runBranchFor,
-  pushRunBranch,
-  openRunPullRequest,
-  type RunHandoff,
+  readAgentHandoff,
+  agentBranchFor,
+  pushAgentBranch,
+  openBranchPullRequest,
+  openAgentPullRequest,
+  type AgentHandoff,
   type HandoffCommit,
   type HandoffFile,
   type HandoffResult,
   type PullRequestDraft,
-  type RunHandoffDeps,
-} from './run-handoff.js'
+  type AgentHandoffDeps,
+} from './agent-handoff.js'
 export {
   buildInterventions,
   interventionKey,

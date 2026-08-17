@@ -1,7 +1,6 @@
 import { renderTemplate } from './prompt-template.js'
 import { ON_BEFORE_MERGEABLE_PROMPT } from './prompts.generated.js'
 import { presetContext } from './presets.js'
-import { dropSection, type EcoOptions, type TfContext } from './system-prompt.js'
 
 /**
  * The on-before-mergeable prompt (#326), in `prompts/on_before_mergeable_prompt.md` (#551).
@@ -23,15 +22,10 @@ import { dropSection, type EcoOptions, type TfContext } from './system-prompt.js
  */
 export const ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE = ON_BEFORE_MERGEABLE_PROMPT
 
-/** The section `EcoOptions.autoMaintenance` drops (#314). */
-const MAINTENANCE_HEADING = '## Maintenance'
-
-/** What the on-before-mergeable prompt's fragments read. A subset of {@link TfContext}. */
+/** What the on-before-mergeable prompt's fragments read. */
 export interface OnBeforeMergeableContext {
-  /** The session the finished run named via setSessionName(). Every line of the prompt names it. */
+  /** The session the finished agent named via setSessionName(). Every line of the prompt names it. */
   session_name: string
-  /** The user's settings; `technical_control` gates the readability entry. Absent means off. */
-  settings?: TfContext['settings']
   /**
    * The materialized presets, stem -> `{ filePath }` (#326). The `## Maintenance` entries carry
    * `tf.presets.<name>.filePath` so the picked-up agent opens the real preset file. Defaulted
@@ -40,21 +34,9 @@ export interface OnBeforeMergeableContext {
   presets?: Record<string, { filePath: string }>
 }
 
-/**
- * Render the on-before-mergeable prompt for a finished session. `settings` is defaulted rather than
- * left absent: the template reads `tf.settings.technical_control`, so a missing `settings`
- * throws a {@link TemplateFragmentError} instead of reading as off.
- *
- * `eco.autoMaintenance` (#314) drops `## Maintenance` here rather than skipping the whole
- * run: since #537 the prompt also carries `## Business knowledge`, which the flag does not
- * name and must not silently take with it. Dropped before rendering, so the dropped
- * section's fragments never evaluate.
- */
-export function renderOnBeforeMergeablePrompt(tf: OnBeforeMergeableContext, eco?: EcoOptions | undefined): string {
-  const template = eco?.autoMaintenance
-    ? dropSection(ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE, MAINTENANCE_HEADING)
-    : ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE
-  return renderTemplate(template, {
-    tf: { ...tf, settings: tf.settings ?? {}, presets: tf.presets ?? presetContext() },
+/** Render the on-before-mergeable prompt for a finished session. */
+export function renderOnBeforeMergeablePrompt(tf: OnBeforeMergeableContext): string {
+  return renderTemplate(ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE, {
+    tf: { ...tf, presets: tf.presets ?? presetContext() },
   })
 }

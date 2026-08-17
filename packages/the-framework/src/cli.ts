@@ -4,68 +4,48 @@ import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import {
-  builtinDomainPresets,
-  cloudflareTarget,
-  dokployTarget,
-  selectPreset,
-  type DeployTarget,
-  type DomainPreset,
-  type FrameworkSignals,
-} from '@gemstack/ai-autopilot'
 import { type ClaudeCodeDriverOptions, type Driver, type DriverSession, type PermissionMode } from './driver/index.js'
-import { AGENTS, AGENT_SPECS, isAgentName, type AgentName } from './agent.js'
-import { createRunDriver } from './run-driver.js'
+import { DRIVERS, DRIVER_SPECS, isDriverName, type DriverName } from './driver-cli.js'
+import { createAgentDriver } from './agent-driver.js'
 import { githubSlugFor } from './dashboard/github.js'
 import { githubToken } from './dashboard/gh.js'
 import type { ActionsDriverOptions } from './driver/index.js'
 import { launchSharedBrowser, withBrowser, type SharedBrowser } from './browser.js'
 import { connectCdp, startBrowserStream, type BrowserStream } from './browser-stream.js'
-import { hostExecutor } from './host-exec.js'
-import { startDashboard, singleProjectProvider, resolveDashboardBundle, type Dashboard } from './dashboard/index.js'
-import { startRelay, relayPublisher, type RelayPublisher } from './relay.js'
 import { randomUUID } from 'node:crypto'
 import { formatFrameworkEvent, mergeWithheldWhy } from './terminal.js'
 import { CLAUDE_CODE_SESSION_LINK } from './session-link.js'
 import { type AutoHandoffSkip, type ChoicePick, type ChoiceRequest, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
-import { runAutoHandoff, withheldMerge } from './dashboard/run-handoff.js'
+import { agentAutoHandoff, withheldMerge } from './dashboard/agent-handoff.js'
 import {
-  runFramework,
-  type AppPreview,
-  type DeployDecision,
-  type RunFrameworkOptions,
-  type RunFrameworkResult,
-  type ServeConfig,
-} from './run.js'
-import { FAKE_DEPLOY, FAKE_INTENT, FAKE_SIGNALS, fakeDriver } from './fake-script.js'
-import { readProjectSignals } from './project.js'
+  runAgent,
+  type RunAgentOptions,
+  type AgentKind,
+} from './agent.js'
+import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
-import { sessionTodoPending } from './todo-loop.js'
+import { isHandsOff, isAgentLocation, type AgentLocation } from './agent-location.js'
+import { handoffStages, isHandoffLevel, type HandoffLevel } from './handoff-level.js'
+import { readAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
+import { agentTodoPending } from './todo-loop.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from './config.js'
 import {
   describeResolvedConfig,
   fileConfigLayer,
-  resolveRunConfig,
-  resolvedModes,
+  resolveAgentConfig,
   type ConfigLayer,
-  type ResolvedRunConfig,
+  type ResolvedAgentConfig,
 } from './config-layers.js'
-import { type EcoOptions } from './system-prompt.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
-import { appendLog, type LogEntry } from './logs.js'
-import { appendMessage, isSafeVia } from './conversations.js'
-import type { BindProjectDeps, RecordMessage } from './await-gate.js'
-import { preflight } from './preflight.js'
-import { RunStore, commitPendingWork, currentBranch, nodeStoreFs, renameRunBranch, runBranchName, type StoreFs } from './store/index.js'
+import { AgentStore, commitPendingWork, currentBranch, nodeStoreFs, renameAgentBranch, agentBranchName, type StoreFs } from './store/index.js'
 import { materializePresets } from './presets.js'
-import { daemonStatus, ensureDaemon, isLoopbackHost, registerHomeProject, runDaemon, stopDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
+import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { appendControl, resetControl, watchControl, type ControlWatcher } from './control.js'
-import { RunMessageQueue } from './run-messages.js'
+import { AgentMessageQueue } from './agent-messages.js'
 import { createGateKeepalive } from './gate-keepalive.js'
 import { nodeGitRunner } from './project.js'
-import { addProject, ensureDaemonToken, listProjects, readDaemonToken, readPreferences, resolveProjectPath } from './registry.js'
-import { startConsumptionGuard } from './consumption-guard.js'
+import { ensureDaemonToken, readDaemonToken, readPreferences } from './registry.js'
 import { DEFAULT_SPEND_OFFSET } from './preference-defaults.js'
 import {
   planMaintenanceSweep,
@@ -78,37 +58,35 @@ import {
   listProjectWorktrees,
   removeProjectWorktree,
   pruneProjectWorktrees,
-  formatWorktreeList,
 } from './worktrees.js'
 import { removeMergedWorktrees } from './merged-worktrees.js'
 import { defaultWhat } from './preset-prompt.js'
 import { renderOnBeforeMergeablePrompt, type OnBeforeMergeableContext } from './on-before-mergeable-prompt.js'
-import { runPrompt } from './prompt-run.js'
 import { presets } from './preset-catalog.js'
 import { errorMessage } from './error-message.js'
 
 /**
- * The default link shown for a live run: the generic Claude Code entry point,
- * surfaced as "Open Claude Code" (not a per-run live session). We drive Claude
+ * The default link shown for a live agent: the generic Claude Code entry point,
+ * surfaced as "Open Claude Code" (not a per-agent live session). We drive Claude
  * Code headless, which is not Remote-Controlled, so there is no per-session deep
- * link to construct (#214). Pass `--session-link "...{sessionId}..."` if you
+ * link to construct (#214). Set `sessionLink: "...{sessionId}..."` on the spec if you
  * wire up a real one.
  */
 export const CLAUDE_CODE_SESSION_LIST = CLAUDE_CODE_SESSION_LINK
 
 /**
- * The session link to show for a run: the user's `--session-link` if given, else
- * the generic Claude Code entry point for a live run (nothing for `--fake`, which
- * has no real session). Pure, so the default is unit-testable without a live run.
+ * The session link to show for an agent: the spec's `sessionLink` if given, else
+ * the generic Claude Code entry point for a live agent (nothing for a fake one, which
+ * has no real session). Pure, so the default is unit-testable without a live agent.
  *
  * The default is Claude Code's *own* entry point, so it is only honest on a
  * Claude run: pointing a Codex session at claude.ai/code offers the user a link
  * to somewhere their run isn't. Codex keeps its sessions locally with nothing
  * equivalent to open, so another agent gets no default link at all (#542).
  */
-export function chooseSessionLink(opts: Pick<CliOptions, 'sessionLink' | 'agent'>, fake: boolean): string | undefined {
+export function chooseSessionLink(opts: Pick<AgentOptions, 'sessionLink' | 'driver'>, fake: boolean): string | undefined {
   if (opts.sessionLink) return opts.sessionLink
-  return fake || opts.agent !== 'claude' ? undefined : CLAUDE_CODE_SESSION_LIST
+  return fake || opts.driver !== 'claude' ? undefined : CLAUDE_CODE_SESSION_LIST
 }
 
 /** Where the CLI writes. Injectable so tests capture output. */
@@ -126,7 +104,7 @@ const defaultIO: CliIO = {
  * The CLI version, read from the package's own `package.json` at runtime (#312).
  * The compiled entry lives one level under the package root (`dist/` or
  * `dist-test/`), so its `package.json` is always `../package.json`. Cached after
- * the first read; falls back to `0.0.0` if the file is somehow unreadable.
+ * the first read; falls back to `unknown` if the file is somehow unreadable.
  */
 let cachedVersion: string | undefined
 export function frameworkVersion(): string {
@@ -134,9 +112,11 @@ export function frameworkVersion(): string {
   try {
     const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json')
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string }
-    cachedVersion = pkg.version ?? '0.0.0'
+    // `unknown`, not `0.0.0`: the packages are unreleased and legitimately versioned `0.0.0`, so a
+    // numeric fallback would make a failed read indistinguishable from a correct one (#312).
+    cachedVersion = pkg.version ?? 'unknown'
   } catch {
-    cachedVersion = '0.0.0'
+    cachedVersion = 'unknown'
   }
   return cachedVersion
 }
@@ -144,767 +124,296 @@ export function frameworkVersion(): string {
 const HELP = `The Framework — turnkey AI orchestration that wraps a coding agent (Claude Code or Codex).
 
 Usage:
-  framework                       Run the dashboard in the foreground (Ctrl+C stops it; logs visible).
-  framework --daemon              Run the dashboard in the background; print commands and return.
-  framework [intent...]           Build what you describe, from scratch.
-  framework stop                  Stop the background dashboard for this workspace.
-  framework research [what]      Rate the "problem variability" of <what> (default:
-                                 this PR), then pick which problems to deep-dive.
-                                 A direct review prompt on existing code — no build.
-  framework prompt <text>         Run one prompt verbatim through the agent, honoring
-                                 its await gates — no scaffold/build pipeline. This is
-                                 what a dashboard preset sends after you edit it.
-  framework maintain              Sweep the registered repos: run the maintainability
-                                 loop on any that grew un-reviewed commits (#298).
-                                 --dry-run to preview; --max-repos / --max-cost to bound.
-  framework worktrees             List the checkouts this project's sessions kept.
-                                 rm <sessionId> removes one; prune removes every one
-                                 whose session is no longer running; sweep removes only
-                                 those whose branch has landed (#1036), keeping the branch.
-  framework --fake                Run the offline demo (no CLI, no model, deterministic).
-  framework doctor                Check prerequisites (Claude Code installed, etc.).
-  framework relay                 Host a session relay so teammates can watch a session (#230).
+  framework              Serve the dashboard in the foreground. Ctrl+C closes it and every
+                         session it is running; the server logs stream to this terminal.
 
 Options:
-  --fake                 Use the fake driver + scripted session (offline / CI).
-  --agent <claude|codex> Which agent CLI drives the session, on your own subscription
-                         (default: claude). Codex reports no price and no quota,
-                         so --max-cost and the consumption limits cannot gate it;
-                         the session says so at startup rather than imply a guard.
-  --run-on <local|actions|web>   Where the run executes (default: local, this
-                         device). actions drives it on a fresh GitHub Actions runner;
-                         needs a GitHub origin remote and a user token with repo +
-                         workflow scopes, from GH_TOKEN or from "gh auth login".
-                         web hands the task to a Claude Code
-                         cloud session on your own account, which runs it off this
-                         machine and opens its own PR; follow it on claude.ai or pull
-                         it back with claude --teleport.
-  --cwd <dir>            Workspace the agent builds in (default: current directory).
-  --model <id>           Model to pass through to the wrapped agent.
-  --via <surface>        Surface this run was started from (e.g. discord); recorded
-                         on the session's conversation turns.
-  --scope <prototype|full>   How much app to build (default: full).
-  --preset <name>        Run under an Open Loop domain preset (its loops + prompts
-                         + skills frame the build), e.g. software-development.
-  --autopilot            Activate the preset's Autopilot mode variants.
-  --technical            Activate the preset's Technical mode variants.
-                         (--preset / --autopilot / --technical / --kind can also be
-                          set per repo in the-framework.yml; these flags override it.)
-  --no-autopilot, --no-technical, --no-vanilla, --no-transparent
-                         The off switch for each toggle: this run overrides a repo
-                         the-framework.yml that turned it on (--no-vanilla puts the
-                         built-in prompt back). With neither form, the file decides.
-  --vanilla              Remove the built-in system prompt entirely. The agent still
-                         gets the AWAIT/SIGNAL emit contract, so it can drive the
-                         dashboard's gates; for a fully raw session use --transparent.
-                         Overrides the Eco flags below (no built-in prompt to trim).
-  --transparent          Fully transparent (#625): run the wrapped agent raw, exactly
-                         like plain "claude -p" — no framework system prompt, emit
-                         protocols, consumption guard, dashboard, or TODO loop. The
-                         coarse master off-switch; also settable per repo in
-                         the-framework.yml (transparent: true) or per user.
-  --eco-auto-planning    Drop the built-in prompt's "Large scope" (planning) section.
-  --eco-auto-research    Drop the built-in prompt's "Alternatives" (research) section.
-  --eco-auto-maintenance Drop the "Maintenance" section from the post-merge
-                         cleanup prompt. Needs --on-before-mergeable; #556 moved
-                         that section out of the built-in prompt.
-                         (The --eco-* flags trim the #326 prompt to save tokens.)
-  --context <dir>        Focus the agent on this directory (repeatable). Adds one
-                         "Context: <dirs>" line to the system prompt; the agent can
-                         still reach every repo, this just narrows where it looks.
-  --on-before-mergeable           When the run signals setReadyForMerge(), fire the on-before-mergeable
-                         prompt: queue the maintainability and security-audit follow-ups
-                         (plus readability under --technical) as TODO entries for the
-                         backlog loop to pick up (#326).
-  --browser              Give the agent a real browser during the run via
-                         chrome-devtools-mcp: navigate pages, read console + network,
-                         inspect the DOM, and screenshot. Off by default (#452).
-  --no-auto-push-branch  Do not push this session's branch to origin when it finishes.
-                         Pushing is the default, so the work does not sit on a local
-                         branch nobody is told about (#1102). Without either flag the
-                         repo's the-framework.yml autoPushBranch decides.
-  --no-auto-open-pr      Do not open a draft PR when the session finishes. Opening one
-                         is the default; it implies the push above (#1102). Without
-                         either flag the-framework.yml autoOpenPr decides.
-  --auto-merge           Merge the session's PR once it is opened (#1216): GitHub
-                         auto-merge when the repo allows it (lands when checks pass),
-                         else merged directly. Off by default — landing on the default
-                         branch has to be asked for. Without either flag
-                         the-framework.yml autoMerge decides.
-  --unattended           Nobody is watching: choice gates take the recommended option
-                         instead of waiting for an answer. Stop still works (#846).
-  --kind <name>          Build event kind the preset's review loop fires for, e.g.
-                         bug-fix or major-change (default: the-framework.yml's event,
-                         else the preset's own, else major-change). Selects which
-                         review chain gates the session.
-  --max-passes <n>       Full-fledged loop pass budget (default: 5).
-  --max-cost <usd>       Stop the session once it has spent this much (USD).
-  --no-todo-loop         Do not consume the agent's TODO backlog after the build
-                         (the loop is on by default; it gates per item on the
-                         dashboard and stops when the backlog is empty).
-  --max-todo-items <n>   Backlog entries worked per session (default: 25).
-  --permission-mode <mode>   Claude Code permission mode: default | acceptEdits |
-                             bypassPermissions | plan (default: bypassPermissions,
-                             so the headless loop can run installs/builds/tests).
-  --dangerously-skip-permissions   Bypass all agent permission checks (sandboxes only).
-  --serve <cmd>          Gate the loop on the app actually running (e.g. "npm run dev"),
-                         then keep it serving with a preview link on the dashboard.
-  --serve-install <cmd>  Install command before serving (e.g. "npm install").
-  --serve-build <cmd>    Build command before serving (e.g. "npm run build").
-  --serve-port <n>       Port the app listens on (default: 3000).
-  --serve-path <path>    Path to health-check once it is up (default: /).
-  --sandbox <where>      Where --serve runs: "local" (host, default) or "docker"
-                         (a throwaway container, so agent code never runs on the host).
-  --deploy <target>      Deploy to this target (cloudflare, dokploy) or narrate any other.
-  --cf-project <name>    Cloudflare Pages project name (for a Pages deploy).
-  --dokploy-url <url>    Dokploy instance URL (required for --deploy dokploy).
-  --dokploy-app <id>     Dokploy application id (required for --deploy dokploy).
-  --port <n>             Dashboard port (default: 4200); with the relay, the relay port (4488).
-  --host <addr>          Daemon bind address (default: 127.0.0.1, localhost only). A non-loopback
-                         address (e.g. 0.0.0.0) exposes the daemon to your network and generates a
-                         shared token; the printed URL carries it, and any request without it gets
-                         401. Exposing a process spawner to the network is a security decision (#806).
-  --no-dashboard         Do not start the localhost dashboard.
-  --share <relay-url>    Publish this session to a relay (from "framework relay") so
-                         teammates can watch it live; prints the shareable URL.
-  --resume               Reopen the last session's dashboard from .the-framework/ in --cwd
-                         (read-only replay; no new agent session). Survives a restart.
-  --no-persist           Do not write the orchestration state to .the-framework/.
-  --skip-preflight       Skip the prerequisite checks before a live session.
-  --session-link <url>   A real per-session link to the live agent session, shown
-                         on the dashboard. Our sessions are headless (not Remote-
-                         Controlled), so by default the dashboard only offers the
-                         generic "Open Claude Code" entry point. Pass your own URL,
-                         using {sessionId} to template in the real Claude session
-                         id, e.g. "https://example.com/s/{sessionId}".
+  --port <n>             Dashboard port (default: 4200).
+  --host <addr>          Bind address (default: 127.0.0.1, localhost only). A non-loopback
+                         address (e.g. 0.0.0.0) exposes the dashboard to your network and
+                         generates a shared token; the printed URL carries it, and any request
+                         without it gets 401. Exposing a process spawner to the network is a
+                         security decision (#806).
   -h, --help             Show this help.
   -v, --version          Print the version.
 
-The Framework drives the wrapped agent as a black box: it prompts, reads the code,
-and gates on the outcome (builds / serves / review-passes), then re-prompts. The
-localhost dashboard foregrounds the loop status beside the agent's own session.`
+Everything else is the dashboard: it is the product's user interface, and where a session's
+prompt, its options, its agent and its checkout are chosen. The dashboard spawns each session
+as its own process, handing it one JSON spec rather than a command line.
 
-/** Parsed CLI options. */
-export interface CliOptions {
-  help: boolean
-  version: boolean
+The Framework drives the wrapped agent as a black box: it prompts, reads the code, and gates on
+the outcome, then re-prompts. The dashboard foregrounds the loop status beside the agent's own
+session.`
+
+/**
+ * One agent's resolved configuration, as it reads it itself (D4).
+ *
+ * These used to be command-line flags, which made every one of them a human surface as well as
+ * the dashboard's process API. They arrive as a {@link AgentSpec} now — one JSON blob on a temp
+ * file — so what is left here is a plain options object with no argv semantics: no tri-state
+ * `--no-*` spellings, no mutual validation, no help text.
+ */
+export interface AgentOptions {
+  /** The `FakeDriver` (`FRAMEWORK_FAKE=1`): an offline stand-in for the agent, for tests and e2e. */
   fake: boolean
-  doctor: boolean
-  skipPreflight: boolean
+  /** What the session was asked to do. */
   intent: string
-  /** `--agent <claude|codex>`: which agent CLI drives the run (#542). Default `claude`. */
-  agent: AgentName
-  /** `--run-on <local|actions|web>` (#1050/#610): where the run executes. `actions` drives it on a
+  /** Which coding-agent CLI does the work (#542). Default `claude`. */
+  driver: DriverName
+  /** `--run-on <local|actions|web>` (#1050/#610): where the agent executes. `actions` drives it on a
    * GitHub Actions runner via ActionsDriver (#934); `web` hands it to a Claude Code cloud session
    * via CloudDriver (#610); absent / `local` runs on this device as before. */
-  target?: 'local' | 'actions' | 'web' | undefined
+  target?: AgentLocation | undefined
   cwd?: string | undefined
   /**
-   * `--run-id <id>` (#736): the id the daemon allocated for this run before spawning it. Its
-   * presence says the framework owns this run's checkout — `--cwd` is a worktree the daemon
-   * created on a `the-framework/run-<id>` branch, which the run renames once the agent names
+   * `--run-id <id>` (#736): the id the daemon allocated for this agent before spawning it. Its
+   * presence says the framework owns this agent's checkout — `--cwd` is a worktree the daemon
+   * created on a `the-framework/agent-<id>` branch, which the agent renames once the agent names
    * the session. Absent for a plain `framework "..."`, which runs in the user's own checkout.
    */
-  runId?: string | undefined
+  agentId?: string | undefined
   /**
-   * `--continue-run` (#762): this run continues the run `--run-id` names rather than starting a new
-   * one. The store reopens that run's log instead of truncating it, so messaging a stopped run
+   * `--continue-run` (#762): this agent continues the agent `--run-id` names rather than starting a new
+   * one. The store reopens that agent's log instead of truncating it, so messaging a stopped agent
    * stays one row in the history.
    */
-  continueRun?: boolean | undefined
-  /**
-   * `--topic` (#1120): this run is project-less. Set by the daemon when it spawns a topic run into a
-   * neutral scratch `--cwd`; recorded on the run's meta so a reader can tell it from a project run.
-   */
-  topic?: boolean | undefined
+  continueAgent?: boolean | undefined
   model?: string | undefined
-  /** `--resume-session <id>` (#720): continue a finished run's agent session — the prompt resumes that conversation (full prior context). Set by the dashboard when you message a run that has ended. */
+  /** `--resume-session <id>` (#720): continue a finished agent's agent session — the prompt resumes that conversation (full prior context). Set by the dashboard when you message an agent that has ended. */
   resumeSession?: string | undefined
-  /** `--via <surface>` (#917): the surface this run was started from, recorded on its conversation turns. Set by the daemon when a non-local surface (e.g. Discord) asked for the run. */
-  via?: string | undefined
-  /** `--ticket <path>` (#1117): the `tickets/<file>.md` this run is implementing. Set by the daemon when it starts a drain run, from the ticket its queue entry links to; recorded on the run's meta. */
+  /** `--ticket <path>` (#1117): the `tickets/<file>.md` this agent is implementing. Set by the daemon when it starts a drain agent, from the ticket its queue entry links to; recorded on the agent's meta. */
   ticket?: string | undefined
   /** `--plan-run` (#1327): the `--ticket` is being planned, not implemented, so the PR title must not inherit its issue as `(fix #42)` (#1334) — the plan's merge would close the issue with the work still undone. */
-  planRun?: boolean
-  /** `--queue-entry <text>` (#1253): the one queue entry a routine drain pinned this run to; recorded on the run's meta so the sweep's claim outlives the daemon and the local process. */
-  queueEntry?: string | undefined
+  planAgent?: boolean
   /** `--unattended`: no human is watching, so choice gates take the recommended option (#846). */
   unattended?: boolean
   scope: 'prototype' | 'full'
   preset?: string | undefined
   /**
-   * The mode toggles are tri-state (#841): `undefined` is "this run said nothing", so the repo's
+   * The mode toggles are tri-state (#841): `undefined` is "this agent said nothing", so the repo's
    * the-framework.yml decides, while an explicit `--no-*` turns the mode off over the file.
    */
-  autopilot?: boolean | undefined
-  technical?: boolean | undefined
-  /** `--vanilla`: remove the built-in #326 system prompt entirely (antiLazyPill off, #314). */
+  /** Remove the built-in #326 system prompt entirely, keeping the session controls (#314). */
   vanilla?: boolean | undefined
   /** `--transparent` (#625): run the wrapped agent fully raw — no framework system prompt, emit
-   * protocols, consumption guard, dashboard, or TODO loop, so a run is identical to `claude -p`. */
+   * protocols, consumption guard, dashboard, or TODO loop, so an agent is identical to `claude -p`. */
   transparent?: boolean | undefined
-  /** `--eco-*`: fine-grained #326 section drops to save tokens (#314). */
-  eco: Required<EcoOptions>
   /** `--context <dir>` (repeatable): in-context directories added as one `Context:` line (#439). */
   context: string[]
-  /** `--on-before-mergeable`: fire the #326 on-before-mergeable prompt when the run signals setReadyForMerge(), queueing the quality follow-ups as TODO entries. */
+  /** `--on-before-mergeable`: fire the built-in on-before-mergeable (#326) prompt when the agent signals setReadyForMerge(), queueing the quality follow-ups as TODO entries. */
   onBeforeMergeable: boolean
-  /** `--browser`: give the agent a real browser via chrome-devtools-mcp (navigate, console, network, DOM, screenshot) during the run (#452). */
+  /** `--browser`: give the agent a real browser via chrome-devtools-mcp (navigate, console, network, DOM, screenshot) during the agent (#452). */
   browser: boolean
   /**
-   * `--auto-push-branch` / `--no-auto-push-branch` (#1102): push this session's branch to `origin`
-   * when it finishes. Tri-state like the mode toggles (#841): `undefined` is "this run said
-   * nothing", so the repo's the-framework.yml decides, and nobody setting it resolves to on —
-   * which is what makes the handoff zero-config.
+   * How far this session publishes itself when it finishes (#1102/#1216/B5). `undefined` is "this
+   * session said nothing", so the repo's the-framework.yml decides, and nobody setting it resolves
+   * to `pr` — which is what makes the handoff zero-config.
    */
-  autoPushBranch?: boolean | undefined
-  /** `--auto-open-pr` / `--no-auto-open-pr` (#1102): open a draft PR when the session finishes. Tri-state like {@link autoPushBranch}; resolves to on. Implies the push. */
-  autoOpenPr?: boolean | undefined
-  /** `--auto-merge` / `--no-auto-merge` (#1216): merge the session's PR once it is opened. Tri-state like {@link autoOpenPr}; resolves to off. */
-  autoMerge?: boolean | undefined
+  handoff?: HandoffLevel | undefined
   buildEvent?: string | undefined
-  maxPasses?: number
-  maxCost?: number
   todoLoop: boolean
   todoMaxItems?: number
-  deploy?: string | undefined
-  cfProject?: string | undefined
-  dokployUrl?: string | undefined
-  dokployApp?: string | undefined
-  serve?: string | undefined
-  serveInstall?: string | undefined
-  serveBuild?: string | undefined
-  servePort?: number
-  servePath?: string | undefined
-  sandbox?: 'local' | 'docker' | undefined
-  port?: number
-  /** `--host <addr>` (#1051): the daemon's bind address. Default loopback; a non-loopback address
-   * exposes the daemon to the network and gates it behind the generated shared token. */
-  host?: string | undefined
-  dashboard: boolean
-  relayServe: boolean
-  share?: string | undefined
   sessionLink?: string | undefined
-  permissionMode?: PermissionMode | undefined
-  skipPermissions: boolean
-  resume: boolean
+  /** Whether the session records itself to `.the-framework/`. Always true outside tests. */
   persist: boolean
-  /** `framework --daemon`: run the dashboard in the background (detached), then return (#456). */
-  daemon: boolean
-  /** Serve the dashboard in-process — the detached child's entry, spawned by the background path (internal, #456). */
-  daemonServe: boolean
-  /** `framework stop`: stop the background daemon for this workspace. */
-  stop: boolean
-  /** `framework research [what]`: run the Research preset as a direct prompt (#331). */
+  /** {@link AgentSpec.kind} `research`: run the Research preset as a direct prompt (#331). */
   research: boolean
-  /** `framework prompt <text>`: run one prompt verbatim through the direct path (#353). */
+  /** {@link AgentSpec.kind} `prompt`: run one prompt verbatim through the direct path (#353). */
   directPrompt: boolean
-  /** `framework maintain`: sweep the registered repos, running the maintenance loop on un-reviewed commits (#298). */
-  maintain: boolean
-  /** `framework worktrees [rm <id> | prune]`: the retained-worktree cleanup the dashboard has (#752). */
-  worktrees?: WorktreesCommand
-  /** `--dry-run`: for `maintain`, list what would be reviewed without running anything. */
-  dryRun: boolean
-  /** `--max-repos <n>`: cap how many repos one maintenance sweep reviews. */
-  maxRepos?: number
+}
+
+/** What the CLI itself accepts: four options, no verbs (D4). */
+export interface CliArgs {
+  help: boolean
+  version: boolean
+  /** `--port <n>`: the port the dashboard binds. Default {@link DEFAULT_DAEMON_PORT}; `0` is ephemeral. */
+  port?: number
+  /**
+   * `--host <addr>` (#1051): the dashboard's bind address. Default loopback; a non-loopback
+   * address exposes it to the network and gates every route behind the generated shared token.
+   */
+  host?: string
+  /**
+   * `--agent <path>`: run the session described by the JSON spec at `path` (D4). The dashboard's
+   * process API, not a human option — it is how one session is spawned, and the file is consumed.
+   */
+  session?: string
   error?: string
 }
 
-/** Parse argv (without the node/script prefix). Pure and testable. */
-export function parseArgs(argv: string[]): CliOptions {
-  const opts: CliOptions = {
-    help: false,
-    version: false,
-    fake: false,
-    doctor: false,
-    skipPreflight: false,
-    intent: '',
-    agent: 'claude',
-    scope: 'full',
-    eco: { autoPlanning: false, autoResearch: false, autoMaintenance: false },
-    context: [],
-    onBeforeMergeable: false,
-    browser: false,
-    // The handoff pair is left unset here on purpose: like the mode toggles it resolves over the
-    // config layers (#841), where no layer setting it means on (#1102) — a session left alone
-    // hands its work back by itself.
-    dashboard: true,
-    relayServe: false,
-    skipPermissions: false,
-    resume: false,
-    persist: true,
-    daemon: false,
-    daemonServe: false,
-    stop: false,
-    research: false,
-    directPrompt: false,
-    maintain: false,
-    dryRun: false,
-    todoLoop: true,
-  }
-  const PERMISSION_MODES: PermissionMode[] = ['default', 'acceptEdits', 'bypassPermissions', 'plan']
-  const words: string[] = []
-  // Parse an integer flag's value, recording opts.error (naming the flag) on a bad one. The
-  // integer flags all share this shape; only the lower bound (0 for --port, else 1) varies.
-  const intFlag = (value: string | undefined, label: string, min: number): number | undefined => {
-    const n = Number(value)
-    if (Number.isInteger(n) && n >= min) return n
-    opts.error = `invalid ${label}: must be a ${min > 0 ? 'positive' : 'non-negative'} integer`
-    return undefined
-  }
+/**
+ * Parse argv (without the node/script prefix). Pure and testable.
+ *
+ * Four options and nothing else. Everything a session needs used to be a flag here — sixty-seven
+ * of them, twenty-seven with no human user at all, because the dashboard serialized
+ * `StartAgentOptions` onto a command line. Those travel as a {@link AgentSpec} now. `--host` and
+ * `--port` survive because they are the two things a browser cannot be asked and a dashboard
+ * cannot serve about itself; `--help` and `--version` because a command with options owes the
+ * user both.
+ */
+export function parseArgs(argv: string[]): CliArgs {
+  const opts: CliArgs = { help: false, version: false }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!
     switch (arg) {
-      case '-h':
       case '--help':
+      case '-h':
         opts.help = true
         break
-      case '-v':
       case '--version':
+      case '-v':
         opts.version = true
         break
-      case '--fake':
-        opts.fake = true
-        break
-      case '--no-dashboard':
-        opts.dashboard = false
-        break
-      case '--preset':
-        opts.preset = argv[++i]
-        break
-      case '--autopilot':
-        opts.autopilot = true
-        break
-      case '--no-autopilot':
-        opts.autopilot = false
-        break
-      case '--technical':
-        opts.technical = true
-        break
-      case '--no-technical':
-        opts.technical = false
-        break
-      case '--vanilla':
-        opts.vanilla = true
-        break
-      case '--no-vanilla':
-        opts.vanilla = false
-        break
-      case '--transparent':
-        opts.transparent = true
-        break
-      case '--no-transparent':
-        opts.transparent = false
-        break
-      case '--on-before-mergeable':
-        opts.onBeforeMergeable = true
-        break
-      case '--browser':
-        opts.browser = true
-        break
-      case '--auto-push-branch':
-        opts.autoPushBranch = true
-        break
-      case '--no-auto-push-branch':
-        opts.autoPushBranch = false
-        break
-      case '--auto-open-pr':
-        opts.autoOpenPr = true
-        break
-      case '--no-auto-open-pr':
-        opts.autoOpenPr = false
-        break
-      case '--auto-merge':
-        opts.autoMerge = true
-        break
-      case '--no-auto-merge':
-        opts.autoMerge = false
-        break
-      case '--eco-auto-planning':
-        opts.eco.autoPlanning = true
-        break
-      case '--eco-auto-research':
-        opts.eco.autoResearch = true
-        break
-      case '--eco-auto-maintenance':
-        opts.eco.autoMaintenance = true
-        break
-      case '--context': {
-        // Repeatable: `--context a --context b` -> the in-context directories (#439).
-        const dir = argv[++i]
-        if (dir) opts.context.push(dir)
+      case '--port': {
+        const n = Number(argv[++i])
+        if (Number.isInteger(n) && n >= 0) opts.port = n
+        else opts.error = 'invalid --port: must be a non-negative integer'
         break
       }
-      case '--kind':
-        opts.buildEvent = argv[++i]
-        break
-      case '--resume':
-        opts.resume = true
-        break
-      case '--daemon':
-        opts.daemon = true
-        break
-      case '--daemon-serve':
-        opts.daemonServe = true
-        break
-      case '--no-persist':
-        opts.persist = false
-        break
-      case '--skip-preflight':
-        opts.skipPreflight = true
-        break
-      case '--dangerously-skip-permissions':
-        opts.skipPermissions = true
-        break
-      case '--permission-mode': {
-        const value = argv[++i] as PermissionMode | undefined
-        if (value === undefined || !PERMISSION_MODES.includes(value)) {
-          opts.error = `invalid --permission-mode: ${value ?? '(missing)'}`
-        } else {
-          opts.permissionMode = value
-        }
+      case '--host': {
+        const value = argv[++i]
+        if (value === undefined) opts.error = 'invalid --host: missing address'
+        else opts.host = value
         break
       }
       case '--agent': {
         const value = argv[++i]
-        if (!isAgentName(value)) opts.error = `invalid --agent: ${value ?? '(missing)'}. Expected: ${AGENTS.join(' | ')}`
-        else opts.agent = value
+        if (value === undefined) opts.error = 'invalid --agent: missing path'
+        else opts.session = value
         break
       }
-      case '--run-on': {
-        const value = argv[++i]
-        if (value !== 'local' && value !== 'actions' && value !== 'web') opts.error = `invalid --run-on: ${value ?? '(missing)'}. Expected: local | actions | web`
-        else opts.target = value
-        break
-      }
-      case '--cwd':
-        opts.cwd = argv[++i]
-        break
-      case '--run-id':
-        opts.runId = argv[++i]
-        break
-      case '--continue-run':
-        opts.continueRun = true
-        break
-      case '--topic':
-        opts.topic = true
-        break
-      case '--model':
-        opts.model = argv[++i]
-        break
-      case '--resume-session':
-        opts.resumeSession = argv[++i]
-        break
-      case '--via':
-        opts.via = argv[++i]
-        break
-      case '--ticket':
-        opts.ticket = argv[++i]
-        break
-      case '--plan-run':
-        opts.planRun = true
-        break
-      case '--queue-entry':
-        opts.queueEntry = argv[++i]
-        break
-      case '--unattended':
-        opts.unattended = true
-        break
-      case '--deploy':
-        opts.deploy = argv[++i]
-        break
-      case '--cf-project':
-        opts.cfProject = argv[++i]
-        break
-      case '--dokploy-url':
-        opts.dokployUrl = argv[++i]
-        break
-      case '--dokploy-app':
-        opts.dokployApp = argv[++i]
-        break
-      case '--serve':
-        opts.serve = argv[++i]
-        break
-      case '--serve-install':
-        opts.serveInstall = argv[++i]
-        break
-      case '--serve-build':
-        opts.serveBuild = argv[++i]
-        break
-      case '--serve-path':
-        opts.servePath = argv[++i]
-        break
-      case '--serve-port': {
-        const n = intFlag(argv[++i], '--serve-port', 1)
-        if (n !== undefined) opts.servePort = n
-        break
-      }
-      case '--sandbox': {
-        const where = argv[++i]
-        if (where !== 'local' && where !== 'docker') opts.error = `invalid --sandbox: expected "local" or "docker"`
-        else opts.sandbox = where
-        break
-      }
-      case '--share':
-        opts.share = argv[++i]
-        break
-      case '--session-link':
-        opts.sessionLink = argv[++i]
-        break
-      case '--scope': {
-        const value = argv[++i]
-        if (value !== 'prototype' && value !== 'full') opts.error = `invalid --scope: ${value ?? '(missing)'}`
-        else opts.scope = value
-        break
-      }
-      case '--max-passes': {
-        const n = intFlag(argv[++i], '--max-passes', 1)
-        if (n !== undefined) opts.maxPasses = n
-        break
-      }
-      case '--max-cost': {
-        const n = Number(argv[++i])
-        if (!Number.isFinite(n) || n <= 0) opts.error = `invalid --max-cost: must be a positive number (USD)`
-        else opts.maxCost = n
-        break
-      }
-      case '--no-todo-loop':
-        opts.todoLoop = false
-        break
-      case '--dry-run':
-        opts.dryRun = true
-        break
-      case '--max-repos': {
-        const n = intFlag(argv[++i], '--max-repos', 1)
-        if (n !== undefined) opts.maxRepos = n
-        break
-      }
-      case '--max-todo-items': {
-        const n = intFlag(argv[++i], '--max-todo-items', 1)
-        if (n !== undefined) opts.todoMaxItems = n
-        break
-      }
-      case '--port': {
-        const n = intFlag(argv[++i], '--port', 0)
-        if (n !== undefined) opts.port = n
-        break
-      }
-      case '--host':
-        opts.host = argv[++i]
-        break
       default:
-        if (arg.startsWith('-')) opts.error = `unknown option: ${arg}`
-        else words.push(arg)
+        opts.error = arg.startsWith('-') ? `unknown option: ${arg}` : `unknown command: ${arg}`
     }
   }
-  // `framework doctor` / `framework relay` / `framework stop` are subcommands, not an intent.
-  if (words[0] === 'doctor') {
-    opts.doctor = true
-    words.shift()
-  } else if (words[0] === 'relay') {
-    opts.relayServe = true
-    words.shift()
-  } else if (words[0] === 'stop') {
-    opts.stop = true
-    words.shift()
-  } else if (words[0] === 'research') {
-    opts.research = true
-    words.shift() // the remaining words are the "what" param (may be empty -> default)
-  } else if (words[0] === 'prompt') {
-    opts.directPrompt = true
-    words.shift() // the remaining words are the prompt text, run verbatim (#353)
-  } else if (words[0] === 'maintain') {
-    opts.maintain = true
-    words.shift() // maintain takes no positional args; the target is the registry
-  } else if (words[0] === 'worktrees') {
-    // `worktrees` / `worktrees prune` / `worktrees rm <sessionId>` (#752). Bare = list; an
-    // unknown sub-verb is a usage error rather than a silent list of something else.
-    words.shift()
-    const sub = words.shift()
-    if (sub === undefined || sub === 'list') opts.worktrees = { action: 'list' }
-    else if (sub === 'prune') opts.worktrees = { action: 'prune' }
-    else if (sub === 'sweep') opts.worktrees = { action: 'sweep' }
-    else if (sub === 'rm') {
-      const runId = words.shift()
-      opts.worktrees = { action: 'rm', ...(runId ? { runId } : {}) }
-    }
-    else opts.error = `unknown worktrees command: ${sub}`
-  }
-  opts.intent = words.join(' ').trim()
   return opts
 }
 
+/** The session defaults nothing sets any more, shared by {@link agentOptions} and the tests. */
+const SESSION_DEFAULTS = {
+  driver: 'claude',
+  scope: 'full',
+  context: [],
+  onBeforeMergeable: false,
+  browser: false,
+  persist: true,
+  todoLoop: true,
+} as const
+
 /**
- * Resolve the Claude Code driver options for a live CLI run. The CLI is a
- * headless autonomous builder: every turn is `claude -p`, which cannot answer an
- * interactive approval. The driver's library default (`acceptEdits`) silently
- * denies installs/builds/tests, so the production-grade checklist can never
- * verify the app actually builds/runs (#225). Default the CLI to
- * `bypassPermissions` so the full loop runs unattended; `--permission-mode` and
- * `--dangerously-skip-permissions` still override.
+ * Read a session's options off the spec the dashboard wrote (D4).
+ *
+ * The handoff pair and the mode toggles are left unset when the spec says nothing about them, on
+ * purpose: that is what lets the repo's `the-framework.yml` decide, with nobody setting them
+ * resolving to on (#1102/#841). JSON distinguishes "absent" from `false` without needing a
+ * `--no-*` spelling for each, which is the whole reason this stopped being an argv.
  */
-export function claudeDriverOptions(opts: Pick<CliOptions, 'permissionMode' | 'skipPermissions'>): ClaudeCodeDriverOptions {
-  return opts.skipPermissions
-    ? { dangerouslySkipPermissions: true }
-    : { permissionMode: opts.permissionMode ?? 'bypassPermissions' }
+export function agentOptions(spec: AgentSpec, env: NodeJS.ProcessEnv = process.env): AgentOptions {
+  const o = spec.options
+  const defined = <T>(value: T | undefined): value is T => value !== undefined
+  return {
+    ...SESSION_DEFAULTS,
+    context: o.context ?? [],
+    fake: env['FRAMEWORK_FAKE'] === '1',
+    intent: spec.prompt,
+    research: spec.kind === 'research',
+    directPrompt: spec.kind === 'prompt',
+    cwd: spec.cwd,
+    ...(spec.agentId ? { agentId: spec.agentId } : {}),
+    ...(spec.continueAgent ? { continueAgent: true } : {}),
+    ...(isDriverName(o.driver) ? { driver: o.driver } : {}),
+    ...(isAgentLocation(o.target) ? { target: o.target } : {}),
+    ...(o.model?.trim() ? { model: o.model.trim() } : {}),
+    ...(o.resumeSession?.trim() ? { resumeSession: o.resumeSession.trim() } : {}),
+    // The ticket comes off a queue file an agent writes, so it is re-checked here rather than
+    // trusted: a path that is not a ticket never reaches the agent (#1117).
+    ...(o.ticket && isTicketPath(o.ticket) ? { ticket: o.ticket } : {}),
+    ...(o.planAgent ? { planAgent: true } : {}),
+    ...(o.unattended ? { unattended: true } : {}),
+    ...(defined(o.vanilla) ? { vanilla: o.vanilla } : {}),
+    ...(defined(o.transparent) ? { transparent: o.transparent } : {}),
+    ...(isHandoffLevel(o.handoff) ? { handoff: o.handoff } : {}),
+    ...(o.onBeforeMergeable ? { onBeforeMergeable: true } : {}),
+    ...(o.browser ? { browser: true } : {}),
+  }
+}
+
+
+/**
+ * Resolve the Claude Code driver options for a live session. A session is a headless autonomous
+ * builder: every turn is `claude -p`, which cannot answer an interactive approval. The driver's
+ * library default (`acceptEdits`) silently denies installs/builds/tests, so the production-grade
+ * checklist can never verify the app actually builds/runs (#225). `bypassPermissions`, so the full
+ * loop runs unattended.
+ *
+ * There used to be a `--permission-mode` and a `--dangerously-skip-permissions` to override it.
+ * Neither had a dashboard control, so with the flags gone (D4) nothing sets them and the mode is
+ * simply what it always resolved to.
+ */
+export function claudeDriverOptions(): ClaudeCodeDriverOptions {
+  return { permissionMode: 'bypassPermissions' }
 }
 
 /**
- * The flags the picked agent cannot honor (#542), as lines to print at startup.
+ * The settings the picked driver cannot honor (#542), as lines to print at startup.
  *
- * A flag that silently does nothing is worse than one that errors. `--agent
- * codex --max-cost 5` reads as capped and isn't: the cap is only ever checked on
- * a turn that reports a price, and Codex reports none (#540). The consumption
- * limits go the same way — no quota to read means no gate. So the run says which
- * guards are not in force, rather than letting the flag imply they are.
+ * A setting that silently does nothing is worse than one that errors. So the session says which
+ * settings are not in force, rather than letting them imply they are.
  */
-export function unguardedNotices(
-  opts: Pick<CliOptions, 'agent' | 'maxCost' | 'browser' | 'permissionMode' | 'skipPermissions'>,
-): string[] {
-  const spec = AGENT_SPECS[opts.agent]
+export function unguardedNotices(opts: Pick<AgentOptions, 'driver' | 'browser'>): string[] {
+  const spec = DRIVER_SPECS[opts.driver]
   const notices: string[] = []
-  if (opts.maxCost != null && !spec.reportsCost) {
-    notices.push(`--max-cost $${opts.maxCost} cannot be enforced: ${spec.label} reports no price per turn, so the spend cap never fires (#540).`)
-  }
-  if (opts.agent !== 'claude') {
-    if (opts.browser) {
-      notices.push(`--browser has no effect on ${spec.label}: the browser tools are wired through Claude Code's MCP config.`)
-    }
-    if (opts.permissionMode !== undefined || opts.skipPermissions) {
-      notices.push(`--permission-mode / --dangerously-skip-permissions have no effect on ${spec.label}: it sandboxes with its own policy (workspace-write).`)
-    }
+  if (opts.driver !== 'claude' && opts.browser) {
+    notices.push(`the browser has no effect on ${spec.label}: the browser tools are wired through Claude Code's MCP config.`)
   }
   return notices
 }
 
-/** The Eco section drops in effect (#314), or `undefined` when none are set. */
-export function ecoOptions(opts: Pick<CliOptions, 'eco'>): EcoOptions | undefined {
-  const { autoPlanning, autoResearch, autoMaintenance } = opts.eco
-  if (!autoPlanning && !autoResearch && !autoMaintenance) return undefined
-  return { autoPlanning, autoResearch, autoMaintenance }
-}
-
-/** The log kind a run records in `.the-framework/LOGS.md` (#379): the direct paths are prompts, a
- * build run is a build. Transparent (#625) routes a build-kind run through the raw prompt path too,
- * so it logs as a prompt. */
-export function runLogKind(opts: Pick<CliOptions, 'directPrompt' | 'research'>, transparent = false): LogEntry['kind'] {
+/** Which flow an agent starts under (#1467), recorded on its meta: the direct paths are prompts, a
+ * build agent is a build. Transparent (#625) routes a build-kind agent through the raw prompt path too,
+ * so it records as a prompt. */
+export function agentLogKind(opts: Pick<AgentOptions, 'directPrompt' | 'research'>, transparent = false): AgentKind {
   return opts.directPrompt || opts.research || transparent ? 'prompt' : 'build'
 }
 
-/**
- * Build the project-log entry (#379) for a finished run from its `end` event and
- * the session captured along the way. Pure, so the status mapping is unit-testable
- * without a live run.
- *
- * A run that never emitted `end` still gets an entry (#898) — it was stopped, or it died
- * mid-flight, and either way it happened and belongs in the committed log. `stopped` then
- * decides between the two, since there is no event left to ask.
- */
-export function runLogEntry(input: {
-  at: string
-  kind: LogEntry['kind']
-  title: string
-  end?: Extract<FrameworkEvent, { kind: 'end' }> | undefined
-  stopped?: boolean | undefined
-  id?: string | undefined
-  sessionId?: string | undefined
-  sessionLink?: string | undefined
-  sessionName?: string | undefined
-  branch?: string | undefined
-}): LogEntry {
-  const status: LogEntry['status'] = input.end
-    ? input.end.ok
-      ? 'done'
-      : input.end.stopped
-        ? 'stopped'
-        : 'failed'
-    : input.stopped
-      ? 'stopped'
-      : 'failed'
-  return {
-    at: input.at,
-    kind: input.kind,
-    title: input.title,
-    status,
-    ...(input.id ? { id: input.id } : {}),
-    ...(input.sessionId ? { sessionId: input.sessionId } : {}),
-    ...(input.sessionLink ? { sessionLink: input.sessionLink } : {}),
-    ...(input.sessionName ? { sessionName: input.sessionName } : {}),
-    ...(input.branch ? { branch: input.branch } : {}),
-  }
-}
-
-/** This run's own flags as the nearest config layer (#841). A flag left off says nothing. */
-function flagConfigLayer(opts: RunConfigFlags): ConfigLayer {
+/** This agent's own flags as the nearest config layer (#841). A flag left off says nothing. */
+function flagConfigLayer(opts: AgentConfigFlags): ConfigLayer {
   return {
     name: 'flag',
     values: {
       ...(opts.preset !== undefined ? { preset: opts.preset } : {}),
       ...(opts.buildEvent !== undefined ? { event: opts.buildEvent } : {}),
-      ...(opts.autopilot !== undefined ? { autopilot: opts.autopilot } : {}),
-      ...(opts.technical !== undefined ? { technical: opts.technical } : {}),
-      // --vanilla is the negative face of the same key: it removes the built-in prompt.
-      ...(opts.vanilla !== undefined ? { antiLazyPill: !opts.vanilla } : {}),
+      ...(opts.vanilla !== undefined ? { vanilla: opts.vanilla } : {}),
       ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
-      ...(opts.autoPushBranch !== undefined ? { autoPushBranch: opts.autoPushBranch } : {}),
-      ...(opts.autoOpenPr !== undefined ? { autoOpenPr: opts.autoOpenPr } : {}),
-      ...(opts.autoMerge !== undefined ? { autoMerge: opts.autoMerge } : {}),
+      ...(opts.handoff !== undefined ? { handoff: opts.handoff } : {}),
     },
   }
 }
 
-type RunConfigFlags = Pick<
-  CliOptions,
-  'preset' | 'autopilot' | 'technical' | 'buildEvent' | 'vanilla' | 'transparent' | 'autoPushBranch' | 'autoOpenPr' | 'autoMerge'
->
+type AgentConfigFlags = Pick<AgentOptions, 'preset' | 'buildEvent' | 'vanilla' | 'transparent' | 'handoff'>
 
 /**
- * Resolve a run's config over its layers, nearest wins (#841): the run's flags, then the repo's
+ * Resolve an agent's config over its layers, nearest wins (#841): the agent's flags, then the repo's
  * `the-framework.yml`. #800 slots the project-user and global tiers in between and at the end.
  */
-export function mergeRunConfig(opts: RunConfigFlags, file: FrameworkFileConfig): ResolvedRunConfig {
-  return resolveRunConfig([flagConfigLayer(opts), fileConfigLayer(file)])
+export function mergeAgentConfig(opts: AgentConfigFlags, file: FrameworkFileConfig): ResolvedAgentConfig {
+  return resolveAgentConfig([flagConfigLayer(opts), fileConfigLayer(file)])
 }
 
-/**
- * Resolve `--preset <name>` to a shipped {@link DomainPreset}, loaded with the
- * active `modes` so its conditions variants are selected (#254, #256). Returns
- * nothing when no `--preset` was given; an error (with the available names) when
- * the name does not match a built-in.
- */
-export async function resolveDomainPreset(
-  name: string | undefined,
-  modes: readonly string[],
-): Promise<{ preset?: DomainPreset; error?: string }> {
-  if (!name) return {}
-  const presets = await builtinDomainPresets({ modes })
-  const preset = selectPreset(presets, name)
-  if (!preset) {
-    const available = presets.map(p => p.name).join(', ') || '(none shipped)'
-    return { error: `unknown --preset: ${name}. Available: ${available}` }
-  }
-  return { preset }
-}
-
-/** The run-scoped state {@link settleRun} needs to close out either run path. */
-interface RunEpilogue {
+/** The run-scoped state {@link settleAgent} needs to close out either run path. */
+interface AgentEpilogue {
   io: CliIO
-  dashboard: Dashboard | undefined
-  store: RunStore | undefined
+  store: AgentStore | undefined
   control: ControlWatcher | undefined
-  guard: { stop: () => void } | undefined
-  publisher: RelayPublisher | undefined
-  /** The run's Chrome (#793), stopped with the run so no headless browser outlives it. */
+  /** The agent's Chrome (#793), stopped with the agent so no headless browser outlives it. */
   sharedBrowser: SharedBrowser | undefined
-  /** The preview of that browser (#802), stopped with the run. */
+  /** The preview of that browser (#802), stopped with the agent. */
   browserStream: BrowserStream | undefined
   clearInterrupt: () => void
   maybeFireOnBeforeMergeable: () => Promise<void>
   /** Hand the session's work back (#1102): push its branch and open a draft PR, if still armed. */
   maybeAutoHandoff: () => Promise<void>
-  /** Write the run's `.the-framework/LOGS.md` entry (#898). Idempotent: called on every exit path. */
-  finishLog: () => Promise<void>
-  /** True once the run stopped cleanly (interrupt / budget cap) rather than failed. */
+  /** True once the agent stopped cleanly (interrupt / budget cap) rather than failed. */
   isStopped: () => boolean
   /** How a real failure is labelled: "run", "research", or "prompt run". */
   failLabel: string
@@ -912,172 +421,111 @@ interface RunEpilogue {
 
 /**
  * Run one engine (a build or a direct prompt) and settle it identically: on success print its
- * line and keep the dashboard (and any app preview) up until Ctrl+C; on a clean stop (interrupt
- * / budget cap #322) report it and stay up; on a real failure report it and close. The teardown
- * — flush the store, close the control channel + consumption guard, flush the relay — runs
- * either way. Returns the exit code (0 on success or a clean stop, 1 on a failure). Shared by
- * both run paths so their epilogues cannot drift.
+ * line; on a clean stop (interrupt / budget cap #322) report it; on a real failure report it. The
+ * teardown — flush the store, close the control channel + consumption guard — runs either way.
+ * Returns the exit code (0 on success or a clean stop, 1 on a failure). Shared by both agent paths
+ * so their epilogues cannot drift.
  */
-async function settleRun(
-  ctx: RunEpilogue,
-  run: () => Promise<{ successLine: string; preview?: AppPreview }>,
-): Promise<number> {
-  const { io, dashboard } = ctx
+async function settleAgent(ctx: AgentEpilogue, run: () => Promise<{ successLine: string }>): Promise<number> {
+  const { io } = ctx
   try {
-    const { successLine, preview } = await run()
-    // Run settled: hand Ctrl+C back to the post-run dashboard/app wait below.
+    const { successLine } = await run()
     ctx.clearInterrupt()
     io.out(successLine)
-    if (preview) io.out(`\n▶ Your app is running at ${preview.url} — open it in a browser.`)
-    // Before the close, not after (#835): close() archives the log into `runs/`, so an
+    // Before the close, not after (#835): close() archives the log into `agents/`, so an
     // outcome appended afterwards would miss the copy the dashboard's history reads.
     await ctx.maybeFireOnBeforeMergeable()
     // After the quality step, so whatever it committed is in what gets pushed; before the close,
     // for the same reason as above — `close()` archives the log, and an outcome appended after it
     // would miss the copy the dashboard's history reads (#835).
     await ctx.maybeAutoHandoff()
-    await ctx.finishLog()
     await ctx.store?.close() // flush the event log; best-effort
-    // Stay up while the dashboard and/or the app are live, then tear both down.
-    if (dashboard || preview) {
-      if (dashboard) io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
-      else io.out(`\nPress Ctrl+C to stop the app.`)
-      await waitForInterrupt()
-      if (preview) await preview.stop()
-      await dashboard?.close()
-    }
     return 0
   } catch (err) {
     ctx.clearInterrupt()
-    // Before the close, like the success path: a run that stopped or blew up is still a session,
-    // and this is the only place the failing path can record it (#898).
-    await ctx.finishLog()
     await ctx.store?.close()
-    // A clean stop (Stop button, Ctrl+C, or a budget cap #322) is not a failure: report it,
-    // keep the dashboard up so the stopped state stays visible, and exit 0.
+    // A clean stop (Stop button, Ctrl+C, or a budget cap #322) is not a failure: report it and
+    // exit 0. The dashboard that spawned this session shows the stopped state from its event log.
     if (ctx.isStopped()) {
       io.out('\n■ Stopped.')
-      if (dashboard) await keepDashboardUp(dashboard, io)
       return 0
     }
     io.err(`\n✗ ${ctx.failLabel} failed: ${errorMessage(err)}`)
-    await dashboard?.close()
     return 1
   } finally {
     ctx.clearInterrupt()
     ctx.control?.close()
-    ctx.guard?.stop()
     await ctx.browserStream?.close()
     await ctx.sharedBrowser?.close()
-    // Make sure every event (including the final `end`) reached the relay before exit.
-    if (ctx.publisher) await ctx.publisher.flush()
   }
 }
 
 /**
- * Start this run's single-project dashboard on `cwd` (#427), or return undefined to run
- * headless. `enabled` gates it (a --no-persist run has no event log to stream); a missing
- * bundle (an old install) or a startup error also fall back to headless. `resumed` tags the
- * URL line, and `headlessNote` is the fallback message's tail.
- */
-async function startRunDashboard(
-  enabled: boolean,
-  cwd: string,
-  port: number | undefined,
-  io: CliIO,
-  labels: { resumed?: boolean; headlessNote: string },
-): Promise<Dashboard | undefined> {
-  if (!enabled) return undefined
-  const clientBundleDir = await resolveDashboardBundle()
-  if (!clientBundleDir) return undefined
-  try {
-    const dashboard = await startDashboard({
-      ...(port !== undefined ? { port } : {}),
-      clientBundleDir,
-      projects: singleProjectProvider(cwd),
-    })
-    io.out(`◆ dashboard${labels.resumed ? ' (resumed)' : ''}: ${dashboard.url}`)
-    return dashboard
-  } catch (err) {
-    io.err(`could not start dashboard (${errorMessage(err)}); ${labels.headlessNote}`)
-    return undefined
-  }
-}
-
-/**
- * Resolve the system-prompt configuration both run paths share (#301/#314), echoing what
- * is in effect: a user SYSTEM.md, the built-in prompt toggle, the eco section drops, and the
- * in-context dirs. Reads SYSTEM.md once, so call it on the shared path before either run.
+ * Resolve the system-prompt configuration both agent paths share (#301/#314), echoing what
+ * is in effect: a user SYSTEM.md, the built-in prompt toggle, and the in-context dirs. Reads
+ * SYSTEM.md once, so call it on the shared path before the session starts.
  */
 async function resolvePromptConfig(
-  opts: CliOptions,
-  config: ResolvedRunConfig,
+  opts: AgentOptions,
+  config: ResolvedAgentConfig,
   cwd: string,
   io: CliIO,
   transparent: boolean,
-): Promise<{ userSystemPrompt?: string; noBuiltinPrompt: boolean; eco?: EcoOptions }> {
+): Promise<{ userSystemPrompt?: string; noBuiltinPrompt: boolean }> {
   const userSystemPrompt = await loadUserSystemPrompt(cwd)
   // Transparent empties the whole channel, which subsumes "no built-in prompt".
-  const noBuiltinPrompt = transparent || !config.antiLazyPill
-  const eco = ecoOptions(opts)
+  const noBuiltinPrompt = transparent || config.vanilla
   if (userSystemPrompt) io.out(`◆ system prompt: ${SYSTEM_PROMPT_FILE}`)
   // Transparent already announced itself (guard line); don't double-report the prompt being off.
-  // Name the layer that turned it off; at the flag tier that flag is --vanilla.
-  const offBy = config.sources.antiLazyPill === 'flag' ? '--vanilla' : (config.sources.antiLazyPill ?? 'transparent')
+  // Name the layer that turned it off.
+  const offBy = config.sources.vanilla ?? 'transparent'
   if (noBuiltinPrompt && !transparent) io.out(`◆ built-in system prompt: off (${offBy})`)
-  else if (eco) io.out(`◆ eco: dropping ${Object.keys(eco).filter(k => eco[k as keyof EcoOptions]).join(', ')}`)
   if (opts.context.length) io.out(`◆ context: ${opts.context.join(', ')}`)
-  return { ...(userSystemPrompt ? { userSystemPrompt } : {}), noBuiltinPrompt, ...(eco ? { eco } : {}) }
+  return { ...(userSystemPrompt ? { userSystemPrompt } : {}), noBuiltinPrompt }
 }
 
 /**
  * The `framework` command. Wires the parsed options into {@link runFramework}
  * over a live dashboard + terminal narration, and resolves with an exit code.
- * Returns 0 on success, 1 on a run error, 2 on a usage error.
+ * Returns 0 on success, 1 on an agent error, 2 on a usage error.
  */
 /**
- * Whether this run can be steered over `.the-framework/control.jsonl` (#344): Stop, a choice pick,
- * a live message. True when its own dashboard is up (#427), when the machine's daemon is live
- * (#393, whose dashboard lists and steers any project's run), or when whoever spawned it handed it
- * a run id.
+ * Whether this agent can be steered over `.the-framework/control.jsonl` (#344): Stop, a choice pick,
+ * a live message. True when its own dashboard is up (#427), or when whoever spawned it handed it a
+ * agent id — the dashboard spawns each session with one in its spec, and steers it
+ * from its own process.
  *
- * That last clause is the #905 fix. The daemon spawns runs with `--no-dashboard`, so `daemonAlive`
- * was the only thing wiring their control channel, and it is a machine-global file that went
- * missing while the daemon was very much alive: `daemonStatus()` deleted it on a stale pid and
- * nothing rewrote it (#922, since fixed). Every Stop press then landed in control.jsonl and was read by
- * nobody, with no error anywhere. A run id is a fact about this run, so it holds when the file
- * does not.
+ * This used to have a third clause, "a daemon is alive somewhere on this machine", read from a
+ * global state file. That file is gone with the background daemon (D4b), and it was never a fact
+ * about *this* run in the first place: it went missing while the daemon was very much alive
+ * (#922), and every Stop press then landed in control.jsonl and was read by nobody, in silence
+ * (#905). An agent id holds when a file about another process does not.
  */
-export function isSteerable(
-  opts: { persist: boolean; runId?: string | undefined },
-  hasDashboard: boolean,
-  daemonAlive: boolean,
-): boolean {
-  return opts.persist && (hasDashboard || opts.runId !== undefined || daemonAlive)
+export function isSteerable(opts: { persist: boolean; agentId?: string | undefined }): boolean {
+  return opts.persist && opts.agentId !== undefined
 }
 
 /**
- * Whether this run should stay open for the user's own messages once it settles (#714).
+ * Whether this session should stay open for the user's own messages once it settles (#714).
  *
- * Narrower than {@link isSteerable} on purpose, and this is the other half of #905. Being
- * steerable only means someone *could* reach it; staying open means a human is expected to keep
- * talking to it. A run typed into a terminal with `--no-dashboard` is neither, but it used to
- * inherit the chat queue purely because a daemon happened to be alive elsewhere on the machine,
- * and then parked forever on a message that terminal could never send. #714 said as much:
- * "headless / CI runs end when done, exactly as today."
+ * The other half of #905. Being steerable only means someone *could* reach it; staying open means
+ * a human is expected to keep talking to it. A headless agent is neither, but it used to inherit the
+ * chat queue purely because a daemon happened to be alive elsewhere on the machine, and then
+ * parked forever on a message nothing could send. #714 said as much: "headless / CI runs end when
+ * done, exactly as today."
  *
- * So: this run's own dashboard, or the daemon started it (a run id) and therefore has a UI to
- * carry on the conversation in. Stop and gate picks keep working either way.
+ * So: the dashboard started it (an agent id) and therefore has a UI to carry on the conversation in.
+ * Stop and gate picks keep working either way.
  */
-export function isInteractive(opts: { runId?: string | undefined }, hasDashboard: boolean): boolean {
-  return hasDashboard || opts.runId !== undefined
+export function isInteractive(opts: { agentId?: string | undefined }): boolean {
+  return opts.agentId !== undefined
 }
 
 /**
- * Route Ctrl+C / SIGTERM into aborting the run — not into default signal termination, which
+ * Route Ctrl+C / SIGTERM into aborting the agent — not into default signal termination, which
  * would kill the framework while its spawned Claude Code tree keeps running (the
  * orphaned-process leak). Aborting drives the driver to group-kill its child; a second
- * signal force-quits. Returns the disarm, called once the run settles.
+ * signal force-quits. Returns the disarm, called once the agent settles.
  */
 function armInterrupt(controller: AbortController, io: CliIO): () => void {
   let interrupts = 0
@@ -1097,39 +545,14 @@ function armInterrupt(controller: AbortController, io: CliIO): () => void {
   }
 }
 
-/**
- * Record chat turns into the committed conversation (#908). Fire-and-forget at the call
- * site — a failed write must never stall or fail a run — but appends are chained rather
- * than fired in parallel: each one creates the dir/header before it writes, so two
- * overlapping turns would race and could land the reply above the message it answers.
- * `flush()` is awaited before the run's log entry, or the last reply is lost (#908).
- */
-function conversationRecorder(deps: {
-  cwd: string
-  enabled: boolean
-  conversationId: string | undefined
-  localVia: string
-}): { recordMessage?: RecordMessage; flush: () => Promise<void> } {
-  const { cwd, conversationId } = deps
-  if (!deps.enabled || !conversationId) return { flush: () => Promise.resolve() }
-  let tail: Promise<void> = Promise.resolve()
-  const recordMessage: RecordMessage = (role, text, via) => {
-    // A per-turn origin wins, but only a safe one: it arrives from a chat surface over the
-    // control channel, and the heading it lands in is line-parsed (#897's threat model).
-    const message = { at: new Date().toISOString(), role, via: isSafeVia(via) ? via : deps.localVia, text }
-    tail = tail.then(() => appendMessage(cwd, conversationId, message)).catch(() => {})
-  }
-  return { recordMessage, flush: () => tail }
-}
-
-/** What the run journal exposes to the epilogue. See {@link createRunJournal}. */
-export interface RunJournal {
+/** What the agent journal exposes to the epilogue. See {@link createAgentJournal}. */
+export interface AgentJournal {
   onEvent: (event: FrameworkEvent) => void
   /** The session name the agent chose via setSessionName() (#326), once it has. */
   sessionName: () => string | undefined
-  /** The agent signalled setReadyForMerge() this run (#326). */
+  /** The agent signalled setReadyForMerge() this agent (#326). */
   sawReadyForMerge: () => boolean
-  /** The run stopped cleanly (user interrupt / budget cap #322) rather than failed. */
+  /** The agent stopped cleanly (user interrupt / budget cap #322) rather than failed. */
   stoppedCleanly: () => boolean
   /** Hold the browser preview's port until the session opens (#829/#813). */
   announceBrowserPort: (port: number) => void
@@ -1137,43 +560,32 @@ export interface RunJournal {
    *  session is open, held until then, and re-said after every later `session` so the row
    *  survives the dashboard's last-session slice. */
   announceBrowserUrl: (url: string) => void
-  /** Write the run's `.the-framework/LOGS.md` entry (#898). Idempotent; every exit path calls it. */
-  finishLog: () => Promise<void>
 }
 
 /**
- * The run's event sink and the state its epilogue reads. One event arrives and this prints it,
- * persists it, publishes it to the relay, folds the fields the LOGS.md entry needs (session
- * id/link, the end event), tracks the settle flags (#322/#326), renames the framework-owned
- * branch once the agent names its session (#736), and re-emits a held browser-stream port
- * right after `session` so it lands in the slice the dashboard renders (#829). These jobs sat
- * inline in runCli across six mutable locals; the journal is their one owner, and runCli reads
- * the getters. Exported for the rename-records-the-branch test (#1277).
+ * The agent's event sink and the state its epilogue reads. One event arrives and this prints it,
+ * persists it, tracks the settle flags (#322/#326), renames the framework-owned branch once the
+ * agent names its session (#736), and re-emits a held browser-stream port right after `session` so
+ * it lands in the slice the dashboard renders (#829). These jobs sat inline in runCli across six
+ * mutable locals; the journal is their one owner, and runCli reads the getters. Exported for the
+ * rename-records-the-branch test (#1277).
  */
-export function createRunJournal(deps: {
+export function createAgentJournal(deps: {
   io: CliIO
   cwd: string
-  store: RunStore | undefined
-  publisher: RelayPublisher | undefined
-  runId: string | undefined
-  kind: LogEntry['kind']
-  title: string
-  /** Awaited before the log entry is written: the queued conversation appends (#908). */
-  beforeLog: () => Promise<void>
-}): RunJournal {
-  const { io, cwd, store, publisher } = deps
-  // The framework's own verdict that the run stopped cleanly rather than failed — set by a
+  store: AgentStore | undefined
+  agentId: string | undefined
+}): AgentJournal {
+  const { io, cwd, store } = deps
+  // The framework's own verdict that the agent stopped cleanly rather than failed — set by a
   // user interrupt or a budget cap (#322). Trusted over which signal aborted, since a budget
   // stop trips an internal signal the CLI never sees.
   let stoppedCleanly = false
   let sawReadyForMerge = false
   let sessionName: string | undefined
-  let logSessionId: string | undefined
-  let logSessionLink: string | undefined
-  let logEnd: Extract<FrameworkEvent, { kind: 'end' }> | undefined
   // The browser preview's port, announced on the first `session` event rather than when the
   // bridge opens (#829): the dashboard renders only the tail from the last `session` event, so
-  // anything emitted ahead of it is dropped from the run's view.
+  // anything emitted ahead of it is dropped from the agent's view.
   let pendingBrowserPort: number | undefined
   // The page the browser preview is on (#1455 item 6b). Held the same way the port is until a
   // session opens; after that a navigation emits straight away. Re-emitted after EVERY `session`
@@ -1181,42 +593,30 @@ export function createRunJournal(deps: {
   // starts a fresh rendered slice, and without the re-say its transcript would have no browser
   // row to host the pane.
   let latestBrowserUrl: string | undefined
-  let sessionOpen = false
+  let agentOpen = false
 
   const onEvent = (event: FrameworkEvent) => {
-    if (event.kind === 'session' && event.sessionLink) logSessionLink = event.sessionLink
-    else if (event.kind === 'session-update') {
-      logSessionId = event.sessionId
-      if (event.sessionLink) logSessionLink = event.sessionLink
-    }
     if (event.kind === 'ready-for-merge') sawReadyForMerge = true
     if (event.kind === 'session-name') {
       sessionName = event.name
-      // The framework-owned checkout (#736) was branched as `the-framework/run-<id>` before a
+      // The framework-owned checkout (#736) was branched as `the-framework/agent-<id>` before a
       // name existed; put the readable name on it now. No-ops when the agent branched itself,
       // and only a rename that happened is recorded (#1277) — a guessed name on the meta is
       // exactly what the branch event exists to end.
-      if (deps.runId) {
+      if (deps.agentId) {
         const renamed = `the-framework/${event.name}`
-        void renameRunBranch(cwd, runBranchName(deps.runId), renamed).then(didRename => {
+        void renameAgentBranch(cwd, agentBranchName(deps.agentId), renamed).then(didRename => {
           if (didRename) onEvent({ kind: 'branch', branch: renamed })
         })
       }
     }
-    if (event.kind === 'end') {
-      if (event.stopped) stoppedCleanly = true
-      // Held, not logged here (#898): the entry is written as the run settles, which is both
-      // after every run reaches it (an `end` is not guaranteed) and the last moment the branch
-      // can still be read off the checkout.
-      logEnd = event
-    }
+    if (event.kind === 'end' && event.stopped) stoppedCleanly = true
     io.out(formatFrameworkEvent(event))
     void store?.append(event)
-    publisher?.publish(event)
 
     // Right after the session opens, so it lands inside the slice the dashboard renders.
     if (event.kind === 'session') {
-      sessionOpen = true
+      agentOpen = true
       if (pendingBrowserPort !== undefined) {
         const port = pendingBrowserPort
         pendingBrowserPort = undefined
@@ -1224,31 +624,6 @@ export function createRunJournal(deps: {
       }
       if (latestBrowserUrl !== undefined) onEvent({ kind: 'browser', url: latestBrowserUrl })
     }
-  }
-
-  // Once per run, and on every path out — a stopped or crashed run is still a session that
-  // happened, and leaving it out is what made the committed log an incomplete record (#898).
-  let logged = false
-  const finishLog = async (): Promise<void> => {
-    if (logged) return
-    logged = true
-    // Let the queued conversation appends land before we exit, or the last reply is lost (#908).
-    await deps.beforeLog()
-    const entry = runLogEntry({
-      at: new Date().toISOString(),
-      kind: deps.kind,
-      title: deps.title,
-      end: logEnd,
-      stopped: stoppedCleanly,
-      id: deps.runId,
-      sessionId: logSessionId,
-      sessionLink: logSessionLink,
-      sessionName,
-      // The last moment it can be observed (#799): a run worktree is torn down after this
-      // process exits, and the agent may have branched itself, so neither name is derivable later.
-      branch: await currentBranch(cwd),
-    })
-    await appendLog(cwd, entry).catch(() => {})
   }
 
   return {
@@ -1261,203 +636,114 @@ export function createRunJournal(deps: {
     },
     announceBrowserUrl: url => {
       latestBrowserUrl = url
-      if (sessionOpen) onEvent({ kind: 'browser', url })
+      if (agentOpen) onEvent({ kind: 'browser', url })
     },
-    finishLog,
   }
 }
 
 export async function runCli(argv: string[], io: CliIO = defaultIO): Promise<number> {
-  const opts = parseArgs(argv)
-  if (opts.error) {
-    io.err(opts.error)
+  const args = parseArgs(argv)
+  if (args.error) {
+    io.err(args.error)
     io.err('Run `framework --help` for usage.')
     return 2
   }
-  if (opts.help) {
+  if (args.help) {
     io.out(HELP)
     return 0
   }
-  if (opts.version) {
+  if (args.version) {
     io.out(frameworkVersion())
     return 0
   }
-  if (opts.doctor) {
-    const result = await preflight({ agent: opts.agent })
-    // A warning is neither a tick nor a cross (#1326): running as root is not a failed check,
-    // but printing it with a ✓ would file the one thing that breaks every run under "all good".
-    for (const check of result.checks) io.out(`${check.warn ? '!' : check.ok ? '✓' : '✗'} ${check.name}: ${check.detail}`)
-    if (result.ok && result.checks.some(c => c.warn)) io.out('\nNo failures, but read the warnings above before you start a session.')
-    else io.out(result.ok ? '\nAll good. You are ready to build.' : '\nSome checks failed. Fix them, then try again.')
-    return result.ok ? 0 : 1
+  // `--agent <path>`: the dashboard's process API (D4). One session, described entirely by the
+  // JSON spec at that path — which is consumed as it is read, so a device token in its options
+  // does not outlive the session that used it.
+  if (args.session !== undefined) {
+    let spec: AgentSpec
+    try {
+      spec = await readAgentSpec(args.session)
+    } catch (err) {
+      io.err(`could not read the session spec (${errorMessage(err)}).`)
+      return 2
+    }
+    return driveAgent(agentOptions(spec), io)
   }
-
-  // `framework relay` hosts the run relay: teammates open a run's URL and watch it
-  // live (#230). It runs until interrupted; a run publishes to it with `--share`.
-  if (opts.relayServe) return runRelayServer(opts, io)
-
-  // Resume a previous run's dashboard from its persisted log — the reload half of
-  // #211. No agent runs; we just replay the saved events into a fresh stream so
-  // the dashboard rehydrates exactly as it looked, then leave it up read-only.
-  if (opts.resume) return resumeRun(opts, io)
-
-  // `--daemon-serve` is the detached child's own entry: it *is* the persistent dashboard,
-  // serving until signalled. Internal — the background `--daemon` path spawns it (#456).
-  if (opts.daemonServe) {
-    await runDaemon(opts.cwd ?? process.cwd(), {
-      ...(opts.port !== undefined ? { port: opts.port } : {}),
-      ...(opts.host !== undefined ? { host: opts.host } : {}),
-    })
-    return 0
-  }
-
-  // `framework --daemon` runs the dashboard in the background (detached) and returns, printing
-  // the convenience commands (#456). Bare `framework` foregrounds it instead (below).
-  if (opts.daemon) return ensureDaemonCmd(opts, io)
-
-  // `framework stop` stops this workspace's background dashboard.
-  if (opts.stop) return stopDaemonCmd(opts, io)
-
-  // `framework maintain` sweeps the registered repos, running the maintenance loop on
-  // any that grew un-reviewed commits (#298). No dashboard, no intent.
-  if (opts.maintain) return maintainCmd(opts, io)
-
-  // `framework worktrees` is the CLI half of the dashboard's retained-worktree cleanup (#752).
-  if (opts.worktrees) return worktreesCmd(opts.worktrees, opts.cwd ?? process.cwd(), io)
-
-  // Everything left is a live run — handled below so the top of runCli stays a dispatch table.
-  return runBuild(opts, io)
+  // Everything else is bare `framework`: serve the dashboard in the foreground until Ctrl-C.
+  return runForegroundDaemonCmd(args, io)
 }
 
 /**
- * The live-run command: a build, a direct `prompt`/`research`, or bare `framework` (which
- * foregrounds the dashboard when there is nothing to build). Resolves config over the layers,
- * runs preflight, wires this run's store / control channel / dashboard / browser / consumption
- * guard / journal, then hands the whole thing to {@link settleRun}. Returns the process exit
- * code. Split out of {@link runCli} so the top reads as a dispatch table and this reads as one
- * run's lifecycle, like every other subcommand handler.
+ * Everything the CLI wires around one session before {@link runAgent} drives it: config
+ * resolved over the layers, the store, the control channel, the browser and the journal — then
+ * handed to {@link settleAgent}. Returns the process exit code. Split out of
+ * {@link runCli} so the top reads as a dispatch table and this reads as one session's lifecycle.
  */
-async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
+async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   const fake = opts.fake
   const intent = opts.intent || (fake ? FAKE_INTENT : '')
-  // Bare `framework` (no prompt): run the dashboard server in the foreground so its logs
-  // (and server-thrown errors) are visible, and Ctrl+C stops it (#456). A prompt still
-  // builds. A bare `framework prompt` has nothing to run — verbatim text is required.
-  if (opts.directPrompt && !intent) {
-    io.err('framework prompt needs the prompt text, e.g. `framework prompt "review the auth flow"`.')
-    io.err('Run `framework --help` for usage.')
+  // A `prompt` session runs verbatim text, so it needs some. `research` is the one kind whose
+  // empty prompt is fine — its "what" falls back to the preset default.
+  if (!intent && !fake && !opts.research) {
+    io.err('this session has no prompt to run.')
     return 2
   }
-  // A bare `framework research` is a real run — its "what" falls back to the preset default.
-  if (!intent && !fake && !opts.research) return runForegroundDaemonCmd(opts, io)
 
   const cwd = opts.cwd ?? (fake ? join(tmpdir(), 'framework-fake-workspace') : process.cwd())
 
-  // The project can carry its own Open Loop defaults in the-framework.yml (#258):
-  // which domain preset + modes to build under. CLI flags override the file; a bad
-  // file is a warning, never a failed run. Read from the run's own workspace, so a
-  // --fake demo (empty tmp cwd) stays deterministic unless pointed at a config dir.
+  // The project can carry its own defaults in the-framework.yml (#258): the prompt switches and
+  // how far a finished agent publishes itself. A bad file is a warning, never a failed agent. Read
+  // from the agent's own workspace, so the fake demo (an empty tmp cwd) stays deterministic unless
+  // it is pointed at a config dir.
   const fileConfig = await loadFrameworkConfig(cwd, msg => io.err(msg))
-  // One resolve over the layers (#841): the nearest layer that set a key wins, so this run's
-  // flags beat the repo file and an explicit `--no-autopilot` can turn off what the file set.
-  const config = mergeRunConfig(opts, fileConfig)
+  // One resolve over the layers (#841): the nearest layer that set a key wins, so what the caller
+  // asked for beats the repo file. Not CLI flags — the CLI has no such flags since D4; these are
+  // the spec the dashboard (or an embedder) handed this process, and `false` there is an answer,
+  // not an absence, so it can turn off what the file set.
+  const config = mergeAgentConfig(opts, fileConfig)
   const fromConfig = describeResolvedConfig(config)
   if (fromConfig) io.out(`◆ config: ${fromConfig}`)
 
   // Transparent mode (#625): the coarse master off-switch — `--transparent` or the-framework.yml.
-  // When on, this run is byte-identical to raw `claude -p`: no framework system channel (composed
-  // empty below), no consumption guard, no dashboard, no TODO loop. Resolved once here so every
+  // When on, this agent is byte-identical to raw `claude -p`: no framework system channel (composed
+  // empty below), no dashboard, no TODO loop. Resolved once here so every
   // one of those sites reads the same answer.
   const transparent = config.transparent
 
-  // Only the direct-prompt path resumes a conversation (#782): a build run rebuilds the
+  // Only the direct-prompt path resumes a conversation (#782): a build agent rebuilds the
   // scope/build framing a resumed transcript already carries, so it takes no session id and
   // used to drop the flag on the floor. Silently losing the context you asked to continue
   // from is the worst outcome, so say so and stop rather than run a fresh session that looks
   // like a resumed one. The exception is a continuation (#1467): `--continue-run` re-enters an
   // existing run, whose recorded flow decides the path — there the session id is the point.
-  if (opts.resumeSession && !(opts.research || opts.directPrompt || transparent || opts.continueRun)) {
-    io.err('--resume-session only applies to a prompt run, e.g. `framework prompt "keep going" --resume-session <id>`.')
+  if (opts.resumeSession && !(opts.research || opts.directPrompt || transparent || opts.continueAgent)) {
+    io.err('a resumed agent session only applies to a prompt session, not a build.')
     io.err('Run `framework --help` for usage.')
     return 2
   }
 
-  // Resolve which Open Loop domain preset (+ modes + build event) to run under:
-  // --preset / the-framework.yml, or none at all (#545). Nothing infers one.
-  let presetName = config.presetName
-  let modeList = resolvedModes(config)
-  let buildEvent = config.buildEvent
-  let domainPreset: DomainPreset | undefined
+  // No preflight here. The dashboard already ran it before spawning this session (#1326,
+  // `daemon-runtime`'s `driverPreflight`) and refused the start outright if the picked agent could
+  // not run, so a doomed session spends no branch and no worktree — and the report lands on the
+  // surface the user is looking at, rather than in a log they have to go and find. Re-running it
+  // here was the same check a second time, and it was wrong for a session that runs somewhere else
+  // entirely: `--run-on actions` needs no local agent CLI at all, which is exactly why the
+  // dashboard's own check skips it.
 
-  // An explicit --preset / the-framework.yml preset is validated up front — a bad
-  // name is a usage error, independent of the environment, so it fails the same way
-  // whether or not the agent is installed (before preflight).
-  if (presetName) {
-    const resolved = await resolveDomainPreset(presetName, modeList)
-    if (resolved.error) {
-      io.err(resolved.error)
-      io.err('Run `framework --help` for usage.')
-      return 2
-    }
-    domainPreset = resolved.preset
-  }
-
-  // The fake demo defaults to a Cloudflare deploy decision so the flow ends with
-  // a deploy phase; a live run only narrates deploy when asked.
-  const deploy: DeployDecision | undefined = opts.deploy
-    ? { render: 'ssr', target: opts.deploy, reason: `deploy to ${opts.deploy}` }
-    : fake
-      ? FAKE_DEPLOY
-      : undefined
-
-  // A real deploy target actually ships the app. Only for live runs against a
-  // known target; --fake stays plan-only and deterministic. An unknown target
-  // just narrates the decision. Real targets never throw on missing creds.
-  // Validated up front like --preset: a bad flag combination is a usage error, and it must
-  // fail before the dashboard / store / control channel are wired — a raw return after them
-  // leaked every handle and left the run recorded as `running` forever.
-  let deployTarget: DeployTarget | undefined
-  if (!fake && opts.deploy) {
-    const built = buildDeployTarget(opts.deploy, opts, cwd)
-    if (built.error) {
-      io.err(built.error)
-      io.err('Run `framework --help` for usage.')
-      return 2
-    }
-    deployTarget = built.target
-  }
-
-  // Fail early and clearly if a live run's prerequisites are missing — before the
-  // run, which needs the wrapped agent.
-  if (!fake && !opts.skipPreflight) {
-    const pre = await preflight({ agent: opts.agent })
-    // Warnings travel even on a pass (#1326): running as root does not fail a check, but it is
-    // why every run after it dies with an empty log, so it is said before the spending, not after.
-    for (const check of pre.checks.filter(c => c.warn)) io.err(`! ${check.name}: ${check.detail}`)
-    if (!pre.ok) {
-      for (const check of pre.checks.filter(c => !c.ok)) io.err(`✗ ${check.name}: ${check.detail}`)
-      io.err('Preflight failed. Fix the above, or pass --skip-preflight, or try `framework --fake`.')
-      return 2
-    }
-  }
-
-  // Which agent is about to spend the user's subscription, and which guards are
-  // not in force while it does — said *before* the first turn. A cap that turns
-  // out not to apply is worth knowing before the spending, not after (#542).
+  // Which agent is about to spend the user's subscription, and which settings are not in force
+  // while it does — said *before* the first turn (#542).
   if (!fake) {
-    if (opts.agent !== 'claude') io.out(`◆ agent: ${AGENT_SPECS[opts.agent].label}`)
+    if (opts.driver !== 'claude') io.out(`◆ driver: ${DRIVER_SPECS[opts.driver].label}`)
     for (const note of unguardedNotices(opts)) io.err(`note: ${note}`)
   }
 
-  const claudeOpts = claudeDriverOptions(opts)
-  // Detection signals: fixed for the fake demo, read from the project otherwise.
-  // Computed once here, reused by extension discovery and the run.
-  const signals = fake ? FAKE_SIGNALS : readProjectSignals(cwd)
-  // One controller for the whole run: the dashboard Stop button aborts it once
+  const claudeOpts = claudeDriverOptions()
+  // Computed once here, reused by extension discovery and the agent.
+  // One controller for the whole agent: the dashboard Stop button aborts it once
   // wired below.
   const controller = new AbortController()
 
-  // Ctrl+C / SIGTERM during a live run aborts the run; disarmed once it settles so the
+  // Ctrl+C / SIGTERM during a live agent aborts the agent; disarmed once it settles so the
   // post-run dashboard wait keeps its own Ctrl+C handling.
   const clearInterrupt = armInterrupt(controller, io)
 
@@ -1465,103 +751,84 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // runFramework checks the signal between phases and the driver kills its current
   // turn on it, so a stop takes effect promptly.
   //
-  // Interactive choices (#304): the run's requestChoice handler parks a resolver
+  // Interactive choices (#304): the agent's requestChoice handler parks a resolver
   // here keyed by the choice id; the dashboard's Accept / autopilot POSTs the pick
-  // to /choice, which resolves it. Aborting the run resolves any pending choice
-  // (proceed) so the gate never hangs a stopped run.
+  // to /choice, which resolves it. Aborting the agent resolves any pending choice
+  // (proceed) so the gate never hangs a stopped agent.
   const pendingChoices = new Map<string, (pick: ChoicePick) => void>()
-  // Live-chat messages the user sends to the running run (#714). The control watcher
+  // Live-chat messages the user sends to the running agent (#714). The control watcher
   // pushes each here; the run loop drains them between turns and waits here when idle.
-  const messages = new RunMessageQueue()
+  const messages = new AgentMessageQueue()
   controller.signal.addEventListener('abort', () => {
     for (const resolve of pendingChoices.values()) resolve({ picked: 'proceed', by: 'auto' })
     pendingChoices.clear()
     messages.close()
   })
-  // Serve the new Vike + Telefunc dashboard (#405/#427) for this run, in single-project mode:
-  // the SPA reads this one `cwd`'s event/control logs without touching the global registry, so
-  // a one-shot run never pollutes the Projects list. It streams the persisted event log, so a
-  // --no-persist run (or an old install missing the built bundle) runs headless.
-  const dashboard = await startRunDashboard(opts.dashboard && opts.persist && !transparent, cwd, opts.port, io, {
-    headlessNote: 'continuing headless',
-  })
-  // The new dashboard steers this live run purely through control.jsonl (its Stop / choice
-  // picks are Telefunc writes to that file, #427), which the watcher below tails whenever
-  // the dashboard is up — not only when a daemon is.
-  const newDashboard = dashboard !== undefined
+  // No per-session dashboard (D3). The one that spawned this session is already serving the UI,
+  // reading this session's event log off disk and steering it through control.jsonl — the file is
+  // the seam, so a second server on a second port was only ever a second implementation of the
+  // product's front door.
 
   // Persist the orchestration state so a restart can --resume it (#211). The log
   // is the dashboard's own event stream, appended to .the-framework/ in the workspace.
   // Best-effort: a store that fails to open just means no persistence, never a
   // failed run. --no-persist opts out entirely.
-  let store: RunStore | undefined
+  let store: AgentStore | undefined
   if (opts.persist) {
     try {
-      // Seed the run's intent (its prompt) so the dashboard's Runs list labels it instead of
-      // showing "(no prompt)". A build run refines this via its scope event; a prompt/research
+      // Seed the agent's intent (its prompt) so the dashboard's Runs list labels it instead of
+      // showing "(no prompt)". A build agent refines this via its scope event; a prompt/research
       // run keeps it. Research with no "what" uses the same preset default the log title uses.
-      store = await RunStore.open(cwd, {
+      store = await AgentStore.open(cwd, {
         fresh: true,
         intent: intent || (opts.research ? defaultWhat() : ''),
-        // Adopt the daemon's id (#736) so the run and the worktree it lives in share one.
-        ...(opts.runId ? { id: opts.runId } : {}),
-        // Continuing (#762): keep the existing log rather than starting this run's history over.
-        ...(opts.continueRun ? { continueRun: true } : {}),
-        // The flow this run starts under (#1467), so a later continuation can re-enter it. A
-        // continuation itself keeps the prior meta's record — this seed only lands on a fresh run.
-        kind: runLogKind(opts, transparent) === 'build' ? 'build' : 'prompt',
-        // Where the run executes (#1053): the run view reads it to switch to the Actions affordance.
+        // Adopt the daemon's id (#736) so the agent and the worktree it lives in share one.
+        ...(opts.agentId ? { id: opts.agentId } : {}),
+        // Continuing (#762): keep the existing log rather than starting this agent's history over.
+        ...(opts.continueAgent ? { continueAgent: true } : {}),
+        // The flow this agent starts under (#1467), so a later continuation can re-enter it. A
+        // continuation itself keeps the prior meta's record — this seed only lands on a fresh agent.
+        kind: agentLogKind(opts, transparent) === 'build' ? 'build' : 'prompt',
+        // Where the agent executes (#1053): the agent view reads it to switch to the Actions affordance.
         ...(opts.target ? { target: opts.target } : {}),
-        // A project-less topic run (#1120): recorded so a reader can tell it from a project run.
-        ...(opts.topic ? { topic: true } : {}),
       })
     } catch (err) {
       io.err(`could not persist session state (${errorMessage(err)}); continuing without it`)
     }
   }
 
-  // Continuing a build run (#1467): the composer's Resume always arrives as a `prompt` start,
-  // but the reopened meta remembers the flow the first leg ran. When it was a build run and the
+  // Continuing a build agent (#1467): the composer's Resume always arrives as a `prompt` start,
+  // but the reopened meta remembers the flow the first leg ran. When it was a build agent and the
   // conversation is resumable, re-enter the build flow (synthesize framing, backlog loop, the
   // build ending) with the message sent verbatim — not the bare prompt ending that used to
-  // downgrade a resumed build run. Runs from before the meta recorded a kind stay on the prompt
+  // downgrade a resumed build agent. Runs from before the meta recorded a kind stay on the prompt
   // path, exactly as they did.
   const continueBuild =
-    opts.continueRun === true && !!opts.resumeSession && !transparent && store?.snapshot().kind === 'build'
+    opts.continueAgent === true && !!opts.resumeSession && !transparent && store?.snapshot().kind === 'build'
 
-  // Steer this run through .the-framework/control.jsonl (#344): a Stop button or choice
+  // Steer this agent through .the-framework/control.jsonl (#344): a Stop button or choice
   // pick appends an entry, we tail the file and abort / resolve the parked gate. Reset
-  // first so a previous run's picks can never fire into this one (gate ids repeat across
+  // first so a previous agent's picks can never fire into this one (gate ids repeat across
   // runs).
   //
-  // Wired when this run's own dashboard is up (#427), or when whoever spawned it said it is
-  // steerable. That second half used to ask `daemonStatus()`, a machine-global file this run has
-  // nothing to do with, and it was wrong in both directions (#905): absent while a daemon is live,
-  // so a daemon-spawned run ignored Stop completely (the daemon spawns with --no-dashboard, so the
-  // file was the only thing wiring it); and present while unrelated to this run, so a headless run
-  // parked in the #714 chat loop forever. The daemon passes --run-id when it spawns, which is a
-  // fact about *this* run rather than about the machine, so that is the signal now.
+  // Wired when this agent's own dashboard is up (#427), or when whoever spawned it passed --run-id
+  // and therefore steers it (see {@link isSteerable}).
   // What this session hands back when it ends (#1102). Mutable: the action bar's checkboxes can
-  // disarm it at any point up to the moment it settles, which is the whole point of them being
-  // pre-commitments rather than buttons. Opening a PR implies pushing, so the pair is normalised
-  // wherever it is set.
-  // Merge is carried alongside but has no checkbox (#1216): it is a per-run/per-repo setting, not
-  // an action-bar pre-commitment. The one thing that mutates it after this line is the user's own
-  // Merge action (#1391), which also records the human authorization below.
-  const armedHandoff = { push: config.autoPushBranch || config.autoOpenPr, pr: config.autoOpenPr, merge: config.autoMerge }
-  // The user pressed Merge (#1391): a human authorized the merge, so the #1363 gate must not also
+  // move it at any point up to the moment it settles, which is the whole point of them being
+  // pre-commitments rather than buttons. One rung, not three flags (B5), so the stages cannot
+  // disagree — every reader derives them, and a box unticked mid-run lowers the whole ladder
+  // instead of leaving a merge armed with no PR under it.
+  // The one thing that raises it after this line is the user's own Merge action (#1391), which
+  // also records the human authorization below.
+  let armedHandoff: HandoffLevel = config.handoff
+  // The user pressed Merge (#1391): a human authorized the merge, so the human-authorized merge gate (#1363) must not also
   // demand the agent's ready-for-merge signal — a human's word outranks it.
   let mergeAuthorized = false
   // Assigned once the journal exists, which is after the control watcher is wired: a change that
   // arrives before then still lands on `armedHandoff`, it just has no event to announce it yet.
-  let announceHandoff: ((push: boolean, pr: boolean) => void) | undefined
-  // Same deferral as announceHandoff: an await-bind-project / await-create-project gate binds this
-  // topic run to a project (#1121), and only an event puts that on the meta a later-opened tab can
-  // read. Wired once the journal exists (below).
-  let recordBind: ((projectId: string) => void) | undefined
-
+  let announceHandoff: (() => void) | undefined
   let control: ControlWatcher | undefined
-  if (isSteerable(opts, newDashboard, await daemonStatus() !== undefined)) {
+  if (isSteerable(opts)) {
     try {
       await resetControl(cwd)
       control = watchControl(cwd, entry => {
@@ -1570,30 +837,21 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
           return
         }
         if (entry.kind === 'message') {
-          // Carry the origin the sender named (#917), so the turn is recorded where it happened.
-          messages.push(entry.text, entry.via)
+          messages.push(entry.text)
           return
         }
         if (entry.kind === 'handoff') {
-          armedHandoff.push = entry.push || entry.pr
-          armedHandoff.pr = entry.pr
-          announceHandoff?.(armedHandoff.push, armedHandoff.pr)
-          return
-        }
-        if (entry.kind === 'bind') {
-          // Fold the bind onto meta + the event log; the daemon watches for it and re-homes (#1122).
-          recordBind?.(entry.projectId)
+          armedHandoff = entry.level
+          announceHandoff?.()
           return
         }
         if (entry.kind === 'merge') {
           // The user's Merge action (#1391): arm the full ladder and record the human
           // authorization. Not an abort — the session still ends at its own natural end (#1390)
           // and the merge fires there; announcing re-arms keeps the meta a mid-run tab reads true.
-          armedHandoff.push = true
-          armedHandoff.pr = true
-          armedHandoff.merge = true
+          armedHandoff = 'merge'
           mergeAuthorized = true
-          announceHandoff?.(true, true)
+          announceHandoff?.()
           // A session parked on the backlog offer (#323) is waiting to know whether to take more
           // work. Merge answers that: wrap up now. Other gates keep waiting — they are questions
           // about the work itself, which merging does not answer.
@@ -1615,115 +873,74 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     }
   }
 
-  // Publish the run to a relay (#230) so teammates can watch it live. Best-effort:
-  // a relay that is down reports each failed POST here but never fails the run.
-  let publisher: RelayPublisher | undefined
-  if (opts.share) {
-    publisher = relayPublisher(opts.share, randomUUID(), err =>
-      io.err(`relay publish failed (${errorMessage(err)})`),
-    )
-    io.out(`◆ shared session: ${publisher.url}`)
-  }
-
-  // Pause the choice gates when someone can answer: this run's own dashboard, or the
+  // Pause the choice gates when someone can answer: this agent's own dashboard, or the
   // workspace daemon's via the control channel (#344). With neither, the gates auto-accept
-  // the recommended option (#304). The run's requestChoice parks a resolver in pendingChoices
+  // the recommended option (#304). The agent's requestChoice parks a resolver in pendingChoices
   // keyed by the choice id; a dashboard/daemon pick (or an abort) resolves it.
-  // An unattended run (#846) is steerable but unwatched: keep the control channel for Stop and
+  // An unattended agent (#846) is steerable but unwatched: keep the control channel for Stop and
   // live messages, and leave requestChoice unset so each gate takes its recommended option. Auto
   // PM (#685) fires when nobody is there, and a parked gate would hang it until someone looked.
   //
-  // Each parked wait is held by the keepalive (#1359): a daemon-spawned run (--no-dashboard, all
+  // Each parked wait is held by the keepalive (#1359): a daemon-spawned agent (--no-dashboard, all
   // stdio detached, per-prompt driver children, unref'd control watcher) has nothing else ref'd
   // between turns, so Node ran out of scheduled work and exited 0 mid-await — the gate's picks
   // then landed in control.jsonl with nobody left to read them.
   const gateKeepalive = createGateKeepalive()
   const requestChoice =
-    (dashboard || control) && !opts.unattended
+    control !== undefined && !opts.unattended
       ? (req: ChoiceRequest): Promise<ChoicePick> =>
           gateKeepalive.hold(new Promise(resolve => pendingChoices.set(req.id, resolve)))
       : undefined
 
-  // Whether to hand the run the live-chat queue (#714) once it settles. Steerable is not enough
-  // (#905): a terminal run with --no-dashboard could be reached by a daemon's dashboard, but
+  // Whether to hand the agent the live-chat queue (#714) once it settles. Steerable is not enough
+  // (#905): a terminal agent with --no-dashboard could be reached by a daemon's dashboard, but
   // nobody is waiting in it, and it used to park forever on a message that never came.
   // The parked message wait is the same empty-event-loop hazard as a parked gate (#1359), so it
   // is held the same way; a Stop closes the queue, which releases the hold.
   //
-  // Who parks and who ends is #1390: a daemon-spawned run (--run-id) drains what queued and then
-  // ends itself — its dashboard reopens the conversation via --resume (#762), so nothing needs to
-  // stay alive for the composer. A run serving its own terminal dashboard has no daemon to resume
-  // through, so it keeps the stay-open park; Ctrl+C / Stop is still its way out.
+  // Who parks and who ends is #1390: a dashboard-spawned session drains what queued and then ends
+  // itself — the dashboard reopens the conversation as a continuation (#762), so nothing needs to
+  // stay alive for the composer.
   const chatQueue =
-    isInteractive(opts, newDashboard) && requestChoice
+    isInteractive(opts) && requestChoice
       ? {
           messages: {
             next: (signal?: AbortSignal) => gateKeepalive.hold(messages.next(signal)),
             takeQueued: () => messages.takeQueued(),
           },
-          ...(opts.runId === undefined ? { stayOpenChat: true } : {}),
+          ...(opts.agentId === undefined ? { stayOpenChat: true } : {}),
         }
       : {}
 
-  // Persist the chat into the committed conversation (#908/#857), so a clone carries what was
-  // said and not just the fact a run happened. Keyed by the same run id LOGS.md records, which
-  // is what joins the committed session list to the committed chat. `--via` names the surface
-  // for a run the daemon started on another surface's behalf (#917); otherwise it is whichever
-  // local surface is here.
-  const conversation = conversationRecorder({
-    cwd,
-    enabled: opts.persist,
-    conversationId: opts.runId ?? store?.snapshot().id,
-    localVia: isSafeVia(opts.via) ? opts.via : requestChoice ? 'dashboard' : 'cli',
-  })
-  const recordMessage = conversation.recordMessage
-
-  // The session link shown on the dashboard: --session-link, else Claude Code's own entry for
-  // a live Claude run, else nothing (#212/#542). Same for both run paths.
+  // The session link shown on the dashboard: the spec's `sessionLink`, else Claude Code's own entry for
+  // a live Claude agent, else nothing (#212/#542). Same for both agent paths.
   const sessionLink = chooseSessionLink(opts, fake)
 
-  // Everything the run reports that its epilogue needs — the settle flags, the LOGS.md
-  // fields, the deferred browser-port announcement — plus the fan-out of every event to the
-  // terminal, the store and the relay, lives in the journal. runCli reads its getters below.
-  const journal = createRunJournal({
-    io,
-    cwd,
-    store,
-    publisher,
-    runId: opts.runId,
-    // A build continuation (#1467) logs as the build run it re-enters, not as the prompt
-    // start that carried it here.
-    kind: continueBuild ? 'build' : runLogKind(opts, transparent),
-    title: intent || (opts.research ? defaultWhat() : ''),
-    beforeLog: conversation.flush,
-  })
+  // Everything the agent reports that its epilogue needs — the settle flags, the deferred
+  // browser-port announcement — plus the fan-out of every event to the terminal and the store,
+  // lives in the journal. runCli reads its getters below.
+  const journal = createAgentJournal({ io, cwd, store, agentId: opts.agentId })
   const onEvent = journal.onEvent
 
-  // Put the armed state on the run's meta (#1102), and keep it there as the checkboxes change it.
+  // Put the armed state on the agent's meta (#1102), and keep it there as the checkboxes change it.
   // The control channel carries the instruction, but only an event reaches meta, and meta is the
   // only thing a dashboard tab opened mid-run can read the boxes back from.
-  // Merge rides along from the closure rather than the signature (#1382): it has no checkbox and
-  // never changes after launch, but every armed line must carry it or the meta a mid-run tab
-  // reads back would say "draft PR" about a run that is set to merge.
-  announceHandoff = (push, pr) => onEvent({ kind: 'handoff-armed', push, pr, merge: armedHandoff.merge === true })
-  announceHandoff(armedHandoff.push, armedHandoff.pr)
-  // The ticket this run implements (#1117), if the daemon named one. Once, at start: it is a fact
-  // about why the run exists, not a state that changes, and folding it to meta is what lets the
+  // The event still spells the three stages out (#1382): it is a snapshot a dashboard tab reads
+  // back, and every armed line must carry the merge stage or the meta would say "draft PR" about a
+  // run that is set to merge. Derived from the rung, so the three can never contradict it.
+  announceHandoff = () => onEvent({ kind: 'handoff-armed', ...handoffStages(armedHandoff) })
+  announceHandoff()
+  // The ticket this agent implements (#1117), if the daemon named one. Once, at start: it is a fact
+  // about why the agent exists, not a state that changes, and folding it to meta is what lets the
   // Overview mark that ticket as being implemented right now.
   if (opts.ticket && isTicketPath(opts.ticket)) onEvent({ kind: 'ticket', path: opts.ticket })
-  // The queue entry a routine drain pinned this run to (#1253), same shape as the ticket above:
-  // once, at start, folded to meta — the durable half of the sweep's claim on the entry.
-  if (opts.queueEntry?.trim()) onEvent({ kind: 'queue-entry', entry: opts.queueEntry })
-  // The branch this run actually starts on (#1277): recorded, not guessed, so surfaces reading
+  // The branch this agent actually starts on (#1277): recorded, not guessed, so surfaces reading
   // the meta mid-run resolve the same name teardown will later confirm. Undefined outside a git
   // checkout (a non-repo project), and then nothing is recorded.
   const startBranch = await currentBranch(cwd)
   if (startBranch) onEvent({ kind: 'branch', branch: startBranch })
-  // Wired now the journal exists: a bind resolved from a topic run's gate folds to meta (#1121).
-  recordBind = projectId => onEvent({ kind: 'bind', projectId })
-
-  // Fire the #326 on-before-mergeable prompt once a --on-before-mergeable run has settled and the agent
-  // signalled setReadyForMerge(). Skipped for a fake/offline run and when the run was stopped —
+  // Fire the built-in on-before-mergeable (#326) prompt once a --on-before-mergeable agent has settled and the agent
+  // signalled setReadyForMerge(). Skipped for a fake/offline run and when the agent was stopped —
   // and every outcome, including each skip, is emitted as an event so the dashboard can show it (#835).
   const maybeFireOnBeforeMergeable = async (): Promise<void> => {
     // The step was never asked for, so there is no outcome to report and nothing to explain.
@@ -1735,7 +952,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     if (!journal.sawReadyForMerge()) return skip('not-ready-for-merge')
     if (journal.stoppedCleanly()) return skip('run-stopped')
     if (fake) return skip('fake-run')
-    // --eco-auto-maintenance (#314) no longer skips the whole run: since #537 this prompt
+    // --eco-auto-maintenance (#314) no longer skips the whole agent: since #537 this prompt
     // also carries `## Business knowledge`, which the flag does not name. It drops just
     // `## Maintenance` inside renderOnBeforeMergeablePrompt() instead.
     // Every line of the prompt names the session, so there is nothing to queue without one.
@@ -1744,14 +961,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     if (!sessionName) return skip('no-session-name')
     const binPath = process.argv[1]
     if (!binPath) return skip('no-bin-path')
-    const outcome = await runOnBeforeMergeable(
-      cwd,
-      binPath,
-      io,
-      { session_name: sessionName, settings: { technical_control: config.technical } },
-      opts.maxCost,
-      opts.eco,
-    )
+    const outcome = await runOnBeforeMergeable(cwd, binPath, io, { session_name: sessionName })
     onEvent({ kind: 'on-before-mergeable', outcome })
   }
 
@@ -1759,19 +969,13 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // action bar's checkboxes were unticked. Runs after the on-before-mergeable step above, so
   // anything that step committed is part of what gets published rather than a commit left behind.
   const maybeAutoHandoff = async (): Promise<void> => {
-    const armed = { ...armedHandoff }
+    const armed = handoffStages(armedHandoff)
     const skip = (reason: AutoHandoffSkip) => onEvent({ kind: 'handoff', outcome: 'skipped', reason })
-    if (!armed.push && !armed.pr) return skip('not-armed')
-    // A stopped run is a session the user cut short; publishing what it happened to reach is the
+    if (!armed.push) return skip('not-armed')
+    // A stopped agent is a session the user cut short; publishing what it happened to reach is the
     // opposite of what stopping meant. Same call the on-before-mergeable step makes.
     if (journal.stoppedCleanly()) return skip('run-stopped')
     if (fake) return skip('fake-run')
-    // A topic run (#1120) lives in a project-less scratch dir: no repo, no branch, nothing to
-    // publish. Without this, the commit attempt below burns its retries against a non-repo and
-    // labels the end `commit-failed` — alarming copy about work that never existed. It never
-    // had a branch, which is what branch-gone says.
-    if (opts.topic) return skip('branch-gone')
-
     // The daemon commits whatever the agent left uncommitted, but only after this process exits
     // (`tearDownWorktree`), so at this point the tree can still hold real work. Pushing first
     // would publish a branch missing the session's last edits. Its own checkout only: a plain
@@ -1782,7 +986,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     // teardown's identical commit landed seconds later, stranding real work on a local branch
     // nobody was told about. A failed commit is now its own skip, said out loud, and the
     // teardown still rescues the work onto the branch afterwards.
-    if (opts.runId && !(await commitPendingWork(cwd))) return skip('commit-failed')
+    if (opts.agentId && !(await commitPendingWork(cwd))) return skip('commit-failed')
 
     // The merge half is authorized, not just configured (#1363; rule settled on #1390): the
     // agent's setReadyForMerge() — the same signal maybeFireOnBeforeMergeable requires above —
@@ -1798,7 +1002,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
       const ready = journal.sawReadyForMerge()
       mergeGate = withheldMerge({
         readyForMerge: ready,
-        sessionTodoOpen: ready && (await sessionTodoPending(cwd, journal.sessionName())),
+        agentTodoOpen: ready && (await agentTodoPending(cwd, journal.sessionName())),
       })
       if (mergeGate) armed.merge = false
     }
@@ -1810,25 +1014,30 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     const sessionName = journal.sessionName()
     // The ticket's GitHub issue rides the PR title as `(fix #42)` (#1334): the squash-merge
     // subject inherits the title, so the merge closes the issue — without it, an auto-merged
-    // quick-win leaves its ticket open. Not on a plan run (#1327): its PR lands the plan, not
+    // quick-win leaves its ticket open. Not on a plan agent (#1327): its PR lands the plan, not
     // the work, so the merge must not close the issue. Best-effort: a ticket that cannot be
     // read fixes nothing.
-    const fixes = opts.ticket && isTicketPath(opts.ticket) && !opts.planRun
+    const fixes = opts.ticket && isTicketPath(opts.ticket) && !opts.planAgent
       ? ticketIssueRef(await readFile(join(cwd, opts.ticket), 'utf8').catch(() => ''))
       : undefined
-    const run = {
-      id: opts.runId ?? '',
+    const agent = {
+      id: opts.agentId ?? '',
       branch,
       ...(sessionName ? { sessionName } : {}),
       ...(intent ? { intent } : {}),
       ...(fixes ? { fixes } : {}),
     }
-    const handedOff = await runAutoHandoff(cwd, run, armed)
+    const handedOff = await agentAutoHandoff(cwd, agent, armed)
     const outcome =
       mergeGate && handedOff.outcome !== 'failed'
         ? { ...handedOff, merge: { outcome: 'withheld' as const, reason: mergeGate } }
         : handedOff
     onEvent({ kind: 'handoff', ...outcome })
+    // Record the PR itself (E6), so every later surface reads the number off the agent instead of
+    // re-deriving it from branch names and creation times.
+    if (outcome.outcome === 'done' && outcome.number !== undefined && outcome.url) {
+      onEvent({ kind: 'pull-request', number: outcome.number, url: outcome.url })
+    }
     if (outcome.outcome === 'failed') io.err(`✗ could not ${outcome.step === 'pr' ? 'open the PR' : 'push the branch'}: ${outcome.error}`)
     else if (outcome.outcome === 'done' && outcome.url) io.out(`\n◆ Opened ${outcome.url}`)
     else if (outcome.outcome === 'done') io.out(`\n◆ Pushed ${branch}.`)
@@ -1842,44 +1051,28 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     else if (merge?.outcome === 'failed') io.err(`✗ could not merge the PR: ${merge.error}`)
   }
 
-  // A mode/kind given with no preset in effect has nothing to act on: note it.
-  // Autopilot is the exception — it auto-answers the run's choice gates, which
-  // needs no preset. (It no longer steers the prompt's maintenance stance: #556
-  // moved that section out, see #801.)
-  const presetOnlyModes = modeList.filter(m => m !== 'autopilot')
-  if (presetOnlyModes.length && !domainPreset) {
-    io.err(`note: ${presetOnlyModes.join(' + ')} mode(s) have no effect without a preset.`)
-  }
-  if (buildEvent && !domainPreset) {
-    io.err(`note: build event "${buildEvent}" has no effect without a preset.`)
-  }
-  // The sandbox only wraps the serve verification, so it is a no-op without --serve.
-  if (opts.sandbox === 'docker' && !opts.serve) {
-    io.err(`note: --sandbox docker has no effect without --serve.`)
-  }
-
-  // The run owns the browser (#793): launching it here, rather than letting chrome-devtools-mcp
-  // launch its own, is what lets the #609 preview attach to the same page. Undefined when the
-  // machine has no Chrome, which leaves `--browser` on its old path rather than failing the run.
+  // The agent owns the browser (#793): launching it here, rather than letting chrome-devtools-mcp
+  // launch its own, is what lets the preview (#609) attach to the same page. Undefined when the
+  // machine has no Chrome, which leaves `--browser` on its old path rather than failing the agent.
   // Local runs only: the browser tools are wired on this machine, so a `--run-on web`/`actions`
   // session could never reach them — launching Chrome here would leak a headless browser per
-  // run, and the system channel must only claim a browser the run really has (#824).
-  const localRun = opts.target === undefined || opts.target === 'local'
-  const sharedBrowser = opts.browser && !fake && localRun ? await launchSharedBrowser() : undefined
-  if (opts.browser && !fake && !localRun) {
+  // run, and the system channel must only claim a browser the agent really has (#824).
+  const localAgent = opts.target === undefined || opts.target === 'local'
+  const sharedBrowser = opts.browser && !fake && localAgent ? await launchSharedBrowser() : undefined
+  if (opts.browser && !fake && !localAgent) {
     io.err(`note: --browser has no effect with --run-on ${opts.target}: the browser tools are wired on this machine, and the session runs elsewhere.`)
   } else if (opts.browser && !fake && !sharedBrowser) {
     io.err('note: no Chrome found, so --browser falls back to its own browser (no preview).')
   }
 
   /**
-   * Give up before a driver exists, on a config fault the run cannot recover from.
+   * Give up before a driver exists, on a config fault the agent cannot recover from.
    *
-   * These aborts sit in an awkward window: `run.json` already says `running` (it is written back
-   * at :1433), but {@link settleRun} — which owns the `end` event and the handle cleanup — does
-   * not wrap anything until its `ctx` is built further down. Returning raw therefore left the run
+   * These aborts sit in an awkward window: `agent.json` already says `running` (it is written back
+   * at :1433), but {@link settleAgent} — which owns the `end` event and the handle cleanup — does
+   * not wrap anything until its `ctx` is built further down. Returning raw therefore left the agent
    * recorded as `running` forever with nobody to correct it, and the dashboard showed a session
-   * that never moved. So close it out here the same way settleRun would: say why, record the
+   * that never moved. So close it out here the same way settleAgent would: say why, record the
    * failure, release the handles.
    *
    * Best-effort throughout, like every other persistence call on this path: a store that cannot
@@ -1887,7 +1080,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
    */
   const abortBeforeDriver = async (reason: string): Promise<number> => {
     io.err(reason)
-    // Release every handle settleRun would: the armed interrupt trap, the run's own dashboard
+    // Release every handle settleAgent would: the armed interrupt trap, the agent's own dashboard
     // server, and the LOGS.md entry — leaving any of them behind kept the process alive with a
     // swallowed first Ctrl+C, exactly the hang this helper exists to prevent.
     clearInterrupt()
@@ -1895,19 +1088,17 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
       await store?.append({ kind: 'end', ok: false, detail: reason })
       await store?.close()
     } catch {
-      // Persistence is never allowed to be the thing that keeps a failing run alive.
+      // Persistence is never allowed to be the thing that keeps a failing agent alive.
     }
-    await journal.finishLog().catch(() => {})
     control?.close()
     await sharedBrowser?.close().catch(() => {})
-    await dashboard?.close().catch(() => {})
     return 2
   }
 
   // Run on GitHub Actions (#1050): owner/repo come from the project's origin remote, the token from
   // the environment or, failing that, the `gh` CLI (#1352) — never the committed the-framework.yml,
   // since a repo file is public and this must be a user credential. Resolved before the driver so a
-  // missing remote or token fails the run with a clear reason rather than deep inside ActionsDriver.
+  // missing remote or token fails the agent with a clear reason rather than deep inside ActionsDriver.
   let actionsConfig: ActionsDriverOptions | undefined
   if (opts.target === 'actions' && !fake) {
     const slug = await githubSlugFor(cwd)
@@ -1918,7 +1109,7 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     if (!token) {
       // Both ways out, because neither is guessable from the other: the env var is what CI sets,
       // and `gh auth login` is what a laptop has. Says which process needs it, too — the daemon
-      // hands each run its own environment, so exporting the variable in a shell does nothing for
+      // hands each agent its own environment, so exporting the variable in a shell does nothing for
       // a daemon that is already up.
       return await abortBeforeDriver(
         '--run-on actions needs a GitHub user token (repo + workflow scopes): set GH_TOKEN in the environment ' +
@@ -1943,8 +1134,8 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
 
   const driver: Driver = fake
     ? fakeDriver()
-    : createRunDriver({
-        agent: opts.agent,
+    : createAgentDriver({
+        driver: opts.driver,
         claudeOpts: withBrowser(claudeOpts, opts.browser, sharedBrowser?.browserUrl),
         ...(opts.target ? { target: opts.target } : {}),
         ...(actionsConfig ? { actionsConfig } : {}),
@@ -1953,11 +1144,11 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
   // Whether the agent actually ends up with browser tools, which is narrower than the flag: they
   // ride Claude Code's MCP config, so `--browser` on another agent wires nothing (see
   // `unguardedNotices`), the fake driver has no tools at all, and a remote target never sees
-  // this machine's MCP config. The system channel must only claim a browser the run really has (#824).
-  const browserAttached = opts.browser && !fake && opts.agent === 'claude' && localRun
+  // this machine's MCP config. The system channel must only claim a browser the agent really has (#824).
+  const browserAttached = opts.browser && !fake && opts.driver === 'claude' && localAgent
 
   // The preview of that browser (#802): the agent's Chrome is headless, so when it parks on an
-  // `await-browser` gate (#796) there is nothing for a human to click. This serves it. Opening
+  // browser hand-off gate (#796) there is nothing for a human to click. This serves it. Opening
   // the stream costs nothing while the page is still — Chrome only emits a frame on a change.
   const browserStream = sharedBrowser
     ? await startBrowserStream({
@@ -1970,198 +1161,102 @@ async function runBuild(opts: CliOptions, io: CliIO): Promise<number> {
     : undefined
   // The port travels as an event — persisted and published live — because a dashboard-started
   // run is spawned with its stdout discarded, so a printed URL reaches nobody (#813). The
-  // journal holds it until the session opens: the bridge exists before the run does, and an
+  // journal holds it until the session opens: the bridge exists before the agent does, and an
   // event ahead of `session` never reaches the dashboard (#829).
   if (browserStream) journal.announceBrowserPort(browserStream.port)
 
-  // The quota boundary (#879). Nothing to configure and nothing to pass: the
-  // boundary is derived from the account's own week, so a run started from a
-  // terminal is gated exactly like one started from the dashboard. `undefined`
-  // when the agent can't report a quota (the fake driver, or Codex), which
-  // leaves the run ungated — the fail-open Rom confirmed.
-  // Transparent mode (#625) leaves the run fully raw, so the guard is off with it — the run is
-  // `claude -p` with no framework behavior, spend included.
-  const guard = transparent
-    ? undefined
-    : startConsumptionGuard({
-        driver,
-        // The #960 slider joins the per-run gate (#1490), read from the registry the same way
-        // the daemon's quota source reads it — so the Usage bar and this gate cannot disagree.
-        limitOffset: async () => (await readPreferences()).autoSpendOffset ?? DEFAULT_SPEND_OFFSET,
-        ...(opts.model ? { model: opts.model } : {}),
-      })
-  if (transparent) io.out(`◆ transparent: on — raw ${AGENT_SPECS[opts.agent].label}, no framework prompt, guard, dashboard, or TODO loop`)
-  else if (guard) io.out('◆ quota boundary: on')
-  else if (!fake) {
-    io.out(`◆ quota boundary: off — ${AGENT_SPECS[opts.agent].label} reports no quota, so nothing gates your subscription spend.`)
-  }
+  // Nothing gates a session that is already running (E1). One gate decides whether a session may
+  // *start* — the daemon's quota boundary, fed by the same slider the Usage bar shows — and once
+  // it has, the session runs to its own end. Interrupting mid-flight is the worst moment to
+  // economise: the tokens are already spent, the work is half-done, and what is saved is the cheap
+  // part while what is lost is the expensive part.
+  if (transparent) io.out(`◆ transparent: on — raw ${DRIVER_SPECS[opts.driver].label}, no framework prompt, dashboard, or TODO loop`)
 
   // A user SYSTEM.md + the anti-lazy-pill toggle shape the system prompt (#301), and the eco
-  // flags trim the built-in one (#314). Resolve and echo once, shared by both run paths.
+  // flags trim the built-in one (#314). Resolve and echo once, shared by both agent paths.
   const promptConfig = await resolvePromptConfig(opts, config, cwd, io, transparent)
 
-  // The run-scoped state both run paths hand to settleRun to close out. stoppedCleanly is a
+  // The run-scoped state both agent paths hand to settleAgent to close out. stoppedCleanly is a
   // getter because the onEvent sink sets it as the `end` event arrives.
-  const epilogue = (failLabel: string): RunEpilogue => ({
+  const epilogue = (failLabel: string): AgentEpilogue => ({
     io,
-    dashboard,
     store,
     control,
-    guard,
-    publisher,
     sharedBrowser,
     browserStream,
     clearInterrupt,
     maybeFireOnBeforeMergeable,
     maybeAutoHandoff,
-    finishLog: journal.finishLog,
     isStopped: () => controller.signal.aborted || journal.stoppedCleanly(),
     failLabel,
   })
 
-  // The options both run paths pass through unchanged: who the agent is, what it may spend, what
+  // The options both agent paths pass through unchanged: who the agent is, what it may spend, what
   // it reads, and who can answer it. They were written out twice, thirteen conditional spreads
-  // each, so a new one had to be added to both by hand — and a run started as a build and a run
-  // started as a prompt are the same run in every respect but the scaffolding around the prompt.
-  // A project-less topic run (#1120) can bind to a project mid-run via an await gate (#1121): the
-  // resolver lists / registers projects against the real registry and signals the bind over the
-  // control channel, which the watcher above folds to the run's meta. Topic runs only.
-  const bindDeps: BindProjectDeps | undefined = opts.topic
-    ? {
-        listProjects: () => listProjects(),
-        addProject: async path => {
-          // Validate before touching the registry: a relative / missing / non-directory path
-          // declines cleanly back to the agent rather than landing junk in the home file (#1121).
-          const resolved = await resolveProjectPath(path)
-          if (!resolved.ok) return { ok: false, error: resolved.error }
-          const already = (await listProjects()).some(p => p.path === resolved.path)
-          const record = await addProject(resolved.path, new Date().toISOString())
-          return { ok: true, project: { id: record.id, path: record.path }, created: !already }
-        },
-        recordBind: projectId => void appendControl(cwd, { kind: 'bind', projectId }),
-      }
-    : undefined
-
-  const sharedRunOptions = {
+  // each, so a new one had to be added to both by hand — and an agent started as a build and an agent
+  // started as a prompt are the same agent in every respect but the scaffolding around the prompt.
+  const sharedAgentOptions = {
     driver,
     cwd,
     onEvent,
     signal: controller.signal,
-    ...(opts.topic ? { topic: true } : {}),
-    ...(bindDeps ? { bind: bindDeps } : {}),
     ...(requestChoice ? { requestChoice } : {}),
     ...chatQueue,
-    ...(recordMessage ? { recordMessage } : {}),
     ...(opts.model ? { model: opts.model } : {}),
-    ...(opts.maxCost ? { budgetUsd: opts.maxCost } : {}),
-    ...(guard ? { consumptionGate: guard.gate } : {}),
     ...(promptConfig.userSystemPrompt ? { systemPrompt: promptConfig.userSystemPrompt } : {}),
-    ...(promptConfig.noBuiltinPrompt ? { antiLazyPill: false } : {}),
+    ...(promptConfig.noBuiltinPrompt ? { vanilla: true } : {}),
     ...(browserAttached ? { browser: true } : {}),
     ...(transparent ? { transparent: true } : {}),
-    ...(promptConfig.eco ? { eco: promptConfig.eco } : {}),
     ...(opts.context.length ? { context: opts.context } : {}),
     ...(sessionLink ? { sessionLink } : {}),
   }
 
-  // `framework research [what]` (#331) and `framework prompt <text>` (#353): the
-  // direct prompt path — run one prompt through runPrompt, which honors its gates
-  // (#337/#339) but skips the scope -> build scaffolding entirely.
-  // Transparent (#625) joins them: "raw Claude Code" must bypass the build orchestration
-  // AND the prompt wrapping too, not just zero the system prompt — so a transparent run
-  // (any kind) runs its prompt verbatim here rather than through runFramework's
-  // scope -> build -> synthesize + extendPrompt. Research renders its preset template
-  // around the "what" (only when it isn't transparent); prompt/transparent run the text
-  // verbatim (it may already BE an edited preset, so it must not be re-rendered).
-  // Shares all the wiring above (dashboard, store, control channel, budget).
-  // A build continuation (#1467) falls through to runFramework below despite arriving as a
-  // `prompt` start: the flow it re-enters is the build run recorded on its own meta.
+  // Which prompt opens the session, and whether its backlog is worked afterwards (D2). A `prompt`
+  // session runs its text verbatim — it may already BE an edited preset, so it must not be
+  // re-rendered — and research renders its preset template around the "what" first. Transparent
+  // (#625) joins them: "raw Claude Code" must bypass the build framing too, not just zero the
+  // system prompt. A build continuation (#1467) stays a build despite arriving as a `prompt`
+  // start: the flow it re-enters is the one recorded on its own meta.
   const isResearch = opts.research && !transparent
-  if ((opts.research || opts.directPrompt || transparent) && !continueBuild) {
-    return settleRun(epilogue(isResearch ? 'research' : 'prompt session'), async () => {
-      await runPrompt({
-        ...sharedRunOptions,
-        prompt: isResearch ? presets.research.render(intent) : intent,
-        ...(modeList.includes('autopilot') ? { autopilot: true } : {}),
-        ...(opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
-      })
-      return {
-        successLine: isResearch
-          ? '\n✓ research done: see the REVIEW-PROBLEMS / TODO files it wrote.'
-          : '\n✓ prompt session done.',
-      }
-    })
-  }
+  const kind: AgentKind = (opts.research || opts.directPrompt || transparent) && !continueBuild ? 'prompt' : 'build'
+  const label = kind === 'build' ? 'session' : isResearch ? 'research' : 'prompt session'
 
-  const serve: ServeConfig | undefined = opts.serve
-    ? {
-        command: opts.serve,
-        // The CLI keeps the dashboard (and app) up until Ctrl+C, so leave the app
-        // serving with a preview link once the run succeeds.
-        keepAlive: true,
-        ...(opts.serveInstall ? { install: opts.serveInstall } : {}),
-        ...(opts.serveBuild ? { build: opts.serveBuild } : {}),
-        ...(opts.servePort !== undefined ? { port: opts.servePort } : {}),
-        ...(opts.servePath ? { healthPath: opts.servePath } : {}),
-      }
-    : undefined
-
-  const runOpts: RunFrameworkOptions = {
-    ...sharedRunOptions,
-    intent,
-    scope: opts.scope,
-    signals,
-    // A build continuation (#1467): resume the stopped leg's conversation; the intent above is
-    // the continuation message and runFramework sends it verbatim.
-    ...(continueBuild && opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
-    ...(opts.maxPasses ? { maxPasses: opts.maxPasses } : {}),
+  const agentOpts: RunAgentOptions = {
+    ...sharedAgentOptions,
+    kind,
+    ...(opts.target ? { location: opts.target } : {}),
+    prompt: isResearch ? presets.research.render(intent) : intent,
+    // Resume the stopped leg's conversation (#720/#1467); the prompt above is the continuation
+    // message, which `runAgent` then sends verbatim.
+    ...(opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
     ...(opts.todoLoop && !transparent ? {} : { todoLoop: false }),
     ...(opts.todoMaxItems ? { todoMaxItems: opts.todoMaxItems } : {}),
-    ...(deploy ? { deploy } : {}),
-    ...(deployTarget ? { deployTarget } : {}),
-    ...(serve ? { serve } : {}),
-    ...(serve && opts.sandbox ? { sandbox: opts.sandbox } : {}),
-    // Modes ride along even without a domain preset: autopilot also steers the
-    // #326 system prompt's maintenance stance.
-    ...(domainPreset ? { preset: domainPreset } : {}),
-    ...(modeList.length ? { modes: modeList } : {}),
-    ...(buildEvent ? { buildEvent } : {}),
   }
 
-  return settleRun(epilogue('session'), async () => {
-    const { result, preview } = await runFramework(runOpts)
-    // A hand-off ran no review passes by design (#1225), so neither of the build lines fits:
-    // "prototype ready" would claim this machine built something it never saw.
-    const successLine = driver.handsOff
+  return settleAgent(epilogue(label), async () => {
+    await runAgent(agentOpts)
+    // A hand-off ends at the hand-off (#1225): "done" would claim this machine built something
+    // it never saw.
+    const successLine = isHandsOff(opts.target)
       ? '\n✓ handed off. The session continues where it was sent, and opens its own pull request.'
-      : result.passes === 0
-        // No review passes: the run had no review configured (#1372 — no preset, no serve).
-        ? '\n✓ done.'
-        : result.productionGrade
-          ? `\n✓ review passed in ${result.passes} pass(es).`
-          : `\n• review not clean${result.stoppedEarly ? ` (stopped with ${result.blockers.length} blocker(s))` : ''}.`
-    return { successLine, ...(preview ? { preview } : {}) }
+      : isResearch
+        ? '\n✓ research done: see the REVIEW-PROBLEMS / TODO files it wrote.'
+        : kind === 'prompt'
+          ? '\n✓ prompt session done.'
+          : '\n✓ done.'
+    return { successLine }
   })
 }
 
 /**
- * Bare `framework` (no prompt): run the dashboard server in the foreground (#456), so its
- * logs and any server-thrown errors are visible and Ctrl+C stops it. If a background daemon
- * (`framework --daemon`) already owns the port, defer to it rather than fight for the bind.
- * Blocks until the server is signalled (SIGINT/SIGTERM).
+ * Bare `framework` (no prompt): run the dashboard server in the foreground (#456), so its logs and
+ * any server-thrown errors are visible and Ctrl+C stops it — along with every session it is
+ * running, which is the only mode there is. Blocks until the server is signalled (SIGINT/SIGTERM).
  */
-async function runForegroundDaemonCmd(opts: CliOptions, io: CliIO): Promise<number> {
-  const cwd = opts.cwd ?? process.cwd()
-  const port = opts.port ?? DEFAULT_DAEMON_PORT
-  const host = opts.host
-  const existing = await daemonStatus()
-  if (existing) {
-    io.out(`◆ dashboard already running in the background: ${existing.url}`)
-    io.out('  Stop it with `framework stop`, or open the URL above.')
-    // The dashboard this defers to *is* the background one, so its footer is the background one.
-    await printStartupFooter(io, { background: true })
-    return 0
-  }
+async function runForegroundDaemonCmd(args: CliArgs, io: CliIO): Promise<number> {
+  const cwd = process.cwd()
+  const port = args.port ?? DEFAULT_DAEMON_PORT
+  const host = args.host
   // #1051: pre-generate the shared token for a non-loopback bind so onListening (sync) can print
   // the reachable URL; runDaemon reuses the same persisted token.
   const token = host !== undefined && !isLoopbackHost(host) ? await ensureDaemonToken() : undefined
@@ -2174,11 +1269,11 @@ async function runForegroundDaemonCmd(opts: CliOptions, io: CliIO): Promise<numb
         if (!isLoopbackHost(state.host ?? DEFAULT_DAEMON_HOST)) {
           printNonLoopbackAccess(io, state.host ?? DEFAULT_DAEMON_HOST, state.url, token)
         }
-        io.out('  Ctrl+C to stop. Server logs stream below.')
+        io.out('  Ctrl+C to stop the dashboard and every session it is running. Server logs stream below.')
         // #312 asks bare `framework` to print the commands + version too. onListening is sync and
         // runDaemon then blocks until signalled, so this is fire-and-forget by necessity: the
         // update line lands a moment later, above the server logs.
-        void printStartupFooter(io, { background: false })
+        void printStartupFooter(io)
       },
     })
   } catch (err) {
@@ -2203,37 +1298,6 @@ function printNonLoopbackAccess(io: CliIO, host: string, url: string, token: str
 }
 
 /**
- * `framework --daemon` (#456): ensure the persistent background dashboard is running
- * for this workspace, then print the URL, the convenience commands, and the version.
- * Idempotent — a second call just re-reports the live one. Bare `framework` foregrounds
- * the same server instead.
- */
-async function ensureDaemonCmd(opts: CliOptions, io: CliIO): Promise<number> {
-  const cwd = opts.cwd ?? process.cwd()
-  const port = opts.port ?? DEFAULT_DAEMON_PORT
-  let result
-  try {
-    result = await ensureDaemon(cwd, { port, ...(opts.host !== undefined ? { host: opts.host } : {}) })
-  } catch (err) {
-    io.err(`could not start the dashboard daemon (${errorMessage(err)}).`)
-    return 1
-  }
-  // One daemon per machine (#393): when it is already running, `framework` in a new repo
-  // would not otherwise register that repo (only the daemon's own cwd is added on startup).
-  // Register it here too, best-effort, so it shows up in the Projects list either way.
-  await registerHomeProject(cwd)
-
-  const { state, alreadyRunning } = result
-  io.out(`◆ dashboard ${alreadyRunning ? 'already running' : 'started'}: ${state.url}`)
-  // #1051: warn + print the token URL when the daemon is actually bound non-loopback. Keyed off the
-  // host that is bound, not the flag, so re-reporting an already-running loopback daemon stays quiet.
-  const boundHost = state.host ?? DEFAULT_DAEMON_HOST
-  if (!isLoopbackHost(boundHost)) printNonLoopbackAccess(io, boundHost, state.url, await readDaemonToken())
-  await printStartupFooter(io, { background: true })
-  return 0
-}
-
-/**
  * The startup footer every dashboard path prints (#312): the convenience commands, the version,
  * and then — once npm answers — whether that version is the latest.
  *
@@ -2241,19 +1305,12 @@ async function ensureDaemonCmd(opts: CliOptions, io: CliIO): Promise<number> {
  * info first, and the foreground path (bare `framework`) blocks on the server forever, so a line
  * printed after the await would never appear there at all. `checkForUpdate` is already forgiving:
  * offline or slow (2.5s cap) resolves to 'unknown', which prints nothing.
- *
- * `background: false` drops the `framework stop` line — that stops a *detached* dashboard, and the
- * foreground path tells you Ctrl+C instead.
  */
-export function printStartupFooter(
-  io: CliIO,
-  opts: { background: boolean; fetchLatest?: VersionFetcher },
-): Promise<void> {
+export function printStartupFooter(io: CliIO, opts: { fetchLatest?: VersionFetcher } = {}): Promise<void> {
   const version = frameworkVersion()
   io.out('')
-  io.out('Type a prompt on the dashboard to start a session, or use:')
+  io.out('Type a prompt on the dashboard to start an agent, or use:')
   io.out('  framework "<what to build>"   Build (streams to the dashboard)')
-  if (opts.background) io.out('  framework stop                Stop the background dashboard')
   io.out('  framework --help              All options')
   io.out('')
   io.out(`The Framework v${version}`)
@@ -2265,186 +1322,52 @@ export function printStartupFooter(
     .catch(() => {})
 }
 
-/** What `framework worktrees` was asked to do (#752). */
-export type WorktreesCommand =
-  | { action: 'list' }
-  | { action: 'rm'; runId?: string }
-  | { action: 'prune' }
-  /** Remove only the checkouts whose branch has landed (#1036) — the daemon's sweep, on demand. */
-  | { action: 'sweep' }
-
 /**
- * `framework worktrees` (#752): the retained-worktree cleanup the dashboard already has (#737),
- * from the terminal, so it is scriptable and available without opening a browser.
- *
- * Scoped to the cwd's project, like the rest of the CLI. A run that failed or was stopped keeps
- * its checkout so you can look at what it was holding, and nothing removes those on a timer — so
- * without this the only way to clear them was the dashboard, one click at a time.
+ * The session spec a spawned on-before-mergeable child runs with (D4). Pure so a test can assert
+ * it: note it carries **no** `onBeforeMergeable`, which is the recursion guard — a quality pass
+ * must not trigger its own suite.
  */
-async function worktreesCmd(command: WorktreesCommand, cwd: string, io: CliIO): Promise<number> {
-  if (command.action === 'list') {
-    for (const line of formatWorktreeList(await listProjectWorktrees(cwd))) io.out(line)
-    return 0
-  }
-  if (command.action === 'rm') {
-    if (!command.runId) {
-      io.err('usage: framework worktrees rm <sessionId>')
-      return 2
-    }
-    const result = await removeProjectWorktree(cwd, command.runId)
-    if (!result.ok) {
-      io.err(result.error)
-      return 1
-    }
-    io.out(`◆ removed the worktree for session ${command.runId}.`)
-    return 0
-  }
-  // The daemon runs this on a timer (#1036); here it is on demand, for a machine whose daemon is
-  // not running and for seeing what the sweep would say.
-  if (command.action === 'sweep') {
-    const { removed, failed } = await removeMergedWorktrees(cwd)
-    for (const item of removed) {
-      io.out(`◆ removed ${item.runId}: ${item.branch} ${item.via === 'pr' ? 'was merged on GitHub' : 'is merged into the base'}.`)
-    }
-    for (const item of failed) io.err(`✗ ${item.runId}: ${item.error}`)
-    if (removed.length === 0 && failed.length === 0) io.out('No landed worktrees to remove.')
-    else if (removed.length > 0) io.out(`The branches and the sessions are kept; only the checkouts were removed.`)
-    return failed.length > 0 ? 1 : 0
-  }
-  const { removed, skipped } = await pruneProjectWorktrees(cwd)
-  for (const skip of skipped) io.out(`  kept ${skip.runId}: ${skip.reason}`)
-  io.out(
-    removed.length === 0
-      ? 'Nothing to prune.'
-      : `◆ removed ${removed.length} worktree${removed.length === 1 ? '' : 's'}.`,
-  )
-  // A worktree that could not be removed is a failure to report, not a silent partial success.
-  return skipped.some(skip => skip.reason !== 'still running') ? 1 : 0
-}
-
-/** `framework stop`: stop the machine's background dashboard, if any (#393). */
-async function stopDaemonCmd(_opts: CliOptions, io: CliIO): Promise<number> {
-  const stopped = await stopDaemon()
-  io.out(stopped ? '◆ dashboard stopped.' : 'No background dashboard was running.')
-  return 0
-}
-
-/**
- * `framework maintain`: the background maintenance sweep (#298). Walks the registered
- * repos, and for each with new commits since its last review runs the maintainability
- * loop (`framework prompt "<maintainability prompt>"`), budget-capped by `--max-cost`
- * and bounded by `--max-repos`. A first-seen repo is baselined (recorded, not reviewed
- * retroactively). `--dry-run` prints the plan without running anything.
- */
-async function maintainCmd(opts: CliOptions, io: CliIO): Promise<number> {
-  const projects = await listProjects()
-  if (projects.length === 0) {
-    io.out('No registered projects. Run `framework` in a repo to add one.')
-    return 0
-  }
-
-  const reviews = await planMaintenanceSweep(
-    projects.map(p => ({ id: p.id, path: p.path })),
-    nodeGitRunner(),
-  )
-
-  if (opts.dryRun) {
-    io.out(`Maintenance sweep (dry run) — ${reviews.length} registered repo${reviews.length === 1 ? '' : 's'}:`)
-    for (const r of reviews) io.out(`  ${describeReview(r)}`)
-    return 0
-  }
-
-  const binPath = process.argv[1]
-  if (!binPath) {
-    io.err('cannot locate the framework CLI entry to run the maintenance loop.')
-    return 1
-  }
-
-  const summary = await maintainSweep(reviews, {
-    run: review => spawnMaintenanceRun(review, binPath, opts.maxCost),
-    // Merged, not replaced: the automatic sweep (#882) keeps its own `sweptAt` in this file.
-    record: (path, state) => mergeMaintenanceState(path, state),
-    log: message => io.out(message),
-    now: () => new Date().toISOString(),
-    ...(opts.maxRepos !== undefined ? { maxRepos: opts.maxRepos } : {}),
-  })
-
-  io.out(
-    `Sweep done: ${summary.reviewed} reviewed, ${summary.baselined} baselined, ${summary.skipped} up-to-date, ` +
-      `${summary.failed} failed${summary.pending ? `, ${summary.pending} pending (--max-repos)` : ''}.`,
-  )
-  return summary.failed ? 1 : 0
-}
-
-/** One line describing a repo's assessed maintenance status, for the dry-run plan. */
-function describeReview(r: RepoReview): string {
-  const name = basename(r.path)
-  switch (r.action) {
-    case 'baseline':
-      return `${name} — baseline at ${short(r.headSha)} (first seen; nothing reviewed retroactively)`
-    case 'review':
-      return `${name} — review ${r.newCommits} new commit${r.newCommits === 1 ? '' : 's'} (${short(r.reviewedSha)}..${short(r.headSha)})${r.note ? ` [${r.note}]` : ''}`
-    case 'skip':
-      return `${name} — up to date`
-    case 'error':
-      return `${name} — skipped (${r.note ?? 'could not assess'})`
+export function promptAgentSpec(prompt: string, cwd: string, vanilla = false): AgentSpec {
+  return {
+    prompt,
+    kind: 'prompt',
+    cwd,
+    options: {
+      // The on-before-mergeable follow-up runs vanilla so it skips the built-in system prompt (#326)'s `### Session
+      // name` step: it is a follow-up to a session, not a session of its own, so it must not
+      // commit + branch + checkout a new `the-framework/<name>` branch. That stranded its output
+      // (the #556 TODO entries and #537 knowledge docs) on a branch nothing merges (#560). Vanilla
+      // keeps it on the session's current branch, where its output rides to review and merge with
+      // the work. The follow-up prompt is self-contained.
+      ...(vanilla ? { vanilla: true } : {}),
+    },
   }
 }
 
 /**
- * Run the maintainability loop on one repo by spawning `framework prompt "<prompt>"
- * --cwd <repo> --no-dashboard`, reusing the whole run path (preflight, driver, budget
- * cap, LOGS.md). The child inherits stdio so its run streams to the terminal.
- * Resolves true on a clean exit (0). Never re-execs a test entry (fork-bomb guard).
+ * Run one direct prompt by spawning `framework --agent <spec>`, reusing the whole agent path
+ * (preflight, driver, budget cap, LOGS.md). The child inherits stdio so its agent streams to the
+ * terminal. Note the spec carries no `onBeforeMergeable`, so a quality pass never triggers its own
+ * on-before-mergeable prompt (the recursion guard). Resolves true on a clean exit (0). Never
+ * re-execs a test entry (fork-bomb guard).
  */
-function spawnMaintenanceRun(review: RepoReview, binPath: string, maxCost?: number): Promise<boolean> {
-  // Scope the maintainability pass to the un-reviewed range so the agent knows what to look at.
-  const what = review.reviewedSha ? `the changes in ${short(review.reviewedSha)}..${short(review.headSha)}` : 'the recent changes'
-  return spawnPromptRun(presets.maintainability.render(what), review.path, binPath, maxCost)
-}
-
-/**
- * The argv a spawned `framework prompt` child runs with. Pure so a test can assert it:
- * note it carries **no** `--on-before-mergeable`, which is the on-before-mergeable recursion guard (a quality
- * pass must not trigger its own suite).
- */
-export function promptRunArgs(prompt: string, cwd: string, binPath: string, maxCost?: number, vanilla = false): string[] {
-  const args = [binPath, 'prompt', prompt, '--no-dashboard', '--cwd', cwd]
-  if (maxCost !== undefined) args.push('--max-cost', String(maxCost))
-  // The on-before-mergeable follow-up runs `--vanilla` so it skips the #326 prompt's
-  // `### Session name` step: it is a follow-up to a session, not a session of its own,
-  // so it must not commit + branch + checkout a new `the-framework/<name>` branch. That
-  // stranded its output (the #556 TODO entries and #537 knowledge docs) on a branch
-  // nothing merges (#560). Vanilla keeps it on the session's current branch, where its
-  // output rides to review and merge with the work. The follow-up prompt is self-contained.
-  if (vanilla) args.push('--vanilla')
-  return args
-}
-
-/**
- * Run one direct prompt by spawning `framework prompt "<prompt>" --cwd <dir> --no-dashboard`,
- * reusing the whole run path (preflight, driver, budget cap, LOGS.md). The child inherits
- * stdio so its run streams to the terminal. Note it carries no `--on-before-mergeable`, so a quality
- * pass never triggers its own on-before-mergeable prompt (the recursion guard). Resolves true on a
- * clean exit (0). Never re-execs a test entry (fork-bomb guard).
- */
-function spawnPromptRun(prompt: string, cwd: string, binPath: string, maxCost?: number, vanilla = false): Promise<boolean> {
+async function spawnPromptAgent(prompt: string, cwd: string, binPath: string, vanilla = false): Promise<boolean> {
   if (process.env.NODE_TEST_CONTEXT || /\.test\.[cm]?[jt]s$/.test(binPath)) {
-    return Promise.resolve(false) // refuse to spawn from a test entry
+    return false // refuse to spawn from a test entry
   }
-  const args = promptRunArgs(prompt, cwd, binPath, maxCost, vanilla)
+  const specPath = await writeAgentSpec(promptAgentSpec(prompt, cwd, vanilla))
   return new Promise<boolean>(resolvePromise => {
-    const child = spawn(process.execPath, args, { stdio: 'inherit' })
+    const child = spawn(process.execPath, [binPath, '--agent', specPath], { stdio: 'inherit' })
     child.once('error', () => resolvePromise(false))
     child.once('exit', code => resolvePromise(code === 0))
   })
 }
 
 /** How the on-before-mergeable prompt is spawned; injectable so tests observe it without spawning. */
-export type PromptRunner = (prompt: string, cwd: string, binPath: string, maxCost?: number) => Promise<boolean>
+export type PromptRunner = (prompt: string, cwd: string, binPath: string) => Promise<boolean>
 
 /**
- * Fire the #326 on-before-mergeable prompt after a run signalled setReadyForMerge(): one
+ * Fire the built-in on-before-mergeable (#326) prompt after an agent signalled setReadyForMerge(): one
  * `framework prompt` child on the same workspace that appends the quality follow-ups to the
  * session's TODO file, for the backlog loop (#323/#538) to pick up.
  *
@@ -2454,126 +1377,31 @@ export type PromptRunner = (prompt: string, cwd: string, binPath: string, maxCos
  * on the same git index. Best-effort, like the suite was: a failure is logged, never thrown.
  *
  * Returns how it went so the caller can emit it as an event (#835); the `io` lines stay for
- * a terminal run, which is the one surface that can still read them.
+ * a terminal agent, which is the one surface that can still read them.
  */
 export async function runOnBeforeMergeable(
   cwd: string,
   binPath: string,
   io: CliIO,
   tf: OnBeforeMergeableContext,
-  maxCost?: number,
-  eco?: EcoOptions,
   // Vanilla by default: the follow-up must not run the session-name step and branch (#560).
-  run: PromptRunner = (prompt, cwd, binPath, maxCost) => spawnPromptRun(prompt, cwd, binPath, maxCost, true),
+  agent: PromptRunner = (prompt, cwd, binPath) => spawnPromptAgent(prompt, cwd, binPath, true),
   fs: StoreFs = nodeStoreFs(),
 ): Promise<'queued' | 'incomplete'> {
   // Ensure the presets exist so the queued entries' filePaths resolve, even in a repo
   // activated before they shipped or a fresh clone (they are gitignored) (#598). Best-effort,
-  // like the rest of this run: a materialize failure must not block the queueing.
+  // like the rest of this agent: a materialize failure must not block the queueing.
   try {
     await materializePresets(cwd, fs)
   } catch (err) {
     io.out(`  ! on-before-mergeable: could not materialize presets (${errorMessage(err)})`)
   }
   io.out(`\n◆ on-before-mergeable: queueing quality follow-ups for ${tf.session_name}`)
-  const ok = await run(renderOnBeforeMergeablePrompt(tf, eco), cwd, binPath, maxCost)
+  const ok = await agent(renderOnBeforeMergeablePrompt(tf), cwd, binPath)
   if (!ok) io.out(`  ! on-before-mergeable queueing did not complete cleanly.`)
   return ok ? 'queued' : 'incomplete'
 }
 
-/**
- * `framework relay`: host the run relay (#230). Teammates open a run's URL
- * (printed when a run uses `--share <this-url>`) and watch it live with full
- * history replay. Runs until interrupted. Unauthenticated by design — anyone with
- * a run URL can watch; accounts/teams/steering come later.
- */
-async function runRelayServer(opts: CliOptions, io: CliIO): Promise<number> {
-  const relay = await startRelay(opts.port !== undefined ? { port: opts.port } : {})
-  io.out(`◆ relay listening at ${relay.url}`)
-  io.out(`  Sessions published with \`framework "..." --share ${relay.url}\` are watchable at ${relay.url}/?run=<id>`)
-  io.out(`  Press Ctrl+C to stop.`)
-  await waitForInterrupt()
-  await relay.close()
-  return 0
-}
-
-/**
- * Reopen the last run from its persisted `.the-framework/` log and replay it into a
- * fresh dashboard (#211). No agent runs; the dashboard rehydrates from the saved
- * event stream and stays up read-only until Ctrl+C.
- */
-async function resumeRun(opts: CliOptions, io: CliIO): Promise<number> {
-  const cwd = opts.cwd ?? process.cwd()
-  let store: RunStore
-  try {
-    store = await RunStore.open(cwd, { fresh: false })
-  } catch (err) {
-    io.err(`could not open .the-framework/ in ${cwd} (${errorMessage(err)})`)
-    return 1
-  }
-  const events = await store.loadEvents()
-  if (events.length === 0) {
-    io.err(`Nothing to resume: no saved session found in ${store.dir}. Run \`framework "..."\` first.`)
-    return 1
-  }
-  const meta = (await store.readMeta()) ?? store.snapshot()
-
-  // Resume serves the new dashboard too (#427), single-project on this `cwd`: the saved
-  // `.the-framework/events.jsonl` is exactly what the SPA's event Channel tails, so the
-  // past run replays with no extra wiring (it is finished, so there is nothing to steer).
-  // A missing bundle (an old install) replays to the terminal only.
-  const dashboard = await startRunDashboard(opts.dashboard, cwd, opts.port, io, {
-    resumed: true,
-    headlessNote: 'replaying to terminal only',
-  })
-
-  for (const event of events) {
-    io.out(formatFrameworkEvent(event))
-  }
-  io.out(`\n• resumed ${meta.status} session of "${meta.intent ?? 'unknown intent'}" (${events.length} event(s), ${meta.passes} pass(es)).`)
-
-  if (dashboard) {
-    io.out(`\nDashboard live at ${dashboard.url}. Press Ctrl+C to exit.`)
-    await waitForInterrupt()
-    await dashboard.close()
-  }
-  return 0
-}
-
-/**
- * Build a real {@link DeployTarget} for a known target name, or return an error /
- * nothing. `cloudflare` runs `wrangler` via a host executor bound to the build's
- * workspace; `dokploy` is a fetch to a self-hosted instance. Creds come from the
- * environment (CLOUDFLARE_API_TOKEN / DOKPLOY_AUTH_TOKEN).
- */
-export function buildDeployTarget(
-  name: string,
-  opts: Pick<CliOptions, 'cfProject' | 'dokployUrl' | 'dokployApp'>,
-  cwd: string,
-): { target?: DeployTarget; error?: string } {
-  if (name === 'cloudflare') {
-    return {
-      target: cloudflareTarget({
-        session: hostExecutor(cwd),
-        ...(opts.cfProject ? { projectName: opts.cfProject } : {}),
-      }),
-    }
-  }
-  if (name === 'dokploy') {
-    if (!opts.dokployUrl || !opts.dokployApp) {
-      return { error: '--deploy dokploy requires --dokploy-url and --dokploy-app' }
-    }
-    return { target: dokployTarget({ serverUrl: opts.dokployUrl, applicationId: opts.dokployApp }) }
-  }
-  return {} // Unknown target: narrate the decision only.
-}
-
-/** The post-run wait: keep the dashboard up until Ctrl+C, then close it. */
-async function keepDashboardUp(dashboard: Dashboard, io: CliIO): Promise<void> {
-  io.out(`\nDashboard still live at ${dashboard.url}. Press Ctrl+C to exit.`)
-  await waitForInterrupt()
-  await dashboard.close()
-}
 
 /** Resolve when the process is interrupted (Ctrl+C), so the dashboard stays up. */
 function waitForInterrupt(): Promise<void> {

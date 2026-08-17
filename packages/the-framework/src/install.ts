@@ -1,17 +1,15 @@
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from './project.js'
-import { logsPath, LOGS_HEADER, THE_FRAMEWORK_DIR, gitignorePath, LOGS_GITIGNORE } from './logs.js'
-import { CONVERSATIONS_GITIGNORE } from './conversations.js'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { frameworkGitignore, gitignorePath } from './framework-gitignore.js'
 import { nodeStoreFs, type StoreFs } from './store/index.js'
 import { materializePresets } from './presets.js'
 import { errorMessage } from './error-message.js'
 
 /**
- * Install/activate a repo for The Framework (#391): create the
- * `.the-framework/` marker + seeded `LOGS.md`, committing pre-existing dirty
- * changes first so the install commit is clean. Pure core over the same
- * {@link GitRunner} + {@link StoreFs} seams as project.ts/logs.ts; the
- * endpoint/UI wiring lands in later #314 slices.
+ * Install/activate a repo for The Framework (#391): create the `.the-framework/` marker and its
+ * ignore file, committing pre-existing dirty changes first so the install commit is clean. Pure
+ * core over the same {@link GitRunner} + {@link StoreFs} seams as project.ts.
  */
 
 /** The outcome of {@link installProject}. Failures are values, never throws. */
@@ -26,16 +24,16 @@ export interface InstallDeps {
 }
 
 /**
- * Activate the repo at `cwd`: commit any pre-existing dirty changes, create
- * `.the-framework/` with a seeded `LOGS.md`, and commit the install. A repo
- * with the log file already present is a no-op (`alreadyActivated`).
+ * Activate the repo at `cwd`: commit any pre-existing dirty changes, create `.the-framework/` with
+ * its ignore file, and commit the install. A repo whose ignore file is already there is a no-op
+ * (`alreadyActivated`) — it is the one file install always writes, and the only one it commits.
  * Forgiving: any git/fs failure surfaces as `{ ok: false, error }`.
  */
 export async function installProject(cwd: string, deps: InstallDeps = {}): Promise<InstallResult> {
   const git = deps.git ?? nodeGitRunner()
   const fs = deps.fs ?? nodeStoreFs()
 
-  if (await fs.exists(logsPath(cwd))) return { ok: true, alreadyActivated: true }
+  if (await fs.exists(gitignorePath(cwd))) return { ok: true, alreadyActivated: true }
 
   try {
     // Auto-initialize a repo when the folder isn't one yet: The Framework treats
@@ -53,17 +51,14 @@ export async function installProject(cwd: string, deps: InstallDeps = {}): Promi
     }
 
     await fs.mkdir(join(cwd, THE_FRAMEWORK_DIR))
-    // The early return above already established LOGS.md is absent, so write it unconditionally.
-    await fs.write(logsPath(cwd), LOGS_HEADER)
-    // Keep the transient run state (events.jsonl / run.json / runs/) out of git; the committed
-    // DB is LOGS.md (#313) plus the conversations (#908), each needing its own negation.
-    const ignore = gitignorePath(cwd)
-    if (!(await fs.exists(ignore))) await fs.write(ignore, LOGS_GITIGNORE + CONVERSATIONS_GITIGNORE)
+    // Keep the transient agent state (events.jsonl / agent.json / agents/) out of git and the session
+    // archive in it (#313/#1179). The early return above established the file is absent.
+    await fs.write(gitignorePath(cwd), frameworkGitignore())
 
     // Materialize the quality presets so an on-before-mergeable TODO entry's filePath resolves to a
     // real file the agent can open (#326). The .the-framework/.gitignore above keeps them out
-    // of git (only LOGS.md is committed), so they are regenerated on install and track the
-    // installed framework version rather than going stale in the repo's history.
+    // of git, so they are regenerated on install and track the installed framework version rather
+    // than going stale in the repo's history.
     await materializePresets(cwd, fs)
     // The ticket-format spec is NOT materialized (#674): it ships inside the package and the
     // #683 context fragment points at its node_modules path, so it versions with the package.

@@ -1,10 +1,10 @@
-A driver that runs the agent on GitHub Actions instead of this machine: dispatch a workflow, wait for it, read back the transcript the run uploads.
+A driver that runs the agent on GitHub Actions instead of this machine: dispatch a workflow, wait for it, read back the transcript the agent uploads.
 
 ## TLDR
 
 - Same contract, different tempo: every prompt is a fresh runner, turns take minutes, and progress replays in one burst at the end instead of trickling live.
-- Continuity across turns is the branch the previous run pushed — the next turn starts from it — plus the agent's carried session id, so a multi-pass run keeps building on its own work; produced code is read off that branch, because the runner is gone by the time we ask.
-- Auth is the same bring-your-own-subscription posture as everywhere else: a token held by the repo, belonging to a real user — bot-triggered agent runs are refused.
+- Continuity across turns is the branch the previous turn pushed — the next one starts from it — plus the carried session id, so a multi-pass agent keeps building on its own work; produced code is read off that branch, because the runner is gone by the time we ask.
+- Auth is the same bring-your-own-subscription posture as everywhere else: a token held by the repo, belonging to a real user — bot-triggered agents are refused.
 - Each dispatch carries a unique correlation tag so a restarted framework can never mistake a stale or foreign run for its own, and every value forwarded to the runner is checked so nothing can act as shell syntax.
 
 ## Before writing SPEC.md files

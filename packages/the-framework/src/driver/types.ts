@@ -1,3 +1,4 @@
+import type { DriverImplId } from '../driver-names.js'
 /**
  * The **driver** seam: the one abstraction The Framework wraps a coding-agent
  * CLI behind. A driver treats the agent (Claude Code today, Codex / opencode
@@ -21,8 +22,12 @@
 
 /** A wrapped coding-agent CLI. Boots {@link DriverSession}s bound to a workspace. */
 export interface Driver {
-  /** Stable name for the wrapped agent, e.g. `"claude-code"`. */
-  readonly name: string
+  /**
+   * Stable id for this concrete implementation, e.g. `"claude-code"`. Not the driver's *name*
+   * (`claude`), which is the user's choice: one driver has an implementation per place it can run
+   * (D5). {@link driverFromImpl} maps this back to the choice.
+   */
+  readonly id: DriverImplId
   /** Boot a session bound to a workspace directory. */
   start(opts: DriverStartOptions): Promise<DriverSession>
   /**
@@ -34,16 +39,6 @@ export interface Driver {
    * way {@link DriverRateLimit} is omitted by drivers that can't emit it.
    */
   readQuota?(opts?: { signal?: AbortSignal }): Promise<DriverQuota>
-  /**
-   * This driver hands the task somewhere this machine cannot follow, so the first prompt is
-   * the whole run (#1225). Everything a run would do after that prompt — review the reply,
-   * improve against blockers, work the backlog, stay open for messages — reads a reply the
-   * agent never wrote, and asks the user questions the agent never asked.
-   *
-   * Optional and false by default: a driver that streams its agent's own replies (local,
-   * Actions, a device) omits it.
-   */
-  readonly handsOff?: boolean
 }
 
 /** How to boot a {@link DriverSession}. */
@@ -62,7 +57,7 @@ export interface DriverStartOptions {
   /**
    * Resume a prior agent session id (#720): seed the session so its very first
    * prompt (with `resume`) continues that conversation instead of starting fresh.
-   * This is how a finished run is revived from the dashboard — its captured session
+   * This is how a finished agent is revived from the dashboard — its captured session
    * id is threaded here so the opening message lands with the full prior context.
    * A driver that can't resume ignores it and runs fresh (the best-effort contract).
    */
@@ -70,7 +65,7 @@ export interface DriverStartOptions {
   /**
    * Observe the agent's *own* progress as it works. Black-box granularity: we
    * forward these for visibility (the dashboard) but never branch control flow
-   * on them. Isolated: a throwing callback must not break the run.
+   * on them. Isolated: a throwing callback must not break the agent.
    */
   onEvent?: (event: DriverEvent) => void
 }
@@ -161,7 +156,7 @@ export interface DriverUsage {
  * Where the account's subscription quota stands, as reported by the wrapped
  * agent (#517). Claude Code emits one of these per turn on its `stream-json`
  * output; drivers that cannot report it simply omit it. This is the account
- * limit, not this run's spend — {@link DriverUsage} covers the latter.
+ * limit, not this agent's spend — {@link DriverUsage} covers the latter.
  */
 export interface DriverRateLimit {
   /**
@@ -269,7 +264,7 @@ export type DriverEvent =
   /**
    * The agent announced its session id, at the start of the turn (#1322). `result` repeats it,
    * but a turn that never settles — a manual Stop, an error, a kill — used to take the id down
-   * with it, and with it the run's `claude --resume` handle. Telemetry consumes this one rather
+   * with it, and with it the agent's `claude --resume` handle. Telemetry consumes this one rather
    * than forwarding it: the id is plumbing, not conversation.
    */
   | { type: 'session'; sessionId: string }

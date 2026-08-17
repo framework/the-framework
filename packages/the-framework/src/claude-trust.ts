@@ -6,9 +6,9 @@ import { join } from 'node:path'
  * Claude Code's folder trust, read (never written) for the dashboard (#1318).
  *
  * The CLI asks its one-time "do you trust this folder?" question interactively, which a
- * `--cloud` start under the daemon's pty can never answer (#1314) — a web run on an
+ * `--cloud` start under the daemon's pty can never answer (#1314) — a web agent on an
  * untrusted project is doomed before it starts. The dashboard can at least know that
- * before the run is spent: this reads the CLI's own record of the decision.
+ * before the agent is spent: this reads the CLI's own record of the decision.
  *
  * Read-only on purpose. Trusting a folder is a security decision the CLI owns; the
  * framework reports it and tells the user the one-time step, it does not make it for them.

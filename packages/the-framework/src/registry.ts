@@ -1,14 +1,10 @@
+import { isAgentLocation, type AgentLocation } from './agent-location.js'
+import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
-import { isAgentName } from './agent-names.js'
+import { isDriverName } from './driver-names.js'
 import { nodeFs } from './node-fs.js'
-import {
-  PROJECT_PREFERENCE_KEYS,
-  MAX_SPEND_OFFSET,
-  DEFAULT_SPEND_OFFSET,
-  MAX_AUTO_PM_CONCURRENCY,
-  type ProjectPreferences,
-} from './preference-defaults.js'
+import { MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, MAX_AUTO_PM_CONCURRENCY } from './preference-defaults.js'
 
 /**
  * The multi-project registry (#390): the list of projects the user has
@@ -31,8 +27,9 @@ export interface ProjectRecord {
 /**
  * The dashboard's Global options (#410), persisted next to the project list so they
  * survive restarts without localStorage — the daemon reads/writes them, the SPA reads
- * them over Telefunc. Flat booleans mirroring the Start form's toggles; every field is
- * optional and absent means off (Autopilot still defaults on in the UI).
+ * them over `POST /_rpc/onPreferences`. Mostly flat booleans mirroring the Start form's
+ * toggles; every field is optional and absent means off, except where a field documents its
+ * own default below.
  */
 
 /**
@@ -52,63 +49,54 @@ export interface CustomPreset {
 const CUSTOM_PRESET_LIMITS = { count: 30, label: 80, prompt: 20_000 } as const
 
 export interface Preferences {
-  autopilot?: boolean
-  technical?: boolean
   vanilla?: boolean
-  eco?: boolean
-  ecoPlanning?: boolean
-  ecoResearch?: boolean
-  ecoMaintenance?: boolean
   /** On-before-mergeable prompt (#326): on setReadyForMerge(), queue the quality follow-ups as TODO entries. */
   onBeforeMergeableQuality?: boolean
-  /** Give the agent a real browser via chrome-devtools-mcp during the run (#452); maps to `--browser`. */
+  /** Give the agent a real browser via chrome-devtools-mcp during the agent (#452); maps to `--browser`. */
   browser?: boolean
   /**
-   * Push a session's branch to `origin` when it finishes (#1102). Absent = on.
+   * How far a finished session publishes itself (#1102/#1216/B5): keep it local, push the branch,
+   * open a draft PR, or merge that PR. Absent = {@link DEFAULT_HANDOFF} (`pr`).
    *
    * Default-on, unlike most of this file, because it is what makes the handoff zero-config: the
    * old behaviour was a button nobody was obliged to press, and work that stayed on a local
    * branch nobody was told about (#860). A session can still opt out from its action bar.
    */
-  autoPushBranch?: boolean
-  /** Open a draft PR for a session's branch when it finishes (#1102). Absent = on; implies {@link autoPushBranch}. */
-  autoOpenPr?: boolean
-  /** Merge a session's PR once it is opened (#1216). Absent = off: landing on the default branch has to be asked for, unlike the default-on publish pair above. */
-  autoMerge?: boolean
+  handoff?: HandoffLevel
   /**
    * Transparent mode (#625): run the wrapped agent raw — no framework system prompt, emit
-   * protocols, consumption guard, dashboard, or TODO loop, so a run is identical to `claude -p`.
+   * protocols, consumption guard, dashboard, or TODO loop, so an agent is identical to `claude -p`.
    * The coarse master off-switch ("only pick what you need"); maps to `--transparent`. Absent = off.
    */
   transparent?: boolean
   /** Fire a browser notification when a new item lands on the "needs you" queue (#627). Absent = on. */
   notifyBrowser?: boolean
   /**
-   * Also notify on plain run activity — a run started, a run finished (#627). The default-off
+   * Also notify on plain agent activity — an agent started, an agent finished (#627). The default-off
    * counterpart to the always-on "needs you" notifications: it keeps you loosely informed of the
    * pipeline moving even when nothing needs you. A *category* toggle: it composes with the method
    * toggles ({@link notifyBrowser} / {@link notifyDiscord}), so activity reaches whichever are on.
    */
   notifyNewActivity?: boolean
   /**
-   * The "needs you" category (#627): notify when a run is awaiting your answer or a PR is ready
+   * The "needs you" category (#627): notify when an agent is awaiting your answer or a PR is ready
    * to review. A *category* toggle, like {@link notifyNewActivity}, composing with the method
    * toggles ({@link notifyBrowser} / {@link notifyDiscord}). **Absent = on**: unlike the other
    * flat opt-in booleans, human-intervention pings are the baseline The Framework leans on, so an
    * unset preference keeps them firing; a user turns them off explicitly.
    */
   notifyHumanIntervention?: boolean
-  /** The model to run on (#628), e.g. `opus` / `sonnet`; maps to a run's `--model`. Absent = the driver's default. */
+  /** The model to run on (#628), e.g. `opus` / `sonnet`; maps to an agent's `--model`. Absent = the driver's default. */
   model?: string
-  /** Which coding agent drives the run (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
-  agent?: string
+  /** Which coding agent drives the agent (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
+  driver?: string
   /** Preferred editor for "Open in editor" (#727): an editor CLI (e.g. `code`, `cursor`, `zed`).
    * Absent falls back to `$FRAMEWORK_EDITOR`, then `code`. */
   editor?: string
   /** Dashboard color theme (#725): `system` (follow the OS, the default), `light`, or `dark`. Absent = system. */
   theme?: 'system' | 'light' | 'dark'
   /** Where a run executes (#1050/#610): `local` (this device, the default), `actions` (a fresh GitHub Actions runner) or `web` (a Claude Code cloud session); maps to `--run-on`. Absent = local. */
-  target?: 'local' | 'actions' | 'web'
+  target?: AgentLocation
   /**
    * Post a Discord message when a new item lands on the "needs you" queue (#627). Absent = off:
    * unlike the in-browser toggle, Discord reaches you when no dashboard is open, so it is opt-in.
@@ -117,14 +105,7 @@ export interface Preferences {
    */
   notifyDiscord?: boolean
   /**
-   * Run the Discord chatbot (#680): take messages from Discord and drive runs with them, rather
-   * than only posting notifications outward. Absent = off, like {@link notifyDiscord}, and for a
-   * stronger reason — this one *acts* on what it reads. Gates the daemon's bot on top of a
-   * `DISCORD_BOT_TOKEN` being set (the token is how to connect; this is whether to).
-   */
-  discordBot?: boolean
-  /**
-   * Auto PM (#685): let the daemon start a PM run by itself when the agent queue has run dry
+   * Auto PM (#685): let the daemon start a PM agent by itself when the agent queue has run dry
    * and there is plenty of budget left, so leftover subscription quota goes on the roadmap
    * instead of expiring. **Absent = off**: it spends the user's allowance without being asked,
    * so it is opt-in like {@link notifyDiscord} rather than a baseline.
@@ -132,7 +113,7 @@ export interface Preferences {
   autoPm?: boolean
   /**
    * The browser bridge (#1237): let an extension running in the user's own Claude session report
-   * the question a Claude web run is parked on, so it shows in the dashboard rather than only on
+   * the question a Claude web agent is parked on, so it shows in the dashboard rather than only on
    * claude.ai. **Absent = off.** It opens the daemon's one route reachable from another origin,
    * so it is opt-in rather than a baseline, and turning it on is what mints the bridge token.
    */
@@ -153,7 +134,7 @@ export interface Preferences {
    *
    * Only the draining routine fans out: it takes work *off* the queue, one pinned entry per agent,
    * so several at once do disjoint work. The rotation invents work and each of its jobs rewrites
-   * the queue file, so it stays one run per tick whatever this says.
+   * the queue file, so it stays one agent per tick whatever this says.
    */
   autoPmConcurrency?: number
   /**
@@ -188,25 +169,14 @@ export interface Preferences {
   reposDirectoryAutoGrant?: boolean
 }
 
-/**
- * The run options a project may override (#840). The rest of {@link Preferences} stays global
- * on purpose: `theme`, `editor`, the notification toggles and `customPresets` are about the
- * user, not the repo.
- *
- * These are the *user's* per-project choices, not the repo's: they live in the user's home
- * file rather than the committed `the-framework.yml` because `model` and `agent` name what
- * this machine runs, which is not something to impose on everyone who clones the repo.
- */
-// The key list lives in the leaf `preference-defaults.ts` so the dashboard reads the same one
-// (a second copy there erased the type link, see that module); re-exported so this stays the
-// import site for everything that already reads it beside `Preferences`.
+// The bounds the browser's controls and this file's sanitizer both need live in the leaf
+// `preference-defaults.ts`; re-exported so this stays the import site for everything that
+// already reads them beside `Preferences`.
 export {
-  PROJECT_PREFERENCE_KEYS,
   MAX_SPEND_OFFSET,
   DEFAULT_SPEND_OFFSET,
   DEFAULT_AUTO_PM_CONCURRENCY,
   MAX_AUTO_PM_CONCURRENCY,
-  type ProjectPreferences,
 } from './preference-defaults.js'
 
 /**
@@ -222,8 +192,6 @@ export {
  * second one would only spread the same exposure over two paths to keep 0600 on.
  */
 export interface RegistrySecrets {
-  /** The Discord chatbot's token (#680). Overridden by `DISCORD_BOT_TOKEN` when that is set. */
-  discordBotToken?: string
   /** Where Discord notifications are posted (#627). Overridden by `DISCORD_WEBHOOK` when that is set. */
   discordWebhook?: string
 }
@@ -231,49 +199,35 @@ export interface RegistrySecrets {
 /** The {@link RegistrySecrets} keys, as a `Record` so the compiler enforces completeness both
  * ways — the same shape (and the same #944 lesson) as the preference tables below. */
 const SECRET_KEYS: Record<keyof RegistrySecrets, true> = {
-  discordBotToken: true,
   discordWebhook: true,
 }
 
 /** A bot token is ~70 chars and a webhook URL ~120; bounded so a hostile write can't bloat the file. */
 const MAX_SECRET_LENGTH = 500
 
-/**
- * The persisted registry file shape (#410): the project list plus the user preferences.
- * Older installs wrote a bare `ProjectRecord[]`; {@link readRegistry} still reads those and
- * the next write migrates the file to this object form.
- */
+/** The persisted registry file shape (#410): the project list plus the user preferences. */
 export interface Registry {
   projects: ProjectRecord[]
   preferences: Preferences
-  /** Per-project overrides (#840), keyed by {@link ProjectRecord.id}. Absent keys fall through. */
-  projectPreferences: Record<string, ProjectPreferences>
   /**
    * The shared daemon token (#1051): generated on the first non-loopback bind and reused after.
    * A top-level field, deliberately not a {@link Preferences} one, so it is never shipped to the
-   * browser bundle or the per-project override map. Absent on a loopback-only machine.
+   * browser bundle. Absent on a loopback-only machine.
    */
   daemonToken?: string
   /** Third-party credentials set from the dashboard (#1095). Absent until one is saved. */
   secrets?: RegistrySecrets
 }
 
-/** A read/write handle for the user preferences, threaded through the dashboard's Telefunc
- * context so a public host (the relay) can leave it unwired. */
+/** A read/write handle for the user preferences, wired into the dashboard's context by the daemon. */
 export interface PreferencesStore {
   read(): Promise<Preferences>
   save(preferences: Preferences): Promise<void>
   /**
-   * Merge only the keys the caller changed (#1148) and hand back the stored result. Optional so an
-   * existing implementation of this seam keeps compiling; without it the caller falls back to
+   * Merge only the keys the caller changed (#1148) and hand back the stored result. Preferred over
    * {@link save}, which replaces the whole block from a snapshot that may already be stale.
    */
-  patch?(patch: Preferences): Promise<Preferences>
-  /** One project's overrides (#840). Optional so a host that only stores globals still compiles. */
-  readProject?(projectId: string): Promise<ProjectPreferences>
-  saveProject?(projectId: string, preferences: ProjectPreferences): Promise<void>
-  /** The {@link patch} counterpart for one project's overrides (#1148). */
-  patchProject?(projectId: string, patch: ProjectPreferences): Promise<ProjectPreferences>
+  patch(patch: Preferences): Promise<Preferences>
 }
 
 /** The registry file name: a single file under `$XDG_CONFIG_HOME` (dotted under `$HOME`). */
@@ -307,20 +261,6 @@ export function projectId(path: string): string {
 export function registryPath(env: NodeJS.ProcessEnv): string {
   if (env.XDG_CONFIG_HOME) return join(env.XDG_CONFIG_HOME, REGISTRY_FILE)
   return join(env.HOME ?? '', '.' + REGISTRY_FILE)
-}
-
-/** The dotted basename topic scratch dirs live under, mirroring the registry file's. */
-const TOPICS_DIR = 'the-framework-topics'
-
-/**
- * The neutral scratch directory a project-less "topic" run (#1120) executes in: `<runId>/`
- * under a config-home folder, resolved exactly like {@link registryPath} so it never lands in a
- * repo. It is deliberately NOT a git checkout, which is what makes a topic run repo-less — a run
- * to ask a question, plan, or draft a ticket with no code for the agent to touch.
- */
-export function topicScratchPath(env: NodeJS.ProcessEnv, runId: string): string {
-  const root = env.XDG_CONFIG_HOME ? join(env.XDG_CONFIG_HOME, TOPICS_DIR) : join(env.HOME ?? '', '.' + TOPICS_DIR)
-  return join(root, runId)
 }
 
 /** Minimal fs seam so the registry is unit-testable without touching disk. */
@@ -384,22 +324,12 @@ type BooleanPreferenceKey = {
  * preference on every save, the write-then-vanish failure shape for a settings file.
  */
 const BOOLEAN_PREFERENCES: Record<BooleanPreferenceKey, true> = {
-  autopilot: true,
-  technical: true,
   vanilla: true,
-  eco: true,
-  ecoPlanning: true,
-  ecoResearch: true,
-  ecoMaintenance: true,
   onBeforeMergeableQuality: true,
   browser: true,
-  autoPushBranch: true,
-  autoOpenPr: true,
-  autoMerge: true,
   transparent: true,
   notifyBrowser: true,
   notifyDiscord: true,
-  discordBot: true,
   notifyNewActivity: true,
   notifyHumanIntervention: true,
   autoPm: true,
@@ -414,9 +344,8 @@ const PREFERENCE_KEYS = Object.keys(BOOLEAN_PREFERENCES) as BooleanPreferenceKey
  * object never lands junk (or the wrong type) in the user's home file. */
 /** The color themes the dashboard offers (#725); anything else means the default `system`. */
 const KNOWN_THEMES = ['system', 'light', 'dark'] as const
-/** The run targets the dashboard offers (#1050/#610); anything else means the default `local`. */
-const KNOWN_RUN_TARGETS = ['local', 'actions', 'web'] as const
 
+/** The agent targets the dashboard offers (#1050/#610); anything else means the default `local`. */
 function sanitizePreferences(value: unknown): Preferences {
   if (typeof value !== 'object' || value === null) return {}
   const input = value as Record<string, unknown>
@@ -425,11 +354,15 @@ function sanitizePreferences(value: unknown): Preferences {
     if (typeof input[key] === 'boolean') preferences[key] = input[key] as boolean
   }
   // `model` (#628) is a free-form string preference; the rest are booleans. A blank string is "no
-  // choice", same as absent, so it is dropped rather than persisted.
-  if (typeof input['model'] === 'string' && input['model'].trim()) preferences.model = input['model'].trim()
-  // `agent` (#650) is constrained to the known set so junk never reaches the run; the set is
-  // the shared node-free vocabulary (agent-names.ts). Default = claude.
-  if (isAgentName(input['agent'] as string | undefined)) preferences.agent = input['agent'] as string
+  // choice", same as absent, so it is dropped rather than persisted. So is the literal word
+  // "Default": that was a picker *label* whose stored value was empty (#1143), and a file carrying
+  // it as the value — hand-edited, or written by a build that mistook the two — would otherwise be
+  // handed to the CLI as `--model Default` and fail the turn on a word nobody chose.
+  const model = typeof input['model'] === 'string' ? input['model'].trim() : ''
+  if (model && model.toLowerCase() !== 'default') preferences.model = model
+  // `driver` (#650) is constrained to the known set so junk never reaches the agent; the set is the
+  // shared node-free vocabulary (agent-names.ts). Default = claude.
+  if (isDriverName(input['driver'] as string | undefined)) preferences.driver = input['driver'] as string
   // `editor` (#727) is a free-form CLI name, trimmed and length-capped so junk / a huge string
   // never lands in the file. A blank string is "no choice" (fall back to env / `code`), so dropped.
   if (typeof input['editor'] === 'string' && input['editor'].trim())
@@ -440,8 +373,10 @@ function sanitizePreferences(value: unknown): Preferences {
     preferences.theme = input['theme'] as (typeof KNOWN_THEMES)[number]
   // `target` (#1050) is a string, so the boolean-only PREFERENCE_KEYS loop would silently eat it;
   // it gets its own branch like `theme`, constrained to the known set (anything else = default `local`).
-  if (typeof input['target'] === 'string' && (KNOWN_RUN_TARGETS as readonly string[]).includes(input['target']))
-    preferences.target = input['target'] as (typeof KNOWN_RUN_TARGETS)[number]
+  if (isAgentLocation(input['target'])) preferences.target = input['target']
+  // `handoff` (B5) is the one ordinal the three booleans it replaced could never be: a rung, not a
+  // combination. Constrained to the ladder, so anything else means the default `pr`.
+  if (isHandoffLevel(input['handoff'])) preferences.handoff = input['handoff']
   // `autoSpendOffset` (#960) is the one numeric preference: a slider position in percentage
   // points, clamped so a hand-edited file cannot push the limit somewhere the slider could not.
   const offset = input['autoSpendOffset']
@@ -476,40 +411,6 @@ function sanitizeNameList(value: unknown): string[] {
     .map(entry => entry.trim().slice(0, 100))
     .filter(Boolean)
   return [...new Set(names)].slice(0, 50)
-}
-
-/**
- * Keep only the keys a project may override (#840), each sanitized by the same rules as the
- * global object, so a hand-edited registry cannot smuggle a global-only key onto a project.
- */
-function sanitizeProjectPreferences(value: unknown): ProjectPreferences {
-  const sanitized = sanitizePreferences(value) as Record<string, unknown>
-  const preferences: Record<string, unknown> = {}
-  for (const key of PROJECT_PREFERENCE_KEYS) {
-    if (sanitized[key] !== undefined) preferences[key] = sanitized[key]
-  }
-  return preferences as ProjectPreferences
-}
-
-/** The whole per-project block, dropping malformed entries and projects that override nothing. */
-function sanitizeProjectPreferenceMap(value: unknown): Record<string, ProjectPreferences> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
-  const map: Record<string, ProjectPreferences> = {}
-  for (const [id, stored] of Object.entries(value as Record<string, unknown>)) {
-    if (!id) continue
-    const preferences = sanitizeProjectPreferences(stored)
-    if (Object.keys(preferences).length) map[id] = preferences
-  }
-  return map
-}
-
-/**
- * The preferences in force for a project (#840): the global object with the project's
- * overrides on top, so a project that sets nothing behaves exactly as it does today.
- * Only the keys the project actually stored win; the rest fall through.
- */
-export function resolvePreferences(global: Preferences, project: ProjectPreferences | undefined): Preferences {
-  return { ...global, ...project }
 }
 
 /**
@@ -555,32 +456,28 @@ function sanitizeSecrets(value: unknown): RegistrySecrets | undefined {
 }
 
 /**
- * Read the whole registry. Forgiving: a missing / unreadable / malformed file yields an
- * empty registry, never throws. Accepts both the current object form and the legacy bare
- * `ProjectRecord[]` (pre-#410), so old installs keep working; projects are deduped by
- * resolved path and unknown preference fields are dropped.
+ * Read the whole registry. Forgiving: a missing / unreadable / malformed file — or one in a shape
+ * this no longer writes — yields an empty registry, never throws. Projects are deduped by resolved
+ * path and unknown preference fields are dropped.
  */
 export async function readRegistry(
   fs: RegistryFs = nodeRegistryFs(),
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<Registry> {
-  const empty: Registry = { projects: [], preferences: {}, projectPreferences: {} }
+  const empty: Registry = { projects: [], preferences: {} }
   let parsed: unknown
   try {
     parsed = JSON.parse(await fs.read(registryPath(env)))
   } catch {
     return empty
   }
-  // Legacy format: a bare array of project records. Migrated to the object form on next write.
-  if (Array.isArray(parsed)) return { ...empty, projects: dedupeProjects(parsed) }
-  if (typeof parsed !== 'object' || parsed === null) return empty
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return empty
   const obj = parsed as Record<string, unknown>
   const projects = Array.isArray(obj.projects) ? dedupeProjects(obj.projects) : []
   const secrets = sanitizeSecrets(obj.secrets)
   return {
     projects,
     preferences: sanitizePreferences(obj.preferences),
-    projectPreferences: sanitizeProjectPreferenceMap(obj.projectPreferences),
     // #1051: kept only as a non-empty string, so a hand-edited registry can't smuggle a junk token.
     ...(typeof obj.daemonToken === 'string' && obj.daemonToken ? { daemonToken: obj.daemonToken } : {}),
     ...(secrets ? { secrets } : {}),
@@ -588,9 +485,7 @@ export async function readRegistry(
 }
 
 /**
- * Write the registry back as pretty object-form JSON, creating the parent dir. The per-project
- * block is omitted while empty, so a user who never sets a per-project option keeps the file
- * they have today.
+ * Write the registry back as pretty object-form JSON, creating the parent dir.
  *
  * Atomic (#991): the JSON goes to a temp file beside the real one and is then renamed over it,
  * the same shape #922 gave the daemon state file. A direct write truncates first, so a crash, a
@@ -606,11 +501,10 @@ export async function readRegistry(
  */
 async function writeRegistry(registry: Registry, fs: RegistryFs, env: NodeJS.ProcessEnv): Promise<void> {
   const file = registryPath(env)
-  const { projects, preferences, projectPreferences, daemonToken, secrets } = registry
+  const { projects, preferences, daemonToken, secrets } = registry
   const contents = {
     projects,
     preferences,
-    ...(Object.keys(projectPreferences).length ? { projectPreferences } : {}),
     ...(daemonToken ? { daemonToken } : {}),
     ...(secrets && Object.keys(secrets).length ? { secrets } : {}),
   }
@@ -660,28 +554,6 @@ export async function listProjects(
   return (await readRegistry(fs, env)).projects
 }
 
-/** A validated project path (#1121), or the reason it was rejected. */
-export type ProjectPathResult = { ok: true; path: string } | { ok: false; error: string }
-
-/**
- * Validate a path a topic run wants to register + bind to (#1121): it must be a non-empty,
- * absolute path to an existing directory. `resolve` collapses any `.`/`..` before it reaches the
- * registry, so a relative-based traversal can never smuggle in a path the agent did not name; the
- * absolute requirement is the guard, mirroring how {@link addProject} normalizes what it stores.
- * `isDirectory` is injected so this is unit-testable without touching disk; it defaults to real fs.
- */
-export async function resolveProjectPath(
-  path: string,
-  isDirectory: (p: string) => Promise<boolean> = p => nodeFs().isDirectory(p),
-): Promise<ProjectPathResult> {
-  const trimmed = typeof path === 'string' ? path.trim() : ''
-  if (!trimmed) return { ok: false, error: 'no path was given' }
-  if (!isAbsolute(trimmed)) return { ok: false, error: `the path must be absolute: ${trimmed}` }
-  const absolute = resolve(trimmed)
-  if (!(await isDirectory(absolute))) return { ok: false, error: `no such directory: ${absolute}` }
-  return { ok: true, path: absolute }
-}
-
 /**
  * Register a project. Idempotent by resolved path: when the path is already
  * registered, the existing record is returned untouched (addedAt survives);
@@ -720,8 +592,7 @@ export async function removeProject(
     const registry = await readRegistry(fs, env)
     const remaining = registry.projects.filter(project => project.id !== id)
     if (remaining.length === registry.projects.length) return false
-    const { [id]: _dropped, ...projectPreferences } = registry.projectPreferences
-    await writeRegistry({ ...registry, projects: remaining, projectPreferences }, fs, env)
+    await writeRegistry({ ...registry, projects: remaining }, fs, env)
     return true
   })
 }
@@ -768,55 +639,6 @@ export async function patchPreferences(
     const preferences = sanitizePreferences({ ...registry.preferences, ...patch })
     await writeRegistry({ ...registry, preferences }, fs, env)
     return preferences
-  })
-}
-
-/** One project's overrides (#840), or `{}` when it has none. */
-export async function readProjectPreferences(
-  projectId: string,
-  fs: RegistryFs = nodeRegistryFs(),
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<ProjectPreferences> {
-  return (await readRegistry(fs, env)).projectPreferences[projectId] ?? {}
-}
-
-/**
- * Persist one project's overrides (#840), sanitized, leaving the globals and every other
- * project untouched. Storing nothing drops the entry rather than leaving an empty object,
- * so the file stays readable and "overrides nothing" has one representation.
- */
-export async function writeProjectPreferences(
-  projectId: string,
-  preferences: ProjectPreferences,
-  fs: RegistryFs = nodeRegistryFs(),
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<void> {
-  return serialize(async () => {
-    const registry = await readRegistry(fs, env)
-    const sanitized = sanitizeProjectPreferences(preferences)
-    const { [projectId]: _previous, ...rest } = registry.projectPreferences
-    const projectPreferences = Object.keys(sanitized).length ? { ...rest, [projectId]: sanitized } : rest
-    await writeRegistry({ ...registry, projectPreferences }, fs, env)
-  })
-}
-
-/**
- * Merge `patch` over one project's overrides (#1148) and return the result — {@link patchPreferences}
- * for the project tier, and the same reason: the run options a tab holds are as stale as its globals.
- */
-export async function patchProjectPreferences(
-  projectId: string,
-  patch: ProjectPreferences,
-  fs: RegistryFs = nodeRegistryFs(),
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<ProjectPreferences> {
-  return serialize(async () => {
-    const registry = await readRegistry(fs, env)
-    const { [projectId]: previous, ...rest } = registry.projectPreferences
-    const sanitized = sanitizeProjectPreferences({ ...previous, ...patch })
-    const projectPreferences = Object.keys(sanitized).length ? { ...rest, [projectId]: sanitized } : rest
-    await writeRegistry({ ...registry, projectPreferences }, fs, env)
-    return sanitized
   })
 }
 
@@ -918,8 +740,5 @@ export function registryPreferencesStore(
     read: () => readPreferences(fs, env),
     save: async preferences => changed(preferences, await writePreferences(preferences, fs, env)),
     patch: async patch => changed(patch, await patchPreferences(patch, fs, env)),
-    readProject: projectId => readProjectPreferences(projectId, fs, env),
-    saveProject: (projectId, preferences) => writeProjectPreferences(projectId, preferences, fs, env),
-    patchProject: (projectId, patch) => patchProjectPreferences(projectId, patch, fs, env),
   }
 }

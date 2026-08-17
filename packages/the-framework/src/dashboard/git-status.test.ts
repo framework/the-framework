@@ -44,7 +44,7 @@ test('readGitStatus degrades to no PR when the lookup fails', async () => {
 
 test('a run-scoped read does not wear a predecessor PR from a reused pinned branch (#1255)', async () => {
   // The default lookup is `gh pr view`, newest PR in any state — on `the-framework/triage-quick`
-  // that is a merged PR from a previous firing. With `since` the pick runs through pickRunPr.
+  // that is a merged PR from a previous firing. With `since` the pick runs through pickAgentPr.
   const old = { number: 1177, url: 'https://x/1177', state: 'MERGED', title: 'old triage', createdAt: '2026-07-25T00:00:00Z' }
   const status = await readGitStatus('/repo', {
     git: gitWith('the-framework/triage-quick', ''),

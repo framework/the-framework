@@ -1,4 +1,4 @@
-Covers doc surfacing: plans before backlogs regardless of write order, per-session variants included while unrelated files are not, the flat backlog found at the root, blank and missing files skipped without error, and name patterns that admit no path escape.
+Covers doc surfacing: plans before backlogs regardless of write order, per-agent variants included while unrelated files are not, the flat backlog found at the root, blank and missing files skipped without error, and name patterns that admit no path escape.
 
 ## Before writing SPEC.md files
 

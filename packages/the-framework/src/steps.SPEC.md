@@ -1,11 +1,10 @@
-Runs the build spine's steps — build, review, improve, deploy — by prompting the wrapped agent, which is treated as a black box that does the actual work.
+The prompts a build agent opens with, and the one check that decides between them.
 
 ## TLDR
 
-- The build is one prompt whose framing states the one thing the agent cannot infer: build from scratch in an empty workspace, or work within the codebase that already exists — an existing project is extended, never re-scaffolded.
-- A build turn that leaves the workspace empty means the agent stalled: it is re-prompted once with a hard "create it from scratch" directive — unless it stopped on purpose to ask a question, which the ask-gate handles instead.
-- There is no built-in review: each checklist pass fires the review chain of the domain preset the user opted into and blocks on the blockers those reviews report; a preset with no matching review blocks nothing. A review that failed to run counts as a blocker, so an errored review is never mistaken for a pass.
-- Improve is a fresh prompt to clear exactly the current blockers (or to scaffold, when the workspace is still empty); deploy either just records a plan or executes a real target.
+- The framing states the one thing the agent cannot infer: build from scratch in an empty workspace, or work within the codebase that already exists — an existing project is extended, never re-scaffolded.
+- A workspace holding no source the agent could have written counts as empty; lockfiles, dotfiles, and dependency or output directories do not.
+- A third prompt exists for the case where a build left the workspace empty anyway: a hard "create it from scratch, an empty directory is expected" directive.
 
 ## Before writing SPEC.md files
 

@@ -4,13 +4,13 @@ import { findFlatTodo } from '../tickets.js'
 
 /**
  * The plan/backlog document categories the dashboard surfaces in its sidebar
- * (#319, part of the MVP UI #309), so the human can read them beside the run.
+ * (#319, part of the MVP UI #309), so the human can read them beside the agent.
  *
  * The Framework's system prompt writes these per session (#323/#326):
  * `PLAN_<SESSION>.agent.md` (the plan for now) and `TODO_<SESSION>.agent.md` (the
  * backlog), where SESSION is a git-branch slug. The flat fallbacks are `PLAN.md`
  * (root) and the flat backlog (`backlog: true` defers to {@link findFlatTodo}, which
- * resolves the #682 root `TODO_AGENTS.md`). Scoped and flat-root names are matched
+ * resolves the repo-root (#682) `TODO_AGENTS.md`). Scoped and flat-root names are matched
  * against a flat readdir of the root, never taken from user input, so there is no
  * path traversal to guard against.
  */

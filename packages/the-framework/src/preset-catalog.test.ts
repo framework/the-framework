@@ -97,7 +97,7 @@ test('the quality presets carry their #326 instructions', () => {
 })
 
 test('UX runs to completion instead of gating on a human (#962)', () => {
-  // The "(auto)" in the label is the contract: it rates, then fixes, so a run started from it
+  // The "(auto)" in the label is the contract: it rates, then fixes, so an agent started from it
   // finishes on its own. The gated sibling that offers its ratings as choices is #962's follow-up.
   const out = presets.ux.render()
   assert.equal(out.includes('<AWAIT>'), false)
@@ -133,17 +133,6 @@ test('Maintenance points at the other presets by their real file paths (#881)', 
   assert.ok(out.includes(presetFilePath('security_audit')), 'expected the security_audit path')
   // No raw placeholder survives a render — the whole point of flattening the nested fragment.
   assert.equal(out.includes('${{'), false)
-})
-
-test('Maintenance queues readability only under technical_control (#881)', () => {
-  const off = presets.maintenance.render(undefined, { settings: { technical_control: false } })
-  assert.equal(off.includes(presetFilePath('readability')), false)
-  // Absent settings behave like off, and must not throw.
-  assert.equal(presets.maintenance.render().includes(presetFilePath('readability')), false)
-
-  const on = presets.maintenance.render(undefined, { settings: { technical_control: true } })
-  assert.ok(on.includes(presetFilePath('readability')), 'expected the readability path')
-  assert.equal(on.includes('${{'), false)
 })
 
 test('a parameterized preset targets the launching session when there is one (#874)', () => {
@@ -203,7 +192,7 @@ test('each triage preset pins its own session name and aborts on a taken branch 
 })
 
 test('neither ungated triage preset waits on a human (#891/#892 vs #698)', () => {
-  // They run unattended from the rotation, so an <AWAIT> would park the run against nobody.
+  // They run unattended from the rotation, so an <AWAIT> would park the agent against nobody.
   // The gated sibling is the one that legitimately has it.
   for (const out of [presets.triageQuick.render(), presets.triageConsensual.render()]) {
     assert.equal(out.includes('<AWAIT>'), false)
@@ -217,7 +206,7 @@ test('the two GitHub-import presets, and only those, always open a session of th
   // The flag is a property of the work, not of the surface that fires it, so it is pinned here
   // rather than in the dashboard: both read GitHub and write `tickets/`, which has nothing to do
   // with whatever session the user happened to be reading when they clicked.
-  const marked = Object.values(presets).filter(p => p.newSession).map(p => p.name)
+  const marked = Object.values(presets).filter(p => p.newAgent).map(p => p.name)
   assert.deepEqual(marked.sort(), ['import-tickets', 'update-tickets'])
   assert.equal(LAUNCHER_PRESETS.includes(presets.importTickets), true)
   assert.equal(LAUNCHER_PRESETS.includes(presets.updateTickets), true)

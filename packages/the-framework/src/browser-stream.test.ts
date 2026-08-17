@@ -272,7 +272,7 @@ test('following survives a browser that stops answering', async () => {
 
 test('a still page keeps re-sending its frame so the pane paints (#818)', async () => {
   // Chrome holds the last MJPEG part back until the next boundary arrives, so one frame on a
-  // page that never changes rendered as nothing. Found against a real run: the bridge served a
+  // page that never changes rendered as nothing. Found against a real agent: the bridge served a
   // good JPEG and the pane stayed blank.
   const cdp = fakeCdp()
   const stream = await startBrowserStream({

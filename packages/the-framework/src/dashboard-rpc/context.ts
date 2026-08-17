@@ -1,126 +1,123 @@
-import { getContext } from 'telefunc'
-import { resolveRunCheckout } from '../store/index.js'
+import { resolveAgentCheckout } from '../store/index.js'
 import { defaultProjectsProvider, type ProjectsProvider } from '../dashboard/projects.js'
-import type { DashboardContext, EventsSource, RemoteRuns } from '../dashboard/telefunc-serve.js'
+import type { DashboardContext, EventsSource, RemoteAgents } from '../dashboard/rpc-serve.js'
 import type { PreferencesStore } from '../registry.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from '../dashboard/quota.js'
 import type { AutoPmReporter } from '../auto-pm.js'
 
 /**
- * Read one field off the Telefunc request context, or undefined when it is unset. Every
- * real call runs inside `serve({ context })`; the try/catch is the defensive fallback for
- * a call made outside a request. The named accessors below add each field's meaning; this
- * is the shared plumbing they all sit on.
+ * What the dashboard's RPCs act through: the daemon's own closures, set once when it comes up.
+ *
+ * A module-level value, not a per-request one. It used to ride Telefunc's request context, read
+ * back through `getContext()` inside an AsyncLocalStorage — machinery for a per-caller context
+ * that never varied per caller. Two rounds of simplification got it here: three hosts wired
+ * different subsets, so every accessor returned `T | undefined` and every RPC branched on the
+ * absent case (D3 left one host, which wires all of it); and the request scoping itself was only
+ * ever carrying process-wide wiring (F3). What is left is what it always was — the daemon's
+ * capabilities, set at boot.
  */
-function fromContext<T>(pick: (ctx: DashboardContext) => T | undefined): T | undefined {
-  try {
-    return pick(getContext<DashboardContext>())
-  } catch {
-    return undefined
-  }
+let wired: DashboardContext | undefined
+
+/** Wire the dashboard's capabilities. The daemon calls this once at start-up; a test calls it per case. */
+export function setDashboardContext(context: DashboardContext): void {
+  wired = context
 }
 
 /**
- * The {@link ProjectsProvider} a telefunction should read a project id against (#427).
- * The mount puts one on the Telefunc request context: the daemon leaves it unset, so
- * every RPC resolves against the global registry; the per-run foreground dashboard
- * passes a single-project provider scoped to its `cwd`. Falls back to the registry when
- * no context is set (defensive — every real call runs inside `serve({ context })`).
+ * Read one capability.
+ *
+ * Unwired is a bug rather than a degraded host, so it throws and names the field instead of
+ * silently answering as if nothing were configured.
  */
-export function contextProjects(): ProjectsProvider {
-  return fromContext(ctx => ctx.projects) ?? defaultProjectsProvider()
+function fromContext<K extends keyof DashboardContext>(key: K): DashboardContext[K] {
+  const value = wired?.[key]
+  if (value === undefined) throw new Error(`the dashboard's RPC context has no ${String(key)}`)
+  return value
 }
 
-/** The workspace path for a project id (registry, or single-project #427), else undefined. */
+/** No run is relayed from here — see {@link contextRemote}. */
+const NO_RELAYED_RUNS: RemoteAgents = { target: () => undefined, list: () => [] }
+
+/** The projects every RPC resolves a project id against: the global registry. */
+export function contextProjects(): ProjectsProvider {
+  return defaultProjectsProvider()
+}
+
+/** The workspace path for a project id, or undefined when no project has that id. */
 export function resolveProjectPath(projectId: string): Promise<string | undefined> {
   return contextProjects().resolvePath(projectId)
 }
 
 /**
- * The checkout a call should act on: a live run's own worktree when `runId` names one (#738/#749),
- * else the project root. Since #736 a run reads and writes inside its worktree — its event log,
+ * The checkout a call should act on: a live agent's own worktree when `agentId` names one (#738/#749),
+ * else the project root. Since #736 an agent reads and writes inside its worktree — its event log,
  * its control log, its working tree — so anything addressed at a *run* has to resolve here, not
- * at the project path, or it reads an empty log and steers a run that is not listening. The
+ * at the project path, or it reads an empty log and steers an agent that is not listening. The
  * resolution itself (and its #766 first-seconds subtlety) lives in the store's
- * {@link resolveRunCheckout}, shared with the daemon; this adds only the project-id lookup.
+ * {@link resolveAgentCheckout}, shared with the daemon; this adds only the project-id lookup.
  */
-export async function resolveRunPath(projectId: string, runId?: string): Promise<string | undefined> {
+export async function resolveAgentPath(projectId: string, agentId?: string): Promise<string | undefined> {
   const cwd = await resolveProjectPath(projectId)
-  return cwd ? resolveRunCheckout(cwd, runId) : undefined
+  return cwd ? resolveAgentCheckout(cwd, agentId) : undefined
 }
 
 /**
- * The Preview handler set on the context (#475), or undefined where Preview is not wired (the
- * relay, or a call made outside a request). Read through the same tolerant accessor as the rest:
- * `sendRemoveWorktree` stops a session's preview before taking its checkout away (#797), and that
- * telefunction is also called directly by tests, where there is no context at all.
+ * The in-memory {@link EventsSource} (#426). It answers only for an agent this daemon is relaying
+ * from a connected device (#1067) — such an agent has no `.the-framework/events.jsonl` here — and
+ * returns undefined for an ordinary local agent, whose log `onEvents` tails off disk.
  */
-export function contextPreview(): DashboardContext['preview'] {
-  return fromContext(ctx => ctx.preview)
+export function contextEventsSource(): EventsSource {
+  return fromContext('eventsSource')
 }
 
 /**
- * The in-memory {@link EventsSource} on the context, or undefined (#426). Only the relay
- * sets one — it has no `.the-framework/events.jsonl` on disk, so `onEvents` streams from
- * the relay's in-memory run instead. Unset on the daemon/foreground, where `onEvents`
- * tails the file as before.
+ * The relayed-agent lookup (#1067 slice 2). A run-scoped RPC uses it to tell an ordinary local agent
+ * (resolve a local checkout) from one running on a connected device (forward the call there).
+ *
+ * The one accessor with a default rather than a throw, because "unwired" has a real meaning here:
+ * a call arriving over `/_relay/rpc` is the *device* side of the relay, and the agent it names is
+ * local to that device. Forwarding it onward would be a loop, so the honest answer there is that
+ * nothing is relayed from here.
  */
-export function contextEventsSource(): EventsSource | undefined {
-  return fromContext(ctx => ctx.eventsSource)
+export function contextRemote(): RemoteAgents {
+  return wired?.remote ?? NO_RELAYED_RUNS
+}
+
+/** The user-preferences store (#410), over the registry file. */
+export function contextPreferences(): PreferencesStore {
+  return fromContext('preferences')
 }
 
 /**
- * The relayed-run lookup on the context (#1067 slice 2), or undefined off the daemon. Only the daemon
- * wires it; a run-scoped RPC uses it to tell an ordinary local run (resolve a local checkout) from one
- * running on a connected device (forward the call there). Unset everywhere else, so those RPCs behave
- * exactly as before.
+ * The Discord credentials store (#1095): it writes the credential to the registry, then rebuilds
+ * this daemon's own Discord services against it, so the bot connects without a restart.
  */
-export function contextRemote(): RemoteRuns | undefined {
-  return fromContext(ctx => ctx.remote)
+export function contextDiscord(): DiscordCredentialsStore {
+  return fromContext('discord')
 }
 
-/**
- * The user-preferences store on the context, or undefined (#410). The daemon/foreground wire
- * the real registry file; a public host (the relay) leaves it unset, so the preferences RPCs
- * degrade to a read-only default / a no-op write on a shared host.
- */
-export function contextPreferences(): PreferencesStore | undefined {
-  return fromContext(ctx => ctx.preferences)
+/** The quota source behind the usage panel (#533). */
+export function contextQuota(): QuotaSource {
+  return fromContext('quota')
 }
 
-/**
- * The Discord credentials store on the context, or undefined (#1095). The daemon wires one that
- * persists to the registry and reloads its own Discord services; a public host leaves it unset, so
- * the credential RPCs report nothing configured and refuse the write — a shared host has no
- * business holding one user's bot token, let alone letting a visitor set it.
- */
-export function contextDiscord(): DiscordCredentialsStore | undefined {
-  return fromContext(ctx => ctx.discord)
+/** Where auto PM's last decision is read from (#1161). */
+export function contextAutoPm(): AutoPmReporter {
+  return fromContext('autoPm')
 }
 
-/**
- * The quota source on the context, or undefined (#533). The daemon wires a live
- * poller; a public host (the relay) leaves it unset, since it has no agent to ask
- * and no business reading someone else's account.
- */
-export function contextQuota(): QuotaSource | undefined {
-  return fromContext(ctx => ctx.quota)
+/** How a sweep is fired on demand (#1210). */
+export function contextAutoPmSweep(): (opts?: { drainOnly?: boolean }) => void | Promise<void> {
+  return fromContext('autoPmSweep')
 }
 
-/**
- * Where auto PM's last decision is read from (#1161), or undefined on a host that runs no
- * sweep. Only the daemon has one: the loop lives in its process, and a report from anywhere
- * else would be describing a sweep nobody is running.
- */
-export function contextAutoPm(): AutoPmReporter | undefined {
-  return fromContext(ctx => ctx.autoPm)
+/** The daemon's own `startAgent`, so a start from the dashboard is the same start the CLI makes. */
+export function contextStartAgent(): DashboardContext['startAgent'] {
+  return fromContext('startAgent')
 }
 
-/**
- * How a sweep is fired on demand (#1210), or undefined on a host that runs none. Same rule as
- * {@link contextAutoPm}: only the daemon holds the loop, so only it can be asked to sweep.
- */
-export function contextAutoPmSweep(): ((opts?: { drainOnly?: boolean }) => void | Promise<void>) | undefined {
-  return fromContext(ctx => ctx.autoPmSweep)
+/** Install + register a repo (#433), which only the daemon can do. */
+export function contextAddProject(): DashboardContext['addProject'] {
+  return fromContext('addProject')
 }

@@ -34,7 +34,7 @@ import {
 export const presets = {
   /**
    * [Research] (#331): the problem-variability review, shipped as a direct prompt (see
-   * `runPrompt`) rather than a build run — research reviews existing code, so it skips the
+   * `runPrompt`) rather than a build agent — research reviews existing code, so it skips the
    * scope -> build scaffolding. `showMultiSelect()` + `<AWAIT>` becomes a live turn-boundary
    * gate (#339/#340) the dashboard resolves.
    */
@@ -54,7 +54,7 @@ export const presets = {
 
   /**
    * [UX (auto)] (#962, replacing #472's gated prompt): rate every UI flow, then fix the low
-   * scorers. Unattended by design — it ends in work rather than in `<AWAIT>`, so a run started
+   * scorers. Unattended by design — it ends in work rather than in `<AWAIT>`, so an agent started
    * from it finishes on its own. A gated sibling that offers its ratings as choices is #962's
    * stated follow-up and belongs beside this row, not inside it.
    */
@@ -80,11 +80,11 @@ export const presets = {
    * triage and planning presets have a backlog to read. One line of prompt, because the system
    * prompt already tells the agent what a ticket is and where it goes.
    *
-   * Marked {@link PresetSpec.newSession}, like its update sibling: importing is repo work, not a
+   * Marked {@link PresetSpec.newAgent}, like its update sibling: importing is repo work, not a
    * reply, so it opens its own session rather than appending to whichever one the user happens to
    * be reading.
    */
-  importTickets: definePreset({ name: 'import-tickets', template: PRESETS_IMPORT_TICKETS, label: 'Import tickets from GitHub', newSession: true, tooltip: 'Fill `tickets/` from the GitHub issues. Always runs in a new session.' }),
+  importTickets: definePreset({ name: 'import-tickets', template: PRESETS_IMPORT_TICKETS, label: 'Import tickets from GitHub', newAgent: true, tooltip: 'Fill `tickets/` from the GitHub issues. Always runs in a new session.' }),
 
   /**
    * [Update from GitHub] (#1208): the second and every later import. It resumes from the
@@ -93,10 +93,10 @@ export const presets = {
    * closed issue's ticket goes.
    *
    * The timestamp is read by the agent out of the repo rather than rendered into the prompt: the
-   * file travels in the same commit as the tickets it describes, so a run whose work never landed
+   * file travels in the same commit as the tickets it describes, so an agent whose work never landed
    * cannot leave behind a stamp claiming those issues were imported.
    */
-  updateTickets: definePreset({ name: 'update-tickets', template: PRESETS_UPDATE_TICKETS, label: 'Update from GitHub', newSession: true, tooltip: 'Bring `tickets/` up to date with the issues and comments changed since the last import.' }),
+  updateTickets: definePreset({ name: 'update-tickets', template: PRESETS_UPDATE_TICKETS, label: 'Update from GitHub', newAgent: true, tooltip: 'Bring `tickets/` up to date with the issues and comments changed since the last import.' }),
 
   /** [Plan tickets] (#685): turn tickets into costed plans. */
   planTickets: definePreset({ name: 'plan-tickets', template: PRESETS_PLAN_TICKETS, label: 'Plan tickets (aka spike)' }),
@@ -117,7 +117,7 @@ export const presets = {
   /**
    * [Suggest tickets to work on] (#698): the gated sibling of the triage pair. It ends in
    * `<AWAIT>`, so it is deliberately kept out of {@link AUTO_PM_JOBS} — firing it unattended
-   * would wedge a run against a human who is not there.
+   * would wedge an agent against a human who is not there.
    */
   suggestTicketsToWorkOn: definePreset({ name: 'suggest-tickets-to-work-on', template: PRESETS_SUGGEST_TICKETS_TO_WORK_ON, label: 'Suggest tickets to work on', tooltip: 'Add tickets to queue (TODO_AGENTS.md)' }),
 
@@ -146,14 +146,14 @@ export type PresetKey = keyof typeof presets
 /**
  * Whether a prompt is the one that takes work OFF the queue (#1117).
  *
- * The daemon knows a drain by the `drains` flag on its job; a run started by hand arrives as bare
+ * The daemon knows a drain by the `drains` flag on its job; an agent started by hand arrives as bare
  * prompt text with no such marking, so the text is all there is to recognise it by. Compared
  * against the rendered preset rather than against a copy of its words, so rewording the preset
  * cannot leave this behind — that drift would show up only as a lane on the Overview quietly
  * staying empty, which is the kind of bug nobody reports.
  *
  * Deliberately exact: a prompt that merely mentions the queue is not a drain, and mistaking one
- * for the other would name a ticket as being implemented by a run doing something else entirely.
+ * for the other would name a ticket as being implemented by an agent doing something else entirely.
  */
 export function drainsQueue(prompt: string): boolean {
   return prompt.trim() === presets.drainQueue.render().trim()

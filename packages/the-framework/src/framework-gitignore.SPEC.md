@@ -5,7 +5,7 @@ The `.the-framework/.gitignore`: what a project commits out of its framework dir
 - An agent's live state is transient and must never make a checkout dirty; its archive is committed, because `git clean -fdx` is an ordinary thing to do to a repo and it used to delete every agent a project had ever run.
 - An allow-list, so every directory on the way down to a committed file has to be re-included — git never descends into an ignored one.
 - The archive rules name no user: a rule per person meant everyone who ever ran an agent appended their own lines to a tracked file, so their checkout went dirty, the next safety commit swept the edit into a branch, and two machines doing it near each other conflicted.
-- One name is re-included, the one the archive directory has. The name it was renamed away from is not carried as a second rule: no repo holds an archive under it, and a rule kept for that case would be a permanent line in a file written into every user's repo.
+- Only the archive's current name is re-included. This file is written into everyone's repo, so it says what is true now rather than listing every name that directory has ever had.
 - One content, written once at install. It grew a rule per record while there were several, each added lazily by whichever feature needed it and each with its own "is this a file we wrote" check; with one record left, the only question is whether the file is already there.
 
 ## Before writing SPEC.md files

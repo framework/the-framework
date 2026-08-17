@@ -2,7 +2,7 @@ Archives finished agents inside the repo, per user, so a project's history survi
 
 ## TLDR
 
-- That history used to live only in untracked state, so an ordinary `git clean` erased every agent a project had ever run; keeping the archive in tracked files is the fix. The directory's earlier name is not read, and its ignore rule is not carried: the project has no users, so there is no repo whose archive predates the rename, and the alternative is a second name in every read, every commit pathspec and every user's `.gitignore` forever.
+- That history used to live only in untracked state, so an ordinary `git clean` erased every agent a project had ever run; keeping the archive in tracked files is the fix. The directory has been renamed since, and only its current name is known — history still sitting under the old one is not listed, not committed, and has to be moved across by hand.
 - Each person's history files under a directory named after the git email they already commit with — nothing new to set up. A hostile or unusable value can never escape the archive path; it falls back to an "anonymous" directory rather than dropping history.
 - The state directory's ignore rules name no user, just a glob covering everyone — naming each user made every newcomer dirty a tracked file. Install writes them, so the repair here only ever fires for a repo activated before the archive existed, and it adds what is missing rather than rewriting what is there.
 

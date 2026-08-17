@@ -18,7 +18,6 @@ import { readFileStatuses, type FileGitStatus } from '../dashboard/file-status.j
 import { readFileDiff, readFileChanges, type FileDiff, type FileChange } from '../dashboard/file-diff.js'
 import { readFileContent, type FileContent } from '../dashboard/file-read.js'
 import { contextProjects, contextRemote, resolveProjectPath, resolveAgentPath } from './context.js'
-import { retiredProjectAdvice, retiredProjectSettings } from '../retired-project-settings.js'
 import { relayOr } from './relay-agent.js'
 import type { FrameworkEvent } from '../events.js'
 import { bridgeQuestions } from '../dashboard/bridge-store.js'
@@ -428,32 +427,4 @@ export async function onBridgeAnswer(sessionId: string): Promise<BridgeAnswer | 
 export async function onBridgeEvents(sessionId: string): Promise<BridgeEvent[]> {
   if (typeof sessionId !== 'string' || !/^session_[A-Za-z0-9]{1,128}$/.test(sessionId)) return []
   return bridgeQuestions().events(sessionId)
-}
-
-/** One row of the banner: the repo, what its block held, and what to do about it. */
-export interface RetiredProjectNotice {
-  path: string
-  keys: string[]
-  /** The sentence the daemon's own log prints for this repo, so the two never drift. */
-  advice: string
-}
-
-/**
- * The per-project settings the deleted tier (#840) held, as the daemon found them at boot.
- *
- * The banner this feeds is the one place a retirement on that branch is not silent: dropping this
- * tier moves in the permissive direction, so a repo set to "don't publish" would start pushing and
- * opening PRs with nothing said. Served from the boot read rather than the file, which the first
- * preference write of the session rewrites without the block.
- *
- * The advice arrives written rather than as the flags behind it: the wording is a judgement about
- * what the removal did to that repo, and it belongs in one place — the module that made it, which
- * the browser cannot import (it reads the registry file).
- */
-export async function onRetiredProjectSettings(): Promise<RetiredProjectNotice[]> {
-  return retiredProjectSettings().map(project => ({
-    path: project.path,
-    keys: project.keys,
-    advice: retiredProjectAdvice(project),
-  }))
 }

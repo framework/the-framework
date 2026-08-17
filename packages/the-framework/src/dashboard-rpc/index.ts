@@ -2,7 +2,7 @@
 // the daemon's own `startAgent`. The browser calls these by name over `POST /_rpc/<name>`; the
 // dashboard's `rpc/` modules are typed stubs against these signatures, so a rename that misses
 // one is a type error rather than a 404 at runtime.
-export { onAgents, onAgent, onDocs, onQueue, onOverview, onRecentAgents, onHotTickets, onInterventions, onOpenQuestions, onActivity, onDashboard, onGithubUrl, onGitStatus, onProjectFiles, onProjectFileStatus, onFileDiff, onAgentChanges, onFileContent, onTickets, onTicket, onTicketsMeta, onAllTickets, onRetainedWorktrees, onAgentWorktree, onAgentHandoff, onSystemPromptUser, onBridgeQuestion, onBridgeStatus, onBridgeToken, onBridgeEvents, onBridgeAnswer, onRetiredProjectSettings, type RetiredProjectNotice } from './reads.js'
+export { onAgents, onAgent, onDocs, onQueue, onOverview, onRecentAgents, onHotTickets, onInterventions, onOpenQuestions, onActivity, onDashboard, onGithubUrl, onGitStatus, onProjectFiles, onProjectFileStatus, onFileDiff, onAgentChanges, onFileContent, onTickets, onTicket, onTicketsMeta, onAllTickets, onRetainedWorktrees, onAgentWorktree, onAgentHandoff, onSystemPromptUser, onBridgeQuestion, onBridgeStatus, onBridgeToken, onBridgeEvents, onBridgeAnswer } from './reads.js'
 export { sendStop, sendChoice, sendBridgeAnswer, sendBridgeAnswerCancel, sendMessage, sendSetHandoff, sendStart, sendOpenInApp, sendRemoveWorktree, sendDeleteAgent, sendPushBranch, sendOpenPullRequest, sendMerge, sendQueueTicket, sendReleaseTicketLock, type QueueTicketResult, type QueuedTicket } from './control.js'
 export { streamAgentEvents, type LiveFeedEvent, type StreamSync } from './events.js'
 export { onProjects, sendAddProject, onOnboarding, onClaudeTrust, onDriverReady, onRepoAutoMerge } from './projects.js'

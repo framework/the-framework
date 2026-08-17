@@ -10,7 +10,6 @@ import {
   pendingAgents,
   startAgentCommitter,
   ARCHIVE_PATHSPEC,
-  LEGACY_ARCHIVE_PATHSPEC,
   type PathProbe,
 } from './agent-commit.js'
 
@@ -58,8 +57,8 @@ test('pending archives are parsed from porcelain and sorted (#912)', async () =>
   ])
   assert.deepEqual(
     calls[0],
-    ['status', '--porcelain', '-uall', '--', ARCHIVE_PATHSPEC, LEGACY_ARCHIVE_PATHSPEC],
-    'the status read is path-scoped to both archive names, and -uall names each untracked file',
+    ['status', '--porcelain', '-uall', '--', ARCHIVE_PATHSPEC],
+    'the status read is path-scoped to the archive, and -uall names each untracked file',
   )
 })
 
@@ -178,10 +177,10 @@ test('a commit stages and commits the pathspec, and never add -A (#912)', async 
   }
 })
 
-test('a pre-D5 sessions/ archive is committed too, so git clean cannot eat it (#1179)', async () => {
-  // The read side handles both archive names; this is the write side. An archive left under the old
-  // `sessions/` name at upgrade time must be committed, or it stays untracked and `git clean -fdx`
-  // deletes it. Real git, because only it enforces the pathspec no-match rule the filter dodges.
+test('an archive under the name D5 renamed away from is not committed', async () => {
+  // One pathspec, the current one. A second spec for `sessions/` would have to be filtered in and
+  // out per commit anyway — git fails the whole command on a pathspec matching nothing — and it
+  // buys a rescue for archives that, with no users, do not exist. Real git, for that no-match rule.
   const { mkdtemp, mkdir, writeFile, rm } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
   const repo = await mkdtemp(join(tmpdir(), 'fw-commit-legacy-'))
@@ -194,14 +193,7 @@ test('a pre-D5 sessions/ archive is committed too, so git clean cannot eat it (#
     await mkdir(join(user, 'sessions'), { recursive: true })
     await writeFile(join(user, 'sessions', 'r1.json'), '{"id":"r1"}\n')
 
-    // Only the legacy scheme is present: the current `agents/` spec matches nothing, so a naive
-    // two-spec commit would fail here — the filter must drop it and commit the one that matched.
-    assert.deepEqual(await commitAgents(repo, real), {
-      committed: true,
-      files: ['.the-framework/git@example.com/sessions/r1.json'],
-    })
-    const status = await real(['status', '--porcelain', '-uall'], repo)
-    assert.equal(status.trim(), '', 'the pre-rename archive is now tracked, not clean-deletable')
+    assert.deepEqual(await commitAgents(repo, real), { committed: false, reason: 'no session changes' })
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

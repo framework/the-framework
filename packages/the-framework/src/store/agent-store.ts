@@ -38,15 +38,6 @@ export const EVENTS_FILE = 'events.jsonl'
 export const META_FILE = 'agent.json'
 
 /**
- * The pre-D5 name of {@link META_FILE}. Read as a fallback wherever a live or worktree meta is
- * loaded, so an agent started before the rename is still seen — healed and archived — rather than
- * read as absent and swept away as dead. The events log ({@link EVENTS_FILE}) kept its name, so a
- * meta under the old name still has its history beside it; the first heal rewrites the meta under
- * the new name, migrating it. Reads only: nothing writes this name.
- */
-export const LEGACY_META_FILE = 'run.json'
-
-/**
  * Where finished agents are archived, so the dashboard can list a project's run
  * history (#303). The live agent stays at `events.jsonl`/`agent.json` (the daemon
  * tails it); on {@link AgentStore.close} a copy lands here as `<id>.jsonl` +
@@ -55,35 +46,16 @@ export const LEGACY_META_FILE = 'run.json'
 export const AGENTS_DIR = 'agents'
 
 /**
- * Where a project's finished agents are archived now (#1179): `.the-framework/<user>/agents/`,
+ * Where a project's finished agents are archived (#1179): `.the-framework/<user>/agents/`,
  * which the install-time ignore un-ignores so the history is committed and survives a
- * `git clean -fdx`. {@link AGENTS_DIR} stays the transient location — an agent worktree still archives
- * into its own throwaway checkout there, and it is where every agent archived before this shipped
- * still lives, so both are read.
+ * `git clean -fdx`. {@link AGENTS_DIR} stays the transient location — an agent with no worktree of
+ * its own archives there, and so does one archiving inside its own throwaway checkout — so both
+ * are read.
  *
  * The name lives here beside its sibling rather than in `sessions.ts`, which owns the per-user
  * naming: that module reads the store, so the constant travelling the other way would be a cycle.
  */
 export const ARCHIVE_DIR = 'agents'
-
-/**
- * What {@link ARCHIVE_DIR} was called before D5 renamed the unit of work: `<user>/sessions/`.
- *
- * Read, never written. The whole point of #1179 was that a project's history is committed and
- * team-visible, so it survives `git clean -fdx` — renaming the directory it lives in would have
- * made every archive written before the rename simply stop appearing, in the surface whose reason
- * to exist is that it does not lose them. Same reason the transient {@link AGENTS_DIR} is still
- * read: the old scheme is in the wild, so both are.
- */
-export const LEGACY_ARCHIVE_DIR = 'sessions'
-
-/**
- * What {@link AGENTS_DIR} was called before the same rename: the transient `runs/`.
- *
- * Read, never written, for the same reason — it holds everything a project archived before #1179,
- * which is exactly the history that was never committed and so has no other copy anywhere.
- */
-export const LEGACY_AGENTS_DIR = 'runs'
 
 /** Filesystem-safe, lexicographically-sortable agent id from an ISO start time. */
 export function agentIdFromStartedAt(startedAt: string): string {
@@ -461,11 +433,11 @@ const TORN_META_READ_DELAY_MS = 5
  * Read + parse a persisted {@link AgentMeta} file, or `undefined` if missing/unreadable.
  *
  * Re-read on a parse failure (#1540). {@link writeMetaFile} closes this off at the source, so this
- * is the backstop rather than the defence: a meta written by an older CLI still on a plain
- * in-place write — a daemon reading an agent started before an upgrade — can still be caught
- * mid-truncate, and reporting that as `undefined` makes a live agent *vanish* from every composed
- * read for one poll. A torn read is transient by construction, so ask again; a file still
- * unparseable after the retries is genuinely corrupt and yields `undefined`, exactly as before.
+ * is the backstop rather than the defence: a meta written through an adapter with no `rename` is
+ * still written in place, so a reader can catch it mid-truncate, and reporting that as `undefined`
+ * makes a live agent *vanish* from every composed read for one poll. A torn read is transient by
+ * construction, so ask again; a file still unparseable after the retries is genuinely corrupt and
+ * yields `undefined`, exactly as before.
  */
 async function readMetaFile(fs: StoreFs, path: string): Promise<AgentMeta | undefined> {
   for (let attempt = 0; ; attempt++) {
@@ -477,17 +449,6 @@ async function readMetaFile(fs: StoreFs, path: string): Promise<AgentMeta | unde
       await new Promise(resolve => setTimeout(resolve, TORN_META_READ_DELAY_MS))
     }
   }
-}
-
-/**
- * Read the meta of the live/worktree agent in `dir`, preferring the current {@link META_FILE} and
- * falling back to {@link LEGACY_META_FILE} for an agent written before the D5 rename. The new name
- * wins even when torn (a transient re-read is right there; a stale pre-upgrade file is not), so the
- * legacy name is consulted only when no `agent.json` exists at all.
- */
-async function readMetaIn(fs: StoreFs, dir: string): Promise<AgentMeta | undefined> {
-  if (await fs.exists(join(dir, META_FILE))) return readMetaFile(fs, join(dir, META_FILE))
-  return readMetaFile(fs, join(dir, LEGACY_META_FILE))
 }
 
 /**
@@ -610,7 +571,7 @@ export class AgentStore {
     if (opts.continueAgent) {
       // Reopen: the log stays, the row keeps its original intent, and this process takes ownership
       // so a liveness probe (#716) reads the agent as alive rather than as an orphan.
-      const prior = await readMetaIn(fs, dir)
+      const prior = await readMetaFile(fs, store.metaPath)
       if (prior) {
         store.meta = { ...prior, status: 'running', pid: owner.pid, host: owner.host, updatedAt: now }
         store.pinnedIntent = prior.intent
@@ -678,7 +639,7 @@ export class AgentStore {
 
   /** Read the persisted meta snapshot, or `undefined` if none/unreadable. */
   readMeta(): Promise<AgentMeta | undefined> {
-    return readMetaIn(this.fs, this.dir)
+    return readMetaFile(this.fs, this.metaPath)
   }
 
   private writeMeta(): Promise<void> {
@@ -702,18 +663,6 @@ function archivePaths(dir: string, id: string, user?: string): { events: string;
 }
 
 /**
- * Every directory a project's archived agents may sit in, newest scheme first: each user's
- * `<user>/agents/` (and the `sessions/` it was called before D5), then the transient top-level `agents/`.
- *
- * Both are read because both exist in the wild: `agents/` holds everything archived before #1179,
- * and a user directory is only created once that user has run something. Every user's archive is
- * listed, not just the reader's — the history is a team-visible record of what the agent has done
- * to the repo, which is the point of committing it.
- *
- * A directory is recognized by having a readable archive child, so a stray file in
- * `.the-framework/` is simply not one (readdir yields `[]` for anything that is not a directory).
- */
-/**
  * Where one agent's archive actually sits, searched across {@link archiveDirs}, or `undefined` when
  * it is nowhere. An agent id alone no longer names a path: which user archived it decides that, and a
  * reader (the continue (#762), a removal) only has the id.
@@ -726,18 +675,23 @@ async function findArchive(fs: StoreFs, dir: string, agentId: string): Promise<{
   return undefined
 }
 
+/**
+ * Every directory a project's archived agents may sit in, committed first: each user's
+ * `<user>/agents/`, then the transient top-level `agents/` an agent with no worktree archives into.
+ *
+ * Every user's archive is listed, not just the reader's — the history is a team-visible record of
+ * what the agent has done to the repo, which is the point of committing it.
+ *
+ * A directory is recognized by having a readable archive child, so a stray file in
+ * `.the-framework/` is simply not one (readdir yields `[]` for anything that is not a directory).
+ */
 async function archiveDirs(fs: StoreFs, dir: string): Promise<string[]> {
   const dirs: string[] = []
   for (const name of await fs.readdir(dir)) {
-    // Both spellings of the per-user archive: the current one, and the `sessions/` D5 renamed
-    // away from. A reader that only knew the new name would lose every archive committed before
-    // the rename — which is the one thing this directory exists to prevent.
-    for (const scheme of [ARCHIVE_DIR, LEGACY_ARCHIVE_DIR]) {
-      const candidate = join(dir, name, scheme)
-      if ((await fs.readdir(candidate)).length > 0) dirs.push(candidate)
-    }
+    const candidate = join(dir, name, ARCHIVE_DIR)
+    if ((await fs.readdir(candidate)).length > 0) dirs.push(candidate)
   }
-  dirs.push(join(dir, AGENTS_DIR), join(dir, LEGACY_AGENTS_DIR))
+  dirs.push(join(dir, AGENTS_DIR))
   return dirs
 }
 
@@ -761,7 +715,7 @@ async function archiveAgent(fs: StoreFs, dir: string, meta: AgentMeta, eventsPat
  * {@link AgentStore.close} still leaves its history behind.
  */
 async function archivePriorAgent(fs: StoreFs, dir: string): Promise<void> {
-  const meta = await readMetaIn(fs, dir)
+  const meta = await readMetaFile(fs, join(dir, META_FILE))
   if (!meta?.id || !isSafeAgentId(meta.id)) return
   if (await fs.exists(archivePaths(dir, meta.id).meta)) return
   await archiveAgent(fs, dir, meta, join(dir, EVENTS_FILE))
@@ -834,7 +788,7 @@ export async function archiveWorktreeAgent(
 ): Promise<AgentMeta | undefined> {
   try {
     const worktreeDir = join(worktree, FRAMEWORK_DIR)
-    const live = await readMetaIn(fs, worktreeDir)
+    const live = await readMetaFile(fs, join(worktreeDir, META_FILE))
     if (!live?.id || !isSafeAgentId(live.id)) return undefined
     // The flip writes the worktree's own log + meta too (#1359): the death gains its `end`
     // event before the archive copies the log, so no reader — live tail or archived replay —
@@ -865,7 +819,7 @@ export async function archivedAgentPaths(cwd: string, agentId: string, fs: Store
 const byIdDesc = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
 
 /**
- * Every `runs/*.json` archived meta with the path it was read from, torn/half-written entries
+ * Every `agents/*.json` archived meta with the path it was read from, torn/half-written entries
  * skipped. The one home of the archived-history read loop, shared by {@link listAgents} and the
  * boot reconcile. A missing/unreadable dir throws to the caller, as both callers always let it.
  */
@@ -894,9 +848,9 @@ function isDeadRunningAgent(meta: AgentMeta | undefined, isAlive: (pid: number) 
 
 /**
  * Every archived meta a project has, across all of {@link archiveDirs}, with the path it came from.
- * De-duplicated by agent id, first directory winning: an agent archived before #1179 and re-archived
- * into its user's sessions afterwards exists in both places, and the history must show it once.
- * The user directories are searched before `agents/`, so the committed copy is the one that wins.
+ * De-duplicated by agent id, first directory winning: the crash rescue archives into the transient
+ * `agents/` and the close into the user's committed one, so an agent can sit in both places and the
+ * history must show it once. The user directories are searched first, so the committed copy wins.
  */
 async function readAllArchivedMetaEntries(fs: StoreFs, dir: string): Promise<Array<{ path: string; meta: AgentMeta }>> {
   const seen = new Set<string>()
@@ -913,7 +867,7 @@ async function readAllArchivedMetaEntries(fs: StoreFs, dir: string): Promise<Arr
 
 /**
  * List a project's archived agents, most-recent first: every user's committed archive plus the
- * legacy `agents/`. The id sorts chronologically so no timestamp parse is needed. Missing or
+ * transient `agents/`. The id sorts chronologically so no timestamp parse is needed. Missing or
  * unreadable dir/entries are skipped, never thrown.
  */
 export async function listAgents(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<AgentMeta[]> {
@@ -937,7 +891,7 @@ function ownerLiveness(meta: AgentMeta, isAlive: (pid: number) => boolean): 'liv
 
 /**
  * Reconcile runs a dead process left marked `running` — the live `agent.json`, an archived
- * `runs/*.json`, or an agent inside a worktree. Such an agent shows as active while nothing is left
+ * `agents/*.json`, or an agent inside a worktree. Such an agent shows as active while nothing is left
  * to read its `control.jsonl`, so its Stop is a no-op. Each is flipped to `stopped`; the live
  * run is archived first (idempotent) so its history is kept. Returns how many were reconciled.
  * Best-effort: a read/write error skips that agent, never throws.
@@ -973,7 +927,7 @@ export async function reconcileOrphanedAgents(
   }
   // The live agent: flip it, then archive so a crash that skipped close() still
   // leaves the stopped agent in the history list.
-  const live = await readMetaIn(fs, dir)
+  const live = await readMetaFile(fs, join(dir, META_FILE))
   if (isDeadRunningAgent(live, isAlive)) {
     await stopAndArchiveLive(fs, dir, live)
     fixed++
@@ -987,7 +941,7 @@ export async function reconcileOrphanedAgents(
   for (const name of await fs.readdir(join(dir, WORKTREES_DIR))) {
     if (!isSafeAgentId(name)) continue
     const worktreeDir = join(dir, WORKTREES_DIR, name, FRAMEWORK_DIR)
-    const meta = await readMetaIn(fs, worktreeDir)
+    const meta = await readMetaFile(fs, join(worktreeDir, META_FILE))
     if (!isDeadRunningAgent(meta, isAlive)) continue
     // recordOrphanEnd rather than a bare status flip (#1359): the worktree's log gains the
     // `end` event first, so the archive below copies a stream that actually ends.
@@ -1034,7 +988,7 @@ export async function readLiveMeta(
   isAlive: (pid: number) => boolean = isPidAlive,
 ): Promise<AgentMeta | undefined> {
   const dir = join(cwd, FRAMEWORK_DIR)
-  const meta = await readMetaIn(fs, dir)
+  const meta = await readMetaFile(fs, join(dir, META_FILE))
   if (!meta) return undefined
   // Only a provably dead owner heals here — 'unknown' (no pid / another host) is left alone.
   if (ownerLiveness(meta, isAlive) === 'dead') return stopAndArchiveLive(fs, dir, meta)

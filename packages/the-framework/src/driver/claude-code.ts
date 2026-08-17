@@ -211,11 +211,8 @@ function isConversationGone(err: unknown): boolean {
   return CONVERSATION_GONE.test(err instanceof Error ? err.message : String(err))
 }
 
-/** @deprecated Use {@link RunCliSessionOptions}. */
-export type RunClaudeOptions = Omit<RunCliSessionOptions, 'parser' | 'driver'>
-
 /** Spawn one Claude Code invocation and resolve with its final turn. */
-export function runClaude(opts: RunClaudeOptions): Promise<DriverTurn> {
+export function runClaude(opts: Omit<RunCliSessionOptions, 'parser' | 'driver'>): Promise<DriverTurn> {
   return runCliSession({ ...opts, parser: new StreamJsonParser() })
 }
 

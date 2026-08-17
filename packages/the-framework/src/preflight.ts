@@ -47,9 +47,6 @@ export interface PreflightResult {
  */
 export type CliProbe = (bin: string, args: readonly string[]) => Promise<{ ok: boolean; output: string }>
 
-/** @deprecated The probe runs more than `--version` now. Use {@link CliProbe}. */
-export type VersionProbe = CliProbe
-
 function defaultProbe(bin: string, args: readonly string[]): Promise<{ ok: boolean; output: string }> {
   return new Promise(resolvePromise => {
     execFile(bin, [...args], { timeout: 10_000 }, (err, stdout, stderr) => {

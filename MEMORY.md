@@ -5,6 +5,7 @@
 - **Only remove what has been pushed to the git remote.** Worktrees, branches, archives — anything deleted must already exist on the remote, so every removal is recoverable from it.
 - **Never interrupt a running session because of low quota.** Quota gates whether a session may *start*; a session already running is never paused, degraded or cut short.
 - **The unit of work is an *agent*** — not a run or a session. The CLI that drives it (`claude`, `codex`) is the *driver*.
+- **Zero migration code.** Nothing reads a file name, a key spelling or a file shape that was renamed or replaced. The project has no users, so a rename is a break to take, not a compatibility branch to carry; migration is manual — rewrite the file.
 
 ## Before modifying this file
 

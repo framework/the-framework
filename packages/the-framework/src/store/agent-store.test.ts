@@ -357,35 +357,19 @@ test('readLiveMeta gives up on an agent.json that is corrupt for good', async ()
   assert.equal(await readLiveMeta(CWD, fs), undefined)
 })
 
-const LEGACY_META = join(CWD, '.the-framework', 'run.json')
-
-test('readLiveMeta falls back to a pre-D5 run.json so an agent from before the rename is still seen (#1179)', async () => {
-  // D5 renamed the meta file agent.json; before it, the meta was run.json (the log kept its name).
-  // Without this fallback such an agent reads as absent — then the sweep archives/removes it as
-  // dead, losing a live agent's worktree or a crashed run's only history.
+test('the meta is read under one name: a pre-D5 run.json is not an agent', async () => {
+  // D5 renamed the meta to agent.json, and nothing reads the name it had before. Zero users, so a
+  // leftover run.json is a file from another product — the alternative is a second name every read
+  // site has to try, forever, to rescue a checkout nobody has.
   const seeded = memFs()
   const store = await AgentStore.open(CWD, { fs: seeded, fresh: true, now: AT })
   for (const e of RUN.slice(0, -1)) await store.append(e)
-  const fs = memFs({ [LEGACY_META]: seeded.files.get(META)!, [EVENTS]: seeded.files.get(EVENTS)! })
+  const fs = memFs({
+    [join(CWD, '.the-framework', 'run.json')]: seeded.files.get(META)!,
+    [EVENTS]: seeded.files.get(EVENTS)!,
+  })
 
-  const live = await readLiveMeta(CWD, fs)
-  assert.ok(live, 'the pre-rename run is found, not read as absent')
-  assert.equal(live!.status, 'running')
-  assert.equal(live!.id, store.snapshot().id)
-})
-
-test('the current agent.json wins over a leftover run.json, even a torn one', async () => {
-  // Once migrated, both names can coexist. The new name is authoritative; the legacy one is only
-  // consulted when no agent.json exists at all, so a stale run.json never shadows the live meta.
-  const seeded = memFs()
-  const store = await AgentStore.open(CWD, { fs: seeded, fresh: true, now: AT })
-  for (const e of RUN.slice(0, -1)) await store.append(e)
-  const current = seeded.files.get(META)!
-  const fs = memFs({ [META]: current, [LEGACY_META]: '{ stale pre-rename junk', [EVENTS]: seeded.files.get(EVENTS)! })
-
-  const live = await readLiveMeta(CWD, fs)
-  assert.ok(live, 'the current meta is read')
-  assert.equal(live!.id, store.snapshot().id)
+  assert.equal(await readLiveMeta(CWD, fs), undefined)
 })
 
 test('agent.json is renamed into place, never truncated where a reader can see it (#1540)', async () => {
@@ -475,23 +459,22 @@ const RUNS = join(CWD, '.the-framework', 'agents')
 const runningAgentMeta = (id: string): string =>
   JSON.stringify({ version: AGENT_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT })
 
-test('listAgents still reads the archive under the name D5 renamed away from (#1179)', async () => {
-  // The committed archive is the one thing under `.the-framework/` that survives `git clean -fdx`,
-  // which is the whole reason it exists. Renaming its directory to `agents/` without reading the
-  // old `sessions/` would have made every archive written before the rename stop appearing — the
-  // history quietly shorter after an upgrade, in the surface whose reason to exist is not losing it.
+test('listAgents reads every user archive and the transient one, under their one name (#1179)', async () => {
+  // Both live locations are listed — the committed per-user archive and the transient one an agent
+  // with no worktree writes into. The names those directories had before D5 (`sessions/`, `runs/`)
+  // are not read: a second spelling per location is four directory probes per listing to find
+  // archives that, with no users, nobody has.
   const meta = (id: string): string =>
     JSON.stringify({ version: AGENT_META_VERSION, status: 'done', id, startedAt: AT, updatedAt: AT, intent: id })
   const user = join(CWD, '.the-framework', 'dev@example.com')
   const fs = memFs({
-    [join(user, 'sessions', '2026-old.json')]: meta('2026-old'),
     [join(user, 'agents', '2026-new.json')]: meta('2026-new'),
-    // The transient location's old name too, which holds everything archived before the committed
-    // scheme existed — the one history with no second copy anywhere.
+    [join(CWD, '.the-framework', 'agents', '2026-transient.json')]: meta('2026-transient'),
+    [join(user, 'sessions', '2026-old.json')]: meta('2026-old'),
     [join(CWD, '.the-framework', 'runs', '2026-ancient.json')]: meta('2026-ancient'),
   })
   const agents = await listAgents(CWD, fs)
-  assert.deepEqual(agents.map(r => r.id).sort(), ['2026-ancient', '2026-new', '2026-old'])
+  assert.deepEqual(agents.map(r => r.id).sort(), ['2026-new', '2026-transient'])
 })
 
 test('reconcileOrphanedAgents flips archived runs stuck at running to stopped (#642)', async () => {

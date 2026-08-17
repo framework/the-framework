@@ -3,7 +3,8 @@ The user's one home file: the projects The Framework is installed into, the user
 ## TLDR
 
 - A single JSON file per machine in the user's home, owned by the daemon, so the dashboard never needs browser storage.
-- Reads are forgiving — a missing, malformed, or old-format file yields an empty registry — and every value is sanitized on the way in (clamped numbers, known-set strings, capped lists), so a hand-edited or hostile file can neither break anything nor smuggle junk into an agent.
+- Reads are forgiving — a missing, malformed, or old-shaped file yields an empty registry — and every value is sanitized on the way in (clamped numbers, known-set strings, capped lists), so a hand-edited or hostile file can neither break anything nor smuggle junk into an agent.
+- One accepted shape and one spelling per key. A file written before a rename reads as the empty registry, or the renamed key reads as an unknown one and is dropped: with no users to carry, a migration path is a branch every reader keeps forever to rescue a file nobody has. Rewriting the file by hand is the migration.
 - A setting whose states are strictly nested is stored as the one ordinal it is, not as a flag per stage: how far an agent publishes itself is a single rung, so the file cannot hold a combination no agent could honour.
 - One tier of preferences lives here, and it is the user's. Repo-shaped settings belong in the repo's committed file, so a per-project block in a home file was a second answer to the same question that only one machine could see.
 - Patch writes touch only the keys the caller changed, so a stale dashboard tab cannot silently revert someone else's setting.

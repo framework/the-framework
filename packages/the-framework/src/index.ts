@@ -234,7 +234,6 @@ export {
   type PreflightResult,
   type PreflightCheck,
   type PreflightOptions,
-  type VersionProbe,
 } from './preflight.js'
 export { runDaemon, isProcessAlive, EventTailer, DEFAULT_DAEMON_PORT, type DaemonState, type RunDaemonOptions } from './daemon.js'
 export {

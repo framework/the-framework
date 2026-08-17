@@ -1,5 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { DriverSession } from './driver/index.js'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
 import { requestChoices, runAwaitRounds } from './await-gate.js'
@@ -164,7 +164,6 @@ async function writeTodoEntry(
   const path = join(cwd, name)
   try {
     const existing = await readFile(path, 'utf8').catch(() => '')
-    await mkdir(dirname(path), { recursive: true }) // a legacy tickets/TODO.md still needs its dir
     if (priority !== undefined) {
       await writeFile(path, insertTodoEntry(existing, entry, priority), 'utf8')
       return name
@@ -179,7 +178,7 @@ async function writeTodoEntry(
 
 /**
  * Locate the workspace's backlog and its open entries: the flat file via `findFlatTodo`
- * (`TODO_AGENTS.md`, or a legacy `tickets/TODO.md` / root `TODO.md`). Returns `undefined`
+ * (the root `TODO_AGENTS.md`, the one location it reads). Returns `undefined`
  * when no backlog exists or it has no open entry. Session-scoped `TODO_<slug>.agent.md`
  * files are retired (#1369) — a leftover one in the checkout is ignored.
  */

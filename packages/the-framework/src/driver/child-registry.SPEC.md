@@ -1,4 +1,4 @@
-Makes sure no agent process ever outlives its run: each spawned agent leads its own process tree, and stopping a run — or the framework itself dying — reaps the whole tree instead of orphaning it.
+Makes sure no driver process ever outlives the agent that spawned it: each spawned child leads its own process tree, and stopping an agent — or the framework itself dying — reaps the whole tree instead of orphaning it.
 
 ## TLDR
 

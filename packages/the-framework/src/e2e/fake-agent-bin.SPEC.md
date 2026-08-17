@@ -1,4 +1,4 @@
-The program spawned as a story's run child: the real CLI with the fake agent forced on, so the complete production run lifecycle executes offline — and it records how it was invoked, the only way a story can prove a dashboard toggle became the run flag it maps to.
+The program spawned as a story's agent child: the real CLI with the fake driver forced on, so the complete production lifecycle executes offline — and it records the spec it was handed, the only way a story can prove a dashboard toggle reached the agent it started.
 
 ## Before writing SPEC.md files
 

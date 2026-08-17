@@ -1,4 +1,4 @@
-GitHub configuration for the repo; its only content is `workflows/` — the five Actions workflows.
+GitHub configuration for the repo; its only content is `workflows/` — the three Actions workflows.
 
 ## Before writing SPEC.md files
 

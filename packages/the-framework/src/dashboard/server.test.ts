@@ -5,11 +5,35 @@ import { connect } from 'node:net'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { startDashboard } from './server.js'
-import { isExpectedHost, isSameOriginRequest } from './telefunc-serve.js'
+import { startDashboard, type Dashboard, type DashboardOptions } from './server.js'
+import { isExpectedHost, isSameOriginRequest } from './rpc-serve.js'
+import { registryPreferencesStore } from '../registry.js'
+import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
+import { defaultQuotaSource } from './quota.js'
 import type { FrameworkEvent } from '../events.js'
-import type { StartRunKind, StartRunOptions, StartRunResult } from './types.js'
+import type { StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
 import type { IncomingMessage } from 'node:http'
+
+/**
+ * Start a dashboard the way the daemon does — every context capability wired (D3) — with only the
+ * parts a test cares about overridden. Since there is one host, the options are required, and a
+ * test asserting one route should still stand up the same server the product does.
+ */
+function dashboard(over: Partial<DashboardOptions> = {}): Promise<Dashboard> {
+  return startDashboard({
+    port: 0,
+    onStart: () => ({ ok: false, error: 'not wired in this test' }),
+    onAddProject: () => ({ ok: false, error: 'not wired in this test' }),
+    eventsSource: () => undefined,
+    remote: { target: () => undefined, list: () => [] },
+    preferences: registryPreferencesStore(),
+    discord: registryDiscordCredentialsStore(),
+    quota: defaultQuotaSource(),
+    autoPm: () => undefined,
+    autoPmSweep: () => {},
+    ...over,
+  })
+}
 
 function fetchText(url: string): Promise<{ status: number; body: string; type: string }> {
   return new Promise((resolvePromise, rejectPromise) => {
@@ -90,7 +114,7 @@ function postRebound(url: string, host = 'evil.com'): Promise<{ status: number; 
   })
 }
 
-// A minimal prerendered SPA bundle: an index.html shell + one hashed asset.
+// A minimal built SPA bundle: an index.html shell + one hashed asset.
 async function fakeBundle(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'dash-bundle-'))
   await writeFile(join(dir, 'index.html'), '<!doctype html><html><body><div id="root"></div></body></html>')
@@ -100,7 +124,7 @@ async function fakeBundle(): Promise<string> {
 }
 
 test('without a bundle the server reports the dashboard is not installed (503)', async () => {
-  const dash = await startDashboard({ port: 0 })
+  const dash = await dashboard()
   try {
     const { status, body } = await fetchText(dash.url + '/')
     assert.equal(status, 503)
@@ -110,9 +134,9 @@ test('without a bundle the server reports the dashboard is not installed (503)',
   }
 })
 
-test('serves the prerendered SPA shell at / and hashed assets, with an SPA fallback', async () => {
+test('serves the built SPA shell at / and hashed assets, with an SPA fallback', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  const dash = await dashboard({ clientBundleDir: bundle })
   try {
     const root = await fetchText(dash.url + '/')
     assert.equal(root.status, 200)
@@ -134,7 +158,7 @@ test('serves the prerendered SPA shell at / and hashed assets, with an SPA fallb
 
 test('a malformed percent-encoded path serves the SPA shell and the server survives (#938)', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  const dash = await dashboard({ clientBundleDir: bundle })
   try {
     // `decodeURIComponent('/%zz')` throws; unguarded it is an unhandled rejection that kills the process.
     const bad = await fetchText(dash.url + '/%zz')
@@ -152,7 +176,7 @@ test('a malformed percent-encoded path serves the SPA shell and the server survi
 
 test('a malformed escape inside a browser-proxy path serves the shell and the server survives (#938)', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  const dash = await dashboard({ clientBundleDir: bundle })
   try {
     // Passes the pathname guard (the URL parses), enters the proxy dispatch, and only explodes
     // at decode time inside parseBrowserRoute — the crash the round-2 pass live-repro'd.
@@ -170,7 +194,7 @@ test('a malformed escape inside a browser-proxy path serves the shell and the se
 
 test('an unparseable absolute-form request target gets a 400 and the server survives (#938)', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  const dash = await dashboard({ clientBundleDir: bundle })
   try {
     // Node's parser passes absolute-form targets through verbatim; `new URL('http://[', ...)`
     // throws synchronously in the request handler, which unguarded kills the process.
@@ -185,11 +209,11 @@ test('an unparseable absolute-form request target gets a 400 and the server surv
   }
 })
 
-test('the Telefunc mount rejects a cross-origin POST (CSRF guard)', async () => {
+test('the RPC mount rejects a cross-origin POST (CSRF guard)', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  const dash = await dashboard({ clientBundleDir: bundle })
   try {
-    const { status, body } = await postCrossOrigin(dash.url + '/_telefunc')
+    const { status, body } = await postCrossOrigin(dash.url + '/_rpc/onProjects')
     assert.equal(status, 403)
     assert.match(body, /cross-origin/)
   } finally {
@@ -198,18 +222,18 @@ test('the Telefunc mount rejects a cross-origin POST (CSRF guard)', async () => 
   }
 })
 
-test('the Telefunc mount rejects a rebound Host, which the Origin check alone lets through', async () => {
+test('the RPC mount rejects a rebound Host, which the Origin check alone lets through', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle })
+  const dash = await dashboard({ clientBundleDir: bundle })
   try {
     // The attack: same-origin as far as the browser is concerned, so `isSameOriginRequest` passes it.
-    const rebound = await postRebound(dash.url + '/_telefunc')
+    const rebound = await postRebound(dash.url + '/_rpc/onProjects')
     assert.equal(rebound.status, 403)
     assert.match(rebound.body, /Host/)
 
     // The real thing still gets through: same request, but the Host the user actually typed.
-    // It reaches telefunc, which logs a parse error over the `{}` body — expected, not a failure.
-    const loopback = await postRebound(dash.url + '/_telefunc', new URL(dash.url).host)
+    // It reaches the mount, which answers the call.
+    const loopback = await postRebound(dash.url + '/_rpc/onProjects', new URL(dash.url).host)
     assert.notEqual(loopback.status, 403)
   } finally {
     await dash.close()
@@ -222,11 +246,11 @@ const TOKEN = 'zX2p8Q0hqk3m9tR7vN1cW4bY6sJ5aL0dFgHiKlMnOp'
 
 // The guard triggers on the token being configured, not on the bind host (a non-loopback bind is
 // exactly what configures one). Binding loopback with the token set exercises every guard path
-// without an external bind that could trip the OS firewall in an automated run; the true two-daemon
+// without an external bind that could trip the OS firewall in an automated agent; the true two-daemon
 // non-loopback drive is noted as a follow-up in the PR.
 async function guardedDashboard(): Promise<{ base: string; close: () => Promise<void> }> {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle, token: TOKEN })
+  const dash = await dashboard({ clientBundleDir: bundle, token: TOKEN })
   return {
     base: dash.url,
     close: async () => {
@@ -240,7 +264,7 @@ test('with a token set, every route is 401 without a cookie or ?token= (#1051)',
   const { base, close } = await guardedDashboard()
   try {
     // The static bundle, the RPC mount, and the browser proxy are all fronted uniformly.
-    for (const path of ['/', '/assets/app.js', '/_telefunc', '/browser/p/x/stream']) {
+    for (const path of ['/', '/assets/app.js', '/_rpc/onProjects', '/browser/p/x/stream']) {
       const res = await fetchAuth(base + path)
       assert.equal(res.status, 401, `${path} should be 401`)
       assert.match(res.body, /unauthorized/)
@@ -278,7 +302,7 @@ test('a wrong ?token= is 401, not admitted (timing-safe compare) (#1051)', async
   }
 })
 
-test('the fw_daemon cookie admits the bundle, /_telefunc, and /browser (#1051)', async () => {
+test('the fw_daemon cookie admits the bundle, /_rpc, and /browser (#1051)', async () => {
   const { base, close } = await guardedDashboard()
   try {
     const cookie = `fw_daemon=${TOKEN}`
@@ -286,7 +310,7 @@ test('the fw_daemon cookie admits the bundle, /_telefunc, and /browser (#1051)',
     assert.equal(root.status, 200)
     assert.match(root.body, /<div id="root">/)
     // Not 401 is the guard passing; the mount / proxy then answer on their own terms.
-    const rpc = await fetchAuth(`${base}/_telefunc`, cookie)
+    const rpc = await fetchAuth(`${base}/_rpc/onProjects`, cookie)
     assert.notEqual(rpc.status, 401)
     const browser = await fetchAuth(`${base}/browser/p/x/stream`, cookie)
     assert.notEqual(browser.status, 401)
@@ -297,7 +321,7 @@ test('the fw_daemon cookie admits the bundle, /_telefunc, and /browser (#1051)',
 
 test('a loopback bind sets no token, so the gate is a no-op (byte-identical) (#1051)', async () => {
   const bundle = await fakeBundle()
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle }) // no token
+  const dash = await dashboard({ clientBundleDir: bundle }) // no token
   try {
     const res = await fetchAuth(dash.url + '/') // no cookie, no ?token=
     assert.equal(res.status, 200)
@@ -359,26 +383,26 @@ function readNdjson(url: string, cookie: string, count: number): Promise<{ statu
 
 // A guarded dashboard wired for the device relay (#1067): a stub start that records its calls, and
 // an events tail backed by a fixed list. Mirrors what the daemon wires, minus a real spawn.
-async function relayDashboard(): Promise<{
+async function relayDashboard(opts: { token?: string | undefined } = { token: TOKEN }): Promise<{
   base: string
-  starts: Array<{ prompt: string; kind: StartRunKind; options: StartRunOptions; projectId?: string }>
+  starts: Array<{ prompt: string; kind: StartAgentKind; options: StartAgentOptions; projectId?: string }>
   close: () => Promise<void>
 }> {
   const bundle = await fakeBundle()
-  const starts: Array<{ prompt: string; kind: StartRunKind; options: StartRunOptions; projectId?: string }> = []
-  const onStart = (prompt: string, kind: StartRunKind, options: StartRunOptions, projectId?: string): StartRunResult => {
+  const starts: Array<{ prompt: string; kind: StartAgentKind; options: StartAgentOptions; projectId?: string }> = []
+  const onStart = (prompt: string, kind: StartAgentKind, options: StartAgentOptions, projectId?: string): StartAgentResult => {
     starts.push({ prompt, kind, options, ...(projectId ? { projectId } : {}) })
-    return { ok: true, runId: 'srv-run' }
+    return { ok: true, agentId: 'srv-run' }
   }
   const events: FrameworkEvent[] = [
     { kind: 'log', message: 'e1' } as FrameworkEvent,
     { kind: 'log', message: 'e2' } as FrameworkEvent,
   ]
-  const tailEvents = (_runId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => {
+  const tailEvents = (_agentId: string, onEvent: (event: FrameworkEvent) => void): (() => void) => {
     for (const e of events) onEvent(e)
     return () => {}
   }
-  const dash = await startDashboard({ port: 0, clientBundleDir: bundle, token: TOKEN, onStart, relay: { tailEvents } })
+  const dash = await dashboard({ clientBundleDir: bundle, ...(opts.token ? { token: opts.token } : {}), onStart, relay: { tailEvents } })
   return {
     base: dash.url,
     starts,
@@ -394,12 +418,12 @@ test('/_relay/start needs the cookie: 401 without it, starts the run with it (#1
   try {
     const body = JSON.stringify({ prompt: 'do it', kind: 'build', options: { autopilot: true } })
     const unauth = await postAuth(`${base}/_relay/start`, body)
-    assert.equal(unauth.status, 401) // the #1051 guard fronts the relay too
+    assert.equal(unauth.status, 401) // the shared-token guard (#1051) fronts the relay too
     assert.equal(starts.length, 0)
 
     const ok = await postAuth(`${base}/_relay/start`, body, `fw_daemon=${TOKEN}`)
     assert.equal(ok.status, 200)
-    assert.deepEqual(JSON.parse(ok.body), { ok: true, runId: 'srv-run' })
+    assert.deepEqual(JSON.parse(ok.body), { ok: true, agentId: 'srv-run' })
     assert.equal(starts.length, 1)
     assert.equal(starts[0]!.prompt, 'do it')
     assert.equal(starts[0]!.projectId, undefined) // slice 1 runs in the device's own home checkout
@@ -439,12 +463,34 @@ test('/_relay/ping is 401 without the cookie, 200 with it, and starts nothing (#
   const { base, starts, close } = await relayDashboard()
   try {
     const unauth = await fetchAuth(`${base}/_relay/ping`)
-    assert.equal(unauth.status, 401) // the #1051 guard fronts the ping too
+    assert.equal(unauth.status, 401) // the shared-token guard (#1051) fronts the ping too
 
     const ok = await fetchAuth(`${base}/_relay/ping`, `fw_daemon=${TOKEN}`)
     assert.equal(ok.status, 200)
     assert.equal(ok.body, '') // an empty body: it only proves reachability
     assert.equal(starts.length, 0) // a health check must never spawn a run
+  } finally {
+    await close()
+  }
+})
+
+// On a loopback bind the shared-token guard is off (#1051), so the relay carries the RPC mount's
+// own CSRF + DNS-rebinding guard — without it a page the user merely visits could POST /_relay/start.
+test('a loopback relay rejects a cross-origin POST and a rebound Host, and starts nothing', async () => {
+  const { base, starts, close } = await relayDashboard({ token: undefined })
+  try {
+    const body = JSON.stringify({ prompt: 'do it', kind: 'build', options: { autopilot: true } })
+
+    const crossOrigin = await postCrossOrigin(`${base}/_relay/start`)
+    assert.equal(crossOrigin.status, 403) // an Origin that is not this server: CSRF
+    const rebound = await postRebound(`${base}/_relay/start`)
+    assert.equal(rebound.status, 403) // same-origin to the browser, but the Host names evil.com
+    assert.equal(starts.length, 0) // neither reached the spawn
+
+    // The real device caller sends no Origin and a loopback Host, so it still passes.
+    const ok = await postAuth(`${base}/_relay/start`, body)
+    assert.equal(ok.status, 200)
+    assert.equal(starts.length, 1)
   } finally {
     await close()
   }

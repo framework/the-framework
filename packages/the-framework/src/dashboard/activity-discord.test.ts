@@ -3,17 +3,17 @@ import { test } from 'node:test'
 import { postActivityDiscord } from './activity.js'
 import type { Activity } from './activity.js'
 
-const started = (runId: string, project = 'p', title?: string): Activity => ({
+const started = (agentId: string, project = 'p', title?: string): Activity => ({
   projectId: project,
   projectName: project,
-  runId,
+  agentId,
   kind: 'started',
   ...(title ? { title } : {}),
 })
-const finished = (runId: string, status: Activity['status'] = 'done', project = 'p', title?: string): Activity => ({
+const finished = (agentId: string, status: Activity['status'] = 'done', project = 'p', title?: string): Activity => ({
   projectId: project,
   projectName: project,
-  runId,
+  agentId,
   kind: 'finished',
   status,
   ...(title ? { title } : {}),

@@ -75,7 +75,7 @@ test('postInterventionsDiscord names the branch for unpushed work, not a PR numb
         kind: 'unpushed',
         title: 'add the cart',
         url: 'http://localhost:4300',
-        runId: 'r1',
+        agentId: 'r1',
         branch: 'the-framework/add-cart',
         commits: 2,
       },
@@ -100,7 +100,7 @@ test('postInterventionsDiscord says "1 commit" rather than "1 commits" (#860)', 
 
   await postInterventionsDiscord(
     'https://discord/hook',
-    [{ projectId: 'p', projectName: 'g', kind: 'unpushed', title: 't', url: '', runId: 'r', branch: 'b', commits: 1 }],
+    [{ projectId: 'p', projectName: 'g', kind: 'unpushed', title: 't', url: '', agentId: 'r', branch: 'b', commits: 1 }],
     fetchImpl,
   )
   assert.match(String((body as { content: string }).content), /1 commit(?!s)/)

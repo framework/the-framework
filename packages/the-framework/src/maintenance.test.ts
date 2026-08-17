@@ -103,7 +103,7 @@ test('planMaintenanceSweep tags each review with its registry id', async () => {
   assert.deepEqual(plan.map(r => r.id), ['a-1', 'b-1'])
 })
 
-/** A SweepDeps that records calls, with a run() outcome per path. */
+/** A SweepDeps that records calls, with an agent() outcome per path. */
 function recordingDeps(outcome: (path: string) => boolean): {
   deps: SweepDeps
   ran: string[]
@@ -115,7 +115,7 @@ function recordingDeps(outcome: (path: string) => boolean): {
     ran,
     recorded,
     deps: {
-      run: async (review: RepoReview) => {
+      agent: async (review: RepoReview) => {
         ran.push(review.path)
         return outcome(review.path)
       },

@@ -29,6 +29,6 @@ module of plain strings crosses that boundary for free and keeps the package `fi
 
 ## Two rules
 
-- **The system prompt is Rom's** (#500/#547). Change it on #326 first, then sync the markdown.
+- **The system prompt is Rom's** (#500/#547). It is designed on #326; these files are the source of truth, and a change to them is reviewed in its PR like any other.
 - **Prompts get a review round before they land in production** (#547). The point of this
   directory is that a prompt change is a readable markdown diff.

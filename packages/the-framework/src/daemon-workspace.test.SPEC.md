@@ -1,4 +1,4 @@
-Covers where a run is allowed to land and what happens when it dies: a repo whose worktree cannot be created refuses the start instead of borrowing the user's checkout, topic runs live in a neutral scratch dir and re-home into the project they bind to (or retain the scratch and say why when they cannot), a child that dies at boot is marked failed with its actual error, transient connection deaths earn a bounded number of automatic continuations while real failures stand, and a logged-out agent is refused before any branch or worktree is spent.
+Covers where an agent is allowed to land and what happens when it dies: a repo whose worktree cannot be created refuses the start instead of borrowing the user's checkout, a child that dies at boot is marked failed with its actual error, transient connection deaths earn a bounded number of automatic continuations while real failures stand, and a logged-out driver is refused before any branch or worktree is spent.
 
 ## Before writing SPEC.md files
 

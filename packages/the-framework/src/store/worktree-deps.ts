@@ -1,16 +1,16 @@
 import { join, relative, isAbsolute } from 'node:path'
 import { nodeFs, type NodeFs } from '../node-fs.js'
 import { nodeGitRunner, type GitRunner } from '../project.js'
-import { FRAMEWORK_DIR } from './run-store.js'
+import { FRAMEWORK_DIR } from './agent-store.js'
 
 /**
  * Give a fresh worktree a dependency tree (#736). `node_modules` is gitignored, so
- * `git worktree add` hands the run an empty one and every command in it fails.
+ * `git worktree add` hands the agent an empty one and every command in it fails.
  *
- * Three ways to fix that: copy the tree (correct, but gigabytes per run), install
+ * Three ways to fix that: copy the tree (correct, but gigabytes per agent), install
  * into each worktree (correct, but real latency on every start), or symlink the
  * parent checkout's trees in (instant, no extra disk, one store shared by N runs).
- * We symlink. The one case it is wrong for is a run that changes the lockfile —
+ * We symlink. The one case it is wrong for is an agent that changes the lockfile —
  * that needs its own install regardless, and the agent runs the install itself.
  *
  * Directory symlinks are what make this work in a pnpm workspace: linking
@@ -93,7 +93,7 @@ export async function findDependencyDirs(repo: string, fs: LinkFs = nodeLinkFs()
  * Symlink `repo`'s dependency trees into `worktree` at the same relative paths.
  * Returns the paths linked. Best-effort throughout: a worktree with no deps is a
  * worse run, not a failed one, so a link that cannot be made is skipped rather
- * than thrown. An existing entry is left alone (the run may have installed already).
+ * than thrown. An existing entry is left alone (the agent may have installed already).
  */
 export async function linkDependencies(repo: string, worktree: string, fs: LinkFs = nodeLinkFs()): Promise<string[]> {
   const linked: string[] = []
@@ -107,7 +107,7 @@ export async function linkDependencies(repo: string, worktree: string, fs: LinkF
       await fs.symlinkDir(target, link)
       linked.push(rel)
     } catch {
-      // Raced, or a filesystem that refuses the link: the run still starts.
+      // Raced, or a filesystem that refuses the link: the agent still starts.
     }
   }
   return linked
@@ -119,8 +119,8 @@ const EXCLUDE_RULE = NODE_MODULES
 /**
  * Make git ignore the dependency links (#738). A repo's `.gitignore` says `node_modules/`, and
  * a trailing slash matches a *directory* only — the links {@link linkDependencies} makes are
- * symlinks, so they are not covered, and they show up as untracked in every run's worktree.
- * That is not cosmetic: the agent runs `git add -A`, so the run would commit dangling absolute
+ * symlinks, so they are not covered, and they show up as untracked in every agent's worktree.
+ * That is not cosmetic: the agent runs `git add -A`, so the agent would commit dangling absolute
  * symlinks into its branch and onto the PR.
  *
  * The rule goes in the repository's `info/exclude` rather than a worktree-local file because
@@ -130,15 +130,15 @@ const EXCLUDE_RULE = NODE_MODULES
  * the main checkout is unaffected in practice: its `node_modules` is a real directory, already
  * ignored by the same name.
  *
- * Best-effort: a run whose links are merely untracked is still a run.
+ * Best-effort: an agent whose links are merely untracked is still an agent.
  */
 export async function excludeDependencyLinks(
   repo: string,
   fs: NodeFs = nodeFs(),
-  run: GitRunner = nodeGitRunner(),
+  agent: GitRunner = nodeGitRunner(),
 ): Promise<void> {
   try {
-    const common = (await run(['rev-parse', '--git-common-dir'], repo)).trim()
+    const common = (await agent(['rev-parse', '--git-common-dir'], repo)).trim()
     if (!common) return
     const infoDir = join(isAbsolute(common) ? common : join(repo, common), 'info')
     const path = join(infoDir, 'exclude')

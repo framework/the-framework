@@ -1,6 +1,6 @@
 /**
  * Loopback-address helpers, shared by the daemon (deciding whether a bind gates behind the
- * token, #1051) and the Telefunc mount (rejecting a rebound `Host`). A leaf module on purpose:
+ * token, #1051) and the RPC mount (rejecting a rebound `Host`). A leaf module on purpose:
  * `daemon.ts` imports the dashboard, so the mount cannot import these back out of it.
  */
 

@@ -5,7 +5,7 @@
  * (node workers, ripgrep, bash tool calls, MCP servers). Signaling only the
  * top-level `claude` orphans that subtree: it reparents to init and keeps
  * burning CPU — the runaway-process leak we hit (a swarm of stray `claude`
- * processes after a run was interrupted).
+ * processes after an agent was interrupted).
  *
  * Fix: spawn each long-lived child as its own process-group leader (`detached`)
  * and signal the whole group at once via a negative pid. Register every live
@@ -47,7 +47,7 @@ function installExitHook(): void {
   // `exit` fires on normal completion, process.exit(), and after an uncaught
   // error unwinds — sync-only, so a plain group SIGKILL is all we can (and need
   // to) do. Signal deaths (SIGINT/SIGTERM) are handled by the CLI, which aborts
-  // the run first; this is the last-resort net for every other exit path.
+  // the agent first; this is the last-resort net for every other exit path.
   process.on('exit', () => {
     for (const pid of live) killTree(pid, 'SIGKILL')
   })

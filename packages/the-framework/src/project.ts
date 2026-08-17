@@ -1,33 +1,15 @@
 import { cliRunner, type CliRunner } from './cli-exec.js'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { FrameworkSignals } from '@gemstack/ai-autopilot'
 import { nodeFs } from './node-fs.js'
-import { THE_FRAMEWORK_DIR } from './logs.js'
+import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 /**
  * Project-level repo helpers (#380): the `.the-framework/` activation marker
  * check, a `git ls-files` crawl, and the project's detection signals. Read-only
- * building blocks for the #314 sidebars; activation/install (creating the dir,
+ * building blocks for the sidebars (#314); activation/install (creating the dir,
  * the install commit) is a separate, deferred concern.
  */
-
-/**
- * Read a project's detection signals from its `package.json`: the union of
- * `dependencies` + `devDependencies` names. Returns empty signals when there is
- * no `package.json` (a from-scratch build in an empty workspace) so preset
- * detection simply finds nothing rather than throwing.
- */
-export function readProjectSignals(cwd: string): FrameworkSignals {
-  let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
-  try {
-    pkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf8'))
-  } catch {
-    return {}
-  }
-  const dependencies = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) }
-  return { dependencies }
-}
 
 /** The `.the-framework/` path under a project root. */
 export function theFrameworkDir(cwd: string): string {
@@ -114,7 +96,7 @@ function gitWords(args: string[]): string[] {
 /**
  * The timeout for one git invocation, chosen by subcommand (#997). One flat 10s budget covered
  * the repo's ~20 call sites, so the slowest two ran under what is really a read's budget: a
- * SIGTERM'd `worktree add` drops a run into the user's main checkout, a SIGTERM'd `push` may
+ * SIGTERM'd `worktree add` drops an agent into the user's main checkout, a SIGTERM'd `push` may
  * have half-landed. Mirrors the read/write split `gh` already has (dashboard/gh.ts).
  */
 export function gitTimeoutMs(args: string[]): number {
@@ -148,8 +130,8 @@ export function nodeGitRunner(): GitRunner {
  * Forgiving in one direction only: an unreadable / missing git reads as "no repo", which is the
  * conservative answer for the caller that treats a repo's failure as fatal.
  */
-export async function isGitRepo(cwd: string, run: GitRunner = nodeGitRunner()): Promise<boolean> {
-  return run(['rev-parse', '--is-inside-work-tree'], cwd)
+export async function isGitRepo(cwd: string, agent: GitRunner = nodeGitRunner()): Promise<boolean> {
+  return agent(['rev-parse', '--is-inside-work-tree'], cwd)
     .then(out => out.trim() === 'true')
     .catch(() => false)
 }
@@ -160,9 +142,9 @@ export async function isGitRepo(cwd: string, run: GitRunner = nodeGitRunner()): 
  * same approach Vike uses). Returns repo-relative paths, deduped and sorted.
  * Forgiving: a non-repo / missing git / any failure yields `[]`, never throws.
  */
-export async function crawlRepoFiles(cwd: string, run: GitRunner = nodeGitRunner()): Promise<string[]> {
+export async function crawlRepoFiles(cwd: string, agent: GitRunner = nodeGitRunner()): Promise<string[]> {
   try {
-    const out = await run(['ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd)
+    const out = await agent(['ls-files', '-z', '--cached', '--others', '--exclude-standard'], cwd)
     const files = new Set<string>()
     for (const entry of out.split('\0')) {
       const trimmed = entry.trim()

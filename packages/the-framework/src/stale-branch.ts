@@ -31,7 +31,7 @@ export interface StaleBranchDeps {
  *
  * Deliberately conservative on the two unprovable cases: an open PR keeps the branch (that is a
  * triage genuinely pending), and a branch with no PR history at all keeps it too — that is either
- * a run still working toward its handoff or a `gh` that could not answer, and deleting on a
+ * an agent still working toward its handoff or a `gh` that could not answer, and deleting on a
  * hiccup would discard work. Never throws: a release that could not happen leaves the routine
  * exactly as jammed as it was, which the next tick retries.
  */

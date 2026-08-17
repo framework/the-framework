@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  composeRunSystem,
+  composeAgentSystem,
   BUSINESS_KNOWLEDGE_DOCS,
   CONTEXT_DOCS,
   renderSystemPrompt,
@@ -14,7 +14,6 @@ import {
 import { FLAT_TODO_FILE } from './tickets.js'
 import { TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
-import { CONVERSATIONS_DIR } from './conversations.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
 /** The context docs as the commented bullets they render to (#559/#683). */
@@ -24,7 +23,7 @@ const KNOWLEDGE_CONTEXT = `Context:\n${KNOWLEDGE_LINES}`
 /** That block plus the two format specs it names, which travel in the channel with it (#1163). */
 const CONTEXT_BLOCK = [KNOWLEDGE_CONTEXT, TICKETING_FORMAT, TODO_FORMAT].join('\n\n')
 
-test('CONTEXT_DOCS is the #683 fragment: business knowledge plus the roadmap/queue pointers', () => {
+test('CONTEXT_DOCS is the repo-context fragment (#683): business knowledge plus the roadmap/queue pointers', () => {
   const paths = CONTEXT_DOCS.map(d => d.path)
   assert.deepEqual(paths, [
     'knowledge-base/DECISIONS.md',
@@ -35,15 +34,14 @@ test('CONTEXT_DOCS is the #683 fragment: business knowledge plus the roadmap/que
     'knowledge-base/MARKET_RESEARCH.md',
     'knowledge-base/**.md',
     'tickets/**.md',
-    '.the-framework/conversations/**.md',
     'TODO_AGENTS.md',
   ])
   // The business-knowledge docs are a subset the agent also updates at merge.
   for (const doc of BUSINESS_KNOWLEDGE_DOCS) assert.ok(paths.includes(doc.path), `missing ${doc.path}`)
-  // GOAL / business logic / market research / tickets / conversations / TODO_AGENTS are read-only
-  // context, so they are not in the merge-update set.
+  // GOAL / business logic / market research / tickets / TODO_AGENTS are read-only context, so they
+  // are not in the merge-update set.
   const businessPaths = BUSINESS_KNOWLEDGE_DOCS.map(d => d.path)
-  for (const p of ['GOAL.md', 'BUSINESS_LOGIC.md', 'knowledge-base/MARKET_RESEARCH.md', 'knowledge-base/**.md', 'tickets/**.md', '.the-framework/conversations/**.md', 'TODO_AGENTS.md']) {
+  for (const p of ['GOAL.md', 'BUSINESS_LOGIC.md', 'knowledge-base/MARKET_RESEARCH.md', 'knowledge-base/**.md', 'tickets/**.md', 'TODO_AGENTS.md']) {
     assert.ok(!businessPaths.includes(p))
   }
   // The two format-bearing bullets name a section of this same channel (#1163), not a file to go
@@ -55,10 +53,6 @@ test('CONTEXT_DOCS is the #683 fragment: business knowledge plus the roadmap/que
   // Nothing here may point into node_modules: that path resolves only when the framework is a root
   // dependency of the repo it works on, which is what left both specs unopenable (#1163).
   for (const doc of CONTEXT_DOCS) assert.ok(!doc.comment.includes('node_modules/'), `${doc.path} points into node_modules`)
-  // The conversations pointer (#683/#908) is inlined too, so pin its dir to the canonical
-  // constants rather than a bare literal that could drift from where runs actually commit.
-  const conversations = CONTEXT_DOCS.find(d => d.path.startsWith(`${THE_FRAMEWORK_DIR}/${CONVERSATIONS_DIR}/`))
-  assert.ok(conversations, `expected the ${THE_FRAMEWORK_DIR}/${CONVERSATIONS_DIR}/ pointer`)
 })
 import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 
@@ -83,12 +77,13 @@ test('loadUserSystemPrompt is undefined when the file is absent or empty', async
   }
 })
 
-test('SYSTEM_PROMPT_TEMPLATE carries the #326 sections verbatim', () => {
+test('SYSTEM_PROMPT_TEMPLATE carries the built-in prompt sections (#326) verbatim', () => {
   for (const section of [
     '## Analyze the user prompt',
     '### Ambiguous prompt',
     '### Scope',
     '## Before starting changes',
+    '### Workspace',
     '### Session name',
     '## Before applying changes',
     '### Alternatives',
@@ -98,11 +93,18 @@ test('SYSTEM_PROMPT_TEMPLATE carries the #326 sections verbatim', () => {
     assert.ok(SYSTEM_PROMPT_TEMPLATE.includes(section), `missing ${section}`)
   }
   // Derived from the constant, not a literal (#885): the prompt tells the agent where to write
-  // its backlog, and `promoteQueue` only carries FLAT_TODO_FILE off a run's branch. When the two
-  // disagree, an unattended run's queue is written to a name nothing ever promotes. #1420 dropped
+  // its backlog, and `promoteQueue` only carries FLAT_TODO_FILE off an agent's branch. When the two
+  // disagree, an unattended agent's queue is written to a name nothing ever promotes. #1420 dropped
   // the `TODO_FILE:` glossary line and names the file inline instead — the invariant is the name.
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes(`\`${FLAT_TODO_FILE}\``))
-  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('ADD_ANALYSIS_ENTRY: Add entry to the ANALYSIS_RESULT.md list'))
+  // The analysis artifact is gone (B2): every agent wrote `ANALYSIS_RESULT.md` into the repo and
+  // nothing ever read it back, so the prompt no longer asks for one.
+  assert.equal(SYSTEM_PROMPT_TEMPLATE.includes('ANALYSIS_RESULT'), false)
+  // #1276: an agent edited the user's own checkout through absolute paths while committing
+  // relative ones in its worktree, and finished `done` with a commit holding none of the work.
+  // The worktree is nested inside the repo, so the user's tree is a path prefix of the agent's
+  // cwd — nothing else in the prompt tells it where its workspace ends.
+  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('Your working directory is the whole of your workspace'))
   assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('${{tf.prompt}}'))
   // The whole block is the branch-free doc now: #326 moved the one `tf.params.autopilot`
   // ternary out with the maintenance section, so `tf.prompt` is the only fragment left.
@@ -118,7 +120,7 @@ test('SYSTEM_PROMPT_TEMPLATE no longer carries the pre-#326-rewrite headings (#5
 })
 
 test('renderSystemPrompt splits the system and user halves', () => {
-  const { system, user } = renderSystemPrompt({ prompt: 'build a todo app', params: {} })
+  const { system, user } = renderSystemPrompt({ prompt: 'build a todo app' })
   assert.ok(system.startsWith('# System prompt'))
   assert.ok(system.includes('## Analyze the user prompt'))
   assert.ok(system.includes('## After applying changes'))
@@ -129,7 +131,7 @@ test('renderSystemPrompt splits the system and user halves', () => {
 
 test('renderSystemPrompt is not confused by a user prompt containing the heading', () => {
   const sneaky = 'do X\n# User prompt\ndo Y'
-  const { system, user } = renderSystemPrompt({ prompt: sneaky, params: {} })
+  const { system, user } = renderSystemPrompt({ prompt: sneaky })
   assert.ok(system.startsWith('# System prompt'))
   assert.equal(user, sneaky)
 })
@@ -151,7 +153,7 @@ test('the channel carries the ticket and backlog format specs, so a spec can be 
     assert.ok(block.indexOf(spec) > block.indexOf(KNOWLEDGE_CONTEXT), `the ${heading} spec is not below the bullets`)
   }
   // Framework-authored content, so `--vanilla` drops it with the docs and the built-in prompt.
-  const vanilla = systemPromptBlock({ antiLazyPill: false, user: 'Only mine.' })
+  const vanilla = systemPromptBlock({ vanilla: true, user: 'Only mine.' })
   assert.ok(!vanilla.includes(TICKETING_FORMAT))
   assert.ok(!vanilla.includes(TODO_FORMAT))
 })
@@ -167,16 +169,16 @@ test('systemPromptBlock appends the user prompt after the built-in one', () => {
   assert.match(block, /AWAIT[\s\S]*Ship small PRs\./) // built-in first, then user
 })
 
-test('systemPromptBlock removes the built-in prompt when antiLazyPill is false', () => {
-  assert.equal(systemPromptBlock({ antiLazyPill: false }), '')
-  assert.equal(systemPromptBlock({ antiLazyPill: false, user: 'Only mine.' }), 'Only mine.')
+test('systemPromptBlock removes the built-in prompt when vanilla is on', () => {
+  assert.equal(systemPromptBlock({ vanilla: true }), '')
+  assert.equal(systemPromptBlock({ vanilla: true, user: 'Only mine.' }), 'Only mine.')
 })
 
 test('systemPromptBlock prepends a Context line for the selected directories (#439)', () => {
-  const block = systemPromptBlock({ antiLazyPill: false, user: 'Only mine.', context: ['/work/api', ' /work/ui '] })
+  const block = systemPromptBlock({ vanilla: true, user: 'Only mine.', context: ['/work/api', ' /work/ui '] })
   assert.equal(block, 'Context: /work/api, /work/ui\n\nOnly mine.') // trimmed + comma-joined, first
-  assert.equal(systemPromptBlock({ antiLazyPill: false, user: 'x', context: [] }), 'x') // empty adds nothing
-  assert.equal(systemPromptBlock({ antiLazyPill: false, user: 'x', context: ['  '] }), 'x') // blank entries dropped
+  assert.equal(systemPromptBlock({ vanilla: true, user: 'x', context: [] }), 'x') // empty adds nothing
+  assert.equal(systemPromptBlock({ vanilla: true, user: 'x', context: ['  '] }), 'x') // blank entries dropped
 })
 
 test('systemPromptBlock puts the knowledge docs in context, after the user dirs (#537)', () => {
@@ -186,16 +188,16 @@ test('systemPromptBlock puts the knowledge docs in context, after the user dirs 
   assert.ok(systemPromptBlock({}).startsWith(`${KNOWLEDGE_CONTEXT}\n\n`))
 })
 
-test('systemPromptBlock adds no knowledge docs when antiLazyPill is false (#537/#547)', () => {
+test('systemPromptBlock adds no knowledge docs when vanilla is on (#537/#547)', () => {
   // `--vanilla` is "Disable system prompt": the docs are framework-authored context, so
   // they go with the built-in prompt. Only the user's own dirs survive it.
-  assert.equal(systemPromptBlock({ antiLazyPill: false }), '')
-  assert.equal(systemPromptBlock({ antiLazyPill: false, context: ['/work/api'] }), 'Context: /work/api')
+  assert.equal(systemPromptBlock({ vanilla: true }), '')
+  assert.equal(systemPromptBlock({ vanilla: true, context: ['/work/api'] }), 'Context: /work/api')
 })
 
-test('systemPromptBlock is the #326 prompt and the user prompt, in that order, and nothing else (#457)', () => {
-  // The bootstrap preamble was the last text here that was neither the #326 doc nor the
-  // user's own. Measured on four live runs: #326 alone already stops an empty-dir build
+test('systemPromptBlock is the built-in system prompt (#326) and the user prompt, in that order, and nothing else (#457)', () => {
+  // The bootstrap preamble was the last text here that was neither the built-in prompt doc (#326) nor the
+  // user's own. Measured on four live agents: #326 alone already stops an empty-dir build
   // for a plan, so the override earned nothing and outranked the doc.
   // The knowledge docs (#537) join the Context line, which is paths, not prompt text.
   const block = systemPromptBlock({ user: 'Ship small PRs.', context: ['/work/api'] })
@@ -205,145 +207,72 @@ test('systemPromptBlock is the #326 prompt and the user prompt, in that order, a
 
 test('systemPromptBlock ignores a whitespace-only user prompt', () => {
   assert.equal(systemPromptBlock({ user: '   ' }), [CONTEXT_BLOCK, renderSystemPrompt().system].join('\n\n'))
-  assert.equal(systemPromptBlock({ antiLazyPill: false, user: '  \n ' }), '')
+  assert.equal(systemPromptBlock({ vanilla: true, user: '  \n ' }), '')
 })
 
 test('systemPromptBlock threads tf through to the template', () => {
-  // `tf.prompt` lands in the user half, so eco is what observably reaches the system half.
-  const block = systemPromptBlock({ tf: { prompt: 'x', params: { eco: { autoResearch: true } } } })
-  assert.ok(!block.includes('### Alternatives'))
+  // `tf.prompt` lands in the user half, so the system half is the template's own content.
+  const block = systemPromptBlock({ tf: { prompt: 'a very distinctive prompt' } })
+  assert.ok(block.includes('### Alternatives'))
+  assert.ok(!block.includes('a very distinctive prompt'), 'the prompt itself stays in the user half')
 })
 
-test('every eco flag with a section still drops it (#314/#555)', () => {
-  // The regression this exists for: the mapping matches by exact heading string and
-  // dropSection() no-ops on a miss, so renaming a heading in the #326 doc silently stops a
-  // flag from trimming anything. A `!system.includes('## Large scope')` assertion cannot
-  // catch that, because it passes for free once the heading is gone. Assert the drop really
-  // shortens the prompt instead.
-  const full = renderSystemPrompt({ prompt: 'x', params: {} }).system
-  for (const flag of ['autoPlanning', 'autoResearch'] as const) {
-    const trimmed = renderSystemPrompt({ prompt: 'x', params: { eco: { [flag]: true } } }).system
-    assert.ok(trimmed.length < full.length, `eco.${flag} dropped nothing`)
-  }
-})
-
-test('eco.autoPlanning drops only the Scope section (#314)', () => {
-  const { system } = renderSystemPrompt({ prompt: 'x', params: { eco: { autoPlanning: true } } })
-  assert.ok(!system.includes('### Scope'))
-  assert.ok(!system.includes('PLAN_<SESSION_NAME>'))
-  assert.ok(!system.includes('whether the scope is small, large, or very large'))
-  // The `##` parent, the `###` sibling above it, and the section after it all survive: the
-  // drop stops at the next same-or-higher heading rather than running past it.
-  assert.ok(system.includes('## Analyze the user prompt'))
-  assert.ok(system.includes('### Ambiguous prompt'))
-  assert.ok(system.includes('whether YES/NO the prompt is ambiguous'))
-  assert.ok(system.includes('## Before starting changes'))
-  assert.ok(system.includes('### Alternatives'))
-})
-
-test('eco.autoResearch drops only the Alternatives section (#314)', () => {
-  const { system } = renderSystemPrompt({ prompt: 'x', params: { eco: { autoResearch: true } } })
-  assert.ok(!system.includes('### Alternatives'))
-  assert.ok(!system.includes('Measure "variability"'))
-  // Its `##` parent stays, and so does the section after it.
-  assert.ok(system.includes('## Before applying changes'))
-  assert.ok(system.includes('## After applying changes'))
-  assert.ok(system.includes('### Scope'))
-})
-
-test('eco.autoMaintenance drops nothing here: #326 moved the section to the on-before-mergeable prompt (#555/#556)', () => {
-  // Not a silent breakage but a deliberate no-op on *this* prompt: the maintenance text left
-  // the system prompt, so the tokens are already saved for everyone. The flag acts on the
-  // on-before-mergeable prompt instead, where the CLI skips it (#556).
-  const { system, user } = renderSystemPrompt({ prompt: 'ship it', params: { eco: { autoMaintenance: true } } })
-  assert.equal(system, renderSystemPrompt({ prompt: 'ship it', params: {} }).system)
-  assert.equal(user, 'ship it') // the user half is untouched by eco
-  assert.ok(!system.includes('${{'))
-})
-
-test('both eco drops leave the rest of the prompt standing (#314)', () => {
-  const { system } = renderSystemPrompt({
-    prompt: 'x',
-    params: { eco: { autoPlanning: true, autoResearch: true, autoMaintenance: true } },
-  })
-  for (const kept of ['## Analyze the user prompt', '### Ambiguous prompt', '### Session name', '## After applying changes']) {
-    assert.ok(system.includes(kept), `missing ${kept}`)
-  }
-  for (const gone of ['### Scope', '### Alternatives']) {
-    assert.ok(!system.includes(gone), `${gone} should be dropped`)
-  }
-})
-
-test('no eco flags renders every section, and eco never touches the template', () => {
-  const { system } = renderSystemPrompt({ prompt: 'x', params: { eco: {} } })
-  for (const section of ['## Analyze the user prompt', '### Scope', '### Alternatives', '## After applying changes']) {
-    assert.ok(system.includes(section), `missing ${section}`)
-  }
-  // The living #326 doc stays byte-identical regardless of eco.
-  assert.ok(SYSTEM_PROMPT_TEMPLATE.includes('### Scope'))
-})
-
-test('vanilla (antiLazyPill false) wins over eco: no built-in prompt at all (#314)', () => {
-  const block = systemPromptBlock({ antiLazyPill: false, tf: { prompt: 'x', params: { eco: { autoResearch: true } } } })
-  assert.equal(block, '')
-})
-
-test('composeRunSystem is exactly the #326 block + both emit protocols, and nothing else (#547)', () => {
-  // The one assembly path both runFramework and runPrompt go through. Exact equality is
+test('composeAgentSystem is exactly the built-in prompt block (#326) + both emit protocols, and nothing else (#547)', () => {
+  // The one assembly path a build and a verbatim prompt both go through. Exact equality is
   // the point: no persona, skill, or memory framing may ever be appended again. The #537
-  // knowledge docs are in front of that, on the #439 context line: paths, not prompt text.
-  const system = composeRunSystem()
+  // knowledge docs are in front of that, on the context (#439) line: paths, not prompt text.
+  const system = composeAgentSystem()
   assert.equal(system, [CONTEXT_BLOCK, renderSystemPrompt().system, AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n'))
 })
 
-test('composeRunSystem appends nothing after the protocols, whatever the options (#547)', () => {
-  // Every supported option feeds the #326 block; none of them can add a trailing section.
-  const system = composeRunSystem({
+test('composeAgentSystem appends nothing after the protocols, whatever the options (#547)', () => {
+  // Every supported option feeds the built-in prompt block (#326); none of them can add a trailing section.
+  const system = composeAgentSystem({
     user: 'Ship small PRs.',
     context: ['/work/api'],
-    tf: { prompt: 'build a todo app', params: { autopilot: true } },
+    tf: { prompt: 'build a todo app' },
   })
   const block = systemPromptBlock({
     user: 'Ship small PRs.',
     context: ['/work/api'],
-    tf: { prompt: 'build a todo app', params: { autopilot: true } },
+    tf: { prompt: 'build a todo app' },
   })
   assert.equal(system, [block, AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n'))
   assert.ok(system.endsWith(SIGNAL_PROTOCOL), 'the signal protocol is the last thing in the channel')
 })
 
-test('composeRunSystem says nothing about a browser unless the run has one (#824)', () => {
+test('composeAgentSystem says nothing about a browser unless the run has one (#824)', () => {
   // The default: no browser wired, so no claim of one. An agent told it has tools it does not
   // have is worse than one that reaches for WebFetch.
-  assert.ok(!composeRunSystem().includes(BROWSER_PROTOCOL))
+  assert.ok(!composeAgentSystem().includes(BROWSER_PROTOCOL))
 })
 
-test('composeRunSystem tells the agent it has a browser when the run does (#824)', () => {
+test('composeAgentSystem tells the agent it has a browser when the run does (#824)', () => {
   // Without this the chrome-devtools tools are wired but never mentioned, so the agent uses
-  // WebFetch and the browser (and its preview) sits on about:blank for the whole run.
-  const system = composeRunSystem({ browser: true })
+  // WebFetch and the browser (and its preview) sits on about:blank for the whole agent.
+  const system = composeAgentSystem({ browser: true })
   assert.ok(system.includes(BROWSER_PROTOCOL))
   assert.ok(system.endsWith(SIGNAL_PROTOCOL), 'the signal protocol is still last (#547)')
 })
 
 test('the browser section survives --vanilla but not transparent (#824)', () => {
-  // It describes what the run can do, like the emit protocols, so dropping the built-in prompt
+  // It describes what the agent can do, like the emit protocols, so dropping the built-in prompt
   // keeps it. Transparent means an empty channel, so nothing at all.
-  assert.ok(composeRunSystem({ antiLazyPill: false, browser: true }).includes(BROWSER_PROTOCOL))
-  assert.equal(composeRunSystem({ transparent: true, browser: true }), '')
+  assert.ok(composeAgentSystem({ vanilla: true, browser: true }).includes(BROWSER_PROTOCOL))
+  assert.equal(composeAgentSystem({ transparent: true, browser: true }), '')
 })
 
-test('composeRunSystem stays quiet about hands-off unless the run is one (#1234)', () => {
-  // A local run's gates work; telling it they do not would auto-answer questions a human is
+test('composeAgentSystem stays quiet about hands-off unless the run is one (#1234)', () => {
+  // A local agent's gates work; telling it they do not would auto-answer questions a human is
   // sitting right there to take.
-  assert.ok(!composeRunSystem().includes(HANDS_OFF_PROTOCOL))
+  assert.ok(!composeAgentSystem().includes(HANDS_OFF_PROTOCOL))
 })
 
-test('composeRunSystem declares the await gates unavailable on a hands-off run (#1234)', () => {
+test('composeAgentSystem declares the await gates unavailable on a hands-off run (#1234)', () => {
   // A cloud session that obeys "ambiguous prompt: showChoices + AWAIT" parks forever on a
   // question nobody attached can answer, and the session is spent for nothing. The block rides
   // right after the await protocol it amends, and the signal protocol stays last (#547).
-  const system = composeRunSystem({ handsOff: true })
+  const system = composeAgentSystem({ handsOff: true })
   assert.ok(system.includes(HANDS_OFF_PROTOCOL))
   assert.ok(system.indexOf(HANDS_OFF_PROTOCOL) > system.indexOf(AWAIT_PROTOCOL))
   assert.ok(system.endsWith(SIGNAL_PROTOCOL), 'the signal protocol is still last (#547)')
@@ -352,24 +281,24 @@ test('composeRunSystem declares the await gates unavailable on a hands-off run (
 test('the hands-off block survives --vanilla but not transparent (#1234)', () => {
   // Availability is a property of the session, not of the built-in prompt: --vanilla still
   // teaches the gates, so it still has to say they cannot be answered here.
-  assert.ok(composeRunSystem({ antiLazyPill: false, handsOff: true }).includes(HANDS_OFF_PROTOCOL))
-  assert.equal(composeRunSystem({ transparent: true, handsOff: true }), '')
+  assert.ok(composeAgentSystem({ vanilla: true, handsOff: true }).includes(HANDS_OFF_PROTOCOL))
+  assert.equal(composeAgentSystem({ transparent: true, handsOff: true }), '')
 })
 
-test('composeRunSystem keeps the emit protocols even with the built-in prompt off (#500/#501)', () => {
+test('composeAgentSystem keeps the emit protocols even with the built-in prompt off (#500/#501)', () => {
   // The drift that #500 fixed, now pinned at the single assembly point: --vanilla drops the
   // #326 block, but the agent still gets the AWAIT + SIGNAL emit contract.
-  const system = composeRunSystem({ antiLazyPill: false })
+  const system = composeAgentSystem({ vanilla: true })
   assert.ok(!system.includes('# System prompt'), 'built-in #326 prompt is off')
   assert.equal(system, [AWAIT_PROTOCOL, SIGNAL_PROTOCOL].join('\n\n'))
 })
 
-test('composeRunSystem is empty under transparent mode — no prompt, no emit protocols (#625)', () => {
+test('composeAgentSystem is empty under transparent mode — no prompt, no emit protocols (#625)', () => {
   // Transparent (#625) is stronger than --vanilla: the whole system channel is dropped, protocols
   // included, so the agent runs as raw `claude -p`. It overrides every other option.
-  assert.equal(composeRunSystem({ transparent: true }), '')
+  assert.equal(composeAgentSystem({ transparent: true }), '')
   assert.equal(
-    composeRunSystem({ transparent: true, antiLazyPill: true, user: 'ignored', context: ['/work/api'] }),
+    composeAgentSystem({ transparent: true, vanilla: false, user: 'ignored', context: ['/work/api'] }),
     '',
   )
 })

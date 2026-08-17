@@ -96,7 +96,7 @@ async function pushLockCommit(git: GitRunner, cwd: string): Promise<boolean> {
  *
  * A batch whose commit failed is rolled back (the written files removed) and resolves `[]`:
  * uncommitted locks in the user's checkout would be noise git blames on nobody. A batch whose
- * *push* failed is kept and resolved as locked — the commit still guards every run forked from
+ * *push* failed is kept and resolved as locked — the commit still guards every agent forked from
  * this checkout, which is the common case, and the sweep should not stand a healthy local
  * fan-out down over a network blip. The push is what closes the cross-machine window (#1320), so
  * its failure is logged rather than swallowed.

@@ -63,7 +63,7 @@ interface Call {
 
 interface FakeOptions {
   /** Statuses the run reports on successive polls. Default: completed straight away. */
-  runs?: { status: string; conclusion?: string }[]
+  agents?: { status: string; conclusion?: string }[]
   execution?: string
   meta?: string
   /** Files the contents API serves, by path. */
@@ -73,7 +73,7 @@ interface FakeOptions {
 /** A GitHub REST double that records every call. */
 function fakeGitHub(opts: FakeOptions = {}): { fetch: FetchLike; calls: Call[] } {
   const calls: Call[] = []
-  const runs = opts.runs ?? [{ status: 'completed', conclusion: 'success' }]
+  const agents = opts.agents ?? [{ status: 'completed', conclusion: 'success' }]
   let poll = 0
 
   const json = (body: unknown): Response => ({ ok: true, status: 200, statusText: 'OK', json: async () => body }) as unknown as Response
@@ -85,7 +85,7 @@ function fakeGitHub(opts: FakeOptions = {}): { fetch: FetchLike; calls: Call[] }
     if (url.includes('/dispatches')) return { ok: true, status: 204, statusText: 'No Content' } as unknown as Response
 
     if (url.includes('/actions/runs?')) {
-      const state = runs[Math.min(poll++, runs.length - 1)]!
+      const state = agents[Math.min(poll++, agents.length - 1)]!
       // The run we are looking for is the one the *latest* dispatch created, not the first:
       // a second turn polls for its own correlation id, never the previous turn's.
       const correlation = calls.filter(c => c.url.includes('/dispatches')).at(-1)?.body as { inputs?: { correlation_id?: string } } | undefined
@@ -137,7 +137,7 @@ function makeDriver(opts: FakeOptions = {}): { driver: ActionsDriver; calls: Cal
 }
 
 test('ActionsDriver dispatches, polls, and returns the run transcript as a turn (#610)', async () => {
-  const { driver, calls } = makeDriver({ runs: [{ status: 'queued' }, { status: 'in_progress' }, { status: 'completed', conclusion: 'success' }] })
+  const { driver, calls } = makeDriver({ agents: [{ status: 'queued' }, { status: 'in_progress' }, { status: 'completed', conclusion: 'success' }] })
   const session = await driver.start({ cwd: '/ws' })
   const turn = await session.prompt('add a --verbose flag')
 
@@ -226,14 +226,14 @@ test('ActionsDriver refuses a model id that could break out of the runner shell 
 })
 
 test('ActionsDriver fails the turn when the run does, naming the run (#610)', async () => {
-  const { driver } = makeDriver({ runs: [{ status: 'completed', conclusion: 'failure' }] })
+  const { driver } = makeDriver({ agents: [{ status: 'completed', conclusion: 'failure' }] })
   const session = await driver.start({ cwd: '/ws' })
   // A red run must not pass as a result, and the URL is the only way to see why it went red.
   await assert.rejects(() => session.prompt('go'), /concluded "failure".*runs\/77/s)
 })
 
 test('ActionsDriver gives up rather than polling a run forever (#610)', async () => {
-  const { fetch } = fakeGitHub({ runs: [{ status: 'in_progress' }] })
+  const { fetch } = fakeGitHub({ agents: [{ status: 'in_progress' }] })
   let clock = 0
   const driver = new ActionsDriver({ owner: 'o', repo: 'r', token: 't', fetch, pollIntervalMs: 1000, timeoutMs: 5000, now: () => clock, sleep: async ms => void (clock += ms) })
   const session = await driver.start({ cwd: '/ws' })

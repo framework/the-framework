@@ -4,10 +4,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { contentTypeFor } from './content-type.js'
 import { requestPathname } from '../request-path.js'
 
-// Serve the prerendered dashboard bundle (#405). The new dashboard is a Vike `ssr:false`
-// SPA prerendered to a static `index.html` + `assets/**`, so the daemon serves it as
+// Serve the built dashboard bundle (#405). The dashboard is a plain Vite SPA — one static
+// `index.html` plus `assets/**` — so the daemon serves it as
 // plain files with an SPA fallback (any non-asset path yields `index.html`, which boots
-// the client router) — no Vike runtime in the daemon. Assets are copied into the
+// the client router). Assets are copied into the
 // framework package at build time (see scripts/bundle-dashboard.mjs).
 
 /** Whether a real, readable file exists at `path`. */

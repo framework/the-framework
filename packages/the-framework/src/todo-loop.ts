@@ -1,5 +1,5 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { DriverSession } from './driver/index.js'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
 import { requestChoices, runAwaitRounds } from './await-gate.js'
@@ -57,9 +57,9 @@ export function parseTodoEntries(md: string): string[] {
  * when the workspace has none. Resolves with the file written, or `undefined` if
  * it couldn't be written.
  *
- * This is how a paused run leaves word to pick itself up again (#529): the
- * backlog is already the thing a later run drains, so a resume note needs no
- * machinery of its own. Never throws — it is called while a run is already
+ * This is how a paused agent leaves word to pick itself up again (#529): the
+ * backlog is already the thing a later agent drains, so a resume note needs no
+ * machinery of its own. Never throws — it is called while an agent is already
  * unwinding, and must not mask the reason it stopped.
  */
 export async function appendTodoEntry(cwd: string, entry: string): Promise<string | undefined> {
@@ -164,7 +164,6 @@ async function writeTodoEntry(
   const path = join(cwd, name)
   try {
     const existing = await readFile(path, 'utf8').catch(() => '')
-    await mkdir(dirname(path), { recursive: true }) // a legacy tickets/TODO.md still needs its dir
     if (priority !== undefined) {
       await writeFile(path, insertTodoEntry(existing, entry, priority), 'utf8')
       return name
@@ -179,7 +178,7 @@ async function writeTodoEntry(
 
 /**
  * Locate the workspace's backlog and its open entries: the flat file via `findFlatTodo`
- * (`TODO_AGENTS.md`, or a legacy `tickets/TODO.md` / root `TODO.md`). Returns `undefined`
+ * (the root `TODO_AGENTS.md`, the one location it reads). Returns `undefined`
  * when no backlog exists or it has no open entry. Session-scoped `TODO_<slug>.agent.md`
  * files are retired (#1369) — a leftover one in the checkout is ignored.
  */
@@ -206,7 +205,7 @@ export async function findTodoBacklog(cwd: string): Promise<TodoBacklog | undefi
  * otherwise. When the agent's word is deemed enough, delete this function and its single call
  * site in `maybeAutoHandoff`.
  */
-export async function sessionTodoPending(cwd: string, sessionName: string | undefined): Promise<boolean> {
+export async function agentTodoPending(cwd: string, sessionName: string | undefined): Promise<boolean> {
   // The prompt asks for [a-z0-9-]+; anything wider (a path separator above all) names no file.
   if (!sessionName || !/^[A-Za-z0-9._-]+$/.test(sessionName)) return false
   const md = await readFile(join(cwd, `TODO_${sessionName}.agent.md`), 'utf8').catch(() => undefined)
@@ -214,7 +213,7 @@ export async function sessionTodoPending(cwd: string, sessionName: string | unde
 }
 
 /**
- * The ticket the next drain run will pick up, or `undefined` when there is none (#1117).
+ * The ticket the next drain agent will pick up, or `undefined` when there is none (#1117).
  *
  * "Next" is the first open entry of the flat backlog, because that is what the [Drain queue]
  * preset says to work ("the FIRST open entry only") and {@link parseTodoEntries} returns entries
@@ -222,7 +221,7 @@ export async function sessionTodoPending(cwd: string, sessionName: string | unde
  * decides whether there is anything to drain, so the entry this names is the entry that decision
  * was made on.
  *
- * A best guess by construction: the run reads its own worktree a moment later, and an entry
+ * A best guess by construction: the agent reads its own worktree a moment later, and an entry
  * checked off in between would move it on. Being wrong here costs a mislabelled lane on the
  * Overview and nothing else — no run is started or steered by this.
  */
@@ -236,11 +235,11 @@ export async function nextQueuedTicket(cwd: string): Promise<string | undefined>
 }
 
 /**
- * The ticket a run started by hand is about to implement, when that run is a drain (#1117).
+ * The ticket an agent started by hand is about to implement, when that agent is a drain (#1117).
  *
- * The daemon already does this for the sweep's own drain, off the `drains` flag on the job. A run
+ * The daemon already does this for the sweep's own drain, off the `drains` flag on the job. An agent
  * fired from the dashboard reaches the same start with none of that context, so a hand-fired drain
- * showed up working on nothing: the run implemented the ticket, and the lane it belonged in stayed
+ * showed up working on nothing: the agent implemented the ticket, and the lane it belonged in stayed
  * empty. Same read as the sweep's, so both agree on which entry is next.
  *
  * Undefined for anything that is not a drain, and for a drain over an empty queue. The `read` seam
@@ -253,28 +252,6 @@ export async function ticketForPrompt(
 ): Promise<string | undefined> {
   if (!drainsQueue(prompt)) return undefined
   return read(cwd).catch(() => undefined)
-}
-
-/**
- * Leave a "resume me" entry on the workspace's backlog, so a later run picks the
- * paused work back up (Rom's call on #519). The backlog is already what a run
- * drains, so this needs no machinery of its own.
- *
- * Named after the session when the agent gave itself one, since that is what the
- * user recognizes; an unnamed run says so plainly rather than inventing an id.
- */
-export async function leaveResumeNote(
-  cwd: string,
-  events: readonly FrameworkEvent[],
-  emit: (event: FrameworkEvent) => void,
-): Promise<string | undefined> {
-  const named = [...events]
-    .reverse()
-    .find((e): e is Extract<FrameworkEvent, { kind: 'session-name' }> => e.kind === 'session-name')
-  const entry = `Resume ${named?.name ?? 'the paused session'}`
-  const file = await appendTodoEntry(cwd, entry)
-  if (file) emit({ kind: 'log', message: `Left "${entry}" on ${file} to pick up when the limit resets.` })
-  return file
 }
 
 /** Why the loop ended. */
@@ -296,15 +273,21 @@ export interface TodoLoopResult {
   reason: TodoLoopReason
   /** The backlog filename, when one was found. */
   file?: string
+  /**
+   * An answer marked `stop` (#358) inside an item's turn — a plan the user declined — ends the
+   * whole session, not just the loop. Distinct from the benign `reason: 'stopped'` per-item gate,
+   * which only stops draining the backlog. The caller aborts the session on this.
+   */
+  sessionStopped?: boolean
 }
 
 /** Options for {@link runTodoLoop}. */
 export interface TodoLoopOptions {
-  /** The live driver session the run already owns. */
+  /** The live driver session the agent already owns. */
   session: DriverSession
   /** The workspace the backlog lives in. */
   cwd: string
-  /** Emit the loop's events onto the run stream. */
+  /** Emit the loop's events onto the agent stream. */
   emit: (event: FrameworkEvent) => void
   /**
    * The interactive gate handler (#304). When wired, the loop pauses before each
@@ -312,13 +295,13 @@ export interface TodoLoopOptions {
    * autopilot off means a human gate per item (#323). Headless runs don't pause.
    */
   requestChoice?: ((req: ChoiceRequest) => Promise<ChoicePick>) | undefined
-  /** The run signal; aborting (Stop button / budget cap #322) ends the loop. */
+  /** The agent signal; aborting (Stop button / budget cap #322) ends the loop. */
   signal?: AbortSignal | undefined
-  /** Hard cap on entries worked in one run. Default {@link DEFAULT_MAX_TODO_ITEMS}. */
+  /** Hard cap on entries worked in one agent. Default {@link DEFAULT_MAX_TODO_ITEMS}. */
   maxItems?: number | undefined
 }
 
-/** The default per-run cap on backlog entries — a backstop beside the budget cap (#322). */
+/** The default per-agent cap on backlog entries — a backstop beside the budget cap (#322). */
 export const DEFAULT_MAX_TODO_ITEMS = 25
 
 /** How many consecutive no-progress items before the loop stops rather than spins. */
@@ -327,8 +310,8 @@ const MAX_STALLS = 2
 /**
  * Drive the backlog to empty: read the next open entry, gate, prompt the agent
  * to complete exactly that entry and check it off, and repeat. Caps make it safe
- * to leave unattended (#322's concern): the run's budget/abort signal ends any
- * turn, a hard item cap bounds the run, and two consecutive items that leave the
+ * to leave unattended (#322's concern): the agent's budget/abort signal ends any
+ * turn, a hard item cap bounds the agent, and two consecutive items that leave the
  * next entry untouched stop the loop instead of spinning. A backlog turn is a turn
  * like any other: await gates (`showChoices()` / `showMultiSelect()`) and the signals
  * (`showMarkdown()`, `setSessionName()`, `setReadyForMerge()`) are honored here too.
@@ -367,7 +350,7 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
     if (item === 0) emit({ kind: 'log', message: `Backlog: ${backlog.name} has ${backlog.entries.length} open item(s).` })
 
     // The per-item gate (#323): pause before starting a new entry when someone
-    // can answer. Interactive-only, like the plan-approval gate — a headless run
+    // can answer. Interactive-only, like the plan-approval gate — a headless agent
     // emits no gate and just proceeds (autopilot semantics, budget-capped).
     if (opts.requestChoice) {
       const picked = await requestChoices({
@@ -390,10 +373,16 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
 
     emit({ kind: 'log', message: `Backlog item ${completed + 1}: ${preview}` })
     // Complete exactly the first open entry and check it off, honoring await gates.
-    // A declined plan (#358) ends the item turn; the loop's stall check takes it from there.
     const prompt = `Open \`${backlog.name}\` in the workspace and work on the FIRST open entry only. Complete it fully and verify your work. Then update \`${backlog.name}\`: check the entry off (or remove it). Do not start any other entry.`
-    await runAwaitRounds({ session, prompt, ...gateDeps })
+    const rounds = await runAwaitRounds({ session, prompt, ...gateDeps })
     completed++
+    // A plan the user declined with a stop-marked answer (#358) ends the whole session, not just
+    // this loop — so the session does not go on to publish work that was just rejected. The caller
+    // aborts on `sessionStopped`; `reason` stays descriptive of the loop itself.
+    if (rounds.stopped) {
+      emit({ kind: 'log', message: `Session stopped by your answer (${backlog.entries.length} item(s) left in ${backlog.name}).` })
+      return { completed, reason: 'stopped', file, sessionStopped: true }
+    }
 
     // Progress check: the item turn must have retired the entry it was given
     // (checked off, removed, or reworded). New entries appended by the work
@@ -411,7 +400,7 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
     }
   }
 
-  // Aborted mid-loop (Stop button / budget cap #322): the run is ending anyway,
+  // Aborted mid-loop (Stop button / budget cap #322): the agent is ending anyway,
   // so report a clean stop without extra narration.
   if (opts.signal?.aborted) return { completed, reason: 'stopped', ...(file ? { file } : {}) }
 

@@ -1,0 +1,79 @@
+import { strict as assert } from 'node:assert'
+import { test } from 'node:test'
+import { provideTestContext } from './test-context.js'
+import { sendAutoPmSweep } from './quota.js'
+import type { AutoPmOutcome } from '../auto-pm.js'
+
+// #1433: "Trigger routine now" was fire-and-forget — the RPC returned before the sweep ran, so
+// the button flashed and the card showed nothing, with the stand-down reason recoverable only
+// from the source. The RPC now awaits the tick and hands back the report's outcome lines.
+
+const OUTCOME: AutoPmOutcome = {
+  projectId: 'p1',
+  path: '/repo',
+  started: false,
+  message: 'the queue has work waiting and its routine is switched off',
+}
+
+test('sendAutoPmSweep awaits the sweep, then answers with the outcomes it decided (#1433)', async () => {
+  let resolved = false
+  provideTestContext({
+    autoPmSweep: async () => {
+      // Awaitable on purpose: the outcomes are only true once the tick has run.
+      await Promise.resolve()
+      resolved = true
+    },
+    autoPm: () => ({ nextSweepAt: 0, outcomes: [OUTCOME] }),
+  })
+  const result = await sendAutoPmSweep()
+  assert.equal(resolved, true, 'the RPC must wait for the tick, not fire and forget')
+  assert.deepEqual(result, { ok: true, outcomes: [OUTCOME] })
+})
+
+test('the outcomes survive the await — the request context does not, so the reporter is captured first (#1433)', async () => {
+  // The context used to be request-scoped and gone after the first await, so a post-await
+  // `contextAutoPm()` read found nothing and every real click fell back to a bare `{ok:true}` —
+  // while this suite's provided context happily outlived the await and hid it. It is wired once at
+  // start-up now (F3) and no longer evaporates, but capturing the reporter first is still what the
+  // RPC promises, so the loss stays modelled: the fake sweep yanks the context mid-flight.
+  provideTestContext({
+    autoPmSweep: async () => {
+      await Promise.resolve()
+      provideTestContext({ autoPm: () => undefined })
+    },
+    autoPm: () => ({ nextSweepAt: 0, outcomes: [OUTCOME] }),
+  })
+  assert.deepEqual(await sendAutoPmSweep(), { ok: true, outcomes: [OUTCOME] })
+})
+
+test('a sweep that throws is a failure; an unreadable report is not (#1433)', async () => {
+  provideTestContext({
+    autoPmSweep: async () => {
+      throw new Error('boom')
+    },
+  })
+  assert.deepEqual(await sendAutoPmSweep(), { ok: false })
+
+  // The sweep itself ran; only the outcome lines are missing. Said as ok without outcomes, so
+  // the card can say "the sweep ran" rather than pretending nothing happened.
+  provideTestContext({
+    autoPmSweep: () => {},
+    autoPm: () => {
+      throw new Error('no report')
+    },
+  })
+  assert.deepEqual(await sendAutoPmSweep(), { ok: true })
+})
+
+test('drainOnly travels to the loop untouched (#1204)', async () => {
+  const seen: unknown[] = []
+  provideTestContext({
+    autoPmSweep: (opts?: { drainOnly?: boolean }) => {
+      seen.push(opts)
+    },
+    autoPm: () => ({ nextSweepAt: 0, outcomes: [] }),
+  })
+  await sendAutoPmSweep({ drainOnly: true })
+  await sendAutoPmSweep()
+  assert.deepEqual(seen, [{ drainOnly: true }, undefined])
+})

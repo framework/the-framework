@@ -18,10 +18,8 @@ import type { RegistrySecrets } from './registry.js'
  * since #948, kept on purpose — a stored credential is not a credential you can read back.
  */
 
-/** The resolved credentials a daemon runs with. Absent means that half of Discord is off. */
+/** The resolved credentials a daemon runs with. Absent means Discord notifications are off. */
 export interface DiscordCredentials {
-  /** The chatbot's token (#680): a bot can read replies, which the webhook cannot. */
-  botToken?: string
   /** Where notifications are posted (#627). */
   webhook?: string
 }
@@ -36,13 +34,11 @@ export type CredentialSource = 'env' | 'stored'
 
 /** Which credentials the daemon holds and where each came from. Presence, never values. */
 export interface DiscordCredentialStatus {
-  botToken?: CredentialSource
   webhook?: CredentialSource
 }
 
 /** An edit to the stored credentials: a string sets, `null` clears, absent leaves alone. */
 export interface DiscordCredentialsPatch {
-  botToken?: string | null
   webhook?: string | null
 }
 
@@ -50,10 +46,10 @@ export interface DiscordCredentialsPatch {
 export type SaveCredentialsResult = { ok: true } | { ok: false; error: string }
 
 /** The env var behind each credential, so the two tables below cannot drift apart. */
-export const ENV_KEYS = { botToken: 'DISCORD_BOT_TOKEN', webhook: 'DISCORD_WEBHOOK' } as const
+export const ENV_KEYS = { webhook: 'DISCORD_WEBHOOK' } as const
 
 /** The registry key behind each credential. */
-export const SECRET_KEYS = { botToken: 'discordBotToken', webhook: 'discordWebhook' } as const satisfies Record<
+export const SECRET_KEYS = { webhook: 'discordWebhook' } as const satisfies Record<
   keyof DiscordCredentials,
   keyof RegistrySecrets
 >
@@ -97,14 +93,6 @@ export function discordCredentialStatus(env: NodeJS.ProcessEnv, secrets: Registr
 export function validateCredential(credential: keyof DiscordCredentials, value: string): string | undefined {
   const trimmed = value.trim()
   if (!trimmed) return undefined // clearing is always legal
-  if (credential === 'botToken') {
-    // Before the whitespace rule below, which would otherwise swallow this with a vaguer message:
-    // "Bot <token>" is what Discord's own Authorization header looks like, so it is a common paste.
-    if (trimmed.toLowerCase().startsWith('bot ')) return 'Paste the token itself, without the "Bot " prefix.'
-    if (/\s/.test(trimmed)) return 'A bot token is a single word with no spaces.'
-    if (trimmed.length < 20) return 'That is too short to be a bot token.'
-    return undefined
-  }
   let url: URL
   try {
     url = new URL(trimmed)
@@ -116,7 +104,7 @@ export function validateCredential(credential: keyof DiscordCredentials, value: 
 }
 
 /**
- * The store the dashboard's Telefunc context carries (#1095): status out, edits in. The daemon
+ * The store the dashboard's context carries (#1095): status out, edits in. The daemon
  * wires one; a public host (the relay) leaves it unset, so the RPCs report nothing configured and
  * refuse the write, the same way the preferences store degrades.
  */

@@ -102,7 +102,7 @@ export class QuotaPoller {
 
   /**
    * Begin polling, starting with a read right now rather than one interval from
-   * now: a poller whose first reading lands five minutes in is no use to a run
+   * now: a poller whose first reading lands five minutes in is no use to an agent
    * that just started, and the session's own measurement needs a baseline. Not
    * awaited — the read takes ~5s and nothing should wait on it. Idempotent.
    */

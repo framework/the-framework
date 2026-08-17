@@ -8,18 +8,19 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { provideTelefuncContext } from 'telefunc'
+import { setDashboardContext } from '../dashboard-rpc/context.js'
 import { createProjectRuntime, type ProjectRuntime } from '../daemon-runtime.js'
 import { registryPreferencesStore, projectId } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
-import { resolveRunEventsPath, type RunMeta, type RunStatus } from '../store/index.js'
-import { withRunLock } from '../run-locks.js'
-import { tailRunEvents } from '../dashboard-rpc/events-tail.js'
-import { sendAddProject } from '../dashboard-rpc/projects.telefunc.js'
-import { sendStart } from '../dashboard-rpc/control.telefunc.js'
-import { onRuns } from '../dashboard-rpc/reads.telefunc.js'
+import { resolveAgentEventsPath, type AgentMeta, type AgentStatus } from '../store/index.js'
+import { withAgentLock } from '../agent-locks.js'
+import { tailAgentEvents } from '../dashboard-rpc/events-tail.js'
+import { sendAddProject } from '../dashboard-rpc/projects.js'
+import { sendStart } from '../dashboard-rpc/control.js'
+import { onAgents } from '../dashboard-rpc/reads.js'
 import type { FrameworkEvent } from '../events.js'
-import type { StartRunKind, StartRunOptions } from '../dashboard/types.js'
+import type { StartAgentKind, StartAgentOptions } from '../dashboard/types.js'
+import type { AgentSpec } from '../agent-spec.js'
 import type { QuotaView } from '../dashboard/quota.js'
 import type { AutoPmReport } from '../auto-pm.js'
 
@@ -45,17 +46,17 @@ export interface StoryProject {
   cwd: string
 }
 
-/** A live tail of one run's event log — the same source `onEvents` streams to the browser. */
-export interface RunTail {
+/** A live tail of one agent's event log — the same source `onEvents` streams to the browser. */
+export interface AgentTail {
   /** Every event seen so far, in arrival order. Poll with {@link waitFor}. */
   events: FrameworkEvent[]
   stop(): void
 }
 
 /**
- * Everything one story test stands up: the daemon runtime on a temp home, the Telefunc request
- * context the daemon would provide, and factories for registered projects. `close()` is the
- * whole teardown — it stops spawned runs the way daemon shutdown does, then removes the state.
+ * Everything one story test stands up: the daemon runtime on a temp home, the dashboard context
+ * the daemon would wire, and factories for registered projects. `close()` is the
+ * whole teardown — it stops spawned agents the way daemon shutdown does, then removes the state.
  */
 export interface StoryWorld {
   /** The daemon's home workspace (a plain temp dir, not a registered project). */
@@ -66,33 +67,32 @@ export interface StoryWorld {
   /** The auto-PM panel's stubs (mutable): what `onAutoPm` reports and what a sweep records. */
   autoPm: { report?: AutoPmReport; sweeps: Array<{ drainOnly?: boolean }> }
   /**
-   * Bind one dashboard RPC to this world's request context. The real mount provides the context
-   * per request; sync-mode telefunc drops a provided context at the next macrotask, so a story
-   * spanning real IO must re-provide it before every call — which is exactly what this does.
-   * Every telefunction reads its context synchronously at its top, so provide-then-call holds.
+   * Bind one dashboard RPC to this world's context. The real mount wires the context once, at
+   * start-up; a story stands several worlds up in one process, so re-providing before every call
+   * is what keeps each story's calls addressing its own world rather than the last one's.
    */
   rpc<A extends unknown[], R>(fn: (...args: A) => R): (...args: A) => R
-  /** Argv of every run child this world spawned, one entry per spawn, oldest first. */
-  spawnedArgv(): Promise<string[][]>
+  /** The session spec of every child this world spawned, one entry per spawn, oldest first. */
+  spawnedSpecs(): Promise<AgentSpec[]>
   /**
    * Create a real git repo (initial commit included) and register it through the same
    * `sendAddProject` RPC the dashboard's Add-project dialog calls.
    */
   addProject(files?: Record<string, string>): Promise<StoryProject>
-  /** Start a run through the same `sendStart` RPC the launcher calls; returns the run id. */
-  startRun(project: StoryProject, prompt: string, options?: StartRunOptions, kind?: StartRunKind): Promise<string>
-  /** Poll `onRuns` until the run reports one of `until`, failing after `timeoutMs`. */
-  waitRun(project: StoryProject, runId: string, until: RunStatus | RunStatus[], timeoutMs?: number): Promise<RunMeta>
+  /** Start an agent through the same `sendStart` RPC the launcher calls; returns the agent id. */
+  startAgent(project: StoryProject, prompt: string, options?: StartAgentOptions, kind?: StartAgentKind): Promise<string>
+  /** Poll `onAgents` until the agent reports one of `until`, failing after `timeoutMs`. */
+  waitAgent(project: StoryProject, agentId: string, until: AgentStatus | AgentStatus[], timeoutMs?: number): Promise<AgentMeta>
   /**
-   * Wait until the daemon's teardown has retired the run's worktree. A run's meta flips to
+   * Wait until the daemon's teardown has retired the agent's worktree. An agent's meta flips to
    * `done` before teardown archives the checkout, and acting on the session in that window
    * (push, resume) races teardown's own git commits — the same window a user hits by clicking
    * Push the instant a session finishes. The stories that act on a finished session wait here
    * first, which is also the honest reading of "finished".
    */
-  waitRetired(project: StoryProject, runId: string, timeoutMs?: number): Promise<void>
-  /** Follow a run's event log live (replays what is already on disk first). */
-  tailRun(project: StoryProject, runId: string): Promise<RunTail>
+  waitRetired(project: StoryProject, agentId: string, timeoutMs?: number): Promise<void>
+  /** Follow an agent's event log live (replays what is already on disk first). */
+  tailAgent(project: StoryProject, agentId: string): Promise<AgentTail>
   close(): Promise<void>
 }
 
@@ -129,7 +129,7 @@ export async function withFakeAwait<T>(mode: 'choices' | 'multiselect' | 'confir
 const agentReady = async () => ({ ok: true, checks: [] })
 
 /**
- * Stand up one story world. The Telefunc context mirrors `runDaemon`'s `startDashboard` wiring
+ * Stand up one story world. The dashboard context mirrors `runDaemon`'s `startDashboard` wiring
  * piece for piece — same closures, same registry-backed stores — except where the daemon holds a
  * live poller/loop (quota, auto PM), which a story controls through mutable stubs instead.
  */
@@ -142,17 +142,16 @@ export async function makeWorld(): Promise<StoryWorld> {
     cwd: home,
     env: process.env,
     binPath: fileURLToPath(new URL('./fake-agent-bin.js', import.meta.url)),
-    agentPreflight: agentReady,
+    driverPreflight: agentReady,
   })
 
   const quota = { view: { windows: [] } as QuotaView }
   const autoPm: StoryWorld['autoPm'] = { sweeps: [] }
   const context = {
-    startRun: runtime.onStart,
+    startAgent: runtime.onStart,
     addProject: runtime.onAddProject,
-    preview: runtime.preview,
     eventsSource: runtime.remoteEventsSource,
-    remote: runtime.remoteRuns,
+    remote: runtime.remoteAgents,
     preferences: registryPreferencesStore(),
     discord: registryDiscordCredentialsStore(),
     quota: { read: async () => quota.view, stop: () => {} },
@@ -163,12 +162,13 @@ export async function makeWorld(): Promise<StoryWorld> {
   }
 
   const repos: string[] = []
-  const tails: RunTail[] = []
-  const started: Array<{ cwd: string; runId: string }> = []
+  const tails: AgentTail[] = []
+  const started: Array<{ cwd: string; agentId: string }> = []
 
   const rpc: StoryWorld['rpc'] = fn => {
     return (...args) => {
-      provideTelefuncContext(context as never)
+      // Re-wired per call so a story's own overrides win over whatever ran before it.
+      setDashboardContext(context)
       return fn(...args)
     }
   }
@@ -180,12 +180,12 @@ export async function makeWorld(): Promise<StoryWorld> {
     autoPm,
     rpc,
 
-    async spawnedArgv() {
+    async spawnedSpecs() {
       const raw = await readFile(argvFile, 'utf8').catch(() => '')
       return raw
         .split('\n')
         .filter(line => line.trim())
-        .map(line => JSON.parse(line) as string[])
+        .map(line => JSON.parse(line) as AgentSpec)
     },
 
     async addProject(files = {}) {
@@ -201,49 +201,55 @@ export async function makeWorld(): Promise<StoryWorld> {
       }
       await git(cwd, 'add', '-A')
       await git(cwd, 'commit', '-q', '-m', 'seed')
+      // A bare repo standing in for `origin`, because a real project has one and the retention
+      // rule is about it (E5): a session's checkout is reclaimed once its work reaches the remote,
+      // so a fixture with nowhere to push would keep every checkout forever.
+      const origin = join(cwd, 'origin.git')
+      await git(cwd, 'init', '-q', '--bare', origin)
+      await git(cwd, 'remote', 'add', 'origin', origin)
       const added = await rpc(sendAddProject)(cwd, false)
       if (!added.ok) throw new Error(`could not register the fixture repo: ${added.error}`)
       return { id: projectId(resolve(cwd)), cwd }
     },
 
-    async startRun(project, prompt, options = {}, kind: StartRunKind = 'prompt') {
+    async startAgent(project, prompt, options = {}, kind: StartAgentKind = 'prompt') {
       const result = await rpc(sendStart)(project.id, prompt, kind, options)
       if (!result.ok) throw new Error(`sendStart refused: ${result.error}`)
-      if (!result.runId) throw new Error('sendStart returned no run id for a worktree project')
-      started.push({ cwd: project.cwd, runId: result.runId })
-      return result.runId
+      if (!result.agentId) throw new Error('sendStart returned no run id for a worktree project')
+      started.push({ cwd: project.cwd, agentId: result.agentId })
+      return result.agentId
     },
 
-    async waitRun(project, runId, until, timeoutMs = 30_000) {
+    async waitAgent(project, agentId, until, timeoutMs = 30_000) {
       const wanted = Array.isArray(until) ? until : [until]
-      let last: RunMeta | undefined
+      let last: AgentMeta | undefined
       return waitFor(
         async () => {
-          const runs = await rpc(onRuns)(project.id)
-          last = runs.find(run => run.id === runId)
+          const agents = await rpc(onAgents)(project.id)
+          last = agents.find(agent => agent.id === agentId)
           return last && wanted.includes(last.status) ? last : undefined
         },
-        `run ${runId} to be ${wanted.join('/')} (last seen: ${JSON.stringify(last?.status)})`,
+        `run ${agentId} to be ${wanted.join('/')} (last seen: ${JSON.stringify(last?.status)})`,
         timeoutMs,
       )
     },
 
-    async waitRetired(project, runId, timeoutMs = 30_000) {
-      const worktree = join(project.cwd, '.the-framework', 'worktrees', runId)
+    async waitRetired(project, agentId, timeoutMs = 30_000) {
+      const worktree = join(project.cwd, '.the-framework', 'worktrees', agentId)
       await waitFor(
         async () => ((await stat(worktree).catch(() => undefined)) ? undefined : true),
-        `run ${runId}'s worktree to be retired`,
+        `run ${agentId}'s worktree to be retired`,
         timeoutMs,
       )
     },
 
-    async tailRun(project, runId) {
+    async tailAgent(project, agentId) {
       const events: FrameworkEvent[] = []
       // The relocating tail — the same seam the dashboard's onEvents rides: when teardown moves
-      // the journal into the archive, the tail re-resolves the run's journal and carries its
+      // the journal into the archive, the tail re-resolves the agent's journal and carries its
       // offset, so the feed keeps the final events even when their fs.watch signal was lost.
-      const stop = tailRunEvents<FrameworkEvent>(
-        () => resolveRunEventsPath(project.cwd, runId),
+      const stop = tailAgentEvents<FrameworkEvent>(
+        () => resolveAgentEventsPath(project.cwd, agentId),
         event => events.push(event),
       )
       const tail = { events, stop }
@@ -253,15 +259,15 @@ export async function makeWorld(): Promise<StoryWorld> {
 
     async close() {
       for (const tail of tails) tail.stop()
-      // Same order as daemon shutdown: stop the runs this world spawned, then the previews.
-      await runtime.suspendRuns(2000).catch(() => 0)
+      // Same order as daemon shutdown: stop the agents this world spawned, then the previews.
+      await runtime.stopAgents(2000).catch(() => 0)
       // Teardowns fire off child-exit events and outlive the assertions — deleting the repos
       // under a mid-flight archive-commit-retire kills its git ("cannot lock ref 'HEAD'") and
-      // litters the output with stranded-worktree warnings. Acquiring each run's lock is the
+      // litters the output with stranded-worktree warnings. Acquiring each agent's lock is the
       // daemon's own way of waiting a teardown out.
       await Promise.all(
-        started.map(({ cwd, runId }) =>
-          withRunLock(join(cwd, '.the-framework', 'worktrees', runId), async () => {}),
+        started.map(({ cwd, agentId }) =>
+          withAgentLock(join(cwd, '.the-framework', 'worktrees', agentId), async () => {}),
         ),
       )
       await runtime.dispose().catch(() => {})

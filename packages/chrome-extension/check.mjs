@@ -12,10 +12,11 @@ import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 
 const here = dirname(fileURLToPath(import.meta.url))
-// jsdom belongs to the dashboard package; this directory deliberately has no package.json of its
-// own, so resolve through the package that actually depends on it.
+// jsdom belongs to the-framework (the dashboard's dev dependency, merged in with it); this
+// directory deliberately has no package.json of its own, so resolve through the package that
+// actually depends on it.
 const require_ = createRequire(import.meta.url)
-const { JSDOM } = require_(require_.resolve('jsdom', { paths: [join(here, '../framework-dashboard')] }))
+const { JSDOM } = require_(require_.resolve('jsdom', { paths: [join(here, '../the-framework')] }))
 
 const block = JSON.stringify(
   {

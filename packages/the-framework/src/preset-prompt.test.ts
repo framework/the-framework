@@ -21,15 +21,3 @@ test('the default resolves to the session name when there is one, else the whole
   assert.equal(preset.render('  the API  ', { session_name: 'fix-login' }), 'Work on the API.')
   assert.equal(preset.render('   ', { session_name: 'fix-login' }), 'Work on fix-login.')
 })
-
-test('a preset template can read tf.presets and tf.settings (#874, needed by #881)', () => {
-  const p = definePreset({ name: 'demo2', template: 'Apply ${{ tf.presets.maintainability.filePath }}.', what: 'What', label: 'demo2' })
-  // Defaults to the registry, so a caller that passes nothing still gets real paths.
-  assert.equal(p.render(), `Apply ${presetFilePath('maintainability')}.`)
-  assert.equal(p.render(undefined, { presets: { maintainability: { filePath: 'x.md' } } }), 'Apply x.md.')
-
-  const s = definePreset({ name: 'demo3', template: "${{ tf.settings.technical_control ? 'on' : 'off' }}", what: 'What', label: 'demo3' })
-  // Absent settings must not throw: they default to `{}`.
-  assert.equal(s.render(), 'off')
-  assert.equal(s.render(undefined, { settings: { technical_control: true } }), 'on')
-})

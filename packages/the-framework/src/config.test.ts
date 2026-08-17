@@ -6,20 +6,18 @@ import { join } from 'node:path'
 import { loadFrameworkConfig, parseFrameworkConfig } from './config.js'
 
 test('parseFrameworkConfig reads preset + mode booleans + event', () => {
-  assert.deepEqual(
-    parseFrameworkConfig('preset: software-development\nautopilot: true\ntechnical: false\nevent: bug-fix\n'),
-    {
-      preset: 'software-development',
-      autopilot: true,
-      technical: false,
-      event: 'bug-fix',
-    },
-  )
+  assert.deepEqual(parseFrameworkConfig('preset: software-development\ntransparent: true\nevent: bug-fix\n'), {
+    preset: 'software-development',
+    transparent: true,
+    event: 'bug-fix',
+  })
 })
 
-test('parseFrameworkConfig reads the antiLazyPill toggle', () => {
-  assert.deepEqual(parseFrameworkConfig('antiLazyPill: false\n'), { antiLazyPill: false })
-  assert.throws(() => parseFrameworkConfig('antiLazyPill: nope\n'), /"antiLazyPill" must be a boolean/)
+test('parseFrameworkConfig reads the vanilla toggle (C3)', () => {
+  // The key the file speaks is the key everything else speaks, and it means the same direction:
+  // it used to be `antiLazyPill: false` here for what is `vanilla: true` everywhere else.
+  assert.deepEqual(parseFrameworkConfig('vanilla: true\n'), { vanilla: true })
+  assert.throws(() => parseFrameworkConfig('vanilla: nope\n'), /"vanilla" must be a boolean/)
 })
 
 test('parseFrameworkConfig reads the transparent toggle (#625)', () => {
@@ -27,18 +25,25 @@ test('parseFrameworkConfig reads the transparent toggle (#625)', () => {
   assert.throws(() => parseFrameworkConfig('transparent: nope\n'), /"transparent" must be a boolean/)
 })
 
-test('parseFrameworkConfig reads the handoff pair (#1173)', () => {
-  // Where the push setting lives now the launcher gear offers a single `Open PR` row.
-  assert.deepEqual(parseFrameworkConfig('autoPushBranch: false\nautoOpenPr: false\n'), {
-    autoPushBranch: false,
-    autoOpenPr: false,
-  })
-  assert.throws(() => parseFrameworkConfig('autoOpenPr: nope\n'), /"autoOpenPr" must be a boolean/)
+test('parseFrameworkConfig reads the handoff rung (#1173/#1216)', () => {
+  // How far a session publishes itself is one repo-level setting: keep it local, push the branch,
+  // open a PR, merge it. The three booleans this replaced could spell combinations no session
+  // could honour, and the file was where a user met them first (B5).
+  assert.deepEqual(parseFrameworkConfig('handoff: local\n'), { handoff: 'local' })
+  assert.deepEqual(parseFrameworkConfig('handoff: merge\n'), { handoff: 'merge' })
+  // A rung nobody defines is refused by name, so a typo is a startup error rather than a session
+  // that quietly publishes nothing.
+  assert.throws(() => parseFrameworkConfig('handoff: publish\n'), /"handoff" must be one of local \| push \| pr \| merge/)
+  assert.throws(() => parseFrameworkConfig('handoff: true\n'), /"handoff" must be one of local \| push \| pr \| merge/)
 })
 
-test('parseFrameworkConfig reads the auto-merge toggle (#1216)', () => {
-  assert.deepEqual(parseFrameworkConfig('autoMerge: true\n'), { autoMerge: true })
-  assert.throws(() => parseFrameworkConfig('autoMerge: nope\n'), /"autoMerge" must be a boolean/)
+test('parseFrameworkConfig reads only the current spellings', () => {
+  // Zero users, so a rename costs nothing to break and a migration path costs a permanent branch
+  // in every reader: the keys `handoff` and `vanilla` replaced are simply unknown keys now, and an
+  // unknown key is ignored. Manual migration is the whole story — rewrite the file.
+  assert.deepEqual(parseFrameworkConfig('autoPushBranch: false\n'), {})
+  assert.deepEqual(parseFrameworkConfig('autoOpenPr: false\nautoMerge: true\n'), {})
+  assert.deepEqual(parseFrameworkConfig('antiLazyPill: false\n'), {})
 })
 
 test('parseFrameworkConfig treats an empty document as {}', () => {
@@ -50,14 +55,14 @@ test('parseFrameworkConfig rejects a non-map document and mistyped fields', () =
   assert.throws(() => parseFrameworkConfig('- a\n- b\n'), /must be a YAML map/)
   assert.throws(() => parseFrameworkConfig('preset: 3\n'), /"preset" must be a string/)
   assert.throws(() => parseFrameworkConfig('event: 3\n'), /"event" must be a string/)
-  assert.throws(() => parseFrameworkConfig('autopilot: yep\n'), /"autopilot" must be a boolean/)
+  assert.throws(() => parseFrameworkConfig('transparent: yep\n'), /"transparent" must be a boolean/)
 })
 
 test('loadFrameworkConfig reads the-framework.yml from a directory', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'framework-cfg-'))
   try {
-    await writeFile(join(dir, 'the-framework.yml'), 'preset: software-development\nautopilot: true\n')
-    assert.deepEqual(await loadFrameworkConfig(dir), { preset: 'software-development', autopilot: true })
+    await writeFile(join(dir, 'the-framework.yml'), 'preset: software-development\ntransparent: true\n')
+    assert.deepEqual(await loadFrameworkConfig(dir), { preset: 'software-development', transparent: true })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

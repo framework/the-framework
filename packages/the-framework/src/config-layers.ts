@@ -1,7 +1,8 @@
+import { DEFAULT_HANDOFF, type HandoffLevel } from './handoff-level.js'
 import { BOOLEAN_CONFIG_KEYS, CONFIG_KEYS, type FrameworkFileConfig } from './config.js'
 
 /**
- * Resolving a run's settings across config layers (#841).
+ * Resolving an agent's settings across config layers (#841).
  *
  * The layers used to combine with `||`, which meant a flag could only ever turn a mode *on* and
  * the-framework.yml could only ever turn one *on*: no layer could say `false`. #800 needs "a
@@ -12,82 +13,68 @@ import { BOOLEAN_CONFIG_KEYS, CONFIG_KEYS, type FrameworkFileConfig } from './co
  * that an explicit `false` in a nearer layer now wins.
  */
 
-/** The run settings a config layer can carry. Keys left `undefined` mean "this layer said nothing". */
-export interface RunConfigValues {
-  /** Open Loop domain preset name. */
+/** The agent settings a config layer can carry. Keys left `undefined` mean "this layer said nothing". */
+export interface AgentConfigValues {
+  /** Preset name. */
   preset?: string | undefined
-  /** Build event kind the preset's review loop fires for (#265). */
+  /** Build event kind the preset applies to (#265). */
   event?: string | undefined
-  autopilot?: boolean | undefined
-  technical?: boolean | undefined
-  /** Inject the built-in #326 system prompt (#314). */
-  antiLazyPill?: boolean | undefined
+  /** Remove the built-in #326 system prompt, keeping the session controls (#314/C3). */
+  vanilla?: boolean | undefined
   /** Run the wrapped agent fully raw (#625). */
   transparent?: boolean | undefined
-  /** Push a session's branch to `origin` when it finishes (#1102/#1173). */
-  autoPushBranch?: boolean | undefined
-  /** Open a draft PR for a session's branch when it finishes (#1102/#1173). */
-  autoOpenPr?: boolean | undefined
-  /** Merge the session's PR once it is opened (#1216). */
-  autoMerge?: boolean | undefined
+  /** How far a finished session publishes itself (#1102/#1216/B5). */
+  handoff?: HandoffLevel | undefined
 }
 
-/** One tier of config, with the label the run narrates when this tier wins a key. */
+/** One tier of config, with the label the agent narrates when this tier wins a key. */
 export interface ConfigLayer {
   /** Where these values came from, e.g. `flag` or `the-framework.yml`. */
   name: string
-  values: RunConfigValues
+  values: AgentConfigValues
 }
 
 /** What a key resolves to when no layer set it. */
 export const RUN_CONFIG_DEFAULTS = {
-  autopilot: false,
-  technical: false,
-  antiLazyPill: true,
+  vanilla: false,
   transparent: false,
-  // On by default (#1102): the zero-config handoff is what makes a session left alone hand
-  // itself back.
-  autoPushBranch: true,
-  autoOpenPr: true,
-  // Off by default (#1216): landing work on the default branch is not reversible the way pushing
-  // a branch is, so it has to be asked for.
-  autoMerge: false,
+  // `pr` by default (#1102): the zero-config handoff is what makes a session left alone hand
+  // itself back. Merging is the rung above, because landing work on the default branch is not
+  // reversible the way pushing a branch is (#1216).
+  handoff: DEFAULT_HANDOFF,
 } as const
 
 /**
  * The nearest layer that set `key`, or `undefined` when none did. Layers are ordered
  * nearest-first: run flags > project user > repo yml > global.
  */
-export function resolveConfigKey<K extends keyof RunConfigValues>(
+export function resolveConfigKey<K extends keyof AgentConfigValues>(
   layers: readonly ConfigLayer[],
   key: K,
-): { value: NonNullable<RunConfigValues[K]>; from: string } | undefined {
+): { value: NonNullable<AgentConfigValues[K]>; from: string } | undefined {
   for (const layer of layers) {
     const value = layer.values[key]
-    if (value !== undefined) return { value: value as NonNullable<RunConfigValues[K]>, from: layer.name }
+    if (value !== undefined) return { value: value as NonNullable<AgentConfigValues[K]>, from: layer.name }
   }
   return undefined
 }
 
-/** A run's settled config, plus which layer supplied each key a layer actually set. */
-export interface ResolvedRunConfig {
+/** An agent's settled config, plus which layer supplied each key a layer actually set. */
+export interface ResolvedAgentConfig {
   presetName?: string | undefined
   buildEvent?: string | undefined
-  autopilot: boolean
-  technical: boolean
-  antiLazyPill: boolean
+  vanilla: boolean
   transparent: boolean
-  autoPushBranch: boolean
-  autoOpenPr: boolean
-  autoMerge: boolean
+  /** How far this session publishes itself (#1102/#1216/B5). */
+  handoff: HandoffLevel
   /** Winning layer name per key; a key left to its default is absent here. */
-  sources: Partial<Record<keyof RunConfigValues, string>>
+  sources: Partial<Record<keyof AgentConfigValues, string>>
 }
 
-/** Resolve every run setting over `layers` (nearest first), falling back to {@link RUN_CONFIG_DEFAULTS}. */
-export function resolveRunConfig(layers: readonly ConfigLayer[]): ResolvedRunConfig {
-  const sources: Partial<Record<keyof RunConfigValues, string>> = {}
-  const pick = <K extends keyof RunConfigValues>(key: K): NonNullable<RunConfigValues[K]> | undefined => {
+/** Resolve every agent setting over `layers` (nearest first), falling back to {@link RUN_CONFIG_DEFAULTS}. */
+export function resolveAgentConfig(layers: readonly ConfigLayer[]): ResolvedAgentConfig {
+  const sources: Partial<Record<keyof AgentConfigValues, string>> = {}
+  const pick = <K extends keyof AgentConfigValues>(key: K): NonNullable<AgentConfigValues[K]> | undefined => {
     const hit = resolveConfigKey(layers, key)
     if (!hit) return undefined
     sources[key] = hit.from
@@ -101,36 +88,30 @@ export function resolveRunConfig(layers: readonly ConfigLayer[]): ResolvedRunCon
     ...(preset ? { presetName: preset } : {}),
     ...(event ? { buildEvent: event } : {}),
     ...modes,
+    handoff: pick('handoff') ?? RUN_CONFIG_DEFAULTS.handoff,
     sources,
   }
 }
 
 /** The repo tier: `the-framework.yml` as a layer. */
 export function fileConfigLayer(file: FrameworkFileConfig, name = 'the-framework.yml'): ConfigLayer {
-  const values: RunConfigValues = {}
+  const values: AgentConfigValues = {}
   for (const key of CONFIG_KEYS) {
     if (file[key] !== undefined) Object.assign(values, { [key]: file[key] })
   }
   return { name, values }
 }
 
-/** The active Open Loop modes of a resolved config, in a stable order. */
-export function resolvedModes(config: Pick<ResolvedRunConfig, 'autopilot' | 'technical'>): string[] {
-  const modes: string[] = []
-  if (config.autopilot) modes.push('autopilot')
-  if (config.technical) modes.push('technical')
-  return modes
-}
-
 /**
  * A one-line summary of what a layer set and which one won, e.g.
- * `preset=software-development (the-framework.yml), autopilot=off (flag)`. Keys nobody set are
- * left out, so a run with no config anywhere narrates nothing.
+ * `preset=software-development (the-framework.yml), vanilla=off (flag)`. Keys nobody set are
+ * left out, so an agent with no config anywhere narrates nothing.
  */
-export function describeResolvedConfig(config: ResolvedRunConfig): string {
-  const shown: [keyof RunConfigValues, string][] = [
+export function describeResolvedConfig(config: ResolvedAgentConfig): string {
+  const shown: [keyof AgentConfigValues, string][] = [
     ['preset', config.presetName ?? ''],
-    ...BOOLEAN_CONFIG_KEYS.map((key): [keyof RunConfigValues, string] => [key, onOff(config[key])]),
+    ...BOOLEAN_CONFIG_KEYS.map((key): [keyof AgentConfigValues, string] => [key, onOff(config[key])]),
+    ['handoff', config.handoff],
     ['event', config.buildEvent ?? ''],
   ]
   return shown

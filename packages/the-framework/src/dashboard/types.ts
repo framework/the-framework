@@ -1,15 +1,16 @@
+import type { HandoffLevel } from '../handoff-level.js'
+import type { AgentLocation } from '../agent-location.js'
 import type { LinkedPr } from './gh.js'
-import type { EcoOptions } from '../system-prompt.js'
 
 // The dashboard's request/result vocabulary (#345/#396/#475): the shapes the Start / Add /
-// Preview RPCs speak. They live here, on neither the HTTP server nor the Telefunc mount, so
-// both — plus the telefunctions themselves — depend on this leaf rather than on each other.
+// Preview RPCs speak. They live here, on neither the HTTP server nor the RPC mount, so both —
+// plus the RPCs themselves — depend on this leaf rather than on each other.
 
 /** The outcome of removing a retained worktree (#737). */
 export type RemoveWorktreeResult = { ok: true } | { ok: false; error: string }
 
 /** The outcome of deleting a session — its records and worktree (#1032). */
-export type DeleteSessionResult = { ok: true } | { ok: false; error: string }
+export type DeleteAgentResult = { ok: true } | { ok: false; error: string }
 
 /** The outcome of an add-project attempt (#396). */
 export type AddProjectResult =
@@ -31,11 +32,11 @@ export interface OnboardingSuggestion {
 }
 
 /**
- * Whether the picked agent's CLI can start a run (#1326), as the launcher needs to hear it:
+ * Whether the picked driver's CLI can start an agent (#1326), as the launcher needs to hear it:
  * what is wrong and what fixes it, never what is right. Both lists are already written for a
  * human, so the warning renders them rather than mapping codes to copy.
  */
-export interface AgentReady {
+export interface DriverReady {
   /** False when a Start would die before the session exists. */
   ok: boolean
   /** Blocking problems, each naming its own fix. Empty when {@link ok}. */
@@ -50,8 +51,8 @@ export interface AgentReady {
  * system prompt, and Eco to the fine-grained #326 section drops. Absent fields
  * default off, i.e. today's behavior.
  */
-export interface StartRunOptions {
-  /** Auto-accept mode; also steers the #326 maintenance stance. */
+export interface StartAgentOptions {
+  /** Auto-accept mode; also steers the maintenance-prompt (#326) stance. */
   autopilot?: boolean
   /** Technical mode: expose technical detail (preset-scoped). */
   technical?: boolean
@@ -60,92 +61,65 @@ export interface StartRunOptions {
   /** Transparent mode (#625): run the wrapped agent fully raw (no framework system prompt, guard, dashboard, or TODO loop); maps to `--transparent`. */
   transparent?: boolean
   /** Fine-grained #326 section drops to save tokens. */
-  eco?: EcoOptions
-  /** In-context directories (#439): each becomes a `--context <dir>` flag on the spawned run. */
+  /** In-context directories (#439): each becomes a `--context <dir>` flag on the spawned agent. */
   context?: string[]
   /** On-before-mergeable prompt (#326): on setReadyForMerge(), queue the quality follow-ups as TODO entries; maps to `--on-before-mergeable`. */
   onBeforeMergeable?: boolean
-  /** Give the agent a real browser via chrome-devtools-mcp during the run (#452); maps to `--browser`. */
+  /** Give the agent a real browser via chrome-devtools-mcp during the agent (#452). */
   browser?: boolean
   /**
-   * Push the session's branch to `origin` when it finishes (#1102); maps to `--auto-push-branch`.
-   *
-   * Tri-state like the four `the-framework.yml` toggles, and for the same reason: it defaults ON,
-   * so an explicit `false` has to travel as `--no-auto-push-branch` or the run's own default would
-   * turn back on what the launcher showed as off.
+   * How far this session publishes itself when it finishes (#1102/#1216/B5): `local`, `push`, `pr`
+   * or `merge`. Absent leaves it to the repo file, then the default (`pr`) — which is what makes
+   * the handoff zero-config.
    */
-  autoPushBranch?: boolean
-  /** Open a draft PR for the session's branch when it finishes (#1102); maps to `--auto-open-pr`. Implies {@link autoPushBranch}. */
-  autoOpenPr?: boolean
-  /** Merge the session's PR once it is opened (#1216); maps to `--auto-merge`. Tri-state like {@link autoOpenPr}, but resolves to off: landing on the default branch has to be asked for. */
-  autoMerge?: boolean
+  handoff?: HandoffLevel
   /** The model to run the wrapped agent on (#628); maps to `--model`. Absent = the driver's own default. */
   model?: string
-  /** Which coding agent drives the run (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
-  agent?: string
+  /** Which coding agent drives the agent (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
+  driver?: string
   /** Where this run executes (#1050/#610): `local` (this device, the default), `actions` (a fresh GitHub Actions runner via ActionsDriver) or `web` (a Claude Code cloud session via CloudDriver); maps to `--run-on`. Absent = local, i.e. today's behavior. */
-  target?: 'local' | 'actions' | 'web'
+  target?: AgentLocation
   /**
-   * Nobody is watching this run (#846): its choice gates take the recommended option instead of
-   * parking for an answer, which is the fallback a fully headless run already uses and the one
-   * autopilot would have clicked. It also keeps the run out of the stay-open chat loop, so it
+   * Nobody is watching this agent (#846): its choice gates take the recommended option instead of
+   * parking for an answer, which is the fallback a fully headless agent already uses and the one
+   * autopilot would have clicked. It also keeps the agent out of the stay-open chat loop, so it
    * ends at settle and its armed handoff fires. Set by the work the daemon starts on its own
    * (auto PM, #685) and by dashboard surfaces that fire routine/preset work (#1279).
-   * Stop still works — that aborts the run controller, not a gate.
+   * Stop still works — that aborts the agent controller, not a gate.
    */
   unattended?: boolean
   /**
-   * The `tickets/<file>.md` this run implements (#1117); maps to `--ticket`. Set by the daemon
-   * when it starts a drain run and the queue entry it will work links back to a ticket, so the
+   * The `tickets/<file>.md` this agent implements (#1117); maps to `--ticket`. Set by the daemon
+   * when it starts a drain agent and the queue entry it will work links back to a ticket, so the
    * Overview can show that ticket as being implemented rather than guessing from its plan.
    */
   ticket?: string
   /**
-   * This run plans its {@link ticket} rather than implementing it; maps to `--plan-run`. Set by
+   * This agent plans its {@link ticket} rather than implementing it; maps to `--plan-run`. Set by
    * the daemon on a fanned-out [Plan tickets] run (#1327), whose PR lands only the plan: the
-   * ticket still rides for the run's meta, but the PR title must not inherit the issue as
+   * ticket still rides for the agent's meta, but the PR title must not inherit the issue as
    * `(fix #42)` (#1334) — a plan's merge would close the issue with the work still undone.
    */
-  planRun?: boolean
-  /**
-   * The one queue entry a routine drain pinned this run to (#1253), verbatim; maps to
-   * `--queue-entry`. Recorded on the run's meta so the sweep's claim on the entry outlives both
-   * the daemon (a restart forgets its in-memory pins) and the run's local process (a hands-off
-   * web run ends at the hand-off while the cloud session still works the entry).
-   */
-  queueEntry?: string
-  /**
-   * The surface this run was asked for from (#917), e.g. `discord`; maps to `--via`. Recorded on
-   * the session's conversation turns so a run started from a chat surface is not filed under the
-   * dashboard. Absent = the local surface, exactly as before.
-   */
-  via?: string
-  /** Resume a finished run's conversation (#720): its captured agent session id; maps to `--resume-session`. The run's prompt continues that session (full prior context) instead of starting fresh. Sent with `kind: 'prompt'` when you message a run that has ended. */
+  planAgent?: boolean
+  /** Resume a finished agent's conversation (#720): its captured agent session id; maps to `--resume-session`. The agent's prompt continues that session (full prior context) instead of starting fresh. Sent with `kind: 'prompt'` when you message an agent that has ended. */
   resumeSession?: string
   /**
-   * Continue this run rather than starting a new one (#762): the follow-up writes into that run's
-   * own log, on its own branch, so a stopped run you message again stays one row in the history
+   * Continue this agent rather than starting a new one (#762): the follow-up writes into that agent's
+   * own log, on its own branch, so a stopped agent you message again stays one row in the history
    * instead of spawning an unrelated-looking second one.
    */
-  continueRunId?: string
+  continueAgentId?: string
   /**
-   * Run this session on a connected device (#1067): the local daemon relays the run to the remote
+   * Run this session on a connected device (#1067): the local daemon relays the agent to the remote
    * daemon at `url` (authenticating with `token` as the `fw_daemon` cookie) and streams its events
-   * back into the local run view. The device `label` rides along (memory-only, like `url`/`token`) so
-   * the local session list + notice can show which device the run is on after a reload (#1077).
+   * back into the local agent view. The device `label` rides along (memory-only, like `url`/`token`) so
+   * the local session list + notice can show which device the agent is on after a reload (#1077).
    * Memory-only relay config the dashboard sets at submit time from a saved device. NEVER persisted to
    * Preferences or the registry, and never a CLI flag: a device token is a per-browser secret. Absent =
-   * run locally, exactly as today. Stripped before the run is forwarded, so the remote starts an
+   * run locally, exactly as today. Stripped before the agent is forwarded, so the remote starts an
    * ordinary local run and does not relay onward.
    */
   remote?: { url: string; token: string; label?: string }
-  /**
-   * Start this run project-less (#1120): it spawns in a neutral scratch dir with no repo or worktree,
-   * so the agent has no code to touch — the "ask a question / plan / draft a ticket without a repo"
-   * path. Set only by {@link sendStartTopic}; a project run leaves it absent. No `projectId` travels
-   * with it, and it allocates no worktree.
-   */
-  topic?: true
 }
 
 /**
@@ -155,17 +129,17 @@ export interface StartRunOptions {
  * `research` renders the [Research] preset around the posted "what" server-side
  * (empty allowed, defaults to `this PR`) and remains for API callers.
  */
-export type StartRunKind = 'build' | 'research' | 'prompt'
+export type StartAgentKind = 'build' | 'research' | 'prompt'
 
 /** The outcome of a Start attempt (#345). */
-export type StartRunResult =
+export type StartAgentResult =
   /**
-   * `runId` is the id the daemon allocated for the run (#761), present whenever it got its own
-   * worktree. The dashboard needs it to select the run it just started: with concurrent runs
-   * (#736) it can no longer find that run by looking for "the running one", because the previous
-   * run is still running and the new one has not written its `run.json` yet.
+   * `agentId` is the id the daemon allocated for the agent (#761), present whenever it got its own
+   * worktree. The dashboard needs it to select the agent it just started: with concurrent agents
+   * (#736) it can no longer find that agent by looking for "the running one", because the previous
+   * run is still running and the new one has not written its `agent.json` yet.
    */
-  | { ok: true; runId?: string }
+  | { ok: true; agentId?: string }
   | { ok: false; busy?: boolean; error: string }
 
 /** The outcome of a Preview attempt (#475): the live URL, or why not. */
@@ -183,12 +157,12 @@ export interface PreviewStatus {
 /**
  * Where a session is working (#798): the checkout, its branch, and what it is holding. Read by
  * the dashboard so a session's action bar can say which worktree it has, rather than leaving the
- * user to infer it from a run id.
+ * user to infer it from an agent id.
  */
-export interface RunWorktree {
-  /** Absolute path of the checkout this run works in. */
+export interface AgentWorktree {
+  /** Absolute path of the checkout this agent works in. */
   path: string
-  /** True when it is the run's own worktree; false when it fell back to the project's checkout. */
+  /** True when it is the agent's own worktree; false when it fell back to the project's checkout. */
   own: boolean
   /** Uncommitted changes present in that checkout. */
   dirty: boolean

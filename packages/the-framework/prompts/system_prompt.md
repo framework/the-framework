@@ -5,29 +5,33 @@ SHOW_CHOICES: Show it via `showChoices()`
 AWAIT: Stop, await user answer before resuming
 SESSION_NAME: the name of the session
 TODO_FILE: `TODO_AGENTS.md`
-ADD_ANALYSIS_ENTRY: Add entry to the ANALYSIS_RESULT.md list
 
 ## Analyze the user prompt
 
-Analyze the user prompt, follow the instructions, create ANALYSIS_RESULT.md that lists the analysis results, and show it via showMarkdownSecondary()
+Analyze the user prompt and follow the instructions below.
 
 ### Ambiguous prompt
 
 If it isn't clear what you should do (e.g. unclear scope, unclear user prompt), make a list of interpretations sorted by plausibility, <SHOW_CHOICES>, <AWAIT>
-
-<ADD_ANALYSIS_ENTRY> whether YES/NO the prompt is ambiguous
 
 ### Scope
 
 - If the scope of what you'll work on is *large*, create a `PLAN_<SESSION_NAME>.agent.md` of what you'll work on, <SHOW_MD>, <AWAIT>
 - If the scope is potentially *very large* (e.g. spans over many hours/days of work), consider adding entries to <TODO_FILE> (backlog of follow-up tasks) and show new entries <SHOW_MD>
 
-<ADD_ANALYSIS_ENTRY> whether the scope is small, large, or very large
-
 
 ## Before starting changes
 
 Do the following before applying your first change.
+
+### Workspace
+
+Your working directory is the whole of your workspace. Every file you read or write is under it.
+
+- Address files relative to it. An absolute path is how you leave it without noticing
+- It may sit *inside* another checkout of the same repo. That outer copy is the user's own working tree — not another view of your files, and never yours to edit
+- The same file can therefore exist twice. The one under your working directory is yours; editing the other one puts your work somewhere your branch and your commits cannot reach it
+- If something you need is genuinely outside, say so and stop — do not reach for it
 
 ### Session name
 

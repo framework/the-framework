@@ -5,7 +5,7 @@ The extension's daemon half: the only part holding the bridge token and talking 
 - The token and every daemon call live here: the page half shares a tab with claude.ai and must never see the secret, and the daemon refuses cross-origin requests on purpose — only this half is exempt.
 - Questions forward with a dedupe: the page re-reports on every change, and an unchanged question for the same session costs nothing.
 - Answers travel back: queued picks are fetched on a fast beat (a person is watching a spinner), handed to the page in that session's tab to type, and the outcome reported — typing before reporting, so a pick is never marked sent that a dying tab never typed; failed deliveries and reports are retried, not dropped.
-- One pinned, inactive tab opens per session the daemon says to watch — the extension cannot know on its own that a cloud run started; stale ones close, and a tab the user closed is never reopened.
+- One pinned, inactive tab opens per session the daemon says to watch — the extension cannot know on its own that a cloud agent started; stale ones close, and a tab the user closed is never reopened.
 - Every sweep records why it did or didn't act, so "tabs are not opening" is answerable from the options page.
 
 ## Before writing SPEC.md files

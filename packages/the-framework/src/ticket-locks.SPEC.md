@@ -2,9 +2,9 @@ Claims a ticket for a single agent by committing a lock file beside it and pushi
 
 ## TLDR
 
-- The claim cannot live in the daemon's memory — cloud runs outlive the local process, and other machines never shared it — so it lives where every agent already looks: a lock sibling in the tickets folder naming the holder, which the stock prompts already skip.
-- The daemon writes and pushes locks, never the agent: agents push only at the end, onto their own branch, and a lock protects nothing unless it reaches the branch runs fork from before work starts.
-- The claim is the commit: locks that never reach one are rolled back; a failed push keeps the batch (it still guards local runs) and is said out loud; the push happens only from the default branch, so a feature checkout cannot smuggle its own commits onto main.
+- The claim cannot live in the daemon's memory — cloud agents outlive the local process, and other machines never shared it — so it lives where every agent already looks: a lock sibling in the tickets folder naming the holder, which the stock prompts already skip.
+- The daemon writes and pushes locks, never the agent: agents push only at the end, onto their own branch, and a lock protects nothing unless it reaches the branch agents fork from before work starts.
+- The claim is the commit: locks that never reach one are rolled back; a failed push keeps the batch (it still guards local agents) and is said out loud; the push happens only from the default branch, so a feature checkout cannot smuggle its own commits onto main.
 - No timed expiry — an agent may legitimately hold a ticket for days. The lock lifts when the agent's own PR deletes it or a human releases it; a release whose commit fails puts the file back.
 
 ## Before writing SPEC.md files

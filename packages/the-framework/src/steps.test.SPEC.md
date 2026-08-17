@@ -1,4 +1,4 @@
-Covers the agent-backed steps: greenfield vs. existing-codebase build framing, the once-only scaffold retry for a workspace left empty, preset review verdicts (blockers unioned across the chain, an errored review blocks, no matching review passes), the improve prompt carrying the blockers, and deploy executing the decided plan.
+Covers the build prompts and the emptiness check they turn on: what counts as an empty workspace, greenfield framing that says so, extend framing that names the existing codebase and nothing else, and the scaffold directive that refuses to let an empty directory be a reason to stop.
 
 ## Before writing SPEC.md files
 

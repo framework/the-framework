@@ -9,10 +9,10 @@ import { defaultQuotaSource, type QuotaSource } from './quota.js'
 import type { AutoPmReporter } from '../auto-pm.js'
 import { serveClientBundle } from './static.js'
 import { BROWSER_PROXY_PREFIX, handleBrowserProxy } from './browser-proxy.js'
-import { makeTelefuncMount } from './telefunc-serve.js'
+import { makeRpcMount, RPC_PREFIX, isSameOriginRequest, isExpectedHost } from './rpc-serve.js'
 import { requestPathname } from '../request-path.js'
-import type { AddProjectResult, PreviewResult, PreviewStatus, StartRunKind, StartRunOptions, StartRunResult } from './types.js'
-import type { EventsSource, PreviewHandlers, RemoteRuns } from './telefunc-serve.js'
+import type { AddProjectResult, PreviewResult, PreviewStatus, StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
+import type { EventsSource, RemoteAgents } from './rpc-serve.js'
 import { handleRelayRequest, RELAY_PREFIX, type RelayHandlers } from './relay-endpoints.js'
 import { BRIDGE_PREFIX, handleBridgeRequest, type BridgeHandlers } from './bridge-endpoints.js'
 import { bridgeQuestions } from './bridge-store.js'
@@ -24,104 +24,73 @@ export interface DashboardOptions {
   /** Host to bind. Default `127.0.0.1` (localhost only). */
   host?: string
   /**
-   * Called when the browser starts a run (#345): the `sendStart` telefunction reaches
-   * this through the request context. Wire it to spawn the run (the daemon does); return
-   * `busy: true` to refuse because a run is already active. Omit to disable starting (the
-   * per-run dashboard and the relay never start runs); `sendStart` then reports so.
+   * Called when the browser starts a session (#345): the `sendStart` RPC reaches this through the
+   * wired dashboard context. Wire it to spawn the session; return `busy: true` to refuse because
+   * one is already active.
    */
-  onStart?: (
+  onStart: (
     prompt: string,
-    kind: StartRunKind,
-    options: StartRunOptions,
+    kind: StartAgentKind,
+    options: StartAgentOptions,
     projectId?: string,
-  ) => StartRunResult | Promise<StartRunResult>
+  ) => StartAgentResult | Promise<StartAgentResult>
   /**
-   * The multi-project registry provider (#392/#427): the `onProjects` / read / steer
-   * telefunctions resolve project ids through this. Omit to use the real registry (the
-   * daemon does); the per-run dashboard passes a single-project provider, the relay an
-   * empty one.
+   * Called when the browser adds a project (#396): the `sendAddProject` RPC reaches this through
+   * the wired dashboard context. Wire it to install the repo (or every git repo under a
+   * directory) and register it.
    */
-  projects?: ProjectsProvider
+  onAddProject: (path: string, directory: boolean) => Promise<AddProjectResult> | AddProjectResult
   /**
-   * Called when the browser adds a project (#396): the `sendAddProject` telefunction
-   * reaches this through the request context. Wire it to install the repo (or every git
-   * repo under a directory) and register it (the daemon does). Omit to disable adding.
+   * The user-preferences store (#410): the `onPreferences` / `savePreferences` RPCs read and
+   * write it through the wired dashboard context.
    */
-  onAddProject?: (path: string, directory: boolean) => Promise<AddProjectResult> | AddProjectResult
-  /**
-   * The Preview handler set (#475): serve a project's built result on demand, list its servable
-   * apps, stop it, and report whether one is running. Omit to disable Preview (the per-run
-   * dashboard and the relay never serve one).
-   *
-   * One field of the shared {@link PreviewHandlers} type rather than four separate callbacks: the
-   * four were re-declared here without their `runId` parameter, so the per-session Preview (#797)
-   * reached the daemon only because this file happened to pass each function straight through by
-   * reference. One wrapper added for a log line or a guard would have dropped `runId` silently,
-   * with nothing for the compiler or a test to catch.
-   */
-  preview?: PreviewHandlers
-  /**
-   * The user-preferences store (#410): the `onPreferences` / `savePreferences` telefunctions
-   * read/write it through the request context. Defaults to the real registry file (the daemon
-   * and per-run foreground dashboard both want it); the public relay serves its own mount and
-   * never wires one, so preferences stay inert there.
-   */
-  preferences?: PreferencesStore
+  preferences: PreferencesStore
   /**
    * The Discord credentials store (#1095): `onNotifyChannels` reports what it holds and
-   * `saveDiscordCredentials` writes through it. Defaults to the registry file; the daemon passes
-   * one that also reloads its Discord services, so a pasted token takes effect with no restart.
-   * The relay wires none, so nothing there can be configured.
+   * `saveDiscordCredentials` writes through it. The daemon passes one that also reloads its
+   * Discord services, so a pasted token takes effect with no restart.
    */
-  discord?: DiscordCredentialsStore
+  discord: DiscordCredentialsStore
+  /** Where the usage panel reads the quota from (#533). */
+  quota: QuotaSource
+  /** What auto PM last decided (#1161), for the line under the panel's toggle. */
+  autoPm: AutoPmReporter
   /**
-   * Where the usage panel reads the quota from (#533). Defaults to the daemon's
-   * own poller; the relay passes nothing and mounts no panel.
+   * Fire an auto PM sweep now instead of waiting out the interval (#1210). Resolves when the
+   * sweep does (#1433), so the trigger RPC can await it.
    */
-  quota?: QuotaSource
+  autoPmSweep: (opts?: { drainOnly?: boolean }) => void | Promise<void>
   /**
-   * What auto PM last decided (#1161), for the line under the panel's toggle. Only the daemon
-   * runs the sweep, so every other host leaves it unset and the panel says nothing about it.
-   */
-  autoPm?: AutoPmReporter
-  /**
-   * Fire an auto PM sweep now instead of waiting out the interval (#1210). Daemon-only for the
-   * same reason as {@link autoPm}: the loop runs in that process, so nowhere else has one.
-   * Resolves when the sweep does (#1433), so the trigger RPC can await it.
-   */
-  autoPmSweep?: (opts?: { drainOnly?: boolean }) => void | Promise<void>
-  /**
-   * Serve the new dashboard bundle (#405) from this directory — the prerendered Vike SPA
-   * (`index.html` + `assets/**`). The daemon also mounts the dashboard's Telefunc surface
-   * at `/_telefunc` (RPCs + the live-event Channel). Omit only for a broken install with
+   * Serve the new dashboard bundle (#405) from this directory — the built SPA
+   * (`index.html` + `assets/**`). The daemon also mounts the dashboard's RPC surface
+   * at `/_rpc` (the calls + the live-event stream). Omit only for a broken install with
    * no built bundle, where the server reports the bundle is missing.
    */
   clientBundleDir?: string
   /**
    * The shared token that guards a non-loopback bind (#1051): with it set, every route (static
-   * bundle, `/_telefunc`, `/browser`, `/_relay`) needs a valid `fw_daemon` cookie or a matching
+   * bundle, `/_rpc`, `/browser`, `/_relay`) needs a valid `fw_daemon` cookie or a matching
    * `?token=`, else 401. Omit for a loopback bind, where the guard is a no-op and local UX is
-   * byte-identical. A separate concern from the CSRF origin check in telefunc-serve.ts.
+   * byte-identical. A separate concern from the CSRF origin check in rpc-serve.ts.
    */
   token?: string
   /**
-   * The live-events source for a run this daemon is relaying from a connected device (#1067): a
-   * stream for such a run, else undefined so `onEvents` tails the on-disk log. Only the daemon
-   * wires one; the per-run dashboard and the relay leave it unset.
+   * The live-events source for a session this daemon is relaying from a connected device (#1067):
+   * a stream for such a session, else undefined so `onEvents` tails the on-disk log.
    */
-  eventsSource?: EventsSource
+  eventsSource: EventsSource
   /**
-   * The relayed-run lookup the read RPCs consult (#1067 slice 2); only the daemon wires it. A run-scoped
-   * RPC uses it to forward a remote run's read/steer/handoff to the device that owns it.
+   * The relayed-agent lookup the read RPCs consult (#1067 slice 2). A run-scoped RPC uses it to
+   * forward a remote agent's read/steer/handoff to the device that owns it.
    */
-  remote?: RemoteRuns
+  remote: RemoteAgents
   /**
-   * Serve a relay-started run's events back to the daemon that relayed it here (#1067): the
-   * `/_relay/*` endpoints (start + events, plus the slice-2 `rpc`). Only the daemon wires one, and all
-   * are fronted by the same `token` guard above, so a device without the cookie cannot start or read a run.
+   * Serve a relay-started agent's events back to the daemon that relayed it here (#1067): the
+   * `/_relay/*` endpoints (start + events, plus the slice-2 `rpc`). All are fronted by the same
+   * `token` guard above, so a device without the cookie cannot start or read an agent.
    */
   relay?: {
-    tailEvents: (runId: string, onEvent: (event: import('../events.js').FrameworkEvent) => void) => () => void
+    tailEvents: (agentId: string, onEvent: (event: import('../events.js').FrameworkEvent) => void) => () => void
     /** Run one whitelisted run-scoped RPC against this daemon's own checkout (#1067 slice 2). */
     rpc?: (fn: string, args: unknown[]) => Promise<unknown>
   }
@@ -130,7 +99,7 @@ export interface DashboardOptions {
    * its cloud session is parked on. Absent leaves every `/_bridge/*` route 404, which is default.
    *
    * Deliberately not {@link token}. That one guards a non-loopback bind and is absent on a normal
-   * loopback daemon, where what keeps other origins out of `/_telefunc` is the same-origin check.
+   * loopback daemon, where what keeps other origins out of `/_rpc` is the same-origin check.
    * The bridge is the one route meant to be reached from another origin, so neither protects it
    * and it authenticates on its own.
    */
@@ -142,7 +111,7 @@ export interface DashboardOptions {
   bridgeSessions?: () => Promise<import('./bridge-endpoints.js').BridgeSession[]>
 }
 
-/** A running localhost dashboard: the prerendered SPA + its Telefunc mount. */
+/** A running localhost dashboard: the built SPA + its RPC mount. */
 export interface Dashboard {
   /** The URL to open. */
   readonly url: string
@@ -151,15 +120,14 @@ export interface Dashboard {
 }
 
 /**
- * Start the localhost dashboard: a tiny `node:http` server that serves the prerendered
- * Vike SPA (#405) and mounts its Telefunc surface at `/_telefunc` — the RPCs and the
- * live-event Channel. The dashboard reads the run's `.the-framework/events.jsonl` over the
- * Channel and steers it through `control.jsonl`, so there is no in-process event stream
- * here; the server is a static-bundle + RPC host. Telefunc runs in-process, so `sendStart`
- * / `sendAddProject` call the daemon's own closures via {@link DashboardOptions.onStart} /
- * {@link DashboardOptions.onAddProject}.
+ * Start the localhost dashboard: a tiny `node:http` server that serves the built SPA (#405) and
+ * mounts its RPC surface at `/_rpc` — the calls and the live-event stream. The dashboard reads the
+ * agent's `.the-framework/events.jsonl` over that stream and steers it through `control.jsonl`, so
+ * there is no in-process event stream here; the server is a static-bundle + RPC host. The RPCs run
+ * in the daemon's own process, so `sendStart` / `sendAddProject` call the daemon's own closures via
+ * {@link DashboardOptions.onStart} / {@link DashboardOptions.onAddProject}.
  */
-export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> {
+export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
   const host = opts.host ?? '127.0.0.1'
   const port = opts.port ?? 4200
   const clientBundleDir = opts.clientBundleDir
@@ -175,24 +143,19 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
     return listenDashboard(server, host, port, () => closeServer(server))
   }
 
-  // The usage panel polls for the dashboard's whole life, not just during a run:
+  // The usage panel polls for the dashboard's whole life, not just during an agent:
   // it has to show where the account stands while nothing is running (#533).
-  const quota = opts.quota ?? defaultQuotaSource()
-  // `projects` is passed raw (may be undefined) so the mount falls back to the global
-  // registry, byte-identical to the daemon default; the per-run dashboard passes a
-  // single-project provider, the relay an empty one.
-  const telefuncMount = makeTelefuncMount(
+  const quota = opts.quota
+  const rpcMount = makeRpcMount(
     {
-      ...(opts.onStart ? { startRun: opts.onStart } : {}),
-      ...(opts.projects ? { projects: opts.projects } : {}),
-      ...(opts.onAddProject ? { addProject: opts.onAddProject } : {}),
-      ...(opts.preview ? { preview: opts.preview } : {}),
-      ...(opts.eventsSource ? { eventsSource: opts.eventsSource } : {}),
-      ...(opts.remote ? { remote: opts.remote } : {}),
-      preferences: opts.preferences ?? registryPreferencesStore(),
-      discord: opts.discord ?? registryDiscordCredentialsStore(),
-      ...(opts.autoPm ? { autoPm: opts.autoPm } : {}),
-      ...(opts.autoPmSweep ? { autoPmSweep: opts.autoPmSweep } : {}),
+      startAgent: opts.onStart,
+      addProject: opts.onAddProject,
+      eventsSource: opts.eventsSource,
+      remote: opts.remote,
+      preferences: opts.preferences,
+      discord: opts.discord,
+      autoPm: opts.autoPm,
+      autoPmSweep: opts.autoPmSweep,
       quota,
     },
     // The bound host, so the mount can reject a rebound `Host`: a page on evil.com whose DNS
@@ -200,15 +163,14 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
     { host },
   )
 
-  // The device-to-daemon relay endpoints (#1067): wired only when the daemon supplies both a start
-  // and an events tail. Fronted by the same token guard as every other route below.
-  const relayHandlers: RelayHandlers | undefined =
-    opts.onStart && opts.relay
-      ? { start: opts.onStart, tailEvents: opts.relay.tailEvents, ...(opts.relay.rpc ? { rpc: opts.relay.rpc } : {}) }
-      : undefined
+  // The device-to-daemon relay endpoints (#1067): wired only when an events tail is supplied.
+  // Fronted by the same token guard as every other route below.
+  const relayHandlers: RelayHandlers | undefined = opts.relay
+    ? { start: opts.onStart, tailEvents: opts.relay.tailEvents, ...(opts.relay.rpc ? { rpc: opts.relay.rpc } : {}) }
+    : undefined
 
   // The browser bridge (#1237). Off unless a token was supplied, and it carries that token itself
-  // rather than riding the #1051 guard, which a loopback daemon does not have.
+  // rather than riding the shared-token guard (#1051), which a loopback daemon does not have.
   const bridgeHandlers: BridgeHandlers | undefined = opts.bridgeToken
     ? {
         token: opts.bridgeToken,
@@ -232,7 +194,7 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
       res.writeHead(400, { 'content-type': 'text/plain' }).end('bad request')
       return
     }
-    // The browser bridge (#1237) is checked BEFORE the #1051 guard, and is the only route that is.
+    // The browser bridge (#1237) is checked BEFORE the shared-token guard (#1051), and is the only route that is.
     // That guard's browser affordance is a `?token=` redirect meant for a human following a link,
     // which is meaningless to an extension posting JSON; the bridge presents its own bearer token
     // instead, so letting it past here costs nothing and skips a 302 it could not follow.
@@ -242,19 +204,26 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
     }
     // #1051: one guard fronting every route on a non-loopback bind; a no-op when no token is set.
     if (token !== undefined && !authorizeDaemonRequest(req, res, token)) return
-    // The device relay (#1067): another daemon posts a run here and streams its events back. Behind
-    // the guard above, so a device without the cookie is already 401'd; unwired hosts 404 it.
+    // The device relay (#1067): another daemon posts an agent here and streams its events back.
+    // The token guard above is a no-op on a loopback bind, so — exactly like the RPC mount below —
+    // the relay carries its own CSRF + DNS-rebinding guard, or a page the user merely visited could
+    // POST /_relay/start to spawn an agent (the real device caller sends no Origin and a loopback
+    // Host, so both checks pass it; only a browser's cross-origin/rebound request is turned away).
     if (pathname === RELAY_PREFIX || pathname.startsWith(`${RELAY_PREFIX}/`)) {
+      if (!guardBrowserOrigin(req, res, host)) return
       void handleRelayRequest(req, res, pathname, relayHandlers)
       return
     }
-    if (pathname === '/_telefunc' || pathname.startsWith('/_telefunc/')) {
-      void telefuncMount(req, res)
+    if (pathname === RPC_PREFIX || pathname.startsWith(`${RPC_PREFIX}/`)) {
+      void rpcMount(req, res)
       return
     }
-    // The browser preview (#813) is proxied, not Telefunc'd: it is an endless MJPEG body and a
-    // raw input POST, neither of which is an RPC.
+    // The browser preview (#813) is proxied, not an RPC: it is an endless MJPEG body and a
+    // raw input POST, neither of which is a call. It carries the same guard as the RPCs: a raw
+    // /browser/…/input POST steers the agent's Chrome, so a cross-origin or rebound caller must
+    // not reach it (the dashboard's own <img>/fetch is same-origin and passes).
     if (pathname.startsWith(`${BROWSER_PROXY_PREFIX}/`)) {
+      if (!guardBrowserOrigin(req, res, host)) return
       void handleBrowserProxy(req, res)
         .then(handled => {
           if (!handled) void serveClientBundle(req, res, clientBundleDir)
@@ -267,7 +236,7 @@ export function startDashboard(opts: DashboardOptions = {}): Promise<Dashboard> 
     void serveClientBundle(req, res, clientBundleDir)
   })
   return listenDashboard(server, host, port, async () => {
-    // Stop polling with the server: the poller outlives every run by design,
+    // Stop polling with the server: the poller outlives every agent by design,
     // so nothing else would ever end it.
     quota.stop()
     await closeServer(server)
@@ -292,6 +261,19 @@ function closeServer(server: Server): Promise<void> {
   return new Promise(resolvePromise => server.close(() => resolvePromise()))
 }
 
+/**
+ * The CSRF + DNS-rebinding guard the RPC mount applies, lifted to the routes that dispatch outside
+ * it — the device relay and the browser-preview proxy. Both are state-changing (spawn an agent,
+ * steer its Chrome) and both are wired unconditionally on a loopback bind, where the shared-token
+ * guard is a no-op, so without this a page the user merely visited reaches them. Returns true to
+ * admit the request; on rejection it has already answered 403.
+ */
+function guardBrowserOrigin(req: IncomingMessage, res: ServerResponse, host: string): boolean {
+  if (isSameOriginRequest(req) && isExpectedHost(req, host)) return true
+  res.writeHead(403, { 'content-type': 'text/plain' }).end('forbidden')
+  return false
+}
+
 /** The cookie a bootstrapped browser carries on every same-origin request (#1051). */
 const DAEMON_COOKIE = 'fw_daemon'
 
@@ -310,7 +292,7 @@ function authorizeDaemonRequest(req: IncomingMessage, res: ServerResponse, token
     url.searchParams.delete('token')
     const query = url.searchParams.toString()
     res.writeHead(302, {
-      // Lax, not Strict: the #1052 device-hop is a cross-origin top-level nav, and a Strict cookie set on it is withheld from the redirect right after, so the clean path 401s. Lax still rides top-level GET navs; CSRF stays covered by the same-origin check on /_telefunc.
+      // Lax, not Strict: the device-hop (#1052) is a cross-origin top-level nav, and a Strict cookie set on it is withheld from the redirect right after, so the clean path 401s. Lax still rides top-level GET navs; CSRF stays covered by the same-origin check on /_rpc.
       'set-cookie': `${DAEMON_COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/`,
       location: url.pathname + (query ? `?${query}` : ''),
     })

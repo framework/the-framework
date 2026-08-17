@@ -1,8 +1,7 @@
-import type { BootstrapEvent } from '@gemstack/ai-autopilot'
 import type { DriverEvent, DriverRateLimit } from './driver/index.js'
 import { pickedIds, type AutoHandoffSkip, type AutoMergeOutcome, type ChoiceOption, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
 
-// The terminal surface for the run's event stream: render one {@link FrameworkEvent} as one
+// The terminal surface for the agent's event stream: render one {@link FrameworkEvent} as one
 // human-readable line. This is the CLI's counterpart to the dashboard's read-model
 // projections (run-view.ts) — a pure formatter over the same union, kept out of events.ts so
 // the event contract stays a plain data module (and browser-safe for the client bundle).
@@ -34,14 +33,12 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `✓ ready for merge`
     case 'settled':
       return `◆ done for now — waiting for your next message`
-    case 'bind':
-      return `◆ bound to project ${event.projectId}`
     case 'ticket':
       return `  implementing ${event.path}`
-    case 'queue-entry':
-      return `  working the queue entry: ${event.entry}`
     case 'branch':
       return `  branch: ${event.branch}`
+    case 'pull-request':
+      return `  pull request: #${event.number}`
     case 'on-before-mergeable':
       switch (event.outcome) {
         case 'queued':
@@ -53,7 +50,7 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       }
     case 'handoff-armed': {
       // Said as what will happen, not as two flags: the line is read once, at a glance.
-      // A merge-armed run's PR is opened ready, not draft, and lands by itself — the line must say
+      // A merge-armed agent's PR is opened ready, not draft, and lands by itself — the line must say
       // so (#1382): merging unattended is the one consequence a reader cannot be left to infer.
       if (event.pr && event.merge) return `  when this ends: push the branch, open a PR, and merge it`
       if (event.pr) return `  when this ends: push the branch and open a draft PR`
@@ -82,7 +79,7 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
         const tokens = event.inputTokens + event.cacheReadTokens + event.outputTokens
         return `  tokens: ${tokens.toLocaleString('en-US')} (${event.outputTokens.toLocaleString('en-US')} out) ${turns} — no price reported`
       }
-      return `  spend: $${event.costUsd.toFixed(4)}${event.budgetUsd ? ` / $${event.budgetUsd}` : ''} ${turns}`
+      return `  spend: $${event.costUsd.toFixed(4)} ${turns}`
     }
     case 'modes': {
       const shown = event.all.map(m => `${event.active.includes(m) ? '[x]' : '[ ]'} ${m}`).join('  ')
@@ -98,8 +95,8 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `  ✓ chose ${pickedIds(event.picked).join(', ') || '(none)'} (${event.by})`
     case 'driver':
       return formatDriverEvent(event.event)
-    case 'bootstrap':
-      return formatBootstrapEvent(event.event)
+    case 'intent':
+      return `▶ "${truncate(event.text)}"`
     case 'end':
       return event.ok ? '✓ finished' : event.stopped ? '■ stopped' : `✗ failed: ${event.detail ?? 'unknown error'}`
   }
@@ -205,30 +202,6 @@ function formatRateLimit(limit: DriverRateLimit): string {
   if (limit.status === 'rejected') return `✗ quota exhausted (${limit.window}), resets ${resets}`
   if (limit.status === 'allowed_warning') return `! quota running low (${limit.window}), resets ${resets}`
   return `· quota ${limit.status} (${limit.window}), resets ${resets}`
-}
-
-function formatBootstrapEvent(event: BootstrapEvent): string {
-  switch (event.type) {
-    case 'scope':
-      return `▶ scope: ${event.scope} — "${event.intent}"`
-    case 'narrate':
-      return `  ${event.message}`
-    case 'build':
-      return `    build/${event.event.type}`
-    case 'checklist':
-      return event.passing
-        ? `  ✓ checklist pass ${event.pass}: no blockers`
-        : `  ✗ checklist pass ${event.pass}: ${event.blockers.join('; ')}`
-    case 'improve':
-      return `  → improving: ${event.blockers.join('; ')}`
-    case 'deploy':
-      return `▶ deploy: ${event.plan.render.toUpperCase()} → ${event.plan.target} (${event.plan.reason})`
-    case 'done':
-      // No review passes means no review was configured (#1372), not an unfinished app.
-      return event.result.passes > 0
-        ? `✓ ${event.result.productionGrade ? 'review passed' : 'blockers remain'} after ${event.result.passes} pass(es)`
-        : '✓ done'
-  }
 }
 
 function truncate(text: string, max = 100): string {

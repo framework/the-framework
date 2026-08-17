@@ -1,13 +1,11 @@
 /**
  * `@gemstack/the-framework` — **The (AI) Framework**: turnkey, zero-config AI
  * orchestration. It wraps a coding-agent CLI (Claude Code today) as a **black
- * box** and takes a user from an idea to a running app, with a localhost
+ * box** and takes a ticket to a reviewed pull request, with a localhost
  * dashboard that foregrounds the orchestration the agent's own chat cannot show.
  *
- * The whole product is built on `@gemstack/ai-autopilot`'s already-shipped
- * spine (bootstrap, the loop, presets, deploy targets);
- * this package adds the two missing pieces from #166: the **driver** seam that
- * wraps the agent, and the **product shell** (CLI + dashboard) that drives it.
+ * Two pieces: the **driver** seam that wraps the agent, and the **product shell**
+ * (CLI + dashboard) that drives it.
  *
  * ## Driver seam
  * The one abstraction we wrap a coding-agent CLI behind. We prompt it, let its
@@ -17,41 +15,18 @@
  *
  * - {@link Driver} / {@link DriverSession} — the contract
  * - {@link ClaudeCodeDriver} — the first real driver (`claude -p` stream-json)
- * - {@link FakeDriver} — deterministic offline driver for `--fake` / tests
+ * - {@link FakeDriver} — deterministic offline driver for `FRAMEWORK_FAKE` / tests
  *
- * ## Driver-backed steps
- * ai-autopilot's `Bootstrap` steps, re-implemented to run everything *through*
- * the driver (option A): build / improve are prompts; a domain preset's review
- * loop gates on the `{ blockers }` verdicts its prompts report (#252, #1372).
- *
- * - {@link driverBuild} / {@link driverImprove}
- *
- * ## Run + product shell
- * - {@link runFramework} — detect the preset, drive the whole bootstrap flow, and
- *   stream {@link FrameworkEvent}s
+ * ## Session + product shell
+ * - {@link runAgent} — frame the agent, send it one prompt, honor the gates it answers with,
+ *   and stream {@link FrameworkEvent}s
  * - {@link startDashboard} — the localhost UI over the event stream
  * - {@link runCli} / {@link parseArgs} — the `framework` command
  */
 export * from './driver/index.js'
-export {
-  driverBuild,
-  driverImprove,
-  decideDeploy,
-  deployWith,
-  buildPrompt,
-  extendPrompt,
-  improvePrompt,
-  isWorkspaceEmpty,
-  type DriverStepOptions,
-} from './steps.js'
-export {
-  runFramework,
-  type RunFrameworkOptions,
-  type RunFrameworkResult,
-  type DeployDecision,
-  type ServeConfig,
-  type AppPreview,
-} from './run.js'
+export { buildPrompt, extendPrompt, scaffoldPrompt, isWorkspaceEmpty } from './steps.js'
+export { runAgent, type AgentKind, type RunAgentOptions, type RunAgentResult } from './agent.js'
+export { isHandsOff, isAgentLocation, AGENT_LOCATIONS, type AgentLocation } from './agent-location.js'
 export {
   requestChoices,
   requestMultiSelect,
@@ -61,7 +36,6 @@ export {
   type MultiSelectOption,
   type MultiSelectDeps,
 } from './await-gate.js'
-export { snapshotWorkspace, SANDBOX_IGNORE, type SnapshotOptions } from './sandbox.js'
 export {
   parseResetsAt,
   boundaryFromResetsAt,
@@ -71,7 +45,6 @@ export {
   type BoundaryWindow,
   type QuotaBoundaryStatus,
 } from './quota-boundary.js'
-export { startConsumptionGuard, type ConsumptionGuard, type StartConsumptionGuardOptions } from './consumption-guard.js'
 export { pollerQuotaSource, defaultQuotaSource, type QuotaView, type QuotaSource } from './dashboard/quota.js'
 export {
   QuotaPoller,
@@ -80,14 +53,6 @@ export {
   type QuotaEnvelope,
   type QuotaPollerOptions,
 } from './quota-poller.js'
-export {
-  startRelay,
-  relayPublisher,
-  type Relay,
-  type RelayOptions,
-  type RelayPublisher,
-} from './relay.js'
-export { hostExecutor, type HostExecutorOptions } from './host-exec.js'
 export {
   type FrameworkEvent,
   type ChoiceOption,
@@ -101,15 +66,13 @@ export {
 export { formatFrameworkEvent } from './terminal.js'
 export { resolveSessionLink, hasSessionIdPlaceholder, SESSION_ID_PLACEHOLDER } from './session-link.js'
 export {
-  loopStatus,
   sessionInfo,
-  runProgress,
+  agentProgress,
   handoffState,
-  type LoopStatus,
   type SessionInfo,
-  type RunProgress,
+  type AgentProgress,
   type HandoffState,
-} from './run-view.js'
+} from './agent-view.js'
 export {
   assessRepo,
   planMaintenanceSweep,
@@ -128,69 +91,42 @@ export {
   type SweepDeps,
   type MaintenanceFs,
 } from './maintenance.js'
-export { startDashboard, summarizeProject, defaultProjectsProvider, readDocs, type Dashboard, type DashboardOptions, type StartRunKind, type StartRunResult, type AddProjectResult, type OnboardingSuggestion, type AgentReady, type PreviewResult, type PreviewStatus, type RunWorktree, type ProjectSummary, type ProjectsProvider, type SummarizeDeps, type WorkspaceDoc, readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta, type TicketGithubLink, type ProjectQueue, type QueueItem, type Overview, type ActiveRun, type RecentProject, type RecentRun, buildRecentRuns, type HotTicket, type HotBucket, buildHotTickets, collectAllTickets, type ProjectTickets, type AllTicketsDeps, type DashboardData, type ProjectStat, type ActivityDay, type GitStatus, type LinkedPr, type FileDiff, type FileChange, type FileContent, type RunHandoff, type HandoffCommit, type HandoffFile, type HandoffResult, buildInterventions, type Intervention, type OpenPr, type PrLister, type InterventionsDeps, buildOpenQuestions, openChoiceRequest, type OpenQuestion, type OpenQuestionsDeps, buildActivity, activityKey, pickNewActivity, type Activity, type ActivityDeps, type BridgeQuestion, type BridgeEvent, type BridgeAnswer } from './dashboard/index.js'
-export { startPreview, detectDevScript, detectServeTargets, parsePreviewUrl, PREVIEW_SCRIPTS, type PreviewHandle, type StartPreviewOptions, type ServeTarget } from './preview.js'
+export { startDashboard, summarizeProject, defaultProjectsProvider, readDocs, type Dashboard, type DashboardOptions, type StartAgentKind, type StartAgentResult, type AddProjectResult, type OnboardingSuggestion, type DriverReady, type PreviewResult, type PreviewStatus, type AgentWorktree, type ProjectSummary, type ProjectsProvider, type SummarizeDeps, type WorkspaceDoc, readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type WorkspaceTicketDetail, type TicketsMeta, type TicketGithubLink, type ProjectQueue, type QueueItem, type Overview, type ActiveAgent, type RecentProject, type RecentAgent, buildRecentAgents, type HotTicket, type HotBucket, buildHotTickets, collectAllTickets, type ProjectTickets, type AllTicketsDeps, type DashboardData, type ProjectStat, type GitStatus, type LinkedPr, type FileDiff, type FileChange, type FileContent, type AgentHandoff, type HandoffCommit, type HandoffFile, type HandoffResult, buildInterventions, type Intervention, type OpenPr, type PrLister, type InterventionsDeps, buildOpenQuestions, openChoiceRequest, type OpenQuestion, type OpenQuestionsDeps, buildActivity, activityKey, pickNewActivity, type Activity, type ActivityDeps, type BridgeQuestion, type BridgeEvent, type BridgeAnswer } from './dashboard/index.js'
 export {
-  RunStore,
+  AgentStore,
   nodeStoreFs,
   applyEventToMeta,
   metaFromEvents,
-  listRuns,
-  loadRunEvents,
-  runIdFromStartedAt,
-  isSafeRunId,
+  listAgents,
+  loadAgentEvents,
+  agentIdFromStartedAt,
+  isSafeAgentId,
   FRAMEWORK_DIR,
   EVENTS_FILE,
   META_FILE,
-  RUNS_DIR,
-  RUN_META_VERSION,
+  AGENTS_DIR,
+  AGENT_META_VERSION,
   type StoreFs,
-  type RunMeta,
-  type RunStatus,
+  type AgentMeta,
+  type AgentStatus,
   type OpenStoreOptions,
 } from './store/index.js'
+export { THE_FRAMEWORK_DIR } from './framework-dir.js'
+export { gitignorePath, frameworkGitignore, archiveGitignore, SESSIONS_RULE } from './framework-gitignore.js'
 export {
-  logsPath,
-  gitignorePath,
-  renderLogEntry,
-  parseLogs,
-  appendLog,
-  readLogs,
-  THE_FRAMEWORK_DIR,
-  LOGS_FILE,
-  LOGS_GITIGNORE,
-  type LogEntry,
-} from './logs.js'
-export {
-  conversationPath,
-  conversationsDir,
-  renderMessage,
-  parseConversation,
-  appendMessage,
-  readConversation,
-  listConversations,
-  ensureConversationsIgnored,
-  CONVERSATIONS_DIR,
-  CONVERSATIONS_GITIGNORE,
-  type ConversationMessage,
-  type ConversationRole,
-} from './conversations.js'
-export {
-  startConversationCommitter,
-  commitConversations,
-  pendingConversations,
+  startAgentCommitter,
+  commitAgents,
+  pendingAgents,
   gitBusy,
   commitMessage,
   nodePathProbe,
-  pathspecsFor,
-  CONVERSATIONS_PATHSPEC,
-  COMMIT_POLL_MS,
+  ARCHIVE_PATHSPEC,
   COMMIT_MAX_WAIT_MS,
-  type ConversationCommitter,
-  type ConversationCommitterOptions,
+  type AgentCommitter,
+  type AgentCommitterOptions,
   type CommitOutcome,
   type PathProbe,
-} from './conversation-commit.js'
+} from './agent-commit.js'
 export {
   theFrameworkDir,
   isActivated,
@@ -202,7 +138,6 @@ export {
   GIT_READ_TIMEOUT_MS,
   GIT_WRITE_TIMEOUT_MS,
   GIT_SLOW_TIMEOUT_MS,
-  readProjectSignals,
   type ProjectFs,
   type GitRunner,
 } from './project.js'
@@ -218,18 +153,12 @@ export {
   readPreferences,
   writePreferences,
   patchPreferences,
-  readProjectPreferences,
-  writeProjectPreferences,
-  patchProjectPreferences,
-  resolvePreferences,
   registryPreferencesStore,
   sanitizeCustomPresets,
   REGISTRY_FILE,
-  PROJECT_PREFERENCE_KEYS,
   type ProjectRecord,
   type Registry,
   type Preferences,
-  type ProjectPreferences,
   type PreferencesStore,
   type CustomPreset,
   type RegistryFs,
@@ -257,7 +186,18 @@ export {
   type VersionFetcher,
   type UpdateStatus,
 } from './update-check.js'
-export { runCli, parseArgs, buildDeployTarget, runOnBeforeMergeable, promptRunArgs, type PromptRunner, type CliIO, type CliOptions } from './cli.js'
+export {
+  runCli,
+  parseArgs,
+  agentOptions,
+  runOnBeforeMergeable,
+  promptAgentSpec,
+  type PromptRunner,
+  type CliIO,
+  type CliArgs,
+  type AgentOptions,
+} from './cli.js'
+export { readAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
 export { renderOnBeforeMergeablePrompt, ON_BEFORE_MERGEABLE_PROMPT_TEMPLATE, type OnBeforeMergeableContext } from './on-before-mergeable-prompt.js'
 export {
   loadFrameworkConfig,
@@ -267,22 +207,21 @@ export {
 } from './config.js'
 export {
   resolveConfigKey,
-  resolveRunConfig,
-  resolvedModes,
+  resolveAgentConfig,
   fileConfigLayer,
   describeResolvedConfig,
   RUN_CONFIG_DEFAULTS,
   type ConfigLayer,
-  type RunConfigValues,
-  type ResolvedRunConfig,
+  type AgentConfigValues,
+  type ResolvedAgentConfig,
 } from './config-layers.js'
 export {
   systemPromptBlock,
-  composeRunSystem,
+  composeAgentSystem,
   renderSystemPrompt,
   SYSTEM_PROMPT_TEMPLATE,
   type SystemPromptOptions,
-  type RunSystemOptions,
+  type AgentSystemOptions,
   type TfContext,
   type RenderedSystemPrompt,
 } from './system-prompt.js'
@@ -295,27 +234,8 @@ export {
   type PreflightResult,
   type PreflightCheck,
   type PreflightOptions,
-  type VersionProbe,
 } from './preflight.js'
-export {
-  ensureDaemon,
-  runDaemon,
-  stopDaemon,
-  daemonStatus,
-  readDaemonState,
-  writeDaemonState,
-  startDaemonStateHeartbeat,
-  isProcessAlive,
-  EventTailer,
-  DAEMON_STATE_FILE,
-  DAEMON_STATE_HEARTBEAT_MS,
-  DEFAULT_DAEMON_PORT,
-  type DaemonState,
-  type DaemonStateHeartbeat,
-  type EnsureResult,
-  type EnsureDaemonOptions,
-  type RunDaemonOptions,
-} from './daemon.js'
+export { runDaemon, isProcessAlive, EventTailer, DEFAULT_DAEMON_PORT, type DaemonState, type RunDaemonOptions } from './daemon.js'
 export {
   appendControl,
   resetControl,
@@ -325,8 +245,7 @@ export {
   type ControlEntry,
   type ControlWatcher,
 } from './control.js'
-export { RunMessageQueue, type RunMessages } from './run-messages.js'
-export { runPrompt, type RunPromptOptions, type RunPromptResult } from './prompt-run.js'
+export { AgentMessageQueue, type AgentMessages } from './agent-messages.js'
 export {
   runTodoLoop,
   findTodoBacklog,
@@ -341,7 +260,7 @@ export {
   type TodoLoopResult,
   type TodoLoopReason,
 } from './todo-loop.js'
-export { runOptionsFromPreferences, autopilotEnabled, preferencesFromFileConfig } from './run-options.js'
+export { agentOptionsFromPreferences, preferencesFromFileConfig } from './agent-options.js'
 export {
   startAutoPm,
   AUTO_PM_JOBS,
@@ -370,21 +289,26 @@ export {
   materializePresets,
 } from './presets.js'
 export { presets, LAUNCHER_PRESETS, type PresetKey } from './preset-catalog.js'
-export { NOTIFICATION_DEFAULTS, notificationEnabled, discordNotificationEnabled } from './preference-defaults.js'
+export {
+  NOTIFICATION_DEFAULTS,
+  notifies,
+  notifyMethodEnabled,
+  notifyCategoryEnabled,
+  type NotifyMethod,
+  type NotifyCategory,
+} from './preference-defaults.js'
 export { interventionKey, pickNewInterventions } from './dashboard/keys.js'
 export { definePreset, defaultWhat, DEFAULT_WHAT, type PresetDef, type PresetParam, type PresetRenderContext } from './preset-prompt.js'
 export {
   fakeDriver,
   FAKE_INTENT,
-  FAKE_SIGNALS,
-  FAKE_DEPLOY,
 } from './fake-script.js'
 export {
-  AGENTS,
-  AGENT_SPECS,
+  DRIVERS,
+  DRIVER_SPECS,
   createDriver,
-  isAgentName,
-  type AgentName,
-  type AgentSpec,
+  isDriverName,
+  type DriverName,
+  type DriverSpec,
   type CreateDriverOptions,
-} from './agent.js'
+} from './driver-cli.js'

@@ -40,7 +40,7 @@ test('preflight probes the picked agent, not always claude (#542)', async () => 
   const probed: string[] = []
   const result = await preflight({
     ...notRoot,
-    agent: 'codex',
+    driver: 'codex',
     probe: (bin, args) => {
       if (args[0] === '--version') probed.push(bin)
       return Promise.resolve({ ok: true, output: 'codex-cli 0.144.4' })
@@ -53,7 +53,7 @@ test('preflight probes the picked agent, not always claude (#542)', async () => 
 })
 
 test('a missing codex points at the codex install, not the claude one (#542)', async () => {
-  const result = await preflight({ ...notRoot, agent: 'codex', probe: probeFor({ version: { ok: false, output: '' } }) })
+  const result = await preflight({ ...notRoot, driver: 'codex', probe: probeFor({ version: { ok: false, output: '' } }) })
   assert.equal(result.ok, false)
   const cli = result.checks.find(c => c.name === 'codex')
   assert.equal(cli?.ok, false)
@@ -95,7 +95,7 @@ test('a logged-in claude passes and says so (#1326)', async () => {
 test('a logged-out codex fails preflight, naming its own fix (#1326)', async () => {
   const result = await preflight({
     ...notRoot,
-    agent: 'codex',
+    driver: 'codex',
     probe: probeFor({ auth: { ok: false, output: 'Not logged in' } }),
   })
   assert.equal(result.ok, false)
@@ -106,19 +106,19 @@ test('a logged-out codex fails preflight, naming its own fix (#1326)', async () 
 
 test('"Not logged in" is not read as logged in (#1326)', async () => {
   // The positive is a substring of the negative, so a naive test order would invert the answer.
-  const result = await preflight({ ...notRoot, agent: 'codex', probe: probeFor({ auth: { ok: true, output: 'Not logged in' } }) })
+  const result = await preflight({ ...notRoot, driver: 'codex', probe: probeFor({ auth: { ok: true, output: 'Not logged in' } }) })
   assert.equal(result.ok, false)
 })
 
 test('a logged-in codex passes (#1326)', async () => {
-  const result = await preflight({ ...notRoot, agent: 'codex', probe: probeFor({ auth: { ok: true, output: 'Logged in using ChatGPT' } }) })
+  const result = await preflight({ ...notRoot, driver: 'codex', probe: probeFor({ auth: { ok: true, output: 'Logged in using ChatGPT' } }) })
   assert.equal(result.ok, true)
   assert.equal(result.checks.find(c => c.name === 'codex auth')?.ok, true)
 })
 
 test('a CLI that will not say whether it is logged in does not fail the run (#1326)', async () => {
   // An older CLI prints usage for a subcommand it does not have. Unreadable means unknown, and
-  // a run that might work beats a warning we cannot stand behind.
+  // an agent that might work beats a warning we cannot stand behind.
   const result = await preflight({ ...notRoot, probe: probeFor({ auth: { ok: false, output: "error: unknown command 'auth'" } }) })
   assert.equal(result.ok, true)
   assert.equal(result.checks.find(c => c.name === 'claude auth'), undefined)
@@ -140,12 +140,12 @@ test('auth is not probed when the CLI itself is missing (#1326)', async () => {
 
 test('the auth answer is read off stderr too (#1326)', async () => {
   // The default probe merges the streams because the two CLIs disagree about where status goes.
-  const result = await preflight({ ...notRoot, agent: 'codex', probe: probeFor({ auth: { ok: false, output: 'Not logged in' } }) })
+  const result = await preflight({ ...notRoot, driver: 'codex', probe: probeFor({ auth: { ok: false, output: 'Not logged in' } }) })
   assert.equal(result.checks.find(c => c.name === 'codex auth')?.ok, false)
 })
 
-// #1326: root is the #1323 trap. sudo moves HOME, so the CLI reads root's credentials, finds
-// none, and every run dies identically with a log that says nothing about why.
+// #1326: root is the sudo-HOME trap (#1323). sudo moves HOME, so the CLI reads root's credentials, finds
+// none, and every agent dies identically with a log that says nothing about why.
 
 test('running as root warns without blocking the run (#1326)', async () => {
   const result = await preflight({ probe: probeFor({}), isRoot: () => true, sudoUser: undefined })
@@ -181,7 +181,7 @@ test('preflightProblems lists only the failures, each with its fix (#1326)', asy
 })
 
 // #1419: an armed PR/merge rung publishes through `gh` at the finish, hours after the Start that
-// could have said it will not work. Warnings only — the run itself needs no gh to do its work.
+// could have said it will not work. Warnings only — the agent itself needs no gh to do its work.
 
 /** A probe that answers for `gh` separately from the agent CLI, which always passes here. */
 function withGh(gh: { version: { ok: boolean; output: string }; auth?: { ok: boolean; output: string } }): CliProbe {

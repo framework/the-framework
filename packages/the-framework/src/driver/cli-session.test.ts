@@ -1,0 +1,133 @@
+import { strict as assert } from 'node:assert'
+import { test } from 'node:test'
+import { spawn } from 'node:child_process'
+import { Readable, Writable } from 'node:stream'
+import { runCliSession, type AgentCliParser, type SpawnLike, type SpawnedProcess } from './cli-session.js'
+import type { DriverEvent } from './types.js'
+
+test('runCliSession streams the parser events and resolves the final turn', async () => {
+  const events: DriverEvent[] = []
+  const parser: AgentCliParser = {
+    push: line => (line === 'hi' ? [{ type: 'text', text: 'hi' }] : []),
+    result: () => ({ text: 'done', sessionId: 's1' }),
+  }
+  const stdout = Readable.from(['hi\n'])
+  const spawn: SpawnLike = () => {
+    const proc: SpawnedProcess = {
+      stdout,
+      stderr: Readable.from([]),
+      stdin: new Writable({ write: (_c, _e, cb) => cb() }),
+      on(event, listener) {
+        if (event === 'close') stdout.on('end', () => (listener as (c: number | null) => void)(0))
+        return proc
+      },
+      kill: () => undefined,
+    }
+    return proc
+  }
+  const turn = await runCliSession({
+    bin: 'agent',
+    args: [],
+    cwd: '/ws',
+    env: {},
+    prompt: 'go',
+    spawn,
+    emit: e => events.push(e),
+    signals: [],
+    parser,
+  })
+  assert.deepEqual(turn, { text: 'done', sessionId: 's1' })
+  assert.equal(events[0]!.type, 'start')
+  assert.ok(events.some(e => e.type === 'text'))
+  assert.equal(events.at(-1)!.type, 'result')
+})
+
+test('an stdin write error fails the turn cleanly, not as an uncaught exception (#943)', async () => {
+  // stdin that errors asynchronously, the shape a pipe takes when the CLI exited before reading.
+  const stdin = new Writable({ write: (_c, _e, cb) => cb(new Error('EPIPE: broken pipe')) })
+  let fireClose: (code: number | null) => void = () => {}
+  const spawn: SpawnLike = () => {
+    const proc: SpawnedProcess = {
+      stdout: Readable.from([]),
+      stderr: Readable.from([]),
+      stdin,
+      on(event, listener) {
+        if (event === 'close') fireClose = listener as (c: number | null) => void
+        return proc
+      },
+      kill: () => undefined,
+    }
+    return proc
+  }
+  const promise = runCliSession({
+    bin: 'agent',
+    args: [],
+    cwd: '/ws',
+    env: {},
+    prompt: 'go',
+    spawn,
+    emit: () => {},
+    signals: [],
+    parser: { push: () => [], result: () => ({ text: '' }) },
+  })
+  // Let the stream's async 'error' emission land; with no listener it is an uncaught exception.
+  await new Promise(resolvePromise => setImmediate(resolvePromise))
+  fireClose(1) // the crashed CLI reports its non-zero exit
+  await assert.rejects(promise, /exited/)
+})
+
+test('a real CLI that exits before reading stdin does not crash the process (#943)', async () => {
+  // A prompt larger than the pipe buffer, so the write is still pending when the child dies
+  // and the kernel answers with a real EPIPE.
+  const turn = await runCliSession({
+    bin: process.execPath,
+    args: ['-e', 'process.exit(0)'],
+    cwd: process.cwd(),
+    env: process.env,
+    prompt: 'x'.repeat(1024 * 1024),
+    spawn: spawn as unknown as SpawnLike,
+    emit: () => {},
+    signals: [],
+    parser: { push: () => [], result: () => ({ text: 'ok' }) },
+  })
+  assert.equal(turn.text, 'ok')
+  // Give the late EPIPE its window inside this test, so an unswallowed one fails here, not elsewhere.
+  await new Promise(resolvePromise => setTimeout(resolvePromise, 100))
+})
+
+test('runCliSession emits no telemetry when the process closes after an abort', async () => {
+  const events: DriverEvent[] = []
+  const controller = new AbortController()
+  // A process whose `close` fires only when the test triggers it, so we can order
+  // the abort strictly before the (killed) process's late exit.
+  let fireClose: (code: number | null) => void = () => {}
+  const spawn: SpawnLike = () => {
+    const proc: SpawnedProcess = {
+      stdout: Readable.from([]),
+      stderr: Readable.from([]),
+      stdin: new Writable({ write: (_c, _e, cb) => cb() }),
+      on(event, listener) {
+        if (event === 'close') fireClose = listener as (c: number | null) => void
+        return proc
+      },
+      kill: () => undefined,
+    }
+    return proc
+  }
+  const promise = runCliSession({
+    bin: 'agent',
+    args: [],
+    cwd: '/ws',
+    env: {},
+    prompt: 'go',
+    spawn,
+    emit: e => events.push(e),
+    signals: [controller.signal],
+    parser: { push: () => [], result: () => ({ text: '' }) },
+  })
+  controller.abort()
+  fireClose(null) // the killed process reports its exit after the abort already rejected
+  await assert.rejects(promise, /aborted/)
+  assert.ok(!events.some(e => e.type === 'error'), 'no error event after abort')
+  assert.ok(!events.some(e => e.type === 'result'), 'no result event after abort')
+})

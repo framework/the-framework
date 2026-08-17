@@ -25,12 +25,16 @@ export {
   type PermissionMode,
 } from './claude-code.js'
 export { ActionsDriver, ActionsSession, replayTranscript, type ActionsDriverOptions, type FetchLike } from './actions.js'
-export { CloudDriver, CloudSession, type CloudDriverOptions, type RunPty, type RunPtyOptions } from './cloud.js'
-export { readZip, type ZipEntry } from './actions-zip.js'
+export { CloudDriver, CloudSession, type CloudDriverOptions, type RunPty, type AgentPtyOptions } from './cloud.js'
+// `readZip`/`ZipEntry` are deliberately absent (#947): the Actions driver's internal zip reader
+// rode this barrel onto the published surface via `src/index.ts`'s `export *`, with no importer
+// outside the driver and its own test — both of which take the module by path. An accidental
+// export is a one-way door once released, and this package has never been published, so the
+// removal costs nobody anything.
 export {
-  runAgentCli,
+  runCliSession,
   type AgentCliParser,
-  type RunAgentCliOptions,
+  type RunCliSessionOptions,
   type SpawnLike,
   type SpawnedProcess,
-} from './agent-cli.js'
+} from './cli-session.js'

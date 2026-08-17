@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { FakeDriver } from './driver/fake.js'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
-import { appendTodoEntry, appendFlatTodoEntry, findTodoBacklog, insertTodoEntry, nextQueuedTicket, parseTodoEntries, runTodoLoop, sessionTodoPending, ticketForPrompt } from './todo-loop.js'
+import { appendTodoEntry, appendFlatTodoEntry, findTodoBacklog, insertTodoEntry, nextQueuedTicket, parseTodoEntries, runTodoLoop, agentTodoPending, ticketForPrompt } from './todo-loop.js'
 import { drainsQueue, presets } from './preset-catalog.js'
 import { AUTO_PM_DRAIN_JOB, AUTO_PM_JOBS } from './auto-pm.js'
 
@@ -36,7 +36,7 @@ test('parseTodoEntries reads open list items and skips checked/blank/prose lines
   ])
 })
 
-test('the #880 priority sections need no parser support: headings are skipped, so a sorted file drains in priority order', () => {
+test('the priority (#880) sections need no parser support: headings are skipped, so a sorted file drains in priority order', () => {
   const md = [
     '## Priority 10 (critical — act immediately)',
     '- restore checkout',
@@ -83,7 +83,7 @@ test('findTodoBacklog no longer reads the retired backlog locations', async () =
   const cwd = await tmpWorkspace()
   try {
     await writeFile(join(cwd, 'TODO.md'), '- [ ] old root entry\n')
-    await writeFile(join(cwd, 'TODO-AGENTS.md'), '- [ ] hyphen entry\n')
+    await writeFile(join(cwd, 'TODO-DRIVERS.md'), '- [ ] hyphen entry\n')
     await mkdir(join(cwd, 'tickets'))
     await writeFile(join(cwd, 'tickets/TODO.md'), '- [ ] tickets entry\n')
     assert.equal(await findTodoBacklog(cwd), undefined)
@@ -303,7 +303,7 @@ test('a backlog turn emits its signals: views, session name, ready-for-merge', a
   try {
     const events: FrameworkEvent[] = []
     // The protocols are unconditional, so the agent is told it can signal on ANY turn,
-    // a backlog turn included. Everything it emits has to reach the run stream.
+    // a backlog turn included. Everything it emits has to reach the agent stream.
     const driver = new FakeDriver({
       respond: () => {
         writeFileSync(file, '- [x] tidy the login redirect\n')
@@ -468,7 +468,7 @@ test('nextQueuedTicket names the ticket the next drain run will pick up (#1117)'
     )
     assert.equal(await nextQueuedTicket(cwd), 'tickets/2026-07-25_login.md')
 
-    // A queue whose first open entry is plain text: a drain run there implements no ticket, and
+    // A queue whose first open entry is plain text: a drain agent there implements no ticket, and
     // saying "the one below it" would label the wrong ticket as being worked.
     await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] tidy the README\n- [ ] [Login](tickets/2026-07-25_login.md)\n')
     assert.equal(await nextQueuedTicket(cwd), undefined)
@@ -491,12 +491,12 @@ test('ticketForPrompt names a ticket for a hand-fired drain, and for nothing els
     assert.equal(await ticketForPrompt(`\n${presets.drainQueue.render()}  `, cwd), 'tickets/2026-07-25_login.md')
 
     // Every other prompt implements whatever it likes; naming the queue's next entry for it would
-    // put a ticket in the in-progress lane on the strength of an unrelated run.
+    // put a ticket in the in-progress lane on the strength of an unrelated agent.
     assert.equal(await ticketForPrompt('Work on the queue please', cwd), undefined)
     assert.equal(await ticketForPrompt(presets.planTickets.render(), cwd), undefined)
     assert.equal(await ticketForPrompt('', cwd), undefined)
 
-    // A read that throws is a lane label, not a run: it must never take the start down with it.
+    // A read that throws is a lane label, not an agent: it must never take the start down with it.
     const boom = async () => {
       throw new Error('unreadable queue')
     }
@@ -516,23 +516,23 @@ test('the drain the sweep fires and the drain a click fires are the same drain (
   for (const job of AUTO_PM_JOBS) assert.equal(drainsQueue(job.prompt), false, `${job.name} is not a drain`)
 })
 
-test('sessionTodoPending reads only the session-named TODO file (#1363)', async () => {
+test('agentTodoPending reads only the session-named TODO file (#1363)', async () => {
   const cwd = await tmpWorkspace()
   try {
     // No file: no pendingness known. The global queue must not count — it is decoupled from
     // sessions (#1390), and counting it would mean auto-merge never fires while any backlog exists.
     await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] a standing project entry\n')
-    assert.equal(await sessionTodoPending(cwd, 'fix-login'), false)
+    assert.equal(await agentTodoPending(cwd, 'fix-login'), false)
 
     // The session's own file with an open entry withholds; all-checked releases.
     await writeFile(join(cwd, 'TODO_fix-login.agent.md'), '- [x] done part\n- [ ] open part\n')
-    assert.equal(await sessionTodoPending(cwd, 'fix-login'), true)
+    assert.equal(await agentTodoPending(cwd, 'fix-login'), true)
     await writeFile(join(cwd, 'TODO_fix-login.agent.md'), '- [x] done part\n- [x] open part\n')
-    assert.equal(await sessionTodoPending(cwd, 'fix-login'), false)
+    assert.equal(await agentTodoPending(cwd, 'fix-login'), false)
 
     // No session name, or one that cannot name a file, knows of nothing pending.
-    assert.equal(await sessionTodoPending(cwd, undefined), false)
-    assert.equal(await sessionTodoPending(cwd, '../escape'), false)
+    assert.equal(await agentTodoPending(cwd, undefined), false)
+    assert.equal(await agentTodoPending(cwd, '../escape'), false)
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

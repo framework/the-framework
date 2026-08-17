@@ -5,11 +5,11 @@ import type { DriverQuota } from './driver/index.js'
 
 const T0 = 1_800_000_000_000
 
-function goodAt(weeklyPercent: number, sessionPercent = 1): DriverQuota {
+function goodAt(weeklyPercent: number, agentPercent = 1): DriverQuota {
   return {
     available: true,
     windows: [
-      { label: 'Current session', kind: 'session', percentUsed: sessionPercent },
+      { label: 'Current session', kind: 'session', percentUsed: agentPercent },
       { label: 'Current week (all models)', kind: 'week', percentUsed: weeklyPercent },
       { label: 'Current week (Fable)', kind: 'week-model', percentUsed: 3 },
     ],

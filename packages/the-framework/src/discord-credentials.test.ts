@@ -44,18 +44,13 @@ const stored = (secrets: Record<string, string>) => ({
 })
 
 test('the environment wins over a stored credential (#1095)', () => {
-  const secrets = { discordBotToken: 'stored-bot', discordWebhook: 'https://stored' }
-  const resolved = resolveDiscordCredentials({ DISCORD_BOT_TOKEN: 'env-bot' }, secrets)
-
-  assert.equal(resolved.botToken, 'env-bot')
-  // Only the credential the environment sets is overridden; the other still resolves.
-  assert.equal(resolved.webhook, 'https://stored')
+  const resolved = resolveDiscordCredentials({ DISCORD_WEBHOOK: 'https://env' }, { discordWebhook: 'https://stored' })
+  assert.equal(resolved.webhook, 'https://env')
 })
 
 test('a stored credential is used when the environment sets none (#1095)', () => {
-  const resolved = resolveDiscordCredentials({}, { discordBotToken: 'stored-bot' })
-  assert.equal(resolved.botToken, 'stored-bot')
-  assert.equal(resolved.webhook, undefined)
+  assert.equal(resolveDiscordCredentials({}, { discordWebhook: 'https://stored' }).webhook, 'https://stored')
+  assert.equal(resolveDiscordCredentials({}, {}).webhook, undefined)
 })
 
 test('a blank environment variable does not shadow a stored credential (#1095)', () => {
@@ -64,11 +59,10 @@ test('a blank environment variable does not shadow a stored credential (#1095)',
 })
 
 test('the status reports where each credential came from, and nothing else (#1095)', () => {
-  const status = discordCredentialStatus({ DISCORD_BOT_TOKEN: 'env-bot' }, { discordWebhook: 'https://stored' })
+  const status = discordCredentialStatus({}, { discordWebhook: 'https://stored' })
 
-  assert.deepEqual(status, { botToken: 'env', webhook: 'stored' })
+  assert.deepEqual(status, { webhook: 'stored' })
   // The whole presence-only contract: no field of this can be turned back into a credential.
-  assert.equal(JSON.stringify(status).includes('env-bot'), false)
   assert.equal(JSON.stringify(status).includes('https://stored'), false)
 })
 
@@ -77,10 +71,6 @@ test('an unset credential is simply absent from the status (#1095)', () => {
 })
 
 test('validation rejects what could only fail later, and accepts the rest (#1095)', () => {
-  assert.equal(validateCredential('botToken', 'a-plausible-bot-token-value'), undefined)
-  assert.match(validateCredential('botToken', 'short') ?? '', /too short/)
-  assert.match(validateCredential('botToken', 'two words in here somewhere') ?? '', /single word/)
-  assert.match(validateCredential('botToken', 'Bot a-plausible-bot-token-value') ?? '', /without the "Bot " prefix/)
 
   assert.equal(validateCredential('webhook', 'https://discord.com/api/webhooks/1/abc'), undefined)
   // Not tied to discord.com: a self-hosted proxy is a legitimate place to post.
@@ -88,13 +78,11 @@ test('validation rejects what could only fail later, and accepts the rest (#1095
   assert.match(validateCredential('webhook', 'not a url') ?? '', /not a URL/)
   assert.match(validateCredential('webhook', 'ftp://example.com/hook') ?? '', /http or https/)
 
-  // Clearing is legal for either — that is the Remove button.
-  assert.equal(validateCredential('botToken', ''), undefined)
+  // Clearing is legal — that is the Remove button.
   assert.equal(validateCredential('webhook', '   '), undefined)
 })
 
 test('the env var name is reported for the UI copy (#1095)', () => {
-  assert.equal(credentialEnvVar('botToken'), 'DISCORD_BOT_TOKEN')
   assert.equal(credentialEnvVar('webhook'), 'DISCORD_WEBHOOK')
 })
 
@@ -152,17 +140,9 @@ test('an invalid credential is refused before it is stored (#1095)', async () =>
   const fs = memFs()
   const store = registryDiscordCredentialsStore({ env: ENV, fs })
 
-  const result = await store.save({ botToken: 'short' })
+  const result = await store.save({ webhook: 'not-a-url' })
   assert.equal(result.ok, false)
   assert.equal(fs.files.has(FILE), false)
-})
-
-test('a validation failure on one credential does not half-apply the other (#1095)', async () => {
-  const fs = memFs()
-  const store = registryDiscordCredentialsStore({ env: ENV, fs })
-
-  await store.save({ webhook: 'https://hook', botToken: 'short' })
-  assert.deepEqual(await store.status(), {})
 })
 
 test('the store clears a stored credential (#1095)', async () => {
@@ -174,6 +154,6 @@ test('the store clears a stored credential (#1095)', async () => {
 })
 
 test('an env-set credential still reads as configured, so the UI can say who owns it (#1095)', async () => {
-  const store = registryDiscordCredentialsStore({ env: { ...ENV, DISCORD_BOT_TOKEN: 'env-bot' }, fs: memFs() })
-  assert.deepEqual(await store.status(), { botToken: 'env' })
+  const store = registryDiscordCredentialsStore({ env: { ...ENV, DISCORD_WEBHOOK: 'https://env' }, fs: memFs() })
+  assert.deepEqual(await store.status(), { webhook: 'env' })
 })

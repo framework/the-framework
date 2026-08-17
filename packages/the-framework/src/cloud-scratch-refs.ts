@@ -1,0 +1,342 @@
+import { join } from 'node:path'
+import { nodeGitRunner, type GitRunner } from './project.js'
+import { ghPrsForBranch, type LinkedPr } from './dashboard/gh.js'
+import { startedAtFromAgentId, FRAMEWORK_DIR } from './store/index.js'
+import { nodeFs } from './node-fs.js'
+import { errorMessage } from './error-message.js'
+
+// Sweep the scratch refs a cloud hand-off leaves on origin (#1547).
+//
+// Every "Run on: Claude web" run pushes two refs that nothing ever consumes again: the slash-free
+// `cloud-*` ref the driver pushes so the cloud session has a ref it can clone at (#1320,
+// anthropics/claude-code#87235), and the run branch (`the-framework/agent-…`) the worktree sweep
+// (#1036) pushes before reclaiming the checkout. The session does its work on its own `claude/*`
+// branch and opens its PR from there, so once provisioning settles both refs are dead names on
+// origin — one pair per web run, accumulating forever.
+//
+// The driver cannot safely delete its own ref: session creation only signals "session created",
+// not "clone finished", and a ref deleted in that window strands the session (recoverable only
+// with `claude --teleport`). So the daemon sweeps instead, and every deletion has to clear four
+// gates:
+//
+// - **Old enough** (~a day) that no provisioning can still be reading it. A run branch carries its
+//   start time in its name; a `cloud-*` ref carries nothing, so the sweep remembers when it first
+//   saw one and only ages it from there — which also keeps a ref pushed by *another* machine safe,
+//   since each machine only deletes what it has itself watched for a day.
+// - **Holds no work**: its tip is already reachable from origin's default branch. That is what
+//   separates a web run's empty scratch branch from a local run's branch holding unmerged commits —
+//   the one thing this sweep must never delete.
+// - **No open PR**, so a deletion can never close one.
+// - **Not a live agent's**, the same `busy` guard the worktree sweep takes.
+//
+// Never throws, and conservative on every unprovable case: a ref it cannot prove dead simply
+// stays, and the next sweep asks again.
+
+/** How long a scratch ref is left alone before it may go: safely past any provisioning. */
+export const SCRATCH_REF_SAFE_AGE_MS = 24 * 60 * 60 * 1000
+
+/**
+ * The shape of the pre-hand-off ref the cloud driver pushes: its own session id, a counter plus
+ * the 8-hex tag (`cloud-1-3955352b`). Anchored tightly so a user's own `cloud-…` branch that does
+ * not match the driver's naming is never even a candidate.
+ */
+export const CLOUD_SCRATCH_REF = /^cloud-\d+-[0-9a-f]{8}$/
+
+/** What every run branch is named under; the rest is the agent id, which carries the start time. */
+const RUN_BRANCH_PREFIX = 'the-framework/agent-'
+
+/**
+ * Where the sweep remembers when it first saw each `cloud-*` ref, under `.the-framework/`
+ * (gitignored, like the other per-repo bookkeeping). Needed because the ref's name carries no
+ * timestamp and its commit date says nothing — the driver pushes the worktree's HEAD, which is
+ * however old the base commit happens to be, not when the hand-off happened.
+ */
+export const CLOUD_REFS_FILE = 'cloud-refs.json'
+
+/** When the sweep first saw each `cloud-*` ref on origin, ISO, keyed by short ref name. */
+interface CloudRefsState {
+  firstSeen: Record<string, string>
+}
+
+/** Minimal fs seam so the state IO is unit-testable without touching disk. */
+export interface ScratchFs {
+  read(path: string): Promise<string>
+  write(path: string, contents: string): Promise<void>
+  mkdir(path: string): Promise<void>
+}
+
+/** A {@link ScratchFs} backed by `node:fs/promises`. See {@link nodeFs}. */
+function nodeScratchFs(): ScratchFs {
+  const { read, write, mkdir } = nodeFs()
+  return { read, write, mkdir }
+}
+
+/** The first-seen state file path for a repo. */
+export function cloudRefsStatePath(cwd: string): string {
+  return join(cwd, FRAMEWORK_DIR, CLOUD_REFS_FILE)
+}
+
+/** Read a repo's first-seen state. Forgiving: missing/unreadable/malformed yields an empty one. */
+async function readState(cwd: string, fs: ScratchFs): Promise<CloudRefsState> {
+  try {
+    const parsed = JSON.parse(await fs.read(cloudRefsStatePath(cwd))) as unknown
+    if (parsed && typeof parsed === 'object') {
+      const record = (parsed as Record<string, unknown>)['firstSeen']
+      if (record && typeof record === 'object') {
+        const firstSeen: Record<string, string> = {}
+        for (const [ref, at] of Object.entries(record as Record<string, unknown>)) {
+          if (typeof at === 'string') firstSeen[ref] = at
+        }
+        return { firstSeen }
+      }
+    }
+  } catch {
+    // absent / unreadable / malformed -> nothing seen yet
+  }
+  return { firstSeen: {} }
+}
+
+/** Record a repo's first-seen state, creating `.the-framework/` as needed. */
+async function writeState(cwd: string, state: CloudRefsState, fs: ScratchFs): Promise<void> {
+  await fs.mkdir(join(cwd, FRAMEWORK_DIR))
+  await fs.write(cloudRefsStatePath(cwd), JSON.stringify(state, null, 2))
+}
+
+/** Why a candidate ref was kept this sweep. Every one of these is retried on a later pass. */
+export type ScratchKeptReason =
+  /** Not past the safe age yet — the window a provisioning session could still be reading it. */
+  | 'young'
+  /** Its agent is one the daemon is still responsible for. */
+  | 'busy'
+  /** Its tip is not provably on the default branch, so it may hold work. */
+  | 'holds-work'
+  /** It has an open PR, which a deletion would close. */
+  | 'open-pr'
+
+/** What {@link sweepCloudScratchRefs} did to one repo's origin. */
+export interface ScratchSweepResult {
+  /** Refs deleted from origin (short names). */
+  deleted: string[]
+  /** Candidate refs kept, and why. Refs matching neither naming are never listed at all. */
+  kept: { ref: string; reason: ScratchKeptReason }[]
+  /** Refs the sweep decided to delete but could not; retried next sweep. */
+  failed: { ref: string; error: string }[]
+}
+
+/** Injectable seams so the sweep is unit-testable off disk, off the network and off GitHub. */
+export interface ScratchSweepDeps {
+  git?: GitRunner
+  /** The branch's full PR history (default {@link ghPrsForBranch}). */
+  prs?: (cwd: string, branch: string) => Promise<LinkedPr[]>
+  fs?: ScratchFs
+  /** The current time in ms (injected so tests can age refs deterministically). */
+  now?: () => number
+  /** Override {@link SCRATCH_REF_SAFE_AGE_MS}. */
+  ageMs?: number
+  /** Agent ids the daemon is still responsible for, whose run branches this must not touch. */
+  busy?: ReadonlySet<string>
+}
+
+/** One branch on origin: its short name and the commit it points at. */
+interface RemoteHead {
+  ref: string
+  sha: string
+}
+
+/**
+ * Parse `git ls-remote --symref origin HEAD 'refs/heads/*'`: the branch HEAD points at (the
+ * default branch) plus every branch with its tip. One listing answers everything the
+ * classification needs, in one network round-trip.
+ */
+function parseLsRemote(listing: string): { defaultBranch?: string; heads: RemoteHead[] } {
+  const heads: RemoteHead[] = []
+  let defaultBranch: string | undefined
+  for (const line of listing.split('\n')) {
+    const symref = /^ref:\s+refs\/heads\/(\S+)\s+HEAD$/.exec(line)
+    if (symref) {
+      defaultBranch = symref[1]!
+      continue
+    }
+    const head = /^([0-9a-f]{40,64})\t+refs\/heads\/(.+)$/.exec(line)
+    if (head) heads.push({ ref: head[2]!, sha: head[1]! })
+  }
+  // A remote that answers no symref (some mirrors) still usually has a conventional default.
+  if (!defaultBranch) defaultBranch = ['main', 'master'].find(name => heads.some(h => h.ref === name))
+  return { ...(defaultBranch !== undefined ? { defaultBranch } : {}), heads }
+}
+
+/**
+ * Whether `sha` is already reachable from the default branch — the proof the ref holds no work.
+ * Tried against the remote's own tip first (the freshest answer, when its object is local because
+ * this machine pushed or fetched it), then against the local `origin/<default>` tracking ref
+ * (stale is fine: reachable from a stale tip is reachable from a newer one). Unprovable — objects
+ * missing, no default branch at all — reads as "not landed", which keeps the ref.
+ */
+async function landed(git: GitRunner, cwd: string, sha: string, defaultBranch: string | undefined, heads: RemoteHead[]): Promise<boolean> {
+  if (defaultBranch === undefined) return false
+  const remoteTip = heads.find(h => h.ref === defaultBranch)?.sha
+  for (const tip of [remoteTip, `refs/remotes/origin/${defaultBranch}`]) {
+    if (!tip) continue
+    const ancestor = await git(['merge-base', '--is-ancestor', sha, tip], cwd).then(
+      () => true,
+      () => false,
+    )
+    if (ancestor) return true
+  }
+  return false
+}
+
+/**
+ * Sweep one repo's origin for the dead refs cloud hand-offs left behind (#1547), deleting the
+ * ones that clear every gate. Never throws: a repo with no remote (or offline) sweeps nothing,
+ * and a failed deletion is reported and retried next sweep.
+ */
+export async function sweepCloudScratchRefs(cwd: string, deps: ScratchSweepDeps = {}): Promise<ScratchSweepResult> {
+  const git = deps.git ?? nodeGitRunner()
+  const prs = deps.prs ?? ghPrsForBranch
+  const fs = deps.fs ?? nodeScratchFs()
+  const now = deps.now ? deps.now() : Date.now()
+  const ageMs = deps.ageMs ?? SCRATCH_REF_SAFE_AGE_MS
+  const result: ScratchSweepResult = { deleted: [], kept: [], failed: [] }
+
+  let listing: string
+  try {
+    listing = await git(['ls-remote', '--symref', 'origin', 'HEAD', 'refs/heads/*'], cwd)
+  } catch {
+    return result // no remote, or it cannot be reached: nothing to sweep
+  }
+  const { defaultBranch, heads } = parseLsRemote(listing)
+
+  const state = await readState(cwd, fs)
+  // Rebuilt from what origin actually has, so entries for refs deleted (by us or anyone) fall away.
+  const firstSeen: Record<string, string> = {}
+  const candidates: RemoteHead[] = []
+
+  for (const head of heads) {
+    if (CLOUD_SCRATCH_REF.test(head.ref)) {
+      const seenAt = state.firstSeen[head.ref]
+      const seenMs = seenAt === undefined ? NaN : Date.parse(seenAt)
+      if (!Number.isFinite(seenMs)) {
+        // First sight (or a hand-edited timestamp): the day starts now.
+        firstSeen[head.ref] = new Date(now).toISOString()
+        result.kept.push({ ref: head.ref, reason: 'young' })
+        continue
+      }
+      firstSeen[head.ref] = seenAt!
+      if (now - seenMs < ageMs) {
+        result.kept.push({ ref: head.ref, reason: 'young' })
+        continue
+      }
+      candidates.push(head)
+      continue
+    }
+    if (head.ref.startsWith(RUN_BRANCH_PREFIX)) {
+      const id = head.ref.slice(RUN_BRANCH_PREFIX.length)
+      const startedAt = startedAtFromAgentId(id)
+      if (startedAt === undefined) continue // a name whose age is unknowable is not ours to delete
+      if (deps.busy?.has(id)) {
+        result.kept.push({ ref: head.ref, reason: 'busy' })
+        continue
+      }
+      if (now - Date.parse(startedAt) < ageMs) {
+        result.kept.push({ ref: head.ref, reason: 'young' })
+        continue
+      }
+      candidates.push(head)
+    }
+    // Every other branch — the default, `claude/*`, `the-framework/<session-name>` — is not a
+    // scratch ref and is never even considered.
+  }
+
+  for (const { ref, sha } of candidates) {
+    // The work gate first: it is local and free, and it is the one that must never be wrong.
+    if (!(await landed(git, cwd, sha, defaultBranch, heads))) {
+      result.kept.push({ ref, reason: 'holds-work' })
+      continue
+    }
+    // ghPrsForBranch resolves [] when gh is missing/unauthed, so a hiccup here fails toward
+    // deletion — acceptable only because the work gate already proved the ref holds nothing.
+    const history = await prs(cwd, ref).catch((): LinkedPr[] => [])
+    if (history.some(pr => pr.state === 'OPEN')) {
+      result.kept.push({ ref, reason: 'open-pr' })
+      continue
+    }
+    try {
+      await git(['push', 'origin', '--delete', ref], cwd)
+      result.deleted.push(ref)
+      delete firstSeen[ref]
+    } catch (err) {
+      // The first-seen entry stays, so the retry next sweep does not restart the day.
+      result.failed.push({ ref, error: errorMessage(err) })
+    }
+  }
+
+  if (JSON.stringify(firstSeen) !== JSON.stringify(state.firstSeen)) {
+    await writeState(cwd, { firstSeen }, fs).catch(() => {
+      // Best effort: an unwritable state file only delays deletions, never loses work.
+    })
+  }
+  return result
+}
+
+/** A running sweep, in the shape the daemon's other background services use. */
+export interface CloudScratchSweep {
+  /** Run one sweep now, awaiting it. Exposed for tests and for a caller that wants it on demand. */
+  tick: () => Promise<void>
+  stop: () => void
+}
+
+/** What {@link startCloudScratchSweep} needs from the daemon. */
+export interface CloudScratchSweepOptions {
+  /** The registered projects to sweep. */
+  projects: () => Promise<readonly { path: string }[]>
+  log: (message: string) => void
+  /** The agents the daemon is still responsible for, whose run branches this must not touch. */
+  busy?: () => ReadonlySet<string>
+  /** The per-project sweep (default {@link sweepCloudScratchRefs}). */
+  sweep?: (cwd: string) => Promise<ScratchSweepResult>
+}
+
+/**
+ * Sweep every registered project's leftover cloud scratch refs (#1547), one turn per call.
+ *
+ * Deletions and failures are said out loud, kept refs are not: a candidate that is merely not old
+ * enough yet is the normal state of every ref this watches, and a line per tick about it would be
+ * noise. A ref vanishing from origin with no line explaining why would read as a bug.
+ */
+export function startCloudScratchSweep(opts: CloudScratchSweepOptions): CloudScratchSweep {
+  const sweep = opts.sweep ?? ((cwd: string) => sweepCloudScratchRefs(cwd, { ...(opts.busy ? { busy: opts.busy() } : {}) }))
+  let stopped = false
+
+  const sweepAll = async (): Promise<void> => {
+    for (const project of await opts.projects().catch(() => [])) {
+      if (stopped) break
+      const { deleted, failed } = await sweep(project.path).catch((): ScratchSweepResult => ({ deleted: [], kept: [], failed: [] }))
+      for (const ref of deleted) {
+        opts.log(`[framework] deleted the leftover cloud hand-off ref ${ref} on origin: its session settled long ago and nothing consumes it (#1547).`)
+      }
+      for (const item of failed) {
+        opts.log(`[framework] could not delete the leftover ref ${item.ref} on origin: ${item.error}`)
+      }
+    }
+  }
+
+  // Overlapping ticks join the sweep already running rather than being dropped, so awaiting
+  // `tick()` means the sweep finished — same rule as the worktree sweep, for the same reason.
+  let inflight: Promise<void> | undefined
+  const tick = (): Promise<void> => {
+    if (stopped) return Promise.resolve()
+    inflight ??= sweepAll().finally(() => {
+      inflight = undefined
+    })
+    return inflight
+  }
+
+  // No timer of its own (E4): the daemon's one clock calls `tick`.
+  return {
+    tick,
+    stop: () => {
+      stopped = true
+    },
+  }
+}

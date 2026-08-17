@@ -21,6 +21,7 @@ import { readTickets } from './dashboard/tickets.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { startAgentCommitter } from './agent-commit.js'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
+import { startCloudScratchSweep } from './cloud-scratch-refs.js'
 import { resolveAgentPr } from './dashboard/agent-handoff.js'
 import { sendChoice, sendMessage, sendStop } from './dashboard-rpc/control.js'
 import type { ProjectSummary } from './dashboard/projects.js'
@@ -30,7 +31,7 @@ import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
 /**
  * Everything the daemon runs in the background beside serving the dashboard: the two Discord
  * notification watchers (#627), auto PM (#685/#773), the CI watch (#1418), the session-archive
- * committer (#912/#1179) and the worktree sweep (#1036).
+ * committer (#912/#1179), the worktree sweep (#1036) and the cloud-scratch sweep (#1547).
  *
  * All of it used to sit inline in `runDaemon`, which meant its body was a lifecycle narrative with
  * ~200 lines of service wiring in the middle of it. Each of these is gated the same way (an env
@@ -45,6 +46,12 @@ import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
 
 /** Ticks between auto-PM sweeps, and between worktree sweeps: both are ten-minute jobs. */
 const AUTO_PM_EVERY = Math.round(DEFAULT_AUTO_PM_INTERVAL_MS / DAEMON_TICK_MS)
+
+/**
+ * Ticks between cloud-scratch sweeps (#1547): hourly. The refs it deletes have to sit for a day
+ * first, so a finer cadence would only spend `ls-remote` round-trips asking the same question.
+ */
+const CLOUD_SCRATCH_EVERY = Math.round((60 * 60 * 1000) / DAEMON_TICK_MS)
 
 /** What the daemon needs back: the two shutdown phases, in the order the daemon's teardown needs them. */
 export interface BackgroundServices {
@@ -276,6 +283,13 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   // a push that could not land at teardown.
   const mergedWorktrees = startMergedWorktreeSweep({ projects, log, busy: deps.busyAgentIds })
 
+  // Delete the scratch refs a web hand-off leaves on origin (#1547): the pre-hand-off `cloud-*`
+  // ref and the run branch, one dead pair per web run. Daemon-side rather than in the driver,
+  // because session creation only signals "created", not "clone finished" — a driver deleting its
+  // own ref races the provisioning and can strand the session. The sweep waits out that race
+  // (~a day) and only deletes refs whose work is provably on the default branch.
+  const cloudScratch = startCloudScratchSweep({ projects, log, busy: deps.busyAgentIds })
+
   // `resolve` matters: projectId hashes the path string, and `--cwd` reaches us verbatim, so a
   // relative path would hash to an id no project lookup can resolve. Same derivation the runtime uses.
   const homeId = projectId(resolve(deps.cwd))
@@ -382,6 +396,10 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // Ten minutes. Its start-up turn matters too: a daemon started with the setting already on
       // would otherwise sit idle with quota going spare (#1161).
       { name: 'auto PM', every: AUTO_PM_EVERY, run: () => autoPm.tick() },
+      // Hourly. Its start-up turn is what starts a `cloud-*` ref's one-day clock (#1547): the
+      // sweep ages those refs from when it first saw them, so the sooner it looks, the sooner
+      // a leftover can go.
+      { name: 'cloud scratch sweep', every: CLOUD_SCRATCH_EVERY, run: () => cloudScratch.tick() },
     ],
   })
 
@@ -394,6 +412,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // The CI watch can start fix runs, so it stops with the other run-starters.
       ciWatch.stop()
       mergedWorktrees.stop()
+      cloudScratch.stop()
       // Stopped before `flushAgents` below, so that is a single flush past the idle window
       // rather than a wait for a turn that is no longer coming.
       agentCommitter.stop()

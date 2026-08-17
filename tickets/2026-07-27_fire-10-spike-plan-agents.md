@@ -13,7 +13,7 @@ Highest-prio dogfooding goal: this is the fan-out beat the framework exists for,
 
 ## Thread refinements (change the plan)
 
-- **Blocker:** #1320 — on the affected machine every CC-web session is a bundle upload with no push access, so cloud agents cannot deliver; 10 agents there = 10 stranded spikes. Check per machine with the diagnostic one-liner in #1320; if bundled, plan B is the same 10 agents on the local driver.
+- **Blocker cleared (2026-08-17):** #1320 is closed — a "Run on: Claude web" launcher run now lands its own PR fully autonomously (first one: #1546; chain evidence on #1320). Web sessions provision repo-bound and can push and open PRs, so fanning spike/plan agents out to cloud sessions is no longer blocked on delivery. Plan B (local driver) is no longer needed for that reason.
 - **Lock tweaks agreed in the thread:**
   1. The **daemon** pushes the PENDING files, not the agents (agents can't push, see #1320) — and locks the whole batch in one commit.
   2. Staleness rule: PENDING + no PR + N minutes old = reclaimable, otherwise a dead agent bricks its ticket forever.
@@ -22,4 +22,4 @@ Highest-prio dogfooding goal: this is the fan-out beat the framework exists for,
 
 ## Source
 
-Imported from GitHub issue [gemstack-land/the-framework#1327](https://github.com/gemstack-land/the-framework/issues/1327), created 2026-07-27, labels: `highest-prio 🌟`, 1 comment (folded above).
+Imported from GitHub issue [gemstack-land/the-framework#1327](https://github.com/gemstack-land/the-framework/issues/1327), created 2026-07-27, labels: `highest-prio 🌟`, 2 comments (folded above; latest 2026-08-17 delivery update).

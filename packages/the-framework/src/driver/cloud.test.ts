@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { isHandsOff } from '../agent-location.js'
-import { CLOUD_COMMAND, CLOUD_PROMPT_SEPARATOR, CloudDriver, cloudHandOffPrompt, trustRootOf, type AgentPtyOptions } from './cloud.js'
+import { CLOUD_COMMAND, CLOUD_ENV, CLOUD_PROMPT_SEPARATOR, CloudDriver, cloudHandOffPrompt, trustRootOf, type AgentPtyOptions } from './cloud.js'
 import type { DriverEvent } from './types.js'
 
 /**
@@ -34,9 +34,21 @@ function fakePty(output: string, calls: AgentPtyOptions[] = []) {
   }
 }
 
-function driverWith(output: string, calls: AgentPtyOptions[] = []) {
+/** A git runner that records its calls; `fail` makes every call reject (#1320). */
+function fakeGit(calls: string[][] = [], fail = false) {
+  return {
+    calls,
+    run: async (args: string[], _cwd: string): Promise<string> => {
+      calls.push([...args])
+      if (fail) throw new Error('no pushable remote')
+      return ''
+    },
+  }
+}
+
+function driverWith(output: string, calls: AgentPtyOptions[] = [], git = fakeGit()) {
   const pty = fakePty(output, calls)
-  return new CloudDriver({ runPty: pty.run, agentTag: () => 'tag', timeoutMs: 1000 })
+  return new CloudDriver({ runPty: pty.run, git: git.run, agentTag: () => 'tag', timeoutMs: 1000 })
 }
 
 test('a prompt creates a cloud session and returns its id', async () => {
@@ -91,6 +103,7 @@ test('output split across chunks still yields the session', async () => {
   const driver = new CloudDriver({
     agentTag: () => 'tag',
     timeoutMs: 1000,
+    git: fakeGit().run,
     runPty: async opts => {
       calls.push(opts)
       // Split mid-URL: a parser that matched per chunk rather than on the accumulated
@@ -107,6 +120,7 @@ test('a run that created no session fails with what the CLI said', async () => {
   const driver = new CloudDriver({
     agentTag: () => 'tag',
     timeoutMs: 1000,
+    git: fakeGit().run,
     runPty: async opts => opts.onData('Invalid API key · Fix external API key\r\n'),
   })
   const session = await driver.start({ cwd: '/repo' })
@@ -120,6 +134,7 @@ test('an untrusted workspace fails fast and says how to fix it, rather than hang
   const driver = new CloudDriver({
     agentTag: () => 'tag',
     timeoutMs: 1000,
+    git: fakeGit().run,
     runPty: async opts => {
       opts.onData('\x1b[2KQuick\x1b[Csafety\x1b[Ccheck\r\n1.\x1b[CYes,\x1b[CI\x1b[Ctrust\x1b[Cthis\x1b[Cfolder\r\n')
       // The driver aborts synchronously from inside onData, so check before waiting: a
@@ -142,6 +157,7 @@ test('trust advice for a run worktree names the project root, which outlives the
   const driver = new CloudDriver({
     agentTag: () => 'tag',
     timeoutMs: 1000,
+    git: fakeGit().run,
     runPty: async opts => {
       opts.onData('Quick\x1b[Csafety\x1b[Ccheck\r\n1.\x1b[CYes,\x1b[CI\x1b[Ctrust\x1b[Cthis\x1b[Cfolder\r\n')
       if (!opts.signal.aborted) await new Promise<void>(r => opts.signal.addEventListener('abort', () => r(), { once: true }))
@@ -263,4 +279,37 @@ test('the web location is the hand-off, so a run ends at the first prompt (#1225
   assert.equal(isHandsOff('web'), true)
   assert.equal(isHandsOff('local'), false)
   assert.equal(isHandsOff('actions'), false, 'an Actions runner streams its own replies')
+})
+
+test('the hand-off pushes HEAD under the agent id and hands the session that ref (#1320)', async () => {
+  const git = fakeGit()
+  const ptyCalls: AgentPtyOptions[] = []
+  const session = await driverWith(CREATED, ptyCalls, git).start({ cwd: '/repo' })
+  await session.prompt('go')
+  // One push, of HEAD, under the agent's own id — which contains no slash, because a
+  // slash-carrying ref never resolves on the cloud side (anthropics/claude-code#87235).
+  assert.deepEqual(git.calls, [['push', 'origin', `HEAD:refs/heads/${session.id}`]])
+  assert.ok(!session.id.includes('/'))
+  assert.equal(ptyCalls[0]?.ref, session.id)
+})
+
+test('a failed pre-push falls back to no ref, says so, and still hands off (#1320)', async () => {
+  const events: DriverEvent[] = []
+  const ptyCalls: AgentPtyOptions[] = []
+  const session = await driverWith(CREATED, ptyCalls, fakeGit([], true)).start({ cwd: '/repo', onEvent: e => events.push(e) })
+  const turn = await session.prompt('go')
+  assert.equal(turn.sessionId, SESSION)
+  assert.equal(ptyCalls[0]?.ref, undefined)
+  const notice = events.find((e): e is DriverEvent & { type: 'notice' } => e.type === 'notice')
+  assert.ok(notice && /could not push/.test(notice.message))
+  assert.ok(notice && /--teleport/.test(notice.message), 'the notice names the recovery path')
+})
+
+test('the ref rides the fixed command as its own guarded flag, after the model (#1320)', () => {
+  assert.match(CLOUD_COMMAND, /\$\{FW_CLOUD_REF:\+--ref "\$FW_CLOUD_REF"\}/)
+  assert.ok(CLOUD_COMMAND.indexOf('FW_CLOUD_MODEL') < CLOUD_COMMAND.indexOf('FW_CLOUD_REF'), 'the prompt slot rule (#1497) extends: nothing may sit between --cloud and its description')
+})
+
+test('the invocation disables nonessential traffic, which is what keeps the session repo-bound (#1320)', () => {
+  assert.equal(CLOUD_ENV['CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'], '1')
 })

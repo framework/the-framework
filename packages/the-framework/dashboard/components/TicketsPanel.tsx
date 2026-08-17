@@ -13,23 +13,13 @@ import { cn } from '../lib/utils.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 /**
- * The prompt behind "Import tickets from GitHub" (#697), read from the preset rather than written
- * here. This panel and the onboarding checklist offer the same button under the same label, and
- * they were sending different instructions: this text, against the preset's four bare words. Two
- * prompts behind one label is a button whose behaviour depends on where it was pressed.
+ * The prompt behind "Update from GitHub" (#1208), read from the preset rather than written here:
+ * this panel and the onboarding checklist offer the same button under the same label, and one
+ * label must mean one instruction wherever it is pressed (#697's lesson, when two surfaces sent
+ * different texts behind the same words).
  *
- * Deliberately short even so: the agent has `gh` and the ticket format already, and #674 settled
- * that over-specifying a preset earns nothing the context fragment does not already carry.
- */
-const IMPORT_PROMPT = presets.importTickets.render()
-
-/**
- * The prompt behind "Update from GitHub" (#1208), the second and every later import. Read from its
- * own preset for the same reason: one label, one instruction, wherever it is offered from.
- *
- * A separate preset rather than a flag on the import, because the two ask for different work. The
- * import fills an empty directory; this one reconciles a full one against what changed, and has to
- * be told to leave the plans already written against a ticket alone.
+ * The one GitHub sync since #1501: the preset's own empty branch treats a bare `tickets/` as the
+ * first import, so the separate import preset could go.
  */
 const UPDATE_PROMPT = presets.updateTickets.render()
 
@@ -318,9 +308,8 @@ export function TicketsPanel({
     if (result?.ok) onAgentStarted?.(prompt, result.agentId)
   }
 
-  // Unattended (#1279): an import/update fired by a button is routine work, not a conversation — it
+  // Unattended (#1279): an update fired by a button is routine work, not a conversation — it
   // ends at settle and its armed handoff fires, as when the sweep starts the same routine.
-  const importFromGithub = () => startSession(IMPORT_PROMPT, 'The import could not be started.', { unattended: true })
   const updateFromGithub = () => startSession(UPDATE_PROMPT, 'The update could not be started.', { unattended: true })
   // Attended, unlike the imports above: a plan is written per-ticket for a human to read and act
   // on, so the session stays a conversation you land in and steer rather than one that settles and
@@ -358,8 +347,8 @@ export function TicketsPanel({
           plans from.
         </p>
         {error && <p className="text-xs text-danger">{error}</p>}
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => void importFromGithub()}>
-          {busy ? 'Starting…' : 'Import tickets from GitHub'}
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => void updateFromGithub()}>
+          {busy ? 'Starting…' : 'Update from GitHub'}
         </Button>
       </div>
     )
@@ -368,9 +357,8 @@ export function TicketsPanel({
   return (
     <div className="overflow-hidden rounded-lg border border-border">
       {error && <p className="border-b border-border p-2 text-xs text-danger">{error}</p>}
-      {/* Offered once there is something to update (#1208). On an empty `tickets/` the button
-          above says "Import" instead: same work, but "update" would be a strange word for
-          filling a directory that has never been filled. */}
+      {/* The same update as the empty state's button (#1501): one preset covers both, its empty
+          branch being the first import. Here it sits beside the stamp it acts on. */}
       <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-2 py-1.5">
         {/* The stamp and its action side by side (#1265) — the button used to sit flush right,
             a whole panel-width away from the line it acts on. */}

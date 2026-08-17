@@ -14,7 +14,6 @@ let prefs: Preferences = {}
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => prefs,
   updatePreferences: vi.fn(),
-  autopilotEnabled: (p: Preferences) => p.browser ?? true,
   themePreference: (p: Preferences) => p.theme ?? 'system',
   usePreferenceSources: () => ({}),
   useProjectFileConfig: () => ({}),

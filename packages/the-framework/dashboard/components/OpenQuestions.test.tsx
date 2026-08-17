@@ -13,7 +13,6 @@ vi.mock('../rpc/control.js', () => ({ sendChoice }))
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => ({ autopilot: true }),
   updatePreferences: vi.fn(),
-  autopilotEnabled: () => true,
 }))
 
 const { OpenQuestions } = await import('./OpenQuestions.js')

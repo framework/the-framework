@@ -23,7 +23,6 @@ vi.mock('../rpc/control.js', () => ({
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => ({}),
   updatePreferences: vi.fn(),
-  autopilotEnabled: () => false,
 }))
 
 // The frame around the feed is not under test: the bar and composer reach for git and session

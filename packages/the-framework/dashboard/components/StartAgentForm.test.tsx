@@ -17,7 +17,6 @@ const prefs = vi.hoisted(() => ({ current: {} as Record<string, unknown> }))
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => prefs.current,
   updatePreferences: vi.fn(),
-  autopilotEnabled: () => false,
 }))
 vi.mock('../lib/profiles.js', () => ({ useConnectionProfiles: () => [] }))
 vi.mock('../lib/remote-target.js', () => ({ useSelectedRemoteDeviceId: () => null }))

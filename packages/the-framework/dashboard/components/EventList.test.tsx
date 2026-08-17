@@ -9,7 +9,6 @@ vi.mock('../rpc/control.js', () => ({ sendChoice }))
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => ({}),
   updatePreferences: vi.fn(),
-  autopilotEnabled: () => false,
 }))
 
 const { EventList } = await import('./EventList.js')

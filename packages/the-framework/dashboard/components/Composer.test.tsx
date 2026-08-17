@@ -12,7 +12,6 @@ let prefs: Preferences = {}
 vi.mock('../lib/preferences.js', () => ({
   usePreferences: () => prefs,
   updatePreferences,
-  autopilotEnabled: (p: Preferences) => p.browser ?? true,
   themePreference: (p: Preferences) => p.theme ?? 'system',
   // #842: the launcher strip reads the resolved layers; nothing here sets a repo tier.
   usePreferenceSources: () => ({}),

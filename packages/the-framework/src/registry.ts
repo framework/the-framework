@@ -1,5 +1,5 @@
 import { isAgentLocation, type AgentLocation } from './agent-location.js'
-import { isHandoffLevel, handoffFromStages, type HandoffLevel } from './handoff-level.js'
+import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { isDriverName } from './driver-names.js'
@@ -205,11 +205,7 @@ const SECRET_KEYS: Record<keyof RegistrySecrets, true> = {
 /** A bot token is ~70 chars and a webhook URL ~120; bounded so a hostile write can't bloat the file. */
 const MAX_SECRET_LENGTH = 500
 
-/**
- * The persisted registry file shape (#410): the project list plus the user preferences.
- * Older installs wrote a bare `ProjectRecord[]`; {@link readRegistry} still reads those and
- * the next write migrates the file to this object form.
- */
+/** The persisted registry file shape (#410): the project list plus the user preferences. */
 export interface Registry {
   projects: ProjectRecord[]
   preferences: Preferences
@@ -349,21 +345,6 @@ const PREFERENCE_KEYS = Object.keys(BOOLEAN_PREFERENCES) as BooleanPreferenceKey
 /** The color themes the dashboard offers (#725); anything else means the default `system`. */
 const KNOWN_THEMES = ['system', 'light', 'dark'] as const
 
-/**
- * The rung a set of pre-B5 preferences means, or `undefined` when they say nothing about it.
- *
- * The defaults are the ones the three booleans carried, so preferences setting none of them land on
- * the same `pr` an absent `handoff` lands on — this only ever changes the answer for a user who
- * actually said something, which is exactly the case worth not losing.
- */
-function legacyHandoffPreference(input: Record<string, unknown>): HandoffLevel | undefined {
-  const read = (key: string): boolean | undefined => (typeof input[key] === 'boolean' ? input[key] : undefined)
-  const stored = ['autoPushBranch', 'autoOpenPr', 'autoMerge'].map(read)
-  if (stored.every(v => v === undefined)) return undefined
-  const [pushed, opened, merged] = stored
-  const push = pushed ?? true
-  return handoffFromStages({ push, pr: push && (opened ?? true), merge: merged ?? false })
-}
 /** The agent targets the dashboard offers (#1050/#610); anything else means the default `local`. */
 function sanitizePreferences(value: unknown): Preferences {
   if (typeof value !== 'object' || value === null) return {}
@@ -380,12 +361,8 @@ function sanitizePreferences(value: unknown): Preferences {
   const model = typeof input['model'] === 'string' ? input['model'].trim() : ''
   if (model && model.toLowerCase() !== 'default') preferences.model = model
   // `driver` (#650) is constrained to the known set so junk never reaches the agent; the set is the
-  // shared node-free vocabulary (agent-names.ts). Default = claude. D5 renamed this stored key from
-  // `agent`; a file written before that still spells it `agent`, and dropping it would silently run
-  // the default CLI instead of the one the user chose — read it when `driver` is not set, migrated
-  // on the first write back.
+  // shared node-free vocabulary (agent-names.ts). Default = claude.
   if (isDriverName(input['driver'] as string | undefined)) preferences.driver = input['driver'] as string
-  else if (isDriverName(input['agent'] as string | undefined)) preferences.driver = input['agent'] as string
   // `editor` (#727) is a free-form CLI name, trimmed and length-capped so junk / a huge string
   // never lands in the file. A blank string is "no choice" (fall back to env / `code`), so dropped.
   if (typeof input['editor'] === 'string' && input['editor'].trim())
@@ -397,15 +374,9 @@ function sanitizePreferences(value: unknown): Preferences {
   // `target` (#1050) is a string, so the boolean-only PREFERENCE_KEYS loop would silently eat it;
   // it gets its own branch like `theme`, constrained to the known set (anything else = default `local`).
   if (isAgentLocation(input['target'])) preferences.target = input['target']
-  // `handoff` (B5) replaced `autoPushBranch` / `autoOpenPr` / `autoMerge`. A file written before
-  // that still spells the ladder as those three, and dropping them would read a stored "publish
-  // nothing" as the default — which pushes the branch and opens a PR. Migrated on read, so the
-  // first write back persists the rung and the old keys leave with it.
+  // `handoff` (B5) is the one ordinal the three booleans it replaced could never be: a rung, not a
+  // combination. Constrained to the ladder, so anything else means the default `pr`.
   if (isHandoffLevel(input['handoff'])) preferences.handoff = input['handoff']
-  else {
-    const legacy = legacyHandoffPreference(input)
-    if (legacy !== undefined) preferences.handoff = legacy
-  }
   // `autoSpendOffset` (#960) is the one numeric preference: a slider position in percentage
   // points, clamped so a hand-edited file cannot push the limit somewhere the slider could not.
   const offset = input['autoSpendOffset']
@@ -485,10 +456,9 @@ function sanitizeSecrets(value: unknown): RegistrySecrets | undefined {
 }
 
 /**
- * Read the whole registry. Forgiving: a missing / unreadable / malformed file yields an
- * empty registry, never throws. Accepts both the current object form and the legacy bare
- * `ProjectRecord[]` (pre-#410), so old installs keep working; projects are deduped by
- * resolved path and unknown preference fields are dropped.
+ * Read the whole registry. Forgiving: a missing / unreadable / malformed file — or one in a shape
+ * this no longer writes — yields an empty registry, never throws. Projects are deduped by resolved
+ * path and unknown preference fields are dropped.
  */
 export async function readRegistry(
   fs: RegistryFs = nodeRegistryFs(),
@@ -501,9 +471,7 @@ export async function readRegistry(
   } catch {
     return empty
   }
-  // Legacy format: a bare array of project records. Migrated to the object form on next write.
-  if (Array.isArray(parsed)) return { ...empty, projects: dedupeProjects(parsed) }
-  if (typeof parsed !== 'object' || parsed === null) return empty
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return empty
   const obj = parsed as Record<string, unknown>
   const projects = Array.isArray(obj.projects) ? dedupeProjects(obj.projects) : []
   const secrets = sanitizeSecrets(obj.secrets)

@@ -9,6 +9,7 @@ import { startBackgroundServices, type BackgroundServices } from './daemon-servi
 import { resolveDashboardBundle } from './dashboard/bundle.js'
 import { isActivated } from './project.js'
 import { addProject, ensureDaemonToken, listProjects, nodeRegistryFs, readPreferences, registryPreferencesStore, type Preferences } from './registry.js'
+import { captureRetiredProjectSettings, retiredProjectSettingsNotice } from './retired-project-settings.js'
 import { listReposInDirectory } from './repos-directory.js'
 import { registryDiscordCredentialsStore } from './discord-credentials-store.js'
 import { JsonlTailer } from './jsonl-tail.js'
@@ -145,6 +146,14 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   const port = opts.port ?? DEFAULT_DAEMON_PORT
   const host = opts.host ?? DEFAULT_DAEMON_HOST
   const env = opts.env ?? process.env
+  // The per-project preference tier B5 deleted (#840), reported before anything can erase it.
+  // First statement in the body on purpose: `writeRegistry` rewrites the file from the fields it
+  // knows, so the token below — or the project registration, or any preference write — drops the
+  // retired block, and a notice raised any later would have nothing left to read. The dashboard's
+  // banner is served from this same read.
+  for (const line of retiredProjectSettingsNotice(await captureRetiredProjectSettings(undefined, env))) {
+    console.log(line)
+  }
   // #1051: a non-loopback bind reaches the network, where a daemon that spawns processes is RCE for
   // anyone who finds the port, so generate + persist the shared token the request guard requires. A
   // loopback bind needs none, so the local zero-config path stays byte-identical.

@@ -88,9 +88,8 @@ test('installProject seeds .the-framework/.gitignore so only the archive is comm
   assert.match(ignore, /^!\*\/$/m)
   assert.match(ignore, /^!\*\/agents\/$/m)
   assert.match(ignore, /^!\*\/agents\/\*\*$/m)
-  // The name D5 renamed away from, still un-ignored: a repo whose archive predates the rename
-  // would otherwise have its committed history ignored the moment this file is rewritten.
-  assert.match(ignore, /^!\*\/sessions\/\*\*$/m)
+  // Only that name: the `sessions/` D5 renamed away from is not carried as a second rule.
+  assert.doesNotMatch(ignore, /sessions/)
 })
 
 test('installProject on a dirty repo commits the pre-existing changes first', async () => {

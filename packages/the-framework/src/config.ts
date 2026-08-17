@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { errorMessage } from './error-message.js'
-import { isHandoffLevel, handoffFromStages, HANDOFF_LEVELS, type HandoffLevel } from './handoff-level.js'
+import { isHandoffLevel, HANDOFF_LEVELS, type HandoffLevel } from './handoff-level.js'
 
 /**
  * The per-repo session defaults persisted in `the-framework.yml`: which preset and modes a project
@@ -59,35 +59,6 @@ export const BOOLEAN_CONFIG_KEYS = ['vanilla', 'transparent'] as const
 /** Every config key, string then enum then boolean, in declaration order. */
 export const CONFIG_KEYS = [...STRING_CONFIG_KEYS, ...ENUM_CONFIG_KEYS, ...BOOLEAN_CONFIG_KEYS] as const
 
-/** The three booleans `handoff` replaced (B5), in ladder order, for files written before it. */
-const LEGACY_HANDOFF_KEYS = ['autoPushBranch', 'autoOpenPr', 'autoMerge'] as const
-
-/**
- * The rung a pre-B5 file means, or `undefined` when it says nothing about the handoff.
- *
- * A committed file saying `autoPushBranch: false` is a repo asking not to be published, and B5
- * dropping the key it says that with would have turned it into the default — which *is* publishing:
- * the branch pushed and a PR opened, on a repo whose own file declined both. Reading the old keys
- * costs three lines and takes the direction of that failure off the table.
- *
- * The defaults are the ones those keys carried, so a file setting none of them lands on `pr`, which
- * is where a file with no handoff key lands anyway.
- */
-function legacyHandoff(obj: Record<string, unknown>, source: string): HandoffLevel | undefined {
-  if (LEGACY_HANDOFF_KEYS.every(key => obj[key] === undefined)) return undefined
-  for (const key of LEGACY_HANDOFF_KEYS) {
-    if (obj[key] !== undefined && typeof obj[key] !== 'boolean') {
-      throw new Error(`${source}: "${key}" must be a boolean (and is better written as "handoff")`)
-    }
-  }
-  const push = (obj['autoPushBranch'] as boolean | undefined) ?? true
-  return handoffFromStages({
-    push,
-    pr: push && ((obj['autoOpenPr'] as boolean | undefined) ?? true),
-    merge: (obj['autoMerge'] as boolean | undefined) ?? false,
-  })
-}
-
 /**
  * Read `the-framework.yml` (or `.yaml`) from a directory. A missing file yields
  * `{}`. Best-effort: a malformed file is reported via `onWarn` and treated as
@@ -141,25 +112,12 @@ export function parseFrameworkConfig(raw: string, source = 'the-framework.yml'):
       throw new Error(`${source}: "handoff" must be one of ${HANDOFF_LEVELS.join(' | ')}`)
     }
     config.handoff = obj['handoff']
-  } else {
-    const legacy = legacyHandoff(obj, source)
-    if (legacy !== undefined) config.handoff = legacy
   }
   for (const key of BOOLEAN_CONFIG_KEYS) {
     if (obj[key] !== undefined) {
       if (typeof obj[key] !== 'boolean') throw new Error(`${source}: "${key}" must be a boolean`)
       config[key] = obj[key] as boolean
     }
-  }
-  // C3 renamed `antiLazyPill` to `vanilla` and inverted it: antiLazyPill was the #326 prompt being
-  // present, vanilla is it being removed. A committed `antiLazyPill: false` is a repo opting out of
-  // the prompt; dropping the key would re-inject it (vanilla defaults false = prompt on) — the same
-  // silent flip the handoff keys had. Read it when vanilla is not set.
-  if (config.vanilla === undefined && obj['antiLazyPill'] !== undefined) {
-    if (typeof obj['antiLazyPill'] !== 'boolean') {
-      throw new Error(`${source}: "antiLazyPill" must be a boolean (and is better written as "vanilla")`)
-    }
-    config.vanilla = !obj['antiLazyPill']
   }
   return config
 }

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import type { ProjectSummary } from './dashboard/projects.js'
-import { ARCHIVE_DIR, LEGACY_ARCHIVE_DIR } from './store/index.js'
+import { ARCHIVE_DIR } from './store/index.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import type { GitRunner } from './project.js'
 import { nodeGitRunner } from './project.js'
@@ -51,18 +51,6 @@ import { errorMessage } from './error-message.js'
  */
 export const ARCHIVE_PATHSPEC = `:(glob)${THE_FRAMEWORK_DIR}/*/${ARCHIVE_DIR}/**`
 
-/**
- * The same, for the pre-D5 archive directory (`<user>/sessions/`). An archive written by an older
- * CLI, or one whose 5-minute commit window was still open when the upgrade landed, sits under this
- * name; without committing it too, it stays untracked and the next `git clean -fdx` deletes it —
- * exactly the #1179 loss the committed archive exists to prevent. Read-side already handles both
- * names; this is the write side of the same back-compat.
- */
-export const LEGACY_ARCHIVE_PATHSPEC = `:(glob)${THE_FRAMEWORK_DIR}/*/${LEGACY_ARCHIVE_DIR}/**`
-
-/** Both archive pathspecs — current and pre-D5 — for the reads that never error on a no-match. */
-export const ARCHIVE_PATHSPECS: readonly string[] = [ARCHIVE_PATHSPEC, LEGACY_ARCHIVE_PATHSPEC]
-
 /** How long writes may keep arriving before the batch is committed anyway. */
 export const COMMIT_MAX_WAIT_MS = 5 * 60_000
 
@@ -111,7 +99,7 @@ export function commitMessage(files: string[]): string {
  * repo shows this; a per-file fake does not.
  */
 export async function pendingAgents(cwd: string, git: GitRunner = nodeGitRunner()): Promise<string[]> {
-  const out = await git(['status', '--porcelain', '-uall', '--', ...ARCHIVE_PATHSPECS], cwd).catch(() => '')
+  const out = await git(['status', '--porcelain', '-uall', '--', ARCHIVE_PATHSPEC], cwd).catch(() => '')
   const files = new Set<string>()
   for (const line of out.split('\n')) {
     if (line.length < 4) continue
@@ -194,16 +182,9 @@ export async function commitAgents(
   const files = await pendingAgents(cwd, git)
   if (files.length === 0) return { committed: false, reason: NOTHING_PENDING }
 
-  // Stage and commit only the pathspecs that actually matched: git treats a pathspec matching no
-  // file as a hard error, so passing the legacy `sessions/` spec on the common repo (which has only
-  // `agents/`) would fail the whole commit. `files` came from those same pathspecs, so a scheme is
-  // present exactly when a pending path sits under its directory.
-  const specs: string[] = []
-  if (files.some(f => f.includes(`/${ARCHIVE_DIR}/`))) specs.push(ARCHIVE_PATHSPEC)
-  if (files.some(f => f.includes(`/${LEGACY_ARCHIVE_DIR}/`))) specs.push(LEGACY_ARCHIVE_PATHSPEC)
   try {
-    await git(['add', '--', ...specs], cwd)
-    await git(['commit', '-m', commitMessage(files), '--', ...specs], cwd)
+    await git(['add', '--', ARCHIVE_PATHSPEC], cwd)
+    await git(['commit', '-m', commitMessage(files), '--', ARCHIVE_PATHSPEC], cwd)
     return { committed: true, files }
   } catch (err) {
     return { committed: false, reason: errorMessage(err) }

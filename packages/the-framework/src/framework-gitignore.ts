@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
-import { ARCHIVE_DIR, LEGACY_ARCHIVE_DIR } from './store/index.js'
+import { ARCHIVE_DIR } from './store/index.js'
 
 /**
  * The `.the-framework/.gitignore` (#313/#1179): one file, one content, written at install.
@@ -36,14 +36,9 @@ export function gitignorePath(cwd: string): string {
  * A star matches one path segment and never a slash, so this reaches exactly `<user>/agents/`
  * and not `worktrees/<agent>/agents/`. The transient siblings stay ignored either way: un-ignoring
  * a directory only lets git descend into it, and the bare `*` still ignores every file it finds.
- *
- * Both spellings are un-ignored: D5 renamed the directory, and a repo carrying archives under the
- * old `sessions/` name would otherwise have them ignored the moment this file is rewritten — still
- * tracked, since git does not un-track what it already knows, but invisible to every later add.
  */
 export function archiveGitignore(): string {
-  const rules = (name: string) => `!*/${name}/\n!*/${name}/**\n`
-  return `!*/\n${rules(ARCHIVE_DIR)}${rules(LEGACY_ARCHIVE_DIR)}`
+  return `!*/\n!*/${ARCHIVE_DIR}/\n!*/${ARCHIVE_DIR}/**\n`
 }
 
 /** The whole file: ignore the transient state, keep the session archive. */

@@ -18,13 +18,6 @@ test('parseFrameworkConfig reads the vanilla toggle (C3)', () => {
   // it used to be `antiLazyPill: false` here for what is `vanilla: true` everywhere else.
   assert.deepEqual(parseFrameworkConfig('vanilla: true\n'), { vanilla: true })
   assert.throws(() => parseFrameworkConfig('vanilla: nope\n'), /"vanilla" must be a boolean/)
-  // The old name is migrated, inverted: `antiLazyPill: false` is the repo opting out of the #326
-  // prompt, which is `vanilla: true`. Dropping the key would silently re-inject the prompt.
-  assert.deepEqual(parseFrameworkConfig('antiLazyPill: false\n'), { vanilla: true }, 'antiLazyPill: false → vanilla: true')
-  assert.deepEqual(parseFrameworkConfig('antiLazyPill: true\n'), { vanilla: false }, 'antiLazyPill: true → vanilla: false')
-  // The new name wins when both are present, rather than the legacy key overriding it.
-  assert.deepEqual(parseFrameworkConfig('vanilla: false\nantiLazyPill: false\n'), { vanilla: false })
-  assert.throws(() => parseFrameworkConfig('antiLazyPill: nope\n'), /"antiLazyPill" must be a boolean/)
 })
 
 test('parseFrameworkConfig reads the transparent toggle (#625)', () => {
@@ -44,21 +37,13 @@ test('parseFrameworkConfig reads the handoff rung (#1173/#1216)', () => {
   assert.throws(() => parseFrameworkConfig('handoff: true\n'), /"handoff" must be one of local \| push \| pr \| merge/)
 })
 
-test('parseFrameworkConfig reads a pre-B5 file by the three keys it replaced', () => {
-  // A committed `autoPushBranch: false` is a repo asking not to be published. Ignoring the key it
-  // says that with does not leave the repo where it was — it lands on the default, which pushes the
-  // branch and opens a PR the file declined. So the old spelling still resolves to a rung.
-  assert.deepEqual(parseFrameworkConfig('autoPushBranch: false\n'), { handoff: 'local' })
-  assert.deepEqual(parseFrameworkConfig('autoOpenPr: false\n'), { handoff: 'push' })
-  assert.deepEqual(parseFrameworkConfig('autoMerge: true\n'), { handoff: 'merge' })
-  // "PR without push" was never a state a session could honour; as a rung it resolves downward
-  // rather than turning the push back on.
-  assert.deepEqual(parseFrameworkConfig('autoPushBranch: false\nautoOpenPr: true\n'), { handoff: 'local' })
-  // Spelling both wins on the new key, and a file saying nothing still says nothing.
-  assert.deepEqual(parseFrameworkConfig('handoff: local\nautoMerge: true\n'), { handoff: 'local' })
-  assert.deepEqual(parseFrameworkConfig('vanilla: true\n'), { vanilla: true })
-  // Still typed, like every other key, and the error points at the spelling that replaced it.
-  assert.throws(() => parseFrameworkConfig('autoMerge: yes please\n'), /"autoMerge" must be a boolean/)
+test('parseFrameworkConfig reads only the current spellings', () => {
+  // Zero users, so a rename costs nothing to break and a migration path costs a permanent branch
+  // in every reader: the keys `handoff` and `vanilla` replaced are simply unknown keys now, and an
+  // unknown key is ignored. Manual migration is the whole story — rewrite the file.
+  assert.deepEqual(parseFrameworkConfig('autoPushBranch: false\n'), {})
+  assert.deepEqual(parseFrameworkConfig('autoOpenPr: false\nautoMerge: true\n'), {})
+  assert.deepEqual(parseFrameworkConfig('antiLazyPill: false\n'), {})
 })
 
 test('parseFrameworkConfig treats an empty document as {}', () => {

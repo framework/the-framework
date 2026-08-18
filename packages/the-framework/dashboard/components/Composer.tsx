@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { ArrowUp, Loader2 } from 'lucide-react'
 import type { ProjectSummary } from '../../src/index.js'
-import { DRIVERS, DRIVER_LABELS, LAUNCHER_PRESETS, type DriverName } from '../../src/client.js'
+import { DRIVERS, DRIVER_LABELS, LAUNCHER_PRESETS, type DriverName, isLoopbackHost } from '../../src/client.js'
 import {
   usePreferences,
   updatePreferences,
@@ -21,7 +21,7 @@ import { DriverModelMenu, type DriverOption } from './DriverModelMenu.js'
 import { OptionsMenu, type AgentTarget } from './OptionsMenu.js'
 import { resumeOptionRows, agentOptionRows } from '../lib/agent-option-rows.js'
 import { AddDeviceDialog } from './AddDeviceDialog.js'
-import { useConnectionProfiles, connectLocal, isLoopbackHost, removeProfile, type ConnectionProfile } from '../lib/profiles.js'
+import { useConnectionProfiles, connectLocal, removeProfile, type ConnectionProfile } from '../lib/profiles.js'
 import { useSelectedRemoteDeviceId, selectRemoteDevice } from '../lib/remote-target.js'
 import { useDeviceStatus } from '../lib/use-device-status.js'
 import { stashDraftFromUrl, takePendingDraft } from '../lib/draft-handoff.js'

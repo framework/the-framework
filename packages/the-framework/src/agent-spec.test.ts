@@ -2,8 +2,8 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { readAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
+import { dirname, join } from 'node:path'
+import { readAgentSpec, removeAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
 
 const SPEC: AgentSpec = {
   prompt: 'fix the login bug',
@@ -33,6 +33,30 @@ test('reading a spec consumes it: a device token does not outlive the session (D
   const spec = await readAgentSpec(path)
   assert.equal(spec.options.remote?.token, 'secret')
   assert.equal(await stat(path).then(() => true, () => false), false, 'the file is gone')
+  // The whole mkdtemp directory, not just the file: one spec makes one directory, so removing
+  // only session.json left one empty directory behind per session, forever.
+  assert.equal(await stat(dirname(path)).then(() => true, () => false), false, 'and so is its directory')
+})
+
+test('a hand-written spec loses only the file, never the directory the user keeps it in (D4)', async () => {
+  // `--agent <path>` accepts any path. Only the directory writeAgentSpec's own prefix names is
+  // this module's to remove whole.
+  const dir = await mkdtemp(join(tmpdir(), 'my-specs-'))
+  try {
+    const path = join(dir, 'session.json')
+    await writeFile(path, JSON.stringify(SPEC))
+    await readAgentSpec(path)
+    assert.equal(await stat(path).then(() => true, () => false), false, 'the file is gone')
+    assert.equal((await stat(dir)).isDirectory(), true, 'the directory survives')
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('a spec whose child never ran is removed by the spawner, directory and all (D4)', async () => {
+  const path = await writeAgentSpec(SPEC)
+  await removeAgentSpec(path)
+  assert.equal(await stat(dirname(path)).then(() => true, () => false), false)
 })
 
 test('a file that is not a spec is refused rather than half-run (D4)', async () => {

@@ -28,7 +28,7 @@ import {
 } from './store/index.js'
 import { agentIdFromWorktreeDir } from './branch-names.js'
 import type { FrameworkEvent } from './events.js'
-import { writeAgentSpec } from './agent-spec.js'
+import { removeAgentSpec, writeAgentSpec } from './agent-spec.js'
 import type { StartAgentKind, StartAgentOptions, StartAgentResult, AddProjectResult } from './dashboard/index.js'
 import type { EventsSource, RemoteAgents } from './dashboard/rpc-serve.js'
 import { RelayedAgents, startRemoteAgent } from './dashboard/remote-run.js'
@@ -725,19 +725,16 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
       // `prompt` kind (#353) is a preset the user reviewed in the textarea: run it verbatim,
       // never re-render. `agentId` is the id its worktree is named with, so the directory and the
       // run recorded inside it are one string — and tells it the framework owns its branch.
-      const child = spawnDetached(
-        realBin,
-        await writeAgentSpec({
-          prompt,
-          kind,
-          cwd: workspace.cwd,
-          ...(workspace.agentId ? { agentId: workspace.agentId } : {}),
-          // Reopen the agent's log instead of truncating it: the follow-up IS that agent.
-          ...(continued ? { continueAgent: true } : {}),
-          options,
-        }, env),
-        ...(workspace.agentId ? [agentStderrPath(workspace.cwd)] : []),
-      )
+      const specPath = await writeAgentSpec({
+        prompt,
+        kind,
+        cwd: workspace.cwd,
+        ...(workspace.agentId ? { agentId: workspace.agentId } : {}),
+        // Reopen the agent's log instead of truncating it: the follow-up IS that agent.
+        ...(continued ? { continueAgent: true } : {}),
+        options,
+      }, env)
+      const child = spawnDetached(realBin, specPath, ...(workspace.agentId ? [agentStderrPath(workspace.cwd)] : []))
       // The agent narrates itself through its own `.the-framework/events.jsonl`, which the
       // dashboard streams over `GET /_rpc/events`; the daemon just tracks liveness.
       const settle = (detail: string): void => {
@@ -756,7 +753,11 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
             .catch(() => {}),
         )
       }
-      child.once('error', err => settle(`its process could not be spawned (${errorMessage(err)})`))
+      child.once('error', err => {
+        // The child never ran, so nothing consumed the spec: remove it here or the prompt stays on disk.
+        void removeAgentSpec(specPath)
+        settle(`its process could not be spawned (${errorMessage(err)})`)
+      })
       child.once('exit', (code, signal) => settle(exitDetail(code, signal)))
       if (child.pid !== undefined) activeAgents.set(key, child.pid)
       // Hand back the agent's id (#761) so the dashboard can select this agent rather than guess.

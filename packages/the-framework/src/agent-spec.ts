@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import type { StartAgentKind, StartAgentOptions } from './dashboard/index.js'
 
 /**
@@ -35,6 +35,9 @@ export interface AgentSpec {
 /** The env var naming the directory session specs are written to. Set by tests; defaults to the OS temp dir. */
 const SPEC_DIR_ENV = 'FRAMEWORK_SESSION_SPEC_DIR'
 
+/** The per-spec mkdtemp directory's prefix, which marks the directory as this module's to remove. */
+const SPEC_DIR_PREFIX = 'framework-session-'
+
 /**
  * Write a spec and return its path, for `framework --agent <path>`.
  *
@@ -43,10 +46,25 @@ const SPEC_DIR_ENV = 'FRAMEWORK_SESSION_SPEC_DIR'
  * the other. The child removes it once read, so a spec never outlives the session it started.
  */
 export async function writeAgentSpec(spec: AgentSpec, env: NodeJS.ProcessEnv = process.env): Promise<string> {
-  const dir = await mkdtemp(join(env[SPEC_DIR_ENV] ?? tmpdir(), 'framework-session-'))
+  const dir = await mkdtemp(join(env[SPEC_DIR_ENV] ?? tmpdir(), SPEC_DIR_PREFIX))
   const path = join(dir, 'session.json')
   await writeFile(path, JSON.stringify(spec, null, 2) + '\n')
   return path
+}
+
+/**
+ * Remove a spec — and the directory {@link writeAgentSpec} made for it, or removing one spec per
+ * session would leave one empty directory per session behind forever. Only a directory carrying
+ * this module's own prefix goes whole: `--agent <path>` accepts any path, and a hand-written spec
+ * must not take the directory the user keeps it in with it.
+ *
+ * Also the cleanup for a spawn that failed (the child never ran, so nothing consumed the spec),
+ * which otherwise left the whole prompt sitting on disk.
+ */
+export async function removeAgentSpec(path: string): Promise<void> {
+  const dir = dirname(path)
+  if (basename(dir).startsWith(SPEC_DIR_PREFIX)) await rm(dir, { recursive: true, force: true }).catch(() => {})
+  else await rm(path, { force: true }).catch(() => {})
 }
 
 /**
@@ -56,7 +74,7 @@ export async function writeAgentSpec(spec: AgentSpec, env: NodeJS.ProcessEnv = p
  */
 export async function readAgentSpec(path: string): Promise<AgentSpec> {
   const raw = await readFile(path, 'utf8')
-  await rm(path, { force: true }).catch(() => {})
+  await removeAgentSpec(path)
   const spec = JSON.parse(raw) as Partial<AgentSpec>
   if (typeof spec.prompt !== 'string' || typeof spec.cwd !== 'string' || !spec.kind) {
     throw new Error(`${path} is not a session spec`)

@@ -26,7 +26,7 @@ import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
 import { isHandsOff, isAgentLocation, type AgentLocation } from './agent-location.js'
 import { handoffStages, isHandoffLevel, type HandoffLevel } from './handoff-level.js'
-import { readAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
+import { readAgentSpec, removeAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
 import { agentTodoPending } from './todo-loop.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from './config.js'
 import {
@@ -1357,7 +1357,11 @@ async function spawnPromptAgent(prompt: string, cwd: string, binPath: string, va
   const specPath = await writeAgentSpec(promptAgentSpec(prompt, cwd, vanilla))
   return new Promise<boolean>(resolvePromise => {
     const child = spawn(process.execPath, [binPath, '--agent', specPath], { stdio: 'inherit' })
-    child.once('error', () => resolvePromise(false))
+    child.once('error', () => {
+      // The child never ran, so nothing consumed the spec: remove it here or the prompt stays on disk.
+      void removeAgentSpec(specPath)
+      resolvePromise(false)
+    })
     child.once('exit', code => resolvePromise(code === 0))
   })
 }

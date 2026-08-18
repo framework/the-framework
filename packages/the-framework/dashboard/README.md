@@ -11,7 +11,7 @@ It is a **projection of the same files the daemon writes** — no daemon process
 IPC:
 
 - **Reads** — `POST /_rpc/<name>` (`rpc/reads.ts`, `rpc/projects.ts`, …) for agent history, an agent's
-  replay, the surfaced PLAN/TODO docs, and the committed `LOGS.md`.
+  replay, and the surfaced PLAN/TODO docs.
 - **Live event stream** — Server-Sent Events at `GET /_rpc/events` (`rpc/events.ts`) tailing
   the selected session's `.the-framework/events.jsonl`; each new line becomes one SSE frame.
 

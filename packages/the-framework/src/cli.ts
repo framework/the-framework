@@ -1081,7 +1081,7 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   const abortBeforeDriver = async (reason: string): Promise<number> => {
     io.err(reason)
     // Release every handle settleAgent would: the armed interrupt trap, the agent's own dashboard
-    // server, and the LOGS.md entry — leaving any of them behind kept the process alive with a
+    // server, and the open event store — leaving any of them behind kept the process alive with a
     // swallowed first Ctrl+C, exactly the hang this helper exists to prevent.
     clearInterrupt()
     try {
@@ -1346,7 +1346,7 @@ export function promptAgentSpec(prompt: string, cwd: string, vanilla = false): A
 
 /**
  * Run one direct prompt by spawning `framework --agent <spec>`, reusing the whole agent path
- * (preflight, driver, budget cap, LOGS.md). The child inherits stdio so its agent streams to the
+ * (preflight, driver, budget cap, session archive). The child inherits stdio so its agent streams to the
  * terminal. Note the spec carries no `onBeforeMergeable`, so a quality pass never triggers its own
  * on-before-mergeable prompt (the recursion guard). Resolves true on a clean exit (0). Never
  * re-execs a test entry (fork-bomb guard).

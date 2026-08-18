@@ -158,8 +158,8 @@ async function withWorktreeRemoval<T>(
 /**
  * Delete a session (#1032): remove it from the dashboard, records and all — the sibling of
  * {@link sendRemoveWorktree}, and the one destructive-of-history action, so its surface confirms
- * first. The checks, the worktree removal and what it leaves behind (the branch, the committed
- * `LOGS.md` line, the conversation record) are all {@link deleteProjectAgent}'s; this adds only the
+ * first. The checks, the worktree removal and what it leaves behind (the branch and its
+ * commits) are all {@link deleteProjectAgent}'s; this adds only the
  * daemon step of stopping a preview that may be serving the worktree before it comes off disk.
  */
 export async function sendDeleteAgent(projectId: string, agentId: string): Promise<DeleteAgentResult> {

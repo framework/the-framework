@@ -24,7 +24,7 @@ describe('format-date (#759)', () => {
   })
 
   test('an unparseable timestamp reads as the fallback too', () => {
-    // A LOGS.md heading carries its `at` verbatim, so a hand-edited one lands here as-is.
+    // Timestamps arrive verbatim from files, so a hand-edited one lands here as-is.
     expect(formatDateTime('not a date')).toBe('—')
     expect(formatDate('not a date')).toBe('—')
   })

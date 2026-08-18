@@ -1,6 +1,6 @@
 import { listProjectWorktrees, removeProjectWorktree, type RemoveResult, type WorktreeRow } from './worktrees.js'
 import { withAgentLock } from './agent-locks.js'
-import { findWorktreePath } from './store/index.js'
+import { worktreePath } from './store/index.js'
 
 // Reclaim a session's checkout once its work is on the remote (#1036/E5).
 //
@@ -71,7 +71,7 @@ export async function removeMergedWorktrees(cwd: string, deps: MergedSweepDeps =
   const result: MergedSweepResult = { removed: [], failed: [] }
   for (const row of await worktrees(cwd).catch((): WorktreeRow[] => [])) {
     if (row.live || deps.busy?.has(row.agentId)) continue
-    const outcome = await withAgentLock(await findWorktreePath(cwd, row.agentId), () => remove(cwd, row.agentId))
+    const outcome = await withAgentLock(worktreePath(cwd, row.agentId), () => remove(cwd, row.agentId))
     if (outcome.ok) result.removed.push({ agentId: row.agentId })
     else result.failed.push({ agentId: row.agentId, error: outcome.error })
   }

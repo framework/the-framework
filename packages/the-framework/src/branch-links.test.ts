@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
 import { reconcileBranchLinks, startBranchLinksPass, type LinksFs } from './branch-links.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, LEGACY_WORKTREES_DIR, type WorktreeDirEntry } from './store/index.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, type WorktreeDirEntry } from './store/index.js'
 
 const CWD = '/repo'
 const LINKS = join(CWD, FRAMEWORK_DIR, BRANCHES_DIR)
@@ -10,8 +10,6 @@ const ROOT_LINK = join(CWD, 'branches')
 
 /** A checkout at the #1580 location, dir named as its birth branch. */
 const current = (agentId: string): WorktreeDirEntry => ({ agentId, path: join(LINKS, `tf-agent-${agentId}`) })
-/** A checkout still draining out of the legacy root. */
-const legacy = (agentId: string): WorktreeDirEntry => ({ agentId, path: join(CWD, FRAMEWORK_DIR, LEGACY_WORKTREES_DIR, agentId) })
 
 /** An in-memory {@link LinksFs}: `links` maps absolute path -> target; `files` are non-symlinks. */
 function memFs(opts: { links?: Record<string, string>; files?: string[] } = {}) {
@@ -48,17 +46,11 @@ test('a renamed branch gets a sibling link, and the stale name goes in the same 
   assert.deepEqual(branchLinksOf(links), { 'tf-cool-name': 'tf-agent-r1' })
 })
 
-test('a legacy checkout is linked into the view by its branch (#1589: drained, never migrated)', async () => {
-  const { fs, links } = memFs()
-  await reconcileBranchLinks(CWD, { fs, worktrees: async () => [legacy('r9')], branchOf: async () => 'tf-fix-login' })
-  assert.deepEqual(branchLinksOf(links), { 'tf-fix-login': join('..', LEGACY_WORKTREES_DIR, 'r9') })
-})
-
 test('a reclaimed checkout loses its link; detached and slash-named branches never get one', async () => {
-  const { fs, links } = memFs({ links: { [join(LINKS, 'tf-done')]: join('..', LEGACY_WORKTREES_DIR, 'gone') } })
+  const { fs, links } = memFs({ links: { [join(LINKS, 'tf-done')]: 'tf-agent-gone' } })
   await reconcileBranchLinks(CWD, {
     fs,
-    worktrees: async () => [legacy('detached'), legacy('old')],
+    worktrees: async () => [current('detached'), current('old')],
     branchOf: async path => (path.endsWith('old') ? 'the-framework/old-name' : undefined),
   })
   assert.deepEqual(branchLinksOf(links), {}, 'the dead link is gone, nothing new appeared')

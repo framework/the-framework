@@ -3,7 +3,6 @@ Keeps every session checkout reachable by its branch name: new checkouts live in
 ## TLDR
 
 - A new checkout's folder is already named as its branch, so most need nothing extra. When a session renames its branch (most do, early on), the background pass adds a link under the new name — a rename costs a link, never moving a checkout under a running session.
-- Checkouts from before this layout stay where they are (nothing is migrated) and are linked into the view by their branch name until the cleanup sweep retires them.
 - Only the framework's own links are ever created, replaced, or removed: a user's own file, folder, or symlink at any of these paths is left alone.
 - A session on a branch whose name cannot be a folder name (old slashed names) simply gets no link.
 

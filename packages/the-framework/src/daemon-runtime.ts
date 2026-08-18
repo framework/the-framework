@@ -13,7 +13,6 @@ import {
   restoreArchivedAgent,
   attachWorktree,
   worktreePath,
-  findWorktreePath,
   listAgents,
   findAgent,
   archivedAgentPaths,
@@ -434,11 +433,9 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     // while teardown is still archiving the very history this restores — reusing the checkout
     // mid-retirement spawned the continuation into a tree about to be removed. Waiting the
     // teardown out costs the click a beat and makes the reuse read a settled archive.
-    // findWorktreePath: a pre-#1580 checkout still lives under the legacy root (never migrated),
-    // and both the lock and the reuse must land on the directory that actually exists.
-    findWorktreePath(projectCwd, agentId).then(path =>
-    withAgentLock(path, async () => {
+    withAgentLock(worktreePath(projectCwd, agentId), async () => {
       try {
+        const path = worktreePath(projectCwd, agentId)
         const existing = await stat(path).then(s => s.isDirectory()).catch(() => false)
         if (!existing) {
           const archived = (await listAgents(projectCwd).catch(() => [])).find(agent => agent.id === agentId)
@@ -455,7 +452,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         console.log(`[framework] could not continue agent ${agentId} (${errorMessage(err)}); starting a new one`)
         return undefined
       }
-    }))
+    })
 
   /**
    * Whether the driver this agent picked can actually start (#1326), as one line to show when it

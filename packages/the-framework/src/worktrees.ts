@@ -10,7 +10,6 @@ import {
   removeWorktree,
   pruneWorktrees,
   worktreePath,
-  findWorktreePath,
   worktreeSize,
   isSafeAgentId,
   archivedAgentPaths,
@@ -89,7 +88,7 @@ export async function listProjectWorktrees(cwd: string, opts: { sizes?: boolean 
 }
 
 async function sizeOf(cwd: string, agentId: string): Promise<{ sizeBytes?: number }> {
-  const bytes = await worktreeSize(await findWorktreePath(cwd, agentId)).catch(() => undefined)
+  const bytes = await worktreeSize(worktreePath(cwd, agentId)).catch(() => undefined)
   return bytes === undefined ? {} : { sizeBytes: bytes }
 }
 
@@ -121,7 +120,7 @@ export async function removeProjectWorktree(
   if (live.some(agent => agent.id === agentId && agent.status === 'running')) {
     return { ok: false, error: 'that session is still going; stop it before removing its worktree' }
   }
-  const path = await findWorktreePath(cwd, agentId)
+  const path = worktreePath(cwd, agentId)
   try {
     // `removeWorktree` forces past a dirty tree, so an uncommitted edit has to be on the branch
     // before the checkout can go — otherwise the very diff the checkout held is what is deleted.
@@ -201,7 +200,7 @@ export async function deleteProjectAgent(cwd: string, agentId: string, opts: Del
     const names = await listWorktreeDirs(cwd).catch((): string[] => [])
     if (names.includes(agentId)) {
       await opts.beforeRemove?.(agentId)
-      await removeWorktree(cwd, await findWorktreePath(cwd, agentId))
+      await removeWorktree(cwd, worktreePath(cwd, agentId))
       await pruneWorktrees(cwd)
     }
     // Then the records that put the row in the list. Looked up rather than derived from the id: a

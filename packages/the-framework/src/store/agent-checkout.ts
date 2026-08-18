@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { archivedAgentPaths, isSafeAgentId, readLiveMetas, EVENTS_FILE, FRAMEWORK_DIR } from './agent-store.js'
-import { findWorktreePath } from './worktree.js'
+import { worktreePath } from './worktree.js'
 import { nodeFs } from '../node-fs.js'
 
 /**
@@ -25,7 +25,7 @@ export async function resolveAgentCheckout(projectCwd: string, agentId: string |
   const live = await readLiveMetas(projectCwd).catch(() => [])
   const running = live.find(agent => agent.id === agentId)?.cwd
   if (running) return running
-  const path = await findWorktreePath(projectCwd, agentId)
+  const path = worktreePath(projectCwd, agentId)
   return (await nodeFs().isDirectory(path)) ? path : projectCwd
 }
 
@@ -48,7 +48,7 @@ export async function resolveAgentEventsPath(projectCwd: string, agentId: string
   const live = await readLiveMetas(projectCwd).catch(() => [])
   const running = live.find(agent => agent.id === agentId)?.cwd
   if (running) return join(running, FRAMEWORK_DIR, EVENTS_FILE)
-  const path = await findWorktreePath(projectCwd, agentId)
+  const path = worktreePath(projectCwd, agentId)
   if (await nodeFs().isDirectory(path)) return join(path, FRAMEWORK_DIR, EVENTS_FILE)
   const [, archivedEvents] = await archivedAgentPaths(projectCwd, agentId)
   return archivedEvents ?? rootJournal

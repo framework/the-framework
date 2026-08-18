@@ -7,7 +7,7 @@ import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
 import { isTicketFile } from '../dashboard/tickets.js'
 import { releaseTicketLock } from '../ticket-locks.js'
-import { findAgent, isSafeAgentId, recordAgentPr, findWorktreePath, type AgentMeta } from '../store/index.js'
+import { findAgent, isSafeAgentId, recordAgentPr, worktreePath, type AgentMeta } from '../store/index.js'
 import { withAgentLock } from '../agent-locks.js'
 import { removeProjectWorktree, deleteProjectAgent } from '../worktrees.js'
 import { commitAgentWork, mergeAgentPr, openAgentPullRequest, pushAgentBranch, agentBranchFor, type HandoffResult } from '../dashboard/agent-handoff.js'
@@ -152,7 +152,7 @@ async function withWorktreeRemoval<T>(
   // Under the agent lock: a Remove/Delete clicked the moment an agent ends races teardown's own
   // archive-commit-remove of the same checkout; serialized, whichever runs second finds the
   // state the first one left and acts on that.
-  return withAgentLock(await findWorktreePath(cwd, agentId), () => remove(cwd, { beforeRemove: async () => {} }))
+  return withAgentLock(worktreePath(cwd, agentId), () => remove(cwd, { beforeRemove: async () => {} }))
 }
 
 /**

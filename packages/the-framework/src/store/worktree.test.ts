@@ -13,12 +13,10 @@ import {
   removeWorktree,
   pruneWorktrees,
   worktreePath,
-  findWorktreePath,
   agentBranchName,
   currentBranch,
   renameAgentBranch,
   FRAMEWORK_DIR,
-  type StoreFs,
 } from './index.js'
 
 const REPO = '/repo'
@@ -39,15 +37,6 @@ const failingGit: GitRunner = async () => {
 
 test('worktreePath nests the run under .the-framework/branches, named as its branch (#1580)', () => {
   assert.equal(worktreePath(REPO, '2026-07-19T10-00-00-000Z'), join(REPO, FRAMEWORK_DIR, 'branches', 'tf-agent-2026-07-19T10-00-00-000Z'))
-})
-
-test('findWorktreePath prefers the #1580 location, falls back to a draining legacy checkout, else points at the #1580 path', async () => {
-  const fsWith = (existing: string[]): StoreFs => ({ exists: async path => existing.includes(path) }) as StoreFs
-  const current = worktreePath(REPO, 'r1')
-  const legacy = join(REPO, FRAMEWORK_DIR, 'worktrees', 'r1')
-  assert.equal(await findWorktreePath(REPO, 'r1', fsWith([current, legacy])), current)
-  assert.equal(await findWorktreePath(REPO, 'r1', fsWith([legacy])), legacy)
-  assert.equal(await findWorktreePath(REPO, 'r1', fsWith([])), current)
 })
 
 test('addWorktree builds `worktree add -b <branch> <path>` and returns the path + branch', async () => {

@@ -33,13 +33,6 @@ export const FRAMEWORK_DIR = '.the-framework'
  */
 export const BRANCHES_DIR = 'branches'
 
-/**
- * Where worktrees lived before #1580 (bare agent-id dirs). Nothing creates one anymore and
- * nothing is migrated: old checkouts stay here until the reclaim sweep removes them, and every
- * reader covers both roots via {@link worktreeRoots} until this one is empty everywhere.
- */
-export const LEGACY_WORKTREES_DIR = 'worktrees'
-
 /** The append-only event log: one {@link FrameworkEvent} per line (JSONL). */
 export const EVENTS_FILE = 'events.jsonl'
 
@@ -750,16 +743,6 @@ export async function restoreArchivedAgent(
   }
 }
 
-/**
- * Both places a checkout can live while the pre-#1580 location drains out: the current
- * `.the-framework/branches/` and the legacy `.the-framework/worktrees/`, in that order. Nothing
- * is migrated (#1589 review) — old checkouts stay where they are until the reclaim sweep removes
- * them, so every reader covers both.
- */
-export function worktreeRoots(cwd: string): string[] {
-  return [join(cwd, FRAMEWORK_DIR, BRANCHES_DIR), join(cwd, FRAMEWORK_DIR, LEGACY_WORKTREES_DIR)]
-}
-
 /** One checkout on disk: where it is, and whose it is. */
 export interface WorktreeDirEntry {
   path: string
@@ -767,20 +750,16 @@ export interface WorktreeDirEntry {
 }
 
 /**
- * Every checkout directory on disk, covering both roots (#1580). Under `branches/` only the run
- * branch spelling counts — the same directory holds the rename links (#1589), which are views,
- * not checkouts; under the legacy root the name is the bare id. Forgiving: missing roots yield
- * nothing.
+ * Every checkout directory on disk (#1580). Only the run branch spelling counts — the same
+ * directory holds the rename links (#1589), which are views, not checkouts. Forgiving: a missing
+ * root yields nothing.
  */
 export async function worktreeDirEntries(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<WorktreeDirEntry[]> {
-  const [branchesRoot, legacyRoot] = worktreeRoots(cwd) as [string, string]
+  const root = join(cwd, FRAMEWORK_DIR, BRANCHES_DIR)
   const entries: WorktreeDirEntry[] = []
-  for (const name of await fs.readdir(branchesRoot).catch(() => [])) {
+  for (const name of await fs.readdir(root).catch(() => [])) {
     const agentId = agentIdFromWorktreeDir(name)
-    if (isWorktreeDirName(name) && isSafeAgentId(agentId)) entries.push({ path: join(branchesRoot, name), agentId })
-  }
-  for (const name of await fs.readdir(legacyRoot).catch(() => [])) {
-    if (isSafeAgentId(name)) entries.push({ path: join(legacyRoot, name), agentId: name })
+    if (isWorktreeDirName(name) && isSafeAgentId(agentId)) entries.push({ path: join(root, name), agentId })
   }
   return entries
 }
@@ -1054,8 +1033,7 @@ export async function readLiveMetas(
   fs: StoreFs = nodeStoreFs(),
   isAlive: (pid: number) => boolean = isPidAlive,
 ): Promise<LiveAgent[]> {
-  // Both roots (#1580): checkouts under `branches/` (run-branch-named dirs, never the rename
-  // links beside them) and the draining legacy `worktrees/`.
+  // The checkouts under `branches/`: run-branch-named dirs, never the rename links beside them.
   const candidates = [cwd, ...(await worktreeDirEntries(cwd, fs)).map(entry => entry.path)]
   const agents: LiveAgent[] = []
   for (const candidate of candidates) {

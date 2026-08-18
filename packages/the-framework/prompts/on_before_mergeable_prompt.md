@@ -1,4 +1,4 @@
-TODO_FILE: `TODO_AGENTS.md`
+TODO_FILE: `TODO_AGENTS.md` on the data branch — see "The data branch"
 
 ## Maintenance
 

@@ -1246,7 +1246,7 @@ test('pinnedPlanJob appends the pin, so the preset keeps its own rules verbatim 
   assert.match(pinned.prompt, /tickets\/2026-07-25_x\.lock\.md/)
   assert.match(pinned.prompt, /CLAIMED: plan-7-0/)
   // The lock has no timer since #1420, so the agent is told to lift it with its own work.
-  assert.match(pinned.prompt, /delete `tickets\/2026-07-25_x\.lock\.md` in the same commit/)
+  assert.match(pinned.prompt, /delete `tickets\/2026-07-25_x\.lock\.md` in the same data-branch commit/)
   assert.equal(pinned.ticket, '2026-07-25_x.md')
 })
 

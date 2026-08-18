@@ -128,7 +128,7 @@ test('the concurrency setting on disk is the number of agents the routine spins 
     // four copies of the first entry. The prompt is where the pin lives (E2) — it used to also
     // ride the agent's meta, so a third claim mechanism could be re-derived from it later.
     for (const [index, start] of starts.entries()) {
-      assert.match(start.prompt, /work on this one open entry only/)
+      assert.match(start.prompt, /Work on this one open task-queue entry only/)
       assert.ok(start.prompt.includes(QUEUE_ENTRIES[index]!), `the prompt pins ${QUEUE_ENTRIES[index]}`)
       // Nobody is at the keyboard, so a gate must auto-answer rather than park (#846/#1279).
       assert.equal(start.options.unattended, true)

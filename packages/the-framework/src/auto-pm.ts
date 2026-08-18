@@ -240,9 +240,10 @@ export interface PlanAssignment {
  * When the entry links back to a ticket the sweep has claimed (#1420), the agent is also told
  * which claim is its own — the same contract {@link pinnedPlanJob} carries, because the same
  * gap exists: without the lock the claim on the *implementation* lived only in this daemon's
- * memory, so another machine's sweep could book the same ticket. The agent removes the ticket,
- * its plan, and its lock in the PR that closes it (the ticketing format: closed tickets leave
- * the repo), because nothing else releases a lock since #1420 dropped the timer.
+ * memory, so another machine's sweep could book the same ticket. Ticket, plan and lock live on
+ * the data branch (#1582), so the agent retires them there once its work is published — nothing
+ * else releases a lock since #1420 dropped the timer. The queue entry itself is NOT the agent's
+ * to touch: the daemon checks it off at settle, once the run's ending reports the work landed.
  */
 export function pinnedDrainJob(job: AutoPmJob, entry: string, assignment?: PlanAssignment): AutoPmJob {
   const stem = assignment?.ticket.replace(/\.md$/, '')
@@ -251,15 +252,15 @@ export function pinnedDrainJob(job: AutoPmJob, entry: string, assignment?: PlanA
     entry,
     ...(assignment ? { claim: assignment } : {}),
     prompt: [
-      'Open TODO_AGENTS.md and work on this one open entry only, then check it off:',
+      'Work on this one open task-queue entry only (the queue lives on the data branch — see "The data branch"):',
       '',
       `- ${entry}`,
       '',
-      'Do not start any other entry. If that entry is already checked off or no longer there, stop and do nothing.',
+      'Do not start any other entry, and do not check the entry off — the framework retires it once your work lands. If the entry is already checked off or no longer on the queue, stop and do nothing.',
       ...(assignment
         ? [
             '',
-            `Your claim on the entry's ticket is already in place: \`${TICKETS_DIR}/${stem}.lock.md\` holds \`CLAIMED: ${assignment.agentId}\`. In the PR that closes the ticket, remove \`${TICKETS_DIR}/${stem}.md\`, \`${TICKETS_DIR}/${stem}.plan.md\`, and \`${TICKETS_DIR}/${stem}.lock.md\` — closed tickets leave the repo, and the lock lifts when your work lands. If the lock file is missing or names a different agent, the ticket is not yours — stop and do nothing.`,
+            `Your claim on the entry's ticket is already in place on the data branch: \`${TICKETS_DIR}/${stem}.lock.md\` holds \`CLAIMED: ${assignment.agentId}\`. Once your work is published, remove \`${TICKETS_DIR}/${stem}.md\`, \`${TICKETS_DIR}/${stem}.plan.md\`, and \`${TICKETS_DIR}/${stem}.lock.md\` on the data branch (see "The data branch") — closed tickets leave it, and the lock lifts when your work lands. If the lock file is missing or names a different agent, the ticket is not yours — stop and do nothing.`,
           ]
         : []),
     ].join('\n'),
@@ -285,8 +286,9 @@ function entryPreview(entry: string): string {
  * The agent is also told which claim is its own: its ticket's `.lock.md` already exists with the
  * `CLAIMED:` line the daemon pushed (#1420), and finding anything else there means the
  * assignment is stale — another agent's claim, or work that landed meanwhile — so it stops. It
- * is told to delete the lock in the same commit as the plan, because nothing else releases it:
- * #1420 removed the staleness timer, so a forgotten lock stands until a human clicks it away.
+ * is told to delete the lock in the same data-branch commit as the plan (#1582), because nothing
+ * else releases it: #1420 removed the staleness timer, so a forgotten lock stands until a human
+ * clicks it away.
  */
 export function pinnedPlanJob(job: AutoPmJob, assignment: PlanAssignment): AutoPmJob {
   const { ticket, agentId } = assignment
@@ -300,7 +302,7 @@ export function pinnedPlanJob(job: AutoPmJob, assignment: PlanAssignment): AutoP
       '',
       `You are one agent of a concurrent batch, so the scope above narrows: plan exactly one ticket, \`tickets/${ticket}\`, and no other.`,
       '',
-      `Your claim on it is already in place: \`tickets/${stem}.lock.md\` holds \`CLAIMED: ${agentId}\`. Write the real \`tickets/${stem}.plan.md\`, and delete \`tickets/${stem}.lock.md\` in the same commit — the lock lifts when your work lands. If the lock file is missing, names a different agent, or a plan already exists, the ticket is not yours — stop and do nothing.`,
+      `Your claim on it is already in place on the data branch: \`tickets/${stem}.lock.md\` holds \`CLAIMED: ${agentId}\`. Write the real \`tickets/${stem}.plan.md\` and delete \`tickets/${stem}.lock.md\` in the same data-branch commit (see "The data branch") — the lock lifts when your work lands, and the plan is a data write, not a PR. If the lock file is missing, names a different agent, or a plan already exists, the ticket is not yours — stop and do nothing.`,
     ].join('\n'),
     describe: `planning "${entryPreview(ticket)}"`,
   }

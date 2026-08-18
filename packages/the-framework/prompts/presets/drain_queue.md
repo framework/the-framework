@@ -1,1 +1,1 @@
-Open TODO_AGENTS.md and work on the FIRST open entry only, then check it off. Do not start any other entry.
+Read `TODO_AGENTS.md` off the data branch (see "The data branch") and work on the FIRST open entry only. When the work is done and published, check the entry off on the data branch. Do not start any other entry.

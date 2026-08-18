@@ -122,7 +122,7 @@ test('Research gates on a multi-select and writes its own review file (#331)', (
 
 test('the Maintenance template queues work rather than doing it (#881)', () => {
   assert.match(presets.maintenance.template, /look for opportunities to refactor code/)
-  assert.match(presets.maintenance.template, /TODO_AGENTS\.md \(usually as low priority\)/)
+  assert.match(presets.maintenance.template, /TODO_AGENTS\.md \(usually as low priority/)
   assert.match(presets.maintenance.template, /<CODEBASE_SUBSET>/)
 })
 

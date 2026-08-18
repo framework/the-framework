@@ -1,3 +1,4 @@
 - The project isn't released, it has zero users
-  - Thus, breaking changes aren't a problem, so prefer clean code over breaking changes
+  - Breaking changes aren't a problem => prefer clean code over breaking changes
 - Before modifying/creating SPEC.md files, always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+- Every user-facing feature is listed at FEATURES-SPEC.md — you must update it when adding/removing a feature

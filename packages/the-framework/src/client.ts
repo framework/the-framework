@@ -68,3 +68,7 @@ export {
   type DiscordCredentialStatus,
   type DiscordCredentialsPatch,
 } from './discord-credentials.js'
+// Whether an address is truly local (#1051). The daemon decides the token gate with it and the
+// dashboard labels the connection with it, so they must agree on what "local" means — the browser
+// kept its own looser copy, which answered `false` for every 127.0.0.0/8 address but the first.
+export { isLoopbackHost } from './loopback-host.js'

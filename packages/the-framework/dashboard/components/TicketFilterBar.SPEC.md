@@ -9,4 +9,4 @@ The Tickets page's toolbar: search, faceted filters, sort and grouping — the p
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -2,4 +2,4 @@ The one shared naming scheme for the daemon's in-memory per-project state, so an
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

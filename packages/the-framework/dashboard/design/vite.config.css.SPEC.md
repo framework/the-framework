@@ -2,4 +2,4 @@ Compiles the app's stylesheet into one plain CSS file for the gallery builder to
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

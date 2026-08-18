@@ -2,4 +2,4 @@ The agent view's banner for an agent running on GitHub Actions: it explains that
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

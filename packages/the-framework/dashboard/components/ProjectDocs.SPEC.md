@@ -2,4 +2,4 @@ The launcher's Docs section: the workspace's PLAN/TODO documents shown in the ma
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

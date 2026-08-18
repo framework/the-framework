@@ -16,10 +16,10 @@ import { agentIdFromWorktreeDir } from '../branch-names.js'
  */
 
 /**
- * The directory, under the workspace root, that holds the persisted agent. Same
- * `.the-framework/` directory as the committed project log (#313): one dir holds
- * both the transient agent state (events.jsonl / agent.json / agents/) and the DB
- * (LOGS.md); a seeded `.the-framework/.gitignore` keeps the agent state untracked.
+ * The directory, under the workspace root, that holds the persisted agent (#313):
+ * one dir holds both the transient agent state (events.jsonl / agent.json) and the
+ * committed agent archive (agents/, #1179); a seeded `.the-framework/.gitignore`
+ * keeps the agent state untracked.
  */
 export const FRAMEWORK_DIR = '.the-framework'
 

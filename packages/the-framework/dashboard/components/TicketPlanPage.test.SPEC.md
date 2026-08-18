@@ -2,4 +2,4 @@ Covers the ticket-to-plan-file mapping, rendering the plan's markdown, the no-pl
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

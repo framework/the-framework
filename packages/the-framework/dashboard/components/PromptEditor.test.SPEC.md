@@ -2,4 +2,4 @@ Covers the editor's send seam: plain Enter and Cmd/Ctrl+Enter submit, while Shif
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -52,7 +52,7 @@ export async function readProjectPresets(
 /**
  * Write a project's shared custom presets, sanitizing first so the committed file is always
  * well-formed. Also ensures `.the-framework/.gitignore` un-ignores the file: the dir's ignore is
- * `*` + a short allowlist (only `LOGS.md` is committed by default), so without a negation git would
+ * `*` + a short allowlist (only the agent archive is committed by default), so without a negation git would
  * never see the presets and they could not be shared. Removing every preset writes an empty array
  * rather than deleting the file, so the negation stays in place for the next save.
  */

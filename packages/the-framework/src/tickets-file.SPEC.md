@@ -2,4 +2,4 @@ Finds the workspace's queue file (`TODO_AGENTS.md`) on disk — the disk half of
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

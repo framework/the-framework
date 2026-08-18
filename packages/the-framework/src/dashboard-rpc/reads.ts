@@ -25,8 +25,8 @@ import type { BridgeEvent, BridgeHello, BridgeQuestion } from '../dashboard/brid
 import type { BridgeAnswer, BridgeContact, BridgeVersion } from '../dashboard/bridge-store.js'
 import { readDaemonToken, readPreferences, type Preferences } from '../registry.js'
 
-// The read model behind the dashboard (#405): the agent history, an agent's replay, the
-// surfaced PLAN/TODO docs, and the committed LOGS.md — each keyed by project id and backed by
+// The read model behind the dashboard (#405): the agent history, an agent's replay, and the
+// surfaced PLAN/TODO docs — each keyed by project id and backed by
 // the readers that own those files, so the dashboard stays a projection of the same files. They live beside the daemon rather than in the
 // browser's own tree so it can serve them in-process; the dashboard calls them by name over
 // `POST /_rpc/<name>`. The live agent stream is its own endpoint (`GET /_rpc/events`).

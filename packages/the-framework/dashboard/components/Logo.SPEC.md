@@ -2,4 +2,4 @@ The Framework's hexknot mark, doubling as the ambient is-the-AI-working signal: 
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -21,8 +21,10 @@ import type { PlanAssignment } from './auto-pm.js'
 // There is no timed release (#1420 dropped #1327's 6-hour staleness rule): a coordinator agent
 // can legitimately hold a ticket for days, and a lock released under a live agent re-opens the
 // exact double-work window it exists to close. The lock lifts when the agent's own PR deletes the
-// file alongside the plan it lands, or when a human releases it ({@link releaseTicketLock}) —
-// watching for dead agents is the user's job, with the dashboard button as the tool.
+// file alongside the plan it lands, when a human releases it ({@link releaseTicketLock}), or when
+// the daemon frees a claim it minted for an agent that settled with nothing to hand off (the
+// `heldBy` release, #1583) — every other dead agent is still the user's to notice, with the
+// dashboard button as the tool.
 
 /** The first line of a lock file: the claim, naming the agent that holds it. */
 const TICKET_LOCK_PREFIX = 'CLAIMED:'
@@ -53,6 +55,11 @@ export function lockMessage(count: number): string {
 /** The commit a manual release lands as, naming the ticket freed. */
 export function releaseMessage(ticket: string): string {
   return `[The Framework] release the lock on ${ticket}`
+}
+
+/** The commit an abandoned claim's release lands as (#1583), naming why the daemon freed it. */
+export function abandonedReleaseMessage(ticket: string): string {
+  return `${releaseMessage(ticket)} — its agent ended with nothing to hand off`
 }
 
 /** Injectable seams so every operation is unit-testable off disk and git. */
@@ -159,8 +166,11 @@ export async function acquireTicketLocks(
   return locked
 }
 
-/** What a manual release did: freed the ticket, found nothing to free, or could not commit. */
-export type ReleaseTicketLockResult = 'released' | 'no-lock' | 'error'
+/**
+ * What a release did: freed the ticket, found nothing to free, found someone else's claim
+ * (`heldBy` releases only, #1583), or could not commit.
+ */
+export type ReleaseTicketLockResult = 'released' | 'no-lock' | 'not-holder' | 'error'
 
 /**
  * Free one ticket's `.lock.md` by hand (#1420): the dashboard's answer to a dead agent, now that
@@ -171,7 +181,20 @@ export type ReleaseTicketLockResult = 'released' | 'no-lock' | 'error'
  * A failed commit puts the file back: the lock's protection is the committed state, and a
  * deletion that never landed would make the checkout lie about it. Never throws.
  */
-export async function releaseTicketLock(cwd: string, ticket: string, deps: TicketLockDeps = {}): Promise<ReleaseTicketLockResult> {
+export async function releaseTicketLock(
+  cwd: string,
+  ticket: string,
+  deps: TicketLockDeps = {},
+  opts: {
+    /**
+     * Free the lock only while it still names this exact agent (#1583): the daemon releasing a
+     * claim it minted for an agent that ended with nothing to hand off. A lock naming anyone
+     * else is someone's live claim — re-locked after a manual release, say — and outranks the
+     * cleanup. Absent (the dashboard button), whoever holds the lock is released.
+     */
+    heldBy?: string
+  } = {},
+): Promise<ReleaseTicketLockResult> {
   const git = deps.git ?? nodeGitRunner()
   const write = deps.write ?? ((path, content) => writeFile(path, content, 'utf8'))
   const read = deps.read ?? (path => readFile(path, 'utf8'))
@@ -181,12 +204,17 @@ export async function releaseTicketLock(cwd: string, ticket: string, deps: Ticke
   const lock = `${TICKETS_DIR}/${ticketLockName(ticket)}`
   const md = await read(join(cwd, lock)).catch(() => undefined)
   if (md === undefined) return 'no-lock'
+  if (opts.heldBy !== undefined && ticketLockHolder(md) !== opts.heldBy) return 'not-holder'
   try {
     await remove(join(cwd, lock))
     await git(['add', '--', lock], cwd)
-    await git(['commit', '-m', releaseMessage(ticket), '--', lock], cwd)
+    await git(['commit', '-m', opts.heldBy !== undefined ? abandonedReleaseMessage(ticket) : releaseMessage(ticket), '--', lock], cwd)
   } catch {
+    // The lock's protection is the committed state, so the failed deletion is undone whole:
+    // the file back on disk AND back in the index — a deletion left staged would ride out on
+    // the next unscoped commit in this checkout, publishing the release that just failed.
     await write(join(cwd, lock), md).catch(() => undefined)
+    await git(['add', '--', lock], cwd).catch(() => undefined)
     return 'error'
   }
   try {

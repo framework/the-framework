@@ -1,6 +1,7 @@
 import type { QuotaBoundaryStatus } from './quota-boundary.js'
 import { presets } from './preset-catalog.js'
 import { DEFAULT_AUTO_PM_CONCURRENCY } from './preference-defaults.js'
+import { TICKETS_DIR, ticketFromQueueEntry } from './tickets.js'
 
 /**
  * Auto PM (#685): spend leftover subscription quota on product management instead of
@@ -226,8 +227,16 @@ export interface PlanAssignment {
  * The prompt also tells the agent to stop when the entry is already checked off or gone: the
  * assignment is a snapshot, and a human may retire the entry between the sweep's read and the
  * run's own.
+ *
+ * When the entry links back to a ticket the sweep has claimed (#1420), the agent is also told
+ * which claim is its own — the same contract {@link pinnedPlanJob} carries, because the same
+ * gap exists: without the lock the claim on the *implementation* lived only in this daemon's
+ * memory, so another machine's sweep could book the same ticket. The agent removes the ticket,
+ * its plan, and its lock in the PR that closes it (the ticketing format: closed tickets leave
+ * the repo), because nothing else releases a lock since #1420 dropped the timer.
  */
-function pinnedDrainJob(job: AutoPmJob, entry: string): AutoPmJob {
+export function pinnedDrainJob(job: AutoPmJob, entry: string, assignment?: PlanAssignment): AutoPmJob {
+  const stem = assignment?.ticket.replace(/\.md$/, '')
   return {
     ...job,
     entry,
@@ -237,6 +246,12 @@ function pinnedDrainJob(job: AutoPmJob, entry: string): AutoPmJob {
       `- ${entry}`,
       '',
       'Do not start any other entry. If that entry is already checked off or no longer there, stop and do nothing.',
+      ...(assignment
+        ? [
+            '',
+            `Your claim on the entry's ticket is already in place: \`${TICKETS_DIR}/${stem}.lock.md\` holds \`CLAIMED: ${assignment.agentId}\`. In the PR that closes the ticket, remove \`${TICKETS_DIR}/${stem}.md\`, \`${TICKETS_DIR}/${stem}.plan.md\`, and \`${TICKETS_DIR}/${stem}.lock.md\` — closed tickets leave the repo, and the lock lifts when your work lands. If the lock file is missing or names a different agent, the ticket is not yours — stop and do nothing.`,
+          ]
+        : []),
     ].join('\n'),
     describe: `draining the queue entry "${entryPreview(entry)}"`,
   }
@@ -480,6 +495,20 @@ export interface AutoPmDeps {
    * agent — one unpinned agent is what ran before #1327 and needs no lock to be safe.
    */
   lockPlans?(
+    project: AutoPmProject,
+    assignments: readonly PlanAssignment[],
+  ): Promise<readonly PlanAssignment[]>
+  /**
+   * Claim the tickets a drain batch is about to implement (#1420), the same way
+   * {@link AutoPmDeps.lockPlans} claims them for planning — one pushed `.lock.md` per ticket —
+   * but skipping only on an existing lock: a `.plan.md` is the drain's input, not a competing
+   * claim. Asked only for the entries that link back to a ticket; a self-contained TODO has
+   * nothing on disk to lock and keeps the queue document as its coordination point. Resolves the
+   * subset actually locked — an entry whose ticket was claimed elsewhere is dropped from the
+   * batch, and the next tick reconsiders it. Absent, drains run exactly as before this seam:
+   * the in-memory pin still guards this daemon's own fan-out.
+   */
+  lockDrains?(
     project: AutoPmProject,
     assignments: readonly PlanAssignment[],
   ): Promise<readonly PlanAssignment[]>
@@ -733,8 +762,44 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
             note(project, false, 'every open queue entry is already being worked on')
             continue
           }
+          const picks = open.slice(0, concurrency - activeAgents)
+          // The cross-machine claim on what a drain *implements* (#1420): an entry that links
+          // back to a ticket (#1164) gets its `.lock.md` before its agent starts, the same
+          // pushed claim planning already makes — without it the booking lived only in this
+          // daemon's `pending` map, and another machine's sweep could implement the same ticket.
+          // A ticketless entry has nothing on disk to lock and proceeds as before. Ids are
+          // generated here for the same reason plan ids are: the lock's CLAIMED line and the
+          // pinned prompt must agree.
+          const linked = new Map(
+            picks.flatMap((entry, i) => {
+              const ticket = ticketFromQueueEntry(entry)
+              return ticket
+                ? [[entry, { ticket: ticket.slice(TICKETS_DIR.length + 1), agentId: `drain-${now()}-${i}` }] as const]
+                : []
+            }),
+          )
+          // Matched back by agent id, not ticket: two entries linking the same ticket race for
+          // one lock, and only the assignment whose id the lock actually names may carry it.
+          const locked = new Set(
+            deps.lockDrains && linked.size
+              ? (await deps.lockDrains(project, [...linked.values()]).catch(() => [])).map(a => a.agentId)
+              : [],
+          )
           batch.length = 0
-          batch.push(...open.slice(0, concurrency - activeAgents).map(entry => pinnedDrainJob(job, entry)))
+          batch.push(
+            ...picks.flatMap(entry => {
+              const assignment = linked.get(entry)
+              // No seam wired means no claim to carry: the entry drains exactly as before #1420.
+              if (!assignment || !deps.lockDrains) return [pinnedDrainJob(job, entry)]
+              // A lost race costs this batch the entry, not the batch: the claim that won it is
+              // pushed, so the check-off will arrive in that agent's own PR.
+              return locked.has(assignment.agentId) ? [pinnedDrainJob(job, entry, assignment)] : []
+            }),
+          )
+          if (!batch.length) {
+            note(project, false, 'every entry in this batch links a ticket another agent already claimed')
+            continue
+          }
         } else if (job.fansOut && deps.planCandidates && deps.lockPlans) {
           // The fan-out for a rotation job that writes per-ticket files (#1327). Both seams or
           // neither: candidates without locks would fan out unguarded, which is exactly the

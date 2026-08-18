@@ -1,6 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { findFlatTodo } from '../tickets.js'
+import { findFlatTodo } from '../tickets-file.js'
 
 /**
  * The plan/backlog document categories the dashboard surfaces in its sidebar

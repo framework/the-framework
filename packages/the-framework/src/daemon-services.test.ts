@@ -1,8 +1,10 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile, mkdir, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { startBackgroundServices } from './daemon-services.js'
 import { quotaBoundaryStatus } from './quota-boundary.js'
 import type { QuotaSource, QuotaView } from './dashboard/quota.js'
@@ -50,10 +52,24 @@ const QUEUE_ENTRIES = [
   '[Entry six](tickets/2026-07-01_six.md) — the sixth thing',
 ]
 
+const git = promisify(execFile)
+
 /** A registry + checkout wired to `startBackgroundServices`, with every start recorded. */
 async function services(preferences: Record<string, unknown>) {
   const config = await mkdtemp(join(tmpdir(), 'framework-concurrency-cfg-'))
   const project = await mkdtemp(join(tmpdir(), 'framework-concurrency-proj-'))
+  // A real git checkout with real tickets, because the drain claims each entry's ticket with a
+  // committed `.lock.md` before its agent starts (#1420) — in a bare directory that commit would
+  // fail and the whole batch would be dropped as claimed elsewhere.
+  await git('git', ['init', '-q', '-b', 'main'], { cwd: project })
+  await git('git', ['config', 'user.email', 'test@example.com'], { cwd: project })
+  await git('git', ['config', 'user.name', 'Test'], { cwd: project })
+  await git('git', ['config', 'commit.gpgsign', 'false'], { cwd: project })
+  await mkdir(join(project, 'tickets'))
+  for (const entry of QUEUE_ENTRIES) {
+    const ticket = /\((tickets\/[^)]+)\)/.exec(entry)![1]!
+    await writeFile(join(project, ticket), `# ${ticket}\n`)
+  }
   await writeFile(
     join(config, 'the-framework.json'),
     JSON.stringify({
@@ -87,7 +103,7 @@ async function services(preferences: Record<string, unknown>) {
     await rm(config, { recursive: true, force: true })
     await rm(project, { recursive: true, force: true })
   }
-  return { starts, stop, services: started }
+  return { starts, stop, services: started, projectDir: project }
 }
 
 /** Poll until `check` holds or the deadline passes; the sweep is fired and not awaited. */
@@ -98,7 +114,7 @@ async function settle(check: () => boolean, ms = 5000): Promise<void> {
 
 test('the concurrency setting on disk is the number of agents the routine spins up (#1204)', async () => {
   // Four, so a pass cannot be the shipped default of two or a hardwired one.
-  const { starts, stop, services: running } = await services({ autoPm: true, autoPmConcurrency: 4 })
+  const { starts, stop, services: running, projectDir } = await services({ autoPm: true, autoPmConcurrency: 4 })
   try {
     // No wake call: the daemon sweeps once on start-up, which is the path a machine booted with
     // the setting already on actually takes.
@@ -129,6 +145,11 @@ test('the concurrency setting on disk is the number of agents the routine spins 
     const outcome = running.autoPmReport().outcomes[0]
     assert.equal(outcome?.started, true)
     assert.match(outcome?.message ?? '', /started 4 agents/)
+    // The claim the sweep committed ahead of each agent (#1420): the ticket's lock is on disk
+    // and names the id the agent's own prompt carries as its own.
+    const lock = await readFile(join(projectDir, 'tickets/2026-07-01_one.lock.md'), 'utf8')
+    assert.ok(lock.startsWith('CLAIMED: drain-'), "the first entry's ticket carries a drain claim")
+    assert.ok(starts[0]!.prompt.includes(lock.trim()), 'and the prompt names that exact claim')
   } finally {
     await stop()
   }

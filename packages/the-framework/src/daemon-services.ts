@@ -200,6 +200,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // pushes at the end of its session onto its own branch, and a claim that stayed local would
     // not reach the machines it exists for.
     lockPlans: (project, assignments) => acquireTicketLocks(project.path, assignments, { log }),
+    // The same claim for what a drain is about to *implement* (#1420): drain mode skips only on
+    // an existing lock, because the plan it would also find is the drain's input, not a rival.
+    lockDrains: (project, assignments) => acquireTicketLocks(project.path, assignments, { log }, 'drain'),
     start: async (project, job) => {
       // A draining agent works one open queue entry, and since #1164 that entry links back to the
       // ticket it was queued from — so this is the one moment the framework knows what an agent is

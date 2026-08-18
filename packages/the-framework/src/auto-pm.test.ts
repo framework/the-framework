@@ -4,6 +4,7 @@ import {
   autoPmDecision,
   quotaHeadroom,
   startAutoPm,
+  pinnedDrainJob,
   pinnedPlanJob,
   AUTO_PM_JOBS,
   AUTO_PM_DRAIN_JOB,
@@ -787,6 +788,131 @@ test('live runs count against the concurrency, so the sweep tops up rather than 
   await loop.tick()
   loop.stop()
   assert.equal(started.length, 1)
+})
+
+// #1420: a drain's claim on what it *implements* is a pushed `.lock.md`, like planning's — the
+// in-memory pin above only guards this daemon's own fan-out, and two daemons on different
+// machines could book the implementation of the same ticket. Only entries that link back to a
+// ticket have anything on disk to lock; self-contained TODOs keep the queue as their
+// coordination point.
+
+test('a drain batch locks its ticket-linked entries, and each prompt carries its own claim (#1420)', async () => {
+  const prompts: string[] = []
+  const lockCalls: PlanAssignment[][] = []
+  const { loop } = harness({
+    cooldownMs: 0,
+    concurrency: async () => 2,
+    queue: async () => ['[Fix a](tickets/2026-07-25_a.md)', '[Fix b](tickets/2026-07-25_b.md)'],
+    lockDrains: async (_p, assignments) => {
+      lockCalls.push([...assignments])
+      return assignments
+    },
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick()
+  loop.stop()
+  // The whole batch was locked in one call, before any agent started, and each agent's prompt
+  // names the id its own lock carries.
+  assert.equal(lockCalls.length, 1)
+  assert.deepEqual(lockCalls[0]!.map(a => a.ticket), ['2026-07-25_a.md', '2026-07-25_b.md'])
+  assert.equal(prompts.length, 2)
+  assert.match(prompts[0]!, new RegExp(`CLAIMED: ${lockCalls[0]![0]!.agentId}`))
+  assert.match(prompts[1]!, new RegExp(`CLAIMED: ${lockCalls[0]![1]!.agentId}`))
+  assert.equal(new Set(lockCalls[0]!.map(a => a.agentId)).size, 2)
+})
+
+test('a ticketless entry drains without a claim, and is not offered to the lock (#1420)', async () => {
+  const prompts: string[] = []
+  const lockCalls: PlanAssignment[][] = []
+  const { loop } = harness({
+    cooldownMs: 0,
+    concurrency: async () => 2,
+    queue: async () => ['just a self-contained TODO', '[Fix b](tickets/2026-07-25_b.md)'],
+    lockDrains: async (_p, assignments) => {
+      lockCalls.push([...assignments])
+      return assignments
+    },
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(lockCalls[0]!.map(a => a.ticket), ['2026-07-25_b.md'])
+  assert.equal(prompts.length, 2)
+  assert.ok(!/CLAIMED/.test(prompts[0]!), 'the ticketless entry carries no claim')
+  assert.match(prompts[1]!, /CLAIMED/)
+})
+
+test('an entry whose ticket claim was lost is dropped from the batch, not the batch (#1420)', async () => {
+  // Another machine's sweep won the race for a.md's lock: its agent will land the check-off in
+  // its own PR, so this batch simply does not start one — the next tick reconsiders.
+  const prompts: string[] = []
+  const { loop } = harness({
+    cooldownMs: 0,
+    concurrency: async () => 2,
+    queue: async () => ['[Fix a](tickets/2026-07-25_a.md)', '[Fix b](tickets/2026-07-25_b.md)'],
+    lockDrains: async (_p, assignments) => assignments.filter(a => a.ticket !== '2026-07-25_a.md'),
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick()
+  loop.stop()
+  assert.equal(prompts.length, 1)
+  assert.match(prompts[0]!, /Fix b/)
+})
+
+test('a batch that lost every claim stands the sweep down with the reason (#1420)', async () => {
+  const { loop, started } = harness({
+    cooldownMs: 0,
+    queue: async () => ['[Fix a](tickets/2026-07-25_a.md)'],
+    lockDrains: async () => [],
+  })
+  await loop.tick()
+  loop.stop()
+  assert.equal(started.length, 0)
+  assert.equal(
+    loop.report().outcomes[0]?.message,
+    'every entry in this batch links a ticket another agent already claimed',
+  )
+})
+
+test('without the lock seam a ticket-linked entry drains exactly as before (#1420)', async () => {
+  const prompts: string[] = []
+  const { loop } = harness({
+    cooldownMs: 0,
+    queue: async () => ['[Fix a](tickets/2026-07-25_a.md)'],
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick()
+  loop.stop()
+  assert.equal(prompts.length, 1)
+  assert.ok(!/CLAIMED/.test(prompts[0]!))
+})
+
+test('pinnedDrainJob with a claim appends the same contract the pinned plan prompt carries (#1420)', () => {
+  const job: AutoPmJob = { name: 'drain', prompt: 'Work the queue.', drains: true }
+  const pinned = pinnedDrainJob(job, '[Fix x](tickets/2026-07-25_x.md)', {
+    ticket: '2026-07-25_x.md',
+    agentId: 'drain-7-0',
+  })
+  assert.match(pinned.prompt, /tickets\/2026-07-25_x\.lock\.md/)
+  assert.match(pinned.prompt, /CLAIMED: drain-7-0/)
+  // The closing PR retires all three siblings: closed tickets leave the repo, and nothing else
+  // lifts a lock since #1420 dropped the timer.
+  assert.match(pinned.prompt, /remove `tickets\/2026-07-25_x\.md`, `tickets\/2026-07-25_x\.plan\.md`, and `tickets\/2026-07-25_x\.lock\.md`/)
+  assert.match(pinned.prompt, /names a different agent, the ticket is not yours/)
+  // And without a claim, the prompt is exactly the pre-#1420 pin.
+  assert.ok(!/CLAIMED/.test(pinnedDrainJob(job, 'entry a').prompt))
 })
 
 // #1327: [Plan tickets] fans out too — the one rotation job that writes per-ticket sibling files

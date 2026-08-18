@@ -74,9 +74,9 @@ test('crawlRepoFiles yields [] when git fails', async () => {
  */
 const BUDGETS: { args: string[]; ms: number }[] = [
   // The network and a whole checkout: the two the flat 10s budget was killing.
-  { args: ['push', '--set-upstream', 'origin', 'the-framework/agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
-  { args: ['worktree', 'add', '-b', 'the-framework/agent-1', '/wt', 'main'], ms: GIT_SLOW_TIMEOUT_MS },
-  { args: ['worktree', 'add', '/wt', 'the-framework/agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
+  { args: ['push', '--set-upstream', 'origin', 'tf-agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
+  { args: ['worktree', 'add', '-b', 'tf-agent-1', '/wt', 'main'], ms: GIT_SLOW_TIMEOUT_MS },
+  { args: ['worktree', 'add', '/wt', 'tf-agent-1'], ms: GIT_SLOW_TIMEOUT_MS },
   { args: ['clone', 'https://example.com/repo.git', '/dest'], ms: GIT_SLOW_TIMEOUT_MS },
   { args: ['fetch', 'origin'], ms: GIT_SLOW_TIMEOUT_MS },
   // Local mutations.

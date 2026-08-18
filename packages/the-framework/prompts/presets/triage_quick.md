@@ -4,4 +4,4 @@ Look at `tickets/*` and choose tickets to work on next:
   - With sensible prioritization, and consider bumping the priority of lowest effort tickets (e.g. to make `effort: 0` the next tasks agents work on)
 
 Always set <SESSION_NAME> to triage-quick
-- If branch the-framework/<SESSION_NAME> already exists, abort and tell user the branch already exists and triage is already pending.
+- If branch tf-<SESSION_NAME> already exists, abort and tell user the branch already exists and triage is already pending.

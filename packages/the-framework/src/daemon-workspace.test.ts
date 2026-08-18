@@ -413,7 +413,7 @@ test('a start on a logged-out agent is refused, and spends no branch or worktree
     // Nothing was spent: no worktrees directory, and no agent branch on the repo.
     const worktrees = await stat(join(cwd, FRAMEWORK_DIR, WORKTREES_DIR)).then(() => true, () => false)
     assert.equal(worktrees, false, 'a refused start creates no worktree')
-    const branches = await git(['branch', '--list', 'the-framework/agent-*'], cwd)
+    const branches = await git(['branch', '--list', 'tf-agent-*'], cwd)
     assert.equal(branches.trim(), '', 'a refused start creates no run branch')
 
     // And no agent was spawned, so there is no dead run to explain afterwards.

@@ -209,7 +209,7 @@ export type FrameworkEvent =
   | { kind: 'view'; id: string; title: string; markdown: string }
   /**
    * The agent named the session (#326): the `[a-z0-9-]` slug it chose (also its
-   * `the-framework/<name>` branch), from a `setSessionName()` signal. Non-blocking;
+   * `tf-<name>` branch), from a `setSessionName()` signal. Non-blocking;
    * the dashboard shows it as the agent's label. Re-emitted on a rename.
    */
   | { kind: 'session-name'; name: string }

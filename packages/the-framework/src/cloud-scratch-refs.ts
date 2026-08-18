@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from './project.js'
 import { ghPrsForBranch, type LinkedPr } from './dashboard/gh.js'
-import { startedAtFromAgentId, FRAMEWORK_DIR } from './store/index.js'
+import { startedAtFromAgentId, FRAMEWORK_DIR, AGENT_BRANCH_PREFIX, LEGACY_AGENT_BRANCH_PREFIX } from './store/index.js'
 import { nodeFs } from './node-fs.js'
 import { errorMessage } from './error-message.js'
 
@@ -9,7 +9,7 @@ import { errorMessage } from './error-message.js'
 //
 // Every "Run on: Claude web" run pushes two refs that nothing ever consumes again: the slash-free
 // `cloud-*` ref the driver pushes so the cloud session has a ref it can clone at (#1320,
-// anthropics/claude-code#87235), and the run branch (`the-framework/agent-…`) the worktree sweep
+// anthropics/claude-code#87235), and the run branch (`tf-agent-…`) the worktree sweep
 // (#1036) pushes before reclaiming the checkout. The session does its work on its own `claude/*`
 // branch and opens its PR from there, so once provisioning settles both refs are dead names on
 // origin — one pair per web run, accumulating forever.
@@ -42,8 +42,12 @@ export const SCRATCH_REF_SAFE_AGE_MS = 24 * 60 * 60 * 1000
  */
 export const CLOUD_SCRATCH_REF = /^cloud-\d+-[0-9a-f]{8}$/
 
-/** What every run branch is named under; the rest is the agent id, which carries the start time. */
-const RUN_BRANCH_PREFIX = 'the-framework/agent-'
+/**
+ * What run branches are named under; the rest is the agent id, which carries the start time. The
+ * legacy slashed spelling (pre-#1581) is still swept — branches under it remain on remotes until
+ * this sweep ages them out, but nothing mints it anymore.
+ */
+const RUN_BRANCH_PREFIXES = [`${AGENT_BRANCH_PREFIX}agent-`, `${LEGACY_AGENT_BRANCH_PREFIX}agent-`]
 
 /**
  * Where the sweep remembers when it first saw each `cloud-*` ref, under `.the-framework/`
@@ -230,8 +234,9 @@ export async function sweepCloudScratchRefs(cwd: string, deps: ScratchSweepDeps 
       candidates.push(head)
       continue
     }
-    if (head.ref.startsWith(RUN_BRANCH_PREFIX)) {
-      const id = head.ref.slice(RUN_BRANCH_PREFIX.length)
+    const runPrefix = RUN_BRANCH_PREFIXES.find(prefix => head.ref.startsWith(prefix))
+    if (runPrefix !== undefined) {
+      const id = head.ref.slice(runPrefix.length)
       const startedAt = startedAtFromAgentId(id)
       if (startedAt === undefined) continue // a name whose age is unknowable is not ours to delete
       if (deps.busy?.has(id)) {
@@ -244,7 +249,7 @@ export async function sweepCloudScratchRefs(cwd: string, deps: ScratchSweepDeps 
       }
       candidates.push(head)
     }
-    // Every other branch — the default, `claude/*`, `the-framework/<session-name>` — is not a
+    // Every other branch — the default, `claude/*`, `tf-<session-name>` — is not a
     // scratch ref and is never even considered.
   }
 

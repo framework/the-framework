@@ -2,4 +2,4 @@ Covers the flat-branches layout pass: an old-location checkout is moved under it
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

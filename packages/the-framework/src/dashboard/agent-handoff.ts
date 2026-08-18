@@ -17,7 +17,7 @@ import { parseNumstat } from './file-diff.js'
 import { parsePorcelain } from './file-status.js'
 import { errorMessage } from '../error-message.js'
 import type { AutoHandoffSkip, AutoMergeOutcome, MergeWithheldReason } from '../events.js'
-import { legacyAgentBranchName, AGENT_BRANCH_PREFIX, LEGACY_AGENT_BRANCH_PREFIX, commitPendingWork, currentBranch, startedAtFromAgentId, FRAMEWORK_DIR, type AgentMeta } from '../store/index.js'
+import { legacyAgentBranchName, AGENT_BRANCH_PREFIX, LEGACY_AGENT_BRANCH_PREFIX, commitPendingWork, currentBranch, repoHasRemote, startedAtFromAgentId, FRAMEWORK_DIR, type AgentMeta } from '../store/index.js'
 
 // What a finished session produced, and what is left to do with it (#799).
 //
@@ -274,7 +274,7 @@ export async function readAgentHandoff(
   if (!(await git(['rev-parse', '--git-dir'], cwd).then(() => true).catch(() => false))) return undefined
 
   const tip = (await agent(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])).trim()
-  const hasRemote = (await agent(['remote'])).trim().length > 0
+  const hasRemote = await repoHasRemote(cwd, git)
   const pending = await countPendingWork(git, deps.checkout)
   if (!tip) {
     // The branch being gone locally does not mean the work is: a hands-off web agent pushes its

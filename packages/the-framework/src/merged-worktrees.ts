@@ -126,12 +126,14 @@ export interface MergedSweepOptions {
 export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktreeSweep {
   const sweep = opts.sweep ?? ((cwd: string) => removeMergedWorktrees(cwd, { ...(opts.busy ? { busy: opts.busy() } : {}) }))
   let stopped = false
-  // The checkouts whose "kept" line has been said, so each is accounted for once rather than
-  // re-announced every ten minutes for the life of the daemon — a permanently unpushable one
-  // (no remote, a publish-nothing session) repeats forever. A removal clears its entry, so a
-  // same-id checkout that reappears is a new thing to account for; a daemon restart starts the
-  // accounting over, which is the boot-time announcement the retained state deserves.
-  const announced = new Set<string>()
+  // Each checkout's last-announced keep reason, so a retained checkout is accounted for once per
+  // *state* rather than re-announced every ten minutes for the life of the daemon — a permanently
+  // unpushable one (no remote, a publish-nothing session) repeats forever. A changed reason is a
+  // changed state and is said again (a remote added, pushes now failing on auth); a removal
+  // clears the entry, so a same-id checkout that reappears is a new thing to account for; a
+  // daemon restart starts the accounting over, which is the boot-time announcement the retained
+  // state deserves.
+  const announced = new Map<string, string>()
 
   const sweepAll = async (): Promise<void> => {
     for (const project of await opts.projects().catch(() => [])) {
@@ -144,8 +146,8 @@ export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktr
         )
       }
       for (const item of failed) {
-        if (announced.has(item.agentId)) continue
-        announced.add(item.agentId)
+        if (announced.get(item.agentId) === item.error) continue
+        announced.set(item.agentId, item.error)
         opts.log(`[framework] kept the worktree for session ${item.agentId}: ${item.error}`)
       }
     }

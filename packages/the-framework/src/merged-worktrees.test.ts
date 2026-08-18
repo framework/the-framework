@@ -136,6 +136,27 @@ test('a kept checkout is accounted for once, not re-announced every turn (E5)', 
   assert.equal(lines.filter(l => /kept the worktree for session r1/.test(l)).length, 1)
 })
 
+test('a changed keep reason is a changed state, and is said again (E5)', async () => {
+  // Adding a remote turns "no remote" into "push failed on auth": the line must not stay
+  // deduplicated on the checkout alone, or the new state never logs.
+  const lines: string[] = []
+  const outcomes: MergedSweepResult[] = [
+    { removed: [], failed: [{ agentId: 'r1', error: 'the repo has no remote; its worktree was kept' }] },
+    { removed: [], failed: [{ agentId: 'r1', error: 'tf-agent-r1 is not on the remote (auth failed); its worktree was kept' }] },
+    { removed: [], failed: [{ agentId: 'r1', error: 'tf-agent-r1 is not on the remote (auth failed); its worktree was kept' }] },
+  ]
+  const sweep = startMergedWorktreeSweep({
+    projects: async () => [{ path: '/a' }],
+    log: line => lines.push(line),
+    sweep: async () => outcomes.shift() ?? { removed: [], failed: [] },
+  })
+  await sweep.tick()
+  await sweep.tick()
+  await sweep.tick()
+  sweep.stop()
+  assert.equal(lines.filter(l => /kept the worktree for session r1/.test(l)).length, 2)
+})
+
 test('a removal clears the accounting, so a same-id checkout that reappears is announced again (E5)', async () => {
   const lines: string[] = []
   const outcomes: MergedSweepResult[] = [

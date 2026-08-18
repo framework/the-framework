@@ -425,6 +425,13 @@ export interface PromoteOutcome {
    * was started under, so the sweep releases that claim itself.
    */
   handoffSkip?: AutoHandoffSkip
+  /**
+   * The run finished cleanly but its epilogue has not reported yet (#1583): the `end` lands
+   * before the handoff does its work, so a sweep can catch the gap between them. A claim-carrying
+   * agent observed there is held pending a little longer rather than settled — settling would
+   * drop the claim with the ending unread, and the release would be missed for good.
+   */
+  handoffPending?: boolean
 }
 
 /** A project the sweep considers. */
@@ -629,8 +636,9 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   // remembers the entry it was pinned to (#1204), and a fanned-out plan agent its ticket (#1327), so
   // while either is still in flight a later tick does not hand the same work to a second agent.
   // The claim rides along (#1583) so a run that settles with nothing to hand off gets the lock
-  // minted for it released rather than stranded.
-  type PendingAgent = { agentId: string; entry?: string; ticket?: string; claim?: PlanAssignment }
+  // minted for it released rather than stranded; `waits` counts the sweeps spent holding a
+  // finished run whose epilogue has not reported yet, so the hold is bounded.
+  type PendingAgent = { agentId: string; entry?: string; ticket?: string; claim?: PlanAssignment; waits?: number }
   const pending = new Map<string, PendingAgent[]>()
   // Where each project is in the job cycle. Per project, not global: two repos idle at once
   // should each work through the rotation, not take alternate halves of it.
@@ -685,6 +693,15 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
             if (outcome.promoted) landed++
             if (!outcome.settled) {
               stillPending.push(agent)
+              continue
+            }
+            // The run ended cleanly but its epilogue has not reported yet — `end` lands before
+            // the handoff event does — and the ending is the one fact the release keys off, so a
+            // claim-carrying agent caught in that gap is held a couple more sweeps rather than
+            // settled blind. Bounded, so a process that died mid-epilogue cannot pin its queue
+            // entry forever; past the bound it settles unread, which is the pre-#1583 behavior.
+            if (agent.claim && outcome.handoffPending && (agent.waits ?? 0) < 2) {
+              stillPending.push({ ...agent, waits: (agent.waits ?? 0) + 1 })
               continue
             }
             // A settled run that ended with nothing to hand off is never opening the PR that

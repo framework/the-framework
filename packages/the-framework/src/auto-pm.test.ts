@@ -941,6 +941,55 @@ test('a claim whose run settled with nothing to hand off is released (#1583)', a
   assert.deepEqual(released, [lockCalls[0]![0]])
 })
 
+test('a sweep that catches the end-before-handoff gap holds the claim and still releases (#1583)', async () => {
+  // `end` lands before the handoff event, so a sweep can observe a finished run whose ending is
+  // not written yet. Settling there would drop the claim with the ending unread — the release
+  // would be missed for good — so the agent is held pending until the epilogue reports.
+  const released: PlanAssignment[] = []
+  let ending: { handoffPending?: boolean; handoffSkip?: 'no-commits' } = { handoffPending: true }
+  let queued = ['[Fix a](tickets/2026-07-25_a.md)']
+  const { loop } = harness({
+    cooldownMs: 0,
+    queue: async () => queued,
+    lockDrains: async (_p, assignments) => assignments,
+    promote: async () => ({ settled: true, promoted: false, ...ending }),
+    releaseLock: async (_p, claim) => void released.push(claim),
+  })
+  await loop.tick() // starts the drain
+  queued = []
+  await loop.tick() // mid-epilogue: held, not settled, nothing released
+  assert.deepEqual(released, [])
+  ending = { handoffSkip: 'no-commits' }
+  await loop.tick() // the ending has landed: the claim is freed
+  loop.stop()
+  assert.equal(released.length, 1)
+})
+
+test('the mid-epilogue hold is bounded, so a run that dies there cannot pin its entry forever (#1583)', async () => {
+  const released: PlanAssignment[] = []
+  const promoted: string[] = []
+  let queued = ['[Fix a](tickets/2026-07-25_a.md)']
+  const { loop } = harness({
+    cooldownMs: 0,
+    queue: async () => queued,
+    lockDrains: async (_p, assignments) => assignments,
+    promote: async (_p, { agentId }) => {
+      promoted.push(agentId)
+      return { settled: true, promoted: false, handoffPending: true }
+    },
+    releaseLock: async (_p, claim) => void released.push(claim),
+  })
+  await loop.tick()
+  queued = []
+  for (let i = 0; i < 5; i++) await loop.tick()
+  loop.stop()
+  // Two held sweeps, then the third settles it unread — the pre-#1583 behavior — rather than
+  // asking forever about a run that will never answer. (Later ticks promote only the rotation
+  // agents the emptied queue lets through, never this one again.)
+  assert.equal(promoted.filter(id => id === 'run-1').length, 3)
+  assert.deepEqual(released, [])
+})
+
 test('every other ending leaves the lock to its own lifecycle (#1583)', async () => {
   // A run that published (or whose handoff skipped because its PR already exists) has a PR whose
   // merge deletes the lock; freeing it here would re-open the double-work window the claim closes.

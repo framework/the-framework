@@ -256,11 +256,14 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // The exception (a checkout busy with the user's own queue edits) is the callee's to flag.
       const retry = !outcome.promoted && outcome.retry === true
       // The run's own recorded ending rides along (#1583): a settled run whose handoff skipped
-      // as `no-commits` is the one case the sweep may free the lock it minted.
+      // as `no-commits` is the one case the sweep may free the lock it minted. A clean end whose
+      // handoff has not reported yet is said too — only a `done` run gets the epilogue, so only
+      // there does an absent report mean "still publishing" rather than "never will".
       return {
         settled: !retry,
         promoted: outcome.promoted,
         ...(agent.handoffSkip !== undefined ? { handoffSkip: agent.handoffSkip } : {}),
+        ...(agent.status === 'done' && agent.handoffReport === undefined ? { handoffPending: true } : {}),
       }
     },
     log,

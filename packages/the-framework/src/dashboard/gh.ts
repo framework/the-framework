@@ -321,11 +321,11 @@ export interface RepoAutoMerge {
 /**
  * Whether this repo allows GitHub auto-merge (#1417).
  *
- * An armed merge on a repo that does not silently degrades to an immediate direct merge (the
- * {@link DIRECT_MERGE_FALLBACK} half of #1216) — the PR lands before CI has run (#1406) — so the
- * launcher warns with the fix instead of leaving the degradation silent. `known: false` (gh
- * missing, unauthenticated, not a GitHub repo) is "could not say", which renders nothing: no
- * crying wolf, same stance as the trust (#1318) read.
+ * An armed merge on a repo that does not (the {@link DIRECT_MERGE_FALLBACK} half of #1216) is
+ * handed to the daemon's CI watch (#1418): merge on green, but only while the daemon runs — so
+ * the launcher notes the local fallback and names the server-side Allow auto-merge setup.
+ * `known: false` (gh missing, unauthenticated, not a GitHub repo) is "could not say", which
+ * renders nothing: no crying wolf, same stance as the trust (#1318) read.
  *
  * The probe is the REST endpoint, not `gh repo view --json autoMergeAllowed`: `repo view` has no
  * such field (any gh version), so that spelling always errored into "could not say". REST omits

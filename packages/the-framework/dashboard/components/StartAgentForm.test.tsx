@@ -230,20 +230,23 @@ describe('StartAgentForm Haiku warning (#1439)', () => {
   })
 })
 
-describe('StartAgentForm auto-merge-disabled warning (#1417)', () => {
-  test('an armed merge on a repo that refuses auto-merge warns, with the fix, without blocking', async () => {
+describe('StartAgentForm auto-merge-disabled notice (#1417)', () => {
+  test('an armed merge on a repo that refuses auto-merge notes the merge-on-green fallback, without blocking', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
     prefs.current = { handoff: 'merge' }
     onRepoAutoMerge.mockResolvedValue({ known: true, allowed: false })
     render(<StartAgentForm {...props} />)
     expect(await screen.findByText(/auto-merge disabled/)).toBeTruthy()
+    // The daemon's CI watch covers the merge (same "merge on green" wording as the terminal),
+    // and the notice still names the server-side setup.
+    expect(screen.getByText(/merge on green/)).toBeTruthy()
     expect(screen.getByText(/Allow auto-merge/)).toBeTruthy()
     // Never a block: the submit path stays untouched.
     expect(screen.getByText('submit-typed')).toBeTruthy()
   })
 
-  test('a repo that allows auto-merge, or one gh cannot speak for, shows no warning', async () => {
+  test('a repo that allows auto-merge, or one gh cannot speak for, shows no notice', async () => {
     onProjects.mockResolvedValue([])
     onSystemPromptUser.mockResolvedValue(null)
 

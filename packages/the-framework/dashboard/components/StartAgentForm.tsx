@@ -112,10 +112,11 @@ export function StartAgentForm({
     [driver, localDriver, publishArmed],
   )
 
-  // An armed merge on a repo with GitHub auto-merge disabled silently degrades to an immediate
-  // direct merge — the PR lands before CI has run (#1417/#1406). Warn with the fix BEFORE the
-  // session is spent, the way #1318 warns about trust. Read only while the merge rung is armed;
-  // a remote agent merges on its own device, so it is not probed here.
+  // An armed merge on a repo with GitHub auto-merge disabled is handed to the daemon's CI watch
+  // instead: merge on green, but only while the daemon runs (#1417/#1418). Say so — and name the
+  // sturdier server-side setup — BEFORE the session is spent, the way #1318 warns about trust.
+  // Read only while the merge rung is armed; a remote agent merges on its own device, so it is
+  // not probed here.
   const mergeArmed = options.handoff === 'merge' && !remoteDevice
   const repoAutoMerge = useLoaded<Awaited<ReturnType<typeof onRepoAutoMerge>>>(
     () => (mergeArmed ? onRepoAutoMerge(projectId) : Promise.resolve(null)),
@@ -234,15 +235,17 @@ export function StartAgentForm({
           for throwaway experiments.
         </p>
       )}
-      {/* The armed merge will not wait for CI (#1417): this repo refuses GitHub auto-merge, so
-          the merge degrades to an immediate direct merge (#1216/#1406). Never a block — the
-          direct merge may be exactly what a solo prototyper wants — but say so, with the fix. */}
+      {/* The armed merge is handled locally (#1417): this repo refuses GitHub auto-merge, so
+          the daemon's CI watch merges on green instead (#1216/#1418) — sound, but only while
+          the daemon runs. Informational, never a block: name the server-side setup, using the
+          same "merge on green" vocabulary as the terminal's per-handoff line. */}
       {autoMergeDisabled && (
-        <p role="alert" className="mt-2 text-xs text-warning">
-          This repo has GitHub auto-merge disabled, so an auto-merged session lands its PR
-          immediately — CI is not awaited. To let checks gate the merge, enable{' '}
-          <span className="font-medium">Allow auto-merge</span> in the repo settings and mark a
-          check (e.g. <code className="font-mono">build</code>) as required.
+        <p role="status" className="mt-2 text-xs text-muted-foreground">
+          This repo has GitHub auto-merge disabled, so the daemon merges the PR once its checks
+          pass (merge on green) — handled locally, only while the dashboard is running. For the
+          server-side version, enable <span className="font-medium">Allow auto-merge</span> in
+          the repo settings and mark a check (e.g. <code className="font-mono">build</code>) as
+          required.
         </p>
       )}
     </form>

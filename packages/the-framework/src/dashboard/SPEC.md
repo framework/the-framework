@@ -20,6 +20,6 @@ The daemon's serving and projection layer: the HTTP host behind the dashboard, t
 
 **The live browser.** The dashboard cannot reach an agent's Chrome directly (wrong origin), so the daemon proxies the screencast and the clicks — and the port comes from the agent's own record, never from the client, which is what keeps the proxy from being an open relay into anything else on the machine.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

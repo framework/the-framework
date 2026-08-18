@@ -8,6 +8,6 @@ Agent persistence and workspaces: the append-only event log every surface is a p
 - Each agent works in its own worktree on its own branch (named after its id until it picks a session name); teardown commits leftover work first, so the branch outlives the checkout. The parent checkout's installed dependencies are symlinked in instead of reinstalled — instant, no extra disk — and hidden from git so a sweeping commit cannot drag them onto the PR.
 - Nothing is resumed at boot. Ctrl-C closed the last dashboard and every agent it was running, which is a deliberate act rather than a crash to recover from; what the next boot does instead is mark as stopped anything a dead process left claiming to be running.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

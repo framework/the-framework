@@ -9,6 +9,6 @@ The dashboard's React component catalog: every page, panel and control the brows
 - Everything renders state the daemon owns (reads poll or stream, writes are daemon calls; components keep only view state), and the house rule is honesty: controls name what will actually happen, no state rides on colour alone, warnings teach before an agent is spent but never block, and empty states name their reason instead of dead-ending.
 - Two sub-kits supply the raw material: the hand-ported UI primitives and the composer's mention-aware prompt-editor engine.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

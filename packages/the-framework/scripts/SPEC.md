@@ -6,6 +6,6 @@ Build-time helpers that keep the prompting authored as markdown, and make the pu
 - Tests run against a throwaway home for the machine's global state, so the developer's live daemon can never leak into the suite and hang it. There are two suites and two runners: `node --test` over the compiled `src/`, and the dashboard's own browser-shaped tests.
 - Copying the dashboard bundle is no longer a step: the dashboard is part of this package now, and its build writes straight into the `dist/` the daemon serves from.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

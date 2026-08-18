@@ -13,6 +13,6 @@ Every word the framework says to a coding agent, authored as markdown: the built
 
 - Prompting lives as prose and is compiled into the code at build time, so a prompt change lands as a readable markdown diff that gets a review round like any other product change. These files are the source of truth: the system prompt used to be authored on a GitHub issue and copied here, with a daily job checking the two had not drifted — a second home for the text, and a checker to paper over having one.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

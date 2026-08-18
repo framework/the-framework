@@ -32,6 +32,6 @@ flowchart LR
 - Worktrees exist so concurrent agents never fight and the user's checkout — uncommitted work included — is never touched; one retention rule decides every removal, and it asks whether the work is on the remote rather than how the agent ended, so cleanup commits and pushes before removing anything and every deletion is recoverable.
 - The CLI is treated as a black box on purpose: the framework never runs its own model calls for the coding work, and swapping which CLI does the work means swapping one driver.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

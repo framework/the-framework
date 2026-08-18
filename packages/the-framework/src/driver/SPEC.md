@@ -14,6 +14,6 @@ The driver seam: the one abstraction a coding-agent CLI is wrapped behind, so th
 - **Quota and cost.** Drivers that can, report the account's quota window: read via the CLI's own usage command, and for free between turns from the telemetry the stream already carries. A transient failure (network, timeout, reworded readout) leaves the last good reading in force; "the CLI isn't installed / has no subscription" invalidates it. A driver that cannot price turns reports cost as unknown — never zero — so an unpriced agent never reads as free.
 - **The fake.** A scripted, offline driver that exercises every path deterministically — the product's whole lifecycle is testable without spending a token.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

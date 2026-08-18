@@ -178,8 +178,8 @@ async function rmFile(path: string): Promise<void> {
  * go but the deletion is itself a change git will record.
  *
  * What it deliberately leaves is git's, not the dashboard's: the branch `tf-agent-<id>`
- * (or the name the agent gave it) and its commits, the committed `LOGS.md` line, and the
- * conversation record. Deleting a branch that may carry merged work or an open PR is not a thing a
+ * (or the name the agent gave it) and its commits. Deleting a branch that may carry merged work
+ * or an open PR is not a thing a
  * dashboard action should do silently, so the branch stays and delete means "remove from the
  * dashboard", not "erase every trace".
  *

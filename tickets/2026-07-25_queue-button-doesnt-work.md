@@ -14,7 +14,7 @@ The queue (#624) is the core mechanism for lining up AI work; a queue entry poin
 
 ## Source
 
-Imported from GitHub issue [gemstack-land/the-framework#1164](https://github.com/gemstack-land/the-framework/issues/1164), created 2026-07-25, labels: `bug`, `priority: high`, 1 comment.
+Imported from GitHub issue [gemstack-land/the-framework#1164](https://github.com/gemstack-land/the-framework/issues/1164), created 2026-07-25, labels: `bug`, `priority: high`, 2 comments.
 
 ### Original description
 
@@ -30,3 +30,4 @@ So I don't think it works?
 ### Notes from the GitHub thread
 
 - Still reproducing later the same day (new screenshot), with the added confusion "What should I do now?" — the queued state gives no guidance on what happens next.
+- 2026-08-17: the plan (PR #1560) is merged, but the implementation (persistent queued state + routine-aware guidance) has not been built yet. The issue was briefly auto-closed by a closing keyword in that PR's body and has been reopened (process fix tracked in #1567).

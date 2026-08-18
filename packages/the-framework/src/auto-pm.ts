@@ -542,10 +542,14 @@ export interface AutoPmDeps {
    * lock's normal release is the agent's own PR deleting it, and a run whose handoff skipped as
    * `no-commits` is never opening one — without this the queue livelocks on the dead claim until
    * a human clicks Release. Keyed off the run's recorded ending, never a timer (#1420). Only the
-   * exact minted claim is freed — the callee leaves a lock naming anyone else alone. Absent (or
-   * throwing) leaves the lock standing, exactly as before this seam.
+   * exact minted claim is freed — the callee leaves a lock naming anyone else alone.
+   *
+   * Resolves `true` when the claim is dealt with (freed, already gone, or someone else's), and
+   * `false` when the release could not land — a transient `index.lock`, say — so the loop holds
+   * the agent and tries again next sweep rather than losing the one shot. Absent (or throwing)
+   * leaves the lock standing, exactly as before this seam.
    */
-  releaseLock?(project: AutoPmProject, claim: PlanAssignment): Promise<unknown>
+  releaseLock?(project: AutoPmProject, claim: PlanAssignment): Promise<boolean>
   /** Progress line. */
   log(message: string): void
   /** Override the tick interval. */
@@ -706,9 +710,15 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
             }
             // A settled run that ended with nothing to hand off is never opening the PR that
             // lifts the lock it was started under (#1583), so the claim minted for it is freed —
-            // the one dead claim the sweep can *know* is dead, rather than guess by a timer.
-            if (agent.claim && outcome.handoffSkip === 'no-commits')
-              await deps.releaseLock?.(project, agent.claim).catch(() => undefined)
+            // the one dead claim the sweep can *know* is dead, rather than guess by a timer. A
+            // release that could not land is retried next sweep, bounded like the hold above.
+            if (agent.claim && outcome.handoffSkip === 'no-commits' && deps.releaseLock) {
+              const ok = await deps.releaseLock(project, agent.claim).catch(() => false)
+              if (!ok && (agent.waits ?? 0) < 2) {
+                stillPending.push({ ...agent, waits: (agent.waits ?? 0) + 1 })
+                continue
+              }
+            }
           }
           if (stillPending.length) pending.set(project.id, stillPending)
           else pending.delete(project.id)

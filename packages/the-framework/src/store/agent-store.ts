@@ -345,7 +345,11 @@ export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: str
       break
     case 'handoff':
       next.handoffReport = event.outcome
+      // Cleared on a non-skipped outcome rather than only ever set: a resumed run's second leg
+      // can publish after its first skipped, and a stale `no-commits` on a published run is
+      // exactly the lie the release must not act on.
       if (event.outcome === 'skipped') next.handoffSkip = event.reason
+      else delete next.handoffSkip
       if (event.outcome !== 'failed' && event.merge) next.mergeOutcome = event.merge.outcome
       break
     case 'ticket':

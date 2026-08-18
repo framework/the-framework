@@ -210,7 +210,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       const result = await releaseAbandonedLock(project.path, claim, { log })
       if (result === 'released')
         log(`[framework] auto PM: released the lock on ${claim.ticket} — its agent ended with nothing to hand off`)
-      return result
+      if (result === 'error')
+        log(`[framework] auto PM: the release of the lock on ${claim.ticket} could not be committed; it will be retried`)
+      return result !== 'error'
     },
     start: async (project, job) => {
       // A draining agent works one open queue entry, and since #1164 that entry links back to the

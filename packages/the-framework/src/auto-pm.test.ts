@@ -932,7 +932,10 @@ test('a claim whose run settled with nothing to hand off is released (#1583)', a
       return assignments
     },
     promote: async () => ({ settled: true, promoted: false, handoffSkip: 'no-commits' }),
-    releaseLock: async (_p, claim) => void released.push(claim),
+    releaseLock: async (_p, claim) => {
+      released.push(claim)
+      return true
+    },
   })
   await loop.tick() // mints the claim and starts the drain
   queued = []
@@ -953,7 +956,10 @@ test('a sweep that catches the end-before-handoff gap holds the claim and still 
     queue: async () => queued,
     lockDrains: async (_p, assignments) => assignments,
     promote: async () => ({ settled: true, promoted: false, ...ending }),
-    releaseLock: async (_p, claim) => void released.push(claim),
+    releaseLock: async (_p, claim) => {
+      released.push(claim)
+      return true
+    },
   })
   await loop.tick() // starts the drain
   queued = []
@@ -977,7 +983,10 @@ test('the mid-epilogue hold is bounded, so a run that dies there cannot pin its 
       promoted.push(agentId)
       return { settled: true, promoted: false, handoffPending: true }
     },
-    releaseLock: async (_p, claim) => void released.push(claim),
+    releaseLock: async (_p, claim) => {
+      released.push(claim)
+      return true
+    },
   })
   await loop.tick()
   queued = []
@@ -988,6 +997,28 @@ test('the mid-epilogue hold is bounded, so a run that dies there cannot pin its 
   // agents the emptied queue lets through, never this one again.)
   assert.equal(promoted.filter(id => id === 'run-1').length, 3)
   assert.deepEqual(released, [])
+})
+
+test('a release that could not land is retried next sweep, bounded (#1583)', async () => {
+  const attempts: PlanAssignment[] = []
+  let queued = ['[Fix a](tickets/2026-07-25_a.md)']
+  const { loop } = harness({
+    cooldownMs: 0,
+    queue: async () => queued,
+    lockDrains: async (_p, assignments) => assignments,
+    promote: async () => ({ settled: true, promoted: false, handoffSkip: 'no-commits' }),
+    releaseLock: async (_p, claim) => {
+      attempts.push(claim)
+      return attempts.length >= 2 // the first try hits a transient failure, the retry lands
+    },
+  })
+  await loop.tick()
+  queued = []
+  await loop.tick() // the release fails to commit: the agent is held for a retry
+  await loop.tick() // the retry lands
+  await loop.tick() // dealt with: no further attempts
+  loop.stop()
+  assert.equal(attempts.length, 2)
 })
 
 test('every other ending leaves the lock to its own lifecycle (#1583)', async () => {
@@ -1004,7 +1035,10 @@ test('every other ending leaves the lock to its own lifecycle (#1583)', async ()
       queue: async () => queued,
       lockDrains: async (_p, assignments) => assignments,
       promote: async () => outcome,
-      releaseLock: async (_p, claim) => void released.push(claim),
+      releaseLock: async (_p, claim) => {
+      released.push(claim)
+      return true
+    },
     })
     await loop.tick()
     queued = []

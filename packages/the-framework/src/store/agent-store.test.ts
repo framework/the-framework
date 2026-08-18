@@ -202,6 +202,10 @@ test('applyEventToMeta folds the skip reason onto the meta, so the sweep can fre
   // A handoff that ran carries no skip: the field means "why nothing happened", nothing else.
   const done = applyEventToMeta(base, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
   assert.equal(done.handoffSkip, undefined)
+  // And a later leg that published clears a stale skip — a resumed run's second handoff can
+  // publish after its first skipped, and the release must not act on leg one's reason.
+  const republished = applyEventToMeta(skipped, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
+  assert.equal(republished.handoffSkip, undefined)
 })
 
 test('applyEventToMeta folds the merge outcome onto the meta, so the CI watch can find its PRs (#1418)', () => {

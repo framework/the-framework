@@ -1298,7 +1298,7 @@ function printNonLoopbackAccess(io: CliIO, host: string, url: string, token: str
 }
 
 /**
- * The startup footer every dashboard path prints (#312): the convenience commands, the version,
+ * The startup footer every dashboard path prints (#312): where prompts come from, the version,
  * and then — once npm answers — whether that version is the latest.
  *
  * The update line is deliberately not awaited before the static lines. #312 asks for the static
@@ -1310,7 +1310,6 @@ export function printStartupFooter(io: CliIO, opts: { fetchLatest?: VersionFetch
   const version = frameworkVersion()
   io.out('')
   io.out('Type a prompt on the dashboard to start an agent, or use:')
-  io.out('  framework "<what to build>"   Build (streams to the dashboard)')
   io.out('  framework --help              All options')
   io.out('')
   io.out(`The Framework v${version}`)

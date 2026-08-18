@@ -649,6 +649,12 @@ test('the footer offers no `framework stop`: Ctrl-C is how the foreground dashbo
   assert.ok(out.includes(`The Framework v${frameworkVersion()}`))
 })
 
+test('the footer offers no positional build command: D4 removed it, and following it exited 2', async () => {
+  const { io, out } = capture()
+  await printStartupFooter(io, { fetchLatest: async () => undefined })
+  assert.ok(!out.some(l => l.includes('<what to build>')))
+})
+
 test('the version prints before npm answers, and a newer release is announced after (#312)', async () => {
   const { io, out } = capture()
   let release: (v: string) => void = () => {}

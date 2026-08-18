@@ -7,6 +7,6 @@ The Tickets page's toolbar: search, faceted filters, sort and grouping — the p
 - Picking a sort key starts at its natural direction, and directions are labelled by meaning per key — "Newest first", "Easiest first" — since "descending" says nothing alone.
 - "/" focuses the search from anywhere, advertised by a keycap chip that steps aside once the field is in use.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

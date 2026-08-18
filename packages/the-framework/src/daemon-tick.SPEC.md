@@ -10,6 +10,6 @@ The daemon's one background clock: a single interval that runs a list of jobs, e
 - Awaiting a tick means the tick finished — overlapping ones join it rather than being dropped — which is what makes the schedule testable without waiting on wall-clock time.
 - Stopping is likewise awaitable, and resolves only once the turn in flight has finished: these jobs commit and push, and clearing the interval stops the next turn, never the one already inside a job. A shutdown that did not wait for it would tear the repo down underneath a sweep.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

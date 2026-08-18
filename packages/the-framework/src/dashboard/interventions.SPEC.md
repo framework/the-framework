@@ -8,6 +8,6 @@ The cross-project "needs you" queue: everything currently waiting on the human, 
 - Forgiving and deduplicated: an unreadable project contributes nothing, and the same repo registered twice contributes each item once.
 - Also phrases the queue as a Discord message, one line per item, worded by kind.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

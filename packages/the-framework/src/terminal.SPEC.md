@@ -6,6 +6,6 @@ Renders the agent's event stream as one human-readable terminal line per event â
 - Refusals are phrased as reasons in the reader's terms (why a merge was withheld, why the handoff or cleanup did nothing), so a setting never reads as a bug.
 - A driver that reports no price shows its token counts rather than a $0 that would read as free.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

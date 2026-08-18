@@ -8,6 +8,6 @@ The one guarded way every panel reads from the daemon — once, or again on a st
 - Switching targets normally clears the panel while the new answer loads; a surface can instead keep the old answer and update in place, trading a blank flicker for a brief staleness.
 - With nothing to read yet (no project selected), nothing is read; an on-demand refresh exists for actions whose effect should show before the next tick.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

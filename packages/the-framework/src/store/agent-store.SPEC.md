@@ -10,6 +10,6 @@ Agent persistence: an agent's history is its append-only event log, and everythi
 - Ids are timestamps made path-safe, so id order is time order.
 - An archived snapshot can be patched afterwards for a fact discovered once the agent's process is gone — the pull request opened for its work. A record is the right home for it either way, and a surface should not have to know which path produced it.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

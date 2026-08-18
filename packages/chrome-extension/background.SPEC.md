@@ -9,6 +9,6 @@ The extension's daemon half: the only part holding the bridge token and talking 
 - Every sweep records why it did or didn't act, so "tabs are not opening" is answerable from the options page.
 - Every daemon call states this extension's version; a daemon expecting another refuses outright with both versions named, so a stale install blocks loudly instead of half-working.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

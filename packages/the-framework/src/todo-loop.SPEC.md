@@ -8,6 +8,6 @@ Drains the agent's own TODO backlog one entry per turn until it is empty, and ow
 - An entry queued with a priority lands in its numbered section, not at the end — the queue drains front to back, so placement is priority.
 - An agent's own TODO file with open entries withholds auto-merge — a temporary belt under the agent's own ready signal.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

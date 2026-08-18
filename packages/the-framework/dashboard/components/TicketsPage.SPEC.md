@@ -7,6 +7,6 @@ The cross-project Tickets view: every registered project's backlog on one full-w
 - Click-to-filter from the rows: a topic badge adds its topic additively, the claim marker narrows to claimed.
 - A project deselected in its facet disappears entirely — no noise about a choice made on purpose — while filtered-to-nothing states say so and clear from right there.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

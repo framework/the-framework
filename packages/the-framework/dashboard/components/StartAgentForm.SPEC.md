@@ -7,6 +7,6 @@ The launcher form that starts an agent in the selected project: the shared compo
 - Preflight warnings spend words before the agent is spent, never blocking: an untrusted project dooming a web agent, a driver CLI that cannot start (the GitHub CLI checked only when a PR or merge is armed, nothing probed for Actions or device targets), a repo whose disabled auto-merge makes an armed merge land immediately, and Haiku's known failure to finish properly.
 - A start answers immediately: an optimistic rail row appears and the view jumps to the agent before its record exists.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -8,6 +8,6 @@ The turn-boundary contract with the wrapped agent: each turn runs as a black box
 - One continuation wording resumes the agent after any answered gate, and a shared cap on ask-rounds stops an agent that keeps asking.
 - Signal emission is deduped across a span of turns: ready-for-merge fires once, and a session name re-emits only on a real rename.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

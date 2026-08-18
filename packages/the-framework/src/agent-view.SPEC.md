@@ -8,6 +8,6 @@ Distills an agent's event stream into the dashboard's summary cards: the agent's
 - A stored snapshot can seed the publish state for a viewer who attached after the agent's opening events, but an event in the stream always wins over it.
 - The workspace comes from the events rather than the disk: a finished agent's working copy is deleted, and the event is the surviving record of where the conversation lived — which resuming it needs.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

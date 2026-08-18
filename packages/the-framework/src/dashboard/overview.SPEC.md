@@ -8,6 +8,6 @@ The cross-project glance: what the agent is working on right now, how much is qu
 - The cross-project tickets page keeps one list per project, present even when empty, so importing stays reachable there.
 - Forgiving throughout: an unreadable project contributes nothing.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

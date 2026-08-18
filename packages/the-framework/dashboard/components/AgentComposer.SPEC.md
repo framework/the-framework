@@ -10,6 +10,6 @@ One composer for an agent, live or finished: the box stays put across its whole 
 
 - Replaced a pair of look-alike composers that swapped when the agent ended, remounting the editor under the user mid-typing and leaving un-resumable agents a dead end.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

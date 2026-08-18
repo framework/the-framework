@@ -6,6 +6,6 @@ The shell header's single notifications bell, making the model legible: where no
 - "Human Queue" (an agent awaiting you, a PR to review) is the default-on baseline but a real toggle; "New activity" (an agent started or finished) is opt-in on top.
 - Turning browser delivery on asks the browser for permission on that same click, and a permission blocked in browser settings disables the toggle with the reason.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

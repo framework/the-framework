@@ -6,6 +6,6 @@ The settings page: the daemon address, the bridge token, and the tab-opening swi
 - Success also says how many cloud sessions the daemon is watching, so "connected but nothing happens" answers itself.
 - A button runs the tab sweep on demand and reports what it did, sparing the wait on the timer.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

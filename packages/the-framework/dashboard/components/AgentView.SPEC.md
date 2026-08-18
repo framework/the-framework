@@ -8,6 +8,6 @@ One agent's view, live or finished, in a stable frame — bar, details, changes/
 - While working, the bar summarizes the worktree's changes; after settle it swaps, once loaded, to what the branch holds.
 - Agents executing elsewhere say so: the Actions burst-at-the-end replay, the web agent's cloud session, the device agent keeping only its preview local.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

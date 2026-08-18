@@ -7,6 +7,6 @@ The agent's one overflow menu: everything you can do to an agent — open it on 
 - Stop and "Merge when finished" exist only while the agent is live; the merge is a pre-commitment honoured at the agent's natural end, so it reads "armed" rather than staying pressable.
 - Delete confirms first — the history goes for good; the branch and PR stay in git.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

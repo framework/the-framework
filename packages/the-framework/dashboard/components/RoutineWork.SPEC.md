@@ -7,6 +7,6 @@ The Overview's Routine work card: the jobs the scheduled sweep fires, each with 
 - Two checkbox tiers: the master switch turns the schedule on or off, a row's box takes that one routine in or out of it — recorded as opt-outs, so a routine added by a later version runs by default.
 - "Trigger routine now" sweeps once even with auto-run off (the click is the consent), and the sweep answers on the card per project, so "ran and found nothing" never looks like "never ran".
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

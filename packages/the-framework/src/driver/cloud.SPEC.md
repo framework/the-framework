@@ -9,6 +9,6 @@ A driver that hands the whole task to Claude Code on the web: it starts a real c
 - The session it creates is repo-bound, not a bundle (#1320): with nonessential traffic disabled the CLI's server-side bundle experiment reads off, so a failed GitHub-App preflight falls through to a session that clones from GitHub and can push — instead of silently uploading a local bundle whose work can never leave the VM (anthropics/claude-code#81776).
 - Before the hand-off, HEAD is pushed to origin under the agent's own id: the CLI's default revision pin is the current local branch — which an agent workspace's local-only branch fails — and a slash-carrying ref never resolves on the cloud side even when pushed (anthropics/claude-code#87235), so the ref is minted slash-free and handed over explicitly. A push that fails degrades to the old behavior and says so, naming `--teleport` as the recovery path.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -5,6 +5,6 @@ The floating menu the composer's triggers open: arrow keys move the highlight, E
 - Focus never leaves the text being typed; the menu reads as a listbox to assistive tech, pointing at the highlighted option.
 - With no items it shows the trigger's explanatory note when one is given, and each item can carry a short hint and a hover explanation.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

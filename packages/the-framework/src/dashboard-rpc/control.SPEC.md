@@ -8,6 +8,6 @@ Every dashboard action that changes something: steering a live agent, starting o
 - Removing a kept checkout or deleting an agent refuses while it is live, saves the work as a commit, and stops any preview serving the tree first.
 - Queueing a ticket writes the project's backlog directly, under the ticket's priority and linking back to it; a stuck ticket claim can be released by hand.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

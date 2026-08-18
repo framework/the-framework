@@ -12,6 +12,6 @@ Everything the daemon runs in the background beside serving the dashboard: Disco
 - Every background start forces unattended mode, so gates auto-answer instead of parking forever on an absent human.
 - Shutdown has two phases: stop everything that could start an agent, then commit the archives the stopped agents just wrote. Nothing is resumed on the next boot — Ctrl-C closed those agents deliberately.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

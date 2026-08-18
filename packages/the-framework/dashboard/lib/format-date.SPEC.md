@@ -7,6 +7,6 @@ Every timestamp the dashboard shows is formatted here, so an absent or unparseab
 - Countdowns to a scheduled sweep read past-due as "any moment" — the daemon ticks on its own clock, so overdue only ever means imminent, not late.
 - A quota reset is named by weekday and time (the bar above already places it in the week), with the full date and time zone spelled out in its tooltip.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

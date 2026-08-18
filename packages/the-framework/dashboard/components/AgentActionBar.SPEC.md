@@ -6,6 +6,6 @@ One agent's action bar: what the agent is on the left — its branch, state, and
 - The agent's state (exactly one of stopped, ready for merge, failed, building, finished) reads beside the branch facts instead of spending a banner row on one word.
 - One bar whether the agent is live or finished, and one row always: the label gives up width before the controls ever wrap.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

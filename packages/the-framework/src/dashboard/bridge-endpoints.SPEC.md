@@ -13,6 +13,6 @@ The daemon's doorway for the browser extension in the user's own claude.ai tab: 
 - No cross-origin allowance is offered: the extension does not need one, and offering one would let any page the user visits reach their daemon.
 - Transcript entries carry their position in the conversation, because the page is re-read constantly and the same message arrives many times.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -7,6 +7,6 @@ The notification engine: a background poll over the registered projects that ann
 - Forgiving: a failed scan or projection simply announces nothing that cycle.
 - It owns no timer of its own — the daemon's one clock calls it — so its cadence is declared where every other background job's is.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

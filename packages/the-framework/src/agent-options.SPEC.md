@@ -8,6 +8,6 @@ Turns the user's saved preferences into the options an agent starts with, so an 
 - Publishing is one ordinal, not a set of switches: each rung includes the ones below it, so nothing has to remember that a pull request implies a push. Unset means open a pull request — the zero-config handoff — and merging is the rung above, because landing on the main branch has to be asked for.
 - Options that would mean nothing are dropped: the browser only goes to the driver that can use it, and the model, driver, and target travel only when they differ from the default.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

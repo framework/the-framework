@@ -8,6 +8,6 @@ The right sidebar: tabs for the project's files, the documents the agent pushed 
 - While the launcher shows the docs in its own column, the rail withholds that tab.
 - It had a History tab too, rendering a committed markdown re-narration of what the agent archive already holds exactly; the agents themselves are the history.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

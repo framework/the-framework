@@ -7,6 +7,6 @@ The shared composer: the prompt editor plus its control row — presets, context
 - On an agent, controls that can no longer change anything disappear — the driver is bound at start, and the options gear hides while it is live, returning after the end offering only what a Resume actually re-arms.
 - A draft carried from another device or a navigating click lands in the launcher's editor, taken once; Start is blocked with a reason while the chosen device is offline, and fast double-submits fire once.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

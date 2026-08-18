@@ -9,6 +9,6 @@ The process behind the dashboard: it serves the UI, spawns agents, and runs the 
 - At boot it registers the home project (and, when opted in, every repo in the user's repos directory), marks agents a dead process left "running" as stopped, and starts the background services. It resumes nothing: Ctrl-C was deliberate.
 - Shutdown is ordered: background services quiesce first, live agents are stopped, their archives committed, then the dashboard goes. Each step is waited out rather than merely started, so the archives being committed are the finished ones — the sweeps are off the repo before the agents are torn down, and the teardowns are done before their work is committed.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

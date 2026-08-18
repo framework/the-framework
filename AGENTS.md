@@ -1,3 +1,3 @@
 - The project isn't released, it has zero users
   - Thus, breaking changes aren't a problem, so prefer clean code over breaking changes
-- Before writing SPEC.md files, read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+- Before modifying/creating SPEC.md files, always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

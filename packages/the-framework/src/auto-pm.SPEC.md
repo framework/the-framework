@@ -13,6 +13,6 @@ Auto PM spends leftover subscription quota on the product's own roadmap: while t
 - An unreadable quota fails closed — the opposite of the per-agent guard: quietly burning quota on work nobody asked for is worse than skipping a tick.
 - "Run now" skips only the master switch: the click is the consent the preference exists to record; every other stand-down holds.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

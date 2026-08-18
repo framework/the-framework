@@ -7,6 +7,6 @@ The second real driver: wraps the Codex CLI so the product runs the same way on 
 - It reports tokens but never a price, so turns carry the counts with the cost left unknown — never zero — which means the budget cap simply cannot fire here; cached input is split out of the inclusive total and reasoning tokens are not double-counted, so accounting means the same thing across drivers.
 - No quota read: a driver that can't report one simply doesn't.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

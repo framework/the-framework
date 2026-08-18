@@ -7,6 +7,6 @@ The first real driver: wraps the Claude Code CLI so the product runs work on the
 - Extra capabilities (like the real browser) are offered as additional tool servers that merge with the user's own, never replacing them.
 - The CLI's stream is mined for free telemetry: its session id — announced at the start of the turn, so a stopped or killed turn can't take the resume handle with it — assistant text, tool names, per-turn token/cost accounting, and the account's quota standing.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

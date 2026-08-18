@@ -10,6 +10,6 @@ The opening screen: the promise (strike through "Babysit AI", announce "Autonomo
 
 - Yarn's install command falls back to npm because no single yarn generation can run both the modern one-shot command and a global install.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

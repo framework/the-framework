@@ -7,6 +7,6 @@ The one way any driver CLI is run: spawn it over the workspace, hand it the prom
 - The prompt travels over the agent's input stream, so its length is unlimited and none of it can be misread as a command; an agent that dies before reading it fails the turn cleanly instead of crashing the product.
 - Only the parser knows which CLI is on the other end, so a second driver gets all of this for free.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

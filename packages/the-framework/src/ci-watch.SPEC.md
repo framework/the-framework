@@ -11,6 +11,6 @@ Watches the pull requests the framework is waiting to land and acts on what thei
 
 - Polling rather than webhooks: a local daemon has no public address GitHub could call, and every decision starts from a fresh read, so a hosted deployment could later swap the trigger without changing the handlers.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

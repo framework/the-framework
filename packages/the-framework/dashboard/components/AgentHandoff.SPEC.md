@@ -8,6 +8,6 @@ The end-of-work handoff riding the agent's action bar: what this agent left behi
 - With nothing to press, the reason is said instead: branch gone, nothing committed (uncommitted files named), or no remote.
 - The bar's disclosure expands into commits, changed and uncommitted files, capped with the remainder counted.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

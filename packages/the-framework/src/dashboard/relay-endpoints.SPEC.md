@@ -7,6 +7,6 @@ The device side of running an agent on another machine: the few endpoints a daem
 - A relayed start strips any nested relay target, so an agent can never be relayed onward to a third machine.
 - Agent-scoped calls go through one channel that admits only named, whitelisted operations; events stream back as a plain line-by-line feed until the agent ends or the caller hangs up.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

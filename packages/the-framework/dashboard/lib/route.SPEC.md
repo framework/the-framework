@@ -7,6 +7,6 @@ The dashboard's address scheme — the URL is the selection: the Overview at the
 - The third segment is the agent's own stable id, not its conversation id with the driver: only the agent id is ours, stable, and already the name of its worktree directory.
 - Anything unparseable is the Overview and stray extra segments are ignored, so a hand-typed URL cannot break the view.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

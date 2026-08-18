@@ -11,6 +11,6 @@ The user's one home file: the projects The Framework is installed into, the user
 - Writes are atomic, serialized, and owner-only readable: the file carries the daemon token and credentials, and a half-written or world-readable registry would lose or leak everything.
 - The token and secrets live outside the preferences so they can never reach the browser; clients are only ever told a credential is present.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

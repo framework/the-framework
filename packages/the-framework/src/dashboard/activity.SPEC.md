@@ -7,6 +7,6 @@ The activity feed: the cross-project stream of agent lifecycle moments — an ag
 - The default-off "for your information" counterpart to the always-on "needs you" interventions queue.
 - Several updates post to Discord as one message; a project whose history cannot be read contributes nothing.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

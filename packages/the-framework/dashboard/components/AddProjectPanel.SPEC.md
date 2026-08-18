@@ -6,6 +6,6 @@ The "Add project" modal: registers a repo — or every git repo directly under a
 - A folder add reports how many repos it registered (and how many already were) instead of finishing silently.
 - It behaves like the dialog it claims to be: Esc closes, Tab stays inside, and focus returns to the control that opened it.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -8,6 +8,6 @@ The two Discord setup dialogs — the bot and notifications — that explain the
 - The enable toggle is independent of the credential: it can be turned on first and starts working once the credential is set.
 - Each dialog's one-line description is shared with the onboarding checklist row that opens it, so the two never tell different stories.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

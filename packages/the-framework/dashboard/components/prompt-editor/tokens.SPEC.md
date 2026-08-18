@@ -10,6 +10,6 @@ The composer's token chips: pills that read nicely in the editor but always seri
 
 - Because a chip flattens to its text verbatim (no escaping), the prompt over the wire is unchanged — presets and everything downstream keep working untouched.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

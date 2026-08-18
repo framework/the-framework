@@ -8,6 +8,6 @@ The daemon's memory of the cloud-session bridge: each session's parked question 
 - Transcript entries are kept one per position, bounded — the page is re-read constantly, so the same message arrives many times.
 - All in memory on purpose: a question is only answerable while its session is parked. Even refused contacts are remembered, telling a misconfigured extension apart from an absent one.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

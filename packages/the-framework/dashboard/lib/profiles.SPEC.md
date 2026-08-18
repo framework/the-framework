@@ -8,6 +8,6 @@ The saved daemons this browser can hop between — each remembered as a label, a
 - "Local" remembers the address the dashboard was launched from, so it can find the way back from a remote box.
 - An indicator names the daemon currently connected: Local on this machine, otherwise the saved device's label or its bare host.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -7,6 +7,6 @@ The rich prompt editor: `/` opens commands, `<` inserts the agent's tag macros, 
 - Enter sends, Shift+Enter breaks the line — except while a suggestion menu is open, inside a code block, or mid-IME-composition, where Enter keeps its editing meaning.
 - Markdown is live; a compact one-line variant serves the navbar quick-launch.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

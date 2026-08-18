@@ -8,6 +8,6 @@ The app's left sidebar, present on every route: brand, global navigation (New, O
 - Start seeds an optimistic "starting…" row that retires when the real agent lands, whatever state it lands in, with a deadline so a start that produced nothing does not pretend forever.
 - The Overview item carries the Human Queue count.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

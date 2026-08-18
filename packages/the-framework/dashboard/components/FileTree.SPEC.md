@@ -8,6 +8,6 @@ The project panel's file tree — a context picker, not an editor: clicking a fi
 - Every file previews on hover — its diff when changed, its contents when not — with the tree's own status deciding which.
 - Localhost-only: with no checkout to list (the relay), the tree renders nothing.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -251,7 +251,7 @@ function parseHandoffFiles(out: string): HandoffFile[] {
   return parseNumstat(out).map(({ path, added, removed, binary }) => ({ path, insertions: added, deletions: removed, binary }))
 }
 
-/** The framework's own paper trail (#1291): conversation records, LOGS, session archives. */
+/** The framework's own paper trail (#1291): conversation records, LOGS, agent archives. */
 function isBookkeepingPath(path: string): boolean {
   return path === FRAMEWORK_DIR || path.startsWith(`${FRAMEWORK_DIR}/`)
 }

@@ -194,6 +194,20 @@ test('applyEventToMeta folds the handoff report onto the meta, so list surfaces 
   assert.equal(failed.handoffReport, 'failed')
 })
 
+test('applyEventToMeta folds the skip reason onto the meta, so the sweep can free a dead claim (#1583)', () => {
+  const base = metaFromEvents(RUN.slice(0, 3), AT)
+  assert.equal(base.handoffSkip, undefined)
+  const skipped = applyEventToMeta(base, { kind: 'handoff', outcome: 'skipped', reason: 'no-commits' }, AT)
+  assert.equal(skipped.handoffSkip, 'no-commits')
+  // A handoff that ran carries no skip: the field means "why nothing happened", nothing else.
+  const done = applyEventToMeta(base, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
+  assert.equal(done.handoffSkip, undefined)
+  // And a later leg that published clears a stale skip — a resumed run's second handoff can
+  // publish after its first skipped, and the release must not act on leg one's reason.
+  const republished = applyEventToMeta(skipped, { kind: 'handoff', outcome: 'done', pushed: true }, AT)
+  assert.equal(republished.handoffSkip, undefined)
+})
+
 test('applyEventToMeta folds the merge outcome onto the meta, so the CI watch can find its PRs (#1418)', () => {
   const base = metaFromEvents(RUN.slice(0, 3), AT)
   assert.equal(base.mergeOutcome, undefined)

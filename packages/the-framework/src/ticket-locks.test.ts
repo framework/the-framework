@@ -9,6 +9,7 @@ import {
   ticketLockName,
   lockMessage,
   releaseMessage,
+  abandonedReleaseMessage,
   type TicketLockDeps,
 } from './ticket-locks.js'
 
@@ -227,4 +228,55 @@ test('a checkout on a feature branch keeps its lock commit local rather than pus
   assert.equal(locked.length, 1, 'the commit still locks: only the cross-machine push is off')
   assert.equal(gitCalls.some(args => args[0] === 'push'), false)
   assert.ok(logs.some(line => /not on the default branch/.test(line)))
+})
+
+test('a heldBy release frees the exact claim the sweep minted, with its own message (#1583)', async () => {
+  const { disk, gitCalls, deps } = checkout({
+    'tickets/a.md': '# a',
+    'tickets/a.lock.md': ticketLockContent('drain-1-0'),
+  })
+  assert.equal(await releaseTicketLock(CWD, 'a.md', deps, { heldBy: 'drain-1-0' }), 'released')
+  assert.equal(disk.has(join(CWD, 'tickets/a.lock.md')), false)
+  const commits = gitCalls.filter(args => args[0] === 'commit')
+  assert.equal(commits.length, 1)
+  assert.equal(commits[0]![2], abandonedReleaseMessage('a.md'))
+  assert.deepEqual(gitCalls.filter(args => args[0] === 'push'), [['push', 'origin', 'HEAD:main']])
+})
+
+test('a heldBy release leaves a lock naming anyone else alone (#1583)', async () => {
+  // A different holder is someone's live claim — the ticket was released by hand and re-claimed,
+  // say — and outranks this cleanup: only the claim this daemon minted is its to free.
+  const { disk, gitCalls, deps } = checkout({
+    'tickets/a.md': '# a',
+    'tickets/a.lock.md': ticketLockContent('someone-else'),
+  })
+  assert.equal(await releaseTicketLock(CWD, 'a.md', deps, { heldBy: 'drain-1-0' }), 'not-holder')
+  assert.equal(disk.get(join(CWD, 'tickets/a.lock.md')), ticketLockContent('someone-else'))
+  assert.equal(gitCalls.filter(args => args[0] === 'commit').length, 0, 'nothing committed')
+})
+
+test('a heldBy release answers no-lock when the file is already gone (#1583)', async () => {
+  const { gitCalls, deps } = checkout({ 'tickets/a.md': '# a' })
+  assert.equal(await releaseTicketLock(CWD, 'a.md', deps, { heldBy: 'drain-1-0' }), 'no-lock')
+  assert.equal(gitCalls.filter(args => args[0] === 'commit').length, 0, 'nothing to commit')
+})
+
+test('a failed release commit leaves nothing staged: the deletion is undone in the index too (#1583)', async () => {
+  // The restore used to put the file back on disk only. The staged deletion survived, and the
+  // next unscoped commit in the checkout would have silently published the release that failed.
+  const { disk, gitCalls, deps } = checkout({
+    'tickets/a.md': '# a',
+    'tickets/a.lock.md': ticketLockContent('drain-1-0'),
+  })
+  const failing: TicketLockDeps = {
+    ...deps,
+    git: async (args, cwd) => {
+      if (args[0] === 'commit') throw new Error('index.lock held')
+      return deps.git!(args, cwd)
+    },
+  }
+  assert.equal(await releaseTicketLock(CWD, 'a.md', failing, { heldBy: 'drain-1-0' }), 'error')
+  assert.equal(disk.get(join(CWD, 'tickets/a.lock.md')), ticketLockContent('drain-1-0'))
+  // Two adds: the one before the failed commit, and the one that re-stages the restored file.
+  assert.equal(gitCalls.filter(args => args[0] === 'add').length, 2)
 })

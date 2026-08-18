@@ -137,7 +137,7 @@ happens while nobody is at the keyboard.
 | 91 | Every stand-down reported with its reason ("it is a setting, not a bug") |
 | 92 | Concurrency cap: how many unattended agents per project |
 | 93 | Fan-out planning: several agents, one ticket each |
-| 94 | Cross-machine ticket claims so two agents never double-work |
+| 94 | Cross-machine ticket claims so two agents never double-work; a claim whose agent ended with nothing to hand off is freed by the daemon |
 | 95 | CI watch: merge a PR once its checks pass |
 | 96 | CI watch: one fix agent per red head commit, max two attempts |
 | 97 | Reclaim the checkout of an agent whose branch has landed |

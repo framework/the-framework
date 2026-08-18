@@ -1,7 +1,7 @@
 import type { AgentLocation } from '../agent-location.js'
 import { join } from 'node:path'
 import { hostname } from 'node:os'
-import type { FrameworkEvent } from '../events.js'
+import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
 import { agentIdFromWorktreeDir, isWorktreeDirName } from '../branch-names.js'
 
@@ -160,6 +160,14 @@ export interface AgentMeta {
    * "publishing…" (#1431). Absent until the event lands, which is what a list reads as "still going".
    */
   handoffReport?: 'done' | 'skipped' | 'failed'
+  /**
+   * Why a skipped handoff skipped (#1583), folded from the same `handoff` event as
+   * {@link handoffReport}. What lets the daemon tell "published elsewhere" from "ended with
+   * nothing to hand off": a drain that settles with `no-commits` will never run the PR that
+   * lifts its ticket lock, so the sweep releases the claim it minted. On the meta because the
+   * sweep reads metas, not event logs. Absent on non-skipped handoffs and on older records.
+   */
+  handoffSkip?: AutoHandoffSkip
   /**
    * How the handoff's merge half went (#1418), folded from the `handoff` event's `merge` field.
    *
@@ -337,6 +345,11 @@ export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: str
       break
     case 'handoff':
       next.handoffReport = event.outcome
+      // Cleared on a non-skipped outcome rather than only ever set: a resumed run's second leg
+      // can publish after its first skipped, and a stale `no-commits` on a published run is
+      // exactly the lie the release must not act on.
+      if (event.outcome === 'skipped') next.handoffSkip = event.reason
+      else delete next.handoffSkip
       if (event.outcome !== 'failed' && event.merge) next.mergeOutcome = event.merge.outcome
       break
     case 'ticket':

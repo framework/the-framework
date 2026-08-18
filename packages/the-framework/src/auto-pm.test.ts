@@ -915,6 +915,194 @@ test('pinnedDrainJob with a claim appends the same contract the pinned plan prom
   assert.ok(!/CLAIMED/.test(pinnedDrainJob(job, 'entry a').prompt))
 })
 
+// #1583: the one claim the sweep can *know* is dead. A drain that settles with `no-commits` never
+// opens the PR whose merge deletes its `.lock.md`, so without this the queue livelocks on the dead
+// claim — the next sweep re-offers the entry, drain-mode locking skips the locked ticket, and the
+// batch empties, forever, until a human clicks Release.
+
+test('a claim whose run settled with nothing to hand off is released (#1583)', async () => {
+  const released: PlanAssignment[] = []
+  const lockCalls: PlanAssignment[][] = []
+  let queued = ['[Fix a](tickets/2026-07-25_a.md)']
+  const { loop } = harness({
+    cooldownMs: 0,
+    queue: async () => queued,
+    lockDrains: async (_p, assignments) => {
+      lockCalls.push([...assignments])
+      return assignments
+    },
+    promote: async () => ({ settled: true, promoted: false, handoffSkip: 'no-commits' }),
+    releaseLock: async (_p, claim) => {
+      released.push(claim)
+      return true
+    },
+  })
+  await loop.tick() // mints the claim and starts the drain
+  queued = []
+  await loop.tick() // the run has settled `no-commits`: the exact minted claim is freed
+  loop.stop()
+  assert.deepEqual(released, [lockCalls[0]![0]])
+})
+
+test('a sweep that catches the end-before-handoff gap holds the claim and still releases (#1583)', async () => {
+  // `end` lands before the handoff event, so a sweep can observe a finished run whose ending is
+  // not written yet. Settling there would drop the claim with the ending unread — the release
+  // would be missed for good — so the agent is held pending until the epilogue reports.
+  const released: PlanAssignment[] = []
+  let ending: { handoffPending?: boolean; handoffSkip?: 'no-commits' } = { handoffPending: true }
+  let queued = ['[Fix a](tickets/2026-07-25_a.md)']
+  const { loop } = harness({
+    cooldownMs: 0,
+    queue: async () => queued,
+    lockDrains: async (_p, assignments) => assignments,
+    promote: async () => ({ settled: true, promoted: false, ...ending }),
+    releaseLock: async (_p, claim) => {
+      released.push(claim)
+      return true
+    },
+  })
+  await loop.tick() // starts the drain
+  queued = []
+  await loop.tick() // mid-epilogue: held, not settled, nothing released
+  assert.deepEqual(released, [])
+  ending = { handoffSkip: 'no-commits' }
+  await loop.tick() // the ending has landed: the claim is freed
+  loop.stop()
+  assert.equal(released.length, 1)
+})
+
+test('the mid-epilogue hold is bounded, so a run that dies there cannot pin its entry forever (#1583)', async () => {
+  const released: PlanAssignment[] = []
+  const promoted: string[] = []
+  let queued = ['[Fix a](tickets/2026-07-25_a.md)']
+  const { loop } = harness({
+    cooldownMs: 0,
+    queue: async () => queued,
+    lockDrains: async (_p, assignments) => assignments,
+    promote: async (_p, { agentId }) => {
+      promoted.push(agentId)
+      return { settled: true, promoted: false, handoffPending: true }
+    },
+    releaseLock: async (_p, claim) => {
+      released.push(claim)
+      return true
+    },
+  })
+  await loop.tick()
+  queued = []
+  for (let i = 0; i < 5; i++) await loop.tick()
+  loop.stop()
+  // Two held sweeps, then the third settles it unread — the pre-#1583 behavior — rather than
+  // asking forever about a run that will never answer. (Later ticks promote only the rotation
+  // agents the emptied queue lets through, never this one again.)
+  assert.equal(promoted.filter(id => id === 'run-1').length, 3)
+  assert.deepEqual(released, [])
+})
+
+test('an entry whose drain ended with nothing to hand off is not drained again (#1583)', async () => {
+  // Releasing the claim re-opens the work, and a job that deterministically ends commitless
+  // would respawn every cooldown forever, burning a quota run per cycle. One attempt per daemon
+  // lifetime; the stand-down says why the entry sits.
+  const prompts: string[] = []
+  const released: PlanAssignment[] = []
+  const { loop } = harness({
+    cooldownMs: 0,
+    queue: async () => ['[Fix a](tickets/2026-07-25_a.md)'],
+    lockDrains: async (_p, assignments) => assignments,
+    promote: async () => ({ settled: true, promoted: false, handoffSkip: 'no-commits' }),
+    releaseLock: async (_p, claim) => {
+      released.push(claim)
+      return true
+    },
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick() // spawns the drain
+  await loop.tick() // settles no-commits: the claim is released and the entry remembered
+  await loop.tick() // the entry is still open, and deliberately not offered again
+  loop.stop()
+  assert.equal(prompts.length, 1)
+  assert.equal(released.length, 1)
+  assert.match(loop.report().outcomes[0]?.message ?? '', /drained once with nothing to hand off/)
+})
+
+test('claims of a batch the start loop never reached are released, not stranded (#1583)', async () => {
+  // The batch's locks are committed and pushed before the first spawn; a refused start breaks
+  // the loop, and the never-started items' claims have no run that could ever settle them free.
+  const released: PlanAssignment[] = []
+  const lockCalls: PlanAssignment[][] = []
+  let starts = 0
+  const { loop } = harness({
+    cooldownMs: 0,
+    concurrency: async () => 2,
+    queue: async () => ['[Fix a](tickets/2026-07-25_a.md)', '[Fix b](tickets/2026-07-25_b.md)'],
+    lockDrains: async (_p, assignments) => {
+      lockCalls.push([...assignments])
+      return assignments
+    },
+    start: async () => (++starts === 1 ? 'run-1' : undefined), // the second spawn is refused
+    releaseLock: async (_p, claim) => {
+      released.push(claim)
+      return true
+    },
+  })
+  await loop.tick()
+  loop.stop()
+  assert.equal(released.length, 1)
+  assert.equal(released[0]!.ticket, lockCalls[0]![1]!.ticket)
+})
+
+test('a release that could not land is retried next sweep, bounded (#1583)', async () => {
+  const attempts: PlanAssignment[] = []
+  let queued = ['[Fix a](tickets/2026-07-25_a.md)']
+  const { loop } = harness({
+    cooldownMs: 0,
+    queue: async () => queued,
+    lockDrains: async (_p, assignments) => assignments,
+    promote: async () => ({ settled: true, promoted: false, handoffSkip: 'no-commits' }),
+    releaseLock: async (_p, claim) => {
+      attempts.push(claim)
+      return attempts.length >= 2 // the first try hits a transient failure, the retry lands
+    },
+  })
+  await loop.tick()
+  queued = []
+  await loop.tick() // the release fails to commit: the agent is held for a retry
+  await loop.tick() // the retry lands
+  await loop.tick() // dealt with: no further attempts
+  loop.stop()
+  assert.equal(attempts.length, 2)
+})
+
+test('every other ending leaves the lock to its own lifecycle (#1583)', async () => {
+  // A run that published (or whose handoff skipped because its PR already exists) has a PR whose
+  // merge deletes the lock; freeing it here would re-open the double-work window the claim closes.
+  for (const outcome of [
+    { settled: true, promoted: true },
+    { settled: true, promoted: false, handoffSkip: 'already-open' as const },
+  ]) {
+    const released: PlanAssignment[] = []
+    let queued = ['[Fix a](tickets/2026-07-25_a.md)']
+    const { loop } = harness({
+      cooldownMs: 0,
+      queue: async () => queued,
+      lockDrains: async (_p, assignments) => assignments,
+      promote: async () => outcome,
+      releaseLock: async (_p, claim) => {
+      released.push(claim)
+      return true
+    },
+    })
+    await loop.tick()
+    queued = []
+    await loop.tick()
+    loop.stop()
+    assert.deepEqual(released, [])
+  }
+})
+
 // #1327: [Plan tickets] fans out too — the one rotation job that writes per-ticket sibling files
 // rather than the shared queue document, so agents pinned one ticket each do disjoint work. The
 // PENDING locks are what make the batch safe beyond this process's memory, so no locks means no

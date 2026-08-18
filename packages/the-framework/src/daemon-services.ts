@@ -16,7 +16,7 @@ import { releaseStalePinnedBranch } from './stale-branch.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
 import { promoteQueue } from './queue-promote.js'
 import { FLAT_TODO_FILE, TICKETS_DIR } from './tickets.js'
-import { acquireTicketLocks } from './ticket-locks.js'
+import { acquireTicketLocks, releaseTicketLock } from './ticket-locks.js'
 import { readTickets } from './dashboard/tickets.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { startAgentCommitter } from './agent-commit.js'
@@ -204,6 +204,16 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // The same claim for what a drain is about to *implement* (#1420): drain mode skips only on
     // an existing lock, because the plan it would also find is the drain's input, not a rival.
     lockDrains: (project, assignments) => acquireTicketLocks(project.path, assignments, { log }, 'drain'),
+    // The one dead claim the daemon can *know* is dead (#1583): the run it minted the lock for
+    // settled with nothing to hand off, so the PR that would delete the lock is never coming.
+    releaseLock: async (project, claim) => {
+      const result = await releaseTicketLock(project.path, claim.ticket, { log }, { heldBy: claim.agentId })
+      if (result === 'released')
+        log(`[framework] auto PM: released the lock on ${claim.ticket} — its agent ended with nothing to hand off`)
+      if (result === 'error')
+        log(`[framework] auto PM: the release of the lock on ${claim.ticket} could not be committed; it will be retried`)
+      return result !== 'error'
+    },
     start: async (project, job) => {
       // A draining agent works one open queue entry, and since #1164 that entry links back to the
       // ticket it was queued from — so this is the one moment the framework knows what an agent is
@@ -247,7 +257,16 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // A finished agent is settled either way — one that wrote no queue is not going to start.
       // The exception (a checkout busy with the user's own queue edits) is the callee's to flag.
       const retry = !outcome.promoted && outcome.retry === true
-      return { settled: !retry, promoted: outcome.promoted }
+      // The run's own recorded ending rides along (#1583): a settled run whose handoff skipped
+      // as `no-commits` is the one case the sweep may free the lock it minted. A clean end whose
+      // handoff has not reported yet is said too — only a `done` run gets the epilogue, so only
+      // there does an absent report mean "still publishing" rather than "never will".
+      return {
+        settled: !retry,
+        promoted: outcome.promoted,
+        ...(agent.handoffSkip !== undefined ? { handoffSkip: agent.handoffSkip } : {}),
+        ...(agent.status === 'done' && agent.handoffReport === undefined ? { handoffPending: true } : {}),
+      }
     },
     log,
   })

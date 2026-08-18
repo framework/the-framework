@@ -584,21 +584,21 @@ test('fresh open adopts the id the daemon allocated, ignoring an unsafe one (#73
 })
 
 // #738: since #736 an agent lives in its own worktree, so a project's live agents are spread across
-// `.the-framework/worktrees/*` rather than sitting at the project path.
+// `.the-framework/branches/*` rather than sitting at the project path.
 const worktreeMeta = (agentId: string, over: Partial<AgentMeta> = {}): string =>
   JSON.stringify({ version: 1, status: 'running', id: agentId, startedAt: AT, updatedAt: AT, ...over })
 
 test('readLiveMetas finds a run living in each worktree, newest first (#738)', async () => {
   const fs = memFs({
-    [join(CWD, '.the-framework', 'worktrees', 'r1', '.the-framework', 'agent.json')]: worktreeMeta('r1'),
-    [join(CWD, '.the-framework', 'worktrees', 'r2', '.the-framework', 'agent.json')]: worktreeMeta('r2'),
+    [join(CWD, '.the-framework', 'branches', 'tf-agent-r1', '.the-framework', 'agent.json')]: worktreeMeta('r1'),
+    [join(CWD, '.the-framework', 'branches', 'tf-agent-r2', '.the-framework', 'agent.json')]: worktreeMeta('r2'),
   })
   const agents = await readLiveMetas(CWD, fs)
   assert.deepEqual(
     agents.map(r => ({ id: r.id, cwd: r.cwd })),
     [
-      { id: 'r2', cwd: join(CWD, '.the-framework', 'worktrees', 'r2') },
-      { id: 'r1', cwd: join(CWD, '.the-framework', 'worktrees', 'r1') },
+      { id: 'r2', cwd: join(CWD, '.the-framework', 'branches', 'tf-agent-r2') },
+      { id: 'r1', cwd: join(CWD, '.the-framework', 'branches', 'tf-agent-r1') },
     ],
     'both runs, newest id first, each carrying its own checkout',
   )
@@ -607,7 +607,7 @@ test('readLiveMetas finds a run living in each worktree, newest first (#738)', a
 test('readLiveMetas also returns a run at the project root (the non-git fallback, and pre-#736 runs)', async () => {
   const fs = memFs({
     [META]: worktreeMeta('root-run'),
-    [join(CWD, '.the-framework', 'worktrees', 'r1', '.the-framework', 'agent.json')]: worktreeMeta('r1'),
+    [join(CWD, '.the-framework', 'branches', 'tf-agent-r1', '.the-framework', 'agent.json')]: worktreeMeta('r1'),
   })
   const agents = await readLiveMetas(CWD, fs)
   assert.deepEqual(agents.map(r => r.id).sort(), ['r1', 'root-run'])
@@ -618,13 +618,13 @@ test('readLiveMetas is empty on a project that never ran, and skips a junk workt
   assert.deepEqual(await readLiveMetas(CWD, memFs()), [])
   // Only our own `<agentId>` directories are read; anything else in there is not an agent of ours.
   const fs = memFs({
-    [join(CWD, '.the-framework', 'worktrees', '.tmp-scratch', '.the-framework', 'agent.json')]: worktreeMeta('x'),
+    [join(CWD, '.the-framework', 'branches', '.tmp-scratch', '.the-framework', 'agent.json')]: worktreeMeta('x'),
   })
   assert.deepEqual(await readLiveMetas(CWD, fs), [])
 })
 
 test('readLiveMetas self-heals a dead run in a worktree, same as the single reader (#716)', async () => {
-  const path = join(CWD, '.the-framework', 'worktrees', 'r1', '.the-framework', 'agent.json')
+  const path = join(CWD, '.the-framework', 'branches', 'tf-agent-r1', '.the-framework', 'agent.json')
   const fs = memFs({ [path]: worktreeMeta('r1', { pid: 999999, host: hostname() }) })
   const agents = await readLiveMetas(CWD, fs, () => false)
   assert.equal(agents[0]?.status, 'stopped', 'a running meta whose process is gone reads as stopped')
@@ -633,7 +633,7 @@ test('readLiveMetas self-heals a dead run in a worktree, same as the single read
 
 // #737: an agent's history lives inside its worktree, so removing that worktree would delete the agent
 // from the dashboard's history. It is copied into the repo first, which is what makes teardown safe.
-const worktreeAt = (agentId: string) => join(CWD, '.the-framework', 'worktrees', agentId)
+const worktreeAt = (agentId: string) => join(CWD, '.the-framework', 'branches', `tf-agent-${agentId}`)
 const worktreeFiles = (agentId: string, meta: Record<string, unknown>, events = '') => ({
   [join(worktreeAt(agentId), '.the-framework', 'agent.json')]: JSON.stringify(meta),
   [join(worktreeAt(agentId), '.the-framework', 'events.jsonl')]: events,
@@ -746,7 +746,7 @@ test('listWorktreeDirs names the run of each worktree, ignoring anything else in
   const fs = memFs({
     ...worktreeFiles('r1', { id: 'r1' }),
     ...worktreeFiles('r2', { id: 'r2' }),
-    [join(CWD, '.the-framework', 'worktrees', '.tmp', 'x')]: '',
+    [join(CWD, '.the-framework', 'branches', '.tmp', 'x')]: '',
   })
   assert.deepEqual((await listWorktreeDirs(CWD, fs)).sort(), ['r1', 'r2'])
   assert.deepEqual(await listWorktreeDirs(join(CWD, 'never-ran'), fs), [])
@@ -786,7 +786,7 @@ test('restoreArchivedAgent puts a torn-down run history back in its worktree (#7
     [join(CWD, '.the-framework', 'agents', 'r1.json')]: JSON.stringify({ version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }),
     [join(CWD, '.the-framework', 'agents', 'r1.jsonl')]: '{"kind":"log","message":"archived"}\n',
   })
-  const wt = join(CWD, '.the-framework', 'worktrees', 'r1')
+  const wt = join(CWD, '.the-framework', 'branches', 'tf-agent-r1')
   assert.equal(await restoreArchivedAgent(CWD, wt, 'r1', fs), true)
   assert.equal(fs.files.get(join(wt, '.the-framework', 'events.jsonl')), '{"kind":"log","message":"archived"}\n')
   assert.equal((JSON.parse(fs.files.get(join(wt, '.the-framework', 'agent.json'))!) as AgentMeta).id, 'r1')

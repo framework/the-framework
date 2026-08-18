@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from '../project.js'
-import { FRAMEWORK_DIR, WORKTREES_DIR, isSafeAgentId } from './agent-store.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, isSafeAgentId } from './agent-store.js'
+import { worktreeDirName } from '../branch-names.js'
 
 /**
  * Git-worktree lifecycle for concurrent agents (#453/#735): give each agent its own
@@ -10,9 +11,9 @@ import { FRAMEWORK_DIR, WORKTREES_DIR, isSafeAgentId } from './agent-store.js'
  * how to add, list, remove, and prune worktrees.
  */
 
-/** The path an agent's worktree gets: `<repo>/.the-framework/worktrees/<agentId>`. */
+/** The path an agent's worktree gets (#1580): `<repo>/.the-framework/branches/<run branch name>`. */
 export function worktreePath(repo: string, agentId: string): string {
-  return join(repo, FRAMEWORK_DIR, WORKTREES_DIR, agentId)
+  return join(repo, FRAMEWORK_DIR, BRANCHES_DIR, worktreeDirName(agentId))
 }
 
 export {
@@ -51,7 +52,7 @@ export interface AddedWorktree {
  * Create a worktree for an agent on a fresh branch: `git worktree add -b <branch>
  * <path> [base]`. Git makes the leaf dir (and any missing parents) itself. The
  * `agentId` is validated as path-safe first so a caller can never traverse out of
- * `.the-framework/worktrees/`. Rejects on any git failure (a caller that wants a
+ * `.the-framework/branches/`. Rejects on any git failure (a caller that wants a
  * run needs its checkout, so failure must surface, not be swallowed).
  */
 export async function addWorktree(

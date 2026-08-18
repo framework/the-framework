@@ -163,21 +163,21 @@ test('trust advice for a run worktree names the project root, which outlives the
       if (!opts.signal.aborted) await new Promise<void>(r => opts.signal.addEventListener('abort', () => r(), { once: true }))
     },
   })
-  const cwd = '/repo/.the-framework/worktrees/2026-07-27T17-30-20-703Z'
+  const cwd = '/repo/.the-framework/branches/tf-agent-2026-07-27T17-30-20-703Z'
   const session = await driver.start({ cwd, onEvent: e => events.push(e) })
   await assert.rejects(session.prompt('go'), /Run `claude` in \/repo once/)
   const notice = events.find(e => e.type === 'notice')
   assert.ok(notice && /has not been trusted in \/repo,/.test(notice.message), 'the notice must name the root, not the worktree')
-  assert.ok(notice && !notice.message.includes('/worktrees/'), 'the worktree path helps nobody')
+  assert.ok(notice && !notice.message.includes('/branches/'), 'the worktree path helps nobody')
 })
 
 test('trustRootOf strips exactly the run-worktree suffix and nothing else', () => {
-  assert.equal(trustRootOf('/repo/.the-framework/worktrees/2026-01-01T00-00-00-000Z'), '/repo')
+  assert.equal(trustRootOf('/repo/.the-framework/branches/tf-agent-2026-01-01T00-00-00-000Z'), '/repo')
   assert.equal(trustRootOf('/repo'), '/repo')
   assert.equal(trustRootOf('/repo/packages/app'), '/repo/packages/app')
   // A deeper path inside an agent worktree is not the worktree itself: leave it alone rather
   // than guess.
-  assert.equal(trustRootOf('/repo/.the-framework/worktrees/run1/nested'), '/repo/.the-framework/worktrees/run1/nested')
+  assert.equal(trustRootOf('/repo/.the-framework/branches/run1/nested'), '/repo/.the-framework/branches/run1/nested')
 })
 
 test('the prompt sits directly after --cloud, ahead of the model flag', () => {

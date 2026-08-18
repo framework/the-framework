@@ -1,4 +1,5 @@
 import type { QuotaBoundaryStatus } from './quota-boundary.js'
+import type { AutoHandoffSkip } from './events.js'
 import { presets } from './preset-catalog.js'
 import { DEFAULT_AUTO_PM_CONCURRENCY } from './preference-defaults.js'
 import { TICKETS_DIR, ticketFromQueueEntry } from './tickets.js'
@@ -205,6 +206,13 @@ export interface AutoPmJob {
    * for drains: which tickets are open is known only at the moment the sweep locks them.
    */
   ticket?: string
+  /**
+   * The `.lock.md` claim the sweep minted for this start (#1420/#1583), on both pinned variants.
+   * What lets the sweep free the claim itself when the agent settles with nothing to hand off:
+   * the agent's PR is what normally deletes the lock, and an agent that never made a commit is
+   * never opening one.
+   */
+  claim?: PlanAssignment
 }
 
 /** One fanned-out agent's claim (#1327): the ticket it is pinned to, and the id its lock names. */
@@ -241,6 +249,7 @@ export function pinnedDrainJob(job: AutoPmJob, entry: string, assignment?: PlanA
   return {
     ...job,
     entry,
+    ...(assignment ? { claim: assignment } : {}),
     prompt: [
       'Open TODO_AGENTS.md and work on this one open entry only, then check it off:',
       '',
@@ -285,6 +294,7 @@ export function pinnedPlanJob(job: AutoPmJob, assignment: PlanAssignment): AutoP
   return {
     ...job,
     ticket,
+    claim: assignment,
     prompt: [
       job.prompt.trimEnd(),
       '',
@@ -408,6 +418,13 @@ export interface PromoteOutcome {
   settled: boolean
   /** The checkout's queue actually changed. */
   promoted: boolean
+  /**
+   * Why the settled run's handoff skipped, when its record says so (#1583). Rides on this outcome
+   * because the promotion already read the run's record, and the sweep needs exactly one fact
+   * from it: a run that ended `no-commits` will never open the PR that lifts the `.lock.md` it
+   * was started under, so the sweep releases that claim itself.
+   */
+  handoffSkip?: AutoHandoffSkip
 }
 
 /** A project the sweep considers. */
@@ -513,6 +530,15 @@ export interface AutoPmDeps {
     project: AutoPmProject,
     assignments: readonly PlanAssignment[],
   ): Promise<readonly PlanAssignment[]>
+  /**
+   * Free a claim this loop minted whose agent settled with nothing to hand off (#1583): the
+   * lock's normal release is the agent's own PR deleting it, and a run whose handoff skipped as
+   * `no-commits` is never opening one — without this the queue livelocks on the dead claim until
+   * a human clicks Release. Keyed off the run's recorded ending, never a timer (#1420). Only the
+   * exact minted claim is freed — the callee leaves a lock naming anyone else alone. Absent (or
+   * throwing) leaves the lock standing, exactly as before this seam.
+   */
+  releaseLock?(project: AutoPmProject, claim: PlanAssignment): Promise<unknown>
   /** Progress line. */
   log(message: string): void
   /** Override the tick interval. */
@@ -602,7 +628,10 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   // Runs this loop started whose queue has not reached the checkout yet, oldest first. A drain
   // remembers the entry it was pinned to (#1204), and a fanned-out plan agent its ticket (#1327), so
   // while either is still in flight a later tick does not hand the same work to a second agent.
-  const pending = new Map<string, { agentId: string; entry?: string; ticket?: string }[]>()
+  // The claim rides along (#1583) so a run that settles with nothing to hand off gets the lock
+  // minted for it released rather than stranded.
+  type PendingAgent = { agentId: string; entry?: string; ticket?: string; claim?: PlanAssignment }
+  const pending = new Map<string, PendingAgent[]>()
   // Where each project is in the job cycle. Per project, not global: two repos idle at once
   // should each work through the rotation, not take alternate halves of it.
   const nextJob = new Map<string, number>()
@@ -649,12 +678,20 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // its entries are still on that agent's branch, and the checkout cannot see them.
         const outstanding = pending.get(project.id) ?? []
         if (outstanding.length) {
-          const stillPending: { agentId: string; entry?: string }[] = []
+          const stillPending: PendingAgent[] = []
           let landed = 0
           for (const agent of outstanding) {
-            const outcome = await deps.promote(project, agent).catch(() => ({ settled: false, promoted: false }))
+            const outcome = await deps.promote(project, agent).catch((): PromoteOutcome => ({ settled: false, promoted: false }))
             if (outcome.promoted) landed++
-            if (!outcome.settled) stillPending.push(agent)
+            if (!outcome.settled) {
+              stillPending.push(agent)
+              continue
+            }
+            // A settled run that ended with nothing to hand off is never opening the PR that
+            // lifts the lock it was started under (#1583), so the claim minted for it is freed —
+            // the one dead claim the sweep can *know* is dead, rather than guess by a timer.
+            if (agent.claim && outcome.handoffSkip === 'no-commits')
+              await deps.releaseLock?.(project, agent.claim).catch(() => undefined)
           }
           if (stillPending.length) pending.set(project.id, stillPending)
           else pending.delete(project.id)
@@ -868,6 +905,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
               agentId,
               ...(item.entry !== undefined ? { entry: item.entry } : {}),
               ...(item.ticket !== undefined ? { ticket: item.ticket } : {}),
+              ...(item.claim !== undefined ? { claim: item.claim } : {}),
             },
           ])
         }

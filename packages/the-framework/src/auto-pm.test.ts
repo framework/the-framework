@@ -915,6 +915,56 @@ test('pinnedDrainJob with a claim appends the same contract the pinned plan prom
   assert.ok(!/CLAIMED/.test(pinnedDrainJob(job, 'entry a').prompt))
 })
 
+// #1583: the one claim the sweep can *know* is dead. A drain that settles with `no-commits` never
+// opens the PR whose merge deletes its `.lock.md`, so without this the queue livelocks on the dead
+// claim — the next sweep re-offers the entry, drain-mode locking skips the locked ticket, and the
+// batch empties, forever, until a human clicks Release.
+
+test('a claim whose run settled with nothing to hand off is released (#1583)', async () => {
+  const released: PlanAssignment[] = []
+  const lockCalls: PlanAssignment[][] = []
+  let queued = ['[Fix a](tickets/2026-07-25_a.md)']
+  const { loop } = harness({
+    cooldownMs: 0,
+    queue: async () => queued,
+    lockDrains: async (_p, assignments) => {
+      lockCalls.push([...assignments])
+      return assignments
+    },
+    promote: async () => ({ settled: true, promoted: false, handoffSkip: 'no-commits' }),
+    releaseLock: async (_p, claim) => void released.push(claim),
+  })
+  await loop.tick() // mints the claim and starts the drain
+  queued = []
+  await loop.tick() // the run has settled `no-commits`: the exact minted claim is freed
+  loop.stop()
+  assert.deepEqual(released, [lockCalls[0]![0]])
+})
+
+test('every other ending leaves the lock to its own lifecycle (#1583)', async () => {
+  // A run that published (or whose handoff skipped because its PR already exists) has a PR whose
+  // merge deletes the lock; freeing it here would re-open the double-work window the claim closes.
+  for (const outcome of [
+    { settled: true, promoted: true },
+    { settled: true, promoted: false, handoffSkip: 'already-open' as const },
+  ]) {
+    const released: PlanAssignment[] = []
+    let queued = ['[Fix a](tickets/2026-07-25_a.md)']
+    const { loop } = harness({
+      cooldownMs: 0,
+      queue: async () => queued,
+      lockDrains: async (_p, assignments) => assignments,
+      promote: async () => outcome,
+      releaseLock: async (_p, claim) => void released.push(claim),
+    })
+    await loop.tick()
+    queued = []
+    await loop.tick()
+    loop.stop()
+    assert.deepEqual(released, [])
+  }
+})
+
 // #1327: [Plan tickets] fans out too — the one rotation job that writes per-ticket sibling files
 // rather than the shared queue document, so agents pinned one ticket each do disjoint work. The
 // PENDING locks are what make the batch safe beyond this process's memory, so no locks means no

@@ -21,8 +21,10 @@ import type { PlanAssignment } from './auto-pm.js'
 // There is no timed release (#1420 dropped #1327's 6-hour staleness rule): a coordinator agent
 // can legitimately hold a ticket for days, and a lock released under a live agent re-opens the
 // exact double-work window it exists to close. The lock lifts when the agent's own PR deletes the
-// file alongside the plan it lands, or when a human releases it ({@link releaseTicketLock}) —
-// watching for dead agents is the user's job, with the dashboard button as the tool.
+// file alongside the plan it lands, when a human releases it ({@link releaseTicketLock}), or when
+// the daemon frees a claim it minted for an agent that settled with nothing to hand off
+// ({@link releaseAbandonedLock}, #1583) — every other dead agent is still the user's to notice,
+// with the dashboard button as the tool.
 
 /** The first line of a lock file: the claim, naming the agent that holds it. */
 const TICKET_LOCK_PREFIX = 'CLAIMED:'
@@ -53,6 +55,11 @@ export function lockMessage(count: number): string {
 /** The commit a manual release lands as, naming the ticket freed. */
 export function releaseMessage(ticket: string): string {
   return `[The Framework] release the lock on ${ticket}`
+}
+
+/** The commit an abandoned claim's release lands as (#1583), naming why the daemon freed it. */
+export function abandonedReleaseMessage(ticket: string): string {
+  return `[The Framework] release the lock on ${ticket} — its agent ended with nothing to hand off`
 }
 
 /** Injectable seams so every operation is unit-testable off disk and git. */
@@ -172,19 +179,56 @@ export type ReleaseTicketLockResult = 'released' | 'no-lock' | 'error'
  * deletion that never landed would make the checkout lie about it. Never throws.
  */
 export async function releaseTicketLock(cwd: string, ticket: string, deps: TicketLockDeps = {}): Promise<ReleaseTicketLockResult> {
+  const read = deps.read ?? (path => readFile(path, 'utf8'))
+  const md = await read(join(cwd, `${TICKETS_DIR}/${ticketLockName(ticket)}`)).catch(() => undefined)
+  if (md === undefined) return 'no-lock'
+  return releaseLockFile(cwd, ticket, md, releaseMessage(ticket), deps)
+}
+
+/** What an abandoned-claim release did: {@link ReleaseTicketLockResult}, or the lock is not ours to free. */
+export type ReleaseAbandonedLockResult = ReleaseTicketLockResult | 'not-holder'
+
+/**
+ * Free the `.lock.md` a settled agent left behind (#1583): the daemon's own answer to the one
+ * claim it can *know* is dead — the agent it minted the lock for ended with nothing to hand off,
+ * so the PR that would have deleted the lock is never coming, and the queue would otherwise
+ * livelock on the claim until a human noticed. Keyed off the run's recorded ending, never a
+ * timer: #1420's no-staleness rule stands.
+ *
+ * Only the exact claim this daemon minted is freed: a lock naming anyone else is someone's live
+ * claim — re-locked after a manual release, say — and outranks this cleanup. Same commit-and-push
+ * path as {@link releaseTicketLock}; never throws.
+ */
+export async function releaseAbandonedLock(
+  cwd: string,
+  assignment: PlanAssignment,
+  deps: TicketLockDeps = {},
+): Promise<ReleaseAbandonedLockResult> {
+  const read = deps.read ?? (path => readFile(path, 'utf8'))
+  const md = await read(join(cwd, `${TICKETS_DIR}/${ticketLockName(assignment.ticket)}`)).catch(() => undefined)
+  if (md === undefined) return 'no-lock'
+  if (ticketLockHolder(md) !== assignment.agentId) return 'not-holder'
+  return releaseLockFile(cwd, assignment.ticket, md, abandonedReleaseMessage(assignment.ticket), deps)
+}
+
+/** The shared tail of both releases: delete, commit pathspec-scoped, push best-effort, restore on failure. */
+async function releaseLockFile(
+  cwd: string,
+  ticket: string,
+  md: string,
+  message: string,
+  deps: TicketLockDeps,
+): Promise<ReleaseTicketLockResult> {
   const git = deps.git ?? nodeGitRunner()
   const write = deps.write ?? ((path, content) => writeFile(path, content, 'utf8'))
-  const read = deps.read ?? (path => readFile(path, 'utf8'))
   const remove = deps.remove ?? (path => rm(path))
   const log = deps.log ?? (() => {})
 
   const lock = `${TICKETS_DIR}/${ticketLockName(ticket)}`
-  const md = await read(join(cwd, lock)).catch(() => undefined)
-  if (md === undefined) return 'no-lock'
   try {
     await remove(join(cwd, lock))
     await git(['add', '--', lock], cwd)
-    await git(['commit', '-m', releaseMessage(ticket), '--', lock], cwd)
+    await git(['commit', '-m', message, '--', lock], cwd)
   } catch {
     await write(join(cwd, lock), md).catch(() => undefined)
     return 'error'

@@ -605,15 +605,27 @@ test('a fake run skips the backlog loop by default; the demo stays deterministic
 })
 
 test('runAgent runs the backlog loop after the build when opted in (#323)', async () => {
-  const { mkdtemp, rm, writeFile } = await import('node:fs/promises')
+  const { mkdtemp, realpath, rm, writeFile } = await import('node:fs/promises')
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-run-todo-'))
-  await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] leftover task\n')
+  const { nodeGitRunner } = await import('./project.js')
+  const { withDataBranch } = await import('./data-branch.js')
+  // The queue lives on the data branch (#1582), so the fixture is a real repo.
+  const git = nodeGitRunner()
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-run-todo-')))
+  await git(['init', '-b', 'main'], cwd)
+  await git(['config', 'user.email', 't@t'], cwd)
+  await git(['config', 'user.name', 't'], cwd)
+  await writeFile(join(cwd, 'README.md'), '# t\n')
+  await git(['add', '-A'], cwd)
+  await git(['commit', '-m', 'init'], cwd)
+  await withDataBranch(cwd, 'seed', async dir => {
+    await writeFile(join(dir, 'TODO_AGENTS.md'), '- [ ] leftover task\n', 'utf8')
+  })
   try {
     const events: FrameworkEvent[] = []
-    // The fake script never edits the backlog, so the loop stall-stops after two
-    // attempts — proving the wiring runs post-build with the agent's own session.
+    // The fake script only answers; the loop's own check-off (#1582) drains the entry —
+    // proving the wiring runs post-build with the agent's own session.
     const result = await runAgent({
       prompt: FAKE_INTENT,
       driver: fakeDriver(),
@@ -621,12 +633,12 @@ test('runAgent runs the backlog loop after the build when opted in (#323)', asyn
       todoLoop: true,
       onEvent: e => events.push(e),
     })
-    assert.deepEqual(result.todo, { completed: 2, reason: 'stalled', file: 'TODO_AGENTS.md' })
+    assert.deepEqual(result.todo, { completed: 1, reason: 'empty', file: 'TODO_AGENTS.md' })
     assert.ok(events.some(e => e.kind === 'log' && /Backlog: TODO_AGENTS\.md has 1 open item\(s\)/.test(e.message)))
     // The loop runs before the agent's end event.
     const endIndex = events.findIndex(e => e.kind === 'end')
-    const stallIndex = events.findIndex(e => e.kind === 'log' && /no progress/.test(e.message))
-    assert.ok(stallIndex !== -1 && stallIndex < endIndex)
+    const doneIndex = events.findIndex(e => e.kind === 'log' && /Backlog done/.test(e.message))
+    assert.ok(doneIndex !== -1 && doneIndex < endIndex)
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

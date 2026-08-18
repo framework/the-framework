@@ -1,6 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { findFlatTodo } from '../tickets-file.js'
+import { readDataFile } from '../data-branch.js'
+import { FLAT_TODO_FILE } from '../tickets.js'
 
 /**
  * The plan/backlog document categories the dashboard surfaces in its sidebar
@@ -9,8 +10,8 @@ import { findFlatTodo } from '../tickets-file.js'
  * The Framework's system prompt writes these per session (#323/#326):
  * `PLAN_<SESSION>.agent.md` (the plan for now) and `TODO_<SESSION>.agent.md` (the
  * backlog), where SESSION is a git-branch slug. The flat fallbacks are `PLAN.md`
- * (root) and the flat backlog (`backlog: true` defers to {@link findFlatTodo}, which
- * resolves the repo-root (#682) `TODO_AGENTS.md`). Scoped and flat-root names are matched
+ * (root) and the flat backlog (`backlog: true` reads `TODO_AGENTS.md` off the data
+ * branch, its one location since #1582). Scoped and flat-root names are matched
  * against a flat readdir of the root, never taken from user input, so there is no
  * path traversal to guard against.
  */
@@ -34,7 +35,13 @@ const MAX_DOC_BYTES = 200_000
  * readdir entry matched against a fixed pattern, so none can traverse. Returns
  * empty when the workspace is missing or unreadable.
  */
-async function surfacedFilenames(cwd: string): Promise<string[]> {
+/**
+ * Read the surfaced plan/backlog docs, in sidebar order: per category the flat file (if present)
+ * then its session-scoped files (sorted). The flat backlog comes off the data branch (#1582);
+ * everything else is a workspace-root file. Missing or blank files are skipped; a file over the
+ * size cap is truncated. Never throws — a read error just omits that doc.
+ */
+export async function readDocs(cwd: string): Promise<WorkspaceDoc[]> {
   let entries: string[]
   try {
     entries = await readdir(cwd)
@@ -42,35 +49,16 @@ async function surfacedFilenames(cwd: string): Promise<string[]> {
     return []
   }
   const present = new Set(entries)
-  const names: string[] = []
-  for (const cat of DOC_CATEGORIES) {
-    if ('backlog' in cat) {
-      // The flat backlog is `TODO_AGENTS.md` at the root (#682).
-      const flat = await findFlatTodo(cwd)
-      if (flat) names.push(flat)
-    } else if (present.has(cat.flat)) {
-      names.push(cat.flat)
-    }
-    names.push(...entries.filter(e => cat.scoped.test(e)).sort())
-  }
-  return names
-}
-
-/**
- * Read the surfaced plan/backlog docs at the workspace root, in sidebar order.
- * Missing or blank files are skipped; a file over the size cap is truncated. Never
- * throws — a read error just omits that doc.
- */
-export async function readDocs(cwd: string): Promise<WorkspaceDoc[]> {
   const docs: WorkspaceDoc[] = []
-  for (const name of await surfacedFilenames(cwd)) {
-    try {
-      let content = await readFile(join(cwd, name), 'utf8')
-      if (!content.trim()) continue
-      if (content.length > MAX_DOC_BYTES) content = content.slice(0, MAX_DOC_BYTES) + '\n\n… (truncated)'
-      docs.push({ name, content })
-    } catch {
-      // absent or unreadable — skip it
+  const push = (name: string, content: string | undefined): void => {
+    if (!content?.trim()) return
+    docs.push({ name, content: content.length > MAX_DOC_BYTES ? content.slice(0, MAX_DOC_BYTES) + '\n\n… (truncated)' : content })
+  }
+  for (const cat of DOC_CATEGORIES) {
+    if ('backlog' in cat) push(FLAT_TODO_FILE, await readDataFile(cwd, FLAT_TODO_FILE))
+    else if (present.has(cat.flat)) push(cat.flat, await readFile(join(cwd, cat.flat), 'utf8').catch(() => undefined))
+    for (const name of entries.filter(e => cat.scoped.test(e)).sort()) {
+      push(name, await readFile(join(cwd, name), 'utf8').catch(() => undefined))
     }
   }
   return docs

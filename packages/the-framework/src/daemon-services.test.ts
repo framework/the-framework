@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { startBackgroundServices } from './daemon-services.js'
+import { dataWorktreePath, withDataBranch } from './data-branch.js'
 import { quotaBoundaryStatus } from './quota-boundary.js'
 import type { QuotaSource, QuotaView } from './dashboard/quota.js'
 import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
@@ -58,28 +59,31 @@ const git = promisify(execFile)
 async function services(preferences: Record<string, unknown>) {
   const config = await mkdtemp(join(tmpdir(), 'framework-concurrency-cfg-'))
   const project = await mkdtemp(join(tmpdir(), 'framework-concurrency-proj-'))
-  // A real git checkout with real tickets, because the drain claims each entry's ticket with a
-  // committed `.lock.md` before its agent starts (#1420) — in a bare directory that commit would
-  // fail and the whole batch would be dropped as claimed elsewhere.
+  // A real git checkout whose tickets and queue live on the data branch (#1582), because the
+  // drain claims each entry's ticket with a committed `.lock.md` before its agent starts (#1420)
+  // — in a bare directory that cycle would fail and the whole batch would be dropped.
   await git('git', ['init', '-q', '-b', 'main'], { cwd: project })
   await git('git', ['config', 'user.email', 'test@example.com'], { cwd: project })
   await git('git', ['config', 'user.name', 'Test'], { cwd: project })
   await git('git', ['config', 'commit.gpgsign', 'false'], { cwd: project })
-  await mkdir(join(project, 'tickets'))
-  for (const entry of QUEUE_ENTRIES) {
-    const ticket = /\((tickets\/[^)]+)\)/.exec(entry)![1]!
-    await writeFile(join(project, ticket), `# ${ticket}\n`)
-  }
+  const seeded = await withDataBranch(project, 'seed', async dir => {
+    await mkdir(join(dir, 'tickets'), { recursive: true })
+    for (const entry of QUEUE_ENTRIES) {
+      const ticket = /\((tickets\/[^)]+)\)/.exec(entry)![1]!
+      await writeFile(join(dir, ticket), `# ${ticket}\n`)
+    }
+    await writeFile(
+      join(dir, 'TODO_AGENTS.md'),
+      ['# TODO_AGENTS', '', '## Priority 9', '', ...QUEUE_ENTRIES.map(entry => `- ${entry}`), ''].join('\n'),
+    )
+  })
+  assert.ok(seeded.ok, 'the fixture queue must land on the data branch')
   await writeFile(
     join(config, 'the-framework.json'),
     JSON.stringify({
       projects: [{ id: 'proj-1', path: project, addedAt: '2026-07-27T00:00:00.000Z' }],
       preferences,
     }),
-  )
-  await writeFile(
-    join(project, 'TODO_AGENTS.md'),
-    ['# TODO_AGENTS', '', '## Priority 9', '', ...QUEUE_ENTRIES.map(entry => `- ${entry}`), ''].join('\n'),
   )
   const starts: { prompt: string; options: StartAgentOptions; projectId: string }[] = []
   const started = startBackgroundServices({
@@ -145,9 +149,9 @@ test('the concurrency setting on disk is the number of agents the routine spins 
     const outcome = running.autoPmReport().outcomes[0]
     assert.equal(outcome?.started, true)
     assert.match(outcome?.message ?? '', /started 4 agents/)
-    // The claim the sweep committed ahead of each agent (#1420): the ticket's lock is on disk
-    // and names the id the agent's own prompt carries as its own.
-    const lock = await readFile(join(projectDir, 'tickets/2026-07-01_one.lock.md'), 'utf8')
+    // The claim the sweep committed ahead of each agent (#1420): the ticket's lock is on the
+    // data branch (#1582) and names the id the agent's own prompt carries as its own.
+    const lock = await readFile(join(dataWorktreePath(projectDir), 'tickets/2026-07-01_one.lock.md'), 'utf8')
     assert.ok(lock.startsWith('CLAIMED: drain-'), "the first entry's ticket carries a drain claim")
     assert.ok(starts[0]!.prompt.includes(lock.trim()), 'and the prompt names that exact claim')
   } finally {

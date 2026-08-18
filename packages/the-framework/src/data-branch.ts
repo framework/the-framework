@@ -192,8 +192,14 @@ export async function ensureDataWorktree(cwd: string, deps: DataBranchDeps = {})
   })
 }
 
-/** What one funneled write did. `changed: false` is the clean no-op (the op wrote nothing new). */
-export type DataWriteResult = { ok: true; changed: boolean; pushed: boolean } | { ok: false; error: string }
+/**
+ * What one funneled write did. `changed: false` is the clean no-op (the op wrote nothing new).
+ * A failure says whether the change still landed as a local commit (`committed` — the push is
+ * what failed, and the next cycle carries it out) or nothing survived at all.
+ */
+export type DataWriteResult =
+  | { ok: true; changed: boolean; pushed: boolean }
+  | { ok: false; committed: boolean; error: string }
 
 /**
  * Apply one change to the data branch: sync with origin, run `op` against the checkout, commit
@@ -209,7 +215,7 @@ export type DataWriteResult = { ok: true; changed: boolean; pushed: boolean } | 
  */
 export async function withDataBranch(
   cwd: string,
-  message: string,
+  message: string | (() => string),
   op: (dataDir: string) => Promise<void>,
   deps: DataBranchDeps = {},
 ): Promise<DataWriteResult> {
@@ -224,7 +230,8 @@ export async function withDataBranch(
         await op(path)
         await r.git(['add', '-A'], path)
         const staged = (await r.git(['status', '--porcelain'], path)).trim()
-        if (staged) await r.git(['commit', '-m', message], path)
+        // The message is resolved after the op ran: a batch write only knows what it did then.
+        if (staged) await r.git(['commit', '-m', typeof message === 'function' ? message() : message], path)
         if (!remote) return { ok: true, changed: Boolean(staged), pushed: false }
         // Unpushed commits — this cycle's, or an earlier cycle's that the sync just rebased. The
         // push is owed whenever any exist, even when this op itself wrote nothing new.
@@ -236,11 +243,16 @@ export async function withDataBranch(
           await r.git(['push', 'origin', `${DATA_BRANCH}:${DATA_BRANCH}`], path)
           return { ok: true, changed: Boolean(staged), pushed: true }
         } catch (err) {
-          if (attempt >= 1) return { ok: false, error: `the data branch could not be pushed: ${errorMessage(err)}` }
+          if (attempt >= 1)
+            return { ok: false, committed: true, error: `the data branch could not be pushed: ${errorMessage(err)}` }
         }
       }
     } catch (err) {
-      return { ok: false, error: errorMessage(err) }
+      // The op's half-written files must not ride a later, unrelated commit: put the checkout
+      // back to its committed state before reporting.
+      await r.git(['reset', '--hard'], path).catch(() => {})
+      await r.git(['clean', '-fd'], path).catch(() => {})
+      return { ok: false, committed: false, error: errorMessage(err) }
     }
   })
 }
@@ -255,4 +267,61 @@ export async function pullDataBranch(cwd: string, deps: DataBranchDeps = {}): Pr
   await withDataBranch(cwd, '[The Framework] data sync', async () => {}, deps).then(result => {
     if (!result.ok) resolveDeps(deps).log(`[framework] data branch sync: ${result.error}`)
   })
+}
+
+/**
+ * The project root `cwd` belongs to: the directory holding the repo's real `.git`. From the main
+ * checkout that is `cwd` itself; from an agent's worktree it is the repo the worktree was made
+ * from — where the data checkout lives, and the address every data write funnels to. `undefined`
+ * outside any repo.
+ */
+export async function dataProjectRoot(cwd: string, git: GitRunner = nodeGitRunner()): Promise<string | undefined> {
+  try {
+    const gitDir = (await git(['rev-parse', '--path-format=absolute', '--git-common-dir'], cwd)).trim()
+    return gitDir ? dirname(gitDir) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Read one file off the data branch, from anywhere in the repo: the checkout when this `cwd` has
+ * one, else `git show` against the local branch (worktrees share the repo's refs, so an agent's
+ * checkout reads the same data without holding any of it), else against `origin/…` (a fresh
+ * clone that fetched but never branched — the cloud case). `undefined` when the file exists in
+ * none of them. Never throws.
+ *
+ * `fresh: true` fetches first and prefers origin's copy — for a reader about to act on the queue
+ * from a long-lived agent process, where the local ref may trail what other writers pushed.
+ */
+export async function readDataFile(
+  cwd: string,
+  rel: string,
+  opts: { fresh?: boolean } = {},
+  deps: DataBranchDeps = {},
+): Promise<string | undefined> {
+  const r = resolveDeps(deps)
+  const remote = opts.fresh && (await hasRemote(cwd, r.git))
+  if (remote) await r.git(['fetch', 'origin', DATA_BRANCH], cwd).catch(() => {})
+  const sources = [
+    ...(remote ? [`origin/${DATA_BRANCH}`] : []),
+    DATA_BRANCH,
+    ...(remote ? [] : [`origin/${DATA_BRANCH}`]),
+  ]
+  if (!opts.fresh) {
+    const fromCheckout = await r.git(['rev-parse', '--abbrev-ref', 'HEAD'], dataWorktreePath(cwd)).then(
+      out => out.trim() === DATA_BRANCH,
+      () => false,
+    )
+    if (fromCheckout) {
+      const { readFile } = await import('node:fs/promises')
+      const md = await readFile(join(dataWorktreePath(cwd), rel), 'utf8').catch(() => undefined)
+      if (md !== undefined) return md
+    }
+  }
+  for (const ref of sources) {
+    const md = await r.git(['show', `${ref}:${rel}`], cwd).catch(() => undefined)
+    if (md !== undefined) return md
+  }
+  return undefined
 }

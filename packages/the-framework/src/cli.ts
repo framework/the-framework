@@ -24,6 +24,7 @@ import {
 } from './agent.js'
 import { FAKE_INTENT, fakeDriver } from './fake-script.js'
 import { isTicketPath, ticketIssueRef } from './tickets.js'
+import { readDataFile } from './data-branch.js'
 import { isHandsOff, isAgentLocation, type AgentLocation } from './agent-location.js'
 import { handoffStages, isHandoffLevel, type HandoffLevel } from './handoff-level.js'
 import { readAgentSpec, writeAgentSpec, type AgentSpec } from './agent-spec.js'
@@ -1016,9 +1017,9 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     // subject inherits the title, so the merge closes the issue — without it, an auto-merged
     // quick-win leaves its ticket open. Not on a plan agent (#1327): its PR lands the plan, not
     // the work, so the merge must not close the issue. Best-effort: a ticket that cannot be
-    // read fixes nothing.
+    // read fixes nothing. Read off the data branch (#1582) — the worktree holds no tickets.
     const fixes = opts.ticket && isTicketPath(opts.ticket) && !opts.planAgent
-      ? ticketIssueRef(await readFile(join(cwd, opts.ticket), 'utf8').catch(() => ''))
+      ? ticketIssueRef((await readDataFile(cwd, opts.ticket).catch(() => undefined)) ?? '')
       : undefined
     const agent = {
       id: opts.agentId ?? '',

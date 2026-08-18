@@ -1,8 +1,5 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import {
   FLAT_TODO_FILE,
   TICKETS_DIR,
@@ -11,7 +8,6 @@ import {
   ticketIssueRef,
   todoPriorityForTicket,
 } from './tickets.js'
-import { findFlatTodo } from './tickets-file.js'
 import { TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 
 test('the flat backlog lives at the root TODO_AGENTS.md (#674/#682)', () => {
@@ -42,36 +38,6 @@ test('the backlog-format spec ships in the package and teaches the priority sect
   // Priority 10 is the exception, not the default, and the file is priority-sorted.
   assert.ok(TODO_FORMAT.includes('Priority 10 is rarely used'))
   assert.ok(TODO_FORMAT.includes('sorted by priority'))
-})
-
-test('findFlatTodo reads the root TODO_AGENTS.md and nothing else (#682)', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-tickets-'))
-  try {
-    assert.equal(await findFlatTodo(cwd), undefined)
-
-    // The pre-#682 spellings are no longer read: one convention, one location.
-    await writeFile(join(cwd, 'TODO.md'), '- [ ] oldest\n')
-    await writeFile(join(cwd, 'TODO-DRIVERS.md'), '- [ ] hyphen\n')
-    await mkdir(join(cwd, TICKETS_DIR))
-    await writeFile(join(cwd, TICKETS_DIR, 'TODO.md'), '- [ ] newer\n')
-    assert.equal(await findFlatTodo(cwd), undefined)
-
-    await writeFile(join(cwd, FLAT_TODO_FILE), '- [ ] current\n')
-    assert.equal(await findFlatTodo(cwd), 'TODO_AGENTS.md')
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
-})
-
-test('findFlatTodo ignores a directory that is not a file', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-tickets-'))
-  try {
-    // A directory named exactly TODO_AGENTS.md must not be mistaken for the backlog file.
-    await mkdir(join(cwd, FLAT_TODO_FILE))
-    assert.equal(await findFlatTodo(cwd), undefined)
-  } finally {
-    await rm(cwd, { recursive: true, force: true })
-  }
 })
 
 test('a ticket priority maps onto the backlog format\'s numbered sections (#1164)', () => {

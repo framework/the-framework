@@ -497,9 +497,9 @@ export interface AutoPmDeps {
    */
   releasePinned?(project: AutoPmProject, branch: string): Promise<unknown>
   /**
-   * Land a finished agent's queue in the project checkout (#852). Called before the sweep decides
-   * anything: an agent's queue lives on its own worktree branch, so until it is promoted the checkout
-   * still reads empty and the sweep would start the same work over again.
+   * Settle a finished agent's queue entry (#852/#1582): the daemon retires the entry it pinned to
+   * the run once the run's ending says the work was published. Called before the sweep decides
+   * anything, so an entry whose run just landed stops reading as open work to start over again.
    */
   promote(project: AutoPmProject, agent: { agentId: string; entry?: string }): Promise<PromoteOutcome>
   /**
@@ -711,7 +711,9 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
             // claim-carrying agent caught in that gap is held a couple more sweeps rather than
             // settled blind. Bounded, so a process that died mid-epilogue cannot pin its queue
             // entry forever; past the bound it settles unread, which is the pre-#1583 behavior.
-            if (agent.claim && outcome.handoffPending && (agent.waits ?? 0) < 2) {
+            // Held for the entry's check-off too (#1582): retiring a drained entry keys off the
+            // same reported ending the claim release does.
+            if ((agent.claim || agent.entry !== undefined) && outcome.handoffPending && (agent.waits ?? 0) < 2) {
               stillPending.push({ ...agent, waits: (agent.waits ?? 0) + 1 })
               continue
             }

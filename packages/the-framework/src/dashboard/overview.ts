@@ -8,7 +8,7 @@ import { TICKETS_DIR } from '../tickets.js'
 // is working on right now, the size of the backlog, and the recently active projects. It
 // rolls up three existing file projections across the whole registry — the live agent meta
 // (`.the-framework/agent.json`, kept current per event), the TODO queue (queue.ts), and each
-// project's last activity (ProjectSummary.lastActivityAt from LOGS.md).
+// project's last activity (ProjectSummary.lastActivityAt from its sessions).
 
 /** One project's in-flight run, surfaced in the Overview's "working now" list. */
 export interface ActiveAgent {

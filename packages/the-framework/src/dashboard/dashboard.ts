@@ -6,7 +6,7 @@ import { buildOverview, type ActiveAgent, type OverviewDeps } from './overview.j
 // The Overview dashboard page (#471): the cross-project rollup that used to live cramped in
 // the first sidebar, promoted to a real at-a-glance page. It reuses buildOverview for the
 // "working now" facts and adds what the page and the onboarding checklist ask of it. Still a pure
-// projection of the same files (agent.json + agents/ + LOGS.md + TODO).
+// projection of the same files (agent.json + agents/ + TODO).
 //
 // It used to carry more: per-project agent counts, how past agents ended, and a two-week activity
 // window. #1139 cut the surfaces that drew them and left the numbers being computed for nobody —

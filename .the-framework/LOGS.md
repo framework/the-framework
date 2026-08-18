@@ -79,3 +79,8 @@
 - status: failed
 - run: 2026-08-18T15-44-35-323Z
 - branch: the-framework/run-2026-08-18T15-44-35-323Z
+## 2026-08-18T15:44:49.463Z · prompt · Open TODO_AGENTS.md and work on this one open entry only, then check it off:\n\n- [Close "Unclear UX: what should I do now?"](tickets/2026-07-25_unclear-ux-what-now.md) — quick win (effort 1, no code expected): every follow-up from the #1173 thread is implemented (audit in [the plan](tickets/2026-07-25_unclear-ux-what-now.plan.md)). Close GitHub issue #1173 with a comment mapping each thread follow-up to what shipped, and delete the ticket + plan files.\n\nDo not start any other entry. If that entry is already checked off or no longer there, stop and do nothing.
+
+- status: failed
+- run: 2026-08-18T15-44-36-634Z
+- branch: the-framework/run-2026-08-18T15-44-36-634Z

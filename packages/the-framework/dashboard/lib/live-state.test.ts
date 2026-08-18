@@ -124,7 +124,6 @@ describe('isPublishing', () => {
 
 describe('isMetaPublishing', () => {
   const meta = (over: Partial<AgentMeta>): AgentMeta => ({
-    version: 2,
     status: 'done',
     id: 'r1',
     startedAt: '2026-01-01T00:00:00.000Z',
@@ -149,8 +148,8 @@ describe('isMetaPublishing', () => {
     expect(isMetaPublishing(unarmed as AgentMeta)).toBe(false)
   })
 
-  test('a pre-fold record (version 1) never reads as publishing — its report just never landed', () => {
-    expect(isMetaPublishing(meta({ version: 1 }))).toBe(false)
+  test('a record that never armed a push is not publishing, whatever its report says', () => {
+    expect(isMetaPublishing(meta({ handoff: { push: false, pr: false } }))).toBe(false)
   })
 })
 

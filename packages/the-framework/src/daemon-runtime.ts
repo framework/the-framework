@@ -23,7 +23,6 @@ import {
   FRAMEWORK_DIR,
   EVENTS_FILE,
   META_FILE,
-  AGENT_META_VERSION,
   isPidAlive,
   type AgentMeta,
 } from './store/index.js'
@@ -148,7 +147,6 @@ export async function markFailedStart(cwd: string, agentId: string, intent: stri
   if (await stat(metaPath).then(() => true, () => false)) return false
   const now = new Date().toISOString()
   const meta: AgentMeta = {
-    version: AGENT_META_VERSION,
     status: 'failed',
     id: agentId,
     startedAt: startedAtFromAgentId(agentId) ?? now,
@@ -639,7 +637,6 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         // registered here so onAgents can show it and a dashboard reload re-opens it. Never written to disk.
         const now = new Date().toISOString()
         const meta: AgentMeta = {
-          version: AGENT_META_VERSION,
           status: 'running',
           id: result.agentId,
           startedAt: now,

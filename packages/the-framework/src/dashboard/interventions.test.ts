@@ -15,7 +15,6 @@ const noAgents = async (): Promise<LiveAgent[]> => []
 const live = (meta: AgentMeta, cwd = '/a/.the-framework/worktrees/r1'): LiveAgent => ({ ...meta, cwd })
 
 const runningAgentMeta = (over: Partial<AgentMeta> = {}): AgentMeta => ({
-  version: 1,
   status: 'running',
   id: 'r1',
   startedAt: '2026-07-16T00:00:00Z',
@@ -118,7 +117,6 @@ test('interventionKey is the url for a PR and project+gate for an awaiting run',
 // #860: a finished agent whose branch still holds unpushed, unmerged commits.
 
 const doneMeta = (over: Partial<AgentMeta> = {}): AgentMeta => ({
-  version: 1,
   status: 'done',
   id: 'r1',
   startedAt: '2026-07-16T00:00:00Z',

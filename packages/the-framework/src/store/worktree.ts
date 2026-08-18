@@ -303,3 +303,18 @@ export async function branchPushed(
     return false
   }
 }
+
+/**
+ * Whether the repo has any remote configured at all. What the sweep asks once per project: with
+ * no remote, {@link branchPushed} is false for every checkout and the push cannot land, so the
+ * whole per-checkout probe-and-push cycle is doomed before it starts — and that answer cannot
+ * change between two rows of the same sweep. Anything unreadable answers `false`, like
+ * {@link branchPushed}: keeping a checkout is the safe direction.
+ */
+export async function repoHasRemote(repo: string, agent: GitRunner = nodeGitRunner()): Promise<boolean> {
+  try {
+    return (await agent(['remote'], repo)).trim().length > 0
+  } catch {
+    return false
+  }
+}

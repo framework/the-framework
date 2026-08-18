@@ -20,6 +20,7 @@ function fakeSweep(rows: WorktreeRow[]) {
   const agent = (over: { remove?: (cwd: string, agentId: string) => Promise<{ ok: true } | { ok: false; error: string }> } = {}) =>
     removeMergedWorktrees('/repo', {
       worktrees: async () => rows,
+      hasRemote: async () => true,
       remove: async (cwd, agentId) => {
         asked.push(agentId)
         return over.remove ? over.remove(cwd, agentId) : { ok: true }
@@ -48,10 +49,30 @@ test('a checkout the daemon has not finished with is left alone (E5)', async () 
   const result = await removeMergedWorktrees('/repo', {
     worktrees: async () => [row({ agentId: 'retiring', status: 'done' }), row({ agentId: 'settled', status: 'done' })],
     busy: new Set(['retiring']),
+    hasRemote: async () => true,
     remove: async (_cwd, agentId) => (asked.push(agentId), { ok: true }),
   })
   assert.deepEqual(asked, ['settled'])
   assert.deepEqual(result.removed, [{ agentId: 'settled' }])
+})
+
+test('a repo with no remote is asked once, and no checkout is probed for a doomed push (E5)', async () => {
+  // The answer cannot change between two rows of the same sweep, so the per-checkout
+  // commit-and-push cycle is skipped — while every retained checkout is still accounted for.
+  const asked: string[] = []
+  let remoteChecks = 0
+  const result = await removeMergedWorktrees('/repo', {
+    worktrees: async () => [row({ agentId: 'a' }), row({ agentId: 'b' })],
+    hasRemote: async () => (remoteChecks++, false),
+    remove: async (_cwd, agentId) => (asked.push(agentId), { ok: true }),
+  })
+  assert.equal(remoteChecks, 1)
+  assert.deepEqual(asked, [])
+  assert.deepEqual(result.removed, [])
+  assert.deepEqual(result.failed, [
+    { agentId: 'a', error: 'the repo has no remote; its worktree was kept' },
+    { agentId: 'b', error: 'the repo has no remote; its worktree was kept' },
+  ])
 })
 
 test('a live session keeps its checkout: its agent is working in there (#1036)', async () => {
@@ -98,6 +119,40 @@ test('the sweep says what it removed and what it kept, per project (#1036)', asy
   assert.match(lines[0] ?? '', /The branch and the session are kept/, 'a checkout vanishing silently reads as a bug')
   assert.match(lines[1] ?? '', /removed the worktree for session r2/)
   assert.match(lines[2] ?? '', /kept the worktree for session r3: not on the remote/)
+})
+
+test('a kept checkout is accounted for once, not re-announced every turn (E5)', async () => {
+  // A permanently unpushable checkout (no remote, a publish-nothing session) fails identically
+  // every ten minutes for the life of the daemon; the line saying so is worth one print.
+  const lines: string[] = []
+  const sweep = startMergedWorktreeSweep({
+    projects: async () => [{ path: '/a' }],
+    log: line => lines.push(line),
+    sweep: async () => ({ removed: [], failed: [{ agentId: 'r1', error: 'the repo has no remote; its worktree was kept' }] }),
+  })
+  await sweep.tick()
+  await sweep.tick()
+  sweep.stop()
+  assert.equal(lines.filter(l => /kept the worktree for session r1/.test(l)).length, 1)
+})
+
+test('a removal clears the accounting, so a same-id checkout that reappears is announced again (E5)', async () => {
+  const lines: string[] = []
+  const outcomes: MergedSweepResult[] = [
+    { removed: [], failed: [{ agentId: 'r1', error: 'the repo has no remote; its worktree was kept' }] },
+    { removed: [{ agentId: 'r1' }], failed: [] },
+    { removed: [], failed: [{ agentId: 'r1', error: 'the repo has no remote; its worktree was kept' }] },
+  ]
+  const sweep = startMergedWorktreeSweep({
+    projects: async () => [{ path: '/a' }],
+    log: line => lines.push(line),
+    sweep: async () => outcomes.shift() ?? { removed: [], failed: [] },
+  })
+  await sweep.tick()
+  await sweep.tick()
+  await sweep.tick()
+  sweep.stop()
+  assert.equal(lines.filter(l => /kept the worktree for session r1/.test(l)).length, 2)
 })
 
 test('a stopped sweep does no further work (#1036)', async () => {
@@ -189,7 +244,7 @@ test('a session with nowhere to push keeps its checkout (E5)', async () => {
     const result = await removeMergedWorktrees(repo)
     assert.deepEqual(result.removed, [])
     assert.equal(result.failed.length, 1)
-    assert.match(result.failed[0]!.error, /not on the remote/)
+    assert.match(result.failed[0]!.error, /no remote/)
     assert.ok((await stat(path)).isDirectory(), 'the checkout is still there')
   } finally {
     await rm(repo, { recursive: true, force: true })

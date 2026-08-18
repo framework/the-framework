@@ -41,6 +41,7 @@ export {
   parseWorktreeList,
   commitPendingWork,
   branchPushed,
+  repoHasRemote,
   removeWorktree,
   pruneWorktrees,
   worktreePath,

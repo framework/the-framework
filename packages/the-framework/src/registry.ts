@@ -578,25 +578,6 @@ export async function addProject(
   })
 }
 
-/**
- * Drop the project whose id matches and write the list back (preferences preserved).
- * Returns whether a record was removed; an empty/missing registry is a no-write `false`.
- * The project's own overrides (#840) go with it, so re-adding the path starts clean.
- */
-export async function removeProject(
-  id: string,
-  fs: RegistryFs = nodeRegistryFs(),
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<boolean> {
-  return serialize(async () => {
-    const registry = await readRegistry(fs, env)
-    const remaining = registry.projects.filter(project => project.id !== id)
-    if (remaining.length === registry.projects.length) return false
-    await writeRegistry({ ...registry, projects: remaining }, fs, env)
-    return true
-  })
-}
-
 /** The user's dashboard preferences (#410), or `{}` when none are stored. */
 export async function readPreferences(
   fs: RegistryFs = nodeRegistryFs(),

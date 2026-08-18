@@ -11,7 +11,6 @@ import {
   readRegistry,
   registryPreferencesStore,
   registryPath,
-  removeProject,
   writePreferences,
   patchPreferences,
   readSecrets,
@@ -166,24 +165,6 @@ test('addProject normalizes the stored path to an absolute one', async () => {
   const fs = memFs()
   const record = await addProject('/repos/app-a/', APP_A.addedAt, fs, ENV)
   assert.equal(record.path, '/repos/app-a')
-})
-
-test('removeProject drops the matching record and returns true', async () => {
-  const fs = memFs({ [FILE]: JSON.stringify({ projects: [APP_A, APP_B], preferences: {} }) })
-  assert.equal(await removeProject(APP_A.id, fs, ENV), true)
-  assert.deepEqual(await listProjects(fs, ENV), [APP_B])
-})
-
-test('removeProject on an unknown id is false and does not write', async () => {
-  const raw = JSON.stringify({ projects: [APP_A], preferences: {} })
-  const fs = memFs({ [FILE]: raw })
-  assert.equal(await removeProject('nope-123', fs, ENV), false)
-  assert.equal(fs.files.get(FILE), raw) // untouched
-})
-
-test('removeProject on an empty / missing registry is false', async () => {
-  assert.equal(await removeProject(APP_A.id, memFs(), ENV), false)
-  assert.equal(await removeProject(APP_A.id, memFs({ [FILE]: JSON.stringify({ projects: [], preferences: {} }) }), ENV), false)
 })
 
 // Preferences (#410): stored in the same file next to the project list.
@@ -604,7 +585,7 @@ test('the daemon token survives the other registry mutators (#1051)', async () =
   const token = await ensureDaemonToken(fs, ENV)
   await addProject('/repos/app-a', APP_A.addedAt, fs, ENV)
   await writePreferences({ vanilla: true }, fs, ENV)
-  await removeProject(APP_A.id, fs, ENV)
+  await patchPreferences({ theme: 'dark' }, fs, ENV)
   assert.equal(await readDaemonToken(fs, ENV), token)
 })
 

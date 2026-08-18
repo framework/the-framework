@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { startRemoteAgent, streamRemoteEvents, pingRemote, relayRpc, RelayedAgents } from './remote-run.js'
-import { AGENT_META_VERSION, type AgentMeta } from '../store/index.js'
+import { type AgentMeta } from '../store/index.js'
 import type { FrameworkEvent } from '../events.js'
 
 // A throwaway loopback server; the handler decides how it answers. Returns its base url + close.
@@ -17,7 +17,7 @@ async function server(handler: (req: IncomingMessage, res: ServerResponse) => vo
 // A minimal running AgentMeta stub, the local list row RelayedAgents keeps for a relayed agent (#1077).
 function stubMeta(id: string, overrides: Partial<AgentMeta> = {}): AgentMeta {
   const now = new Date().toISOString()
-  return { version: AGENT_META_VERSION, status: 'running', id, startedAt: now, updatedAt: now, target: 'remote', ...overrides }
+  return { status: 'running', id, startedAt: now, updatedAt: now, target: 'remote', ...overrides }
 }
 
 // Drain a RelayedAgents stream to completion, so both its `end`-driven settle and its close flip have run.

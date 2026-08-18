@@ -7,7 +7,7 @@ import { ARCHIVE_DIR } from './store/index.js'
  *
  * Agent state is transient — `events.jsonl`, `agent.json`, `agents/`, the worktrees — and would
  * otherwise turn every session into a dirty checkout. The one thing under here that is committed
- * is the session archive (#1179), because `git clean -fdx` is an ordinary thing to do to a repo
+ * is the agent archive (#1179), because `git clean -fdx` is an ordinary thing to do to a repo
  * and it used to delete every session a project had ever run.
  *
  * An allow-list: `*` ignores everything, and each directory on the way down has to be re-included
@@ -41,10 +41,10 @@ export function archiveGitignore(): string {
   return `!*/\n!*/${ARCHIVE_DIR}/\n!*/${ARCHIVE_DIR}/**\n`
 }
 
-/** The whole file: ignore the transient state, keep the session archive. */
+/** The whole file: ignore the transient state, keep the agent archive. */
 export function frameworkGitignore(): string {
-  return `# The Framework: session state is transient; the session archive is committed.\n*\n!.gitignore\n${archiveGitignore()}`
+  return `# The Framework: agent state is transient; the agent archive is committed.\n*\n!.gitignore\n${archiveGitignore()}`
 }
 
-/** The rule whose presence means the file already un-ignores the session archive. */
-export const SESSIONS_RULE = `!*/${ARCHIVE_DIR}/**`
+/** The rule whose presence means the file already un-ignores the agent archive. */
+export const ARCHIVE_RULE = `!*/${ARCHIVE_DIR}/**`

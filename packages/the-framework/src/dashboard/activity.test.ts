@@ -7,7 +7,6 @@ import type { AgentMeta } from '../store/index.js'
 const project = (id: string, path: string): ProjectSummary => ({ id, path, name: id, activated: true })
 
 const agent = (over: Partial<AgentMeta> = {}): AgentMeta => ({
-  version: 1,
   status: 'running',
   id: 'r1',
   startedAt: '2026-07-16T00:00:00Z',

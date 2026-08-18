@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { appendControl } from './control.js'
 import { BROWSER_MCP_SERVERS, withBrowser } from './browser.js'
-import { EVENTS_FILE, FRAMEWORK_DIR, AGENTS_DIR, type StoreFs } from './store/index.js'
+import { EVENTS_FILE, FRAMEWORK_DIR, ARCHIVE_DIR, type StoreFs } from './store/index.js'
 import { nodeGitRunner } from './project.js'
 import {
   chooseSessionLink,
@@ -576,7 +576,7 @@ test('a declined post-merge cleanup lands in the archived event log, not on stdo
     // decline is *reported*: it has to survive into runs/, which close() copies the log into.
     const code = await runAgentCli({ prompt: 'review the auth flow', kind: 'prompt', cwd: dir, options: { onBeforeMergeable: true } }, io)
     assert.equal(code, 0)
-    const agents = join(dir, FRAMEWORK_DIR, AGENTS_DIR)
+    const agents = join(dir, FRAMEWORK_DIR, ARCHIVE_DIR)
     const archived = (await readdir(agents)).filter(f => f.endsWith('.jsonl'))
     assert.equal(archived.length, 1, 'the run was archived')
     const events = (await readFile(join(agents, archived[0]!), 'utf8'))

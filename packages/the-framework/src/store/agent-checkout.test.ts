@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import { resolveAgentEventsPath } from './agent-checkout.js'
-import { FRAMEWORK_DIR, EVENTS_FILE, WORKTREES_DIR, AGENTS_DIR, ARCHIVE_DIR } from './agent-store.js'
+import { FRAMEWORK_DIR, EVENTS_FILE, WORKTREES_DIR, ARCHIVE_DIR } from './agent-store.js'
 
 // resolveAgentEventsPath probes the real filesystem (same as resolveAgentCheckout), so these
 // tests build a throwaway project directory rather than a memory fs.
@@ -51,7 +51,7 @@ test('resolveAgentEventsPath: an existing worktree resolves to its own journal',
 test('resolveAgentEventsPath: an ended run (worktree gone) resolves to its archived log, not the root journal (#1472)', async () => {
   const cwd = await makeProject()
   try {
-    const events = await seedArchive(cwd, join(cwd, FRAMEWORK_DIR, AGENTS_DIR))
+    const events = await seedArchive(cwd, join(cwd, FRAMEWORK_DIR, ARCHIVE_DIR))
     assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), events)
   } finally {
     await rm(cwd, { recursive: true, force: true })
@@ -71,7 +71,7 @@ test('resolveAgentEventsPath: finds an archive filed under a user sessions dir (
 test('resolveAgentEventsPath: a live worktree beats a stale archive (a resumed run)', async () => {
   const cwd = await makeProject()
   try {
-    await seedArchive(cwd, join(cwd, FRAMEWORK_DIR, AGENTS_DIR))
+    await seedArchive(cwd, join(cwd, FRAMEWORK_DIR, ARCHIVE_DIR))
     const worktree = join(cwd, FRAMEWORK_DIR, WORKTREES_DIR, RUN_ID)
     await mkdir(worktree, { recursive: true })
     assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), join(worktree, FRAMEWORK_DIR, EVENTS_FILE))

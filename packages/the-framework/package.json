@@ -30,24 +30,8 @@
   "files": [
     "dist"
   ],
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "bin": {
     "the-framework": "./dist/bin.js"
-  },
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./dashboard-rpc": {
-      "import": "./dist/dashboard-rpc/index.js",
-      "types": "./dist/dashboard-rpc/index.d.ts"
-    },
-    "./client": {
-      "import": "./dist/client.js",
-      "types": "./dist/client.d.ts"
-    }
   },
   "scripts": {
     "build": "node scripts/gen-prompts.mjs && tsc -p tsconfig.build.json && cd dashboard && vite build",

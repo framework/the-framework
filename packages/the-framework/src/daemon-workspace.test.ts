@@ -14,7 +14,7 @@ import type { PreflightResult } from './preflight.js'
  */
 const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
 
-import { FRAMEWORK_DIR, WORKTREES_DIR, EVENTS_FILE, META_FILE, worktreePath, agentBranchName, startedAtFromAgentId, type AgentMeta } from './store/index.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, EVENTS_FILE, META_FILE, worktreePath, agentBranchName, startedAtFromAgentId, type AgentMeta } from './store/index.js'
 import { addProject, projectId } from './registry.js'
 import { nodeGitRunner } from './project.js'
 import type { AgentSpec } from './agent-spec.js'
@@ -97,7 +97,7 @@ test('a repo whose worktree could not be created fails the run instead of borrow
     // so `worktree add` rejects. Stands in for the SIGTERM this exists for, which needs a repo big
     // enough to outrun a 120s budget; both arrive here as one rejection from a working git.
     await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true })
-    await writeFile(join(cwd, FRAMEWORK_DIR, WORKTREES_DIR), '')
+    await writeFile(join(cwd, FRAMEWORK_DIR, BRANCHES_DIR), '')
 
     const log = join(cwd, 'started.log')
     const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeStub(cwd, log) })
@@ -411,7 +411,7 @@ test('a start on a logged-out agent is refused, and spends no branch or worktree
     assert.match(result.error!, /auth login/)
 
     // Nothing was spent: no worktrees directory, and no agent branch on the repo.
-    const worktrees = await stat(join(cwd, FRAMEWORK_DIR, WORKTREES_DIR)).then(() => true, () => false)
+    const worktrees = await stat(join(cwd, FRAMEWORK_DIR, BRANCHES_DIR)).then(() => true, () => false)
     assert.equal(worktrees, false, 'a refused start creates no worktree')
     const branches = await git(['branch', '--list', 'tf-agent-*'], cwd)
     assert.equal(branches.trim(), '', 'a refused start creates no run branch')

@@ -26,6 +26,7 @@ import {
   isPidAlive,
   type AgentMeta,
 } from './store/index.js'
+import { agentIdFromWorktreeDir } from './branch-names.js'
 import type { FrameworkEvent } from './events.js'
 import { writeAgentSpec } from './agent-spec.js'
 import type { StartAgentKind, StartAgentOptions, StartAgentResult, AddProjectResult } from './dashboard/index.js'
@@ -36,6 +37,7 @@ import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
 import { tailEvents, tailAgentEvents } from './dashboard-rpc/events-tail.js'
 import { ensureArchiveIgnored, resolveUserDir } from './agent-archive.js'
 import { removeProjectWorktree } from './worktrees.js'
+import { reconcileBranchLinks } from './branch-links.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId } from './registry.js'
 import { isTicketPath } from './tickets.js'
@@ -482,7 +484,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
 
   /**
    * The checkout an agent gets (#736). Each agent is given its own git worktree under the project's
-   * `.the-framework/worktrees/<agentId>`, on a `tf-agent-<agentId>` branch, so N runs on one
+   * `.the-framework/branches/<branch name>` (#1580), on a `tf-agent-<agentId>` branch, so N runs on one
    * repo never fight over the working tree — and the user's own checkout, uncommitted work
    * included, is left untouched.
    *
@@ -507,6 +509,8 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
       // make git ignore the links (a `node_modules/` rule does not match a symlink, #738).
       await linkDependencies(projectCwd, worktree.path).catch(() => [])
       await excludeDependencyLinks(projectCwd).catch(() => {})
+      // The branches view (#1580) learns about this checkout now rather than at the next tick.
+      void reconcileBranchLinks(projectCwd).catch(() => {})
       return { ok: true, workspace: { cwd: worktree.path, agentId } }
     } catch (err) {
       if (await isGitRepo(projectCwd)) {
@@ -555,8 +559,9 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         // Remove button are one behaviour. A push that cannot land keeps the checkout, and the
         // sweep retries it later. It used to keep a failed or stopped run's checkout "for
         // inspection", which meant those accumulated one per session until someone noticed.
-        // The directory's own name is the agent id, so this never depends on the caller having one.
-        const outcome = await removeProjectWorktree(projectCwd, agentId ?? basename(worktree))
+        // The directory's own name is the run branch, which carries the agent id (#1580), so this
+        // never depends on the caller having one.
+        const outcome = await removeProjectWorktree(projectCwd, agentId ?? agentIdFromWorktreeDir(basename(worktree)))
         if (!outcome.ok) console.log(`[framework] keeping worktree ${worktree}: ${outcome.error}`)
       } catch {
         // A worktree we could not retire is a worktree left on disk, which is the safe direction.

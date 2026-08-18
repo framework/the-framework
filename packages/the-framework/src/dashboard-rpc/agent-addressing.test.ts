@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { sendStop, sendMessage, sendChoice, sendRemoveWorktree } from './control.js'
 import { onRetainedWorktrees, onAgents } from './reads.js'
 import { addProject, projectId as idFor } from '../registry.js'
-import { FRAMEWORK_DIR, WORKTREES_DIR, addWorktree, agentBranchName } from '../store/index.js'
+import { FRAMEWORK_DIR, worktreePath, addWorktree, agentBranchName } from '../store/index.js'
 import { CONTROL_FILE } from '../control.js'
 import { nodeGitRunner } from '../project.js'
 import { provideTestContext } from './test-context.js'
@@ -29,7 +29,7 @@ async function projectWithWorktreeAgent(): Promise<{
 }> {
   const dir = await realpath(await mkdtemp(join(tmpdir(), 'framework-addressing-')))
   const agentId = '2026-07-19T10-00-00-000Z'
-  const worktree = join(dir, FRAMEWORK_DIR, WORKTREES_DIR, agentId)
+  const worktree = worktreePath(dir, agentId)
   await mkdir(join(worktree, FRAMEWORK_DIR), { recursive: true })
   // The live meta is what readLiveMetas discovers, and its id is what the caller addresses.
   await writeFile(
@@ -222,7 +222,7 @@ test('onRetainedWorktrees hides a live run, and lists one that has finished (#73
     assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [], 'a running run has nothing to offer removing')
     // Once it is no longer running, its retained checkout is listed.
     await writeFile(
-      join(ctx.dir, FRAMEWORK_DIR, WORKTREES_DIR, ctx.agentId, FRAMEWORK_DIR, 'agent.json'),
+      join(worktreePath(ctx.dir, ctx.agentId), FRAMEWORK_DIR, 'agent.json'),
       JSON.stringify({ version: 1, status: 'failed', id: ctx.agentId, startedAt: ctx.agentId, updatedAt: ctx.agentId }),
     )
     assert.deepEqual(await onRetainedWorktrees(ctx.projectId), [ctx.agentId])
@@ -240,7 +240,7 @@ test('a run that has a worktree but has not written its state yet still resolves
   const ctx = await projectWithWorktreeAgent()
   try {
     const fresh = '2026-07-19T11-30-00-000Z'
-    const worktree = join(ctx.dir, FRAMEWORK_DIR, WORKTREES_DIR, fresh)
+    const worktree = worktreePath(ctx.dir, fresh)
     await mkdir(worktree, { recursive: true }) // the daemon has made the checkout; the run has not started writing
     await sendStop(ctx.projectId, fresh)
     assert.deepEqual(

@@ -1,4 +1,4 @@
-The package's public doorway: re-exports the driver seam, the agent flow, the dashboard, the daemon, and every other public piece, with a top-of-file tour of how the product hangs together.
+The vocabulary the dashboard reads the daemon's answers in: the types its RPCs return, and nothing else.
 
 ## Before modifying/creating SPEC.md files
 

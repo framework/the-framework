@@ -15,14 +15,12 @@ export function worktreePath(repo: string, agentId: string): string {
   return join(repo, FRAMEWORK_DIR, WORKTREES_DIR, agentId)
 }
 
-/**
- * The branch a framework-allocated worktree starts on (#736). The agent id exists
- * before the session name does, so the branch is created from the id and renamed
- * by {@link renameAgentBranch} once the agent picks a name.
- */
-export function agentBranchName(agentId: string): string {
-  return `the-framework/agent-${agentId}`
-}
+export {
+  AGENT_BRANCH_PREFIX,
+  LEGACY_AGENT_BRANCH_PREFIX,
+  agentBranchName,
+  legacyAgentBranchName,
+} from '../branch-names.js'
 
 /** One entry parsed from `git worktree list --porcelain`. */
 export interface WorktreeInfo {
@@ -201,11 +199,11 @@ export async function currentBranch(path: string, agent: GitRunner = nodeGitRunn
 
 /**
  * Rename an agent's branch once the agent names the session (#736): the worktree is
- * created on `the-framework/agent-<agentId>` before a name exists, and this puts the
- * readable `the-framework/<sessionName>` on it.
+ * created on `tf-agent-<agentId>` before a name exists, and this puts the
+ * readable `tf-<sessionName>` on it.
  *
  * Only renames when `path` is still on `from`. The #326 system prompt currently
- * tells the agent to create and check out its own `the-framework/<name>` branch,
+ * tells the agent to create and check out its own `tf-<name>` branch,
  * and until that step is dropped there (the prompt ships verbatim from the issue,
  * so it is not ours to edit) the agent may already have moved off `from` — in
  * which case it named the branch itself and there is nothing to rename. Returns

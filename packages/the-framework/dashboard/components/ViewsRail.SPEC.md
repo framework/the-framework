@@ -2,4 +2,4 @@ The agent-views rail: the ad-hoc markdown the agent pushes to the side panel (pl
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

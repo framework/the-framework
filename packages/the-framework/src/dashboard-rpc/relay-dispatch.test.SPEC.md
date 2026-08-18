@@ -2,4 +2,4 @@ Covers that the relay allowlist is exactly the agent-scoped read/steer/handoff s
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

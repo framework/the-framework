@@ -2,4 +2,4 @@ Test-runner setup for the dashboard's unit tests: jsdom and the JSX transform, w
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

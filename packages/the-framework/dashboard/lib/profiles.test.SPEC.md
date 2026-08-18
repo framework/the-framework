@@ -2,4 +2,4 @@ Covers saved devices: add, refresh, and remove round-trips; parsing a pasted dev
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

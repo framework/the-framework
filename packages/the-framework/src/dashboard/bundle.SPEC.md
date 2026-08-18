@@ -2,4 +2,4 @@ Finds the prebuilt dashboard web app on disk so the daemon can serve it, answeri
 
 ## Before modifying/creating SPEC.md files
 
-Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

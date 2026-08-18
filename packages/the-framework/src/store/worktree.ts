@@ -305,6 +305,17 @@ export async function branchPushed(
 }
 
 /**
+ * Whether the checkout has nothing uncommitted — the read half of {@link commitPendingWork}, for
+ * a decision that must not commit on the way to its answer: removing a publish-nothing session's
+ * checkout requires a clean tree, and grabbing someone's half-typed edits as a commit to find
+ * that out would be the intrusion the question exists to avoid. Throws when git cannot answer,
+ * so the caller keeps the checkout rather than guessing.
+ */
+export async function worktreeClean(path: string, agent: GitRunner = nodeGitRunner()): Promise<boolean> {
+  return !(await agent(['status', '--porcelain'], path)).trim()
+}
+
+/**
  * Whether the repo has any remote configured at all. What the sweep asks once per project: with
  * no remote, {@link branchPushed} is false for every checkout and the push cannot land, so the
  * whole per-checkout probe-and-push cycle is doomed before it starts — and that answer cannot

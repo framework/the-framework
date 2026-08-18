@@ -92,6 +92,32 @@ test('a publish-nothing session keeps its checkout instead of being pushed to ma
       () => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo),
       'and nothing reached the remote',
     )
+    // Nothing committed on the way to the refusal either: a kept checkout is a place someone
+    // works, and the sweep re-offers it every pass — half-typed edits must stay theirs.
+    assert.ok((await git(['status', '--porcelain'], path)).trim().length > 0, 'the uncommitted edit is untouched')
+    assert.equal((await git(['log', '--format=%s', branch], repo)).trim(), 'init', 'no commit was grabbed')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a record that cannot be read keeps the checkout: unreadable is not "publish freely" (B5)', async () => {
+  // A meta exists but does not parse. Absent would mean a boot death and take the recoverable
+  // default (push); unreadable cannot tell a publish-nothing session from any other, so the
+  // removal refuses rather than guesses.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await mkdir(join(path, '.the-framework'), { recursive: true })
+    await writeFile(join(path, '.the-framework', 'agent.json'), 'not json')
+    const result = await removeProjectWorktree(repo, RUN_ID)
+    assert.equal(result.ok, false)
+    assert.match(result.ok === false ? result.error : '', /could not be read/)
+    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
+    await assert.rejects(
+      () => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo),
+      'and nothing reached the remote',
+    )
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

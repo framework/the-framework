@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { errorMessage } from './error-message.js'
 import {
@@ -6,8 +7,8 @@ import {
   readLiveMetas,
   branchPushed,
   commitPendingWork,
+  worktreeClean,
   currentBranch,
-  findAgent,
   removeWorktree,
   pruneWorktrees,
   worktreePath,
@@ -15,6 +16,8 @@ import {
   isSafeAgentId,
   archivedAgentPaths,
   FRAMEWORK_DIR,
+  META_FILE,
+  type AgentMeta,
   type AgentStatus,
 } from './store/index.js'
 import { pushAgentBranch } from './dashboard/agent-handoff.js'
@@ -110,7 +113,10 @@ async function sizeOf(cwd: string, agentId: string): Promise<{ sizeBytes?: numbe
  * (`handoff: local`, B5/#1379) said its branch must not reach the remote, so its unpushed checkout
  * is kept — the same outcome as a repo with no remote — rather than pushed to make it removable.
  * Deciding otherwise would have teardown publish the very branch the agent's own handoff just
- * declined to.
+ * declined to. Nothing is committed on the way to that refusal either — a kept checkout is a
+ * place someone works, and the sweep re-offers it every pass — so it goes only from a clean tree
+ * on a pushed tip. And a record that cannot be read keeps the checkout too: unreadable is not
+ * "publish freely".
  *
  * Refuses while the agent is still going — an agent's checkout is where its agent is working, and Stop
  * is how you end an agent, not pulling the floor out from under it.
@@ -129,36 +135,54 @@ export async function removeProjectWorktree(
   }
   const path = worktreePath(cwd, agentId)
   try {
-    // `removeWorktree` forces past a dirty tree, so an uncommitted edit has to be on the branch
-    // before the checkout can go — otherwise the very diff the checkout held is what is deleted.
-    if (!(await commitPendingWork(path))) {
-      return {
-        ok: false,
-        error: `session ${agentId} has uncommitted work that could not be committed; its worktree was kept`,
-      }
-    }
     const branch = await currentBranch(path)
     if (!branch) return { ok: false, error: `session ${agentId} is on no branch; its worktree was kept` }
-    if (!(await branchPushed(cwd, branch))) {
-      // A session that was armed to publish nothing keeps its checkout instead of having its
-      // branch pushed to make removal possible: the push here serves recoverability, and pushing
-      // a `handoff: local` session's branch is the publish that rung exists to refuse. `handoff`
-      // is on the meta from the agent's first event, so a meta without one (a boot death) keeps
-      // the recoverable default. An already-pushed branch never reaches this: removing what the
-      // remote holds publishes nothing.
-      const meta = await findAgent(cwd, agentId).catch(() => undefined)
-      if (meta?.handoff && !meta.handoff.push) {
+    // The armed handoff decides before anything commits or pushes: a session armed to publish
+    // nothing keeps its checkout instead of having its branch pushed to make removal possible —
+    // the push here serves recoverability, and pushing a `handoff: local` session's branch is
+    // the publish that rung exists to refuse. `handoff` is on the meta from the agent's first
+    // event, so a meta that exists without one (a boot death) keeps the recoverable default;
+    // a meta that cannot be read keeps the checkout instead, because it cannot tell a
+    // publish-nothing session from any other (fail closed, retried by a later pass).
+    let meta: AgentMeta | undefined
+    try {
+      meta = await readMetaFor(cwd, path, agentId)
+    } catch (err) {
+      return {
+        ok: false,
+        error: `session ${agentId}'s record could not be read (${errorMessage(err)}); its worktree was kept`,
+      }
+    }
+    if (meta?.handoff && !meta.handoff.push) {
+      // A publish-nothing session's checkout goes only once everything it holds is already on
+      // the remote by someone's explicit act: a clean tree on a pushed tip — then removing it
+      // publishes nothing. Anything short of that would take a commit or a push of removal's
+      // own, and a kept checkout is a place someone works, re-offered by the sweep every pass:
+      // grabbing half-typed edits as "[The Framework] uncommitted changes" on the way to a
+      // refusal is not cleanup.
+      if (!(await worktreeClean(path)) || !(await branchPushed(cwd, branch))) {
         return {
           ok: false,
           error: `session ${agentId} was set to publish nothing (handoff: local); its worktree was kept`,
         }
       }
-      // Pushing is what makes the removal recoverable, so it is attempted here rather than
-      // required of the caller. A repo with no remote never gets past this, which is the honest
-      // answer: there is nowhere for the work to be recoverable from.
-      const pushed = await pushAgentBranch(cwd, branch)
-      if (!pushed.ok) {
-        return { ok: false, error: `${branch} is not on the remote (${pushed.error}); its worktree was kept` }
+    } else {
+      // `removeWorktree` forces past a dirty tree, so an uncommitted edit has to be on the branch
+      // before the checkout can go — otherwise the very diff the checkout held is what is deleted.
+      if (!(await commitPendingWork(path))) {
+        return {
+          ok: false,
+          error: `session ${agentId} has uncommitted work that could not be committed; its worktree was kept`,
+        }
+      }
+      if (!(await branchPushed(cwd, branch))) {
+        // Pushing is what makes the removal recoverable, so it is attempted here rather than
+        // required of the caller. A repo with no remote never gets past this, which is the honest
+        // answer: there is nowhere for the work to be recoverable from.
+        const pushed = await pushAgentBranch(cwd, branch)
+        if (!pushed.ok) {
+          return { ok: false, error: `${branch} is not on the remote (${pushed.error}); its worktree was kept` }
+        }
       }
     }
     await opts.beforeRemove?.(agentId)
@@ -168,6 +192,33 @@ export async function removeProjectWorktree(
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
   }
+}
+
+/**
+ * The meta the keep decision reads: the live copy in the checkout, else the archived one.
+ *
+ * Unlike the store's forgiving list reads — where anything unreadable contributes nothing — this
+ * read tells absence from failure, because here they mean opposite things: `undefined` is "no
+ * record was ever written" (a boot death, safe to treat as the default), while a record that
+ * exists but cannot be read or parsed throws, so the caller refuses rather than guesses.
+ */
+async function readMetaFor(cwd: string, path: string, agentId: string): Promise<AgentMeta | undefined> {
+  const live = await readMetaStrict(join(path, FRAMEWORK_DIR, META_FILE))
+  if (live) return live
+  const archived = (await archivedAgentPaths(cwd, agentId)).find(p => p.endsWith('.json'))
+  return archived ? readMetaStrict(archived) : undefined
+}
+
+/** One meta file, strictly: `undefined` when absent, a throw when present but unreadable. */
+async function readMetaStrict(path: string): Promise<AgentMeta | undefined> {
+  let raw: string
+  try {
+    raw = await readFile(path, 'utf8')
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw err
+  }
+  return JSON.parse(raw) as AgentMeta
 }
 
 /** The outcome of {@link deleteProjectAgent}. */

@@ -1,8 +1,11 @@
 import { dirname, join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from './project.js'
 import { FRAMEWORK_DIR, BRANCHES_DIR } from './store/index.js'
+import { DATA_BRANCH } from './branch-names.js'
 import { TICKETS_DIR, FLAT_TODO_FILE } from './tickets.js'
 import { errorMessage } from './error-message.js'
+
+export { DATA_BRANCH }
 
 // The `the-framework_data` branch (#1582): every file The Framework itself writes — the tickets,
 // the queue, the session archives — lives on one branch of the project repo, the way `gh-pages`
@@ -25,9 +28,6 @@ import { errorMessage } from './error-message.js'
 // The checkout lives at `.the-framework/branches/the-framework_data`, a plain git worktree in the
 // #1580 branches dir, named as its branch like every checkout there. The repo root keeps a
 // `tickets` symlink into it so the roadmap stays one `ls` away for humans.
-
-/** The branch's name — also its checkout's directory name under `.the-framework/branches/`. */
-export const DATA_BRANCH = 'the-framework_data'
 
 /** The data branch's checkout under a project: `<repo>/.the-framework/branches/the-framework_data`. */
 export function dataWorktreePath(cwd: string): string {

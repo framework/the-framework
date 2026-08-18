@@ -35,7 +35,8 @@ import { RelayedAgents, startRemoteAgent } from './dashboard/remote-run.js'
 import { agentBranchFor } from './dashboard/agent-handoff.js'
 import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
 import { tailEvents, tailAgentEvents } from './dashboard-rpc/events-tail.js'
-import { ensureArchiveIgnored, resolveUserDir } from './agent-archive.js'
+import { resolveUserDir } from './agent-archive.js'
+import { withDataBranch } from './data-branch.js'
 import { removeProjectWorktree } from './worktrees.js'
 import { reconcileBranchLinks } from './branch-links.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
@@ -548,11 +549,19 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         // Where the work ended up, recorded before the checkout can go (#799). The branch outlives
         // the worktree and is the only handle the dashboard has left on a finished session.
         const branch = await currentBranch(worktree)
-        // Filed under the identity this repo commits as, and the ignore rules taught to keep it, so
-        // the session survives the repo being cleaned (#1179).
+        // Filed under the identity this repo commits as, onto the data branch (#1179/#1582)
+        // through its write funnel: the archive is committed and pushed the moment it lands —
+        // durable without a human, and never a commit on main.
         const user = await resolveUserDir(projectCwd)
-        await ensureArchiveIgnored(projectCwd, user).catch(() => false)
-        await archiveWorktreeAgent(worktree, projectCwd, undefined, branch, user)
+        const archived = await withDataBranch(
+          projectCwd,
+          `[The Framework] archive session ${agentId ?? agentIdFromWorktreeDir(basename(worktree))}`,
+          async () => {
+            await archiveWorktreeAgent(worktree, projectCwd, undefined, branch, user)
+          },
+        )
+        if (!archived.ok && !archived.committed)
+          console.log(`[framework] could not archive session ${basename(worktree)}: ${archived.error}`)
         // One rule (E5): the checkout goes once its work is on the remote, whatever state the agent
         // ended in. `removeProjectWorktree` owns the whole sequence — commit what is pending, push
         // the branch, remove only if the remote has it — so teardown, the sweep and the dashboard's

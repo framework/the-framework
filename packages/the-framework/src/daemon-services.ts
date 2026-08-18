@@ -20,7 +20,6 @@ import { readTickets } from './dashboard/tickets.js'
 import { checkOffEntry, findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { pullDataBranch, withDataBranch } from './data-branch.js'
 import { readFile, writeFile } from 'node:fs/promises'
-import { startAgentCommitter } from './agent-commit.js'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
 import { startBranchLinksPass } from './branch-links.js'
 import { startCloudScratchSweep } from './cloud-scratch-refs.js'
@@ -66,11 +65,6 @@ export interface BackgroundServices {
    * are torn down — these jobs commit and push, and stopping their clock does not stop their turn.
    */
   quiesce: () => Promise<void>
-  /**
-   * Commit whatever the shutdown just archived (#912/#1179), after the agents have been stopped so
-   * their last events are on disk. Returns how many projects were committed.
-   */
-  flushAgents: () => Promise<number>
   /**
    * Rebuild the Discord services against freshly-read credentials (#1095), so a token pasted into
    * the dashboard takes effect now rather than at the next daemon start. Idempotent and safe to
@@ -283,12 +277,6 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     log,
   })
 
-  // Commit the agent archives written into the main checkout (#912/#1179). An agent's own worktree
-  // sweeps its archive on teardown; nothing did the same for one held in the checkout itself, so it
-  // sat as an uncommitted change until a human noticed. Path-scoped and debounced, and it skips a
-  // repo that is mid-rebase or index-locked rather than committing into someone's work.
-  const agentCommitter = startAgentCommitter({ projects, log })
-
   // Watch the PRs the framework is waiting to land (#1418): merge a `watched` PR once its checks
   // pass (the #1417/#1406 answer for repos without GitHub auto-merge), and put an agent on a
   // watched PR whose checks fail. The merge half runs ungated — it finishes a merge the agent was
@@ -438,9 +426,6 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
           for (const project of await projects().catch((): ProjectSummary[] => [])) await pullDataBranch(project.path, { log })
         },
       },
-      // The finest cadence, and what the base tick is set by: the committer's idle window is a
-      // poll seeing the same pending set twice, so its window *is* one tick.
-      { name: 'session commit', run: () => agentCommitter.poll() },
       // ~1 min, the CI latency agreed on #1418.
       { name: 'CI watch', every: 2, run: () => ciWatch.tick() },
       // The watched things change slowly and a poll costs a read per project. Their first turn is
@@ -467,11 +452,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       mergedWorktrees.stop()
       branchLinks.stop()
       cloudScratch.stop()
-      // Stopped before `flushAgents` below, so that is a single flush past the idle window
-      // rather than a wait for a turn that is no longer coming.
-      agentCommitter.stop()
     },
-    flushAgents: () => agentCommitter.flush().catch(() => 0),
     reloadDiscord,
     // Awaitable (#1433) so the trigger button can wait for the sweep's answer; a caller that
     // does not care simply drops the promise. The plain wake is safe to call when the preference

@@ -74,21 +74,17 @@ test('installProject materializes the quality presets so an on-before-mergeable 
   }
 })
 
-test('installProject seeds .the-framework/.gitignore so only the archive is committed (#313/#1179)', async () => {
+test('installProject seeds .the-framework/.gitignore ignoring everything transient (#313/#1582)', async () => {
   const fs = memFs()
   const { git } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : ''))
 
   await installProject(CWD, { git, fs })
   const ignore = fs.files.get(gitignorePath(CWD)) ?? ''
-  // Agent state (events.jsonl / agent.json / agents/) stays untracked...
+  // Everything under .the-framework/ is transient on main: the lasting records live on the data
+  // branch (#1582), so nothing is un-ignored except the file itself.
   assert.match(ignore, /^\*$/m)
-  // ...and the agent archive is un-ignored all the way down, since git never descends into an
-  // ignored directory. Written whole at install (B3): with one record there is one content, so
-  // nothing has to be appended to it later.
-  assert.match(ignore, /^!\*\/$/m)
-  assert.match(ignore, /^!\*\/agents\/$/m)
-  assert.match(ignore, /^!\*\/agents\/\*\*$/m)
-  // Only that name: the `sessions/` D5 renamed away from is not carried as a second rule.
+  assert.match(ignore, /^!\.gitignore$/m)
+  assert.doesNotMatch(ignore, /agents/)
   assert.doesNotMatch(ignore, /sessions/)
 })
 

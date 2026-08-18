@@ -391,6 +391,11 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   // Live run pids, keyed per agent rather than per project (#736) — see onStart for the key.
   const activeAgents = new Map<string, number>()
   const starting = new Set<string>() // reserved keys mid-spawn, to close the async gap
+  // Set by the first stopAgents call and never cleared: the daemon shuts down once. A Start
+  // landing after the stop pass would spawn a detached agent outside the snapshot stopAgents
+  // terminates — an orphan on `ppid 1` nothing ever stops — because the HTTP surface closes
+  // after the agents do. Same shape as auto-pm's stop re-checks (#983).
+  let closing = false
   // A finished leg's exit → retirement chain, parked per agent slot so a continuation that raced
   // the exit (#1529) can await the retirement instead of reusing a checkout mid-removal.
   const retiring = new Map<string, Promise<void>>()
@@ -630,6 +635,9 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     options: StartAgentOptions = {},
     targetProjectId?: string,
   ): Promise<StartAgentResult> => {
+    // Ctrl-C closes everything: a Start that lands while the daemon is shutting down is refused,
+    // never spawned into the gap between the stop pass and the server actually closing.
+    if (closing) return { ok: false, error: 'the daemon is shutting down' }
     // Run on a connected device (#1067): forward the agent to the remote daemon and relay its events
     // back, without allocating a worktree or touching this daemon's busy guard; the remote owns
     // both. `remote` is stripped so the remote starts an ordinary local agent and does not relay on.
@@ -734,6 +742,13 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         ...(continued ? { continueAgent: true } : {}),
         options,
       }, env)
+      // Re-checked right before the spawn because everything above is awaited (#983): an agent
+      // spawned past the stop pass is missing from the snapshot stopAgents terminates, so
+      // nothing would ever stop it.
+      if (closing) {
+        await removeAgentSpec(specPath)
+        return { ok: false, error: 'the daemon is shutting down' }
+      }
       const child = spawnDetached(realBin, specPath, ...(workspace.agentId ? [agentStderrPath(workspace.cwd)] : []))
       // The agent narrates itself through its own `.the-framework/events.jsonl`, which the
       // dashboard streams over `GET /_rpc/events`; the daemon just tracks liveness.
@@ -835,6 +850,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
    * see {@link waitOutSlots}. The archive commit that runs right behind this depends on it.
    */
   const stopAgents = async (graceMs = 5000): Promise<number> => {
+    closing = true
     const stopping = [...activeAgents.entries()]
     let stopped = 0
     for (const [, pid] of stopping) if (await terminate(pid, graceMs)) stopped++

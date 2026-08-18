@@ -80,6 +80,25 @@ async function withCapturedLog(body: () => Promise<void>): Promise<string> {
   return lines.join('\n')
 }
 
+test('a Start landing after the stop pass is refused, never spawned into the shutdown gap (#983)', async () => {
+  // The HTTP surface closes after the agents do, so a Start can arrive mid-shutdown. Spawned, it
+  // would be a detached child outside the snapshot stopAgents terminated — an orphan on ppid 1.
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-closing-')))
+  try {
+    const log = join(cwd, 'started.log')
+    const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeStub(cwd, log) })
+    await runtime.stopAgents()
+    const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; error?: string }
+    assert.equal(result.ok, false)
+    assert.match(result.error ?? '', /shutting down/)
+    await new Promise(r => setTimeout(r, 250))
+    assert.equal(await readFile(log, 'utf8').catch(() => ''), '', 'no run was spawned at all')
+    await runtime.dispose()
+  } finally {
+    await rm(cwd, RETRIED_RM)
+  }
+})
+
 test('a repo whose worktree could not be created fails the run instead of borrowing the checkout (#997)', async () => {
   // realpath: on macOS tmpdir sits under the /var -> /private/var symlink and git reports the
   // resolved path (the same gotcha the worktree round-trip test documents).

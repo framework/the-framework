@@ -999,6 +999,61 @@ test('the mid-epilogue hold is bounded, so a run that dies there cannot pin its 
   assert.deepEqual(released, [])
 })
 
+test('an entry whose drain ended with nothing to hand off is not drained again (#1583)', async () => {
+  // Releasing the claim re-opens the work, and a job that deterministically ends commitless
+  // would respawn every cooldown forever, burning a quota run per cycle. One attempt per daemon
+  // lifetime; the stand-down says why the entry sits.
+  const prompts: string[] = []
+  const released: PlanAssignment[] = []
+  const { loop } = harness({
+    cooldownMs: 0,
+    queue: async () => ['[Fix a](tickets/2026-07-25_a.md)'],
+    lockDrains: async (_p, assignments) => assignments,
+    promote: async () => ({ settled: true, promoted: false, handoffSkip: 'no-commits' }),
+    releaseLock: async (_p, claim) => {
+      released.push(claim)
+      return true
+    },
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick() // spawns the drain
+  await loop.tick() // settles no-commits: the claim is released and the entry remembered
+  await loop.tick() // the entry is still open, and deliberately not offered again
+  loop.stop()
+  assert.equal(prompts.length, 1)
+  assert.equal(released.length, 1)
+  assert.match(loop.report().outcomes[0]?.message ?? '', /drained once with nothing to hand off/)
+})
+
+test('claims of a batch the start loop never reached are released, not stranded (#1583)', async () => {
+  // The batch's locks are committed and pushed before the first spawn; a refused start breaks
+  // the loop, and the never-started items' claims have no run that could ever settle them free.
+  const released: PlanAssignment[] = []
+  const lockCalls: PlanAssignment[][] = []
+  let starts = 0
+  const { loop } = harness({
+    cooldownMs: 0,
+    concurrency: async () => 2,
+    queue: async () => ['[Fix a](tickets/2026-07-25_a.md)', '[Fix b](tickets/2026-07-25_b.md)'],
+    lockDrains: async (_p, assignments) => {
+      lockCalls.push([...assignments])
+      return assignments
+    },
+    start: async () => (++starts === 1 ? 'run-1' : undefined), // the second spawn is refused
+    releaseLock: async (_p, claim) => {
+      released.push(claim)
+      return true
+    },
+  })
+  await loop.tick()
+  loop.stop()
+  assert.equal(released.length, 1)
+  assert.equal(released[0]!.ticket, lockCalls[0]![1]!.ticket)
+})
+
 test('a release that could not land is retried next sweep, bounded (#1583)', async () => {
   const attempts: PlanAssignment[] = []
   let queued = ['[Fix a](tickets/2026-07-25_a.md)']

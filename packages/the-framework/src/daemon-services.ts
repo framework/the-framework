@@ -16,7 +16,7 @@ import { releaseStalePinnedBranch } from './stale-branch.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
 import { promoteQueue } from './queue-promote.js'
 import { FLAT_TODO_FILE, TICKETS_DIR } from './tickets.js'
-import { acquireTicketLocks, releaseAbandonedLock } from './ticket-locks.js'
+import { acquireTicketLocks, releaseTicketLock } from './ticket-locks.js'
 import { readTickets } from './dashboard/tickets.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { startAgentCommitter } from './agent-commit.js'
@@ -207,7 +207,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // The one dead claim the daemon can *know* is dead (#1583): the run it minted the lock for
     // settled with nothing to hand off, so the PR that would delete the lock is never coming.
     releaseLock: async (project, claim) => {
-      const result = await releaseAbandonedLock(project.path, claim, { log })
+      const result = await releaseTicketLock(project.path, claim.ticket, { log }, { heldBy: claim.agentId })
       if (result === 'released')
         log(`[framework] auto PM: released the lock on ${claim.ticket} — its agent ended with nothing to hand off`)
       if (result === 'error')

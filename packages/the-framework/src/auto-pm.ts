@@ -644,6 +644,13 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   // finished run whose epilogue has not reported yet, so the hold is bounded.
   type PendingAgent = { agentId: string; entry?: string; ticket?: string; claim?: PlanAssignment; waits?: number }
   const pending = new Map<string, PendingAgent[]>()
+  // Work this loop already spawned an agent for that ended with nothing to hand off (#1583): the
+  // drain's entry, or the plan agent's ticket. Releasing such a claim re-opens the work, and a
+  // job that deterministically ends commitless would otherwise respawn every cooldown, forever,
+  // burning a quota run per cycle. One attempt per daemon lifetime: a restart forgets the set,
+  // which allows one more try rather than forbidding the work for good — a human retires or
+  // fixes the entry in between.
+  const endedDry = new Map<string, Set<string>>()
   // Where each project is in the job cycle. Per project, not global: two repos idle at once
   // should each work through the rotation, not take alternate halves of it.
   const nextJob = new Map<string, number>()
@@ -713,6 +720,11 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
             // the one dead claim the sweep can *know* is dead, rather than guess by a timer. A
             // release that could not land is retried next sweep, bounded like the hold above.
             if (agent.claim && outcome.handoffSkip === 'no-commits' && deps.releaseLock) {
+              // Remembered before the release, not after: respawning the same work is the hazard
+              // whether or not the release lands.
+              const dry = endedDry.get(project.id) ?? new Set()
+              dry.add(agent.entry ?? agent.claim.ticket)
+              endedDry.set(project.id, dry)
               const ok = await deps.releaseLock(project, agent.claim).catch(() => false)
               if (!ok && (agent.waits ?? 0) < 2) {
                 stillPending.push({ ...agent, waits: (agent.waits ?? 0) + 1 })
@@ -822,9 +834,19 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           // claim used to be re-derived here — from agent metas, their PRs, and the queue diffs of
           // open PRs on other machines — which is a guess assembled at read time rather than a
           // claim anyone wrote down.
-          const open = (entries ?? []).filter(entry => !assigned.has(entry))
+          // An entry whose agent already ended with nothing to hand off (#1583) is not offered
+          // again either: its released claim would just mint the same commitless run every
+          // cooldown. A human retires or reshapes the entry; a daemon restart allows one retry.
+          const dry = endedDry.get(project.id)
+          const open = (entries ?? []).filter(entry => !assigned.has(entry) && !dry?.has(entry))
           if (!open.length) {
-            note(project, false, 'every open queue entry is already being worked on')
+            note(
+              project,
+              false,
+              (entries ?? []).some(entry => dry?.has(entry))
+                ? 'every open queue entry is being worked on, or already drained once with nothing to hand off'
+                : 'every open queue entry is already being worked on',
+            )
             continue
           }
           const picks = open.slice(0, concurrency - activeAgents)
@@ -878,7 +900,10 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
             (pending.get(project.id) ?? []).flatMap(agent => (agent.ticket !== undefined ? [agent.ticket] : [])),
           )
           const candidates = ((await deps.planCandidates(project).catch(() => [])) ?? []).filter(
-            ticket => !pinned.has(ticket),
+            // A ticket whose plan agent already ended with nothing to hand off (#1583) is skipped
+            // for the same reason a drained-dry entry is: its released claim respawns the same
+            // commitless run forever.
+            ticket => !pinned.has(ticket) && !endedDry.get(project.id)?.has(ticket),
           )
           if (!candidates.length) {
             // Nothing left to plan is this job's work being done, not a refusal: the rotation
@@ -935,6 +960,14 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
               ...(item.claim !== undefined ? { claim: item.claim } : {}),
             },
           ])
+        }
+        // A claim whose agent never started is dead on arrival (#1583): the batch's locks were
+        // committed and pushed before the first spawn, so a refused start — or a stop mid-batch —
+        // would strand the claims of every item the loop never reached, with no run that could
+        // ever settle them free. Released here, not left for the promote loop: these never enter
+        // `pending`.
+        for (const item of batch) {
+          if (item.claim && !started.includes(item)) await deps.releaseLock?.(project, item.claim).catch(() => false)
         }
         if (started.length) {
           // Advanced only on a start that took, so a refused job is retried rather than skipped.

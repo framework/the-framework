@@ -54,7 +54,7 @@ import { projectId, listProjects, addProject, writePreferences } from './registr
 import { nodeGitRunner } from './project.js'
 
 // The dashboard steers + starts over the daemon's in-process RPC mount (#405/#426), not the
-// retired /api/* HTTP routes. Post to `/_rpc/<name>` (same-origin) and return the unwrapped `ret`.
+// retired per-read HTTP routes. Post to `/_rpc/<name>` (same-origin) and return the unwrapped `ret`.
 async function callRpc(url: string, name: string, args: unknown[]): Promise<unknown> {
   const res = await fetch(`${url}/_rpc/${name}`, {
     method: 'POST',

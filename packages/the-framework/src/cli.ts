@@ -38,7 +38,7 @@ import {
 } from './config-layers.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { checkForUpdate, formatUpdateStatus, nodeVersionFetcher, type VersionFetcher } from './update-check.js'
-import { AgentStore, commitPendingWork, currentBranch, nodeStoreFs, renameAgentBranch, agentBranchName, type StoreFs } from './store/index.js'
+import { AgentStore, commitPendingWork, currentBranch, nodeStoreFs, renameAgentBranch, agentBranchName, AGENT_BRANCH_PREFIX, type StoreFs } from './store/index.js'
 import { materializePresets } from './presets.js'
 import { isLoopbackHost, registerHomeProject, runDaemon, DEFAULT_DAEMON_HOST, DEFAULT_DAEMON_PORT } from './daemon.js'
 import { appendControl, resetControl, watchControl, type ControlWatcher } from './control.js'
@@ -168,7 +168,7 @@ export interface AgentOptions {
   /**
    * `--run-id <id>` (#736): the id the daemon allocated for this agent before spawning it. Its
    * presence says the framework owns this agent's checkout — `--cwd` is a worktree the daemon
-   * created on a `the-framework/agent-<id>` branch, which the agent renames once the agent names
+   * created on a `tf-agent-<id>` branch, which the agent renames once the agent names
    * the session. Absent for a plain `framework "..."`, which runs in the user's own checkout.
    */
   agentId?: string | undefined
@@ -599,12 +599,12 @@ export function createAgentJournal(deps: {
     if (event.kind === 'ready-for-merge') sawReadyForMerge = true
     if (event.kind === 'session-name') {
       sessionName = event.name
-      // The framework-owned checkout (#736) was branched as `the-framework/agent-<id>` before a
+      // The framework-owned checkout (#736) was branched as `tf-agent-<id>` before a
       // name existed; put the readable name on it now. No-ops when the agent branched itself,
       // and only a rename that happened is recorded (#1277) — a guessed name on the meta is
       // exactly what the branch event exists to end.
       if (deps.agentId) {
-        const renamed = `the-framework/${event.name}`
+        const renamed = `${AGENT_BRANCH_PREFIX}${event.name}`
         void renameAgentBranch(cwd, agentBranchName(deps.agentId), renamed).then(didRename => {
           if (didRename) onEvent({ kind: 'branch', branch: renamed })
         })

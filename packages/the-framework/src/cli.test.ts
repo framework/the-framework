@@ -679,7 +679,7 @@ test('naming the session renames the run-id branch and records it as a branch ev
   git('config', 'user.name', 'Test')
   git('commit', '--allow-empty', '-q', '-m', 'seed')
   // The state allocateWorkspace leaves an agent in: checked out on its run-id branch (#736).
-  git('checkout', '-q', '-b', 'the-framework/agent-r1')
+  git('checkout', '-q', '-b', 'tf-agent-r1')
   const { io, out } = capture()
   const journal = createAgentJournal({
     io,
@@ -689,14 +689,14 @@ test('naming the session renames the run-id branch and records it as a branch ev
   })
   journal.onEvent({ kind: 'session-name', name: 'cool-name' })
   // The rename runs off the event asynchronously; wait for the recorded branch to come through.
-  for (let i = 0; i < 200 && !out.some(line => line.includes('branch: the-framework/cool-name')); i++) {
+  for (let i = 0; i < 200 && !out.some(line => line.includes('branch: tf-cool-name')); i++) {
     await new Promise(res => setTimeout(res, 10))
   }
   assert.ok(
-    out.some(line => line.includes('branch: the-framework/cool-name')),
+    out.some(line => line.includes('branch: tf-cool-name')),
     `expected a branch event, got: ${out.join('; ')}`,
   )
-  assert.equal(git('rev-parse', '--abbrev-ref', 'HEAD').trim(), 'the-framework/cool-name')
+  assert.equal(git('rev-parse', '--abbrev-ref', 'HEAD').trim(), 'tf-cool-name')
 })
 
 test('a browser URL is held until the session opens, then re-said after every later session (#1455 item 6b)', () => {

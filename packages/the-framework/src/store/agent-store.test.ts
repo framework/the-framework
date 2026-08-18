@@ -841,11 +841,11 @@ test('applyEventToMeta records the pull request a session opened (E6)', () => {
 
 test('applyEventToMeta records the branch a branch event names (#1277)', () => {
   const base = metaFromEvents(RUN.slice(0, 3), AT)
-  const on = applyEventToMeta(base, { kind: 'branch', branch: 'the-framework/agent-r1' }, AT)
-  assert.equal(on.branch, 'the-framework/agent-r1')
+  const on = applyEventToMeta(base, { kind: 'branch', branch: 'tf-agent-r1' }, AT)
+  assert.equal(on.branch, 'tf-agent-r1')
   // A rename mid-run replaces it: the meta always names the branch the work is on now.
-  const renamed = applyEventToMeta(on, { kind: 'branch', branch: 'the-framework/cool-name' }, AT)
-  assert.equal(renamed.branch, 'the-framework/cool-name')
+  const renamed = applyEventToMeta(on, { kind: 'branch', branch: 'tf-cool-name' }, AT)
+  assert.equal(renamed.branch, 'tf-cool-name')
 })
 
 // #1359: an agent that dies holding an open gate. The process exited without writing `end` (the

@@ -140,7 +140,7 @@ test('excludeDependencyLinks makes git ignore the linked trees in a worktree (#7
     await git(['commit', '-m', 'init'], repo)
 
     const wt = join(root, 'wt')
-    await git(['worktree', 'add', wt, '-b', 'the-framework/agent-1'], repo)
+    await git(['worktree', 'add', wt, '-b', 'tf-agent-1'], repo)
     await linkDependencies(repo, wt, nodeLinkFs())
     assert.equal(
       (await git(['status', '--porcelain'], wt)).includes('node_modules'),

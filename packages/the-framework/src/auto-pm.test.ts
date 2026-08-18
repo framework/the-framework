@@ -1189,7 +1189,7 @@ test('the triage jobs declare exactly the branch their prompts pin (#1293)', () 
   assert.deepEqual(pinned.map(job => job.name), ['triage-quick', 'triage-consensual'])
   for (const job of pinned) {
     // The release targets the branch the prompt's abort guard tests, so the two must not drift.
-    assert.equal(job.pinnedBranch, `the-framework/${job.name}`)
+    assert.equal(job.pinnedBranch, `tf-${job.name}`)
     assert.ok(
       job.prompt.includes(`Always set <SESSION_NAME> to ${job.name}`),
       `${job.name} must pin the session name its release targets`,

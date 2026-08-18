@@ -251,12 +251,12 @@ setTimeout(() => {}, 800)
     }
     assert.notEqual(agents[0]!.cwd, agents[1]!.cwd, 'the two runs got different checkouts')
 
-    // Each agent is on its own `the-framework/agent-<id>` branch, and the user's own checkout
+    // Each agent is on its own `tf-agent-<id>` branch, and the user's own checkout
     // was never moved off the branch it was sitting on.
     const branches = await git(['branch', '--format=%(refname:short)'], cwd)
-    for (const agent of agents) assert.ok(branches.includes(`the-framework/agent-${agent.agentId}`), `branch for ${agent.agentId}`)
+    for (const agent of agents) assert.ok(branches.includes(`tf-agent-${agent.agentId}`), `branch for ${agent.agentId}`)
     const head = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd)).trim()
-    assert.equal(head.startsWith('the-framework/agent-'), false, 'the main checkout stayed on its own branch')
+    assert.equal(head.startsWith('tf-agent-'), false, 'the main checkout stayed on its own branch')
 
     ac.abort()
     await done
@@ -353,9 +353,9 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
     // The branch is the only handle left on the work once the checkout goes, so it is recorded
     // while the worktree still exists (#799) — otherwise the handoff has nothing to read.
     const doneMeta = await archivedMeta(doneId)
-    assert.equal(doneMeta?.branch, `the-framework/agent-${doneId}`, "the finished run's branch is recorded")
+    assert.equal(doneMeta?.branch, `tf-agent-${doneId}`, "the finished run's branch is recorded")
     assert.match(
-      await git(['log', '--format=%s', `refs/remotes/origin/the-framework/agent-${doneId}`], cwd),
+      await git(['log', '--format=%s', `refs/remotes/origin/tf-agent-${doneId}`], cwd),
       /\S/,
       'the work reached the remote, which is what let the checkout go',
     )

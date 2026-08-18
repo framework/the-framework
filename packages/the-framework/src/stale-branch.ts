@@ -4,7 +4,7 @@ import { ghPrsForBranch, type LinkedPr } from './dashboard/gh.js'
 // Release a pinned routine branch its closed PR left behind (#1293).
 //
 // The triage prompts pin their session name, so every firing wants the same branch
-// (`the-framework/triage-quick`) and aborts when it already exists: a triage still in flight owns
+// (`tf-triage-quick`) and aborts when it already exists: a triage still in flight owns
 // the branch, and the next firing must not triage twice. But nothing ever released the name. The
 // first triage PR that got closed or merged without its branch being deleted jammed the routine
 // forever: every later firing found the branch, followed the scripted abort, and reported a

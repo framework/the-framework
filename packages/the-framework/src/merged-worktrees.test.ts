@@ -65,9 +65,9 @@ test('a live session keeps its checkout: its agent is working in there (#1036)',
 test('a checkout that could not be reclaimed is reported with its reason (E5)', async () => {
   // The one failure mode the rule has: the push did not land, so the checkout stays and says why.
   const { agent: agent } = fakeSweep([row({ agentId: 'stuck' })])
-  const result = await agent({ remove: async () => ({ ok: false, error: 'the-framework/agent-stuck is not on the remote' }) })
+  const result = await agent({ remove: async () => ({ ok: false, error: 'tf-agent-stuck is not on the remote' }) })
   assert.deepEqual(result.removed, [])
-  assert.deepEqual(result.failed, [{ agentId: 'stuck', error: 'the-framework/agent-stuck is not on the remote' }])
+  assert.deepEqual(result.failed, [{ agentId: 'stuck', error: 'tf-agent-stuck is not on the remote' }])
 })
 
 test('an unlisted project sweeps nothing rather than failing (#1036)', async () => {

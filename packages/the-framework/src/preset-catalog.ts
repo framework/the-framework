@@ -124,7 +124,7 @@ export const presets = {
    * whether the work is cheap. Keeping them apart lets the rotation queue the cheap batch and the
    * significant batch on separate turns rather than in one indiscriminate sweep.
    *
-   * Each prompt pins its own `<SESSION_NAME>` and aborts when `the-framework/<SESSION_NAME>`
+   * Each prompt pins its own `<SESSION_NAME>` and aborts when `tf-<SESSION_NAME>`
    * already exists. That collision guard is what makes them safe to fire on a schedule: a triage
    * still in flight owns the branch, so the next firing does nothing instead of triaging twice.
    */

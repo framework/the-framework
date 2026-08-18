@@ -752,6 +752,17 @@ test('listWorktreeDirs names the run of each worktree, ignoring anything else in
   assert.deepEqual(await listWorktreeDirs(join(CWD, 'never-ran'), fs), [])
 })
 
+test('listWorktreeDirs covers the draining legacy root, and never mistakes a rename link for a run (#1580)', async () => {
+  const fs = memFs({
+    ...worktreeFiles('r1', { id: 'r1' }),
+    // A pre-#1580 checkout, still at worktrees/<id>, never migrated (#1589 review).
+    [join(CWD, '.the-framework', 'worktrees', 'r0', '.the-framework', 'agent.json')]: JSON.stringify({ id: 'r0' }),
+    // A rename link beside the checkouts: its name has no run prefix, so it is not a run.
+    [join(CWD, '.the-framework', 'branches', 'tf-cool-name')]: 'tf-agent-r1',
+  })
+  assert.deepEqual((await listWorktreeDirs(CWD, fs)).sort(), ['r0', 'r1'])
+})
+
 // #762: messaging a stopped agent continues THAT run, so the history shows one row rather than an
 // unrelated-looking second one. The follow-up is still a separate process; what makes it one agent is
 // that it reopens the same log instead of truncating it.

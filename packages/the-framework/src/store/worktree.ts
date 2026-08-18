@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from '../project.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, isSafeAgentId } from './agent-store.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, LEGACY_WORKTREES_DIR, isSafeAgentId, nodeStoreFs, type StoreFs } from './agent-store.js'
 import { worktreeDirName } from '../branch-names.js'
 
 /**
@@ -14,6 +14,19 @@ import { worktreeDirName } from '../branch-names.js'
 /** The path an agent's worktree gets (#1580): `<repo>/.the-framework/branches/<run branch name>`. */
 export function worktreePath(repo: string, agentId: string): string {
   return join(repo, FRAMEWORK_DIR, BRANCHES_DIR, worktreeDirName(agentId))
+}
+
+/**
+ * Where an agent's checkout actually is: the #1580 location, else the pre-#1580 one still
+ * draining out (nothing is migrated, per the #1589 review). Resolves to the #1580 path when
+ * neither exists — that is where anything new would be created, and where a caller's error
+ * message should point.
+ */
+export async function findWorktreePath(repo: string, agentId: string, fs: StoreFs = nodeStoreFs()): Promise<string> {
+  const current = worktreePath(repo, agentId)
+  if (await fs.exists(current)) return current
+  const legacy = join(repo, FRAMEWORK_DIR, LEGACY_WORKTREES_DIR, agentId)
+  return (await fs.exists(legacy)) ? legacy : current
 }
 
 export {

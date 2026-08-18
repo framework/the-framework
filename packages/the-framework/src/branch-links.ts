@@ -1,20 +1,25 @@
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from './project.js'
-import { FRAMEWORK_DIR, WORKTREES_DIR, listWorktreeDirs, worktreePath, currentBranch } from './store/index.js'
+import {
+  FRAMEWORK_DIR,
+  BRANCHES_DIR,
+  LEGACY_WORKTREES_DIR,
+  worktreeDirEntries,
+  currentBranch,
+  type WorktreeDirEntry,
+} from './store/index.js'
+import { isWorktreeDirName } from './branch-names.js'
 
-// The flat branches view (#1580): `.the-framework/branches/` holds one symlink per agent
-// worktree, named as the worktree's current branch, plus a `branches` symlink at the repo root
-// pointing there — so `cd branches/<name>` reaches any session's checkout by the name the
-// dashboard shows. #1581 (slash-free branch names) is what lets a branch name be a link name.
+// The branches view (#1580): every checkout under `.the-framework/branches/` is a directory named
+// as its birth branch (`tf-agent-<id>`), and this pass keeps the *current* names reachable beside
+// them — a symlink named as the branch a checkout is on now, whenever that differs from the dir's
+// own name (the agent checks out `tf-<slug>` early, per #326), plus a link for each checkout still
+// draining out of the legacy `worktrees/` root, plus the `branches` shortcut at the repo root. So
+// `cd branches/<name>` reaches any session's checkout by the name the dashboard shows, and a
+// rename costs a link, never moving a checkout under a live agent (the #1589 review's call).
 //
-// Links, not moves (Rom's call on #1589): the worktrees themselves stay at
-// `.the-framework/worktrees/<agentId>`, so nothing that derives paths from agent ids changes,
-// and a branch rename costs a link rename instead of moving a checkout under a live agent.
 // The daemon reconciles on its clock and after each worktree it allocates: derive the wanted
-// links from the worktrees on disk, add what is missing, drop only our own stale links.
-
-/** Where the per-branch links live, under `.the-framework/` (gitignored like the worktrees). */
-export const BRANCH_LINKS_DIR = 'branches'
+// links from the checkouts on disk, add what is missing, drop only our own stale links.
 
 /** The filesystem the reconcile needs; `node:fs/promises` in production. */
 export interface LinksFs {
@@ -49,8 +54,8 @@ export function nodeLinksFs(): LinksFs {
 export interface BranchLinksDeps {
   git?: GitRunner
   fs?: LinksFs
-  /** The agent ids with a worktree (default {@link listWorktreeDirs}). */
-  worktrees?: (cwd: string) => Promise<string[]>
+  /** The checkouts on disk (default {@link worktreeDirEntries}). */
+  worktrees?: (cwd: string) => Promise<WorktreeDirEntry[]>
   /** The branch a worktree is on (default {@link currentBranch}). */
   branchOf?: (path: string) => Promise<string | undefined>
 }
@@ -67,27 +72,31 @@ export interface BranchLinksDeps {
 export async function reconcileBranchLinks(cwd: string, deps: BranchLinksDeps = {}): Promise<void> {
   const git = deps.git ?? nodeGitRunner()
   const fs = deps.fs ?? nodeLinksFs()
-  const worktrees = deps.worktrees ?? listWorktreeDirs
+  const worktrees = deps.worktrees ?? worktreeDirEntries
   const branchOf = deps.branchOf ?? ((path: string) => currentBranch(path, git))
 
-  const linksDir = join(cwd, FRAMEWORK_DIR, BRANCH_LINKS_DIR)
+  const linksDir = join(cwd, FRAMEWORK_DIR, BRANCHES_DIR)
   /** Link name -> relative target, derived from what is actually checked out. */
   const wanted = new Map<string, string>()
-  for (const agentId of await worktrees(cwd).catch((): string[] => [])) {
-    const branch = await branchOf(worktreePath(cwd, agentId)).catch(() => undefined)
+  for (const entry of await worktrees(cwd).catch((): WorktreeDirEntry[] => [])) {
+    const branch = await branchOf(entry.path).catch(() => undefined)
     // A detached worktree has no name to link; a slashed name (a pre-#1581 branch) cannot be a
     // link name at all — both simply get no link.
     if (!branch || branch.includes('/')) continue
-    wanted.set(branch, join('..', WORKTREES_DIR, agentId))
+    // A sibling for a checkout in this dir, a reach into the legacy root for one still draining.
+    const target = dirname(entry.path) === linksDir ? basename(entry.path) : join('..', LEGACY_WORKTREES_DIR, basename(entry.path))
+    // The dir already carries the branch's name: nothing to add.
+    if (branch === target) continue
+    wanted.set(branch, target)
   }
 
-  // Drop our stale links: entries that are symlinks into `worktrees/` but no longer wanted, or
-  // wanted with a different target (a reused branch name now belongs to a newer worktree).
-  const ourTargets = join('..', WORKTREES_DIR) + '/'
+  // Drop our stale links: entries that are symlinks to a checkout but no longer wanted, or wanted
+  // with a different target (a reused branch name now belongs to a newer worktree).
+  const isOurs = (target: string) => target.startsWith(join('..', LEGACY_WORKTREES_DIR) + '/') || isWorktreeDirName(target)
   for (const name of await fs.readdir(linksDir)) {
     const path = join(linksDir, name)
     const target = await fs.readlink(path)
-    if (target === undefined || !target.startsWith(ourTargets)) continue // not ours to touch
+    if (target === undefined || !isOurs(target)) continue // not ours to touch
     if (wanted.get(name) === target) continue
     await fs.unlink(path).catch(() => {})
   }
@@ -104,7 +113,7 @@ export async function reconcileBranchLinks(cwd: string, deps: BranchLinksDeps = 
   const rootLink = join(cwd, 'branches')
   if (!(await fs.lexists(rootLink))) {
     await fs.mkdir(linksDir)
-    await fs.symlink(join(FRAMEWORK_DIR, BRANCH_LINKS_DIR), rootLink).catch(() => {})
+    await fs.symlink(join(FRAMEWORK_DIR, BRANCHES_DIR), rootLink).catch(() => {})
   }
 }
 

@@ -50,3 +50,12 @@ export function agentIdFromWorktreeDir(name: string): string {
   const prefix = `${AGENT_BRANCH_PREFIX}agent-`
   return name.startsWith(prefix) ? name.slice(prefix.length) : name
 }
+
+/**
+ * Whether a name under `branches/` is a framework checkout directory. The same directory also
+ * holds the rename links (#1589) and possibly a user's own entries, and only names the framework
+ * mints — the run branch spelling — are checkouts.
+ */
+export function isWorktreeDirName(name: string): boolean {
+  return name.startsWith(`${AGENT_BRANCH_PREFIX}agent-`)
+}

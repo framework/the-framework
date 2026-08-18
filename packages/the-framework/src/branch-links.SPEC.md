@@ -1,9 +1,9 @@
-Gives every agent checkout a human-reachable name: `.the-framework/branches/` holds one symlink per session checkout, named as the branch it is on, with a `branches` shortcut at the repo root — so `cd branches/<name>` opens any session's work by the name the dashboard shows.
+Keeps every session checkout reachable by its branch name: new checkouts live in `.the-framework/branches/` in a folder named as their branch, a symlink appears beside them whenever a branch gets renamed, and a `branches` shortcut at the repo root points there — so `cd branches/<name>` opens any session's work by the name the dashboard shows.
 
 ## TLDR
 
-- The checkouts themselves stay where they always were; the branches folder is a view over them, made of links. Renaming a session's branch therefore costs a link rename, never moving a checkout under a running agent.
-- The daemon keeps the view current in the background, and a freshly-started session appears immediately. A link is dropped once its checkout is reclaimed or its branch renamed.
+- A new checkout's folder is already named as its branch, so most need nothing extra. When a session renames its branch (most do, early on), the background pass adds a link under the new name — a rename costs a link, never moving a checkout under a running session.
+- Checkouts from before this layout stay where they are (nothing is migrated) and are linked into the view by their branch name until the cleanup sweep retires them.
 - Only the framework's own links are ever created, replaced, or removed: a user's own file, folder, or symlink at any of these paths is left alone.
 - A session on a branch whose name cannot be a folder name (old slashed names) simply gets no link.
 

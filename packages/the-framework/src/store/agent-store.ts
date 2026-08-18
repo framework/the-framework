@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { hostname } from 'node:os'
 import type { FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
-import { agentIdFromWorktreeDir } from '../branch-names.js'
+import { agentIdFromWorktreeDir, isWorktreeDirName } from '../branch-names.js'
 
 /**
  * Persisted orchestration state (#211). The dashboard is a pure projection of the
@@ -34,9 +34,9 @@ export const FRAMEWORK_DIR = '.the-framework'
 export const BRANCHES_DIR = 'branches'
 
 /**
- * Where worktrees lived before #1580 (bare agent-id dirs). Nothing creates one anymore; the
- * daemon's layout pass moves leftovers to {@link BRANCHES_DIR}, and this name exists for that
- * move alone.
+ * Where worktrees lived before #1580 (bare agent-id dirs). Nothing creates one anymore and
+ * nothing is migrated: old checkouts stay here until the reclaim sweep removes them, and every
+ * reader covers both roots via {@link worktreeRoots} until this one is empty everywhere.
  */
 export const LEGACY_WORKTREES_DIR = 'worktrees'
 
@@ -751,14 +751,46 @@ export async function restoreArchivedAgent(
 }
 
 /**
- * The agent ids that have a worktree directory under `.the-framework/branches/` (#737/#1580).
- * From the filesystem: a directory here IS an agent's checkout, named as its run branch, and the
- * id is recovered from that name. Forgiving — a project that never ran concurrently has no such
- * dir and yields `[]`.
+ * Both places a checkout can live while the pre-#1580 location drains out: the current
+ * `.the-framework/branches/` and the legacy `.the-framework/worktrees/`, in that order. Nothing
+ * is migrated (#1589 review) — old checkouts stay where they are until the reclaim sweep removes
+ * them, so every reader covers both.
+ */
+export function worktreeRoots(cwd: string): string[] {
+  return [join(cwd, FRAMEWORK_DIR, BRANCHES_DIR), join(cwd, FRAMEWORK_DIR, LEGACY_WORKTREES_DIR)]
+}
+
+/** One checkout on disk: where it is, and whose it is. */
+export interface WorktreeDirEntry {
+  path: string
+  agentId: string
+}
+
+/**
+ * Every checkout directory on disk, covering both roots (#1580). Under `branches/` only the run
+ * branch spelling counts — the same directory holds the rename links (#1589), which are views,
+ * not checkouts; under the legacy root the name is the bare id. Forgiving: missing roots yield
+ * nothing.
+ */
+export async function worktreeDirEntries(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<WorktreeDirEntry[]> {
+  const [branchesRoot, legacyRoot] = worktreeRoots(cwd) as [string, string]
+  const entries: WorktreeDirEntry[] = []
+  for (const name of await fs.readdir(branchesRoot).catch(() => [])) {
+    const agentId = agentIdFromWorktreeDir(name)
+    if (isWorktreeDirName(name) && isSafeAgentId(agentId)) entries.push({ path: join(branchesRoot, name), agentId })
+  }
+  for (const name of await fs.readdir(legacyRoot).catch(() => [])) {
+    if (isSafeAgentId(name)) entries.push({ path: join(legacyRoot, name), agentId: name })
+  }
+  return entries
+}
+
+/**
+ * The agent ids that have a worktree directory (#737/#1580). Forgiving — a project that never ran
+ * concurrently has no such dir and yields `[]`.
  */
 export async function listWorktreeDirs(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<string[]> {
-  const names = await fs.readdir(join(cwd, FRAMEWORK_DIR, BRANCHES_DIR)).catch(() => [])
-  return names.map(agentIdFromWorktreeDir).filter(isSafeAgentId)
+  return [...new Set((await worktreeDirEntries(cwd, fs)).map(entry => entry.agentId))]
 }
 
 /**
@@ -939,15 +971,14 @@ export async function reconcileOrphanedAgents(
   // where nothing reads it. Flip it in place (so the dashboard stops showing it as live) and copy
   // it into the repo's history. The worktree itself is left on disk: an agent that ended this way did
   // not end cleanly, and those are kept for inspection. Removing one is an explicit action.
-  for (const name of await fs.readdir(join(dir, BRANCHES_DIR))) {
-    if (!isSafeAgentId(agentIdFromWorktreeDir(name))) continue
-    const worktreeDir = join(dir, BRANCHES_DIR, name, FRAMEWORK_DIR)
+  for (const entry of await worktreeDirEntries(cwd, fs)) {
+    const worktreeDir = join(entry.path, FRAMEWORK_DIR)
     const meta = await readMetaFile(fs, join(worktreeDir, META_FILE))
     if (!isDeadRunningAgent(meta, isAlive)) continue
     // recordOrphanEnd rather than a bare status flip (#1359): the worktree's log gains the
     // `end` event first, so the archive below copies a stream that actually ends.
     await recordOrphanEnd(fs, worktreeDir, meta)
-    await archiveWorktreeAgent(join(dir, BRANCHES_DIR, name), cwd, fs).catch(() => undefined)
+    await archiveWorktreeAgent(entry.path, cwd, fs).catch(() => undefined)
     fixed++
   }
   return fixed
@@ -1023,11 +1054,9 @@ export async function readLiveMetas(
   fs: StoreFs = nodeStoreFs(),
   isAlive: (pid: number) => boolean = isPidAlive,
 ): Promise<LiveAgent[]> {
-  const worktreesDir = join(cwd, FRAMEWORK_DIR, BRANCHES_DIR)
-  const names = await fs.readdir(worktreesDir).catch(() => [])
-  // isSafeAgentId on the recovered id: the directory is named as its run branch (#1580), and
-  // anything in there that doesn't map back to an agent id is not ours.
-  const candidates = [cwd, ...names.filter(name => isSafeAgentId(agentIdFromWorktreeDir(name))).map(name => join(worktreesDir, name))]
+  // Both roots (#1580): checkouts under `branches/` (run-branch-named dirs, never the rename
+  // links beside them) and the draining legacy `worktrees/`.
+  const candidates = [cwd, ...(await worktreeDirEntries(cwd, fs)).map(entry => entry.path)]
   const agents: LiveAgent[] = []
   for (const candidate of candidates) {
     const meta = await readLiveMeta(candidate, fs, isAlive).catch(() => undefined)

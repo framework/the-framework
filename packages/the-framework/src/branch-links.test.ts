@@ -1,12 +1,17 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { reconcileBranchLinks, startBranchLinksPass, BRANCH_LINKS_DIR, type LinksFs } from './branch-links.js'
-import { FRAMEWORK_DIR, WORKTREES_DIR } from './store/index.js'
+import { reconcileBranchLinks, startBranchLinksPass, type LinksFs } from './branch-links.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, LEGACY_WORKTREES_DIR, type WorktreeDirEntry } from './store/index.js'
 
 const CWD = '/repo'
-const LINKS = join(CWD, FRAMEWORK_DIR, BRANCH_LINKS_DIR)
+const LINKS = join(CWD, FRAMEWORK_DIR, BRANCHES_DIR)
 const ROOT_LINK = join(CWD, 'branches')
+
+/** A checkout at the #1580 location, dir named as its birth branch. */
+const current = (agentId: string): WorktreeDirEntry => ({ agentId, path: join(LINKS, `tf-agent-${agentId}`) })
+/** A checkout still draining out of the legacy root. */
+const legacy = (agentId: string): WorktreeDirEntry => ({ agentId, path: join(CWD, FRAMEWORK_DIR, LEGACY_WORKTREES_DIR, agentId) })
 
 /** An in-memory {@link LinksFs}: `links` maps absolute path -> target; `files` are non-symlinks. */
 function memFs(opts: { links?: Record<string, string>; files?: string[] } = {}) {
@@ -27,43 +32,43 @@ function memFs(opts: { links?: Record<string, string>; files?: string[] } = {}) 
   return { fs, links, files }
 }
 
-const worktreeTarget = (agentId: string) => join('..', WORKTREES_DIR, agentId)
+/** The links inside the branches dir, as name -> target. */
+const branchLinksOf = (links: Map<string, string>) =>
+  Object.fromEntries([...links].filter(([path]) => path.startsWith(LINKS + '/')).map(([path, t]) => [path.slice(LINKS.length + 1), t]))
 
-test('each worktree gets a link named as its branch, pointing into worktrees/ (#1580)', async () => {
+test('a checkout still on its birth branch gets no link — the dir already carries the name (#1580)', async () => {
   const { fs, links } = memFs()
-  await reconcileBranchLinks(CWD, {
-    fs,
-    worktrees: async () => ['r1', 'r2'],
-    branchOf: async path => (path.endsWith('r1') ? 'tf-agent-r1' : 'tf-add-auth'),
-  })
-  assert.equal(links.get(join(LINKS, 'tf-agent-r1')), worktreeTarget('r1'))
-  assert.equal(links.get(join(LINKS, 'tf-add-auth')), worktreeTarget('r2'))
+  await reconcileBranchLinks(CWD, { fs, worktrees: async () => [current('r1')], branchOf: async () => 'tf-agent-r1' })
+  assert.deepEqual(branchLinksOf(links), {})
 })
 
-test('a rename settles in one pass: the old name goes, the new one appears', async () => {
-  const { fs, links } = memFs({ links: { [join(LINKS, 'tf-agent-r1')]: worktreeTarget('r1') } })
-  await reconcileBranchLinks(CWD, { fs, worktrees: async () => ['r1'], branchOf: async () => 'tf-cool-name' })
-  assert.equal(links.has(join(LINKS, 'tf-agent-r1')), false, 'the stale name is gone')
-  assert.equal(links.get(join(LINKS, 'tf-cool-name')), worktreeTarget('r1'))
+test('a renamed branch gets a sibling link, and the stale name goes in the same pass', async () => {
+  const { fs, links } = memFs({ links: { [join(LINKS, 'tf-old-name')]: 'tf-agent-r1' } })
+  await reconcileBranchLinks(CWD, { fs, worktrees: async () => [current('r1')], branchOf: async () => 'tf-cool-name' })
+  assert.deepEqual(branchLinksOf(links), { 'tf-cool-name': 'tf-agent-r1' })
 })
 
-test('a reclaimed worktree loses its link; a detached or slash-named branch never gets one', async () => {
-  const { fs, links } = memFs({ links: { [join(LINKS, 'tf-done')]: worktreeTarget('gone') } })
+test('a legacy checkout is linked into the view by its branch (#1589: drained, never migrated)', async () => {
+  const { fs, links } = memFs()
+  await reconcileBranchLinks(CWD, { fs, worktrees: async () => [legacy('r9')], branchOf: async () => 'tf-fix-login' })
+  assert.deepEqual(branchLinksOf(links), { 'tf-fix-login': join('..', LEGACY_WORKTREES_DIR, 'r9') })
+})
+
+test('a reclaimed checkout loses its link; detached and slash-named branches never get one', async () => {
+  const { fs, links } = memFs({ links: { [join(LINKS, 'tf-done')]: join('..', LEGACY_WORKTREES_DIR, 'gone') } })
   await reconcileBranchLinks(CWD, {
     fs,
-    worktrees: async () => ['detached', 'legacy'],
-    branchOf: async path => (path.endsWith('legacy') ? 'the-framework/old-name' : undefined),
+    worktrees: async () => [legacy('detached'), legacy('old')],
+    branchOf: async path => (path.endsWith('old') ? 'the-framework/old-name' : undefined),
   })
-  assert.equal(links.has(join(LINKS, 'tf-done')), false, 'the dead link is dropped')
-  const branchLinks = [...links.keys()].filter(path => path.startsWith(LINKS + '/'))
-  assert.deepEqual(branchLinks, [], 'no branch link was created for either worktree')
+  assert.deepEqual(branchLinksOf(links), {}, 'the dead link is gone, nothing new appeared')
 })
 
 test('only our own links are touched: user files and foreign symlinks stay', async () => {
   const userFile = join(LINKS, 'tf-mine')
   const foreignLink = join(LINKS, 'elsewhere')
   const { fs, links, files } = memFs({ files: [userFile], links: { [foreignLink]: '/somewhere/else' } })
-  await reconcileBranchLinks(CWD, { fs, worktrees: async () => ['r1'], branchOf: async () => 'tf-mine' })
+  await reconcileBranchLinks(CWD, { fs, worktrees: async () => [current('r1')], branchOf: async () => 'tf-mine' })
   assert.ok(files.has(userFile), 'the user file at the wanted name is untouched')
   assert.equal(links.get(foreignLink), '/somewhere/else', 'a foreign symlink is never removed')
   assert.equal(links.has(join(LINKS, 'tf-mine')), false, 'nothing was created over the user file')
@@ -72,7 +77,7 @@ test('only our own links are touched: user files and foreign symlinks stay', asy
 test('the repo-root branches shortcut is created once, relative, and never clobbers', async () => {
   const fresh = memFs()
   await reconcileBranchLinks(CWD, { fs: fresh.fs, worktrees: async () => [] })
-  assert.equal(fresh.links.get(ROOT_LINK), join(FRAMEWORK_DIR, BRANCH_LINKS_DIR))
+  assert.equal(fresh.links.get(ROOT_LINK), join(FRAMEWORK_DIR, BRANCHES_DIR))
 
   const taken = memFs({ files: [ROOT_LINK] })
   await reconcileBranchLinks(CWD, { fs: taken.fs, worktrees: async () => [] })

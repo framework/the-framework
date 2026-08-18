@@ -1403,15 +1403,3 @@ export async function runOnBeforeMergeable(
 }
 
 
-/** Resolve when the process is interrupted (Ctrl+C), so the dashboard stays up. */
-function waitForInterrupt(): Promise<void> {
-  return new Promise(resolvePromise => {
-    const done = () => {
-      process.off('SIGINT', done)
-      process.off('SIGTERM', done)
-      resolvePromise()
-    }
-    process.once('SIGINT', done)
-    process.once('SIGTERM', done)
-  })
-}

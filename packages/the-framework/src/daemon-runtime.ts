@@ -19,6 +19,8 @@ import {
   currentBranch,
   readLiveMetas,
   readLiveMeta,
+  removeWorktree,
+  pruneWorktrees,
   resolveAgentEventsPath,
   FRAMEWORK_DIR,
   EVENTS_FILE,
@@ -43,7 +45,7 @@ import { addProject, listProjects, projectId } from './registry.js'
 import { isTicketPath } from './tickets.js'
 import { resolveProjectAgentOptions } from './daemon-services.js'
 import { installProject, enumerateGitRepos } from './install.js'
-import { isGitRepo } from './project.js'
+import { isGitRepo, nodeGitRunner } from './project.js'
 import { isCliTimeout } from './cli-exec.js'
 import { withAgentLock } from './agent-locks.js'
 import { errorMessage } from './error-message.js'
@@ -744,9 +746,17 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
       }, env)
       // Re-checked right before the spawn because everything above is awaited (#983): an agent
       // spawned past the stop pass is missing from the snapshot stopAgents terminates, so
-      // nothing would ever stop it.
+      // nothing would ever stop it. The refusal takes back everything the way here allocated —
+      // the spec, and the fresh worktree + branch (a continuation's checkout is the agent's own,
+      // not this refusal's to remove). Left standing, the worktree would have no agent.json, and
+      // the next boot's sweep would reclaim it by pushing an empty junk branch.
       if (closing) {
-        await removeAgentSpec(specPath)
+        await removeAgentSpec(specPath, env)
+        if (!continued && workspace.agentId) {
+          await removeWorktree(projectCwd, workspace.cwd).catch(() => {})
+          await pruneWorktrees(projectCwd).catch(() => {})
+          await nodeGitRunner()(['branch', '-D', agentBranchName(workspace.agentId)], projectCwd).catch(() => {})
+        }
         return { ok: false, error: 'the daemon is shutting down' }
       }
       const child = spawnDetached(realBin, specPath, ...(workspace.agentId ? [agentStderrPath(workspace.cwd)] : []))
@@ -770,10 +780,15 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
       }
       child.once('error', err => {
         // The child never ran, so nothing consumed the spec: remove it here or the prompt stays on disk.
-        void removeAgentSpec(specPath)
+        void removeAgentSpec(specPath, env)
         settle(`its process could not be spawned (${errorMessage(err)})`)
       })
-      child.once('exit', (code, signal) => settle(exitDetail(code, signal)))
+      child.once('exit', (code, signal) => {
+        // A child that died before reading its spec leaves the prompt (and any device token) on
+        // disk; one that consumed it makes this a no-op.
+        void removeAgentSpec(specPath, env)
+        settle(exitDetail(code, signal))
+      })
       if (child.pid !== undefined) activeAgents.set(key, child.pid)
       // Hand back the agent's id (#761) so the dashboard can select this agent rather than guess.
       return { ok: true, ...(workspace.agentId ? { agentId: workspace.agentId } : {}) }

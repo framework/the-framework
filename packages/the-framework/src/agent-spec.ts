@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import type { StartAgentKind, StartAgentOptions } from './dashboard/index.js'
 
 /**
@@ -54,17 +54,23 @@ export async function writeAgentSpec(spec: AgentSpec, env: NodeJS.ProcessEnv = p
 
 /**
  * Remove a spec — and the directory {@link writeAgentSpec} made for it, or removing one spec per
- * session would leave one empty directory per session behind forever. Only a directory carrying
- * this module's own prefix goes whole: `--agent <path>` accepts any path, and a hand-written spec
- * must not take the directory the user keeps it in with it.
+ * session would leave one empty directory per session behind forever. Only a directory this
+ * module verifiably made goes whole: it must carry the mkdtemp prefix AND sit directly in the
+ * configured spec home. `--agent <path>` accepts any path, and neither a hand-written spec nor a
+ * user's own directory that happens to be named like ours may be taken with the file.
  *
- * Also the cleanup for a spawn that failed (the child never ran, so nothing consumed the spec),
- * which otherwise left the whole prompt sitting on disk.
+ * Also the cleanup for a spawn whose child never consumed the spec — the spawn failed outright,
+ * or the child died before reading it — which otherwise left the whole prompt sitting on disk.
+ * Idempotent: removing a spec an exiting child already consumed is a no-op.
  */
-export async function removeAgentSpec(path: string): Promise<void> {
+export async function removeAgentSpec(path: string, env: NodeJS.ProcessEnv = process.env): Promise<void> {
   const dir = dirname(path)
-  if (basename(dir).startsWith(SPEC_DIR_PREFIX)) await rm(dir, { recursive: true, force: true }).catch(() => {})
-  else await rm(path, { force: true }).catch(() => {})
+  const home = resolve(env[SPEC_DIR_ENV] ?? tmpdir())
+  if (basename(dir).startsWith(SPEC_DIR_PREFIX) && resolve(dirname(dir)) === home) {
+    await rm(dir, { recursive: true, force: true }).catch(() => {})
+  } else {
+    await rm(path, { force: true }).catch(() => {})
+  }
 }
 
 /**
@@ -72,9 +78,9 @@ export async function removeAgentSpec(path: string): Promise<void> {
  * session's options can name a device token (`options.remote`), which has no business staying on
  * disk after the session that used it has started.
  */
-export async function readAgentSpec(path: string): Promise<AgentSpec> {
+export async function readAgentSpec(path: string, env: NodeJS.ProcessEnv = process.env): Promise<AgentSpec> {
   const raw = await readFile(path, 'utf8')
-  await removeAgentSpec(path)
+  await removeAgentSpec(path, env)
   const spec = JSON.parse(raw) as Partial<AgentSpec>
   if (typeof spec.prompt !== 'string' || typeof spec.cwd !== 'string' || !spec.kind) {
     throw new Error(`${path} is not a session spec`)

@@ -1354,7 +1354,12 @@ async function spawnPromptAgent(prompt: string, cwd: string, binPath: string, va
       void removeAgentSpec(specPath)
       resolvePromise(false)
     })
-    child.once('exit', code => resolvePromise(code === 0))
+    child.once('exit', code => {
+      // A child that died before reading its spec leaves the prompt on disk; one that consumed
+      // it makes this a no-op.
+      void removeAgentSpec(specPath)
+      resolvePromise(code === 0)
+    })
   })
 }
 

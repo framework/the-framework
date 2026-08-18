@@ -48,7 +48,7 @@ async function startDaemon(cwd: string, opts: RunDaemonOptions): Promise<{ done:
   return { done, state: await listening }
 }
 import { listAgents } from './store/index.js'
-import { EVENTS_FILE, FRAMEWORK_DIR, addWorktree, worktreePath } from './store/index.js'
+import { EVENTS_FILE, FRAMEWORK_DIR, addWorktree } from './store/index.js'
 import { controlPath } from './control.js'
 import { projectId, listProjects, addProject, writePreferences } from './registry.js'
 import { nodeGitRunner } from './project.js'
@@ -245,7 +245,7 @@ setTimeout(() => {}, 800)
 
     const agents = lines.map(line => JSON.parse(line) as { cwd: string; agentId: string })
     for (const agent of agents) {
-      assert.equal(agent.cwd, worktreePath(cwd, agent.agentId), 'ran in the worktree named by its run branch')
+      assert.equal(agent.cwd, join(cwd, FRAMEWORK_DIR, 'worktrees', agent.agentId), 'ran in the worktree named by its run id')
       assert.equal((await stat(agent.cwd)).isDirectory(), true, 'the worktree checkout exists')
       assert.equal((await stat(join(agent.cwd, 'README.md'))).isFile(), true, 'with the repo content in it')
     }
@@ -339,7 +339,7 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
      */
     const worktreeGone = async (agentId: string): Promise<boolean> => {
       for (let i = 0; i < 600; i++) {
-        const gone = await stat(worktreePath(cwd, agentId)).then(() => false, () => true)
+        const gone = await stat(join(cwd, FRAMEWORK_DIR, 'worktrees', agentId)).then(() => false, () => true)
         if (gone) return true
         await new Promise(r => setTimeout(r, 20))
       }

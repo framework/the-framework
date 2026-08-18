@@ -172,8 +172,6 @@ test('trust advice for a run worktree names the project root, which outlives the
 })
 
 test('trustRootOf strips exactly the run-worktree suffix and nothing else', () => {
-  assert.equal(trustRootOf('/repo/.the-framework/branches/tf-agent-2026-01-01T00-00-00-000Z'), '/repo')
-  // The pre-#1580 location still resolves: worktrees created before the layout pass ran.
   assert.equal(trustRootOf('/repo/.the-framework/worktrees/2026-01-01T00-00-00-000Z'), '/repo')
   assert.equal(trustRootOf('/repo'), '/repo')
   assert.equal(trustRootOf('/repo/packages/app'), '/repo/packages/app')

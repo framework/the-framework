@@ -35,8 +35,8 @@ const failingGit: GitRunner = async () => {
   throw new Error('not a git repository')
 }
 
-test('worktreePath nests the run under .the-framework/branches, named as its branch (#1580)', () => {
-  assert.equal(worktreePath(REPO, '2026-07-19T10-00-00-000Z'), join(REPO, FRAMEWORK_DIR, 'branches', 'tf-agent-2026-07-19T10-00-00-000Z'))
+test('worktreePath nests the run under .the-framework/worktrees', () => {
+  assert.equal(worktreePath(REPO, '2026-07-19T10-00-00-000Z'), join(REPO, FRAMEWORK_DIR, 'worktrees', '2026-07-19T10-00-00-000Z'))
 })
 
 test('addWorktree builds `worktree add -b <branch> <path>` and returns the path + branch', async () => {

@@ -21,7 +21,6 @@ import { readTickets } from './dashboard/tickets.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { startAgentCommitter } from './agent-commit.js'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
-import { startBranchesLayoutPass } from './branches-layout.js'
 import { startCloudScratchSweep } from './cloud-scratch-refs.js'
 import { resolveAgentPr } from './dashboard/agent-handoff.js'
 import { sendChoice, sendMessage, sendStop } from './dashboard-rpc/control.js'
@@ -287,10 +286,6 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   // a push that could not land at teardown.
   const mergedWorktrees = startMergedWorktreeSweep({ projects, log, busy: deps.busyAgentIds })
 
-  // The #1580 layout pass: move pre-#1580 worktrees under `.the-framework/branches/` and keep the
-  // repo-root `branches` symlink in place. Idempotent and near-free once a project has settled.
-  const branchesLayout = startBranchesLayoutPass({ projects, log })
-
   // Delete the scratch refs a web hand-off leaves on origin (#1547): the pre-hand-off `cloud-*`
   // ref and the run branch, one dead pair per web run. Daemon-side rather than in the driver,
   // because session creation only signals "created", not "clone finished" — a driver deleting its
@@ -390,9 +385,6 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // Behind a slow job it would instead land in the middle of the first session, racing that
     // session's teardown for the same checkout — which the `busy` guard then has to catch.
     jobs: [
-      // Before the worktree sweep, so the sweep's very first listing already sees the #1580
-      // layout: pre-#1580 checkouts moved under branches/, and the repo-root symlink in place.
-      { name: 'branches layout', every: AUTO_PM_EVERY, run: () => branchesLayout.tick() },
       // Ten minutes. Its start-up turn is the point: the case it exists for is a machine that was
       // off (or a daemon that was down) while a session's push could not land.
       { name: 'worktree sweep', every: AUTO_PM_EVERY, run: () => mergedWorktrees.tick() },
@@ -423,7 +415,6 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // The CI watch can start fix runs, so it stops with the other run-starters.
       ciWatch.stop()
       mergedWorktrees.stop()
-      branchesLayout.stop()
       cloudScratch.stop()
       // Stopped before `flushAgents` below, so that is a single flush past the idle window
       // rather than a wait for a turn that is no longer coming.

@@ -32,21 +32,3 @@ export function agentBranchName(agentId: string): string {
 export function legacyAgentBranchName(agentId: string): string {
   return `${LEGACY_AGENT_BRANCH_PREFIX}agent-${agentId}`
 }
-
-/**
- * The directory an agent's worktree lives in under `.the-framework/branches/` (#1580): the run
- * branch's own name, so the flat `branches/` listing reads as branch names. #1581 (slash-free
- * names) is what makes this equality possible at all.
- */
-export function worktreeDirName(agentId: string): string {
-  return agentBranchName(agentId)
-}
-
-/**
- * The inverse of {@link worktreeDirName}. A name without the run prefix is a pre-#1580 worktree
- * directory, which was the bare agent id — returned as-is so legacy checkouts stay addressable.
- */
-export function agentIdFromWorktreeDir(name: string): string {
-  const prefix = `${AGENT_BRANCH_PREFIX}agent-`
-  return name.startsWith(prefix) ? name.slice(prefix.length) : name
-}

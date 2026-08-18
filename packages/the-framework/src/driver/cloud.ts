@@ -121,7 +121,7 @@ const TRUST_PROMPT = 'trustthisfolder'
  * that works is: trust the root once, and every agent worktree under it is covered.
  */
 export function trustRootOf(cwd: string): string {
-  const match = /^(.+?)\/\.the-framework\/(?:branches|worktrees)\/[^/]+\/?$/.exec(cwd)
+  const match = /^(.+?)\/\.the-framework\/worktrees\/[^/]+\/?$/.exec(cwd)
   return match ? match[1]! : cwd
 }
 

@@ -12,7 +12,7 @@ import { setDashboardContext } from '../dashboard-rpc/context.js'
 import { createProjectRuntime, type ProjectRuntime } from '../daemon-runtime.js'
 import { registryPreferencesStore, projectId } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
-import { resolveAgentEventsPath, worktreePath, type AgentMeta, type AgentStatus } from '../store/index.js'
+import { resolveAgentEventsPath, type AgentMeta, type AgentStatus } from '../store/index.js'
 import { withAgentLock } from '../agent-locks.js'
 import { tailAgentEvents } from '../dashboard-rpc/events-tail.js'
 import { sendAddProject } from '../dashboard-rpc/projects.js'
@@ -235,7 +235,7 @@ export async function makeWorld(): Promise<StoryWorld> {
     },
 
     async waitRetired(project, agentId, timeoutMs = 30_000) {
-      const worktree = worktreePath(project.cwd, agentId)
+      const worktree = join(project.cwd, '.the-framework', 'worktrees', agentId)
       await waitFor(
         async () => ((await stat(worktree).catch(() => undefined)) ? undefined : true),
         `run ${agentId}'s worktree to be retired`,
@@ -267,7 +267,7 @@ export async function makeWorld(): Promise<StoryWorld> {
       // daemon's own way of waiting a teardown out.
       await Promise.all(
         started.map(({ cwd, agentId }) =>
-          withAgentLock(worktreePath(cwd, agentId), async () => {}),
+          withAgentLock(join(cwd, '.the-framework', 'worktrees', agentId), async () => {}),
         ),
       )
       await runtime.dispose().catch(() => {})

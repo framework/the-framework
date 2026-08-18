@@ -51,7 +51,7 @@ const WITH_PROJECT: DashboardData = {
 
 /** Click the import step and wait for the start to have been attempted. */
 const clickImport = async () => {
-  fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
+  fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
   await waitFor(() => expect(startAgent.start).toHaveBeenCalled())
 }
 
@@ -92,8 +92,8 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
 
     // The project travels with it: this surface has none selected, so an id alone cannot be routed.
     // Unattended (#1279): a checklist-fired routine ends at settle instead of parking in the chat loop.
-    expect(startAgent.start).toHaveBeenCalledWith('p1', presets.importTickets.render(), 'prompt', { unattended: true })
-    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', presets.importTickets.render(), 'run-7'))
+    expect(startAgent.start).toHaveBeenCalledWith('p1', presets.updateTickets.render(), 'prompt', { unattended: true })
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', presets.updateTickets.render(), 'run-7'))
   })
 
   test('a project with no worktree hands up no id, so the shell can adopt the running one', async () => {
@@ -104,7 +104,7 @@ describe('the GitHub import lands on the session it starts (#1169)', () => {
     render(<OnboardingChecklist onAgentStarted={onAgentStarted} />)
     await clickImport()
 
-    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', presets.importTickets.render(), undefined))
+    await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', presets.updateTickets.render(), undefined))
   })
 
   test('a refused start says why and moves you nowhere', async () => {

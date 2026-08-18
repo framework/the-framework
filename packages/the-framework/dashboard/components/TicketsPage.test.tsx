@@ -52,11 +52,11 @@ describe('TicketsPage (#1144)', () => {
     expect(onOpenTicket).toHaveBeenCalledWith('p1', 't.md')
   })
 
-  test('a project with no tickets still offers its own GitHub import, not a dead end', async () => {
+  test('a project with no tickets still offers its own GitHub update, not a dead end', async () => {
     onAllTickets.mockResolvedValue([{ projectId: 'p1', projectName: 'Alpha', tickets: [] }])
     render(<TicketsPage onOpenTicket={() => {}} />)
     expect(await screen.findByText('Alpha')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /import tickets from github/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /update from github/i })).toBeTruthy()
   })
 
   test('no registered projects says so rather than an empty page', async () => {
@@ -71,7 +71,7 @@ describe('TicketsPage (#1144)', () => {
     vi.mocked(sendStart).mockResolvedValue({ ok: true, agentId: 'r1' })
     const onAgentStarted = vi.fn()
     render(<TicketsPage onOpenTicket={() => {}} onAgentStarted={onAgentStarted} />)
-    fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith('p1', expect.any(String), 'r1'))
   })
 })
@@ -192,8 +192,8 @@ describe('TicketsPage filters (#1144)', () => {
     window.history.replaceState(null, '', '/tickets?q=zzz-no-match')
     render(<TicketsPage onOpenTicket={() => {}} />)
     expect(await screen.findByText(/2 tickets hidden by the current filters/i)).toBeTruthy()
-    // Not the import offer — these tickets exist, they are filtered (#1230's rule, kept).
-    expect(screen.queryByRole('button', { name: /import tickets from github/i })).toBeNull()
+    // Not the update offer — these tickets exist, they are filtered (#1230's rule, kept).
+    expect(screen.queryByRole('button', { name: /update from github/i })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /clear filters/i }))
     expect(await screen.findByText('Improve the lock')).toBeTruthy()
     expect(window.location.search).toBe('')

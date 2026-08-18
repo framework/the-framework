@@ -205,11 +205,11 @@ describe('Composer (#721)', () => {
   test('a new-session preset marks its submit, and a normal one does not (#959)', () => {
     const { onSubmit } = renderComposer()
     fireEvent.click(screen.getByRole('button', { name: /Presets/ }))
-    fireEvent.click(screen.getByText('Import tickets from GitHub'))
+    fireEvent.click(screen.getByText('Update from GitHub'))
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     // The menu row is the label; what is submitted is the preset's prompt. They used to be the same
     // string, which is how the import shipped asking for nothing in particular (#697).
-    expect(onSubmit).toHaveBeenCalledWith(presets.importTickets.render(), 'prompt', { newAgent: true })
+    expect(onSubmit).toHaveBeenCalledWith(presets.updateTickets.render(), 'prompt', { newAgent: true })
 
     cleanup()
     const second = renderComposer()
@@ -250,7 +250,7 @@ describe('Composer (#721)', () => {
   test('emptying the box drops the preset\'s new-session rule with the preset (#959)', () => {
     const { onSubmit } = renderComposer()
     fireEvent.click(screen.getByRole('button', { name: /Presets/ }))
-    fireEvent.click(screen.getByText('Import tickets from GitHub'))
+    fireEvent.click(screen.getByText('Update from GitHub'))
     // The stub editor does not mirror the loaded text into the DOM input, and jsdom drops a
     // change event whose value did not actually change — so give it something to clear.
     fireEvent.change(screen.getByLabelText('prompt'), { target: { value: 'edited' } })

@@ -7,7 +7,7 @@ import { nodeGitRunner } from './project.js'
 import { errorMessage } from './error-message.js'
 
 /**
- * Committing the session archives the daemon writes (#912/#1179) into the project checkout.
+ * Committing the agent archives the daemon writes (#912/#1179) into the project checkout.
  *
  * An agent's own worktree sweeps its archive on teardown (`store/worktree.ts`). The main checkout has
  * no such path — `install.ts` commits once at activation and nothing after — so an archive written
@@ -39,7 +39,7 @@ import { errorMessage } from './error-message.js'
  */
 
 /**
- * The committed session archives (#1179), under every user's own directory.
+ * The committed agent archives (#1179), under every user's own directory.
  *
  * `:(glob)` magic so the `*` stops at a path separator — a plain pathspec wildcard matches `/` too,
  * and would reach further down `.the-framework/` than this means to.
@@ -161,7 +161,7 @@ export async function gitBusy(
 const NOTHING_PENDING = 'no session changes'
 
 /**
- * Stage and commit the pending session archives under `cwd`, scoped to {@link ARCHIVE_PATHSPEC}.
+ * Stage and commit the pending agent archives under `cwd`, scoped to {@link ARCHIVE_PATHSPEC}.
  *
  * `add` before `commit` because a brand-new archive is untracked, and `git commit -- <path>` only
  * knows paths git already knows. Both are pathspec-scoped, so the staging is as narrow as the
@@ -197,7 +197,7 @@ export interface AgentCommitter {
   /** Run one poll now. Exposed so the daemon and tests can drive it deterministically. */
   poll: () => Promise<void>
   /**
-   * Commit every project's pending session archives now, skipping the idle window. For shutdown: the
+   * Commit every project's pending agent archives now, skipping the idle window. For shutdown: the
    * daemon is going away, so waiting for quiet would just defer the work to the next boot. Returns
    * how many projects committed.
    */
@@ -234,7 +234,7 @@ interface Pending {
 }
 
 /**
- * Start committing settled session archives, and return the handle that stops it.
+ * Start committing settled agent archives, and return the handle that stops it.
  *
  * The idle window is the poll itself: a project whose pending set is byte-identical to the previous
  * poll's has stopped being written to, so its batch is committed. Anything still moving is recorded

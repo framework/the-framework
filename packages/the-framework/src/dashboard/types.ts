@@ -46,24 +46,18 @@ export interface DriverReady {
 }
 
 /**
- * The dashboard's Global options (#314), posted alongside a Start. Each maps to a
- * run flag: Autopilot + Technical to modes, Vanilla to removing the built-in
- * system prompt, and Eco to the fine-grained #326 section drops. Absent fields
- * default off, i.e. today's behavior.
+ * The dashboard's Global options (#314), posted alongside a Start and carried to
+ * the spawned session on its spec (D4). Absent fields default off, i.e. today's
+ * behavior — except where a field's own doc says the repo file decides.
  */
 export interface StartAgentOptions {
-  /** Auto-accept mode; also steers the maintenance-prompt (#326) stance. */
-  autopilot?: boolean
-  /** Technical mode: expose technical detail (preset-scoped). */
-  technical?: boolean
   /** Remove the built-in #326 system prompt entirely (keeps the emit contract so the dashboard still drives it). */
   vanilla?: boolean
-  /** Transparent mode (#625): run the wrapped agent fully raw (no framework system prompt, guard, dashboard, or TODO loop); maps to `--transparent`. */
+  /** Transparent mode (#625): run the wrapped agent fully raw (no framework system prompt, guard, dashboard, or TODO loop). */
   transparent?: boolean
-  /** Fine-grained #326 section drops to save tokens. */
-  /** In-context directories (#439): each becomes a `--context <dir>` flag on the spawned agent. */
+  /** In-context directories (#439): each becomes a `Context:` line for the spawned agent. */
   context?: string[]
-  /** On-before-mergeable prompt (#326): on setReadyForMerge(), queue the quality follow-ups as TODO entries; maps to `--on-before-mergeable`. */
+  /** On-before-mergeable prompt (#326): on setReadyForMerge(), queue the quality follow-ups as TODO entries. */
   onBeforeMergeable?: boolean
   /** Give the agent a real browser via chrome-devtools-mcp during the agent (#452). */
   browser?: boolean
@@ -73,11 +67,11 @@ export interface StartAgentOptions {
    * the handoff zero-config.
    */
   handoff?: HandoffLevel
-  /** The model to run the wrapped agent on (#628); maps to `--model`. Absent = the driver's own default. */
+  /** The model to run the wrapped agent on (#628). Absent = the driver's own default. */
   model?: string
-  /** Which coding agent drives the agent (#650): `claude` or `codex`; maps to `--agent`. Absent = the default (`claude`). */
+  /** Which coding agent drives the agent (#650): `claude` or `codex`. Absent = the default (`claude`). */
   driver?: string
-  /** Where this run executes (#1050/#610): `local` (this device, the default), `actions` (a fresh GitHub Actions runner via ActionsDriver) or `web` (a Claude Code cloud session via CloudDriver); maps to `--run-on`. Absent = local, i.e. today's behavior. */
+  /** Where this run executes (#1050/#610): `local` (this device, the default), `actions` (a fresh GitHub Actions runner via ActionsDriver) or `web` (a Claude Code cloud session via CloudDriver). Absent = local, i.e. today's behavior. */
   target?: AgentLocation
   /**
    * Nobody is watching this agent (#846): its choice gates take the recommended option instead of
@@ -89,19 +83,19 @@ export interface StartAgentOptions {
    */
   unattended?: boolean
   /**
-   * The `tickets/<file>.md` this agent implements (#1117); maps to `--ticket`. Set by the daemon
+   * The `tickets/<file>.md` this agent implements (#1117). Set by the daemon
    * when it starts a drain agent and the queue entry it will work links back to a ticket, so the
    * Overview can show that ticket as being implemented rather than guessing from its plan.
    */
   ticket?: string
   /**
-   * This agent plans its {@link ticket} rather than implementing it; maps to `--plan-run`. Set by
+   * This agent plans its {@link ticket} rather than implementing it. Set by
    * the daemon on a fanned-out [Plan tickets] run (#1327), whose PR lands only the plan: the
    * ticket still rides for the agent's meta, but the PR title must not inherit the issue as
    * `(fix #42)` (#1334) — a plan's merge would close the issue with the work still undone.
    */
   planAgent?: boolean
-  /** Resume a finished agent's conversation (#720): its captured agent session id; maps to `--resume-session`. The agent's prompt continues that session (full prior context) instead of starting fresh. Sent with `kind: 'prompt'` when you message an agent that has ended. */
+  /** Resume a finished agent's conversation (#720): its captured agent session id. The agent's prompt continues that session (full prior context) instead of starting fresh. Sent with `kind: 'prompt'` when you message an agent that has ended. */
   resumeSession?: string
   /**
    * Continue this agent rather than starting a new one (#762): the follow-up writes into that agent's

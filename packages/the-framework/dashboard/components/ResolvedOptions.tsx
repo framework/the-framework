@@ -1,4 +1,4 @@
-import type { FrameworkFileConfig, Preferences } from '../../src/index.js'
+import type { Preferences } from '../../src/index.js'
 import type { PreferenceSources } from '../lib/preferences.js'
 import type { OptionRow } from './OptionsMenu.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
@@ -14,20 +14,13 @@ import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 export function ResolvedOptions({
   options,
   sources,
-  fileConfig,
 }: {
   /** The same rows the gear renders, so the strip and the menu can never disagree. */
   options: OptionRow[]
   sources: PreferenceSources
-  /** The repo file, for the keys with no preference counterpart: `preset` and `event`. */
-  fileConfig: FrameworkFileConfig
 }) {
   const on = options.filter(o => o.checked && !o.disabled)
-  const chips = [
-    ...(fileConfig.preset ? [{ key: 'preset', label: `preset: ${fileConfig.preset}`, repo: true }] : []),
-    ...(fileConfig.event ? [{ key: 'event', label: `kind: ${fileConfig.event}`, repo: true }] : []),
-    ...on.map(o => ({ key: o.key, label: o.label, repo: sources[o.key as keyof Preferences] === 'repo' })),
-  ]
+  const chips = on.map(o => ({ key: o.key, label: o.label, repo: sources[o.key as keyof Preferences] === 'repo' }))
   if (!chips.length) return null
   return (
     <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">

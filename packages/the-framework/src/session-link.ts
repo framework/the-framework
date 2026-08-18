@@ -5,8 +5,8 @@
 /**
  * The placeholder a session-link template uses for the real session id.
  * Remote Control does not expose a URL you can build from a session id, so we
- * surface the honest id and let a template drop a real URL in when there is one:
- * `sessionLink: "https://example.com/s/{sessionId}"` in the spec.
+ * surface the honest id and let a template — a driver's own link report, e.g.
+ * `https://example.com/s/{sessionId}` — drop a real URL in when there is one.
  */
 export const SESSION_ID_PLACEHOLDER = '{sessionId}'
 

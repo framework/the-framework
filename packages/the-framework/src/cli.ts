@@ -69,23 +69,22 @@ import { errorMessage } from './error-message.js'
  * The default link shown for a live agent: the generic Claude Code entry point,
  * surfaced as "Open Claude Code" (not a per-agent live session). We drive Claude
  * Code headless, which is not Remote-Controlled, so there is no per-session deep
- * link to construct (#214). Set `sessionLink: "...{sessionId}..."` on the spec if you
- * wire up a real one.
+ * link to construct (#214); a cloud run reports its real link through its own
+ * driver events instead.
  */
 export const CLAUDE_CODE_SESSION_LIST = CLAUDE_CODE_SESSION_LINK
 
 /**
- * The session link to show for an agent: the spec's `sessionLink` if given, else
- * the generic Claude Code entry point for a live agent (nothing for a fake one, which
- * has no real session). Pure, so the default is unit-testable without a live agent.
+ * The session link to show for an agent: the generic Claude Code entry point for
+ * a live agent, nothing for a fake one (which has no real session). Pure, so the
+ * default is unit-testable without a live agent.
  *
  * The default is Claude Code's *own* entry point, so it is only honest on a
  * Claude run: pointing a Codex session at claude.ai/code offers the user a link
  * to somewhere their run isn't. Codex keeps its sessions locally with nothing
  * equivalent to open, so another agent gets no default link at all (#542).
  */
-export function chooseSessionLink(opts: Pick<AgentOptions, 'sessionLink' | 'driver'>, fake: boolean): string | undefined {
-  if (opts.sessionLink) return opts.sessionLink
+export function chooseSessionLink(opts: Pick<AgentOptions, 'driver'>, fake: boolean): string | undefined {
   return fake || opts.driver !== 'claude' ? undefined : CLAUDE_CODE_SESSION_LIST
 }
 
@@ -179,30 +178,29 @@ export interface AgentOptions {
    */
   continueAgent?: boolean | undefined
   model?: string | undefined
-  /** `--resume-session <id>` (#720): continue a finished agent's agent session — the prompt resumes that conversation (full prior context). Set by the dashboard when you message an agent that has ended. */
+  /** Continue a finished agent's agent session (#720) — the prompt resumes that conversation (full prior context). Set by the dashboard when you message an agent that has ended. */
   resumeSession?: string | undefined
-  /** `--ticket <path>` (#1117): the `tickets/<file>.md` this agent is implementing. Set by the daemon when it starts a drain agent, from the ticket its queue entry links to; recorded on the agent's meta. */
+  /** The `tickets/<file>.md` this agent is implementing (#1117). Set by the daemon when it starts a drain agent, from the ticket its queue entry links to; recorded on the agent's meta. */
   ticket?: string | undefined
-  /** `--plan-run` (#1327): the `--ticket` is being planned, not implemented, so the PR title must not inherit its issue as `(fix #42)` (#1334) — the plan's merge would close the issue with the work still undone. */
+  /** The {@link ticket} is being planned, not implemented (#1327), so the PR title must not inherit its issue as `(fix #42)` (#1334) — the plan's merge would close the issue with the work still undone. */
   planAgent?: boolean
-  /** `--unattended`: no human is watching, so choice gates take the recommended option (#846). */
+  /** No human is watching (#846), so choice gates take the recommended option. */
   unattended?: boolean
   scope: 'prototype' | 'full'
-  preset?: string | undefined
   /**
    * The mode toggles are tri-state (#841): `undefined` is "this agent said nothing", so the repo's
    * the-framework.yml decides, while an explicit `--no-*` turns the mode off over the file.
    */
   /** Remove the built-in #326 system prompt entirely, keeping the session controls (#314). */
   vanilla?: boolean | undefined
-  /** `--transparent` (#625): run the wrapped agent fully raw — no framework system prompt, emit
+  /** Transparent mode (#625): run the wrapped agent fully raw — no framework system prompt, emit
    * protocols, consumption guard, dashboard, or TODO loop, so an agent is identical to `claude -p`. */
   transparent?: boolean | undefined
-  /** `--context <dir>` (repeatable): in-context directories added as one `Context:` line (#439). */
+  /** In-context directories, added as one `Context:` line (#439). */
   context: string[]
-  /** `--on-before-mergeable`: fire the built-in on-before-mergeable (#326) prompt when the agent signals setReadyForMerge(), queueing the quality follow-ups as TODO entries. */
+  /** Fire the built-in on-before-mergeable (#326) prompt when the agent signals setReadyForMerge(), queueing the quality follow-ups as TODO entries. */
   onBeforeMergeable: boolean
-  /** `--browser`: give the agent a real browser via chrome-devtools-mcp (navigate, console, network, DOM, screenshot) during the agent (#452). */
+  /** Give the agent a real browser via chrome-devtools-mcp (navigate, console, network, DOM, screenshot) during the agent (#452). */
   browser: boolean
   /**
    * How far this session publishes itself when it finishes (#1102/#1216/B5). `undefined` is "this
@@ -210,10 +208,7 @@ export interface AgentOptions {
    * to `pr` — which is what makes the handoff zero-config.
    */
   handoff?: HandoffLevel | undefined
-  buildEvent?: string | undefined
   todoLoop: boolean
-  todoMaxItems?: number
-  sessionLink?: string | undefined
   /** Whether the session records itself to `.the-framework/`. Always true outside tests. */
   persist: boolean
   /** {@link AgentSpec.kind} `research`: run the Research preset as a direct prompt (#331). */
@@ -381,8 +376,6 @@ function flagConfigLayer(opts: AgentConfigFlags): ConfigLayer {
   return {
     name: 'flag',
     values: {
-      ...(opts.preset !== undefined ? { preset: opts.preset } : {}),
-      ...(opts.buildEvent !== undefined ? { event: opts.buildEvent } : {}),
       ...(opts.vanilla !== undefined ? { vanilla: opts.vanilla } : {}),
       ...(opts.transparent !== undefined ? { transparent: opts.transparent } : {}),
       ...(opts.handoff !== undefined ? { handoff: opts.handoff } : {}),
@@ -390,7 +383,7 @@ function flagConfigLayer(opts: AgentConfigFlags): ConfigLayer {
   }
 }
 
-type AgentConfigFlags = Pick<AgentOptions, 'preset' | 'buildEvent' | 'vanilla' | 'transparent' | 'handoff'>
+type AgentConfigFlags = Pick<AgentOptions, 'vanilla' | 'transparent' | 'handoff'>
 
 /**
  * Resolve an agent's config over its layers, nearest wins (#841): the agent's flags, then the repo's
@@ -912,8 +905,8 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
         }
       : {}
 
-  // The session link shown on the dashboard: the spec's `sessionLink`, else Claude Code's own entry for
-  // a live Claude agent, else nothing (#212/#542). Same for both agent paths.
+  // The session link shown on the dashboard: Claude Code's own entry for a live Claude agent,
+  // else nothing (#212/#542). Same for both agent paths.
   const sessionLink = chooseSessionLink(opts, fake)
 
   // Everything the agent reports that its epilogue needs — the settle flags, the deferred
@@ -1230,7 +1223,6 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     // message, which `runAgent` then sends verbatim.
     ...(opts.resumeSession ? { resumeSessionId: opts.resumeSession } : {}),
     ...(opts.todoLoop && !transparent ? {} : { todoLoop: false }),
-    ...(opts.todoMaxItems ? { todoMaxItems: opts.todoMaxItems } : {}),
   }
 
   return settleAgent(epilogue(label), async () => {

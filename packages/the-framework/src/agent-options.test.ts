@@ -32,8 +32,6 @@ test('preferencesFromFileConfig maps the repo yml onto the preference keys (#842
   // including whether its PRs may land on their own — is a fact about the repo.
   assert.deepEqual(preferencesFromFileConfig({ handoff: 'local' }), { handoff: 'local' })
   assert.deepEqual(preferencesFromFileConfig({ handoff: 'merge' }), { handoff: 'merge' })
-  // preset and event have no preference counterpart, so they are not mapped.
-  assert.deepEqual(preferencesFromFileConfig({ preset: 'software-development', event: 'bug-fix' }), {})
 })
 
 test('a repo yml sits over the user tier, key by key (#842)', () => {

@@ -1,4 +1,4 @@
-The per-repo defaults every agent starts from, persisted in a small YAML file (`the-framework.yml`) so a project's way of being built — its preset, modes, and what happens when an agent finishes — travels with the code instead of being retyped each time.
+The per-repo defaults every agent starts from, persisted in a small YAML file (`the-framework.yml`) so a project's way of being built — its prompt switches, and what happens when an agent finishes — travels with the code instead of being retyped each time.
 
 ## TLDR
 

@@ -68,9 +68,9 @@ test('a throwing reader is forgiving: inactive, no activity, never throws', asyn
 test('the summary carries the repo the-framework.yml so the launcher can resolve (#842)', async () => {
   const summary = await summarizeProject(
     RECORD,
-    deps({ readFileConfig: async () => ({ preset: 'software-development', autopilot: true }) }),
+    deps({ readFileConfig: async () => ({ handoff: 'local' as const, transparent: true }) }),
   )
-  assert.deepEqual(summary.fileConfig, { preset: 'software-development', autopilot: true })
+  assert.deepEqual(summary.fileConfig, { handoff: 'local', transparent: true })
 })
 
 test('a repo that sets nothing carries no fileConfig key at all (#842)', async () => {

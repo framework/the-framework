@@ -12,6 +12,6 @@ The machinery behind the composer's in-editor triggers and token chips: typing a
 
 - The one invariant: chips change how the prompt looks, never what it says — the submitted text stays exactly what the agent already parses, so presets and everything downstream are untouched.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -21,6 +21,6 @@ flowchart LR
 
 - Files are the seam on purpose: the dashboard shares no process with an agent, so steering and watching both travel through files the agent already owns — which is why a remote device steers an agent exactly the way a dashboard click does.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

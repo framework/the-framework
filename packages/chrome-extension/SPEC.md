@@ -9,6 +9,6 @@ A Chrome extension bridging Claude Code cloud sessions on claude.ai to the local
 - Reading is driven by page changes with a slow heartbeat backstop (it lives in background tabs), and every stage reports its status — on the page's panel and in the settings page's connection test — so a silent misconfiguration is visible.
 - The extension and the daemon insist on matching versions: every call states the manifest version, and a daemon expecting another blocks it with an error naming both and the update path, because a version-skewed pair half-works in ways that read as bugs.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

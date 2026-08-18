@@ -31,6 +31,6 @@ be a package boundary; the dependency survived the merge, the boundary did not.
 - **Proposals vs. decisions.** Agents propose (tickets, plans, PRs); humans decide. The queue holds only confirmed work.
 - **Refuse loudly, degrade quietly.** A guard that cannot be enforced is announced; a read that fails yields an empty result rather than a crash.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

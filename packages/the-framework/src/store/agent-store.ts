@@ -38,22 +38,19 @@ export const EVENTS_FILE = 'events.jsonl'
 export const META_FILE = 'agent.json'
 
 /**
- * Where finished agents are archived, so the dashboard can list a project's run
- * history (#303). The live agent stays at `events.jsonl`/`agent.json` (the daemon
- * tails it); on {@link AgentStore.close} a copy lands here as `<id>.jsonl` +
- * `<id>.json`, giving the history sidebar a per-agent log to replay.
- */
-export const AGENTS_DIR = 'agents'
-
-/**
- * Where a project's finished agents are archived (#1179): `.the-framework/<user>/agents/`,
- * which the install-time ignore un-ignores so the history is committed and survives a
- * `git clean -fdx`. {@link AGENTS_DIR} stays the transient location — an agent with no worktree of
- * its own archives there, and so does one archiving inside its own throwaway checkout — so both
- * are read.
+ * Where finished agents are archived, under both placements that name has: a project's committed
+ * `.the-framework/<user>/agents/` (#1179), which the install-time ignore un-ignores so the history
+ * survives a `git clean -fdx`, and the transient `.the-framework/agents/` that an agent with no
+ * worktree of its own — or one archiving inside its own throwaway checkout — writes into. What
+ * separates the two is the user segment, not the directory's name, and {@link archiveDir} is where
+ * a caller picks; both are read when a project's history is listed.
  *
- * The name lives here beside its sibling rather than in `sessions.ts`, which owns the per-user
- * naming: that module reads the store, so the constant travelling the other way would be a cycle.
+ * The live agent stays at `events.jsonl`/`agent.json` (the daemon tails it); on
+ * {@link AgentStore.close} a copy lands here as `<id>.jsonl` + `<id>.json` (#303), giving the
+ * history sidebar a per-agent log to replay.
+ *
+ * The name lives here rather than in `sessions.ts`, which owns the per-user naming: that module
+ * reads the store, so the constant travelling the other way would be a cycle.
  */
 export const ARCHIVE_DIR = 'agents'
 
@@ -647,7 +644,7 @@ export class AgentStore {
  * be kept — the project's copy — never for the copy an agent leaves inside its own worktree.
  */
 function archiveDir(dir: string, user?: string): string {
-  return user ? join(dir, user, ARCHIVE_DIR) : join(dir, AGENTS_DIR)
+  return user ? join(dir, user, ARCHIVE_DIR) : join(dir, ARCHIVE_DIR)
 }
 
 /** Paths of an agent's archived log + meta. */
@@ -685,7 +682,7 @@ async function archiveDirs(fs: StoreFs, dir: string): Promise<string[]> {
     const candidate = join(dir, name, ARCHIVE_DIR)
     if ((await fs.readdir(candidate)).length > 0) dirs.push(candidate)
   }
-  dirs.push(join(dir, AGENTS_DIR))
+  dirs.push(join(dir, ARCHIVE_DIR))
   return dirs
 }
 

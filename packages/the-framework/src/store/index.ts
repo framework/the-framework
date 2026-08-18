@@ -24,7 +24,6 @@ export {
   WORKTREES_DIR,
   EVENTS_FILE,
   META_FILE,
-  AGENTS_DIR,
   ARCHIVE_DIR,
   type StoreFs,
   type AgentMeta,

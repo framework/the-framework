@@ -7,6 +7,7 @@ import {
   branchPushed,
   commitPendingWork,
   currentBranch,
+  findAgent,
   removeWorktree,
   pruneWorktrees,
   worktreePath,
@@ -105,6 +106,12 @@ async function sizeOf(cwd: string, agentId: string): Promise<{ sizeBytes?: numbe
  * is one failure mode now, and it is legible: the push did not land, so the checkout stays and the
  * reason says why.
  *
+ * The push serves the rule; it is not a licence to publish. A session armed to publish nothing
+ * (`handoff: local`, B5/#1379) said its branch must not reach the remote, so its unpushed checkout
+ * is kept — the same outcome as a repo with no remote — rather than pushed to make it removable.
+ * Deciding otherwise would have teardown publish the very branch the agent's own handoff just
+ * declined to.
+ *
  * Refuses while the agent is still going — an agent's checkout is where its agent is working, and Stop
  * is how you end an agent, not pulling the floor out from under it.
  */
@@ -133,6 +140,19 @@ export async function removeProjectWorktree(
     const branch = await currentBranch(path)
     if (!branch) return { ok: false, error: `session ${agentId} is on no branch; its worktree was kept` }
     if (!(await branchPushed(cwd, branch))) {
+      // A session that was armed to publish nothing keeps its checkout instead of having its
+      // branch pushed to make removal possible: the push here serves recoverability, and pushing
+      // a `handoff: local` session's branch is the publish that rung exists to refuse. `handoff`
+      // is on the meta from the agent's first event, so a meta without one (a boot death) keeps
+      // the recoverable default. An already-pushed branch never reaches this: removing what the
+      // remote holds publishes nothing.
+      const meta = await findAgent(cwd, agentId).catch(() => undefined)
+      if (meta?.handoff && !meta.handoff.push) {
+        return {
+          ok: false,
+          error: `session ${agentId} was set to publish nothing (handoff: local); its worktree was kept`,
+        }
+      }
       // Pushing is what makes the removal recoverable, so it is attempted here rather than
       // required of the caller. A repo with no remote never gets past this, which is the honest
       // answer: there is nowhere for the work to be recoverable from.

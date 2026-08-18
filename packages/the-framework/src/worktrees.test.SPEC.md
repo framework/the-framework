@@ -1,4 +1,4 @@
-Covers worktree cleanup against real git: removal preserves a checkout's uncommitted work on the agent's branch and on the remote before deleting anything, refuses when the commit fails or the branch cannot reach the remote, deletion clears the agent's records and checkout while the branch and its commits survive, record-only agents still delete cleanly, and unsafe or unknown agent ids are refused before anything is touched.
+Covers worktree cleanup against real git: removal preserves a checkout's uncommitted work on the agent's branch and on the remote before deleting anything, refuses when the commit fails or the branch cannot reach the remote, keeps a publish-nothing session's unpushed checkout rather than pushing it (while one whose branch already reached the remote still goes), deletion clears the agent's records and checkout while the branch and its commits survive, record-only agents still delete cleanly, and unsafe or unknown agent ids are refused before anything is touched.
 
 ## Before modifying/creating SPEC.md files
 

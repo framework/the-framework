@@ -4,6 +4,7 @@ Cleans up the per-agent checkouts a project retains — one implementation behin
 
 - **One rule: only what is on the remote may go.** Removing a checkout commits whatever it is still holding to the agent's branch, pushes that branch, and deletes the checkout only once the remote has it — so nothing local is ever the last copy of work, and every deletion is recoverable with `git worktree add`.
 - A repo with nowhere to push keeps every checkout, which is the honest answer rather than a special case: there is nowhere for the work to be recoverable from.
+- A session set to publish nothing (`handoff: local`) keeps its unpushed checkout the same way: the push exists to make removal recoverable, not to publish work the session said must stay local. A branch already on the remote still lets the checkout go — removing what the remote holds publishes nothing.
 - One failure mode, and it is legible: the push did not land, so the checkout stays and the reason says why. It replaced a retention policy that asked what state the agent ended in, which is a question with three answers and no bearing on whether the work is safe.
 - Deleting an agent is the other thing entirely: its archived records leave the dashboard for good and uncommitted work is discarded with the checkout — but the branch and its commits stay, because silently deleting a branch that may carry merged work or an open pull request is not a dashboard's call.
 - Both refuse while the agent is live: Stop is how one ends, not pulling the floor out from under it.

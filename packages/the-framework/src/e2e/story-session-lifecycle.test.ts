@@ -58,12 +58,18 @@ test('start a session, watch it live, and read the archived row when it ends', a
     assert.equal(meta.branch, `tf-agent-${agentId}`)
     assert.equal(meta.driver, 'fake')
 
-    // A cleanly finished session retires its worktree (#737): nothing left to inspect, so the
-    // checkout is gone from disk, the Remove list is empty, and the agent addresses the project root.
-    await world.waitRetired(project, agentId)
-    assert.deepEqual(await rpc(onRetainedWorktrees)(project.id), [])
+    // A publish-nothing session keeps its checkout (B5): retiring one means pushing its branch,
+    // and that push is the publish the `local` rung exists to refuse. So the checkout stays on
+    // the Remove list, nothing reaches origin, and the agent still addresses its own worktree.
+    // (The clean retire-on-finish story lives in the publish test below, where pushing is armed.)
+    await waitFor(
+      async () => ((await rpc(onRetainedWorktrees)(project.id)).includes(agentId) ? true : undefined),
+      'the kept worktree to reach the Remove list',
+    )
+    const remoteBranches = await git(project.cwd, 'ls-remote', '--heads', 'origin')
+    assert.ok(!remoteBranches.includes(`tf-agent-${agentId}`), 'publish nothing: the branch never reached origin')
     const worktree = await rpc(onAgentWorktree)(project.id, agentId)
-    assert.equal(worktree?.own, false)
+    assert.equal(worktree?.own, true)
 
     // The archived history replays the same story the live tail told (#1472 reads the agent's own
     // journal, not another agent's), and the cross-project surfaces list the session.
@@ -143,8 +149,9 @@ test("publish a finished session: push its branch from the handoff panel (#799)"
     const project = await world.addProject()
     // The fixture already carries a bare `origin` (the harness gives every project one, since the
     // retention rule is about the remote), so the push here is a real git push and the handoff
-    // panel's pushed flag comes from the remote rather than from a stub.
-    const agentId = await world.startAgent(project, 'Ship the settings page', { handoff: 'local' })
+    // panel's pushed flag comes from the remote rather than from a stub. Push-armed, so teardown
+    // is a pusher too (a fake run's own handoff always skips): that is the collision under test.
+    const agentId = await world.startAgent(project, 'Ship the settings page', { handoff: 'push' })
     await world.waitAgent(project, agentId, 'done')
 
     // Pushed the instant the row flips done — deliberately INSIDE teardown's window. This used

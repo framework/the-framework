@@ -31,8 +31,8 @@ function frameworkDevDaemon(): Plugin {
         // Node process, outside any transform pipeline, so plain `src/` TypeScript would not load.
         // The specifier is a URL rather than a literal so it stays a runtime import — and the type
         // comes from the source it is built from, so a signature change is still an error here.
-        const built = new URL('../dist/index.js', import.meta.url).href
-        const { runDaemon } = (await import(built)) as typeof import('../src/index.js')
+        const built = new URL('../dist/daemon.js', import.meta.url).href
+        const { runDaemon } = (await import(built)) as typeof import('../src/daemon.js')
         const cwd = process.env.FRAMEWORK_DEV_DAEMON_CWD || process.cwd()
         // Ephemeral port: the dev server owns the address the browser talks to, and binding 4200
         // would collide with a `framework` the developer is running in another terminal.

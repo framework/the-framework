@@ -8,3 +8,7 @@ A replayable, multi-consumer stream of events: every event is buffered, live con
 ## Notes
 
 - Absorbed from `@gemstack/ai-autopilot` when that package was deleted. Its element type used to default to the supervisor's event type; the only caller here passes `FrameworkEvent`, so the type parameter is required.
+
+## Before modifying/creating SPEC.md files
+
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

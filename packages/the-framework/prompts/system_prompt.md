@@ -36,7 +36,7 @@ Your working directory is the whole of your workspace. Every file you read or wr
 ### Session name
 
 1. Create a <SESSION_NAME> as a string [a-z0-9-]+ that succinctly represents the intention of the user prompt
-2. Create a new branch `the-framework/<SESSION_NAME>` and `$ git checkout` it — do all the work in that branch
+2. Create a new branch `tf-<SESSION_NAME>` and `$ git checkout` it — do all the work in that branch
 3. Call setSessionName(<SESSION_NAME>)
 
 

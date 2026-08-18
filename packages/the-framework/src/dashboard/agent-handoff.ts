@@ -17,7 +17,7 @@ import { parseNumstat } from './file-diff.js'
 import { parsePorcelain } from './file-status.js'
 import { errorMessage } from '../error-message.js'
 import type { AutoHandoffSkip, AutoMergeOutcome, MergeWithheldReason } from '../events.js'
-import { agentBranchName, commitPendingWork, currentBranch, startedAtFromAgentId, FRAMEWORK_DIR, type AgentMeta } from '../store/index.js'
+import { legacyAgentBranchName, AGENT_BRANCH_PREFIX, LEGACY_AGENT_BRANCH_PREFIX, commitPendingWork, currentBranch, startedAtFromAgentId, FRAMEWORK_DIR, type AgentMeta } from '../store/index.js'
 
 // What a finished session produced, and what is left to do with it (#799).
 //
@@ -118,13 +118,12 @@ export interface AgentHandoffDeps {
  */
 export function agentBranchFor(agent: { id: string; branch?: string; sessionName?: string }): string {
   if (agent.branch) return agent.branch
-  // The id fallback goes through the store's own builder rather than assembling the same name a
+  // The fallbacks go through the store's own builders rather than assembling the same names a
   // second time here — two spellings of one branch name is how the prefix went stale under D5.
-  return agent.sessionName ? `${AGENT_BRANCH_PREFIX}${agent.sessionName}` : agentBranchName(agent.id)
+  // They use the *legacy* slashed spellings on purpose: every run they can apply to was archived
+  // before the branch was recorded, which predates the slash-free rename (#1581).
+  return agent.sessionName ? `${LEGACY_AGENT_BRANCH_PREFIX}${agent.sessionName}` : legacyAgentBranchName(agent.id)
 }
-
-/** What every branch an agent creates for itself is named under. */
-const AGENT_BRANCH_PREFIX = 'the-framework/'
 
 /**
  * The branch's PR as it applies to *this* run: the injected seam when the caller gave one, else
@@ -214,7 +213,7 @@ export async function mergeAgentPr(
  * branch name. Every caller uses it to decide how loudly to surface something, never to act.
  */
 export function isAgentBranch(branch: string | undefined): boolean {
-  return Boolean(branch?.startsWith(AGENT_BRANCH_PREFIX))
+  return Boolean(branch && (branch.startsWith(AGENT_BRANCH_PREFIX) || branch.startsWith(LEGACY_AGENT_BRANCH_PREFIX)))
 }
 
 /** `git` that resolves to '' instead of rejecting, for reads where "no answer" is a fine answer. */

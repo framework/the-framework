@@ -482,7 +482,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
 
   /**
    * The checkout an agent gets (#736). Each agent is given its own git worktree under the project's
-   * `.the-framework/worktrees/<agentId>`, on a `the-framework/agent-<agentId>` branch, so N runs on one
+   * `.the-framework/worktrees/<agentId>`, on a `tf-agent-<agentId>` branch, so N runs on one
    * repo never fight over the working tree — and the user's own checkout, uncommitted work
    * included, is left untouched.
    *

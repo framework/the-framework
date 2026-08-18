@@ -2,6 +2,7 @@ import type { QuotaBoundaryStatus } from './quota-boundary.js'
 import { presets } from './preset-catalog.js'
 import { DEFAULT_AUTO_PM_CONCURRENCY } from './preference-defaults.js'
 import { TICKETS_DIR, ticketFromQueueEntry } from './tickets.js'
+import { AGENT_BRANCH_PREFIX } from './branch-names.js'
 
 /**
  * Auto PM (#685): spend leftover subscription quota on product management instead of
@@ -330,13 +331,13 @@ export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
     name: presets.triageQuick.name,
     prompt: presets.triageQuick.render(),
     label: presets.triageQuick.label,
-    pinnedBranch: `the-framework/${presets.triageQuick.name}`,
+    pinnedBranch: `${AGENT_BRANCH_PREFIX}${presets.triageQuick.name}`,
   },
   {
     name: presets.triageConsensual.name,
     prompt: presets.triageConsensual.render(),
     label: presets.triageConsensual.label,
-    pinnedBranch: `the-framework/${presets.triageConsensual.name}`,
+    pinnedBranch: `${AGENT_BRANCH_PREFIX}${presets.triageConsensual.name}`,
   },
   {
     name: presets.planTickets.name,

@@ -183,7 +183,7 @@ test('each triage preset pins its own session name and aborts on a taken branch 
     assert.match(out, new RegExp(`Always set <SESSION_NAME> to ${preset.name}`))
     // The guard is the invariant, not its phrasing — the two templates word the sentence
     // slightly differently, and pinning one wording is how this assertion went stale.
-    assert.match(out, /If branch the-framework\/<SESSION_NAME> already exists, abort and tell user/)
+    assert.match(out, /If branch tf-<SESSION_NAME> already exists, abort and tell user/)
   }
   // Distinct session names, or the two would collide with each other rather than with their own
   // in-flight run.

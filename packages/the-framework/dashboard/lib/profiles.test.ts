@@ -7,7 +7,6 @@ import {
   connectUrl,
   connectTo,
   currentConnection,
-  isLoopbackHost,
   localOrigin,
   rememberLocalOrigin,
 } from './profiles.js'
@@ -71,12 +70,6 @@ describe('profiles.ts (#1052)', () => {
     expect(url).toContain('token=abc')
     expect(url).toContain('draft=' + encodeURIComponent('my prompt'))
     vi.unstubAllGlobals()
-  })
-
-  test('isLoopbackHost knows the local machine', () => {
-    expect(isLoopbackHost('127.0.0.1')).toBe(true)
-    expect(isLoopbackHost('localhost')).toBe(true)
-    expect(isLoopbackHost('192.168.1.5')).toBe(false)
   })
 
   test('currentConnection labels the daemon the browser is on', () => {

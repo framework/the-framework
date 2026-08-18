@@ -109,7 +109,7 @@ export interface AgentMeta {
   sessionId?: string
   /** The link shown to jump into the live agent session. */
   sessionLink?: string
-  /** The session name the agent chose (#326), also its `the-framework/<name>` branch. */
+  /** The session name the agent chose (#326), also its `tf-<name>` branch. */
   sessionName?: string
   /**
    * The branch the agent's work is on: folded from `branch` events as the agent observes it (#1277),

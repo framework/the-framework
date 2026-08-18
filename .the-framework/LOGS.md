@@ -73,3 +73,14 @@
 - run: 2026-08-05T10-08-25-082Z
 - session: [session_01Czm2w8HWZ9J6GLLuUvgo3j](https://claude.ai/code/session_01Czm2w8HWZ9J6GLLuUvgo3j?from=cli&m=0)
 - branch: the-framework/plan-avoid-term-spike
+
+## 2026-08-18T15:44:47.643Z · prompt · Open TODO_AGENTS.md and work on this one open entry only, then check it off:\n\n- [Reword stale auto-merge-disabled launcher warning](tickets/2026-07-31_ux-gh-auto-merge-disabled.md) — quick win (effort 1): the copy in `StartAgentForm.tsx:240-247` still claims "an auto-merged session lands its PR immediately — CI is not awaited", but the CI watch now merges on green. Apply Solution 1 of [the plan](tickets/2026-07-31_ux-gh-auto-merge-disabled.plan.md): reword to "merge on green, handled locally by the daemon; enable Allow auto-merge for the server-side version", update the two adjacent comments and `StartAgentForm.test.tsx`, then close #1417 and delete the ticket files.\n\nDo not start any other entry. If that entry is already checked off or no longer there, stop and do nothing.
+
+- status: failed
+- run: 2026-08-18T15-44-35-323Z
+- branch: the-framework/run-2026-08-18T15-44-35-323Z
+## 2026-08-18T15:44:49.463Z · prompt · Open TODO_AGENTS.md and work on this one open entry only, then check it off:\n\n- [Close "Unclear UX: what should I do now?"](tickets/2026-07-25_unclear-ux-what-now.md) — quick win (effort 1, no code expected): every follow-up from the #1173 thread is implemented (audit in [the plan](tickets/2026-07-25_unclear-ux-what-now.plan.md)). Close GitHub issue #1173 with a comment mapping each thread follow-up to what shipped, and delete the ticket + plan files.\n\nDo not start any other entry. If that entry is already checked off or no longer there, stop and do nothing.
+
+- status: failed
+- run: 2026-08-18T15-44-36-634Z
+- branch: the-framework/run-2026-08-18T15-44-36-634Z

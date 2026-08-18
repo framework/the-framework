@@ -1,4 +1,4 @@
-Surfaces the plan and backlog documents at a project's root so the human can read them in the dashboard beside the agent.
+Surfaces the plan documents at a project's root and the backlog off the data branch, so the human can read them in the dashboard beside the agent.
 
 ## TLDR
 

@@ -5,5 +5,8 @@
 !conversations/
 !conversations/**
 !*/
+!*/agents/
+!*/agents/**
+!*/
 !*/sessions/
 !*/sessions/**

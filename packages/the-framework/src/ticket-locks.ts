@@ -88,11 +88,20 @@ async function pushLockCommit(git: GitRunner, cwd: string): Promise<boolean> {
 }
 
 /**
+ * Which side of a ticket's life a batch claims for (#1420). A `plan` batch is about to *write*
+ * plans, so an existing `.plan.md` means the work it came for is already done and the ticket is
+ * skipped. A `drain` batch is about to *implement* a plan — the `.plan.md` is its input, not a
+ * competing claim — so only an existing `.lock.md` stands in its way.
+ */
+export type TicketLockPhase = 'plan' | 'drain'
+
+/**
  * Claim `assignments`' tickets for their agents: write one `.lock.md` per ticket, commit the
  * whole batch in one pathspec-scoped commit, and push it to origin's default branch
- * ({@link pushLockCommit}). Resolves the subset actually locked — a ticket whose lock or plan
- * appeared since the candidates were enumerated is skipped, not overwritten: an existing file is
- * someone's claim or someone's work, and either outranks this batch.
+ * ({@link pushLockCommit}). Resolves the subset actually locked — a ticket whose lock (or, for a
+ * `plan` batch, whose plan — see {@link TicketLockPhase}) appeared since the candidates were
+ * enumerated is skipped, not overwritten: an existing file is someone's claim or someone's work,
+ * and either outranks this batch.
  *
  * A batch whose commit failed is rolled back (the written files removed) and resolves `[]`:
  * uncommitted locks in the user's checkout would be noise git blames on nobody. A batch whose
@@ -107,6 +116,7 @@ export async function acquireTicketLocks(
   cwd: string,
   assignments: readonly PlanAssignment[],
   deps: TicketLockDeps = {},
+  phase: TicketLockPhase = 'plan',
 ): Promise<PlanAssignment[]> {
   const git = deps.git ?? nodeGitRunner()
   const write = deps.write ?? ((path, content) => writeFile(path, content, 'utf8'))
@@ -122,8 +132,10 @@ export async function acquireTicketLocks(
       const lock = `${TICKETS_DIR}/${stem}.lock.md`
       const plan = `${TICKETS_DIR}/${stem}.plan.md`
       // Existence via a read, so one seam serves every operation. A lock is someone's claim; a
-      // plan is someone's finished work — either means the ticket is not this batch's to claim.
-      const taken = await Promise.all([read(join(cwd, lock)).then(() => true, () => false), read(join(cwd, plan)).then(() => true, () => false)])
+      // plan is someone's finished work — for a `plan` batch either means the ticket is not this
+      // batch's to claim, while a `drain` batch reads the plan as its input ({@link TicketLockPhase}).
+      const siblings = phase === 'plan' ? [lock, plan] : [lock]
+      const taken = await Promise.all(siblings.map(file => read(join(cwd, file)).then(() => true, () => false)))
       if (taken.some(Boolean)) continue
       await write(join(cwd, lock), ticketLockContent(assignment.agentId))
       locked.push(assignment)

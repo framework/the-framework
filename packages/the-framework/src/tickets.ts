@@ -1,6 +1,3 @@
-import { stat } from 'node:fs/promises'
-import { join } from 'node:path'
-
 /**
  * The root `tickets/` directory (#629): a plain repo convention where The Framework
  * keeps its human-facing roadmap files, rather than hiding them in a proprietary
@@ -101,18 +98,3 @@ export function ticketIssueRef(md: string): string | undefined {
   return match ? `#${match[1]}` : undefined
 }
 
-/** Whether a workspace-relative path is an existing file. Never throws. */
-async function isFile(cwd: string, rel: string): Promise<boolean> {
-  return stat(join(cwd, rel))
-    .then(s => s.isFile())
-    .catch(() => false)
-}
-
-/**
- * The workspace's flat backlog file: the root `TODO_AGENTS.md`, or `undefined` when it does not
- * exist. The pre-#682 spellings (`TODO-DRIVERS.md`, `tickets/TODO.md`, root `TODO.md`) are no
- * longer read — one convention, one location.
- */
-export async function findFlatTodo(cwd: string): Promise<string | undefined> {
-  return (await isFile(cwd, FLAT_TODO_FILE)) ? FLAT_TODO_FILE : undefined
-}

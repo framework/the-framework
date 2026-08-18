@@ -86,6 +86,29 @@ test('acquireTicketLocks skips a ticket already locked or already planned (#1420
   assert.equal(disk.has(join(CWD, 'tickets/b.lock.md')), false, 'the planned ticket gains no lock')
 })
 
+test('a drain batch claims a planned ticket, since the plan is its input (#1420)', async () => {
+  // Same fixture as above, opposite verdict on b.md: for a drain the `.plan.md` is the work it
+  // came to implement, not a rival's finished work, so only an existing lock skips the ticket.
+  const { disk, deps } = checkout({
+    'tickets/a.md': '# a',
+    'tickets/a.lock.md': 'CLAIMED: someone-else',
+    'tickets/b.md': '# b',
+    'tickets/b.plan.md': '# a real plan',
+  })
+  const locked = await acquireTicketLocks(
+    CWD,
+    [
+      { ticket: 'a.md', agentId: 'drain-1-0' },
+      { ticket: 'b.md', agentId: 'drain-1-1' },
+    ],
+    deps,
+    'drain',
+  )
+  assert.deepEqual(locked.map(a => a.ticket), ['b.md'])
+  assert.equal(disk.get(join(CWD, 'tickets/a.lock.md')), 'CLAIMED: someone-else')
+  assert.equal(disk.get(join(CWD, 'tickets/b.lock.md')), 'CLAIMED: drain-1-1\n')
+})
+
 test('acquireTicketLocks rolls the files back when the commit fails (#1420)', async () => {
   // The claim is the commit: files that never reached one claim nothing, and left behind they
   // would be uncommitted noise in the user's checkout.

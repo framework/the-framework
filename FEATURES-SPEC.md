@@ -3,8 +3,7 @@
 Every user-facing feature of The Framework, in the order a user meets them — from setup to what
 happens while nobody is at the keyboard.
 
-The product a user comes for — *register a repo, describe work, watch an agent do it, get a PR,
-and let it keep working while you sleep* — in **123 features**.
+> @AI You must never add or remove a feature to this project without human approval.
 
 ## Setup
 
@@ -188,9 +187,3 @@ and let it keep working while you sleep* — in **123 features**.
 | 121 | Browser notifications |
 | 122 | Discord notifications: agents started and finished |
 | 123 | Discord notifications: what needs a human (open PR, parked question, unpushed commits) |
-
----
-
-*Distilled from the feature inventory of the simplification review
-([#1536](https://github.com/gemstack-land/the-framework/pull/1536)), updated to the product as it
-stands after that review landed.*

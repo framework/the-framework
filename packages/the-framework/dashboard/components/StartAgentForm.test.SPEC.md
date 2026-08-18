@@ -1,5 +1,5 @@
 Covers the submit semantics — presets run unattended, typed prompts stay attended — and the preflight warnings: web-agent trust, driver-CLI readiness (with the GitHub CLI half asked only while publishing is armed, and never for an Actions target), the Haiku advisory, and the auto-merge-disabled warning, all teaching without ever blocking the start.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

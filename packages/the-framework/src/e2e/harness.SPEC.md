@@ -7,6 +7,6 @@ Stands up a disposable copy of the product for one story: the daemon's business 
 - Each world gets its own throwaway global state, so parallel stories never see each other's projects; a story can also park an agent on a scripted question, and read back exactly how each agent child was invoked.
 - Teardown mirrors daemon shutdown: stop the agents, wait out in-flight teardowns, then delete everything.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

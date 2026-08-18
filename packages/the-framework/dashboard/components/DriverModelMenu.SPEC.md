@@ -6,6 +6,6 @@ One menu picking the driver and its model together — drivers at the top level,
 - Not choosing is still a state, and the trigger says so rather than naming the first model in the list — which is what it did while that entry existed, so an unset preference read as whichever model happened to be listed first.
 - The trigger carries its own accessible name, because with no model pinned its rendered content is a logo and a chevron. It used to be named by the model text incidentally, and that text was "Default".
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

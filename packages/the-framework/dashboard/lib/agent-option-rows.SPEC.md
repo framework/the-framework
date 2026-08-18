@@ -9,6 +9,6 @@ An agent's options as one table with every rule between them already applied, so
 - The browser option is offered only under Claude Code, the one agent it is wired to; every disabled row says why.
 - A finished agent's composer shows the filtered subset of the same table: only the options a resume will actually apply.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

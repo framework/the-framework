@@ -7,6 +7,6 @@ The dashboard's front door: one small web server that serves the app, mounts its
 - One host, wiring everything: there is no second dashboard to serve a single agent on its own port, so nothing here is optional and no call has to ask what this server can do.
 - A broken install with no built app answers "not installed" everywhere rather than standing up half a dashboard, and malformed requests are answered, never allowed to crash the process.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

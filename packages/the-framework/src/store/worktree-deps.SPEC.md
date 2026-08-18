@@ -6,6 +6,6 @@ Gives a fresh worktree a working dependency tree instantly, by symlinking the pa
 - The links are hidden from git through a repo-level exclude, because the usual ignore rule matches directories, not symlinks — without it the agent's sweeping commit would drag dangling links onto its branch and the PR.
 - Best-effort throughout: a worktree without dependencies is a worse agent, not a failed one.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

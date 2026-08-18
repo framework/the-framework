@@ -6,6 +6,6 @@ The safe way the dashboard reads one file out of a checkout, used by the hover c
 - Confinement is real, not textual: links are resolved before checking the file sits inside the checkout, so a link pointing outside is refused.
 - Previews are cut at a fixed length, binary files say so instead of rendering bytes, and anything unreadable is simply nothing.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

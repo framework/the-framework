@@ -9,6 +9,6 @@ Cleans up the per-agent checkouts a project retains — one implementation behin
 - Both refuse while the agent is live: Stop is how one ends, not pulling the floor out from under it.
 - The prune sweep offers every non-live checkout to the same rule and reports each one it could not reclaim, so a checkout that stays is always accounted for rather than silently kept.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

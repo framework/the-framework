@@ -6,6 +6,6 @@ Reduces everything an agent has reported to the single word its status pill show
 - Between a clean end and the report that publishing finished, the pill says "publishing…" — pushing, opening the PR, or merging is what is actually happening then.
 - It pulses "building…" only while the agent is live, says nothing until it has said something, and a resume starts the ranking over, so an earlier stop or an earlier publish never sticks to the new leg.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

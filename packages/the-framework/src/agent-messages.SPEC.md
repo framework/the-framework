@@ -7,6 +7,6 @@ The live-chat channel into a running agent: the user's own messages, spoken unpr
 - Stopping or closing wakes every waiter empty so the agent ends cleanly, and a stale message never starts a turn on an aborted agent.
 - A headless agent gets no channel at all and ends when it stops asking, exactly as before live chat existed.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

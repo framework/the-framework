@@ -1,5 +1,5 @@
 Builds the design gallery: every registered card becomes its own self-contained static page showing the component side by side in light and dark, with the app's real compiled stylesheet inlined so the card shows exactly what ships.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

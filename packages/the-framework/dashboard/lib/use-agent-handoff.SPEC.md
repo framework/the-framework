@@ -6,6 +6,6 @@ One shared reading of what a finished agent's branch has to hand off — push, o
 - Re-asked slowly at rest, and quickly while the PR lookup is still out, since that answer decides which buttons to offer; the last answer stays on screen across the cadence switch instead of blanking.
 - Each action names itself while in flight ("Pushing…" rather than a silently greyed button) and refreshes the answer the moment it lands, so the offer follows the action immediately.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

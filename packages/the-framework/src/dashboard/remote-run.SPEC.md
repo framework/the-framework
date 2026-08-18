@@ -7,6 +7,6 @@ The local half of running an agent on a saved device: this daemon — never the 
 - A relayed agent keeps a local stand-in record, updated from the device's events, so it shows in the agent list and survives a dashboard reload; the device address outlives the event stream because reads after it ends, push, and PR still have to reach the device.
 - Failures answer like local ones: an unreachable device is a plain error result or an empty read, and a rotated token ends the stream as a normal finish, not a lost connection.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

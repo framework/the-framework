@@ -12,6 +12,6 @@ Decides how much of the account's weekly allowance The Framework may have spent 
 - Continuous rather than stepping once a day: a step handed out a whole day's allowance the instant a new day began, inviting a burst; continuous stays honest about what has actually elapsed.
 - The limit and the boundary are separate values because moving the user's slider must not redraw the boundary it is measured against.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

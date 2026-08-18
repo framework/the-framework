@@ -8,6 +8,6 @@ Read-only project helpers: whether a repo has The Framework installed, what its 
 - Git operations get one of three time budgets — read, local write, or network/whole-checkout — because killing a slow push or checkout mid-flight can corrupt real work, while a hung read must not hold the daemon for minutes.
 - "Is this a git repo at all" is answered separately, so a project that cannot host agents is told apart from git failing.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

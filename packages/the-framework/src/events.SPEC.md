@@ -7,6 +7,6 @@ The single event stream an agent narrates itself over: one timeline uniting the 
 - Interactive gates are events too: a choice pauses the agent until a pick is posted back, and both the question and who answered it are on the record.
 - Every skipped or withheld outcome carries its reason, so "it was on and nothing happened" always has an answer in the log.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -7,6 +7,6 @@ Claims a ticket for a single agent by committing a lock file beside it and pushi
 - The claim is the commit: locks that never reach one are rolled back; a failed push keeps the batch (it still guards local agents) and is said out loud; the push happens only from the default branch, so a feature checkout cannot smuggle its own commits onto main.
 - No timed expiry — an agent may legitimately hold a ticket for days. The lock lifts when the agent's own PR deletes it or a human releases it; a release whose commit fails puts the file back.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

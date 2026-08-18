@@ -8,6 +8,6 @@ Every read the dashboard makes: agents and their history, docs, tickets and queu
 - The handoff read asks the agent's branch — the thing that outlives it — taking only uncommitted work from the checkout, and only when that checkout is genuinely the agent's own.
 - The bridge reads report what the browser extension saw of a Claude web session: its parked question, the picked answer's fate, and whether the extension has made contact at all.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

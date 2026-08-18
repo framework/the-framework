@@ -7,6 +7,6 @@ What the agent view shows when the work was handed to a Claude web cloud session
 - The mirror is one clearly labelled box of what the Claude tab shows — a best-effort scrape kept visibly apart from the agent's own durable log, with the site's UI chrome scrubbed out.
 - Both pieces render nothing for any other target, so agent views mount them unconditionally.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

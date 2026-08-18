@@ -7,6 +7,6 @@ Asks Claude Code where the account's subscription quota stands, by running the a
 - An account with no subscription quota (API-key auth) is told apart from a readout we failed to read: one means no quota exists, the other means try again — and an account burning overage still reports its quota.
 - A missing agent, a refused fetch, and a hung read each get their own reason, so callers know whether to keep the last good reading.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -5,6 +5,6 @@ The prompt sent to an agent once its work is ready to merge: queue the quality r
 - It queues the quality presets (maintainability and security audit) onto the project's backlog rather than running them on the spot; the backlog loop picks them up later.
 - Every queued entry targets the changes introduced by the finished agent, named explicitly.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

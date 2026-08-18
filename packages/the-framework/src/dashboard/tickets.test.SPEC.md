@@ -1,5 +1,5 @@
 The tests cover reading the backlog — format keys with fallbacks for pre-format tickets, filename-versus-mtime dating, plan and claim siblings folded in (effort and uncertainty, the claim holder, malformed claims still locking), newest-first order — plus the full-text single-ticket read with its escape-path refusals, the cheap has-tickets check agreeing with the full read, and the forgiving import stamp.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

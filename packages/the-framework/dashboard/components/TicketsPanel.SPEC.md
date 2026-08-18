@@ -8,6 +8,6 @@ A project's tickets as scannable one-liner rows — start column, title, topics,
 - An empty backlog offers to import the repo's GitHub issues; a filled one offers an update that reconciles what changed, stamped with when it last caught up and admitting when there is no record.
 - Buttons send their presets' text verbatim — one label, one instruction, wherever offered — and empty-because-filtered says so instead of offering an import for work already done.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

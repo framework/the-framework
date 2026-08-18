@@ -11,6 +11,6 @@ Streams the agent's headless browser to a human — the latest screen frame as a
 
 - The agent hosts the bridge itself because opening the browser's remote-control socket to web origins would let any page the user visits drive the agent's browser; that socket stays unreachable, and this bridge is the only way in.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

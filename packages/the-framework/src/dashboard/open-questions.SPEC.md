@@ -6,6 +6,6 @@ Every agent's open question gathered into one hub, so a human can answer any par
 - Longest-waiting first: the agent blocked on its human the longest is the one to unblock first.
 - A question the log no longer shows open (already answered, or unreadable) is dropped — offering an answer the daemon would refuse is worse than one card fewer.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

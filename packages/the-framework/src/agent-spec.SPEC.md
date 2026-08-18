@@ -7,6 +7,6 @@ The dashboard's process API to an agent it spawns: a JSON blob on a temp file, n
 - The spec is consumed, not merely read: the child removes the file once it has it, so a device token carried in the options never outlives the agent that used it.
 - Because the dashboard is the only writer, an invalid combination is never constructed, and the child validates only that the file is a spec at all.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -6,6 +6,6 @@ Resolves an agent's settings across configuration tiers — this agent's own say
 - Nobody setting anything resolves to the shipped defaults: a finished agent hands itself back by opening a draft pull request, and merging is the one rung above that, because landing on the default branch is not reversible the way publishing a branch is.
 - Each settled key remembers which tier decided it, so the agent can say out loud where every setting came from.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

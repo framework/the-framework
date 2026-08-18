@@ -9,6 +9,6 @@ The one table of every built-in preset — the prompts the product offers as one
 - The launcher's menu is one ordered list here; the queue-drain preset is daemon-only and absent from it.
 - Recognising "the prompt that drains the queue" compares against the rendered preset itself, so rewording the preset cannot silently break the detection.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

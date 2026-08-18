@@ -8,6 +8,6 @@ Deletes the two dead refs every Claude-web hand-off leaves on origin — the pre
 - A run branch's age is in its name; a `cloud-*` ref's is not, so the sweep remembers when it first saw one and ages it from there — which also keeps refs pushed by another machine safe, since each machine only deletes what it has itself watched for a day.
 - Conservative and quiet: anything unprovable simply stays for the next pass, and only actual deletions (and failures) are announced.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

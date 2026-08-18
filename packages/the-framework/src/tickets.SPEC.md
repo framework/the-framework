@@ -7,6 +7,6 @@ The repo's ticket and queue conventions: tickets are plain markdown files in a r
 - A ticket's GitHub header names the issue it tracks, which is what lets merging the work close that issue.
 - One queue location; the older spellings are no longer read.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

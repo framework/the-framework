@@ -1,5 +1,5 @@
 A two-thumb slider for picking a numeric min–max range, built for the tickets filter's fine-grained ranges.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -8,6 +8,6 @@ The settings page: every setting in one findable place — appearance, driver an
 - Typed automation values are clamped to the same bounds the daemon enforces, and an untouched value shows the real default in force rather than a zero nothing is using.
 - A row with nothing to pick renders nothing at all: an empty dropdown is a control you can open and not use, which reads as broken rather than as "no choices here". Every list here is static today, so the guard is for the next dynamic one.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

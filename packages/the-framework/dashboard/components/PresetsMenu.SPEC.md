@@ -6,6 +6,6 @@ The composer's presets button: the one visible place to load, create, and delete
 - Exists because loading used to hide behind typing `/` and deleting lived in a different menu, so a first-time user saw an empty box and no sign that presets exist.
 - Some built-ins always run as an agent of their own, even when loaded from inside one.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

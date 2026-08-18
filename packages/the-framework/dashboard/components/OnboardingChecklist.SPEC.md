@@ -7,6 +7,6 @@ The onboarding checklist: what a new install needs, each step shown in the state
 - Undone steps carry their own actions: register the current directory or pick one, start an unattended agent that imports tickets from GitHub (landing on it), enable browser notifications, open the Discord setups.
 - It renders dismissible on the Overview and permanent on the settings page — which is what dismissing promises you can come back to.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

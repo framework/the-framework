@@ -6,6 +6,6 @@ Turns the registered-project list into what the dashboard shows per project: its
 - One provider, the real registry: with one dashboard host there is no per-agent scope to substitute and no public host to blank out.
 - Forgiving: a failed read shows as an inactive project with no activity, never a crash.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

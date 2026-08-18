@@ -7,6 +7,6 @@ Shows what actually changed in a checkout's files: one file's diff for the tree'
 - The whole Changes list costs two git reads however many files changed, and stays sorted so a live agent does not reshuffle it.
 - Paths come from the client, so every one goes through the shared safety guard before anything is read.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

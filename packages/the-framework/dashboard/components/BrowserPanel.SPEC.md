@@ -6,6 +6,6 @@ The live view and remote control of the agent's own browser — in the right rai
 - An unreachable stream says so and offers Retry; a failure belongs to that one attempt, so retrying, switching agents, or coming back later always tries fresh instead of replaying it.
 - It can hand out a periodic still of the newest frame, so a pane whose agent ends degrades to a snapshot rather than a dead stream — frames live only in this viewer's memory, never in the log or on disk.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

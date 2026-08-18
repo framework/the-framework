@@ -7,6 +7,6 @@ Streams one agent's events live to the browser: everything already logged is rep
 - After the replay, a one-time caught-up marker lets a reconnecting viewer swap its feed whole instead of blanking and refilling; the marker travels only on the wire, never into any journal.
 - An agent with no file on this host — the relay's own, or one relayed from a device — streams from memory instead.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

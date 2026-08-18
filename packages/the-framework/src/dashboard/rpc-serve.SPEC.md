@@ -8,6 +8,6 @@ Mounts the dashboard's RPC surface on the daemon's server and keeps other websit
 - The feed's response simply ending is how a viewer tells "the server is done" from "the connection dropped" — the first is a finished agent, the second is worth retrying and worth saying out loud.
 - A malformed request is answered, and so is one whose RPC throws: a failing call is a failing call, never a dead daemon. A name that is not an RPC is one of those answers, including the names every object carries whether anyone registered them or not.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

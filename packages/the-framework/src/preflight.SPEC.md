@@ -8,6 +8,6 @@ Pre-start checks so an agent is refused early and clearly when a prerequisite is
 - Running as root warns without blocking (a container legitimately is root): under sudo the driver looks for credentials in the wrong home and every agent dies with a log that says nothing about why.
 - Every failure and warning names its fix.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

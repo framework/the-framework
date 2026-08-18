@@ -9,6 +9,6 @@ The dashboard's settings: your own options with the open project's committed set
 - Each control can also see which tier won its value — a repo-inherited value shows as not yours — and a project's shared, repo-committed custom presets ride along.
 - The theme choice and the notification toggles read through here, with their defaults defined framework-side so daemon and dashboard cannot drift.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

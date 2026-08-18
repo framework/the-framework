@@ -6,6 +6,6 @@ How each dashboard call reaches the one host's capabilities, and which checkout 
 - The one exception is "is this agent relayed onward?", which defaults to no: a call arriving over the device relay runs outside a request, and the agent it names is local to that device — forwarding it again would be a loop.
 - A call that names an agent resolves to that agent's own checkout — where it actually reads, writes, and listens — falling back to the project root only for one that has none.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

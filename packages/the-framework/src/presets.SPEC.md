@@ -6,6 +6,6 @@ Writes the built-in presets into a project as real files, so queued follow-up wo
 - The files keep their target blank unfilled — the queue entry that references a preset says what to aim it at.
 - Re-installing overwrites, refreshing the files to the installed framework version.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

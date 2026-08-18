@@ -7,6 +7,6 @@ The git-worktree lifecycle behind concurrent agents: each agent gets its own che
 - Teardown commits whatever the agent left uncommitted before removing the checkout — the agent deliberately never commits its own final work, and removing without committing would destroy the diff — so the branch outlives the worktree; the commit retries briefly past a lock race that once made an agent's real work look like nothing.
 - Removal tries politely first and forces only as a told-about fallback; a checkout's size read is best-effort, since it only labels a delete button.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

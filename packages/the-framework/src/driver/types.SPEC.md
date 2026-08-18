@@ -8,6 +8,6 @@ The contract every wrapped coding agent must fit: start a session in a workspace
 - A quota reading is available-with-windows or unavailable-with-a-reason, and the reasons split "this attempt failed" (keep showing the last good reading) from "this setup has no quota" (drop it).
 - A driver answers only "which CLI do I spawn". Whether an agent ends at its first prompt is a fact about where that prompt executed, and lives with the location instead.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

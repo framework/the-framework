@@ -6,12 +6,12 @@ import { join } from 'node:path'
 import {
   FLAT_TODO_FILE,
   TICKETS_DIR,
-  findFlatTodo,
   isTicketPath,
   ticketFromQueueEntry,
   ticketIssueRef,
   todoPriorityForTicket,
 } from './tickets.js'
+import { findFlatTodo } from './tickets-file.js'
 import { TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 
 test('the flat backlog lives at the root TODO_AGENTS.md (#674/#682)', () => {

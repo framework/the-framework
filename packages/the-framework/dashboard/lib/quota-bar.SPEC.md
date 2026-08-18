@@ -9,6 +9,6 @@ The arithmetic behind the usage bar — purely about drawing the week; where the
 - The pace gap converts to real time ("2h ahead", "1d behind"), which says more than a share of the week; consumption converts the same way, so the two figures beside each other share a unit rather than asking a reader to convert one into the other.
 - Consumption also reads against the allowance elapsed so far rather than against the week, because that is the line which actually parks unattended work — and it declines to read at all while that allowance is still zero.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

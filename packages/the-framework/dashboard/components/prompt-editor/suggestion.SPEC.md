@@ -8,6 +8,6 @@ Turns a trigger character typed in the composer into a floating menu at the care
 - A fresh trigger over an empty source shows the trigger's explanatory note instead of nothing, so the feature never looks broken.
 - While a menu shows, the editor announces it to assistive tech, and the rest of the composer can tell a menu is open — which is how Enter means "pick" instead of "send".
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

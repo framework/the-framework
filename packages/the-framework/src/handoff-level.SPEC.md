@@ -7,6 +7,6 @@ How far a finished agent publishes itself — one ordinal covering keep it local
 - Unset means open a pull request: that is what makes the handoff zero-config, so work never sits on a local branch nobody is told about. Merging is the rung above, and landing on the default branch has to be asked for.
 - A surface that still shows three checkboxes converts both ways, and the conversion is where an impossible answer resolves *downward* rather than being quietly repaired upward. Settings written before the ladder are read through that same conversion, since forgetting them would read "publish nothing" as the default — which publishes.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -6,6 +6,6 @@ One ticket's own page: its full markdown and every known fact, plus the Queue ac
 - Queue files the ticket into the AI queue with its priority; once queued it reads so and cannot be pressed twice, while a failed write surfaces and leaves it pressable.
 - Nothing times a claim out anymore, so a dead agent's claim stands until a human lifts it here: a claimed ticket names its holder inline and offers Release lock.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

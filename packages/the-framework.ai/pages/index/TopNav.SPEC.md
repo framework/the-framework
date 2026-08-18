@@ -4,6 +4,6 @@ The shared top navigation: the brand mark (goes home, or back to top on the land
 
 - Deliberately no Dashboard button: the dashboard runs on the visitor's machine, which a public web page can't reach or detect, so the button would dead-end.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

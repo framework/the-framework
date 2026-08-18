@@ -8,6 +8,6 @@ The live transcript feed: one subscription to the selected agent's own event log
 - Starting a new agent clears the pane at once, so the finished one's transcript is not shown while the new one spins up.
 - An agent's own feed keeps its pre-resume transcript; only the project-wide fallback (used when no agent is addressable) trims itself to the newest one.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

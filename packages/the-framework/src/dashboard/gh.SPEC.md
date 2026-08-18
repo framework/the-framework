@@ -9,6 +9,6 @@ Everything the dashboard asks or tells GitHub — pull request lookups, merging,
 - CI status boils down to passing, failing (naming the failures), pending, or none; an unreadable status is never green.
 - A cloud agent authenticates with a token from the environment or, failing that, the user's existing GitHub login.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

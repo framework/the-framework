@@ -7,6 +7,6 @@ The options gear: an agent's options as one checkbox dropdown that writes each p
 - A disabled option stays visible with the reason it does not apply, and cannot be flipped.
 - The trigger wears a small dot whenever any option is on.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

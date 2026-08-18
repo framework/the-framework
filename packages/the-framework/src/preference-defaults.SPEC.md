@@ -6,6 +6,6 @@ The shared defaults and bounds for user preferences, written down once so the da
 - The polarities are not uniform, and that is the point of writing them once: the browser bell and the "needs you" baseline fire unless turned off, while anything that reaches outward (Discord) or is loosely informative is opt-in.
 - The bounds and defaults for the automatic-spend slider and the auto-PM concurrency — one number each that both the browser control and the daemon's sanitizer read.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

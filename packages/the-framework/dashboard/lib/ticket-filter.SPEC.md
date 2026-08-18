@@ -8,6 +8,6 @@ The tickets page's filtering, sorting, and grouping model: every project's backl
 - Sorting puts tickets with no value last in both directions, breaks ties newest-first, and starts each key in its natural direction; sort and grouping reorder but never hide, so they don't count as filters.
 - A hand-typed URL is input: junk is ignored, and defaults are omitted so the bare page keeps a bare address.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

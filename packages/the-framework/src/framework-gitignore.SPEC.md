@@ -8,6 +8,6 @@ The `.the-framework/.gitignore`: what a project commits out of its framework dir
 - Only the archive's current name is re-included. This file is written into everyone's repo, so it says what is true now rather than listing every name that directory has ever had.
 - One content, written once at install. It grew a rule per record while there were several, each added lazily by whichever feature needed it and each with its own "is this a file we wrote" check; with one record left, the only question is whether the file is already there.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

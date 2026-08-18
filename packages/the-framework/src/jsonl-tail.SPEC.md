@@ -6,6 +6,6 @@ Follows an append-only line-per-record log as it grows — the seam through whic
 - A tail can follow its log to a new home when the file is moved with content intact, without replaying what it already delivered.
 - Watches the directory for low latency with a polling backstop for reliability; nothing that goes wrong in either may crash the process, and a tail can opt out of keeping the process alive so steering never holds a finished agent open.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

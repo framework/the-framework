@@ -11,6 +11,6 @@ The framework command: serves the dashboard in the foreground, and runs one agen
 - Once an agent starts it is never interrupted for quota. The gate is on starting, and it lives with the daemon that decides whether to start unattended work at all.
 - Ctrl+C aborts the agent itself, the driver's process tree included; a second press force-quits.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

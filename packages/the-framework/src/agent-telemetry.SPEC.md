@@ -8,6 +8,6 @@ The accounting every agent shares, whatever kind it is: naming the session, foll
 - An unreadable quota never stops the work: a failing quota check means carry on.
 - One shared classification of how an agent ended — a user stop, a quota pause (which leaves a note to resume from), or a real failure — so every surface agrees on what "stopped" means.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

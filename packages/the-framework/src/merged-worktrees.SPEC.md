@@ -8,6 +8,6 @@ Automatically reclaims an agent's checkout once its work is on the remote — th
 - A live agent keeps its checkout: its driver is working in there, and Stop is how one ends. So does one the daemon has not finished retiring — an agent's records say `done` a beat before its teardown reclaims the checkout, and "not live" is not "nobody is holding this".
 - Every project is swept once at startup and every ten minutes after, on the daemon's shared clock rather than a timer of its own, and each removal is announced so it never reads as a bug.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

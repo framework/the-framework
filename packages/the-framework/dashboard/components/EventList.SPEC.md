@@ -8,6 +8,6 @@ The agent's transcript, shared by the live stream and the replay of a finished o
 - When the transcript knows its agent, a decision row IS the interaction: an open question is answerable in place, an answered one collapses to a ✓ card, and one whose agent ended stays plain text — its audience is gone.
 - The latest browser row hosts the live inline preview — one screencast, with re-said pages replacing their earlier row rather than stacking — and the live log follows the newest row but yields the moment the reader scrolls up.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

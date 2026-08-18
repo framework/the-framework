@@ -10,6 +10,6 @@ What the daemon does for a project: starting agents in isolated checkouts, retir
 - On shutdown, live agents are stopped rather than orphaned; each keeps its worktree and branch, so the dashboard can continue the same conversation in the same checkout when asked. An agent can also be forwarded to a connected device, its events relayed back.
 - Stopping resolves when the daemon has let go of the repo, not when the processes die: a child's exit event lands after its pid disappears, and the teardown that event starts — archive the agent, commit its work, keep or remove its checkout — runs well past that. The archive commit behind it would otherwise miss the ending of an agent still being archived. A teardown that wedges costs the shutdown its grace period, not the exit.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

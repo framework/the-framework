@@ -1,5 +1,5 @@
 Covers that pipe tables render as real tables (and mere pipes in prose do not), that links render only for safe web targets while code stays literal, and that compact mode shrinks the output to log density.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

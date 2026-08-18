@@ -6,6 +6,6 @@ Releases a pinned routine branch its closed or merged PR left behind, so a recur
 - A branch existing is not evidence of pending work; an open PR is. The branch goes only when its PR history proves the work is over: some PR existed and none is open. Deleting is safe exactly then — the closed PR preserves the diff, so the branch is a leftover name, not the last copy of anything.
 - An open PR keeps the branch (genuinely busy); no PR history keeps it too (either an agent still heading for its handoff, or the PR lookup hiccuped — deleting on a hiccup would discard work). A failed release never throws; the next sweep retries.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

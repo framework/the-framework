@@ -7,6 +7,6 @@ The workflow the product dispatches to run one coding-agent turn on a disposable
 - The turn's work — including anything left uncommitted — is pushed to the branch the driver chose, so the next turn continues exactly where this one stopped.
 - The transcript comes back as an uploaded artifact, the only channel out of a run; a failed turn still uploads it, which is exactly when it's most wanted.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

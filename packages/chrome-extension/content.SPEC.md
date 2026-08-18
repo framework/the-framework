@@ -7,6 +7,6 @@ The extension's page half: injected into claude.ai session pages, it finds the q
 - Delivering an answer is the one action taken: the pick is typed into the composer and submitted, after patiently waiting for a slow page to render the composer; only the top frame types, so nothing submits twice — and only labels the session itself offered can ever be typed.
 - It re-reads on page mutation with a slow heartbeat backstop (built to run in background tabs), and its collapsible panel reports every stage's status — found, sent, delivered, and why not — because silent failure was the recurring failure.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

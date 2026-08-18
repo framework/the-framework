@@ -7,6 +7,6 @@ Reads a project's ticket backlog for the dashboard, so what the agent plans from
 - A ticket's date is the one its filename carries, falling back to file time, so mere edits do not reshuffle the newest-first list.
 - Ticket names taken from the browser must be bare filenames, so they can never address another directory; the last GitHub-import stamp reads any malformed state as "not known" rather than failing.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

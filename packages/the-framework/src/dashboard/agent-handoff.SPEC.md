@@ -10,6 +10,6 @@ How a finished agent's work is handed back to the human: measure what its branch
 - The branch's own PR history is still consulted for a different question — does this branch already have one — because a branch name pinned by a prompt is reused across agents, so a reused branch never wears an old PR and a branch with one never gets a second.
 - Configuration arms an automatic merge; only the agent's declared-done signal plus an empty backlog of its own authorizes it, and a withheld merge still pushes and opens the draft for a human.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

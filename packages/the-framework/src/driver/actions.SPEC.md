@@ -7,6 +7,6 @@ A driver that runs the agent on GitHub Actions instead of this machine: dispatch
 - Auth is the same bring-your-own-subscription posture as everywhere else: a token held by the repo, belonging to a real user — bot-triggered agents are refused.
 - Each dispatch carries a unique correlation tag so a restarted framework can never mistake a stale or foreign run for its own, and every value forwarded to the runner is checked so nothing can act as shell syntax.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -12,6 +12,6 @@ Carries the shared work queue (`TODO_AGENTS.md`) out of a finished agent's isola
 
 - Removing an entry is the ordinary way to retire it, so "on the agent's branch but absent in the checkout" is ambiguous: the point where the agent forked is what tells its own addition from a human's removal, and with no fork point nothing is added — resurrecting struck-off work is worse than losing a follow-up.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

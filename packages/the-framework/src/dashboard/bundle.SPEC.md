@@ -1,5 +1,5 @@
 Finds the prebuilt dashboard web app on disk so the daemon can serve it, answering nothing when it is not there.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

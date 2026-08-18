@@ -5,6 +5,6 @@ Turns an agent's chosen target into the driver that executes it: this device by 
 - The Actions target needs the repo's owner, name, and a token, and fails fast with a clear message without them; the cloud target needs nothing extra, because the agent's own signed-in account carries it.
 - Kept apart from which CLI the agent uses, so GitHub configuration is never pushed onto ordinary local agents.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

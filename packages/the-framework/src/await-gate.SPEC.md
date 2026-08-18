@@ -7,6 +7,6 @@ The shared pause-and-ask machinery: an agent can park mid-conversation to ask th
 - With nobody to answer (headless, or stopped mid-question) a gate falls back to its recommended option so it never hangs. Which option that is belongs to the agent: handing over a browser recommends "could not handle it", because claiming a human cleared a login wall nobody saw sends the agent back to a blocked page.
 - Once the agent stops asking, live chat takes over: each user message resumes the same conversation; by default the agent finishes what queued and ends itself — only one whose own terminal is the single surface stays parked for the next message.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

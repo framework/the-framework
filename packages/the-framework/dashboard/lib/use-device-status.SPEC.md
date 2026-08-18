@@ -6,6 +6,6 @@ The saved devices' online/offline dots, refreshed on a short interval.
 - A device whose first check has not come back reads as unknown, not offline.
 - A re-pasted token restarts the checks even though the device itself is unchanged — otherwise the dot would keep pinging with the dead token and read offline forever.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

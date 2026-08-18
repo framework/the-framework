@@ -6,6 +6,6 @@ Carries a half-typed prompt into the next screen — across a device hop or an i
 - An in-app navigation writes the same stash directly — it never leaves the tab, so there is no reason to put the prompt in a URL at all.
 - The stash is handed over exactly once and cleared, so a reload does not re-seed the composer.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

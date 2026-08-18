@@ -6,6 +6,6 @@ Resolves which checkout — and which event journal — a session id points at, 
 - The events variant differs in one place: for an ended agent whose worktree is gone, its archived log wins over the project's shared journal — the archive is the agent's own record and proves it ended.
 - Shared on purpose, so the fallback rules cannot drift apart between the daemon and the dashboard.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

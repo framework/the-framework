@@ -8,6 +8,6 @@ The checkout-in-play status line — active branch, a clean/dirty dot, the linke
 - Clean is deliberately neutral, not green: green means "changed/added" one pane away, and a clean tree has nothing to announce.
 - It can double as the disclosure for the branch detail below it, so an agent's branch is spoken about in exactly one place.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

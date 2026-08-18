@@ -5,6 +5,6 @@ The net under the whole dashboard: a crash while drawing any view shows a recove
 - The error is shown on the card and its details logged to the browser console — the one trace a data-driven "random" crash leaves, since the daemon never sees it.
 - "Try again" redraws the view, which recovers when the cause was transient; Reload sits beside it as the sure way out — and the agent and daemon keep running either way.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

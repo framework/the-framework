@@ -7,6 +7,6 @@
 - A sent answer parks the panel — buttons off, "waiting for the agent to pick it up" — until the agent confirms and the question goes away.
 - The first open gate also answers to Ctrl+Enter, so the shortcut is unambiguous with several gates open.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

@@ -14,6 +14,6 @@ Automatically commits the agent archives the daemon writes into a project's main
 - Failures are values, retried on the next poll, and logged only when the reason changes — a stuck project costs one log line, not one per poll.
 - One record means one pathspec. A second one lived here — the per-agent conversation markdown — and with it the machinery for deciding which of the two to pass, because passing a pattern that matches nothing fails the command for the other.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

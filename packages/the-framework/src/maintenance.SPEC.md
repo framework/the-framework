@@ -12,6 +12,6 @@ The maintenance sweep: a background job that keeps registered repos healthy by r
 - The weekly interval is deliberately not a setting: the sweep only queues follow-up work on an idle machine, so being a little too eager costs a backlog entry, not money.
 - Broken state (rewritten history, an unreadable timestamp) errs toward reviewing again rather than silently dropping the repo from the schedule forever.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

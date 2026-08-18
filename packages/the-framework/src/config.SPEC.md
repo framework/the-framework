@@ -8,6 +8,6 @@ The per-repo defaults every agent starts from, persisted in a small YAML file (`
 - Only today's spelling of a setting is read. A file still using an older one — the three booleans the publish ladder replaced, or the earlier name of the mode key — is not translated: those settings simply stop applying, until someone rewrites the file by hand.
 - A missing file yields nothing; a malformed one is a warning and nothing — a bad config must never fail an agent; explicit flags override whatever the file says.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

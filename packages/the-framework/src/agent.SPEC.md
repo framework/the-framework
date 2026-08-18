@@ -17,6 +17,6 @@ One agent: frame it, send it one prompt, honor the gates it answers with, work t
 - Frame the agent → opening prompt (pausing on its questions) → scaffold retry, if a build produced nothing → backlog loop → live chat → end.
 - On any stop or failure: classify why, emit a clean end event, and release the driver session.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

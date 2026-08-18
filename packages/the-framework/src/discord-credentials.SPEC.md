@@ -8,6 +8,6 @@ The rules for where the daemon's Discord notification webhook comes from: the en
 - Validation is deliberately shallow — reject only what could never work (a non-URL webhook); whether it actually delivers is Discord's answer to give.
 - Holds no credential and touches no file itself, so the browser shares exactly the rules the daemon enforces.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

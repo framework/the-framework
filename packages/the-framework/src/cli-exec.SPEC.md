@@ -6,6 +6,6 @@ One shared way to run a command-line tool such as git or gh: hand back its outpu
 - A kill is reported as a timeout, distinct from the tool refusing: a killed push says nothing on its own and would otherwise read as a rejected one.
 - A tool that explains itself on its error output (gh does) can have that shown instead of a generic failure.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

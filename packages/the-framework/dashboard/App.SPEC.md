@@ -13,6 +13,6 @@ The entire dashboard is this one page: it reads the selection from the address, 
 - The selection used to be several pieces of state reconciled at render, and every disagreement was a bug; a route cannot disagree with itself.
 - "No such project" and "this agent is gone" appear only after the relevant list actually loaded, so a slow read never looks like a missing thing.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

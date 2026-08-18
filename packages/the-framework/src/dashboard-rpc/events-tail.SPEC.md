@@ -7,6 +7,6 @@ Follows an agent's on-disk event journal: replay what is already logged, then de
 - While the new home is not yet visible (or never will be — a deleted agent), the tail idles rather than hopping somewhere wrong.
 - A file watcher with a slow poll behind it, so a missed filesystem signal delays events rather than losing them.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

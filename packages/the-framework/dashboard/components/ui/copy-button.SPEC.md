@@ -1,5 +1,5 @@
 A copy-to-clipboard button for the strings users take to a terminal (branch names, agent ids, URLs), flashing a brief check so the click visibly landed.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

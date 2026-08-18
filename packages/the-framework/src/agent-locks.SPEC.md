@@ -6,6 +6,6 @@ Serializes everything that touches one agent's checkout, so a finishing agent's 
 - Both actors live in the daemon by design, so an in-process lock is the whole fix — there is no second process to coordinate with.
 - A failed holder surfaces its own error without blocking whoever waits behind it.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

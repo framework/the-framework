@@ -36,6 +36,7 @@ import { dispatchRelayRpc } from './dashboard-rpc/relay-dispatch.js'
 import { tailEvents, tailAgentEvents } from './dashboard-rpc/events-tail.js'
 import { ensureArchiveIgnored, resolveUserDir } from './agent-archive.js'
 import { removeProjectWorktree } from './worktrees.js'
+import { reconcileBranchLinks } from './branch-links.js'
 import { scopedKey, parseScopedKey, keyBelongsTo } from './runtime-keys.js'
 import { addProject, listProjects, projectId } from './registry.js'
 import { isTicketPath } from './tickets.js'
@@ -507,6 +508,8 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
       // make git ignore the links (a `node_modules/` rule does not match a symlink, #738).
       await linkDependencies(projectCwd, worktree.path).catch(() => [])
       await excludeDependencyLinks(projectCwd).catch(() => {})
+      // The branches view (#1580) learns about this checkout now rather than at the next tick.
+      void reconcileBranchLinks(projectCwd).catch(() => {})
       return { ok: true, workspace: { cwd: worktree.path, agentId } }
     } catch (err) {
       if (await isGitRepo(projectCwd)) {

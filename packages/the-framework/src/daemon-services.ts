@@ -21,6 +21,7 @@ import { readTickets } from './dashboard/tickets.js'
 import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { startAgentCommitter } from './agent-commit.js'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
+import { startBranchLinksPass } from './branch-links.js'
 import { startCloudScratchSweep } from './cloud-scratch-refs.js'
 import { resolveAgentPr } from './dashboard/agent-handoff.js'
 import { sendChoice, sendMessage, sendStop } from './dashboard-rpc/control.js'
@@ -286,6 +287,10 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   // a push that could not land at teardown.
   const mergedWorktrees = startMergedWorktreeSweep({ projects, log, busy: deps.busyAgentIds })
 
+  // The #1580 branches view: one symlink per worktree under `.the-framework/branches/`, named as
+  // its branch, plus the repo-root `branches` shortcut. Quiet, idempotent, near-free per tick.
+  const branchLinks = startBranchLinksPass({ projects })
+
   // Delete the scratch refs a web hand-off leaves on origin (#1547): the pre-hand-off `cloud-*`
   // ref and the run branch, one dead pair per web run. Daemon-side rather than in the driver,
   // because session creation only signals "created", not "clone finished" — a driver deleting its
@@ -388,6 +393,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // Ten minutes. Its start-up turn is the point: the case it exists for is a machine that was
       // off (or a daemon that was down) while a session's push could not land.
       { name: 'worktree sweep', every: AUTO_PM_EVERY, run: () => mergedWorktrees.tick() },
+      // After the worktree sweep, so links to checkouts the sweep just reclaimed drop in the same
+      // turn. A rename settles within a tick; a fresh worktree gets its link at allocation.
+      { name: 'branch links', every: AUTO_PM_EVERY, run: () => branchLinks.tick() },
       // The finest cadence, and what the base tick is set by: the committer's idle window is a
       // poll seeing the same pending set twice, so its window *is* one tick.
       { name: 'session commit', run: () => agentCommitter.poll() },
@@ -415,6 +423,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // The CI watch can start fix runs, so it stops with the other run-starters.
       ciWatch.stop()
       mergedWorktrees.stop()
+      branchLinks.stop()
       cloudScratch.stop()
       // Stopped before `flushAgents` below, so that is a single flush past the idle window
       // rather than a wait for a turn that is no longer coming.

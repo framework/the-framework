@@ -1,7 +1,6 @@
 import { definePreset, type PresetDef } from './preset-prompt.js'
 import {
   PRESETS_DRAIN_QUEUE,
-  PRESETS_IMPORT_TICKETS,
   PRESETS_MAINTAINABILITY,
   PRESETS_MAINTENANCE,
   PRESETS_MARKET_RESEARCH,
@@ -76,27 +75,20 @@ export const presets = {
   marketResearch: definePreset({ name: 'market-research', template: PRESETS_MARKET_RESEARCH, label: 'Market research' }),
 
   /**
-   * [Import tickets from GitHub] (#959): fill `tickets/` from the repo's own issues, so the
-   * triage and planning presets have a backlog to read. One line of prompt, because the system
-   * prompt already tells the agent what a ticket is and where it goes.
-   *
-   * Marked {@link PresetSpec.newAgent}, like its update sibling: importing is repo work, not a
-   * reply, so it opens its own session rather than appending to whichever one the user happens to
-   * be reading.
-   */
-  importTickets: definePreset({ name: 'import-tickets', template: PRESETS_IMPORT_TICKETS, label: 'Import tickets from GitHub', newAgent: true, tooltip: 'Fill `tickets/` from the GitHub issues. Always runs in a new session.' }),
-
-  /**
-   * [Update from GitHub] (#1208): the second and every later import. It resumes from the
+   * [Update from GitHub] (#1208, #1501): the one GitHub sync. It resumes from the
    * `lastImportedAt` in `tickets/meta.json` and reconciles rather than refilling — an existing
    * ticket is edited in place, keeping the `.plan.md` written against it, and a
-   * closed issue's ticket goes.
+   * closed issue's ticket goes. An empty `tickets/` is its first-import branch: every open issue
+   * comes across, which is why the separate import preset could go (#1501).
    *
    * The timestamp is read by the agent out of the repo rather than rendered into the prompt: the
    * file travels in the same commit as the tickets it describes, so an agent whose work never landed
    * cannot leave behind a stamp claiming those issues were imported.
+   *
+   * Marked {@link PresetSpec.newAgent}: syncing is repo work, not a reply, so it opens its own
+   * session rather than appending to whichever one the user happens to be reading.
    */
-  updateTickets: definePreset({ name: 'update-tickets', template: PRESETS_UPDATE_TICKETS, label: 'Update from GitHub', newAgent: true, tooltip: 'Bring `tickets/` up to date with the issues and comments changed since the last import.' }),
+  updateTickets: definePreset({ name: 'update-tickets', template: PRESETS_UPDATE_TICKETS, label: 'Update from GitHub', newAgent: true, tooltip: 'Bring `tickets/` up to date with the GitHub issues. An empty `tickets/` gets a full first import.' }),
 
   /** [Plan tickets] (#685): turn tickets into costed plans. */
   planTickets: definePreset({ name: 'plan-tickets', template: PRESETS_PLAN_TICKETS, label: 'Plan tickets (aka spike)' }),
@@ -178,7 +170,6 @@ export const LAUNCHER_PRESETS: readonly PresetDef[] = [
   presets.suggestTicketsToWorkOn,
   presets.planTickets,
   presets.marketResearch,
-  presets.importTickets,
   presets.updateTickets,
   presets.maintenance,
   presets.triageQuick,

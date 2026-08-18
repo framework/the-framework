@@ -99,9 +99,11 @@ export function OnboardingChecklist({
     if (permission === 'default') void Notification.requestPermission()
   }
 
-  const importTickets = async () => {
+  const populateTickets = async () => {
     if (!targetProjectId) return
-    const intent = presets.importTickets.render()
+    // The update preset (#1501): its empty branch is the first import, so one preset serves both
+    // this checklist's fresh project and the panel's filled one — one label, one instruction.
+    const intent = presets.updateTickets.render()
     // Unattended (#1279): a checklist-fired routine ends at settle instead of parking in the chat loop.
     const started = await start(targetProjectId, intent, 'prompt', { unattended: true })
     // Land on the session doing the import, not the project's launcher (#1169): its id is what
@@ -147,8 +149,8 @@ export function OnboardingChecklist({
       optional: true,
       action: (
         <div className="flex flex-col items-end gap-1">
-          <Button size="sm" onClick={importTickets} disabled={!targetProjectId || starting}>
-            {starting ? 'Starting…' : 'Import tickets from GitHub'}
+          <Button size="sm" onClick={populateTickets} disabled={!targetProjectId || starting}>
+            {starting ? 'Starting…' : 'Update from GitHub'}
           </Button>
           {!targetProjectId && <span className="text-xs text-muted-foreground">Add a project first</span>}
           {startError && <span className="text-xs text-destructive">{startError}</span>}

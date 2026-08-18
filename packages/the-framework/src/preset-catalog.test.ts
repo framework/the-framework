@@ -20,7 +20,6 @@ const PARAMETERIZED = [
 /** The presets that scope themselves, so there is no blank for a user to fill. */
 const PARAMLESS = [
   presets.marketResearch,
-  presets.importTickets,
   presets.planTickets,
   presets.suggestNewTickets,
   presets.suggestNewFeatures,
@@ -37,7 +36,7 @@ test('every preset keeps its exact run-kind name', () => {
   assert.deepEqual(
     Object.values(presets).map(p => p.name).sort(),
     [
-      'drain-queue', 'import-tickets', 'maintainability', 'maintenance', 'market-research',
+      'drain-queue', 'maintainability', 'maintenance', 'market-research',
       'plan-tickets', 'readability', 'research', 'security-audit',
       'suggest-new-features', 'suggest-new-tickets', 'suggest-tickets-to-work-on',
       'triage-consensual', 'triage-quick', 'update-tickets', 'ux',
@@ -202,34 +201,22 @@ test('neither ungated triage preset waits on a human (#891/#892 vs #698)', () =>
   assert.ok(presets.suggestTicketsToWorkOn.template.includes('<AWAIT>'), 'the gated preset still awaits')
 })
 
-test('the two GitHub-import presets, and only those, always open a session of their own (#959/#1208)', () => {
+test('the GitHub-sync preset, and only it, always opens a session of its own (#959/#1208/#1501)', () => {
   // The flag is a property of the work, not of the surface that fires it, so it is pinned here
-  // rather than in the dashboard: both read GitHub and write `tickets/`, which has nothing to do
+  // rather than in the dashboard: it reads GitHub and writes `tickets/`, which has nothing to do
   // with whatever session the user happened to be reading when they clicked.
   const marked = Object.values(presets).filter(p => p.newAgent).map(p => p.name)
-  assert.deepEqual(marked.sort(), ['import-tickets', 'update-tickets'])
-  assert.equal(LAUNCHER_PRESETS.includes(presets.importTickets), true)
+  assert.deepEqual(marked.sort(), ['update-tickets'])
   assert.equal(LAUNCHER_PRESETS.includes(presets.updateTickets), true)
-})
-
-test('the import preset names where the tickets go, not just the button (#697)', () => {
-  // It read "Import tickets from GitHub", the label repeated back: no destination, no format. The
-  // rail's panel had spelled out the real ask in its own constant, so the same button asked for two
-  // different things depending on where it was pressed. The instruction lives on the preset now.
-  const prompt = presets.importTickets.render()
-  assert.equal(prompt, presets.importTickets.template)
-  assert.match(prompt, /tickets\//)
-  assert.match(prompt, /one file per issue/)
-  assert.notEqual(prompt, presets.importTickets.label)
-  // It also leaves the stamp behind (#1208), so the first update has somewhere to resume from
-  // instead of re-importing the whole repo.
-  assert.match(prompt, /tickets\/meta\.json/)
-  assert.match(prompt, /lastImportedAt/)
 })
 
 test('the update preset resumes from the stamp and keeps our own work (#1208)', () => {
   const prompt = presets.updateTickets.render()
   assert.equal(prompt, presets.updateTickets.template)
+  // It names the destination, not just the button back (#697's lesson): the instruction lives on
+  // the preset, so every surface offering the label sends the same ask.
+  assert.match(prompt, /tickets\//)
+  assert.notEqual(prompt, presets.updateTickets.label)
   // Resuming is the whole point: with no `since` an update is just a slower re-import.
   assert.match(prompt, /tickets\/meta\.json/)
   assert.match(prompt, /lastImportedAt/)
@@ -243,7 +230,8 @@ test('the update preset resumes from the stamp and keeps our own work (#1208)', 
   // agent's own work every time someone pressed the button.
   assert.match(prompt, /\.plan\.md/)
   assert.match(prompt, /closed/)
-  // And it must not read as the first import: that is the other preset, under the other button.
-  assert.notEqual(prompt, presets.importTickets.render())
+  // The empty branch is the first import (#1501): the reason no separate import preset exists.
+  assert.match(prompt, /\[Empty\]/)
+  assert.match(prompt, /every open issue/)
 })
 

@@ -205,50 +205,49 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(onOpen).toHaveBeenCalledWith('2026-07-20_do-the-thing.md')
   })
 
-  test('an empty tickets/ offers the GitHub import instead of a dead end', async () => {
+  test('an empty tickets/ offers the GitHub update instead of a dead end (#1501)', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'r1' })
     const onAgentStarted = vi.fn()
     render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
-    fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     // A fixed prompt, so it takes the verbatim-text path rather than a build.
     expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
-    expect(sendStart.mock.calls[0]?.[1]).toMatch(/GitHub issues into tickets\//i)
     // And it is the preset's own text: the onboarding checklist offers this button under the same
-    // label and sends `presets.importTickets`, so a second source here means one label, two asks.
-    expect(sendStart.mock.calls[0]?.[1]).toBe(presets.importTickets.render())
-    // Unattended (#1279): a button-fired import ends at settle instead of parking in the chat loop.
+    // label, so a second source here means one label, two asks. Its empty branch is the first
+    // import (#1501), which is why an empty tickets/ needs no preset of its own.
+    expect(sendStart.mock.calls[0]?.[1]).toBe(presets.updateTickets.render())
+    // Unattended (#1279): a button-fired update ends at settle instead of parking in the chat loop.
     expect(sendStart.mock.calls[0]?.[3]).toEqual({ unattended: true })
-    // The agent id is what lands you on the import session rather than the project home (#1169).
+    // The agent id is what lands you on the update session rather than the project home (#1169).
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r1'))
   })
 
-  test('a refused import says why and moves you nowhere (#1169)', async () => {
+  test('a refused update says why and moves you nowhere (#1169)', async () => {
     sendStart.mockResolvedValue({ ok: false, error: 'a session is already active' })
     const onAgentStarted = vi.fn()
     render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
-    fireEvent.click(await screen.findByRole('button', { name: /import tickets from github/i }))
+    fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
     expect(await screen.findByText(/already active/i)).toBeTruthy()
     expect(onAgentStarted).not.toHaveBeenCalled()
   })
 
-  test('a filled tickets/ offers the update, and sends the update preset verbatim (#1208)', async () => {
+  test('a filled tickets/ offers the same update beside the stamp (#1208)', async () => {
     sendStart.mockResolvedValue({ ok: true, agentId: 'r2' })
     const onAgentStarted = vi.fn()
     render(<TicketsPanel projectId="p1" tickets={[ticket()]} loaded onOpen={() => {}} onAgentStarted={onAgentStarted} />)
     fireEvent.click(await screen.findByRole('button', { name: /update from github/i }))
     await waitFor(() => expect(sendStart).toHaveBeenCalled())
     expect(sendStart.mock.calls[0]?.[2]).toBe('prompt')
-    // Its own preset, not the import's: the two ask for different work on a full directory.
     expect(sendStart.mock.calls[0]?.[1]).toBe(presets.updateTickets.render())
-    expect(sendStart.mock.calls[0]?.[1]).not.toBe(presets.importTickets.render())
     await waitFor(() => expect(onAgentStarted).toHaveBeenCalledWith(expect.any(String), 'r2'))
   })
 
-  test('the update is not offered on an empty tickets/, where importing is the word (#1208)', async () => {
+  test('the empty state offers exactly one update button, without the stamp row (#1501)', async () => {
     render(<TicketsPanel projectId="p1" tickets={[]} loaded onOpen={() => {}} />)
-    expect(await screen.findByRole('button', { name: /import tickets from github/i })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /update from github/i })).toBeNull()
+    // One button, one preset: the stamp row and its sibling button belong to the filled panel.
+    expect((await screen.findAllByRole('button', { name: /update from github/i })).length).toBe(1)
+    expect(screen.queryByText(/No record of an import yet/i)).toBeNull()
   })
 
   test('the stamp says when tickets/ last caught up, and admits when it does not know (#1208)', async () => {
@@ -271,10 +270,10 @@ describe('TicketsPanel (#697/#1144)', () => {
     expect(onAgentStarted).not.toHaveBeenCalled()
   })
 
-  test('an empty list with hiddenByFilter says so, rather than offering an import for work already done (#1144/#1230)', async () => {
+  test('an empty list with hiddenByFilter says so, rather than offering an update for work already done (#1144/#1230)', async () => {
     render(<TicketsPanel projectId="p1" tickets={[]} loaded hiddenByFilter={3} onOpen={() => {}} />)
     expect(await screen.findByText(/3 tickets hidden by the current filter/i)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /import tickets from github/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /update from github/i })).toBeNull()
   })
 
   test('no project renders nothing at all', () => {

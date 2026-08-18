@@ -25,7 +25,7 @@ export interface WorkspaceDoc {
   content: string
 }
 
-/** Cap a single doc so a runaway file can't bloat the `/api/docs` payload. */
+/** Cap a single doc so a runaway file can't bloat the docs payload. */
 const MAX_DOC_BYTES = 200_000
 
 /**

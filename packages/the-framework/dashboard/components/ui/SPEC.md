@@ -8,6 +8,6 @@ The dashboard's shared kit of basic interface pieces — buttons, inputs, menus,
 - The sidebar shell adapts by screen: a collapsible rail on desktop whose state survives reloads, a slide-in drawer on mobile.
 - Popups (menus, popovers, tooltips) share one surface look, and a trigger stays highlighted while its popup is open.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

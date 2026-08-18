@@ -7,6 +7,6 @@ The landing page — the product pitch told top to bottom — plus the shared bu
 - Every command appears in the visitor's chosen package manager, copies with one click, and the choice is remembered across pages and visits.
 - This directory doubles as the site's component library: the other pages reuse its navigation bar, footer, styling, copy-to-clipboard behavior, and package-manager machinery.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

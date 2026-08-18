@@ -52,6 +52,6 @@ flowchart TD
 
 **Prompts and presets.** One assembly path composes the system prompt for every agent — the built-in protocol, the extra protocol each capability brings, the user's own system file, and the picked context — and the exact composed text is recorded, so the dashboard can show precisely what the agent ran under. Two switches dial the wrapping down, where there were five modes: *vanilla* drops the enhanced prompt while keeping the framework integration, and *transparent* is the master off-switch — no framework channel at all, the CLI raw. Presets (triage, research, security audit, drain-the-queue, …) are one catalog with prompt text authored as prose; custom presets save to either the user tier (follows the person, private) or the project tier (travels with the repo, shared). A per-repo config file records which preset and switches a project works under, resolved layer over layer.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

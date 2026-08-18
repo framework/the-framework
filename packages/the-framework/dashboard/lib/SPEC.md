@@ -9,6 +9,6 @@ The dashboard's client-side logic layer: the dashboard owns no facts of its own,
 - Attention plumbing keeps a backgrounded tab honest: browser notifications for new needs-you items and agent activity (sharing the daemon notifier's idea of "new"), the needs-you count folded into the tab title, and the tab icon animating while an agent works.
 - Rules that can be pure are pure, wrapped thinly for the pages — so the behavior above is testable without a browser.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

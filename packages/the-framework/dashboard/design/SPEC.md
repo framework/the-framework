@@ -7,6 +7,6 @@ The dashboard's design gallery: static pages that show the design foundations (c
 - Cards are pure pages with nothing to click; hover and open states appear as separately rendered instances.
 - The build turns the card registry into one page per card, each self-contained and showing light and dark side by side, ready for the design-sync upload.
 
-## Before writing SPEC.md files
+## Before modifying/creating SPEC.md files
 
-Read https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md
+Always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

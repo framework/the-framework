@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { isLoopbackHost } from '../../src/client.js'
 
 // Client connection profiles (#1052): the saved daemons this browser can hop to. "A device I have"
 // is a CONNECTION, not an agent driver — the SPA is served by its daemon and every transport is
@@ -92,11 +93,6 @@ export function parseDeviceUrl(pasted: string): { url: string; token: string } |
   } catch {
     return null
   }
-}
-
-/** Whether a host is loopback (so the dashboard is talking to this machine's own daemon). */
-export function isLoopbackHost(host: string): boolean {
-  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1'
 }
 
 /** Remember the loopback origin the dashboard is served from, so "Local" can return to the right

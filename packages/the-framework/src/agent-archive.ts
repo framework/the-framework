@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
-import { frameworkGitignore, gitignorePath, archiveGitignore, SESSIONS_RULE } from './framework-gitignore.js'
+import { frameworkGitignore, gitignorePath, archiveGitignore, ARCHIVE_RULE } from './framework-gitignore.js'
 import { nodeStoreFs, ARCHIVE_DIR, type StoreFs } from './store/index.js'
 import { nodeGitRunner, type GitRunner } from './project.js'
 
@@ -73,7 +73,7 @@ export async function ensureArchiveIgnored(cwd: string, _user: string, fs: Store
     return true
   }
   const current = await fs.read(path)
-  if (current.includes(SESSIONS_RULE)) return false
+  if (current.includes(ARCHIVE_RULE)) return false
   await fs.write(path, current.endsWith('\n') ? current + archiveGitignore() : current + '\n' + archiveGitignore())
   return true
 }

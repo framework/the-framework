@@ -38,22 +38,19 @@ export const EVENTS_FILE = 'events.jsonl'
 export const META_FILE = 'agent.json'
 
 /**
- * Where finished agents are archived, so the dashboard can list a project's run
- * history (#303). The live agent stays at `events.jsonl`/`agent.json` (the daemon
- * tails it); on {@link AgentStore.close} a copy lands here as `<id>.jsonl` +
- * `<id>.json`, giving the history sidebar a per-agent log to replay.
- */
-export const AGENTS_DIR = 'agents'
-
-/**
- * Where a project's finished agents are archived (#1179): `.the-framework/<user>/agents/`,
- * which the install-time ignore un-ignores so the history is committed and survives a
- * `git clean -fdx`. {@link AGENTS_DIR} stays the transient location — an agent with no worktree of
- * its own archives there, and so does one archiving inside its own throwaway checkout — so both
- * are read.
+ * Where finished agents are archived, under both placements that name has: a project's committed
+ * `.the-framework/<user>/agents/` (#1179), which the install-time ignore un-ignores so the history
+ * survives a `git clean -fdx`, and the transient `.the-framework/agents/` that an agent with no
+ * worktree of its own — or one archiving inside its own throwaway checkout — writes into. What
+ * separates the two is the user segment, not the directory's name, and {@link archiveDir} is where
+ * a caller picks; both are read when a project's history is listed.
  *
- * The name lives here beside its sibling rather than in `sessions.ts`, which owns the per-user
- * naming: that module reads the store, so the constant travelling the other way would be a cycle.
+ * The live agent stays at `events.jsonl`/`agent.json` (the daemon tails it); on
+ * {@link AgentStore.close} a copy lands here as `<id>.jsonl` + `<id>.json` (#303), giving the
+ * history sidebar a per-agent log to replay.
+ *
+ * The name lives here rather than in `sessions.ts`, which owns the per-user naming: that module
+ * reads the store, so the constant travelling the other way would be a cycle.
  */
 export const ARCHIVE_DIR = 'agents'
 
@@ -79,9 +76,6 @@ export function startedAtFromAgentId(id: string): string | undefined {
   return match ? `${match[1]}:${match[2]}:${match[3]}.${match[4]}Z` : undefined
 }
 
-/** Bumped when the on-disk shape changes, so a reader can detect an old file. */
-export const AGENT_META_VERSION = 2
-
 /** How an agent ended (or that it is still going). */
 export type AgentStatus = 'running' | 'done' | 'stopped' | 'failed'
 
@@ -90,7 +84,6 @@ export type AgentStatus = 'running' | 'done' | 'stopped' | 'failed'
  * dashboard render a header (and a future agent list) without parsing every line.
  */
 export interface AgentMeta {
-  version: number
   status: AgentStatus
   /** Stable, path-safe id for this agent (derived from {@link startedAt}). */
   id: string
@@ -162,8 +155,7 @@ export interface AgentMeta {
    * What lets a list surface — which reads meta, not the event log — tell "ended, still
    * publishing" from "ended, published": between a clean `end` and this field, an armed agent's
    * epilogue is still pushing / opening the PR, exactly the window the session pill calls
-   * "publishing…" (#1431). Only trustworthy at {@link AgentMeta.version} ≥ 2: older records never
-   * folded the event, so its absence there says nothing and must not read as forever-publishing.
+   * "publishing…" (#1431). Absent until the event lands, which is what a list reads as "still going".
    */
   handoffReport?: 'done' | 'skipped' | 'failed'
   /**
@@ -391,7 +383,6 @@ function freshMeta(
   kind?: 'build' | 'prompt',
 ): AgentMeta {
   return {
-    version: AGENT_META_VERSION,
     status: 'running',
     id: id && isSafeAgentId(id) ? id : agentIdFromStartedAt(startedAt),
     startedAt,
@@ -653,7 +644,7 @@ export class AgentStore {
  * be kept — the project's copy — never for the copy an agent leaves inside its own worktree.
  */
 function archiveDir(dir: string, user?: string): string {
-  return user ? join(dir, user, ARCHIVE_DIR) : join(dir, AGENTS_DIR)
+  return user ? join(dir, user, ARCHIVE_DIR) : join(dir, ARCHIVE_DIR)
 }
 
 /** Paths of an agent's archived log + meta. */
@@ -691,7 +682,7 @@ async function archiveDirs(fs: StoreFs, dir: string): Promise<string[]> {
     const candidate = join(dir, name, ARCHIVE_DIR)
     if ((await fs.readdir(candidate)).length > 0) dirs.push(candidate)
   }
-  dirs.push(join(dir, AGENTS_DIR))
+  dirs.push(join(dir, ARCHIVE_DIR))
   return dirs
 }
 

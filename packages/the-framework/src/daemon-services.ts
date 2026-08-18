@@ -248,7 +248,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     log,
   })
 
-  // Commit the session archives written into the main checkout (#912/#1179). An agent's own worktree
+  // Commit the agent archives written into the main checkout (#912/#1179). An agent's own worktree
   // sweeps its archive on teardown; nothing did the same for one held in the checkout itself, so it
   // sat as an uncommitted change until a human noticed. Path-scoped and debounced, and it skips a
   // repo that is mid-rebase or index-locked rather than committing into someone's work.

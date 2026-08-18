@@ -5,11 +5,9 @@ import { loadFrameworkConfig, type FrameworkFileConfig } from '../config.js'
 import { readAllAgents, type AgentMeta } from '../store/index.js'
 
 /**
- * The multi-project read side (#392): projects the daemon serves come from the
- * registry (#390), and each read endpoint (`/api/logs`, `/api/runs`, `/api/docs`)
- * resolves a `?project=<id>` to that project's path before running the existing
- * per-cwd reader. Live streaming + per-project run start/stop stay single-project
- * for now (#393).
+ * The multi-project read side (#392): projects the daemon serves come from the registry (#390),
+ * and every read resolves a project id to that project's path before running the per-cwd reader
+ * underneath. One daemon serves them all; it runs one agent at a time per project (#393).
  */
 
 /** One project's summary for the Projects sidebar (#314). */
@@ -82,7 +80,7 @@ export async function summarizeProject(record: ProjectRecord, deps: SummarizeDep
  * a fake so the server is exercised without touching the user's registry.
  */
 export interface ProjectsProvider {
-  /** Every registered project, summarized, for `GET /api/projects`. */
+  /** Every registered project, summarized, for the projects read. */
   list(): Promise<ProjectSummary[]>
   /** The absolute path for a registry id, or `undefined` when unknown. */
   resolvePath(id: string): Promise<string | undefined>

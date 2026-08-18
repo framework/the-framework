@@ -8,7 +8,6 @@ const PROJECTS = [{ id: 'p1', path: '/one', name: 'one', activated: true }]
 
 function liveAgent(overrides: Partial<LiveAgent> = {}): LiveAgent {
   return {
-    version: 2,
     status: 'running',
     id: 'run-1',
     startedAt: '2026-08-01T10:00:00.000Z',

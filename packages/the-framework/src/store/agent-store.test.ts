@@ -17,7 +17,6 @@ import {
   loadAgentEvents,
   agentIdFromStartedAt,
   startedAtFromAgentId,
-  AGENT_META_VERSION,
   type StoreFs,
   type AgentMeta,
 } from './agent-store.js'
@@ -79,7 +78,6 @@ test('fresh open truncates the log and writes an initial meta snapshot', async (
   const store = await AgentStore.open(CWD, { fs, fresh: true, now: AT })
   assert.equal(fs.files.get(EVENTS), '')
   const meta = await store.readMeta()
-  assert.equal(meta?.version, AGENT_META_VERSION)
   assert.equal(meta?.status, 'running')
   assert.equal(meta?.startedAt, AT)
 })
@@ -457,7 +455,7 @@ test('a fresh run archives a prior run that never got closed (crash safety) (#30
 
 const RUNS = join(CWD, '.the-framework', 'agents')
 const runningAgentMeta = (id: string): string =>
-  JSON.stringify({ version: AGENT_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT })
+  JSON.stringify({ status: 'running', id, startedAt: AT, updatedAt: AT })
 
 test('listAgents reads every user archive and the transient one, under their one name (#1179)', async () => {
   // Both live locations are listed — the committed per-user archive and the transient one an agent
@@ -465,7 +463,7 @@ test('listAgents reads every user archive and the transient one, under their one
   // are not read: a second spelling per location is four directory probes per listing to find
   // archives that, with no users, nobody has.
   const meta = (id: string): string =>
-    JSON.stringify({ version: AGENT_META_VERSION, status: 'done', id, startedAt: AT, updatedAt: AT, intent: id })
+    JSON.stringify({ status: 'done', id, startedAt: AT, updatedAt: AT, intent: id })
   const user = join(CWD, '.the-framework', 'dev@example.com')
   const fs = memFs({
     [join(user, 'agents', '2026-new.json')]: meta('2026-new'),
@@ -481,7 +479,7 @@ test('reconcileOrphanedAgents flips archived runs stuck at running to stopped (#
   const fs = memFs({
     [join(RUNS, 'a.json')]: runningAgentMeta('a'),
     [join(RUNS, 'b.json')]: runningAgentMeta('b'),
-    [join(RUNS, 'c.json')]: JSON.stringify({ version: AGENT_META_VERSION, status: 'done', id: 'c', startedAt: AT, updatedAt: AT }),
+    [join(RUNS, 'c.json')]: JSON.stringify({ status: 'done', id: 'c', startedAt: AT, updatedAt: AT }),
   })
   const fixed = await reconcileOrphanedAgents(CWD, fs)
   assert.equal(fixed, 2)
@@ -504,7 +502,7 @@ test('reconcileOrphanedAgents flips a live run and archives it, counting it once
 // in-flight run. A second daemon boot then marked genuinely live agents as finished.
 test('reconcileOrphanedAgents leaves a run whose pid is alive on this host (#926)', async () => {
   const owned = (id: string, over: Record<string, unknown> = {}): string =>
-    JSON.stringify({ version: AGENT_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT, pid: 42, host: hostname(), ...over })
+    JSON.stringify({ status: 'running', id, startedAt: AT, updatedAt: AT, pid: 42, host: hostname(), ...over })
   const fs = memFs({
     [META]: owned('live'),
     [join(RUNS, 'alive.json')]: owned('alive'),
@@ -527,7 +525,7 @@ test('reconcileOrphanedAgents leaves a run whose pid is alive on this host (#926
 
 test('reconcileOrphanedAgents is a no-op on a clean or empty workspace (#642)', async () => {
   assert.equal(await reconcileOrphanedAgents(CWD, memFs()), 0)
-  const done = memFs({ [META]: JSON.stringify({ version: AGENT_META_VERSION, status: 'done', id: 'd', startedAt: AT, updatedAt: AT }) })
+  const done = memFs({ [META]: JSON.stringify({ status: 'done', id: 'd', startedAt: AT, updatedAt: AT }) })
   assert.equal(await reconcileOrphanedAgents(CWD, done), 0)
 })
 
@@ -535,7 +533,7 @@ test('reconcileOrphanedAgents is a no-op on a clean or empty workspace (#642)', 
 // reader can flip it to `stopped` (and archive it) without waiting for a daemon-restart reconcile.
 const HERE = hostname()
 const ownedMeta = (id: string, pid: number, host: string): string =>
-  JSON.stringify({ version: AGENT_META_VERSION, status: 'running', id, startedAt: AT, updatedAt: AT, pid, host })
+  JSON.stringify({ status: 'running', id, startedAt: AT, updatedAt: AT, pid, host })
 
 test('a fresh open records the owning pid + host so a dead run can be detected (#716)', async () => {
   const fs = memFs()
@@ -857,7 +855,6 @@ test('applyEventToMeta records the branch a branch event names (#1277)', () => {
 const CHOICE_LINE = '{"kind":"choice","id":"todo-next","title":"Start the next backlog item?","options":[{"id":"proceed","label":"Go"},{"id":"stop","label":"Stop"}]}\n'
 const deadGatedMeta = (id: string): string =>
   JSON.stringify({
-    version: AGENT_META_VERSION,
     status: 'running',
     id,
     startedAt: AT,

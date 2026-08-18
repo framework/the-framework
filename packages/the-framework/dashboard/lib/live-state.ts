@@ -154,17 +154,14 @@ export function isPublishing(events: readonly FrameworkEvent[]): boolean {
  * {@link isPublishing}, but off an agent's meta snapshot instead of its event log — for the list
  * surfaces (the Recent-sessions rail) that only ever hold a {@link AgentMeta} (#1455). The rail
  * said "done" while the session's own pill still said "publishing…": `status` flips to `done`
- * the moment `end` lands, and until the `handoff` fold (meta version 2) the report never
- * reached the meta, so a list could not know the epilogue was still pushing.
+ * the moment `end` lands, and the report reaches the meta only when the handoff answers, so
+ * between the two a list could not know the epilogue was still pushing.
  *
- * The version gate is the old-records guard: a meta from before the fold has no
- * `handoffReport` even though its handoff reported long ago, so only a version ≥ 2 record —
- * one whose writer folds the event — may read the field's absence as "still in flight".
  * `handoff.push` must be affirmatively on, the same rule as the event-side check: nothing to
  * wait for when the epilogue was never armed to push.
  */
 export function isMetaPublishing(meta: AgentMeta): boolean {
-  return meta.version >= 2 && meta.status === 'done' && meta.handoff?.push === true && meta.handoffReport === undefined
+  return meta.status === 'done' && meta.handoff?.push === true && meta.handoffReport === undefined
 }
 
 /**

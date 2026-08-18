@@ -82,7 +82,7 @@ test('installProject seeds .the-framework/.gitignore so only the archive is comm
   const ignore = fs.files.get(gitignorePath(CWD)) ?? ''
   // Agent state (events.jsonl / agent.json / agents/) stays untracked...
   assert.match(ignore, /^\*$/m)
-  // ...and the session archive is un-ignored all the way down, since git never descends into an
+  // ...and the agent archive is un-ignored all the way down, since git never descends into an
   // ignored directory. Written whole at install (B3): with one record there is one content, so
   // nothing has to be appended to it later.
   assert.match(ignore, /^!\*\/$/m)

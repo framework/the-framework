@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { summarizeProject, type SummarizeDeps } from './projects.js'
 import type { ProjectRecord } from '../registry.js'
-import { AGENT_META_VERSION, type AgentMeta } from '../store/index.js'
+import { type AgentMeta } from '../store/index.js'
 
 const RECORD: ProjectRecord = { id: 'app-a-1', path: '/repos/app-a', addedAt: '2026-07-11T00:00:00.000Z' }
 
@@ -16,7 +16,6 @@ function deps(over: SummarizeDeps): SummarizeDeps {
 }
 
 const agent = (id: string, updatedAt: string): AgentMeta => ({
-  version: AGENT_META_VERSION,
   status: 'stopped',
   id,
   startedAt: updatedAt,

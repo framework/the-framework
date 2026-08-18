@@ -14,7 +14,7 @@ import type { PreflightResult } from './preflight.js'
  */
 const agentReady = (): Promise<PreflightResult> => Promise.resolve({ ok: true, checks: [] })
 
-import { FRAMEWORK_DIR, WORKTREES_DIR, EVENTS_FILE, META_FILE, worktreePath, agentBranchName, AGENT_META_VERSION, startedAtFromAgentId, type AgentMeta } from './store/index.js'
+import { FRAMEWORK_DIR, WORKTREES_DIR, EVENTS_FILE, META_FILE, worktreePath, agentBranchName, startedAtFromAgentId, type AgentMeta } from './store/index.js'
 import { addProject, projectId } from './registry.js'
 import { nodeGitRunner } from './project.js'
 import type { AgentSpec } from './agent-spec.js'
@@ -143,7 +143,6 @@ async function writeAgentMeta(checkout: string, status: AgentMeta['status'], ext
   const dir = join(checkout, FRAMEWORK_DIR)
   await mkdir(dir, { recursive: true })
   const meta: AgentMeta = {
-    version: AGENT_META_VERSION,
     status,
     id: 'run1',
     startedAt: '2026-07-24T00:00:00.000Z',
@@ -316,7 +315,7 @@ fs.mkdirSync(dir, { recursive: true })
 const now = new Date().toISOString()
 fs.writeFileSync(
   path.join(dir, 'agent.json'),
-  JSON.stringify({ version: ${AGENT_META_VERSION}, status: 'failed', id: agentId, startedAt: now, updatedAt: now, driver: 'claude-code' }),
+  JSON.stringify({ status: 'failed', id: agentId, startedAt: now, updatedAt: now, driver: 'claude-code' }),
 )
 fs.appendFileSync(path.join(dir, 'events.jsonl'), JSON.stringify({ kind: 'end', ok: false, detail: ${JSON.stringify(detail)} }) + '\\n')
 process.exit(1)

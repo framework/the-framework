@@ -79,9 +79,6 @@ export function startedAtFromAgentId(id: string): string | undefined {
   return match ? `${match[1]}:${match[2]}:${match[3]}.${match[4]}Z` : undefined
 }
 
-/** Bumped when the on-disk shape changes, so a reader can detect an old file. */
-export const AGENT_META_VERSION = 2
-
 /** How an agent ended (or that it is still going). */
 export type AgentStatus = 'running' | 'done' | 'stopped' | 'failed'
 
@@ -90,7 +87,6 @@ export type AgentStatus = 'running' | 'done' | 'stopped' | 'failed'
  * dashboard render a header (and a future agent list) without parsing every line.
  */
 export interface AgentMeta {
-  version: number
   status: AgentStatus
   /** Stable, path-safe id for this agent (derived from {@link startedAt}). */
   id: string
@@ -162,8 +158,7 @@ export interface AgentMeta {
    * What lets a list surface — which reads meta, not the event log — tell "ended, still
    * publishing" from "ended, published": between a clean `end` and this field, an armed agent's
    * epilogue is still pushing / opening the PR, exactly the window the session pill calls
-   * "publishing…" (#1431). Only trustworthy at {@link AgentMeta.version} ≥ 2: older records never
-   * folded the event, so its absence there says nothing and must not read as forever-publishing.
+   * "publishing…" (#1431). Absent until the event lands, which is what a list reads as "still going".
    */
   handoffReport?: 'done' | 'skipped' | 'failed'
   /**
@@ -391,7 +386,6 @@ function freshMeta(
   kind?: 'build' | 'prompt',
 ): AgentMeta {
   return {
-    version: AGENT_META_VERSION,
     status: 'running',
     id: id && isSafeAgentId(id) ? id : agentIdFromStartedAt(startedAt),
     startedAt,

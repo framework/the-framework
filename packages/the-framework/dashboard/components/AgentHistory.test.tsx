@@ -25,7 +25,6 @@ afterEach(cleanup)
 
 function agent(over: Partial<AgentMeta> = {}): AgentMeta {
   return {
-    version: 1,
     status: 'running',
     id: 'run-1',
     startedAt: '2026-07-19T16:05:44.756Z',
@@ -56,7 +55,7 @@ describe('AgentHistory (#785)', () => {
   })
 
   test('an ended run armed to publish reads as publishing… until the handoff report folds in (#1455)', () => {
-    const publishing = agent({ version: 2, status: 'done', handoff: { push: true, pr: true } })
+    const publishing = agent({ status: 'done', handoff: { push: true, pr: true } })
     const { container } = renderRail(
       <AgentHistory projectId="p1" agents={[publishing]} selectedAgentId={null} onSelect={() => {}} />,
     )
@@ -65,15 +64,15 @@ describe('AgentHistory (#785)', () => {
     expect(container.querySelector('.animate-pulse')).toBeTruthy()
   })
 
-  test('a run whose handoff reported — and a pre-fold record — read as plain done (#1455)', () => {
-    // The reported agent's window is closed; the version-1 record predates the fold, so its
-    // missing report says nothing and must not read as forever-publishing.
+  test('a run whose handoff reported reads as plain done, armed or not (#1455)', () => {
+    // Once the report lands the epilogue's window is closed, whichever way it went — and an agent
+    // that never armed a push had no window to begin with.
     renderRail(
       <AgentHistory
         projectId="p1"
         agents={[
-          agent({ id: 'run-1', version: 2, status: 'done', handoff: { push: true, pr: true }, handoffReport: 'done' }),
-          agent({ id: 'run-2', version: 1, status: 'done', handoff: { push: true, pr: true } }),
+          agent({ id: 'run-1', status: 'done', handoff: { push: true, pr: true }, handoffReport: 'done' }),
+          agent({ id: 'run-2', status: 'done', handoff: { push: false, pr: false } }),
         ]}
         selectedAgentId={null}
         onSelect={() => {}}

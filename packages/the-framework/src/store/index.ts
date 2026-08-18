@@ -26,7 +26,6 @@ export {
   META_FILE,
   AGENTS_DIR,
   ARCHIVE_DIR,
-  AGENT_META_VERSION,
   type StoreFs,
   type AgentMeta,
   type LiveAgent as LiveAgent,

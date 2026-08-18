@@ -18,7 +18,6 @@ const NOW = Date.parse('2026-08-01T12:00:00Z')
 
 function meta(overrides: Partial<AgentMeta> = {}): AgentMeta {
   return {
-    version: 2,
     status: 'done',
     id: 'run-1',
     startedAt: '2026-08-01T10:00:00.000Z',

@@ -4,7 +4,7 @@ import type { DriverSession } from './driver/index.js'
 import type { ChoicePick, ChoiceRequest, FrameworkEvent } from './events.js'
 import { requestChoices, runAwaitRounds } from './await-gate.js'
 import { FLAT_TODO_FILE, ticketFromQueueEntry } from './tickets.js'
-import { findFlatTodo } from './tickets-file.js'
+import { dataProjectRoot, readDataFile, withDataBranch } from './data-branch.js'
 import { drainsQueue } from './preset-catalog.js'
 import { createTurnSignalEmitter } from './turn-gate.js'
 
@@ -54,9 +54,8 @@ export function parseTodoEntries(md: string): string[] {
 }
 
 /**
- * Append an open entry to the workspace's backlog, creating the flat {@link FLAT_TODO_FILE}
- * when the workspace has none. Resolves with the file written, or `undefined` if
- * it couldn't be written.
+ * Append an open entry to the queue on the data branch (#1582), creating {@link FLAT_TODO_FILE}
+ * when the branch has none. Resolves with the file written, or `undefined` if it couldn't be.
  *
  * This is how a paused agent leaves word to pick itself up again (#529): the
  * backlog is already the thing a later agent drains, so a resume note needs no
@@ -64,24 +63,46 @@ export function parseTodoEntries(md: string): string[] {
  * unwinding, and must not mask the reason it stopped.
  */
 export async function appendTodoEntry(cwd: string, entry: string): Promise<string | undefined> {
-  return writeTodoEntry(cwd, (await findFlatTodo(cwd)) ?? FLAT_TODO_FILE, entry)
+  return queueWrite(cwd, '[The Framework] queue a resume note', md => {
+    const separator = md === '' || md.endsWith('\n') ? '' : '\n'
+    return `${md}${separator}- [ ] ${entry}\n`
+  })
 }
 
 /**
- * Append an open entry to the workspace's flat backlog with a priority, creating
- * {@link FLAT_TODO_FILE} when there is none.
+ * Append an open entry to the queue with a priority, creating {@link FLAT_TODO_FILE} when there
+ * is none.
  *
  * The difference from {@link appendTodoEntry} is the priority placement (#1164): a dashboard
- * pick (#697) lands in its `## Priority N` section rather than at the end of the file. The flat
- * file is the durable global queue #624 settled on, and the only one `promoteQueue` carries
- * between branches (#852).
+ * pick (#697) lands in its `## Priority N` section rather than at the end of the file.
  */
 export async function appendFlatTodoEntry(
   cwd: string,
   entry: string,
   priority?: number,
 ): Promise<string | undefined> {
-  return writeTodoEntry(cwd, (await findFlatTodo(cwd)) ?? FLAT_TODO_FILE, entry, priority)
+  return queueWrite(cwd, '[The Framework] queue an entry', md =>
+    priority !== undefined
+      ? insertTodoEntry(md, entry, priority)
+      : `${md}${md === '' || md.endsWith('\n') ? '' : '\n'}- [ ] ${entry}\n`,
+  )
+}
+
+/**
+ * One edit of the queue file, through the data branch's write funnel (#1582): resolve the project
+ * root (an agent calls this from its worktree; the data checkout lives beside the main repo),
+ * apply the pure edit, let the funnel commit and push it. Never throws; `undefined` means the
+ * write did not land.
+ */
+async function queueWrite(cwd: string, message: string, edit: (md: string) => string): Promise<string | undefined> {
+  const root = await dataProjectRoot(cwd).catch(() => undefined)
+  if (!root) return undefined
+  const result = await withDataBranch(root, message, async dir => {
+    const path = join(dir, FLAT_TODO_FILE)
+    const md = await readFile(path, 'utf8').catch(() => '')
+    await writeFile(path, edit(md), 'utf8')
+  })
+  return result.ok ? FLAT_TODO_FILE : undefined
 }
 
 /** A `## Priority 7` heading, with whatever gloss the format's example puts after the number. */
@@ -151,45 +172,36 @@ export function insertTodoEntry(md: string, entry: string, priority: number): st
 }
 
 /**
- * Write one open entry to a named backlog file. Never throws; resolves with the file written.
- *
- * With no `priority` this stays the plain append it always was: the resume note (#529) and the
- * agent's own follow-ups are a running list, and the file's order is theirs to keep.
+ * Retire one open entry in a queue document: check its box (or give a bare bullet one, checked).
+ * The same "open" grammar {@link parseTodoEntries} reads (#1164/#1297), the retire half of what
+ * `queue-promote.ts` did before #1582 made the daemon the queue's one local writer.
  */
-async function writeTodoEntry(
-  cwd: string,
-  name: string,
-  entry: string,
-  priority?: number,
-): Promise<string | undefined> {
-  const path = join(cwd, name)
-  try {
-    const existing = await readFile(path, 'utf8').catch(() => '')
-    if (priority !== undefined) {
-      await writeFile(path, insertTodoEntry(existing, entry, priority), 'utf8')
-      return name
-    }
-    const separator = existing === '' || existing.endsWith('\n') ? '' : '\n'
-    await writeFile(path, `${existing}${separator}- [ ] ${entry}\n`, 'utf8')
-    return name
-  } catch {
-    return undefined
-  }
+export function checkOffEntry(md: string, entry: string): string {
+  const line = /^(\s*(?:[-*]|\d+\.)\s+)(?:\[([ xX])\]\s*)?(.*)$/
+  return md
+    .split('\n')
+    .map(row => {
+      const item = line.exec(row)
+      if (!item || item[3]?.trim() !== entry || item[2] === 'x' || item[2] === 'X') return row
+      return `${item[1]}[x] ${item[3]!.trim()}`
+    })
+    .join('\n')
 }
 
 /**
- * Locate the workspace's backlog and its open entries: the flat file via `findFlatTodo`
- * (the root `TODO_AGENTS.md`, the one location it reads). Returns `undefined`
- * when no backlog exists or it has no open entry. Session-scoped `TODO_<slug>.agent.md`
- * files are retired (#1369) — a leftover one in the checkout is ignored.
+ * The backlog and its open entries, read off the data branch (#1582) — the queue's one location,
+ * readable from the project checkout and from any agent worktree alike. Returns `undefined` when
+ * no queue exists or it has no open entry. Session-scoped `TODO_<slug>.agent.md` files are
+ * retired (#1369).
+ *
+ * `fresh: true` re-fetches the branch first: for a long-lived agent process about to act on the
+ * queue, where the local ref may trail what other writers pushed meanwhile.
  */
-export async function findTodoBacklog(cwd: string): Promise<TodoBacklog | undefined> {
-  const name = await findFlatTodo(cwd)
-  if (!name) return undefined
-  const md = await readFile(join(cwd, name), 'utf8').catch(() => undefined)
+export async function findTodoBacklog(cwd: string, opts: { fresh?: boolean } = {}): Promise<TodoBacklog | undefined> {
+  const md = await readDataFile(cwd, FLAT_TODO_FILE, opts)
   if (md === undefined) return undefined
   const entries = parseTodoEntries(md)
-  return entries.length ? { name, entries } : undefined
+  return entries.length ? { name: FLAT_TODO_FILE, entries } : undefined
 }
 
 /**
@@ -227,9 +239,7 @@ export async function agentTodoPending(cwd: string, sessionName: string | undefi
  * Overview and nothing else — no run is started or steered by this.
  */
 export async function nextQueuedTicket(cwd: string): Promise<string | undefined> {
-  const name = await findFlatTodo(cwd)
-  if (!name) return undefined
-  const md = await readFile(join(cwd, name), 'utf8').catch(() => undefined)
+  const md = await readDataFile(cwd, FLAT_TODO_FILE)
   if (md === undefined) return undefined
   const first = parseTodoEntries(md)[0]
   return first ? ticketFromQueueEntry(first) : undefined
@@ -261,7 +271,7 @@ export type TodoLoopReason =
   | 'empty'
   /** The user picked "stop" at a per-item gate. */
   | 'stopped'
-  /** Two items in a row left the backlog's next entry untouched. */
+  /** Two check-offs in a row could not be written to the data branch. */
   | 'stalled'
   /** The item cap was reached with entries still open. */
   | 'max-items'
@@ -305,17 +315,19 @@ export interface TodoLoopOptions {
 /** The default per-agent cap on backlog entries — a backstop beside the budget cap (#322). */
 export const DEFAULT_MAX_TODO_ITEMS = 25
 
-/** How many consecutive no-progress items before the loop stops rather than spins. */
+/** How many consecutive failed check-off writes before the loop stops rather than spins. */
 const MAX_STALLS = 2
 
 /**
- * Drive the backlog to empty: read the next open entry, gate, prompt the agent
- * to complete exactly that entry and check it off, and repeat. Caps make it safe
- * to leave unattended (#322's concern): the agent's budget/abort signal ends any
- * turn, a hard item cap bounds the agent, and two consecutive items that leave the
- * next entry untouched stop the loop instead of spinning. A backlog turn is a turn
- * like any other: await gates (`showChoices()` / `showMultiSelect()`) and the signals
- * (`showMarkdown()`, `setSessionName()`, `setReadyForMerge()`) are honored here too.
+ * Drive the backlog to empty: read the next open entry (fresh off the data branch), gate, prompt
+ * the agent to complete exactly that entry, check it off on the data branch, and repeat. The
+ * check-off is the framework's, not the agent's (#1582): the queue lives on a branch the agent's
+ * checkout does not hold, and the one writer model keeps every edit going through the same
+ * funnel. Caps make it safe to leave unattended (#322's concern): the agent's budget/abort
+ * signal ends any turn, a hard item cap bounds the agent, and two check-offs in a row failing to
+ * land stop the loop instead of re-working the same entry. A backlog turn is a turn like any
+ * other: await gates (`showChoices()` / `showMultiSelect()`) and the signals (`showMarkdown()`,
+ * `setSessionName()`, `setReadyForMerge()`) are honored here too.
  */
 export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult> {
   const { session, cwd, emit } = opts
@@ -330,7 +342,6 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
   }
 
   let completed = 0
-  let stalls = 0
   let file: string | undefined
 
   // The backlog emptied: announce it if we did any work, and report a clean finish.
@@ -342,7 +353,7 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
 
   for (let item = 0; item < maxItems; item++) {
     if (opts.signal?.aborted) break
-    const backlog = await findTodoBacklog(cwd)
+    const backlog = await findTodoBacklog(cwd, { fresh: true })
     if (!backlog) return finishEmpty()
     file = backlog.name
     const next = backlog.entries[0]!
@@ -373,8 +384,9 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
     }
 
     emit({ kind: 'log', message: `Backlog item ${completed + 1}: ${preview}` })
-    // Complete exactly the first open entry and check it off, honoring await gates.
-    const prompt = `Open \`${backlog.name}\` in the workspace and work on the FIRST open entry only. Complete it fully and verify your work. Then update \`${backlog.name}\`: check the entry off (or remove it). Do not start any other entry.`
+    // Complete exactly this entry, honoring await gates. The queue file is not the agent's to
+    // touch (#1582): it lives on the data branch, and the check-off below is the framework's.
+    const prompt = `Work on exactly this task from the project's task queue, and nothing else:\n\n${next}\n\nComplete it fully and verify your work. Do not start any other task; the framework checks this entry off the queue when the turn ends.`
     const rounds = await runAwaitRounds({ session, prompt, ...gateDeps })
     completed++
     // A plan the user declined with a stop-marked answer (#358) ends the whole session, not just
@@ -385,19 +397,17 @@ export async function runTodoLoop(opts: TodoLoopOptions): Promise<TodoLoopResult
       return { completed, reason: 'stopped', file, sessionStopped: true }
     }
 
-    // Progress check: the item turn must have retired the entry it was given
-    // (checked off, removed, or reworded). New entries appended by the work
-    // (e.g. Maintenance follow-ups) are fine — only the *next* entry standing
-    // still counts as a stall.
-    const after = await findTodoBacklog(cwd)
-    if (after && after.name === backlog.name && after.entries[0] === next) {
-      stalls++
-      if (stalls >= MAX_STALLS) {
-        emit({ kind: 'log', message: `Backlog loop stopped: no progress on "${preview}" after ${MAX_STALLS} attempt(s).` })
-        return { completed, reason: 'stalled', file }
-      }
-    } else {
-      stalls = 0
+    // Retire the entry on the data branch. `checkOffEntry` no-ops when someone else already
+    // retired it meanwhile — the write funnel re-reads the fresh queue either way. Retried
+    // inline rather than across rounds: a check-off that never lands would re-serve the same
+    // entry, and re-doing finished work is worse than stopping with the queue intact.
+    let landed: string | undefined
+    for (let tries = 0; tries < MAX_STALLS && landed === undefined; tries++) {
+      landed = await queueWrite(cwd, '[The Framework] check off a worked entry', md => checkOffEntry(md, next))
+    }
+    if (landed === undefined) {
+      emit({ kind: 'log', message: `Backlog loop stopped: the check-off of "${preview}" could not be written after ${MAX_STALLS} attempt(s).` })
+      return { completed, reason: 'stalled', file }
     }
   }
 

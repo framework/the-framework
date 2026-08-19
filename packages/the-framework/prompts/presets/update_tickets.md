@@ -1,4 +1,4 @@
-Update `tickets/` from this repo's GitHub issues, bringing across what has changed since the last import rather than starting over.
+Update `tickets/` from this repo's GitHub issues, bringing across what has changed since the last import rather than starting over — the whole update as one commit.
 
 Note the current UTC time before you fetch anything, in ISO 8601. That is the timestamp you will record at the end, and taking it first is deliberate: an issue edited while you work is then picked up by the next update instead of being missed.
 

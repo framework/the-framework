@@ -478,11 +478,11 @@ test('listAgents reads every user archive and the transient one, under their one
   // archives that, with no users, nobody has.
   const meta = (id: string): string =>
     JSON.stringify({ status: 'done', id, startedAt: AT, updatedAt: AT, intent: id })
-  const user = join(CWD, '.the-framework', 'dev@example.com')
+  const user = join(CWD, '.the-framework', 'branches', 'tf-data', 'agents', 'dev@example.com')
   const fs = memFs({
-    [join(user, 'agents', '2026-new.json')]: meta('2026-new'),
+    [join(user, '2026-new.json')]: meta('2026-new'),
     [join(CWD, '.the-framework', 'agents', '2026-transient.json')]: meta('2026-transient'),
-    [join(user, 'sessions', '2026-old.json')]: meta('2026-old'),
+    [join(CWD, '.the-framework', 'dev@example.com', 'agents', '2026-old.json')]: meta('2026-old'),
     [join(CWD, '.the-framework', 'runs', '2026-ancient.json')]: meta('2026-ancient'),
   })
   const agents = await listAgents(CWD, fs)
@@ -692,7 +692,8 @@ test('archiveWorktreeAgent is forgiving of a worktree with no run', async () => 
 })
 
 const USER = 'git@brillout.com'
-const archiveAt = (id: string, ext: string) => join(CWD, '.the-framework', USER, 'agents', `${id}.${ext}`)
+const archiveAt = (id: string, ext: string) =>
+  join(CWD, '.the-framework', 'branches', 'tf-data', 'agents', USER, `${id}.${ext}`)
 
 test('a named user files the archive under their own sessions, not runs/ (#1179)', async () => {
   // The whole point: `agents/` is gitignored, so a `git clean -fdx` took every session with it.
@@ -709,7 +710,7 @@ test('the history lists every user, and the runs archived before this shipped (#
   const fs = memFs({
     [join(CWD, '.the-framework', 'agents', 'r1.json')]: done('r1'),
     [archiveAt('r2', 'json')]: done('r2'),
-    [join(CWD, '.the-framework', 'someone@else.com', 'agents', 'r3.json')]: done('r3'),
+    [join(CWD, '.the-framework', 'branches', 'tf-data', 'agents', 'someone@else.com', 'r3.json')]: done('r3'),
   })
   assert.deepEqual((await listAgents(CWD, fs)).map(agent => agent.id), ['r3', 'r2', 'r1'])
 })

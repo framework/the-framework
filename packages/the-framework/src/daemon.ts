@@ -275,10 +275,8 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // can continue them on the next start.
   const stopped = await runtime.stopAgents().catch(() => 0)
   if (stopped > 0) console.log(`[framework] stopped ${stopped} agent(s)`)
-  // Now that the agents' last events are on disk, commit their archives (#912/#1179) — otherwise an
-  // uncommitted session sits until a human notices, which is the gap that service exists to close.
-  const committed = await services.flushAgents()
-  if (committed > 0) console.log(`[framework] committed agent archives in ${committed} project(s)`)
+  // Archives need no flush pass here (#1582): teardown writes each one through the data branch's
+  // funnel, committed and pushed the moment the session settles.
   // Stopped here as well as by the dashboard: a broken install serves 503s without ever taking
   // ownership of the source we handed in, and that poller would go on reading by itself.
   quota.stop()

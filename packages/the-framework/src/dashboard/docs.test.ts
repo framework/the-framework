@@ -1,19 +1,37 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, realpath, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readDocs, DOC_CATEGORIES } from './docs.js'
+import { withDataBranch } from '../data-branch.js'
+import { nodeGitRunner } from '../project.js'
 
-test('readDocs returns the surfaced docs present at the workspace root, PLAN before TODO (#319)', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-docs-'))
+/** A real repo whose queue lives on the data branch (#1582), the way readDocs now reads it. */
+async function repoWithQueue(md: string): Promise<string> {
+  const git = nodeGitRunner()
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-docs-repo-')))
+  await git(['init', '-b', 'main'], repo)
+  await git(['config', 'user.email', 't@t'], repo)
+  await git(['config', 'user.name', 't'], repo)
+  await writeFile(join(repo, 'README.md'), '# t\n')
+  await git(['add', '-A'], repo)
+  await git(['commit', '-m', 'init'], repo)
+  const seeded = await withDataBranch(repo, 'seed', async dir => {
+    await writeFile(join(dir, 'TODO_AGENTS.md'), md, 'utf8')
+  })
+  assert.ok(seeded.ok)
+  return repo
+}
+
+test('readDocs returns the surfaced docs, PLAN before the data-branch backlog (#319/#1582)', async () => {
+  const cwd = await repoWithQueue('- [ ] later\n')
   try {
-    // Write TODO first to prove the result follows category order, not write order.
-    await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] later\n')
     await writeFile(join(cwd, 'PLAN.md'), '# Plan\n')
     const docs = await readDocs(cwd)
     assert.deepEqual(docs.map(d => d.name), ['PLAN.md', 'TODO_AGENTS.md'])
     assert.equal(docs[0]!.content, '# Plan\n')
+    assert.equal(docs[1]!.content, '- [ ] later\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }
@@ -35,14 +53,14 @@ test('readDocs surfaces session-scoped PLAN_/TODO_ .agent.md files (#323/#326)',
   }
 })
 
-test('readDocs surfaces the flat backlog from the root TODO_AGENTS.md, after PLAN (#682)', async () => {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-docs-'))
+test('readDocs reads the backlog off the data branch, never a checkout copy (#682/#1582)', async () => {
+  const cwd = await repoWithQueue('- [ ] roadmap\n')
   try {
-    await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] roadmap\n')
-    await writeFile(join(cwd, 'PLAN.md'), '# Plan\n')
+    // A leftover root copy must not shadow the branch: one queue, one location.
+    await writeFile(join(cwd, 'TODO_AGENTS.md'), '- [ ] stale checkout copy\n')
     const docs = await readDocs(cwd)
-    assert.deepEqual(docs.map(d => d.name), ['PLAN.md', 'TODO_AGENTS.md'])
-    assert.equal(docs[1]!.content, '- [ ] roadmap\n')
+    assert.deepEqual(docs.map(d => d.name), ['TODO_AGENTS.md'])
+    assert.equal(docs[0]!.content, '- [ ] roadmap\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

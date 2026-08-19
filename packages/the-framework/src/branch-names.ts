@@ -17,6 +17,14 @@ export const AGENT_BRANCH_PREFIX = 'tf-'
 export const LEGACY_AGENT_BRANCH_PREFIX = 'the-framework/'
 
 /**
+ * The branch holding everything The Framework writes (#1582) — tickets, queue, session archives —
+ * checked out under `.the-framework/branches/` in a dir named as itself, like every checkout
+ * there. Named here beside the other branch names so the store can build its paths without
+ * importing the data-branch module (which imports the store).
+ */
+export const DATA_BRANCH = 'tf-data'
+
+/**
  * The branch a framework-allocated worktree starts on (#736). The agent id exists
  * before the session name does, so the branch is created from the id and renamed
  * once the agent picks a name.

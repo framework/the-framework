@@ -59,10 +59,10 @@ test('resolveAgentEventsPath: an ended run (worktree gone) resolves to its archi
   }
 })
 
-test('resolveAgentEventsPath: finds an archive filed under a user sessions dir (#1179)', async () => {
+test('resolveAgentEventsPath: finds an archive filed under a user dir on the data branch (#1179/#1582)', async () => {
   const cwd = await makeProject()
   try {
-    const events = await seedArchive(cwd, join(cwd, FRAMEWORK_DIR, 'someone', ARCHIVE_DIR))
+    const events = await seedArchive(cwd, join(cwd, FRAMEWORK_DIR, 'branches', 'tf-data', ARCHIVE_DIR, 'someone'))
     assert.equal(await resolveAgentEventsPath(cwd, RUN_ID), events)
   } finally {
     await rm(cwd, { recursive: true, force: true })

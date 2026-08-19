@@ -34,7 +34,7 @@ Body:
 CLAIMED: <SESSION_ID> (<SESSION_NAME>)
 ```
 
-Whenever an agent is working/planning a ticket, a `.lock.md` file must be created to avoid two agents working/planning the same ticket.
+Whenever an agent is working/planning a ticket, a `.lock.md` file must be created to avoid two agents working/planning the same ticket. If pushing the lock hits a conflict on that same `.lock.md`, another agent claimed the ticket first: back off and pick something else — never resolve the conflict in your favor.
 
 
 ## tickets/<DATE>_<SLUG>.plan.md

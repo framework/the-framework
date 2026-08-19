@@ -72,8 +72,14 @@ test('start a session, watch it live, and read the archived row when it ends', a
     assert.equal(worktree?.own, true)
 
     // The archived history replays the same story the live tail told (#1472 reads the agent's own
-    // journal, not another agent's), and the cross-project surfaces list the session.
-    const replay = await rpc(onAgent)(project.id, agentId)
+    // journal, not another agent's), and the cross-project surfaces list the session. Waited for,
+    // not read once: a kept checkout reaches the Remove list the moment its meta flips done, while
+    // the archive lands later in teardown — as a data-branch commit since #1582, a full git cycle
+    // rather than the old file copy, so the read would otherwise race it.
+    const replay = await waitFor(async () => {
+      const events = await rpc(onAgent)(project.id, agentId)
+      return events.some(e => e.kind === 'session') && events.some(e => e.kind === 'end') ? events : undefined
+    }, 'the archived replay to carry the whole journal')
     assert.ok(replay.some(e => e.kind === 'session') && replay.some(e => e.kind === 'end'), 'replay has the whole journal')
     const activity = await rpc(onActivity)()
     assert.ok(activity.some(a => a.agentId === agentId && a.kind === 'finished' && a.status === 'done'))

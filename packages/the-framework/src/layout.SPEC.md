@@ -2,7 +2,7 @@ The layout gate: a framework build refuses to run in a repo that records a diffe
 
 ## TLDR
 
-- Every activated repo carries a small committed marker naming the layout its bookkeeping is on (where archives, tickets, and the queue live).
+- Every activated repo carries a small committed marker naming the layout its bookkeeping is on (the data branch's name, and where archives, tickets, and the queue live).
 - Before a session starts, the build compares the repo's marker against its own layout; a mismatch refuses the session outright with both sides named and the fix — no degraded mode.
 - A repo without the marker is not gated; installing writes it, so every newly activated repo is gated from the start.
 

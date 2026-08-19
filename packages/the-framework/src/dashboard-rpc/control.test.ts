@@ -1,13 +1,33 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { provideTestContext } from './test-context.js'
 import { sendStart, sendReleaseTicketLock } from './control.js'
 import { presets } from '../preset-catalog.js'
 import { addProject, projectId } from '../registry.js'
+import { withDataBranch } from '../data-branch.js'
+import { nodeGitRunner } from '../project.js'
 import type { StartAgentOptions } from '../dashboard/types.js'
+
+/** A committed real repo whose framework data sits on the data branch (#1582). */
+async function dataRepo(files: Record<string, string>): Promise<string> {
+  const git = nodeGitRunner()
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-control-')))
+  await git(['init', '-b', 'main'], cwd)
+  await git(['config', 'user.email', 'test@test'], cwd)
+  await git(['config', 'user.name', 'test'], cwd)
+  await writeFile(join(cwd, 'README.md'), '# t\n')
+  await git(['add', '-A'], cwd)
+  await git(['commit', '-m', 'init'], cwd)
+  const seeded = await withDataBranch(cwd, 'seed', async dir => {
+    await mkdir(join(dir, 'tickets'), { recursive: true })
+    for (const [file, md] of Object.entries(files)) await writeFile(join(dir, file), md)
+  })
+  assert.ok(seeded.ok)
+  return cwd
+}
 
 /**
  * Register `cwd` in a throwaway registry and provide the context these RPCs run inside.
@@ -30,11 +50,9 @@ async function registerProject(cwd: string, over: Parameters<typeof provideTestC
 
 /** The options `startAgent` was handed, plus a workspace with one queued ticket to resolve against. */
 async function harness(): Promise<{ cwd: string; id: string; started: () => StartAgentOptions | undefined }> {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-start-'))
-  await writeFile(
-    join(cwd, 'TODO_AGENTS.md'),
-    ['## Priority 9', '', '- [ ] [Add a login page](tickets/2026-07-25_login.md)', ''].join('\n'),
-  )
+  const cwd = await dataRepo({
+    'TODO_AGENTS.md': ['## Priority 9', '', '- [ ] [Add a login page](tickets/2026-07-25_login.md)', ''].join('\n'),
+  })
   let seen: StartAgentOptions | undefined
   const id = await registerProject(cwd, {
     startAgent: async (_text: string, _kind: string, options: StartAgentOptions) => {
@@ -84,37 +102,24 @@ test('a ticket named by the caller is not replaced by the guess (#1117)', async 
 // deleting it, so the RPC has to hold the same line the file readers do about what a ticket
 // filename is, and actually land the release as a commit.
 
-/** A real git checkout holding one ticket, optionally locked, registered as project `p1`. */
+/** A real repo holding one ticket on its data branch, optionally locked, registered as a project. */
 async function lockedProject(files: Record<string, string>): Promise<{ cwd: string; id: string }> {
-  const cwd = await mkdtemp(join(tmpdir(), 'framework-release-'))
-  const git = async (...args: string[]) => {
-    const { execFile } = await import('node:child_process')
-    await new Promise<void>((resolve, reject) =>
-      execFile('git', args, { cwd }, error => (error ? reject(error) : resolve())),
-    )
-  }
-  await git('init', '-q', '-b', 'main')
-  await git('config', 'user.email', 'test@test')
-  await git('config', 'user.name', 'test')
-  await mkdir(join(cwd, 'tickets'), { recursive: true })
-  for (const [file, md] of Object.entries(files)) await writeFile(join(cwd, file), md)
-  await git('add', '-A')
-  await git('commit', '-q', '-m', 'seed')
+  const cwd = await dataRepo(files)
   return { cwd, id: await registerProject(cwd) }
 }
 
-test('sendReleaseTicketLock deletes the lock and commits the release (#1420)', async () => {
+test('sendReleaseTicketLock deletes the lock and commits the release (#1420/#1582)', async () => {
   const { cwd, id } = await lockedProject({
     'tickets/2026-07-20_thing.md': '# Thing\n',
     'tickets/2026-07-20_thing.lock.md': 'CLAIMED: plan-1-0\n',
   })
   try {
     const result = await sendReleaseTicketLock(id, '2026-07-20_thing.md')
-    // The push fails (no origin) but the release stands: the commit is the local half, and the
-    // push is best-effort exactly like the acquisition's.
     assert.deepEqual(result, { ok: true })
-    const { access } = await import('node:fs/promises')
-    await assert.rejects(access(join(cwd, 'tickets/2026-07-20_thing.lock.md')), 'the lock file is gone')
+    // The release is a data-branch commit: the lock is gone from the branch, not just a checkout.
+    const git = nodeGitRunner()
+    await assert.rejects(git(['show', 'tf-data:tickets/2026-07-20_thing.lock.md'], cwd))
+    assert.equal(await git(['show', 'tf-data:tickets/2026-07-20_thing.md'], cwd), '# Thing\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

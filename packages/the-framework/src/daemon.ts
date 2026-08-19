@@ -10,6 +10,7 @@ import { resolveDashboardBundle } from './dashboard/bundle.js'
 import { isActivated } from './project.js'
 import { addProject, ensureDaemonToken, listProjects, nodeRegistryFs, readPreferences, registryPreferencesStore, type Preferences } from './registry.js'
 import { listReposInDirectory } from './repos-directory.js'
+import { installProject, type InstallResult } from './install.js'
 import { registryDiscordCredentialsStore } from './discord-credentials-store.js'
 import { JsonlTailer } from './jsonl-tail.js'
 import { isLoopbackHost } from './loopback-host.js'
@@ -94,12 +95,24 @@ export async function registerHomeProject(cwd: string, env: NodeJS.ProcessEnv = 
  * that one directory. Idempotent (addProject dedupes by path); logs one line per newly added repo.
  * Best-effort, so a bad path never blocks the daemon coming up.
  */
-export async function registerReposDirectory(env: NodeJS.ProcessEnv = process.env): Promise<void> {
+export async function registerReposDirectory(
+  env: NodeJS.ProcessEnv = process.env,
+  install: (repo: string) => Promise<InstallResult> = installProject,
+): Promise<void> {
   const { reposDirectory, reposDirectoryAutoGrant } = await readPreferences(undefined, env).catch((): Preferences => ({}))
   if (!reposDirectoryAutoGrant || !reposDirectory) return
   const known = new Set((await listProjects(undefined, env).catch(() => [])).map(p => resolve(p.path)))
   for (const repo of await listReposInDirectory(reposDirectory).catch(() => [])) {
     if (known.has(resolve(repo))) continue
+    // Install before registering (#1600), like the dashboard's Add-project path: a repo without
+    // the self-ignoring .the-framework/.gitignore leaks framework state onto its work branches
+    // through the first agent's sweeping `git add -A`. A repo that will not install is skipped
+    // rather than registered half-set-up.
+    const installed = await install(repo)
+    if (!installed.ok) {
+      console.log(`[framework] auto-add skipped ${basename(repo)}: ${installed.error}`)
+      continue
+    }
     await addProject(repo, new Date().toISOString(), undefined, env).catch(() => {})
     console.log(`[framework] auto-added repo ${basename(repo)} from ${reposDirectory}`)
   }

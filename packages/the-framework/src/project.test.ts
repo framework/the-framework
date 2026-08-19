@@ -1,39 +1,33 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { join } from 'node:path'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import {
   crawlRepoFiles,
   gitTimeoutMs,
   isActivated,
-  theFrameworkDir,
   GIT_READ_TIMEOUT_MS,
   GIT_SLOW_TIMEOUT_MS,
   GIT_WRITE_TIMEOUT_MS,
   type GitRunner,
   type ProjectFs,
 } from './project.js'
+import { gitignorePath } from './framework-gitignore.js'
 
 const CWD = '/proj'
 
-/** A {@link ProjectFs} that reports exactly one set of paths as directories. */
-function fakeFs(dirs: string[]): ProjectFs {
+/** A {@link ProjectFs} that reports exactly one set of paths as existing files. */
+function fakeFs(files: string[]): ProjectFs {
   return {
-    async isDirectory(path) {
-      return dirs.includes(path)
+    async exists(path) {
+      return files.includes(path)
     },
   }
 }
 
-test('theFrameworkDir joins cwd + .the-framework', () => {
-  assert.equal(theFrameworkDir(CWD), join(CWD, THE_FRAMEWORK_DIR))
+test('isActivated is true when the install-written .the-framework/.gitignore exists (#1600)', async () => {
+  assert.equal(await isActivated(CWD, fakeFs([gitignorePath(CWD)])), true)
 })
 
-test('isActivated is true when .the-framework/ is a directory', async () => {
-  assert.equal(await isActivated(CWD, fakeFs([join(CWD, THE_FRAMEWORK_DIR)])), true)
-})
-
-test('isActivated is false when the marker dir is absent', async () => {
+test('isActivated is false without the ignore file — a bare .the-framework/ dir is not activation (#1600)', async () => {
   assert.equal(await isActivated(CWD, fakeFs([])), false)
 })
 

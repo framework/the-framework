@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { type ClaudeCodeDriverOptions, type Driver, type DriverSession, type PermissionMode } from './driver/index.js'
 import { DRIVERS, DRIVER_SPECS, isDriverName, type DriverName } from './driver-cli.js'
 import { createAgentDriver } from './agent-driver.js'
+import { checkLayout } from './layout.js'
 import { githubSlugFor } from './dashboard/github.js'
 import { githubToken } from './dashboard/gh.js'
 import type { ActionsDriverOptions } from './driver/index.js'
@@ -683,6 +684,18 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
   }
 
   const cwd = opts.cwd ?? (fake ? join(tmpdir(), 'framework-fake-workspace') : process.cwd())
+
+  // The layout gate (#1575): a build whose bookkeeping layout differs from what the repo records
+  // is refused outright before it writes anything — no degraded mode, same stance as the
+  // extension gate (#1519). The case it exists for: the cloud environment installs the framework
+  // from npm, and a published build that predates a repo-side rename would otherwise commit its
+  // session archive under a name the repo has moved away from (#1574). An unmarked repo (no
+  // tracked marker — the fake demo's tmp workspace, say) passes ungated.
+  const layout = await checkLayout(cwd)
+  if (!layout.ok) {
+    io.err(layout.error)
+    return 1
+  }
 
   // The project can carry its own defaults in the-framework.yml (#258): the prompt switches and
   // how far a finished agent publishes itself. A bad file is a warning, never a failed agent. Read

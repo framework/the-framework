@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from './project.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 import { frameworkGitignore, gitignorePath } from './framework-gitignore.js'
+import { layoutMarker, layoutMarkerPath } from './layout.js'
 import { nodeStoreFs, type StoreFs } from './store/index.js'
 import { materializePresets } from './presets.js'
 import { errorMessage } from './error-message.js'
@@ -25,8 +26,8 @@ export interface InstallDeps {
 
 /**
  * Activate the repo at `cwd`: commit any pre-existing dirty changes, create `.the-framework/` with
- * its ignore file, and commit the install. A repo whose ignore file is already there is a no-op
- * (`alreadyActivated`) — it is the one file install always writes, and the only one it commits.
+ * its ignore file and layout marker (#1575), and commit the install. A repo whose ignore file is
+ * already there is a no-op (`alreadyActivated`) — the ignore file is the activation marker.
  * Forgiving: any git/fs failure surfaces as `{ ok: false, error }`.
  */
 export async function installProject(cwd: string, deps: InstallDeps = {}): Promise<InstallResult> {
@@ -54,6 +55,9 @@ export async function installProject(cwd: string, deps: InstallDeps = {}): Promi
     // Keep the transient agent state (events.jsonl / agent.json / agents/) out of git and the session
     // archive in it (#313/#1179). The early return above established the file is absent.
     await fs.write(gitignorePath(cwd), frameworkGitignore())
+    // Record the bookkeeping layout this build writes (#1575), so a build whose layout differs —
+    // a stale published one, say — refuses to run here instead of committing wrong-layout files.
+    await fs.write(layoutMarkerPath(cwd), layoutMarker())
 
     // Materialize the quality presets so an on-before-mergeable TODO entry's filePath resolves to a
     // real file the agent can open (#326). The .the-framework/.gitignore above keeps them out

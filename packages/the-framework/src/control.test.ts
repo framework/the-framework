@@ -156,13 +156,13 @@ test('a handoff entry needs both booleans, so a half-written line cannot disarm 
 })
 
 /**
- * The committed half of `.the-framework/` (#313/#857): the ignore file, the session list, the
- * conversations, and each user's session history. Everything else in there is runtime state that
- * belongs to one machine and one moment.
+ * The committed half of `.the-framework/` (#313/#857): the ignore file, the layout marker
+ * (#1575), the session list, the conversations, and each user's session history. Everything else
+ * in there is runtime state that belongs to one machine and one moment.
  */
 function isCommittedFrameworkFile(path: string): boolean {
   const rest = path.slice(path.indexOf(`${FRAMEWORK_DIR}/`) + FRAMEWORK_DIR.length + 1)
-  if (rest === '.gitignore' || rest === 'LOGS.md') return true
+  if (rest === '.gitignore' || rest === 'LAYOUT' || rest === 'LOGS.md') return true
   if (rest.startsWith('conversations/')) return true
   const [, sessions] = rest.split('/')
   return sessions === 'agents'

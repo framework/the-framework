@@ -1,10 +1,4 @@
-# The Framework: the committed project DB; session state is transient.
+# The Framework: agent state is transient; the lasting records live on the tf-data branch.
 *
 !.gitignore
 !LAYOUT
-!LOGS.md
-!conversations/
-!conversations/**
-!*/
-!*/agents/
-!*/agents/**

@@ -3,14 +3,14 @@ Agent persistence: an agent's history is its append-only event log, and everythi
 ## TLDR
 
 - The log is the truth; the snapshot beside it is a fold of the log, kept for cheap reads.
-- Finished agents are archived into the repo per user, so a project's history is a team record that survives a `git clean`.
+- Finished agents are archived onto the data branch per user, so a project's history is a team record that never touches the code history.
 - An agent that died without saying goodbye is given its ending, wherever it is found.
 
 ## Flows
 
 - Each event is appended to the log and folded into a small snapshot, so a list read costs one file instead of a replay. A restarted dashboard rehydrates by replaying the log itself.
 - Only orchestration events are stored; the agent's own transcript belongs to the agent.
-- On close, a finished agent's log and snapshot are copied into the archive: the project's committed per-user directory, or the transient one when the agent has no worktree of its own.
+- On close, a finished agent's log and snapshot are copied into the archive: the data branch's per-user directory, or the transient one when the agent has no worktree of its own.
 - Listing a project's history reads every user's archive and the transient one, shows an agent once when it appears in both, and prefers an agent's live copy to its archived one.
 - The snapshot is renamed into place rather than written over, so a reader outside the agent's process sees a whole snapshot or the whole previous one. One that arrives unreadable is read again before it is called corrupt.
 - An agent whose process is provably dead has its missing ending written on its behalf — into the log as well as the snapshot. An owner that cannot be probed is left alone until boot.

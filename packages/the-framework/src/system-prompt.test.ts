@@ -12,7 +12,7 @@ import {
   SYSTEM_PROMPT_TEMPLATE,
 } from './system-prompt.js'
 import { FLAT_TODO_FILE } from './tickets.js'
-import { TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
+import { DATA_BRANCH_PROTOCOL, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 import { loadUserSystemPrompt, SYSTEM_PROMPT_FILE } from './system-prompt-file.js'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
 
@@ -21,7 +21,7 @@ const KNOWLEDGE_LINES = CONTEXT_DOCS.map(d => `- \`${d.path}\` (${d.comment})`).
 /** The `Context:` block the context docs stand up on their own, with no dirs picked. */
 const KNOWLEDGE_CONTEXT = `Context:\n${KNOWLEDGE_LINES}`
 /** That block plus the two format specs it names, which travel in the channel with it (#1163). */
-const CONTEXT_BLOCK = [KNOWLEDGE_CONTEXT, TICKETING_FORMAT, TODO_FORMAT].join('\n\n')
+const CONTEXT_BLOCK = [KNOWLEDGE_CONTEXT, TICKETING_FORMAT, TODO_FORMAT, DATA_BRANCH_PROTOCOL].join('\n\n')
 
 test('CONTEXT_DOCS is the repo-context fragment (#683): business knowledge plus the roadmap/queue pointers', () => {
   const paths = CONTEXT_DOCS.map(d => d.path)
@@ -145,6 +145,7 @@ test('the channel carries the ticket and backlog format specs, so a spec can be 
   for (const [heading, spec] of [
     ['Ticketing format', TICKETING_FORMAT],
     ['TODO_AGENTS.md', TODO_FORMAT],
+    ['The data branch', DATA_BRANCH_PROTOCOL],
   ] as const) {
     assert.ok(block.includes(spec), `expected the ${heading} spec in the channel`)
     assert.ok(block.includes(`# ${heading}`), `expected the ${heading} spec to open with its heading`)
@@ -156,6 +157,7 @@ test('the channel carries the ticket and backlog format specs, so a spec can be 
   const vanilla = systemPromptBlock({ vanilla: true, user: 'Only mine.' })
   assert.ok(!vanilla.includes(TICKETING_FORMAT))
   assert.ok(!vanilla.includes(TODO_FORMAT))
+  assert.ok(!vanilla.includes(DATA_BRANCH_PROTOCOL))
 })
 
 test('systemPromptBlock defaults to the knowledge-doc context line + the built-in #326 prompt', () => {
@@ -202,7 +204,7 @@ test('systemPromptBlock is the built-in system prompt (#326) and the user prompt
   // The knowledge docs (#537) join the Context line, which is paths, not prompt text.
   const block = systemPromptBlock({ user: 'Ship small PRs.', context: ['/work/api'] })
   const context = `Context: /work/api\n${KNOWLEDGE_LINES}`
-  assert.equal(block, [context, TICKETING_FORMAT, TODO_FORMAT, renderSystemPrompt().system, 'Ship small PRs.'].join('\n\n'))
+  assert.equal(block, [context, TICKETING_FORMAT, TODO_FORMAT, DATA_BRANCH_PROTOCOL, renderSystemPrompt().system, 'Ship small PRs.'].join('\n\n'))
 })
 
 test('systemPromptBlock ignores a whitespace-only user prompt', () => {

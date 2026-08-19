@@ -1,5 +1,5 @@
 import { renderTemplate } from './prompt-template.js'
-import { SYSTEM_PROMPT, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
+import { DATA_BRANCH_PROTOCOL, SYSTEM_PROMPT, TICKETING_FORMAT, TODO_FORMAT } from './prompts.generated.js'
 import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 
 // No Node imports here, deliberately. This module composes the prompt and the
@@ -90,13 +90,15 @@ export const BUSINESS_KNOWLEDGE_DOCS: readonly ContextDoc[] = [DECISIONS_DOC, FA
  * rather than something it has to go and find. It is framework-authored prompt content, so like
  * the context bullets it goes with the built-in prompt and `--vanilla` drops it.
  */
-const CONTEXT_FORMATS: readonly string[] = [TICKETING_FORMAT, TODO_FORMAT]
+const CONTEXT_FORMATS: readonly string[] = [TICKETING_FORMAT, TODO_FORMAT, DATA_BRANCH_PROTOCOL]
 
 /** The heading each spec opens with, so a bullet can name the section that answers it.
  * Must track the spec's own H1 — #1420 renamed it "Ticketing format", and a bullet naming a
  * section that does not exist sends the agent to follow a format it cannot find. */
 const TICKET_FORMAT_HEADING = 'Ticketing format'
 const TODO_FORMAT_HEADING = 'TODO_AGENTS.md'
+/** Where both of those live and how they are edited (#1582): the data branch, via its protocol. */
+const DATA_BRANCH_HEADING = 'The data branch'
 
 /**
  * Everything the agent keeps in context when it starts (#683), which
@@ -126,8 +128,14 @@ export const CONTEXT_DOCS: readonly ContextDoc[] = [
   { path: 'knowledge-base/MARKET_RESEARCH.md', comment: 'the market the project competes in' },
   // The catch-all (#683): any other file the agent parks under knowledge-base/.
   { path: 'knowledge-base/**.md', comment: 'more files holding knowledge related to the project' },
-  { path: 'tickets/**.md', comment: `things to potentially work on; format: the "${TICKET_FORMAT_HEADING}" section below` },
-  { path: 'TODO_AGENTS.md', comment: `the AI task queue; format: the "${TODO_FORMAT_HEADING}" section below` },
+  {
+    path: 'tickets/**.md',
+    comment: `things to potentially work on; format: the "${TICKET_FORMAT_HEADING}" section below; lives on the data branch — read/write per the "${DATA_BRANCH_HEADING}" section below`,
+  },
+  {
+    path: 'TODO_AGENTS.md',
+    comment: `the AI task queue; format: the "${TODO_FORMAT_HEADING}" section below; lives on the data branch — read/write per the "${DATA_BRANCH_HEADING}" section below`,
+  },
 ]
 
 /** The two halves of the rendered {@link SYSTEM_PROMPT_TEMPLATE}. */

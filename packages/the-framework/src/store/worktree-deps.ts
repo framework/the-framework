@@ -1,5 +1,6 @@
-import { join, relative, isAbsolute } from 'node:path'
+import { join, relative } from 'node:path'
 import { nodeFs, type NodeFs } from '../node-fs.js'
+import { excludeFromGit } from '../git-exclude.js'
 import { nodeGitRunner, type GitRunner } from '../project.js'
 import { FRAMEWORK_DIR } from './agent-store.js'
 
@@ -123,12 +124,9 @@ const EXCLUDE_RULE = NODE_MODULES
  * That is not cosmetic: the agent runs `git add -A`, so the agent would commit dangling absolute
  * symlinks into its branch and onto the PR.
  *
- * The rule goes in the repository's `info/exclude` rather than a worktree-local file because
- * git resolves excludes from the *common* git dir, so a per-worktree copy is never read (a
- * detail worth pinning: the per-worktree path looks right and silently does nothing). Writing
- * a slash-free `node_modules` there covers the symlink form in every worktree. Idempotent, and
- * the main checkout is unaffected in practice: its `node_modules` is a real directory, already
- * ignored by the same name.
+ * A slash-free `node_modules` in the repo-level exclude ({@link excludeFromGit}) covers the
+ * symlink form in every worktree, and the main checkout is unaffected in practice: its
+ * `node_modules` is a real directory, already ignored by the same name.
  *
  * Best-effort: an agent whose links are merely untracked is still an agent.
  */
@@ -138,14 +136,7 @@ export async function excludeDependencyLinks(
   agent: GitRunner = nodeGitRunner(),
 ): Promise<void> {
   try {
-    const common = (await agent(['rev-parse', '--git-common-dir'], repo)).trim()
-    if (!common) return
-    const infoDir = join(isAbsolute(common) ? common : join(repo, common), 'info')
-    const path = join(infoDir, 'exclude')
-    const current = await fs.read(path).catch(() => '')
-    if (current.split('\n').some(line => line.trim() === EXCLUDE_RULE)) return
-    await fs.mkdir(infoDir)
-    await fs.append(path, (current && !current.endsWith('\n') ? '\n' : '') + EXCLUDE_RULE + '\n')
+    await excludeFromGit(repo, EXCLUDE_RULE, fs, agent)
   } catch {
     // Not a repo, or an unwritable git dir: the links just stay visible to git status.
   }

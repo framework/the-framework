@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { errorMessage } from './error-message.js'
 import {
   listWorktreeDirs,
@@ -21,6 +21,7 @@ import {
   type AgentStatus,
 } from './store/index.js'
 import { pushAgentBranch } from './dashboard/agent-handoff.js'
+import { dataWorktreePath, withDataBranch } from './data-branch.js'
 
 /** A retained worktree and the agent that left it behind (#752). */
 export interface WorktreeRow {
@@ -277,8 +278,17 @@ export async function deleteProjectAgent(cwd: string, agentId: string, opts: Del
     // Then the records that put the row in the list. Looked up rather than derived from the id: a
     // session is archived under whichever user ran it (#1179), so the id alone no longer names its
     // path. Tolerant of an absent file, so a half-deleted session (its worktree already gone)
-    // still finishes cleanly.
-    for (const path of await archivedAgentPaths(cwd, agentId)) await removeFile(path)
+    // still finishes cleanly. A record on the data branch is removed inside its write funnel
+    // (#1582) — the deletion is a committed, pushed change — while a transient copy is an unlink.
+    const paths = await archivedAgentPaths(cwd, agentId)
+    const dataRoot = dataWorktreePath(cwd) + sep
+    for (const path of paths.filter(p => !p.startsWith(dataRoot))) await removeFile(path)
+    if (paths.some(p => p.startsWith(dataRoot))) {
+      const removed = await withDataBranch(cwd, `[The Framework] delete session ${agentId}`, async () => {
+        for (const path of paths.filter(p => p.startsWith(dataRoot))) await removeFile(path)
+      })
+      if (!removed.ok && !removed.committed) return { ok: false, error: removed.error }
+    }
     return { ok: true }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }

@@ -1,7 +1,7 @@
-import { readFile, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { nodeGitRunner, type GitRunner } from './project.js'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { TICKETS_DIR } from './tickets.js'
+import { withDataBranch } from './data-branch.js'
 import type { PlanAssignment } from './auto-pm.js'
 
 // The `.lock.md` claim on a ticket (#1420, replacing #1327's PENDING placeholders).
@@ -14,16 +14,18 @@ import type { PlanAssignment } from './auto-pm.js'
 // `CLAIMED: <AGENT_ID>`, the file the ticketing format defines (#1420), so the stock prompts skip
 // a locked ticket with no cooperation from anyone who has not heard of this module.
 //
-// The daemon writes and pushes the locks, never the agent (#1320): an agent pushes at the *end*
-// of its session, onto its own branch, and a lock protects nothing unless it is on the default
-// branch — the branch runs fork from — *before* work starts. (Cloud sessions cannot push at all.)
+// Since #1582 the tickets live on the data branch, and a lock is one more data write through the
+// same funnel: `withDataBranch` syncs, commits the batch, and pushes the branch itself. That
+// retires this module's own commit/push machinery — locks reach every machine the way all data
+// does, and the old "the checkout must be on the default branch" dance is gone with the reason
+// for it.
 //
 // There is no timed release (#1420 dropped #1327's 6-hour staleness rule): a coordinator agent
 // can legitimately hold a ticket for days, and a lock released under a live agent re-opens the
-// exact double-work window it exists to close. The lock lifts when the agent's own PR deletes the
-// file alongside the plan it lands, when a human releases it ({@link releaseTicketLock}), or when
-// the daemon frees a claim it minted for an agent that settled with nothing to hand off (the
-// `heldBy` release, #1583) — every other dead agent is still the user's to notice, with the
+// exact double-work window it exists to close. The lock lifts when the ticket's work lands and
+// the tickets sync retires the files, when a human releases it ({@link releaseTicketLock}), or
+// when the daemon frees a claim it minted for an agent that settled with nothing to hand off
+// (the `heldBy` release, #1583) — every other dead agent is still the user's to notice, with the
 // dashboard button as the tool.
 
 /** The first line of a lock file: the claim, naming the agent that holds it. */
@@ -64,34 +66,16 @@ export function abandonedReleaseMessage(ticket: string): string {
 
 /** Injectable seams so every operation is unit-testable off disk and git. */
 export interface TicketLockDeps {
-  git?: GitRunner
   /** Write one lock file (default `fs.writeFile`). */
   write?: (path: string, content: string) => Promise<void>
   /** Read one sibling (default `fs.readFile`); a rejection reads as "absent". */
   read?: (path: string) => Promise<string>
   /** Delete one lock file (default `fs.rm`). */
   remove?: (path: string) => Promise<void>
+  /** The data-branch write funnel (default {@link withDataBranch}); a test's fake stands in. */
+  funnel?: typeof withDataBranch
   /** Progress line. */
   log?: (message: string) => void
-}
-
-/**
- * Push the just-made lock commit to origin's default branch — the branch other machines fork
- * from, the only place a lock closes the cross-machine window (#1320, #1364 review). Pushed only
- * when the checkout is *on* that branch: `HEAD:main` from anywhere else would carry the branch's
- * own commits onto main, and the old `HEAD:<current branch>` published whatever branch the
- * checkout happened to be on. Resolves false when the push was skipped for that reason; a failed
- * push still throws, so each caller keeps its own log line.
- */
-async function pushLockCommit(git: GitRunner, cwd: string): Promise<boolean> {
-  const current = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], cwd)).trim()
-  // `origin/main` in almost every checkout; asked rather than assumed, with the assumption as
-  // the fallback for a clone whose origin/HEAD was never set.
-  const head = await git(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], cwd).then(out => out.trim(), () => 'origin/main')
-  const target = head.replace(/^origin\//, '')
-  if (current !== target) return false
-  await git(['push', 'origin', `HEAD:${target}`], cwd)
-  return true
 }
 
 /**
@@ -103,19 +87,18 @@ async function pushLockCommit(git: GitRunner, cwd: string): Promise<boolean> {
 export type TicketLockPhase = 'plan' | 'drain'
 
 /**
- * Claim `assignments`' tickets for their agents: write one `.lock.md` per ticket, commit the
- * whole batch in one pathspec-scoped commit, and push it to origin's default branch
- * ({@link pushLockCommit}). Resolves the subset actually locked — a ticket whose lock (or, for a
- * `plan` batch, whose plan — see {@link TicketLockPhase}) appeared since the candidates were
- * enumerated is skipped, not overwritten: an existing file is someone's claim or someone's work,
- * and either outranks this batch.
+ * Claim `assignments`' tickets for their agents: one `.lock.md` per ticket, written on the data
+ * branch in one funneled cycle (#1582) — the funnel commits the batch and pushes the branch. The
+ * cycle re-runs the checks against origin's state when a push loses a race, so a ticket whose
+ * lock (or, for a `plan` batch, whose plan — see {@link TicketLockPhase}) appeared meanwhile is
+ * skipped, not overwritten: an existing file is someone's claim or someone's work, and either
+ * outranks this batch.
  *
- * A batch whose commit failed is rolled back (the written files removed) and resolves `[]`:
- * uncommitted locks in the user's checkout would be noise git blames on nobody. A batch whose
- * *push* failed is kept and resolved as locked — the commit still guards every agent forked from
- * this checkout, which is the common case, and the sweep should not stand a healthy local
- * fan-out down over a network blip. The push is what closes the cross-machine window (#1320), so
- * its failure is logged rather than swallowed.
+ * Resolves the subset actually locked. A batch that could not land at all resolves `[]`; a batch
+ * that committed but could not *push* is kept and resolved as locked — the commit still guards
+ * every agent forked from this machine, which is the common case, and the sweep should not stand
+ * a healthy local fan-out down over a network blip. The push is what closes the cross-machine
+ * window (#1320), so its failure is logged rather than swallowed.
  *
  * Never throws: this runs on a background tick with nothing to catch it.
  */
@@ -125,44 +108,52 @@ export async function acquireTicketLocks(
   deps: TicketLockDeps = {},
   phase: TicketLockPhase = 'plan',
 ): Promise<PlanAssignment[]> {
-  const git = deps.git ?? nodeGitRunner()
-  const write = deps.write ?? ((path, content) => writeFile(path, content, 'utf8'))
+  // Creating parents, because `tickets/` itself is not a given: retiring the last ticket removes
+  // the directory (git keeps no empty dirs), and the branch is born without it.
+  const write =
+    deps.write ??
+    (async (path: string, content: string) => {
+      await mkdir(dirname(path), { recursive: true })
+      await writeFile(path, content, 'utf8')
+    })
   const read = deps.read ?? (path => readFile(path, 'utf8'))
-  const remove = deps.remove ?? (path => rm(path))
+  const funnel = deps.funnel ?? withDataBranch
   const log = deps.log ?? (() => {})
 
-  const locked: PlanAssignment[] = []
-  const files: string[] = []
-  try {
-    for (const assignment of assignments) {
-      const stem = assignment.ticket.replace(/\.md$/, '')
-      const lock = `${TICKETS_DIR}/${stem}.lock.md`
-      const plan = `${TICKETS_DIR}/${stem}.plan.md`
-      // Existence via a read, so one seam serves every operation. A lock is someone's claim; a
-      // plan is someone's finished work — for a `plan` batch either means the ticket is not this
-      // batch's to claim, while a `drain` batch reads the plan as its input ({@link TicketLockPhase}).
-      const siblings = phase === 'plan' ? [lock, plan] : [lock]
-      const taken = await Promise.all(siblings.map(file => read(join(cwd, file)).then(() => true, () => false)))
-      if (taken.some(Boolean)) continue
-      await write(join(cwd, lock), ticketLockContent(assignment.agentId))
-      locked.push(assignment)
-      files.push(lock)
-    }
-    if (!locked.length) return []
-    await git(['add', '--', ...files], cwd)
-    await git(['commit', '-m', lockMessage(locked.length), '--', ...files], cwd)
-  } catch {
-    // The claim is the *commit*: files that never reached one claim nothing, so they are removed
-    // rather than left as uncommitted noise, and the sweep falls back to a single unpinned agent.
-    await Promise.all(files.map(file => remove(join(cwd, file)).catch(() => undefined)))
+  let locked: PlanAssignment[] = []
+  const result = await funnel(
+    cwd,
+    () => lockMessage(locked.length),
+    async dataDir => {
+      locked = []
+      for (const assignment of assignments) {
+        const stem = assignment.ticket.replace(/\.md$/, '')
+        const lock = `${TICKETS_DIR}/${stem}.lock.md`
+        const plan = `${TICKETS_DIR}/${stem}.plan.md`
+        // Any existing lock file outranks this batch — except one naming THIS agent, which is
+        // the batch's own claim seen again on a re-run (the funnel re-runs the op when a push
+        // loses a race, and the first attempt's commit survives the re-sync): still locked.
+        const existing = await read(join(dataDir, lock)).then(md => ({ md }), () => undefined)
+        if (existing) {
+          if (ticketLockHolder(existing.md) === assignment.agentId) locked.push(assignment)
+          continue
+        }
+        if (phase === 'plan' && (await read(join(dataDir, plan)).then(() => true, () => false))) continue
+        await write(join(dataDir, lock), ticketLockContent(assignment.agentId))
+        locked.push(assignment)
+      }
+    },
+    { log },
+  )
+  if (!result.ok && !result.committed) {
+    // Said even for an empty batch: a cycle that failed before any lock landed is the sweep's
+    // real stand-down reason, and swallowing it left "no claims" indistinguishable from "lost
+    // every race".
+    log(`[framework] ticket locks: the batch could not be committed (${result.error})`)
     return []
   }
-  try {
-    if (!(await pushLockCommit(git, cwd)))
-      log(`[framework] ticket locks: the checkout is not on the default branch, so the lock commit was not pushed — agents on other machines cannot see these ${locked.length} claim(s)`)
-  } catch {
+  if (!result.ok)
     log(`[framework] ticket locks: the lock commit could not be pushed, so agents on other machines cannot see these ${locked.length} claim(s)`)
-  }
   return locked
 }
 
@@ -174,12 +165,9 @@ export type ReleaseTicketLockResult = 'released' | 'no-lock' | 'not-holder' | 'e
 
 /**
  * Free one ticket's `.lock.md` by hand (#1420): the dashboard's answer to a dead agent, now that
- * no timer releases locks. Deletes the lock, commits it pathspec-scoped, and pushes best-effort
- * like the acquisition — a release other machines cannot see would leave the ticket claimed
- * everywhere the claim actually matters.
- *
- * A failed commit puts the file back: the lock's protection is the committed state, and a
- * deletion that never landed would make the checkout lie about it. Never throws.
+ * no timer releases locks. One funneled data-branch cycle (#1582); a release that cannot land
+ * reports `error` and changes nothing — the funnel restores the checkout, so the committed state
+ * keeps telling the truth about the claim.
  */
 export async function releaseTicketLock(
   cwd: string,
@@ -195,33 +183,32 @@ export async function releaseTicketLock(
     heldBy?: string
   } = {},
 ): Promise<ReleaseTicketLockResult> {
-  const git = deps.git ?? nodeGitRunner()
-  const write = deps.write ?? ((path, content) => writeFile(path, content, 'utf8'))
   const read = deps.read ?? (path => readFile(path, 'utf8'))
   const remove = deps.remove ?? (path => rm(path))
+  const funnel = deps.funnel ?? withDataBranch
   const log = deps.log ?? (() => {})
 
   const lock = `${TICKETS_DIR}/${ticketLockName(ticket)}`
-  const md = await read(join(cwd, lock)).catch(() => undefined)
-  if (md === undefined) return 'no-lock'
-  if (opts.heldBy !== undefined && ticketLockHolder(md) !== opts.heldBy) return 'not-holder'
-  try {
-    await remove(join(cwd, lock))
-    await git(['add', '--', lock], cwd)
-    await git(['commit', '-m', opts.heldBy !== undefined ? abandonedReleaseMessage(ticket) : releaseMessage(ticket), '--', lock], cwd)
-  } catch {
-    // The lock's protection is the committed state, so the failed deletion is undone whole:
-    // the file back on disk AND back in the index — a deletion left staged would ride out on
-    // the next unscoped commit in this checkout, publishing the release that just failed.
-    await write(join(cwd, lock), md).catch(() => undefined)
-    await git(['add', '--', lock], cwd).catch(() => undefined)
-    return 'error'
-  }
-  try {
-    if (!(await pushLockCommit(git, cwd)))
-      log(`[framework] ticket locks: the checkout is not on the default branch, so the release of ${ticket} was not pushed`)
-  } catch {
-    log(`[framework] ticket locks: the release of ${ticket} could not be pushed`)
-  }
-  return 'released'
+  let outcome: ReleaseTicketLockResult = 'released'
+  const result = await funnel(
+    cwd,
+    () => (opts.heldBy !== undefined ? abandonedReleaseMessage(ticket) : releaseMessage(ticket)),
+    async dataDir => {
+      outcome = 'released'
+      const md = await read(join(dataDir, lock)).catch(() => undefined)
+      if (md === undefined) {
+        outcome = 'no-lock'
+        return
+      }
+      if (opts.heldBy !== undefined && ticketLockHolder(md) !== opts.heldBy) {
+        outcome = 'not-holder'
+        return
+      }
+      await remove(join(dataDir, lock))
+    },
+    { log },
+  )
+  if (!result.ok && !result.committed) return 'error'
+  if (!result.ok) log(`[framework] ticket locks: the release of ${ticket} could not be pushed`)
+  return outcome
 }

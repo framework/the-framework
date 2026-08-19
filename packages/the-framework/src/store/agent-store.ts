@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { hostname } from 'node:os'
 import type { AutoHandoffSkip, FrameworkEvent } from '../events.js'
 import { nodeFs } from '../node-fs.js'
-import { agentIdFromWorktreeDir, isWorktreeDirName } from '../branch-names.js'
+import { agentIdFromWorktreeDir, isWorktreeDirName, DATA_BRANCH } from '../branch-names.js'
 
 /**
  * Persisted orchestration state (#211). The dashboard is a pure projection of the
@@ -40,12 +40,11 @@ export const EVENTS_FILE = 'events.jsonl'
 export const META_FILE = 'agent.json'
 
 /**
- * Where finished agents are archived, under both placements that name has: a project's committed
- * `.the-framework/<user>/agents/` (#1179), which the install-time ignore un-ignores so the history
- * survives a `git clean -fdx`, and the transient `.the-framework/agents/` that an agent with no
- * worktree of its own — or one archiving inside its own throwaway checkout — writes into. What
- * separates the two is the user segment, not the directory's name, and {@link archiveDir} is where
- * a caller picks; both are read when a project's history is listed.
+ * Where finished agents are archived, under both placements that name has: the lasting
+ * `agents/<user>/` on the data branch's checkout (#1179/#1582), and the transient
+ * `.the-framework/agents/` that an agent with no worktree of its own — or one archiving inside
+ * its own throwaway checkout — writes into. {@link archiveDir}/{@link committedArchiveDir} are
+ * where a caller picks; both are read when a project's history is listed.
  *
  * The live agent stays at `events.jsonl`/`agent.json` (the daemon tails it); on
  * {@link AgentStore.close} a copy lands here as `<id>.jsonl` + `<id>.json` (#303), giving the
@@ -622,7 +621,7 @@ export class AgentStore {
   async close(): Promise<void> {
     await this.tail
     try {
-      await archiveAgent(this.fs, this.dir, this.meta, this.eventsPath)
+      await archiveAgent(this.fs, archiveDir(this.dir), this.meta, this.eventsPath)
     } catch (err) {
       console.error('[framework] failed to archive run history:', err)
     }
@@ -654,18 +653,25 @@ export class AgentStore {
 }
 
 /**
- * The directory an agent's archive lives in: this user's committed `agents/` when a caller named
- * one (#1179), else the transient `agents/`. Callers pass a user only where the archive is meant to
- * be kept — the project's copy — never for the copy an agent leaves inside its own worktree.
+ * The transient archive inside a `.the-framework` dir: what an agent's own worktree copy and the
+ * crash rescue use. Untracked by design — the lasting copy lives on the data branch (#1582).
  */
-function archiveDir(dir: string, user?: string): string {
-  return user ? join(dir, user, ARCHIVE_DIR) : join(dir, ARCHIVE_DIR)
+function archiveDir(dir: string): string {
+  return join(dir, ARCHIVE_DIR)
 }
 
-/** Paths of an agent's archived log + meta. */
-function archivePaths(dir: string, id: string, user?: string): { events: string; meta: string } {
-  const agents = archiveDir(dir, user)
-  return { events: join(agents, `${id}.jsonl`), meta: join(agents, `${id}.json`) }
+/**
+ * A user's lasting archive (#1179/#1582): `agents/<user>/` at the root of the data branch's
+ * checkout. On the branch, so the history survives `git clean -fdx` AND never touches the code
+ * history; per user, so two people's machines write side by side instead of conflicting.
+ */
+function committedArchiveDir(cwd: string, user: string): string {
+  return join(cwd, FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, ARCHIVE_DIR, user)
+}
+
+/** Paths of an agent's archived log + meta inside one archive directory. */
+function archivePaths(agentsDir: string, id: string): { events: string; meta: string } {
+  return { events: join(agentsDir, `${id}.jsonl`), meta: join(agentsDir, `${id}.json`) }
 }
 
 /**
@@ -673,9 +679,9 @@ function archivePaths(dir: string, id: string, user?: string): { events: string;
  * it is nowhere. An agent id alone no longer names a path: which user archived it decides that, and a
  * reader (the continue (#762), a removal) only has the id.
  */
-async function findArchive(fs: StoreFs, dir: string, agentId: string): Promise<{ events: string; meta: string } | undefined> {
-  for (const agentsDir of await archiveDirs(fs, dir)) {
-    const paths = { events: join(agentsDir, `${agentId}.jsonl`), meta: join(agentsDir, `${agentId}.json`) }
+async function findArchive(fs: StoreFs, cwd: string, agentId: string): Promise<{ events: string; meta: string } | undefined> {
+  for (const agentsDir of await archiveDirs(fs, cwd)) {
+    const paths = archivePaths(agentsDir, agentId)
     if (await fs.exists(paths.meta)) return paths
   }
   return undefined
@@ -683,33 +689,35 @@ async function findArchive(fs: StoreFs, dir: string, agentId: string): Promise<{
 
 /**
  * Every directory a project's archived agents may sit in, committed first: each user's
- * `<user>/agents/`, then the transient top-level `agents/` an agent with no worktree archives into.
+ * `agents/<user>/` on the data branch's checkout (#1582), then the transient
+ * `.the-framework/agents/` an agent with no worktree archives into.
  *
  * Every user's archive is listed, not just the reader's — the history is a team-visible record of
  * what the agent has done to the repo, which is the point of committing it.
  *
- * A directory is recognized by having a readable archive child, so a stray file in
- * `.the-framework/` is simply not one (readdir yields `[]` for anything that is not a directory).
+ * A directory is recognized by having a readable archive child, so a stray file is simply not one
+ * (readdir yields `[]` for anything that is not a directory).
  */
-async function archiveDirs(fs: StoreFs, dir: string): Promise<string[]> {
+async function archiveDirs(fs: StoreFs, cwd: string): Promise<string[]> {
   const dirs: string[] = []
-  for (const name of await fs.readdir(dir)) {
-    const candidate = join(dir, name, ARCHIVE_DIR)
+  const committed = join(cwd, FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, ARCHIVE_DIR)
+  for (const name of await fs.readdir(committed)) {
+    const candidate = join(committed, name)
     if ((await fs.readdir(candidate)).length > 0) dirs.push(candidate)
   }
-  dirs.push(join(dir, ARCHIVE_DIR))
+  dirs.push(join(cwd, FRAMEWORK_DIR, ARCHIVE_DIR))
   return dirs
 }
 
 /**
- * Copy an agent's live log + meta into its archive as `<id>.jsonl` / `<id>.json`. The live files stay
- * put (the daemon keeps tailing them until the next agent); this is a durable snapshot for the
- * history list. Idempotent per id. `user` files it under that user's committed sessions (#1179).
+ * Copy an agent's live log + meta into `agentsDir` as `<id>.jsonl` / `<id>.json`. The live files
+ * stay put (the daemon keeps tailing them until the next agent); this is a durable snapshot for
+ * the history list. Idempotent per id.
  */
-async function archiveAgent(fs: StoreFs, dir: string, meta: AgentMeta, eventsPath: string, user?: string): Promise<void> {
+async function archiveAgent(fs: StoreFs, agentsDir: string, meta: AgentMeta, eventsPath: string): Promise<void> {
   if (!isSafeAgentId(meta.id)) return
-  await fs.mkdir(archiveDir(dir, user))
-  const out = archivePaths(dir, meta.id, user)
+  await fs.mkdir(agentsDir)
+  const out = archivePaths(agentsDir, meta.id)
   const events = (await fs.exists(eventsPath)) ? await fs.read(eventsPath) : ''
   await fs.write(out.events, events)
   await writeMetaFile(fs, out.meta, meta)
@@ -723,8 +731,8 @@ async function archiveAgent(fs: StoreFs, dir: string, meta: AgentMeta, eventsPat
 async function archivePriorAgent(fs: StoreFs, dir: string): Promise<void> {
   const meta = await readMetaFile(fs, join(dir, META_FILE))
   if (!meta?.id || !isSafeAgentId(meta.id)) return
-  if (await fs.exists(archivePaths(dir, meta.id).meta)) return
-  await archiveAgent(fs, dir, meta, join(dir, EVENTS_FILE))
+  if (await fs.exists(archivePaths(archiveDir(dir), meta.id).meta)) return
+  await archiveAgent(fs, archiveDir(dir), meta, join(dir, EVENTS_FILE))
 }
 
 /**
@@ -745,7 +753,7 @@ export async function restoreArchivedAgent(
     if (!isSafeAgentId(agentId)) return false
     const dir = join(worktree, FRAMEWORK_DIR)
     if (await fs.exists(join(dir, META_FILE))) return false
-    const archive = await findArchive(fs, join(repo, FRAMEWORK_DIR), agentId)
+    const archive = await findArchive(fs, repo, agentId)
     if (!archive) return false
     await fs.mkdir(dir)
     await fs.write(join(dir, EVENTS_FILE), (await fs.exists(archive.events)) ? await fs.read(archive.events) : '')
@@ -792,12 +800,13 @@ export async function listWorktreeDirs(cwd: string, fs: StoreFs = nodeStoreFs())
  * worktree would delete the agent's history with it. This copies it into the repo, which is the one
  * place the dashboard's history reads from, so teardown becomes safe.
  *
- * `user` files the copy under that user's committed `agents/` (#1179) instead of the transient
- * `agents/`. It is this copy, not the one the agent left in its own worktree, that is meant to last:
- * every agent in a git repo gets a worktree, so this is the only archive of it that outlives the
- * checkout, and committing it is what makes the history survive `git clean -fdx`. The worktree's
- * own copy deliberately stays untracked — it would otherwise be committed onto the agent's branch as
- * well and collide with this one on merge.
+ * `user` files the copy under that user's lasting `agents/<user>/` on the data branch's checkout
+ * (#1179/#1582) instead of the transient `agents/`. It is this copy, not the one the agent left in
+ * its own worktree, that is meant to last: every agent in a git repo gets a worktree, so this is
+ * the only archive of it that outlives the checkout. The caller owns getting it committed — the
+ * daemon funnels this through the data branch's writer. The worktree's own copy deliberately
+ * stays untracked — it would otherwise be committed onto the agent's branch as well and collide
+ * with this one on merge.
  *
  * A meta still marked `running` is flipped to `stopped` first: this runs when the process is
  * already gone, so `running` means it died without closing (crash, kill -9), exactly the case
@@ -822,7 +831,8 @@ export async function archiveWorktreeAgent(
     // The branch is read from the checkout by the caller and stamped here, because this is the
     // last moment it can be observed: the worktree is about to go (#799).
     const meta: AgentMeta = branch ? { ...stopped, branch } : stopped
-    await archiveAgent(fs, join(repo, FRAMEWORK_DIR), meta, join(worktreeDir, EVENTS_FILE), user)
+    const dest = user ? committedArchiveDir(repo, user) : archiveDir(join(repo, FRAMEWORK_DIR))
+    await archiveAgent(fs, dest, meta, join(worktreeDir, EVENTS_FILE))
     return meta
   } catch {
     return undefined
@@ -836,7 +846,7 @@ export async function archiveWorktreeAgent(
  */
 export async function archivedAgentPaths(cwd: string, agentId: string, fs: StoreFs = nodeStoreFs()): Promise<string[]> {
   if (!isSafeAgentId(agentId)) return []
-  const archive = await findArchive(fs, join(cwd, FRAMEWORK_DIR), agentId).catch(() => undefined)
+  const archive = await findArchive(fs, cwd, agentId).catch(() => undefined)
   return archive ? [archive.meta, archive.events] : []
 }
 
@@ -877,10 +887,10 @@ function isDeadRunningAgent(meta: AgentMeta | undefined, isAlive: (pid: number) 
  * `agents/` and the close into the user's committed one, so an agent can sit in both places and the
  * history must show it once. The user directories are searched first, so the committed copy wins.
  */
-async function readAllArchivedMetaEntries(fs: StoreFs, dir: string): Promise<Array<{ path: string; meta: AgentMeta }>> {
+async function readAllArchivedMetaEntries(fs: StoreFs, cwd: string): Promise<Array<{ path: string; meta: AgentMeta }>> {
   const seen = new Set<string>()
   const entries: Array<{ path: string; meta: AgentMeta }> = []
-  for (const agentsDir of await archiveDirs(fs, dir)) {
+  for (const agentsDir of await archiveDirs(fs, cwd)) {
     for (const entry of await readArchivedMetaEntries(fs, agentsDir).catch(() => [])) {
       if (seen.has(entry.meta.id)) continue
       seen.add(entry.meta.id)
@@ -896,7 +906,7 @@ async function readAllArchivedMetaEntries(fs: StoreFs, dir: string): Promise<Arr
  * unreadable dir/entries are skipped, never thrown.
  */
 export async function listAgents(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<AgentMeta[]> {
-  const entries = await readAllArchivedMetaEntries(fs, join(cwd, FRAMEWORK_DIR))
+  const entries = await readAllArchivedMetaEntries(fs, cwd)
   return entries.map(entry => entry.meta).sort(byIdDesc)
 }
 
@@ -936,7 +946,7 @@ export async function reconcileOrphanedAgents(
   let fixed = 0
   // Archived agents stuck at `running` (e.g. a prior live agent the next agent never rescued), wherever
   // they are archived. Done before the live agent so its fresh archive isn't re-counted here.
-  for (const { path, meta } of await readAllArchivedMetaEntries(fs, dir)) {
+  for (const { path, meta } of await readAllArchivedMetaEntries(fs, cwd)) {
     if (!isDeadRunningAgent(meta, isAlive)) continue
     try {
       // The archived pair sits side by side (`<id>.json` + `<id>.jsonl`), so the surrogate end
@@ -1067,7 +1077,7 @@ export async function loadAgentEvents(
   fs: StoreFs = nodeStoreFs(),
 ): Promise<FrameworkEvent[] | undefined> {
   if (!isSafeAgentId(id)) return undefined
-  const archive = await findArchive(fs, join(cwd, FRAMEWORK_DIR), id)
+  const archive = await findArchive(fs, cwd, id)
   if (!archive || !(await fs.exists(archive.events))) return undefined
   return parseEventLog(await fs.read(archive.events))
 }
@@ -1145,7 +1155,7 @@ export async function recordAgentPr(
 ): Promise<boolean> {
   if (!isSafeAgentId(agentId)) return false
   try {
-    const archive = await findArchive(fs, join(cwd, FRAMEWORK_DIR), agentId)
+    const archive = await findArchive(fs, cwd, agentId)
     if (!archive) return false
     const meta = await readMetaFile(fs, archive.meta)
     if (!meta) return false

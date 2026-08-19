@@ -1,4 +1,4 @@
-Covers the archive rules: hostile identity values can never escape the archive directory, the ignore-file upgrade to the everyone-glob happens once and keeps unrelated rules, and — against real git — a committed agent survives `git clean` while its transient state stays swept.
+Covers the archive identity rules: hostile identity values can never escape the archive directory, the identity is read from git once per repo with a fallback instead of a throw, and — against real git — everything under the framework directory stays transient on main.
 
 ## Before modifying/creating SPEC.md files
 

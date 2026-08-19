@@ -1,4 +1,4 @@
-import { basename, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { listProjects, projectId, readPreferences, readSecrets, type Preferences } from './registry.js'
 import { resolveDiscordCredentials, type DiscordCredentials } from './discord-credentials.js'
 import { errorMessage } from './error-message.js'
@@ -14,12 +14,12 @@ import { startDaemonTick, DAEMON_TICK_MS } from './daemon-tick.js'
 import { ciFixPrompt, startCiWatch } from './ci-watch.js'
 import { releaseStalePinnedBranch } from './stale-branch.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
-import { promoteQueue } from './queue-promote.js'
 import { FLAT_TODO_FILE, TICKETS_DIR } from './tickets.js'
 import { acquireTicketLocks, releaseTicketLock } from './ticket-locks.js'
 import { readTickets } from './dashboard/tickets.js'
-import { findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
-import { startAgentCommitter } from './agent-commit.js'
+import { checkOffEntry, findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
+import { pullDataBranch, withDataBranch } from './data-branch.js'
+import { readFile, writeFile } from 'node:fs/promises'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
 import { startBranchLinksPass } from './branch-links.js'
 import { startCloudScratchSweep } from './cloud-scratch-refs.js'
@@ -65,11 +65,6 @@ export interface BackgroundServices {
    * are torn down — these jobs commit and push, and stopping their clock does not stop their turn.
    */
   quiesce: () => Promise<void>
-  /**
-   * Commit whatever the shutdown just archived (#912/#1179), after the agents have been stopped so
-   * their last events are on disk. Returns how many projects were committed.
-   */
-  flushAgents: () => Promise<number>
   /**
    * Rebuild the Discord services against freshly-read credentials (#1095), so a token pasted into
    * the dashboard takes effect now rather than at the next daemon start. Idempotent and safe to
@@ -245,38 +240,43 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       })
       return result.ok ? result.agentId : undefined
     },
-    // The daemon promotes the queue, never the agent (#852): the agent stays sandboxed in its
-    // worktree, and one known file is copied across once it has finished cleanly.
+    // The daemon retires a drained entry itself (#1582): the queue has one local writer, so the
+    // check-off is a funneled data-branch write at settle, not an agent edit promoted off a
+    // branch. It waits for the run's epilogue — the report is what says the work was published —
+    // and a run that published nothing leaves its entry open (its claim is freed below).
     promote: async (project, { agentId, entry }) => {
       const agent = (await listAgents(project.path).catch(() => [])).find(r => r.id === agentId)
       // Unknown or still going: not settled, so it is tried again next tick.
       if (!agent || agent.status === 'running') return { settled: false, promoted: false }
-      // The entry it was pinned to travels with it (#1204), so the promotion lands that one entry
-      // rather than the agent's whole view of the queue.
-      const outcome = await promoteQueue(project.path, { ...agent, ...(entry !== undefined ? { entry } : {}) })
-      if (!outcome.promoted) log(`[framework] auto PM: ${outcome.reason} (${agentId})`)
-      // A finished agent is settled either way — one that wrote no queue is not going to start.
-      // The exception (a checkout busy with the user's own queue edits) is the callee's to flag.
-      const retry = !outcome.promoted && outcome.retry === true
       // The run's own recorded ending rides along (#1583): a settled run whose handoff skipped
       // as `no-commits` is the one case the sweep may free the lock it minted. A clean end whose
       // handoff has not reported yet is said too — only a `done` run gets the epilogue, so only
       // there does an absent report mean "still publishing" rather than "never will".
-      return {
-        settled: !retry,
-        promoted: outcome.promoted,
+      const flags = {
         ...(agent.handoffSkip !== undefined ? { handoffSkip: agent.handoffSkip } : {}),
         ...(agent.status === 'done' && agent.handoffReport === undefined ? { handoffPending: true } : {}),
       }
+      // Published: the epilogue reported a hand-off, or skipped because the PR was already open
+      // (a resumed run whose earlier leg published). Anything else left the work unlanded.
+      const published =
+        agent.status === 'done' && (agent.handoffReport === 'done' || agent.handoffSkip === 'already-open')
+      if (entry === undefined || !published) return { settled: true, promoted: false, ...flags }
+      const result = await withDataBranch(project.path, '[The Framework] check off a drained entry', async dir => {
+        const path = join(dir, FLAT_TODO_FILE)
+        const md = await readFile(path, 'utf8').catch(() => undefined)
+        if (md === undefined) return
+        const next = checkOffEntry(md, entry)
+        if (next !== md) await writeFile(path, next, 'utf8')
+      })
+      if (!result.ok && !result.committed) {
+        // Not settled: the write is retried next tick, and the entry stays held meanwhile.
+        log(`[framework] auto PM: the check-off of a drained entry could not land (${result.error}) (${agentId})`)
+        return { settled: false, promoted: false, ...flags }
+      }
+      return { settled: true, promoted: result.ok ? result.changed : true, ...flags }
     },
     log,
   })
-
-  // Commit the agent archives written into the main checkout (#912/#1179). An agent's own worktree
-  // sweeps its archive on teardown; nothing did the same for one held in the checkout itself, so it
-  // sat as an uncommitted change until a human noticed. Path-scoped and debounced, and it skips a
-  // repo that is mid-rebase or index-locked rather than committing into someone's work.
-  const agentCommitter = startAgentCommitter({ projects, log })
 
   // Watch the PRs the framework is waiting to land (#1418): merge a `watched` PR once its checks
   // pass (the #1417/#1406 answer for repos without GitHub auto-merge), and put an agent on a
@@ -416,9 +416,17 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // After the worktree sweep, so links to checkouts the sweep just reclaimed drop in the same
       // turn. A rename settles within a tick; a fresh worktree gets its link at allocation.
       { name: 'branch links', every: AUTO_PM_EVERY, run: () => branchLinks.tick() },
-      // The finest cadence, and what the base tick is set by: the committer's idle window is a
-      // poll seeing the same pending set twice, so its window *is* one tick.
-      { name: 'session commit', run: () => agentCommitter.poll() },
+      // The eager data pull (#1582): converge every project's data checkout on what other
+      // machines and cloud sessions pushed, and carry out anything a failed cycle left local.
+      // Its start-up turn is also what creates the checkout on a fresh clone. Before auto PM in
+      // the list, so a sweep the same tick reads the queue the pull just brought in.
+      {
+        name: 'data sync',
+        every: 2,
+        run: async () => {
+          for (const project of await projects().catch((): ProjectSummary[] => [])) await pullDataBranch(project.path, { log })
+        },
+      },
       // ~1 min, the CI latency agreed on #1418.
       { name: 'CI watch', every: 2, run: () => ciWatch.tick() },
       // The watched things change slowly and a poll costs a read per project. Their first turn is
@@ -445,11 +453,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       mergedWorktrees.stop()
       branchLinks.stop()
       cloudScratch.stop()
-      // Stopped before `flushAgents` below, so that is a single flush past the idle window
-      // rather than a wait for a turn that is no longer coming.
-      agentCommitter.stop()
     },
-    flushAgents: () => agentCommitter.flush().catch(() => 0),
     reloadDiscord,
     // Awaitable (#1433) so the trigger button can wait for the sweep's answer; a caller that
     // does not care simply drops the promise. The plain wake is safe to call when the preference

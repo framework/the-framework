@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { startBackgroundServices } from './daemon-services.js'
+import { dataWorktreePath, withDataBranch } from './data-branch.js'
 import { quotaBoundaryStatus } from './quota-boundary.js'
 import type { QuotaSource, QuotaView } from './dashboard/quota.js'
 import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
@@ -58,28 +59,31 @@ const git = promisify(execFile)
 async function services(preferences: Record<string, unknown>) {
   const config = await mkdtemp(join(tmpdir(), 'framework-concurrency-cfg-'))
   const project = await mkdtemp(join(tmpdir(), 'framework-concurrency-proj-'))
-  // A real git checkout with real tickets, because the drain claims each entry's ticket with a
-  // committed `.lock.md` before its agent starts (#1420) — in a bare directory that commit would
-  // fail and the whole batch would be dropped as claimed elsewhere.
+  // A real git checkout whose tickets and queue live on the data branch (#1582), because the
+  // drain claims each entry's ticket with a committed `.lock.md` before its agent starts (#1420)
+  // — in a bare directory that cycle would fail and the whole batch would be dropped.
   await git('git', ['init', '-q', '-b', 'main'], { cwd: project })
   await git('git', ['config', 'user.email', 'test@example.com'], { cwd: project })
   await git('git', ['config', 'user.name', 'Test'], { cwd: project })
   await git('git', ['config', 'commit.gpgsign', 'false'], { cwd: project })
-  await mkdir(join(project, 'tickets'))
-  for (const entry of QUEUE_ENTRIES) {
-    const ticket = /\((tickets\/[^)]+)\)/.exec(entry)![1]!
-    await writeFile(join(project, ticket), `# ${ticket}\n`)
-  }
+  const seeded = await withDataBranch(project, 'seed', async dir => {
+    await mkdir(join(dir, 'tickets'), { recursive: true })
+    for (const entry of QUEUE_ENTRIES) {
+      const ticket = /\((tickets\/[^)]+)\)/.exec(entry)![1]!
+      await writeFile(join(dir, ticket), `# ${ticket}\n`)
+    }
+    await writeFile(
+      join(dir, 'TODO_AGENTS.md'),
+      ['# TODO_AGENTS', '', '## Priority 9', '', ...QUEUE_ENTRIES.map(entry => `- ${entry}`), ''].join('\n'),
+    )
+  })
+  assert.ok(seeded.ok, 'the fixture queue must land on the data branch')
   await writeFile(
     join(config, 'the-framework.json'),
     JSON.stringify({
       projects: [{ id: 'proj-1', path: project, addedAt: '2026-07-27T00:00:00.000Z' }],
       preferences,
     }),
-  )
-  await writeFile(
-    join(project, 'TODO_AGENTS.md'),
-    ['# TODO_AGENTS', '', '## Priority 9', '', ...QUEUE_ENTRIES.map(entry => `- ${entry}`), ''].join('\n'),
   )
   const starts: { prompt: string; options: StartAgentOptions; projectId: string }[] = []
   const started = startBackgroundServices({
@@ -124,7 +128,7 @@ test('the concurrency setting on disk is the number of agents the routine spins 
     // four copies of the first entry. The prompt is where the pin lives (E2) — it used to also
     // ride the agent's meta, so a third claim mechanism could be re-derived from it later.
     for (const [index, start] of starts.entries()) {
-      assert.match(start.prompt, /work on this one open entry only/)
+      assert.match(start.prompt, /Work on this one open task-queue entry only/)
       assert.ok(start.prompt.includes(QUEUE_ENTRIES[index]!), `the prompt pins ${QUEUE_ENTRIES[index]}`)
       // Nobody is at the keyboard, so a gate must auto-answer rather than park (#846/#1279).
       assert.equal(start.options.unattended, true)
@@ -145,9 +149,9 @@ test('the concurrency setting on disk is the number of agents the routine spins 
     const outcome = running.autoPmReport().outcomes[0]
     assert.equal(outcome?.started, true)
     assert.match(outcome?.message ?? '', /started 4 agents/)
-    // The claim the sweep committed ahead of each agent (#1420): the ticket's lock is on disk
-    // and names the id the agent's own prompt carries as its own.
-    const lock = await readFile(join(projectDir, 'tickets/2026-07-01_one.lock.md'), 'utf8')
+    // The claim the sweep committed ahead of each agent (#1420): the ticket's lock is on the
+    // data branch (#1582) and names the id the agent's own prompt carries as its own.
+    const lock = await readFile(join(dataWorktreePath(projectDir), 'tickets/2026-07-01_one.lock.md'), 'utf8')
     assert.ok(lock.startsWith('CLAIMED: drain-'), "the first entry's ticket carries a drain claim")
     assert.ok(starts[0]!.prompt.includes(lock.trim()), 'and the prompt names that exact claim')
   } finally {
@@ -169,6 +173,89 @@ test("the drain row's Run now fans out to the setting with auto-run off (#1204/#
     for (const [index, start] of starts.entries()) {
       assert.ok(start.prompt.includes(QUEUE_ENTRIES[index]!), `the prompt pins ${QUEUE_ENTRIES[index]}`)
     }
+  } finally {
+    await stop()
+  }
+})
+
+/** An archived meta in the transient `.the-framework/agents/`, where the promote poll reads it. */
+async function archiveMeta(projectDir: string, meta: { id: string } & Record<string, unknown>): Promise<void> {
+  const dir = join(projectDir, '.the-framework', 'agents')
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, `${meta.id}.json`), JSON.stringify({ startedAt: '2026-08-19T00:00:00.000Z', updatedAt: '2026-08-19T00:01:00.000Z', ...meta }))
+}
+
+test('a drained entry is checked off on the data branch once its run reports the work published (#1582)', async () => {
+  // The whole retire loop, with only the agent stubbed: the sweep pins the entry, the run's
+  // archived record reports the hand-off, and the daemon — the queue's one local writer — lands
+  // the check-off as a data-branch commit. The agent never touches the queue.
+  const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
+  try {
+    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    await settle(() => starts.length >= 1)
+    assert.ok(starts[0]!.prompt.includes(QUEUE_ENTRIES[0]!), 'the first entry is the pinned one')
+    // The run settles `done` and its epilogue reported the push/PR: the one ending that retires.
+    await archiveMeta(projectDir, { id: 'run-1', status: 'done', handoffReport: 'done' })
+    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    // Waited for on the branch, not the checkout file: the funnel writes the file first and
+    // commits a beat later, and only the commit is the retirement every machine pulls.
+    const deadline = Date.now() + 5000
+    let subjects = ''
+    while (Date.now() < deadline) {
+      subjects = await git('git', ['log', '--format=%s', 'tf-data'], { cwd: projectDir }).then(r => r.stdout, () => '')
+      if (subjects.includes('check off a drained entry')) break
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+    assert.ok(subjects.includes('check off a drained entry'), 'the check-off is a data-branch commit')
+    const queue = await readFile(join(dataWorktreePath(projectDir), 'TODO_AGENTS.md'), 'utf8')
+    assert.ok(queue.includes(`- [x] ${QUEUE_ENTRIES[0]!}`), 'the drained entry is checked off')
+    // The fixture seeds bare bullets, and untouched ones must stay exactly as written.
+    assert.ok(queue.includes(`- ${QUEUE_ENTRIES[1]!}`), 'the untouched entries stay open')
+    assert.ok(!queue.includes(`[x] ${QUEUE_ENTRIES[1]!}`), 'only the drained entry is retired')
+  } finally {
+    await stop()
+  }
+})
+
+test('a run whose hand-off failed leaves its entry open: unpublished work is not retired (#1582)', async () => {
+  // The negative half of the gate above, seen live in the PR smoke: the push or PR did not land
+  // (`handoffReport: 'failed'`), so the daemon settles the run without checking anything off —
+  // the entry stays open for the next drain rather than vanishing with the work unpublished.
+  const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
+  try {
+    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    await settle(() => starts.length >= 1)
+    await archiveMeta(projectDir, { id: 'run-1', status: 'done', handoffReport: 'failed' })
+    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    // No positive signal marks "the promote settled without retiring", so give the tick a
+    // moment and then require the queue untouched — the check-off in the sibling test lands
+    // well inside this window when the gate passes.
+    await settle(() => false, 1500)
+    const queue = await readFile(join(dataWorktreePath(projectDir), 'TODO_AGENTS.md'), 'utf8')
+    assert.ok(!queue.includes('[x]'), 'nothing is checked off')
+    assert.ok(queue.includes(`- ${QUEUE_ENTRIES[0]!}`), "the failed run's entry stays open")
+  } finally {
+    await stop()
+  }
+})
+
+test('a drain claims an entry whose ticket file is gone, recreating tickets/ on the way (#1582)', async () => {
+  // The live-smoke regression: retiring the last ticket removes `tickets/` itself (git keeps no
+  // empty dirs), while the queue entry linking it stays open — a failed publish leaves exactly
+  // this state. The next drain must still claim and start, not stand the batch down with
+  // "another agent already claimed".
+  const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
+  try {
+    const cleared = await withDataBranch(projectDir, 'retire every ticket', async dir => {
+      await rm(join(dir, 'tickets'), { recursive: true, force: true })
+    })
+    assert.ok(cleared.ok, 'the fixture must drop tickets/ from the data branch')
+    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    await settle(() => starts.length >= 1)
+    assert.equal(starts.length, 1, 'the batch starts instead of standing down')
+    assert.ok(starts[0]!.prompt.includes(QUEUE_ENTRIES[0]!), 'the first entry is the pinned one')
+    const lock = await readFile(join(dataWorktreePath(projectDir), 'tickets/2026-07-01_one.lock.md'), 'utf8')
+    assert.ok(lock.startsWith('CLAIMED: drain-'), 'the claim landed in a recreated tickets/')
   } finally {
     await stop()
   }

@@ -16,7 +16,6 @@ vi.mock('../lib/preferences.js', () => ({
   updatePreferences: vi.fn(),
   themePreference: (p: Preferences) => p.theme ?? 'system',
   usePreferenceSources: () => ({}),
-  useProjectFileConfig: () => ({}),
 }))
 
 // The Composer is exercised by its own tests; here it only has to hand back the two submits and

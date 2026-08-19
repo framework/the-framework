@@ -81,10 +81,6 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       }
       return `  spend: $${event.costUsd.toFixed(4)} ${turns}`
     }
-    case 'modes': {
-      const shown = event.all.map(m => `${event.active.includes(m) ? '[x]' : '[ ]'} ${m}`).join('  ')
-      return `  modes: ${shown}`
-    }
     case 'choice': {
       const mark = (o: ChoiceOption) =>
         event.multi ? (o.default ? '[x]' : '[ ]') : o.id === event.recommended ? '●' : '○'

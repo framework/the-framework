@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile, readFile, rm, stat, realpath } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, readdir, readFile, rm, stat, realpath } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { createProjectRuntime, cleanupTimedOutWorktree, markFailedStart, agentStderrPath, isTransientAgentFailure, lastAgentFailureDetail, MAX_TRANSIENT_RETRIES } from './daemon-runtime.js'
@@ -79,6 +79,94 @@ async function withCapturedLog(body: () => Promise<void>): Promise<string> {
   }
   return lines.join('\n')
 }
+
+test('a Start landing after the stop pass is refused, never spawned into the shutdown gap (#983)', async () => {
+  // The HTTP surface closes after the agents do, so a Start can arrive mid-shutdown. Spawned, it
+  // would be a detached child outside the snapshot stopAgents terminated — an orphan on ppid 1.
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-closing-')))
+  try {
+    const log = join(cwd, 'started.log')
+    const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeStub(cwd, log) })
+    await runtime.stopAgents()
+    const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; error?: string }
+    assert.equal(result.ok, false)
+    assert.match(result.error ?? '', /shutting down/)
+    await new Promise(r => setTimeout(r, 250))
+    assert.equal(await readFile(log, 'utf8').catch(() => ''), '', 'no run was spawned at all')
+    await runtime.dispose()
+  } finally {
+    await rm(cwd, RETRIED_RM)
+  }
+})
+
+test('a shutdown refusal takes back the workspace it had already allocated (#983)', async () => {
+  // The stop can land between onStart's entry check and its pre-spawn re-check — everything
+  // between is awaited. The refusal must return the fresh worktree and branch too: left
+  // standing, the worktree has no agent.json, and the next boot's sweep would reclaim it by
+  // pushing an empty junk branch. The preflight seam is where this test lands the stop.
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-closing-alloc-')))
+  try {
+    const git = nodeGitRunner()
+    await git(['init'], cwd)
+    await git(['config', 'user.email', 't@t'], cwd)
+    await git(['config', 'user.name', 't'], cwd)
+    await writeFile(join(cwd, 'README.md'), '# t\n')
+    await git(['add', '-A'], cwd)
+    await git(['commit', '-m', 'init'], cwd)
+
+    const specHome = join(cwd, 'spec-home')
+    await mkdir(specHome, { recursive: true })
+    const log = join(cwd, 'started.log')
+    const runtime = createProjectRuntime({
+      driverPreflight: async () => {
+        await runtime.stopAgents()
+        return { ok: true, checks: [] }
+      },
+      cwd,
+      env: { FRAMEWORK_SESSION_SPEC_DIR: specHome },
+      binPath: await writeStub(cwd, log),
+    })
+    const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; error?: string }
+    assert.equal(result.ok, false)
+    assert.match(result.error ?? '', /shutting down/)
+    assert.deepEqual(await readdir(join(cwd, FRAMEWORK_DIR, BRANCHES_DIR)).catch(() => []), [], 'the worktree is gone')
+    assert.equal((await git(['branch', '--list', 'tf-agent-*'], cwd)).trim(), '', 'and so is its branch')
+    assert.deepEqual(await readdir(specHome), [], 'and the spec it wrote')
+    await runtime.dispose()
+  } finally {
+    await rm(cwd, RETRIED_RM)
+  }
+})
+
+test('a child that dies before reading its spec does not leave it on disk (D4)', async () => {
+  const cwd = await realpath(await mkdtemp(join(tmpdir(), 'framework-spec-sweep-')))
+  try {
+    const specHome = join(cwd, 'spec-home')
+    await mkdir(specHome, { recursive: true })
+    const runtime = createProjectRuntime({
+      driverPreflight: agentReady,
+      cwd,
+      env: { FRAMEWORK_SESSION_SPEC_DIR: specHome },
+      binPath: await writeDyingStub(cwd),
+    })
+    let result: { ok: boolean } | undefined
+    await withCapturedLog(async () => {
+      result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean }
+    })
+    assert.equal(result?.ok, true)
+    // The stub exits without ever reading its spec; the exit handler removes what it left —
+    // the prompt, and any device token the options carried.
+    let leftover: string[] = ['unread']
+    for (let i = 0; i < POLL_ATTEMPTS && leftover.length > 0; i++) {
+      await new Promise(r => setTimeout(r, 20))
+      leftover = await readdir(specHome)
+    }
+    assert.deepEqual(leftover, [])
+    await runtime.dispose()
+  } finally {
+    await rm(cwd, RETRIED_RM)
+  }
+})
 
 test('a repo whose worktree could not be created fails the run instead of borrowing the checkout (#997)', async () => {
   // realpath: on macOS tmpdir sits under the /var -> /private/var symlink and git reports the

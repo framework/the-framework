@@ -416,7 +416,7 @@ async function relayDashboard(opts: { token?: string | undefined } = { token: TO
 test('/_relay/start needs the cookie: 401 without it, starts the run with it (#1067)', async () => {
   const { base, starts, close } = await relayDashboard()
   try {
-    const body = JSON.stringify({ prompt: 'do it', kind: 'build', options: { autopilot: true } })
+    const body = JSON.stringify({ prompt: 'do it', kind: 'build', options: { browser: true } })
     const unauth = await postAuth(`${base}/_relay/start`, body)
     assert.equal(unauth.status, 401) // the shared-token guard (#1051) fronts the relay too
     assert.equal(starts.length, 0)
@@ -435,11 +435,11 @@ test('/_relay/start needs the cookie: 401 without it, starts the run with it (#1
 test('/_relay/start strips a nested remote target so a relayed run never relays onward (#1067)', async () => {
   const { base, starts, close } = await relayDashboard()
   try {
-    const body = JSON.stringify({ prompt: 'x', kind: 'build', options: { remote: { url: 'http://evil', token: 'z' }, autopilot: true } })
+    const body = JSON.stringify({ prompt: 'x', kind: 'build', options: { remote: { url: 'http://evil', token: 'z' }, browser: true } })
     const ok = await postAuth(`${base}/_relay/start`, body, `fw_daemon=${TOKEN}`)
     assert.equal(ok.status, 200)
     assert.equal(starts[0]!.options.remote, undefined) // the onward target was dropped
-    assert.equal(starts[0]!.options.autopilot, true) // the rest of the options survive
+    assert.equal(starts[0]!.options.browser, true) // the rest of the options survive
   } finally {
     await close()
   }
@@ -479,7 +479,7 @@ test('/_relay/ping is 401 without the cookie, 200 with it, and starts nothing (#
 test('a loopback relay rejects a cross-origin POST and a rebound Host, and starts nothing', async () => {
   const { base, starts, close } = await relayDashboard({ token: undefined })
   try {
-    const body = JSON.stringify({ prompt: 'do it', kind: 'build', options: { autopilot: true } })
+    const body = JSON.stringify({ prompt: 'do it', kind: 'build', options: { browser: true } })
 
     const crossOrigin = await postCrossOrigin(`${base}/_relay/start`)
     assert.equal(crossOrigin.status, 403) // an Origin that is not this server: CSRF

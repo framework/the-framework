@@ -5,11 +5,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { loadFrameworkConfig, parseFrameworkConfig } from './config.js'
 
-test('parseFrameworkConfig reads preset + mode booleans + event', () => {
-  assert.deepEqual(parseFrameworkConfig('preset: software-development\ntransparent: true\nevent: bug-fix\n'), {
-    preset: 'software-development',
+test('parseFrameworkConfig reads the mode booleans together', () => {
+  assert.deepEqual(parseFrameworkConfig('transparent: true\nvanilla: true\n'), {
     transparent: true,
-    event: 'bug-fix',
+    vanilla: true,
   })
 })
 
@@ -44,6 +43,9 @@ test('parseFrameworkConfig reads only the current spellings', () => {
   assert.deepEqual(parseFrameworkConfig('autoPushBranch: false\n'), {})
   assert.deepEqual(parseFrameworkConfig('autoOpenPr: false\nautoMerge: true\n'), {})
   assert.deepEqual(parseFrameworkConfig('antiLazyPill: false\n'), {})
+  // `preset` and `event` are retired the same way: their consumer (the domain review loop) went
+  // with A5, so the keys were parsed, echoed and obeyed by nothing.
+  assert.deepEqual(parseFrameworkConfig('preset: software-development\nevent: bug-fix\n'), {})
 })
 
 test('parseFrameworkConfig treats an empty document as {}', () => {
@@ -53,16 +55,14 @@ test('parseFrameworkConfig treats an empty document as {}', () => {
 
 test('parseFrameworkConfig rejects a non-map document and mistyped fields', () => {
   assert.throws(() => parseFrameworkConfig('- a\n- b\n'), /must be a YAML map/)
-  assert.throws(() => parseFrameworkConfig('preset: 3\n'), /"preset" must be a string/)
-  assert.throws(() => parseFrameworkConfig('event: 3\n'), /"event" must be a string/)
   assert.throws(() => parseFrameworkConfig('transparent: yep\n'), /"transparent" must be a boolean/)
 })
 
 test('loadFrameworkConfig reads the-framework.yml from a directory', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'framework-cfg-'))
   try {
-    await writeFile(join(dir, 'the-framework.yml'), 'preset: software-development\ntransparent: true\n')
-    assert.deepEqual(await loadFrameworkConfig(dir), { preset: 'software-development', transparent: true })
+    await writeFile(join(dir, 'the-framework.yml'), 'handoff: local\ntransparent: true\n')
+    assert.deepEqual(await loadFrameworkConfig(dir), { handoff: 'local', transparent: true })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -80,7 +80,7 @@ test('loadFrameworkConfig yields {} when no config file is present', async () =>
 test('loadFrameworkConfig warns and returns {} on a malformed file', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'framework-cfg-bad-'))
   try {
-    await writeFile(join(dir, 'the-framework.yml'), 'preset: 3\n')
+    await writeFile(join(dir, 'the-framework.yml'), 'vanilla: 3\n')
     const warnings: string[] = []
     assert.deepEqual(await loadFrameworkConfig(dir, m => warnings.push(m)), {})
     assert.ok(warnings.some(w => /ignoring the-framework\.yml/.test(w)))

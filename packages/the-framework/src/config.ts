@@ -5,14 +5,11 @@ import { errorMessage } from './error-message.js'
 import { isHandoffLevel, HANDOFF_LEVELS, type HandoffLevel } from './handoff-level.js'
 
 /**
- * The per-repo session defaults persisted in `the-framework.yml`: which preset and modes a project
- * works under, so its config travels with the code instead of being chosen again every session.
+ * The per-repo session defaults persisted in `the-framework.yml`: the prompt switches and how far
+ * a finished session publishes itself, so a repo's config travels with the code instead of being
+ * chosen again every session.
  */
 export interface FrameworkFileConfig {
-  /** Preset to work under, by name. */
-  preset?: string
-  /** Build event kind the preset's review loop fires for, e.g. `bug-fix` (#265). */
-  event?: string
   /**
    * Remove the built-in #326 system prompt, keeping the session controls. Default `false`.
    *
@@ -43,8 +40,6 @@ export interface FrameworkFileConfig {
 /** Config file names read from the workspace root, in precedence order. */
 export const FRAMEWORK_CONFIG_FILES = ['the-framework.yml', 'the-framework.yaml'] as const
 
-/** The free-string config keys, parsed and copied across layers as-is. */
-const STRING_CONFIG_KEYS = ['preset', 'event'] as const
 /**
  * The keys whose values come from a closed set, so parsing checks the value rather than the type
  * (B5). Only the publish ladder so far; each is validated by name in {@link parseFrameworkConfig}.
@@ -56,8 +51,8 @@ const ENUM_CONFIG_KEYS = ['handoff'] as const
  * flows through them (only its default and any renamed output field are declared per key).
  */
 export const BOOLEAN_CONFIG_KEYS = ['vanilla', 'transparent'] as const
-/** Every config key, string then enum then boolean, in declaration order. */
-export const CONFIG_KEYS = [...STRING_CONFIG_KEYS, ...ENUM_CONFIG_KEYS, ...BOOLEAN_CONFIG_KEYS] as const
+/** Every config key, enum then boolean, in declaration order. */
+export const CONFIG_KEYS = [...ENUM_CONFIG_KEYS, ...BOOLEAN_CONFIG_KEYS] as const
 
 /**
  * Read `the-framework.yml` (or `.yaml`) from a directory. A missing file yields
@@ -99,11 +94,6 @@ export function parseFrameworkConfig(raw: string, source = 'the-framework.yml'):
   }
   const obj = data as Record<string, unknown>
   const config: FrameworkFileConfig = {}
-  for (const key of STRING_CONFIG_KEYS) {
-    if (obj[key] === undefined) continue
-    if (typeof obj[key] !== 'string') throw new Error(`${source}: "${key}" must be a string`)
-    config[key] = obj[key] as never
-  }
   // The one key with a closed set (B5), so it is checked by its values rather than by its type: a
   // typo — or a leftover `handoff: true` — has to be an error, not a silently ignored rung that
   // leaves the repo publishing more than its file says.

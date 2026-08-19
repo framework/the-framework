@@ -225,8 +225,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
           job.ticket !== undefined
           ? `${TICKETS_DIR}/${job.ticket}`
           : undefined
-      // The pinned entry itself also rides along (#1253), so the claim on it reaches the agent's
-      // meta and outlives both this process's memory and the agent's local process.
+      // The ticket is the durable claim: the pushed drain lock above (#1420) outlives this
+      // process. An entry with no ticket has only the sweep's in-memory pin — auto-pm.SPEC.md
+      // owns the hand-off window that leaves open.
       const result = await startUnattended(project.id, job.prompt, {
         ...(ticket ? { ticket } : {}),
         // A fanned-out plan agent plans its ticket rather than implementing it (#1327), so its PR

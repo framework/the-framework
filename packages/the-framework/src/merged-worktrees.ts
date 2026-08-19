@@ -1,6 +1,6 @@
 import { listProjectWorktrees, removeProjectWorktree, type RemoveResult, type WorktreeRow } from './worktrees.js'
 import { withAgentLock } from './agent-locks.js'
-import { worktreePath } from './store/index.js'
+import { repoHasRemote, worktreePath } from './store/index.js'
 
 // Reclaim a session's checkout once its work is on the remote (#1036/E5).
 //
@@ -44,6 +44,8 @@ export interface MergedSweepDeps {
   worktrees?: (cwd: string) => Promise<WorktreeRow[]>
   /** Removes one worktree (default {@link removeProjectWorktree}). */
   remove?: (cwd: string, agentId: string) => Promise<RemoveResult>
+  /** Whether the repo has a remote at all (default {@link repoHasRemote}). */
+  hasRemote?: (cwd: string) => Promise<boolean>
   /** Agent ids whose checkouts the daemon is still responsible for; see {@link MergedSweepOptions.busy}. */
   busy?: ReadonlySet<string>
 }
@@ -67,10 +69,21 @@ export async function removeMergedWorktrees(cwd: string, deps: MergedSweepDeps =
   // that only decides removal never reads the number.
   const worktrees = deps.worktrees ?? ((path: string) => listProjectWorktrees(path, { sizes: false }))
   const remove = deps.remove ?? removeProjectWorktree
+  const hasRemote = deps.hasRemote ?? repoHasRemote
 
   const result: MergedSweepResult = { removed: [], failed: [] }
-  for (const row of await worktrees(cwd).catch((): WorktreeRow[] => [])) {
-    if (row.live || deps.busy?.has(row.agentId)) continue
+  const rows = (await worktrees(cwd).catch((): WorktreeRow[] => [])).filter(
+    row => !row.live && !deps.busy?.has(row.agentId),
+  )
+  if (!rows.length) return result
+  // Asked once per project, not once per checkout: with no remote the rule keeps everything, and
+  // that answer cannot change between two rows of the same sweep — so the doomed per-checkout
+  // probe-and-push cycle is skipped while each retained checkout is still accounted for.
+  if (!(await hasRemote(cwd))) {
+    for (const row of rows) result.failed.push({ agentId: row.agentId, error: 'the repo has no remote; its worktree was kept' })
+    return result
+  }
+  for (const row of rows) {
     const outcome = await withAgentLock(worktreePath(cwd, row.agentId), () => remove(cwd, row.agentId))
     if (outcome.ok) result.removed.push({ agentId: row.agentId })
     else result.failed.push({ agentId: row.agentId, error: outcome.error })
@@ -113,17 +126,28 @@ export interface MergedSweepOptions {
 export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktreeSweep {
   const sweep = opts.sweep ?? ((cwd: string) => removeMergedWorktrees(cwd, { ...(opts.busy ? { busy: opts.busy() } : {}) }))
   let stopped = false
+  // Each checkout's last-announced keep reason, so a retained checkout is accounted for once per
+  // *state* rather than re-announced every ten minutes for the life of the daemon — a permanently
+  // unpushable one (no remote, a publish-nothing session) repeats forever. A changed reason is a
+  // changed state and is said again (a remote added, pushes now failing on auth); a removal
+  // clears the entry, so a same-id checkout that reappears is a new thing to account for; a
+  // daemon restart starts the accounting over, which is the boot-time announcement the retained
+  // state deserves.
+  const announced = new Map<string, string>()
 
   const sweepAll = async (): Promise<void> => {
     for (const project of await opts.projects().catch(() => [])) {
       if (stopped) break
       const { removed, failed } = await sweep(project.path).catch((): MergedSweepResult => ({ removed: [], failed: [] }))
       for (const item of removed) {
+        announced.delete(item.agentId)
         opts.log(
           `[framework] removed the worktree for session ${item.agentId}: its branch is on the remote. The branch and the session are kept.`,
         )
       }
       for (const item of failed) {
+        if (announced.get(item.agentId) === item.error) continue
+        announced.set(item.agentId, item.error)
         opts.log(`[framework] kept the worktree for session ${item.agentId}: ${item.error}`)
       }
     }

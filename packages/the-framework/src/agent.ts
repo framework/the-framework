@@ -83,8 +83,6 @@ export interface RunAgentOptions {
    * demo writes no backlog and must stay deterministic). Set explicitly to force either way.
    */
   todoLoop?: boolean
-  /** Per-session cap on backlog entries worked (#323). Default 25. */
-  todoMaxItems?: number
   /**
    * Continue a stopped session's conversation (#720/#1467): the captured agent session id to
    * `--resume`. When set, {@link prompt} is sent verbatim as a continuation message rather than
@@ -245,7 +243,6 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
         emit,
         requestChoice: opts.requestChoice,
         signal: agentSignal,
-        maxItems: opts.todoMaxItems,
       })
       // A plan declined mid-backlog with a stop-marked answer ends the session, the same as #217.
       if (todo.sessionStopped) answerController.abort(new Error('[framework] stopped by your answer'))

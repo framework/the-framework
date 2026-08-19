@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { enumerateGitRepos, installProject, type DirLister } from './install.js'
 import { PRESETS, PRESET_DIR } from './presets.js'
 import { frameworkGitignore, gitignorePath } from './framework-gitignore.js'
+import { layoutMarker, layoutMarkerPath } from './layout.js'
 import type { GitRunner } from './project.js'
 import type { StoreFs } from './store/index.js'
 
@@ -90,6 +91,16 @@ test('installProject seeds .the-framework/.gitignore so only the archive is comm
   assert.match(ignore, /^!\*\/agents\/\*\*$/m)
   // Only that name: the `sessions/` D5 renamed away from is not carried as a second rule.
   assert.doesNotMatch(ignore, /sessions/)
+})
+
+test('installProject records the layout marker, tracked, so a skewed build is refused (#1575)', async () => {
+  const fs = memFs()
+  const { git } = fakeGit(args => (args[0] === 'rev-parse' ? 'true' : ''))
+
+  await installProject(CWD, { git, fs })
+  assert.equal(fs.files.get(layoutMarkerPath(CWD)), layoutMarker())
+  // The seeded ignore un-ignores it: `*` would otherwise keep the marker out of the install commit.
+  assert.match(fs.files.get(gitignorePath(CWD)) ?? '', /^!LAYOUT$/m)
 })
 
 test('installProject on a dirty repo commits the pre-existing changes first', async () => {

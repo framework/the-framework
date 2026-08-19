@@ -1,0 +1,7 @@
+framework-dir: .the-framework
+archive-dir: agents
+branches-dir: branches
+events-file: events.jsonl
+meta-file: agent.json
+tickets-dir: tickets
+queue-file: TODO_AGENTS.md

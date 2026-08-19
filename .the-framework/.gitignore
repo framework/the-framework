@@ -1,6 +1,7 @@
 # The Framework: the committed project DB; session state is transient.
 *
 !.gitignore
+!LAYOUT
 !LOGS.md
 !conversations/
 !conversations/**

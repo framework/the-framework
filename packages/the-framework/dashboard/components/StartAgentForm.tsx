@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ProjectSummary } from '../../src/index.js'
 import { DEFAULT_HANDOFF, handoffReaches, agentOptionsFromPreferences } from '../../src/client.js'
-import { onDriverReady, onClaudeTrust, onProjects, onRepoAutoMerge } from '../rpc/projects.js'
+import { onDriverReady, onProjects, onRepoAutoMerge } from '../rpc/projects.js'
 import { onSystemPromptUser } from '../rpc/reads.js'
 import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { useConnectionProfiles } from '../lib/profiles.js'
@@ -85,18 +85,6 @@ export function StartAgentForm({
     ...agentOptionsFromPreferences(preferences, [...context]),
     ...(remoteDevice ? { remote: { url: remoteDevice.url, token: remoteDevice.token, label: remoteDevice.label } } : {}),
   }
-
-  // A web agent on a project Claude Code has not been trusted in dies on the CLI's interactive
-  // trust dialog (#1314), so say so BEFORE the agent is spent, with the one-time fix (#1318).
-  // Read only when web is the target; `known: false` (config unreadable) shows nothing rather
-  // than crying wolf, and the agent's own failure advice remains the fallback.
-  const web = options.target === 'web' && !remoteDevice
-  const trust = useLoaded<Awaited<ReturnType<typeof onClaudeTrust>>>(
-    () => (web ? onClaudeTrust(projectId) : Promise.resolve(null)),
-    null,
-    [projectId, web],
-  )
-  const untrusted = web && trust !== null && trust.known && !trust.trusted
 
   // Can the picked driver's CLI start an agent at all (#1326)? An `actions` run needs nothing local,
   // and a remote agent executes on its own device, so neither is probed here. Re-read when the agent
@@ -204,15 +192,6 @@ export function StartAgentForm({
           expanded, tall) Context disclosure, past the fold from the Start button that caused it. */}
       {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
       {note && !error && <p role="status" className="mt-2 text-xs text-muted-foreground">{note}</p>}
-      {/* The doomed-web-run warning (#1318): before the start, not after three dead runs (#1314). */}
-      {untrusted && (
-        <p role="alert" className="mt-2 text-xs text-warning">
-          Claude Code has not been trusted in this project, so a Claude web run cannot start a cloud
-          session. One-time fix: run <code className="font-mono">claude</code> in{' '}
-          <code className="font-mono">{trust!.root}</code> once and accept the trust prompt, then start
-          the session — future runs inherit it.
-        </p>
-      )}
       {/* The agent cannot start at all (#1326): said here, before the Start spends a branch and a
           worktree on a session that dies before it exists (#1323). Each line names its own fix. */}
       {ready?.problems.map(problem => (

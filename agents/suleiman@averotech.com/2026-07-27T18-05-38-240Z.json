@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "status": "stopped",
+  "id": "2026-07-27T18-05-38-240Z",
+  "startedAt": "2026-07-27T18:05:38.836Z",
+  "updatedAt": "2026-07-27T18:25:09.172Z",
+  "passes": 0,
+  "pid": 97996,
+  "host": "Suleimans-MacBook-Pro.local",
+  "intent": "Open TODO_AGENTS.md and work on this one open entry only, then check it off:\n\n- [Dry-run the Human Queue demo flow and fix glaring breaks](tickets/2026-07-25_nice-demo-human-queue.md) — the maintainer hasn't tested the flow and needs it to demo well: click a Human Queue item → see the list of choices → pick one → done. Walk that exact path, fix only glaring breaks that would show on camera (\"non-glaring paper cuts are okay\" per the ticket), and report the state of the flow either way.\n\nDo not start any other entry. If that entry is already checked off or no longer there, stop and do nothing.",
+  "handoff": {
+    "push": true,
+    "pr": true
+  },
+  "ticket": "tickets/2026-07-25_nice-demo-human-queue.md",
+  "queueEntry": "[Dry-run the Human Queue demo flow and fix glaring breaks](tickets/2026-07-25_nice-demo-human-queue.md) — the maintainer hasn't tested the flow and needs it to demo well: click a Human Queue item → see the list of choices → pick one → done. Walk that exact path, fix only glaring breaks that would show on camera (\"non-glaring paper cuts are okay\" per the ticket), and report the state of the flow either way.",
+  "branch": "the-framework/demo-human-queue-dryrun",
+  "driver": "claude-code",
+  "workspace": "/Users/suleiman/Projects/gemstack/.the-framework/worktrees/2026-07-27T18-05-38-240Z",
+  "sessionLink": "https://claude.ai/code"
+}

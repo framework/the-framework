@@ -115,7 +115,7 @@ happens while nobody is at the keyboard.
 |---|---|
 | 75 | Every agent gets its own git worktree and branch; your checkout is never touched |
 | 76 | Dependency directories shared from the parent checkout instead of reinstalled |
-| 77 | A failed or stopped agent keeps its checkout for inspection |
+| 77 | A checkout whose work is not on the remote is kept — and a publish-nothing (`handoff: local`) agent's is kept until you publish or delete it |
 | 78 | Commit what the agent left uncommitted |
 | 79 | Push the branch (on by default) |
 | 80 | Open a PR (on by default) |
@@ -140,7 +140,7 @@ happens while nobody is at the keyboard.
 | 94 | Cross-machine ticket claims so two agents never double-work; a claim whose agent ended with nothing to hand off is freed by the daemon |
 | 95 | CI watch: merge a PR once its checks pass |
 | 96 | CI watch: one fix agent per red head commit, max two attempts |
-| 97 | Reclaim the checkout of an agent whose branch has landed |
+| 97 | Reclaim the checkout of an agent whose work is on the remote — never by publishing what a `handoff: local` agent refused to |
 | 98 | Release a pinned routine branch left behind by a closed PR |
 | 99 | The agent drains its own TODO backlog, one entry per turn |
 

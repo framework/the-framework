@@ -180,8 +180,9 @@ export async function sendStart(
   kind: StartAgentKind = 'build',
   options: StartAgentOptions = {},
 ): Promise<StartAgentResult> {
+  // Throws on an unwired context (D3): there is one host and it wires everything, so "not
+  // enabled on this server" stopped being a state a request can find.
   const startAgent = contextStartAgent()
-  if (!startAgent) return { ok: false, error: 'starting a session is not enabled on this server' }
   const text = prompt.trim()
   if (!text && kind !== 'research') return { ok: false, error: 'a non-empty prompt is required' }
   // A drain fired by hand is the same work the sweep does, so it says the same thing about itself

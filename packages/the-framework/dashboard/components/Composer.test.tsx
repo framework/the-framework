@@ -15,7 +15,6 @@ vi.mock('../lib/preferences.js', () => ({
   themePreference: (p: Preferences) => p.theme ?? 'system',
   // #842: the launcher strip reads the resolved layers; nothing here sets a repo tier.
   usePreferenceSources: () => ({}),
-  useProjectFileConfig: () => ({}),
   // #1025: project presets; nothing here opens a project, so no shared presets and no project scope.
   useProjectPresets: () => [],
   saveProjectPresetList: vi.fn(),

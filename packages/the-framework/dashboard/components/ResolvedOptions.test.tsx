@@ -19,13 +19,13 @@ const rows = (over: Partial<Record<string, boolean>> = {}): OptionRow[] => [
 ]
 
 describe('ResolvedOptions (#842)', () => {
-  test('renders nothing when no option is on and the repo sets nothing', () => {
-    const { container } = render(<ResolvedOptions options={rows()} sources={{}} fileConfig={{}} />)
+  test('renders nothing when no option is on', () => {
+    const { container } = render(<ResolvedOptions options={rows()} sources={{}} />)
     expect(container.innerHTML).toBe('')
   })
 
   test('lists the options in play without opening the gear', () => {
-    render(<ResolvedOptions options={rows({ transparent: true, vanilla: true })} sources={{}} fileConfig={{}} />)
+    render(<ResolvedOptions options={rows({ transparent: true, vanilla: true })} sources={{}} />)
     expect(screen.getByText('Transparent')).toBeTruthy()
     expect(screen.getByText('Disable system prompt')).toBeTruthy()
     expect(screen.queryByText('Browser')).toBeNull()
@@ -33,7 +33,7 @@ describe('ResolvedOptions (#842)', () => {
 
   test('a disabled option is not in play, however it is stored', () => {
     render(
-      <ResolvedOptions options={rows({ browser: true, browserDisabled: true })} sources={{}} fileConfig={{}} />,
+      <ResolvedOptions options={rows({ browser: true, browserDisabled: true })} sources={{}} />,
     )
     expect(screen.queryByText('Browser')).toBeNull()
   })
@@ -43,7 +43,6 @@ describe('ResolvedOptions (#842)', () => {
       <ResolvedOptions
         options={rows({ transparent: true, vanilla: true })}
         sources={{ vanilla: 'repo', transparent: 'global' }}
-        fileConfig={{}}
       />,
     )
     const repo = screen.getByText('Disable system prompt')
@@ -54,13 +53,5 @@ describe('ResolvedOptions (#842)', () => {
     unhoverTooltip(repo)
     expect(yours.textContent).not.toContain('repo')
     expect((await hoverTooltip(yours)).textContent).toContain('Your setting')
-  })
-
-  test('shows the yml keys the gear cannot set, always as the repo tier', () => {
-    render(
-      <ResolvedOptions options={rows()} sources={{}} fileConfig={{ preset: 'software-development', event: 'bug-fix' }} />,
-    )
-    expect(screen.getByText(/preset: software-development/).textContent).toContain('repo')
-    expect(screen.getByText(/kind: bug-fix/).textContent).toContain('repo')
   })
 })

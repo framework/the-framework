@@ -113,7 +113,6 @@ test('the session spec is what carries a session, and it round-trips through age
 
 test('the backlog loop runs unless the spec says otherwise (#323)', () => {
   assert.equal(opts().todoLoop, true)
-  assert.equal(opts().todoMaxItems, undefined)
   // Unattended (#846): off unless asked, so an ordinary agent still parks its gates for the human.
   assert.equal(opts().unattended, undefined)
   assert.equal(opts({ options: { unattended: true } }).unattended, true)
@@ -368,20 +367,11 @@ test('mergeAgentConfig: the-framework.yml supplies defaults, flags override (#25
   const flags = {}
   const modes = (config: { vanilla: boolean; transparent: boolean }) => [config.vanilla, config.transparent]
   // file-only: the repo config drives the agent
-  const fromFile = mergeAgentConfig(flags, { preset: 'software-development', transparent: true })
-  assert.equal(fromFile.presetName, 'software-development')
-  assert.deepEqual(modes(fromFile), [false, true])
-  // a --preset flag wins over the file's preset
-  assert.equal(mergeAgentConfig({ preset: 'web-dev' }, { preset: 'software-development' }).presetName, 'web-dev')
+  assert.deepEqual(modes(mergeAgentConfig(flags, { transparent: true })), [false, true])
   // a mode set by either layer is on; the flag layer says nothing about the mode it did not set
   assert.deepEqual(modes(mergeAgentConfig({ vanilla: true }, { transparent: true })), [true, true])
-  // nothing set anywhere: no preset, no modes
+  // nothing set anywhere: no modes
   assert.deepEqual(modes(mergeAgentConfig(flags, {})), [false, false])
-  assert.equal(mergeAgentConfig(flags, {}).presetName, undefined)
-  // build event: the file's `event` supplies a default, --kind overrides it (#265)
-  assert.equal(mergeAgentConfig(flags, { event: 'bug-fix' }).buildEvent, 'bug-fix')
-  assert.equal(mergeAgentConfig({ buildEvent: 'major-change' }, { event: 'bug-fix' }).buildEvent, 'major-change')
-  assert.equal(mergeAgentConfig(flags, {}).buildEvent, undefined)
 })
 
 test('mergeAgentConfig: a nearer layer can turn a mode off, not just on (#841)', () => {
@@ -415,22 +405,16 @@ test('runCli honors a resumed agent session on the prompt path it belongs to (#7
 })
 
 test('chooseSessionLink defaults a live run to the claude.ai/code session list (#212)', () => {
-  assert.equal(chooseSessionLink({ sessionLink: undefined, driver: 'claude' }, false), CLAUDE_CODE_SESSION_LIST)
+  assert.equal(chooseSessionLink({ driver: 'claude' }, false), CLAUDE_CODE_SESSION_LIST)
   assert.equal(CLAUDE_CODE_SESSION_LIST, 'https://claude.ai/code')
 })
 
-test('chooseSessionLink honors an explicit session link over the default', () => {
-  assert.equal(chooseSessionLink({ sessionLink: 'https://x/s/{sessionId}', driver: 'claude' }, false), 'https://x/s/{sessionId}')
-  // An explicit link is the user's own, so it stands whatever agent runs.
-  assert.equal(chooseSessionLink({ sessionLink: 'https://x/s/{sessionId}', driver: 'codex' }, false), 'https://x/s/{sessionId}')
-})
-
 test('chooseSessionLink gives no link for a fake run (no real session)', () => {
-  assert.equal(chooseSessionLink({ sessionLink: undefined, driver: 'claude' }, true), undefined)
+  assert.equal(chooseSessionLink({ driver: 'claude' }, true), undefined)
 })
 
 test('chooseSessionLink does not point a non-Claude session at claude.ai (#542)', () => {
-  assert.equal(chooseSessionLink({ sessionLink: undefined, driver: 'codex' }, false), undefined)
+  assert.equal(chooseSessionLink({ driver: 'codex' }, false), undefined)
 })
 
 test('runCli --help prints usage and exits 0', async () => {
@@ -647,6 +631,12 @@ test('the footer offers no `framework stop`: Ctrl-C is how the foreground dashbo
   await printStartupFooter(io, { fetchLatest: async () => undefined })
   assert.ok(!out.some(l => l.includes('framework stop')))
   assert.ok(out.includes(`The Framework v${frameworkVersion()}`))
+})
+
+test('the footer offers no positional build command: D4 removed it, and following it exited 2', async () => {
+  const { io, out } = capture()
+  await printStartupFooter(io, { fetchLatest: async () => undefined })
+  assert.ok(!out.some(l => l.includes('<what to build>')))
 })
 
 test('the version prints before npm answers, and a newer release is announced after (#312)', async () => {

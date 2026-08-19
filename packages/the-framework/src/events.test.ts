@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { OPEN_LOOP_MODES, pickedIds, type OnBeforeMergeableSkip } from './events.js'
+import { pickedIds, type OnBeforeMergeableSkip } from './events.js'
 import { formatFrameworkEvent } from './terminal.js'
 import { SESSION_ID_PLACEHOLDER, hasSessionIdPlaceholder, resolveSessionLink } from './session-link.js'
 
@@ -119,17 +119,6 @@ test('formatFrameworkEvent renders a preview line', () => {
     formatFrameworkEvent({ kind: 'preview', url: 'http://localhost:3000', command: 'npm run dev' }),
     '▶ your app is running at http://localhost:3000',
   )
-})
-
-test('formatFrameworkEvent renders modes as checkboxes (#272)', () => {
-  assert.equal(
-    formatFrameworkEvent({ kind: 'modes', all: ['autopilot', 'technical'], active: ['technical'] }),
-    '  modes: [ ] autopilot  [x] technical',
-  )
-})
-
-test('OPEN_LOOP_MODES is the canonical mode ordering', () => {
-  assert.deepEqual([...OPEN_LOOP_MODES], ['autopilot', 'technical'])
 })
 
 test('formatFrameworkEvent distinguishes finished / stopped / failed (#218)', () => {

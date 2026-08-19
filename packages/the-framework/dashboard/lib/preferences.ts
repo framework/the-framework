@@ -23,7 +23,6 @@ import { parseRoute } from './route.js'
 // and its price was a write-split, per-tier write bookkeeping and a three-way provenance union.
 
 const EMPTY: Preferences = {}
-const EMPTY_FILE: FrameworkFileConfig = {}
 let cache: Preferences | null = null
 let loading: Promise<void> | null = null
 /** Each project's committed `the-framework.yml`, as served on the project payload (#842). */
@@ -297,21 +296,6 @@ export function usePreferenceSources(): PreferenceSources {
     subscribe,
     () => sourceSnapshot(projectId),
     () => EMPTY_SOURCES,
-  )
-  useEffect(() => ensureLoaded(projectId), [projectId])
-  return value
-}
-
-/**
- * The open project's raw `the-framework.yml` (#842). The launcher shows `preset` and `event` from
- * it directly: they steer the agent but have no preference counterpart, so the gear cannot set them.
- */
-export function useProjectFileConfig(): FrameworkFileConfig {
-  const projectId = typeof window === 'undefined' ? null : parseRoute(window.location.pathname).projectId
-  const value = useSyncExternalStore(
-    subscribe,
-    () => (projectId ? (files.get(projectId) ?? EMPTY_FILE) : EMPTY_FILE),
-    () => EMPTY_FILE,
   )
   useEffect(() => ensureLoaded(projectId), [projectId])
   return value

@@ -1,5 +1,4 @@
 import { contextAddProject, contextProjects } from './context.js'
-import { readClaudeTrust, type ClaudeTrust } from '../claude-trust.js'
 import { cachedRepoAutoMerge, type RepoAutoMerge } from '../dashboard/gh.js'
 import { preflight, preflightProblems } from '../preflight.js'
 import { isDriverName } from '../driver-names.js'
@@ -39,20 +38,6 @@ export async function onOnboarding(): Promise<OnboardingSuggestion> {
   const cwd = process.cwd()
   const registered = await contextProjects().list()
   return { cwd, cwdProjectId: registered.find(p => p.path === cwd)?.id ?? null }
-}
-
-/**
- * Whether Claude Code trusts this project's root (#1318): the launcher warns before a web agent
- * on an untrusted project, which is doomed to die on the CLI's interactive trust dialog
- * (#1314), instead of after it. Read-only — trusting a folder stays the user's own act in the
- * CLI; run worktrees inherit the root's answer. `null` when the project is unknown here, and
- * `known: false` when the CLI's config could not say.
- */
-export async function onClaudeTrust(projectId: string): Promise<(ClaudeTrust & { root: string }) | null> {
-  const projects = await contextProjects().list()
-  const root = projects.find(p => p.id === projectId)?.path
-  if (!root) return null
-  return { ...(await readClaudeTrust(root)), root }
 }
 
 /**

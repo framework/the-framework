@@ -20,20 +20,28 @@ export function BridgeSettings({ enabled, onChange }: { enabled: boolean; onChan
   const [token, setToken] = useState<string | null>(null)
   const [shown, setShown] = useState(false)
   const [blocked, setBlocked] = useState<{ got: string; expected: string } | null>(null)
+  const [refused, setRefused] = useState(false)
 
   // The version gate's visible half (#1519): a refused extension would otherwise look merely
   // disconnected, and "the bridge stopped working" after a pull is exactly this. Polled, because
   // the block clears on the extension's own next call, not on anything this page does.
+  // A rejected token gets the same treatment (#1225): it dies before the version gate, so an
+  // extension that is stale in both copy and token never even records a version claim — the
+  // store's refused-contact slot is the only trace, and without this line that failure is
+  // silent everywhere.
   useEffect(() => {
     if (!enabled) {
       setBlocked(null)
+      setRefused(false)
       return
     }
     let live = true
     const read = () =>
       void onBridgeStatus()
         .then(status => {
-          if (live) setBlocked(status.version?.blocked ? { got: status.version.got, expected: status.version.expected } : null)
+          if (!live) return
+          setBlocked(status.version?.blocked ? { got: status.version.got, expected: status.version.expected } : null)
+          setRefused(status.lastContact?.status === 401)
         })
         .catch(() => {})
     read()
@@ -72,6 +80,12 @@ export function BridgeSettings({ enabled, onChange }: { enabled: boolean; onChan
         <p className="text-danger">
           The extension is blocked: it is v{blocked.got} and this dashboard expects v{blocked.expected}. Update it —
           pull the repo, then reload the extension at chrome://extensions.
+        </p>
+      )}
+      {!blocked && refused && (
+        <p className="text-danger">
+          Something is calling the bridge with a token this dashboard rejects, so the calls get nowhere. Open the
+          extension&apos;s options and save the token shown below again.
         </p>
       )}
       {token === null ? (

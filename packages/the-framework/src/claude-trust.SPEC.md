@@ -1,9 +1,13 @@
-Reads Claude Code's own record of which folders it trusts, so the dashboard can warn that a cloud agent on an untrusted project would die on the CLI's interactive trust question before the work is spent.
+Reads and grants Claude Code's own folder trust, so a web run never dies on the CLI's interactive trust question.
 
 ## TLDR
 
-- Read-only on purpose: trusting a folder is the driver CLI's security decision; the framework reports it and points at the one-time fix, never makes the decision for the user.
-- A folder never asked about reads as untrusted (the question will fire there — exactly when to warn); a record that is missing or not understood answers unknown, and the dashboard simply shows nothing extra.
+- The trust record written is the CLI's own — the same one the user's accepting of the dialog would leave behind — and everything else in the CLI's config survives the write.
+- A record that is missing or not understood reads as unknown; a config file that exists but cannot be parsed is never overwritten — it is the CLI's file, so the write refuses instead.
+
+## Rationales
+
+- Trust was read-only here at first: the framework warned and named the manual one-time fix. That manual step broke the click-and-it-works story for web runs, and starting a web agent on a project is itself the user's trust decision — so the write automates consent already given, it does not invent it.
 
 ## Before modifying/creating SPEC.md files
 

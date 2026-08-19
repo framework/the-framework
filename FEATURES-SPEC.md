@@ -179,6 +179,7 @@ happens while nobody is at the keyboard.
 | 118 | Chrome extension bridging claude.ai questions back to the dashboard |
 | 119 | Answer a cloud agent's question from the dashboard (typed back into claude.ai) |
 | 120 | Browser-bridge token setting |
+| 124 | Web runs trust the project for Claude Code automatically — no manual trust step |
 
 ## Notifications
 

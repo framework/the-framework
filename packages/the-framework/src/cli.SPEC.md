@@ -8,6 +8,7 @@ The framework command: serves the dashboard in the foreground, and runs one agen
 - Three shapes share that wiring: the full build flow, a verbatim prompt (research included), and transparent mode — the driver completely raw.
 - Every agent settles identically: the quality follow-up if asked for and earned, then the handoff — commit what it left, push the branch, open a draft PR, merge only when authorized — then a project-log entry, written even for agents that stopped or crashed.
 - Settings that cannot apply say so before the spending; a stopped agent never publishes — publishing what it happened to reach is the opposite of what stopping meant.
+- A build whose bookkeeping layout differs from the one the repo records is refused before it writes anything, with both layouts and the fix named — the stale published build a cloud environment installs must fail in seconds with the cause, not hours later at the main branch's guard.
 - Once an agent starts it is never interrupted for quota. The gate is on starting, and it lives with the daemon that decides whether to start unattended work at all.
 - Ctrl+C aborts the agent itself, the driver's process tree included; a second press force-quits.
 

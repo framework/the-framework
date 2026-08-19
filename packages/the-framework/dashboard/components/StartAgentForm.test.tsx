@@ -4,10 +4,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 // Everything the form reads goes through a lib module, so the mocks stop at the `rpc/` stubs: an
 // unmocked one reaches for `/_rpc/<name>`, and there is no daemon behind jsdom to answer.
 const onProjects = vi.hoisted(() => vi.fn())
-const onClaudeTrust = vi.hoisted(() => vi.fn())
 const onDriverReady = vi.hoisted(() => vi.fn())
 const onRepoAutoMerge = vi.hoisted(() => vi.fn())
-vi.mock('../rpc/projects.js', () => ({ onProjects, onClaudeTrust, onDriverReady, onRepoAutoMerge }))
+vi.mock('../rpc/projects.js', () => ({ onProjects, onDriverReady, onRepoAutoMerge }))
 
 const onSystemPromptUser = vi.hoisted(() => vi.fn())
 vi.mock('../rpc/reads.js', () => ({ onSystemPromptUser }))
@@ -56,7 +55,6 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   start.mockReset()
-  onClaudeTrust.mockReset()
   onDriverReady.mockReset()
   onRepoAutoMerge.mockReset()
   prefs.current = {}
@@ -92,45 +90,6 @@ describe('StartAgentForm submit (#1279)', () => {
     await waitFor(() => expect(start).toHaveBeenCalled())
     expect(start.mock.calls[0]![2]).toBe('build')
     expect(start.mock.calls[0]![3]).not.toHaveProperty('unattended')
-  })
-})
-
-describe('StartAgentForm web-run trust warning (#1318)', () => {
-  test('an untrusted project warns before a web run, naming the root (#1314)', async () => {
-    onProjects.mockResolvedValue([])
-    onSystemPromptUser.mockResolvedValue(null)
-    prefs.current = { target: 'web' }
-    onClaudeTrust.mockResolvedValue({ known: true, trusted: false, root: '/repo' })
-    render(<StartAgentForm {...props} />)
-    await waitFor(() => expect(screen.getByText(/has not been trusted/)).toBeTruthy())
-    expect(screen.getByText('/repo')).toBeTruthy()
-  })
-
-  test('a trusted project, an unknown answer, or a local target shows no warning', async () => {
-    onProjects.mockResolvedValue([])
-    onSystemPromptUser.mockResolvedValue(null)
-
-    prefs.current = { target: 'web' }
-    onClaudeTrust.mockResolvedValue({ known: true, trusted: true, root: '/repo' })
-    const trusted = render(<StartAgentForm {...props} />)
-    await waitFor(() => expect(onClaudeTrust).toHaveBeenCalled())
-    expect(screen.queryByText(/has not been trusted/)).toBeNull()
-    trusted.unmount()
-
-    // Config unreadable: do not cry wolf — the agent's own failure advice is the fallback.
-    onClaudeTrust.mockResolvedValue({ known: false, trusted: false, root: '/repo' })
-    const unknown = render(<StartAgentForm {...props} />)
-    await waitFor(() => expect(onClaudeTrust).toHaveBeenCalledTimes(2))
-    expect(screen.queryByText(/has not been trusted/)).toBeNull()
-    unknown.unmount()
-
-    // A local agent never asks the question at all.
-    prefs.current = {}
-    onClaudeTrust.mockClear()
-    render(<StartAgentForm {...props} />)
-    await waitFor(() => expect(onProjects).toHaveBeenCalled())
-    expect(onClaudeTrust).not.toHaveBeenCalled()
-    expect(screen.queryByText(/has not been trusted/)).toBeNull()
   })
 })
 

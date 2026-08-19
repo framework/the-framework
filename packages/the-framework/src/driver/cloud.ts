@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { killTree, registerChild, unregisterChild } from './child-registry.js'
 import { makeEmit } from './session-support.js'
 import { nodeGitRunner, type GitRunner } from '../project.js'
+import { readClaudeTrust, writeClaudeTrust } from '../claude-trust.js'
 import { errorMessage } from '../error-message.js'
 import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverStartOptions, DriverTurn } from './types.js'
 
@@ -59,6 +60,8 @@ export interface CloudDriverOptions {
   runPty?: RunPty
   /** Runs git for the pre-hand-off push (#1320). Injected in tests; defaults to real git. */
   git?: GitRunner
+  /** The CLI's config file the pre-hand-off trust write (#1493) touches. Injected in tests; defaults to `~/.claude.json`. */
+  claudeConfig?: string
   /**
    * Unique tag mixed into the session id. Default a random token. Injected in tests for a
    * stable id, and load-bearing in production for the same reason it is in the Actions
@@ -104,10 +107,10 @@ const SESSION_URL = /https:\/\/claude\.ai\/code\/(session_[A-Za-z0-9]+)\S*/
 
 /**
  * The workspace-trust question, matched with every space removed so a terminal that draws
- * the words with cursor moves rather than literal spaces still matches. The driver does not
- * answer it: trusting a workspace is the user's call to make once, in their own terminal,
- * not something a background agent should decide on their behalf. It is detected only so the
- * run says what it is parked on instead of timing out with nothing to show.
+ * the words with cursor moves rather than literal spaces still matches. The pre-hand-off
+ * trust write (#1493) should keep this dialog from ever appearing; it is still detected as
+ * the safety net for when that write failed or the CLI rejected it, so the run says what it
+ * is parked on — with the manual fix named — instead of timing out with nothing to show.
  */
 const TRUST_PROMPT = 'trustthisfolder'
 
@@ -219,6 +222,27 @@ export class CloudSession implements DriverSession {
       clearTimeout(timer)
       this.controllers.delete(controller)
       throw new Error(`[framework] claude-web: unsafe model id ${JSON.stringify(model)}`)
+    }
+
+    // The pre-hand-off trust write (#1493): the CLI's one-time "trust this folder?" dialog
+    // cannot be answered under the daemon's pty, and the manual one-time fix broke the
+    // "click and it works" story for web runs. Starting a web agent on the project is itself
+    // the user's trust decision, so record it the way the CLI itself would. Best-effort: a
+    // failed write falls through to the dialog detection below and its manual advice.
+    const trustRoot = trustRootOf(this.cwd)
+    try {
+      if (!(await readClaudeTrust(trustRoot, this.config.claudeConfig)).trusted) {
+        await writeClaudeTrust(trustRoot, this.config.claudeConfig)
+        this.emit({
+          type: 'notice',
+          message: `[framework] claude-web: trusted ${trustRoot} for Claude Code on behalf of this run (#1493).`,
+        })
+      }
+    } catch (err) {
+      this.emit({
+        type: 'notice',
+        message: `[framework] claude-web: could not record Claude Code trust for ${trustRoot} (${errorMessage(err)}) — if the CLI asks its trust question, this run will fail with the manual fix named.`,
+      })
     }
 
     // The pre-hand-off push (#1320): the cloud session clones the repo at a named origin ref,

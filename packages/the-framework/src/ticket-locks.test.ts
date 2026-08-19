@@ -132,6 +132,36 @@ test('a batch whose cycle could not land resolves [] (#1420/#1582)', async () =>
   assert.equal(disk.has(join(DATA, 'tickets/a.lock.md')), false)
 })
 
+test('a failed cycle is logged even when it claimed nothing, naming the error (#1582)', async () => {
+  // Silence here left the sweep's "another agent already claimed" as the only story, when the
+  // truth was that the cycle itself failed before any lock landed.
+  const { logs, deps } = checkout(
+    { 'tickets/a.md': '# a' },
+    { result: () => ({ ok: false, committed: false, error: 'ENOENT: tickets missing' }) },
+  )
+  await acquireTicketLocks(CWD, [{ ticket: 'a.md', agentId: 'x-0' }], deps)
+  assert.ok(logs.some(line => line.includes('could not be committed') && line.includes('ENOENT: tickets missing')))
+})
+
+test('the default write creates tickets/ when the checkout has none (#1582)', async () => {
+  // Retiring the last ticket removes the directory (git keeps no empty dirs), and the branch is
+  // born without it — the next drain claim must not fail on the missing parent.
+  const { mkdtemp, rm: rmDir, readFile: readReal } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const dir = await mkdtemp(join(tmpdir(), 'tf-lock-'))
+  try {
+    const funnel: typeof withDataBranch = async (_cwd, _message, op) => {
+      await op(dir)
+      return { ok: true, changed: true, pushed: true }
+    }
+    const locked = await acquireTicketLocks(CWD, [{ ticket: 'a.md', agentId: 'x-0' }], { funnel })
+    assert.deepEqual(locked.map(a => a.ticket), ['a.md'])
+    assert.equal(await readReal(join(dir, 'tickets/a.lock.md'), 'utf8'), 'CLAIMED: x-0\n')
+  } finally {
+    await rmDir(dir, { recursive: true, force: true })
+  }
+})
+
 test('a batch that committed but could not push is kept, and the gap is logged (#1320/#1582)', async () => {
   // The commit still guards every agent forked from this machine; standing the fan-out down over
   // a network blip would cost more than the cross-machine window it briefly leaves open.

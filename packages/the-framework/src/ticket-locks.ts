@@ -1,5 +1,5 @@
-import { readFile, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { TICKETS_DIR } from './tickets.js'
 import { withDataBranch } from './data-branch.js'
 import type { PlanAssignment } from './auto-pm.js'
@@ -108,7 +108,14 @@ export async function acquireTicketLocks(
   deps: TicketLockDeps = {},
   phase: TicketLockPhase = 'plan',
 ): Promise<PlanAssignment[]> {
-  const write = deps.write ?? ((path, content) => writeFile(path, content, 'utf8'))
+  // Creating parents, because `tickets/` itself is not a given: retiring the last ticket removes
+  // the directory (git keeps no empty dirs), and the branch is born without it.
+  const write =
+    deps.write ??
+    (async (path: string, content: string) => {
+      await mkdir(dirname(path), { recursive: true })
+      await writeFile(path, content, 'utf8')
+    })
   const read = deps.read ?? (path => readFile(path, 'utf8'))
   const funnel = deps.funnel ?? withDataBranch
   const log = deps.log ?? (() => {})
@@ -139,7 +146,10 @@ export async function acquireTicketLocks(
     { log },
   )
   if (!result.ok && !result.committed) {
-    if (locked.length) log(`[framework] ticket locks: the batch could not be committed (${result.error})`)
+    // Said even for an empty batch: a cycle that failed before any lock landed is the sweep's
+    // real stand-down reason, and swallowing it left "no claims" indistinguishable from "lost
+    // every race".
+    log(`[framework] ticket locks: the batch could not be committed (${result.error})`)
     return []
   }
   if (!result.ok)

@@ -1,5 +1,9 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { isHandsOff } from '../agent-location.js'
 import { CLOUD_COMMAND, CLOUD_ENV, CLOUD_PROMPT_SEPARATOR, CloudDriver, cloudHandOffPrompt, trustRootOf, type AgentPtyOptions } from './cloud.js'
 import type { DriverEvent } from './types.js'
@@ -46,9 +50,20 @@ function fakeGit(calls: string[][] = [], fail = false) {
   }
 }
 
+/**
+ * A per-test stand-in for `~/.claude.json`, so the trust write (#1493) never touches the
+ * real one. Pass a root to start the file with that root already trusted.
+ */
+function tmpClaudeConfig(trustedRoot?: string): string {
+  const path = join(mkdtempSync(join(tmpdir(), 'cloud-trust-')), 'claude.json')
+  if (trustedRoot) writeFileSync(path, JSON.stringify({ projects: { [trustedRoot]: { hasTrustDialogAccepted: true } } }))
+  return path
+}
+
 function driverWith(output: string, calls: AgentPtyOptions[] = [], git = fakeGit()) {
   const pty = fakePty(output, calls)
-  return new CloudDriver({ runPty: pty.run, git: git.run, agentTag: () => 'tag', timeoutMs: 1000 })
+  // Pre-trusted, so tests about other behavior see the event stream they always saw.
+  return new CloudDriver({ runPty: pty.run, git: git.run, agentTag: () => 'tag', timeoutMs: 1000, claudeConfig: tmpClaudeConfig('/repo') })
 }
 
 test('a prompt creates a cloud session and returns its id', async () => {
@@ -104,6 +119,7 @@ test('output split across chunks still yields the session', async () => {
     agentTag: () => 'tag',
     timeoutMs: 1000,
     git: fakeGit().run,
+    claudeConfig: tmpClaudeConfig('/repo'),
     runPty: async opts => {
       calls.push(opts)
       // Split mid-URL: a parser that matched per chunk rather than on the accumulated
@@ -121,20 +137,24 @@ test('a run that created no session fails with what the CLI said', async () => {
     agentTag: () => 'tag',
     timeoutMs: 1000,
     git: fakeGit().run,
+    claudeConfig: tmpClaudeConfig('/repo'),
     runPty: async opts => opts.onData('Invalid API key · Fix external API key\r\n'),
   })
   const session = await driver.start({ cwd: '/repo' })
   await assert.rejects(session.prompt('go'), /no cloud session was created[\s\S]*Invalid API key/)
 })
 
-test('an untrusted workspace fails fast and says how to fix it, rather than hanging', async () => {
+test('a dialog the trust write did not prevent still fails fast with the manual fix (#1493)', async () => {
   // The dialog is drawn with cursor moves, so the words arrive with no literal spaces
   // between them — matching has to survive that, which is why this fixture looks like this.
+  // The fixture CLI shows the dialog even though the write above it succeeded — the
+  // CLI-rejected-our-record scenario the detection stays around for.
   const events: DriverEvent[] = []
   const driver = new CloudDriver({
     agentTag: () => 'tag',
     timeoutMs: 1000,
     git: fakeGit().run,
+    claudeConfig: tmpClaudeConfig(),
     runPty: async opts => {
       opts.onData('\x1b[2KQuick\x1b[Csafety\x1b[Ccheck\r\n1.\x1b[CYes,\x1b[CI\x1b[Ctrust\x1b[Cthis\x1b[Cfolder\r\n')
       // The driver aborts synchronously from inside onData, so check before waiting: a
@@ -144,7 +164,7 @@ test('an untrusted workspace fails fast and says how to fix it, rather than hang
   })
   const session = await driver.start({ cwd: '/repo', onEvent: e => events.push(e) })
   await assert.rejects(session.prompt('go'), /no cloud session was created — the workspace is not trusted[\s\S]*Run `claude` in \/repo once/)
-  const notice = events.find(e => e.type === 'notice')
+  const notice = events.find((e): e is DriverEvent & { type: 'notice' } => e.type === 'notice' && /has not been trusted/.test(e.message))
   assert.ok(notice && /has not been trusted in \/repo/.test(notice.message))
   assert.ok(notice && /Run `claude` in \/repo once/.test(notice.message))
 })
@@ -158,6 +178,7 @@ test('trust advice for a run worktree names the project root, which outlives the
     agentTag: () => 'tag',
     timeoutMs: 1000,
     git: fakeGit().run,
+    claudeConfig: tmpClaudeConfig(),
     runPty: async opts => {
       opts.onData('Quick\x1b[Csafety\x1b[Ccheck\r\n1.\x1b[CYes,\x1b[CI\x1b[Ctrust\x1b[Cthis\x1b[Cfolder\r\n')
       if (!opts.signal.aborted) await new Promise<void>(r => opts.signal.addEventListener('abort', () => r(), { once: true }))
@@ -166,9 +187,47 @@ test('trust advice for a run worktree names the project root, which outlives the
   const cwd = '/repo/.the-framework/branches/tf-agent-2026-07-27T17-30-20-703Z'
   const session = await driver.start({ cwd, onEvent: e => events.push(e) })
   await assert.rejects(session.prompt('go'), /Run `claude` in \/repo once/)
-  const notice = events.find(e => e.type === 'notice')
+  const notice = events.find((e): e is DriverEvent & { type: 'notice' } => e.type === 'notice' && /has not been trusted/.test(e.message))
   assert.ok(notice && /has not been trusted in \/repo,/.test(notice.message), 'the notice must name the root, not the worktree')
   assert.ok(notice && !notice.message.includes('/branches/'), 'the worktree path helps nobody')
+})
+
+test('a web run trusts the project root before the hand-off, and says so (#1493)', async () => {
+  const events: DriverEvent[] = []
+  const config = tmpClaudeConfig()
+  const pty = fakePty(CREATED)
+  const driver = new CloudDriver({ runPty: pty.run, git: fakeGit().run, agentTag: () => 'tag', timeoutMs: 1000, claudeConfig: config })
+  // An agent cwd: the record must land on the root — worktrees inherit it — not the worktree.
+  const cwd = '/repo/.the-framework/branches/tf-agent-2026-01-01T00-00-00-000Z'
+  const session = await driver.start({ cwd, onEvent: e => events.push(e) })
+  assert.equal((await session.prompt('go')).sessionId, SESSION)
+  const written = JSON.parse(await readFile(config, 'utf8'))
+  assert.equal(written.projects['/repo'].hasTrustDialogAccepted, true)
+  assert.equal(written.projects[cwd], undefined)
+  // The act stays visible: consent was the user's, the write on their behalf is still said.
+  const notice = events.find((e): e is DriverEvent & { type: 'notice' } => e.type === 'notice')
+  assert.ok(notice && /trusted \/repo for Claude Code/.test(notice.message))
+})
+
+test('an already-trusted root is left alone, with nothing to announce (#1493)', async () => {
+  const events: DriverEvent[] = []
+  const session = await driverWith(CREATED).start({ cwd: '/repo', onEvent: e => events.push(e) })
+  await session.prompt('go')
+  assert.ok(!events.some(e => e.type === 'notice' && /trusted \/repo/.test(e.message)))
+})
+
+test('a failed trust write says so and still hands off, the dialog detection as the net (#1493)', async () => {
+  // An existing config we cannot parse is not ours to replace — the write throws, the run
+  // continues, and the CLI decides: here it starts anyway, so the hand-off still lands.
+  const events: DriverEvent[] = []
+  const config = tmpClaudeConfig()
+  writeFileSync(config, 'not json {')
+  const pty = fakePty(CREATED)
+  const driver = new CloudDriver({ runPty: pty.run, git: fakeGit().run, agentTag: () => 'tag', timeoutMs: 1000, claudeConfig: config })
+  const session = await driver.start({ cwd: '/repo', onEvent: e => events.push(e) })
+  assert.equal((await session.prompt('go')).sessionId, SESSION)
+  const notice = events.find((e): e is DriverEvent & { type: 'notice' } => e.type === 'notice')
+  assert.ok(notice && /could not record Claude Code trust for \/repo/.test(notice.message))
 })
 
 test('trustRootOf strips exactly the run-worktree suffix and nothing else', () => {

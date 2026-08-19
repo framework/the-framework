@@ -122,6 +122,14 @@ export interface AgentMeta {
    */
   branch?: string
   /**
+   * The hand-off anchor a cloud run pushed for its session to clone at (#1601): an empty commit
+   * unique to this run, folded from the `cloud-anchor` event. The session works on a `claude/*`
+   * branch of the cloud's own naming, and this is the ancestor by which the daemon's adoption
+   * pass recognizes which of origin's `claude/*` heads is this run's. Absent on non-web runs
+   * and on web runs whose pre-hand-off push failed.
+   */
+  cloudAnchor?: string
+  /**
    * The ticket this agent is implementing (#1117), repo-relative (`tickets/<file>.md`).
    *
    * Set only when the framework picked the ticket itself, so the Overview can show a ticket that is
@@ -359,6 +367,9 @@ export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: str
       break
     case 'branch':
       next.branch = event.branch
+      break
+    case 'cloud-anchor':
+      next.cloudAnchor = event.sha
       break
     case 'settled':
       next.settledAt = at
@@ -1160,6 +1171,33 @@ export async function recordAgentPr(
     const meta = await readMetaFile(fs, archive.meta)
     if (!meta) return false
     await fs.write(archive.meta, JSON.stringify({ ...meta, pr }))
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Record the branch a cloud session's work actually landed on (#1601), patching the archived
+ * meta in place the same way {@link recordAgentPr} does and for the same reason: the fact
+ * becomes known only after the agent's process is gone — the cloud VM pushes its `claude/*`
+ * branch while the local wrapper is already history — so there is no event stream left to
+ * carry it. Every surface resolves the recorded branch first, so this one write is what turns
+ * a run's "nothing committed" row into its real branch, PR and merge state.
+ */
+export async function adoptAgentBranch(
+  cwd: string,
+  agentId: string,
+  branch: string,
+  fs: StoreFs = nodeStoreFs(),
+): Promise<boolean> {
+  if (!isSafeAgentId(agentId)) return false
+  try {
+    const archive = await findArchive(fs, cwd, agentId)
+    if (!archive) return false
+    const meta = await readMetaFile(fs, archive.meta)
+    if (!meta) return false
+    await fs.write(archive.meta, JSON.stringify({ ...meta, branch }))
     return true
   } catch {
     return false

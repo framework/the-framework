@@ -181,6 +181,8 @@ export class CloudSession implements DriverSession {
   private disposed = false
   /** The cloud session this agent was handed to, once it exists. Set at most once. */
   private handedOff: { url: string; sessionId: string } | undefined
+  /** The hand-off anchor commit (#1601), once it is on origin. Set at most once, with the hand-off. */
+  private anchorSha: string | undefined
 
   constructor(
     private readonly config: CloudDriverOptions,
@@ -249,13 +251,29 @@ export class CloudSession implements DriverSession {
     // and its two failure modes are both local facts — the CLI's default pin is the current
     // branch, which an agent worktree's local-only run branch fails, and a slash-carrying
     // name (every `the-framework/...` branch) never resolves on the cloud side even when
-    // pushed (anthropics/claude-code#87235). So push HEAD under this agent's own id — unique,
+    // pushed (anthropics/claude-code#87235). So push under this agent's own id — unique,
     // slash-free — and hand the session that. Best-effort: a repo with no pushable remote
     // falls back to the CLI's default, which still works wherever it worked before, and the
     // notice names what a stranded session will look like.
+    //
+    // What gets pushed is not HEAD itself but the hand-off anchor (#1601): an empty commit on
+    // top of HEAD, minted with `commit-tree` so no local branch moves. The session does its
+    // work on a branch of its own naming (`claude/*`), never the designated run branch — and
+    // since every commit it makes descends from what it cloned, a commit unique to this run is
+    // the one exact mark by which the daemon can later recognize which `claude/*` branch is
+    // this run's. A repo where the anchor cannot be minted hands off plain HEAD: the session
+    // still works, the run is simply never matched to its branch.
+    const git = this.config.git ?? nodeGitRunner()
+    let anchor: string | undefined
+    try {
+      anchor = (await git(['commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', `[The Framework] web hand-off ${this.id}`], this.cwd)).trim() || undefined
+    } catch {
+      anchor = undefined
+    }
     let ref: string | undefined = this.id
     try {
-      await (this.config.git ?? nodeGitRunner())(['push', 'origin', `HEAD:refs/heads/${this.id}`], this.cwd)
+      await git(['push', 'origin', `${anchor ?? 'HEAD'}:refs/heads/${this.id}`], this.cwd)
+      this.anchorSha = anchor
     } catch (err) {
       ref = undefined
       this.emit({
@@ -336,9 +354,15 @@ export class CloudSession implements DriverSession {
             `View the session: ${session.url}`,
             `Continue it here: claude --teleport ${session.sessionId}`,
           ].join('\n')
-    // The result also carries the session's real URL (#1317): the action above is what the
-    // agent view links through, the result is what reaches the meta.
-    this.emit({ type: 'result', text: summary, sessionId: session.sessionId, sessionLink: session.url })
+    // The result also carries the session's real URL (#1317) and the hand-off anchor (#1601):
+    // the action above is what the agent view links through, the result is what reaches the meta.
+    this.emit({
+      type: 'result',
+      text: summary,
+      sessionId: session.sessionId,
+      sessionLink: session.url,
+      ...(this.anchorSha ? { anchorSha: this.anchorSha } : {}),
+    })
     return { text: summary, sessionId: session.sessionId }
   }
 

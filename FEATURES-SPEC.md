@@ -157,6 +157,7 @@ happens while nobody is at the keyboard.
 - Answer a cloud agent's question from the dashboard (typed back into claude.ai)
 - Browser-bridge token setting
 - Web runs trust the project for Claude Code automatically — no manual trust step
+- A cloud run's row follows the session's real branch and PR, with its armed draft PR opened when the session opens none
 
 ## Notifications
 

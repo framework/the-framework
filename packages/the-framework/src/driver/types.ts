@@ -276,8 +276,11 @@ export type DriverEvent =
    * The turn settled with this final text. `sessionLink` is the real URL of the session,
    * for a driver whose session has one of its own (#1317) — the cloud hand-off — so the
    * meta can link there instead of the generic entry point; drivers without one omit it.
+   * `anchorSha` is the hand-off anchor commit (#1601), for a driver whose session does its
+   * work on a branch of its own naming that this machine can only recognize later by
+   * ancestry; drivers whose work stays on the designated branch omit it.
    */
-  | { type: 'result'; text: string; sessionId?: string; sessionLink?: string; usage?: DriverUsage }
+  | { type: 'result'; text: string; sessionId?: string; sessionLink?: string; anchorSha?: string; usage?: DriverUsage }
   /** Where the account's subscription quota stands (#517). */
   | { type: 'rate-limit'; limit: DriverRateLimit }
   /** The agent (or its transport) errored. */

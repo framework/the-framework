@@ -11,6 +11,7 @@ import {
   readLiveMetas,
   archiveWorktreeAgent,
   recordAgentPr,
+  adoptAgentBranch,
   restoreArchivedAgent,
   listWorktreeDirs,
   reconcileOrphanedAgents,
@@ -677,6 +678,21 @@ test('recordAgentPr patches the archived meta, so a PR opened after the run stil
   await archiveWorktreeAgent(worktreeAt('r1'), CWD, fs)
   assert.equal(await recordAgentPr(CWD, 'r1', { number: 42, url: 'https://x/pull/42' }, fs), true)
   assert.deepEqual((await listAgents(CWD, fs)).find(r => r.id === 'r1')?.pr, { number: 42, url: 'https://x/pull/42' })
+})
+
+test('adoptAgentBranch patches the archived meta with the branch the cloud work landed on (#1601)', async () => {
+  // The cloud VM pushes its `claude/*` branch after the wrapper's process is gone, so the fact
+  // arrives the same way a late PR does: patched onto the archive, read by every surface.
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, branch: 'tf-agent-r1' }))
+  await archiveWorktreeAgent(worktreeAt('r1'), CWD, fs)
+  assert.equal(await adoptAgentBranch(CWD, 'r1', 'claude/fix-the-thing', fs), true)
+  assert.equal((await listAgents(CWD, fs)).find(r => r.id === 'r1')?.branch, 'claude/fix-the-thing')
+})
+
+test('adoptAgentBranch leaves the record as it was when there is nothing to patch (#1601)', async () => {
+  const fs = memFs()
+  assert.equal(await adoptAgentBranch(CWD, 'nope', 'claude/x', fs), false)
+  assert.equal(await adoptAgentBranch(CWD, '../escape', 'claude/x', fs), false, 'and an unsafe id is refused')
 })
 
 test('recordAgentPr leaves the record as it was when there is nothing to patch (E6)', async () => {

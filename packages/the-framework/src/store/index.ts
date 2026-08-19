@@ -15,6 +15,7 @@ export {
   archiveWorktreeAgent,
   archivedAgentPaths,
   recordAgentPr,
+  adoptAgentBranch,
   restoreArchivedAgent,
   listWorktreeDirs,
   worktreeDirEntries,

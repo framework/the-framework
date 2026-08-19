@@ -72,6 +72,9 @@ test('ensure births the branch parentless, checks it out, seeds the queue, links
     assert.equal(await readFile(join(wt, 'TODO_AGENTS.md'), 'utf8'), '')
     // The root symlink reaches into the checkout, relatively, so a moved repo keeps working.
     assert.equal(await readlink(join(repo, 'tickets')), join('.the-framework', 'branches', DATA_BRANCH, 'tickets'))
+    // The link is hidden from git, so no sweeping `git add -A` ever commits it onto a code branch.
+    const status = await git(['status', '--porcelain'], repo)
+    assert.ok(!status.split('\n').some(line => line.trim() === '?? tickets'), status)
     // Idempotent: a second ensure changes nothing and still reports ok.
     assert.deepEqual(await ensureDataWorktree(repo), { ok: true })
   } finally {
@@ -85,6 +88,9 @@ test('ensure leaves a pre-existing tickets/ path alone', async () => {
     await writeFile(join(repo, 'tickets'), 'mine\n')
     assert.deepEqual(await ensureDataWorktree(repo), { ok: true })
     assert.equal(await readFile(join(repo, 'tickets'), 'utf8'), 'mine\n')
+    // The user's own path stays theirs all the way: still visible to git, not excluded.
+    const status = await git(['status', '--porcelain'], repo)
+    assert.ok(status.split('\n').some(line => line.trim() === '?? tickets'), status)
   } finally {
     await rm(repo, RETRIED_RM)
   }

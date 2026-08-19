@@ -3,6 +3,7 @@ import { nodeGitRunner, type GitRunner } from './project.js'
 import { FRAMEWORK_DIR, BRANCHES_DIR } from './store/index.js'
 import { DATA_BRANCH } from './branch-names.js'
 import { TICKETS_DIR, FLAT_TODO_FILE } from './tickets.js'
+import { excludeFromGit } from './git-exclude.js'
 import { errorMessage } from './error-message.js'
 
 export { DATA_BRANCH }
@@ -148,10 +149,14 @@ async function ensureCore(cwd: string, r: Resolved): Promise<void> {
     await r.git(['commit', '-m', '[The Framework] seed the queue'], path)
   }
   // The roadmap stays one `ls` away: `<repo>/tickets` links into the data checkout. Created only
-  // over nothing — a real `tickets/` dir (pre-migration) or a user's own file is theirs.
+  // over nothing — a real `tickets/` dir (pre-migration) or a user's own file is theirs. The link
+  // is framework state, so it is hidden from git the moment it is made: uncommitted at the root,
+  // it would ride any sweeping `git add -A` onto a code branch. Root-anchored, so only this link
+  // is hidden — a `tickets` path of the project's own elsewhere stays visible.
   const rootLink = join(cwd, TICKETS_DIR)
   if (!(await r.lexists(rootLink))) {
     await r.symlink(join(FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, TICKETS_DIR), rootLink).catch(() => {})
+    await excludeFromGit(cwd, '/' + TICKETS_DIR, undefined, r.git).catch(() => {})
   }
 }
 

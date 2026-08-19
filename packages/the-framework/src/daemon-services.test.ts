@@ -177,3 +177,86 @@ test("the drain row's Run now fans out to the setting with auto-run off (#1204/#
     await stop()
   }
 })
+
+/** An archived meta in the transient `.the-framework/agents/`, where the promote poll reads it. */
+async function archiveMeta(projectDir: string, meta: { id: string } & Record<string, unknown>): Promise<void> {
+  const dir = join(projectDir, '.the-framework', 'agents')
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, `${meta.id}.json`), JSON.stringify({ startedAt: '2026-08-19T00:00:00.000Z', updatedAt: '2026-08-19T00:01:00.000Z', ...meta }))
+}
+
+test('a drained entry is checked off on the data branch once its run reports the work published (#1582)', async () => {
+  // The whole retire loop, with only the agent stubbed: the sweep pins the entry, the run's
+  // archived record reports the hand-off, and the daemon — the queue's one local writer — lands
+  // the check-off as a data-branch commit. The agent never touches the queue.
+  const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
+  try {
+    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    await settle(() => starts.length >= 1)
+    assert.ok(starts[0]!.prompt.includes(QUEUE_ENTRIES[0]!), 'the first entry is the pinned one')
+    // The run settles `done` and its epilogue reported the push/PR: the one ending that retires.
+    await archiveMeta(projectDir, { id: 'run-1', status: 'done', handoffReport: 'done' })
+    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    // Waited for on the branch, not the checkout file: the funnel writes the file first and
+    // commits a beat later, and only the commit is the retirement every machine pulls.
+    const deadline = Date.now() + 5000
+    let subjects = ''
+    while (Date.now() < deadline) {
+      subjects = await git('git', ['log', '--format=%s', 'the-framework_data'], { cwd: projectDir }).then(r => r.stdout, () => '')
+      if (subjects.includes('check off a drained entry')) break
+      await new Promise(resolve => setTimeout(resolve, 25))
+    }
+    assert.ok(subjects.includes('check off a drained entry'), 'the check-off is a data-branch commit')
+    const queue = await readFile(join(dataWorktreePath(projectDir), 'TODO_AGENTS.md'), 'utf8')
+    assert.ok(queue.includes(`- [x] ${QUEUE_ENTRIES[0]!}`), 'the drained entry is checked off')
+    // The fixture seeds bare bullets, and untouched ones must stay exactly as written.
+    assert.ok(queue.includes(`- ${QUEUE_ENTRIES[1]!}`), 'the untouched entries stay open')
+    assert.ok(!queue.includes(`[x] ${QUEUE_ENTRIES[1]!}`), 'only the drained entry is retired')
+  } finally {
+    await stop()
+  }
+})
+
+test('a run whose hand-off failed leaves its entry open: unpublished work is not retired (#1582)', async () => {
+  // The negative half of the gate above, seen live in the PR smoke: the push or PR did not land
+  // (`handoffReport: 'failed'`), so the daemon settles the run without checking anything off —
+  // the entry stays open for the next drain rather than vanishing with the work unpublished.
+  const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
+  try {
+    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    await settle(() => starts.length >= 1)
+    await archiveMeta(projectDir, { id: 'run-1', status: 'done', handoffReport: 'failed' })
+    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    // No positive signal marks "the promote settled without retiring", so give the tick a
+    // moment and then require the queue untouched — the check-off in the sibling test lands
+    // well inside this window when the gate passes.
+    await settle(() => false, 1500)
+    const queue = await readFile(join(dataWorktreePath(projectDir), 'TODO_AGENTS.md'), 'utf8')
+    assert.ok(!queue.includes('[x]'), 'nothing is checked off')
+    assert.ok(queue.includes(`- ${QUEUE_ENTRIES[0]!}`), "the failed run's entry stays open")
+  } finally {
+    await stop()
+  }
+})
+
+test('a drain claims an entry whose ticket file is gone, recreating tickets/ on the way (#1582)', async () => {
+  // The live-smoke regression: retiring the last ticket removes `tickets/` itself (git keeps no
+  // empty dirs), while the queue entry linking it stays open — a failed publish leaves exactly
+  // this state. The next drain must still claim and start, not stand the batch down with
+  // "another agent already claimed".
+  const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
+  try {
+    const cleared = await withDataBranch(projectDir, 'retire every ticket', async dir => {
+      await rm(join(dir, 'tickets'), { recursive: true, force: true })
+    })
+    assert.ok(cleared.ok, 'the fixture must drop tickets/ from the data branch')
+    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    await settle(() => starts.length >= 1)
+    assert.equal(starts.length, 1, 'the batch starts instead of standing down')
+    assert.ok(starts[0]!.prompt.includes(QUEUE_ENTRIES[0]!), 'the first entry is the pinned one')
+    const lock = await readFile(join(dataWorktreePath(projectDir), 'tickets/2026-07-01_one.lock.md'), 'utf8')
+    assert.ok(lock.startsWith('CLAIMED: drain-'), 'the claim landed in a recreated tickets/')
+  } finally {
+    await stop()
+  }
+})

@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert'
-import { mkdtemp, readFile, readlink, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readlink, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { realpath } from 'node:fs/promises'
@@ -75,6 +75,13 @@ test('ensure births the branch parentless, checks it out, seeds the queue, links
     // The link is hidden from git, so no sweeping `git add -A` ever commits it onto a code branch.
     const status = await git(['status', '--porcelain'], repo)
     assert.ok(!status.split('\n').some(line => line.trim() === '?? tickets'), status)
+    // ...while the data checkout's real tickets/ stays committable — the exclude speaks for every
+    // worktree, and it must never swallow the branch's own cargo.
+    await mkdir(join(wt, 'tickets'), { recursive: true })
+    await writeFile(join(wt, 'tickets', 't.md'), 'x\n')
+    await git(['add', '-A'], wt)
+    await git(['commit', '-m', 't'], wt)
+    assert.equal((await git(['show', `${DATA_BRANCH}:tickets/t.md`], repo)).trim(), 'x')
     // Idempotent: a second ensure changes nothing and still reports ok.
     assert.deepEqual(await ensureDataWorktree(repo), { ok: true })
   } finally {

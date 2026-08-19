@@ -151,12 +151,16 @@ async function ensureCore(cwd: string, r: Resolved): Promise<void> {
   // The roadmap stays one `ls` away: `<repo>/tickets` links into the data checkout. Created only
   // over nothing — a real `tickets/` dir (pre-migration) or a user's own file is theirs. The link
   // is framework state, so it is hidden from git the moment it is made: uncommitted at the root,
-  // it would ride any sweeping `git add -A` onto a code branch. Root-anchored, so only this link
-  // is hidden — a `tickets` path of the project's own elsewhere stays visible.
+  // it would ride any sweeping `git add -A` onto a code branch. The exclude is a pair because the
+  // repo-level exclude speaks for every worktree at once — this checkout included, whose root
+  // holds the real `tickets/` the branch exists to carry: `/tickets` hides root entries of that
+  // name, and `!/tickets/` re-includes directories (a trailing slash never matches a symlink), so
+  // the link stays hidden while the data checkout's own directory keeps committing.
   const rootLink = join(cwd, TICKETS_DIR)
   if (!(await r.lexists(rootLink))) {
     await r.symlink(join(FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH, TICKETS_DIR), rootLink).catch(() => {})
     await excludeFromGit(cwd, '/' + TICKETS_DIR, undefined, r.git).catch(() => {})
+    await excludeFromGit(cwd, '!/' + TICKETS_DIR + '/', undefined, r.git).catch(() => {})
   }
 }
 

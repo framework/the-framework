@@ -118,8 +118,8 @@ test('sendReleaseTicketLock deletes the lock and commits the release (#1420/#158
     assert.deepEqual(result, { ok: true })
     // The release is a data-branch commit: the lock is gone from the branch, not just a checkout.
     const git = nodeGitRunner()
-    await assert.rejects(git(['show', 'the-framework_data:tickets/2026-07-20_thing.lock.md'], cwd))
-    assert.equal(await git(['show', 'the-framework_data:tickets/2026-07-20_thing.md'], cwd), '# Thing\n')
+    await assert.rejects(git(['show', 'tf-data:tickets/2026-07-20_thing.lock.md'], cwd))
+    assert.equal(await git(['show', 'tf-data:tickets/2026-07-20_thing.md'], cwd), '# Thing\n')
   } finally {
     await rm(cwd, { recursive: true, force: true })
   }

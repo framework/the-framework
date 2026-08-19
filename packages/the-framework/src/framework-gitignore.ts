@@ -18,5 +18,5 @@ export function gitignorePath(cwd: string): string {
 
 /** The whole file: everything under `.the-framework/` is transient except the layout marker (#1582, #1575). */
 export function frameworkGitignore(): string {
-  return `# The Framework: agent state is transient; the lasting records live on the the-framework_data branch.\n*\n!.gitignore\n!${LAYOUT_FILE}\n`
+  return `# The Framework: agent state is transient; the lasting records live on the tf-data branch.\n*\n!.gitignore\n!${LAYOUT_FILE}\n`
 }

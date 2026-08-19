@@ -24,7 +24,7 @@ GitHub: [#42](https://github.com/org/repo/issues/42) [optional]
 [optional: more info (any heading and format you want)]
 ```
 
-When a ticket is closed, it should be removed from the data branch (also its `.plan.md` and `.lock.md`), so that `tickets/*` only contains open tickets. All of `tickets/*` lives on the data branch — see "The data branch".
+When a ticket is closed, it should be removed from the repository (also its `.plan.md` and `.lock.md`), so that `tickets/*` only contains open tickets.
 
 
 ## tickets/<DATE>_<SLUG>.lock.md

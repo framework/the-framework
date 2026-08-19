@@ -123,7 +123,7 @@ happens while nobody is at the keyboard.
 | 82 | Empty agents publish nothing |
 | 83 | Handoff panel: push / open PR / merge, as buttons |
 | 84 | A withheld merge is reported with its reason |
-| 85 | Agent history archived on the `the-framework_data` branch under per-user directories — pushed the moment a session settles |
+| 85 | Agent history archived on the `tf-data` branch under per-user directories — pushed the moment a session settles |
 | 86 | Post-merge quality follow-ups queued (maintainability / security / readability) |
 | 87 | Knowledge folded back into `DECISIONS.md` / `FACTS.md` / `INSIGHTS.md` at merge |
 

@@ -16,7 +16,7 @@ import type { DataWriteResult, withDataBranch } from './data-branch.js'
 
 const CWD = '/repo'
 /** Where the funnel's op runs: the data branch's checkout (#1582). */
-const DATA = join(CWD, '.the-framework', 'branches', 'the-framework_data')
+const DATA = join(CWD, '.the-framework', 'branches', 'tf-data')
 
 /**
  * An in-memory data checkout behind a fake write funnel: the op runs against a file map, the

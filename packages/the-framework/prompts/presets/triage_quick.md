@@ -1,4 +1,4 @@
-Look at `tickets/*` and choose tickets to work on next — tickets and queue live on the data branch (see "The data branch"):
+Look at `tickets/*` and choose tickets to work on next:
 - Pick a ticket if it has a `.plan.md` that shows it's a quick-win (low `effort` value) with `uncertainty: 0`
 - Add tickets to TODO_AGENTS.md
   - With sensible prioritization, and consider bumping the priority of lowest effort tickets (e.g. to make `effort: 0` the next tasks agents work on)

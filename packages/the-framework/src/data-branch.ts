@@ -7,7 +7,7 @@ import { errorMessage } from './error-message.js'
 
 export { DATA_BRANCH }
 
-// The `the-framework_data` branch (#1582): every file The Framework itself writes — the tickets,
+// The `tf-data` branch (#1582): every file The Framework itself writes — the tickets,
 // the queue, the session archives — lives on one branch of the project repo, the way `gh-pages`
 // holds a site's data. Main is 100% code, 0% framework data.
 //
@@ -25,11 +25,11 @@ export { DATA_BRANCH }
 // its own checkout and pushes, and the race is settled by the push itself — whoever loses re-syncs
 // and re-applies.
 //
-// The checkout lives at `.the-framework/branches/the-framework_data`, a plain git worktree in the
+// The checkout lives at `.the-framework/branches/tf-data`, a plain git worktree in the
 // #1580 branches dir, named as its branch like every checkout there. The repo root keeps a
 // `tickets` symlink into it so the roadmap stays one `ls` away for humans.
 
-/** The data branch's checkout under a project: `<repo>/.the-framework/branches/the-framework_data`. */
+/** The data branch's checkout under a project: `<repo>/.the-framework/branches/tf-data`. */
 export function dataWorktreePath(cwd: string): string {
   return join(cwd, FRAMEWORK_DIR, BRANCHES_DIR, DATA_BRANCH)
 }
@@ -131,7 +131,7 @@ async function ensureCore(cwd: string, r: Resolved): Promise<void> {
       if (await refExists(cwd, `refs/remotes/origin/${DATA_BRANCH}`, r.git)) {
         await r.git(['branch', DATA_BRANCH, `origin/${DATA_BRANCH}`], cwd)
       } else {
-        const commit = (await r.git(['commit-tree', EMPTY_TREE, '-m', '[The Framework] the-framework_data'], cwd)).trim()
+        const commit = (await r.git(['commit-tree', EMPTY_TREE, '-m', '[The Framework] tf-data'], cwd)).trim()
         await r.git(['branch', DATA_BRANCH, commit], cwd)
       }
     }

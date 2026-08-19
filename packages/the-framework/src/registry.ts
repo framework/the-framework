@@ -1,6 +1,6 @@
 import { isAgentLocation, type AgentLocation } from './agent-location.js'
 import { isHandoffLevel, type HandoffLevel } from './handoff-level.js'
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { isDriverName } from './driver-names.js'
 import { nodeFs } from './node-fs.js'
@@ -155,18 +155,6 @@ export interface Preferences {
    * the same checklist stays available on the settings page.
    */
   onboardingDismissed?: boolean
-  /**
-   * Absolute path to the directory the user keeps their repos in (#1123): the default the
-   * create-project flow (#1121) offers, and the root {@link reposDirectoryAutoGrant} scans.
-   * Absent = no default. Kept only as a non-empty absolute path.
-   */
-  reposDirectory?: string
-  /**
-   * Auto-add and grant every git repo directly inside {@link reposDirectory} on daemon boot (#1123).
-   * **Absent = off**: it hands the app filesystem access to a whole directory of repos at once, so it
-   * is an explicit opt-in, and the blast radius is contained to that one directory.
-   */
-  reposDirectoryAutoGrant?: boolean
 }
 
 // The bounds the browser's controls and this file's sanitizer both need live in the leaf
@@ -335,7 +323,6 @@ const BOOLEAN_PREFERENCES: Record<BooleanPreferenceKey, true> = {
   autoPm: true,
   bridge: true,
   onboardingDismissed: true,
-  reposDirectoryAutoGrant: true,
 }
 
 const PREFERENCE_KEYS = Object.keys(BOOLEAN_PREFERENCES) as BooleanPreferenceKey[]
@@ -382,10 +369,6 @@ function sanitizePreferences(value: unknown): Preferences {
   const offset = input['autoSpendOffset']
   if (typeof offset === 'number' && Number.isFinite(offset))
     preferences.autoSpendOffset = Math.round(Math.min(Math.max(offset, -MAX_SPEND_OFFSET), MAX_SPEND_OFFSET))
-  // `reposDirectory` (#1123) is a string, so like `target` the boolean-only loop would eat it. Kept
-  // only as a non-empty absolute path; a relative or junk value is dropped rather than persisted.
-  const reposDir = typeof input['reposDirectory'] === 'string' ? input['reposDirectory'].trim() : ''
-  if (reposDir && isAbsolute(reposDir)) preferences.reposDirectory = reposDir
   const customPresets = sanitizeCustomPresets(input['customPresets'])
   if (customPresets.length) preferences.customPresets = customPresets
   // `autoPmOptOut` (#1209) is a list of routine names, kept as free-form strings rather than

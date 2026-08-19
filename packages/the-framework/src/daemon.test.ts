@@ -10,7 +10,6 @@ import {
   isProcessAlive,
   runDaemon,
   registerHomeProject,
-  registerReposDirectory,
   isNestedWithin,
   type DaemonState,
   type RunDaemonOptions,
@@ -50,7 +49,7 @@ async function startDaemon(cwd: string, opts: RunDaemonOptions): Promise<{ done:
 import { listAgents } from './store/index.js'
 import { EVENTS_FILE, FRAMEWORK_DIR, addWorktree, worktreePath } from './store/index.js'
 import { controlPath } from './control.js'
-import { projectId, listProjects, addProject, writePreferences } from './registry.js'
+import { projectId, listProjects, addProject } from './registry.js'
 import { nodeGitRunner } from './project.js'
 import { gitignorePath, frameworkGitignore } from './framework-gitignore.js'
 
@@ -605,66 +604,3 @@ test('registerHomeProject still adds an activated cwd that is not nested (#647)'
   }
 })
 
-test('registerReposDirectory installs then auto-adds the git repos when the opt-in is on (#1123, #1600)', async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-repos-')))
-  const env = await configEnv(root)
-  try {
-    // Two git repos and one plain directory directly inside the repos dir.
-    await mkdir(join(root, 'app-a', '.git'), { recursive: true })
-    await mkdir(join(root, 'app-b', '.git'), { recursive: true })
-    await mkdir(join(root, 'not-a-repo'), { recursive: true })
-    await writePreferences({ reposDirectory: root, reposDirectoryAutoGrant: true }, undefined, env)
-
-    const installed: string[] = []
-    const install = async (repo: string) => {
-      installed.push(repo)
-      return { ok: true as const }
-    }
-    await registerReposDirectory(env, install)
-
-    const projects = (await listProjects(undefined, env)).map(p => p.path).sort()
-    assert.deepEqual(projects, [join(root, 'app-a'), join(root, 'app-b')])
-    assert.deepEqual(installed.sort(), projects, 'every registered repo went through install first')
-
-    // A second pass finds both repos already registered: nothing is re-installed.
-    await registerReposDirectory(env, install)
-    assert.equal(installed.length, 2)
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
-})
-
-test('registerReposDirectory skips a repo whose install failed instead of registering it half-set-up (#1600)', async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-repos-badinstall-')))
-  const env = await configEnv(root)
-  try {
-    await mkdir(join(root, 'app-good', '.git'), { recursive: true })
-    await mkdir(join(root, 'app-bad', '.git'), { recursive: true })
-    await writePreferences({ reposDirectory: root, reposDirectoryAutoGrant: true }, undefined, env)
-
-    await registerReposDirectory(env, async repo =>
-      repo.endsWith('app-bad') ? { ok: false as const, error: 'no git identity' } : { ok: true as const },
-    )
-
-    const projects = (await listProjects(undefined, env)).map(p => p.path)
-    assert.deepEqual(projects, [join(root, 'app-good')])
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
-})
-
-test('registerReposDirectory adds nothing while the opt-in is off (#1123)', async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-repos-off-')))
-  const env = await configEnv(root)
-  try {
-    await mkdir(join(root, 'app-a', '.git'), { recursive: true })
-    // reposDirectory is set, but the auto-grant is not: the default must stay hands-off.
-    await writePreferences({ reposDirectory: root }, undefined, env)
-
-    await registerReposDirectory(env)
-
-    assert.deepEqual(await listProjects(undefined, env), [])
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
-})

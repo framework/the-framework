@@ -19,6 +19,8 @@ import {
   currentBranch,
   readLiveMetas,
   readLiveMeta,
+  removeWorktree,
+  pruneWorktrees,
   resolveAgentEventsPath,
   FRAMEWORK_DIR,
   EVENTS_FILE,
@@ -28,7 +30,7 @@ import {
 } from './store/index.js'
 import { agentIdFromWorktreeDir } from './branch-names.js'
 import type { FrameworkEvent } from './events.js'
-import { writeAgentSpec } from './agent-spec.js'
+import { removeAgentSpec, writeAgentSpec } from './agent-spec.js'
 import type { StartAgentKind, StartAgentOptions, StartAgentResult, AddProjectResult } from './dashboard/index.js'
 import type { EventsSource, RemoteAgents } from './dashboard/rpc-serve.js'
 import { RelayedAgents, startRemoteAgent } from './dashboard/remote-run.js'
@@ -43,7 +45,7 @@ import { addProject, listProjects, projectId } from './registry.js'
 import { isTicketPath } from './tickets.js'
 import { resolveProjectAgentOptions } from './daemon-services.js'
 import { installProject, enumerateGitRepos } from './install.js'
-import { isGitRepo } from './project.js'
+import { isGitRepo, nodeGitRunner } from './project.js'
 import { isCliTimeout } from './cli-exec.js'
 import { withAgentLock } from './agent-locks.js'
 import { errorMessage } from './error-message.js'
@@ -391,6 +393,11 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   // Live run pids, keyed per agent rather than per project (#736) — see onStart for the key.
   const activeAgents = new Map<string, number>()
   const starting = new Set<string>() // reserved keys mid-spawn, to close the async gap
+  // Set by the first stopAgents call and never cleared: the daemon shuts down once. A Start
+  // landing after the stop pass would spawn a detached agent outside the snapshot stopAgents
+  // terminates — an orphan on `ppid 1` nothing ever stops — because the HTTP surface closes
+  // after the agents do. Same shape as auto-pm's stop re-checks (#983).
+  let closing = false
   // A finished leg's exit → retirement chain, parked per agent slot so a continuation that raced
   // the exit (#1529) can await the retirement instead of reusing a checkout mid-removal.
   const retiring = new Map<string, Promise<void>>()
@@ -630,6 +637,9 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     options: StartAgentOptions = {},
     targetProjectId?: string,
   ): Promise<StartAgentResult> => {
+    // Ctrl-C closes everything: a Start that lands while the daemon is shutting down is refused,
+    // never spawned into the gap between the stop pass and the server actually closing.
+    if (closing) return { ok: false, error: 'the daemon is shutting down' }
     // Run on a connected device (#1067): forward the agent to the remote daemon and relay its events
     // back, without allocating a worktree or touching this daemon's busy guard; the remote owns
     // both. `remote` is stripped so the remote starts an ordinary local agent and does not relay on.
@@ -725,19 +735,31 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
       // `prompt` kind (#353) is a preset the user reviewed in the textarea: run it verbatim,
       // never re-render. `agentId` is the id its worktree is named with, so the directory and the
       // run recorded inside it are one string — and tells it the framework owns its branch.
-      const child = spawnDetached(
-        realBin,
-        await writeAgentSpec({
-          prompt,
-          kind,
-          cwd: workspace.cwd,
-          ...(workspace.agentId ? { agentId: workspace.agentId } : {}),
-          // Reopen the agent's log instead of truncating it: the follow-up IS that agent.
-          ...(continued ? { continueAgent: true } : {}),
-          options,
-        }, env),
-        ...(workspace.agentId ? [agentStderrPath(workspace.cwd)] : []),
-      )
+      const specPath = await writeAgentSpec({
+        prompt,
+        kind,
+        cwd: workspace.cwd,
+        ...(workspace.agentId ? { agentId: workspace.agentId } : {}),
+        // Reopen the agent's log instead of truncating it: the follow-up IS that agent.
+        ...(continued ? { continueAgent: true } : {}),
+        options,
+      }, env)
+      // Re-checked right before the spawn because everything above is awaited (#983): an agent
+      // spawned past the stop pass is missing from the snapshot stopAgents terminates, so
+      // nothing would ever stop it. The refusal takes back everything the way here allocated —
+      // the spec, and the fresh worktree + branch (a continuation's checkout is the agent's own,
+      // not this refusal's to remove). Left standing, the worktree would have no agent.json, and
+      // the next boot's sweep would reclaim it by pushing an empty junk branch.
+      if (closing) {
+        await removeAgentSpec(specPath, env)
+        if (!continued && workspace.agentId) {
+          await removeWorktree(projectCwd, workspace.cwd).catch(() => {})
+          await pruneWorktrees(projectCwd).catch(() => {})
+          await nodeGitRunner()(['branch', '-D', agentBranchName(workspace.agentId)], projectCwd).catch(() => {})
+        }
+        return { ok: false, error: 'the daemon is shutting down' }
+      }
+      const child = spawnDetached(realBin, specPath, ...(workspace.agentId ? [agentStderrPath(workspace.cwd)] : []))
       // The agent narrates itself through its own `.the-framework/events.jsonl`, which the
       // dashboard streams over `GET /_rpc/events`; the daemon just tracks liveness.
       const settle = (detail: string): void => {
@@ -756,8 +778,17 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
             .catch(() => {}),
         )
       }
-      child.once('error', err => settle(`its process could not be spawned (${errorMessage(err)})`))
-      child.once('exit', (code, signal) => settle(exitDetail(code, signal)))
+      child.once('error', err => {
+        // The child never ran, so nothing consumed the spec: remove it here or the prompt stays on disk.
+        void removeAgentSpec(specPath, env)
+        settle(`its process could not be spawned (${errorMessage(err)})`)
+      })
+      child.once('exit', (code, signal) => {
+        // A child that died before reading its spec leaves the prompt (and any device token) on
+        // disk; one that consumed it makes this a no-op.
+        void removeAgentSpec(specPath, env)
+        settle(exitDetail(code, signal))
+      })
       if (child.pid !== undefined) activeAgents.set(key, child.pid)
       // Hand back the agent's id (#761) so the dashboard can select this agent rather than guess.
       return { ok: true, ...(workspace.agentId ? { agentId: workspace.agentId } : {}) }
@@ -834,6 +865,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
    * see {@link waitOutSlots}. The archive commit that runs right behind this depends on it.
    */
   const stopAgents = async (graceMs = 5000): Promise<number> => {
+    closing = true
     const stopping = [...activeAgents.entries()]
     let stopped = 0
     for (const [, pid] of stopping) if (await terminate(pid, graceMs)) stopped++

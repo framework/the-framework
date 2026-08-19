@@ -121,17 +121,6 @@ describe('preferences', () => {
     expect(result.current.browser).toBe('global')
   })
 
-  test('useProjectFileConfig exposes the keys the gear cannot set (#842)', async () => {
-    onPreferences.mockResolvedValue({})
-    onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { preset: 'software-development', event: 'bug-fix' } }])
-    openProject('app-a-1')
-    const { useProjectFileConfig } = await import('./preferences.js')
-
-    const { result } = renderHook(() => useProjectFileConfig())
-    await flush()
-    expect(result.current).toEqual({ preset: 'software-development', event: 'bug-fix' })
-  })
-
   test('refreshFileConfigs re-reads the repo tier after an edit on disk (#842)', async () => {
     onPreferences.mockResolvedValue({})
     onProjects.mockResolvedValue([{ id: 'app-a-1', path: '/repos/a', name: 'a', activated: true, fileConfig: { transparent: true } }])

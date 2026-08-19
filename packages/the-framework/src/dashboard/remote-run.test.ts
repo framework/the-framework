@@ -51,13 +51,13 @@ test('startRemoteAgent posts to /_relay/start with the fw_daemon cookie, no Orig
     })
   })
   try {
-    const result = await startRemoteAgent({ url: srv.url, token: 'sekret' }, { prompt: 'do it', kind: 'build', options: { autopilot: true } })
+    const result = await startRemoteAgent({ url: srv.url, token: 'sekret' }, { prompt: 'do it', kind: 'build', options: { browser: true } })
     assert.deepEqual(result, { ok: true, agentId: 'r1' })
     assert.equal(captured.method, 'POST')
     assert.equal(captured.url, '/_relay/start')
     assert.equal(captured.cookie, 'fw_daemon=sekret') // the shared-token cookie (#1051), daemon to daemon
     assert.equal(captured.origin, undefined) // NO Origin header, so it passes the remote CSRF guard
-    assert.deepEqual(captured.body, { prompt: 'do it', kind: 'build', options: { autopilot: true } })
+    assert.deepEqual(captured.body, { prompt: 'do it', kind: 'build', options: { browser: true } })
   } finally {
     await srv.close()
   }

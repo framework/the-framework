@@ -308,13 +308,6 @@ export type FrameworkEvent =
       turns: number
     }
   /**
-   * The agent's active modes (#272), emitted once when a preset is
-   * in effect. `all` is every mode the agent knows about (stable order); `active` is
-   * the subset switched on for this agent. The dashboard renders them as read-only
-   * checkboxes so the policy driving the build is visible.
-   */
-  | { kind: 'modes'; all: readonly string[]; active: readonly string[] }
-  /**
    * The agent paused on an interactive choice (#304) and is awaiting a pick. The
    * dashboard renders the options with the recommended default pre-selected and
    * posts the pick back; a headless agent auto-accepts the recommended option.
@@ -328,9 +321,3 @@ export type FrameworkEvent =
    * Ctrl+C), so a surface can show "stopped" rather than "failed".
    */
   | { kind: 'end'; ok: boolean; stopped?: boolean; detail?: string }
-
-/**
- * The modes an agent can activate, in the order the dashboard shows them.
- * The single source of truth for the mode checkboxes (#272).
- */
-export const OPEN_LOOP_MODES = ['autopilot', 'technical'] as const

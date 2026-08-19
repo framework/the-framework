@@ -21,11 +21,11 @@ export async function onProjects(): Promise<ProjectSummary[]> {
  * repo under a directory, and register each so it joins the Projects list. Like
  * `sendStart` this needs the daemon (it spawns git + writes the shared registry), so it
  * calls the daemon's own `addProject` closure off the wired dashboard context. Returns
- * the daemon's {@link AddProjectResult}; a public host (the relay) leaves it unwired.
+ * the daemon's {@link AddProjectResult}.
  */
 export async function sendAddProject(path: string, directory: boolean): Promise<AddProjectResult> {
+  // Throws on an unwired context (D3), like `sendStart`: a missing capability is a wiring bug.
   const addProject = contextAddProject()
-  if (!addProject) return { ok: false, error: 'adding projects is not enabled on this server' }
   const trimmed = path.trim()
   if (!trimmed) return { ok: false, error: 'a project path is required' }
   return addProject(trimmed, directory)
@@ -34,13 +34,8 @@ export async function sendAddProject(path: string, directory: boolean): Promise<
 /**
  * The Onboarding checklist's one server-side fact (#958): the directory this server runs in,
  * so the first step can offer "Add {cwd} as project" without the user typing a path.
- *
- * Gated on the same `addProject` wiring as {@link sendAddProject}. A public host (the relay)
- * cannot act on the suggestion anyway, and must not disclose where it runs, so it offers none.
  */
 export async function onOnboarding(): Promise<OnboardingSuggestion> {
-  const addProject = contextAddProject()
-  if (!addProject) return { cwd: null, cwdProjectId: null }
   const cwd = process.cwd()
   const registered = await contextProjects().list()
   return { cwd, cwdProjectId: registered.find(p => p.path === cwd)?.id ?? null }

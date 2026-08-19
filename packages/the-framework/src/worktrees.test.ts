@@ -72,6 +72,81 @@ test('a worktree whose branch cannot reach the remote is kept, and says so (E5)'
   }
 })
 
+test('a publish-nothing session keeps its checkout instead of being pushed to make it removable (B5)', async () => {
+  // A remote exists and the push would succeed — that is the point: `handoff: local` said the
+  // branch must not reach it, and removal's own push is still a publish.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    const now = new Date().toISOString()
+    await mkdir(join(path, '.the-framework'), { recursive: true })
+    await writeFile(
+      join(path, '.the-framework', 'agent.json'),
+      JSON.stringify({ status: 'done', id: RUN_ID, startedAt: now, updatedAt: now, handoff: { push: false, pr: false } }),
+    )
+    const result = await removeProjectWorktree(repo, RUN_ID)
+    assert.equal(result.ok, false)
+    assert.match(result.ok === false ? result.error : '', /publish nothing/)
+    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
+    await assert.rejects(
+      () => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo),
+      'and nothing reached the remote',
+    )
+    // Nothing committed on the way to the refusal either: a kept checkout is a place someone
+    // works, and the sweep re-offers it every pass — half-typed edits must stay theirs.
+    assert.ok((await git(['status', '--porcelain'], path)).trim().length > 0, 'the uncommitted edit is untouched')
+    assert.equal((await git(['log', '--format=%s', branch], repo)).trim(), 'init', 'no commit was grabbed')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a record that cannot be read keeps the checkout: unreadable is not "publish freely" (B5)', async () => {
+  // A meta exists but does not parse. Absent would mean a boot death and take the recoverable
+  // default (push); unreadable cannot tell a publish-nothing session from any other, so the
+  // removal refuses rather than guesses.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await mkdir(join(path, '.the-framework'), { recursive: true })
+    await writeFile(join(path, '.the-framework', 'agent.json'), 'not json')
+    const result = await removeProjectWorktree(repo, RUN_ID)
+    assert.equal(result.ok, false)
+    assert.match(result.ok === false ? result.error : '', /could not be read/)
+    assert.equal((await stat(path)).isDirectory(), true, 'the checkout is still on disk')
+    await assert.rejects(
+      () => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo),
+      'and nothing reached the remote',
+    )
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a publish-nothing session whose branch is already on the remote still lets the checkout go (B5)', async () => {
+  // Someone else pushed it (the user, by hand). Removing what the remote already holds publishes
+  // nothing, so the handoff rung has nothing to refuse.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    const now = new Date().toISOString()
+    await mkdir(join(path, '.the-framework'), { recursive: true })
+    await writeFile(
+      join(path, '.the-framework', 'agent.json'),
+      JSON.stringify({ status: 'done', id: RUN_ID, startedAt: now, updatedAt: now, handoff: { push: false, pr: false } }),
+    )
+    await git(['config', 'user.email', 't@t'], path)
+    await git(['config', 'user.name', 't'], path)
+    await git(['add', '-A'], path)
+    await git(['commit', '-m', 'work'], path)
+    await git(['push', 'origin', branch], path)
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
+    await assert.rejects(() => stat(path), 'the checkout is gone')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
 test('a worktree whose work cannot be committed is refused, not force-removed (#982)', async () => {
   const { repo, path } = await repoWithDirtyWorktree()
   try {

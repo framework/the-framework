@@ -32,7 +32,7 @@ test('resolveConfigKey takes the nearest layer that set the key (#841)', () => {
 test('resolveConfigKey ignores layers that left the key unset (#841)', () => {
   assert.equal(resolveConfigKey(chain(), 'transparent'), undefined)
   // An unset key in a nearer layer does not shadow a farther one that set it.
-  assert.deepEqual(resolveConfigKey(chain({ technical: true }, {}, { transparent: true }), 'transparent'), {
+  assert.deepEqual(resolveConfigKey(chain({ vanilla: true }, {}, { transparent: true }), 'transparent'), {
     value: true,
     from: 'the-framework.yml',
   })
@@ -40,22 +40,18 @@ test('resolveConfigKey ignores layers that left the key unset (#841)', () => {
 
 test('resolveAgentConfig: each layer can win, and each can be absent (#841)', () => {
   for (const layer of ['run', 'project', 'the-framework.yml', 'global']) {
-    const layers = chain().map(l => (l.name === layer ? { ...l, values: { transparent: true, preset: layer } } : l))
+    const layers = chain().map(l => (l.name === layer ? { ...l, values: { transparent: true } } : l))
     const resolved = resolveAgentConfig(layers)
-    assert.equal(resolved.transparent, true, `${layer} should win autopilot`)
-    assert.equal(resolved.presetName, layer)
+    assert.equal(resolved.transparent, true, `${layer} should win transparent`)
     assert.equal(resolved.sources.transparent, layer)
   }
   // Every layer absent: the defaults hold and nothing claims a source.
   const bare = resolveAgentConfig(chain())
   assert.equal(bare.transparent, RUN_CONFIG_DEFAULTS.transparent)
   assert.equal(bare.vanilla, RUN_CONFIG_DEFAULTS.vanilla)
-  assert.equal(bare.transparent, RUN_CONFIG_DEFAULTS.transparent)
   // The handoff defaults to the PR rung (#1102/#1216): a session nobody configured hands itself
   // back, and merging — the one rung above — has to be asked for.
   assert.equal(bare.handoff, 'pr')
-  assert.equal(bare.presetName, undefined)
-  assert.equal(bare.buildEvent, undefined)
   assert.deepEqual(bare.sources, {})
   // No layers at all resolves the same way as layers that set nothing.
   assert.deepEqual(resolveAgentConfig([]), bare)
@@ -69,23 +65,17 @@ test('resolveAgentConfig: a nearer false beats a farther true (#841)', () => {
 
 test('fileConfigLayer carries only the keys the-framework.yml set', () => {
   assert.deepEqual(fileConfigLayer({}), { name: 'the-framework.yml', values: {} })
-  assert.deepEqual(fileConfigLayer({ transparent: false, preset: 'software-development' }).values, {
+  assert.deepEqual(fileConfigLayer({ transparent: false, handoff: 'local' }).values, {
     transparent: false,
-    preset: 'software-development',
+    handoff: 'local',
   })
-  // `event` is the file's name for the build event key.
-  assert.deepEqual(fileConfigLayer({ event: 'bug-fix' }).values, { event: 'bug-fix' })
   assert.equal(fileConfigLayer({}, 'other.yml').name, 'other.yml')
 })
 
 test('describeResolvedConfig narrates which layer won each key (#841)', () => {
   assert.equal(describeResolvedConfig(resolveAgentConfig(chain())), '')
   assert.equal(
-    describeResolvedConfig(resolveAgentConfig(chain({ transparent: false }, {}, { transparent: true, preset: 'software-development' }))),
-    'preset=software-development (the-framework.yml), transparent=off (run)',
-  )
-  assert.equal(
-    describeResolvedConfig(resolveAgentConfig(chain({}, {}, { event: 'bug-fix', transparent: true }))),
-    'transparent=on (the-framework.yml), event=bug-fix (the-framework.yml)',
+    describeResolvedConfig(resolveAgentConfig(chain({ transparent: false }, {}, { transparent: true, handoff: 'local' }))),
+    'transparent=off (run), handoff=local (the-framework.yml)',
   )
 })

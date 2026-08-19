@@ -15,10 +15,6 @@ import { BOOLEAN_CONFIG_KEYS, CONFIG_KEYS, type FrameworkFileConfig } from './co
 
 /** The agent settings a config layer can carry. Keys left `undefined` mean "this layer said nothing". */
 export interface AgentConfigValues {
-  /** Preset name. */
-  preset?: string | undefined
-  /** Build event kind the preset applies to (#265). */
-  event?: string | undefined
   /** Remove the built-in #326 system prompt, keeping the session controls (#314/C3). */
   vanilla?: boolean | undefined
   /** Run the wrapped agent fully raw (#625). */
@@ -61,8 +57,6 @@ export function resolveConfigKey<K extends keyof AgentConfigValues>(
 
 /** An agent's settled config, plus which layer supplied each key a layer actually set. */
 export interface ResolvedAgentConfig {
-  presetName?: string | undefined
-  buildEvent?: string | undefined
   vanilla: boolean
   transparent: boolean
   /** How far this session publishes itself (#1102/#1216/B5). */
@@ -80,13 +74,9 @@ export function resolveAgentConfig(layers: readonly ConfigLayer[]): ResolvedAgen
     sources[key] = hit.from
     return hit.value
   }
-  const preset = pick('preset')
-  const event = pick('event')
   const modes = {} as Record<(typeof BOOLEAN_CONFIG_KEYS)[number], boolean>
   for (const key of BOOLEAN_CONFIG_KEYS) modes[key] = pick(key) ?? RUN_CONFIG_DEFAULTS[key]
   return {
-    ...(preset ? { presetName: preset } : {}),
-    ...(event ? { buildEvent: event } : {}),
     ...modes,
     handoff: pick('handoff') ?? RUN_CONFIG_DEFAULTS.handoff,
     sources,
@@ -104,15 +94,13 @@ export function fileConfigLayer(file: FrameworkFileConfig, name = 'the-framework
 
 /**
  * A one-line summary of what a layer set and which one won, e.g.
- * `preset=software-development (the-framework.yml), vanilla=off (flag)`. Keys nobody set are
+ * `vanilla=off (flag), handoff=local (the-framework.yml)`. Keys nobody set are
  * left out, so an agent with no config anywhere narrates nothing.
  */
 export function describeResolvedConfig(config: ResolvedAgentConfig): string {
   const shown: [keyof AgentConfigValues, string][] = [
-    ['preset', config.presetName ?? ''],
     ...BOOLEAN_CONFIG_KEYS.map((key): [keyof AgentConfigValues, string] => [key, onOff(config[key])]),
     ['handoff', config.handoff],
-    ['event', config.buildEvent ?? ''],
   ]
   return shown
     .filter(([key]) => config.sources[key])

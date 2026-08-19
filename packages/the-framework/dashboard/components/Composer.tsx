@@ -7,7 +7,6 @@ import {
   updatePreferences,
   themePreference,
   usePreferenceSources,
-  useProjectFileConfig,
   useProjectPresets,
   saveProjectPresetList,
   useActiveProjectId,
@@ -155,7 +154,6 @@ export const Composer = forwardRef<ComposerHandle, {
 
   const preferences = usePreferences()
   const sources = usePreferenceSources() // #842: which layer won each option
-  const fileConfig = useProjectFileConfig() // #842: the repo's committed the-framework.yml
   const vanilla = preferences.vanilla ?? false
 
   // Presets render against the session they are launched from (#874). The agent pages pass their
@@ -447,7 +445,7 @@ export const Composer = forwardRef<ComposerHandle, {
       {!inAgent && (
         <div className="mt-2 flex items-center justify-between gap-3">
           {resolvedRowStart}
-          <ResolvedOptions options={mainOptions} sources={sources} fileConfig={fileConfig} />
+          <ResolvedOptions options={mainOptions} sources={sources} />
         </div>
       )}
 

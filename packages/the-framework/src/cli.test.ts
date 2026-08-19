@@ -6,6 +6,7 @@ import { join, dirname } from 'node:path'
 import { appendControl } from './control.js'
 import { BROWSER_MCP_SERVERS, withBrowser } from './browser.js'
 import { EVENTS_FILE, FRAMEWORK_DIR, ARCHIVE_DIR, type StoreFs } from './store/index.js'
+import { layoutMarker, layoutMarkerPath } from './layout.js'
 import { nodeGitRunner } from './project.js'
 import {
   chooseSessionLink,
@@ -292,6 +293,18 @@ test('runCli errors on a session spec with nothing to run (#353)', async () => {
   const code = await runAgentCli({ prompt: '', kind: 'prompt' }, io, false)
   assert.equal(code, 2)
   assert.ok(err.some(l => /no prompt to run/.test(l)))
+})
+
+test('runCli refuses a session whose repo records another layout, before writing anything (#1575)', async () => {
+  // The stale-published-build case: the repo's tracked marker says `sessions`, this build says
+  // `agents` — the session is refused outright rather than committing wrong-layout bookkeeping.
+  const { io, err } = capture()
+  const cwd = await mkdtemp(join(tmpdir(), 'framework-layout-skew-'))
+  await mkdir(join(cwd, '.the-framework'), { recursive: true })
+  await writeFile(layoutMarkerPath(cwd), layoutMarker().replace('archive-dir: agents', 'archive-dir: sessions'))
+  const code = await runAgentCli({ prompt: 'say hi', kind: 'prompt', cwd }, io)
+  assert.equal(code, 1)
+  assert.ok(err.some(l => /#1575/.test(l)))
 })
 
 test('runCli refuses a session spec it cannot read, rather than running something else (D4)', async () => {

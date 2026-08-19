@@ -2,12 +2,12 @@ The `.the-framework/.gitignore`: what a project commits out of its framework dir
 
 ## TLDR
 
-- An agent's live state stays out of git; the agent archive is committed.
+- An agent's live state stays out of git; the agent archive and the layout marker are committed.
 - One file with one content, written whole at install, naming no user.
 
 ## Flows
 
-- Everything under the framework directory is ignored, and then the archive is re-included: the directories on the way down first, since git never descends into an ignored one, and the files under them after.
+- Everything under the framework directory is ignored, and then the committed pieces are re-included: the layout marker, and the archive — its directories on the way down first, since git never descends into an ignored one, and the files under them after.
 - The archive is re-included by a glob covering every user, so someone who has never run an agent is already covered.
 - Only the name the archive directory has now is re-included.
 - Install writes the whole file. A repo activated before the archive existed gets the missing rules appended; a repo that already has them is left alone.

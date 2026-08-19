@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { LAYOUT_FILE } from './layout.js'
 import { ARCHIVE_DIR } from './store/index.js'
 
 /**
@@ -41,9 +42,9 @@ export function archiveGitignore(): string {
   return `!*/\n!*/${ARCHIVE_DIR}/\n!*/${ARCHIVE_DIR}/**\n`
 }
 
-/** The whole file: ignore the transient state, keep the agent archive. */
+/** The whole file: ignore the transient state, keep the agent archive and the layout marker. */
 export function frameworkGitignore(): string {
-  return `# The Framework: agent state is transient; the agent archive is committed.\n*\n!.gitignore\n${archiveGitignore()}`
+  return `# The Framework: agent state is transient; the agent archive is committed.\n*\n!.gitignore\n!${LAYOUT_FILE}\n${archiveGitignore()}`
 }
 
 /** The rule whose presence means the file already un-ignores the agent archive. */

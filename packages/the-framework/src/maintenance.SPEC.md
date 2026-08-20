@@ -1,6 +1,6 @@
 The maintenance sweep: a background job that keeps registered repos healthy by running the maintainability review on whatever new work each repo has grown since it was last reviewed.
 
-## TLDR
+## Flows
 
 - Each repo remembers its last-reviewed commit in a small local file, so a sweep only ever acts on commits added since then.
 - A repo seen for the first time is baselined at its current state — its pre-existing history is never reviewed retroactively.

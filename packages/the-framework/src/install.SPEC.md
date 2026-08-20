@@ -1,6 +1,6 @@
 Activates a repo for the framework: it becomes a Git repo if it is not one yet, gets the framework's marker directory and its ignore rules, and the activation itself is committed.
 
-## TLDR
+## Flows
 
 - Pre-existing uncommitted changes are committed first, so the install commit is clean and none of the user's work is mixed into it.
 - The ignore rules keep every bit of agent state out of Git on the code branches (the durable records live on the data branch); the quality presets are materialized so their references resolve, but regenerate per install rather than being committed.

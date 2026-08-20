@@ -1,6 +1,6 @@
 The single event stream an agent narrates itself over: one timeline uniting the framework's own steps, the driver's progress, and the moments that need a human.
 
-## TLDR
+## Flows
 
 - The framework owns the stream rather than exposing the driver's transport, so every surface — terminal, dashboard, chat — renders the same story.
 - Events are the agent's durable record: anything a dashboard tab opened later must know (the ticket being implemented, the branch, the pull request opened for the work, what the end-of-work handoff is armed to do) travels as an event, because only events reach its stored history.

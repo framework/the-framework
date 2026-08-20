@@ -1,6 +1,6 @@
 Writes the built-in presets into a project as real files, so queued follow-up work can point the agent at a preset it can open.
 
-## TLDR
+## Flows
 
 - Derived from the one preset table, so a preset exists on disk exactly when it exists in the catalog.
 - The files keep their target blank unfilled — the queue entry that references a preset says what to aim it at.

@@ -1,9 +1,12 @@
 The dashboard's entry point: mount the app into the static shell's root element, inside the theme-and-error-boundary frame, with the global stylesheet.
 
-## TLDR
+## Flows
 
-- Everything here is the browser's. The daemon serves one static `index.html` plus fingerprinted assets and answers RPCs; the app routes itself off the address.
-- There is no framework between the HTML and the app. A prerendering meta-framework used to sit here, and its entire net contribution was emitting that one `index.html` — the rest was scaffolding for a prerender with a single page in it.
+- Everything here is the browser's: the daemon serves the one static page plus its assets and answers the app's calls, and the app routes itself off the address.
+
+## Rationales
+
+- There is no framework between the static page and the app: with a single always-served page and client-side routing, a prerendering meta-framework's entire net contribution is emitting that one page — the rest is scaffolding for a prerender with one page in it.
 
 ## Before modifying/creating SPEC.md files
 

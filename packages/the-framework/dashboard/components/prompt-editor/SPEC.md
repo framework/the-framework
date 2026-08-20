@@ -1,6 +1,6 @@
 The machinery behind the composer's in-editor triggers and token chips: typing a trigger character opens a menu at the caret, and picked or typed tokens become pills that always submit as the exact plain text the agent parses.
 
-## TLDR
+## Flows
 
 - The composer wires four triggers with it: `/` for commands and presets, `<` for the agent's tags, `@` for project references, `#` for file references.
 - A trigger menu filters as you type, picks with Enter/Tab or a click, and closes on a non-match, so stray trigger characters in prose are never a trap.

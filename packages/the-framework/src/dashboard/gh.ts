@@ -144,9 +144,23 @@ function prCacheKey(cwd: string, branch?: string): string {
  * indistinguishable from "no PRs", which is what every caller would do with a failure anyway.
  */
 export async function ghPrsForBranch(cwd: string, branch: string): Promise<LinkedPr[]> {
-  const fields = 'number,url,state,title,createdAt,headRefOid'
-  const args = ['pr', 'list', '--head', branch, '--state', 'all', '--limit', '20', '--json', fields]
-  const prs = await ghJson<LinkedPr[]>(args, cwd, [])
+  return linkedPrs(await ghJson<LinkedPr[]>(prListArgs(branch), cwd, []))
+}
+
+/**
+ * {@link ghPrsForBranch} for a caller about to *open* a PR (#1601): a listing that fails throws
+ * instead of reading as "no PRs", because "none" and "could not tell" must not look alike there —
+ * the difference is a second draft PR on a branch that already has one.
+ */
+export async function ghPrsForBranchOrThrow(cwd: string, branch: string): Promise<LinkedPr[]> {
+  return linkedPrs(JSON.parse(await readGh(prListArgs(branch), cwd)) as LinkedPr[])
+}
+
+function prListArgs(branch: string): string[] {
+  return ['pr', 'list', '--head', branch, '--state', 'all', '--limit', '20', '--json', 'number,url,state,title,createdAt,headRefOid']
+}
+
+function linkedPrs(prs: LinkedPr[]): LinkedPr[] {
   return prs.map(pr => ({
     number: pr.number,
     url: pr.url,

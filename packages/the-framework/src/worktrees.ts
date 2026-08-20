@@ -22,6 +22,7 @@ import {
 } from './store/index.js'
 import { pushAgentBranch } from './dashboard/agent-handoff.js'
 import { dataWorktreePath, withDataBranch } from './data-branch.js'
+import { nodeGitRunner } from './project.js'
 
 /** A retained worktree and the agent that left it behind (#752). */
 export interface WorktreeRow {
@@ -154,7 +155,16 @@ export async function removeProjectWorktree(
         error: `session ${agentId}'s record could not be read (${errorMessage(err)}); its worktree was kept`,
       }
     }
-    if (meta?.handoff && !meta.handoff.push) {
+    if (meta?.target === 'web' && meta.cloudAnchor && (await webCheckoutCovered(path, branch, meta.cloudAnchor))) {
+      // A web run's checkout never holds the work (#1601): the hand-off pushed everything the
+      // cloud session clones at, and the work itself lands on the session's own remote branch.
+      // Pushing the local run branch just to satisfy the remote rule is what accreted one empty
+      // `tf-agent-*` ref on origin per web run — so the checkout goes without a push, once it is
+      // provably holding nothing: a clean tree whose tip is inside what the hand-off pushed (the
+      // recorded anchor). Anything short of that proof — no anchor recorded, the anchor's object
+      // gone, a tree or tip that moved — falls through to the ordinary rule below, which is never
+      // worse than what every web run got before.
+    } else if (meta?.handoff && !meta.handoff.push) {
       // A publish-nothing session's checkout goes only once everything it holds is already on
       // the remote by someone's explicit act: a clean tree on a pushed tip — then removing it
       // publishes nothing. Anything short of that would take a commit or a push of removal's
@@ -193,6 +203,20 @@ export async function removeProjectWorktree(
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
   }
+}
+
+/**
+ * Whether a web run's checkout provably holds nothing its hand-off did not carry (#1601): the
+ * tree is clean and the branch tip is an ancestor of the pushed anchor. False on any doubt —
+ * the caller then treats the checkout like every other run's.
+ */
+async function webCheckoutCovered(path: string, branch: string, anchor: string): Promise<boolean> {
+  if (!(await worktreeClean(path))) return false
+  const git = nodeGitRunner()
+  return git(['merge-base', '--is-ancestor', branch, anchor], path).then(
+    () => true,
+    () => false,
+  )
 }
 
 /**

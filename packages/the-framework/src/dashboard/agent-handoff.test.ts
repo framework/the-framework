@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, pushAgentBranch, openBranchPullRequest, openAgentPullRequest, gitReason, agentAutoHandoff, isAgentBranch, prBaseName, commitAgentWork, withheldMerge } from './agent-handoff.js'
+import { readAgentHandoff, resolveAgentPr, mergeAgentPr, agentBranchFor, pushAgentBranch, openBranchPullRequest, openRemoteBranchPullRequest, openAgentPullRequest, gitReason, agentAutoHandoff, isAgentBranch, prBaseName, commitAgentWork, withheldMerge } from './agent-handoff.js'
 import { pickAgentPr } from './gh.js'
 import { nodeGitRunner, GIT_SLOW_TIMEOUT_MS, type GitRunner } from '../project.js'
 import { CliTimeoutError, isCliTimeout } from '../cli-exec.js'
@@ -199,6 +199,38 @@ test('opening a PR pushes first and returns the URL gh printed', async () => {
   assert.ok(args.includes('--base') && args.includes('main'))
   // Not a draft: the interventions queue (#632) lists open non-draft PRs as "needs you".
   assert.ok(!args.includes('--draft'))
+})
+
+test('a remote-only branch gets its draft PR without any push (#1601)', async () => {
+  // A cloud session's `claude/*` branch was pushed from a VM this machine never sees: there is
+  // nothing local to push, and gh's default base is the right one.
+  const ghCalls: string[][] = []
+  const result = await openRemoteBranchPullRequest(
+    '/repo',
+    { id: 'r1', sessionName: 'fix the thing', intent: 'fix it' },
+    'claude/fix-the-thing',
+    {
+      gh: async args => {
+        ghCalls.push(args)
+        return 'https://github.com/o/r/pull/13\n'
+      },
+    },
+  )
+  assert.deepEqual(result, { ok: true, url: 'https://github.com/o/r/pull/13', number: 13 })
+  const args = ghCalls[0] ?? []
+  assert.deepEqual(args.slice(0, 4), ['pr', 'create', '--head', 'claude/fix-the-thing'])
+  assert.ok(args.includes('--draft'), 'a PR the framework opens by itself must not request review')
+  assert.ok(!args.includes('--base'), "gh's default base is the repo's default branch")
+})
+
+test('a remote-only PR that gh refuses is a reported failure, never a throw (#1601)', async () => {
+  const result = await openRemoteBranchPullRequest('/repo', { id: 'r1' }, 'claude/x', {
+    gh: async () => {
+      throw new Error('gh: no commits between main and claude/x')
+    },
+  })
+  assert.equal(result.ok, false)
+  assert.match(result.ok === false ? result.error : '', /no commits/)
 })
 
 test('a PR is not opened when the push fails', async () => {

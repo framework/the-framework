@@ -14,7 +14,7 @@ Agent persistence: an agent's history is its append-only event log, and everythi
 - Listing a project's history reads every user's archive and the transient one, shows an agent once when it appears in both, and prefers an agent's live copy to its archived one.
 - The snapshot is renamed into place rather than written over, so a reader outside the agent's process sees a whole snapshot or the whole previous one. One that arrives unreadable is read again before it is called corrupt.
 - An agent whose process is provably dead has its missing ending written on its behalf — into the log as well as the snapshot. An owner that cannot be probed is left alone until boot.
-- An archived snapshot can be patched afterwards with a fact discovered once the agent's process is gone, such as the pull request opened for its work.
+- An archived snapshot can be patched afterwards with a fact discovered once the agent's process is gone, such as the pull request opened for its work or the branch a cloud session's work landed on.
 - Ids are timestamps made path-safe, so id order is time order.
 
 ## Rationales

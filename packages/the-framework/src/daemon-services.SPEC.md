@@ -8,6 +8,7 @@ Everything the daemon runs in the background beside serving the dashboard: Disco
 - Auto PM spends idle quota on the roadmap: it fans out up to the configured number of unattended agents, each pinned to one queue entry, and retires an entry on the data branch once its agent's ending reports the work published; the daemon, never the agent, writes queue check-offs and ticket locks.
 - The CI watch merges a watched PR once its checks pass, and puts a fix agent on one whose checks fail.
 - An hourly sweep deletes the dead refs Claude-web hand-offs leave on origin, once they are old enough and provably hold no work.
+- Settled web runs are matched to the `claude/*` branch that grew out of their hand-off, and the branch and its PR are adopted onto the run's record — with the armed draft PR opened when the session never opened one.
 - The Discord notification watchers are rebuilt when the webhook changes, so a value pasted into the dashboard works immediately.
 - The data branch is pulled eagerly, so this machine reads what other machines and cloud sessions pushed without waiting for its own next write.
 - Every background start forces unattended mode, so gates auto-answer instead of parking forever on an absent human.

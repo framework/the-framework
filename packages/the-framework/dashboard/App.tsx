@@ -17,7 +17,7 @@ import { RelayView } from './components/RelayView.js'
 import { NotFound } from './components/NotFound.js'
 import { useLiveEvents } from './lib/use-live-events.js'
 import { useAgents } from './lib/use-agents.js'
-import { useLoaded, usePolled } from './lib/use-async.js'
+import { usePolled } from './lib/use-async.js'
 import { useRoute } from './lib/use-route.js'
 import { useContextSet } from './lib/use-context-set.js'
 import { useActivityNotifications, useInterventionNotifications } from './lib/use-notifications.js'
@@ -107,16 +107,20 @@ export function App() {
   // each poll spawns `gh` per project.
   const { value: interventions } = usePolled<Intervention[]>(onInterventions, EMPTY_INTERVENTIONS, 15000, [])
 
-  // The registered projects, loaded once for the browser-tab title (#695/U3): the selected
-  // project's name plus the needs-you count drive `document.title` so a backgrounded tab tells
-  // you which project needs attention. The sidebar keeps its own poll; this is a cheap one-shot.
-  // Reloadable so adding a project from the sidebar's "New" reflects at once (bump the key).
+  // The registered projects, for the browser-tab title (#695/U3) — the selected project's name
+  // plus the needs-you count drive `document.title` so a backgrounded tab tells you which project
+  // needs attention — and for the sidebar's Projects list. Polled rather than read once (#1500):
+  // each project carries what the daemon currently finds wrong with it, a state that appears and
+  // clears on the daemon's own minute cadence, so the sidebar dot and the project's banner have to
+  // follow it. Slow, and reloadable so adding a project from the sidebar's "New" reflects at once
+  // (bump the key).
   const [projectsKey, setProjectsKey] = useState(0)
-  const projects = useLoaded<ProjectSummary[]>(onProjects, EMPTY_PROJECTS, [projectsKey])
-  const projectName = projectId ? projects.find(p => p.id === projectId)?.name : null
+  const { value: projects } = usePolled<ProjectSummary[]>(onProjects, EMPTY_PROJECTS, 30_000, [projectsKey])
+  const project = projectId ? projects.find(p => p.id === projectId) : undefined
+  const projectName = project?.name ?? null
   useDocumentTitle(interventions.length, projectName)
   // A URL naming a project that is not registered (renamed, removed, mistyped). A non-empty list
-  // is the answer, so this never fires while the one-shot read is still out.
+  // is the answer, so this never fires while the first read is still out.
   const unknownProject = projectId !== null && projects.length > 0 && !projects.some(p => p.id === projectId)
 
   // Fire a browser notification when a new item lands on the "needs you" queue (#627). Rides the
@@ -323,6 +327,7 @@ export function App() {
           removeContext={removeContext}
           toggleContext={toggleContext}
           onOpenAgent={selectAgentInProject}
+          errors={project?.errors}
         />
       )
     }

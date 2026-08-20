@@ -1,4 +1,4 @@
-import { contextAddProject, contextProjects } from './context.js'
+import { contextAddProject, contextProjectErrors, contextProjects } from './context.js'
 import { cachedRepoAutoMerge, type RepoAutoMerge } from '../dashboard/gh.js'
 import { preflight, preflightProblems } from '../preflight.js'
 import { isDriverName } from '../driver-names.js'
@@ -11,8 +11,17 @@ import type { DashboardContext } from '../dashboard/rpc-serve.js'
 // daemon and CLI write — id, path, name, activated, last activity. The per-agent
 // foreground dashboard (#427) scopes this to a single project via the request context.
 // The live event stream is its own endpoint rather than a call (`GET /_rpc/events`).
+//
+// Each project also carries what the daemon's background jobs found wrong with it (#1500) —
+// a data branch that cannot reach origin, say (#1599). It rides this list rather than a read of
+// its own because the list is what every project surface already polls, so an error reaches the
+// sidebar dot and the project's banner with nothing new to subscribe to.
 export async function onProjects(): Promise<ProjectSummary[]> {
-  return contextProjects().list()
+  const errors = contextProjectErrors()
+  return (await contextProjects().list()).map(project => {
+    const found = errors(project.path)
+    return found.length > 0 ? { ...project, errors: found } : project
+  })
 }
 
 /**

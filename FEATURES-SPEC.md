@@ -84,6 +84,7 @@ happens while nobody is at the keyboard.
 - Routine work panel
 - Hottest tickets
 - Projects sidebar
+- Project errors: a project whose data branch cannot reach origin (push rejected, or no remote) is flagged with a red dot in the sidebar and a banner on its page, until a sync converges
 
 ## Tickets
 

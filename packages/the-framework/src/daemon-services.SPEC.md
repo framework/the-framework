@@ -10,7 +10,7 @@ Everything the daemon runs in the background beside serving the dashboard: Disco
 - An hourly sweep deletes the dead refs Claude-web hand-offs leave on origin, once they are old enough and provably hold no work.
 - Settled web runs are matched to the `claude/*` branch that grew out of their hand-off, and the branch and its PR are adopted onto the run's record — with the armed draft PR opened when the session never opened one.
 - The Discord notification watchers are rebuilt when the webhook changes, so a value pasted into the dashboard works immediately.
-- The data branch is pulled eagerly, so this machine reads what other machines and cloud sessions pushed without waiting for its own next write.
+- The data branch is pulled eagerly, so this machine reads what other machines and cloud sessions pushed without waiting for its own next write. A project whose branch cannot converge — origin rejects the push, or there is no remote at all — is recorded as that project's error state for the dashboard to show, and the record is cleared by the first sync that converges.
 - Every background start forces unattended mode, so gates auto-answer instead of parking forever on an absent human.
 - Shutdown quiesces everything that could start an agent before the daemon stops the agents it owns. Nothing is resumed on the next boot — Ctrl-C closed those agents deliberately.
 

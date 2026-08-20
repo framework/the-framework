@@ -1,4 +1,4 @@
-Assembles the Overview page: the cross-project, at-a-glance rollup of what is running, what recently happened, and how much work is waiting.
+Assembles the Overview page: the cross-project, at-a-glance rollup of what is running and how much work is waiting.
 
 ## Flows
 

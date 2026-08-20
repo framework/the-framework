@@ -1,11 +1,10 @@
 import { cliRunner, type CliRunner } from './cli-exec.js'
-import { readFileSync } from 'node:fs'
 import { nodeFs } from './node-fs.js'
 import { gitignorePath } from './framework-gitignore.js'
 
 /**
- * Project-level repo helpers (#380): the activation marker check, a
- * `git ls-files` crawl, and the project's detection signals. Read-only
+ * Project-level repo helpers (#380): the activation marker check and a
+ * `git ls-files` crawl. Read-only
  * building blocks for the sidebars (#314); activation/install (writing the
  * marker, the install commit) is a separate, deferred concern.
  */

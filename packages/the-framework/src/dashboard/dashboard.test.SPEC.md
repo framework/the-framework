@@ -1,4 +1,4 @@
-Covers the Overview rollup: totals, per-project counts and running flags, the fixed two-week activity window (oldest first, out-of-window agents not counted), and per-project ticket presence.
+Covers the Overview rollup: totals and the working-now list, projects ordered most-recently-active first (whose head onboarding acts on), per-project ticket presence, and a shape guard that the payload carries only what a reader asks for.
 
 ## Before modifying/creating SPEC.md files
 

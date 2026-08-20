@@ -7,7 +7,6 @@ The dashboard's React component catalog: every page, panel and control the brows
 - The user scans the Overview board for quota pace, running agents, queued work, routine jobs and hot tickets, and answers any agent's open question from there.
 - The user filters, sorts and groups every project's tickets on one page, opens a ticket's detail and plan, and queues or starts work from a row.
 - The user changes every preference — appearance, driver and model, where agents execute, agent options, notifications, automation — on one settings page.
-- A teammate opens a shared link and watches one agent's live feed read-only.
 
 ## Flows
 

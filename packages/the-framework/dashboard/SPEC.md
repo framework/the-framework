@@ -8,7 +8,6 @@ The dashboard UI: a browser app served by the daemon that renders everything the
 - The user sees on one overview everything that needs them: the quota bar, every unanswered question across all projects, agents working now, the AI queue, routine work, and the hottest tickets.
 - The user browses every project's tickets in one filterable list, shares the filtered view as a URL, and starts an agent straight from a ticket.
 - The user follows an onboarding checklist whose steps tick themselves off real facts, not clicks.
-- The user shares a watch link that shows one agent read-only.
 - The user tunes every preference in settings, from appearance to automation and spend.
 
 ## Flows — TL;DR
@@ -17,7 +16,6 @@ The dashboard UI: a browser app served by the daemon that renders everything the
 - The URL is the selection, so every view is a link to paste, reload, or bookmark.
 - A live agent streams its events; everything else polls; a finished agent reads from the archive.
 - The dashboard is a plain client-side app behind one static page the daemon serves.
-- A shared watch link renders one agent read-only.
 - The overview leads with the quota bar, then everything that needs the user.
 - The composer starts agents and is a live agent's control.
 - The agent view is the transcript with every control inline.

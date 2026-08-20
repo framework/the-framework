@@ -1,6 +1,6 @@
 The onboarding checklist: what a new install needs, each step shown in the state it is actually in rather than as a list to read past.
 
-## TLDR
+## Flows
 
 - Every "done" derives from a real fact — a registered project, a filled AI queue, tickets on disk, a granted notification permission, saved Discord credentials — so a step cannot be ticked by clicking it, and one done outside the dashboard ticks itself.
 - Only adding a project and filling the AI queue are essential; the rest are marked optional because nothing breaks without them.

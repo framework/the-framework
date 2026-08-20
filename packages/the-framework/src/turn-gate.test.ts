@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { continuationPrompt, parseAwaitGate, parseMarkdownViews, parseSessionName, parseReadyForMerge } from './turn-gate.js'
+import { continuationPrompt, parseAwaitGate, parseMarkdownViews, parseSessionName, parseReadyForMerge, parsePullRequestDescription } from './turn-gate.js'
 
 const block = (json: string): string => 'Here are the options.\n```await-choices\n' + json + '\n```'
 
@@ -160,3 +160,30 @@ test('parseReadyForMerge is true only when a ready-for-merge block is present (#
 
 
 
+
+// #1567: the `open-pr` block is how an agent opens a pull request through the framework rather
+// than by running `gh pr create` itself — the agent writes the description, the framework keeps
+// the title, the ticket's issue reference, and the recorded number.
+test('parsePullRequestDescription takes the block body as the PR description (#1567)', () => {
+  const text = 'Done.\n```open-pr\nRewrites the queue reader so a reload keeps the queued state.\n```\n'
+  assert.equal(parsePullRequestDescription(text), 'Rewrites the queue reader so a reload keeps the queued state.')
+})
+
+test('parsePullRequestDescription returns undefined when the agent wrote no block (#1567)', () => {
+  assert.equal(parsePullRequestDescription('just some output'), undefined)
+})
+
+test('parsePullRequestDescription keeps markdown whole, since the block is the PR body (#1567)', () => {
+  const body = '## What changed\n\n- one thing\n- another\n\nSee `src/thing.ts`.'
+  assert.equal(parsePullRequestDescription('```open-pr\n' + body + '\n```'), body)
+})
+
+test('parsePullRequestDescription takes the last block, so the agent can revise it (#1567)', () => {
+  const text = '```open-pr\nfirst\n```\nlater…\n```open-pr\nsecond\n```'
+  assert.equal(parsePullRequestDescription(text), 'second')
+})
+
+test('parsePullRequestDescription ignores an empty block rather than blanking the body (#1567)', () => {
+  assert.equal(parsePullRequestDescription('```open-pr\n\n```'), undefined)
+  assert.equal(parsePullRequestDescription('```open-pr\nreal\n```\n```open-pr\n \n```'), 'real')
+})

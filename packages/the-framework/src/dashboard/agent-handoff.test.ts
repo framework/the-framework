@@ -223,6 +223,40 @@ test('a remote-only branch gets its draft PR without any push (#1601)', async ()
   assert.ok(!args.includes('--base'), "gh's default base is the repo's default branch")
 })
 
+test("the agent's own description becomes the PR body, in place of the intent (#1567)", async () => {
+  // The `open-pr` capability: the agent describes what the change turned out to be, and the
+  // framework opens the PR — so the agent has no reason to run `gh pr create` itself and lose
+  // the title, the ticket's issue reference and the recorded number along with it.
+  const ghCalls: string[][] = []
+  await openRemoteBranchPullRequest(
+    '/repo',
+    { id: 'r1', sessionName: 'fix-the-thing', intent: 'fix it', description: '## What changed\n\nThe queue reader keeps its state across a reload.' },
+    'claude/fix-the-thing',
+    {
+      gh: async args => {
+        ghCalls.push(args)
+        return 'https://github.com/o/r/pull/14\n'
+      },
+    },
+  )
+  const body = (ghCalls[0] ?? [])[(ghCalls[0] ?? []).indexOf('--body') + 1] ?? ''
+  assert.match(body, /The queue reader keeps its state across a reload\./)
+  assert.doesNotMatch(body, /fix it/, "the agent's description replaces the opening intent rather than joining it")
+  assert.match(body, /Opened from The Framework session/, 'the session line still rides along')
+})
+
+test('without a description the PR body still says what was asked for (#1567)', async () => {
+  const ghCalls: string[][] = []
+  await openRemoteBranchPullRequest('/repo', { id: 'r1', sessionName: 'x', intent: 'fix it' }, 'claude/x', {
+    gh: async args => {
+      ghCalls.push(args)
+      return 'https://github.com/o/r/pull/15\n'
+    },
+  })
+  const body = (ghCalls[0] ?? [])[(ghCalls[0] ?? []).indexOf('--body') + 1] ?? ''
+  assert.match(body, /fix it/)
+})
+
 test('a remote-only PR that gh refuses is a reported failure, never a throw (#1601)', async () => {
   const result = await openRemoteBranchPullRequest('/repo', { id: 'r1' }, 'claude/x', {
     gh: async () => {

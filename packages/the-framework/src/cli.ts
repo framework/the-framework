@@ -15,6 +15,7 @@ import { launchSharedBrowser, withBrowser, type SharedBrowser } from './browser.
 import { connectCdp, startBrowserStream, type BrowserStream } from './browser-stream.js'
 import { randomUUID } from 'node:crypto'
 import { formatFrameworkEvent, mergeWithheldWhy } from './terminal.js'
+import { defuseClosingKeywords } from './closing-keywords.js'
 import { CLAUDE_CODE_SESSION_LINK } from './session-link.js'
 import { type AutoHandoffSkip, type ChoicePick, type ChoiceRequest, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
 import { agentAutoHandoff, withheldMerge } from './dashboard/agent-handoff.js'
@@ -547,6 +548,8 @@ export interface AgentJournal {
   sessionName: () => string | undefined
   /** The agent signalled setReadyForMerge() this agent (#326). */
   sawReadyForMerge: () => boolean
+  /** The pull-request description the agent wrote via an `open-pr` block (#1567), if any. */
+  prDescription: () => string | undefined
   /** The agent stopped cleanly (user interrupt / budget cap #322) rather than failed. */
   stoppedCleanly: () => boolean
   /** Hold the browser preview's port until the session opens (#829/#813). */
@@ -578,6 +581,9 @@ export function createAgentJournal(deps: {
   let stoppedCleanly = false
   let sawReadyForMerge = false
   let sessionName: string | undefined
+  // The agent's own pull-request description (#1567), latest wins: it may revise it as the work
+  // changes, and the handoff wants what it said last.
+  let prDescription: string | undefined
   // The browser preview's port, announced on the first `session` event rather than when the
   // bridge opens (#829): the dashboard renders only the tail from the last `session` event, so
   // anything emitted ahead of it is dropped from the agent's view.
@@ -592,6 +598,7 @@ export function createAgentJournal(deps: {
 
   const onEvent = (event: FrameworkEvent) => {
     if (event.kind === 'ready-for-merge') sawReadyForMerge = true
+    if (event.kind === 'pull-request-description') prDescription = event.description
     if (event.kind === 'session-name') {
       sessionName = event.name
       // The framework-owned checkout (#736) was branched as `tf-agent-<id>` before a
@@ -625,6 +632,7 @@ export function createAgentJournal(deps: {
     onEvent,
     sessionName: () => sessionName,
     sawReadyForMerge: () => sawReadyForMerge,
+    prDescription: () => prDescription,
     stoppedCleanly: () => stoppedCleanly,
     announceBrowserPort: port => {
       pendingBrowserPort = port
@@ -1027,12 +1035,24 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     const fixes = opts.ticket && isTicketPath(opts.ticket) && !opts.planAgent
       ? ticketIssueRef((await readDataFile(cwd, opts.ticket).catch(() => undefined)) ?? '')
       : undefined
+    // The agent's own description of the work (#1567), when it wrote one: this is what an
+    // `open-pr` block is for — the agent describes the change and the framework opens the PR,
+    // so it has no reason to run `gh pr create` itself and lose the title convention, the
+    // ticket's issue reference, and the recorded number along the way.
+    //
+    // A plan agent's description is defused first: its PR lands the plan, not the work, so a
+    // closing phrase in it would close the ticket's issue on merge — which is exactly what
+    // happened on #1560. The same reasoning already keeps `(fix #N)` off a plan agent's title
+    // just above; the description is the other half of the same rule.
+    const written = journal.prDescription()
+    const description = written && opts.planAgent ? defuseClosingKeywords(written) : written
     const agent = {
       id: opts.agentId ?? '',
       branch,
       ...(sessionName ? { sessionName } : {}),
       ...(intent ? { intent } : {}),
       ...(fixes ? { fixes } : {}),
+      ...(description ? { description } : {}),
     }
     const handedOff = await agentAutoHandoff(cwd, agent, armed)
     const outcome =

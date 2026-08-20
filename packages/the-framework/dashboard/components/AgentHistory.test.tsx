@@ -366,3 +366,36 @@ describe('AgentHistory title tooltip (#1494)', () => {
     expect(screen.queryByRole('tooltip')).toBeNull()
   })
 })
+
+describe('project errors in the Projects list (#1500)', () => {
+  const stranded: ProjectSummary = {
+    id: 'p1',
+    path: '/repos/p1',
+    name: 'p1',
+    activated: true,
+    errors: [{ code: 'data-sync', message: 'the data branch could not be pushed: Permission denied (publickey)', since: '2026-08-20T10:00:00.000Z' }],
+  }
+
+  test('a project the daemon recorded an error for gets a red dot that names the error on hover', async () => {
+    const { container } = renderRail(
+      <AgentHistory projectId="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} projects={[stranded]} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Projects' }))
+    const dot = container.querySelector('.bg-danger')
+    expect(dot).toBeTruthy()
+    expect(screen.getByText('Error:')).toBeTruthy()
+    const tooltip = await hoverTooltip(dot!)
+    expect(tooltip.textContent).toContain('The data branch is not syncing')
+    expect(tooltip.textContent).toContain('Permission denied (publickey)')
+  })
+
+  test('a healthy project keeps the activated dot', () => {
+    const { errors: _errors, ...healthy } = stranded
+    const { container } = renderRail(
+      <AgentHistory projectId="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} projects={[healthy]} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Projects' }))
+    expect(container.querySelector('.bg-danger')).toBeNull()
+    expect(screen.getByText('Activated:')).toBeTruthy()
+  })
+})

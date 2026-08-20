@@ -191,6 +191,37 @@ async function landed(git: GitRunner, cwd: string, sha: string, defaultBranch: s
 }
 
 /**
+ * Whether `sha` is an empty commit sitting on a landed parent — the hand-off anchor's shape
+ * (#1601): its tree is its parent's tree, so it holds no work of its own, and the parent being
+ * on the default branch means everything under it landed. The commit object may not be local
+ * (another machine pushed the ref), so the ref is fetched first when needed; anything still
+ * unprovable reads as "holds work", which keeps the ref for a later sweep.
+ */
+async function emptyTipOnLandedParent(
+  git: GitRunner,
+  cwd: string,
+  ref: string,
+  sha: string,
+  defaultBranch: string | undefined,
+  heads: RemoteHead[],
+): Promise<boolean> {
+  const present = await git(['cat-file', '-e', `${sha}^{commit}`], cwd).then(
+    () => true,
+    () => false,
+  )
+  if (!present && !(await git(['fetch', 'origin', `refs/heads/${ref}`], cwd).then(() => true, () => false))) return false
+  try {
+    const tree = (await git(['rev-parse', `${sha}^{tree}`], cwd)).trim()
+    const parent = (await git(['rev-parse', `${sha}^`], cwd)).trim()
+    const parentTree = (await git(['rev-parse', `${sha}^^{tree}`], cwd)).trim()
+    if (!tree || !parent || tree !== parentTree) return false
+    return await landed(git, cwd, parent, defaultBranch, heads)
+  } catch {
+    return false
+  }
+}
+
+/**
  * Sweep one repo's origin for the dead refs cloud hand-offs left behind (#1547), deleting the
  * ones that clear every gate. Never throws: a repo with no remote (or offline) sweeps nothing,
  * and a failed deletion is reported and retried next sweep.
@@ -255,7 +286,10 @@ export async function sweepCloudScratchRefs(cwd: string, deps: ScratchSweepDeps 
 
   for (const { ref, sha } of candidates) {
     // The work gate first: it is local and free, and it is the one that must never be wrong.
-    if (!(await landed(git, cwd, sha, defaultBranch, heads))) {
+    // A tip the default branch never absorbs still clears it when it is a hand-off anchor
+    // (#1601): an empty commit whose parent landed changes nothing, and no merge ever lands
+    // the anchor itself — a squash merge rewrites the session's history without it.
+    if (!(await landed(git, cwd, sha, defaultBranch, heads)) && !(await emptyTipOnLandedParent(git, cwd, ref, sha, defaultBranch, heads))) {
       result.kept.push({ ref, reason: 'holds-work' })
       continue
     }

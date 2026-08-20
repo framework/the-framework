@@ -3,6 +3,7 @@ import { listProjects, type ProjectRecord } from '../registry.js'
 import { isActivated } from '../project.js'
 import { loadFrameworkConfig, type FrameworkFileConfig } from '../config.js'
 import { readAllAgents, type AgentMeta } from '../store/index.js'
+import type { ProjectError } from '../project-errors.js'
 
 /**
  * The multi-project read side (#392): projects the daemon serves come from the registry (#390),
@@ -29,6 +30,12 @@ export interface ProjectSummary {
    * {@link loadFrameworkConfig} reports as empty rather than failing).
    */
   fileConfig?: FrameworkFileConfig
+  /**
+   * What the daemon's background jobs currently find wrong with the project (#1500), oldest
+   * first — absent when nothing is. Not part of the summary itself: the dashboard's project
+   * list attaches it from the daemon's error state.
+   */
+  errors?: ProjectError[]
 }
 
 /** Injectable readers so {@link summarizeProject} is unit-testable off disk. */

@@ -7,6 +7,7 @@ The app's left sidebar, present on every route: brand, global navigation (New, O
 - A row says what its agent is really doing: pulsing while it works, a still "waiting" when parked on you, "publishing…" while an ended one still pushes or opens its PR, "in cloud" for a web agent continuing elsewhere — plus device/cloud glyphs and the driver's logo.
 - Start seeds an optimistic "starting…" row that retires when the real agent lands, whatever state it lands in, with a deadline so a start that produced nothing does not pretend forever.
 - The Overview item carries the Human Queue count.
+- A project the daemon has found something wrong with — a data branch that cannot reach origin — gets a red dot in the Projects list, naming the error on hover.
 
 ## Before modifying/creating SPEC.md files
 

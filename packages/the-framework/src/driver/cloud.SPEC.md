@@ -7,7 +7,8 @@ A driver that hands the whole task to Claude Code on the web: it starts a real c
 - The project root is trusted for the CLI before the hand-off, so the CLI's interactive trust question — which a background run could never answer — does not fire. A dialog that appears anyway (the write failed or was rejected) still fails fast with the manual fix named instead of timing out with nothing to show.
 - Nothing the user typed can ever reach a shell as syntax.
 - The session it creates is repo-bound — it clones from GitHub and can push — never a silently uploaded local bundle whose work could never leave the VM; the CLI's nonessential traffic is switched off for the invocation to keep it so.
-- Before the hand-off, HEAD is pushed to origin under the agent's own slash-free id and the session is told to clone at that ref. A push that fails hands the ref choice back to the CLI's own default and says so, naming `--teleport` as the recovery path.
+- Before the hand-off, an anchor — an empty commit on top of HEAD, unique to this run and minted without moving any branch — is pushed to origin under the agent's own slash-free id, and the session is told to clone at it; the branch the cloud session works on (a name of the cloud's own choosing) descends from that anchor, and that ancestry is how the daemon later recognizes which branch is this run's.
+- A hand-off whose anchor cannot be minted or pushed goes ahead with no ref and says so, naming `--teleport` as the recovery path; such a run is never matched to its branch.
 
 ## Rationales
 
@@ -15,6 +16,7 @@ A driver that hands the whole task to Claude Code on the web: it starts a real c
 - The hand-off ending lives on the location rather than on the driver so later phases never mistake the driver's own summary for the agent's answer.
 - Trusting the project root on the user's behalf is sound because starting a web agent is itself the user's trust decision, and worktrees inherit the root's trust, so one grant covers every agent workspace.
 - With nonessential traffic disabled, the CLI's server-side bundle experiment reads off, so a failed GitHub-App preflight falls through to a repo-bound session instead of a silent local-bundle upload (#1320, anthropics/claude-code#81776).
+- The anchor is an empty commit rather than HEAD itself so it is unique to this run and mints without moving any branch.
 - The ref is minted slash-free and handed over explicitly because the CLI's default revision pin is the current local branch — which an agent workspace's local-only branch fails — and a slash-carrying ref never resolves on the cloud side even when pushed (anthropics/claude-code#87235).
 
 ## Before modifying/creating SPEC.md files

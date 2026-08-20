@@ -38,13 +38,20 @@ function fakePty(output: string, calls: AgentPtyOptions[] = []) {
   }
 }
 
-/** A git runner that records its calls; `fail` makes every call reject (#1320). */
+/** The anchor sha the fake git mints for `commit-tree` (#1601). */
+const ANCHOR = 'a'.repeat(40)
+
+/**
+ * A git runner that records its calls; `fail` makes every call reject (#1320). `commit-tree`
+ * answers with a fixed sha.
+ */
 function fakeGit(calls: string[][] = [], fail = false) {
   return {
     calls,
     run: async (args: string[], _cwd: string): Promise<string> => {
       calls.push([...args])
       if (fail) throw new Error('no pushable remote')
+      if (args[0] === 'commit-tree') return `${ANCHOR}\n`
       return ''
     },
   }
@@ -340,16 +347,25 @@ test('the web location is the hand-off, so a run ends at the first prompt (#1225
   assert.equal(isHandsOff('actions'), false, 'an Actions runner streams its own replies')
 })
 
-test('the hand-off pushes HEAD under the agent id and hands the session that ref (#1320)', async () => {
+test('the hand-off pushes the anchor under the agent id and hands the session that ref (#1320/#1601)', async () => {
   const git = fakeGit()
+  const events: DriverEvent[] = []
   const ptyCalls: AgentPtyOptions[] = []
-  const session = await driverWith(CREATED, ptyCalls, git).start({ cwd: '/repo' })
+  const session = await driverWith(CREATED, ptyCalls, git).start({ cwd: '/repo', onEvent: e => events.push(e) })
   await session.prompt('go')
-  // One push, of HEAD, under the agent's own id — which contains no slash, because a
-  // slash-carrying ref never resolves on the cloud side (anthropics/claude-code#87235).
-  assert.deepEqual(git.calls, [['push', 'origin', `HEAD:refs/heads/${session.id}`]])
+  // The anchor commit first (#1601): an empty commit on top of HEAD, minted without moving any
+  // branch, whose message carries the run's own id. Then one push, of that anchor, under the
+  // agent's own id — which contains no slash, because a slash-carrying ref never resolves on
+  // the cloud side (anthropics/claude-code#87235).
+  assert.deepEqual(git.calls, [
+    ['commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', `[The Framework] web hand-off ${session.id}`],
+    ['push', 'origin', `${ANCHOR}:refs/heads/${session.id}`],
+  ])
   assert.ok(!session.id.includes('/'))
   assert.equal(ptyCalls[0]?.ref, session.id)
+  // The anchor reaches the meta through the result (#1601): it is how the daemon later
+  // recognizes which `claude/*` branch is this run's.
+  assert.ok(events.some(e => e.type === 'result' && e.anchorSha === ANCHOR))
 })
 
 test('a failed pre-push falls back to no ref, says so, and still hands off (#1320)', async () => {
@@ -362,6 +378,8 @@ test('a failed pre-push falls back to no ref, says so, and still hands off (#132
   const notice = events.find((e): e is DriverEvent & { type: 'notice' } => e.type === 'notice')
   assert.ok(notice && /could not push/.test(notice.message))
   assert.ok(notice && /--teleport/.test(notice.message), 'the notice names the recovery path')
+  // A push that failed leaves nothing on origin containing the anchor, so none is reported (#1601).
+  assert.ok(events.every(e => e.type !== 'result' || e.anchorSha === undefined))
 })
 
 test('the ref rides the fixed command as its own guarded flag, after the model (#1320)', () => {

@@ -122,6 +122,14 @@ export interface AgentMeta {
    */
   branch?: string
   /**
+   * The hand-off anchor a cloud run pushed for its session to clone at (#1601): an empty commit
+   * unique to this run, folded from the `cloud-anchor` event. The session works on a `claude/*`
+   * branch of the cloud's own naming, and this is the ancestor by which the daemon's adoption
+   * pass recognizes which of origin's `claude/*` heads is this run's. Absent on non-web runs
+   * and on web runs whose pre-hand-off push failed.
+   */
+  cloudAnchor?: string
+  /**
    * The ticket this agent is implementing (#1117), repo-relative (`tickets/<file>.md`).
    *
    * Set only when the framework picked the ticket itself, so the Overview can show a ticket that is
@@ -359,6 +367,9 @@ export function applyEventToMeta(meta: AgentMeta, event: FrameworkEvent, at: str
       break
     case 'branch':
       next.branch = event.branch
+      break
+    case 'cloud-anchor':
+      next.cloudAnchor = event.sha
       break
     case 'settled':
       next.settledAt = at
@@ -1135,22 +1146,23 @@ export async function readEventLog(cwd: string, fs: StoreFs = nodeStoreFs()): Pr
   }
 }
 
+/** The facts a settled run learns after its process is gone: the PR its work is on, the branch it landed on. */
+export type ArchivePatch = Partial<Pick<AgentMeta, 'branch' | 'pr'>>
+
 /**
- * Record the pull request a finished agent's work is on (E6).
+ * Patch an archived run's record with a fact discovered once the agent's process is gone (E6,
+ * #1601): the pull request opened for its work, or the branch a cloud session's work landed
+ * on. There is no event stream left to carry it, and every surface reads the record, so this
+ * one write is what turns a "nothing committed" row into its real branch and PR.
  *
- * A PR opened by the dashboard's button happens *after* the agent's process is gone, so there is no
- * event stream left to carry it — but the fact is exactly as worth recording as the one the agent
- * emits for itself, and every surface reads it from the same place either way. So the archived meta
- * is patched in place.
- *
- * Best-effort and idempotent: an agent with no archive yet, an unreadable meta, or a failed write
- * simply leaves the record as it was. The cost of missing it is one surface having to ask `gh`,
- * which is what all of them used to do.
+ * A plain file write: the archive lives on the data branch's checkout, and a fact written there
+ * is only durable once committed — {@link patchArchivedAgentOnDataBranch} is the funneled form
+ * every caller outside a test uses.
  */
-export async function recordAgentPr(
+export async function patchArchivedAgent(
   cwd: string,
   agentId: string,
-  pr: { number: number; url: string },
+  patch: ArchivePatch,
   fs: StoreFs = nodeStoreFs(),
 ): Promise<boolean> {
   if (!isSafeAgentId(agentId)) return false
@@ -1159,7 +1171,7 @@ export async function recordAgentPr(
     if (!archive) return false
     const meta = await readMetaFile(fs, archive.meta)
     if (!meta) return false
-    await fs.write(archive.meta, JSON.stringify({ ...meta, pr }))
+    await fs.write(archive.meta, JSON.stringify({ ...meta, ...patch }))
     return true
   } catch {
     return false

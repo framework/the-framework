@@ -1,41 +1,37 @@
 import { cliRunner, type CliRunner } from './cli-exec.js'
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { nodeFs } from './node-fs.js'
-import { THE_FRAMEWORK_DIR } from './framework-dir.js'
+import { gitignorePath } from './framework-gitignore.js'
 
 /**
- * Project-level repo helpers (#380): the `.the-framework/` activation marker
- * check, a `git ls-files` crawl, and the project's detection signals. Read-only
- * building blocks for the sidebars (#314); activation/install (creating the dir,
- * the install commit) is a separate, deferred concern.
+ * Project-level repo helpers (#380): the activation marker check, a
+ * `git ls-files` crawl, and the project's detection signals. Read-only
+ * building blocks for the sidebars (#314); activation/install (writing the
+ * marker, the install commit) is a separate, deferred concern.
  */
-
-/** The `.the-framework/` path under a project root. */
-export function theFrameworkDir(cwd: string): string {
-  return join(cwd, THE_FRAMEWORK_DIR)
-}
 
 /** Minimal fs seam so activation is unit-testable without touching disk. */
 export interface ProjectFs {
-  /** True when `path` exists AND is a directory. */
-  isDirectory(path: string): Promise<boolean>
+  /** True when `path` exists AND is a file. */
+  exists(path: string): Promise<boolean>
 }
 
 /** A {@link ProjectFs} backed by `node:fs/promises`. See {@link nodeFs}. */
 export function nodeProjectFs(): ProjectFs {
-  const { isDirectory } = nodeFs()
-  return { isDirectory }
+  const { exists } = nodeFs()
+  return { exists }
 }
 
 /**
- * A repo is "activated"/installed for The Framework when it has a
- * `.the-framework/` directory (#314: the dir is the activation marker).
- * Read-only check; creating the dir + the install commit is a separate,
- * deferred concern.
+ * A repo is "activated"/installed for The Framework when it has the
+ * `.the-framework/.gitignore` install writes — the same marker install's own
+ * no-op check reads (#1600), so a `.the-framework/` directory something else
+ * created can never read as activated while the repo still lacks the ignore
+ * file that keeps framework state off its branches. Read-only check; writing
+ * the marker + the install commit is a separate, deferred concern.
  */
 export async function isActivated(cwd: string, fs: ProjectFs = nodeProjectFs()): Promise<boolean> {
-  return fs.isDirectory(theFrameworkDir(cwd))
+  return fs.exists(gitignorePath(cwd))
 }
 
 /** Runs `git` in `cwd` and resolves stdout. Injectable so the crawl is testable. */

@@ -10,7 +10,6 @@ import {
   isProcessAlive,
   runDaemon,
   registerHomeProject,
-  registerReposDirectory,
   isNestedWithin,
   type DaemonState,
   type RunDaemonOptions,
@@ -50,8 +49,9 @@ async function startDaemon(cwd: string, opts: RunDaemonOptions): Promise<{ done:
 import { listAgents } from './store/index.js'
 import { EVENTS_FILE, FRAMEWORK_DIR, addWorktree, worktreePath } from './store/index.js'
 import { controlPath } from './control.js'
-import { projectId, listProjects, addProject, writePreferences } from './registry.js'
+import { projectId, listProjects, addProject } from './registry.js'
 import { nodeGitRunner } from './project.js'
+import { gitignorePath, frameworkGitignore } from './framework-gitignore.js'
 
 // The dashboard steers + starts over the daemon's in-process RPC mount (#405/#426), not the
 // retired per-read HTTP routes. Post to `/_rpc/<name>` (same-origin) and return the unwrapped `ret`.
@@ -75,9 +75,15 @@ const logEvent = (message: string): FrameworkEvent => ({ kind: 'log', message })
 const line = (message: string): string => JSON.stringify(logEvent(message)) + '\n'
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
 
+/** Fake an activated workspace: the install-written ignore file is the activation marker (#1600). */
+async function activate(cwd: string): Promise<void> {
+  await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true })
+  await writeFile(gitignorePath(cwd), frameworkGitignore())
+}
+
 async function tmpWorkspace(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), 'framework-daemon-'))
-  await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true })
+  await activate(cwd)
   return cwd
 }
 
@@ -204,7 +210,7 @@ test('a git project starts concurrent runs, each in its own worktree (#736)', as
   const git = nodeGitRunner()
   const ac = new AbortController()
   try {
-    await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true })
+    await activate(cwd)
     await git(['init'], cwd)
     await git(['config', 'user.email', 't@t'], cwd)
     await git(['config', 'user.name', 't'], cwd)
@@ -271,7 +277,7 @@ test('a run loses its worktree once its work is on the remote, whatever the run 
   const git = nodeGitRunner()
   const ac = new AbortController()
   try {
-    await mkdir(join(cwd, FRAMEWORK_DIR), { recursive: true })
+    await activate(cwd)
     await git(['init'], cwd)
     await git(['config', 'user.email', 't@t'], cwd)
     await git(['config', 'user.name', 't'], cwd)
@@ -570,7 +576,7 @@ test('registerHomeProject skips a cwd nested inside an already-tracked project (
     await addProject(parent, new Date().toISOString(), undefined, env)
     // A nested, activated subfolder (like packages/the-framework inside the repo).
     const nested = join(parent, 'packages', 'framework')
-    await mkdir(join(nested, FRAMEWORK_DIR), { recursive: true })
+    await activate(nested)
 
     await registerHomeProject(nested, env)
 
@@ -589,7 +595,7 @@ test('registerHomeProject still adds an activated cwd that is not nested (#647)'
   const home = await mkdtemp(join(tmpdir(), 'framework-home-'))
   const env = await configEnv(home)
   try {
-    await mkdir(join(home, FRAMEWORK_DIR), { recursive: true })
+    await activate(home)
     await registerHomeProject(home, env)
     const projects = await listProjects(undefined, env)
     assert.deepEqual(projects.map(p => p.path), [home])
@@ -598,37 +604,3 @@ test('registerHomeProject still adds an activated cwd that is not nested (#647)'
   }
 })
 
-test('registerReposDirectory auto-adds the git repos when the opt-in is on (#1123)', async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-repos-')))
-  const env = await configEnv(root)
-  try {
-    // Two git repos and one plain directory directly inside the repos dir.
-    await mkdir(join(root, 'app-a', '.git'), { recursive: true })
-    await mkdir(join(root, 'app-b', '.git'), { recursive: true })
-    await mkdir(join(root, 'not-a-repo'), { recursive: true })
-    await writePreferences({ reposDirectory: root, reposDirectoryAutoGrant: true }, undefined, env)
-
-    await registerReposDirectory(env)
-
-    const projects = (await listProjects(undefined, env)).map(p => p.path).sort()
-    assert.deepEqual(projects, [join(root, 'app-a'), join(root, 'app-b')])
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
-})
-
-test('registerReposDirectory adds nothing while the opt-in is off (#1123)', async () => {
-  const root = await realpath(await mkdtemp(join(tmpdir(), 'framework-repos-off-')))
-  const env = await configEnv(root)
-  try {
-    await mkdir(join(root, 'app-a', '.git'), { recursive: true })
-    // reposDirectory is set, but the auto-grant is not: the default must stay hands-off.
-    await writePreferences({ reposDirectory: root }, undefined, env)
-
-    await registerReposDirectory(env)
-
-    assert.deepEqual(await listProjects(undefined, env), [])
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
-})

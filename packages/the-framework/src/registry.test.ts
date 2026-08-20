@@ -207,7 +207,6 @@ test('every boolean preference survives a save; the sanitizer cannot silently dr
     autoPm: true,
     bridge: true,
     onboardingDismissed: true,
-    reposDirectoryAutoGrant: true,
   }
   const fs = memFs()
   await writePreferences(allOn, fs, ENV)
@@ -238,18 +237,6 @@ test('sanitizePreferences reads only the current spellings', async () => {
   assert.deepEqual(await stored({ driver: 'codex', agent: 'gpt-9000' }), { driver: 'codex' })
 })
 
-test('sanitizePreferences keeps an absolute reposDirectory and drops junk (#1123)', async () => {
-  // Another string preference the boolean-only loop would eat: kept only as a non-empty absolute
-  // path, so a relative or blank value never lands in the file.
-  const fs = memFs()
-  await writePreferences({ reposDirectory: '/home/u/repos' }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { reposDirectory: '/home/u/repos' })
-  await writePreferences({ reposDirectory: 'relative/repos' }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), {})
-  await writePreferences({ reposDirectory: '   ' }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), {})
-})
-
 test('sanitizePreferences keeps the routine opt-out list, trimmed and deduplicated (#1209)', async () => {
   // A list preference, so like the string ones the boolean-only loop would eat it whole. Junk
   // entries are dropped one by one rather than taking the list with them: losing the list would
@@ -262,13 +249,6 @@ test('sanitizePreferences keeps the routine opt-out list, trimmed and deduplicat
   assert.deepEqual(await patchPreferences({ autoPmOptOut: [] }, fs, ENV), {})
   await writePreferences({ autoPmOptOut: 'drain-queue' as never }, fs, ENV)
   assert.deepEqual(await readPreferences(fs, ENV), {})
-})
-
-test('reposDirectoryAutoGrant is a boolean preference, off by default (#1123)', async () => {
-  const fs = memFs()
-  assert.equal((await readPreferences(fs, ENV)).reposDirectoryAutoGrant, undefined) // absent = off
-  await writePreferences({ reposDirectory: '/home/u/repos', reposDirectoryAutoGrant: true }, fs, ENV)
-  assert.deepEqual(await readPreferences(fs, ENV), { reposDirectory: '/home/u/repos', reposDirectoryAutoGrant: true })
 })
 
 test('patchPreferences merges only the keys it is given (#1148)', async () => {

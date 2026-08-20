@@ -9,6 +9,7 @@ import type { PreferencesStore } from '../registry.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from './quota.js'
 import type { AutoPmReporter } from '../auto-pm.js'
+import type { ProjectErrorsReader } from '../project-errors.js'
 import type { AddProjectResult, StartAgentKind, StartAgentOptions, StartAgentResult } from './types.js'
 import type { AgentMeta } from '../store/index.js'
 
@@ -66,6 +67,8 @@ export interface DashboardContext {
    * does (#1433), so the trigger RPC can await it and return what it decided.
    */
   autoPmSweep: (opts?: { drainOnly?: boolean }) => void | Promise<void>
+  /** What a project currently suffers from (#1500): the daemon's error state, read per project. */
+  projectErrors: ProjectErrorsReader
 }
 
 /**

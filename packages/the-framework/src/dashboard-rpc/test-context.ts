@@ -25,6 +25,7 @@ export function provideTestContext(over: Partial<DashboardContext> = {}): void {
     quota: defaultQuotaSource(),
     autoPm: () => undefined,
     autoPmSweep: () => {},
+    projectErrors: () => [],
     ...over,
   } satisfies DashboardContext)
 }

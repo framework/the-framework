@@ -21,6 +21,7 @@ const context: DashboardContext = {
   quota: defaultQuotaSource(),
   autoPm: () => undefined,
   autoPmSweep: () => {},
+  projectErrors: () => [],
 }
 
 /** A server carrying just the mount, so a test can call it over real HTTP. */

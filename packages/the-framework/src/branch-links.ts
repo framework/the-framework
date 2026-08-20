@@ -1,5 +1,6 @@
 import { basename, join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from './project.js'
+import { excludeFromGit } from './git-exclude.js'
 import { FRAMEWORK_DIR, BRANCHES_DIR, worktreeDirEntries, currentBranch, type WorktreeDirEntry } from './store/index.js'
 import { isWorktreeDirName } from './branch-names.js'
 
@@ -51,6 +52,8 @@ export interface BranchLinksDeps {
   worktrees?: (cwd: string) => Promise<WorktreeDirEntry[]>
   /** The branch a worktree is on (default {@link currentBranch}). */
   branchOf?: (path: string) => Promise<string | undefined>
+  /** Hide a repo-root entry from git (default {@link excludeFromGit} over `git`). */
+  exclude?: (repo: string, rule: string) => Promise<void>
 }
 
 /**
@@ -67,6 +70,7 @@ export async function reconcileBranchLinks(cwd: string, deps: BranchLinksDeps = 
   const fs = deps.fs ?? nodeLinksFs()
   const worktrees = deps.worktrees ?? worktreeDirEntries
   const branchOf = deps.branchOf ?? ((path: string) => currentBranch(path, git))
+  const exclude = deps.exclude ?? ((repo: string, rule: string) => excludeFromGit(repo, rule, undefined, git))
 
   const linksDir = join(cwd, FRAMEWORK_DIR, BRANCHES_DIR)
   /** Link name -> relative target, derived from what is actually checked out. */
@@ -101,10 +105,17 @@ export async function reconcileBranchLinks(cwd: string, deps: BranchLinksDeps = 
 
   // The repo-root `branches` shortcut (#1580). Relative, so a checkout that moves keeps working;
   // created only when nothing sits at that path — a user's own `branches` file or dir is theirs.
+  // The link is framework state, so it is hidden from git the moment it is made (#1600):
+  // uncommitted at the root, it would ride any sweeping `git add -A` onto a code branch. The
+  // same exclude pair as the data checkout's `tickets` link: `/branches` hides root entries of
+  // that name, and `!/branches/` re-includes directories (a trailing slash never matches a
+  // symlink), so a user's own `branches` directory keeps committing while the link stays hidden.
   const rootLink = join(cwd, 'branches')
   if (!(await fs.lexists(rootLink))) {
     await fs.mkdir(linksDir)
     await fs.symlink(join(FRAMEWORK_DIR, BRANCHES_DIR), rootLink).catch(() => {})
+    await exclude(cwd, '/branches').catch(() => {})
+    await exclude(cwd, '!/branches/').catch(() => {})
   }
 }
 

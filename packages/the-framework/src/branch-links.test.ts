@@ -66,14 +66,19 @@ test('only our own links are touched: user files and foreign symlinks stay', asy
   assert.equal(links.has(join(LINKS, 'tf-mine')), false, 'nothing was created over the user file')
 })
 
-test('the repo-root branches shortcut is created once, relative, and never clobbers', async () => {
+test('the repo-root branches shortcut is created once, relative, hidden from git, and never clobbers (#1600)', async () => {
   const fresh = memFs()
-  await reconcileBranchLinks(CWD, { fs: fresh.fs, worktrees: async () => [] })
+  const excluded: string[] = []
+  const exclude = async (_repo: string, rule: string) => void excluded.push(rule)
+  await reconcileBranchLinks(CWD, { fs: fresh.fs, worktrees: async () => [], exclude })
   assert.equal(fresh.links.get(ROOT_LINK), join(FRAMEWORK_DIR, BRANCHES_DIR))
+  assert.deepEqual(excluded, ['/branches', '!/branches/'], 'the link is excluded the moment it is made')
 
   const taken = memFs({ files: [ROOT_LINK] })
-  await reconcileBranchLinks(CWD, { fs: taken.fs, worktrees: async () => [] })
+  excluded.length = 0
+  await reconcileBranchLinks(CWD, { fs: taken.fs, worktrees: async () => [], exclude })
   assert.equal(taken.links.has(ROOT_LINK), false, 'an occupied path is left alone')
+  assert.deepEqual(excluded, [], "a user's own entry is never hidden from their git status")
 })
 
 test('the pass covers every registered project and a stopped pass does nothing', async () => {

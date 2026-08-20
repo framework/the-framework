@@ -12,7 +12,6 @@ happens while nobody is at the keyboard.
 | 1 | Install globally or run via `npx` |
 | 2 | `the-framework` spins up the dashboard and the daemon, in the foreground — Ctrl-C closes the dashboard and every agent with it |
 | 3 | Activate a repo from the dashboard (commits dirty state, creates `.the-framework/`, teaches `.gitignore`, registers it) |
-| 4 | Auto-register every repo under a configured "repos directory" |
 | 5 | Onboarding checklist — each step derived from a real fact, not a click |
 | 6 | Prerequisite checks surfaced by the dashboard |
 | 7 | Per-agent preflight — probe the driver CLI before spending a branch |

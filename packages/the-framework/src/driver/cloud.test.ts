@@ -42,19 +42,16 @@ function fakePty(output: string, calls: AgentPtyOptions[] = []) {
 const ANCHOR = 'a'.repeat(40)
 
 /**
- * A git runner that records its calls; `fail` makes every call reject (#1320), `noAnchor`
- * makes only the anchor mint fail (#1601). `commit-tree` answers with a fixed sha.
+ * A git runner that records its calls; `fail` makes every call reject (#1320). `commit-tree`
+ * answers with a fixed sha.
  */
-function fakeGit(calls: string[][] = [], fail = false, noAnchor = false) {
+function fakeGit(calls: string[][] = [], fail = false) {
   return {
     calls,
     run: async (args: string[], _cwd: string): Promise<string> => {
       calls.push([...args])
       if (fail) throw new Error('no pushable remote')
-      if (args[0] === 'commit-tree') {
-        if (noAnchor) throw new Error('cannot mint the anchor')
-        return `${ANCHOR}\n`
-      }
+      if (args[0] === 'commit-tree') return `${ANCHOR}\n`
       return ''
     },
   }
@@ -369,16 +366,6 @@ test('the hand-off pushes the anchor under the agent id and hands the session th
   // The anchor reaches the meta through the result (#1601): it is how the daemon later
   // recognizes which `claude/*` branch is this run's.
   assert.ok(events.some(e => e.type === 'result' && e.anchorSha === ANCHOR))
-})
-
-test('a repo where the anchor cannot be minted hands off plain HEAD, with no anchor reported (#1601)', async () => {
-  const git = fakeGit([], false, true)
-  const events: DriverEvent[] = []
-  const session = await driverWith(CREATED, [], git).start({ cwd: '/repo', onEvent: e => events.push(e) })
-  const turn = await session.prompt('go')
-  assert.equal(turn.sessionId, SESSION)
-  assert.ok(git.calls.some(args => args.join(' ') === `push origin HEAD:refs/heads/${session.id}`))
-  assert.ok(events.every(e => e.type !== 'result' || e.anchorSha === undefined))
 })
 
 test('a failed pre-push falls back to no ref, says so, and still hands off (#1320)', async () => {

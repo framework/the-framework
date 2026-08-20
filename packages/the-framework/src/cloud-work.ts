@@ -1,8 +1,10 @@
 import { nodeGitRunner, type GitRunner } from './project.js'
-import { ghPrsForBranch, nodeGhRunner, pickAgentPr, type GhRunner, type LinkedPr } from './dashboard/gh.js'
+import { ghPrsForBranchOrThrow, pickAgentPr, type LinkedPr } from './dashboard/gh.js'
 import { openRemoteBranchPullRequest, type HandoffResult } from './dashboard/agent-handoff.js'
 import { agentBranchName } from './branch-names.js'
-import { adoptAgentBranch, listAgents, recordAgentPr, startedAtFromAgentId, type AgentMeta } from './store/index.js'
+import { listAgents, startedAtFromAgentId, type AgentMeta, type ArchivePatch } from './store/index.js'
+import { patchArchivedAgentOnDataBranch } from './archived-agent-patch.js'
+import { errorMessage } from './error-message.js'
 
 // Adopt the branch a cloud session actually worked on (#1601).
 //
@@ -15,10 +17,10 @@ import { adoptAgentBranch, listAgents, recordAgentPr, startedAtFromAgentId, type
 // The hand-off anchor (#1601) makes the match exact rather than guessed: the driver pushes an
 // empty commit unique to the run as the ref the session clones at, so the session's branch — and
 // only it — descends from that commit. This pass walks origin's `claude/*` heads, matches each
-// waiting run by that ancestry, and records what it finds onto the run's archive: the branch
-// (the same patch-in-place `recordAgentPr` uses), the PR the session opened for it — and when the
-// run was armed for a PR the session never opened, it opens the draft PR itself, which is the
-// armed handoff finally resolving against the facts.
+// waiting run by that ancestry, and records what it finds onto the run's archive as one commit
+// on the data branch: the branch, the PR the session opened for it — and when the run was armed
+// for a PR the session never opened, it opens the draft PR itself, which is the armed handoff
+// finally resolving against the facts.
 //
 // Conservative on every unprovable case: a run matching no head (the session has not pushed, or
 // did nothing) or more than one (ancestry alone cannot say which) is simply retried next pass,
@@ -47,15 +49,12 @@ export interface CloudWorkResult {
 /** Injectable seams so the pass is unit-testable off disk, off the network and off GitHub. */
 export interface CloudWorkDeps {
   git?: GitRunner
-  gh?: GhRunner
-  /** The branch's full PR history (default {@link ghPrsForBranch}). */
+  /** The branch's full PR history; a listing that fails must throw (default {@link ghPrsForBranchOrThrow}). */
   prs?: (cwd: string, branch: string) => Promise<LinkedPr[]>
   /** The project's run records (default {@link listAgents}). */
   agents?: (cwd: string) => Promise<AgentMeta[]>
-  /** Record the adopted branch (default {@link adoptAgentBranch}). */
-  adoptBranch?: (cwd: string, agentId: string, branch: string) => Promise<boolean>
-  /** Record the PR (default {@link recordAgentPr}). */
-  recordPr?: (cwd: string, agentId: string, pr: { number: number; url: string }) => Promise<boolean>
+  /** Record the adopted branch and PR on the run's archive (default {@link patchArchivedAgentOnDataBranch}). */
+  patch?: (cwd: string, agentId: string, patch: ArchivePatch, message: string) => Promise<boolean>
   /** Open the armed draft PR for a remote-only branch (default {@link openRemoteBranchPullRequest}). */
   openPr?: (cwd: string, agent: AgentMeta, branch: string) => Promise<HandoffResult>
   /** The current time in ms (injected so tests can age runs deterministically). */
@@ -131,12 +130,10 @@ async function descendsFrom(git: GitRunner, cwd: string, anchor: string, head: C
  */
 export async function adoptCloudWork(cwd: string, deps: CloudWorkDeps = {}): Promise<CloudWorkResult> {
   const git = deps.git ?? nodeGitRunner()
-  const gh = deps.gh ?? nodeGhRunner()
-  const prs = deps.prs ?? ghPrsForBranch
+  const prs = deps.prs ?? ghPrsForBranchOrThrow
   const agents = deps.agents ?? listAgents
-  const adoptBranch = deps.adoptBranch ?? adoptAgentBranch
-  const recordPr = deps.recordPr ?? recordAgentPr
-  const openPr = deps.openPr ?? ((c: string, agent: AgentMeta, branch: string) => openRemoteBranchPullRequest(c, agent, branch, { gh }))
+  const patchArchive = deps.patch ?? patchArchivedAgentOnDataBranch
+  const openPr = deps.openPr ?? openRemoteBranchPullRequest
   const now = deps.now ? deps.now() : Date.now()
   const result: CloudWorkResult = { adopted: [], failed: [] }
 
@@ -162,24 +159,30 @@ export async function adoptCloudWork(cwd: string, deps: CloudWorkDeps = {}): Pro
     if (matches.length !== 1) continue
     const head = matches[0]!
     const branch = head.ref
-
-    if (onBirthBranch(run) && !(await adoptBranch(cwd, run.id, branch))) {
-      result.failed.push({ agentId: run.id, error: `could not record ${branch} on the run's archive` })
-      continue
-    }
+    // A run whose record names some other branch — neither the one it was born on nor this head
+    // — is not this pass's to answer: a PR opened here would be recorded against a branch it
+    // does not live on.
+    if (!onBirthBranch(run) && run.branch !== branch) continue
 
     // The PR the session opened for its branch, if any — filtered by the run's start so a
     // predecessor's PR on a reused name is never this run's, `latest` so the last PR that saw
-    // the branch answers (#1512).
+    // the branch answers (#1512). "None" and "could not list" must not look alike here: a
+    // listing that fails opens nothing this pass (a second draft PR on a branch that already
+    // has one is the cost of guessing), and the run is asked again next time.
     const since = run.startedAt ?? startedAtFromAgentId(run.id)
-    let pr = pickAgentPr(await prs(cwd, branch).catch((): LinkedPr[] => []), since, 'latest')
+    const listing = await prs(cwd, branch).then(
+      found => ({ ok: true as const, pr: pickAgentPr(found, since, 'latest') }),
+      (err: unknown) => ({ ok: false as const, error: errorMessage(err) }),
+    )
+    let pr = listing.ok ? listing.pr : undefined
     let opened = false
-
-    // The armed handoff, finally resolving (#1601): the run was armed for a PR, the session
-    // opened none, and the branch carries something beyond the hand-off itself — so the draft
-    // PR the wrapper's epilogue could never open (it saw only the empty run branch) opens now.
-    // A run whose PR arming was off gets its branch recorded and nothing else.
-    if (!pr && prArmed(run) && run.status === 'done' && head.sha !== run.cloudAnchor) {
+    if (!listing.ok) {
+      result.failed.push({ agentId: run.id, error: `could not list the PRs of ${branch} (${listing.error}), so no draft PR was opened this pass` })
+    } else if (!pr && prArmed(run) && run.status === 'done' && head.sha !== run.cloudAnchor) {
+      // The armed handoff, finally resolving (#1601): the run was armed for a PR, the session
+      // opened none, and the branch carries something beyond the hand-off itself — so the draft
+      // PR the wrapper's epilogue could never open (it saw only the empty run branch) opens now.
+      // A run whose PR arming was off gets its branch recorded and nothing else.
       const openedPr = await openPr(cwd, run, branch)
       if (openedPr.ok && openedPr.number !== undefined && openedPr.url) {
         pr = { number: openedPr.number, url: openedPr.url, state: 'OPEN', title: '' }
@@ -189,7 +192,17 @@ export async function adoptCloudWork(cwd: string, deps: CloudWorkDeps = {}): Pro
       }
     }
 
-    if (pr && run.pr === undefined) await recordPr(cwd, run.id, { number: pr.number, url: pr.url })
+    // One commit on the data branch carries whatever this pass learned: the branch (first time
+    // only), the PR (once known). Nothing learned, nothing written — and nothing announced.
+    const patch: ArchivePatch = {
+      ...(onBirthBranch(run) ? { branch } : {}),
+      ...(pr && run.pr === undefined ? { pr: { number: pr.number, url: pr.url } } : {}),
+    }
+    if (Object.keys(patch).length === 0) continue
+    if (!(await patchArchive(cwd, run.id, patch, `[The Framework] adopt session ${run.id}'s cloud work`))) {
+      result.failed.push({ agentId: run.id, error: `could not record ${branch} on the run's archive` })
+      continue
+    }
     result.adopted.push({
       agentId: run.id,
       branch,

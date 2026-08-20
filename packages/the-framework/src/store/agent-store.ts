@@ -1146,49 +1146,23 @@ export async function readEventLog(cwd: string, fs: StoreFs = nodeStoreFs()): Pr
   }
 }
 
-/**
- * Record the pull request a finished agent's work is on (E6).
- *
- * A PR opened by the dashboard's button happens *after* the agent's process is gone, so there is no
- * event stream left to carry it — but the fact is exactly as worth recording as the one the agent
- * emits for itself, and every surface reads it from the same place either way. So the archived meta
- * is patched in place.
- *
- * Best-effort and idempotent: an agent with no archive yet, an unreadable meta, or a failed write
- * simply leaves the record as it was. The cost of missing it is one surface having to ask `gh`,
- * which is what all of them used to do.
- */
-export async function recordAgentPr(
-  cwd: string,
-  agentId: string,
-  pr: { number: number; url: string },
-  fs: StoreFs = nodeStoreFs(),
-): Promise<boolean> {
-  if (!isSafeAgentId(agentId)) return false
-  try {
-    const archive = await findArchive(fs, cwd, agentId)
-    if (!archive) return false
-    const meta = await readMetaFile(fs, archive.meta)
-    if (!meta) return false
-    await fs.write(archive.meta, JSON.stringify({ ...meta, pr }))
-    return true
-  } catch {
-    return false
-  }
-}
+/** The facts a settled run learns after its process is gone: the PR its work is on, the branch it landed on. */
+export type ArchivePatch = Partial<Pick<AgentMeta, 'branch' | 'pr'>>
 
 /**
- * Record the branch a cloud session's work actually landed on (#1601), patching the archived
- * meta in place the same way {@link recordAgentPr} does and for the same reason: the fact
- * becomes known only after the agent's process is gone — the cloud VM pushes its `claude/*`
- * branch while the local wrapper is already history — so there is no event stream left to
- * carry it. Every surface resolves the recorded branch first, so this one write is what turns
- * a run's "nothing committed" row into its real branch, PR and merge state.
+ * Patch an archived run's record with a fact discovered once the agent's process is gone (E6,
+ * #1601): the pull request opened for its work, or the branch a cloud session's work landed
+ * on. There is no event stream left to carry it, and every surface reads the record, so this
+ * one write is what turns a "nothing committed" row into its real branch and PR.
+ *
+ * A plain file write: the archive lives on the data branch's checkout, and a fact written there
+ * is only durable once committed — {@link patchArchivedAgentOnDataBranch} is the funneled form
+ * every caller outside a test uses.
  */
-export async function adoptAgentBranch(
+export async function patchArchivedAgent(
   cwd: string,
   agentId: string,
-  branch: string,
+  patch: ArchivePatch,
   fs: StoreFs = nodeStoreFs(),
 ): Promise<boolean> {
   if (!isSafeAgentId(agentId)) return false
@@ -1197,7 +1171,7 @@ export async function adoptAgentBranch(
     if (!archive) return false
     const meta = await readMetaFile(fs, archive.meta)
     if (!meta) return false
-    await fs.write(archive.meta, JSON.stringify({ ...meta, branch }))
+    await fs.write(archive.meta, JSON.stringify({ ...meta, ...patch }))
     return true
   } catch {
     return false

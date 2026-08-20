@@ -261,18 +261,13 @@ export class CloudSession implements DriverSession {
     // work on a branch of its own naming (`claude/*`), never the designated run branch — and
     // since every commit it makes descends from what it cloned, a commit unique to this run is
     // the one exact mark by which the daemon can later recognize which `claude/*` branch is
-    // this run's. A repo where the anchor cannot be minted hands off plain HEAD: the session
-    // still works, the run is simply never matched to its branch.
+    // this run's. Minting and pushing are one step: a checkout that cannot mint an empty commit
+    // on its HEAD has no HEAD to push either.
     const git = this.config.git ?? nodeGitRunner()
-    let anchor: string | undefined
-    try {
-      anchor = (await git(['commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', `[The Framework] web hand-off ${this.id}`], this.cwd)).trim() || undefined
-    } catch {
-      anchor = undefined
-    }
     let ref: string | undefined = this.id
     try {
-      await git(['push', 'origin', `${anchor ?? 'HEAD'}:refs/heads/${this.id}`], this.cwd)
+      const anchor = (await git(['commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', `[The Framework] web hand-off ${this.id}`], this.cwd)).trim()
+      await git(['push', 'origin', `${anchor}:refs/heads/${this.id}`], this.cwd)
       this.anchorSha = anchor
     } catch (err) {
       ref = undefined

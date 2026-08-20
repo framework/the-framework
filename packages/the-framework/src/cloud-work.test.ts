@@ -60,12 +60,9 @@ function deps(agents: AgentMeta[], git = fakeGit([{ ref: 'claude/fix-it', sha: H
     git: git.run,
     agents: async () => agents,
     prs: async () => prs,
-    adoptBranch: async (_cwd, agentId, branch) => {
-      recorded.branches.push({ agentId, branch })
-      return true
-    },
-    recordPr: async (_cwd, agentId, pr) => {
-      recorded.prs.push({ agentId, number: pr.number })
+    patch: async (_cwd, agentId, patch) => {
+      if (patch.branch !== undefined) recorded.branches.push({ agentId, branch: patch.branch })
+      if (patch.pr !== undefined) recorded.prs.push({ agentId, number: patch.pr.number })
       return true
     },
     openPr: async (_cwd, _agent, branch) => {
@@ -190,4 +187,29 @@ test('startCloudWorkAdoption says adoptions out loud and joins overlapping ticks
   adoption.stop()
   await adoption.tick()
   assert.equal(calls, 1, 'a stopped pass runs nothing')
+})
+
+test('a PR listing that fails records the branch but opens nothing: "none" and "could not tell" must not look alike (#1601)', async () => {
+  // A transient gh failure used to read as "the session opened no PR" and open a second draft on
+  // a branch that already had one.
+  const { d, recorded } = deps([webRun()])
+  d.prs = async () => {
+    throw new Error('gh: rate limited')
+  }
+  const result = await adoptCloudWork(CWD, d)
+  assert.deepEqual(recorded.branches, [{ agentId: ID, branch: 'claude/fix-it' }], 'the branch is a fact regardless')
+  assert.deepEqual(recorded.opened, [], 'no PR is opened on a listing this pass could not read')
+  assert.deepEqual(recorded.prs, [])
+  assert.equal(result.failed.length, 1)
+  assert.match(result.failed[0]!.error, /could not list the PRs/)
+})
+
+test('a run whose record names a branch that is neither its birth branch nor the matched head is left alone (#1601)', async () => {
+  // Its PR would otherwise be opened from the claude/* head and recorded against a branch it
+  // does not live on.
+  const { d, recorded } = deps([webRun({ branch: 'tf-renamed-by-hand' })])
+  const result = await adoptCloudWork(CWD, d)
+  assert.deepEqual(recorded.branches, [])
+  assert.deepEqual(recorded.opened, [])
+  assert.deepEqual(result.adopted, [])
 })

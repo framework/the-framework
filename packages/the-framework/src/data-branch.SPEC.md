@@ -1,6 +1,6 @@
 All the data The Framework writes — the tickets, the task queue, the session archives — lives on one dedicated branch, `tf-data`, so the code history stays 100% code and the data can be pushed and pulled eagerly without ever touching anyone's working tree.
 
-## TLDR
+## Flows
 
 - The branch is checked out at `.the-framework/branches/tf-data`, and a `tickets` symlink at the repo root points into it, so the roadmap stays one `ls` away. The symlink is hidden from git through a repo-level exclude, so no sweeping commit ever drags it onto a code branch.
 - The daemon is the only local writer: every write is one serialized cycle — sync with origin, apply the change, commit, push — so a lost race re-reads the fresher state and re-applies the intent instead of clobbering what someone else landed.

@@ -1,6 +1,6 @@
 What the daemon does for a project: starting agents in isolated checkouts, retiring them when they end, and keeping every one of them recoverable.
 
-## TLDR
+## Flows
 
 - Each agent gets its own worktree and branch, so concurrent agents never touch each other or the user's checkout; a project that is not a Git repo falls back to its main checkout, one agent at a time. A repo whose worktree cannot be created fails the start rather than borrowing the user's working tree.
 - A start is refused when the chosen driver cannot run (not installed or not logged in), so a doomed agent spends no branch or worktree.

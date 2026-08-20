@@ -40,6 +40,21 @@ test('the result repeating the announced id does not emit a second session-updat
   assert.equal(events.filter(e => e.kind === 'session-update').length, 1)
 })
 
+test('a result carrying the hand-off anchor emits it as its own event (#1601)', () => {
+  // The anchor is how the daemon later recognizes which `claude/*` branch is this run's, and
+  // only an event reaches the meta the daemon reads after this process is gone.
+  const events: FrameworkEvent[] = []
+  handler(events).onDriverEvent({ type: 'result', text: 'done', sessionId: 's1', anchorSha: 'a'.repeat(40) })
+  assert.deepEqual(
+    events.filter(e => e.kind === 'cloud-anchor'),
+    [{ kind: 'cloud-anchor', sha: 'a'.repeat(40) }],
+  )
+  // And a result without one — every non-cloud driver — emits none.
+  const bare: FrameworkEvent[] = []
+  handler(bare).onDriverEvent({ type: 'result', text: 'done' })
+  assert.equal(bare.filter(e => e.kind === 'cloud-anchor').length, 0)
+})
+
 test('a result with a fresh id still emits, the pre-#1322 path unchanged', () => {
   const events: FrameworkEvent[] = []
   handler(events).onDriverEvent({ type: 'result', text: 'done', sessionId: 's2' })

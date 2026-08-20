@@ -10,7 +10,7 @@ import {
   readLiveMeta,
   readLiveMetas,
   archiveWorktreeAgent,
-  recordAgentPr,
+  patchArchivedAgent,
   restoreArchivedAgent,
   listWorktreeDirs,
   reconcileOrphanedAgents,
@@ -669,22 +669,31 @@ test('archiveWorktreeAgent records a run that died mid-flight as stopped, not ru
   assert.equal((JSON.parse(fs.files.get(join(CWD, '.the-framework', 'agents', 'r1.json'))!) as AgentMeta).status, 'stopped')
 })
 
-test('recordAgentPr patches the archived meta, so a PR opened after the run still lands on it (E6)', async () => {
+test('patchArchivedAgent records a PR opened after the run on its archived meta (E6)', async () => {
   // The dashboard's Open PR button runs after the session's process is gone, so there is no event
   // stream left to carry the fact — but it is the same fact, and every surface reads it from the
   // same place either way.
   const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT }))
   await archiveWorktreeAgent(worktreeAt('r1'), CWD, fs)
-  assert.equal(await recordAgentPr(CWD, 'r1', { number: 42, url: 'https://x/pull/42' }, fs), true)
+  assert.equal(await patchArchivedAgent(CWD, 'r1', { pr: { number: 42, url: 'https://x/pull/42' } }, fs), true)
   assert.deepEqual((await listAgents(CWD, fs)).find(r => r.id === 'r1')?.pr, { number: 42, url: 'https://x/pull/42' })
 })
 
-test('recordAgentPr leaves the record as it was when there is nothing to patch (E6)', async () => {
+test('patchArchivedAgent records the branch the cloud work landed on (#1601)', async () => {
+  // The cloud VM pushes its `claude/*` branch after the wrapper's process is gone, so the fact
+  // arrives the same way a late PR does: patched onto the archive, read by every surface.
+  const fs = memFs(worktreeFiles('r1', { version: 1, status: 'done', id: 'r1', startedAt: AT, updatedAt: AT, branch: 'tf-agent-r1' }))
+  await archiveWorktreeAgent(worktreeAt('r1'), CWD, fs)
+  assert.equal(await patchArchivedAgent(CWD, 'r1', { branch: 'claude/fix-the-thing' }, fs), true)
+  assert.equal((await listAgents(CWD, fs)).find(r => r.id === 'r1')?.branch, 'claude/fix-the-thing')
+})
+
+test('patchArchivedAgent leaves the record as it was when there is nothing to patch (E6/#1601)', async () => {
   // Best-effort: the cost of missing it is one surface having to ask gh, which is what all of them
   // used to do anyway.
   const fs = memFs()
-  assert.equal(await recordAgentPr(CWD, 'nope', { number: 1, url: 'u' }, fs), false)
-  assert.equal(await recordAgentPr(CWD, '../escape', { number: 1, url: 'u' }, fs), false, 'and an unsafe id is refused')
+  assert.equal(await patchArchivedAgent(CWD, 'nope', { pr: { number: 1, url: 'u' } }, fs), false)
+  assert.equal(await patchArchivedAgent(CWD, '../escape', { branch: 'claude/x' }, fs), false, 'and an unsafe id is refused')
 })
 
 test('archiveWorktreeAgent is forgiving of a worktree with no run', async () => {

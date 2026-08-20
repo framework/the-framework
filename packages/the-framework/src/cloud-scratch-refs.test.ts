@@ -37,6 +37,8 @@ function fakeGit(opts: {
   defaultBranch?: string
   /** The shas reachable from the default branch ('all' for every one). Default 'all'. */
   landed?: Set<string> | 'all'
+  /** Locally-known commits (#1601): sha -> its tree and parent. Everything else is not local. */
+  commits?: Record<string, { tree: string; parent?: string }>
   refuseDeletes?: boolean
   noRemote?: boolean
 }) {
@@ -54,6 +56,29 @@ function fakeGit(opts: {
       if (landed === 'all' || landed.has(args[2]!)) return ''
       throw new Error('exit 1') // not an ancestor
     }
+    if (args[0] === 'cat-file') {
+      const sha = /^([0-9a-f]+)\^\{commit\}$/.exec(args[2] ?? '')?.[1]
+      if (sha && opts.commits?.[sha]) return ''
+      throw new Error('exit 1') // not a local object
+    }
+    if (args[0] === 'rev-parse') {
+      const match = /^([0-9a-f]+)(\^?)(?:\^\{tree\})?$/.exec(args[1] ?? '')
+      const commit = match ? opts.commits?.[match[1]!] : undefined
+      if (!match || !commit) throw new Error('exit 128')
+      const spec = args[1]!
+      if (spec.endsWith('^^{tree}')) {
+        const parent = commit.parent ? opts.commits?.[commit.parent] : undefined
+        if (!parent) throw new Error('exit 128')
+        return `${parent.tree}\n`
+      }
+      if (spec.endsWith('^{tree}')) return `${commit.tree}\n`
+      if (spec.endsWith('^')) {
+        if (!commit.parent) throw new Error('exit 128')
+        return `${commit.parent}\n`
+      }
+      throw new Error(`unexpected rev-parse ${spec}`)
+    }
+    if (args[0] === 'fetch') throw new Error('exit 128') // the canned origin serves no objects
     if (args[0] === 'push' && args[2] === '--delete') {
       if (opts.refuseDeletes) throw new Error('remote hung up')
       deleted.push(args[3]!)
@@ -187,6 +212,43 @@ test('a cloud-* ref watched for less than the safe age is kept', async () => {
   const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
   assert.deepEqual(deleted, [])
   assert.deepEqual(result.kept, [{ ref: CLOUD_REF, reason: 'young' }])
+})
+
+test('a hand-off anchor tip still counts as holding no work: empty commit, landed parent (#1601)', async () => {
+  // The anchor is an empty commit on top of the run's HEAD, and no merge ever lands it — a
+  // squash merge rewrites the session's history without it — so reachability alone would keep
+  // its ref forever.
+  const ANCHOR_SHA = 'c'.repeat(40)
+  const { git, deleted } = fakeGit({
+    heads: { main: MAIN_SHA, [CLOUD_REF]: ANCHOR_SHA },
+    landed: new Set([SHA, MAIN_SHA]),
+    commits: {
+      [ANCHOR_SHA]: { tree: 'tree1', parent: SHA },
+      [SHA]: { tree: 'tree1' },
+    },
+  })
+  const { files, fs } = memFs()
+  seenState(files, { [CLOUD_REF]: new Date(NOW - SCRATCH_REF_SAFE_AGE_MS).toISOString() })
+  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
+  assert.deepEqual(result.deleted, [CLOUD_REF])
+  assert.deepEqual(deleted, [CLOUD_REF])
+})
+
+test('a tip that changes something against its parent is not an anchor: kept as holding work (#1601)', async () => {
+  const TIP = 'c'.repeat(40)
+  const { git, deleted } = fakeGit({
+    heads: { main: MAIN_SHA, [CLOUD_REF]: TIP },
+    landed: new Set([SHA, MAIN_SHA]),
+    commits: {
+      [TIP]: { tree: 'tree2', parent: SHA },
+      [SHA]: { tree: 'tree1' },
+    },
+  })
+  const { files, fs } = memFs()
+  seenState(files, { [CLOUD_REF]: new Date(NOW - SCRATCH_REF_SAFE_AGE_MS).toISOString() })
+  const result = await sweepCloudScratchRefs('/repo', { git, fs, prs: noPrs, now: () => NOW })
+  assert.deepEqual(deleted, [])
+  assert.deepEqual(result.kept, [{ ref: CLOUD_REF, reason: 'holds-work' }])
 })
 
 test('a record for a ref no longer on origin is pruned — someone else already deleted it', async () => {

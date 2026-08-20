@@ -7,9 +7,10 @@ import { appendFlatTodoEntry, ticketForPrompt } from '../todo-loop.js'
 import { TICKETS_DIR, todoPriorityForTicket } from '../tickets.js'
 import { isTicketFile } from '../dashboard/tickets.js'
 import { releaseTicketLock } from '../ticket-locks.js'
-import { findAgent, isSafeAgentId, recordAgentPr, worktreePath, type AgentMeta } from '../store/index.js'
+import { findAgent, isSafeAgentId, worktreePath, type AgentMeta } from '../store/index.js'
 import { withAgentLock } from '../agent-locks.js'
 import { removeProjectWorktree, deleteProjectAgent } from '../worktrees.js'
+import { patchArchivedAgentOnDataBranch } from '../archived-agent-patch.js'
 import { commitAgentWork, mergeAgentPr, openAgentPullRequest, pushAgentBranch, agentBranchFor, type HandoffResult } from '../dashboard/agent-handoff.js'
 import type { ChoiceBy } from '../events.js'
 import { isHandoffLevel, type HandoffLevel } from '../handoff-level.js'
@@ -289,7 +290,7 @@ export async function sendOpenPullRequest(projectId: string, agentId: string): P
     // stream to carry the fact — but it is the same fact, and every surface reads it from the same
     // place either way rather than re-deriving it from branch names.
     if (opened.ok && opened.number !== undefined && opened.url) {
-      await recordAgentPr(target.cwd, agentId, { number: opened.number, url: opened.url })
+      await patchArchivedAgentOnDataBranch(target.cwd, agentId, { pr: { number: opened.number, url: opened.url } }, `[The Framework] record the PR of session ${agentId}`)
     }
     return opened
   }, { ok: false, error: 'could not reach the device' })

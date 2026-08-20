@@ -271,6 +271,14 @@ export type FrameworkEvent =
    */
   | { kind: 'branch'; branch: string }
   /**
+   * The hand-off anchor a cloud run pushed for its session to clone at (#1601): an empty commit
+   * unique to this run, so the branch the session actually works on — a `claude/*` name of the
+   * cloud's own choosing, never the designated run branch — is recognizable later by plain
+   * ancestry. Folded to `AgentMeta.cloudAnchor`, which the daemon's adoption pass matches
+   * against origin's `claude/*` heads once the session has pushed its work.
+   */
+  | { kind: 'cloud-anchor'; sha: string }
+  /**
    * What the end-of-session handoff actually did (#1102): pushed and/or opened a draft PR,
    * declined for a reason that is not a fault, or failed at one of the two steps.
    *

@@ -1,4 +1,4 @@
-Tests that the session id surfaces the moment a turn starts (so a stopped turn cannot lose the resume handle), never repeats for the same id, and that the agent's opening event records the model it was started with.
+Tests that the session id surfaces the moment a turn starts (so a stopped turn cannot lose the resume handle), never repeats for the same id, that the agent's opening event records the model it was started with, and that a hand-off carrying an anchor commit reports it as its own event while one without reports none.
 
 ## Before modifying/creating SPEC.md files
 

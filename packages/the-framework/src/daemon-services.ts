@@ -23,6 +23,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
 import { startBranchLinksPass } from './branch-links.js'
 import { startCloudScratchSweep } from './cloud-scratch-refs.js'
+import { startCloudWorkAdoption } from './cloud-work.js'
 import { resolveAgentPr } from './dashboard/agent-handoff.js'
 import { sendChoice, sendMessage, sendStop } from './dashboard-rpc/control.js'
 import type { ProjectSummary } from './dashboard/projects.js'
@@ -32,7 +33,8 @@ import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
 /**
  * Everything the daemon runs in the background beside serving the dashboard: the two Discord
  * notification watchers (#627), auto PM (#685/#773), the CI watch (#1418), the session-archive
- * committer (#912/#1179), the worktree sweep (#1036) and the cloud-scratch sweep (#1547).
+ * committer (#912/#1179), the worktree sweep (#1036), the cloud-scratch sweep (#1547) and the
+ * cloud work adoption (#1601).
  *
  * All of it used to sit inline in `runDaemon`, which meant its body was a lifecycle narrative with
  * ~200 lines of service wiring in the middle of it. Each of these is gated the same way (an env
@@ -318,6 +320,12 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
   // (~a day) and only deletes refs whose work is provably on the default branch.
   const cloudScratch = startCloudScratchSweep({ projects, log, busy: deps.busyAgentIds })
 
+  // Adopt the branch a cloud session actually worked on (#1601): match each settled web run to
+  // the `claude/*` head descending from its hand-off anchor, record the branch and PR on the
+  // run's archive, and open the armed draft PR the session never did. Daemon-side by necessity:
+  // the branch does not exist yet when the wrapper ends — the cloud VM is still provisioning.
+  const cloudWork = startCloudWorkAdoption({ projects, log })
+
   // `resolve` matters: projectId hashes the path string, and `--cwd` reaches us verbatim, so a
   // relative path would hash to an id no project lookup can resolve. Same derivation the runtime uses.
   const homeId = projectId(resolve(deps.cwd))
@@ -439,6 +447,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // sweep ages those refs from when it first saw them, so the sooner it looks, the sooner
       // a leftover can go.
       { name: 'cloud scratch sweep', every: CLOUD_SCRATCH_EVERY, run: () => cloudScratch.tick() },
+      // Ten minutes: the cloud session it waits on lives minutes-to-hours itself, and the pass
+      // costs an `ls-remote` per project only while a settled web run is actually waiting.
+      { name: 'cloud work adoption', every: AUTO_PM_EVERY, run: () => cloudWork.tick() },
     ],
   })
 
@@ -453,6 +464,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       mergedWorktrees.stop()
       branchLinks.stop()
       cloudScratch.stop()
+      cloudWork.stop()
     },
     reloadDiscord,
     // Awaitable (#1433) so the trigger button can wait for the sweep's answer; a caller that

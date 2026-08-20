@@ -1,4 +1,4 @@
-Covers the agent+model tree: the trigger shows the current agent's logo and model (spelled out on hover), picking a model inside an agent's submenu sets both together, and a submenu never lists another agent's models.
+Covers the driver+model tree: the trigger shows the current driver's logo and model (spelled out on hover), picking a model inside a driver's submenu sets both together, and a submenu never lists another driver's models.
 
 ## Before modifying/creating SPEC.md files
 

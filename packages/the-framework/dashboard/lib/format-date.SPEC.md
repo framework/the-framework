@@ -1,6 +1,6 @@
 Every timestamp the dashboard shows is formatted here, so an absent or unparseable one reads as a quiet fallback instead of "Invalid Date".
 
-## TLDR
+## Flows
 
 - Full, short, and date-only forms for tables and rows; the short form doubles as a name for unnamed sessions.
 - Ages ("22s ago", "2w ago") and durations ("2h", "2 hours") are floored, so "1m" always means at least a full minute has really passed.

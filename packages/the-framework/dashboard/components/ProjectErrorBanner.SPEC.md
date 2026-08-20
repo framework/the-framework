@@ -1,8 +1,12 @@
 The banner at the top of a project's page naming what the daemon currently finds wrong with the project — a headline per kind of error, the failing command's own words underneath, and since when.
 
-## TLDR
+## Flows
 
-- Renders exactly what the project list carries and holds nothing of its own: there is no dismiss, because the daemon clears the error the moment the condition is fixed.
+- Renders exactly what the project list carries and holds nothing of its own; there is no dismiss.
+
+## Rationales
+
+- No dismiss because the daemon clears the error the moment the condition is fixed — the banner disappears by the problem going away, not by being waved off.
 
 ## Before modifying/creating SPEC.md files
 

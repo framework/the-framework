@@ -1,6 +1,6 @@
 Reads a project's ticket backlog for the dashboard, so what the agent plans from is visible without opening the repo.
 
-## TLDR
+## Flows
 
 - A ticket is one file; its plan and its claim are sibling files folded into it, never rows of their own — "planned" means a plan exists, "locked" means an agent holds a claim (an unreadable claim still locks; the holder's name is only display sugar).
 - Deliberately tolerant of tickets predating the format: a missing heading, summary, or key falls back rather than dropping the ticket, and the plan's effort/uncertainty values ride along when named.

@@ -1,6 +1,6 @@
 Every agent's open question gathered into one hub, so a human can answer any parked agent from one place instead of hunting through their individual views.
 
-## TLDR
+## Flows
 
 - The full question — options, recommendation, whether several may be picked — is read back from each parked agent's own log, because its summary record only carries the title.
 - Longest-waiting first: the agent blocked on its human the longest is the one to unblock first.

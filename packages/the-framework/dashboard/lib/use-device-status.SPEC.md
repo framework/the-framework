@@ -1,6 +1,6 @@
 The saved devices' online/offline dots, refreshed on a short interval.
 
-## TLDR
+## Flows
 
 - Device tokens are a per-browser secret the daemon never stores, so the browser hands over each device's address and token per check and the daemon does the ping.
 - A device whose first check has not come back reads as unknown, not offline.

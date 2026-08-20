@@ -1,15 +1,34 @@
 The dashboard UI: a browser app served by the daemon that renders everything the daemon knows and steers agents through it — holding no authoritative state of its own.
 
-## TLDR
+## User Stories
+
+- The user starts an agent from the composer — typing a prompt for an attended one, picking a preset for an unattended one — and is warned before spending when something would block the handoff.
+- The user watches an agent as a live transcript, answers the questions it parks on right where they happened, chats with it, and stops or resumes it.
+- The user reviews an agent's changed files and diffs and hands the work off — push, open a PR, merge.
+- The user sees on one overview everything that needs them: the quota bar, every unanswered question across all projects, agents working now, the AI queue, routine work, and the hottest tickets.
+- The user browses every project's tickets in one filterable list, shares the filtered view as a URL, and starts an agent straight from a ticket.
+- The user follows an onboarding checklist whose steps tick themselves off real facts, not clicks.
+- The user tunes every preference in settings, from appearance to automation and spend.
+
+## Flows — TL;DR
+
+- Every read is a projection of daemon state; every write is a call into the daemon.
+- The URL is the selection, so every view is a link to paste, reload, or bookmark.
+- A live agent streams its events; everything else polls; a finished agent reads from the archive.
+- The dashboard is a plain client-side app behind one static page the daemon serves.
+- The overview leads with the quota bar, then everything that needs the user.
+- The composer starts agents and is a live agent's control.
+- The agent view is the transcript with every control inline.
+- Tickets are the cross-project roadmap surface, filterable and shareable by URL.
+- Settings gathers every preference on one page.
+
+## Flows
 
 - Every read is a projection of state the daemon assembles (agent logs, tickets, the queue, git and GitHub state, preferences); every write is a call into the daemon. The one exception is saved remote devices: their access tokens stay in this browser only, handed to the daemon per call.
 - The URL is the selection: the overview at `/`, a project at `/{projectId}`, one agent at `/{projectId}/{agentId}`, plus cross-project tickets, a per-ticket page and its plan page, and settings. An agent is a link you can paste, reload, and bookmark — there is no selection state to disagree with the address bar.
 - An agent's events stream live over one channel bound to its own log; everything else polls. A finished agent reads from the archive instead, catching up whenever the live channel outgrew it.
-- It is a plain client-side bundle: one static page the daemon serves for every address, and all the behaviour in the browser. There is no server rendering and no framework between the HTML and the app — plain Vite, and the calls are plain HTTP handlers.
-- What it reads out of the rest of the package comes from that package's *source*, not its build output. Nearly all of it is type-only and reaches no bundle; the runtime part is the browser-safe barrel, compiled here like any other file. Pointing at the build instead made a fresh clone fail to type-check until something had run `tsc`, and type-checked the browser against the last build rather than the current source.
+- The dashboard is a plain client-side app: one static page the daemon serves for every address, and all the behaviour in the browser — no server rendering, no framework between the page and the app.
 - Watch mode: opened against a shared link, the same app renders one agent read-only.
-
-## Flows
 
 **The overview** is ordered by what governs what: the quota bar first (a week-track with pace and projection — the one figure that decides what agents may do next), then everything that needs *you* — the open-questions hub, every agent's unanswered question across all projects, answerable right there in one scrolling view — then the agents working now, the full AI queue of every project (uncollapsed: a plan you cannot read is not a plan), routine work, and the hottest tickets. An onboarding checklist sits on top until dismissed; each step's "done" is derived from a real fact (a registered project, a ticket on disk, a granted permission, stored credentials), so a step cannot be ticked by clicking it and work done outside the dashboard shows up ticked anyway.
 
@@ -20,6 +39,10 @@ The dashboard UI: a browser app served by the daemon that renders everything the
 **Tickets** are the roadmap surface: a cross-project list with client-side faceted filtering (text, priority/effort/uncertainty buckets or ranges, topics, planning stage, project), sorting, and a group-by-project toggle — the whole view mirrored to the URL so it can be shared. Each ticket row leads with a start button that spins up an unattended agent implementing that one ticket, and shows whether a plan exists: a link to a page rendering the plan when it does, a button that starts an agent to write one when it doesn't. Queueing a ticket into the AI queue happens from the ticket's own page.
 
 **Settings** covers appearance, driver and model defaults, the options every new agent starts with, saved devices, notification channels, automation (the idle sweep and the spend slider), and the cloud-session bridge token.
+
+## Rationales
+
+- What the dashboard reads out of the rest of the package comes from that package's *source*, not its build output; nearly all of it is type-only and reaches no bundle, and the little that is runtime code is compiled into the bundle like any other file. Reading the build instead would type-check the browser against the last build rather than the current source, and a fresh clone would not type-check until a build had run.
 
 ## Before modifying/creating SPEC.md files
 

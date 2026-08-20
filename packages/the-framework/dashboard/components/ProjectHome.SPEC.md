@@ -1,6 +1,6 @@
 The project home / launcher: the page for starting an agent, plus everything worth answering or reading about the project.
 
-## TLDR
+## Flows
 
 - Never consumed by an agent: starting one adds its own view alongside, and this page stays put so you can launch again.
 - Anything the daemon finds wrong with the project — a data branch that cannot reach origin — sits as a banner above the start form, until the daemon sees it fixed.

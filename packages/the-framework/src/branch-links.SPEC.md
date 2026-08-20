@@ -1,6 +1,6 @@
 Keeps every session checkout reachable by its branch name: new checkouts live in `.the-framework/branches/` in a folder named as their branch, a symlink appears beside them whenever a branch gets renamed, and a `branches` shortcut at the repo root points there — so `cd branches/<name>` opens any session's work by the name the dashboard shows.
 
-## TLDR
+## Flows
 
 - A new checkout's folder is already named as its branch, so most need nothing extra. When a session renames its branch (most do, early on), the background pass adds a link under the new name — a rename costs a link, never moving a checkout under a running session.
 - Only the framework's own links are ever created, replaced, or removed: a user's own file, folder, or symlink at any of these paths is left alone.

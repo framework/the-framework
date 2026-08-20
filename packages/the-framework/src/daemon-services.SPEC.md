@@ -1,8 +1,8 @@
 Everything the daemon runs in the background beside serving the dashboard: Discord notifications, automatic project management, CI watching, data-branch syncing, and disk reclamation.
 
-## TLDR
+## Flows
 
-- One clock runs every background job, each declaring how many ticks it wants between turns rather than owning an interval — six timers used to run side by side, with no single place to look when a sweep turned out not to be running.
+- One clock runs every background job, each declaring how many ticks it wants between turns rather than owning an interval.
 - Every service re-reads its preference on each tick, so a dashboard toggle takes effect without restarting the daemon.
 - An agent the daemon starts resolves its options from the same two tiers the launcher uses — your settings, then the repo's committed file — so one nobody asked for and one someone clicked differ only in who asked.
 - Auto PM spends idle quota on the roadmap: it fans out up to the configured number of unattended agents, each pinned to one queue entry, and retires an entry on the data branch once its agent's ending reports the work published; the daemon, never the agent, writes queue check-offs and ticket locks.
@@ -12,7 +12,12 @@ Everything the daemon runs in the background beside serving the dashboard: Disco
 - The Discord notification watchers are rebuilt when the webhook changes, so a value pasted into the dashboard works immediately.
 - The data branch is pulled eagerly, so this machine reads what other machines and cloud sessions pushed without waiting for its own next write. A project whose branch cannot converge — origin rejects the push, or there is no remote at all — is recorded as that project's error state for the dashboard to show, and the record is cleared by the first sync that converges.
 - Every background start forces unattended mode, so gates auto-answer instead of parking forever on an absent human.
-- Shutdown quiesces everything that could start an agent before the daemon stops the agents it owns. Nothing is resumed on the next boot — Ctrl-C closed those agents deliberately.
+- Shutdown quiesces everything that could start an agent before the daemon stops the agents it owns. Nothing is resumed on the next boot.
+
+## Rationales
+
+- One clock rather than a timer per service: a single schedule gives one place to look when a sweep turns out not to be running.
+- Nothing is resumed on the next boot because Ctrl-C closed those agents deliberately.
 
 ## Before modifying/creating SPEC.md files
 

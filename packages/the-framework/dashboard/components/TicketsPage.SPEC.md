@@ -1,6 +1,6 @@
 The cross-project Tickets view: every registered project's backlog on one full-width page — filterable, sortable, groupable — because the backlog is worth seeing whole rather than scoped to whichever project is selected.
 
-## TLDR
+## Flows
 
 - The whole viewing state lives in the URL, so a filtered view is a shareable link; changes mirror to the address without adding history steps, and the shown/total tally rides the page title.
 - Grouped by project by default, each section its own panel with its GitHub update bar; the flat list is the one view that answers "the single highest-priority ticket anywhere", rows carrying their project and still starting work or plans in it.

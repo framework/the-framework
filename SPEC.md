@@ -1,8 +1,18 @@
 Autonomous AI programming: humans make the important decisions while The Framework runs coding agents unattended — planning its own work, spending idle subscription quota on the roadmap, and handing everything off as pull requests for review.
 
-## TLDR
+## User Stories
 
-- The product is a local daemon plus a dashboard. You register your repos, and from then on coding agents (Claude Code today, others behind the same driver seam) work on them: each agent gets a throwaway copy of the repo, does its work, and hands the result off as a pull request. Your own checkout is never touched.
+- The user activates a repo from the dashboard; from then on coding agents work on it in throwaway copies, and the user's own checkout is never touched.
+- The user types a prompt or picks a preset, then watches the agent live — answering the questions it parks on, chatting with it, stopping it — or is not there at all.
+- The user reviews finished work as pull requests: an agent that produced real work pushes it and opens a PR by itself.
+- The user walks away and the product keeps working: it drains the confirmed queue, refills it by triaging and planning tickets, fixes red CI on its own PRs, and merges them on green.
+- The user never budgets: unattended work spends only the share of the subscription week that has already elapsed, and work the user asks for is never starved.
+- The user runs agents on another machine, a GitHub Actions runner, or a Claude cloud session, follows them from the same dashboard, and answers the questions they park on — a browser extension bridges claude.ai cloud sessions back to it.
+- The user is notified — browser or Discord — whenever an agent needs a human.
+
+## Flows
+
+- The product is a local daemon plus a dashboard. The user registers repos, and from then on coding agents (Claude Code today, other CLIs pluggable behind the same driver interface) work on them: each agent gets a throwaway copy of the repo, does its work, and hands the result off as a pull request.
 - The human's job shrinks to decisions: answer the questions an agent parks on, accept or reject proposed tickets, review PRs. Everything else — picking the next task, triaging, planning, fixing red CI, merging on green — the daemon does by itself when nobody is at the keyboard, as long as the account's quota allows it.
 - The driver is a black box: The Framework prompts it, lets it run a full turn, then reads the code and the turn's final message. It never micro-manages individual tool calls, and the CLI keeps its own subscription login — The Framework adds orchestration, not another AI bill.
 - Two satellites complete the family: a browser extension that bridges claude.ai cloud sessions back to the daemon, and the product's website.
@@ -17,8 +27,7 @@ graph TD
     end
 ```
 
-The arrow points one way — the dashboard renders the product — and nothing depends "up". It used to
-be a package boundary; the dependency survived the merge, the boundary did not.
+The arrow points one way — the dashboard renders the product — and nothing depends "up".
 
 ## Rationales
 

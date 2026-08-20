@@ -1,6 +1,6 @@
 The project list and the launcher's pre-flight answers: which projects are registered, adding new ones, and whether an agent started now would get anywhere.
 
-## TLDR
+## Flows
 
 - Each listed project carries what the daemon's background jobs currently find wrong with it — a data branch that cannot reach origin, say — so the one list every project surface already polls is also how an error reaches the sidebar and the project's page.
 - Adding a project (one repo, or every repo under a folder) goes through the daemon so it lands in the shared registry; the onboarding hint offers the daemon's own directory as the first project — and a public host neither offers nor accepts, and must not disclose where it runs.

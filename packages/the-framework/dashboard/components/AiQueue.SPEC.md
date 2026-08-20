@@ -1,6 +1,6 @@
 The Overview's AI Queue card: every project's open queue entries — the work the framework picks up on its own — shown in full, each readable and startable.
 
-## TLDR
+## Flows
 
 - An entry's title opens what it names: a queued ticket opens its own ticket page in-app, an external link opens in a new tab, and plain text pretends to be nothing.
 - The play button starts one unattended agent on that entry alone — the same work the automatic drain sweep would get to, on your click — then jumps to the agent it started.

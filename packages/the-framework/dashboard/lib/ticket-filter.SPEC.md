@@ -1,6 +1,6 @@
 The tickets page's filtering, sorting, and grouping model: every project's backlog as one pool, narrowed instantly in the browser, with the whole view carried by the URL so it can be shared, reloaded, and returned to.
 
-## TLDR
+## Flows
 
 - The facets: word search, priority/effort/uncertainty, topics, pipeline stage (unplanned / planned / claimed by an agent), project, and locally-written-only. Selections OR within a facet and AND across facets.
 - A numeric facet takes named buckets or a fine range — two ways to say the same thing, so picking one clears the other — while "names no value" composes with either: "critical or unprioritized" is a real triage lens.

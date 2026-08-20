@@ -1,6 +1,6 @@
 The dashboard's shared kit of basic interface pieces — buttons, inputs, menus, dialogs, tooltips, scroll areas, the sidebar shell — hand-ported shadcn-style components rather than product logic, so every panel looks and behaves the same.
 
-## TLDR
+## Flows
 
 - Two dialog tiers on purpose: an irreversible action goes through a focus-trapped confirm dialog a stray click cannot dismiss, while ordinary forms and drawers close on Esc or a click outside.
 - Scrollbars are the app's own — thin, themed, visible only while content overflows — never the OS overlay bar that hides itself.

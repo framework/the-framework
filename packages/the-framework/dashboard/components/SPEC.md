@@ -1,6 +1,14 @@
 The dashboard's React component catalog: every page, panel and control the browser app is assembled from.
 
-## TLDR
+## User Stories
+
+- The user starts an agent from the launcher — a typed prompt for an attended run, a preset for unattended routine work.
+- The user watches a live agent's transcript, answers its questions inline, steers it, stops it, and resumes it.
+- The user scans the Overview board for quota pace, running agents, queued work, routine jobs and hot tickets, and answers any agent's open question from there.
+- The user filters, sorts and groups every project's tickets on one page, opens a ticket's detail and plan, and queues or starts work from a row.
+- The user changes every preference — appearance, driver and model, where agents execute, agent options, notifications, automation — on one settings page.
+
+## Flows
 
 - One shared shell frames every route: the left sidebar (brand, New launcher, Overview / Tickets / Projects navigation, recent agents, utility footer) and a right rail of agent-pushed views, surfaced docs and project history. Its pages are the Overview board, the project home/launcher, one agent's view, the cross-project tickets pages (list, per-ticket detail, per-ticket plan), Settings, a read-only shared watch view, and not-found.
 - The agent surface is a transcript with its controls inline: an action bar carrying the branch / PR / handoff and the one menu of agent actions, the event feed rendering its questions as answerable cards and its browser screencast in place, the changes and handoff panels, and one composer that starts, steers, stops and resumes — in a stable frame, so an ending never blanks what you are reading.

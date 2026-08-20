@@ -1,6 +1,6 @@
 A driver that runs the agent on GitHub Actions instead of this machine: dispatch a workflow, wait for it, read back the transcript the agent uploads.
 
-## TLDR
+## Flows
 
 - Same contract, different tempo: every prompt is a fresh runner, turns take minutes, and progress replays in one burst at the end instead of trickling live.
 - Continuity across turns is the branch the previous turn pushed — the next one starts from it — plus the carried session id, so a multi-pass agent keeps building on its own work; produced code is read off that branch, because the runner is gone by the time we ask.

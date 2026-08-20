@@ -1,6 +1,6 @@
 Answers the live view's questions purely from an agent's event stream — the dashboard is a projection of the same journal the agent writes.
 
-## TLDR
+## Flows
 
 - The choice gates the agent is parked on: an answer closes one, the agent's end closes them all, so a dead agent's question stops looking answerable.
 - The markdown views the agent has shown, one entry each, updated in place when re-shown.

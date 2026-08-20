@@ -1,6 +1,6 @@
-A read-through cache for the dashboard's slow questions — mostly GitHub ones, which cost hundreds of times a local git read — so a polling page never buys the same answer twice.
+A read-through cache for the dashboard's slow questions — mostly GitHub ones, which cost many times a local git read — so a polling page never buys the same answer twice.
 
-## TLDR
+## Flows
 
 - Concurrent asks for the same thing share one lookup.
 - A known answer is served instantly and refreshed behind the scenes once it ages; a failed refresh keeps the last good answer rather than dropping it.

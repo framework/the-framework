@@ -1,6 +1,6 @@
 Renders the agent's event stream as one human-readable terminal line per event — the CLI's counterpart to the dashboard's views over the same stream.
 
-## TLDR
+## Flows
 
 - Consequences over flags: the handoff line says what will happen ("push the branch, open a PR, and merge it"), and every merge outcome is spoken — after "auto-merge is on", silence would read as "it merged".
 - Refusals are phrased as reasons in the reader's terms (why a merge was withheld, why the handoff or cleanup did nothing), so a setting never reads as a bug.

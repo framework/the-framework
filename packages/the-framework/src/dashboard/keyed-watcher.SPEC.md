@@ -1,6 +1,6 @@
 The notification engine: a background poll over the registered projects that announces only what newly appeared, so a Discord message fires even when no dashboard is open.
 
-## TLDR
+## Flows
 
 - The first look only takes a baseline — whatever already existed when the daemon started is never announced; you only hear about what happens while it watches.
 - What makes two items "the same" is the caller's decision, so one engine serves both the needs-you queue and the activity feed.

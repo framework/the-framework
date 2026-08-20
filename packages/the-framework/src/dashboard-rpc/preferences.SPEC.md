@@ -1,6 +1,6 @@
 Reading and saving the user's settings: the dashboard preferences, a project's shared presets, the editor picker, and the Discord credentials.
 
-## TLDR
+## Flows
 
 - Settings live with the dashboard, not the browser, so they survive restarts and follow the user across tabs. A write that fails answers with the reason rather than rejecting, so the client renders it instead of losing the save.
 - A save can merge only the keys a tab changed and hand back what is now stored, so a stale tab converges instead of reverting settings it never touched.

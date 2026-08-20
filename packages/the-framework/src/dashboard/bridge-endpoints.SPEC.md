@@ -1,6 +1,6 @@
 The daemon's doorway for the browser extension in the user's own claude.ai tab: questions a cloud session is parked on (and what it said) come in, and answers picked in the dashboard go back out.
 
-## TLDR
+## Flows
 
 - The one surface meant to be reached from another origin, so every call must present a shared secret, checked before anything else is read.
 - Payloads are tiny and validated field by field — no paths, no commands, no free text — so a stolen secret buys at worst a bogus question card.

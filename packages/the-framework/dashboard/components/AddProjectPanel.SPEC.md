@@ -1,6 +1,6 @@
 The "Add project" modal: registers a repo — or every git repo directly under a folder — with the daemon so it joins the project list.
 
-## TLDR
+## Flows
 
 - Adding is a two-step act: submitting the path first shows a trust confirmation, because adding a repo lets the agent read its files and hidden instructions in an untrusted repo can hijack the agent (prompt injection); nothing is installed until trust is confirmed.
 - A folder add reports how many repos it registered (and how many already were) instead of finishing silently.

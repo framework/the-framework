@@ -1,6 +1,6 @@
 Streams the agent's headless browser to a human — the latest screen frame as a simple image stream, with clicks, typing, scrolling and navigation posted back — so when an agent parks asking someone to deal with a login wall or captcha, there is actually a page to act on.
 
-## TLDR
+## Flows
 
 - Follows the agent: always shows the tab it is working in, re-attaching when it opens or switches tabs, and announces each real page change so the transcript can show the pane at the point of use.
 - A still page is exactly the parked case, so the newest frame is re-sent on a timer to keep the pane painted.

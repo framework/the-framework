@@ -1,6 +1,6 @@
 Distills an agent's event stream into the dashboard's summary cards: the agent's lifecycle progress, what it will do with its work when it ends, and the agent session behind it.
 
-## TLDR
+## Flows
 
 - Pure folds over the same events the log renders, so a live dashboard and a replay of a past agent always show the identical summary.
 - Latest wins throughout: the agent may rename its session or re-arm its handoff at any point.

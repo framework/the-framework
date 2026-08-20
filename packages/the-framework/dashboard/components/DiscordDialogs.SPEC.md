@@ -1,6 +1,6 @@
 The two Discord setup dialogs — the bot and notifications — that explain the integration, take its credential, and toggle the matching preference, so Discord is set up inside the product instead of by editing the daemon's environment and restarting it.
 
-## TLDR
+## Flows
 
 - A credential is write-only: it goes to the daemon and never comes back, so a stored one reads "saved" with Replace and Remove instead of a field holding a secret.
 - A credential set in the daemon's environment wins over a stored one, so that case is reported as fixed rather than offering an edit the daemon would ignore; a host that stores no credentials says so instead of offering a field.

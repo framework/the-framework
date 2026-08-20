@@ -7,7 +7,7 @@ Autonomous AI programming: humans make the important decisions while The Framewo
 - The user reviews finished work as pull requests: an agent that produced real work pushes it and opens a PR by itself.
 - The user walks away and the product keeps working: it drains the confirmed queue, refills it by triaging and planning tickets, fixes red CI on its own PRs, and merges them on green.
 - The user never budgets: unattended work spends only the share of the subscription week that has already elapsed, and work the user asks for is never starved.
-- The user runs agents on another machine, a GitHub Actions runner, or a Claude cloud session, and steers them from the same dashboard — a browser extension bridges claude.ai cloud sessions back to it.
+- The user runs agents on another machine, a GitHub Actions runner, or a Claude cloud session, follows them from the same dashboard, and answers the questions they park on — a browser extension bridges claude.ai cloud sessions back to it.
 - The user is notified — browser or Discord — whenever an agent needs a human.
 
 ## Flows

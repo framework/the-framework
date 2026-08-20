@@ -1,6 +1,6 @@
 The app's left sidebar, present on every route: brand, global navigation (New, Overview, Tickets, Projects), the recent-agents rail, and the utility footer.
 
-## TLDR
+## Flows
 
 - "New" adapts to what exists: no projects prompts to add one, one project starts there, several open a picker; inside a project it starts another agent there.
 - The rail lists the selected project's agents — or, on the Overview, every project's pooled newest-first, each row naming its project and jumping into it.

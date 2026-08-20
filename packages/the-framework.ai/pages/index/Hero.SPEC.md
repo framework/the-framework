@@ -1,6 +1,6 @@
 The opening screen: the promise (strike through "Babysit AI", announce "Autonomous AI" — make the important decisions, let AI do the rest) plus the fastest possible path to trying the product.
 
-## TLDR
+## Flows
 
 - Leads with the trust badges (100% open source, free, local), the headline, and the tagline.
 - A one-shot "try" command takes center stage, with a smaller install command as alternative; one click copies either.

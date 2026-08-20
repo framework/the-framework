@@ -1,4 +1,4 @@
-The "Autonomous AI" section: two cards listing what AI handles autonomously — product management and coding — with reassurances that agents still ask before non-obvious decisions and that you pick the autonomy level.
+The "Autonomous AI" section: two cards listing what AI does autonomously — product management and coding — with reassurances that agents still ask before non-obvious decisions and that you pick the autonomy level.
 
 ## Before modifying/creating SPEC.md files
 

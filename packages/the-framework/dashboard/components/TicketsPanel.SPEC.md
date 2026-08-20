@@ -1,6 +1,6 @@
 A project's tickets as scannable one-liner rows — start column, title, topics, claim, effort, priority, age, plan column, GitHub link — plus the GitHub update.
 
-## TLDR
+## Flows
 
 - The start column spins up an unattended agent on that one ticket, the ticket named on the agent so its record says what it implements; opening the row goes to the detail page instead — starting is not opening.
 - The plan column links an existing plan, or starts an agent to write one — attended, because a plan is written for a human to review.

@@ -390,8 +390,9 @@ describe('project errors in the Projects list (#1500)', () => {
   })
 
   test('a healthy project keeps the activated dot', () => {
+    const { errors: _errors, ...healthy } = stranded
     const { container } = renderRail(
-      <AgentHistory projectId="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} projects={[{ ...stranded, errors: undefined }]} />,
+      <AgentHistory projectId="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} projects={[healthy]} />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Projects' }))
     expect(container.querySelector('.bg-destructive')).toBeNull()

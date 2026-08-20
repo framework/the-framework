@@ -30,6 +30,7 @@ export function ProjectHome({
   removeContext,
   toggleContext,
   onOpenAgent,
+  errors,
 }: {
   projectId: string
   events: FrameworkEvent[]

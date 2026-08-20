@@ -1,6 +1,13 @@
 Auto PM spends leftover subscription quota on the product's own roadmap: while the account is under its weekly boundary and nobody is at the keyboard, the daemon works the agent queue down and, once it is empty, refills it — importing, triaging, then planning tickets.
 
-## TLDR
+## User Stories
+
+- The user leaves the keyboard and comes back to a worked-down queue and freshly imported, triaged, and planned tickets.
+- The user caps how many unattended agents a project runs at once and switches individual routines off.
+- The user clicks "Run now" on a routine and it runs, even while the master switch is off.
+- The user reads the reason for every tick that started nothing, so a setting never looks like a bug.
+
+## Flows
 
 - One pure policy question per project — enabled, under the concurrency cap, past the cooldown, queue readable, quota under the boundary; the sweep loop only supplies the readings.
 - A standing queue is drained before new work is invented; a calendar-paced codebase maintenance sweep outranks the rotation when due, and only ever while the queue is genuinely empty.
@@ -9,13 +16,14 @@ Auto PM spends leftover subscription quota on the product's own roadmap: while t
 - A claim whose agent settled with nothing to hand off is released by the sweep: the pull request that normally lifts the lock is never coming, and without the release the queue would jam forever on a dead claim. The freed work is not respawned by this daemon — one commitless run is evidence for a human, not an invitation to repeat it every cooldown — and a claim whose agent never even started (a refused spawn, a stop mid-batch) is freed the same way.
 - The queue coordinates a ticketless entry only once its check-off is in the checkout, and that leaves a window: an agent handed off to a cloud session settles locally before its pull request lands, so until the merge reaches the checkout the entry still reads open, and past the cooldown it can be fanned out to a second agent. The same window opens when the daemon restarts, since only its in-memory pin covered the wait.
 - Each routine can be switched off individually, and every stand-down is reported with its reason: a wedged sweep must not look like a healthy idle one.
-- Switching the draining routine off means "do not *work* the queue", not "do nothing": the tick falls through to the rotation, which puts entries *on* the queue rather than taking them off. Standing down instead made every inventing routine unreachable for as long as the queue held anything — and the queue is auto-populated, so that was most of the time. The one exception is a click that asked for the queue by name: a drain-only sweep says why it cannot, rather than borrowing the click.
+- Switching the draining routine off means "do not *work* the queue", not "do nothing": the tick falls through to the rotation, which puts entries *on* the queue rather than taking them off. The one exception is a click that asked for the queue by name: a drain-only sweep says why it cannot, rather than borrowing the click.
 
 ## Rationales
 
 - An unreadable quota fails closed — the opposite of the per-agent guard: quietly burning quota on work nobody asked for is worse than skipping a tick.
 - "Run now" skips only the master switch: the click is the consent the preference exists to record; every other stand-down holds.
-- The ticketless hand-off window is accepted rather than closed: the durable per-entry claim it would take was deleted as a read-time guess, tickets — the queue's normal case — are covered by the pushed lock, and the queue's planned move onto an eagerly-pushed data branch closes the window structurally. A second claim shape built now would be deleted then.
+- A switched-off draining routine falls through to the rotation rather than standing the tick down, because a stand-down would make every inventing routine unreachable whenever the queue holds anything — and the queue is auto-populated, so it usually does.
+- The ticketless hand-off window is accepted rather than closed: closing it would take a durable per-entry claim — a second claim shape beside the pushed ticket lock that already covers the queue's normal case — and the queue's planned move onto an eagerly-pushed data branch closes the window structurally, so a claim shape built now would be deleted then.
 
 ## Before modifying/creating SPEC.md files
 

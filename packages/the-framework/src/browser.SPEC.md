@@ -1,6 +1,6 @@
 The agent launches its own browser with a shared remote-control port, so the agent's browser tools and a human's preview can watch the very same page — a second viewer cannot attach to a browser that launched privately.
 
-## TLDR
+## Flows
 
 - Finds the machine's Chrome (explicit override first, then the well-known locations, then the PATH); none found means the agent's browser tools fall back to launching their own — a missing browser costs the preview, never the tools.
 - Headless, on a throwaway profile: an agent never inherits or dirties the user's real browser session.

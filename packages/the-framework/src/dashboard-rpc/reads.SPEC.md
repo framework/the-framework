@@ -1,6 +1,6 @@
 Every read the dashboard makes: agents and their history, docs, tickets and queues, cross-project rollups, files and diffs, and where a finished agent's work stands.
 
-## TLDR
+## Flows
 
 - Everything is a projection of files the agents and daemon already write — the dashboard holds no state of its own — and an unknown project or a host with no checkout gets empty results, never errors.
 - The agent list merges archived, live, and device-relayed agents; a live copy wins a tie, so a continued agent reads as running rather than as its finished first leg, and a relayed one survives a reload despite existing only in memory.

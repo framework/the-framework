@@ -1,12 +1,15 @@
 Turns the user's saved preferences into the options an agent starts with, so an unattended agent honours exactly the same settings as one started from the dashboard.
 
-## TLDR
+## Flows
 
-- One shared mapping because two things start agents — the dashboard and the automatic project manager — and the second used to pass nothing, ignoring every setting.
 - The repo's committed config file becomes a preference layer of its own, sitting under the project's overrides and over the user's global choices.
 - Settled answers travel explicitly, "off" included, so a repo file or an agent-side default can never turn back on what the launcher just showed as off.
 - Publishing is one ordinal, not a set of switches: each rung includes the ones below it, so nothing has to remember that a pull request implies a push. Unset means open a pull request — the zero-config handoff — and merging is the rung above, because landing on the main branch has to be asked for.
 - Options that would mean nothing are dropped: the browser only goes to the driver that can use it, and the model, driver, and target travel only when they differ from the default.
+
+## Rationales
+
+- One shared mapping, because two things start agents — the dashboard and the automatic project manager — and a mapping apiece is how one of them ends up ignoring every setting.
 
 ## Before modifying/creating SPEC.md files
 

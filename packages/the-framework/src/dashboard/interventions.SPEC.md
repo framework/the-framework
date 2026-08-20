@@ -1,6 +1,6 @@
 The cross-project "needs you" queue: everything currently waiting on the human, gathered from every registered project.
 
-## TLDR
+## Flows
 
 - Three kinds of item: an open pull request to review, an agent parked on a question, and a finished agent whose commits were never pushed.
 - Hand-opened draft PRs stay off the queue (they are not asking for review yet); an agent's own draft stays on it — the automatic handoff opens drafts precisely so reviewers are not pinged, and the queue is then the only place the work is visible at all.

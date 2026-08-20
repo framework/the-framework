@@ -1,6 +1,6 @@
 The Overview's cross-project shortlist of the tickets that matter right now: what is being worked on, what sits in the AI Queue, and what is flagged high priority.
 
-## TLDR
+## Flows
 
 - Three lanes, every qualifying ticket listed in full — never "+N more" — and the empty state names the lanes rather than claiming the backlog is empty.
 - A ticket an agent is implementing right now says so — live work outranks the "planned" mark older work left behind — and its row opens that agent.

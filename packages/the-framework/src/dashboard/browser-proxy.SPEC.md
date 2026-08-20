@@ -1,6 +1,6 @@
 Lets the dashboard watch and steer an agent's live browser by relaying the screen stream and the clicks through the daemon.
 
-## TLDR
+## Flows
 
 - The dashboard cannot reach an agent's browser directly (wrong origin), so the pane talks to the daemon and the daemon talks to the agent's own preview channel on the same machine.
 - The client never names the port: it comes from the agent's own live record, so the relay cannot be pointed at anything else on the machine, and a finished agent's port is never reused.

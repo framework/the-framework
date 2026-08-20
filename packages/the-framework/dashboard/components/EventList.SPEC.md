@@ -1,6 +1,6 @@
 The agent's transcript, shared by the live stream and the replay of a finished one: every event as a human-readable line, with the conversation and the agent's interactive surfaces rendered as themselves.
 
-## TLDR
+## Flows
 
 - Your prompts read YOU (blue) and the agent's replies AGENT, both as Markdown; a long message collapses to its first line and expands in place, and the system prompt hides behind a character count.
 - The agent's first prompt is hoisted to the very top, so the log opens with what you asked rather than the machinery that preceded it; later turns stay where they happened.

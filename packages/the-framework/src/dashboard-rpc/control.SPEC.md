@@ -1,6 +1,6 @@
 Every dashboard action that changes something: steering a live agent, starting one, and publishing or cleaning up what a finished one left.
 
-## TLDR
+## Flows
 
 - Steering (stop, answer a choice, send a message, arm the handoff, merge) appends a command to the agent's own control file, which the agent watches — the same append whoever asks, no direct line into the process. A Claude web session has none to steer: its answer is queued for the browser extension to type in, and only as a label of the question actually parked.
 - Starting an agent, previews, and opening a checkout in an editor call straight into the daemon's own wiring: there is one host and it wires everything, so a missing capability is a wiring bug that names itself rather than a state a request can find.

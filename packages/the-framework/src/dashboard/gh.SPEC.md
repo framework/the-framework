@@ -1,6 +1,6 @@
 Everything the dashboard asks or tells GitHub — pull request lookups, merging, CI status — in one place.
 
-## TLDR
+## Flows
 
 - Reads are quick, cached, and forgiving: an unreachable GitHub reads as nothing, never a failed page.
 - An agent's PR is picked from its branch's whole history — an open PR always counts, a closed one only if created after the agent began — so a reused branch name cannot wear a predecessor's merged PR.

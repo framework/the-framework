@@ -1,6 +1,6 @@
 The shared composer: the prompt editor plus its control row — presets, context, driver and model, options, send — used by the launcher to start agents and by an agent's chat to message it.
 
-## TLDR
+## Flows
 
 - A loaded preset prefills the editor and runs verbatim as its own kind; emptying the box falls back to a normal build, and a preset can insist on opening a new agent.
 - Agent, model, options, and target are shared preferences: every composer, including the compact navbar row, shows and writes the same state instead of silently using stored values.

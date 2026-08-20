@@ -1,6 +1,6 @@
 The second real driver: wraps the Codex CLI so the product runs the same way on the user's own ChatGPT subscription.
 
-## TLDR
+## Flows
 
 - Codex works inside its own workspace sandbox — it can edit the workspace it was pointed at and nothing else — and the sandbox-bypass option is never passed.
 - Codex takes no separate system prompt, so role framing is prepended to the prompt; the same words reach the CLI.

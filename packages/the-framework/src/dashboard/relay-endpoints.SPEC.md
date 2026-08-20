@@ -1,6 +1,6 @@
 The device side of running an agent on another machine: the few endpoints a daemon exposes so a trusted peer daemon can start an agent here, watch its events, and make agent-scoped calls.
 
-## TLDR
+## Flows
 
 - Everything sits behind the shared-token guard, so a caller without the device's token is refused before reaching any of this.
 - A reachability ping answers even when the relay is not wired and starts nothing — it only proves "I'm here and your token works", which is what the device list's status dots poll.

@@ -1,6 +1,6 @@
 Follows an append-only line-per-record log as it grows — the seam through which agents, daemon, and dashboard talk via files rather than direct connections.
 
-## TLDR
+## Flows
 
 - Reads only what was appended since last time, holds back a half-written line until it completes, and starts over when a fresh agent truncates the log.
 - A tail can follow its log to a new home when the file is moved with content intact, without replaying what it already delivered.

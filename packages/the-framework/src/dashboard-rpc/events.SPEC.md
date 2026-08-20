@@ -1,6 +1,6 @@
 Streams one agent's events live to the browser: everything already logged is replayed, then each new event as it happens.
 
-## TLDR
+## Flows
 
 - The agent id picks whose journal to follow — each agent logs in its own checkout — so the feed is that agent's alone; without it, the project root's journal is followed, which is only right for an agent that has no checkout.
 - The tail follows the journal when teardown archives it mid-stream, so a watcher never misses the ending — but an agent-scoped feed never falls back to the project-root journal, which is another agent's story: a deleted agent's tab goes quiet instead.

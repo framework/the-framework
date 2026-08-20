@@ -1,11 +1,15 @@
 How far a finished agent publishes itself — one ordinal covering keep it local, push the branch, open a pull request, merge it.
 
-## TLDR
+## Flows
 
-- One ladder, not three switches. The stages are strictly nested — a pull request needs a pushed branch, a merge needs a pull request — so three independent booleans described eight states of which four were reachable, and the implication lived in a doc comment because the type could not carry it.
-- The impossible combinations stop being representable. "A pull request without a push" was never something an agent could honour; it used to be resolved by turning the push back on, which meant a launcher offering "publish nothing" could not deliver it.
+- One ladder, not three switches. The stages are strictly nested — a pull request needs a pushed branch, a merge needs a pull request — so a rung includes every rung below it, and the impossible combinations are not representable.
 - Unset means open a pull request: that is what makes the handoff zero-config, so work never sits on a local branch nobody is told about. Merging is the rung above, and landing on the default branch has to be asked for.
-- A surface that still shows three checkboxes converts both ways, and the conversion is where an impossible answer resolves *downward* rather than being quietly repaired upward. Settings written before the ladder are read through that same conversion, since forgetting them would read "publish nothing" as the default — which publishes.
+- A surface that offers the stages as three separate checkboxes converts both ways, and the conversion is where an impossible answer resolves *downward* rather than being quietly repaired upward. A stored setting that spells the stages out is read through that same conversion, since forgetting it would read "publish nothing" as the default — which publishes.
+
+## Rationales
+
+- Three independent booleans describe eight states of which four are reachable, and the implication has to live in a doc comment because the type cannot carry it; the ladder carries the implication structurally.
+- "A pull request without a push" is not something an agent can honour, and repairing it upward — turning the push back on — makes a "publish nothing" answer undeliverable; resolving downward keeps every answer deliverable.
 
 ## Before modifying/creating SPEC.md files
 

@@ -1,6 +1,13 @@
 The product's marketing website, the-framework.ai — it pitches The Framework and funnels visitors into trying it.
 
-## TLDR
+## User Stories
+
+- A visitor reads the pitch and copies one terminal command to try The Framework.
+- A visitor picks their package manager once and every command on the site follows, this visit and the next.
+- A visitor landing on the go-to-dashboard page learns the dashboard runs on their own machine and how to launch it.
+- Someone writing about The Framework downloads logos, naming rules, and the banner from the press page.
+
+## Flows
 
 - One long landing page carries the whole pitch: stop babysitting AI, make the important decisions, let AI do the rest.
 - The main call to action everywhere is a copy-pasteable terminal command that runs The Framework; visitors pick their package manager once and every command site-wide shows in that flavor, remembered across visits.

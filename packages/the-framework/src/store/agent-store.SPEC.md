@@ -1,11 +1,5 @@
 Agent persistence: an agent's history is its append-only event log, and everything shown about it is folded from that log.
 
-## TLDR
-
-- The log is the truth; the snapshot beside it is a fold of the log, kept for cheap reads.
-- Finished agents are archived onto the data branch per user, so a project's history is a team record that never touches the code history.
-- An agent that died without saying goodbye is given its ending, wherever it is found.
-
 ## Flows
 
 - Each event is appended to the log and folded into a small snapshot, so a list read costs one file instead of a replay. A restarted dashboard rehydrates by replaying the log itself.
@@ -19,10 +13,11 @@ Agent persistence: an agent's history is its append-only event log, and everythi
 
 ## Rationales
 
+- Archives live on the data branch, so a project's history is a team record that never touches the code history.
 - A live agent must never blink out of a listing, because readers act on that absence: it is why a torn snapshot is re-read, and why the write is a rename rather than a truncate.
 - The ending is written into the log too, or the agent's last question renders as answerable forever.
 - An owner on another machine, or one with no record of its process, is cleaned up only at boot: a routine read must not kill an agent another machine is still driving.
-- Everything here is known by one name. What the snapshot and the archive directories were called before is not looked for, so state left under the old names reads as absent.
+- Everything here is known by one name: when a file or directory here is renamed, no fallback to the previous name is added, so state left under it reads as absent.
 - A record is the right home for a late fact either way, so a surface reading it never has to know which path produced it.
 
 ## Before modifying/creating SPEC.md files

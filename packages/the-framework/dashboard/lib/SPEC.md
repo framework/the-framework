@@ -1,6 +1,6 @@
 The dashboard's client-side logic layer: the dashboard owns no facts of its own, and this is where the daemon's answers and an agent's event stream become everything the pages show — no components here, only the state and rules they consume.
 
-## TLDR
+## Flows
 
 - Freshness comes two ways: one live feed streams the selected agent's transcript (replay the log, then follow it, never showing less than it already showed), and everything else re-asks the daemon on short intervals. All reads share one guarded pattern — a failure keeps the last answer, a late answer for an abandoned target is dropped, absence is never claimed before the first answer — and a separate heartbeat is what turns "daemon unreachable" into a visible fact instead of silently frozen panels.
 - Anything two surfaces show is computed once and shared so they cannot drift: an agent's options table with its cross-option rules, the one-word status pill, the status color vocabulary, agent and queue-entry labels, event badge wording, the quota week's bar arithmetic, and timestamp formatting that never shows a broken date.

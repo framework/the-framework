@@ -1,6 +1,6 @@
 The prompts a build agent opens with, and the one check that decides between them.
 
-## TLDR
+## Flows
 
 - The framing states the one thing the agent cannot infer: build from scratch in an empty workspace, or work within the codebase that already exists — an existing project is extended, never re-scaffolded.
 - A workspace holding no source the agent could have written counts as empty; lockfiles, dotfiles, and dependency or output directories do not.

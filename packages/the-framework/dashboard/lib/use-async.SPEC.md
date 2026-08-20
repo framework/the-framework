@@ -1,6 +1,6 @@
 The one guarded way every panel reads from the daemon — once, or again on a steady interval — instead of each panel hand-rolling the same fetch loop.
 
-## TLDR
+## Flows
 
 - A failed read keeps the last answer on screen rather than blanking it: an empty panel would read as "nothing there" when the truth is "no answer", and the next tick usually recovers.
 - An answer that lands after the panel moved on (switched target, closed) is dropped, so a slow read can never show the wrong target's data.

@@ -1,6 +1,6 @@
 The live transcript feed: one subscription to the selected agent's own event log, replayed from the top and then followed as it grows, shared by every pane that renders it.
 
-## TLDR
+## Flows
 
 - The feed is addressed per agent, so selecting another switches to that agent's log — two agents never share a feed.
 - A dead stream is not silent: an errored drop flags the feed as possibly behind reality and retries with backoff, while a deliberate close by the server (watch stream over, unknown session) simply ends it, no alarm.

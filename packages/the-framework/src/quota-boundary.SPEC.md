@@ -1,6 +1,6 @@
 Decides how much of the account's weekly allowance The Framework may have spent by now: the share of the week that has already elapsed.
 
-## TLDR
+## Flows
 
 - One policy, nothing to configure: the boundary rises continuously with the clock and reaches the full allowance exactly as the week resets, so a quiet week still gets spent instead of expiring.
 - Work the user asks for may borrow ahead; unattended work stands down once usage passes the limit — the boundary plus an optional user-set offset (by default a small cushion beyond it).
@@ -9,7 +9,7 @@ Decides how much of the account's weekly allowance The Framework may have spent 
 
 ## Rationales
 
-- Continuous rather than stepping once a day: a step handed out a whole day's allowance the instant a new day began, inviting a burst; continuous stays honest about what has actually elapsed.
+- Continuous rather than stepping once a day: a step hands out a whole day's allowance the instant a new day begins, inviting a burst; continuous stays honest about what has actually elapsed.
 - The limit and the boundary are separate values because moving the user's slider must not redraw the boundary it is measured against.
 
 ## Before modifying/creating SPEC.md files

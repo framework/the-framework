@@ -1,6 +1,6 @@
 One agent's view, live or finished, in a stable frame — bar, details, changes/handoff, transcript and composer — whose contents change instead of remounting when the agent ends.
 
-## TLDR
+## Flows
 
 - The transcript is one log with two sources — the live channel while running, the archive once ended — swapped behind the events on screen, so an ending never blanks what you are reading.
 - An empty archive never replaces shown events, a stale one never hides a resumed leg, a foreign journal never beats the agent's own record; the archive is re-read once the feed outgrows it, which is how the epilogue's PR line arrives without a refresh.

@@ -1,6 +1,6 @@
 The live view and remote control of the agent's own browser — in the right rail or inline in the transcript — which is what lets a human get the agent past a login wall.
 
-## TLDR
+## Flows
 
 - The browser streams in as live video, and clicks, scrolls, and typed keys go back to the real page, with clicks rescaled so they land where they look like they land.
 - An unreachable stream says so and offers Retry; a failure belongs to that one attempt, so retrying, switching agents, or coming back later always tries fresh instead of replaying it.

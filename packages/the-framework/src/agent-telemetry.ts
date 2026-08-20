@@ -79,6 +79,9 @@ export function createDriverEventHandler(opts: DriverEventHandlerOptions): Drive
     }
     emit({ kind: 'driver', event })
     if (event.type !== 'result') return
+    // The hand-off anchor (#1601) reaches the meta the same way the session id does: it is a
+    // fact about the run the daemon needs after this process is gone, so only an event carries it.
+    if (event.anchorSha) emit({ kind: 'cloud-anchor', sha: event.anchorSha })
     if (event.sessionId && event.sessionId !== lastSessionId) {
       lastSessionId = event.sessionId
       // A driver that knows its session's real URL (#1317, the cloud hand-off) beats the

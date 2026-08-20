@@ -266,16 +266,31 @@ export async function withDataBranch(
   })
 }
 
+/** How a sync went: converged with origin, or why it could not. */
+export type DataSyncResult = { ok: true } | { ok: false; error: string }
+
 /**
  * The eager pull (#1582): sync the checkout with origin so this machine reads what other machines
  * and cloud sessions committed, without waiting for the next local write — and push anything a
  * failed cycle left stranded locally, via the same owed-push rule as the writer. Ensures the
  * checkout exists, so a fresh clone converges on its first tick. Never throws.
+ *
+ * Reports why it could not converge (#1599): a push origin rejects, or no origin to converge with
+ * at all. The writer treats a remote-less repo as fine — the commit is safe locally — but a sync's
+ * whole job is to meet the other machines, and a repo nothing can reach is an error state the user
+ * has to fix, not a mode the framework supports (#1595). The daemon records the answer as the
+ * project's error state, so it reaches the dashboard rather than only the daemon's stdout.
  */
-export async function pullDataBranch(cwd: string, deps: DataBranchDeps = {}): Promise<void> {
-  await withDataBranch(cwd, '[The Framework] data sync', async () => {}, deps).then(result => {
-    if (!result.ok) resolveDeps(deps).log(`[framework] data branch sync: ${result.error}`)
-  })
+export async function pullDataBranch(cwd: string, deps: DataBranchDeps = {}): Promise<DataSyncResult> {
+  const r = resolveDeps(deps)
+  const result = await withDataBranch(cwd, '[The Framework] data sync', async () => {}, deps)
+  const outcome: DataSyncResult = !result.ok
+    ? { ok: false, error: result.error }
+    : (await hasRemote(cwd, r.git))
+      ? { ok: true }
+      : { ok: false, error: 'the repository has no remote, so the data branch cannot be shared with other machines' }
+  if (!outcome.ok) r.log(`[framework] data branch sync: ${outcome.error}`)
+  return outcome
 }
 
 /**

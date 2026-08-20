@@ -31,6 +31,7 @@ function dashboard(over: Partial<DashboardOptions> = {}): Promise<Dashboard> {
     quota: defaultQuotaSource(),
     autoPm: () => undefined,
     autoPmSweep: () => {},
+    projectErrors: () => [],
     ...over,
   })
 }

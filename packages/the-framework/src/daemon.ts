@@ -6,6 +6,7 @@ import { startDashboard, type Dashboard, type StartAgentOptions } from './dashbo
 import { createProjectRuntime, type ProjectRuntimeOptions } from './daemon-runtime.js'
 import { defaultQuotaSource } from './dashboard/quota.js'
 import { startBackgroundServices, type BackgroundServices } from './daemon-services.js'
+import { projectErrorStore } from './project-errors.js'
 import { resolveDashboardBundle } from './dashboard/bundle.js'
 import { isActivated } from './project.js'
 import { addProject, ensureDaemonToken, listProjects, nodeRegistryFs, readPreferences, registryPreferencesStore, type Preferences } from './registry.js'
@@ -172,6 +173,8 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // Owned here rather than left to the dashboard (#685): auto PM has to consult the same
   // long-lived meter the usage panel draws, and a second poller would double a rate-limited read.
   const quota = defaultQuotaSource()
+  // The per-project error state (#1500): the background services write it, the dashboard reads it.
+  const projectErrors = projectErrorStore()
   // Assigned below, read from the credentials store's `onChange` (#1095): the dashboard mount has
   // to exist before the services do, and a save can only arrive over a mount that is already up.
   let services: BackgroundServices | undefined
@@ -206,6 +209,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     // switched-on preference above uses: the button is an explicit ask, so the sweep runs even
     // while auto-run is off — one sweep for the click, and the schedule stays off.
     autoPmSweep: opts => services?.wakeAutoPm({ onDemand: true, ...opts }),
+    projectErrors: projectErrors.list,
     ...(token ? { token } : {}),
     ...(clientBundleDir ? { clientBundleDir } : {}),
   })
@@ -239,6 +243,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     startAgent,
     activeAgentCount: runtime.activeAgentCount,
     busyAgentIds: runtime.busyAgentIds,
+    projectErrors,
     log: console.log,
   })
 

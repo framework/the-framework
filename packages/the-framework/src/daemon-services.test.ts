@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { startBackgroundServices } from './daemon-services.js'
+import { startBackgroundServices, syncProjectData } from './daemon-services.js'
+import { projectErrorStore } from './project-errors.js'
 import { dataWorktreePath, withDataBranch } from './data-branch.js'
 import { quotaBoundaryStatus } from './quota-boundary.js'
 import type { QuotaSource, QuotaView } from './dashboard/quota.js'
@@ -99,6 +100,7 @@ async function services(preferences: Record<string, unknown>) {
     // cap is measured against them rather than against a constant zero.
     activeAgentCount: () => starts.length,
     busyAgentIds: () => new Set<string>(),
+    projectErrors: projectErrorStore(),
     log: () => {},
   })
   const stop = async () => {
@@ -258,5 +260,39 @@ test('a drain claims an entry whose ticket file is gone, recreating tickets/ on 
     assert.ok(lock.startsWith('CLAIMED: drain-'), 'the claim landed in a recreated tickets/')
   } finally {
     await stop()
+  }
+})
+
+/**
+ * The data-sync error state (#1599/#1500): one project's sync turn sets the project's `data-sync`
+ * error when the branch cannot converge with origin, and clears it the first time it does. Real
+ * git again, because the two outcomes are git's own: no remote at all, then a bare remote added.
+ */
+test('a project whose data branch cannot reach a remote carries a data-sync error until a sync converges (#1599)', async () => {
+  const project = await mkdtemp(join(tmpdir(), 'framework-sync-proj-'))
+  const remote = await mkdtemp(join(tmpdir(), 'framework-sync-remote-'))
+  try {
+    await git('git', ['init', '-q', '-b', 'main'], { cwd: project })
+    await git('git', ['config', 'user.email', 'test@example.com'], { cwd: project })
+    await git('git', ['config', 'user.name', 'Test'], { cwd: project })
+    await git('git', ['config', 'commit.gpgsign', 'false'], { cwd: project })
+    const errors = projectErrorStore()
+    const logs: string[] = []
+
+    // No remote: the branch is born locally, but nothing else can ever read it — an error, not a mode.
+    await syncProjectData(project, errors, m => logs.push(m))
+    const [noRemote] = errors.list(project)
+    assert.equal(noRemote?.code, 'data-sync')
+    assert.match(noRemote?.message ?? '', /no remote/)
+    assert.ok(logs.some(m => m.includes('data branch sync')), 'still said on the daemon log too')
+
+    // The user fixes it: the next turn converges and the error is gone, not merely re-worded.
+    await git('git', ['init', '-q', '--bare'], { cwd: remote })
+    await git('git', ['remote', 'add', 'origin', remote], { cwd: project })
+    await syncProjectData(project, errors, () => {})
+    assert.deepEqual(errors.list(project), [])
+  } finally {
+    await rm(project, { recursive: true, force: true })
+    await rm(remote, { recursive: true, force: true })
   }
 })

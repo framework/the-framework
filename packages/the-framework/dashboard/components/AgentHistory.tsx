@@ -13,6 +13,7 @@ import { DriverLogo } from './driver-logos.js'
 import { AddProjectPanel } from './AddProjectPanel.js'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './ui/dropdown-menu.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
+import { projectErrorTitle } from './ProjectErrorBanner.js'
 import {
   Sidebar,
   SidebarContent,
@@ -389,19 +390,30 @@ function ProjectsNav({
                   : 'text-foreground hover:bg-sidebar-accent/60',
               )}
             >
-              {/* The activated dot the picker used, kept so the two project lists still read alike. */}
+              {/* The activated dot the picker used, kept so the two project lists still read alike.
+                  A project the daemon has recorded an error for (#1500) turns it red, and the
+                  tooltip says what is wrong — the project's own page carries the full banner. */}
               <Tooltip>
                 <TooltipTrigger
                   render={
                     <span
                       aria-hidden
-                      className={cn('h-2 w-2 shrink-0 rounded-full', p.activated ? 'bg-primary' : 'bg-muted-foreground')}
+                      className={cn(
+                        'h-2 w-2 shrink-0 rounded-full',
+                        p.errors?.length ? 'bg-danger' : p.activated ? 'bg-primary' : 'bg-muted-foreground',
+                      )}
                     />
                   }
                 />
-                <TooltipContent>{p.activated ? 'activated' : 'not activated'}</TooltipContent>
+                <TooltipContent className="whitespace-pre-line">
+                  {p.errors?.length
+                    ? p.errors.map(e => `${projectErrorTitle(e.code)}: ${e.message}`).join('\n')
+                    : p.activated
+                      ? 'activated'
+                      : 'not activated'}
+                </TooltipContent>
               </Tooltip>
-              <span className="sr-only">{p.activated ? 'Activated' : 'Not activated'}: </span>
+              <span className="sr-only">{p.errors?.length ? 'Error' : p.activated ? 'Activated' : 'Not activated'}: </span>
               <span className="flex-1 truncate text-left">{p.name}</span>
             </button>
           ))}

@@ -147,6 +147,60 @@ test('a publish-nothing session whose branch is already on the remote still lets
   }
 })
 
+test("a web run's checkout goes without pushing its empty run branch to origin (#1601)", async () => {
+  // The hand-off pushed everything the cloud session clones at, and the work lands on the
+  // session's own remote branch — pushing the local run branch just to satisfy the remote rule
+  // is what accreted one dead `tf-agent-*` ref on origin per web run.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    // A web run's wrapper never edits, so its tree is clean — and the framework's own
+    // bookkeeping is git-excluded, as the install leaves every activated repo (#1600).
+    await git(['checkout', '--', '.'], path)
+    await mkdir(join(repo, '.git', 'info'), { recursive: true })
+    await writeFile(join(repo, '.git', 'info', 'exclude'), '.the-framework/\n')
+    const anchor = (await git(['commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'hand-off'], path)).trim()
+    const now = new Date().toISOString()
+    await mkdir(join(path, '.the-framework'), { recursive: true })
+    await writeFile(
+      join(path, '.the-framework', 'agent.json'),
+      JSON.stringify({ status: 'done', id: RUN_ID, startedAt: now, updatedAt: now, target: 'web', cloudAnchor: anchor }),
+    )
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
+    await assert.rejects(() => stat(path), 'the checkout is gone')
+    await assert.rejects(
+      () => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo),
+      'and no empty run branch reached origin',
+    )
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a web run whose checkout holds more than the hand-off carried falls back to the ordinary rule (#1601)', async () => {
+  // The dirty tree is exactly the doubt the carve-out must not swallow: the ordinary rule
+  // commits and pushes, which is never worse than what every web run got before.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    const anchor = (await git(['commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'hand-off'], path)).trim()
+    const now = new Date().toISOString()
+    await mkdir(join(path, '.the-framework'), { recursive: true })
+    await writeFile(
+      join(path, '.the-framework', 'agent.json'),
+      JSON.stringify({ status: 'done', id: RUN_ID, startedAt: now, updatedAt: now, target: 'web', cloudAnchor: anchor }),
+    )
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
+    assert.match(
+      await git(['show', `refs/remotes/origin/${branch}:index.html`], repo),
+      /Welcome!/,
+      'the edit survived on the remote, exactly as a non-web run would have it',
+    )
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
 test('a worktree whose work cannot be committed is refused, not force-removed (#982)', async () => {
   const { repo, path } = await repoWithDirtyWorktree()
   try {

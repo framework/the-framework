@@ -84,6 +84,7 @@ happens while nobody is at the keyboard.
 - Routine work panel
 - Hottest tickets
 - Projects sidebar
+- Project errors: a project whose data branch cannot reach origin (push rejected, or no remote) is flagged with a red dot in the sidebar and a banner on its page, until a sync converges
 
 ## Tickets
 
@@ -157,6 +158,7 @@ happens while nobody is at the keyboard.
 - Answer a cloud agent's question from the dashboard (typed back into claude.ai)
 - Browser-bridge token setting
 - Web runs trust the project for Claude Code automatically — no manual trust step
+- A cloud run's row follows the session's real branch and PR, with its armed draft PR opened when the session opens none
 
 ## Notifications
 

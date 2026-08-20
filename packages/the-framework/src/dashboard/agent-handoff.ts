@@ -504,6 +504,34 @@ export async function openBranchPullRequest(
 }
 
 /**
+ * Open a draft PR for a branch that exists only on the remote (#1601): a cloud session's own
+ * `claude/*` branch was pushed from a VM this machine never sees, so there is nothing to push
+ * here — `gh pr create --head` against the remote branch is the whole action, and gh's default
+ * base (the repo's default branch) is the right one. Draft for the same reason the auto-handoff
+ * opens drafts: a PR the framework opens by itself must not put a review request in anyone's
+ * inbox, and the interventions queue keeps listing a session's draft.
+ */
+export async function openRemoteBranchPullRequest(
+  cwd: string,
+  agent: HandoffAgent,
+  branch: string,
+  deps: { gh?: GhRunner } = {},
+): Promise<HandoffResult> {
+  const gh = deps.gh ?? nodeGhRunner()
+  try {
+    const out = (await gh(['pr', 'create', '--head', branch, '--title', agentPrTitle(agent), '--body', agentPrBody(agent), '--draft'], cwd)).trim()
+    forgetPr(cwd, branch)
+    forgetBranchPrs(cwd, branch)
+    const url = out.split('\n').filter(Boolean).at(-1)
+    if (!url) return { ok: true }
+    const number = prNumberFromUrl(url)
+    return { ok: true, url, ...(number !== undefined ? { number } : {}) }
+  } catch (err) {
+    return { ok: false, error: errorMessage(err) }
+  }
+}
+
+/**
  * Whether the session kept committing after its PR merged or closed (#1512): the PR carries a
  * head, the branch has a tip, and they disagree. False for an open PR (pushed commits still land
  * on it), for a headless read (an older cache or injected lookup — never risk a duplicate PR on

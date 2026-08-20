@@ -1,6 +1,6 @@
 Turns a trigger character typed in the composer into a floating menu at the caret: it filters as you keep typing, inserts the pick, and hides when nothing matches.
 
-## TLDR
+## Flows
 
 - Each trigger is built independently from its own character, item source, and insert action, so several menus coexist without clashing.
 - The menu tracks the caret through scrolling and resizing, flipping above it near the bottom of the screen.

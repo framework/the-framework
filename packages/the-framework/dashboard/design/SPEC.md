@@ -1,6 +1,6 @@
 The dashboard's design gallery: static pages that show the design foundations (colors, status vocabulary, type, radii) and the app's building blocks in both themes, for design review outside the running app.
 
-## TLDR
+## Flows
 
 - Cards render the shipped components themselves against the app's own compiled stylesheet, so what the gallery shows is what the dashboard ships — silent drift between gallery and app is exactly what this exists to catch.
 - The few surfaces that cannot render statically (popups that appear only at runtime) are hand-copied and visibly flagged as replicas.

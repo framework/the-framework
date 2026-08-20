@@ -1,6 +1,6 @@
 The local half of running an agent on a saved device: this daemon — never the browser — drives the remote daemon and streams the agent back so it looks and behaves like a local one.
 
-## TLDR
+## Flows
 
 - The device's token stays between the two daemons and only ever in memory; the browser watches the agent over its normal same-origin channel, so nothing crosses origins in the browser and the token never reaches a page.
 - Short health pings are how the device list's online/offline dots know what is reachable.

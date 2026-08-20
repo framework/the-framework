@@ -400,7 +400,7 @@ function ProjectsNav({
                       aria-hidden
                       className={cn(
                         'h-2 w-2 shrink-0 rounded-full',
-                        p.errors?.length ? 'bg-destructive' : p.activated ? 'bg-primary' : 'bg-muted-foreground',
+                        p.errors?.length ? 'bg-danger' : p.activated ? 'bg-primary' : 'bg-muted-foreground',
                       )}
                     />
                   }

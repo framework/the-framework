@@ -381,7 +381,7 @@ describe('project errors in the Projects list (#1500)', () => {
       <AgentHistory projectId="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} projects={[stranded]} />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Projects' }))
-    const dot = container.querySelector('.bg-destructive')
+    const dot = container.querySelector('.bg-danger')
     expect(dot).toBeTruthy()
     expect(screen.getByText('Error:')).toBeTruthy()
     const tooltip = await hoverTooltip(dot!)
@@ -395,7 +395,7 @@ describe('project errors in the Projects list (#1500)', () => {
       <AgentHistory projectId="p1" agents={[]} selectedAgentId={null} onSelect={() => {}} projects={[healthy]} />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Projects' }))
-    expect(container.querySelector('.bg-destructive')).toBeNull()
+    expect(container.querySelector('.bg-danger')).toBeNull()
     expect(screen.getByText('Activated:')).toBeTruthy()
   })
 })

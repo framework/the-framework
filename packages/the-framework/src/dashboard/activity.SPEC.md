@@ -1,6 +1,6 @@
 The activity feed: the cross-project stream of agent lifecycle moments — an agent started, an agent finished — that notify without needing the human.
 
-## TLDR
+## Flows
 
 - Each project's recent agents contribute one item apiece: "started" while it runs, "finished" once it ends, tagged by how it ended so a stop reads differently from a success.
 - A start and a finish are separate events, so an agent notifies at most twice — and one that starts and ends between two looks notifies once, as finished.

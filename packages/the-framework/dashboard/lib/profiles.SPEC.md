@@ -1,6 +1,6 @@
 The saved daemons this browser can hop between — each remembered as a label, an address, and a per-browser access token.
 
-## TLDR
+## Flows
 
 - Saved only in this browser, on purpose: the token is a per-browser secret and must never land in the daemon's shared registry.
 - Switching devices is a navigation: the browser goes to the other daemon's address carrying the token once (plus any half-typed prompt, unless oversized), after which everything is same-origin again.

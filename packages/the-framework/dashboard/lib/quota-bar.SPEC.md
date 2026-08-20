@@ -1,6 +1,6 @@
 The arithmetic behind the usage bar — purely about drawing the week; where the spending boundary sits and what it gates is decided framework-side and never re-derived here.
 
-## TLDR
+## Flows
 
 - Draws the quota week as real calendar days: segments run local midnight to midnight, so a day's width is how much of it is actually in the week, and a mid-day start's split day is named once, at whichever end holds more of it.
 - Day labels are a fixed two-letter notation, not the viewer's locale — two letters of a localized weekday do not distinguish the days in every language.

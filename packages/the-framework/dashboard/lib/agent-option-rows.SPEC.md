@@ -1,6 +1,6 @@
 An agent's options as one table with every rule between them already applied, so the launcher and the settings page render the same options and can never disagree.
 
-## TLDR
+## Flows
 
 - A box shows the option's effective value, not the stored one: an option overridden by another reads as off, because off is what the agent will do.
 - Transparent turns the whole framework off, so it disables every option below it.

@@ -1,6 +1,6 @@
 One shared reading of which notification channels the daemon can deliver on, so every surface showing it — the bell, the settings rows, the onboarding checklist — agrees the moment one of them changes it.
 
-## TLDR
+## Flows
 
 - Loaded once and shared: several surfaces mounting together ask the daemon a single time.
 - After saving a credential, one reload settles every surface on the new state together.

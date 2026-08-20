@@ -7,6 +7,7 @@ import { registryDiscordCredentialsStore } from '../discord-credentials-store.js
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import { defaultQuotaSource, type QuotaSource } from './quota.js'
 import type { AutoPmReporter } from '../auto-pm.js'
+import type { ProjectErrorsReader } from '../project-errors.js'
 import { serveClientBundle } from './static.js'
 import { BROWSER_PROXY_PREFIX, handleBrowserProxy } from './browser-proxy.js'
 import { makeRpcMount, RPC_PREFIX, isSameOriginRequest, isExpectedHost } from './rpc-serve.js'
@@ -60,6 +61,8 @@ export interface DashboardOptions {
    * sweep does (#1433), so the trigger RPC can await it.
    */
   autoPmSweep: (opts?: { drainOnly?: boolean }) => void | Promise<void>
+  /** What a project currently suffers from (#1500), for the project list to carry. */
+  projectErrors: ProjectErrorsReader
   /**
    * Serve the new dashboard bundle (#405) from this directory — the built SPA
    * (`index.html` + `assets/**`). The daemon also mounts the dashboard's RPC surface
@@ -156,6 +159,7 @@ export function startDashboard(opts: DashboardOptions): Promise<Dashboard> {
       discord: opts.discord,
       autoPm: opts.autoPm,
       autoPmSweep: opts.autoPmSweep,
+      projectErrors: opts.projectErrors,
       quota,
     },
     // The bound host, so the mount can reject a rebound `Host`: a page on evil.com whose DNS

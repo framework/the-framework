@@ -159,6 +159,7 @@ export async function makeWorld(): Promise<StoryWorld> {
     autoPmSweep: async (opts?: { drainOnly?: boolean }) => {
       autoPm.sweeps.push(opts ?? {})
     },
+    projectErrors: () => [],
   }
 
   const repos: string[] = []

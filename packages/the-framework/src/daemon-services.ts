@@ -19,6 +19,7 @@ import { acquireTicketLocks, releaseTicketLock } from './ticket-locks.js'
 import { readTickets } from './dashboard/tickets.js'
 import { checkOffEntry, findTodoBacklog, nextQueuedTicket, ticketFromQueueEntry } from './todo-loop.js'
 import { pullDataBranch, withDataBranch } from './data-branch.js'
+import type { ProjectErrors } from './project-errors.js'
 import { readFile, writeFile } from 'node:fs/promises'
 import { startMergedWorktreeSweep, type MergedSweepOptions } from './merged-worktrees.js'
 import { startBranchLinksPass } from './branch-links.js'
@@ -106,7 +107,20 @@ export interface BackgroundServiceDeps {
    * alone. See {@link MergedSweepOptions.busy}.
    */
   busyAgentIds: () => ReadonlySet<string>
+  /** Where a job records a project state the user must fix (#1500), for the dashboard to show. */
+  projectErrors: ProjectErrors
   log: (message: string) => void
+}
+
+/**
+ * One project's data-sync turn (#1599): pull the data branch, and set or clear the project's
+ * `data-sync` error by the outcome. The clear is unconditional on success, so the error lives
+ * exactly as long as the condition — the next tick after the user fixes the remote, it is gone.
+ */
+export async function syncProjectData(path: string, errors: ProjectErrors, log: (message: string) => void): Promise<void> {
+  const result = await pullDataBranch(path, { log })
+  if (result.ok) errors.clear(path, 'data-sync')
+  else errors.set(path, 'data-sync', result.error)
 }
 
 /** The registered projects as dashboard summaries. */
@@ -419,12 +433,14 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
       // The eager data pull (#1582): converge every project's data checkout on what other
       // machines and cloud sessions pushed, and carry out anything a failed cycle left local.
       // Its start-up turn is also what creates the checkout on a fresh clone. Before auto PM in
-      // the list, so a sweep the same tick reads the queue the pull just brought in.
+      // the list, so a sweep the same tick reads the queue the pull just brought in. A project
+      // that cannot converge is recorded as such for the dashboard (#1599).
       {
         name: 'data sync',
         every: 2,
         run: async () => {
-          for (const project of await projects().catch((): ProjectSummary[] => [])) await pullDataBranch(project.path, { log })
+          for (const project of await projects().catch((): ProjectSummary[] => []))
+            await syncProjectData(project.path, deps.projectErrors, log)
         },
       },
       // ~1 min, the CI latency agreed on #1418.

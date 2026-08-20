@@ -1,6 +1,7 @@
-import type { FrameworkEvent } from '../../src/index.js'
+import type { FrameworkEvent, ProjectError } from '../../src/index.js'
 import { StartAgentForm } from './StartAgentForm.js'
 import { ProjectActions } from './ProjectActions.js'
+import { ProjectErrorBanner } from './ProjectErrorBanner.js'
 import { AgentOverview } from './AgentOverview.js'
 import { OpenQuestions } from './OpenQuestions.js'
 import { ProjectDocs } from './ProjectDocs.js'
@@ -41,10 +42,15 @@ export function ProjectHome({
   toggleContext: (path: string) => void
   /** Jump into a parked session (#1455 item 4) — possibly another project's. */
   onOpenAgent: (projectId: string, agentId: string) => void
+  /** What the daemon currently finds wrong with the project (#1500), off the shell's project list. */
+  errors?: ProjectError[] | undefined
 }) {
   return (
     <ScrollArea className="min-h-0 flex-1">
       <ProjectActions projectId={projectId} />
+      {/* Above the start form, because an agent started on a project whose data branch cannot
+          reach origin (#1599) works from stale tickets and a queue nobody else will see. */}
+      <ProjectErrorBanner errors={errors} />
       <StartAgentForm
         projectId={projectId}
         onAgentStarted={onAgentStarted}

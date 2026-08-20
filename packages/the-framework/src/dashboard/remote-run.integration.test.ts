@@ -86,6 +86,7 @@ test('a run submitted with options.remote is created on the other daemon and its
     quota: defaultQuotaSource(),
     autoPm: () => undefined,
     autoPmSweep: () => {},
+    projectErrors: () => [],
   })
 
   // Daemon A: the browser's own daemon, a real project runtime. Its onStart takes the remote branch.

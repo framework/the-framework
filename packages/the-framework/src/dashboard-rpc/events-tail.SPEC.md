@@ -1,6 +1,6 @@
 Follows an agent's on-disk event journal: replay what is already logged, then deliver each appended event — even across the journal's moves.
 
-## TLDR
+## Flows
 
 - Each logged event is handed over once, with a one-time signal after the backlog — the boundary a reconnecting viewer needs to swap its feed atomically instead of blanking while history re-streams.
 - A journal does not sit still: teardown copies it into the archive and removes the checkout. "The file existed and is now gone" is treated as that move — the tail asks where the journal lives now and picks up there at the same position, so the ending's final lines arrive exactly once instead of being swallowed.

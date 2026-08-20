@@ -1,6 +1,6 @@
 Shows what actually changed in a checkout's files: one file's diff for the tree's hover card, and every changed file's line counts for the agent's Changes list.
 
-## TLDR
+## Flows
 
 - Tracked files diff against the last commit, so a change the agent already staged still shows; an untracked file, having nothing to diff against, renders as all-added from its contents.
 - A binary change says so instead of dumping bytes, and a long patch is cut for display and says it was cut.

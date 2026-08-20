@@ -1,14 +1,35 @@
 The daemon's serving and projection layer: the HTTP host behind the dashboard, the read models it assembles from disk and git, the git handoff (push → PR → merge), and the notification watchers.
 
-## TLDR
+## User Stories
 
-- Everything the dashboard shows is assembled here from what is already on disk — agent logs, tickets, the queue, git state, GitHub state. Reads are forgiving: whatever fails yields an empty result, never a crash at the view.
-- Serving is guarded by where the daemon is bound: on localhost, browser calls must come from the dashboard's own origin; on a reachable address, everything demands a shared token, because a daemon that spawns processes on an open port is remote code execution.
-- Expensive questions (a GitHub lookup costs many times a git read) go through a cache that asks once for all concurrent callers, serves the last good answer while refreshing, and answers "pending" — not "failed" — when a cold ask exceeds its time budget, so a caller that must not act on a half-answer can hold off. A failure never overwrites the last good value.
+- The user reviews finished work as pull requests: an agent that produced real work pushes it and opens a PR by itself, and a merge waits for the agent's own ready signal.
+- The user is notified on Discord when an agent starts or finishes, and when something needs a human — an open PR to review, a parked question, unpushed commits.
+- The user answers every agent's parked question from one hub, across all projects.
+- The user runs an agent on a saved remote device and watches and steers it from the local dashboard.
+- The user answers a cloud agent's question from the dashboard, and it is typed back into claude.ai.
+- The user watches an agent's live browser and clicks into it from the dashboard.
+
+## Flows — TL;DR
+
+- Everything shown is assembled from what is already on disk; a failed read yields an empty result.
+- Localhost serving demands the dashboard's own origin; a reachable bind demands a shared token on every route.
+- Slow GitHub questions go through a cache: one lookup for all concurrent callers, the last good answer while refreshing, "pending" over a half-answer.
+- A cleanly settled agent's work is committed, pushed and opened as a PR — unless it is empty, which is never published.
+- Configuration arms auto-merge; only the agent's ready signal authorizes it, and a withheld merge is recorded with its reason.
+- Two Discord watchers post only what is genuinely new: activity, and what needs a human.
+- A saved device's agents are started and streamed through the local daemon, never the browser.
+- A browser extension posts parked claude.ai questions in; picked answers queue back out.
+- The daemon relays an agent's live browser screencast and clicks, on a port from the agent's own record.
 
 ## Flows
 
-**The handoff.** When an agent settles cleanly, decide whether it is empty (no commits, or only bookkeeping changes) — empty agents are never published. Otherwise commit what it left uncommitted, push the branch, open the PR. The PR number is then recorded on the agent, so every surface reads the same integer instead of re-deriving it from three candidate branch names filtered by a start time; its *state* is still read live, because that changes without the agent doing anything. A PR opened after the process is gone is recorded too, by patching the archive.
+**The read models.** Everything the dashboard shows is assembled here from what is already on disk — agent logs, tickets, the queue, git state, GitHub state. Reads are forgiving: whatever fails yields an empty result, never a crash at the view.
+
+**Serving.** Serving is guarded by where the daemon is bound: on localhost, browser calls must come from the dashboard's own origin; on a reachable address, everything demands a shared token, because a daemon that spawns processes on an open port is remote code execution.
+
+**The cache.** Expensive questions (a GitHub lookup costs many times a git read) go through a cache that asks once for all concurrent callers, serves the last good answer while refreshing, and answers "pending" — not "failed" — when a cold ask exceeds its time budget, so a caller that must not act on a half-answer can hold off. A failure never overwrites the last good value.
+
+**The handoff.** When an agent settles cleanly, decide whether it is empty (no commits, or only bookkeeping changes) — empty agents are never published. Otherwise commit what it left uncommitted, push the branch, open the PR. The PR number is then recorded on the agent, so every surface reads the same integer instead of re-deriving it; its *state* is still read live, because that changes without the agent doing anything. A PR opened after the process is gone is recorded too, by patching the archive.
 
 **Merging.** Arming and authorizing are separate: configuration arms auto-merge, and only the agent's ready-for-merge signal plus an empty backlog of its own authorizes it — an armed-but-unauthorized merge is recorded as withheld, with the reason. On a repo without native auto-merge the PR is handed to the CI watch to merge once checks pass, and the merge outcome lands on the agent's record so every surface can say what happened.
 

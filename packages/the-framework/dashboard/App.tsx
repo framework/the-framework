@@ -13,7 +13,6 @@ import { TicketPlanPage } from './components/TicketPlanPage.js'
 import { AgentView } from './components/AgentView.js'
 import { agentLabel } from './lib/agent-label.js'
 import { RightRail } from './components/RightRail.js'
-import { RelayView } from './components/RelayView.js'
 import { NotFound } from './components/NotFound.js'
 import { useLiveEvents } from './lib/use-live-events.js'
 import { useAgents } from './lib/use-agents.js'
@@ -244,7 +243,7 @@ export function App() {
   }
 
   // The live agent feed is owned here so both the main view and the right rail's views tab read
-  // one shared event stream. Hooks run before the relay early return below.
+  // one shared event stream.
   // The agent whose feed and controls are in play is simply the one in the URL; in the no-id
   // fallback there is none yet, and a null id resolves to the project root, as before.
   const { events, lost } = useLiveEvents(projectId, agentId, agentStart.tick)
@@ -258,25 +257,14 @@ export function App() {
   // from AgentView rather than being folded here: a finished agent's events live in its archived log,
   // which that view is the one to read.
 
-  // On the relay (#426), the URL carries `?run=<id>` and there is no local registry or
-  // files — show that one agent read-only. Guarded on `window` so the module can be loaded
-  // without a browser at all, where it resolves to the full shell.
-  const relayAgent = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('run')
-
-  // Is an agent working (#875)? Drives the mark and the tab icon. Both off on the relay: there is
-  // no project registry behind it, so the cross-project read cannot answer, and RelayView owns
-  // both from its one agent's feed instead.
-  const local = relayAgent === null
-  const working = useWorking(local)
-  useFavicon(working, local)
+  // Is an agent working (#875)? Drives the mark and the tab icon.
+  const working = useWorking()
+  useFavicon(working)
 
   // Whether the daemon answers at all (#948). Without this, a dead daemon froze every surface
   // silently: the channels retry their transport without a verdict and the polls keep their
   // last value, so "the agent went quiet" and "nothing on this page is live" looked identical.
-  const healthy = useDaemonHealth(local)
-
-  // Hooks above run unconditionally (rules of hooks); this early return is safe after them.
-  if (relayAgent) return <RelayView agentId={relayAgent} />
+  const healthy = useDaemonHealth()
 
   // Route the main pane: the Overview dashboard when no project is selected (#471); else the
   // project home/launcher, a running agent's live output, or a finished agent's replay. Each live

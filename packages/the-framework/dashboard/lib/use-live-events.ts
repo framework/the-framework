@@ -13,15 +13,15 @@ import { stampReceived } from './event-times.js'
 //
 // The feed is per RUN, not per project (#749): each agent tails its own worktree's log since #736,
 // so the selected agent id picks the log to follow. Changing it resubscribes, which is what makes
-// selecting agent A vs agent B show different output. Omitted (the relay, or a Start whose id has not
-// been adopted yet) falls back to the project root.
+// selecting agent A vs agent B show different output. Omitted (a Start whose id has not been
+// adopted yet) falls back to the project root.
 
 /** The live feed plus whether its channel is currently down (#948). */
 export interface LiveEvents {
   events: FrameworkEvent[]
   /** True while the stream is lost and being retried — the feed may be behind reality. */
   lost: boolean
-  /** The server closed the channel on purpose (relay stream ended, unknown run) — final. */
+  /** The server closed the channel on purpose (device-relay stream ended, unknown run) — final. */
   done: boolean
 }
 
@@ -35,7 +35,7 @@ function retryDelay(attempt: number): number {
 /**
  * How long a reconnect waits for the server's end-of-replay marker before swapping anyway
  * (#1383). The on-disk tail sends `stream-sync` the moment its replay is delivered, so this
- * deadline only fires for the in-memory sources (relay #426, relayed device runs #1067),
+ * deadline only fires for the in-memory source (relayed device runs #1067),
  * which have no replay boundary to report — their buffered history streams in well under it.
  */
 const SYNC_GRACE_MS = 1500
@@ -70,7 +70,7 @@ export function useLiveEvents(projectId: string | null, agentId?: string | null,
     // A dead stream used to be silent: the daemon restarts, events just stop, and "the agent
     // went quiet" is indistinguishable from "the feed died" (#948). Now an errored close (or a
     // failed subscribe) flips `lost` and retries with backoff. A clean close is the server being
-    // done with the channel on purpose (relay stream ended, unknown project) — not an outage —
+    // done with the channel on purpose (device-relay stream ended, unknown project) — not an outage —
     // so it neither retries nor alarms, matching the old behavior.
     const retry = () => {
       if (cancelled) return

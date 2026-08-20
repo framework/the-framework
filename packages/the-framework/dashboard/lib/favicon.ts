@@ -15,15 +15,10 @@ export function faviconHref(working: boolean): string {
   return working ? WORKING_FAVICON : IDLE_FAVICON
 }
 
-/**
- * Point the tab icon at {@link faviconHref} (client-only).
- *
- * `enabled` is false where the caller is not the one that knows: the shell hands the tab over to
- * the relay view, which reads a single agent's feed rather than the project registry.
- */
-export function useFavicon(working: boolean, enabled = true): void {
+/** Point the tab icon at {@link faviconHref} (client-only). */
+export function useFavicon(working: boolean): void {
   useEffect(() => {
-    if (!enabled || typeof document === 'undefined') return
+    if (typeof document === 'undefined') return
     // `rel~=` because the emitted rel can carry more than one token.
     let link = document.querySelector<HTMLLinkElement>('link[rel~="icon"]')
     if (!link) {
@@ -35,5 +30,5 @@ export function useFavicon(working: boolean, enabled = true): void {
     // Guarded: writing the same href re-fetches the icon in some browsers, which restarts the
     // animation on every render.
     if (link.getAttribute('href') !== href) link.setAttribute('href', href)
-  }, [working, enabled])
+  }, [working])
 }

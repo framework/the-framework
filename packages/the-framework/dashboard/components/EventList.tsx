@@ -282,15 +282,15 @@ export function EventList({
    *  live mirror box — that must scroll (and stick) with the log rather than float over it. */
   tail?: ReactNode
   /** The log's own project (#1455 item 6): with it, a `choice` row IS the interaction — an open
-   *  gate renders the inline ChoicePanel, a resolved one the collapsed ✓ card. Absent (the
-   *  read-only relay watch), every row keeps the formatter's text. */
+   *  gate renders the inline ChoicePanel, a resolved one the collapsed ✓ card. Absent, every row
+   *  keeps the formatter's text. */
   projectId?: string | undefined
   /** Which run an inline pick resolves (#749), forwarded to the panel with projectId. */
   agentId?: string | null | undefined
 }) {
   const choiceRows = useMemo(() => (projectId ? foldChoiceRows(events) : undefined), [projectId, events])
-  // The inline pane needs both halves of the proxy path, so the read-only relay watch (no
-  // projectId/agentId) keeps every browser row as formatter text.
+  // The inline pane needs both halves of the proxy path, so a feed without projectId/agentId
+  // keeps every browser row as formatter text.
   const browserRows = useMemo(() => (projectId && agentId ? foldBrowserRows(events) : undefined), [projectId, agentId, events])
   const shown = promptFirst(events).filter(e => !choiceRows?.hidden.has(e) && !browserRows?.hidden.has(e))
   return (

@@ -11,30 +11,17 @@ import { cn } from '../lib/utils.js'
 // shows nothing extra.
 export function AgentOverview({
   events,
-  showSessionLink = true,
-  showName = true,
-  showStatus = true,
 }: {
   events: FrameworkEvent[]
-  showSessionLink?: boolean
-  /** The agent's own view sets this false: its action bar already names the session in the breadcrumb,
-   *  so the status line just shows the state (and reads the same whether or not the agent reported a
-   *  name). The relay watch and project home keep it, since they have no breadcrumb. */
-  showName?: boolean
-  /** The agent's own view sets this false too: the status is a label in its toolbar, beside the ⋮
-   *  menu, rather than a banner over the feed. The relay watch and project home have no toolbar,
-   *  so they keep the line. */
-  showStatus?: boolean
 }) {
   const session = sessionInfo(events)
   const progress = agentProgress(events)
-  const status = showStatus ? agentStatusPill(events) : null
+  const status = agentStatusPill(events)
 
   // The "Open session" link, labeled honestly: a headless Claude Code run has no per-session
   // URL, so the generic app entry (claude.ai/code) is shown as "Open Claude Code" with the id
-  // surfaced separately, not as a deep link to that id. See {@link describeSessionLink}. The
-  // run's own view moves this into its action bar, so it opts out via `showSessionLink={false}`.
-  const sessionLink = showSessionLink ? describeSessionLink(session) : null
+  // surfaced separately, not as a deep link to that id. See {@link describeSessionLink}.
+  const sessionLink = describeSessionLink(session)
 
   if (!sessionLink && !status) return null
 
@@ -43,7 +30,7 @@ export function AgentOverview({
       {status && (
         <div className="flex items-center gap-2 text-sm md:col-span-2">
           <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', status.dot)} aria-hidden />
-          {showName && progress.sessionName && <span className="font-medium">{progress.sessionName}</span>}
+          {progress.sessionName && <span className="font-medium">{progress.sessionName}</span>}
           <span className={cn('text-xs', status.tone)}>{status.label}</span>
         </div>
       )}

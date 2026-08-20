@@ -10,11 +10,10 @@ const PROBE_MS = 5000
 // from a quiet agent. One cheap read on a fixed cadence turns "unreachable" into a fact the
 // shell can say out loud. Recovery needs no action here: the channels reconcile and the polls
 // resume on their own once the daemon answers again.
-export function useDaemonHealth(enabled = true): boolean {
+export function useDaemonHealth(): boolean {
   const [healthy, setHealthy] = useState(true)
 
   useEffect(() => {
-    if (!enabled) return
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | undefined
     const probe = () => {
@@ -36,7 +35,7 @@ export function useDaemonHealth(enabled = true): boolean {
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [enabled])
+  }, [])
 
   return healthy
 }

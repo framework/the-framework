@@ -1,0 +1,1 @@
+cloud branch adoption smoke test

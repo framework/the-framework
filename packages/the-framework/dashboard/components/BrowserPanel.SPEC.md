@@ -1,5 +1,9 @@
 The live view and remote control of the agent's own browser — in the right rail or inline in the transcript — which is what lets a human get the agent past a login wall.
 
+## User Stories
+
+- The user watches the agent's browser live and drives the real page — clicking, scrolling, typing — to get the agent past a login wall, captcha, or 2FA.
+
 ## Flows
 
 - The browser streams in as live video, and clicks, scrolls, and typed keys go back to the real page, with clicks rescaled so they land where they look like they land.

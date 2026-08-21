@@ -2,11 +2,11 @@ One agent's view, live or finished, in a stable frame — bar, details, changes/
 
 ## Flows
 
-- The transcript is one log with two sources — the live channel while running, the archive once ended — swapped behind the events on screen, so an ending never blanks what you are reading.
-- An empty archive never replaces shown events, a stale one never hides a resumed leg, a foreign journal never beats the agent's own record; the archive is re-read once the feed outgrows it, which is how the epilogue's PR line arrives without a refresh.
-- "Done" means the agent settled, not that the process died: a parked agent stays alive for your next message, so the handoff keys off settling.
-- While working, the bar summarizes the worktree's changes; after settle it swaps, once loaded, to what the branch holds.
-- Agents executing elsewhere say so: the Actions burst-at-the-end replay, the web agent's cloud session, the device agent keeping only its preview local.
+- The transcript is one log with two sources — the live channel while running, the archive once ended — swapped behind the events on screen, so an ending never blanks what the user is reading.
+- Three guards keep that swap honest: an empty archive never replaces events already shown, a stale archive never hides a resumed agent's newest events, and a channel carrying some other run's log — the server's fallback once this agent's checkout is gone — never beats the agent's own archive. The archive is re-read once the live feed outgrows it, which is how the PR line written after the agent ends arrives without a refresh.
+- "Done" means the agent settled — finished its work — not that its process died: a parked agent stays alive for the user's next message, so the handoff keys off settling.
+- While the agent works, the bar summarizes its checkout's changes; once it settles, the summary swaps — only after the branch read has loaded, never blanking — to what the branch holds.
+- An agent executing elsewhere says so in place: a GitHub Actions run's log arrives as one burst at the end (the wait is named, with a link to the live run), a web run points at its Claude cloud session, and a run on a connected device flags that only its browser preview stays on the device.
 
 ## Before modifying/creating SPEC.md files
 

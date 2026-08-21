@@ -1,8 +1,8 @@
-Names the identity a finished agent's history is filed under, so the archive on the data branch is per user and two people on one repo never conflict.
+Names the identity a finished agent's history is filed under, so the archive on the data branch (`tf-data`, where the framework commits its own records) is per user and two people on one repo never conflict.
 
 ## Flows
 
-- Each person's history files under a directory named after the git email they already commit with — nothing new to set up. A hostile or unusable value can never escape the archive path; it falls back to an "anonymous" directory rather than dropping history.
+- Each person's history files under a directory named after the git email they already commit with — nothing new to set up. An email that cannot become a safe directory name — hostile, empty, or unreadable — files under an "anonymous" directory instead: history is never dropped, and no configured value can ever climb out of the archive path.
 
 ## Rationales
 

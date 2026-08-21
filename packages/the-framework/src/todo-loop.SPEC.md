@@ -8,10 +8,12 @@ Drains the project's task queue one entry per turn until it is empty, and owns t
 
 ## Flows
 
-- The framework drives: read the queue's first open entry fresh off the data branch, gate ("start the next item?" — an agent nobody is watching takes the recommended answer and carries on), prompt the agent to complete exactly that entry, then check it off on the data branch itself — the queue is not the agent's file to edit, and an entry someone else already retired is simply found done.
+- The framework, not the agent, drives the drain: each turn it reads the queue's first open entry fresh off the data branch, asks "start the next item?", prompts the agent to complete exactly that entry, then checks it off on the data branch itself.
+- The user watching answers that per-item gate and can stop the loop there; an agent nobody is watching takes the recommended answer and carries on.
+- The queue is not the agent's file to edit — the framework writes every check-off, and an entry someone else already retired is simply found done.
 - Safe to leave unattended: a hard item cap, the agent's stop and budget signal, and a write guard — a check-off that cannot land stops the loop rather than re-serving finished work.
 - A backlog turn is a full turn: ask-gates and signals are honored there too, with ready-for-merge fired once across the whole backlog.
-- An entry queued with a priority lands in its numbered section, not at the end of the file. Every queue write, the paused agent's resume note included, goes through the data branch's write funnel.
+- An entry the user queues with a priority lands in its numbered section, not at the end of the file. Every queue write, the paused agent's resume note included, goes through the data branch's write funnel.
 - An agent's own session TODO file (a checkout file, not the queue) with open entries withholds auto-merge — a temporary belt under the agent's own ready signal.
 
 ## Rationales

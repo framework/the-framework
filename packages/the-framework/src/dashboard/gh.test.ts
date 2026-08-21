@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ghMergePr, ghPrCiStatus, ghRepoAutoMerge, githubToken } from './gh.js'
+import { ghMergePr, ghPrCiStatus, ghPrView, ghRepoAutoMerge, githubToken } from './gh.js'
 import type { GhRunner } from './gh.js'
 
 /** A `gh` that answers with `stdout`, or rejects, and records what it was asked. */
@@ -226,4 +226,45 @@ test('ghRepoAutoMerge reads the repo setting, and an unreadable answer is unknow
   // REST omits allow_auto_merge for viewers without push access — absent is unknown too.
   const { gh: noField } = fakeGh('{"full_name":"acme/repo"}')
   assert.deepEqual(await ghRepoAutoMerge('/repo', noField), { known: false, allowed: false })
+})
+
+// #1334, found by dogfooding: `PR_VIEW_FIELDS` asked for `number,url,state,title` only, and the
+// copy-out below it dropped anything else anyway. So every caller of this path got a `LinkedPr`
+// with no `createdAt` — and the CI watch reads exactly that to decide whether a check-less PR has
+// outlived the window a check suite takes to attach. With the age unknowable, such a PR was never
+// merged at all: an armed auto-merge on a repo without CI hung open forever.
+//
+// Both tests go through the real field list on purpose. The bug survived because every ci-watch
+// test injects its own PR lookup, so the one thing that was wrong — what this function asks `gh`
+// for, and what it keeps of the answer — was the one thing nothing exercised.
+test('the PR read asks gh for every field LinkedPr carries (#1334)', async () => {
+  const { gh, calls } = fakeGh('{}')
+  await ghPrView('/repo', 'tf-thing', gh)
+  const fields = calls[0]?.[calls[0].indexOf('--json') + 1] ?? ''
+  for (const field of ['number', 'url', 'state', 'title', 'createdAt', 'headRefOid'])
+    assert.ok(fields.split(',').includes(field), `--json must ask for ${field}, got "${fields}"`)
+})
+
+test('the PR read keeps the creation time the CI watch decides on (#1334)', async () => {
+  const { gh } = fakeGh(
+    JSON.stringify({
+      number: 2,
+      url: 'https://github.com/o/r/pull/2',
+      state: 'OPEN',
+      title: 'Add a LICENSE file',
+      createdAt: '2026-08-21T10:47:50Z',
+      headRefOid: 'f1789c5ebaab4cfb79e4ea214508daee147a4092',
+    }),
+  )
+  const pr = await ghPrView('/repo', 'tf-thing', gh)
+  assert.equal(pr?.createdAt, '2026-08-21T10:47:50Z')
+  assert.equal(pr?.headRefOid, 'f1789c5ebaab4cfb79e4ea214508daee147a4092')
+})
+
+test('a field gh does not answer with is absent rather than undefined-valued', async () => {
+  // The copy-out stays conditional: a PR read that came back without a creation time must not
+  // manufacture the key, or "we do not know" becomes indistinguishable from "it has none".
+  const { gh } = fakeGh(JSON.stringify({ number: 2, url: 'u', state: 'OPEN', title: 't' }))
+  const pr = await ghPrView('/repo', 'tf-thing', gh)
+  assert.ok(pr && !('createdAt' in pr), 'createdAt must not be present when gh did not answer with it')
 })

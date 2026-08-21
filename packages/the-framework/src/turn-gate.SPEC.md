@@ -12,7 +12,7 @@ The turn-boundary contract with the wrapped agent: each turn runs as a black box
 - Parsing is tolerant on purpose: a malformed block is ignored rather than crashing an agent, the block appearing latest in the turn wins (falling back past a broken one), and missing ids and titles get sensible defaults. A block with nothing pickable in it is not a gate — the agent carries on rather than parking on an empty question.
 - One continuation wording resumes the agent after any answered gate, and a shared cap on ask-rounds stops an agent that keeps asking.
 - Signal emission is deduped across a span of turns: ready-for-merge fires once, and a session name or a pull-request description re-emits only on a real change.
-- An agent describes its pull request in a block instead of opening one itself; the description is the body the end-of-agent handoff publishes, and the last one the agent wrote is the one used.
+- An agent names and describes its pull request in a block instead of opening one itself, written like a commit message: the first line is the title the end-of-agent handoff publishes, the rest is the body, and the last block the agent wrote is the one used. A first line too long to be a name for the work is read as body text instead, so a paragraph never becomes a pull request title.
 
 ## Rationales
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { continuationPrompt, parseAwaitGate, parseMarkdownViews, parseSessionName, parseReadyForMerge, parsePullRequestDescription } from './turn-gate.js'
+import { continuationPrompt, parseAwaitGate, parseMarkdownViews, parseSessionName, parseReadyForMerge, parsePullRequest } from './turn-gate.js'
 
 const block = (json: string): string => 'Here are the options.\n```await-choices\n' + json + '\n```'
 
@@ -161,29 +161,49 @@ test('parseReadyForMerge is true only when a ready-for-merge block is present (#
 
 
 
-// #1567: the `open-pr` block is how an agent opens a pull request through the framework rather
-// than by running `gh pr create` itself — the agent writes the description, the framework keeps
-// the title, the ticket's issue reference, and the recorded number.
-test('parsePullRequestDescription takes the block body as the PR description (#1567)', () => {
-  const text = 'Done.\n```open-pr\nRewrites the queue reader so a reload keeps the queued state.\n```\n'
-  assert.equal(parsePullRequestDescription(text), 'Rewrites the queue reader so a reload keeps the queued state.')
+// #1567/#1618: the `open-pr` block is how an agent opens a pull request through the framework
+// rather than by running `gh pr create` itself — the agent names and describes the work, the
+// framework keeps the ticket's issue reference and the recorded number. Read like a commit
+// message: first line the title, the rest the body.
+test('parsePullRequest reads the block as a commit message: first line title, rest body (#1618)', () => {
+  const text = 'Done.\n```open-pr\nKeep the queued state across a reload\n\nThe reader re-read the file on mount.\n```\n'
+  assert.deepEqual(parsePullRequest(text), {
+    title: 'Keep the queued state across a reload',
+    description: 'The reader re-read the file on mount.',
+  })
 })
 
-test('parsePullRequestDescription returns undefined when the agent wrote no block (#1567)', () => {
-  assert.equal(parsePullRequestDescription('just some output'), undefined)
+test('parsePullRequest returns undefined when the agent wrote no block (#1567)', () => {
+  assert.equal(parsePullRequest('just some output'), undefined)
 })
 
-test('parsePullRequestDescription keeps markdown whole, since the block is the PR body (#1567)', () => {
+test('parsePullRequest keeps the body markdown whole below the title (#1567)', () => {
   const body = '## What changed\n\n- one thing\n- another\n\nSee `src/thing.ts`.'
-  assert.equal(parsePullRequestDescription('```open-pr\n' + body + '\n```'), body)
+  assert.deepEqual(parsePullRequest('```open-pr\nRewrite the queue reader\n\n' + body + '\n```'), {
+    title: 'Rewrite the queue reader',
+    description: body,
+  })
 })
 
-test('parsePullRequestDescription takes the last block, so the agent can revise it (#1567)', () => {
+test('parsePullRequest takes a one-line block as a title with nothing below it (#1618)', () => {
+  // A name for the work and no more: the PR body then says what was asked for, as it does for
+  // any session that wrote no description.
+  assert.deepEqual(parsePullRequest('```open-pr\nRewrite the queue reader\n```'), { title: 'Rewrite the queue reader' })
+})
+
+test('parsePullRequest refuses a first line too long to be a name for the work (#1618)', () => {
+  // A paragraph, not a title. Taken as body alone rather than cut to fit: a truncated sentence
+  // as a PR title becomes a truncated sentence in `main`'s history once the PR is squashed.
+  const paragraph = 'This change rewrites the queue reader so that a reload keeps the queued state, which it did not before because the reader re-read the file on mount.'
+  assert.deepEqual(parsePullRequest('```open-pr\n' + paragraph + '\n```'), { description: paragraph })
+})
+
+test('parsePullRequest takes the last block, so the agent can revise it (#1567)', () => {
   const text = '```open-pr\nfirst\n```\nlater…\n```open-pr\nsecond\n```'
-  assert.equal(parsePullRequestDescription(text), 'second')
+  assert.deepEqual(parsePullRequest(text), { title: 'second' })
 })
 
-test('parsePullRequestDescription ignores an empty block rather than blanking the body (#1567)', () => {
-  assert.equal(parsePullRequestDescription('```open-pr\n\n```'), undefined)
-  assert.equal(parsePullRequestDescription('```open-pr\nreal\n```\n```open-pr\n \n```'), 'real')
+test('parsePullRequest ignores an empty block rather than blanking the body (#1567)', () => {
+  assert.equal(parsePullRequest('```open-pr\n\n```'), undefined)
+  assert.deepEqual(parsePullRequest('```open-pr\nreal\n```\n```open-pr\n \n```'), { title: 'real' })
 })

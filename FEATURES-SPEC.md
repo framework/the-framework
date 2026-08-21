@@ -105,7 +105,7 @@ happens while nobody is at the keyboard.
 - Commit what the agent left uncommitted
 - Push the branch (on by default)
 - Open a PR (on by default)
-- The PR is described by the agent that did the work, when it wrote a description for it
+- The PR is named and described by the agent that did the work, when it wrote them — never titled with the prompt it was given
 - Auto-merge — armed by config, authorized by the agent's ready signal
 - Empty agents publish nothing
 - Handoff panel: push / open PR / merge, as buttons

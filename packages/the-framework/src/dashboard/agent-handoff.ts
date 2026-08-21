@@ -744,6 +744,11 @@ export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'sessionName' | 'in
      */
     fixes?: string
     /**
+     * The agent's own name for the work (#1618), from an `open-pr` block's first line: the PR
+     * title when it wrote one. Absent, the title falls back to the session's name.
+     */
+    prTitle?: string
+    /**
      * The agent's own description of the work (#1567), from an `open-pr` block: the PR body
      * when it wrote one. Absent, the body describes what was asked for instead — which is all
      * the framework knows on its own.
@@ -751,9 +756,19 @@ export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'sessionName' | 'in
     description?: string
   }
 
-/** The PR title for a session (#1102), with the ticket's issue reference riding along (#1334). */
-function agentPrTitle(agent: Pick<HandoffAgent, 'id' | 'sessionName' | 'intent' | 'fixes'>): string {
-  const title = agent.sessionName ?? agent.intent?.split('\n')[0]?.slice(0, 72) ?? `Session ${agent.id}`
+/**
+ * The PR title for a session (#1102), with the ticket's issue reference riding along (#1334).
+ *
+ * Three rungs, each a name for the work the session did: what the agent called it in its
+ * `open-pr` block (#1618), else the session's own name, else the session id — which says little,
+ * but says it honestly.
+ *
+ * The prompt the session was given is not among them. It used to be, cut to 72 characters, and a
+ * squash merge made that permanent: `main` ended up carrying instructions truncated mid-sentence
+ * as commit subjects, which describe neither what changed nor even a whole thought (#1618).
+ */
+function agentPrTitle(agent: Pick<HandoffAgent, 'id' | 'sessionName' | 'prTitle' | 'fixes'>): string {
+  const title = agent.prTitle ?? agent.sessionName ?? `Session ${agent.id}`
   return agent.fixes ? `${title} (fix ${agent.fixes})` : title
 }
 

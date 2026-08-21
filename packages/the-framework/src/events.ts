@@ -220,12 +220,13 @@ export type FrameworkEvent =
    */
   | { kind: 'ready-for-merge' }
   /**
-   * The description the agent wrote for its pull request (#1567), via an `open-pr` block: how
-   * an agent opens a PR *through* the framework instead of running `gh pr create` itself, so
-   * the title convention, the ticket's issue reference and recording the number all still
-   * apply. Non-blocking; the end-of-agent handoff uses the latest one as the PR's body.
+   * The pull request the agent asked for (#1567/#1618), via an `open-pr` block: how an agent
+   * opens a PR *through* the framework instead of running `gh pr create` itself, so the ticket's
+   * issue reference and recording the number still apply. The title is the agent's name for the
+   * work and the description is what changed; either may be absent when the agent wrote only the
+   * other. Non-blocking; the end-of-agent handoff uses the latest one.
    */
-  | { kind: 'pull-request-description'; description: string }
+  | { kind: 'open-pr'; title?: string; description?: string }
   /**
    * The #326 post-merge cleanup step settled (#835): it queued the quality follow-ups,
    * queued them but did not finish cleanly, or declined with a {@link OnBeforeMergeableSkip}.

@@ -50,8 +50,10 @@ export interface KeyedWatcherOptions<T> {
 }
 
 /**
- * Watch a projection and hand each poll's new items to `onNew`. The first poll only seeds the
- * baseline. Forgiving — a failed project scan or projection just yields no new items that cycle.
+ * Watch a projection and hand each poll's new items to `onNew`. The first successful poll only
+ * seeds the baseline. Forgiving — a failed project scan or projection just yields no new items
+ * that cycle, and never counts as a poll: the baseline must come from a real read, or a failed
+ * first poll would make the next good one announce everything pre-existing as new.
  *
  * Owns no timer (E4): the daemon's one clock calls {@link KeyedWatcher.poll}, so the cadence is
  * declared where every other background job's is.
@@ -65,8 +67,12 @@ export function startKeyedWatcher<T>(opts: KeyedWatcherOptions<T>): KeyedWatcher
     if (stopped || running) return
     running = true
     try {
-      const projects = await opts.projects().catch(() => [])
-      const items = await opts.build(projects).catch(() => [])
+      let items: T[]
+      try {
+        items = await opts.build(await opts.projects())
+      } catch {
+        return
+      }
       const fresh = tracker.observe(items)
       if (fresh.length > 0 && !stopped) await opts.onNew(fresh)
     } finally {

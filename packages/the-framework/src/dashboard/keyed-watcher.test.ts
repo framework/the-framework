@@ -77,3 +77,28 @@ test('startKeyedWatcher yields no new items when the scan or the projection fail
     watcher.stop()
   }
 })
+
+test('a failed first poll does not seed the baseline, so the backlog is not announced as new', async () => {
+  const projects = async (): Promise<ProjectSummary[]> => [{ id: 'a', path: '/a', name: 'a', activated: true }]
+  let failing = true
+  const announced: number[][] = []
+  const watcher = startKeyedWatcher({
+    projects,
+    build: async (): Promise<Intervention[]> => {
+      if (failing) throw new Error('projection failed')
+      return [pr(1, 'u1')]
+    },
+    keyOf: interventionKey,
+    onNew: items => void announced.push(items.map(i => i.number!)),
+  })
+  try {
+    await watcher.poll() // fails — must NOT count as the baseline
+    failing = false
+    await watcher.poll() // first real read: this is the baseline, pre-existing pr(1) stays silent
+    assert.deepEqual(announced, [])
+    await watcher.poll() // and it stays silent on the next poll too — seen, not new
+    assert.deepEqual(announced, [])
+  } finally {
+    watcher.stop()
+  }
+})

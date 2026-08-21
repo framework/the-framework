@@ -14,6 +14,7 @@ The daemon's per-project error state: when a background job finds a project in a
 ## Rationales
 
 - Errors surface in the dashboard rather than as console lines on the daemon's stdout, which nobody reads — swallowing an error is the worst way to handle it.
+- This holds only what a background job finds while nothing is running; what an agent hits during a run is reported by the agent itself and lives in that run's log. The split is what each thing is: a condition that is true now and clears itself, against something that happened and cannot un-happen.
 - A repository with no remote is not a supported mode but an error, since every other machine and cloud session converges through that remote.
 
 ## Before modifying/creating SPEC.md files

@@ -13,7 +13,7 @@
  * ends where its consumers end, so a name nothing renders cannot quietly live on in it.
  */
 
-export type { HandoffState, SessionInfo } from './agent-view.js'
+export type { AgentError, HandoffState, SessionInfo } from './agent-view.js'
 export type { AutoPmJob, AutoPmOutcome, AutoPmReport } from './auto-pm.js'
 export type { FrameworkFileConfig } from './config.js'
 export type { ChoiceRequest, FrameworkEvent } from './events.js'

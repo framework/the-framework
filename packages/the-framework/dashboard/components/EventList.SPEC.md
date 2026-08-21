@@ -4,6 +4,7 @@ The agent's transcript, shared by the live stream and the replay of a finished o
 
 - The user's prompts read YOU (blue) and the agent's replies AGENT, both as Markdown. A long message collapses to its first line and expands in place, and the system prompt hides behind a character count.
 - The agent's first prompt is hoisted to the very top, so the log opens with what the user asked rather than the machinery that preceded it; later turns stay where they happened.
+- An error the agent reported is a red line in the transcript like any other failure, at the point in the run where it hit it — nothing dismisses it or clears it, because it is a record of what happened rather than a state of the agent now.
 - Colour carries meaning: failures red, the user's own turn blue, decision badges amber, milestones green, the surfaces the agent pushes (views, previews, browser rows) primary — and a stopped agent is not an error, since stopping was asked for.
 - When the transcript knows its agent, a decision row IS the interaction: an open question is answerable in place, an answered one collapses to a ✓ card, and one whose agent ended stays plain text — its audience is gone.
 - The latest browser row hosts the live inline preview — there is one screencast, and a page announced again replaces its earlier row rather than stacking. The live log follows the newest row but yields the moment the reader scrolls up.

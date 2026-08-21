@@ -228,6 +228,34 @@ export function parsePullRequest(text: string): ParsedPullRequest | undefined {
   return parsed
 }
 
+/** An error the agent reported this turn (#1500), split the way the block is written. */
+export interface ParsedError {
+  /** What is wrong, in one line: the block's first line. */
+  headline: string
+  /** What it ran and what that said: everything below the headline, when the agent wrote any. */
+  detail?: string
+}
+
+/**
+ * Parse the errors the agent reported this turn (#1500), from every non-empty `error` block
+ * (per {@link SIGNAL_PROTOCOL}), in the order they were written.
+ *
+ * Unlike the other signals, every block is kept rather than only the last: two different things
+ * going wrong in one turn are two errors, and collapsing them would lose one. Blocks that are
+ * empty are skipped — an error with nothing to say is not an error.
+ */
+export function parseErrors(text: string): ParsedError[] {
+  const errors: ParsedError[] = []
+  for (const body of blocks(text, 'error')) {
+    const trimmed = body.trim()
+    if (!trimmed) continue
+    const [first = '', ...rest] = trimmed.split('\n')
+    const detail = rest.join('\n').trim()
+    errors.push({ headline: first.trim(), ...(detail ? { detail } : {}) })
+  }
+  return errors
+}
+
 /**
  * Whether the agent signalled `setReadyForMerge()` this turn (#326): the presence of a
  * `ready-for-merge` block (per {@link SIGNAL_PROTOCOL}) anywhere in the text. Non-blocking
@@ -312,14 +340,14 @@ function parseGateBody(body: string): ParsedAwaitGate | undefined {
 }
 
 /**
- * Emit the {@link PROTOCOLS_SIGNAL} signals an agent turn carries: markdown views, the
- * session name, `setReadyForMerge()`, and a pull-request description. Every turn the framework prompts goes through
+ * Emit the {@link PROTOCOLS_SIGNAL} signals an agent turn carries: markdown views, the errors it
+ * reported, the session name, `setReadyForMerge()`, and a pull-request description. Every turn the framework prompts goes through
  * one of these, because the protocols are unconditional (see `composeAgentSystem`) — the
  * agent is told it can signal on any turn, so any turn we don't parse drops the signal.
  *
  * The returned function holds the dedupe state for the turns it covers: `ready-for-merge`
- * fires once, and a session name and a pull-request description only re-emit on an actual
- * change. Each caller makes one
+ * fires once, a session name and a pull-request description only re-emit on an actual
+ * change, and an error is logged once however often the agent restates it. Each caller makes one
  * for its own span of turns (a build's await rounds, the whole backlog), so keep it for as
  * many turns as should share that dedupe rather than making one per turn.
  */
@@ -327,8 +355,18 @@ export function createTurnSignalEmitter(emit: (event: FrameworkEvent) => void): 
   let named: string | undefined
   let ready = false
   let described: string | undefined
+  const reported = new Set<string>()
   return (text: string): void => {
     for (const view of parseMarkdownViews(text)) emit({ kind: 'view', ...view })
+    for (const error of parseErrors(text)) {
+      // Reported once per span (#1500): agents restate their blocks turn after turn, and the
+      // same failure logged ten times reads as ten failures. The whole block keys it, so a
+      // second attempt that fails differently is still its own error.
+      const key = `${error.headline}\n${error.detail ?? ''}`
+      if (reported.has(key)) continue
+      reported.add(key)
+      emit({ kind: 'error', ...error })
+    }
     const name = parseSessionName(text)
     if (name && name !== named) {
       named = name

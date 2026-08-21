@@ -59,9 +59,9 @@ export async function githubToken(
 }
 
 /** A forgiving `gh --json` read: resolves `empty` when gh is missing/unauthed, or its output is not JSON. */
-export async function ghJson<T>(args: string[], cwd: string, empty: T): Promise<T> {
+export async function ghJson<T>(args: string[], cwd: string, empty: T, gh: GhRunner = readGh): Promise<T> {
   try {
-    return JSON.parse(await readGh(args, cwd)) as T
+    return JSON.parse(await gh(args, cwd)) as T
   } catch {
     return empty
   }
@@ -96,7 +96,7 @@ export type PrLookup = (cwd: string, branch?: string) => Promise<LinkedPr | unde
  */
 export type BranchPrLookup = (cwd: string, branch: string) => Promise<LinkedPr | undefined>
 
-const PR_VIEW_FIELDS = 'number,url,state,title'
+const PR_VIEW_FIELDS = 'number,url,state,title,createdAt,headRefOid'
 
 /**
  * The PR for `branch`, or for whatever branch `cwd` is on when none is named. Resolves undefined
@@ -105,11 +105,25 @@ const PR_VIEW_FIELDS = 'number,url,state,title'
  * The named-branch form is what a finished session needs (#799): its worktree may be gone, so the
  * checkout's current branch is the project's, not the session's. The fields are copied out rather
  * than passed through, so a future `--json` addition cannot leak into what callers store.
+ *
+ * Every optional field {@link LinkedPr} declares must be both asked for and copied out here, or it
+ * is silently absent for every caller of this path. `createdAt` was neither, and the CI watch reads
+ * it to decide whether a check-less PR has outlived the window a check suite takes to attach — with
+ * the field missing, that age is unknowable and such a PR could never be merged at all.
  */
-export async function ghPrView(cwd: string, branch?: string): Promise<LinkedPr | undefined> {
+export async function ghPrView(cwd: string, branch?: string, gh: GhRunner = readGh): Promise<LinkedPr | undefined> {
   const args = ['pr', 'view', ...(branch ? [branch] : []), '--json', PR_VIEW_FIELDS]
-  const pr = await ghJson<LinkedPr | undefined>(args, cwd, undefined)
-  return pr ? { number: pr.number, url: pr.url, state: pr.state, title: pr.title } : undefined
+  const pr = await ghJson<LinkedPr | undefined>(args, cwd, undefined, gh)
+  return pr
+    ? {
+        number: pr.number,
+        url: pr.url,
+        state: pr.state,
+        title: pr.title,
+        ...(pr.createdAt ? { createdAt: pr.createdAt } : {}),
+        ...(pr.headRefOid ? { headRefOid: pr.headRefOid } : {}),
+      }
+    : undefined
 }
 
 /**

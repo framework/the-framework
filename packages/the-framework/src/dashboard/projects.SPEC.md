@@ -2,7 +2,7 @@ Turns the registered-project list into what the dashboard shows per project: its
 
 ## Flows
 
-- Last activity is the newest of the project's log entries and its agents, so an agent that stopped before writing the log still counts as activity.
+- Last activity is the newest timestamp across the project's agents.
 - One provider, the real registry: with one dashboard host there is no per-agent scope to substitute and no public host to blank out.
 - Forgiving: a failed read shows as an inactive project with no activity, never a crash.
 

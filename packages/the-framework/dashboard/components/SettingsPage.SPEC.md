@@ -10,7 +10,7 @@ The settings page: every setting in one findable place — appearance, driver an
 
 ## Rationales
 
-- Every list here is static today, so the guard against empty dropdowns is for the next dynamic one.
+- The editor dropdown is assembled at run time from the editors detected on the machine; the other lists are static, and the guard against empty dropdowns covers both.
 
 ## Before modifying/creating SPEC.md files
 

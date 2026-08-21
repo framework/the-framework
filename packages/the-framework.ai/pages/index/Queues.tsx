@@ -54,7 +54,7 @@ export function Queues() {
             (important) decisions with subtle pros and cons.
           </P>
           <P>
-            <span style={leadStyle}>It's your cockpit</span> — it keeps humans under control.
+            <span style={leadStyle}>It's your cockpit</span> — it keeps humans in control.
           </P>
         </QueueCard>
       </div>

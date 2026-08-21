@@ -13,8 +13,8 @@ When you call setReadyForMerge() — you believe the work is complete and ready 
 ## Opening a pull request
 Whenever you emit `ready-for-merge`, emit an `open-pr` block too, naming and describing the work. The Framework opens the pull request for you — you do not need to run `gh pr create` yourself. Write it like a commit message: the first line is the title, the rest is the body.
 ```open-pr
-<one line naming what the change does — keep it under 100 characters, or it is read as body text>
+<one line naming what the change does, under 100 characters>
 
 <what changed, and why — markdown, as long as it needs to be>
 ```
-Without it the pull request has no name for your work and can only repeat the prompt you were given, which does not say what the work turned out to be. The squash merge makes that title the permanent commit subject, so it is worth a sentence. The Framework supplies the rest: the ticket's issue reference where there is one, and recording the number so every surface shows the same pull request. You do not stop, and you can re-emit it as the work changes — the last one is used. Opening the pull request yourself instead still works; you then own all of the above.
+Without it the pull request has no name for your work and can only repeat the prompt you were given, which does not say what the work turned out to be. The Framework supplies the rest: the ticket's issue reference where there is one, and recording the number so every surface shows the same pull request. You do not stop, and you can re-emit it as the work changes — the last one is used. Opening the pull request yourself instead still works; you then own all of the above.

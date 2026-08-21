@@ -193,7 +193,7 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
     expect(sendChoice).toHaveBeenCalledWith('p1', 'gate-1', 'work', 'user', 'r1')
   })
 
-  test('without a projectId the row keeps the formatter text (the read-only relay watch)', () => {
+  test('without a projectId the row keeps the formatter text', () => {
     render(<EventList events={[gate()]} stick={false} />)
     expect(screen.queryByRole('button', { name: /Work on it/ })).toBeNull()
     expect(screen.getByText(/Start the next backlog item\?/)).toBeTruthy()
@@ -231,7 +231,7 @@ describe('EventList inline choice rows (#1455 item 6)', () => {
 })
 
 // The latest `browser` row hosts the live inline preview (#1455 item 6b); earlier rows and the
-// read-only relay watch keep the formatter's text, and an ended agent's pane degrades (#1359).
+// a log rendered without them keeps the formatter's text, and an ended agent's pane degrades (#1359).
 describe('EventList inline browser rows (#1455 item 6b)', () => {
   const browser = (url = 'https://app.test/'): FrameworkEvent => ({ kind: 'browser', url })
 
@@ -259,7 +259,7 @@ describe('EventList inline browser rows (#1455 item 6b)', () => {
     expect(screen.getByText(/browser · https:\/\/a\.test\//)).toBeTruthy()
   })
 
-  test('without a agentId the row keeps the formatter text (the read-only relay watch)', () => {
+  test('without a agentId the row keeps the formatter text', () => {
     render(<EventList events={[browser()]} stick={false} projectId="p1" />)
     expect(screen.queryByAltText("The agent's browser")).toBeNull()
     expect(screen.getByText(/browser: https:\/\/app\.test\//)).toBeTruthy()

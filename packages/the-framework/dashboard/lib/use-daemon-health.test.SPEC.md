@@ -1,4 +1,4 @@
-Covers the liveness probe: an answering daemon reads healthy, a failing one flips to down, and the shared watch view (which has no daemon of its own) never probes.
+Covers the liveness probe: an answering daemon reads healthy, and a failing one flips to down.
 
 ## Before modifying/creating SPEC.md files
 

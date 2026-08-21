@@ -1,4 +1,4 @@
-The tab icon follows the work: the still logo while nothing is running, the animated one while an agent is working — and a view that cannot know (the relay) leaves the icon alone.
+The tab icon follows the work: the still logo while nothing is running, the animated one while an agent is working.
 
 ## Before modifying/creating SPEC.md files
 

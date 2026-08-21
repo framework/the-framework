@@ -55,8 +55,7 @@ const EMPTY_STATUS: Record<string, FileGitStatus> = {}
 // The project panel's file tree (#492): a lazy, collapsible tree built from the flat
 // `git ls-files` list (onProjectFiles, shared with the `#` picker #504). It is a file-level
 // CONTEXT PICKER, not an editor — clicking a file toggles it in the agent Context, the same
-// set the `#` chips and the whole-repo Context selector feed. Localhost-only: no files (the
-// relay has no checkout) renders nothing.
+// set the `#` chips and the whole-repo Context selector feed. With no files, it renders nothing.
 //
 // Folders are native `<details>`: open/closed state, keyboard operation and the disclosure
 // semantics come from the browser. This used to be 1,225 lines of vendored animate-ui — a copied

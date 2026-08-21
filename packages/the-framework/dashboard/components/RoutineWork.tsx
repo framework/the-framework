@@ -104,8 +104,8 @@ export function RoutineWork({
     setSweepNote(null)
     const result = await sendAutoPmSweep().catch(() => ({ ok: false as const }))
     setSweeping(false)
-    // A host with no loop is the honest failure here, and the only one: the relay serves this
-    // same dashboard, and there the button has nothing to fire.
+    // A host with no loop is the honest failure here, and the only one: a dashboard served by
+    // something that does not run the sweep has nothing for this button to fire.
     if (!result.ok) setSweepNote('This dashboard is not running the sweep, so there is nothing to trigger here.')
     else setSweepNote(describeOutcomes('outcomes' in result ? result.outcomes : undefined))
   }

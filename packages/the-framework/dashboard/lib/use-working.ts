@@ -13,8 +13,8 @@ import { usePolled } from './use-async.js'
 /** Stable initial, so the poll does not churn on every render. */
 const IDLE: Overview = { active: [], queueOpen: 0, recent: [] }
 
-/** True while any project has a running agent. `enabled` false skips the poll and answers false. */
-export function useWorking(enabled = true): boolean {
-  const { value } = usePolled<Overview>(enabled ? onOverview : null, IDLE, 5000, [enabled])
+/** True while any project has a running agent. */
+export function useWorking(): boolean {
+  const { value } = usePolled<Overview>(onOverview, IDLE, 5000, [])
   return value.active.length > 0
 }

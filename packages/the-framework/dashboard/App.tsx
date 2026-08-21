@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Intervention, Activity, ProjectSummary, RecentAgent } from '../src/index.js'
+import type { Intervention, Activity, ProjectionRead, ProjectSummary, RecentAgent } from '../src/index.js'
 import { onProjectFiles, onInterventions, onActivity, onRecentAgents } from './rpc/reads.js'
 import { onProjects } from './rpc/projects.js'
 import { AgentHistory } from './components/AgentHistory.js'
@@ -35,10 +35,10 @@ const EMPTY_FILES: string[] = []
 const EMPTY_PROJECTS: ProjectSummary[] = []
 
 /** Stable initial for the interventions poll, so it does not churn on every render. */
-const EMPTY_INTERVENTIONS: Intervention[] = []
+const EMPTY_INTERVENTIONS: ProjectionRead<Intervention> = { items: [], whole: [] }
 
 /** Stable initial for the activity poll (#627), so it does not churn on every render. */
-const EMPTY_ACTIVITY: Activity[] = []
+const EMPTY_ACTIVITY: ProjectionRead<Activity> = { items: [], whole: [] }
 
 /** Stable initial for the cross-project recents poll, so it does not churn on every render. */
 const EMPTY_RECENT: RecentAgent[] = []
@@ -104,7 +104,10 @@ export function App() {
   // The cross-project "needs you" queue (#632): open PRs to review. Polled here in the shell so
   // the sidebar badge and the Overview card share one poll. Slow cadence — PRs change rarely and
   // each poll spawns `gh` per project.
-  const { value: interventions } = usePolled<Intervention[]>(onInterventions, EMPTY_INTERVENTIONS, 15000, [])
+  const { value: interventionsRead } = usePolled<ProjectionRead<Intervention>>(onInterventions, EMPTY_INTERVENTIONS, 15000, [])
+  // The queue itself for every panel; the read as a whole for the notifier, which also needs to know
+  // which projects the poll actually reached before it calls anything "new" (#1625).
+  const interventions = interventionsRead.items
 
   // The registered projects, for the browser-tab title (#695/U3) — the selected project's name
   // plus the needs-you count drive `document.title` so a backgrounded tab tells you which project
@@ -127,14 +130,14 @@ export function App() {
   // and Overview card); only the notification is gated, on both the category (`notifyHumanIntervention`,
   // default on) and the browser method (`notifyBrowser`).
   const preferences = usePreferences()
-  useInterventionNotifications(interventions, humanInterventionEnabled(preferences) && notificationsEnabled(preferences))
+  useInterventionNotifications(interventionsRead, humanInterventionEnabled(preferences) && notificationsEnabled(preferences))
 
   // The "New activity" category (#627): the default-off feed of agents starting/finishing. Its only
   // client consumer is the browser notification below, so it is polled exactly when that will fire —
   // both the category (`notifyNewActivity`) and the browser method (`notifyBrowser`) on. (Discord
   // delivery, if enabled, is the daemon's own watcher, independent of this poll.)
   const browserActivity = newActivityEnabled(preferences) && notificationsEnabled(preferences)
-  const { value: activity } = usePolled<Activity[]>(browserActivity ? onActivity : null, EMPTY_ACTIVITY, 15000, [browserActivity])
+  const { value: activity } = usePolled<ProjectionRead<Activity>>(browserActivity ? onActivity : null, EMPTY_ACTIVITY, 15000, [browserActivity])
   useActivityNotifications(activity, browserActivity)
 
   // The shared sidebar's recents on the Overview (#shared-shell): with no project selected the rail

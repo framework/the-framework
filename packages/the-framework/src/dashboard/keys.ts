@@ -27,26 +27,10 @@ export function interventionKey(item: Intervention): string {
 }
 
 /**
- * The interventions in `current` not already in `seen` (by {@link interventionKey}) — the ones
- * that just landed on the queue.
- */
-export function pickNewInterventions(seen: ReadonlySet<string>, current: Intervention[]): Intervention[] {
-  return current.filter(item => !seen.has(interventionKey(item)))
-}
-
-/**
  * The stable identity of an activity item: its kind + project + run. The kind is part of the key
  * so an agent's `started` and `finished` are two separate announcements (one when it kicks off, one
  * when it lands), each firing exactly once.
  */
 export function activityKey(item: Activity): string {
   return `${item.kind}:${item.projectId}:${item.agentId}`
-}
-
-/**
- * The activity items in `current` not already in `seen` (by {@link activityKey}) — the transitions
- * that just happened.
- */
-export function pickNewActivity(seen: ReadonlySet<string>, current: Activity[]): Activity[] {
-  return current.filter(item => !seen.has(activityKey(item)))
 }

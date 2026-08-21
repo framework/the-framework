@@ -41,7 +41,12 @@ export { presets, LAUNCHER_PRESETS, type PresetKey } from './preset-catalog.js'
 export { AUTO_PM_ROUTINES, AUTO_PM_JOBS, AUTO_PM_DRAIN_JOB, AUTO_PM_MAINTENANCE_JOB, type AutoPmJob } from './auto-pm.js'
 // The identity + diff both notifier paths run, and the preference defaults both sides read (#627).
 // Pure, so the dashboard shares them rather than keeping copies that drift silently.
-export { interventionKey, pickNewInterventions, activityKey, pickNewActivity } from './dashboard/keys.js'
+export { interventionKey, activityKey } from './dashboard/keys.js'
+// The baseline half of the same engine (#1625): what counts as "already there" when a feed is first
+// seen. The dashboard used to decide that by counting observations, which made a page loaded with no
+// GitHub reach take an empty backlog for a real one. Pure, and its only import is a type.
+export { SeenTracker } from './dashboard/keyed-watcher.js'
+export type { ProjectionRead } from './dashboard/projects.js'
 export { NOTIFICATION_DEFAULTS, MAX_SPEND_OFFSET, DEFAULT_SPEND_OFFSET, DEFAULT_AUTO_PM_CONCURRENCY, MAX_AUTO_PM_CONCURRENCY, notifies, notifyMethodEnabled, notifyCategoryEnabled, type NotifyMethod, type NotifyCategory } from './preference-defaults.js'
 // The preferences -> run options mapping (#858), shared with the daemon so an unattended agent
 // starts with the same settings a launcher-started one would. Pure field logic, no Node imports.

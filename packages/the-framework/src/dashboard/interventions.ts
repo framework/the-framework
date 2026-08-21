@@ -6,7 +6,7 @@ import { interventionKey } from './keys.js'
 import { postDiscordWebhook } from './discord-webhook.js'
 
 // Pure identity + diff, in the leaf `keys.ts` so the dashboard shares them rather than copying.
-export { interventionKey, pickNewInterventions } from './keys.js'
+export { interventionKey } from './keys.js'
 
 // The interventions queue (#632, part of the Queue #624): the cross-project "needs you" list.
 // Rom's design (#624): proposals and finished work are both just PRs, so the bulk of what

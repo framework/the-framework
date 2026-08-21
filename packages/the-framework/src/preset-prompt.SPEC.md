@@ -1,5 +1,9 @@
 How a preset is defined: only what actually differs between presets (name, prompt, what its one target means) is declared; parameter handling, defaults, and rendering are shared.
 
+## User Stories
+
+- The user launches a preset with its target left blank, and it runs against the agent it was launched from — or the whole codebase when there is none.
+
 ## Flows
 
 - A preset either takes one target ("what to run against") or scopes itself, in which case its prompt is used verbatim.

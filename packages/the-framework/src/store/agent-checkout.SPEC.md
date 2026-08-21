@@ -1,9 +1,14 @@
 Resolves which checkout — and which event journal — a session id points at, one shared rule for every surface that addresses a session by id.
 
+## User Stories
+
+- The user opens an agent — pasted URL, reloaded tab, history row — and every read lands on that agent's own checkout, whatever state the agent is in.
+- The user opens an ended agent whose worktree is gone and still reads that agent's own transcript.
+
 ## Flows
 
-- Order: the live agent's own recorded checkout first, then its worktree directory — which exists before the agent has written any state — and finally the project root, the sane thing to act on for an unknown or finished id.
-- The events variant differs in one place: for an ended agent whose worktree is gone, its archived log wins over the project's shared journal.
+- A session id resolves in order: the live agent's own recorded checkout first; then its worktree directory, which exists before the agent has written any state; finally the project root — the sane thing to act on for an unknown or finished id.
+- The events variant differs in one place: for an ended agent whose worktree is gone, its archived log wins over the project root's own journal, so the transcript shown is the agent's own rather than whatever run last wrote at the root.
 
 ## Rationales
 

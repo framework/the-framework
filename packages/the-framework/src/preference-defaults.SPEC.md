@@ -1,5 +1,9 @@
 The shared defaults and bounds for user preferences, written down once so the dashboard and the daemon act on the same values.
 
+## User Stories
+
+- The user gets the browser bell and "needs you" alerts without configuring anything; Discord and plain-activity notifications stay silent until switched on.
+
 ## Flows
 
 - Notifications are a 2×2 with the axes named: *how* one reaches you (browser, Discord) and *what it is about* (needs-you, plain activity). Delivering a cell asks one question: both its method and its category must be on.

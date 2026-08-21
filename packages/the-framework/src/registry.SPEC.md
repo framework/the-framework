@@ -1,11 +1,16 @@
 The user's one home file: the projects The Framework is installed into, the user's dashboard preferences, the daemon's access token, and third-party credentials.
 
+## User Stories
+
+- The user's dashboard preferences persist on the machine and hold in every tab — no browser storage involved.
+- The user's daemon token and third-party credentials never reach the browser.
+
 ## Flows
 
 - A single JSON file per machine in the user's home, owned by the daemon, so the dashboard never needs browser storage.
 - Reads are forgiving — a missing, malformed, or old-shaped file yields an empty registry — and every value is sanitized on the way in (clamped numbers, known-set strings, capped lists), so a hand-edited or hostile file can neither break anything nor smuggle junk into an agent.
 - One shape, and one spelling per setting. A file in an older shape reads as no projects and no preferences at all, and a setting under an older name is simply not there — nothing is translated on the way in, so a file left behind by a rename is brought up to date by hand.
-- How far a finished agent publishes itself is stored as the single rung it is.
+- How far a finished agent publishes itself — keep it local, push, open a PR, or merge — is stored as one position on that ladder.
 - One tier of preferences lives here, and it is the user's; repo-shaped settings belong in the repo's committed file.
 - Patch writes touch only the keys the caller changed, so a stale dashboard tab cannot silently revert someone else's setting.
 - Writes are atomic, serialized, and owner-only readable.

@@ -1,5 +1,11 @@
 The process behind the dashboard: it serves the UI, spawns agents, and runs the background services.
 
+## User Stories
+
+- The user runs one foreground command and gets the dashboard; Ctrl-C closes it and every agent with it, and nothing burns quota afterwards.
+- The user reaches the dashboard on localhost out of the box; putting it on the network takes a generated shared token.
+- The user adds each repo through the dashboard — the one onboarding path.
+
 ## Flows
 
 - It runs in the foreground and only in the foreground. Ctrl-C closes the dashboard and every agent it is running, so there is no liveness record, no machine-global state file, and no second process to find, reuse or stop.

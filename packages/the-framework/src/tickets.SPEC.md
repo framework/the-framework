@@ -8,9 +8,9 @@ The repo's ticket and queue conventions: tickets are plain markdown files in a r
 
 ## Flows
 
-- A ticket put on the queue keeps its identity as a markdown link back to the ticket file; only a link to a plain file directly inside the tickets folder counts — traversal, absolute paths, URLs, and nesting are all refused.
-- A ticket's written priority (0-10) maps straight onto the queue's numbered sections; anything else — words, out-of-range, fractions — lands in the middle rather than being guessed at.
-- A ticket's GitHub header names the issue it tracks, which is what lets merging the work close that issue.
+- When the user queues a ticket, the entry keeps the ticket's identity as a markdown link back to its file; only a link to a plain file directly inside the tickets folder counts — traversal, absolute paths, URLs, and nesting are all refused.
+- The priority the user wrote on the ticket (0-10) maps straight onto the queue's numbered sections; anything else — words, out-of-range, fractions — lands in the middle rather than being guessed at.
+- The GitHub header the user put on a ticket names the issue it tracks, which is what lets merging the work close that issue.
 
 ## Rationales
 

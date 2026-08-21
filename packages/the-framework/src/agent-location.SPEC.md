@@ -2,7 +2,7 @@ Where an agent's turns execute — this device, a fresh CI runner, or a cloud se
 
 ## Flows
 
-- Whether an agent hands the task somewhere this machine cannot follow is a fact about the location, not about the agent. Only a cloud session does: it opens its own pull request and never reports back, so the first prompt is the whole agent and every later phase would misread the hand-off note as the agent's own reply. A CI runner streams its agent's replies and is followed like a local agent.
+- Whether an agent hands the task somewhere this machine cannot follow is a fact about the location, not about the agent. Only a cloud session does: it opens its own pull request and never reports back, so the first prompt is the whole agent. Every later phase would misread the driver's hand-off note as the agent's own reply — and would show the user questions nobody here can answer, asked on behalf of an agent that is somewhere else. A CI runner streams its agent's replies and is followed like a local agent.
 
 ## Rationales
 

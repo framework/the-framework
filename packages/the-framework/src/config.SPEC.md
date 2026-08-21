@@ -1,5 +1,11 @@
 The per-repo defaults every agent starts from, persisted in a small YAML file (`the-framework.yml`) so a project's way of being built — its prompt switches, and what happens when an agent finishes — travels with the code instead of being retyped each time.
 
+## User Stories
+
+- The user commits `the-framework.yml` and every agent in the repo starts from its defaults — nothing retyped per agent.
+- The user overrides the file for a single agent with an explicit flag.
+- The user who mistypes a setting gets a warning naming the problem — never a failed agent, and never a silently applied guess.
+
 ## Flows
 
 - The file is read from the workspace root; a missing one yields nothing, and a malformed one is a warning and nothing.

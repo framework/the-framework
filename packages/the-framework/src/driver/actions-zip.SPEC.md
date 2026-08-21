@@ -1,4 +1,4 @@
-Reads the archive a GitHub Actions run uploads — the only channel the transcript can come back through — and refuses anything it does not fully understand.
+Reads the archive a GitHub Actions run uploads — the only channel the agent's transcript can come back through — and refuses any archive it cannot read in full rather than returning part of one.
 
 ## Rationales
 

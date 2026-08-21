@@ -1,5 +1,10 @@
 The agent launches its own browser with a shared remote-control port, so the agent's browser tools and a human's preview can watch the very same page — a second viewer cannot attach to a browser that launched privately.
 
+## User Stories
+
+- The user watches the very page the agent's browser tools are driving, and can be handed that browser at a gate — both attach to the same Chrome.
+- The user's real browser session is never inherited or dirtied: the agent's Chrome is headless, on a throwaway profile.
+
 ## Flows
 
 - Finds the machine's Chrome (explicit override first, then the well-known locations, then the PATH); none found means the agent's browser tools fall back to launching their own — a missing browser costs the preview, never the tools.

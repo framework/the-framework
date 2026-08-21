@@ -1,5 +1,10 @@
 The daemon's per-project error state: when a background job finds a project in a state only the user can fix, it records the error here, and clears it the moment the state is good again — the dashboard shows whatever is recorded.
 
+## User Stories
+
+- The user sees a project whose data cannot reach origin flagged in the dashboard, with the failing command's own words and how long it has been that way.
+- The user fixes the cause and the flag clears itself on the next sync that converges.
+
 ## Flows
 
 - One slot per project and kind of error, holding the detail and when it was first seen; a repeat report of the same kind refreshes the detail but keeps the first-seen time, so the dashboard can say how long the project has been in that state.

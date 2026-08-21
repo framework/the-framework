@@ -2,7 +2,7 @@ The `.the-framework/.gitignore`: everything under a project's framework director
 
 ## Flows
 
-- One file with one content, written whole at install: ignore it all, keep only the ignore file itself and the layout marker.
+- One file with one content, written whole at install: ignore it all, keep only the ignore file itself and the layout marker (the committed note of which bookkeeping layout the repo is on) — so the framework's state never shows up as uncommitted changes in anyone's checkout.
 
 ## Rationales
 

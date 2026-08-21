@@ -10,8 +10,9 @@
  *
  * That happened (#1560 closed #1164, and the next tickets sync then deleted the ticket and its
  * fresh plan). The cure is not to forbid the phrase — the agent is describing its plan, and the
- * sentence is true — but to write the issue reference in a form GitHub's parser does not read as
- * a command. Backticks do it: `close `#1164`` renders as the same words and links nowhere.
+ * sentence is true — but to break the adjacency GitHub's parser needs. The keyword only counts
+ * when the reference follows it directly, so two words in between end its authority while the
+ * sentence keeps saying what it said.
  */
 
 /**
@@ -22,9 +23,15 @@
 const CLOSING_KEYWORDS = ['close', 'closes', 'closed', 'fix', 'fixes', 'fixed', 'resolve', 'resolves', 'resolved']
 
 /**
+ * What goes between the keyword and the reference. Chosen to read as the sentence's own words
+ * rather than as an escape: "…then close the ticket #1164" is what the agent meant anyway.
+ */
+const FILLER = 'the ticket'
+
+/**
  * A closing keyword, whitespace, then an issue reference — `#123`, or the cross-repo
- * `owner/repo#123` form, which closes just as well. Only a reference already inside backticks
- * is left alone, since it is already defused; that is what makes this safe to run twice.
+ * `owner/repo#123` form, which closes just as well. A reference already inside backticks is
+ * left alone: GitHub does not act on one, and rewriting it would corrupt a code sample.
  */
 const CLOSING_PHRASE = new RegExp(
   String.raw`(^|[^\`\w])(${CLOSING_KEYWORDS.join('|')})(\s+)((?:[\w.-]+\/[\w.-]+)?#\d+)(?!\`)`,
@@ -33,11 +40,17 @@ const CLOSING_PHRASE = new RegExp(
 
 /**
  * Rewrite every closing phrase in `text` so GitHub stops reading it as a command, leaving the
- * words as the agent wrote them: `close #1164` becomes ``close `#1164``.
+ * issue reference itself untouched: `close #1164` becomes `close the ticket #1164`.
  *
- * Prose only — the reference keeps its own text, so a human reads the same sentence and the
- * PR simply stops closing an issue it did not finish.
+ * The reference stays live — clickable, and still cross-referenced onto the issue's own timeline,
+ * so the ticket is told a pull request mentioned it. Only the closing authority is removed.
+ *
+ * Idempotent by construction: after the rewrite the keyword is followed by the filler rather than
+ * by a reference, so a second pass finds nothing to change.
  */
 export function defuseClosingKeywords(text: string): string {
-  return text.replace(CLOSING_PHRASE, (_all, before: string, keyword: string, gap: string, ref: string) => `${before}${keyword}${gap}\`${ref}\``)
+  return text.replace(
+    CLOSING_PHRASE,
+    (_all, before: string, keyword: string, gap: string, ref: string) => `${before}${keyword}${gap}${FILLER} ${ref}`,
+  )
 }

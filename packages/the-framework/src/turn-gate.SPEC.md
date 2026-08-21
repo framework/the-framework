@@ -1,5 +1,10 @@
 The turn-boundary contract with the wrapped agent: each turn runs as a black box, so everything the framework learns — the agent stopping to ask, views to show, its chosen session name, ready-for-merge — is a tagged block parsed out of the turn's final message.
 
+## User Stories
+
+- The user answers the agent's question, and the agent resumes the same conversation.
+- The user's answer can end the agent instead of resuming it — declining a plan stops the run.
+
 ## Flows
 
 - The protocol texts appended to the system channel pin how to emit, not when: one blocking ask-gate and the non-blocking signals (markdown views, session name, ready-for-merge).

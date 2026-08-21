@@ -1,5 +1,9 @@
 Writes the built-in presets into a project as real files, so queued follow-up work can point the agent at a preset it can open.
 
+## User Stories
+
+- The user finds each built-in preset as a real markdown file in the project (`.the-framework/presets/`), so a queued entry naming one points at a file that opens.
+
 ## Flows
 
 - Derived from the one preset table, so a preset exists on disk exactly when it exists in the catalog.

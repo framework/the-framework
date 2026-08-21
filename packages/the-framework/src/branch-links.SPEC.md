@@ -1,4 +1,8 @@
-Keeps every session checkout reachable by its branch name: new checkouts live in `.the-framework/branches/` in a folder named as their branch, a symlink appears beside them whenever a branch gets renamed, and a `branches` shortcut at the repo root points there — so `cd branches/<name>` opens any session's work by the name the dashboard shows.
+Keeps every session checkout reachable by its branch name: new checkouts live in `.the-framework/branches/` in a folder named as their branch, a symlink appears beside them whenever a branch gets renamed, and a `branches` shortcut at the repo root points there.
+
+## User Stories
+
+- The user opens any session's checkout from the repo root — `cd branches/<name>` — by the branch name the dashboard shows.
 
 ## Flows
 

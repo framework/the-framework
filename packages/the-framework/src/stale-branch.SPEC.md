@@ -1,5 +1,9 @@
 Releases a pinned routine branch its closed or merged PR left behind, so a recurring job stops reporting a pending agent that no longer exists.
 
+## User Stories
+
+- The user's recurring routine resumes on schedule after its PR merges or closes, instead of standing down forever behind a leftover branch.
+
 ## Flows
 
 - Routine agents pin their branch name so two firings never run at once; a firing that finds the branch already existing stands down.

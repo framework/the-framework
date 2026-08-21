@@ -3,7 +3,7 @@ The static shell the daemon serves for every address: the root element the app m
 ## Flows
 
 - Served for every path, not just `/`: the app owns routing, so an unknown path is the shell plus a client-side decision, never a 404 from the daemon.
-- The tab icon carries its own dark-mode ramp inside the file, because a favicon sits on browser chrome — which follows the OS theme, not the in-app theme choice.
+- The tab icon swaps to its dark-mode palette inside the file itself, because a favicon sits on browser chrome — which follows the OS theme, not the in-app theme choice.
 
 ## Rationales
 

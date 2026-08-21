@@ -1,5 +1,9 @@
 Keeps a recent reading of the account's quota on hand, polling slowly and backing off on failure so the number is available without being refused upstream.
 
+## User Stories
+
+- The user's usage bar always shows a recent reading — an upstream blip never blanks it into "nothing used".
+
 ## Flows
 
 - Polling is deliberately slow and backs off on failure rather than retrying into the refusal.
@@ -8,7 +12,7 @@ Keeps a recent reading of the account's quota on hand, polling slowly and backin
 
 ## Rationales
 
-- Reading the quota is expensive (it launches the whole agent) and gets refused when asked too often — an eager retry loop would keep the number permanently unavailable.
+- Reading the quota is expensive (it spawns the coding agent's own CLI) and gets refused when asked too often — an eager retry loop would keep the number permanently unavailable.
 - The last good reading is retained through blips because a usage bar going empty would read as "nothing used", the one thing this must never imply.
 
 ## Before modifying/creating SPEC.md files

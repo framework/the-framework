@@ -1,5 +1,11 @@
 Resolves an agent's settings across configuration tiers — this agent's own say, then the project's, the repo's, the account's — where the nearest tier that set something wins and a tier that said nothing does not participate.
 
+## User Stories
+
+- The user sets an option on one agent and it wins over the same option set for the project, the repo, or the account — an explicit off included.
+- The user who configures nothing still gets finished work handed back: the defaults open a draft pull request.
+- The user reads, for each setting the agent ran with, which tier decided it.
+
 ## Flows
 
 - An explicit off in a nearer tier beats an on in a farther one.

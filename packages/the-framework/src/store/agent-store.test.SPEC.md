@@ -1,8 +1,13 @@
-The tests cover the persistence promises: events fold into the same snapshot whether appended live or replayed, agents archive on close and are rescued after a crash, per-user archives on the data branch are listed team-wide and deduplicated, dead agents are healed everywhere they can be found (the missing ending written into log, snapshot, and archive, while live owners and other machines' agents are left alone), and continuing an agent reopens the same log under its original intent.
+The tests cover the agent store's persistence promises, from event folding and archiving to crash healing and torn-read safety.
 
 ## Flows
 
-- A snapshot is renamed into place rather than written over, so its own path is never the empty file a truncate leaves for a concurrent reader; a store whose filesystem cannot rename still writes in place, and a snapshot that arrives unparseable anyway is read again rather than reported missing — a live agent never blinks out of a listing mid-write — while one that stays unparseable is still given up on.
+- Events fold into the same snapshot whether appended live or replayed from the log.
+- Agents archive on close and are rescued into the archive after a crash.
+- Per-user archives on the data branch (`tf-data`) are listed team-wide and deduplicated.
+- Dead agents are healed everywhere they can be found: the missing ending is written into log, snapshot, and archive, while live owners and other machines' agents are left alone.
+- Continuing an agent reopens the same log under its original intent.
+- A snapshot is renamed into place rather than written over, so its own path never holds the empty file a truncate leaves for a concurrent reader. A store whose filesystem cannot rename still writes in place. A snapshot that arrives unparseable anyway is read again rather than reported missing — a live agent never blinks out of a listing mid-write — while one that stays unparseable is still given up on.
 
 ## Before modifying/creating SPEC.md files
 

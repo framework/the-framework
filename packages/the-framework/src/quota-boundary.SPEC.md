@@ -1,10 +1,15 @@
 Decides how much of the account's weekly allowance The Framework may have spent by now: the share of the week that has already elapsed.
 
+## User Stories
+
+- The user's asked-for work is never starved by the quota; only unattended work stands down when the week's spend passes its pro-rated share.
+- The user moves one slider to give unattended work more or less headroom — there is nothing else to configure.
+
 ## Flows
 
 - One policy, nothing to configure: the boundary rises continuously with the clock and reaches the full allowance exactly as the week resets, so a quiet week still gets spent instead of expiring.
 - Work the user asks for may borrow ahead; unattended work stands down once usage passes the limit — the boundary plus an optional user-set offset (by default a small cushion beyond it).
-- Where the week stands is recovered from the agent's own prose about when the quota resets; prose that cannot be placed means "we don't know", never a boundary of zero.
+- Where the week stands is recovered from the reset time the coding agent prints as prose; prose that cannot be placed means "we don't know", never a boundary of zero.
 - Both the account's overall week and the selected model's own week are measured, and whichever reaches the limit first is what stops the work.
 
 ## Rationales

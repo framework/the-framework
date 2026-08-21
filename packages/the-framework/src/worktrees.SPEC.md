@@ -1,16 +1,22 @@
 Cleans up the per-agent checkouts a project retains — one implementation behind the dashboard's buttons, the teardown and the automatic sweep, so none of them can drift.
 
+## User Stories
+
+- The user removes an agent's checkout — or lets the automatic sweep reclaim idle ones — and can always recover the work afterwards.
+- The user deletes an agent for good: its records leave the dashboard, while its branch and commits survive.
+- The user learns why a checkout stayed whenever cleanup could not reclaim it.
+
 ## Flows
 
-- **One rule: only what is on the remote may go.** Removing a checkout commits whatever it is still holding to the agent's branch, pushes that branch, and deletes the checkout only once the remote has it.
-- A repo with nowhere to push keeps every checkout.
-- A session set to publish nothing (`handoff: local`) keeps its unpushed checkout; that decision comes before anything commits, so its checkout goes only from a clean tree on a tip already on the remote, where removing it publishes nothing.
-- A web run's checkout goes without a push once it provably holds nothing — a clean tree whose tip is inside what the hand-off already pushed; any doubt falls back to the ordinary commit-push-remove rule.
-- A record that cannot be read keeps the checkout too, and a later pass retries; a record that was never written is a boot death and takes the ordinary commit-push-remove path.
-- One failure mode, and it is legible: the push did not land, so the checkout stays and the reason says why.
-- Deleting an agent is the other thing entirely: its archived records leave the dashboard for good and uncommitted work is discarded with the checkout — but the branch and its commits stay.
-- Removal and deletion both refuse while the agent is live.
-- The prune sweep offers every non-live checkout to the same rule and reports each one it could not reclaim, so a checkout that stays is always accounted for rather than silently kept.
+- When the user removes a checkout (or the sweep reclaims one), the work is made recoverable first: whatever the checkout still holds is committed to the agent's branch, the branch is pushed, and the checkout is deleted only once the remote has it. **Only what is on the remote may go.**
+- In a repo with nowhere to push, every checkout is kept.
+- A session the user set to publish nothing (`handoff: local`) keeps its unpushed checkout. That decision is checked before anything commits, so such a checkout goes only when it is clean and its work is already on the remote — removing it publishes nothing.
+- A web run's checkout goes without a push once it provably holds nothing: its tree is clean and its work is already inside what the hand-off pushed. Any doubt falls back to the ordinary commit-push-remove rule.
+- A checkout whose session record cannot be read is kept, and a later pass retries. A record that was never written means the session died at boot, and the ordinary commit-push-remove path applies.
+- There is one failure mode, and the user sees it: the push did not land, so the checkout stays and the reason says why.
+- When the user deletes an agent, the deletion goes further: the agent's archived records leave the dashboard for good and uncommitted work is discarded with the checkout — but the branch and its commits stay.
+- While the agent is live, both removal and deletion refuse.
+- The automatic sweep offers every non-live checkout to the same rule and reports each one it could not reclaim, so a kept checkout is always accounted for.
 
 ## Rationales
 

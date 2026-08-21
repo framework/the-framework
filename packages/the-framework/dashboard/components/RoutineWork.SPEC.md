@@ -1,4 +1,4 @@
-The Overview's Routine work card: the jobs the scheduled sweep fires, each with a Run now that starts it against a chosen project immediately.
+The Overview's Routine work card: the jobs fired by the scheduled sweep — the daemon's recurring pass that starts routine work on its own — each with a Run now that starts it against a chosen project immediately.
 
 ## Flows
 

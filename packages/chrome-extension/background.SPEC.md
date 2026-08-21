@@ -2,10 +2,10 @@ The extension's daemon half: the only part holding the bridge token and talking 
 
 ## Flows
 
-- Questions forward with a dedupe: the page re-reports on every change, and an unchanged question for the same session costs nothing.
-- Answers travel back: queued picks are fetched on a fast beat, handed to the page in that session's tab to type, and the outcome reported — typing before reporting, so a pick is never marked sent that a dying tab never typed; failed deliveries and reports are retried, not dropped.
-- One pinned, inactive tab opens per session the daemon says to watch; stale ones close, and a tab the user closed is never reopened.
-- Every sweep records why it did or didn't act, so "tabs are not opening" is answerable from the options page.
+- Questions forward with a dedupe: the page half re-reports on every page change, and an unchanged question for the same session is not re-sent to the daemon.
+- Answers travel back: each answer the user picks in the dashboard is queued at the daemon, fetched on a fast beat, and handed to the page half in that session's tab to type, and the outcome is reported back. Typing comes before the report, so an answer is never marked sent that a dying tab never typed. Failed deliveries and failed reports are retried, not dropped.
+- One pinned, inactive tab opens per session the daemon says to watch; a tab whose session is no longer watched closes, and a tab the user closed is never reopened.
+- Every sweep — each pass that opens and closes these tabs — records why it did or didn't act, so "tabs are not opening" is answerable from the options page.
 - Every daemon call states this extension's version; a daemon expecting another refuses outright with both versions named, so a stale install blocks loudly instead of half-working.
 
 ## Rationales

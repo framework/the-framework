@@ -1,5 +1,9 @@
 The one table of every built-in preset — the prompts the product offers as one-click agents, from quality reviews to the product-management cluster.
 
+## User Stories
+
+- The user picks a preset from the launcher menu — a quality review aimed at a target, or the PM cluster aimed at the repo's own tickets and queue — and gets an agent with no prompt to write.
+
 ## Flows
 
 - The quality reviews (research, maintainability, readability, security audit, UX) take a target, defaulting to the launching agent or the whole codebase.

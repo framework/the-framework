@@ -14,4 +14,4 @@ Iterating on a plan currently means starting a fresh agent without the planning 
 
 ## Source
 
-Imported from GitHub issue [gemstack-land/the-framework#1511](https://github.com/gemstack-land/the-framework/issues/1511) ("Cotinue planning"), created 2026-08-05, labels: `UX ✨`, `only-if-quick-win 🧹`, 0 comments.
+Imported from GitHub issue [gemstack-land/the-framework#1511](https://github.com/gemstack-land/the-framework/issues/1511) ("Resume planning", retitled from "Cotinue planning" on 2026-08-19), created 2026-08-05, labels: `UX ✨`, `only-if-quick-win 🧹`, 0 comments.

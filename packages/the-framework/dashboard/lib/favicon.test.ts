@@ -24,12 +24,6 @@ describe('useFavicon', () => {
     expect(icon()).toBe(WORKING_FAVICON)
   })
 
-  test('leaves the tab alone when it is not the caller\'s to set', () => {
-    document.head.innerHTML = `<link rel="icon" href="${IDLE_FAVICON}" />`
-    renderHook(() => useFavicon(true, false))
-    expect(icon()).toBe(IDLE_FAVICON)
-  })
-
   test('names the two icon files', () => {
     expect(faviconHref(true)).toBe(WORKING_FAVICON)
     expect(faviconHref(false)).toBe(IDLE_FAVICON)

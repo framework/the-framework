@@ -2,18 +2,14 @@ import type { ReactNode } from 'react'
 import type { FrameworkEvent } from '../../src/index.js'
 import { TriangleAlert } from 'lucide-react'
 import { EventList } from './EventList.js'
-import { AgentOverview } from './AgentOverview.js'
 
-// One agent's feed: the agent overview plus the live/replayed event log, or a waiting placeholder
-// before anything has streamed. Rendered by the agent's own view (AgentView, which shows the
-// session link in its action bar instead — `showSessionLink={false}`). `lost` is the live
-// channel's health (#948): while the stream is down the feed is behind reality, and saying so
-// beats letting "the agent went quiet" and "the connection died" look identical.
+// One agent's feed: the live/replayed event log, or a waiting placeholder before anything has
+// streamed. Rendered by the agent's own view (AgentView), whose action bar already carries the
+// session link, the session name and the status. `lost` is the live channel's health (#948):
+// while the stream is down the feed is behind reality, and saying so beats letting "the agent
+// went quiet" and "the connection died" look identical.
 export function AgentFeed({
   events,
-  showSessionLink = true,
-  showName = true,
-  showStatus = true,
   lost = false,
   stick = true,
   openAt,
@@ -23,16 +19,11 @@ export function AgentFeed({
   agentId: agentId,
 }: {
   events: FrameworkEvent[]
-  /** The feed's own project/run (#1455 item 6): with a projectId the log's `choice` rows become
-   *  the interaction (inline panels/answered cards). The relay watch passes nothing — read-only. */
-  projectId?: string | undefined
+  /** The feed's own project/run (#1455 item 6): the log's `choice` rows are the interaction
+   *  (inline panels/answered cards). Required, so no caller can silently downgrade an open gate
+   *  to log text — a gate rendered as text is a run parked with nothing to answer it (#846). */
+  projectId: string
   agentId?: string | null | undefined
-  showSessionLink?: boolean
-  /** The agent's own view sets this false: its action bar's breadcrumb already names the session. */
-  showName?: boolean
-  /** The agent's own view sets this false: its action bar carries the status beside the ⋮ menu. */
-  showStatus?: boolean
-  /** The agent's own view sets this false: its right rail pins the loop's verdict under the tabs. */
   lost?: boolean
   /** A finished log is static (#1026): it does not follow new output, and opens at its end. */
   stick?: boolean
@@ -59,13 +50,13 @@ export function AgentFeed({
   return (
     <>
       {lostBanner}
-      <AgentOverview events={events} showSessionLink={showSessionLink} showName={showName} showStatus={showStatus} />
       <EventList
         events={events}
         stick={stick}
         {...(openAt ? { openAt } : {})}
         {...(tail ? { tail } : {})}
-        {...(projectId ? { projectId, agentId: agentId } : {})}
+        projectId={projectId}
+        agentId={agentId}
       />
     </>
   )

@@ -239,9 +239,6 @@ export function AgentView({
           events={shown}
           projectId={projectId}
           agentId={agentId}
-          showSessionLink={false}
-          showName={false}
-          showStatus={false}
           lost={lost}
           {...(feedLive ? {} : { stick: false, openAt: 'end' as const, emptyLabel: 'This agent has no events.' })}
           // A web agent's log dead-ends at the hand-off (#1265): the mirror box rides the tail of

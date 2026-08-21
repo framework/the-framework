@@ -4,7 +4,7 @@ The product's end-to-end stories: each test walks a user journey through the dae
 
 - Four story files cover the journeys: the agent lifecycle (start, watch live, read the archived row, publish the branch), steering and gates (questions, chat, handoff, stop), projects and settings, and tickets and the work queue.
 - Stories observe the product exactly where users do — the dashboard's reads and the live event feed. The one extra window is the recorded child invocation: a capture of how each agent process was launched.
-- The harness gives every story a throwaway world with its own global state and a daemon-shaped teardown, so stories are isolated, parallel-safe, and repeatable.
+- The harness gives every story a throwaway world and a daemon-shaped teardown — global state is fresh per story file, so parallel files never see each other — making stories repeatable.
 
 ## Rationales
 

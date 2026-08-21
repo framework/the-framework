@@ -1,4 +1,4 @@
-The engine of The Framework: everything that turns an idea, a ticket, or a queue entry into a reviewed pull request — the CLI, the per-machine daemon, the agent runtime that drives the wrapped coding-agent CLI, and the surfaces that watch and steer it.
+The engine of The Framework: everything that turns an idea, a ticket, or a queue entry into a pull request for human review — the CLI, the per-machine daemon, the agent runtime that drives the wrapped coding-agent CLI, and the surfaces that watch and steer it.
 
 ## User Stories
 
@@ -27,7 +27,7 @@ flowchart LR
 - The pull request the user gets back is the agent publishing itself: an agent that ends with real work commits, pushes, and opens a PR; an empty one publishes nothing. Merging is authorized by the agent's own ready signal plus an empty backlog of its own, never by configuration alone. How far an agent publishes is one ordinal — each rung including the ones below it — not a set of switches, so an impossible combination cannot be represented.
 - When nobody is around, the daemon plays product manager bounded by the account's own quota week: drain the confirmed queue, refill it by triaging and planning tickets (claims committed as lock files beside the tickets, so other machines and cloud agents see them), keep CI green on the PRs it opened, and merge on green.
 - Unattended spending stands down past the pro-rated share of the account's week that has elapsed; work the user asked for carries on. The gate is on starting and only on starting — an agent already going is never interrupted to economise.
-- What must outlive a process lands in git, not memory: each agent's own event log, archived per user so a repo clean cannot erase it and teammates never conflict, plus tickets and their claims, the queue, and the project log.
+- What must outlive a process lands in git, not memory: each agent's own event log, archived per user so a repo clean cannot erase it and teammates never conflict, plus tickets and their claims and the queue — all on the framework's own data branch.
 - The subdirectories hold the seams: the CLI adapters (driver), the on-disk agent state (store), the dashboard and its RPC contract, and the end-to-end proofs.
 
 ## Rationales

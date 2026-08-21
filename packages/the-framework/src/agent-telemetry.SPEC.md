@@ -5,8 +5,7 @@ The accounting every agent shares, whatever kind it is: naming the session, foll
 - The handle for resuming the conversation survives a stop or crash mid-turn: the agent's real session id is surfaced the moment a turn starts, not only when it ends.
 - Each turn's spend is folded into a running total as the turn reports, so the dashboard's per-agent spend readout is live rather than final.
 - One self-stop exists: an answer that says to stop. It is composed with the stop signal from outside (the Stop button, Ctrl+C), so everything downstream ends the same way whichever fired.
-- An unreadable quota never stops the work: a failing quota check means carry on.
-- One shared classification of how an agent ended — a user stop, a quota pause (which leaves a note to resume from), or a real failure — so every surface agrees on what "stopped" means.
+- One shared classification of how an agent ended — a user stop or a real failure — so every surface agrees on what "stopped" means.
 
 ## Rationales
 

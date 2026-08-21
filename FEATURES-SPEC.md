@@ -72,6 +72,7 @@ happens while nobody is at the keyboard.
 - An agent is a URL you can paste, reload and bookmark
 - The agent names itself; the branch is renamed to match
 - Ready-for-merge flips the agent's badge
+- The agent reports what it could not get past: a red line in the log where it hit it, and a running error count on the session
 - Live spend readout per agent
 - See the exact system prompt the agent ran under
 

@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { sessionInfo, agentProgress, handoffState } from './agent-view.js'
+import { sessionInfo, agentProgress, agentErrors, handoffState } from './agent-view.js'
 import type { FrameworkEvent } from './events.js'
 
 test('agentProgress starts building with no name and flips to ready on setReadyForMerge (#326)', () => {
@@ -101,4 +101,17 @@ test('handoffState carries the outcome once the handoff has run (#1102)', () => 
 
   const skipped: FrameworkEvent[] = [{ kind: 'handoff', outcome: 'skipped', reason: 'no-remote' }]
   assert.deepEqual(handoffState(skipped).result, { outcome: 'skipped', reason: 'no-remote' })
+})
+
+test('agentErrors folds the errors the agent reported, oldest first (#1500)', () => {
+  assert.deepEqual(agentErrors([]), [])
+  const events: FrameworkEvent[] = [
+    { kind: 'error', headline: 'gh is not logged in', detail: 'ran `gh auth status`' },
+    { kind: 'session-name', name: 'update-tickets' },
+    { kind: 'error', headline: 'tickets/meta.json has no lastImportedAt' },
+  ]
+  assert.deepEqual(agentErrors(events), [
+    { headline: 'gh is not logged in', detail: 'ran `gh auth status`' },
+    { headline: 'tickets/meta.json has no lastImportedAt' },
+  ])
 })

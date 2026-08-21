@@ -29,6 +29,30 @@ export function agentProgress(events: readonly FrameworkEvent[]): AgentProgress 
   return progress
 }
 
+/** One error the agent reported through an `error` block (#1500). */
+export interface AgentError {
+  /** What is wrong, in one line. */
+  headline: string
+  /** What it ran and what that said, when the agent wrote any. */
+  detail?: string
+}
+
+/**
+ * Every error the agent reported (#1500), oldest first — the count the dashboard shows on the
+ * session, and the latest headline it shows beside it.
+ *
+ * A fold over the log rather than state of its own: an error is an event that happened, so the
+ * list only ever grows, and reopening a finished agent shows exactly what it showed while it ran.
+ */
+export function agentErrors(events: readonly FrameworkEvent[]): AgentError[] {
+  const errors: AgentError[] = []
+  for (const event of events) {
+    if (event.kind !== 'error') continue
+    errors.push({ headline: event.headline, ...(event.detail ? { detail: event.detail } : {}) })
+  }
+  return errors
+}
+
 /** What a session will do with its work when it ends (#1102), and what it did. */
 export interface HandoffState {
   /** Push the branch to `origin` on finish. */

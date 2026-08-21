@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { continuationPrompt, parseAwaitGate, parseMarkdownViews, parseSessionName, parseReadyForMerge, parsePullRequest } from './turn-gate.js'
+import { continuationPrompt, createTurnSignalEmitter, parseAwaitGate, parseErrors, parseMarkdownViews, parseSessionName, parseReadyForMerge, parsePullRequest } from './turn-gate.js'
+import type { FrameworkEvent } from './events.js'
 
 const block = (json: string): string => 'Here are the options.\n```await-choices\n' + json + '\n```'
 
@@ -206,4 +207,46 @@ test('parsePullRequest takes the last block, so the agent can revise it (#1567)'
 test('parsePullRequest ignores an empty block rather than blanking the body (#1567)', () => {
   assert.equal(parsePullRequest('```open-pr\n\n```'), undefined)
   assert.deepEqual(parsePullRequest('```open-pr\nreal\n```\n```open-pr\n \n```'), { title: 'real' })
+})
+
+test('parseErrors returns nothing when the turn reported none (#1500)', () => {
+  assert.deepEqual(parseErrors('All good, the import finished.'), [])
+})
+
+test('parseErrors splits the block into a headline and the detail below it (#1500)', () => {
+  assert.deepEqual(parseErrors('```error\ngh is not logged in\n\nran `gh auth status`: You are not logged into any hosts\n```'), [
+    { headline: 'gh is not logged in', detail: 'ran `gh auth status`: You are not logged into any hosts' },
+  ])
+})
+
+test('parseErrors takes a one-line block as a headline with no detail (#1500)', () => {
+  assert.deepEqual(parseErrors('```error\ntickets/meta.json has no lastImportedAt\n```'), [
+    { headline: 'tickets/meta.json has no lastImportedAt' },
+  ])
+})
+
+test('parseErrors keeps every block, in order: two things going wrong is two errors (#1500)', () => {
+  const text = '```error\nfirst\n```\nand then\n```error\nsecond\n```'
+  assert.deepEqual(parseErrors(text), [{ headline: 'first' }, { headline: 'second' }])
+})
+
+test('parseErrors ignores an empty block — an error with nothing to say is not one (#1500)', () => {
+  assert.deepEqual(parseErrors('```error\n \n```'), [])
+  assert.deepEqual(parseErrors('```error\n \n```\n```error\nreal\n```'), [{ headline: 'real' }])
+})
+
+test('the turn emitter logs an error once however often the agent restates it (#1500)', () => {
+  const events: FrameworkEvent[] = []
+  const emit = createTurnSignalEmitter(e => events.push(e))
+  emit('```error\npush rejected\n```')
+  emit('still stuck.\n```error\npush rejected\n```')
+  assert.deepEqual(events, [{ kind: 'error', headline: 'push rejected' }])
+})
+
+test('the turn emitter treats a second, different failure as its own error (#1500)', () => {
+  const events: FrameworkEvent[] = []
+  const emit = createTurnSignalEmitter(e => events.push(e))
+  emit('```error\npush rejected\n\nfirst attempt\n```')
+  emit('```error\npush rejected\n\nsecond attempt, different remote\n```')
+  assert.equal(events.length, 2)
 })

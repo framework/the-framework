@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { FrameworkEvent } from '../../src/index.js'
 import { GitStatusBar } from './GitStatusBar.js'
 import { AgentActionsMenu } from './AgentActionsMenu.js'
+import { AgentErrorCount } from './AgentErrorCount.js'
 import { agentStatusPill } from '../lib/agent-status.js'
 import { cn } from '../lib/utils.js'
 
@@ -84,6 +85,10 @@ export function AgentActionBar({
           grows but never shrinks (#1030), so a tight row takes its width from the label. */}
       <div className="grow shrink-0" />
       <div className="flex shrink-0 items-center gap-2">
+        {/* What the agent could not get past (#1500): the log scrolls, this row does not. It sits
+            with the controls rather than among the branch facts, which give up width as the row
+            fills — a count is only useful if it is whole. */}
+        <AgentErrorCount events={events} />
         {/* The handoff's next step stays visible — the one thing here that moves the session forward
             rather than just opening it somewhere. Everything else is in the ⋮ menu. */}
         {actions}

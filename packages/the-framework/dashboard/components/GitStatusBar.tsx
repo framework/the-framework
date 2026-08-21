@@ -8,8 +8,7 @@ import { cn } from '../lib/utils.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 
 // The checkout in play (#491, part of #488): active branch, a clean/dirty dot, the linked PR.
-// Polled, so it tracks an agent committing or branching. Hidden when there is no git repo (or on
-// the relay, which has no local checkout).
+// Polled, so it tracks an agent committing or branching. Hidden when there is no git repo.
 //
 // One component for both pages (#809). With a `agentId` it reads that session's own worktree, which
 // also carries its size on disk and the path it lives at; without one it reads the project's

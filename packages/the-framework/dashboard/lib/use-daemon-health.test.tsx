@@ -11,8 +11,8 @@ afterEach(() => {
   onProjects.mockReset()
 })
 
-function Probe({ enabled = true }: { enabled?: boolean }) {
-  return <span>{useDaemonHealth(enabled) ? 'healthy' : 'down'}</span>
+function Probe() {
+  return <span>{useDaemonHealth() ? 'healthy' : 'down'}</span>
 }
 
 // #948: a dead daemon froze every surface silently — the probe is what lets the shell say so.
@@ -28,12 +28,5 @@ describe('useDaemonHealth', () => {
     onProjects.mockRejectedValue(new Error('ECONNREFUSED'))
     render(<Probe />)
     await waitFor(() => expect(screen.getByText('down')).toBeTruthy())
-  })
-
-  test('disabled (the relay) never probes and stays healthy', async () => {
-    render(<Probe enabled={false} />)
-    await new Promise(resolve => setTimeout(resolve, 50))
-    expect(onProjects).not.toHaveBeenCalled()
-    expect(screen.getByText('healthy')).toBeTruthy()
   })
 })

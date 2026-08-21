@@ -5,7 +5,7 @@ Note the current UTC time before you fetch anything, in ISO 8601. That is the ti
 Read `tickets/meta.json` for `lastImportedAt`.
 
 Do one of the following:
-- [Error] If there are existing `tickets/*.md` but `lastImportedAt` is missing, or `gh` is missing or logged out, show an error to the user and abort
+- [Error] If there are existing `tickets/*.md` but `lastImportedAt` is missing, or `gh` is missing or logged out, report the error — say which of those it is — and abort
 - [Empty] If `tickets/` is empty (or doesn't exist), treat it as a first import and bring every open issue across
 - [Update] Fetch only what changed: `gh issue list --state all --limit 500 --json number,title,body,state,labels,updatedAt --search "updated:>=<lastImportedAt>"`, and the discussion with `gh api --paginate "repos/{owner}/{repo}/issues/comments?since=<lastImportedAt>"`
 

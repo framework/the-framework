@@ -25,6 +25,8 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `◆ browser: ${event.url}`
     case 'log':
       return `  ${event.message}`
+    case 'error':
+      return `✗ ${event.headline}${event.detail ? `\n    ${event.detail.replace(/\n/g, '\n    ')}` : ''}`
     case 'view':
       return `▶ view: ${event.title}`
     case 'session-name':

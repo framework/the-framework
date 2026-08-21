@@ -1,17 +1,19 @@
-The turn-boundary contract with the wrapped agent: each turn runs as a black box, so everything the framework learns — the agent stopping to ask, views to show, its chosen session name, ready-for-merge, a pull-request description — is a tagged block parsed out of the turn's final message.
+The turn-boundary contract with the wrapped agent: each turn runs as a black box, so everything the framework learns — the agent stopping to ask, views to show, errors it hit, its chosen session name, ready-for-merge, a pull-request description — is a tagged block parsed out of the turn's final message.
 
 ## User Stories
 
 - The user answers the agent's question, and the agent resumes the same conversation.
+- The user learns what the agent could not get past, from the agent itself, instead of finding it buried in a paragraph of its reply.
 - The user's answer can end the agent instead of resuming it — declining a plan stops the run.
 
 ## Flows
 
-- The protocol texts appended to the system channel pin how to emit, not when: one blocking ask-gate and the non-blocking signals (markdown views, session name, ready-for-merge, a pull-request description).
+- The protocol texts appended to the system channel pin how to emit, not when: one blocking ask-gate and the non-blocking signals (markdown views, reported errors, session name, ready-for-merge, a pull-request description).
 - There is one gate block, not four: every gate is a question with options, and what distinguishes the kinds is what the agent writes in one — two options for an approval, a file for a plan, a flag for several picks, a mark on the options that end the agent rather than resuming it.
 - Parsing is tolerant on purpose: a malformed block is ignored rather than crashing an agent, the block appearing latest in the turn wins (falling back past a broken one), and missing ids and titles get sensible defaults. A block with nothing pickable in it is not a gate — the agent carries on rather than parking on an empty question.
 - One continuation wording resumes the agent after any answered gate, and a shared cap on ask-rounds stops an agent that keeps asking.
-- Signal emission is deduped across a span of turns: ready-for-merge fires once, and a session name or a pull-request description re-emits only on a real change.
+- Signal emission is deduped across a span of turns: ready-for-merge fires once, a session name or a pull-request description re-emits only on a real change, and an error is recorded once however often the agent restates it — an agent repeating its block every turn must not read as the same failure happening over and over.
+- An error the agent reports is written as a headline and the detail below it, and every error in a turn is kept rather than only the last: two different things going wrong are two errors, and collapsing them would lose one.
 - An agent names and describes its pull request in a block instead of opening one itself, written like a commit message: the first line is the title the end-of-agent handoff publishes, the rest is the body, and the last block the agent wrote is the one used. A first line too long to be a name for the work is read as body text instead, so a paragraph never becomes a pull request title.
 
 ## Rationales

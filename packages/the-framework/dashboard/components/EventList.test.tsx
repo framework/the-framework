@@ -80,6 +80,11 @@ describe('EventList row colour', () => {
     expect(row.className).toContain('text-danger')
   })
 
+  test('an error the agent reported itself renders in red (#1500)', () => {
+    render(<EventList events={[{ kind: 'error', headline: 'gh is not logged in' }]} stick={false} />)
+    expect(screen.getByText(/gh is not logged in/).className).toContain('text-danger')
+  })
+
   test('a failed run renders in red (#1199)', () => {
     render(<EventList events={[{ kind: 'end', ok: false, detail: 'exited 1' }]} stick={false} />)
     expect(screen.getByText(/failed: exited 1/).className).toContain('text-danger')
@@ -279,6 +284,11 @@ describe('EventList row wash (#1508)', () => {
       <EventList events={[{ kind: 'driver', event: { type: 'start', prompt: 'add a search box' } }]} stick={false} />,
     )
     expect(container.querySelector('[class*="bg-info/10"]')).toBeTruthy()
+  })
+
+  test('an agent-reported error gets the red wash too (#1500)', () => {
+    const { container } = render(<EventList events={[{ kind: 'error', headline: 'push rejected' }]} stick={false} />)
+    expect(container.querySelector('[class*="bg-danger/10"]')).toBeTruthy()
   })
 
   test('a failure gets the red wash', () => {

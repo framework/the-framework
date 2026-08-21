@@ -1,5 +1,6 @@
 import type { FrameworkEvent } from '../../src/index.js'
-import { sessionInfo, agentProgress } from '../../src/client.js'
+import { sessionInfo, agentProgress, agentErrors } from '../../src/client.js'
+import { AgentErrorCount } from './AgentErrorCount.js'
 import { agentStatusPill } from '../lib/agent-status.js'
 import { describeSessionLink } from '../lib/session-link.js'
 import { cn } from '../lib/utils.js'
@@ -13,13 +14,14 @@ export function AgentOverview({ events }: { events: FrameworkEvent[] }) {
   const session = sessionInfo(events)
   const progress = agentProgress(events)
   const status = agentStatusPill(events)
+  const errors = agentErrors(events)
 
   // The "Open session" link, labeled honestly: a headless Claude Code run has no per-session
   // URL, so the generic app entry (claude.ai/code) is shown as "Open Claude Code" with the id
   // surfaced separately, not as a deep link to that id. See {@link describeSessionLink}.
   const sessionLink = describeSessionLink(session)
 
-  if (!sessionLink && !status) return null
+  if (!sessionLink && !status && errors.length === 0) return null
 
   return (
     <div className="grid gap-3 border-b border-border p-4 md:grid-cols-2">
@@ -28,6 +30,13 @@ export function AgentOverview({ events }: { events: FrameworkEvent[] }) {
           <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', status.dot)} aria-hidden />
           {progress.sessionName && <span className="font-medium">{progress.sessionName}</span>}
           <span className={cn('text-xs', status.tone)}>{status.label}</span>
+        </div>
+      )}
+      {/* What went wrong, kept where the log cannot scroll it away (#1500). The rows themselves
+          stay in the log, at the point in the run where the agent hit them. */}
+      {errors.length > 0 && (
+        <div className="text-sm md:col-span-2">
+          <AgentErrorCount events={events} headline />
         </div>
       )}
       {sessionLink && (

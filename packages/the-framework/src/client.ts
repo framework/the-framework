@@ -10,9 +10,11 @@ export { pickedIds } from './events.js'
 export {
   sessionInfo,
   agentProgress,
+  agentErrors,
   handoffState,
   type SessionInfo,
   type AgentProgress,
+  type AgentError,
   type HandoffState,
 } from './agent-view.js'
 // The Start-an-agent presets (#433): pure prompt builders (no Node imports) the dashboard

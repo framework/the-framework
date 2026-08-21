@@ -314,7 +314,7 @@ test('an aborted signal ends the loop before starting another entry', async () =
   }
 })
 
-test('a backlog turn emits its signals: views, session name, ready-for-merge', async () => {
+test('a backlog turn emits its signals: views, errors, session name, ready-for-merge', async () => {
   const repo = await repoWorkspace()
   await seedQueue(repo, '- [ ] tidy the login redirect\n')
   try {
@@ -329,6 +329,11 @@ test('a backlog turn emits its signals: views, session name, ready-for-merge', a
           '# What I changed',
           'Rewrote the redirect guard.',
           '```',
+          '```error',
+          'the redirect test fixture is missing',
+          '',
+          'ran `ls test/fixtures`: No such file or directory',
+          '```',
           '```set-session-name',
           'login-redirect-fix',
           '```',
@@ -341,6 +346,16 @@ test('a backlog turn emits its signals: views, session name, ready-for-merge', a
 
     const view = events.find(e => e.kind === 'view')
     assert.equal(view?.title, 'What I changed')
+    assert.deepEqual(
+      events.filter(e => e.kind === 'error'),
+      [
+        {
+          kind: 'error',
+          headline: 'the redirect test fixture is missing',
+          detail: 'ran `ls test/fixtures`: No such file or directory',
+        },
+      ],
+    )
     assert.equal(events.find(e => e.kind === 'session-name')?.name, 'login-redirect-fix')
     assert.equal(events.filter(e => e.kind === 'ready-for-merge').length, 1)
   } finally {

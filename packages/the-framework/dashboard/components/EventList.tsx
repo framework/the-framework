@@ -84,6 +84,9 @@ function isTurnBoundary(e: FrameworkEvent): boolean {
  */
 function isFailure(e: FrameworkEvent): boolean {
   if (e.kind === 'driver') return e.event.type === 'error'
+  // An error the agent reported itself (#1500) is a failure like any other: the log already has
+  // one red lane, and a second vocabulary for the same thing would only make both quieter.
+  if (e.kind === 'error') return true
   return e.kind === 'end' && !e.ok && !e.stopped
 }
 

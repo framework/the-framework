@@ -1,5 +1,9 @@
 Reads and grants Claude Code's own folder trust, so a web run never dies on the CLI's interactive trust question.
 
+## User Stories
+
+- The user starts a web agent and never answers Claude Code's folder-trust question by hand.
+
 ## Flows
 
 - The trust record written is the CLI's own — the same one the user's accepting of the dialog would leave behind — and everything else in the CLI's config survives the write.

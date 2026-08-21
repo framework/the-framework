@@ -1,5 +1,10 @@
 Watches the pull requests the framework is waiting to land and acts on what their checks say: merge the green ones, start an unattended fix agent for the red ones.
 
+## User Stories
+
+- The user arms merge-on-green and the pull request merges by itself once its checks pass — in any repo, with or without GitHub's native auto-merge.
+- The user finds a fix agent already at work when an agent's pull request goes red; after two attempts the failure is left to them.
+
 ## Flows
 
 - Merge-on-green everywhere: the sweep polls a watched PR's checks about once a minute and merges once they pass.

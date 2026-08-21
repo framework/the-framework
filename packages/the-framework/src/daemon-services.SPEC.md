@@ -12,7 +12,7 @@ Everything the daemon runs in the background beside serving the dashboard: Disco
 
 - One clock runs every background job, each declaring how many ticks it wants between turns rather than owning an interval.
 - Every service re-reads its preference on each tick, so a dashboard toggle takes effect without restarting the daemon.
-- An agent the daemon starts resolves its options from the same two tiers the launcher uses — your settings, then the repo's committed file — so one nobody asked for and one someone clicked differ only in who asked.
+- An agent the daemon starts resolves its options from the same two tiers a dashboard start uses — the user's settings, then the repo's committed file — so an agent nobody asked for and one someone clicked differ only in who asked.
 - Auto PM spends idle quota on the roadmap: it fans out up to the configured number of unattended agents, each pinned to one queue entry. An entry is retired on the data branch (the dedicated branch the framework's shared records live on) once its agent's ending reports the work published — and it is the daemon, never the agent, that writes queue check-offs and ticket locks.
 - The CI watch merges a watched PR once its checks pass, and puts a fix agent on one whose checks fail.
 - An hourly sweep deletes the dead refs Claude-web hand-offs leave on origin, once they are old enough and provably hold no work.

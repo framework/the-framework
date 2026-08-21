@@ -10,7 +10,7 @@ Adopts the branch a cloud session actually worked on: each settled web run is ma
 - A web run hands the task to claude.ai and ends; the cloud session does the work on a branch of its own naming, never the branch the run was born on.
 - The match is exact, never guessed: the hand-off pushed a commit unique to the run for the session to clone at, so the session's branch — and only it — descends from that commit. A run matching no branch (the session has not pushed, or never will) or more than one is simply asked again next pass, and a run past the window (two days) stops being asked about.
 - What gets recorded, as one commit on the data branch (the dedicated branch the framework's own records live on) so every machine learns it: the branch, and the pull request the session opened for it. A run that was armed for a PR the session never opened gets its draft PR opened by the daemon — unless the branch carries nothing beyond the hand-off itself, or the session's pull requests could not be listed that pass.
-- A later daemon pass patches the run's record, the same way a late-opened PR already is.
+- Adoption is not one-shot: a run recorded while its armed pull request was still missing is asked about again, and a later pass patches the pull request on once it exists.
 - Adoptions and failures are said out loud; a run still waiting is not.
 
 ## Rationales

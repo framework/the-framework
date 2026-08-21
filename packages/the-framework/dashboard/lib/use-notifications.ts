@@ -1,24 +1,23 @@
 import { useEffect, useRef } from 'react'
 import type { Activity, Intervention } from '../../src/index.js'
-import { activityKey, interventionKey, pickNewActivity, pickNewInterventions } from '../../src/client.js'
+import { SeenTracker, activityKey, interventionKey, type ProjectionRead } from '../../src/client.js'
 
 // Browser notifications for the two feeds the shell already polls (#627): the "needs you"
-// queue and the "new activity" feed. One engine — the identity half (key + new-item pick) is
-// the same code the daemon's Discord notifier runs, imported from the framework so the two
-// surfaces cannot drift (#935 unified the server side; this is the client side of the same
-// move). What differs per feed is wording and where a click goes, which is what a spec is.
+// queue and the "new activity" feed. One engine — identity and baseline are both the same code
+// the daemon's Discord notifier runs, imported from the framework so the two surfaces cannot
+// drift (#935 unified the server side; this is the client side of the same move). What differs
+// per feed is wording and where a click goes, which is what a spec is.
 //
-// Two guards keep it quiet: it never fires unless enabled AND the browser permission is
-// granted, and it absorbs the first couple of observations (the initial empty value, then the
-// first fetch of already-known items) as a baseline — you only hear about things that happen
-// while you are watching, never the backlog that existed when the page loaded.
-
-/** Observations to treat as baseline before notifying: the initial `[]` plus the first fetch. */
-const WARMUP = 2
+// Two guards keep it quiet: it never fires unless enabled AND the browser permission is granted,
+// and a project's backlog is absorbed as a baseline the first time that project is read whole —
+// you only hear about what happens while you are watching, never what was already there.
+//
+// The baseline used to be a count: the first two observations, whatever they held (#1625). A page
+// opened while the daemon could not reach GitHub spent both of them on empty lists, and the first
+// fetch that did reach GitHub announced every already-open pull request as new.
 
 /** The per-feed half: identity (shared with the daemon's notifier) plus wording and click target. */
 interface NotificationSpec<T> {
-  pickNew: (seen: Set<string>, items: T[]) => T[]
   keyOf: (item: T) => string
   title: (first: T, count: number) => string
   /** How one item reads in the notification body. */
@@ -46,31 +45,29 @@ function fire<T>(items: T[], spec: NotificationSpec<T>): void {
  * the remaining gate (checked in {@link fire}). No-op on the server (no `window`), and harmless
  * when notifications are unsupported.
  */
-function useNewItemNotifications<T>(items: T[], enabled: boolean, spec: NotificationSpec<T>): void {
-  const seen = useRef<Set<string>>(new Set())
-  const observations = useRef(0)
-  const lastItems = useRef<T[] | undefined>(undefined)
+function useNewItemNotifications<T extends { projectId: string }>(
+  read: ProjectionRead<T>,
+  enabled: boolean,
+  spec: NotificationSpec<T>,
+): void {
+  const tracker = useRef<SeenTracker<T> | undefined>(undefined)
+  tracker.current ??= new SeenTracker<T>(spec.keyOf, item => item.projectId)
+  const lastRead = useRef<ProjectionRead<T> | undefined>(undefined)
 
   useEffect(() => {
-    // A toggle flip re-runs this effect with the SAME feed. Counting that as an observation
-    // burns a warmup slot, so the first real fetch after enabling is treated as post-baseline
-    // and notifies for the whole backlog — the exact thing the warmup exists to prevent. Only a
-    // genuine feed change advances the baseline; an `enabled` flip with unchanged items is a no-op.
-    if (items === lastItems.current) return
-    lastItems.current = items
-    const fresh = spec.pickNew(seen.current, items)
-    if (observations.current < WARMUP) {
-      observations.current += 1 // still warming up: fold these into the baseline, don't notify
-    } else if (enabled && fresh.length > 0) {
-      fire(fresh, spec)
-    }
-    for (const item of items) seen.current.add(spec.keyOf(item))
+    // A toggle flip re-runs this effect with the SAME feed, and re-observing it would be busywork:
+    // every item is already in the baseline. Only a genuine fetch is worth folding in.
+    if (read === lastRead.current) return
+    lastRead.current = read
+    // Observed whether or not notifications are on, which is what keeps flipping the toggle from
+    // replaying the backlog: what happened while it was off is still "already there".
+    const fresh = tracker.current!.observe(read.items, read.whole)
+    if (enabled && fresh.length > 0) fire(fresh, spec)
     // The spec is a module const (stable identity), so the feed and the toggle are the deps.
-  }, [items, enabled]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [read, enabled]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 const INTERVENTIONS: NotificationSpec<Intervention> = {
-  pickNew: pickNewInterventions,
   keyOf: interventionKey,
   title: (first, count) => (count === 1 ? `Human Queue · ${first.projectName}` : `${count} items in your Human Queue`),
   // A PR by number, a paused agent by its question (#636), a finished agent by what sits unpushed (#860).
@@ -89,7 +86,6 @@ const INTERVENTIONS: NotificationSpec<Intervention> = {
 }
 
 const ACTIVITY: NotificationSpec<Activity> = {
-  pickNew: pickNewActivity,
   keyOf: activityKey,
   title: (first, count) =>
     count === 1 ? `${first.kind === 'started' ? 'Agent started' : 'Agent finished'} · ${first.projectName}` : `${count} agent updates`,
@@ -99,11 +95,11 @@ const ACTIVITY: NotificationSpec<Activity> = {
 }
 
 /** Notify when a new "needs you" item appears (#627). */
-export function useInterventionNotifications(interventions: Intervention[], enabled: boolean): void {
+export function useInterventionNotifications(interventions: ProjectionRead<Intervention>, enabled: boolean): void {
   useNewItemNotifications(interventions, enabled, INTERVENTIONS)
 }
 
 /** Notify when an agent starts or finishes (#627). */
-export function useActivityNotifications(activity: Activity[], enabled: boolean): void {
+export function useActivityNotifications(activity: ProjectionRead<Activity>, enabled: boolean): void {
   useNewItemNotifications(activity, enabled, ACTIVITY)
 }

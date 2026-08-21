@@ -5,7 +5,7 @@ import type { ProjectSummary, ProjectionRead } from './projects.js'
 // The identity + diff live in the leaf `keys.ts` so the dashboard can share them (they are pure);
 // re-exported here so this stays the import site for anything that already reads them from the
 // module that defines `Activity`.
-export { activityKey, pickNewActivity } from './keys.js'
+export { activityKey } from './keys.js'
 
 // The "New activity" feed (#627): the cross-project stream of run lifecycle transitions that
 // do NOT need the human — an agent started, an agent finished. It is the default-off notification

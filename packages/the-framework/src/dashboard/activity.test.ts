@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { buildActivity, activityKey, pickNewActivity, type Activity } from './activity.js'
+import { buildActivity, activityKey, type Activity } from './activity.js'
 import type { ProjectSummary } from './projects.js'
 import type { AgentMeta } from '../store/index.js'
 
@@ -79,10 +79,3 @@ test('activityKey separates a run start from its finish', () => {
   assert.equal(activityKey({ ...base, kind: 'finished' }), 'finished:a:r1')
 })
 
-test('pickNewActivity returns only items whose key is unseen', () => {
-  const started: Activity = { projectId: 'a', projectName: 'a', agentId: 'r1', kind: 'started' }
-  const finished: Activity = { projectId: 'a', projectName: 'a', agentId: 'r1', kind: 'finished' }
-  const seen = new Set([activityKey(started)])
-  // The same agent finishing is a new key, so it is picked up even though its start was already seen.
-  assert.deepEqual(pickNewActivity(seen, [started, finished]), [finished])
-})

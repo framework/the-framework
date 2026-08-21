@@ -6,6 +6,7 @@ import { readTickets, readTicket, readTicketsMeta, type WorkspaceTicket, type Wo
 import { collectQueue, type ProjectQueue } from '../dashboard/queue.js'
 import { buildOverview, buildRecentAgents, buildHotTickets, collectAllTickets, type Overview, type RecentAgent, type HotTicket, type ProjectTickets } from '../dashboard/overview.js'
 import { buildInterventions, type Intervention } from '../dashboard/interventions.js'
+import type { ProjectionRead } from '../dashboard/projects.js'
 import { buildOpenQuestions, type OpenQuestion } from '../dashboard/open-questions.js'
 import { buildActivity, type Activity } from '../dashboard/activity.js'
 import { buildDashboard, type DashboardData } from '../dashboard/dashboard.js'
@@ -212,9 +213,17 @@ export async function onHotTickets(): Promise<HotTicket[]> {
   return withProjects(projects => buildHotTickets(projects))
 }
 
-/** The cross-project interventions queue (#632, Queue #624): open PRs that need review, newest first. */
-export async function onInterventions(): Promise<Intervention[]> {
-  return (await withProjects(buildInterventions)).items
+/**
+ * The cross-project interventions queue (#632, Queue #624): open PRs that need review, newest first,
+ * plus which projects were read whole (#1625).
+ *
+ * The panels render `items` and ignore the rest. The browser's notifier is the caller that cannot:
+ * it keeps a baseline of what was already waiting when the page opened, and a queue that came back
+ * empty because GitHub was unreachable is not a baseline — taking it for one announces the whole
+ * backlog the moment GitHub answers.
+ */
+export async function onInterventions(): Promise<ProjectionRead<Intervention>> {
+  return withProjects(buildInterventions)
 }
 
 /** Every session's open question with its full gate (#1455), longest-waiting first: the launcher's hub. */
@@ -222,9 +231,12 @@ export async function onOpenQuestions(): Promise<OpenQuestion[]> {
   return withProjects(buildOpenQuestions)
 }
 
-/** The cross-project "New activity" feed (#627): recent run started/finished transitions, newest first. */
-export async function onActivity(): Promise<Activity[]> {
-  return (await withProjects(buildActivity)).items
+/**
+ * The cross-project "New activity" feed (#627): recent run started/finished transitions, newest
+ * first, with the projects that were read whole beside them (#1625) — see {@link onInterventions}.
+ */
+export async function onActivity(): Promise<ProjectionRead<Activity>> {
+  return withProjects(buildActivity)
 }
 
 /** The Overview dashboard page (#471): the {@link onOverview} rollup plus agent counts, run-status totals, and activity. */

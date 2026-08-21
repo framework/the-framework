@@ -1,4 +1,4 @@
-The stable identity of a notification item plus the "only what is new" diff, kept as a dependency-free leaf so the browser and the daemon share one definition of "already announced" — a drifted copy would silently double-notify or never notify.
+The stable identity of a notification item, kept as a dependency-free leaf so the browser and the daemon share one definition of "the same item" — a drifted copy would silently double-notify or never notify.
 
 ## Before modifying/creating SPEC.md files
 

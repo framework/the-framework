@@ -2,7 +2,7 @@ The composer's presets button: the one visible place to load, create, and delete
 
 ## Flows
 
-- Three groups: the built-in presets, your own saved presets, and the open project's shared presets; saved presets load their prompt verbatim, and each saved row carries its own delete.
+- Three groups: the built-in presets, the user's own saved presets, and the open project's shared presets; saved presets load their prompt verbatim, and each saved row carries its own delete.
 - Some built-ins always run as an agent of their own, even when loaded from inside one.
 
 ## Rationales

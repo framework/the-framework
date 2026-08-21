@@ -2,7 +2,7 @@ The rich prompt editor: `/` opens commands, `<` inserts the agent's tag macros, 
 
 ## Flows
 
-- `/` loads a preset (built-in, yours, or the project's) or inserts an agent action, and can open the create-preset panel; loading over a typed draft is allowed, one undo away, and the caller is told so its note can say so.
+- `/` loads a preset (built-in, the user's own, or the project's) or inserts an agent action, and can open the create-preset panel; loading over a typed draft is allowed and one undo away — the form around the editor is told, so its note can say so.
 - Referencing a project or file also focuses the context on it, and deleting the chip undoes that focus — the prompt and the context set can never silently disagree.
 - Enter sends, Shift+Enter breaks the line — except while a suggestion menu is open, inside a code block, or mid-IME-composition, where Enter keeps its editing meaning.
 - Markdown is live; a compact one-line variant serves the navbar quick-launch.

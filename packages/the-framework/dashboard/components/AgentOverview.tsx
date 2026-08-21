@@ -1,6 +1,6 @@
-import { TriangleAlert } from 'lucide-react'
 import type { FrameworkEvent } from '../../src/index.js'
 import { sessionInfo, agentProgress, agentErrors } from '../../src/client.js'
+import { AgentErrorCount } from './AgentErrorCount.js'
 import { agentStatusPill } from '../lib/agent-status.js'
 import { describeSessionLink } from '../lib/session-link.js'
 import { cn } from '../lib/utils.js'
@@ -32,17 +32,11 @@ export function AgentOverview({ events }: { events: FrameworkEvent[] }) {
           <span className={cn('text-xs', status.tone)}>{status.label}</span>
         </div>
       )}
-      {/* What went wrong, kept where the log cannot scroll it away (#1500): the count, and the
-          last thing the agent said was broken. The rows themselves stay in the log. */}
+      {/* What went wrong, kept where the log cannot scroll it away (#1500). The rows themselves
+          stay in the log, at the point in the run where the agent hit them. */}
       {errors.length > 0 && (
-        <div role="alert" className="flex items-start gap-2 text-sm text-danger md:col-span-2">
-          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <div className="min-w-0">
-            <span className="font-medium">
-              {errors.length} {errors.length === 1 ? 'error' : 'errors'}
-            </span>
-            <span className="break-words text-muted-foreground"> · {errors[errors.length - 1]!.headline}</span>
-          </div>
+        <div className="text-sm md:col-span-2">
+          <AgentErrorCount events={events} headline />
         </div>
       )}
       {sessionLink && (

@@ -3,8 +3,8 @@ How each dashboard call reaches the one host's capabilities, and which checkout 
 ## Flows
 
 - One host wires everything at start-up, so a capability is simply there; a missing one is a wiring bug that says which capability is missing.
-- The one exception is "is this agent relayed onward?", which defaults to no: a call arriving over the device relay runs outside a request, and the agent it names is local to that device — forwarding it again would be a loop.
-- A call that names an agent resolves to that agent's own checkout — where it actually reads, writes, and listens — falling back to the project root only for one that has none.
+- One lookup defaults instead of throwing: "is this agent relayed onward?" answers no when unwired. A call arriving over the device relay runs outside a request, and the agent it names is local to that device — forwarding it again would be a loop.
+- A call that names an agent resolves to that agent's own checkout — where it actually reads, writes, and listens — falling back to the project root only for an agent that has none. Anywhere else the call would read an empty journal and steer an agent that is not listening.
 
 ## Rationales
 

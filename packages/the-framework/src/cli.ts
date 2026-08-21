@@ -16,6 +16,7 @@ import { connectCdp, startBrowserStream, type BrowserStream } from './browser-st
 import { randomUUID } from 'node:crypto'
 import { formatFrameworkEvent, mergeWithheldWhy } from './terminal.js'
 import { defuseClosingKeywords } from './closing-keywords.js'
+import type { ParsedPullRequest } from './turn-gate.js'
 import { CLAUDE_CODE_SESSION_LINK } from './session-link.js'
 import { type AutoHandoffSkip, type ChoicePick, type ChoiceRequest, type FrameworkEvent, type MergeWithheldReason, type OnBeforeMergeableSkip } from './events.js'
 import { agentAutoHandoff, withheldMerge } from './dashboard/agent-handoff.js'
@@ -548,8 +549,8 @@ export interface AgentJournal {
   sessionName: () => string | undefined
   /** The agent signalled setReadyForMerge() this agent (#326). */
   sawReadyForMerge: () => boolean
-  /** The pull-request description the agent wrote via an `open-pr` block (#1567), if any. */
-  prDescription: () => string | undefined
+  /** The pull request the agent asked for via an `open-pr` block (#1567/#1618), if any. */
+  pullRequest: () => ParsedPullRequest | undefined
   /** The agent stopped cleanly (user interrupt / budget cap #322) rather than failed. */
   stoppedCleanly: () => boolean
   /** Hold the browser preview's port until the session opens (#829/#813). */
@@ -581,9 +582,9 @@ export function createAgentJournal(deps: {
   let stoppedCleanly = false
   let sawReadyForMerge = false
   let sessionName: string | undefined
-  // The agent's own pull-request description (#1567), latest wins: it may revise it as the work
+  // The pull request the agent asked for (#1567), latest wins: it may revise it as the work
   // changes, and the handoff wants what it said last.
-  let prDescription: string | undefined
+  let pullRequest: ParsedPullRequest | undefined
   // The browser preview's port, announced on the first `session` event rather than when the
   // bridge opens (#829): the dashboard renders only the tail from the last `session` event, so
   // anything emitted ahead of it is dropped from the agent's view.
@@ -598,7 +599,7 @@ export function createAgentJournal(deps: {
 
   const onEvent = (event: FrameworkEvent) => {
     if (event.kind === 'ready-for-merge') sawReadyForMerge = true
-    if (event.kind === 'pull-request-description') prDescription = event.description
+    if (event.kind === 'open-pr') pullRequest = { ...(event.title ? { title: event.title } : {}), ...(event.description ? { description: event.description } : {}) }
     if (event.kind === 'session-name') {
       sessionName = event.name
       // The framework-owned checkout (#736) was branched as `tf-agent-<id>` before a
@@ -632,7 +633,7 @@ export function createAgentJournal(deps: {
     onEvent,
     sessionName: () => sessionName,
     sawReadyForMerge: () => sawReadyForMerge,
-    prDescription: () => prDescription,
+    pullRequest: () => pullRequest,
     stoppedCleanly: () => stoppedCleanly,
     announceBrowserPort: port => {
       pendingBrowserPort = port
@@ -1044,14 +1045,19 @@ async function driveAgent(opts: AgentOptions, io: CliIO): Promise<number> {
     // closing phrase in it would close the ticket's issue on merge — which is exactly what
     // happened on #1560. The same reasoning already keeps `(fix #N)` off a plan agent's title
     // just above; the description is the other half of the same rule.
-    const written = journal.prDescription()
-    const description = written && opts.planAgent ? defuseClosingKeywords(written) : written
+    const written = journal.pullRequest()
+    // Both halves are defused, not just the body: since #1618 the title is the agent's prose too,
+    // and a closing phrase there would ride the squash-merge subject straight into the issue.
+    const defuse = (text: string | undefined) => (text && opts.planAgent ? defuseClosingKeywords(text) : text)
+    const prTitle = defuse(written?.title)
+    const description = defuse(written?.description)
     const agent = {
       id: opts.agentId ?? '',
       branch,
       ...(sessionName ? { sessionName } : {}),
       ...(intent ? { intent } : {}),
       ...(fixes ? { fixes } : {}),
+      ...(prTitle ? { prTitle } : {}),
       ...(description ? { description } : {}),
     }
     const handedOff = await agentAutoHandoff(cwd, agent, armed)

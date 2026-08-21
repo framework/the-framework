@@ -9,7 +9,7 @@ The notification engine: a background poll over the registered projects that ann
 ## Flows
 
 - The first look at a project only takes a baseline — whatever already existed there when the daemon started is never announced; the user only hears about what happens while it watches.
-- What makes two items "the same" is the caller's decision, so one engine serves both callers: the "needs you" queue (open PRs, parked questions, unpushed work) and the activity feed (agents started and finished).
+- What makes two items "the same" is the caller's decision, so one engine serves every caller: the "needs you" queue (open PRs, parked questions, unpushed work), the activity feed (agents started and finished), and the dashboard's own browser notifications, which keep their baseline by the same rule rather than a rule of their own.
 - What counts as a baseline is decided per project: a project earns one from the first look that read it completely, so a project that was unreachable at start-up is simply not being watched yet, rather than being watched against an empty picture of itself.
 - Forgiving, and honest about it: a failed scan or projection announces nothing that cycle and earns no baseline, and one project that can never be read — a repo with no remote, say — leaves the others notifying normally instead of silencing them or flooding them.
 - It owns no timer of its own — the daemon's one clock calls it — so its cadence is declared where every other background job's is.

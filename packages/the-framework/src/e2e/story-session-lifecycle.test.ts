@@ -82,7 +82,10 @@ test('start a session, watch it live, and read the archived row when it ends', a
     }, 'the archived replay to carry the whole journal')
     assert.ok(replay.some(e => e.kind === 'session') && replay.some(e => e.kind === 'end'), 'replay has the whole journal')
     const activity = await rpc(onActivity)()
-    assert.ok(activity.some(a => a.agentId === agentId && a.kind === 'finished' && a.status === 'done'))
+    assert.ok(activity.items.some(a => a.agentId === agentId && a.kind === 'finished' && a.status === 'done'))
+    // The feed also names the project as read whole, which is what lets the browser's notifier tell
+    // this apart from a poll that simply could not reach it (#1625).
+    assert.ok(activity.whole.includes(project.id))
     const recent = await rpc(onRecentAgents)()
     assert.ok(recent.some(r => r.projectId === project.id && r.agent.id === agentId))
 

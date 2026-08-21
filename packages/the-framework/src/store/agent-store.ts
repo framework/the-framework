@@ -865,14 +865,33 @@ export async function archivedAgentPaths(cwd: string, agentId: string, fs: Store
 const byIdDesc = (a: { id: string }, b: { id: string }): number => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)
 
 /**
+ * Whether an `<id>.json` archive entry is older than `since` going by its *name* — an id is the
+ * run's start time, so the filename dates the record and most of a long history can be rejected
+ * before it is ever read (#1607).
+ *
+ * Only a name that parses as one of our ids can reject: an id handed in from outside is not a
+ * date, and is read like any other. The id is allocated when the run is spawned and `startedAt`
+ * written when it first opens its store, so the name can be the older of the two by the length of
+ * a spawn — a caller filtering on `startedAt` sees a record drop out at most that much early.
+ */
+function namedBefore(name: string, since: number): boolean {
+  const startedAt = startedAtFromAgentId(name.slice(0, -'.json'.length))
+  return startedAt !== undefined && Date.parse(startedAt) < since
+}
+
+/**
  * Every `agents/*.json` archived meta with the path it was read from, torn/half-written entries
  * skipped. The one home of the archived-history read loop, shared by {@link listAgents} and the
  * boot reconcile. A missing/unreadable dir throws to the caller, as both callers always let it.
+ *
+ * `since` (epoch ms) drops the runs that started before it without reading them; see
+ * {@link namedBefore}.
  */
-async function readArchivedMetaEntries(fs: StoreFs, agentsDir: string): Promise<Array<{ path: string; meta: AgentMeta }>> {
+async function readArchivedMetaEntries(fs: StoreFs, agentsDir: string, since?: number): Promise<Array<{ path: string; meta: AgentMeta }>> {
   const entries: Array<{ path: string; meta: AgentMeta }> = []
   for (const name of await fs.readdir(agentsDir)) {
     if (!name.endsWith('.json')) continue
+    if (since !== undefined && namedBefore(name, since)) continue
     const path = join(agentsDir, name)
     try {
       entries.push({ path, meta: JSON.parse(await fs.read(path)) as AgentMeta })
@@ -898,11 +917,11 @@ function isDeadRunningAgent(meta: AgentMeta | undefined, isAlive: (pid: number) 
  * `agents/` and the close into the user's committed one, so an agent can sit in both places and the
  * history must show it once. The user directories are searched first, so the committed copy wins.
  */
-async function readAllArchivedMetaEntries(fs: StoreFs, cwd: string): Promise<Array<{ path: string; meta: AgentMeta }>> {
+async function readAllArchivedMetaEntries(fs: StoreFs, cwd: string, since?: number): Promise<Array<{ path: string; meta: AgentMeta }>> {
   const seen = new Set<string>()
   const entries: Array<{ path: string; meta: AgentMeta }> = []
   for (const agentsDir of await archiveDirs(fs, cwd)) {
-    for (const entry of await readArchivedMetaEntries(fs, agentsDir).catch(() => [])) {
+    for (const entry of await readArchivedMetaEntries(fs, agentsDir, since).catch(() => [])) {
       if (seen.has(entry.meta.id)) continue
       seen.add(entry.meta.id)
       entries.push(entry)
@@ -915,9 +934,12 @@ async function readAllArchivedMetaEntries(fs: StoreFs, cwd: string): Promise<Arr
  * List a project's archived agents, most-recent first: every user's committed archive plus the
  * transient `agents/`. The id sorts chronologically so no timestamp parse is needed. Missing or
  * unreadable dir/entries are skipped, never thrown.
+ *
+ * `since` (epoch ms) is for a caller that only wants recent runs — a poll on a cadence, not the
+ * history list. It is answered from the filenames, so the records it excludes cost no read at all.
  */
-export async function listAgents(cwd: string, fs: StoreFs = nodeStoreFs()): Promise<AgentMeta[]> {
-  const entries = await readAllArchivedMetaEntries(fs, cwd)
+export async function listAgents(cwd: string, fs: StoreFs = nodeStoreFs(), since?: number): Promise<AgentMeta[]> {
+  const entries = await readAllArchivedMetaEntries(fs, cwd, since)
   return entries.map(entry => entry.meta).sort(byIdDesc)
 }
 

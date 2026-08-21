@@ -724,6 +724,33 @@ test('the history lists every user, and the runs archived before this shipped (#
   assert.deepEqual((await listAgents(CWD, fs)).map(agent => agent.id), ['r3', 'r2', 'r1'])
 })
 
+test('a `since` skips the older runs by filename, without reading them (#1607)', async () => {
+  // The cost this exists to remove: the adoption poll wants the last 48h and an archive holds
+  // years, so the read loop spent every pass parsing records its caller was about to discard.
+  const at = (iso: string) => JSON.stringify({ version: 1, status: 'done', id: agentIdFromStartedAt(iso), startedAt: iso, updatedAt: iso })
+  const old = agentIdFromStartedAt('2026-07-04T00:00:00.000Z')
+  const recent = agentIdFromStartedAt('2026-07-06T00:00:00.000Z')
+  const fs = memFs({
+    [archiveAt(old, 'json')]: at('2026-07-04T00:00:00.000Z'),
+    [archiveAt(recent, 'json')]: at('2026-07-06T00:00:00.000Z'),
+    [archiveAt('hand-picked', 'json')]: JSON.stringify({ version: 1, status: 'done', id: 'hand-picked', startedAt: AT, updatedAt: AT }),
+  })
+  const read: string[] = []
+  const spy = { ...fs, read: async (path: string) => (read.push(path), fs.read(path)) }
+
+  const listed = await listAgents(CWD, spy, Date.parse('2026-07-05T00:00:00.000Z'))
+
+  assert.deepEqual(listed.map(agent => agent.id).sort(), ['hand-picked', recent].sort())
+  assert.equal(
+    read.some(path => path.includes(old)),
+    false,
+    'the run outside the window is never opened',
+  )
+  // An id that is not one of our timestamps cannot be dated from its name, so it is still read:
+  // rejecting it unread would hide it from every caller that passes a window.
+  assert.equal(read.some(path => path.includes('hand-picked')), true)
+})
+
 test('a run archived under both schemes is listed once (#1179)', async () => {
   // An agent archived before #1179 and re-archived after exists in both places; the history is a list
   // of sessions, not of files.

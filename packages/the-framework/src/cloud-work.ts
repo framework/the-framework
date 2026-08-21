@@ -2,7 +2,7 @@ import { nodeGitRunner, type GitRunner } from './project.js'
 import { ghPrsForBranchOrThrow, pickAgentPr, type LinkedPr } from './dashboard/gh.js'
 import { openRemoteBranchPullRequest, type HandoffResult } from './dashboard/agent-handoff.js'
 import { agentBranchName } from './branch-names.js'
-import { listAgents, startedAtFromAgentId, type AgentMeta, type ArchivePatch } from './store/index.js'
+import { listAgents, nodeStoreFs, startedAtFromAgentId, type AgentMeta, type ArchivePatch } from './store/index.js'
 import { patchArchivedAgentOnDataBranch } from './archived-agent-patch.js'
 import { errorMessage } from './error-message.js'
 
@@ -51,8 +51,8 @@ export interface CloudWorkDeps {
   git?: GitRunner
   /** The branch's full PR history; a listing that fails must throw (default {@link ghPrsForBranchOrThrow}). */
   prs?: (cwd: string, branch: string) => Promise<LinkedPr[]>
-  /** The project's run records (default {@link listAgents}). */
-  agents?: (cwd: string) => Promise<AgentMeta[]>
+  /** The project's run records, none older than `since` in epoch ms (default {@link listAgents}). */
+  agents?: (cwd: string, since: number) => Promise<AgentMeta[]>
   /** Record the adopted branch and PR on the run's archive (default {@link patchArchivedAgentOnDataBranch}). */
   patch?: (cwd: string, agentId: string, patch: ArchivePatch, message: string) => Promise<boolean>
   /** Open the armed draft PR for a remote-only branch (default {@link openRemoteBranchPullRequest}). */
@@ -146,13 +146,15 @@ async function headsDescendingFrom(git: GitRunner, cwd: string, anchor: string):
 export async function adoptCloudWork(cwd: string, deps: CloudWorkDeps = {}): Promise<CloudWorkResult> {
   const git = deps.git ?? nodeGitRunner()
   const prs = deps.prs ?? ghPrsForBranchOrThrow
-  const agents = deps.agents ?? listAgents
+  const agents = deps.agents ?? ((project: string, since: number) => listAgents(project, nodeStoreFs(), since))
   const patchArchive = deps.patch ?? patchArchivedAgentOnDataBranch
   const openPr = deps.openPr ?? openRemoteBranchPullRequest
   const now = deps.now ? deps.now() : Date.now()
   const result: CloudWorkResult = { adopted: [], failed: [] }
 
-  const waiting = waitingRuns(await agents(cwd).catch((): AgentMeta[] => []), now)
+  // Only the window's runs are asked for: an archive grows without bound, and everything older
+  // than the window is a record `waitingRuns` would drop anyway — so it is never read (#1607).
+  const waiting = waitingRuns(await agents(cwd, now - CLOUD_ADOPTION_WINDOW_MS).catch((): AgentMeta[] => []), now)
   if (waiting.length === 0) return result
 
   try {

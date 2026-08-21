@@ -1,8 +1,8 @@
-Makes sure no driver process ever outlives the agent that spawned it: each spawned child leads its own process tree, and stopping an agent — or the framework itself dying — reaps the whole tree instead of orphaning it.
+No driver process ever outlives the agent that spawned it: each spawned child leads its own process tree, and stopping an agent — or the framework itself dying — takes the whole tree down instead of orphaning it.
 
 ## Flows
 
-- Every live tree is tracked so even a hard crash of the framework still takes them all down on the way out.
+- Every live tree is tracked so even a hard crash of the framework still takes them all down on the way out — the user's machine is never left running stray agent processes.
 
 ## Rationales
 

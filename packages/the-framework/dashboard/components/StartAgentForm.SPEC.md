@@ -2,10 +2,10 @@ The launcher form that starts an agent in the selected project: the shared compo
 
 ## Flows
 
-- A typed prompt starts an attended conversation; a preset starts unattended routine work that ends at settle with its armed handoff firing.
-- The options sent and the prompt previewed come from the same mapping the agent uses, so the form cannot disagree with the agent it starts; a picked device relays it there, its secret token riding in memory only.
-- Preflight warnings spend words before the agent is spent, never blocking: a driver CLI that cannot start (the GitHub CLI checked only when a PR or merge is armed, nothing probed for Actions or device targets), a repo whose disabled auto-merge makes an armed merge land immediately, and Haiku's known skipping of the finish step, which leaves a publishing run an unmerged draft PR.
-- A start answers immediately: an optimistic rail row appears and the view jumps to the agent before its record exists.
+- A typed prompt starts an attended conversation. A preset starts unattended routine work: it ends on its own once the agent's work settles, firing the hand-off it was armed with — how far the work publishes, up to push, PR, or merge.
+- The options sent and the prompt previewed come from the same mapping the agent uses, so the form cannot disagree with the agent it starts; a picked device relays the start to that machine, the device's secret token riding in memory only — never persisted.
+- Preflight warnings spend words before the agent is spent, and never block. They cover: a driver CLI that cannot start — the GitHub CLI checked only when a PR or merge is armed, and nothing probed for Actions or device targets; a repo whose disabled auto-merge makes an armed merge land immediately; and Haiku's known skipping of the finish step, which leaves a publishing run an unmerged draft PR.
+- A start answers immediately: an optimistic row for the run appears in the sidebar and the view jumps to the agent before its record exists.
 
 ## Before modifying/creating SPEC.md files
 

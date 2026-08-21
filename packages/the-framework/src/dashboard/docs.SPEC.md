@@ -1,4 +1,8 @@
-Surfaces the plan documents at a project's root and the backlog off the data branch, so the human can read them in the dashboard beside the agent.
+Surfaces the plan documents at a project's root and the backlog off the framework's data branch (`tf-data`), so the user can read them in the dashboard beside the agent.
+
+## User Stories
+
+- The user reads the agents' plan and backlog documents in the dashboard's docs rail, beside the agent they belong to.
 
 ## Flows
 

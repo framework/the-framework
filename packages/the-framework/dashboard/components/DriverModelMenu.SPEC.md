@@ -1,7 +1,8 @@
-One menu picking the driver and its model together — drivers at the top level, each opening a submenu of only its own models, so a pick sets both at once and an incompatible pair can never be chosen; the trigger wears the current driver's logo and, when one is pinned, its model.
+One menu picking the driver and its model together: drivers at the top level, each opening a submenu of only its own models, so a pick sets both at once and an incompatible pair can never be chosen.
 
 ## Flows
 
+- The trigger wears the current driver's logo and, when one is pinned, its model.
 - Every listed model is a real model id; there is no "Default" entry.
 - Not choosing is still a state, and the trigger says so rather than naming the first model in the list.
 - The trigger carries its own accessible name, because with no model pinned its rendered content is a logo and a chevron.

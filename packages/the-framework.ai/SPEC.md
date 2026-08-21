@@ -10,7 +10,7 @@ The product's marketing website, the-framework.ai — it pitches The Framework a
 ## Flows
 
 - One long landing page carries the whole pitch: stop babysitting AI, make the important decisions, let AI do the rest.
-- The main call to action everywhere is a copy-pasteable terminal command that runs The Framework; visitors pick their package manager once and every command site-wide shows in that flavor, remembered across visits.
+- The main call to action everywhere is a copy-pasteable terminal command that runs The Framework. Visitors pick their package manager once, every command site-wide switches to it, and the choice is remembered across visits.
 - Three side pages support it: a press page with brand material, a go-to-dashboard page explaining that the dashboard runs on the visitor's own machine, and a hidden banner page that gets screenshotted into the social-preview image.
 - The whole site is pre-rendered into plain static pages — no server.
 

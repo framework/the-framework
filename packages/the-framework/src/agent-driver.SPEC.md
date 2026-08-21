@@ -1,8 +1,8 @@
-Turns an agent's chosen target into the driver that executes it: this device by default, a fresh GitHub Actions runner, or a Claude cloud session.
+Turns the run target the user picked for an agent into the driver that executes it: this device by default, a fresh GitHub Actions runner, or a Claude Code cloud session.
 
 ## Flows
 
-- The Actions target needs the repo's owner, name, and a token, and fails fast with a clear message without them; the cloud target needs nothing extra, because the agent's own signed-in account carries it.
+- When the user targets a GitHub Actions runner, the repo's owner, name, and a token are required; without them the start fails fast with a message naming what to set. Targeting a cloud session needs nothing extra, because the agent's own signed-in account carries it.
 
 ## Rationales
 

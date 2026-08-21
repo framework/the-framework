@@ -1,5 +1,9 @@
 The deterministic offline demo: a scripted fake agent builds a small orders app so the whole flow can be shown with no agent CLI and no model.
 
+## User Stories
+
+- The user demos the whole flow with no agent CLI and no model: a scripted agent builds the same small orders app every time.
+
 ## Flows
 
 - Optional variants make the scripted build pause on each kind of interactive gate (single choice, checklist, plan approval), so the ask-and-resume flow is demonstrable offline too.

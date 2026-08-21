@@ -2,7 +2,7 @@ The banner at the top of a project's page naming what the daemon currently finds
 
 ## Flows
 
-- Renders exactly what the project list carries and holds nothing of its own; there is no dismiss.
+- The user sees exactly the errors the daemon's project list carries — the banner holds no state of its own, and there is no dismiss.
 
 ## Rationales
 

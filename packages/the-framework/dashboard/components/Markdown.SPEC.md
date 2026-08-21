@@ -1,4 +1,4 @@
-A tiny, dependency-free Markdown renderer for agent-written content: the surfaced PLAN/TODO docs, pushed views, and conversation messages.
+A tiny, dependency-free Markdown renderer for agent-written content: the surfaced PLAN/TODO docs, the views the agent pushes to the dashboard, and conversation messages.
 
 ## Flows
 

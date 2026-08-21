@@ -1,5 +1,11 @@
 Composes, in one place, the entire system channel every agent runs under, so every surface agrees on exactly what it was told.
 
+## User Stories
+
+- The user reads the exact system prompt their agent ran under — one place composes it, so what is shown is what ran.
+- The user's own instructions (`SYSTEM.md`) ride on top of the built-in prompt.
+- The user drops the built-in prompt with vanilla mode, or everything framework-authored with transparent mode.
+
 ## Flows
 
 - Fixed order: the project context (goal, knowledge docs, tickets, queue — with the ticket and queue format specs inlined into the channel itself), then the built-in prompt, then the user's own instructions, then the emit protocols, signal protocol always last.

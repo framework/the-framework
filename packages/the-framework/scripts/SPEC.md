@@ -2,8 +2,8 @@ Build-time helpers that keep the prompting authored as markdown, and make the pu
 
 ## Flows
 
-- Every prompt markdown file is compiled into a generated module of plain strings before each build, test, and typecheck; the markdown is the only source of truth.
-- Tests run against a throwaway home for the machine's global state, so the developer's live daemon can never leak into the suite and hang it. There are two suites and two runners: Node's test runner over the compiled daemon suite, and the dashboard's own browser-shaped tests.
+- Every prompt markdown file is compiled into a generated module of plain strings before each build, test, and typecheck; the markdown is the only source of truth. Daemon and dashboard read the same generated module, so the prompt the user reads in the dashboard is the text the agent runs under.
+- Tests run against a throwaway home for the machine's global state, so the developer's live daemon can never leak into the suite and hang it. There are two suites and two runners: Node's test runner over the compiled daemon suite, and the dashboard's own tests in a browser-like environment.
 
 ## Rationales
 

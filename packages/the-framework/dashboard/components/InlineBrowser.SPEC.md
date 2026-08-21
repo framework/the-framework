@@ -1,4 +1,4 @@
-The browser preview inline in the transcript — the same proxied screencast the rail's Browser tab shows, so the two surfaces can never disagree about what the browser is doing.
+The browser preview inline in the transcript — the same proxied screencast the right rail's Browser tab shows, so the two surfaces can never disagree about what the browser is doing.
 
 ## Flows
 

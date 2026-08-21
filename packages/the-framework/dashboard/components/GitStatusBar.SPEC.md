@@ -2,8 +2,8 @@ The checkout-in-play status line — active branch, a clean/dirty dot, the linke
 
 ## Flows
 
-- On an agent it reports that agent's own worktree, adding what only a worktree has: its size on disk, and honesty that uncommitted changes there are the agent's, not yours.
-- Refreshed on a slow cadence, but sped up while a PR lookup is still settling, so that answer appears in seconds rather than after a full cycle; nothing renders when there is no checkout to report.
+- On an agent it reports that agent's own checkout, adding what only an agent's checkout carries: its size on disk, and honesty that uncommitted changes there are the agent's, not the user's.
+- Refreshed on a slow cadence, but sped up while a PR lookup is still settling, so that answer appears in seconds rather than after a full cycle. Nothing renders when there is no checkout to report.
 - The agent's name leads and truncates last — it is the stable identity, where the branch gets renamed by the agent — and other facts drop out whole as the bar narrows rather than squeezing.
 - It can double as the disclosure for the branch detail below it, so an agent's branch is spoken about in exactly one place.
 

@@ -1,9 +1,13 @@
-The repo's GitHub Actions workflows: continuous integration, the dispatchable agent runner, and website deployment.
+The repo's three GitHub Actions workflows — one is part of the product (the agent runner), two are repo plumbing (continuous integration and website deployment).
+
+## User Stories
+
+- The user runs an agent on a fresh GitHub Actions runner instead of their own machine.
 
 ## Flows
 
-- `framework-agent.yml` is the only workflow that is part of the product runtime — the daemon dispatches it to run agent turns on cloud runners; the rest is repo plumbing.
-- `ci.yml` builds, typechecks, and tests every push and PR; `website-deploy.yml` publishes the-framework.ai.
+- When the user runs an agent on GitHub Actions instead of their own machine, the framework dispatches `framework-agent.yml` — one dispatch per agent turn, each on a fresh GitHub-hosted runner.
+- `ci.yml` builds, typechecks, and tests every push and PR; `website-deploy.yml` publishes the-framework.ai whenever a change to the website lands on `main`.
 
 ## Rationales
 

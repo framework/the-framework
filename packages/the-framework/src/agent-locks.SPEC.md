@@ -2,7 +2,7 @@ Serializes everything that touches one agent's checkout, so a finishing agent's 
 
 ## Flows
 
-- A failed holder surfaces its own error without blocking whoever waits behind it.
+- An action that fails while holding the lock reports its own error; the action waiting behind it still runs.
 
 ## Rationales
 

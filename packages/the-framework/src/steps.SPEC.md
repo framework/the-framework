@@ -1,5 +1,10 @@
 The prompts a build agent opens with, and the one check that decides between them.
 
+## User Stories
+
+- The user points an agent at an existing project and it works within that codebase — it never re-scaffolds.
+- The user starts in an empty workspace and the agent scaffolds the whole app from scratch.
+
 ## Flows
 
 - The framing states the one thing the agent cannot infer: build from scratch in an empty workspace, or work within the codebase that already exists — an existing project is extended, never re-scaffolded.

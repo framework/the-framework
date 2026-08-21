@@ -1,4 +1,4 @@
-The gallery's card registry — the design foundations (color tokens, status palette, type and radius scales) and the dashboard's building blocks — where every card renders the real shipped component so it cannot drift from the app, and the few that cannot (popups that render nowhere statically) are hand-copied and flagged as replicas on the card itself.
+The gallery's card registry: cards for the design foundations (color tokens, status palette, type and radius scales) and for the dashboard's building blocks, each rendering the real shipped component so it cannot drift from the app — and the few that cannot render statically are hand-copied, flagged as replicas on the card itself.
 
 ## Rationales
 

@@ -3,7 +3,7 @@ One shared reading of what a finished agent's branch has to hand off — push, o
 ## Flows
 
 - Not read while the agent is still running: a branch still being written to has nothing to hand off yet.
-- Re-asked slowly at rest, and quickly while the PR lookup is still out, since that answer decides which buttons to offer; the last answer stays on screen across the cadence switch instead of blanking.
+- Re-asked slowly at rest, and quickly while the PR lookup has not answered yet, since that answer decides which buttons to offer. The last answer stays on screen across the cadence switch instead of blanking.
 - Each action names itself while in flight ("Pushing…" rather than a silently greyed button) and refreshes the answer the moment it lands, so the offer follows the action immediately.
 
 ## Before modifying/creating SPEC.md files

@@ -3,7 +3,7 @@ The tickets page's filtering, sorting, and grouping model: every project's backl
 ## Flows
 
 - The facets: word search, priority/effort/uncertainty, topics, pipeline stage (unplanned / planned / claimed by an agent), project, and locally-written-only. Selections OR within a facet and AND across facets.
-- A numeric facet takes named buckets or a fine range — two ways to say the same thing, so picking one clears the other — while "names no value" composes with either: "critical or unprioritized" is a real triage lens.
+- A numeric facet takes named buckets or a fine range — two ways to say the same thing, so picking one clears the other. The "no value" option composes with either, so tickets naming no value can be included alongside any selection.
 - Every facet option shows how many tickets it would reveal under all the other filters, its own facet ignored, so options don't all collapse to zero the moment one is picked.
 - Sorting puts tickets with no value last in both directions, breaks ties newest-first, and starts each key in its natural direction; sort and grouping reorder but never hide, so they don't count as filters.
 - A hand-typed URL is input: junk is ignored, and defaults are omitted so the bare page keeps a bare address.

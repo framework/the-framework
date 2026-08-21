@@ -20,8 +20,11 @@ export interface TickJob {
   /** For the log line when it throws. */
   name: string
   /**
-   * Ticks between turns. `1` is every tick, `20` is every twentieth. Its own turn is *skipped*
-   * rather than queued, so a slow job never accumulates a backlog of missed turns to work through.
+   * Ticks between turns. `1` is every tick, `20` is every twentieth. A tick is the interval
+   * coming round, not a turn that ran, so a slow job on the same clock cannot stretch this out.
+   *
+   * Its own turn is *skipped* rather than queued, so a slow job never accumulates a backlog of
+   * missed turns to work through.
    */
   every?: number
   /** Run one turn. Awaited, so a long job holds the tick rather than overlapping the next one. */
@@ -58,6 +61,11 @@ export interface DaemonTickOptions {
   log: (message: string) => void
 }
 
+/** Ticks between a job's turns, defaulted and floored. */
+function cadence(job: TickJob): number {
+  return Math.max(1, job.every ?? 1)
+}
+
 /**
  * Start the clock and return the handle that stops it.
  *
@@ -71,17 +79,34 @@ export interface DaemonTickOptions {
  */
 export function startDaemonTick(opts: DaemonTickOptions): DaemonTick {
   let stopped = false
-  let count = 0
+  /**
+   * Which tick is running now. Advanced by {@link elapsedWhileBusy} as well as by one, so it
+   * stays a count of how many times the interval has *come round* rather than how many turns
+   * happened to run (#1607).
+   */
+  let tickNow = -1
+  /**
+   * Interval firings that arrived while a turn was in flight. Time passed for them, so they count
+   * towards every cadence — the turn they would each have had is folded into the next one.
+   */
+  let elapsedWhileBusy = 0
   let inflight: Promise<void> | undefined
+  /**
+   * The tick each job last took a turn on, seeded so tick 0 is already due for a job that wants
+   * the start-up turn and one whole cadence away for a job that sits it out.
+   */
+  const lastTurn = opts.jobs.map(job => (job.onStart === false ? 0 : -cadence(job)))
 
-  const runTick = async (): Promise<void> => {
-    const n = count++
-    for (const job of opts.jobs) {
+  const runTick = async (n: number): Promise<void> => {
+    for (const [index, job] of opts.jobs.entries()) {
       if (stopped) return
-      const every = Math.max(1, job.every ?? 1)
-      // Offset by one so a job with `every: 20` runs on tick 0 too when it wants a start-up turn,
-      // and is skipped on tick 0 when it does not.
-      if (n === 0 ? job.onStart === false : n % every !== 0) continue
+      // Ticks *since this job's own last turn*, rather than `n % every`: when the clock jumps
+      // over the tick a job's cadence would have landed on, the job is due at the next turn
+      // instead of waiting a whole further cadence for the modulo to come round again.
+      if (n - lastTurn[index]! < cadence(job)) continue
+      // Claimed before the run, not after: a missed turn is skipped rather than queued, and a job
+      // that throws has still had its turn.
+      lastTurn[index] = n
       try {
         await job.run()
       } catch (err) {
@@ -92,14 +117,30 @@ export function startDaemonTick(opts: DaemonTickOptions): DaemonTick {
 
   const tick = (): Promise<void> => {
     if (stopped) return Promise.resolve()
-    inflight ??= runTick().finally(() => {
+    // A caller that arrives mid-turn joins it without moving the clock: `tick()` means "run a
+    // turn now" — the daemon's shutdown and the tests drive it, and neither is elapsed time.
+    // Only the interval is, and it says so through `elapsedWhileBusy`.
+    if (inflight) return inflight
+    tickNow += 1 + elapsedWhileBusy
+    elapsedWhileBusy = 0
+    inflight = runTick(tickNow).finally(() => {
       inflight = undefined
     })
     return inflight
   }
 
   void tick()
-  const timer = setInterval(() => void tick(), opts.intervalMs ?? DAEMON_TICK_MS)
+  const timer = setInterval(() => {
+    // The clock moved whether or not a turn can start. Counting a firing that lands on a busy
+    // daemon is the whole point: without it a long job — a data sync failing slowly against an
+    // unreachable remote — stretched every `every: N` cadence by its own duration, because a
+    // cadence was measured in turns that ran rather than in time that passed (#1607).
+    if (inflight) {
+      elapsedWhileBusy++
+      return
+    }
+    void tick()
+  }, opts.intervalMs ?? DAEMON_TICK_MS)
   timer.unref?.()
   return {
     tick,

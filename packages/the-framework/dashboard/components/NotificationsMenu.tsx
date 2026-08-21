@@ -15,12 +15,12 @@ import {
   DropdownMenuSeparator,
 } from './ui/dropdown-menu.js'
 
-// One "Notifications" bell in the shell header (#676), replacing the three loose icons (bell /
-// Discord / activity). It makes the model legible: the bell and Discord are *delivery methods*
-// (where a notification goes), "New activity" is a *category* on top of the always-on "needs you"
-// pings. The trigger shows an active state + dot when a method is effectively on; the popover
-// groups and labels every toggle. The underlying prefs and hooks are unchanged — this is purely
-// the header control that writes them. The Discord *bot* (#680) sits in its own "Chat" group
+// One "Notifications" bell in the sidebar's utility footer (#676), replacing the three loose
+// icons (bell / Discord / activity). It makes the model legible: the bell and Discord are
+// *delivery methods* (where a notification goes), "New activity" is a *category* on top of the
+// always-on "needs you" pings. The trigger shows an active state + dot when a method is
+// effectively on; the popover groups and labels every toggle. The underlying prefs and hooks are
+// unchanged — this is purely the control that writes them. The Discord *bot* (#680) sits in its own "Chat" group
 // rather than under a delivery method: it is the one control here that takes messages in.
 
 export function NotificationsMenu() {

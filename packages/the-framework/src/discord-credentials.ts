@@ -1,11 +1,11 @@
 import type { RegistrySecrets } from './registry.js'
 
 /**
- * Where the daemon's two Discord credentials come from (#1095).
+ * Where the daemon's Discord credential — the notifications webhook — comes from (#1095).
  *
- * They used to be environment variables and nothing else, which made "enable Discord" the one
+ * It used to be an environment variable and nothing else, which made "enable Discord" the one
  * onboarding step you could not finish from the dashboard: you had to edit the daemon's
- * environment and restart it. They are now also settable from the UI, stored in the registry file
+ * environment and restart it. It is now also settable from the UI, stored in the registry file
  * beside the daemon token, and picked up without a restart.
  *
  * The values only ever move daemon-side. This module is the rules — resolution, precedence,

@@ -9,7 +9,7 @@ The notification engine: a background poll over the registered projects that ann
 
 - The first look only takes a baseline — whatever already existed when the daemon started is never announced; the user only hears about what happens while it watches.
 - What makes two items "the same" is the caller's decision, so one engine serves both callers: the "needs you" queue (open PRs, parked questions, unpushed work) and the activity feed (agents started and finished).
-- Forgiving: a failed scan or projection simply announces nothing that cycle.
+- Forgiving: a failed scan or projection simply announces nothing that cycle, and never counts as the baseline — the first *successful* look is the one that seeds it.
 - It owns no timer of its own — the daemon's one clock calls it — so its cadence is declared where every other background job's is.
 
 ## Before modifying/creating SPEC.md files

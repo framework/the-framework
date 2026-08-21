@@ -5,7 +5,7 @@ import { Dialog } from './ui/dialog.js'
 import { Button } from './ui/button.js'
 import { usePreferences, updatePreferences, discordEnabled } from '../lib/preferences.js'
 
-// The two Discord setup dialogs (#958, credentials in #1095).
+// The Discord setup dialog (#958, credentials in #1095).
 //
 // #958 shipped these as explainers: they described what to set and told you to edit the daemon's
 // environment and restart it, which is what made Discord the one onboarding step you could not
@@ -23,7 +23,7 @@ import { usePreferences, updatePreferences, discordEnabled } from '../lib/prefer
 export const DISCORD_WEBHOOK_DESCRIPTION =
   'Delivers notifications to Discord, so an agent waiting on you reaches you with no dashboard open.'
 
-/** What both dialogs take from their host: what the daemon holds, and a reload for after a save. */
+/** What the dialog takes from its host: what the daemon holds, and a reload for after a save. */
 interface DialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -70,10 +70,10 @@ interface ToggleSpec {
 }
 
 /**
- * The shell both dialogs are: explain, take the credential, toggle the preference. One component
- * rather than two near-copies, because what differs between them is a credential name and its
- * words — while everything that could drift (what "configured" means, what an env-set credential
- * does to the form, how a save is reported) is behaviour they have to share.
+ * The dialog's shell: explain, take the credential, toggle the preference. Kept apart from the
+ * wiring above so the behaviour that must not drift (what "configured" means, what an env-set
+ * credential does to the form, how a save is reported) lives in one place, whatever credential
+ * a dialog is for.
  */
 function CredentialDialog({
   open,

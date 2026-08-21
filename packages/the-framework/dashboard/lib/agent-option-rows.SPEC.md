@@ -3,7 +3,7 @@ An agent's options as one table with every rule between them already applied, so
 ## Flows
 
 - A box shows the option's effective value, not the stored one: an option overridden by another reads as off, because off is what the agent will do.
-- Transparent turns the whole framework off, so it disables every option below it.
+- Transparent turns the framework's own wrapping off, so it disables the options that ride on it — the system-prompt switch, post-merge cleanup, and the browser — while the publish ladder stays the user's to set.
 - Publishing is a strict ladder — push branch, open PR, auto-merge — each rung alive only while the one below is on, which makes "publish nothing" expressible and the contradictory PR-without-push state unreachable. Auto-merge is the one rung off by default: publishing a branch is reversible, landing it is not.
 - The three publishing boxes store one rung between them: each box writes the rung it means, so unticking one lowers the whole ladder instead of leaving a merge armed over a pull request nobody asked for.
 - The browser option is offered only under Claude Code, the one agent it is wired to; every disabled row says why.

@@ -1,4 +1,4 @@
-The shell header's single notifications bell, making the model legible: where notifications are delivered, and which categories trigger them.
+The single notifications bell in the sidebar's utility footer, making the model legible: where notifications are delivered, and which categories trigger them.
 
 ## Flows
 

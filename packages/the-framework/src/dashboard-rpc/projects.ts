@@ -50,9 +50,10 @@ export async function onOnboarding(): Promise<OnboardingSuggestion> {
 }
 
 /**
- * Whether this project's repo allows GitHub auto-merge (#1417): the launcher warns when the merge
- * rung is armed on a repo that does not, because the armed merge silently degrades to an immediate
- * direct merge (#1216) — the PR lands before CI has run (#1406). Read-only and cached (#1028).
+ * Whether this project's repo allows GitHub auto-merge (#1417): the launcher notes when the merge
+ * rung is armed on a repo that does not, because the merge is then handled by the daemon's CI
+ * watch (merge on green, #1216/#1418) — sound, but only while the daemon runs, unlike GitHub's
+ * server-side auto-merge. Read-only and cached (#1028).
  * `null` when the project is unknown here; `known: false` when `gh` could not say (not installed,
  * not a GitHub repo), which renders nothing rather than crying wolf — the no-crying-wolf stance (#1318).
  */

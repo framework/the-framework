@@ -6,8 +6,8 @@ import { presetContext } from './presets.js'
  * The on-before-mergeable prompt (#326), in `prompts/on_before_mergeable_prompt.md` (#551).
  *
  * It does not *run* the quality presets, it *queues* them: one agent turn that appends
- * "Apply <preset filePath> with tf.params.what set to ..." entries to the session's TODO
- * file, which the backlog loop (#323/#538) picks up later. That is the whole point of
+ * "Apply <preset filePath> with tf.params.what set to ..." entries to the project's queue
+ * file (`TODO_AGENTS.md`), which a later drain picks up. That is the whole point of
  * #556 — the previous suite executed maintainability, readability and security-audit as
  * three child runs on the spot, which does not compose with the queue.
  *

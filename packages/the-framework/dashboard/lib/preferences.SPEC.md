@@ -7,7 +7,7 @@ The dashboard's settings: your own options with the open project's committed set
 - A change shows instantly and saves in the background; the write sends only the keys it changed and adopts the daemon's merged answer, so a stale tab can neither revert other people's changes nor keep showing them wrong.
 - Returning to the tab re-reads both tiers, making edits from another tab or from the repo's settings file on disk visible.
 - Each control can also see which tier won its value — a repo-inherited value shows as not yours — and a project's shared, repo-committed custom presets ride along.
-- The theme choice and the notification toggles read through here, with their defaults defined framework-side so daemon and dashboard cannot drift.
+- The theme choice and the notification toggles read through here; the notification defaults are defined framework-side so daemon and dashboard cannot drift, while the theme's default lives here — absent means follow the OS.
 
 ## Rationales
 

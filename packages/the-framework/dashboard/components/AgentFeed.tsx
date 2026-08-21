@@ -19,9 +19,10 @@ export function AgentFeed({
   agentId: agentId,
 }: {
   events: FrameworkEvent[]
-  /** The feed's own project/run (#1455 item 6): with a projectId the log's `choice` rows become
-   *  the interaction (inline panels/answered cards). */
-  projectId?: string | undefined
+  /** The feed's own project/run (#1455 item 6): the log's `choice` rows are the interaction
+   *  (inline panels/answered cards). Required, so no caller can silently downgrade an open gate
+   *  to log text — a gate rendered as text is a run parked with nothing to answer it (#846). */
+  projectId: string
   agentId?: string | null | undefined
   lost?: boolean
   /** A finished log is static (#1026): it does not follow new output, and opens at its end. */
@@ -54,7 +55,8 @@ export function AgentFeed({
         stick={stick}
         {...(openAt ? { openAt } : {})}
         {...(tail ? { tail } : {})}
-        {...(projectId ? { projectId, agentId: agentId } : {})}
+        projectId={projectId}
+        agentId={agentId}
       />
     </>
   )

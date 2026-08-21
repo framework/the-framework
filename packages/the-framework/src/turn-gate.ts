@@ -182,6 +182,26 @@ export function parseSessionName(text: string): string | undefined {
 }
 
 /**
+ * Parse the pull-request description the agent wrote this turn (#1567), from the last
+ * non-empty `open-pr` block (per {@link SIGNAL_PROTOCOL}). Returns `undefined` when the agent
+ * wrote none, which is the common case and simply leaves the handoff describing the work
+ * itself. A later block in the same turn wins, so an agent may revise it as the work changes.
+ *
+ * The block is how an agent opens a pull request *through the framework* rather than by
+ * reaching for `gh` itself: the description is the agent's, and the handoff keeps the parts
+ * that have to be consistent — the title, the ticket's issue reference, and recording the
+ * number on the agent.
+ */
+export function parsePullRequestDescription(text: string): string | undefined {
+  let description: string | undefined
+  for (const body of blocks(text, 'open-pr')) {
+    const trimmed = body.trim()
+    if (trimmed) description = trimmed
+  }
+  return description
+}
+
+/**
  * Whether the agent signalled `setReadyForMerge()` this turn (#326): the presence of a
  * `ready-for-merge` block (per {@link SIGNAL_PROTOCOL}) anywhere in the text. Non-blocking
  * and body-less — it just flips the agent from building to ready-for-review.
@@ -266,18 +286,20 @@ function parseGateBody(body: string): ParsedAwaitGate | undefined {
 
 /**
  * Emit the {@link PROTOCOLS_SIGNAL} signals an agent turn carries: markdown views, the
- * session name, and `setReadyForMerge()`. Every turn the framework prompts goes through
+ * session name, `setReadyForMerge()`, and a pull-request description. Every turn the framework prompts goes through
  * one of these, because the protocols are unconditional (see `composeAgentSystem`) — the
  * agent is told it can signal on any turn, so any turn we don't parse drops the signal.
  *
  * The returned function holds the dedupe state for the turns it covers: `ready-for-merge`
- * fires once, and a session name only re-emits on an actual rename. Each caller makes one
+ * fires once, and a session name and a pull-request description only re-emit on an actual
+ * change. Each caller makes one
  * for its own span of turns (a build's await rounds, the whole backlog), so keep it for as
  * many turns as should share that dedupe rather than making one per turn.
  */
 export function createTurnSignalEmitter(emit: (event: FrameworkEvent) => void): (text: string) => void {
   let named: string | undefined
   let ready = false
+  let described: string | undefined
   return (text: string): void => {
     for (const view of parseMarkdownViews(text)) emit({ kind: 'view', ...view })
     const name = parseSessionName(text)
@@ -288,6 +310,11 @@ export function createTurnSignalEmitter(emit: (event: FrameworkEvent) => void): 
     if (!ready && parseReadyForMerge(text)) {
       ready = true
       emit({ kind: 'ready-for-merge' })
+    }
+    const description = parsePullRequestDescription(text)
+    if (description && description !== described) {
+      described = description
+      emit({ kind: 'pull-request-description', description })
     }
   }
 }

@@ -91,35 +91,50 @@ function waitingRuns(agents: AgentMeta[], now: number): AgentMeta[] {
   })
 }
 
-/** Parse `git ls-remote origin 'refs/heads/claude/*'`. */
-function parseCloudHeads(listing: string): CloudHead[] {
-  const heads: CloudHead[] = []
-  for (const line of listing.split('\n')) {
-    const head = /^([0-9a-f]{40,64})\t+refs\/heads\/(claude\/.+)$/.exec(line)
-    if (head) heads.push({ ref: head[2]!, sha: head[1]! })
-  }
-  return heads
+/** Where the pass keeps origin's `claude/*` heads locally. */
+const CLOUD_HEAD_PREFIX = 'refs/remotes/origin/claude/'
+
+/**
+ * Bring origin's `claude/*` heads local, once for the whole pass rather than once per head.
+ *
+ * The objects belong to a cloud VM, so they have to be fetched before any ancestry can be read.
+ * This replaces a fetch per unmatched head per waiting run (#1607) — the saving is the call
+ * count, not the transfer: a second fetch of heads already local negotiates and sends nothing.
+ *
+ * The destination refspec is named rather than left to chance. An ordinary checkout would write
+ * these refs anyway, because git opportunistically updates the remote-tracking branches its
+ * configured refspec covers even when the command line names its own; a checkout cloned with a
+ * narrower refspec — `--single-branch` — would not, and would re-fetch every pass forever.
+ *
+ * Pruned, because these refs are now a standing local copy of a list that used to be read live
+ * from origin each pass: without it a `claude/*` branch deleted on origin would go on matching.
+ */
+async function fetchCloudHeads(git: GitRunner, cwd: string): Promise<void> {
+  await git(['fetch', '--prune', 'origin', `+refs/heads/claude/*:${CLOUD_HEAD_PREFIX}*`], cwd)
 }
 
 /**
- * Whether `head` descends from `anchor` — the proof the branch is this run's. The head's
- * objects may not be local (the cloud VM pushed them), so the ref is fetched once when needed;
- * the fetch also (re)supplies the anchor commit itself, being an ancestor. Unprovable reads as
- * "not this run's", retried next pass.
+ * The `claude/*` heads descending from `anchor` — the proof a branch is this run's, asked of git
+ * once for the whole set rather than once per head.
+ *
+ * `--contains` is the same ancestry question `merge-base --is-ancestor` answered one head at a
+ * time, and asking it this way also answers "how many" in the same call. Unprovable reads as no
+ * match and is retried next pass: an anchor whose object is not local is exactly the case where
+ * the session has pushed nothing for it to be an ancestor of.
  */
-async function descendsFrom(git: GitRunner, cwd: string, anchor: string, head: CloudHead): Promise<boolean> {
-  const isAncestor = () =>
-    git(['merge-base', '--is-ancestor', anchor, head.sha], cwd).then(
-      () => true,
-      () => false,
-    )
-  const present = await git(['cat-file', '-e', `${head.sha}^{commit}`], cwd).then(
-    () => true,
-    () => false,
-  )
-  if (present) return isAncestor()
-  if (!(await git(['fetch', 'origin', `refs/heads/${head.ref}`], cwd).then(() => true, () => false))) return false
-  return isAncestor()
+async function headsDescendingFrom(git: GitRunner, cwd: string, anchor: string): Promise<CloudHead[]> {
+  const listing = await git(
+    ['for-each-ref', `--contains=${anchor}`, '--format=%(objectname) %(refname)', CLOUD_HEAD_PREFIX],
+    cwd,
+  ).catch(() => '')
+  const heads: CloudHead[] = []
+  for (const line of listing.split('\n')) {
+    const head = /^([0-9a-f]{40,64}) (.+)$/.exec(line.trim())
+    if (head?.[2]?.startsWith(CLOUD_HEAD_PREFIX)) {
+      heads.push({ ref: `claude/${head[2].slice(CLOUD_HEAD_PREFIX.length)}`, sha: head[1]! })
+    }
+  }
+  return heads
 }
 
 /**
@@ -140,20 +155,14 @@ export async function adoptCloudWork(cwd: string, deps: CloudWorkDeps = {}): Pro
   const waiting = waitingRuns(await agents(cwd).catch((): AgentMeta[] => []), now)
   if (waiting.length === 0) return result
 
-  let listing: string
   try {
-    listing = await git(['ls-remote', 'origin', 'refs/heads/claude/*'], cwd)
+    await fetchCloudHeads(git, cwd)
   } catch {
     return result // no remote, or it cannot be reached: nothing to match against
   }
-  const heads = parseCloudHeads(listing)
-  if (heads.length === 0) return result
 
   for (const run of waiting) {
-    const matches: CloudHead[] = []
-    for (const head of heads) {
-      if (await descendsFrom(git, cwd, run.cloudAnchor!, head)) matches.push(head)
-    }
+    const matches = await headsDescendingFrom(git, cwd, run.cloudAnchor!)
     // Exactly one, or nothing happens: zero is a session that has not pushed (or never will),
     // and two is a history this pass cannot arbitrate — both are the next pass's question.
     if (matches.length !== 1) continue

@@ -1,8 +1,15 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { adoptCloudWork, startCloudWorkAdoption, CLOUD_ADOPTION_WINDOW_MS, type CloudWorkDeps, type CloudWorkResult } from './cloud-work.js'
 import type { AgentMeta } from './store/index.js'
 import type { LinkedPr } from './dashboard/gh.js'
+
+const sh = promisify(execFile)
 
 // #1601: a web run's work lands on the cloud session's own `claude/*` branch, which this pass
 // recognizes by ancestry from the run's hand-off anchor and records onto the run's archive.
@@ -28,20 +35,21 @@ function webRun(over: Partial<AgentMeta> = {}): AgentMeta {
 }
 
 /**
- * A git runner speaking just enough of the pass's dialect: `ls-remote` answers with `heads`,
- * `cat-file -e` says every object is local, and `merge-base --is-ancestor` answers from
- * `descends` (anchor -> the head shas descending from it).
+ * A git runner speaking just enough of the pass's dialect: `fetch` succeeds, and `for-each-ref
+ * --contains=<anchor>` answers with the `heads` whose sha is listed under that anchor in
+ * `descends`, formatted as the remote-tracking refs the fetch would have written.
  */
 function fakeGit(heads: { ref: string; sha: string }[], descends: Record<string, string[]> = { [ANCHOR]: [HEAD_SHA] }) {
   const calls: string[][] = []
   const run = async (args: string[], _cwd: string): Promise<string> => {
     calls.push([...args])
-    if (args[0] === 'ls-remote') return heads.map(h => `${h.sha}\trefs/heads/${h.ref}`).join('\n')
-    if (args[0] === 'cat-file') return ''
-    if (args[0] === 'merge-base') {
-      const [anchor, sha] = [args[2]!, args[3]!]
-      if (descends[anchor]?.includes(sha)) return ''
-      throw new Error('not an ancestor')
+    if (args[0] === 'fetch') return ''
+    if (args[0] === 'for-each-ref') {
+      const anchor = /^--contains=(.+)$/.exec(args[1] ?? '')?.[1] ?? ''
+      return heads
+        .filter(h => descends[anchor]?.includes(h.sha))
+        .map(h => `${h.sha} refs/remotes/origin/${h.ref}`)
+        .join('\n')
     }
     throw new Error(`unexpected git ${args.join(' ')}`)
   }
@@ -142,7 +150,7 @@ test('runs outside the pass: non-web, still running, no anchor, already adopted,
   const { d, recorded } = deps(settled, git)
   await adoptCloudWork(CWD, d)
   assert.deepEqual(recorded.branches, [])
-  assert.deepEqual(git.calls, [], 'nothing waiting means not even an ls-remote')
+  assert.deepEqual(git.calls, [], 'nothing waiting means not even a fetch')
 })
 
 test('a run already adopted but still owed its armed PR keeps being asked about (#1601)', async () => {
@@ -157,7 +165,7 @@ test('a run already adopted but still owed its armed PR keeps being asked about 
 test('no remote, or a remote that cannot be reached, adopts nothing and never throws (#1601)', async () => {
   const git = {
     run: async (args: string[]): Promise<string> => {
-      if (args[0] === 'ls-remote') throw new Error('no remote')
+      if (args[0] === 'fetch') throw new Error('no remote')
       throw new Error('unexpected')
     },
   }
@@ -212,4 +220,120 @@ test('a run whose record names a branch that is neither its birth branch nor the
   assert.deepEqual(recorded.branches, [])
   assert.deepEqual(recorded.opened, [])
   assert.deepEqual(result.adopted, [])
+})
+
+/**
+ * A real repo standing in for the daemon's checkout, plus a separate clone standing in for the
+ * cloud VM. The `claude/*` branches are pushed only from the clone, so the daemon's checkout has
+ * never seen them — which is the whole point: a fixture that pushed them from the checkout under
+ * test would already hold the remote-tracking refs `git push` writes, and the pass's fetch would
+ * have nothing left to prove.
+ */
+async function repoWithCloudHeads(): Promise<{
+  project: string
+  anchor: string
+  strandedAnchor: string
+  cleanup: () => Promise<void>
+}> {
+  const origin = await mkdtemp(join(tmpdir(), 'framework-cloud-work-origin-'))
+  const project = await mkdtemp(join(tmpdir(), 'framework-cloud-work-'))
+  const session = await mkdtemp(join(tmpdir(), 'framework-cloud-work-session-'))
+  const identify = async (cwd: string) => {
+    for (const cfg of [
+      ['user.email', 'test@example.com'],
+      ['user.name', 'Test'],
+      ['commit.gpgsign', 'false'],
+    ]) {
+      await sh('git', ['config', ...cfg], { cwd })
+    }
+  }
+  await sh('git', ['init', '-q', '--bare'], { cwd: origin })
+  await sh('git', ['init', '-q', '-b', 'main'], { cwd: project })
+  await identify(project)
+  await sh('git', ['remote', 'add', 'origin', origin], { cwd: project })
+
+  const git = (...args: string[]) => sh('git', args, { cwd: project })
+  const head = async () => (await git('rev-parse', 'HEAD')).stdout.trim()
+  await writeFile(join(project, 'a.txt'), 'base')
+  await git('add', '-A')
+  await git('commit', '-qm', 'base')
+  const base = await head()
+  await git('push', '-q', 'origin', 'main')
+
+  // The two hand-off anchors the driver pushes from this checkout: one the session will build
+  // on, one whose session never pushes anything at all.
+  await git('checkout', '-q', '-b', 'run', base)
+  await git('commit', '-q', '--allow-empty', '-m', 'hand-off anchor')
+  const anchor = await head()
+  await git('push', '-q', 'origin', 'HEAD:refs/heads/tf-agent-run')
+  await git('checkout', '-q', '-b', 'stranded', base)
+  await git('commit', '-q', '--allow-empty', '-m', 'hand-off anchor 2')
+  const strandedAnchor = await head()
+  await git('push', '-q', 'origin', 'HEAD:refs/heads/tf-agent-stranded')
+  await git('checkout', '-q', 'main')
+
+  // The cloud VM: a different clone, which is where every `claude/*` branch is pushed from.
+  await sh('git', ['clone', '-q', origin, session])
+  await identify(session)
+  const vm = (...args: string[]) => sh('git', args, { cwd: session })
+  await vm('checkout', '-q', '-b', 'work', anchor)
+  await vm('commit', '-q', '--allow-empty', '-m', 'session work')
+  await vm('push', '-q', 'origin', 'HEAD:refs/heads/claude/this-run')
+  // And a `claude/*` branch forked before the anchor exists: ancestry must rule it out.
+  await vm('checkout', '-q', '-b', 'unrelated', base)
+  await vm('commit', '-q', '--allow-empty', '-m', 'someone else')
+  await vm('push', '-q', 'origin', 'HEAD:refs/heads/claude/not-this-run')
+
+  return {
+    project,
+    anchor,
+    strandedAnchor,
+    cleanup: async () => {
+      for (const dir of [project, origin, session]) await rm(dir, { recursive: true, force: true })
+    },
+  }
+}
+
+test('against real git: the anchor picks out its own `claude/*` head and no other (#1601/#1607)', async () => {
+  // The other tests speak to a fake git, which will agree with whatever commands the pass sends
+  // it. This one runs the real ones, so a wrong refspec or a wrong ancestry query is caught here.
+  const { project, anchor, strandedAnchor, cleanup } = await repoWithCloudHeads()
+  try {
+    // Nothing local knows about the session's branches yet: the fetch has to go and get them.
+    const before = await sh('git', ['for-each-ref', '--format=%(refname)', 'refs/remotes/origin/claude/'], { cwd: project })
+    assert.equal(before.stdout.trim(), '', 'the checkout under test has never seen a `claude/*` head')
+
+    const recorded: { agentId: string; branch: string }[] = []
+    const seams = (cloudAnchor: string): CloudWorkDeps => ({
+      agents: async () => [webRun({ cloudAnchor, handoff: { push: true, pr: false } })],
+      prs: async () => [],
+      patch: async (_cwd, agentId, patch) => {
+        if (patch.branch !== undefined) recorded.push({ agentId, branch: patch.branch })
+        return true
+      },
+      now: () => NOW,
+    })
+
+    const matched = await adoptCloudWork(project, seams(anchor))
+    assert.deepEqual(
+      matched.adopted.map(a => a.branch),
+      ['claude/this-run'],
+      'the branch descending from the anchor, and not the one forked before it',
+    )
+    assert.deepEqual(recorded, [{ agentId: ID, branch: 'claude/this-run' }])
+    assert.deepEqual(matched.failed, [])
+
+    // The fetch wrote remote-tracking refs rather than leaving the objects reachable only from
+    // `FETCH_HEAD`, which is what keeps the next garbage collection from throwing them away.
+    const after = (await sh('git', ['for-each-ref', '--format=%(refname)', 'refs/remotes/origin/claude/'], { cwd: project })).stdout
+    assert.match(after, /refs\/remotes\/origin\/claude\/this-run/)
+
+    // A run whose session pushed nothing matches nothing, and is left for the next pass.
+    recorded.length = 0
+    const stranded = await adoptCloudWork(project, seams(strandedAnchor))
+    assert.deepEqual(stranded.adopted, [], 'no head descends from that anchor')
+    assert.deepEqual(recorded, [])
+  } finally {
+    await cleanup()
+  }
 })

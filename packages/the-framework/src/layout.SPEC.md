@@ -1,5 +1,10 @@
 The layout gate: a framework build refuses to run in a repo that records a different bookkeeping layout, instead of committing files under names the repo no longer uses.
 
+## User Stories
+
+- The user whose installed build and repo disagree on the bookkeeping layout is refused at session start — no degraded mode, no wrong-layout commits rejected hours later.
+- The user reads, in the refusal, both layouts and the fix for each direction.
+
 ## Flows
 
 - Every activated repo carries a small committed marker naming the layout its bookkeeping is on (the data branch's name, and where archives, tickets, and the queue live).

@@ -1,5 +1,10 @@
 Reads and writes the two Discord credentials in the user's registry file, and tells the running daemon when they change so a pasted token works without a restart.
 
+## User Stories
+
+- The user pastes Discord credentials into the dashboard and they take effect without restarting the daemon.
+- The user who tries to edit an environment-owned credential is told no, and told why.
+
 ## Flows
 
 - A credential set in the daemon's environment cannot be edited here: the save is refused with an explanation instead.

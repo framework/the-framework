@@ -1,5 +1,10 @@
 How far a finished agent publishes itself — one ordinal covering keep it local, push the branch, open a pull request, merge it.
 
+## User Stories
+
+- The user picks how far a finished agent publishes itself — keep it local, push the branch, open a pull request, or merge — as one choice.
+- The user who picks nothing gets a pull request opened for the work, so it never sits on a local branch nobody is told about; merging always has to be asked for.
+
 ## Flows
 
 - One ladder, not three switches. The stages are strictly nested — a pull request needs a pushed branch, a merge needs a pull request — so a rung includes every rung below it, and the impossible combinations are not representable.

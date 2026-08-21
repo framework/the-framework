@@ -139,3 +139,47 @@ test('stopping waits out the turn already in flight, rather than only the next o
   assert.equal(finished, true, 'stop resolved only once the sweep had finished')
   await turn
 })
+
+test('a firing that lands mid-turn still counts, so one slow job cannot stretch every other cadence', async () => {
+  // #1607: a cadence was measured in turns that *ran*, and a firing arriving mid-turn joined the
+  // one in flight without being counted anywhere. A job that blocked for minutes — the case seen
+  // live was a data sync failing slowly against an unreachable remote — therefore pushed every
+  // other `every: N` job out by its own duration: a ten-minute pass came round every twenty-six.
+  let rare = 0
+  let slowTurns = 0
+  let releaseSlow = (): void => {}
+  const blocked = new Promise<void>(resolve => {
+    releaseSlow = resolve
+  })
+  const tick = startDaemonTick({
+    intervalMs: 5,
+    log: () => {},
+    jobs: [
+      { name: 'rare', every: 5, run: async () => void rare++ },
+      { name: 'slow', run: async () => void (slowTurns++ === 0 && (await blocked)) },
+    ],
+  })
+  try {
+    // The constructor's tick 0: `rare` takes its start-up turn, then `slow` holds the turn open.
+    const turn0 = tick.tick()
+    await new Promise(resolve => setTimeout(resolve, 50))
+    assert.equal(rare, 1, 'only the start-up turn so far — the clock is still inside tick 0')
+
+    // ~10 firings came round at 5ms apart while that one turn was in flight.
+    releaseSlow()
+    await turn0
+    await tick.tick()
+
+    // Well past tick 5, so `rare` is due now — not five *further* turns from now, which is what
+    // counting only the turns that ran used to mean.
+    assert.equal(rare, 2, 'the firings that landed mid-turn counted towards the cadence')
+    // And each job took exactly one further turn: the ones they missed are skipped, never queued
+    // up to be worked through one after another.
+    assert.equal(slowTurns, 2, 'one further turn, not one per firing that was missed')
+  } finally {
+    // Before `stop()`, which waits out the turn in flight: a turn still blocked here would
+    // deadlock the shutdown rather than fail the assertion above.
+    releaseSlow()
+    await tick.stop()
+  }
+})

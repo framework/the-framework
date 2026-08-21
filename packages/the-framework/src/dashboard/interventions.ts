@@ -1,5 +1,5 @@
 import { listAgents, readLiveMetas, type LiveAgent, type AgentMeta } from '../store/index.js'
-import type { ProjectSummary } from './projects.js'
+import type { ProjectSummary, ProjectionRead } from './projects.js'
 import { isAgentBranch, readAgentHandoff, agentBranchFor, type AgentHandoff } from './agent-handoff.js'
 import { ghPrList, type OpenPr, type PrLister } from './gh.js'
 import { interventionKey } from './keys.js'
@@ -77,16 +77,29 @@ const HANDOFF_LIMIT = 5
  * (or an unreadable one) simply contributes nothing. Hand-opened draft PRs are excluded: they are
  * not yet asking for review. A session's own draft is not (#1102), because that is how
  * auto-handoff hands work back.
+ *
+ * Which projects were read whole comes back alongside the items (#1623): forgiveness here is what
+ * lets one unreachable project keep the queue useful, and it is also what would let that project's
+ * whole backlog announce itself as new the moment it came back. The queue's panels ignore this;
+ * the notification watcher is the caller that cannot.
  */
 export async function buildInterventions(
   projects: ProjectSummary[],
   deps: InterventionsDeps = {},
-): Promise<Intervention[]> {
+): Promise<ProjectionRead<Intervention>> {
   const prs = deps.prs ?? ghPrList
   const liveAgents = deps.liveAgents ?? readLiveMetas
   const items: Intervention[] = []
+  const whole: string[] = []
   for (const project of projects) {
-    const open = await prs(project.path).catch(() => [])
+    // A project is read whole only when every one of its sources answered. Each `unread()` below is
+    // a source that did not, and contributed nothing for a reason other than nothing being there.
+    let sawEverything = true
+    const unread = () => {
+      sawEverything = false
+      return []
+    }
+    const open = await prs(project.path).catch(unread)
     for (const pr of open) {
       // A draft opened by hand is not asking for review, so it stays off the queue. A draft the
       // framework opened for a session is the opposite (#1102): auto-handoff opens it as a draft
@@ -107,7 +120,7 @@ export async function buildInterventions(
     // still `running` and has an unresolved choice gate. An agent parks on one gate at a time, but
     // a project now has several concurrent agents (#736), so each parked agent contributes its own
     // item — keyed on the gate id, plus the agent id so two agents are told apart.
-    for (const meta of await liveAgents(project.path).catch(() => [])) {
+    for (const meta of await liveAgents(project.path).catch(unread)) {
       if (meta.status !== 'running' || !meta.pendingChoice) continue
       items.push({
         projectId: project.id,
@@ -128,13 +141,15 @@ export async function buildInterventions(
     // Surfacing only: this says there is a decision waiting, it does not take it. Since #1102 a
     // session usually pushes itself, so what reaches here is the remainder — auto-handoff turned
     // off for the project, or turned off for that session, or tried and failed.
-    for (const item of await unpushedFor(project, deps).catch(() => [])) items.push(item)
+    for (const item of await unpushedFor(project, deps, unread).catch(unread)) items.push(item)
+    if (sawEverything) whole.push(project.id)
   }
   items.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
   // The same repo can be registered under two projects (e.g. a monorepo root + a subdir), so a
   // PR would otherwise appear once per entry. Collapse by identity, keeping the first (newest-sorted).
   const seen = new Set<string>()
-  return items.filter(item => (seen.has(interventionKey(item)) ? false : (seen.add(interventionKey(item)), true)))
+  const unique = items.filter(item => (seen.has(interventionKey(item)) ? false : (seen.add(interventionKey(item)), true)))
+  return { items: unique, whole }
 }
 
 /**
@@ -143,7 +158,11 @@ export async function buildInterventions(
  * Only the most recent {@link InterventionsDeps.handoffLimit} finished agents are inspected: each
  * costs several git reads and this runs on a poll.
  */
-async function unpushedFor(project: ProjectSummary, deps: InterventionsDeps): Promise<Intervention[]> {
+async function unpushedFor(
+  project: ProjectSummary,
+  deps: InterventionsDeps,
+  unread: () => void,
+): Promise<Intervention[]> {
   const agents = deps.agents ?? listAgents
   const handoff =
     deps.handoff ??
@@ -161,7 +180,10 @@ async function unpushedFor(project: ProjectSummary, deps: InterventionsDeps): Pr
   const items: Intervention[] = []
   for (const agent of finished) {
     const branch = agentBranchFor(agent)
-    const state = await handoff(project.path, branch).catch(() => undefined)
+    const state = await handoff(project.path, branch).catch(() => {
+      unread()
+      return undefined
+    })
     // Every condition is a reason this is *not* waiting on anyone: the branch is gone, the session
     // wrote nothing, it already landed, it is already on the remote, or there is nowhere to push.
     if (!state || !state.exists || state.empty || state.merged || state.pushed || !state.hasRemote) continue

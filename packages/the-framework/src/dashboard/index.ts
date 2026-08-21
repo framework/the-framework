@@ -4,6 +4,7 @@ export {
   summarizeProject,
   defaultProjectsProvider,
   type ProjectSummary,
+  type ProjectionRead,
   type ProjectsProvider,
   type SummarizeDeps,
 } from './projects.js'

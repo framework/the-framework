@@ -20,7 +20,7 @@ test('buildActivity maps a running run to started and a terminal run to finished
     '/b': [agent({ id: 'r2', status: 'done', intent: 'fix login', updatedAt: '2026-07-16T01:00:00Z' })],
   }
   const readAgents = async (cwd: string): Promise<AgentMeta[]> => agentsByPath[cwd] ?? []
-  const items = await buildActivity([project('a', '/a'), project('b', '/b')], { readAgents })
+  const { items } = await buildActivity([project('a', '/a'), project('b', '/b')], { readAgents })
 
   // Newest first.
   assert.deepEqual(
@@ -34,7 +34,7 @@ test('buildActivity maps a running run to started and a terminal run to finished
 
 test('buildActivity carries the terminal status so a stop reads differently from a done', async () => {
   const readAgents = async (): Promise<AgentMeta[]> => [agent({ status: 'stopped', updatedAt: '2026-07-16T02:00:00Z' })]
-  const items = await buildActivity([project('a', '/a')], { readAgents })
+  const { items } = await buildActivity([project('a', '/a')], { readAgents })
   assert.deepEqual({ kind: items[0]!.kind, status: items[0]!.status }, { kind: 'finished', status: 'stopped' })
 })
 
@@ -43,7 +43,7 @@ test('buildActivity emits one item per run across a project history', async () =
     agent({ id: 'live', status: 'running', updatedAt: '2026-07-16T05:00:00Z' }),
     agent({ id: 'old', status: 'done', updatedAt: '2026-07-15T00:00:00Z' }),
   ]
-  const items = await buildActivity([project('a', '/a')], { readAgents })
+  const { items } = await buildActivity([project('a', '/a')], { readAgents })
   assert.deepEqual(items.map(i => [i.agentId, i.kind]), [['live', 'started'], ['old', 'finished']])
 })
 
@@ -52,17 +52,25 @@ test('buildActivity caps each project to the most recent runs', async () => {
     agent({ id: `r${i}`, status: 'done', updatedAt: `2026-07-16T00:${String(i).padStart(2, '0')}:00Z` }),
   )
   const readAgents = async (): Promise<AgentMeta[]> => many
-  const items = await buildActivity([project('a', '/a')], { readAgents })
+  const { items } = await buildActivity([project('a', '/a')], { readAgents })
   assert.equal(items.length, 20)
 })
 
-test('buildActivity skips a project whose run read throws', async () => {
+test('buildActivity skips a project whose run read throws, and does not call it read (#1623)', async () => {
   const readAgents = async (cwd: string): Promise<AgentMeta[]> => {
     if (cwd === '/boom') throw new Error('disk exploded')
     return [agent({ id: 'ok', status: 'done' })]
   }
-  const items = await buildActivity([project('boom', '/boom'), project('ok', '/ok')], { readAgents })
+  const { items, whole } = await buildActivity([project('boom', '/boom'), project('ok', '/ok')], { readAgents })
   assert.deepEqual(items.map(i => i.projectId), ['ok'])
+  assert.deepEqual(whole, ['ok'])
+})
+
+test('buildActivity calls a project read when it has no runs at all (#1623)', async () => {
+  const readAgents = async (): Promise<AgentMeta[]> => []
+  const { items, whole } = await buildActivity([project('fresh', '/fresh')], { readAgents })
+  assert.deepEqual(items, [])
+  assert.deepEqual(whole, ['fresh'])
 })
 
 test('activityKey separates a run start from its finish', () => {

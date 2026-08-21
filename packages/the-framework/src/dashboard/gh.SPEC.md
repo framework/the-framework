@@ -8,7 +8,7 @@ Everything the dashboard asks or tells GitHub — pull request lookups, merging,
 
 ## Flows
 
-- Reads are quick, cached, and forgiving: an unreachable GitHub reads as nothing, never a failed page.
+- Reads are quick, cached, and forgiving: an unreachable GitHub reads as nothing, never a failed page. The one exception is the list of a project's open pull requests, which says so when GitHub could not answer: its reader has to tell that apart from a project with no open pull requests, and a page showing nothing is a smaller cost than a notification flood.
 - An agent's PR is picked from its branch's whole history — an open PR always counts, a closed one only if created after the agent began — so a reused branch name cannot wear a predecessor's merged PR.
 - Merging prefers GitHub's auto-merge, so the PR lands when its checks pass. Where the repo refuses auto-merge, a merge the user asked for goes through directly; the automatic path merges only on green checks and otherwise hands the PR to the daemon's CI watch, which merges it once its checks pass — unverified work never lands.
 - A draft in the way is marked ready and retried: asking for the merge says its review already happened.

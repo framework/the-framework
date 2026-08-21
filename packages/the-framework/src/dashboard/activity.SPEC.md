@@ -9,7 +9,7 @@ The activity feed: the cross-project stream of agent lifecycle moments — an ag
 - Each project's recent agents contribute one item apiece: "started" while it runs, "finished" once it ends, tagged by how it ended so a stop reads differently from a success.
 - A start and a finish are separate events, so an agent notifies at most twice — and one that starts and ends between two polls notifies once, as finished.
 - Activity is off by default: it is the "for your information" counterpart to the always-on interventions feed, the list of what needs the user.
-- Several updates post to Discord as one message; a project whose history cannot be read contributes nothing.
+- Several updates post to Discord as one message; a project whose history cannot be read contributes nothing — and is reported as unread, so it is not mistaken for a project that has simply never run anything.
 
 ## Before modifying/creating SPEC.md files
 

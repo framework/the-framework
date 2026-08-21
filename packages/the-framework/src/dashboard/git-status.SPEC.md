@@ -1,5 +1,11 @@
 A project's git status for the panel: the current branch, whether there are uncommitted changes, and the pull request linked to that branch.
 
+## User Stories
+
+- The user sees a project's current branch, whether it has uncommitted changes, and the branch's pull request.
+- The user's status row renders without waiting on GitHub; a slow PR lookup arrives late as "not known yet".
+- The user viewing an agent's checkout sees that agent's own PR, never a predecessor's from a reused branch name.
+
 ## Flows
 
 - Branch and dirtiness are instant local reads; the PR is the slow lookup, served through the cache and allowed to arrive late as "not known yet" rather than holding the row back on every poll.

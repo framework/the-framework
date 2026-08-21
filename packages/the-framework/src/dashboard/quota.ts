@@ -34,6 +34,22 @@ export interface QuotaView {
 /** Where a dashboard reads the quota from. */
 export interface QuotaSource {
   read(): Promise<QuotaView>
+  /**
+   * Where the account stands once the model the work will run on is named (#1619).
+   *
+   * A different question from {@link QuotaView.boundary}, and deliberately a second method rather
+   * than an argument to {@link QuotaSource.read}: the panel's boundary is about the account, this
+   * one is about one impending run, and a shared entry point that answered both would leave the
+   * panel's call looking like it had simply forgotten to pass a model — which is exactly how the
+   * model's own week came to be filtered out of every gate for a year.
+   *
+   * Both are measured off the same reading and the same slider, so #960's one-source promise
+   * holds: they cannot disagree about the account, only about a question the other never asked.
+   *
+   * No model given is the account's week alone. That is not a shortcut: with no model preference
+   * set the driver picks, and a window we cannot name the model of must not stop work (#879).
+   */
+  boundaryFor(model?: string): Promise<QuotaBoundaryStatus | undefined>
   /** Stop any polling behind it. */
   stop(): void
 }
@@ -41,10 +57,12 @@ export interface QuotaSource {
 /**
  * A {@link QuotaSource} backed by a live poller.
  *
- * The boundary is computed per call rather than captured: it moves with the
- * clock, so a cached one would be stale the moment the week's day rolls over.
- * No model is passed — the panel is about the account, and a model's own week
- * only narrows the gate for an agent that has chosen one (#879).
+ * Both questions are measured per call rather than captured: the boundary moves with the clock,
+ * so a cached one would be stale the moment the week's day rolls over. Neither costs a reading —
+ * the poller's last good windows are measured again, so asking per project is free.
+ *
+ * The panel's own boundary names no model on purpose: the bar is about the account, and a model's
+ * own week only narrows the gate for a run that has chosen one (#879/#1619).
  */
 export function pollerQuotaSource(
   poller: QuotaPoller,
@@ -52,12 +70,17 @@ export function pollerQuotaSource(
   /** The user's slider position, read per call so moving it takes effect without a restart (#960). */
   limitOffset: () => number | Promise<number> = () => DEFAULT_SPEND_OFFSET,
 ): QuotaSource {
+  const measure = async (model?: string) => {
+    const windows = poller.current().lastGood?.windows ?? []
+    return quotaBoundaryStatus({ windows, now: now(), ...(model ? { model } : {}), limitOffset: await limitOffset() })
+  }
   return {
     stop: () => poller.stop(),
+    boundaryFor: model => measure(model),
     read: async () => {
       const envelope = poller.current()
       const windows = envelope.lastGood?.windows ?? []
-      const boundary = quotaBoundaryStatus({ windows, now: now(), limitOffset: await limitOffset() })
+      const boundary = await measure()
       const view: QuotaView = {
         windows,
         ...(boundary ? { boundary } : {}),

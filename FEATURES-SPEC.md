@@ -133,6 +133,7 @@ happens while nobody is at the keyboard.
 
 - Usage panel: quota consumed, pace, projection
 - Unattended work stands down past the pro-rated share of the week — quota gates *starting* work, never an agent already running
+- The chosen model's own weekly allowance gates unattended work too — a spent model week holds the work back while the account's week still has room
 - Work you asked for is never starved
 - Spend-offset slider — the one budget control for autonomous work
 

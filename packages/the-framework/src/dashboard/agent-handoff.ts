@@ -743,6 +743,12 @@ export type HandoffAgent = Pick<AgentMeta, 'id' | 'branch' | 'sessionName' | 'in
      * closes the issue; without it an auto-merged quick-win leaves its ticket open.
      */
     fixes?: string
+    /**
+     * The agent's own description of the work (#1567), from an `open-pr` block: the PR body
+     * when it wrote one. Absent, the body describes what was asked for instead — which is all
+     * the framework knows on its own.
+     */
+    description?: string
   }
 
 /** The PR title for a session (#1102), with the ticket's issue reference riding along (#1334). */
@@ -762,10 +768,18 @@ function prNumberFromUrl(url: string | undefined): number | undefined {
   return match ? Number(match[1]) : undefined
 }
 
-/** The PR body: what was asked for, and which session did it. */
+/**
+ * The PR body: what the agent said about the work, else what was asked for — and which session
+ * did it either way.
+ *
+ * The agent's own description wins where it wrote one (#1567), because it describes what the
+ * change turned out to be; the intent only says what was asked at the start, which is the best
+ * the framework can do by itself.
+ */
 function agentPrBody(agent: HandoffAgent): string {
   const lines: string[] = []
-  if (agent.intent) lines.push(agent.intent.trim(), '')
+  const opening = agent.description?.trim() || agent.intent?.trim()
+  if (opening) lines.push(opening, '')
   lines.push(`Opened from The Framework session \`${agent.sessionName ?? agent.id}\`.`)
   return lines.join('\n')
 }

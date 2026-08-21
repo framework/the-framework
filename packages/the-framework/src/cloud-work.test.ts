@@ -153,6 +153,18 @@ test('runs outside the pass: non-web, still running, no anchor, already adopted,
   assert.deepEqual(git.calls, [], 'nothing waiting means not even a fetch')
 })
 
+test('the archive is only asked for the window, so an old history costs no reads (#1607)', async () => {
+  // The pass runs on a cadence forever while the archive only grows, so the window has to reach
+  // the store rather than being applied after every record has already been parsed.
+  const asked: number[] = []
+  const { d } = deps([webRun()])
+  await adoptCloudWork(CWD, {
+    ...d,
+    agents: async (_cwd, since) => (asked.push(since), [webRun()]),
+  })
+  assert.deepEqual(asked, [NOW - CLOUD_ADOPTION_WINDOW_MS])
+})
+
 test('a run already adopted but still owed its armed PR keeps being asked about (#1601)', async () => {
   // The session pushed its branch but had not opened a PR when the branch was adopted; a later
   // pass finds the PR (or opens the armed draft) without re-recording the branch.

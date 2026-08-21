@@ -111,7 +111,7 @@ happens while nobody is at the keyboard.
 - Handoff panel: push / open PR / merge, as buttons
 - A withheld merge is reported with its reason
 - Agent history archived on the `tf-data` branch under per-user directories — pushed the moment a session settles
-- Post-merge quality follow-ups queued (maintainability / security / readability)
+- Post-merge quality follow-ups queued (maintainability / security)
 - Knowledge folded back into `DECISIONS.md` / `FACTS.md` / `INSIGHTS.md` at merge
 
 ## Autonomy — what happens when nobody is at the keyboard

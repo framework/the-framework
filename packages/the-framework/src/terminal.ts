@@ -31,6 +31,8 @@ export function formatFrameworkEvent(event: FrameworkEvent): string {
       return `  session: ${event.name}`
     case 'ready-for-merge':
       return `✓ ready for merge`
+    case 'pull-request-description':
+      return `  pull request description written`
     case 'settled':
       return `◆ done for now — waiting for your next message`
     case 'ticket':

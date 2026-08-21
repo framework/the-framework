@@ -11,8 +11,8 @@ When you call setReadyForMerge() — you believe the work is complete and ready 
 ```
 
 ## Opening a pull request
-When your work is ready to be published, describe it in an `open-pr` block and The Framework opens the pull request for you — you do not need to run `gh pr create` yourself:
+Whenever you emit `ready-for-merge`, emit an `open-pr` block too, describing the work. The Framework opens the pull request for you and this block is its body — you do not need to run `gh pr create` yourself:
 ```open-pr
 <what changed, and why — markdown, as long as it needs to be>
 ```
-The block is the body of the pull request. The Framework supplies the rest: the title from your session name, the ticket's issue reference where there is one, and recording the number so every surface shows the same pull request. You do not stop, and you can re-emit it as the work changes — the last one is used. Opening the pull request yourself still works if you prefer; you then own all of the above.
+Without it the pull request can only repeat the prompt you were given, which does not say what the work turned out to be. The Framework supplies everything else: the title from your session name, the ticket's issue reference where there is one, and recording the number so every surface shows the same pull request. You do not stop, and you can re-emit it as the work changes — the last one is used. Opening the pull request yourself instead still works; you then own all of the above.

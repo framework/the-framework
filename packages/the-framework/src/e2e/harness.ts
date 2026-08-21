@@ -154,7 +154,9 @@ export async function makeWorld(): Promise<StoryWorld> {
     remote: runtime.remoteAgents,
     preferences: registryPreferencesStore(),
     discord: registryDiscordCredentialsStore(),
-    quota: { read: async () => quota.view, stop: () => {} },
+    // The story sets one view; both questions are answered off it, since a story that cares about
+    // the model's own week states that window in the view it sets (#1619).
+    quota: { read: async () => quota.view, boundaryFor: async () => quota.view.boundary, stop: () => {} },
     autoPm: () => autoPm.report,
     autoPmSweep: async (opts?: { drainOnly?: boolean }) => {
       autoPm.sweeps.push(opts ?? {})

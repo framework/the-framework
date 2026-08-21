@@ -8,8 +8,9 @@ import { promisify } from 'node:util'
 import { startBackgroundServices, syncProjectData } from './daemon-services.js'
 import { projectErrorStore } from './project-errors.js'
 import { dataWorktreePath, withDataBranch } from './data-branch.js'
-import { quotaBoundaryStatus } from './quota-boundary.js'
-import type { QuotaSource, QuotaView } from './dashboard/quota.js'
+import { pollerQuotaSource, type QuotaSource } from './dashboard/quota.js'
+import { QuotaPoller } from './quota-poller.js'
+import type { DriverQuotaWindow } from './driver/index.js'
 import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
 
 /**
@@ -24,26 +25,6 @@ import type { StartAgentOptions, StartAgentResult } from './dashboard/types.js'
  * is about how many agents are asked for and with what, not about the child processes.
  */
 
-/** A reading with room to spare, so the quota gate is never the reason a start did not happen. */
-function spareQuota(): QuotaSource {
-  // Placed against the real clock, since the sweep's own `now` is not injectable from here: the
-  // week resets four days out, so ~43% of it has elapsed and 1% used is nowhere near the line.
-  const resets = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000)
-  const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][resets.getUTCMonth()]
-  const windows = [
-    {
-      label: 'Current week (all models)',
-      kind: 'week' as const,
-      percentUsed: 1,
-      resetsAtText: `${month} ${resets.getUTCDate()} at 7am (UTC)`,
-    },
-  ]
-  const boundary = quotaBoundaryStatus({ windows, now: Date.now() })
-  if (!boundary) throw new Error('the fixture week should be placeable')
-  const view: QuotaView = { windows, boundary, readAt: Date.now() }
-  return { read: async () => view, stop: () => {} }
-}
-
 /** Six open entries, distinguishable, in the format the sweep's reader actually parses. */
 const QUEUE_ENTRIES = [
   '[Entry one](tickets/2026-07-01_one.md) — the first thing',
@@ -56,8 +37,27 @@ const QUEUE_ENTRIES = [
 
 const git = promisify(execFile)
 
+/**
+ * A quota source over a real reading, built the way the daemon builds its own (#1619): the poller
+ * and `pollerQuotaSource` are the production ones, and only the driver call is stubbed. A hand-made
+ * fake would answer whatever the test wanted here, which is exactly how a gate that never passed a
+ * model went a year without anyone noticing.
+ */
+async function accountQuota(windows: DriverQuotaWindow[]): Promise<QuotaSource> {
+  const poller = new QuotaPoller({ read: async () => ({ available: true, windows }) })
+  await poller.poll()
+  return pollerQuotaSource(poller)
+}
+
+/** A week that resets four days out, so ~43% of it has elapsed and the boundary sits there. */
+function weekResetText(): string {
+  const resets = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000)
+  const month = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][resets.getUTCMonth()]
+  return `${month} ${resets.getUTCDate()} at 7am (UTC)`
+}
+
 /** A registry + checkout wired to `startBackgroundServices`, with every start recorded. */
-async function services(preferences: Record<string, unknown>) {
+async function services(preferences: Record<string, unknown>, quota?: QuotaSource) {
   const config = await mkdtemp(join(tmpdir(), 'framework-concurrency-cfg-'))
   const project = await mkdtemp(join(tmpdir(), 'framework-concurrency-proj-'))
   // A real git checkout whose tickets and queue live on the data branch (#1582), because the
@@ -91,7 +91,9 @@ async function services(preferences: Record<string, unknown>) {
     cwd: project,
     env: { XDG_CONFIG_HOME: config },
     dashboardUrl: 'http://localhost:4000',
-    quota: spareQuota(),
+    // A reading with room to spare, unless the test is about the gate itself: 1% used against a
+    // week that is ~43% elapsed is nowhere near the line.
+    quota: quota ?? (await accountQuota([{ label: 'Current week (all models)', kind: 'week', percentUsed: 1, resetsAtText: weekResetText() }])),
     startAgent: async (prompt, options, projectId): Promise<StartAgentResult> => {
       starts.push({ prompt, options, projectId })
       return { ok: true, agentId: `run-${starts.length}` }
@@ -294,5 +296,46 @@ test('a project whose data branch cannot reach a remote carries a data-sync erro
   } finally {
     await rm(project, { recursive: true, force: true })
     await rm(remote, { recursive: true, force: true })
+  }
+})
+
+test("unattended work stands down when the model it would run on has spent its own week (#1619)", async () => {
+  // The account has most of its week left; the model the runs would use has none of its own.
+  // Before this was wired, the sweep read the account's 30%, started its batch, and every agent in
+  // it died at its first API call with "limit reached".
+  const quota = await accountQuota([
+    { label: 'Current week (all models)', kind: 'week', percentUsed: 30, resetsAtText: weekResetText() },
+    { label: 'Current week (Fable)', kind: 'week-model', percentUsed: 100, resetsAtText: weekResetText() },
+  ])
+  const { starts, stop, services: running } = await services({ autoPm: true, autoPmConcurrency: 4, model: 'claude-fable-5' }, quota)
+  try {
+    // Waited on the sweep's own report rather than a bare delay: the assertion is that the pass ran
+    // and decided not to start, which a timeout could not tell from a pass that had not run yet.
+    await settle(() => running.autoPmReport().outcomes.length > 0)
+    assert.equal(starts.length, 0, 'a spent model week starts nothing, however much of the account week is left')
+    // And it says which window stopped it: "the quota" alone would send someone to a panel that
+    // is showing 30% and looking fine.
+    const outcome = running.autoPmReport().outcomes[0]
+    assert.equal(outcome?.started, false)
+    assert.match(outcome?.message ?? '', /Current week \(Fable\) is 100% used/)
+  } finally {
+    await stop()
+  }
+})
+
+test('the same spent model week does not stop work on a model that has its own allowance left (#1619)', async () => {
+  // The gate is the model's week, not any model's week: with the preference on Opus, Fable being
+  // spent is none of this run's business — and the account's own week is still under its line.
+  const quota = await accountQuota([
+    { label: 'Current week (all models)', kind: 'week', percentUsed: 30, resetsAtText: weekResetText() },
+    { label: 'Current week (Fable)', kind: 'week-model', percentUsed: 100, resetsAtText: weekResetText() },
+  ])
+  const { starts, stop } = await services({ autoPm: true, autoPmConcurrency: 2, model: 'claude-opus-5' }, quota)
+  try {
+    await settle(() => starts.length >= 2)
+    assert.equal(starts.length, 2, 'the batch goes out as usual')
+    assert.equal(starts[0]!.options.model, 'claude-opus-5', 'and on the model the gate was measured for')
+  } finally {
+    await stop()
   }
 })

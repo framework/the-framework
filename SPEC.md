@@ -12,7 +12,7 @@ Autonomous AI programming: humans make the important decisions while The Framewo
 
 ## Flows
 
-- The product is a local daemon plus a dashboard. The user registers repos, and from then on coding agents (Claude Code today, other CLIs pluggable behind the same driver interface) work on them: each agent gets a throwaway copy of the repo, does its work, and hands the result off as a pull request.
+- The product is a local daemon plus a dashboard. The user registers repos, and from then on coding agents work on them: each agent gets a throwaway copy of the repo, does its work, and hands the result off as a pull request. Claude Code does the coding today; other CLIs can plug in behind the same adapter, the *driver*.
 - The human's job shrinks to decisions: answer the questions an agent parks on, accept or reject proposed tickets, review PRs. Everything else — picking the next task, triaging, planning, fixing red CI, merging on green — the daemon does by itself when nobody is at the keyboard, as long as the account's quota allows it.
 - The driver is a black box: The Framework prompts it, lets it run a full turn, then reads the code and the turn's final message. It never micro-manages individual tool calls, and the CLI keeps its own subscription login — The Framework adds orchestration, not another AI bill.
 - Two satellites complete the family: a browser extension that bridges claude.ai cloud sessions back to the daemon, and the product's website.

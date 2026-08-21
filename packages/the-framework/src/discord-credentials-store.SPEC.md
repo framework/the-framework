@@ -1,4 +1,4 @@
-Reads and writes the two Discord credentials in the user's registry file, and tells the running daemon when they change so a pasted token works without a restart.
+Reads and writes the Discord notifications webhook in the user's registry file, and tells the running daemon when it changes so a pasted credential works without a restart.
 
 ## User Stories
 

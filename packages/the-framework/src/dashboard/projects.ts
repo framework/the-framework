@@ -38,6 +38,21 @@ export interface ProjectSummary {
   errors?: ProjectError[]
 }
 
+/**
+ * A projection over the registered projects, together with the projects it could actually see.
+ *
+ * A project whose sources cannot be read contributes no items — which is exactly what a project
+ * with nothing waiting contributes. `whole` is what tells the two apart (#1623). Only a caller
+ * that keeps a baseline of what it has already announced needs the distinction; the panels that
+ * simply render the list read `items` and ignore it.
+ */
+export interface ProjectionRead<T> {
+  /** What was found. Possibly only part of it, when some project could not be read. */
+  items: T[]
+  /** The ids of the projects every source answered for, so their share of `items` is all of it. */
+  whole: string[]
+}
+
 /** Injectable readers so {@link summarizeProject} is unit-testable off disk. */
 export interface SummarizeDeps {
   isActivated?: (path: string) => Promise<boolean>

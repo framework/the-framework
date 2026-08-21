@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ghMergePr, ghPrCiStatus, ghPrView, ghRepoAutoMerge, githubToken } from './gh.js'
+import { ghMergePr, ghPrCiStatus, ghPrList, ghPrView, ghRepoAutoMerge, githubToken } from './gh.js'
 import type { GhRunner } from './gh.js'
 
 /** A `gh` that answers with `stdout`, or rejects, and records what it was asked. */
@@ -267,4 +267,18 @@ test('a field gh does not answer with is absent rather than undefined-valued', a
   const { gh } = fakeGh(JSON.stringify({ number: 2, url: 'u', state: 'OPEN', title: 't' }))
   const pr = await ghPrView('/repo', 'tf-thing', gh)
   assert.ok(pr && !('createdAt' in pr), 'createdAt must not be present when gh did not answer with it')
+})
+
+test('ghPrList reports a gh that could not answer, rather than calling it an empty queue (#1623)', async () => {
+  // Every other read here forgives its own failure. This one must not: its caller keeps a baseline
+  // of what it has already announced, and "no PRs" swallowed from "no answer" makes the next good
+  // read announce the entire open backlog as new.
+  const { gh } = fakeGh(new Error('gh: not authenticated'))
+  await assert.rejects(ghPrList('/repo', gh))
+})
+
+test('ghPrList reads the open PRs when gh answers (#1623)', async () => {
+  const { gh, calls } = fakeGh(JSON.stringify([{ number: 3, title: 'a fix', url: 'u3', isDraft: false }]))
+  assert.deepEqual((await ghPrList('/repo', gh)).map(pr => pr.number), [3])
+  assert.ok(calls[0]!.includes('--json'))
 })

@@ -214,7 +214,7 @@ export async function onHotTickets(): Promise<HotTicket[]> {
 
 /** The cross-project interventions queue (#632, Queue #624): open PRs that need review, newest first. */
 export async function onInterventions(): Promise<Intervention[]> {
-  return withProjects(buildInterventions)
+  return (await withProjects(buildInterventions)).items
 }
 
 /** Every session's open question with its full gate (#1455), longest-waiting first: the launcher's hub. */
@@ -224,7 +224,7 @@ export async function onOpenQuestions(): Promise<OpenQuestion[]> {
 
 /** The cross-project "New activity" feed (#627): recent run started/finished transitions, newest first. */
 export async function onActivity(): Promise<Activity[]> {
-  return withProjects(buildActivity)
+  return (await withProjects(buildActivity)).items
 }
 
 /** The Overview dashboard page (#471): the {@link onOverview} rollup plus agent counts, run-status totals, and activity. */

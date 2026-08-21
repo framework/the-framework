@@ -394,6 +394,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
             projects,
             build: items => buildInterventions(items, { dashboardUrl: deps.dashboardUrl }),
             keyOf: interventionKey,
+            scopeOf: item => item.projectId,
             onNew: async items => {
               if (!notifies(await prefs(), 'discord', 'humanIntervention')) return
               const delivered = await postInterventionsDiscord(webhook, items).catch(() => false)
@@ -404,6 +405,7 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
             projects,
             build: buildActivity,
             keyOf: activityKey,
+            scopeOf: item => item.projectId,
             onNew: async items => {
               if (!notifies(await prefs(), 'discord', 'newActivity')) return
               const delivered = await postActivityDiscord(webhook, items).catch(() => false)

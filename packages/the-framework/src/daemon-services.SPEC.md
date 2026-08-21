@@ -5,6 +5,7 @@ Everything the daemon runs in the background beside serving the dashboard: Disco
 - The user toggles a background service on the dashboard and it takes effect without restarting the daemon.
 - The user pastes a Discord webhook into the dashboard and notifications start immediately.
 - The user walks away and idle quota is spent on the roadmap: unattended agents drain the confirmed queue, CI-green pull requests are merged, and red ones get a fix agent.
+- The user finds unattended work held back, and the reason said, when the model that work would run on has spent its own weekly allowance — rather than a stack of runs that died at their first request.
 - The user reads on this machine what other machines and cloud sessions pushed, without waiting.
 - The user sees a project flagged when its shared data cannot reach origin, and the flag clears with the first sync that converges.
 
@@ -15,6 +16,7 @@ Everything the daemon runs in the background beside serving the dashboard: Disco
 - An agent the daemon starts resolves its options from the same two tiers a dashboard start uses — the user's settings, then the repo's committed file — so an agent nobody asked for and one someone clicked differ only in who asked.
 - Auto PM spends idle quota on the roadmap: it fans out up to the configured number of unattended agents, each pinned to one queue entry. An entry is retired on the data branch (the dedicated branch the framework's shared records live on) once its agent's ending reports the work published — and it is the daemon, never the agent, that writes queue check-offs and ticket locks.
 - The CI watch merges a watched PR once its checks pass, and puts a fix agent on one whose checks fail.
+- Every job that starts work on its own measures the account against the model that start would use, resolved from the same two tiers the start itself resolves. A model whose own weekly allowance is spent therefore stands the work down, however much of the account's week is left. The fix half says its stand-down once per failing head commit rather than on every turn of the clock.
 - An hourly sweep deletes the dead refs Claude-web hand-offs leave on origin, once they are old enough and provably hold no work.
 - Settled web runs are matched to the `claude/*` branch that grew out of their hand-off, and the branch and its PR are adopted onto the run's record — with the armed draft PR opened when the session never opened one.
 - The Discord notification watchers are rebuilt when the webhook changes, so a value pasted into the dashboard works immediately.

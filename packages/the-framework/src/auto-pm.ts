@@ -472,8 +472,15 @@ export interface AutoPmDeps {
    * setting has never meant "less".
    */
   concurrency?(): Promise<number | undefined>
-  /** Where the account stands against its boundary, or `undefined` when there is no reading. */
-  quota(): Promise<QuotaBoundaryStatus | undefined>
+  /**
+   * Where the account stands against its boundary for the work *this project* would start, or
+   * `undefined` when there is no reading.
+   *
+   * Asked per project rather than once per sweep (#1619): the model is a project-resolvable
+   * setting, and the model's own weekly window binds alongside the account's (#879) — so two
+   * projects on two models can stand at two different places against the same reading.
+   */
+  quota(project: AutoPmProject): Promise<QuotaBoundaryStatus | undefined>
   /** The jobs to rotate through, in cycle order. Used only while the queue is empty. */
   jobs: readonly AutoPmJob[]
   /** The job for a queue with open entries (#855); {@link AUTO_PM_DRAIN_JOB} by default. */
@@ -684,9 +691,6 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
       // the cycle stays a cycle: with two of four off, the remaining two alternate instead of
       // every other tick landing on a job that cannot run.
       const rotation = deps.jobs.filter(job => !optedOut.has(job.name))
-      // One reading for the whole sweep: it is an account-wide meter, and re-reading it per
-      // project would spend a rate-limited call to learn the same number.
-      const quota = await deps.quota().catch(() => undefined)
       // How many agents each project may keep going (#1204). Read beside the opt-outs and for the
       // same reason: it is the same preference file, re-read so the setting takes effect
       // mid-schedule. Floored at one, since zero agents is the master switch's job.
@@ -747,6 +751,9 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           }
         }
         const entries = await deps.queue(project).catch(() => undefined)
+        // Per project, because the model the work would run on is (#1619). It costs no reading:
+        // the meter is polled elsewhere and this only measures the last one against the boundary.
+        const quota = await deps.quota(project).catch(() => undefined)
         const activeAgents = deps.activeAgents(project)
         const since = lastStart.get(project.id)
         const decision = autoPmDecision({

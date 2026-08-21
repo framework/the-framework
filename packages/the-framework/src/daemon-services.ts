@@ -169,6 +169,17 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     return deps.startAgent(prompt, { ...options, ...extra, unattended: true }, projectId)
   }
 
+  /**
+   * Where the account stands against the boundary for the run {@link startUnattended} would make
+   * on this project (#1619) — the same resolve, asked for the model rather than for the options.
+   *
+   * Both self-starting gates go through here for the same reason both starts go through
+   * `startUnattended`: a gate that measured a different model than the one about to run would
+   * clear a window that is already spent, and the run would die at its first API call.
+   */
+  const quotaFor = async (projectId: string) =>
+    deps.quota.boundaryFor((await resolveProjectAgentOptions(projectId, env)).model)
+
   // Auto PM (#685/#773): while the queue is dry and there is quota to spare, triage and
   // plan tickets rather than let the day's allowance expire unused.
   const autoPm = startAutoPm({
@@ -185,8 +196,10 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // How many agents the routine may keep going per project (#1204). Global like the opt-outs;
     // the sweep applies the default when it is unset.
     concurrency: async () => (await prefs()).autoPmConcurrency,
-    // The quota boundary is the gate (#879): auto PM has no budget notion of its own.
-    quota: async () => (await deps.quota.read()).boundary,
+    // The quota boundary is the gate (#879): auto PM has no budget notion of its own. Measured for
+    // the project's own model (#1619), so a spent model week stands the sweep down here instead of
+    // letting it start runs that die at their first API call.
+    quota: project => quotaFor(project.id),
     // The periodic codebase sweep (#882). The schedule is a file in the project checkout rather
     // than loop state, because unlike the rotation it has to survive a daemon restart: a machine
     // rebooted daily would otherwise sweep every morning and never reach its interval.
@@ -294,6 +307,10 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     log,
   })
 
+  // The stand-downs the fix half has already said, keyed `<cwd>\0<number>\0<headSha>` like the
+  // sweep's own attempted-merge set: in memory, so a restart says it once more.
+  const quotaSaid = new Set<string>()
+
   // Watch the PRs the framework is waiting to land (#1418): merge a `watched` PR once its checks
   // pass (the #1417/#1406 answer for repos without GitHub auto-merge), and put an agent on a
   // watched PR whose checks fail. The merge half runs ungated — it finishes a merge the agent was
@@ -306,10 +323,22 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     deps: {
       fix: async (cwd, request) => {
         if ((await prefs()).autoPm !== true) return undefined
-        const boundary = (await deps.quota.read().catch(() => undefined))?.boundary
-        if (!quotaHeadroom(boundary).start) return undefined
         const project = (await projects()).find(p => p.path === cwd)
         if (!project) return undefined
+        // Resolved before the meter is read, because the model the fix would run on is what the
+        // meter has to be measured against (#1619).
+        const headroom = quotaHeadroom(await quotaFor(project.id).catch(() => undefined))
+        if (!headroom.start) {
+          // Said once per failing head, the same re-arm rule the fix half's own restraint uses
+          // (#1418): a stand-down that repeated every tick would drown the log for as long as the
+          // PR stayed red, and one that said nothing at all is what made this invisible (#1619).
+          const key = `${cwd}\0${request.number}\0${request.headSha}`
+          if (!quotaSaid.has(key)) {
+            quotaSaid.add(key)
+            log(`[framework] CI watch: not starting a fix for PR #${request.number} — ${headroom.reason}`)
+          }
+          return undefined
+        }
         // The fix lands on the red PR's own branch, so this agent's handoff must not push or open
         // anything of its own.
         const result = await startUnattended(project.id, ciFixPrompt(request), { handoff: 'local' })

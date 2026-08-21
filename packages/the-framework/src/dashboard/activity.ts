@@ -1,6 +1,6 @@
 import { readAllAgents, type AgentMeta, type AgentStatus } from '../store/index.js'
 import { postDiscordWebhook } from './discord-webhook.js'
-import type { ProjectSummary } from './projects.js'
+import type { ProjectSummary, ProjectionRead } from './projects.js'
 
 // The identity + diff live in the leaf `keys.ts` so the dashboard can share them (they are pure);
 // re-exported here so this stays the import site for anything that already reads them from the
@@ -62,22 +62,30 @@ function activityFor(project: ProjectSummary, agent: AgentMeta): Activity {
 /**
  * Build the cross-project activity feed: for each registered project's most recent agents, one
  * item per agent reflecting where it is now (`started` while it runs, `finished` once it lands),
- * newest first. Forgiving — a project whose agents cannot be read simply contributes nothing.
+ * newest first. Forgiving — a project whose agents cannot be read simply contributes nothing, and
+ * comes back named as one that was *not* read whole (#1623), since "nothing happened there" and
+ * "I could not look" are the same empty list to everyone but the notification watcher.
  *
  * The `started` and `finished` items for one agent carry distinct keys ({@link activityKey}), so a
  * run that is still going notifies once (started) and again when it lands (finished). An agent that
  * both starts and finishes between two polls is only ever seen terminal, so it notifies once
  * (finished) — one quick agent, one line.
  */
-export async function buildActivity(projects: ProjectSummary[], deps: ActivityDeps = {}): Promise<Activity[]> {
+export async function buildActivity(
+  projects: ProjectSummary[],
+  deps: ActivityDeps = {},
+): Promise<ProjectionRead<Activity>> {
   const readAgents = deps.readAgents ?? readAllAgents
   const items: Activity[] = []
+  const whole: string[] = []
   for (const project of projects) {
-    const agents = (await readAgents(project.path).catch(() => [])).slice(0, RECENT_RUNS)
-    for (const agent of agents) items.push(activityFor(project, agent))
+    const read = await readAgents(project.path).catch(() => undefined)
+    if (!read) continue
+    whole.push(project.id)
+    for (const agent of read.slice(0, RECENT_RUNS)) items.push(activityFor(project, agent))
   }
   items.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))
-  return items
+  return { items, whole }
 }
 
 

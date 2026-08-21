@@ -434,13 +434,21 @@ export interface OpenPr {
   createdAt?: string
 }
 
-/** A checkout's open PRs; resolves `[]` when there is no remote or gh is unavailable. */
-export async function ghPrList(cwd: string): Promise<OpenPr[]> {
+/**
+ * A checkout's open PRs. Unlike the other reads here it *rejects* when gh could not answer — no
+ * remote, not authenticated, GitHub unreachable — instead of resolving `[]`.
+ *
+ * "No PRs are open" and "I could not look" are different answers, and its caller keeps a baseline
+ * of what it has already announced (#1623): taking the second for the first makes the next
+ * successful read announce every already-open PR as new. The caller decides what a failure costs;
+ * it cannot decide what it never hears about.
+ */
+export async function ghPrList(cwd: string, gh: GhRunner = readGh): Promise<OpenPr[]> {
   const fields = 'number,title,url,isDraft,headRefName,createdAt'
   const args = ['pr', 'list', '--state', 'open', '--limit', '50', '--json', fields]
-  return ghJson<OpenPr[]>(args, cwd, [])
+  return JSON.parse(await gh(args, cwd)) as OpenPr[]
 }
 
-/** Lists a checkout's open PRs; resolves `[]` when there is no remote / gh is unavailable. */
+/** Lists a checkout's open PRs; rejects when there is no remote / gh is unavailable. */
 export type PrLister = (cwd: string) => Promise<OpenPr[]>
 

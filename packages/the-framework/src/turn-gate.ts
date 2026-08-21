@@ -182,23 +182,50 @@ export function parseSessionName(text: string): string | undefined {
 }
 
 /**
- * Parse the pull-request description the agent wrote this turn (#1567), from the last
- * non-empty `open-pr` block (per {@link SIGNAL_PROTOCOL}). Returns `undefined` when the agent
- * wrote none, which is the common case and simply leaves the handoff describing the work
- * itself. A later block in the same turn wins, so an agent may revise it as the work changes.
+ * The longest first line still readable as a title (#1618). Past this the agent wrote a
+ * paragraph, not a name for its work, and the block is taken as body alone — a pull request
+ * whose title runs to a paragraph is a squash-merge subject that runs to a paragraph.
+ */
+const MAX_PR_TITLE = 100
+
+/** What the agent asked the framework to open a pull request with (#1567/#1618). */
+export interface ParsedPullRequest {
+  /** The agent's name for the work: the block's first line, when it reads as a title. */
+  title?: string
+  /** What changed and why: everything after that line, or the whole block when there is no title. */
+  description?: string
+}
+
+/**
+ * Parse the pull request the agent asked for this turn (#1567), from the last non-empty
+ * `open-pr` block (per {@link SIGNAL_PROTOCOL}). Returns `undefined` when the agent wrote none,
+ * which simply leaves the handoff describing the work itself. A later block in the same turn
+ * wins, so an agent may revise it as the work changes.
  *
  * The block is how an agent opens a pull request *through the framework* rather than by
- * reaching for `gh` itself: the description is the agent's, and the handoff keeps the parts
- * that have to be consistent — the title, the ticket's issue reference, and recording the
- * number on the agent.
+ * reaching for `gh` itself: the title and the description are the agent's, and the handoff keeps
+ * the parts that have to be consistent — the ticket's issue reference and recording the number
+ * on the agent.
+ *
+ * Shaped like a commit message, and read like one: the first line names the work, the rest
+ * describes it. A first line too long to be a name is not treated as one (#1618) — the block is
+ * all description then, and the title falls back to the session's name rather than being cut
+ * mid-sentence, which is how a raw prompt ended up as a permanent commit subject.
  */
-export function parsePullRequestDescription(text: string): string | undefined {
-  let description: string | undefined
+export function parsePullRequest(text: string): ParsedPullRequest | undefined {
+  let parsed: ParsedPullRequest | undefined
   for (const body of blocks(text, 'open-pr')) {
     const trimmed = body.trim()
-    if (trimmed) description = trimmed
+    if (!trimmed) continue
+    const [first = '', ...rest] = trimmed.split('\n')
+    const title = first.trim()
+    const description = rest.join('\n').trim()
+    parsed =
+      title.length <= MAX_PR_TITLE
+        ? { title, ...(description ? { description } : {}) }
+        : { description: trimmed }
   }
-  return description
+  return parsed
 }
 
 /**
@@ -311,10 +338,11 @@ export function createTurnSignalEmitter(emit: (event: FrameworkEvent) => void): 
       ready = true
       emit({ kind: 'ready-for-merge' })
     }
-    const description = parsePullRequestDescription(text)
-    if (description && description !== described) {
-      described = description
-      emit({ kind: 'pull-request-description', description })
+    const pr = parsePullRequest(text)
+    const seen = pr && `${pr.title ?? ''}\n${pr.description ?? ''}`
+    if (pr && seen !== described) {
+      described = seen
+      emit({ kind: 'open-pr', ...pr })
     }
   }
 }

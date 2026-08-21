@@ -2,7 +2,7 @@ Why a pull request that does not finish an issue must not carry a phrase GitHub 
 
 ## User Stories
 
-- The user merges a plan's pull request and the ticket it discusses stays open, even though the plan's own text says the work will close it.
+- The user merges a plan's pull request and the ticket it discusses stays open, even though the plan's own text — its title as much as its body — says the work will close it.
 - The user follows the issue reference in that sentence, and finds it still links to the issue — and the issue still shows that the pull request mentioned it.
 
 ## Flows

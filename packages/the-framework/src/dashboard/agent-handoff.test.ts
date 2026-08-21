@@ -889,6 +889,42 @@ test("a run implementing a ticket carries its issue as `(fix #42)` in the PR tit
   assert.equal(title, 'fix-login (fix #42)')
 })
 
+async function titleOf(agent: Parameters<typeof agentAutoHandoff>[1]): Promise<string | undefined> {
+  const gh: string[][] = []
+  const { git } = fakeGit({ ...READY, push: '' })
+  await agentAutoHandoff('/repo', agent, { push: true, pr: true }, {
+    git,
+    pr: async () => undefined,
+    gh: async args => {
+      gh.push(args)
+      return 'https://github.com/o/r/pull/9\n'
+    },
+  })
+  return gh[0]?.[gh[0].indexOf('--title') + 1]
+}
+
+test("the PR is titled with the agent's own name for the work (#1618)", async () => {
+  // The first line of its `open-pr` block: the one rung that says what the change turned out to
+  // be, in a whole sentence, rather than the slug the session happens to be called.
+  const title = await titleOf({
+    id: 'r1',
+    branch: 'the-framework/x',
+    sessionName: 'queue-reader',
+    prTitle: 'Keep the queued state across a reload',
+    fixes: '#42',
+  })
+  assert.equal(title, 'Keep the queued state across a reload (fix #42)')
+})
+
+test('a session that named nothing gets its id as the title, not the prompt it was given (#1618)', async () => {
+  // The prompt used to be the middle rung, cut to 72 characters. The squash merge made that a
+  // permanent commit subject: an instruction, truncated mid-sentence, standing in for a
+  // description of the change. The session id says less and misleads nobody.
+  const intent = 'Open TODO_AGENTS.md and work on the FIRST open entry only. When the work is done, close the ticket it links to.'
+  assert.equal(await titleOf({ id: 'r1', branch: 'the-framework/x', intent }), 'Session r1')
+  assert.equal(await titleOf({ id: 'r1', branch: 'the-framework/x', intent, fixes: '#1' }), 'Session r1 (fix #1)')
+})
+
 test("the Merge action merges the session's open PR, marking a draft ready on the way (#1391)", async () => {
   const gh: string[][] = []
   const result = await mergeAgentPr(

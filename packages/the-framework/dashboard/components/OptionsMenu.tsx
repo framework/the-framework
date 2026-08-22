@@ -31,6 +31,7 @@ export type { OptionRow } from '../lib/agent-option-rows.js'
 // Moved to ui/option-label.tsx (#948) so menus without preference wiring can share it;
 // re-exported to keep this module the import site the other menus already use.
 import { OptionLabel } from './ui/option-label.js'
+import { RUN_TARGET_LABELS } from '../lib/agent-settings.js'
 export { OptionLabel }
 
 /**
@@ -91,9 +92,9 @@ function StatusDot({ status }: { status: DeviceStatus | undefined }) {
 // (Check-marked rows), not the boolean OptionRow. "Claude web" describes the hand-off it is
 // rather than promising a streamed agent: the session runs on claude.ai and opens its own PR.
 const RUN_TARGET_ROWS: { value: AgentTarget; label: string; description: string }[] = [
-  { value: 'local', label: 'This machine', description: 'Run on this machine, as today.' },
-  { value: 'actions', label: 'GitHub Actions', description: 'Run on a fresh GitHub Actions runner.' },
-  { value: 'web', label: 'Claude web', description: 'Hand off to a Claude Code cloud session, which opens its own PR.' },
+  { value: 'local', label: RUN_TARGET_LABELS.local, description: 'Run on this machine, as today.' },
+  { value: 'actions', label: RUN_TARGET_LABELS.actions, description: 'Run on a fresh GitHub Actions runner.' },
+  { value: 'web', label: RUN_TARGET_LABELS.web, description: 'Hand off to a Claude Code cloud session, which opens its own PR.' },
 ]
 
 // One flat "Run on" list (#1066/#1067): the driver rows, then the saved devices and "Add a device",

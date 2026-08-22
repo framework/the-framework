@@ -6,6 +6,7 @@ The Overview's Routine work card: the jobs fired by the scheduled sweep — the 
 - The queue-draining routine's Run now fires a drain-only sweep — the only path that can fan out several agents, up to the concurrency setting; card-fired routines run unattended, like the sweep's own.
 - Two checkbox tiers: the master switch turns the schedule on or off, a row's box takes that one routine in or out of it — recorded as opt-outs, so a routine added by a later version runs by default.
 - "Trigger routine now" sweeps once even with auto-run off (the click is the consent), and the sweep answers on the card per project, so "ran and found nothing" never looks like "never ran".
+- Hovering a Run now says what it is about to spend before it is spent: what that routine does, which model it will use, and where it runs — none of which the card can otherwise show, because all three come from the Global options on another page. The queue-draining routine answers differently, since its Run now is the sweep rather than one start: it visits every project the daemon watches, and each of those decides its own model and place.
 - Beside each Run now sits "Configure first, then run": it opens the picked project's launcher with that routine's prompt already in the box, so the model and where it runs can be set before an agent is spent. For the queue-draining routine it says what it costs — the launcher sends one agent, not the fan-out.
 
 ## Before modifying/creating SPEC.md files

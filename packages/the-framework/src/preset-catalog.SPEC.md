@@ -11,6 +11,7 @@ The one table of every built-in preset — the prompts the product offers as one
 - Presets that pause for a human are kept off unattended schedules; the scheduled triage pair pins its own session name so a firing aborts instead of triaging twice.
 - The GitHub-sync preset always opens an agent of its own — its work is about the repo, not the conversation it was clicked from.
 - The launcher's menu is one ordered list; the queue-drain preset is daemon-only and absent from it.
+- A preset can carry a one-line description of what it queues, said wherever the preset is offered: under its name in the launcher's menu, and on the routine that fires it, so the same work is described the same way in both places.
 - Recognising "the prompt that drains the queue" compares against the rendered preset itself, so rewording the preset cannot silently break the detection.
 
 ## Before modifying/creating SPEC.md files

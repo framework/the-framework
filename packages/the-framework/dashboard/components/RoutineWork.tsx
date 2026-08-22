@@ -15,6 +15,7 @@ import { useStartAgent } from '../lib/use-start-agent.js'
 import { useLoaded } from '../lib/use-async.js'
 import { formatUntil } from '../lib/format-date.js'
 import { stashPendingDraft } from '../lib/draft-handoff.js'
+import { describeAgentSettings } from '../lib/agent-settings.js'
 import { cn } from '../lib/utils.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { Button, buttonVariants } from './ui/button.js'
@@ -141,6 +142,18 @@ export function RoutineWork({
     onSelectProject(projectId)
   }
 
+  /**
+   * What a Run now is about to spend, said before it is spent (#1506). The card fires prompts on
+   * settings that are nowhere on it: the model and where it runs come from the Global options, a
+   * page away, so the button's own cost was invisible right up until the agent existed.
+   *
+   * The first line is the preset's own sentence rather than one written again here (#1506), so the
+   * launcher and this card describe a routine the same way, and the second is rendered from the
+   * very preferences the start reads — not a copy that can go stale.
+   */
+  const settings = describeAgentSettings(preferences)
+  const projectName = projects.find(p => p.id === projectId)?.name
+
   const runNow = async (job: AutoPmJob) => {
     if (!projectId || busy) return
     // The drain's Run now means "spin agents up on the queue" (#1204), and only the sweep can fan
@@ -229,17 +242,38 @@ export function RoutineWork({
                       only exists under a mouse is reachable by neither keyboard nor touch. The
                       chevron is the secondary half, so the common click stays one click. */}
                   <div className="flex shrink-0 items-center">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="xs"
-                      disabled={busy || !projectId}
-                      onClick={() => void runNow(job)}
-                      className="rounded-r-none border-r-0"
-                    >
-                      <Play className="h-3 w-3" aria-hidden />
-                      {starting === job.name ? 'Starting…' : 'Run now'}
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            disabled={busy || !projectId}
+                            onClick={() => void runNow(job)}
+                            className="rounded-r-none border-r-0"
+                          />
+                        }
+                      >
+                        <Play className="h-3 w-3" aria-hidden />
+                        {starting === job.name ? 'Starting…' : 'Run now'}
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[22rem] space-y-1">
+                        {job.tooltip && <span className="block">{job.tooltip}</span>}
+                        {/* The drain row's Run now is the sweep, so neither half of the settings
+                            line would be true of it: the sweep resolves each project's own
+                            `the-framework.yml` on top of these preferences, and it visits every
+                            project rather than the one picked above. It says that instead. */}
+                        <span className="block text-muted-foreground">
+                          {job.drains ? "Each project's own settings decide the model and where it runs." : settings}
+                        </span>
+                        <span className="block text-muted-foreground">
+                          {job.drains
+                            ? `Sweeps every project the daemon watches, up to ${concurrency} ${concurrency === 1 ? 'agent' : 'agents'} each, unattended.`
+                            : `Starts one agent${projectName ? ` in ${projectName}` : ''}, unattended — nothing is asked mid-run.`}
+                        </span>
+                      </TooltipContent>
+                    </Tooltip>
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         type="button"

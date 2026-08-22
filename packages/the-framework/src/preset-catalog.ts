@@ -91,7 +91,7 @@ export const presets = {
   updateTickets: definePreset({ name: 'update-tickets', template: PRESETS_UPDATE_TICKETS, label: 'Update from GitHub', newAgent: true, tooltip: 'Bring `tickets/` up to date with the GitHub issues. An empty `tickets/` gets a full first import.' }),
 
   /** [Plan tickets] (#685): turn tickets into costed plans. */
-  planTickets: definePreset({ name: 'plan-tickets', template: PRESETS_PLAN_TICKETS, label: 'Plan tickets (aka spike)' }),
+  planTickets: definePreset({ name: 'plan-tickets', template: PRESETS_PLAN_TICKETS, label: 'Plan tickets (aka spike)', tooltip: 'Turn `tickets/*.md` into costed plans (`tickets/*.plan.md`)' }),
 
   /** [Suggest new tickets] (#462/#683): the dashboard prefills this one line and the user edits it freely. */
   suggestNewTickets: definePreset({ name: 'suggest-new-tickets', template: PRESETS_SUGGEST_NEW_TICKETS, label: 'Suggest new tickets' }),
@@ -114,7 +114,7 @@ export const presets = {
   suggestTicketsToWorkOn: definePreset({ name: 'suggest-tickets-to-work-on', template: PRESETS_SUGGEST_TICKETS_TO_WORK_ON, label: 'Suggest tickets to work on', tooltip: 'Add tickets to queue (TODO_AGENTS.md)' }),
 
   /** [Drain queue] (#855): work the entries already on `TODO_AGENTS.md`. */
-  drainQueue: definePreset({ name: 'drain-queue', template: PRESETS_DRAIN_QUEUE, label: 'Spin up agents working on the AI queue' }),
+  drainQueue: definePreset({ name: 'drain-queue', template: PRESETS_DRAIN_QUEUE, label: 'Spin up agents working on the AI queue', tooltip: 'Work the entries already on the queue (TODO_AGENTS.md)' }),
 
   /**
    * [Do quick-win work] (#891) and [Do consensual work] (#892): read `tickets/*.md`, pick the ones

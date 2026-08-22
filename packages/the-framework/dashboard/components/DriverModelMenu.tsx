@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { ChevronDown, Check } from 'lucide-react'
 import { cn } from '../lib/utils.js'
+import { NO_MODEL_PINNED } from '../lib/agent-settings.js'
 import { buttonVariants } from './ui/button.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
 import {
@@ -31,9 +32,6 @@ export interface DriverOption {
   /** The models this driver offers. Every entry is a real model id — none of them means "unset". */
   models: ModelOption[]
 }
-
-/** What the trigger and tooltip say when no model is pinned and the CLI picks for itself. */
-const NO_MODEL_PINNED = "the CLI's own default"
 
 function driverOf(drivers: DriverOption[], value: string): DriverOption | undefined {
   return drivers.find(a => a.value === value) ?? drivers[0]

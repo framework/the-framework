@@ -316,6 +316,42 @@ async function waitForSpecs(log: string, expected: number): Promise<AgentSpec[]>
   return lines.map(line => JSON.parse(line) as AgentSpec)
 }
 
+/** A stub CLI that stays up until it is told to stop, like a run whose process outlived its work. */
+async function writeLingeringStub(dir: string): Promise<string> {
+  const stub = join(dir, 'lingering-stub.cjs')
+  await writeFile(stub, `process.on('SIGTERM', () => process.exit(0))\nsetInterval(() => {}, 1000)\n`)
+  return stub
+}
+
+test('a held slot names its run and pid, and the shutdown names what it stopped (#1646)', async () => {
+  // The daemon's slot table is the one place a process that outlived its finished run still
+  // shows: the Agents panel reads each run's own status. So the reading has to say *which* run
+  // holds a slot, or a cap reached by such a process reads as a bug in the count.
+  const cwd = await initRepo('framework-slots-')
+  const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeLingeringStub(cwd) })
+  try {
+    const result = (await runtime.onStart('build a thing', 'build')) as { ok: boolean; agentId?: string }
+    assert.equal(result.ok, true)
+    const agentId = result.agentId!
+    const home = projectId(cwd)
+    let slots = runtime.activeAgentSlots(home)
+    for (let i = 0; i < POLL_ATTEMPTS && slots.length === 0; i++) {
+      await new Promise(r => setTimeout(r, 20))
+      slots = runtime.activeAgentSlots(home)
+    }
+    assert.equal(slots.length, 1)
+    assert.equal(slots[0]!.agentId, agentId, 'the slot is the run the worktree is named with')
+    assert.equal(slots[0]!.state, 'live')
+    assert.equal(typeof slots[0]!.pid, 'number', 'and its process, so `ps` can be asked about it')
+    // Stopping it returns the same name, which is what the shutdown line prints.
+    assert.deepEqual(await runtime.stopAgents(2000), [agentId])
+    assert.deepEqual(runtime.activeAgentSlots(home), [], 'the slot is gone once the process is')
+  } finally {
+    await runtime.dispose()
+    await rm(cwd, RETRIED_RM)
+  }
+})
+
 test('a worktree run whose child dies at boot is marked failed instead of waiting forever (#1261)', async () => {
   const cwd = await initRepo('framework-bootfail-')
   const runtime = createProjectRuntime({ driverPreflight: agentReady, cwd, env: {}, binPath: await writeDyingStub(cwd) })

@@ -169,7 +169,7 @@ function harness(overrides: Partial<AutoPmDeps> = {}) {
     // Pinned at one so every test written before #1204 keeps asserting against the behaviour it
     // was written for; the fan-out tests set it explicitly.
     concurrency: async () => 1,
-    activeAgents: () => 0,
+    activeAgents: () => [],
     quota: async () => status(1),
     start: async (p, job) => {
       started.push(p.id)
@@ -210,7 +210,7 @@ test('an on-demand tick sweeps with the preference off: the click is the ask (#1
 })
 
 test('on demand skips the master switch and the cooldown: every other stand-down still holds (#1210/#1642)', async () => {
-  const { loop, started } = harness({ enabled: async () => false, activeAgents: () => 1 })
+  const { loop, started } = harness({ enabled: async () => false, activeAgents: () => ['run-live (pid 111)'] })
   await loop.tick({ onDemand: true })
   loop.stop()
   assert.deepEqual(started, [])
@@ -547,7 +547,7 @@ test('the report names what a sweep started (#1161)', async () => {
 test('the report carries the reason a sweep stood down (#1161)', async () => {
   // The whole point: standing down for a reason must not look like quietly working. The reason
   // was already logged, but the log is the daemon's stdout and the toggle is in a browser.
-  const { loop } = harness({ activeAgents: () => 2 })
+  const { loop } = harness({ activeAgents: () => ['run-a (pid 111)', 'run-b (pid 222)'] })
   await loop.tick()
   loop.stop()
   const [outcome] = loop.report().outcomes
@@ -758,6 +758,41 @@ test('a standing queue fans out to the concurrency in one tick, one entry per ag
   assert.equal(new Set(prompts).size, 3)
 })
 
+// #1646: the live-agent reading names what it counted. The one time it came out one too high, the
+// Agents panel showed nothing running and the number could not be questioned — the run holding the
+// slot was a process that had outlived its finished run, visible only to the daemon's own table.
+
+test('a cap stand-down names the runs holding the slots (#1646)', () => {
+  const capped = autoPmDecision({ ...IDLE, activeAgents: 2, concurrency: 2, running: ['run-a (pid 111)', 'run-b (pid 222)'] })
+  assert.equal(capped.start, false)
+  assert.equal(
+    capped.start === false ? capped.reason : '',
+    '2 runs are already going (run-a (pid 111), run-b (pid 222)), and the routine keeps at most 2 at once',
+  )
+  // Unnamed stays as it was: the count alone is still a complete sentence.
+  const unnamed = autoPmDecision({ ...IDLE, activeAgents: 1, concurrency: 1 })
+  assert.equal(unnamed.start === false ? unnamed.reason : '', '1 run is already going')
+})
+
+test('a fan-out that came out short says what it was short by, by name (#1646)', async () => {
+  // Three allowed, one slot held by a run the sweep did not start: two go out, and the card says
+  // alongside whom, so a held slot nobody can see on the dashboard is named rather than silent.
+  const { loop, ran } = harness({
+    cooldownMs: 0,
+    concurrency: async () => 3,
+    activeAgents: () => ['2026-08-22T22-06-41-065Z (pid 4242)'],
+    queue: async () => ['entry a', 'entry b', 'entry c'],
+  })
+  await loop.tick()
+  loop.stop()
+  assert.equal(ran.length, 2, 'the batch is the cap minus the held slot')
+  assert.equal(
+    loop.report().outcomes[0]?.message,
+    'started 2 agents alongside 1 already going (2026-08-22T22-06-41-065Z (pid 4242)): ' +
+      'draining the queue entry "entry a"; draining the queue entry "entry b"',
+  )
+})
+
 test('an entry a live run was pinned to is not handed out twice (#1204)', async () => {
   // The assignment outlives the tick that made it: the first agent is still working entry a when
   // the next sweep comes round, and its queue has not landed yet, so the checkout still shows the
@@ -802,7 +837,7 @@ test('live runs count against the concurrency, so the sweep tops up rather than 
   const { loop, started } = harness({
     cooldownMs: 0,
     concurrency: async () => 3,
-    activeAgents: () => 2,
+    activeAgents: () => ['run-a (pid 111)', 'run-b (pid 222)'],
     queue: async () => ['entry a', 'entry b', 'entry c'],
   })
   await loop.tick()
@@ -1531,7 +1566,7 @@ test('a switched-off pinned routine stands the click down, and so does every oth
   assert.equal(unknown.loop.report().outcomes[0]?.message, 'no routine is pinned to the-framework/nobody')
 
   // The click skips the master switch and the cooldown, not the cap (#1204/#1642).
-  const capped = harness({ jobs: [PINNED_JOB], cooldownMs: 0, activeAgents: () => 1 })
+  const capped = harness({ jobs: [PINNED_JOB], cooldownMs: 0, activeAgents: () => ['run-live (pid 111)'] })
   await capped.loop.tick({ onDemand: true, only: { pinned: 'the-framework/triage-quick' }, projectId: 'p1' })
   capped.loop.stop()
   assert.deepEqual(capped.ran, [], 'a live agent at the cap holds the click like it holds the sweep')

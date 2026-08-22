@@ -241,7 +241,7 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
     dashboardUrl: dashboard.url,
     quota,
     startAgent,
-    activeAgentCount: runtime.activeAgentCount,
+    activeAgentSlots: runtime.activeAgentSlots,
     busyAgentIds: runtime.busyAgentIds,
     projectErrors,
     log: console.log,
@@ -255,8 +255,10 @@ export async function runDaemon(cwd: string, opts: RunDaemonOptions = {}): Promi
   // Stop the agents this daemon spawned, before the previews they may be serving. Left running they
   // are orphans nothing tracks; stopped here they keep their worktree and branch, so the dashboard
   // can continue them on the next start.
-  const stopped = await runtime.stopAgents().catch(() => 0)
-  if (stopped > 0) console.log(`[framework] stopped ${stopped} agent(s)`)
+  // Named (#1646): a process still alive here that the dashboard showed as finished is the one
+  // fact that explains a slot the sweep could not account for, and the count alone hid it.
+  const stopped = await runtime.stopAgents().catch((): string[] => [])
+  if (stopped.length > 0) console.log(`[framework] stopped ${stopped.length} agent(s): ${stopped.join(', ')}`)
   // Archives need no flush pass here (#1582): teardown writes each one through the data branch's
   // funnel, committed and pushed the moment the session settles.
   // Stopped here as well as by the dashboard: a broken install serves 503s without ever taking

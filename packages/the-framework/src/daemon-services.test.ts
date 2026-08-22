@@ -100,7 +100,7 @@ async function services(preferences: Record<string, unknown>, quota?: QuotaSourc
     },
     // What the daemon's own counter reports: the agents this sweep has asked for are live, so the
     // cap is measured against them rather than against a constant zero.
-    activeAgentCount: () => starts.length,
+    activeAgentSlots: () => starts.map((_, i) => ({ agentId: `run-${i + 1}`, pid: 4000 + i, state: 'live' as const })),
     busyAgentIds: () => new Set<string>(),
     projectErrors: projectErrorStore(),
     log: () => {},

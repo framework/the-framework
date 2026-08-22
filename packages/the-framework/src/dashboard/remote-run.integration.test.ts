@@ -106,7 +106,7 @@ test('a run submitted with options.remote is created on the other daemon and its
     assert.equal(bStarts[0]!.projectId, undefined) // slice 1: the device's own home checkout
 
     // A's own busy guard never fired: it allocated no worktree and spawned nothing.
-    assert.equal(runtimeA.activeAgentCount(homeIdA), 0)
+    assert.deepEqual(runtimeA.activeAgentSlots(homeIdA), [])
 
     // The relayed agent keeps a local list row on A (#1077), so a dashboard reload re-opens it instead of
     // losing it: a remote stub carrying B's agent id, the device label, and the prompt, running until the

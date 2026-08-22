@@ -41,6 +41,12 @@ export interface AutoPmInputs {
   /** Live agents on this project, measured against {@link AutoPmInputs.concurrency}. */
   activeAgents: number
   /**
+   * What holds each of those slots (#1646), one label per run, for the stand-down's wording. A
+   * cap reached by a process the Agents panel no longer shows looked exactly like one reached by
+   * real work; named, the reader can go and look at the run it names.
+   */
+  running?: readonly string[]
+  /**
    * How many agents the routine may keep going on this project at once (#1204);
    * {@link DEFAULT_AUTO_PM_CONCURRENCY} when unset. Floored at one, because zero concurrent
    * agents is what `enabled: false` already spells.
@@ -125,7 +131,10 @@ export function autoPmDecision(input: AutoPmInputs): AutoPmDecision {
     // The cap is named, for the same reason the quota refusal names its line (#960): with the
     // setting raised or lowered, "already going" on its own reads as a bug rather than a setting.
     // At one — what this was before #1204 — the old wording is kept exactly.
-    const going = `${input.activeAgents} run${input.activeAgents === 1 ? ' is' : 's are'} already going`
+    // Which runs, when the reading says (#1646): the one time this wording mattered, the runs it
+    // counted were nowhere on the dashboard, and a number could not be questioned.
+    const named = input.running?.length ? ` (${input.running.join(', ')})` : ''
+    const going = `${input.activeAgents} run${input.activeAgents === 1 ? ' is' : 's are'} already going${named}`
     return { start: false, reason: concurrency === 1 ? going : `${going}, and the routine keeps at most ${concurrency} at once` }
   }
   const cooldownMs = input.cooldownMs ?? DEFAULT_AUTO_PM_COOLDOWN_MS
@@ -482,8 +491,13 @@ export interface AutoPmDeps {
    * entry each (#1204) and the assignment has to come from the read the decision was made on.
    */
   queue(project: AutoPmProject): Promise<readonly string[]>
-  /** How many agents are live on a project. */
-  activeAgents(project: AutoPmProject): number
+  /**
+   * The agents live on a project, one label each (#1646) — the run's id and pid, as the daemon
+   * holds them. Their number is what the cap is measured against; their names are what the
+   * stand-down and the fan-out say, so a slot held by a process the dashboard no longer shows
+   * names itself rather than reading as a bug in the count.
+   */
+  activeAgents(project: AutoPmProject): readonly string[]
   /**
    * How many agents the routine may keep going per project (#1204). Re-read per tick like
    * {@link AutoPmDeps.enabled}, so the setting takes effect without a restart. Unset or unreadable
@@ -807,12 +821,14 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // Per project, because the model the work would run on is (#1619). It costs no reading:
         // the meter is polled elsewhere and this only measures the last one against the boundary.
         const quota = await deps.quota(project).catch(() => undefined)
-        const activeAgents = deps.activeAgents(project)
+        const running = deps.activeAgents(project)
+        const activeAgents = running.length
         const since = lastStart.get(project.id)
         const decision = autoPmDecision({
           enabled: true,
           backlogEmpty: entries === undefined ? undefined : entries.length === 0,
-          activeAgents: activeAgents,
+          activeAgents,
+          running,
           concurrency,
           quota,
           ...(since !== undefined ? { sinceLastStartMs: now() - since } : {}),
@@ -1082,7 +1098,14 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           // One line per project however many agents went out, and a single start keeps the old
           // wording exactly.
           const described = started.map(item => doing(item)).join('; ')
-          note(project, true, started.length === 1 ? described : `started ${started.length} agents: ${described}`)
+          // A fan-out that came out short says what it was short by (#1646): a batch of two under
+          // a cap of three, with the panel showing nothing running, used to be unexplainable.
+          const alongside = running.length ? ` alongside ${running.length} already going (${running.join(', ')})` : ''
+          note(
+            project,
+            true,
+            started.length === 1 ? `${described}${alongside}` : `started ${started.length} agents${alongside}: ${described}`,
+          )
         } else if (!stopped) {
           // Nothing took, so the cooldown armed above is given back: a batch that started nothing
           // spent nothing, and holding it would strand the project for a whole cooldown.

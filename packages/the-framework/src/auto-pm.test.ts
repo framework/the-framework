@@ -1483,6 +1483,80 @@ test('an unpinned job never asks for a release, and a failing release does not s
   assert.deepEqual(failing.ran, ['triage-quick'])
 })
 
+// #1643: Run now on a pinned routine reaches the same release-then-start the sweep does. It used
+// to be a plain start outside the sweep, so a leftover copy of the branch — which the sweep
+// releases before firing — made the agent abort as "triage already pending" on every click.
+
+const PINNED_JOB: AutoPmJob = {
+  name: 'triage-quick',
+  prompt: 'Triage.',
+  label: 'Triage quick wins',
+  pinnedBranch: 'the-framework/triage-quick',
+}
+
+test('a sweep narrowed to a pinned job releases its branch, then starts exactly one agent (#1643)', async () => {
+  const order: string[] = []
+  const { loop } = harness({
+    // The rotation is on another job's turn, so a tick that ignored the narrowing would start
+    // that one instead — the release-then-start below is the click's doing, not the cycle's.
+    jobs: [{ name: 'update', prompt: 'Update.' }, PINNED_JOB],
+    cooldownMs: 0,
+    // Room for three, so a single start is the routine's own shape and not the cap's doing.
+    concurrency: async () => 3,
+    releasePinned: async (_project, branch) => {
+      order.push(`release:${branch}`)
+    },
+    start: async (_project, job) => {
+      order.push(`start:${job.name}`)
+      return `run-${order.length}`
+    },
+  })
+  await loop.tick({ onDemand: true, only: { pinned: 'the-framework/triage-quick' }, projectId: 'p1' })
+  loop.stop()
+  assert.deepEqual(order, ['release:the-framework/triage-quick', 'start:triage-quick'])
+})
+
+test('a switched-off pinned routine stands the click down, and so does every other gate (#1643)', async () => {
+  const off = harness({ jobs: [PINNED_JOB], cooldownMs: 0, optedOut: async () => ['triage-quick'] })
+  await off.loop.tick({ onDemand: true, only: { pinned: 'the-framework/triage-quick' }, projectId: 'p1' })
+  off.loop.stop()
+  assert.deepEqual(off.ran, [], 'an unticked box is not overridden by the click')
+  assert.equal(off.loop.report().outcomes[0]?.message, 'Triage quick wins is switched off')
+
+  // A branch nothing pins is said as such, not as a setting the user could go and undo.
+  const unknown = harness({ jobs: [PINNED_JOB], cooldownMs: 0 })
+  await unknown.loop.tick({ onDemand: true, only: { pinned: 'the-framework/nobody' }, projectId: 'p1' })
+  unknown.loop.stop()
+  assert.deepEqual(unknown.ran, [])
+  assert.equal(unknown.loop.report().outcomes[0]?.message, 'no routine is pinned to the-framework/nobody')
+
+  // The click skips the master switch and the cooldown, not the cap (#1204/#1642).
+  const capped = harness({ jobs: [PINNED_JOB], cooldownMs: 0, activeAgents: () => 1 })
+  await capped.loop.tick({ onDemand: true, only: { pinned: 'the-framework/triage-quick' }, projectId: 'p1' })
+  capped.loop.stop()
+  assert.deepEqual(capped.ran, [], 'a live agent at the cap holds the click like it holds the sweep')
+})
+
+test('a sweep narrowed to a pinned job never falls through to the drain or another rotation job (#1643)', async () => {
+  // The queue is full, so the queue-picked mode would drain; the rotation is on another job's
+  // turn, so the index would fire that one. The click named the pinned routine and gets it alone
+  // — and the scheduled tick after it still gets the rotation job it was owed.
+  const other: AutoPmJob = { name: 'update', prompt: 'Update.' }
+  let entries = ['work one']
+  const { loop, ran } = harness({
+    jobs: [other, PINNED_JOB],
+    cooldownMs: 0,
+    queue: async () => entries,
+    drainJob: { name: 'drain', prompt: 'Work the queue.', drains: true },
+  })
+  await loop.tick({ onDemand: true, only: { pinned: 'the-framework/triage-quick' }, projectId: 'p1' })
+  assert.deepEqual(ran, ['triage-quick'], 'neither the full queue nor the rotation index took the click')
+  entries = []
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(ran, ['triage-quick', 'update'], 'the scheduled tick still gets the rotation job it was owed')
+})
+
 test('only the drain job lands its own PRs (#1216)', () => {
   // The drain implements queue entries whose triage a human could have vetoed, so its review
   // happened before the agent. Every other job writes tickets/plans and has nothing to merge —

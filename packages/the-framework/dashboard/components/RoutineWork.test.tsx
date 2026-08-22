@@ -236,12 +236,36 @@ describe('RoutineWork (#1159)', () => {
 
   test('the prompt goes to the project the card has picked, not the first one (#1507)', async () => {
     onProjects.mockResolvedValue([project('p1', 'gemstack'), project('p2', 'other')])
+    // The pick is the setting (#1647); the picker writes it, and the card reads it back.
+    prefs = { autoPmProject: 'p2' }
     const selected: string[] = []
     renderCard({ onSelectProject: id => selected.push(id) })
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
-    fireEvent.change(screen.getByLabelText('Run in'), { target: { value: 'p2' } })
     fireEvent.click(await openRunMenu(ROTATION_JOB))
     await waitFor(() => expect(selected).toEqual(['p2']))
+  })
+
+  // #1647: the pick is a preference. Held as card state it was forgotten whenever the card
+  // unmounted — open a run, come back — and the next click landed on the first project, the real
+  // repo, which pushed an empty triage branch there.
+  test('the picked project is a setting, so it holds across navigations and reloads (#1647)', async () => {
+    onProjects.mockResolvedValue([project('p1', 'gemstack'), project('p2', 'other')])
+    prefs = { autoPmProject: 'p2' }
+    renderCard()
+    await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
+    // Read back from the setting, not defaulted to the first project.
+    expect((screen.getByLabelText('Run in') as HTMLSelectElement).value).toBe('p2')
+    // Written as the setting, so a remount reads the same answer.
+    fireEvent.change(screen.getByLabelText('Run in'), { target: { value: 'p1' } })
+    expect(updatePreferences).toHaveBeenCalledWith({ autoPmProject: 'p1' })
+  })
+
+  test('a remembered project that is no longer registered falls back to the first (#1647)', async () => {
+    onProjects.mockResolvedValue([project('p1', 'gemstack'), project('p2', 'other')])
+    prefs = { autoPmProject: 'gone' }
+    renderCard()
+    await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
+    expect((screen.getByLabelText('Run in') as HTMLSelectElement).value).toBe('p1')
   })
 
   test("the drain's menu item says it is one agent, not the fan-out its Run now fires (#1507)", async () => {
@@ -390,9 +414,10 @@ describe('RoutineWork (#1159)', () => {
 
   test('several projects get a picker, and Run now honours it', async () => {
     onProjects.mockResolvedValue([project('p1', 'gemstack'), project('p2', 'rudder')])
+    // The picker's pick is the setting (#1647), so this is what a picked card reads.
+    prefs = { autoPmProject: 'p2' }
     renderCard()
-    const select = await screen.findByLabelText('Run in')
-    fireEvent.change(select, { target: { value: 'p2' } })
+    expect(((await screen.findByLabelText('Run in')) as HTMLSelectElement).value).toBe('p2')
     fireEvent.click(screen.getAllByText('Run now')[1]!)
     await waitFor(() => expect(start).toHaveBeenCalled())
     expect(start.mock.calls[0]![0]).toBe('p2')

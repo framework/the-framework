@@ -103,16 +103,21 @@ export function RoutineWork({
   const preferences = usePreferences()
   const report = useAutoPm()
   const { busy, error, start } = useStartAgent()
-  const [picked, setPicked] = useState<string | null>(null)
   // Which routine is in flight, so only its own button says "Starting…".
   const [starting, setStarting] = useState<string | null>(null)
   // The on-demand sweep (#1210): in flight, and anything worth saying about the last attempt.
   const [sweeping, setSweeping] = useState(false)
   const [sweepNote, setSweepNote] = useState<string | null>(null)
 
+  // The pick is a preference, not card state (#1647): the card unmounts on the most common
+  // navigation there is — open a run, come back — and a pick held here went with it, so the next
+  // click landed on the first project, which is the user's real repo. As a setting it holds
+  // across navigations, reloads and tabs, the way the opt-outs beside it do.
+  //
   // The list arrives after the first render, and a project can be removed under a stale pick, so
   // the selection is validated against what is actually there rather than trusted.
-  const projectId = (picked !== null && projects.some(p => p.id === picked) ? picked : projects[0]?.id) ?? null
+  const picked = preferences.autoPmProject
+  const projectId = (picked !== undefined && projects.some(p => p.id === picked) ? picked : projects[0]?.id) ?? null
 
   const autoAgent = preferences.autoPm ?? false
   // Absent = nothing opted out, which is also what the store saves an empty list back as.
@@ -231,7 +236,7 @@ export function RoutineWork({
                   id="routine-project"
                   className="min-w-0 flex-1 rounded-md border border-border bg-transparent px-2 py-1 text-sm"
                   value={projectId ?? ''}
-                  onChange={e => setPicked(e.target.value)}
+                  onChange={e => updatePreferences({ autoPmProject: e.target.value })}
                 >
                   {projects.map(p => (
                     <option key={p.id} value={p.id}>

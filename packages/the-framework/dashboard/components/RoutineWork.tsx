@@ -6,7 +6,7 @@ import {
   MAX_AUTO_PM_CONCURRENCY,
   agentOptionsFromPreferences,
 } from '../../src/client.js'
-import { CalendarClock, Play } from 'lucide-react'
+import { CalendarClock, ChevronDown, Play } from 'lucide-react'
 import { onProjects } from '../rpc/projects.js'
 import { sendAutoPmSweep } from '../rpc/quota.js'
 import { useAutoPm } from '../lib/quota.js'
@@ -14,10 +14,19 @@ import { usePreferences, updatePreferences } from '../lib/preferences.js'
 import { useStartAgent } from '../lib/use-start-agent.js'
 import { useLoaded } from '../lib/use-async.js'
 import { formatUntil } from '../lib/format-date.js'
+import { stashPendingDraft } from '../lib/draft-handoff.js'
+import { cn } from '../lib/utils.js'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card.js'
-import { Button } from './ui/button.js'
+import { Button, buttonVariants } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'
+import { OptionLabel } from './ui/option-label.js'
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip.js'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from './ui/dropdown-menu.js'
 
 // The Overview's "Routine work" card (#1159): the jobs the idle sweep fires on a schedule, each with
 // a Run now button that starts it against a project immediately.
@@ -55,12 +64,15 @@ function describeOutcomes(outcomes: AutoPmOutcome[] | undefined): string {
 
 export function RoutineWork({
   onAgentStarted,
+  onSelectProject,
 }: {
   /**
    * Told which run the button just started (#1191). The project-carrying form, because the
    * Overview has no project selected — each row picks one — so the shell cannot supply it.
    */
   onAgentStarted: (projectId: string, intent: string, agentId?: string) => void
+  /** Where "Configure first, then run" lands (#1507): the picked project's launcher. */
+  onSelectProject: (id: string) => void
 }) {
   const projects = useLoaded<ProjectSummary[]>(onProjects, NO_PROJECTS, [])
   const preferences = usePreferences()
@@ -108,6 +120,25 @@ export function RoutineWork({
     // something that does not run the sweep has nothing for this button to fire.
     if (!result.ok) setSweepNote('This dashboard is not running the sweep, so there is nothing to trigger here.')
     else setSweepNote(describeOutcomes('outcomes' in result ? result.outcomes : undefined))
+  }
+
+  /**
+   * "Configure first, then run" (#1507). Run now spends an agent on settings that are nowhere on
+   * this card: the model and where it runs come from the Global options, so the only way to change
+   * them was to leave, edit the preferences, and come back. This hands the same prompt to the
+   * launcher instead — where those controls are, and where the prompt itself can be edited before
+   * it is sent.
+   *
+   * The carry is the draft stash a hot ticket already uses (#1066/#1139) rather than a second
+   * mechanism: the launcher takes it once as it mounts, so nothing re-seeds on a reload.
+   *
+   * Not gated on `busy`: this starts nothing, and being unable to go and look at the settings
+   * because a start is in flight would be the opposite of the point.
+   */
+  const configureFirst = (job: AutoPmJob) => {
+    if (!projectId) return
+    stashPendingDraft(job.prompt)
+    onSelectProject(projectId)
   }
 
   const runNow = async (job: AutoPmJob) => {
@@ -193,16 +224,52 @@ export function RoutineWork({
                       )}
                     </span>
                   </label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    disabled={busy || !projectId}
-                    onClick={() => void runNow(job)}
-                  >
-                    <Play className="h-3 w-3" aria-hidden />
-                    {starting === job.name ? 'Starting…' : 'Run now'}
-                  </Button>
+                  {/* A split button, not a hover-revealed second control (#1507): the routine
+                      it belongs to is not always the row the pointer is on, and a control that
+                      only exists under a mouse is reachable by neither keyboard nor touch. The
+                      chevron is the secondary half, so the common click stays one click. */}
+                  <div className="flex shrink-0 items-center">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      disabled={busy || !projectId}
+                      onClick={() => void runNow(job)}
+                      className="rounded-r-none border-r-0"
+                    >
+                      <Play className="h-3 w-3" aria-hidden />
+                      {starting === job.name ? 'Starting…' : 'Run now'}
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        type="button"
+                        disabled={!projectId}
+                        aria-label={`Other ways to run ${job.label ?? job.name}`}
+                        className={cn(buttonVariants({ variant: 'outline', size: 'xs' }), 'rounded-l-none px-1.5')}
+                      >
+                        <ChevronDown className="h-3 w-3" aria-hidden />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="max-w-[20rem]">
+                        <DropdownMenuItem
+                          disabled={!projectId}
+                          onClick={() => configureFirst(job)}
+                          className="items-start"
+                        >
+                          <OptionLabel
+                            label="Configure first, then run"
+                            /* The drain's Run now is a fan-out sweep, and the launcher can only
+                               ever send one agent — so this row's secondary action really is a
+                               different job, and says so rather than looking like the same one. */
+                            description={
+                              job.drains
+                                ? 'Opens the launcher with this prompt — one agent, not the fan-out.'
+                                : 'Opens the launcher with this prompt, so you can set the model and where it runs.'
+                            }
+                          />
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </li>
               ))}
             </ul>

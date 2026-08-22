@@ -69,7 +69,7 @@ export function DashboardPage({
 
         {/* Routine work sits below the AI Queue (#1139/#1159): the scheduled jobs and the button
             that fires one now. */}
-        <RoutineWork onAgentStarted={onAgentStarted} />
+        <RoutineWork onAgentStarted={onAgentStarted} onSelectProject={onSelectProject} />
 
         <HotTickets onSelectProject={onSelectProject} onSelectAgent={onSelectAgent} />
       </div>

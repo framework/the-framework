@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { presets, LAUNCHER_PRESETS } from './preset-catalog.js'
 import { presetFilePath } from './preset-registry.js'
+import { TRIAGE_SCOPE } from './prompts.generated.js'
 
 // One test file for the whole catalog, matching the one module that now defines it. What used to
 // be thirteen near-identical files is here two shared contracts plus the per-preset prompt content
@@ -173,6 +174,16 @@ test('the triage pair splits on cost and both append to the queue (#891/#892)', 
   assert.match(presets.triageQuick.template, /Add tickets to TODO_AGENTS\.md/)
   assert.match(presets.triageConsensual.template, /Only pick tickets that are significant \(no quick-wins\) and consensual/)
   assert.match(presets.triageConsensual.template, /Add tickets to TODO_AGENTS\.md/)
+})
+
+test('both triage presets carry the one queue-only rule, and carry it whole (#1641)', () => {
+  // A triage on a throwaway repo queued two tickets and implemented the third itself. The rule
+  // against that is one shared file, so both presets are checked against that file's text
+  // rather than against a phrase each could drift from.
+  assert.match(TRIAGE_SCOPE, /the only file you change is `TODO_AGENTS\.md`/)
+  for (const preset of [presets.triageQuick, presets.triageConsensual]) {
+    assert.ok(preset.render().endsWith(TRIAGE_SCOPE), `${preset.name} must end with the shared scope rule`)
+  }
 })
 
 test('each triage preset pins its own session name and aborts on a taken branch (#891/#892)', () => {

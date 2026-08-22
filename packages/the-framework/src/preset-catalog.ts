@@ -15,6 +15,7 @@ import {
   PRESETS_TRIAGE_QUICK,
   PRESETS_UPDATE_TICKETS,
   PRESETS_UX,
+  TRIAGE_SCOPE,
 } from './prompts.generated.js'
 
 /**
@@ -30,6 +31,9 @@ import {
  *
  * Pure by construction (no `node:*`), so the dashboard can render any preset in the browser (#520).
  */
+/** A triage prompt, with the queue-only rule the pair shares (#1641) at the end. */
+const triage = (template: string): string => `${template}\n\n${TRIAGE_SCOPE}`
+
 export const presets = {
   /**
    * [Research] (#331): the problem-variability review, shipped as a direct prompt (see
@@ -127,9 +131,13 @@ export const presets = {
    * Each prompt pins its own `<SESSION_NAME>` and aborts when `tf-<SESSION_NAME>`
    * already exists. That collision guard is what makes them safe to fire on a schedule: a triage
    * still in flight owns the branch, so the next firing does nothing instead of triaging twice.
+   *
+   * Both end with the same rule (#1641): a triage only writes `TODO_AGENTS.md`, never a ticket's
+   * code. It is one file, `prompts/triage_scope.md`, appended here rather than pasted into each
+   * preset, so the pair cannot drift apart on it.
    */
-  triageQuick: definePreset({ name: 'triage-quick', template: PRESETS_TRIAGE_QUICK, label: 'Add quick-win work to AI Queue', tooltip: 'Add `tickets/*.md` to queue (TODO_AGENTS.md), only quick-win and consensual tickets' }),
-  triageConsensual: definePreset({ name: 'triage-consensual', template: PRESETS_TRIAGE_CONSENSUAL, label: 'Add consensual work to AI Queue', tooltip: 'Add `tickets/*.md` to queue (TODO_AGENTS.md), only significant (no quick-wins) and consensual tickets' }),
+  triageQuick: definePreset({ name: 'triage-quick', template: triage(PRESETS_TRIAGE_QUICK), label: 'Add quick-win work to AI Queue', tooltip: 'Add `tickets/*.md` to queue (TODO_AGENTS.md), only quick-win and consensual tickets' }),
+  triageConsensual: definePreset({ name: 'triage-consensual', template: triage(PRESETS_TRIAGE_CONSENSUAL), label: 'Add consensual work to AI Queue', tooltip: 'Add `tickets/*.md` to queue (TODO_AGENTS.md), only significant (no quick-wins) and consensual tickets' }),
 } as const satisfies Record<string, PresetDef>
 
 /** The presets by key, e.g. `planTickets`. */

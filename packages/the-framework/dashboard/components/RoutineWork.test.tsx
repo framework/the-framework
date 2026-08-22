@@ -104,6 +104,55 @@ describe('RoutineWork (#1159)', () => {
     expect(started[0]).toEqual(['p1', ROTATION_JOB.prompt, 'run-1'])
   })
 
+  /** One row's Run now, by its place in the list the card renders. */
+  const runNowOf = async (job: AutoPmJob) => {
+    await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
+    return screen.getAllByText('Run now')[AUTO_PM_ROUTINES.indexOf(job)]!.closest('button')!
+  }
+
+  test('Run now says what the routine does and the settings its start would use (#1506)', async () => {
+    prefs = { model: 'opus' }
+    renderCard()
+    const hint = await hoverTooltip(await runNowOf(ROTATION_JOB))
+    // The preset's own sentence, not a second one written for this card: the launcher describes
+    // the same routine with the same words.
+    expect(hint.textContent).toContain(ROTATION_JOB.tooltip)
+    // The three facts the card cannot otherwise show, because all three live in the Global
+    // options on another page — and the model is the one this start would really pass.
+    expect(hint.textContent).toContain('Claude Code · Opus · This machine')
+    expect(hint.textContent).toMatch(/Starts one agent in gemstack, unattended/)
+  })
+
+  test('no model pinned is said as such, never as the first one in the list (#1143/#1506)', async () => {
+    renderCard()
+    expect((await hoverTooltip(await runNowOf(ROTATION_JOB))).textContent).toContain("the CLI's own default")
+    cleanup()
+    // A model pinned on the *other* driver is not this driver's model either, so naming it would
+    // name something the agent is never passed.
+    prefs = { driver: 'claude', model: 'gpt-5' }
+    renderCard()
+    const hint = await hoverTooltip(await runNowOf(ROTATION_JOB))
+    expect(hint.textContent).toContain("the CLI's own default")
+    expect(hint.textContent).not.toContain('GPT-5')
+  })
+
+  test('where it runs is read off the preference, not assumed to be this machine (#1506)', async () => {
+    prefs = { target: 'web' }
+    renderCard()
+    expect((await hoverTooltip(await runNowOf(ROTATION_JOB))).textContent).toContain('Claude web')
+  })
+
+  test("the drain's Run now reports the sweep it fires, not these settings (#1506)", async () => {
+    prefs = { model: 'opus', autoPmConcurrency: 3 }
+    renderCard()
+    const hint = await hoverTooltip(await runNowOf(AUTO_PM_DRAIN_JOB))
+    // The sweep visits every project and resolves each one's own committed settings on top of
+    // these, so the model and place the other rows promise would both be a guess here.
+    expect(hint.textContent).toContain("Each project's own settings decide the model and where it runs.")
+    expect(hint.textContent).toMatch(/Sweeps every project the daemon watches, up to 3 agents each, unattended/)
+    expect(hint.textContent).not.toContain('Opus')
+  })
+
   /** Open one row's secondary half — the chevron beside its Run now. */
   const openRunMenu = async (job: AutoPmJob) => {
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))

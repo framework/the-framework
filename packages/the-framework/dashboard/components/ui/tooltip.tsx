@@ -30,7 +30,13 @@ function TooltipContent({
 }) {
   return (
     <TooltipPrimitive.Portal>
+      {/* The stacking layer belongs here, on the positioned element (#1506). It used to sit on the
+          popup below, which Base UI leaves `position: static` — where a z-index does nothing at
+          all. A tooltip opened over a menu or a popover, both of which carry theirs on their own
+          positioner, was painted *behind* it: the preset hints in the launcher's menu rendered
+          with the right words and were covered by the very menu that triggered them. */}
       <TooltipPrimitive.Positioner
+        className="z-50"
         sideOffset={sideOffset}
         {...(side ? { side } : {})}
         {...(align ? { align } : {})}
@@ -42,7 +48,7 @@ function TooltipContent({
           // that no element carries a `title`.
           role="tooltip"
           className={cn(
-            'z-50 rounded-md border border-border bg-card px-2 py-1 text-xs text-card-foreground shadow-md',
+            'rounded-md border border-border bg-card px-2 py-1 text-xs text-card-foreground shadow-md',
             className,
           )}
           {...props}

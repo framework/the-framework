@@ -164,6 +164,13 @@ export interface AutoPmJob {
    */
   label?: string
   /**
+   * The preset's own one-line "what this does" (#1506), for a surface that has to say what a click
+   * is about to spend an agent on before it spends it. Read off the preset like
+   * {@link AutoPmJob.label}, so the sentence the launcher shows for a preset and the sentence the
+   * routines list shows for its routine are the same sentence. Absent for a preset without one.
+   */
+  tooltip?: string | undefined
+  /**
    * This job works an entry already on the queue, rather than putting entries on it (#1117).
    *
    * Only the draining job has a specific piece of work it is about to pick up, so only it can be
@@ -338,23 +345,27 @@ export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
     name: presets.updateTickets.name,
     prompt: presets.updateTickets.render(),
     label: presets.updateTickets.label,
+    tooltip: presets.updateTickets.tooltip,
   },
   {
     name: presets.triageQuick.name,
     prompt: presets.triageQuick.render(),
     label: presets.triageQuick.label,
+    tooltip: presets.triageQuick.tooltip,
     pinnedBranch: `${AGENT_BRANCH_PREFIX}${presets.triageQuick.name}`,
   },
   {
     name: presets.triageConsensual.name,
     prompt: presets.triageConsensual.render(),
     label: presets.triageConsensual.label,
+    tooltip: presets.triageConsensual.tooltip,
     pinnedBranch: `${AGENT_BRANCH_PREFIX}${presets.triageConsensual.name}`,
   },
   {
     name: presets.planTickets.name,
     prompt: presets.planTickets.render(),
     label: presets.planTickets.label,
+    tooltip: presets.planTickets.tooltip,
     fansOut: true,
   },
 ]
@@ -368,6 +379,7 @@ export const AUTO_PM_DRAIN_JOB: AutoPmJob = {
   name: presets.drainQueue.name,
   prompt: presets.drainQueue.render(),
   label: presets.drainQueue.label,
+  tooltip: presets.drainQueue.tooltip,
   drains: true,
   autoMerge: true,
 }
@@ -390,6 +402,7 @@ export const AUTO_PM_MAINTENANCE_JOB: AutoPmJob = {
   prompt: presets.maintenance.render(),
   describe: 'sweeping the codebase for maintenance work',
   label: presets.maintenance.label,
+  tooltip: presets.maintenance.tooltip,
 }
 
 /**

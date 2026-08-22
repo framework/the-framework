@@ -4,7 +4,7 @@ import type { DashboardContext, EventsSource, RemoteAgents } from '../dashboard/
 import type { PreferencesStore } from '../registry.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import type { QuotaSource } from '../dashboard/quota.js'
-import type { AutoPmReporter } from '../auto-pm.js'
+import type { AutoPmReporter, AutoPmOnly } from '../auto-pm.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
 
 /**
@@ -109,7 +109,7 @@ export function contextAutoPm(): AutoPmReporter {
 }
 
 /** How a sweep is fired on demand (#1210). */
-export function contextAutoPmSweep(): (opts?: { drainOnly?: boolean }) => void | Promise<void> {
+export function contextAutoPmSweep(): (opts?: { only?: AutoPmOnly; projectId?: string }) => void | Promise<void> {
   return fromContext('autoPmSweep')
 }
 

@@ -9,7 +9,7 @@ import { readLiveMetas, listAgents, type LiveAgent } from './store/index.js'
 import { startKeyedWatcher, type KeyedWatcher } from './dashboard/keyed-watcher.js'
 import { buildInterventions, interventionKey, postInterventionsDiscord } from './dashboard/interventions.js'
 import { buildActivity, activityKey, postActivityDiscord } from './dashboard/activity.js'
-import { startAutoPm, AUTO_PM_JOBS, DEFAULT_AUTO_PM_INTERVAL_MS, quotaHeadroom, type AutoPmReport } from './auto-pm.js'
+import { startAutoPm, AUTO_PM_JOBS, DEFAULT_AUTO_PM_INTERVAL_MS, quotaHeadroom, type AutoPmReport, type AutoPmOnly } from './auto-pm.js'
 import { startDaemonTick, DAEMON_TICK_MS } from './daemon-tick.js'
 import { ciFixPrompt, startCiWatch } from './ci-watch.js'
 import { releaseStalePinnedBranch } from './stale-branch.js'
@@ -86,7 +86,7 @@ export interface BackgroundServices {
    * Resolves when the tick does (#1433), so the trigger button can await the sweep and say what
    * it decided; the switched-on-preference wake simply does not await it.
    */
-  wakeAutoPm: (opts?: { onDemand?: boolean; drainOnly?: boolean }) => Promise<void>
+  wakeAutoPm: (opts?: { onDemand?: boolean; only?: AutoPmOnly; projectId?: string }) => Promise<void>
   /** What the last auto-PM sweep decided, for the usage panel to show (#1161). */
   autoPmReport: () => AutoPmReport
 }

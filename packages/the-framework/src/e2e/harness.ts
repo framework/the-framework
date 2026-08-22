@@ -22,7 +22,7 @@ import type { FrameworkEvent } from '../events.js'
 import type { StartAgentKind, StartAgentOptions } from '../dashboard/types.js'
 import type { AgentSpec } from '../agent-spec.js'
 import type { QuotaView } from '../dashboard/quota.js'
-import type { AutoPmReport } from '../auto-pm.js'
+import type { AutoPmReport, AutoPmOnly } from '../auto-pm.js'
 
 // Re-home the process-global config home FIRST: the registry, preferences, and daemon state all
 // resolve through $XDG_CONFIG_HOME at call time, and run-tests.mjs gives the whole suite ONE
@@ -65,7 +65,7 @@ export interface StoryWorld {
   /** The usage panel's reading (mutable): what `onQuota` serves. */
   quota: { view: QuotaView }
   /** The auto-PM panel's stubs (mutable): what `onAutoPm` reports and what a sweep records. */
-  autoPm: { report?: AutoPmReport; sweeps: Array<{ drainOnly?: boolean }> }
+  autoPm: { report?: AutoPmReport; sweeps: Array<{ only?: AutoPmOnly; projectId?: string }> }
   /**
    * Bind one dashboard RPC to this world's context. The real mount wires the context once, at
    * start-up; a story stands several worlds up in one process, so re-providing before every call
@@ -158,7 +158,7 @@ export async function makeWorld(): Promise<StoryWorld> {
     // the model's own week states that window in the view it sets (#1619).
     quota: { read: async () => quota.view, boundaryFor: async () => quota.view.boundary, stop: () => {} },
     autoPm: () => autoPm.report,
-    autoPmSweep: async (opts?: { drainOnly?: boolean }) => {
+    autoPmSweep: async (opts?: { only?: AutoPmOnly; projectId?: string }) => {
       autoPm.sweeps.push(opts ?? {})
     },
     projectErrors: () => [],

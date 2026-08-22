@@ -130,8 +130,8 @@ test('the usage panel reads the daemon quota source, and the sweep button fires 
       nextSweepAt: 789,
       outcomes: [{ projectId: 'p', path: '/p', started: false, message: 'the queue is empty' }],
     }
-    const swept = await rpc(sendAutoPmSweep)({ drainOnly: true })
-    assert.deepEqual(world.autoPm.sweeps, [{ drainOnly: true }])
+    const swept = await rpc(sendAutoPmSweep)({ only: 'drain' })
+    assert.deepEqual(world.autoPm.sweeps, [{ only: 'drain' }])
     assert.equal(swept.ok, true)
     assert.equal(swept.outcomes?.[0]?.message, 'the queue is empty')
   } finally {

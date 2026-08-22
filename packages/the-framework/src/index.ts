@@ -14,7 +14,7 @@
  */
 
 export type { AgentError, HandoffState, SessionInfo } from './agent-view.js'
-export type { AutoPmJob, AutoPmOutcome, AutoPmReport } from './auto-pm.js'
+export type { AutoPmJob, AutoPmOutcome, AutoPmReport, AutoPmOnly } from './auto-pm.js'
 export type { FrameworkFileConfig } from './config.js'
 export type { ChoiceRequest, FrameworkEvent } from './events.js'
 export type { QuotaBoundaryStatus } from './quota-boundary.js'

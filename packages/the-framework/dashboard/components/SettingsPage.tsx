@@ -15,6 +15,7 @@ import { Button } from './ui/button.js'
 import { Checkbox } from './ui/checkbox.js'
 import { ScrollArea } from './ui/scroll-area.js'
 import { cn } from '../lib/utils.js'
+import { RUN_TARGET_LABELS } from '../lib/agent-settings.js'
 
 // The settings page (#958): every setting in one place, and the Onboarding checklist.
 //
@@ -105,9 +106,9 @@ export function SettingsPage({
             description="Where an agent executes: this machine, a fresh GitHub Actions runner, or a Claude Code cloud session."
             value={preferences.target ?? 'local'}
             options={[
-              { value: 'local', label: 'This device' },
-              { value: 'actions', label: 'GitHub Actions' },
-              { value: 'web', label: 'Claude web' },
+              { value: 'local', label: RUN_TARGET_LABELS.local },
+              { value: 'actions', label: RUN_TARGET_LABELS.actions },
+              { value: 'web', label: RUN_TARGET_LABELS.web },
             ]}
             onChange={value => updatePreferences({ target: value as 'local' | 'actions' | 'web' })}
           />

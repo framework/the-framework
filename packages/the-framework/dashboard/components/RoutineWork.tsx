@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AutoPmJob, AutoPmOutcome, ProjectSummary } from '../../src/index.js'
+import type { AutoPmJob, AutoPmOnly, AutoPmOutcome, ProjectSummary } from '../../src/index.js'
 import {
   AUTO_PM_ROUTINES,
   DEFAULT_AUTO_PM_CONCURRENCY,
@@ -34,8 +34,10 @@ import {
 //
 // The list is `AUTO_PM_ROUTINES` itself, straight off the browser-safe client entry, so what is on
 // screen is what the daemon runs rather than a second copy of it: no read of its own, and no way
-// for the two to drift. Run now takes the same path the launcher does (`sendStart` with the job's
-// prompt verbatim), so it starts the work now instead of asking the sweep to come round sooner.
+// for the two to drift. Run now on an ordinary routine takes the same path the launcher does
+// (`sendStart` with the job's prompt verbatim), so it starts the work now instead of asking the
+// sweep to come round sooner; a routine that needs the sweep's own preparation asks the sweep for
+// that one routine's work instead (see `narrowedSweep`).
 //
 // Two tiers of checkbox, and they control different things (#1209). The one at the foot is the
 // `autoPm` preference (#685): whether the schedule runs at all. The one on each row is that
@@ -47,6 +49,28 @@ import {
 
 /** Captured once: `useLoaded` treats a fresh `[]` literal as a new value on every render. */
 const NO_PROJECTS: ProjectSummary[] = []
+
+/**
+ * The sweep a routine's Run now asks for, when it is a sweep rather than a plain start — or
+ * nothing, for the routine a plain start serves exactly. Decided by what the job declares about
+ * itself (it drains, fans out, or pins a branch), never by its name, so a renamed routine keeps
+ * its path.
+ *
+ * The two that fan out (#1204) go because only the sweep can: it claims the work before each
+ * agent starts — a queue entry for a drain, a ticket lock for planning — and a plain start could
+ * only ever be one agent. A routine pinned to a branch (#1643) goes for the sweep's other
+ * preparation: it releases a stale copy of that branch before the start, and without it the
+ * agent read the leftover as a triage already pending and aborted, on every click.
+ *
+ * The drain visits every project, which is what its tooltip says and why it sends no id. The
+ * rest are the picked project's own work, so they carry one.
+ */
+function narrowedSweep(job: AutoPmJob, projectId: string): { only: AutoPmOnly; projectId?: string } | undefined {
+  if (job.drains) return { only: 'drain' }
+  if (job.fansOut) return { only: 'plan', projectId }
+  if (job.pinnedBranch !== undefined) return { only: { pinned: job.pinnedBranch }, projectId }
+  return undefined
+}
 
 /**
  * The triggered sweep's answer as one card line (#1433): a single project speaks its message
@@ -156,19 +180,13 @@ export function RoutineWork({
 
   const runNow = async (job: AutoPmJob) => {
     if (!projectId || busy) return
-    // The two routines that fan out go through the sweep (#1204), because only the sweep can:
-    // it claims the work before each agent starts — a queue entry for a drain, a ticket lock for
-    // planning — and a plain start could only ever be one agent, reading whatever is first.
-    // Narrowed to the one routine the click named, so having nothing to work is reported on the
+    // Narrowed to the one routine the click named, so having nothing to do is reported on the
     // card rather than the click quietly borrowing a different rotation job. No navigation on
     // purpose: the agents land in the Agents card, which is where a batch is watchable.
-    //
-    // The drain visits every project, which is what its tooltip says and why it sends no id.
-    // Planning is the picked project's own work, so it carries one.
-    if (job.drains || job.fansOut) {
+    const narrowed = narrowedSweep(job, projectId)
+    if (narrowed) {
       setStarting(job.name)
       setSweepNote(null)
-      const narrowed = job.drains ? { only: 'drain' as const } : { only: 'plan' as const, projectId }
       const result = await sendAutoPmSweep(narrowed).catch(() => ({ ok: false as const }))
       setStarting(null)
       if (!result.ok) setSweepNote('This dashboard is not running the sweep, so there is nothing to trigger here.')

@@ -75,8 +75,14 @@ test('the narrowing travels to the loop untouched (#1204)', async () => {
   })
   await sendAutoPmSweep({ only: 'drain' })
   await sendAutoPmSweep({ only: 'plan', projectId: 'p1' })
+  await sendAutoPmSweep({ only: { pinned: 'tf-triage-quick' }, projectId: 'p1' })
   await sendAutoPmSweep()
   // Passed through rather than rebuilt: a wrapper that reconstructed the object is how a new
   // narrowing silently stops reaching the loop.
-  assert.deepEqual(seen, [{ only: 'drain' }, { only: 'plan', projectId: 'p1' }, undefined])
+  assert.deepEqual(seen, [
+    { only: 'drain' },
+    { only: 'plan', projectId: 'p1' },
+    { only: { pinned: 'tf-triage-quick' }, projectId: 'p1' },
+    undefined,
+  ])
 })

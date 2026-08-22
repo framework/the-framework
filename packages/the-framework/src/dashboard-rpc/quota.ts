@@ -52,8 +52,10 @@ export async function onAutoPm(): Promise<AutoPmReport | undefined> {
  * `only` narrows the sweep to one routine's work (#1204), which is what a Run now that fans out
  * means: `'drain'` spins agents up on the queue's entries, `'plan'` on the open tickets. Either
  * way the fan-out is the sweep's — a plain start could only ever be one agent — and having
- * nothing to work is reported rather than borrowed for a rotation job. `projectId` scopes it to
- * the project the card has picked.
+ * nothing to work is reported rather than borrowed for a rotation job. `{ pinned }` is the
+ * routine pinned to that branch (#1643): one agent, but the sweep releases a stale copy of the
+ * branch before starting it, which a plain start never did. `projectId` scopes it to the project
+ * the card has picked.
  */
 export async function sendAutoPmSweep(opts?: { only?: AutoPmOnly; projectId?: string }): Promise<{ ok: boolean; outcomes?: AutoPmOutcome[] }> {
   const sweep = contextAutoPmSweep()

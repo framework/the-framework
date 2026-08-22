@@ -194,6 +194,25 @@ describe('RoutineWork (#1159)', () => {
     expect((await hoverTooltip(await runNowOf(PLAN_JOB))).textContent).toMatch(/Starts up to 1 agent in gemstack/)
   })
 
+  // #1643: a routine pinned to a branch goes through the sweep too — one agent still, but the
+  // sweep releases a stale copy of its branch before the start, and a plain start never did: the
+  // agent read the leftover as a triage already pending and aborted, on every click.
+  test("a pinned routine's Run now asks the sweep for it by its branch, not a plain start (#1643)", async () => {
+    const pinned = AUTO_PM_ROUTINES.filter(job => job.pinnedBranch !== undefined)
+    expect(pinned.length).toBeGreaterThan(0)
+    renderCard()
+    for (const job of pinned) {
+      fireEvent.click(await runNowOf(job))
+      // By the branch the job declares, never its name, and scoped to the picked project like
+      // the plan click: the routine is that project's own work.
+      await waitFor(() =>
+        expect(sendAutoPmSweep).toHaveBeenCalledWith({ only: { pinned: job.pinnedBranch }, projectId: 'p1' }),
+      )
+    }
+    expect(sendAutoPmSweep).toHaveBeenCalledTimes(pinned.length)
+    expect(start).not.toHaveBeenCalled()
+  })
+
   /** Open one row's secondary half — the chevron beside its Run now. */
   const openRunMenu = async (job: AutoPmJob) => {
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))

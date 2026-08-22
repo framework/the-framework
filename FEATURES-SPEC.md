@@ -24,6 +24,7 @@ happens while nobody is at the keyboard.
 - Start an agent from a ticket row
 - Start an agent from a queue entry's play button
 - "Run now" on a routine
+- "Configure first, then run" on a routine — the launcher opens with its prompt, so the model and location can be set first
 - The whole CLI is one command: `the-framework` serves the dashboard — four options, no verbs
 - `--host` / `--port`, the two things a browser cannot be asked; `--help` / `--version`
 - Reach the dashboard from another machine — non-loopback bind behind a generated shared token

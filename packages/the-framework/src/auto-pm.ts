@@ -52,6 +52,12 @@ export interface AutoPmInputs {
   sinceLastStartMs?: number
   /** Override {@link DEFAULT_AUTO_PM_COOLDOWN_MS}. */
   cooldownMs?: number
+  /**
+   * A person asked for this pass (#1210's Run now), so the cooldown does not apply (#1642): it
+   * paces work nobody asked for, and a click is asking. The concurrency cap still does — that is
+   * what keeps a second click from doubling up, since a start registers before the sweep moves on.
+   */
+  onDemand?: boolean
 }
 
 /** Why the sweep is not starting anything. Logged, so it reads as a sentence. */
@@ -123,7 +129,7 @@ export function autoPmDecision(input: AutoPmInputs): AutoPmDecision {
     return { start: false, reason: concurrency === 1 ? going : `${going}, and the routine keeps at most ${concurrency} at once` }
   }
   const cooldownMs = input.cooldownMs ?? DEFAULT_AUTO_PM_COOLDOWN_MS
-  if (input.sinceLastStartMs !== undefined && input.sinceLastStartMs < cooldownMs) {
+  if (!input.onDemand && input.sinceLastStartMs !== undefined && input.sinceLastStartMs < cooldownMs) {
     return { start: false, reason: 'a run was started for this project a moment ago' }
   }
   if (input.backlogEmpty === undefined) {
@@ -627,8 +633,10 @@ export interface AutoPmLoop {
    *
    * `onDemand` marks a sweep a person explicitly asked for (#1210's trigger button). The `autoPm`
    * preference is consent to spend quota *unasked*, and a click is asking — so an on-demand sweep
-   * runs with the preference off, and the master switch is the only gate it skips: every other
-   * reason to stand down (live agents, cooldowns, the quota boundary, unticked routines) still holds.
+   * runs with the preference off. It skips the cooldown for the same reason (#1642): the cooldown
+   * paces the unattended sweep, and for half an hour after any run it made Run now a button that
+   * could start nothing. Every other reason to stand down (live agents, the quota boundary,
+   * unticked routines) still holds.
    *
    * `drainOnly` narrows the sweep to working the queue (#1204): the drain row's Run now means
    * "spin agents up on the queue", so a tick that would fall through to a rotation job (the queue
@@ -777,6 +785,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           quota,
           ...(since !== undefined ? { sinceLastStartMs: now() - since } : {}),
           ...(deps.cooldownMs !== undefined ? { cooldownMs: deps.cooldownMs } : {}),
+          ...(opts?.onDemand ? { onDemand: true } : {}),
         })
         if (!decision.start) {
           // Logged, so a wedged sweep is distinguishable from a healthy idle one (#855).

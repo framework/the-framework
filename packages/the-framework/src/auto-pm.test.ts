@@ -92,6 +92,15 @@ test('autoPmDecision holds off during the cooldown after a start (#685)', () => 
   assert.deepEqual(later, { start: true, mode: 'pm' })
 })
 
+test('autoPmDecision lets an asked-for pass through the cooldown (#1642)', () => {
+  // The cooldown paces the unattended sweep; a click is a person asking, so it does not apply.
+  const decision = autoPmDecision({ ...IDLE, sinceLastStartMs: 60_000, onDemand: true })
+  assert.deepEqual(decision, { start: true, mode: 'pm' })
+  // The concurrency cap is not waived with it: that is what stops a second click doubling up.
+  const capped = autoPmDecision({ ...IDLE, sinceLastStartMs: 60_000, onDemand: true, activeAgents: 1, concurrency: 1 })
+  assert.equal(capped.start, false)
+})
+
 test('quotaHeadroom refuses to start when the quota cannot be read (#685)', () => {
   // The inverse of the per-agent guard's fail-open (#519): that one must never STOP the user's
   // own work, this one must never START work nobody asked for on an unknown budget.
@@ -200,12 +209,23 @@ test('an on-demand tick sweeps with the preference off: the click is the ask (#1
   assert.equal(report.outcomes[0]?.started, true)
 })
 
-test('on demand skips only the master switch: every other stand-down still holds (#1210)', async () => {
+test('on demand skips the master switch and the cooldown: every other stand-down still holds (#1210/#1642)', async () => {
   const { loop, started } = harness({ enabled: async () => false, activeAgents: () => 1 })
   await loop.tick({ onDemand: true })
   loop.stop()
   assert.deepEqual(started, [])
   assert.match(loop.report().outcomes[0]?.message ?? '', /already going/)
+})
+
+test('a Run now right after a run starts anyway: the cooldown is for work nobody asked for (#1642)', async () => {
+  // Same two ticks as the #685 double-up test above, the second one a click. The sweep's own
+  // cooldown held the button for half an hour after any run, and the card said so in small
+  // text under the fold — a button that did nothing, to anyone who clicked and looked away.
+  const { loop, started } = harness()
+  await loop.tick()
+  await loop.tick({ onDemand: true })
+  loop.stop()
+  assert.deepEqual(started, ['p1', 'p1'])
 })
 
 test('startAutoPm does not start a second run for the same project (#685)', async () => {

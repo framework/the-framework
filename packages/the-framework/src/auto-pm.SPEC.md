@@ -9,7 +9,7 @@ Auto PM spends leftover subscription quota on the product's own roadmap: while t
 
 ## Flows
 
-- Whether a pass starts anything is one pure policy question per project — enabled, under the concurrency cap, past the cooldown, queue readable, quota under the boundary; the sweep loop only supplies the readings.
+- Whether a pass starts anything is one pure policy question per project — enabled, under the concurrency cap, past the cooldown unless a person asked, queue readable, quota under the boundary; the sweep loop only supplies the readings.
 - A standing queue is drained before new work is invented; a calendar-paced codebase maintenance sweep outranks the rotation when due, and only ever while the queue is genuinely empty.
 - Draining and planning fan out, one pinned queue entry or locked ticket per agent, so concurrent agents do disjoint work; every other routine stays one per pass since concurrent copies would undo each other.
 - Both phases claim their ticket with a pushed lock file before the agent starts, so agents on other machines cannot double-book it: planning locks the ticket it will plan, and draining locks the ticket its queue entry links back to. An entry claimed elsewhere is dropped from the batch, and an entry with no ticket behind it keeps the queue itself as the coordination point.
@@ -22,7 +22,7 @@ Auto PM spends leftover subscription quota on the product's own roadmap: while t
 
 - An unreadable quota fails closed — the opposite of the per-agent guard: quietly burning quota on work nobody asked for is worse than skipping a pass.
 - Where the account stands is asked per project rather than once per pass, because the model a project's work would run on is a project setting and each model's own weekly allowance binds alongside the account's. Two projects on two models can therefore stand at two different places against the same reading.
-- "Run now" skips only the master switch: the click is the consent the preference exists to record; every other stand-down holds.
+- "Run now" skips the master switch and the cooldown: the click is the consent the preference exists to record, and the cooldown paces work nobody asked for — without skipping it, the button could start nothing for half an hour after any run. Every other stand-down holds: a click cannot exceed the concurrency cap, and that cap is what keeps a second click from doubling up.
 - A "Run now" can ask for one routine's work in one project, rather than a whole pass: it never falls through to work the click did not name, a switched-off routine stands it down instead of being overridden, and it leaves the rotation on whichever turn it was on.
 - A switched-off draining routine falls through to the rotation rather than standing the pass down, because a stand-down would make every inventing routine unreachable whenever the queue holds anything — and the queue is auto-populated, so it usually does.
 - The ticketless hand-off window is accepted rather than closed: closing it would take a durable per-entry claim — a second claim shape beside the pushed ticket lock that already covers the queue's normal case — for a race whose cost is a duplicated attempt, never lost work.

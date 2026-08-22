@@ -6,7 +6,6 @@
 
 ## Priority 7
 
-- Create tickets/2026-07-24_interrupt-turn-steer-in-place.plan.md (ticket Priority 7; the spike already removed the architectural blocker, so planning is low effort)
 
 ## Priority 6
 

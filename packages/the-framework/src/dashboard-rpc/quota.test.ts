@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { provideTestContext } from './test-context.js'
 import { sendAutoPmSweep } from './quota.js'
-import type { AutoPmOutcome } from '../auto-pm.js'
+import type { AutoPmOutcome, AutoPmOnly } from '../auto-pm.js'
 
 // #1433: "Trigger routine now" was fire-and-forget — the RPC returned before the sweep ran, so
 // the button flashed and the card showed nothing, with the stand-down reason recoverable only
@@ -65,15 +65,18 @@ test('a sweep that throws is a failure; an unreadable report is not (#1433)', as
   assert.deepEqual(await sendAutoPmSweep(), { ok: true })
 })
 
-test('drainOnly travels to the loop untouched (#1204)', async () => {
+test('the narrowing travels to the loop untouched (#1204)', async () => {
   const seen: unknown[] = []
   provideTestContext({
-    autoPmSweep: (opts?: { drainOnly?: boolean }) => {
+    autoPmSweep: (opts?: { only?: AutoPmOnly; projectId?: string }) => {
       seen.push(opts)
     },
     autoPm: () => ({ nextSweepAt: 0, outcomes: [] }),
   })
-  await sendAutoPmSweep({ drainOnly: true })
+  await sendAutoPmSweep({ only: 'drain' })
+  await sendAutoPmSweep({ only: 'plan', projectId: 'p1' })
   await sendAutoPmSweep()
-  assert.deepEqual(seen, [{ drainOnly: true }, undefined])
+  // Passed through rather than rebuilt: a wrapper that reconstructed the object is how a new
+  // narrowing silently stops reaching the loop.
+  assert.deepEqual(seen, [{ only: 'drain' }, { only: 'plan', projectId: 'p1' }, undefined])
 })

@@ -23,6 +23,7 @@ Auto PM spends leftover subscription quota on the product's own roadmap: while t
 - An unreadable quota fails closed — the opposite of the per-agent guard: quietly burning quota on work nobody asked for is worse than skipping a pass.
 - Where the account stands is asked per project rather than once per pass, because the model a project's work would run on is a project setting and each model's own weekly allowance binds alongside the account's. Two projects on two models can therefore stand at two different places against the same reading.
 - "Run now" skips only the master switch: the click is the consent the preference exists to record; every other stand-down holds.
+- A "Run now" can ask for one routine's work in one project, rather than a whole pass: it never falls through to work the click did not name, a switched-off routine stands it down instead of being overridden, and it leaves the rotation on whichever turn it was on.
 - A switched-off draining routine falls through to the rotation rather than standing the pass down, because a stand-down would make every inventing routine unreachable whenever the queue holds anything — and the queue is auto-populated, so it usually does.
 - The ticketless hand-off window is accepted rather than closed: closing it would take a durable per-entry claim — a second claim shape beside the pushed ticket lock that already covers the queue's normal case — for a race whose cost is a duplicated attempt, never lost work.
 

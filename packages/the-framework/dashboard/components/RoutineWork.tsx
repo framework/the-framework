@@ -156,15 +156,20 @@ export function RoutineWork({
 
   const runNow = async (job: AutoPmJob) => {
     if (!projectId || busy) return
-    // The drain's Run now means "spin agents up on the queue" (#1204), and only the sweep can fan
-    // out — one agent per entry, up to the concurrency. A plain start could only ever be one
-    // agent reading the first entry. Drain-only, so an empty queue is reported on the card
-    // rather than the click quietly borrowing a rotation job. No navigation on purpose: the
-    // agents land in the Agents card, which is where a batch is watchable.
-    if (job.drains) {
+    // The two routines that fan out go through the sweep (#1204), because only the sweep can:
+    // it claims the work before each agent starts — a queue entry for a drain, a ticket lock for
+    // planning — and a plain start could only ever be one agent, reading whatever is first.
+    // Narrowed to the one routine the click named, so having nothing to work is reported on the
+    // card rather than the click quietly borrowing a different rotation job. No navigation on
+    // purpose: the agents land in the Agents card, which is where a batch is watchable.
+    //
+    // The drain visits every project, which is what its tooltip says and why it sends no id.
+    // Planning is the picked project's own work, so it carries one.
+    if (job.drains || job.fansOut) {
       setStarting(job.name)
       setSweepNote(null)
-      const result = await sendAutoPmSweep({ drainOnly: true }).catch(() => ({ ok: false as const }))
+      const narrowed = job.drains ? { only: 'drain' as const } : { only: 'plan' as const, projectId }
+      const result = await sendAutoPmSweep(narrowed).catch(() => ({ ok: false as const }))
       setStarting(null)
       if (!result.ok) setSweepNote('This dashboard is not running the sweep, so there is nothing to trigger here.')
       else setSweepNote(describeOutcomes('outcomes' in result ? result.outcomes : undefined))
@@ -267,10 +272,16 @@ export function RoutineWork({
                         <span className="block text-muted-foreground">
                           {job.drains ? "Each project's own settings decide the model and where it runs." : settings}
                         </span>
+                        {/* Three cases, because the click does three different things (#1204).
+                            A routine that fans out spends what the setting allows rather than one
+                            agent, so a tooltip that exists to say what a click costs has to say
+                            so — and "one per ticket" is why several here is not redundant work. */}
                         <span className="block text-muted-foreground">
                           {job.drains
                             ? `Sweeps every project the daemon watches, up to ${concurrency} ${concurrency === 1 ? 'agent' : 'agents'} each, unattended.`
-                            : `Starts one agent${projectName ? ` in ${projectName}` : ''}, unattended — nothing is asked mid-run.`}
+                            : job.fansOut
+                              ? `Starts up to ${concurrency} ${concurrency === 1 ? 'agent' : 'agents'}${projectName ? ` in ${projectName}` : ''}, one per open ticket, unattended.`
+                              : `Starts one agent${projectName ? ` in ${projectName}` : ''}, unattended — nothing is asked mid-run.`}
                         </span>
                       </TooltipContent>
                     </Tooltip>
@@ -291,11 +302,13 @@ export function RoutineWork({
                         >
                           <OptionLabel
                             label="Configure first, then run"
-                            /* The drain's Run now is a fan-out sweep, and the launcher can only
+                            /* A fan-out routine's Run now is a sweep, and the launcher can only
                                ever send one agent — so this row's secondary action really is a
-                               different job, and says so rather than looking like the same one. */
+                               different job, and says so rather than looking like the same one.
+                               Both fan-out routines (#1204), not just the drain: the same
+                               sentence is true the moment a Run now stops being one start. */
                             description={
-                              job.drains
+                              job.drains || job.fansOut
                                 ? 'Opens the launcher with this prompt — one agent, not the fan-out.'
                                 : 'Opens the launcher with this prompt, so you can set the model and where it runs.'
                             }

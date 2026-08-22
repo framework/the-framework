@@ -153,6 +153,47 @@ describe('RoutineWork (#1159)', () => {
     expect(hint.textContent).not.toContain('Opus')
   })
 
+  test("the planning routine's menu item says it is one agent too, not its fan-out (#1204/#1507)", async () => {
+    renderCard()
+    await openRunMenu(AUTO_PM_ROUTINES.find(job => job.fansOut)!)
+    // The launcher sends one agent whichever routine it is handed, so the moment a Run now stops
+    // being one start its menu item has to say what it gives up.
+    expect(await screen.findByText(/one agent, not the fan-out/)).toBeTruthy()
+  })
+
+  // #1204: the planning routine is the other one that fans out, so its Run now goes to the sweep
+  // too — a plain start could only ever be one agent, which is the one thing the concurrency
+  // setting could not reach.
+  const PLAN_JOB = AUTO_PM_ROUTINES.find(job => job.fansOut)!
+
+  test("the planning routine's Run now fires the sweep for its project, not a single start (#1204)", async () => {
+    renderCard()
+    fireEvent.click(await runNowOf(PLAN_JOB))
+    await waitFor(() => expect(sendAutoPmSweep).toHaveBeenCalled())
+    // Narrowed to planning, and scoped to the project the picker shows: the drain's Run now
+    // deliberately sends no id because it sweeps every project, and this one is not that.
+    expect(sendAutoPmSweep).toHaveBeenCalledWith({ only: 'plan', projectId: 'p1' })
+    // The fan-out is the sweep's whole point here: a plain start is the pre-#1204 behaviour and
+    // is exactly what must not happen.
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  test("the planning routine's Run now says it spends the concurrency, one agent per ticket (#1204)", async () => {
+    prefs = { model: 'opus', autoPmConcurrency: 3 }
+    renderCard()
+    const hint = await hoverTooltip(await runNowOf(PLAN_JOB))
+    expect(hint.textContent).toMatch(/Starts up to 3 agents in gemstack, one per open ticket, unattended/)
+    // Not the drain's line: this one stays in the picked project and does resolve these settings.
+    expect(hint.textContent).not.toContain('Sweeps every project')
+    expect(hint.textContent).toContain('Claude Code · Opus · This machine')
+  })
+
+  test('a concurrency of one is said as one agent, not "up to 1 agents" (#1204)', async () => {
+    prefs = { autoPmConcurrency: 1 }
+    renderCard()
+    expect((await hoverTooltip(await runNowOf(PLAN_JOB))).textContent).toMatch(/Starts up to 1 agent in gemstack/)
+  })
+
   /** Open one row's secondary half — the chevron beside its Run now. */
   const openRunMenu = async (job: AutoPmJob) => {
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBe(AUTO_PM_ROUTINES.length))
@@ -218,7 +259,9 @@ describe('RoutineWork (#1159)', () => {
     renderCard({ onAgentStarted: (...args) => started.push(args) })
     await waitFor(() => expect(screen.getAllByText('Run now').length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByText('Run now')[0]!)
-    await waitFor(() => expect(sendAutoPmSweep).toHaveBeenCalledWith({ drainOnly: true }))
+    // No project id on purpose: the drain sweeps every project the daemon watches, which is what
+    // its own tooltip promises — unlike the planning routine's click, which stays in the picked one.
+    await waitFor(() => expect(sendAutoPmSweep).toHaveBeenCalledWith({ only: 'drain' }))
     expect(start).not.toHaveBeenCalled()
     // No navigation: the batch lands in the Agents card, not one session's page.
     expect(started).toHaveLength(0)

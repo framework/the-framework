@@ -6,7 +6,7 @@ import { registryPreferencesStore, type PreferencesStore } from '../registry.js'
 import { registryDiscordCredentialsStore } from '../discord-credentials-store.js'
 import type { DiscordCredentialsStore } from '../discord-credentials.js'
 import { defaultQuotaSource, type QuotaSource } from './quota.js'
-import type { AutoPmReporter } from '../auto-pm.js'
+import type { AutoPmReporter, AutoPmOnly } from '../auto-pm.js'
 import type { ProjectErrorsReader } from '../project-errors.js'
 import { serveClientBundle } from './static.js'
 import { BROWSER_PROXY_PREFIX, handleBrowserProxy } from './browser-proxy.js'
@@ -60,7 +60,7 @@ export interface DashboardOptions {
    * Fire an auto PM sweep now instead of waiting out the interval (#1210). Resolves when the
    * sweep does (#1433), so the trigger RPC can await it.
    */
-  autoPmSweep: (opts?: { drainOnly?: boolean }) => void | Promise<void>
+  autoPmSweep: (opts?: { only?: AutoPmOnly; projectId?: string }) => void | Promise<void>
   /** What a project currently suffers from (#1500), for the project list to carry. */
   projectErrors: ProjectErrorsReader
   /**

@@ -664,7 +664,7 @@ test('a drain-only sweep still stands down when the drain routine is off (#1204/
     queue: async () => ['entry a'],
     optedOut: async () => [AUTO_PM_DRAIN_JOB.name],
   })
-  await loop.tick({ onDemand: true, drainOnly: true })
+  await loop.tick({ onDemand: true, only: 'drain' })
   loop.stop()
   assert.deepEqual(ran, [])
   assert.equal(loop.report().outcomes[0]?.message, 'the queue has work waiting and its routine is switched off')
@@ -1162,6 +1162,107 @@ test('a fansOut job fans out to the concurrency, one locked ticket per agent (#1
   assert.match(prompts[0]!, new RegExp(`CLAIMED: ${lockCalls[0]![0]!.agentId}`))
 })
 
+// #1204: Run now on the planning routine reaches the same fan-out the daemon uses. It used to be
+// a plain single start, so the concurrency setting was the one thing that click ignored.
+
+test("a plan-only sweep fans out the planning routine, one locked ticket per agent (#1204)", async () => {
+  const prompts: string[] = []
+  const { loop } = harness({
+    jobs: [PLAN_JOB],
+    cooldownMs: 0,
+    concurrency: async () => 3,
+    planCandidates: async () => ['a.md', 'b.md', 'c.md'],
+    lockPlans: async (_p, assignments) => assignments,
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick({ onDemand: true, only: 'plan', projectId: 'p1' })
+  loop.stop()
+  assert.equal(prompts.length, 3, 'the click spends the concurrency, not one agent')
+  assert.match(prompts[0]!, /tickets\/a\.md/)
+  assert.match(prompts[2]!, /tickets\/c\.md/)
+})
+
+test("a plan-only sweep plans instead of draining, however full the queue is (#1204)", async () => {
+  // The queue-picked mode would send this tick to the drain. The click named the planning
+  // routine, so the queue is not its business.
+  //
+  // Asserted on the prompts rather than the job name: the name stays `plan` even when the tick
+  // falls through to the drain's fan-out, because it is the *batch* that differs — entries off
+  // the queue instead of tickets. The name alone passes either way, which is no guard at all.
+  const prompts: string[] = []
+  const { loop, ran } = harness({
+    jobs: [PLAN_JOB],
+    cooldownMs: 0,
+    concurrency: async () => 2,
+    queue: async () => ['work one', 'work two'],
+    drainJob: { name: 'drain', prompt: 'Work the queue.', drains: true },
+    planCandidates: async () => ['a.md'],
+    lockPlans: async (_p, assignments) => assignments,
+    start: async (_p, job) => {
+      prompts.push(job.prompt)
+      return `run-${prompts.length}`
+    },
+  })
+  await loop.tick({ onDemand: true, only: 'plan', projectId: 'p1' })
+  loop.stop()
+  assert.deepEqual(ran, [])
+  assert.equal(prompts.length, 1, 'one open ticket is one agent, not one per queue entry')
+  assert.match(prompts[0]!, /tickets\/a\.md/)
+  assert.ok(
+    !prompts.some(prompt => prompt.includes('work one')),
+    'no agent was handed a queue entry: the click asked for planning, not draining',
+  )
+})
+
+test("a plan-only sweep stands down when the planning routine is switched off (#1204)", async () => {
+  const { loop, ran, logs } = harness({
+    jobs: [PLAN_JOB],
+    cooldownMs: 0,
+    optedOut: async () => ['plan'],
+    planCandidates: async () => ['a.md'],
+    lockPlans: async (_p, assignments) => assignments,
+  })
+  await loop.tick({ onDemand: true, only: 'plan', projectId: 'p1' })
+  loop.stop()
+  assert.deepEqual(ran, [], 'an unticked box is not overridden by the click')
+  assert.ok(logs.some(line => line.includes('the planning routine is switched off')))
+})
+
+test("a plan-only sweep visits only the project the card picked (#1204)", async () => {
+  const { loop, started } = harness({
+    projects: async () => [
+      { id: 'p1', path: '/one' },
+      { id: 'p2', path: '/two' },
+    ],
+    jobs: [PLAN_JOB],
+    cooldownMs: 0,
+    planCandidates: async () => ['a.md'],
+    lockPlans: async (_p, assignments) => assignments,
+  })
+  await loop.tick({ onDemand: true, only: 'plan', projectId: 'p2' })
+  loop.stop()
+  assert.deepEqual(started, ['p2'], 'the other project is not swept by a click that named one')
+})
+
+test("a plan click does not cost the rotation its turn (#1204)", async () => {
+  // The rotation is mid-cycle; a click that borrows the tick for a routine it named must leave
+  // the cycle where it was, the same way a due maintenance sweep does.
+  const other: AutoPmJob = { name: 'triage', prompt: 'Triage.' }
+  const { loop, ran } = harness({
+    jobs: [other, PLAN_JOB],
+    cooldownMs: 0,
+    planCandidates: async () => ['a.md'],
+    lockPlans: async (_p, assignments) => assignments,
+  })
+  await loop.tick({ onDemand: true, only: 'plan', projectId: 'p1' })
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(ran, ['plan', 'triage'], 'the scheduled tick still gets the rotation job it was owed')
+})
+
 test('only the tickets the lock actually claimed go out (#1327)', async () => {
   // A lost race — b.md's sibling appeared between the enumeration and the lock — costs that one
   // agent, not the batch.
@@ -1328,13 +1429,13 @@ test('a drain-only sweep works the queue and never borrows the tick for the rota
       return `run-${prompts.length}`
     },
   })
-  await loop.tick({ onDemand: true, drainOnly: true })
+  await loop.tick({ onDemand: true, only: 'drain' })
   loop.stop()
   assert.equal(prompts.length, 2)
 
   // ...and with an empty queue it says so instead of starting a rotation job.
   const { loop: empty, started } = harness({ cooldownMs: 0, queue: async () => [] })
-  await empty.tick({ onDemand: true, drainOnly: true })
+  await empty.tick({ onDemand: true, only: 'drain' })
   empty.stop()
   assert.equal(started.length, 0)
   assert.equal(empty.report().outcomes[0]?.message, 'the queue is empty, so there is nothing to drain')

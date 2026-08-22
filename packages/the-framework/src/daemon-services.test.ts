@@ -171,7 +171,7 @@ test("the drain row's Run now fans out to the setting with auto-run off (#1204/#
     assert.equal(starts.length, 0, 'auto-run off means the schedule starts nothing by itself')
     // Exactly what the card's Run now sends for the draining routine, through the same
     // `wakeAutoPm` seam the RPC calls.
-    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    running.wakeAutoPm({ onDemand: true, only: 'drain' })
     await settle(() => starts.length >= 3)
     assert.equal(starts.length, 3, 'the click spins the setting up, not one agent')
     for (const [index, start] of starts.entries()) {
@@ -195,12 +195,12 @@ test('a drained entry is checked off on the data branch once its run reports the
   // the check-off as a data-branch commit. The agent never touches the queue.
   const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
   try {
-    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    running.wakeAutoPm({ onDemand: true, only: 'drain' })
     await settle(() => starts.length >= 1)
     assert.ok(starts[0]!.prompt.includes(QUEUE_ENTRIES[0]!), 'the first entry is the pinned one')
     // The run settles `done` and its epilogue reported the push/PR: the one ending that retires.
     await archiveMeta(projectDir, { id: 'run-1', status: 'done', handoffReport: 'done' })
-    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    running.wakeAutoPm({ onDemand: true, only: 'drain' })
     // Waited for on the branch, not the checkout file: the funnel writes the file first and
     // commits a beat later, and only the commit is the retirement every machine pulls.
     const deadline = Date.now() + 5000
@@ -227,10 +227,10 @@ test('a run whose hand-off failed leaves its entry open: unpublished work is not
   // the entry stays open for the next drain rather than vanishing with the work unpublished.
   const { starts, stop, services: running, projectDir } = await services({ autoPm: false, autoPmConcurrency: 1 })
   try {
-    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    running.wakeAutoPm({ onDemand: true, only: 'drain' })
     await settle(() => starts.length >= 1)
     await archiveMeta(projectDir, { id: 'run-1', status: 'done', handoffReport: 'failed' })
-    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    running.wakeAutoPm({ onDemand: true, only: 'drain' })
     // No positive signal marks "the promote settled without retiring", so give the tick a
     // moment and then require the queue untouched — the check-off in the sibling test lands
     // well inside this window when the gate passes.
@@ -254,7 +254,7 @@ test('a drain claims an entry whose ticket file is gone, recreating tickets/ on 
       await rm(join(dir, 'tickets'), { recursive: true, force: true })
     })
     assert.ok(cleared.ok, 'the fixture must drop tickets/ from the data branch')
-    running.wakeAutoPm({ onDemand: true, drainOnly: true })
+    running.wakeAutoPm({ onDemand: true, only: 'drain' })
     await settle(() => starts.length >= 1)
     assert.equal(starts.length, 1, 'the batch starts instead of standing down')
     assert.ok(starts[0]!.prompt.includes(QUEUE_ENTRIES[0]!), 'the first entry is the pinned one')

@@ -1,5 +1,5 @@
 import { contextAutoPm, contextAutoPmSweep, contextQuota } from './context.js'
-import type { AutoPmOutcome, AutoPmReport } from '../auto-pm.js'
+import type { AutoPmOutcome, AutoPmReport, AutoPmOnly } from '../auto-pm.js'
 import type { QuotaView } from '../dashboard/quota.js'
 
 // The usage panel's read surface (#533): where the account's subscription quota stands, and where
@@ -49,11 +49,13 @@ export async function onAutoPm(): Promise<AutoPmReport | undefined> {
  * off the loop's own report once the tick resolves, so the card can say them without a poll
  * having to race the sweep. `false` means the sweep itself failed.
  *
- * `drainOnly` narrows the sweep to working the queue (#1204): the drain routine's Run now spins
- * agents up on the queue's entries — the fan-out only the sweep can do — and an empty queue is
- * reported rather than borrowed for a rotation job.
+ * `only` narrows the sweep to one routine's work (#1204), which is what a Run now that fans out
+ * means: `'drain'` spins agents up on the queue's entries, `'plan'` on the open tickets. Either
+ * way the fan-out is the sweep's — a plain start could only ever be one agent — and having
+ * nothing to work is reported rather than borrowed for a rotation job. `projectId` scopes it to
+ * the project the card has picked.
  */
-export async function sendAutoPmSweep(opts?: { drainOnly?: boolean }): Promise<{ ok: boolean; outcomes?: AutoPmOutcome[] }> {
+export async function sendAutoPmSweep(opts?: { only?: AutoPmOnly; projectId?: string }): Promise<{ ok: boolean; outcomes?: AutoPmOutcome[] }> {
   const sweep = contextAutoPmSweep()
   // The reporter is captured BEFORE the sweep is awaited. It had to be: the context was
   // request-scoped and did not survive an await, so a post-await `contextAutoPm()` found nothing
@@ -62,7 +64,7 @@ export async function sendAutoPmSweep(opts?: { drainOnly?: boolean }): Promise<{
   // load-bearing; the captured closure needs no context to be called later either way.
   const reporter = contextAutoPm()
   try {
-    await sweep(opts?.drainOnly ? { drainOnly: true } : undefined)
+    await sweep(opts)
   } catch {
     return { ok: false }
   }

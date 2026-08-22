@@ -10,7 +10,6 @@
 
 ## Priority 6
 
-- Create tickets/2026-08-21_empty-poll-vs-failed-poll-discord-flood.plan.md (ticket Priority 6; bug is fully root-caused at the empty-read-vs-failed-read seam, so a plan is low effort)
 
 ## Priority 5
 

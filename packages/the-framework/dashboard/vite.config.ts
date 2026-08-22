@@ -88,7 +88,7 @@ function frameworkDevDaemon(): Plugin {
 // plain HTTP (`POST /_rpc/<name>`, plus an SSE stream for the live feed). `index.html` beside this
 // file is the whole entry; the daemon serves the built output as static files with an SPA fallback.
 export default defineConfig({
-  // The dashboard is a directory inside @gemstack/the-framework rather than a package of its own
+  // The dashboard is a directory inside `framework` rather than a package of its own
   // (A7), so `root` is pinned to this file's directory instead of inherited from the cwd — the
   // scripts that run it live one level up.
   root: fileURLToPath(new URL('.', import.meta.url)),

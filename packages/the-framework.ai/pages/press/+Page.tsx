@@ -73,7 +73,7 @@ export default function Page() {
         <Step kicker="Name">
           <p style={pStyle}>
             The name is written <b style={{ color: '#d3c6aa', fontWeight: 600 }}>The Framework</b> (capital T, capital
-            F), and the package is <CodeChip fontSize={13}>@gemstack/the-framework</CodeChip>.
+            F), and the package is <CodeChip fontSize={13}>framework</CodeChip>.
           </p>
         </Step>
         <Step kicker="Banner">

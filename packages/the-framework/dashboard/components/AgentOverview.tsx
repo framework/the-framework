@@ -7,7 +7,7 @@ import { cn } from '../lib/utils.js'
 
 // The agent overview (#431): the "moat" the wrapped agent's own chat cannot show, rebuilt
 // on the new dashboard. Each card is a pure projection of the event stream (run-view.ts
-// in @gemstack/the-framework) — the agent's status and a link
+// in `framework`) — the agent's status and a link
 // to the live session. Cards render only when their data has arrived, so an early agent
 // shows nothing extra.
 export function AgentOverview({ events }: { events: FrameworkEvent[] }) {

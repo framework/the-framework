@@ -38,7 +38,7 @@ merging the package removed.
 ## Run it
 
 ```bash
-pnpm --filter @gemstack/the-framework dev:dashboard
+pnpm --filter framework dev:dashboard
 # open http://localhost:4300
 ```
 
@@ -50,5 +50,5 @@ configuration travels to it as a JSON spec (`--agent <path>`), never as flags.
 ## Tests
 
 `vitest` with a jsdom environment, which is why the package runs two test runners: `node --test`
-over the compiled `src/`, then `vitest` over this directory. `pnpm --filter @gemstack/the-framework test`
+over the compiled `src/`, then `vitest` over this directory. `pnpm --filter framework test`
 runs both.

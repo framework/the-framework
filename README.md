@@ -5,7 +5,7 @@
 **Autonomous AI programming.**  
 Stop babysitting your coding agents. Make the important decisions, let AI do the rest.
 
-[![npm](https://img.shields.io/npm/v/@gemstack/the-framework)](https://www.npmjs.com/package/@gemstack/the-framework) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE) [![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/qc8zvdzWNR)
+[![npm](https://img.shields.io/npm/v/framework)](https://www.npmjs.com/package/framework) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE) [![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/qc8zvdzWNR)
 
 <br clear="left" />
 
@@ -17,9 +17,9 @@ Stop babysitting your coding agents. Make the important decisions, let AI do the
 
 ```bash
 # Install
-npm i -g @gemstack/the-framework
+npm i -g framework
 the-framework # Spins up the dashboard
 
 # Or one-shot (no install):
-npx @gemstack/the-framework # Spins up the dashboard
+npx framework # Spins up the dashboard
 ```

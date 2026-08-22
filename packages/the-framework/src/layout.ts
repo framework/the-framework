@@ -68,7 +68,7 @@ export async function checkLayout(cwd: string, fs: StoreFs = nodeStoreFs()): Pro
       `${THE_FRAMEWORK_DIR}/${LAYOUT_FILE}, so running it here would commit files under names ` +
       `the repo does not use (#1575).\n\nthis build writes:\n${layoutMarker()}\nthe repo records:\n${recorded}\n` +
       `A published build that predates a repo-side rename does this: update ` +
-      `@gemstack/the-framework to a build matching the repo, or — if this build is the newer ` +
+      `framework to a build matching the repo, or — if this build is the newer ` +
       `side — rewrite the marker with its layout and land that as the rename's own commit.`,
   }
 }

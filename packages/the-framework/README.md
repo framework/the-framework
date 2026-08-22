@@ -1,4 +1,4 @@
-# @gemstack/the-framework
+# framework
 
 **The Framework** — autonomous AI programming: humans make the important decisions
 while coding agents run unattended.
@@ -8,16 +8,16 @@ gets a throwaway copy of the repo, does its work, and hands the result off as a 
 request. Your own checkout is never touched.
 
 ```bash
-npm i -g @gemstack/the-framework
+npm i -g framework
 
 cd ~/code/my-repo
-framework          # serves the dashboard at http://127.0.0.1:4200
+the-framework      # serves the dashboard at http://127.0.0.1:4200
 ```
 
 ## The CLI is four options and no verbs
 
 ```
-framework              Serve the dashboard in the foreground. Ctrl+C closes it and
+the-framework          Serve the dashboard in the foreground. Ctrl+C closes it and
                        every session it is running.
 
   --port <n>           Dashboard port (default: 4200).
@@ -74,5 +74,5 @@ in prose. [`SPEC.md`](./SPEC.md) at the package root is the place to start.
 
 ## Status
 
-Pre-release and unversioned. There are no users to keep compatible, so the code
-prefers being clean over being backward-compatible.
+Pre-release, published from the `0.x` line. There are no users to keep compatible,
+so the code prefers being clean over being backward-compatible.

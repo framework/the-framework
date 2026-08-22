@@ -1,5 +1,0 @@
----
-'@gemstack/the-framework': minor
----
-
-A cloud run's record now follows the branch its session actually worked on (#1601). A web run hands the task to claude.ai and ends; the session does the work on a `claude/*` branch of the cloud's own naming, never the designated run branch — so every surface keyed to the recorded branch (the session row, PR resolution, CI watch, merge) said "nothing committed" while the work sat on origin, and the armed draft PR never opened. The hand-off now pushes an anchor — an empty commit unique to the run, minted without moving any branch — as the ref the session clones at, so the session's branch is recognizable later by plain ancestry. A daemon pass matches each settled web run to the one `claude/*` head descending from its anchor and patches the run's archive with the branch and its PR, opening the armed draft PR itself when the session never did. Web-run teardown stops pushing the empty `tf-agent-*` branch to origin (the scratch-ref sweep clears the ones already there, and learns that an anchor tip — an empty commit on a landed parent — holds no work).

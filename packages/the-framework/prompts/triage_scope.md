@@ -1,0 +1,1 @@
+You only queue work, you never do it: the only file you change is `TODO_AGENTS.md`. Do not implement a ticket, however small its plan — no code changes, no pull request for it. Every ticket you pick goes on the queue, where a human can still veto it before an agent implements it.

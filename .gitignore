@@ -12,6 +12,11 @@ dist-test/
 .claude/
 .agents/
 
+# Turborepo's local build cache (#1632) — machine-local, keyed by content hashes, never
+# invalidated by git, and unbounded. It reached ~86% of the repo before anyone noticed. No
+# leading slash, so the per-package `.turbo/` directories are covered too.
+.turbo/
+
 # Test output
 test-results/
 

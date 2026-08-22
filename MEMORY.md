@@ -6,6 +6,7 @@
 - **Never interrupt a running session because of low quota.** Quota gates whether a session may *start*; a session already running is never paused, degraded or cut short.
 - **The unit of work is an *agent*** — not a run or a session. The CLI that drives it (`claude`, `codex`) is the *driver*.
 - **Zero migration code.** Manual migration is good; code that migrates is not. A renamed or deleted thing leaves nothing behind — no fallback to the old name, no key alias, no old-format branch, no upgrade step. Nor a notice about what was dropped: a warning about data nobody has is still code nobody needs.
+- **Haiku is out of scope.** It skips the session-finish protocol, so unattended work started on it always ends as an unmerged draft PR that a human has to finish. We deliberately don't work around this: no model floor that overrides the model a user picked, and no refusal to arm the hand-off. The dashboard's warning is the whole treatment — it teaches and never blocks.
 
 ## Before modifying this file
 

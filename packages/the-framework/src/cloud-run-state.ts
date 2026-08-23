@@ -8,15 +8,19 @@ import type { AgentMeta } from './store/agent-store.js'
 // one place that turns the record into the word a local run's row would show, and it is node-free
 // so the dashboard client, the rail and the Overview all derive the same word from the same rule.
 
-/** How long after its start a run's cloud session is still assumed to be alive: safely past any session's life. */
-export const CLOUD_ADOPTION_WINDOW_MS = 48 * 60 * 60 * 1000
+/**
+ * How long after its start a run's cloud session is still assumed to be alive. The same window
+ * the browser bridge watches a session for (`bridge-sessions`): past it nothing could learn the
+ * session is parked, so "in cloud" would be a guess nobody can correct — hence "done".
+ */
+export const CLOUD_SESSION_WINDOW_MS = 12 * 60 * 60 * 1000
 
 /**
  * What the cloud side of a web run is doing.
  *
  * - `waiting`: the browser bridge holds a question the session is parked on
  * - `merged` / `pr`: the session's work was adopted (#1601) and its pull request merged / is open
- * - `in-cloud`: nothing adopted yet and the run is young enough for its session to still be working
+ * - `in-cloud`: nothing adopted yet and the run is inside the session window, so it may still be working
  * - `done`: past that window with nothing adopted — the session finished or never pushed
  */
 export type CloudRunState = 'waiting' | 'merged' | 'pr' | 'in-cloud' | 'done'
@@ -34,7 +38,7 @@ export function cloudRunState(meta: CloudRunFacts, now: number): CloudRunState |
   if (meta.mergeOutcome === 'merged') return 'merged'
   if (meta.pr) return 'pr'
   const started = Date.parse(meta.startedAt)
-  return Number.isFinite(started) && now - started <= CLOUD_ADOPTION_WINDOW_MS ? 'in-cloud' : 'done'
+  return Number.isFinite(started) && now - started <= CLOUD_SESSION_WINDOW_MS ? 'in-cloud' : 'done'
 }
 
 /** Whether the cloud side still counts as an agent at work: in its session, or waiting on a human. */

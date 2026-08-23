@@ -5,7 +5,6 @@ import { agentBranchName } from './branch-names.js'
 import { listAgents, nodeStoreFs, startedAtFromAgentId, type AgentMeta, type ArchivePatch } from './store/index.js'
 import { patchArchivedAgentOnDataBranch } from './archived-agent-patch.js'
 import { errorMessage } from './error-message.js'
-import { CLOUD_ADOPTION_WINDOW_MS } from './cloud-run-state.js'
 
 // Adopt the branch a cloud session actually worked on (#1601).
 //
@@ -27,6 +26,9 @@ import { CLOUD_ADOPTION_WINDOW_MS } from './cloud-run-state.js'
 // did nothing) or more than one (ancestry alone cannot say which) is simply retried next pass,
 // and a run older than the window stops being asked about at all.
 
+
+/** How long after its start a run is still asked about: safely past any cloud session's life. */
+export const CLOUD_ADOPTION_WINDOW_MS = 48 * 60 * 60 * 1000
 
 /** What one adoption did, for the daemon to say out loud. */
 export interface CloudAdoption {

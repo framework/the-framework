@@ -1,6 +1,6 @@
 What the tests cover for the cloud state of a `web`-target agent:
 
-- **Age** - a young agent with nothing adopted is in cloud, up to and including the adoption window's edge; one past it, or one whose start time cannot be read, is done.
+- **Age** - a young agent with nothing adopted is in cloud, up to and including the session window's edge; one past it, or one whose start time cannot be read, is done.
 - **Waiting** - a question the bridge holds makes the agent waiting, over a pull request and over any age.
 - **Adopted work** - a pull request reads as the pull request; a merged one reads merged, whatever the agent's age; a withheld merge is still just the pull request.
 - **Scope** - a local or Actions agent, and a web agent still running, stopped or failed, have no cloud state.

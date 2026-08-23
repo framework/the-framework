@@ -284,6 +284,9 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
   const now = (deps.now ?? Date.now)()
 
   const active: ActiveAgent[] = []
+  // One entry per web run across projects: two checkouts of one repository share their archive,
+  // so the same run is in both projects' lists; the first project to list it keeps it.
+  const cloudSeen = new Set<string>()
   const entry = (project: ProjectSummary, meta: AgentMeta, cwd: string): ActiveAgent => ({
     projectId: project.id,
     projectName: project.name,
@@ -304,9 +307,10 @@ export async function buildOverview(projects: ProjectSummary[], deps: OverviewDe
     // The web runs whose cloud side is still at work (#1668): their local half is over and their
     // checkout may be gone, so they are read from the archive and keyed to the project's own path.
     for (const meta of await agents(project.path).catch((): AgentMeta[] => [])) {
-      if (meta.target !== 'web') continue
+      if (meta.target !== 'web' || cloudSeen.has(meta.id)) continue
       const state = cloudRunState({ ...meta, cloudWaiting: meta.sessionId !== undefined && waiting(meta.sessionId) }, now)
       if (state !== 'in-cloud' && state !== 'waiting') continue
+      cloudSeen.add(meta.id)
       active.push({ ...entry(project, meta, project.path), cloud: state })
     }
   }

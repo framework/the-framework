@@ -256,13 +256,14 @@ test('buildOverview lists a web run whose cloud side is still at work, and says 
   const at = (hoursAgo: number) => new Date(now - hoursAgo * 60 * 60 * 1000).toISOString()
   const web = (id: string, over: Partial<AgentMeta>): AgentMeta =>
     ({ version: 1, status: 'done', id, startedAt: at(1), updatedAt: at(1), target: 'web', intent: id, ...over }) as AgentMeta
-  const overview = await buildOverview([project('a', '/a')], {
+  // Two projects sharing one archive (a clone of the repository) list each run once.
+  const overview = await buildOverview([project('a', '/a'), project('b', '/b')], {
     liveAgents: async () => [],
     agents: async () => [
       web('working', { sessionId: 'session_01Work' }),
       web('parked', { sessionId: 'session_01Park' }),
       web('opened', { sessionId: 'session_01Pr', pr: { number: 3, url: 'u' } }),
-      web('stale', { startedAt: at(49), updatedAt: at(49) }),
+      web('stale', { startedAt: at(13), updatedAt: at(13) }),
       web('stopped', { status: 'stopped' }),
     ],
     waiting: sessionId => sessionId === 'session_01Park',

@@ -3,7 +3,7 @@ Picks which cloud sessions the Claude web bridge's Chrome extension should have 
 ## Business logic — TL;DR
 
 - **Only `web`-target agents that reached a cloud session** - an agent with no cloud session has no page to watch.
-- **Recent only** - a cloud session is worth a tab for twelve hours after its agent started, and no longer.
+- **Recent only** - a cloud session is worth a tab for twelve hours after its agent started, and no longer — the same session window after which the agent's row stops saying "in cloud" (`cloud-run-state`).
 - **At most three tabs, newest first** - a browser quietly filling up with tabs is worse than missing an old cloud session.
 - **One tab per cloud session** - several agents pointing at the same cloud session yield a single entry.
 

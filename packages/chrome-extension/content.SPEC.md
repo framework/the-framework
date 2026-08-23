@@ -1,8 +1,8 @@
-The half of the Claude web bridge that lives inside the claude.ai page: it finds the question the cloud session is parked on and hands it to the extension's service worker, mirrors what the session is saying, types the pick the dashboard confirmed into the session's composer and submits it, and draws an on-page panel showing exactly what it did and did not find.
+The half of the Claude web bridge that lives inside the claude.ai page: it finds the question the cloud session is parked on and hands it to the extension's service worker, mirrors what the session is saying, types the answer the dashboard produced into the session's composer and submits it, and draws an on-page panel showing exactly what it did and did not find.
 
 ## User story
 
-A `web`-target agent hands its task to a cloud session and ends, so when that session later parks on a question there is nothing streaming back and the question is stranded on claude.ai. The user wants it carried into their local dashboard, wants their pick typed back into the session, and — when any of that fails — wants to be told which step failed rather than facing a bridge that is silently doing nothing.
+A `web`-target agent hands its task to a cloud session and ends, so when that session later parks on a question there is nothing streaming back and the question is stranded on claude.ai. The user wants it carried into their local dashboard, wants their answer typed back into the session, and — when any of that fails — wants to be told which step failed rather than facing a bridge that is silently doing nothing.
 
 ## Glossary
 
@@ -14,12 +14,13 @@ A `web`-target agent hands its task to a cloud session and ends, so when that se
 
 - **The session is identified by its page URL** - the cloud session id in the address is the key everything reported from this page is filed under.
 - **The parked question is a JSON block on the page** - any object carrying `options` is brace-matched out of the surrounding prose, wherever it renders, including inside shadow roots.
+- **The question travels whole** - not just the title and the labels, but whether several answers may be picked at once, which options start ticked, and which option ends the session instead of continuing it.
 - **The protocol's own examples are not questions** - the page opens with the agent's prompt, which quotes the await protocol verbatim, so anything inside that opening message and anything that looks like the protocol's placeholders or its two literal samples is discarded.
 - **The last real block wins** - page order is transcript order, so a later question supersedes an earlier one and the spec that renders above them all.
 - **The transcript is mirrored per message** - each message block is reported under its position, and only positions whose text changed are re-sent.
 - **When the page has no message blocks, the conversation is mirrored whole** - as one block holding its most recent text, rather than guessing where messages divide.
-- **A pick is typed only into a composer that exists** - the composer is waited for, filled, given a beat to settle, then submitted by the page's own send button, or by Enter when there is none.
-- **Only the top frame delivers a pick** - a child frame answering too would submit the same text twice.
+- **An answer is typed only into a composer that exists** - the composer is waited for, filled, given a beat to settle, then submitted by the page's own send button, or by Enter when there is none.
+- **Only the top frame delivers an answer** - a child frame answering too would submit the same text twice.
 - **The panel says which step failed** - what was found, where, and what the daemon said, with structure-only counters when nothing was found.
 - **It watches the page rather than polling it** - the session's own changes trigger a re-read immediately; a slow heartbeat is only a backstop.
 
@@ -35,7 +36,9 @@ The dashboard has to show the question against the right agent. The join is the 
 
 The cloud session id is read out of the page's own address. Nothing is reported from a page that is not a cloud session page.
 
-A found question is handed to the service worker as a title, a list of options with optional detail text, and the recommended option when the block names one. It is trimmed to what the daemon accepts before being sent — title to 500 characters, at most 20 options, each detail to 500 characters, options without a label dropped — and a question left with no title or no options is not reported at all. The worker's verdict is kept for the panel: sent, sent-but-unchanged, the daemon's error, or the fact that the worker never replied.
+A found question is handed to the service worker with the whole shape the session asked it in: a title, a list of options with optional detail text, the recommended option when the block names one, whether several options may be picked at once, which options start ticked, and which options end the session rather than continuing it. It is trimmed to what the daemon accepts before being sent — title to 500 characters, at most 20 options, each detail to 500 characters, options without a label dropped — and a question left with no title or no options is not reported at all. The worker's verdict is kept for the panel: sent, sent-but-unchanged, the daemon's error, or the fact that the worker never replied.
+
+Carrying the shape whole rather than the labels alone is what lets the dashboard render the question as the gate it is — the recommended option marked, several answers tickable at once — and lets an option that ends the session be answered as a hand-over rather than as an instruction to carry on.
 
 #### Rationale
 
@@ -109,23 +112,23 @@ When the page has no message blocks, the conversation is mirrored as a single en
 
 Guessing where one message ends and the next begins would post gibberish that reads like real output, so the honest shape is "here is what is on screen", not "here is how it divides". The text is taken from the end because the page opens with the rendered system prompt: a slice from the front sent 8000 characters of protocol spec and cut off everything the session actually did. Mirroring the whole body sent the sidebar — every navigation label and a run of icon glyphs — which is why the conversation region is preferred, and why the panel hides itself rather than mirroring the mirror.
 
-### Typing the pick into the session
+### Typing the answer into the session
 
 #### User story
 
-The user picks an option in the dashboard and confirms the send. They expect exactly that option to be typed into the session and submitted, and expect to be told what happened either way.
+The user answers the question in the dashboard. They expect the session to be told exactly that decision and continued, and expect to be told what happened either way.
 
 #### Business logic
 
-On being handed a pick, this half waits up to twenty seconds for a composer to appear rather than failing the instant one is absent, then puts the text into it — as the value of a plain text box, or by inserting text into a rich editor, falling back to setting its content directly. After a short pause for the editor's own handling to settle, it submits: by clicking the page's send button when one is enabled — the last such button on the page, since pages render hidden and historical ones above the live composer's — and otherwise by sending an Enter keypress into the composer.
+On being handed an answer, this half waits up to twenty seconds for a composer to appear rather than failing the instant one is absent, then puts the text into it — as the value of a plain text box, or by inserting text into a rich editor, falling back to setting its content directly. After a short pause for the editor's own handling to settle, it submits: by clicking the page's send button when one is enabled — the last such button on the page, since pages render hidden and historical ones above the live composer's — and otherwise by sending an Enter keypress into the composer.
 
 The outcome is reported back precisely: which fill path was used and whether the send was a button click or the Enter fallback, or that no composer ever appeared.
 
-Only the page's top frame accepts a pick.
+Only the page's top frame accepts an answer.
 
 #### Rationale
 
-This is the one place the extension acts on the user's behalf instead of observing, so it says exactly what it did. The text it can type is bounded twice over: it comes only from the daemon, and the daemon only ever hands back a label belonging to the question the session is currently parked on. The composer wait exists because the first live delivery landed right after a tab was reloaded, and the page takes well over a few seconds to render — "no composer on the page" almost always means "not yet". Only the top frame answers because a child frame answering as well would submit the same text a second time.
+This is the one place the extension acts on the user's behalf instead of observing, so it says exactly what it did. The text it can type is bounded twice over: it comes only from the daemon, and the daemon composes it out of the options belonging to the question the session is currently parked on — this half neither writes nor edits any of it. The composer wait exists because the first live delivery landed right after a tab was reloaded, and the page takes well over a few seconds to render — "no composer on the page" almost always means "not yet". Only the top frame answers because a child frame answering as well would submit the same text a second time.
 
 ### The bridge panel
 
@@ -135,7 +138,7 @@ When the question does not reach the dashboard, the user needs to know which ste
 
 #### Business logic
 
-A panel is drawn in the page's bottom-right corner showing the extension's version, whether a question was found and in what kind of element, its title and option labels, whether a composer was found, the daemon's verdict on the last question report, the outcome of the last pick delivery, the outcome of the last transcript report, and how many message blocks the page has. The version is on the panel because that is how a stale injected script is told from a current one.
+A panel is drawn in the page's bottom-right corner showing the extension's version, whether a question was found and in what kind of element, its title and option labels, whether a composer was found, the daemon's verdict on the last question report, the outcome of the last answer delivery, the outcome of the last transcript report, and how many message blocks the page has. The version is on the panel because that is how a stale injected script is told from a current one.
 
 When no question was found, the panel adds structure-only counters: how many code and pre elements exist, how many shadow roots, how many frames and how many of them are readable, whether the `options` text exists in the plain page text and whether it exists once shadow content is included, how many object-shaped candidates the scan produced, how many failed to parse and the last parse error, and whether a child frame reported anything. None of this includes message text, so the report is safe to paste into a public issue.
 

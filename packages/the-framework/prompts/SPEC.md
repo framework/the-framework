@@ -11,7 +11,7 @@ Every prompt The Framework sends an agent lives here as markdown. Nothing agent-
 - **The built-in system prompt** - the standing instructions every agent starts with: analyze the prompt, park at a gate when the user should decide, branch before the first change, declare ready for merge only when finished.
 - **The file formats** - the shapes agents must follow for tickets and for the agent queue, carried in the agent's own context rather than pointed at.
 - **The data-branch protocol** - where the framework's own data lives and how to read and write it without putting it on a code branch.
-- **The protocols** - how an agent signals: awaited choices, session name and ready for merge, plus the sections added only when it has a browser or runs hands-off.
+- **The protocols** - how an agent signals: awaited choices, session name and ready for merge, plus the sections added only when it has a browser, when it runs hands-off, and when nothing can answer its questions.
 - **The presets** - one file per launcher button and per routine prompt.
 - **The on-before-mergeable prompt** - the optional extra turn a finished agent gets, queueing quality follow-ups and folding what it learned into the knowledge base.
 - **Prompts are reviewed before they land** - a prompt change goes through review like any other change.

@@ -5,7 +5,7 @@ What the tests cover: which checkouts the sweep reclaims, what it says, and — 
 - A project with no remote is asked about that once per pass, no doomed push is attempted for any checkout, and every retained checkout is still reported as kept with that reason.
 - A checkout that could not be reclaimed is reported with the reason it could not be.
 - A project that cannot be listed at all sweeps nothing instead of failing, and a project whose sweep fails does not stop the projects after it.
-- The loop reports, per project, what it removed — stating that the branch and the agent's record are kept — and what it kept and why.
+- The loop reports, per project, what it removed and what it kept and why. A removal that left the branch alone says the branch and the agent's record are kept; a removal that took branches with the checkout names every one of them.
 - A kept checkout is accounted for once rather than re-announced on every pass; a *changed* keep reason is announced again, because it means the situation changed; and a removal resets the accounting, so a checkout reappearing under the same identity is announced afresh.
 - A stopped sweep does no further work.
 

@@ -7,10 +7,14 @@ The Overview's "Routine work" card: the routines Auto PM runs on a schedule, eac
 - The user wants to take one routine out of the schedule without switching the whole schedule off.
 - The user wants a click that finds nothing to do to say so, rather than appearing to do nothing.
 
+## Glossary
+
+- **routine lock** — a routine's lock file on the data branch, naming the machine running that routine and since when, so no two machines run it at once. A routine declares whether it holds one.
+
 ## Business logic — TL;DR
 
 - **The card is the daemon's own routine list** - the rows are the routines the daemon runs, not a second copy, so what is on screen cannot drift from what actually runs.
-- **Run now takes the right path per routine** - a routine that fans out or needs the sweep's own preparation asks the daemon to run that one routine's work; every other routine is started directly, as one unattended agent with the routine's prompt.
+- **Run now takes the right path per routine** - a routine that fans out, or that has to hold its routine lock while it runs, asks the daemon to run that one routine's work; every other routine is started directly, as one unattended agent with the routine's prompt.
 - **The button says what it costs first** - each Run now carries the routine's own description, the model and run target the start would use, and how many agents it starts.
 - **Configure first, then run** - the secondary half of the split button hands the routine's prompt to the project's launcher instead of starting anything, so the model and run target can be changed and the prompt edited before sending.
 - **The picked project is a preference** - which project the routines run in survives navigation, reloads and tabs, and is re-checked against the projects that actually exist.
@@ -41,7 +45,7 @@ See `## User story`.
 
 Which path a Run now takes is decided by what the routine declares about itself, never by its name, so renaming a routine cannot change how it runs.
 
-A routine that drains the agent queue, a routine that fans out over tickets, or a routine pinned to a branch is run by asking the daemon to perform that single routine's sweep work. The drain covers every project the daemon watches and so carries no project; the other two are scoped to the picked project. Every other routine is started directly: one agent in the picked project, with the routine's prompt verbatim, on the user's own preferences — the repo's committed configuration is not resolved here, since the Overview has no project open — and unattended, so gates auto-answer, the agent ends when its work settles, and its handoff fires.
+A routine that drains the agent queue, a routine that fans out over tickets, or a routine that holds a routine lock is run by asking the daemon to perform that single routine's sweep work. A locked routine is asked for by the lock it holds rather than by its name, for the same reason the other two are asked for by what they declare. The drain covers every project the daemon watches and so carries no project; the other two are scoped to the picked project. Every other routine is started directly: one agent in the picked project, with the routine's prompt verbatim, on the user's own preferences — the repo's committed configuration is not resolved here, since the Overview has no project open — and unattended, so gates auto-answer, the agent ends when its work settles, and its handoff fires.
 
 After a direct start, the dashboard moves to the agent that was just started. If no agent identifier came back, it moves to the project and adopts the running agent once it surfaces.
 
@@ -49,7 +53,7 @@ A start failure is shown on the card.
 
 #### Rationale
 
-The fan-out routines have to go through the daemon because only the daemon claims the work before each agent starts — a queue entry for a drain, a ticket lock for planning — and a direct start could only ever be one agent. A routine pinned to a branch needs the daemon's other preparation: it releases a stale copy of that branch first, without which the agent read the leftover as work already pending and aborted on every click.
+The fan-out routines have to go through the daemon because only the daemon claims the work before each agent starts — a queue entry for a drain, a ticket lock for planning — and a direct start could only ever be one agent. A routine that holds a routine lock goes through the daemon for the same claim: the daemon takes that lock before the agent starts, and a direct start would run the routine unlocked.
 
 Run now deliberately does not navigate away for the sweep-backed routines: their agents land in the Agents card, which is where a batch of them is watchable.
 

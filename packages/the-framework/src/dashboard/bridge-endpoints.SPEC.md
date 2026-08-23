@@ -12,9 +12,9 @@ The daemon half of the Claude web bridge: the `/_bridge` routes the Chrome exten
 - **Deliberately no cross-origin headers** - the extension's background worker can call without them, and adding them would let any page the user visits reach their daemon.
 - **A tiny, fully validated surface** - no path, command, prompt or free text is accepted anywhere, so a stolen token buys at most a bogus question card.
 - **The extension version must match exactly** - a mismatched extension is refused outright rather than allowed to half-work.
-- **The parked question becomes an open question** - a validated question from a cloud session is handed to the dashboard.
+- **The parked question becomes an open question** - a validated question from a cloud session, in the shape the session asked it, is handed to the dashboard.
 - **The transcript arrives as numbered entries** - each message carries its position in the transcript, so re-reading the page overwrites rather than duplicates.
-- **The answer is polled, and its delivery reported back** - the extension asks what to type and then says whether typing it worked.
+- **The answer is polled, and its delivery reported back** - the extension asks for the exact text to type, which the daemon composed, and then says whether typing it worked.
 - **The daemon says which cloud sessions to watch** - the extension only sees tabs the user is already on, so the daemon lists the sessions a tab should be opened for.
 - **Every contact is recorded, including refusals** - so the dashboard can show what the bridge is doing.
 - **The bridge can be off** - a daemon with the feature disabled answers every bridge route as not found.
@@ -63,13 +63,15 @@ A cloud session asks its user to choose between options. The dashboard shows it 
 
 #### Business logic
 
-The extension posts the question it scraped: which cloud session asked, the question's title, its options (each a label with optional detail), and optionally which option is recommended. The daemon stamps the moment it accepted the question and hands it on.
+The extension posts the question it scraped, in the shape the cloud session itself asked it: which cloud session asked, the question's title, its options, whether several answers may be picked at once, and optionally which option is recommended. Each option carries its label, an optional one-line detail, whether it starts checked on a multi-select question, and whether picking it means the user is taking over rather than letting the session continue. The daemon stamps the moment it accepted the question and hands it on.
 
-Every field is checked and a rejection says which field was wrong: the cloud session id must have the shape claude.ai uses, the title must be non-empty and within a length limit, there must be at least one option and no more than twenty, each option needs a non-empty label within a length limit, and a recommendation must name one of the options actually present. Fields the daemon does not know are dropped rather than refused, so a newer extension posting an extra field still works against an older daemon.
+Every field is checked and a rejection says which field was wrong: the cloud session id must have the shape claude.ai uses, the title must be non-empty and within a length limit, there must be at least one option and no more than twenty, each option needs a non-empty label within a length limit, the two option flags and the multi-select flag must be true or false, no two options may carry the same label, and a recommendation must name one of the options actually present. Flags that are false are dropped rather than carried, and fields the daemon does not know are dropped rather than refused, so a newer extension posting an extra field still works against an older daemon.
 
 #### Rationale
 
 A recommendation naming an option that is not in the list would render a default the user cannot see and cannot pick, so it is rejected rather than dropped.
+
+Two options sharing a label are refused because a label is also how a pick names the option it chose — a claude.ai page offers no ids, and the label is the only thing that can be typed back — so two alike could not be told apart.
 
 ### The transcript
 
@@ -93,7 +95,9 @@ The user picks an option in the dashboard. Something has to type that pick into 
 
 #### Business logic
 
-The extension asks the daemon what answer is queued for a given cloud session, and always gets an answer-shaped reply — the queued pick, or nothing to deliver — so it can poll blindly without treating "nothing yet" as a failure. A daemon that queues no answers replies "nothing to deliver" rather than an error.
+The extension asks the daemon what answer is queued for a given cloud session, and always gets an answer-shaped reply — the queued answer, or nothing to deliver — so it can poll blindly without treating "nothing yet" as a failure. A daemon that queues no answers replies "nothing to deliver" rather than an error.
+
+What comes back is the answer's identity and the exact text to type: the extension types that text verbatim and decides nothing about it. The text is composed by the daemon out of labels the session itself offered, which is what keeps the whole feature bounded — the only thing this can ever put in a claude.ai composer is a sentence built from that session's own options.
 
 After trying to type the answer into the page, the extension reports back which cloud session it was for, which answer it tried to deliver, whether it worked, and an optional note.
 

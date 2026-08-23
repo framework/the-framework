@@ -13,9 +13,9 @@ Starting, supervising and retiring agents on behalf of the daemon: every agent t
 - **Continuing an agent** - a continuation reuses the agent's id, branch, checkout and event log, and inherits the project's agent options so an armed handoff survives the resume.
 - **Refusing a start the driver cannot serve** - before a branch and a worktree are spent, the driver is checked to be installed and logged in; a passing check is trusted briefly, a failing one is re-checked every time.
 - **One agent per checkout** - a second agent aimed at a checkout that is already busy is refused as busy; different checkouts never wait on each other.
-- **An agent that never booted is reported as failed** - when the spawned process dies before writing its own status, the daemon writes the `failed` status for it and puts the process's error output into the agent's event log.
+- **An agent that never booted is reported as failed** - when the spawned process dies before writing its own status, the daemon writes the `failed` status for it and puts the process's error output into the agent's event log — unless the checkout is gone, where only the terminal records it.
 - **One more try after a transient driver death** - an agent killed by a dropped connection or an overloaded API is continued automatically, at most twice; any other failure stands.
-- **Retiring a finished agent** - its history is archived onto the data branch, then its checkout is removed once its work has reached the remote, and kept otherwise.
+- **Retiring a finished agent** - its history is archived onto the data branch, then its checkout is removed once its work has reached the remote, and kept otherwise; any branch that went with it is named.
 - **Running an agent on another device** - a start aimed at a device is handed to that daemon over the relay, its events are streamed back, and read/steer requests for it are forwarded there.
 - **Adding projects** - one repo, or every git repo directly under a directory, is activated and registered in one go.
 - **Shutdown stops every agent it spawned** - Ctrl-C terminates each agent's process and waits for its teardown to finish before the daemon lets go of the repo; starts landing during shutdown are refused.
@@ -118,6 +118,8 @@ An agent's process dies before it manages to say anything — it could not be sp
 
 When a spawned process ends, the daemon checks whether the agent ever wrote its own status record. If it did, the agent's lifecycle is its own to report and the daemon leaves it alone. If it did not, the daemon writes a minimal `failed` status for it and appends a log entry to the agent's event log saying how the process ended, with the tail of the process's error output attached, and prints the same to the terminal.
 
+The status is written only into a checkout that still exists. When the checkout is gone — removed by hand while the process was alive, or never created at all — the daemon says so in the terminal instead and writes nothing, because a record written where a checkout used to be creates a directory under `.the-framework/branches/` that git does not know as a checkout, and every later git command run in it would act on the user's own repository.
+
 The task description written for the agent is deleted when the process ends without consuming it, so an abandoned prompt (and any device token in it) does not stay on disk.
 
 ### One more try after a transient driver death
@@ -146,9 +148,9 @@ An agent finishes. Its work must survive, its history must stay visible in the d
 
 #### Business logic
 
-When an agent's process exits, its history — which lives inside its own checkout — is copied out into the project first, as an archive filed under the identity the repo commits as, on the data branch, through the data branch's single write cycle so it is committed and pushed the moment it lands. The branch the work ended on is recorded with it, because the branch outlives the checkout and is the only handle the dashboard has left on a finished agent.
+When an agent's process exits, its history — which lives inside its own checkout — is copied out into the project first, as an archive filed under the identity the repo commits as, on the data branch, through the data branch's single write cycle so it is committed and pushed the moment it lands. The branch the work ended on is recorded with it, because the branch outlives the checkout and is the only handle the dashboard has left on a finished agent. That branch is read only from a directory git knows as a checkout in its own right: a leftover directory would answer with the *enclosing* repository's branch, and the archive would record the user's own branch as the agent's.
 
-Then the checkout goes, under one rule: it is removed once its work is on the remote, whatever state the agent ended in — pending changes are committed, the branch is pushed, and only a successful push allows the removal. A push that cannot land keeps the checkout, and a later sweep retries it. Teardown, the sweep and the dashboard's Remove button are the same behaviour by construction.
+Then the checkout goes, under one rule: it is removed once its work is on the remote, whatever state the agent ended in — pending changes are committed and the branch is pushed, unless everything the checkout holds is already there, and only then does the checkout come off disk. A push that cannot land keeps the checkout, and a later sweep retries it. Teardown, the sweep and the dashboard's Remove button are the same behaviour by construction. When branches went with the checkout — one that provably held nothing the remote lacks, or the `tf-agent-<agent id>` branch the agent had branched away from — the teardown names them, because a branch disappearing unannounced reads as a bug.
 
 Retirement is best-effort from end to end: it runs off a process-exit event with nobody to report to, so a failure must not take the daemon down, and a checkout that could not be retired is left on disk, which is the safe direction.
 

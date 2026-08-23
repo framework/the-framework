@@ -3,7 +3,7 @@ The triage-consensual preset: fills the agent queue with the significant work th
 ## Business logic — TL;DR
 
 - **Significant and consensual only** - quick wins are left to the sibling triage preset, and anything carrying an open question or a real choice of approach is left out entirely.
-- **A fixed session name guards against double triage** - the agent always names its session `triage-consensual`, and aborts when the branch of that name already exists.
+- **A fixed session name** - the agent always names its session `triage-consensual` rather than inventing one, so this triage's work always lands on the same branch.
 - **It only queues** - the shared triage rule appended to this preset forbids implementing any ticket it picks.
 
 ## Business logic
@@ -18,15 +18,19 @@ The user wants unattended work to be substantial but never to make a decision th
 
 Two filters apply together: the ticket must be significant, and it must be consensual — zero open questions and zero variability. Quick wins are excluded here because the sibling triage preset covers them, which is what lets the daemon queue the cheap batch and the significant batch on separate firings rather than in one indiscriminate sweep.
 
-### A fixed session name guards against double triage
+### A fixed session name
 
 #### User story
 
-Triage runs on a schedule. A firing that starts while the previous triage is still in flight would triage the same tickets twice.
+Triage runs on a schedule, and the user wants every firing of it recognizable in the same place rather than under a new invented name each time.
 
 #### Business logic
 
-The agent always sets its session name to `triage-consensual` rather than inventing one. If the branch `tf-triage-consensual` already exists, it aborts and tells the user that the branch exists and a triage is already pending. The branch is therefore the lock: a triage still in flight owns it, so the next firing does nothing.
+The agent always sets its session name to `triage-consensual` rather than inventing one, so this triage's branch is always `tf-triage-consensual`. The name also differs from the sibling triage preset's, so the two never land on the same branch.
+
+#### Rationale
+
+The prompt says nothing about two triages overlapping, because keeping one triage at a time is not the agent's job: the daemon takes this routine's lock before starting the agent at all. The prompt used to carry that guard — abort if the branch already exists — which cost a started agent to discover, and stopped guarding anything across machines once a triage no longer committed to that branch.
 
 ## Before modifying/creating SPEC.md files
 

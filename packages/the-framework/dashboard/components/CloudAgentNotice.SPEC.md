@@ -8,9 +8,9 @@ What the dashboard shows for an agent handed to a Claude Code cloud session: whe
 
 ## Business logic — TL;DR
 
-- **A hand-off is shown as a hand-off** - a `web` agent's page says the work runs in a cloud session, asks its questions and opens its own PR over there.
+- **A hand-off is shown as a hand-off** - a `web` agent's page says the work runs in a cloud session and opens its own PR over there, while a question that session parks on shows here.
 - **Two ways to reach the session** - a link that opens it on claude.ai, and a copyable command that continues it in the local terminal.
-- **The parked question can be answered from here** - pick, then confirm, because confirming types the answer into the user's own claude.ai tab.
+- **The parked question is answered like a local gate** - the same "Your call" panel a local agent's question gets, answered in one click, with the pick queued for the browser extension instead of written to a control channel no cloud session reads.
 - **A queued answer can be withdrawn** - until the extension collects it; once typed and submitted, the panel says so.
 - **A failed delivery hands the question back** - naming what failed and offering to pick again or answer in the session.
 - **The mirror is one clearly-labelled box** - a best-effort view of the Claude tab, kept visibly separate from the agent's own event log, with claude.ai's interface text stripped out.

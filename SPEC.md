@@ -42,7 +42,7 @@ See `## User story`: the daemon keeps working while nobody is around, within the
 
 #### Business logic
 
-On a shared clock the daemon runs its background jobs: Auto PM works the agent queue down and refills it by triaging tickets and planning the ones without plans; the CI watch merges the framework's pull requests once their checks pass and starts a fix agent when checks go red; sweeps reclaim finished agents' checkouts (only what is already on the remote), release stale branches, and keep bookkeeping healthy. Each unattended start checks the quota boundary first.
+On a shared clock the daemon runs its background jobs: Auto PM works the agent queue down and refills it by triaging tickets and planning the ones without plans; the CI watch merges the framework's pull requests once their checks pass and starts a fix agent when checks go red; sweeps reclaim finished agents' checkouts (only what is already on the remote) and keep bookkeeping healthy, and a routine that must not run twice is guarded by a routine lock on the data branch. Each unattended start checks the quota boundary first.
 
 ## Before modifying/creating SPEC.md files
 

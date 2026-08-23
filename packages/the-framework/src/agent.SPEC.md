@@ -14,7 +14,8 @@ The user gives The Framework a task. From there the agent runs unattended: it wo
 - **A build that produced nothing is pushed once** - if a build leaves the workspace empty, the agent is re-prompted once with a hard directive to create the app from scratch.
 - **The agent queue is worked after the opening exchange settles** - a build then consumes the confirmed backlog one gated entry per turn until it is empty.
 - **Live chat comes last** - a build takes the user's own messages once its backlog is worked; a one-prompt agent takes them straight after its opening exchange.
-- **A hands-off agent is its opening prompt and nothing else** - the work leaves this machine, so every later phase is dropped and the agent says so before ending.
+- **A hands-off agent is its opening prompt and nothing else** - the work leaves this machine, so every later phase is dropped, the agent is told to land its own work, and it says so before ending.
+- **A hands-off agent decides alone only when nothing can answer it** - with the Claude web bridge on, its framing leaves the gates in place, because the bridge carries its question to the dashboard and types the answer back.
 - **The agent always ends with a verdict** - success, stopped, or failed with the reason, and the coding agent's session is always closed.
 
 ## Glossary
@@ -129,11 +130,13 @@ A user hands a task to a Claude Code cloud session. The dashboard must show the 
 
 #### Business logic
 
-When the run target is hands-off, the opening prompt is the whole agent: the gates, the backlog loop and live chat are all dropped rather than fed, and the framing tells the coding agent so. Before ending, the agent states in its log that the rest of the work happens in its own session, which opens its own pull request. The link to that session is already carried by the driver's own turn.
+When the run target is hands-off, the opening prompt is the whole agent: the gates, the backlog loop and live chat are all dropped rather than fed, and the framing tells the coding agent so — nothing on this machine sees its workspace, so it has to commit its own work and open its own pull request. Before ending, the agent states in its log that the rest of the work happens in its own session, which opens its own pull request. The link to that session is already carried by the driver's own turn.
+
+Whether that session is also told to decide every question alone is a separate switch the caller sets: it is told so only when the Claude web bridge is off. With the bridge on, its framing leaves the await gates exactly as a local agent has them, because a question it parks on is carried into the dashboard and the user's answer is typed back into it.
 
 #### Rationale
 
-Everything after the opening prompt would otherwise be reading the driver's own "handed off" summary as though the agent had written it, which put unanswerable questions on the dashboard for agents that were somewhere else entirely.
+Everything after the opening prompt would otherwise be reading the driver's own "handed off" summary as though the agent had written it, which put unanswerable questions on the dashboard for agents that were somewhere else entirely. That is about the *local* half of the agent, which really does end at the hand-off — it says nothing about whether the session on the other side may ask, which is what the bridge decides.
 
 ### The agent always ends with a verdict
 

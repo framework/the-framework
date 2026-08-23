@@ -15,7 +15,7 @@ The user wants a task done without it costing anything on their own machine — 
 - **The hand-off prompt is written for a human to read** - the task comes first, and everything The Framework injects follows behind a labelled rule.
 - **The project is trusted on the user's behalf** - starting a `web` agent is itself the user's decision to trust the project, so Claude Code's one-time trust question is answered ahead of time instead of blocking the hand-off.
 - **The starting point is pushed first, under a name the cloud side can resolve** - the session is told exactly which ref to clone, and that ref doubles as the mark that later identifies the branch it produces.
-- **The turn ends the moment the session link appears** - there is no way to read back a cloud session's progress, so the turn's result is the link, and following the work happens on claude.ai or by pulling the session back to this machine.
+- **The turn ends the moment the session link appears** - there is no way to read back a cloud session's progress, so the turn's result is the link, and following the work happens on claude.ai, through the Claude web bridge where it is switched on, or by pulling the session back to this machine.
 - **Nothing the user typed can be interpreted as a command** - the prompt and the model reach the CLI through the environment, never as part of a command line.
 
 ## Business logic
@@ -32,7 +32,7 @@ The first prompt creates the cloud session. Every prompt after it reports the ha
 
 #### Rationale
 
-An agent is not one prompt: the agent loop prompts again for each pass — plan, build, review, then the backlog loop. A driver that started a cloud session per prompt turned one agent into half a dozen independent cloud machines racing on the same repository. There is also nothing better on offer, because a cloud session can be created and pulled back but never sent a second message; "this agent is already over there" is the honest answer.
+An agent is not one prompt: the agent loop prompts again for each pass — plan, build, review, then the backlog loop. A driver that started a cloud session per prompt turned one agent into half a dozen independent cloud machines racing on the same repository. There is also nothing better on offer, because the wrapped CLI can create a cloud session and pull one back but cannot send it a second message; "this agent is already over there" is the honest answer.
 
 ### The hand-off prompt is written for a human to read
 
@@ -90,7 +90,7 @@ The CLI is watched until it prints the cloud session's link, at which point the 
 
 The hand-off gives up after two minutes. The user pressing Stop, the trust question appearing, and the CLI simply failing each produce their own distinct message; a plain failure carries the tail of the CLI's own output so the reason is visible.
 
-There is no reading of files from a `web` agent: its workspace lives in a cloud machine this device never sees. There is no quota reading either — a cloud session draws on the same subscription a local agent already reports.
+There is no reading of files from a `web` agent: its workspace lives in a cloud machine this device never sees. There is no quota reading either — a cloud session draws on the same subscription a local agent already reports. What the session then does reaches the user on claude.ai itself, or — where the Claude web bridge is switched on — mirrored into the dashboard along with any question the session parks on, which is a separate subsystem entirely and nothing this driver reads.
 
 ### Nothing the user typed can be interpreted as a command
 

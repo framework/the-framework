@@ -14,10 +14,10 @@ The turn-boundary protocol: what an agent may tell The Framework in the final me
 
 ## Business logic — TL;DR
 
-- **Protocol text on top of the system prompt** - four snippets that pin *how* to emit each signal; two of them are only told to agents that can use them.
+- **Protocol text on top of the system prompt** - five snippets that pin *how* to emit each signal and what this particular agent may do with them; three of them are only told to the agents they apply to.
 - **One question shape for every gate** - a single `await-choices` block with N options covers approvals, plan reviews, multi-select and anything else; there are no gate kinds.
 - **A bad block never breaks the agent** - gate parsing is deliberately forgiving, and anything unreadable is simply not a gate.
-- **A pick that stops instead of resuming** - the agent can mark options whose meaning is "I will take it from here"; picking one ends the agent rather than resuming it.
+- **A pick that stops instead of resuming** - the agent can mark options whose meaning is "I will take it from here"; picking one ends the agent rather than resuming it, and tells a cloud session that cannot be ended from here that the user is taking over.
 - **A cap on stopping to ask** - after five await rounds the agent stops being gated and finishes.
 - **One resume wording for every path** - every caller resumes a gated agent with the same sentence.
 - **Non-blocking signals** - views, errors, session name, pull request, and ready for merge are recorded and reflected in the dashboard while the agent keeps going.
@@ -33,13 +33,19 @@ The user gets an agent that reliably parks its questions and reports its state, 
 
 #### Business logic
 
-Four protocol snippets are available for the system prompt. The **await protocol** pins how to emit a question the agent stopped on. The **signal protocol** pins how to emit the session name, ready for merge, errors, views, and a pull request. Both describe only the emission mechanics — *when* to use each one is the system prompt's business, not theirs.
+Five protocol snippets are available for the system prompt. The **await protocol** pins how to emit a question the agent stopped on. The **signal protocol** pins how to emit the session name, ready for merge, errors, views, and a pull request. Both describe only the emission mechanics — *when* to use each one is the system prompt's business, not theirs.
 
-Two more are conditional. The **hands-off protocol** is told only to a hands-off agent: gates do not exist in that session, so an ambiguous instruction should be read the most plausible way rather than parked on a question nobody attached can answer. The **browser protocol** is told only to an agent that has a browser: that it has one, and that anything it needs to see or act on goes through the browser rather than plain web fetching.
+Three more are conditional on the agent rather than on the prompt:
+
+- The **hands-off protocol** is told to every hands-off agent: nothing on this machine sees its workspace or follows it to the end, so it has to land its own work — commit it on its branch and open a pull request for it, and write an analysis, plan or decision into committed files rather than leaving it in the conversation. Ending without a pull request is allowed only when the task genuinely needed no repository change, and then it has to say so.
+- The **decide-alone protocol** is told to a hands-off agent whose questions nobody can answer — one running with the Claude web bridge off. It amends the await protocol just taught: do not emit the block and do not stop, take the most plausible reading, say in one line which assumption was made, and carry the work to the end. The non-blocking signals are untouched. With the bridge on it is left out entirely, because then the question does reach the user.
+- The **browser protocol** is told only to an agent that has a browser: that it has one, and that anything it needs to see or act on goes through the browser rather than plain web fetching.
 
 #### Rationale
 
-The hands-off wording is framed as what is available in this session rather than as a rule, so that it disappears cleanly if gates ever become available there.
+Landing the work and deciding alone used to be one block told to every hands-off agent. They are different rules: a hands-off agent always has to land its own work, but it only has to decide alone when nothing can answer it. Told together, a cloud session was instructed to decide alone even with the bridge carrying its questions home — which is what made choices appear not to work on cloud sessions at all.
+
+The decide-alone wording is framed as what is available in this session rather than as a rule, so that it disappears cleanly the moment gates become answerable there.
 
 ### One question shape for every gate
 
@@ -75,6 +81,8 @@ The user is shown a plan, declines it, and gets the agent back for fresh instruc
 
 The agent marks options whose meaning is "stop, I will take it from here". Picking one ends the agent instead of resuming it, and the agent is told nothing further. The user sees a line naming the answer they picked, so the outcome reads as their decision rather than as a failure.
 
+A cloud session is the exception, because nothing here can end one: it is sent a take-over wording instead — what it paused to ask, what the user chose, and that the user is taking over and will come back with fresh instructions.
+
 #### Rationale
 
 Which answers mean "stop" is a property of the question, so the agent that wrote the question marks them, rather than the framework inferring it from a gate kind.
@@ -97,7 +105,7 @@ The user's answer reaches the agent the same way no matter what the agent was do
 
 #### Business logic
 
-A resumed agent is told, in one sentence, what it paused to ask, what the user chose, and to continue with that decision. The caller's context is deliberately left out of it: the agent already knows what it is working on from its own session, so a clause that varied per caller carried no meaning to it, and one wording means a reword lands on every path at once.
+A resumed agent is told, in one sentence, what it paused to ask, what the user chose, and to continue with that decision. The caller's context is deliberately left out of it: the agent already knows what it is working on from its own session, so a clause that varied per caller carried no meaning to it, and one wording means a reword lands on every path at once. It is also the wording the Claude web bridge types into a cloud session, so a question asked over there hears its answer exactly as a local agent does.
 
 #### Rationale
 

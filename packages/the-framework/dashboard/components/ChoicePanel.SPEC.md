@@ -3,7 +3,8 @@
 ## User story
 
 - An agent reaches a decision it will not make alone and parks; the user answers it and the agent carries on.
-- The user answers the gate from the agent's own right rail, from the pooled open questions list, or inline where it was asked in the agent's event log.
+- The user answers the gate inline where it was asked in the agent's event log, from the pooled open questions list, or on the notice of an agent handed to a Claude Code cloud session.
+- A question a cloud session parked on is answered exactly like a local agent's — one click, the same panel — even though it has to travel out through the user's browser to reach that session.
 
 ## Business logic — TL;DR
 
@@ -11,7 +12,8 @@
 - **The recommended option is marked** - and it is what Accept and the keyboard shortcut choose.
 - **A multi-select says what Accept will do** - the button names how many options are selected, so accepting nothing is a deliberate choice rather than a surprise.
 - **The panel stays parked after answering** - it reports that the pick was sent and waits for the agent to pick it up, instead of just greying out.
-- **Ctrl+Enter accepts, on one gate at a time** - only the first gate in the right rail binds the shortcut, so it is never ambiguous.
+- **Ctrl+Enter accepts, on one gate at a time** - only the agent's newest open gate binds the shortcut, so it is never ambiguous.
+- **Where the pick is delivered can be swapped** - by default it goes to the agent it belongs to; a question carried in by the Claude web bridge queues it for the browser extension instead, and the panel is identical either way.
 - **A refused pick is reported and retryable** - the panel says the choice could not be sent rather than failing silently.
 
 ## Business logic
@@ -72,19 +74,21 @@ The user has several gates open and wants the keyboard shortcut to be unambiguou
 
 #### Business logic
 
-Ctrl+Enter (or its command-key equivalent) accepts the gate marked as active — the first one in the right rail — and only that one; the hint "Ctrl+Enter to accept" is shown on that gate alone. The shortcut does nothing once a pick has been sent.
+Ctrl+Enter (or its command-key equivalent) accepts the gate marked as active — the newest open gate in the agent's event log — and only that one; the hint "Ctrl+Enter to accept" is shown on that gate alone. The shortcut does nothing once a pick has been sent.
 
 ### Where the pick goes, and where it is shown
 
 #### User story
 
-The user answers a gate that belongs to one specific agent.
+The user answers a gate that belongs to one specific agent — which may be running on this machine, or may be a Claude Code cloud session this machine cannot steer.
 
 #### Business logic
 
-The pick is posted to the agent it belongs to, recorded as answered by the user rather than by autopilot; without an agent it falls back to the project's own control channel. A gate only ever reaches this panel when somebody is watching — an unwatched agent resolves its gates to the recommended option without one.
+By default the pick is posted to the agent it belongs to, recorded as answered by the user rather than by autopilot; without an agent it falls back to the project's own control channel. A gate only ever reaches this panel when somebody is watching — an unwatched agent resolves its gates to the recommended option without one.
 
-The panel appears in three places with identical behaviour and only a different container: full-width in the agent's right rail, as a rounded card inline in the agent's event log, and in the pooled open questions list. The pooled list is told what was picked so it can collapse the answered gate to a single line; the right rail needs no such notice, because the gate-resolved event removes the panel there.
+Where the pick is delivered can be swapped out for a gate that did not come from a local agent. A question the Claude web bridge carried in from a cloud session queues the pick for the browser extension to type back into that session, instead of writing it to a control channel no cloud session reads. Nothing else changes: the same panel, the same one click, the same multi-select and recommended option — which is the point, since a cloud session's question is a question like any other.
+
+The panel appears in three places with identical behaviour and only a different container: as a rounded card inline in the agent's event log, in the pooled open questions list, and on the notice shown for an agent handed to a cloud session. The pooled list is told what was picked so it can collapse the answered gate to a single line; inline in the log no such notice is needed, because the gate-resolved event removes the panel there.
 
 ### A refused pick is reported and retryable
 

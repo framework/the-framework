@@ -8,7 +8,7 @@ Starting agents on a git project: two agents run concurrently on the same projec
 
 The kinds of start: a research task travels as its own kind, and is allowed an empty subject that the agent itself defaults; a preset the user reviewed in the composer runs verbatim rather than being re-rendered.
 
-Retiring an agent: a finished agent's history is copied into the project, the branch its work ended on is recorded while the checkout still exists, that work reaches the remote, and only then is the checkout removed. A failed agent goes exactly the same way — how the agent ended is not what decides this, whether its work is recoverable is.
+Retiring an agent: a finished agent's history is copied into the project, the branch its work ended on is recorded while the checkout still exists, that work reaches the remote, and only then is the checkout removed. A failed agent goes exactly the same way — how the agent ended is not what decides this, whether its work is recoverable is. An agent that committed nothing, whose tip the remote already holds under another agent's branch, has nothing pushed and loses its branch along with its checkout.
 
 Steering: Stop and a choice pick sent from the dashboard land as entries in that project's control channel.
 

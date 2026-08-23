@@ -4,7 +4,7 @@ The triage-quick preset: fills the agent queue with the cheap, decision-free wor
 
 - **The plan is the filter** - a ticket qualifies only if it has a plan, and only if that plan rates it low effort with zero uncertainty; an unplanned ticket cannot be picked.
 - **The cheapest work goes first** - entries are prioritized sensibly, with the lowest-effort tickets bumped so that the trivial ones become the next tasks agents work on.
-- **A fixed session name guards against double triage** - the agent always names its session `triage-quick`, and aborts when the branch of that name already exists.
+- **A fixed session name** - the agent always names its session `triage-quick` rather than inventing one, so this triage's work always lands on the same branch.
 - **It only queues** - the shared triage rule appended to this preset forbids implementing any ticket it picks.
 
 ## Business logic
@@ -29,15 +29,19 @@ The queue is worked top-down, so the order decides how quickly the backlog of tr
 
 The agent prioritizes the entries it adds sensibly, and is told to consider bumping the lowest-effort tickets — so that the ones rated as trivial become the next tasks agents work on.
 
-### A fixed session name guards against double triage
+### A fixed session name
 
 #### User story
 
-Triage runs on a schedule. A firing that starts while the previous triage is still in flight would triage the same tickets twice.
+Triage runs on a schedule, and the user wants every firing of it recognizable in the same place rather than under a new invented name each time.
 
 #### Business logic
 
-The agent always sets its session name to `triage-quick` rather than inventing one. If the branch `tf-triage-quick` already exists, it aborts and tells the user that the branch exists and a triage is already pending. The branch is therefore the lock: a triage still in flight owns it, so the next firing does nothing.
+The agent always sets its session name to `triage-quick` rather than inventing one, so this triage's branch is always `tf-triage-quick`.
+
+#### Rationale
+
+The prompt says nothing about two triages overlapping, because keeping one triage at a time is not the agent's job: the daemon takes this routine's lock before starting the agent at all. The prompt used to carry that guard — abort if the branch already exists — which cost a started agent to discover, and stopped guarding anything across machines once a triage no longer committed to that branch.
 
 ## Before modifying/creating SPEC.md files
 

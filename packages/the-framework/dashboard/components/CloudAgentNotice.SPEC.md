@@ -3,7 +3,7 @@ What the dashboard shows for an agent handed to a Claude Code cloud session: whe
 ## User story
 
 - The user starts an agent on the `web` run target and wants to know where the work actually is, rather than staring at an empty event log.
-- The cloud session parks on a question; the user answers it from the dashboard instead of switching to claude.ai.
+- The cloud session parks on a question; the user answers it from the dashboard, in the same way they answer any other agent's question, instead of switching to claude.ai.
 - The user wants to keep an eye on what the cloud session is saying, even though this machine cannot stream it.
 
 ## Business logic — TL;DR
@@ -44,15 +44,17 @@ The user wants to look at the cloud session, or take it over locally.
 
 Once the cloud session is known, the notice offers a link that opens the session on claude.ai in a new tab, and a copyable command that continues that same session in the user's own terminal.
 
-### The parked question can be answered from here
+### The parked question is answered like a local gate
 
 #### User story
 
-The cloud session parks asking a question and the user answers it without leaving the dashboard.
+The cloud session parks asking a question and the user answers it without leaving the dashboard — and without having to learn a second way of answering.
 
 #### Business logic
 
-When the Claude web bridge reports that the session is parked on a question, the notice shows that question's title and its options, marking the one the session recommends and showing each option's extra detail. Answering is two steps — pick an option, then confirm sending it — unlike a local agent's one-click gate, because confirming has the browser extension type the answer into the user's own claude.ai session. The confirm button names the option it will send, and is unavailable until one is picked. A link to answer it in the session stays available for whoever prefers to do it over there.
+When the Claude web bridge reports that the session is parked on a question, the notice renders it in the very same gate panel a local agent's question gets: the "Your call" heading, the question, its options with their detail text, the recommended one marked, and — when the session asked for several answers at once — tick boxes with an Accept button. Answering is the one click answering a local gate is.
+
+What differs is only where the answer goes. A local agent's pick is written to its control channel; this one is queued for the browser extension, which types it into the user's own claude.ai tab. A link to answer it in the session stays available for whoever prefers to do it over there. The automatic-acceptance countdown does not run here: the question is answered by the user or not at all.
 
 The daemon is polled for the parked question rather than the question arriving on the agent's live stream: the bridge writes over HTTP from a browser extension and never touches the agent's event log, so there is no event to carry. A daemon with the bridge switched off simply reports no question, and a transport failure is not worth a banner.
 
@@ -64,9 +66,9 @@ The user picks an answer and changes their mind before the extension has deliver
 
 #### Business logic
 
-An answer that has been accepted but not yet collected by the extension is reported as being sent through the user's Claude tab on the extension's next check-in, and can be cancelled — that window is the only time withdrawing it means anything. Once the extension has typed and submitted it, the panel says which answer was given, notes that the session continues over there with the mirror following along, and links to the session.
+An answer that has been accepted but not yet collected by the extension is reported as being sent through the user's Claude tab on the extension's next check-in, and can be cancelled — that window is the only time withdrawing it means anything. The question itself gives way to that report, so a second answer cannot race the first. Once the extension has typed and submitted it, the panel says which answer was given, notes that the session continues over there with the mirror following along, and links to the session.
 
-A delivery that fails brings the question back, naming the answer that failed and any reason for it, and inviting the user to pick again or answer in the session. Failing to queue the answer at all, or failing to reach the daemon, is reported in the same place.
+A delivery that fails brings the question back, naming the answer that failed and any reason for it, and inviting the user to pick again or answer in the session. An answer the daemon refuses to queue at all — because that session is no longer parked on the question, say — is reported on the gate panel itself, in the daemon's own words, with the options left usable so the user can try again.
 
 ### The mirror is one clearly-labelled box
 

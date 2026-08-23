@@ -4,19 +4,22 @@ The notice itself:
 
 - Before the hand-off names a cloud session, it says one is being started and offers no links.
 - Once the cloud session is known, it links through to that session and offers the copyable command that brings the work back to this machine.
-- It states that the cloud session opens its own pull request and asks its questions over there, since nothing streams back to the dashboard.
+- It states that the cloud session opens its own pull request over there, since nothing streams back to the dashboard, and that a question the session parks on shows up here.
 - It shows nothing at all for the other run targets.
 
 The parked question the bridge reports:
 
 - The question, its options, and which option is recommended are shown once the bridge has one, asked for by cloud session id.
+- It is rendered as the gate it is: the same panel and the same "Your call" heading a local agent's question gets.
 - The link out stays available as the manual way to answer.
 - With no question parked, nothing extra appears; before the hand-off lands, the bridge is not asked at all.
 
 Answering from the dashboard:
 
-- Picking an option is not enough — the answer is only sent once confirmed, and the confirm control is unavailable until something is picked.
-- A queued answer reads as on its way and can still be withdrawn; the question card yields to it, so a second pick cannot race the first.
+- One click answers, and the answer goes out through the bridge rather than being written to the agent's control channel.
+- A question offering several answers at once posts exactly the ticked subset.
+- An answer the daemon refuses is reported on the panel in the daemon's own words.
+- A queued answer reads as on its way and can still be withdrawn; the question card yields to it, so a second answer cannot race the first.
 - A delivered answer reads as answered, with no withdraw offered.
 - A failed delivery says what failed and why, and offers the question again.
 

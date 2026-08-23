@@ -117,7 +117,7 @@ The user starts an agent somewhere other than this machine and wonders why the f
 Each run target that behaves differently from a local agent gets its own notice above the feed:
 
 - A GitHub Actions agent replays its whole log in a burst at the end, so the feed looks stalled while it runs. The notice says the wait is expected and links to the live Actions run.
-- A `web` agent's work happens in a Claude Code cloud session this machine cannot stream, so the notice points at where the work is instead of showing an empty feed. That agent's log dead-ends at the hand-off, so the box showing what the cloud session did next rides the tail of the scroller, where "and then…" belongs.
+- A `web` agent's work happens in a Claude Code cloud session this machine cannot stream, so the notice points at where the work is instead of showing an empty feed, and a question that session parks on is answered right there on the notice, as this agent's own gate. That agent's log dead-ends at the hand-off, so the box showing what the cloud session did next rides the tail of the scroller, where "and then…" belongs.
 - An agent relayed to a device runs elsewhere but has its changes, handoff and push/PR relayed back, so those panels are shown as for a local agent and the notice only flags that the browser preview stays local.
 
 Losing the live channel is surfaced as a banner over the feed rather than as silence.

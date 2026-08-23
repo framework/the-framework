@@ -17,8 +17,8 @@ A `web`-target agent hands its task to a cloud session and ends, so when that se
 - **The question travels whole** - not just the title and the labels, but whether several answers may be picked at once, which options start ticked, and which option ends the session instead of continuing it.
 - **The protocol's own examples are not questions** - the page opens with the agent's prompt, which quotes the await protocol verbatim, so anything inside that opening message and anything that looks like the protocol's placeholders or its two literal samples is discarded.
 - **The last real block wins** - page order is transcript order, so a later question supersedes an earlier one and the spec that renders above them all.
-- **The transcript is mirrored per message** - each message block is reported under its position, and only positions whose text changed are re-sent.
-- **When the page has no message blocks, the conversation is mirrored whole** - as one block holding its most recent text, rather than guessing where messages divide.
+- **The transcript is mirrored one turn at a time** - each conversation turn the page marks is reported under the position the page gives it, as the user's or the session's, and only turns whose text changed are re-sent.
+- **A page that marks no turns mirrors nothing** - the panel and the self-report name that state, rather than mirroring whatever text is on screen.
 - **An answer is typed only into a composer that exists** - the composer is waited for, filled, given a beat to settle, then submitted by the page's own send button, or by Enter when there is none.
 - **Only the top frame delivers an answer** - a child frame answering too would submit the same text twice.
 - **The panel says which step failed** - what was found, where, and what the daemon said, with structure-only counters when nothing was found.
@@ -72,7 +72,7 @@ The user must never see a dashboard card asking them to choose between `<option 
 
 Two rules together discard the decoys.
 
-First, position: the transcript's opening message is the agent's own prompt, which quotes the whole await protocol including its worked examples, so no code block rendered inside that first message is ever treated as a question. This applies only when the page marks messages at all; the whole-page fallback has no message boundaries to work with and relies on the second rule alone.
+First, position: the transcript's opening turn — the one the page marks as position zero — is the agent's own prompt, which quotes the whole await protocol including its worked examples, so no code block rendered inside that turn is ever treated as a question. The page keeps only the recent part of a long transcript rendered, so the opening turn may be absent; its decoys are then absent with it, and the second rule stands alone.
 
 Second, shape. A block is discarded when its title is a lone placeholder in angle brackets; when its title is placeholders joined only by punctuation, leaving no letters once the bracketed groups are removed; when every one of its labels is a placeholder; or when it matches one of the two examples the protocol ships as literal text — the handoff pair "Handled it" / "Could not handle it", and the approval example titled "Ship this?" offering Approve and Decline.
 
@@ -84,33 +84,27 @@ The placeholder rules exist because the spec block's values are placeholders, an
 
 #### User story
 
-The dashboard should show what the cloud session has been saying, not only the moment it stops to ask something.
+The dashboard should show what the cloud session has been saying — turn by turn, as it is said — not only the moment it stops to ask something.
 
 #### Business logic
 
-Each message the page renders as its own block becomes one transcript entry, numbered by its position on the page, carrying up to 8000 characters of its text. A block that contains an editable field is the composer rather than a message and is left out.
+The page marks each conversation turn as its own row, stating the turn's position in the transcript and its kind: the user's, the session's, or a marker such as "Resumed session". Each user or session turn becomes one transcript entry under the page's own position, carrying up to 8000 characters from the start of its text, with icon-font glyphs and blank lines removed. Markers are left out.
 
-Only entries whose text differs from what was last accepted are sent, and what was sent is remembered only once the daemon has taken it, so a refused batch is retried rather than lost. Position numbering is what makes this work in both directions: a message that is still streaming is re-sent under the same position and replaces its earlier state, while unchanged messages cost nothing.
+Only the opening turn — the run's prompt — is ever long enough to be cut. A reply still being written is reported as it grows and replaces its earlier state under the same position.
 
-On every pass this half also reports itself to the daemon — its version, the session it is on, how many message blocks the page has, which container the text came from, and the outcome of the last transcript report.
+The page keeps only the recent part of a long transcript rendered. Positions come from the page rather than from counting what is rendered, so the daemon keeps one copy of every turn it has ever been sent, whichever turns are currently on screen.
 
-#### Rationale
+Only entries whose text differs from what was last accepted are sent, and what was sent is remembered only once the daemon has taken it, so a refused batch is retried rather than lost.
 
-The observer fires on every page change and a session's transcript is mostly stable; re-sending all of it each time would be hundreds of kilobytes a second carrying no new information. The self-report exists because diagnosis otherwise required a screenshot of the panel, so every wrong guess cost a round trip through a person.
+When the page marks no turns at all, nothing is mirrored: the panel's transcript line and the self-report both say that no transcript rows were found.
 
-### Mirroring a page with no message blocks
-
-#### User story
-
-A live session turned out not to mark its messages at all, and a bridge that reports nothing at all in that case is worse than a crude one.
-
-#### Business logic
-
-When the page has no message blocks, the conversation is mirrored as a single entry holding its **most recent** 8000 characters, replaced as it grows. The text is taken from the page's main conversation region when there is one, falling back to the whole document body only as a last resort, with icon-font glyphs removed, blank lines dropped, and the bridge panel itself hidden for the duration of the read. Which container was used is reported, so a layout change surfaces as a container change rather than as mystery text.
+On every pass this half also reports itself to the daemon — its version, the session it is on, how many turn rows the page has and which kinds they are, how many turns were mirrored, and the outcome of the last transcript report.
 
 #### Rationale
 
-Guessing where one message ends and the next begins would post gibberish that reads like real output, so the honest shape is "here is what is on screen", not "here is how it divides". The text is taken from the end because the page opens with the rendered system prompt: a slice from the front sent 8000 characters of protocol spec and cut off everything the session actually did. Mirroring the whole body sent the sidebar — every navigation label and a run of icon glyphs — which is why the conversation region is preferred, and why the panel hides itself rather than mirroring the mirror.
+The observer fires on every page change and a session's transcript is mostly stable; re-sending all of it each time would be hundreds of kilobytes a second carrying no new information.
+
+An earlier version, finding no turn markers it recognised, mirrored the whole conversation region as one block of its most recent 8000 characters: the dashboard showed the run's own prompt, the page's navigation labels, and the exchange somewhere at the end with no boundaries. Mirroring nothing and saying so is preferred to that: a layout the mirror does not know is a named state that is fixed by naming the new markers, whereas a wall of page text reads like output and hides that anything is wrong. Reporting the row kinds seen is what makes a new kind show up by name rather than as a missing turn.
 
 ### Typing the answer into the session
 
@@ -138,7 +132,7 @@ When the question does not reach the dashboard, the user needs to know which ste
 
 #### Business logic
 
-A panel is drawn in the page's bottom-right corner showing the extension's version, whether a question was found and in what kind of element, its title and option labels, whether a composer was found, the daemon's verdict on the last question report, the outcome of the last answer delivery, the outcome of the last transcript report, and how many message blocks the page has. The version is on the panel because that is how a stale injected script is told from a current one.
+A panel is drawn in the page's bottom-right corner showing the extension's version, whether a question was found and in what kind of element, its title and option labels, whether a composer was found, the daemon's verdict on the last question report, the outcome of the last answer delivery, the outcome of the last transcript report, and how many turn rows the page has. The version is on the panel because that is how a stale injected script is told from a current one.
 
 When no question was found, the panel adds structure-only counters: how many code and pre elements exist, how many shadow roots, how many frames and how many of them are readable, whether the `options` text exists in the plain page text and whether it exists once shadow content is included, how many object-shaped candidates the scan produced, how many failed to parse and the last parse error, and whether a child frame reported anything. None of this includes message text, so the report is safe to paste into a public issue.
 

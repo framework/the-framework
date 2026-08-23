@@ -162,6 +162,7 @@ happens while nobody is at the keyboard.
 - Run on a fresh GitHub Actions runner
 - Run on a Claude Code cloud session
 - Chrome extension bridging claude.ai questions back to the dashboard
+- A cloud session's conversation mirrored into the run view, turn by turn, as it is written
 - Answer a cloud agent's question from the dashboard (typed back into claude.ai) — the same gate panel a local agent gets, multi-select and stop options included, listed with every other open question
 - Browser-bridge token setting
 - Web runs trust the project for Claude Code automatically — no manual trust step

@@ -13,7 +13,7 @@ What the dashboard shows for an agent handed to a Claude Code cloud session: whe
 - **The parked question is answered like a local gate** - the same "Your call" panel a local agent's question gets, answered in one click, with the pick queued for the browser extension instead of written to a control channel no cloud session reads.
 - **A queued answer can be withdrawn** - until the extension collects it; once typed and submitted, the panel says so.
 - **A failed delivery hands the question back** - naming what failed and offering to pick again or answer in the session.
-- **The mirror is one clearly-labelled box** - a best-effort view of the Claude tab, kept visibly separate from the agent's own event log, with claude.ai's interface text stripped out.
+- **The mirror is one clearly-labelled box** - a best-effort view of the Claude tab, turn by turn, kept visibly separate from the agent's own event log, with claude.ai's interface text stripped out; the user's turns are one line each, the session's are shown whole, and the newest turn is kept in view.
 - **Nothing at all for other run targets** - so an agent's page can carry these unconditionally.
 
 ## Glossary
@@ -80,7 +80,9 @@ The user wants to see what the cloud session is saying after the hand-off.
 
 A `web` agent's own event log dead-ends at the hand-off, so what happens afterwards is shown as one boxed row at the tail of the log, labelled "Cloud session mirror" and described as a best-effort view of the Claude tab rather than the agent's own log. Until the mirror has anything, it says it is connecting, so a `web` agent never shows dead air. The mirror is polled from the daemon on the same cadence as the parked question.
 
-Claude's own interface text that the scrape drags in — tile-navigation hints, per-message action labels, and a bare model name on its own line — is removed, and the gaps that leaves are collapsed. The removal is matched line by line and anchored, so a message that merely mentions a model is left untouched.
+Each turn is its own block, in transcript order. The user's turns show as a single line — "you ›" followed by the turn's first line, the whole turn available on hover — because the opening turn is the run's entire prompt and what the session did is the point of the mirror, not what it was told. The session's turns are shown whole. The box keeps its newest turn in view, scrolling to the end whenever the last turn changes or grows, so a reply being written is watched rather than scrolled to.
+
+Claude's own interface text that the scrape drags in — tile-navigation hints, per-message action labels, and a bare model name on its own line — is removed from every turn, and the gaps that leaves are collapsed. The removal is matched line by line and anchored, so a message that merely mentions a model is left untouched.
 
 #### Rationale
 

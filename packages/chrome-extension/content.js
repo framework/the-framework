@@ -16,7 +16,7 @@
 // `check.mjs` covers all four offline, in jsdom, with no browser and no live session.
 
 const POLL_MS = 2000
-/** So the scrape can exclude our own panel from what it mirrors. */
+/** The on-page panel's element id. */
 const PANEL_ID = 'tf-bridge-panel'
 const IS_TOP = window.top === window
 
@@ -90,78 +90,58 @@ const sentEvents = new Map()
 let transcriptStatus = 'not sent yet'
 
 /**
- * The transcript, as message blocks (#1237).
+ * Where claude.ai marks the conversation's turns (#1225).
  *
- * `article` is the anchor: the page reports one per message, which is a far better handle than
- * guessing at prose boundaries in a wall of text. Falling back to nothing rather than to a
- * heuristic is deliberate, because a wrong split would post gibberish that looks like output.
+ * The page renders no `<article>` elements — the session's transcript is a `role="feed"` of
+ * `transcript-row` elements, one per turn, each naming its position (`data-index`) and its kind
+ * (`data-perf-row`: `human`, `assistant`, or a `marker` such as "Resumed session"). The list is
+ * virtual, so a long session only keeps its tail in the DOM; the position is what lets the daemon
+ * keep one copy per turn regardless of which turns happen to be rendered.
  */
-function transcript() {
-  const blocks = deepQueryAll('article')
-    .map((el, index) => {
-      const text = (el.innerText ?? el.textContent ?? '').trim()
-      if (!text) return undefined
-      // The composer lives in its own article on some layouts; an input-only block is not a
-      // message.
-      if (el.querySelector('[contenteditable="true"], textarea')) return undefined
-      return { seq: index, role: 'agent', text: text.slice(0, 8000) }
-    })
-    .filter(Boolean)
-  if (blocks.length) return blocks
+const TURN_ROW = '[data-testid="transcript-row"]'
+/** Which row kinds are conversation; every other kind (markers) is left out of the mirror. */
+const TURN_ROLES = { human: 'user', assistant: 'agent' }
 
-  // No article blocks on this page, which is what a live session turned out to look like. Rather
-  // than guess where one message ends and the next begins, mirror the page as a single block and
-  // let it be replaced as it grows. Crude, but it is the honest shape: we know what is on screen,
-  // not how it divides.
-  //
-  // Sliced from the END: the page opens with the rendered system prompt, so a head slice sent
-  // 8000 characters of protocol spec and cut the session's actual activity off. The newest text
-  // is the mirror's whole point.
-  const text = pageText()
-  return text ? [{ seq: 0, role: 'agent', text: text.slice(-8000) }] : []
+function turnRows() {
+  return deepQueryAll(TURN_ROW)
+}
+
+/** The opening message: the run's own prompt, which quotes our whole protocol (#1568). */
+function openingMessage() {
+  return turnRows().find(row => row.getAttribute('data-index') === '0')
 }
 
 /**
- * The conversation's text, without the rest of the application around it.
+ * The transcript, one entry per conversation turn (#1225).
  *
- * Mirroring `body` sent the sidebar: "Home", "Code", "Artifacts", "Pinned", every nav label and
- * a run of icon-font glyphs. `main` is the conversation on this page, so it is preferred and the
- * body is only a last resort. Which one was used is reported, so a layout change shows up as a
- * container change rather than as mystery text.
+ * Each turn carries up to 8000 characters from its start. Only the opening turn — the run's
+ * prompt — is ever that long; a reply that is still streaming is sent as it grows and replaced
+ * in place, since the daemon keys entries by position.
  */
-function conversation() {
-  const main = deepQueryAll('main')[0] ?? deepQueryAll('[role="main"]')[0]
-  return { el: main ?? document.body, via: main ? 'main' : 'body' }
+function transcript() {
+  return turnRows().flatMap(row => {
+    const role = TURN_ROLES[row.getAttribute('data-perf-row')]
+    const seq = Number(row.getAttribute('data-index'))
+    if (!role || !Number.isInteger(seq) || seq < 0) return []
+    const text = cleanText(row.innerText ?? row.textContent ?? '')
+    return text ? [{ seq, role, text: text.slice(0, 8000) }] : []
+  })
 }
 
 /** Private-use codepoints are icon-font glyphs, which carry no meaning outside their font. */
 const ICON_GLYPHS = /[\uE000-\uF8FF]/g
 
-/** The session's own text, with our panel and the application chrome left out. */
-function pageText() {
-  const panel = document.getElementById(PANEL_ID)
-  const hidden = panel?.style.display
-  // Hide our own panel for the read, or the mirror would show the mirror.
-  if (panel) panel.style.display = 'none'
-  try {
-    const { el } = conversation()
-    return (el?.innerText ?? '')
-      .replace(ICON_GLYPHS, '')
-      .split('\n')
-      .map(line => line.trim())
-      .filter(Boolean)
-      .join('\n')
-      .trim()
-  } finally {
-    if (panel) panel.style.display = hidden ?? ''
-  }
+/** A turn's text as prose: no icon glyphs, no blank lines, no leading or trailing whitespace. */
+function cleanText(text) {
+  return text
+    .replace(ICON_GLYPHS, '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .join('\n')
+    .trim()
 }
 
-/**
- * Post whatever changed since the last look. Only what changed: the observer fires on every DOM
- * mutation and a session's transcript is mostly stable, so sending it all each time would be a
- * few hundred kilobytes a second for no new information.
- */
 /**
  * Tell the daemon what this injected script is and what it just saw.
  *
@@ -179,18 +159,31 @@ function sayHello(sessionId, note) {
   }
 }
 
+/**
+ * Post whatever changed since the last look. Only what changed: the observer fires on every DOM
+ * mutation and a session's transcript is mostly stable, so sending it all each time would be a
+ * few hundred kilobytes a second for no new information.
+ */
 function reportTranscript() {
   const sessionId = sessionIdFromUrl()
-  if (!sessionId || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
+  if (!sessionId) return
+  const rows = turnRows()
   const blocks = transcript()
-  sayHello(sessionId, `articles ${deepQueryAll('article').length}, via ${conversation().via}, blocks ${blocks.length}, ${transcriptStatus}`)
-  const events = blocks.filter(event => sentEvents.get(event.seq) !== event.text)
-  if (!blocks.length) {
-    transcriptStatus = 'no <article> blocks found'
+  // Offline (check.mjs, no extension runtime): expose what would have been posted.
+  if (typeof chrome === 'undefined') window.__tfBridgeTranscript = blocks
+  if (!rows.length) {
+    // Named, not guessed at: a page with no turn rows is a layout the mirror does not know, and
+    // saying so beats mirroring whatever text happens to be on screen.
+    transcriptStatus = 'no transcript rows found'
+    sayHello(sessionId, `rows 0, ${transcriptStatus}`)
     return
   }
+  const kinds = [...new Set(rows.map(row => row.getAttribute('data-perf-row') ?? '?'))].join(',')
+  sayHello(sessionId, `rows ${rows.length} (${kinds}), turns ${blocks.length}, ${transcriptStatus}`)
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
+  const events = blocks.filter(event => sentEvents.get(event.seq) !== event.text)
   if (!events.length) {
-    transcriptStatus = `${blocks.length} block(s), unchanged`
+    transcriptStatus = `${blocks.length} turn(s), unchanged`
     return
   }
   try {
@@ -202,7 +195,7 @@ function reportTranscript() {
       // Only remember what the daemon actually took, so a rejected batch is retried.
       if (reply?.ok) {
         for (const event of events) sentEvents.set(event.seq, event.text)
-        transcriptStatus = `sent ${events.length} of ${blocks.length} block(s)`
+        transcriptStatus = `sent ${events.length} of ${blocks.length} turn(s)`
       } else {
         transcriptStatus = reply?.error ?? 'failed'
       }
@@ -277,7 +270,7 @@ function isTemplate(parsed) {
  * boundaries on the way up. The page opens with the run's prompt — which quotes our whole
  * protocol, examples included — so nothing inside that first message is ever a question the
  * session asked (#1568). Roots are walked via their host so a block inside a shadowed
- * highlighter still resolves to the article that carries it.
+ * highlighter still resolves to the turn row that carries it.
  */
 function inFirstMessage(el, first) {
   if (!first) return false
@@ -366,10 +359,10 @@ function findPendingChoice() {
   // sit inside shadow roots (round 2). DOM order tracks transcript order, so the last real
   // question wins over both the spec and any earlier answered one.
   // The opening message is the run's own prompt, which quotes the whole protocol — examples
-  // included — so blocks inside it are documentation, never the session asking (#1568). Only
-  // applied when the page marks messages at all; the page-text fallback has no elements to
-  // scope and leans on isTemplate alone.
-  const firstMessage = deepQueryAll('article')[0]
+  // included — so blocks inside it are documentation, never the session asking (#1568). A
+  // virtual list may have scrolled that row out of the DOM, in which case its decoys are gone
+  // with it and isTemplate alone stands.
+  const firstMessage = openingMessage()
   const fromElements = []
   for (const el of deepQueryAll('pre code, pre, code')) {
     if (inFirstMessage(el, firstMessage)) continue
@@ -663,7 +656,7 @@ if (!IS_TOP) {
       // Always shown: the transcript is the half that runs even when no question was asked, so
       // it needs its own line rather than sharing the question's.
       ['transcript', transcriptStatus],
-      ['articles', deepQueryAll('article').length],
+      ['turn rows', turnRows().length],
     ]
     if (!winner.choiceFound) {
       rows.push(

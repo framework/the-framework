@@ -194,6 +194,24 @@ describe('the mirror row at the log tail (#1265)', () => {
     expect(screen.getByRole('status', { name: /Cloud session mirror/i })).toBeTruthy()
   })
 
+  test("the user's turns are one line each, the session's in full (#1225)", async () => {
+    onBridgeEvents.mockResolvedValue([
+      { sessionId: 'session_01ABCdefGHIjklMNO', seq: 0, role: 'user', text: 'Fix the flaky publish job\n\nYou are an agent of The Framework.\nProtocol: …', receivedAt: '' },
+      { sessionId: 'session_01ABCdefGHIjklMNO', seq: 2, role: 'agent', text: 'Reading the repo\nFound three packages', receivedAt: '' },
+      { sessionId: 'session_01ABCdefGHIjklMNO', seq: 3, role: 'user', text: 'Go with the first', receivedAt: '' },
+    ])
+    render(<CloudMirrorRow target="web" events={[handOff()]} />)
+    await waitFor(() => expect(screen.getByText(/Found three packages/)).toBeTruthy())
+    // The opening turn is the run's whole prompt: only its first line shows, the rest is a tooltip.
+    const prompt = screen.getByText(/Fix the flaky publish job/)
+    expect(prompt.textContent).toBe('you › Fix the flaky publish job')
+    expect(prompt.getAttribute('title')).toContain('You are an agent of The Framework.')
+    expect(screen.queryByText(/Protocol:/)).toBeNull()
+    expect(screen.getByText(/Go with the first/).textContent).toBe('you › Go with the first')
+    // The session's own turn is shown whole.
+    expect(screen.getByText(/Reading the repo/).textContent).toBe('Reading the repo\nFound three packages')
+  })
+
   test('shows a connecting placeholder before anything is scraped, so a web run never shows dead air', async () => {
     render(<CloudMirrorRow target="web" events={[handOff()]} />)
     await waitFor(() => expect(onBridgeEvents).toHaveBeenCalled())

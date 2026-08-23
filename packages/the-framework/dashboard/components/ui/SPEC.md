@@ -1,0 +1,5 @@
+The dashboard's design-system primitives: the buttons, fields, panels, badges, dividers, dropdown menus, popovers, tooltips, dialogs, drawers, sliders, loading placeholders, scrollable regions, the collapsible side column, and the live message transcript that every dashboard view is assembled from. They exist so one look and one set of manners — the dashboard's own theme colours, one keyboard focus ring, the dashboard's own scrollbar in place of the operating system's, tooltips that open instantly — hold across every screen, instead of each view hand-rolling its own controls. Most are plain presentation, but a few carry product behavior of their own: the confirmation step that guards an irreversible action and reports its failure in place, the transcript that follows a growing stream of messages while letting the reader scroll back, the side column that remembers whether it is collapsed, and the copy-to-clipboard control that confirms the copy landed.
+
+## Before modifying/creating SPEC.md files
+
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

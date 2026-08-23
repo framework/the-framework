@@ -1,0 +1,12 @@
+What the tests cover:
+
+- **Reading the reset the driver reports** - both phrasings of the reset text are understood, with and without minutes, with noon and midnight read correctly; the missing year is filled in with the one that puts the reset near the present, including across a new year in both directions; a named time zone is resolved as of the reset itself, so a reset on the other side of a daylight-saving change still lands on the wall-clock time printed. Text that cannot be placed — free prose, an unknown month, an impossible clock hour, an unrecognized zone — is refused rather than guessed at.
+- **Where the quota boundary sits** - the boundary is the plain elapsed share of the quota week: nothing at the very first instant, a quarter of the way in it is a quarter, half way in it is half, and it reaches the full allowance only at the exact instant the week resets — never a whole day's worth in a lump, and never the last day's allowance handed out early. The day number counts from one, steps at the second the week's own day rolls over rather than at midnight, and a week already past its reset reads as its last day rather than an eighth.
+- **Measuring the account against the boundary** - the account's own weekly window is compared against the boundary and reported as reached or not.
+- **Which windows bind** - the selected model's own weekly window binds alongside the account's, and can be the one that stops the work; a spent weekly window belonging to a different model never stops work on the selected model; with no model given, only the account's own week binds.
+- **When nothing can be said** - no status at all is produced when there is no weekly reading, when the weekly reading carries no reset text, or when that text cannot be placed on a calendar — a usage percentage alone says nothing about where in the week the account is.
+- **The user's own limit** - by default the quota limit sits exactly on the boundary; moving it changes the line work stops at while leaving the boundary untouched, so pulling it back can put an already-spent account over the line and pushing it forward can give a stopped account room again. A limit dragged past either end of the week is clamped to the week, so it can never read as "always stopped" or as "never stops".
+
+## Before modifying/creating SPEC.md files
+
+You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

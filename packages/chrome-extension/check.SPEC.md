@@ -8,12 +8,18 @@ Finding the parked question, across every shape the block has been seen in:
 - A page with no question block reports no question.
 - The await protocol's own spec block, which renders on the page as part of the agent's prompt, never counts as a question — on its own, and when a real question follows it, in which case the real question wins.
 - The protocol's two literal worked examples — the browser-handoff pair and the "Ship this?" approval pair — never count as questions.
-- When the page marks its messages, everything inside the opening message is the rendered prompt: decoys there are ignored while a real question in a later message still wins, and a question-shaped block that exists only inside the opening message is never reported.
+- Everything inside the opening turn is the rendered prompt: decoys there are ignored while a real question in a later turn still wins, and a question-shaped block that exists only inside the opening turn is never reported.
 - Every one of those cases also checks that the composer was located and that the panel shows the question's actual title.
 
 What is reported to the daemon:
 
 - The question reaches the daemon in the shape the session asked it: whether several answers may be picked at once, which options start ticked, and which option ends the session, alongside the labels and their detail text — while keys the daemon does not know are dropped rather than forwarded.
+
+Mirroring the transcript:
+
+- The mirror is one entry per conversation turn, under the position the page gives the turn: the user's turns as the user's, the session's as the session's, markers such as "Initialized session" left out, interface glyphs and blank lines removed, and the opening turn — the run's prompt — cut to its first 8000 characters.
+- When only the recent part of the transcript is rendered, positions still come from the page, not from counting what is on screen.
+- A page that marks no turns mirrors nothing, and the panel says that no transcript rows were found.
 
 Typing the dashboard's answer back into the session:
 

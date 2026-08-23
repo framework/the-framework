@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, Cloud, ExternalLink, Loader2, TriangleAlert } from 'lucide-react'
 import type { BridgeAnswer, BridgeEvent, BridgeQuestion, FrameworkEvent } from '../../src/index.js'
 import { bridgeChoiceRequest } from '../../src/client.js'
@@ -164,7 +164,7 @@ function AnswerState({ answer, url, sessionId }: { answer: BridgeAnswer; url: st
 }
 
 /**
- * Lines of claude.ai UI chrome the tail scrape drags in (#1265). The mirror is `main`'s rendered
+ * Lines of claude.ai UI chrome a scraped turn drags in (#1265). A turn is its row's rendered
  * text, so tile-focus hints, per-message action affordances and the bare model name ride along
  * with the conversation. Matched per line, anchored, so a message that merely mentions a model
  * is untouched.
@@ -175,7 +175,7 @@ const MIRROR_CHROME = [
   /^(Claude\s+)?(Fable|Opus|Sonnet|Haiku)(\s+\d[\d.]*)?$/i,
 ]
 
-/** Drop the scraped-in UI chrome from a mirror block, collapsing the holes it leaves. */
+/** Drop the scraped-in UI chrome from a mirrored turn, collapsing the holes it leaves. */
 export function scrubMirrorText(text: string): string {
   return text
     .split('\n')
@@ -205,8 +205,9 @@ export function CloudMirrorRow({
 }) {
   const session = target === 'web' ? cloudSession(events) : undefined
   const transcript = useBridgeEvents(session?.id)
+  const turns = transcript.map(event => ({ ...event, text: scrubMirrorText(event.text) })).filter(turn => turn.text)
+  const scroller = useScrollToNewest(turns.at(-1)?.seq, turns.at(-1)?.text.length)
   if (target !== 'web' || !session) return null
-  const blocks = transcript.map(event => scrubMirrorText(event.text)).filter(Boolean)
   return (
     <div role="status" aria-label="Cloud session mirror" className="mt-2 rounded-md border border-border bg-muted/40 font-sans">
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-1.5 text-[10px] text-muted-foreground">
@@ -214,13 +215,21 @@ export function CloudMirrorRow({
         <span className="font-medium uppercase tracking-wide">Cloud session mirror</span>
         <span className="opacity-70">a best-effort view of the Claude tab, not the run's own log</span>
       </div>
-      {blocks.length > 0 ? (
-        <div className="max-h-80 space-y-2 overflow-y-auto px-3 py-2 text-xs">
-          {blocks.map((text, i) => (
-            <div key={i} className="whitespace-pre-wrap break-words text-muted-foreground">
-              {text}
-            </div>
-          ))}
+      {turns.length > 0 ? (
+        <div ref={scroller} className="max-h-80 space-y-2 overflow-y-auto px-3 py-2 text-xs">
+          {turns.map(turn =>
+            turn.role === 'user' ? (
+              // The user's side is one line: the opening turn is the run's whole prompt, and
+              // what the session did is the point of the mirror, not what it was told.
+              <div key={turn.seq} className="truncate text-muted-foreground/70" title={turn.text}>
+                <span className="font-medium">you ›</span> {firstLine(turn.text)}
+              </div>
+            ) : (
+              <div key={turn.seq} className="whitespace-pre-wrap break-words text-muted-foreground">
+                {turn.text}
+              </div>
+            ),
+          )}
         </div>
       ) : (
         <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
@@ -230,6 +239,24 @@ export function CloudMirrorRow({
       )}
     </div>
   )
+}
+
+/** The first non-empty line of a turn, which is all the mirror shows of the user's side. */
+function firstLine(text: string): string {
+  return text.split('\n').find(line => line.trim()) ?? ''
+}
+
+/**
+ * Keep the newest turn in view: the box scrolls to its end whenever the last turn changes or
+ * grows, so a reply streaming in is watched, not scrolled to.
+ */
+function useScrollToNewest(lastSeq: number | undefined, lastLength: number | undefined) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [lastSeq, lastLength])
+  return ref
 }
 
 /** Poll the daemon for this session's transcript, on the same cadence as the question. */

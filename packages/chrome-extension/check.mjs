@@ -41,6 +41,11 @@ const highlighted = wideBlock
 // Escaped, because these fixtures go in through innerHTML and `<the question>` would otherwise
 // be parsed as an HTML tag and vanish from textContent. The real page escapes it too.
 const esc = t => t.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+// One conversation turn as claude.ai renders it (#1225): a `transcript-row` naming its position
+// and its kind. The page has no <article> elements; this is the shape the mirror reads.
+const row = (kind, index, html) => `<div data-testid="transcript-row" data-index="${index}" data-perf-row="${kind}"><div role="article" aria-label="Message ${index + 1}">${html}</div></div>`
+const feed = (...rows) => `<div role="feed" aria-label="Chat messages">${rows.join('')}</div>`
 const SPEC = esc(JSON.stringify({
   title: '<the question>',
   options: [{ label: '<option>', detail: '<optional one-liner>' }],
@@ -84,15 +89,15 @@ const cases = [
   ['browser-handoff example only', `<pre><code>${HANDOFF_EXAMPLE}</code></pre><div contenteditable="true"></div>`, false],
   // #1568: the approval example is literal end to end and can only be matched verbatim.
   ['approval example only', `<pre><code>${APPROVAL_EXAMPLE}</code></pre><div contenteditable="true"></div>`, false],
-  // #1568: when the page marks messages, everything in the opening one is the rendered prompt —
-  // documentation, not the session asking — and the real question in a later message still wins.
+  // #1568: everything in the opening turn is the rendered prompt — documentation, not the
+  // session asking — and the real question in a later turn still wins.
   [
-    'decoys in the opening message, real question after',
-    `<article><pre><code>${SPEC}</code><code>${HANDOFF_EXAMPLE}</code><code>${APPROVAL_EXAMPLE}</code></pre></article><article><code>${block}</code></article><div contenteditable="true"></div>`,
+    'decoys in the opening turn, real question after',
+    `${feed(row('human', 0, `<pre><code>${SPEC}</code><code>${HANDOFF_EXAMPLE}</code><code>${APPROVAL_EXAMPLE}</code></pre>`), row('assistant', 1, `<code>${block}</code>`))}<div contenteditable="true"></div>`,
     true,
   ],
-  // #1568: a question-shaped block that only exists inside the opening message is never asked.
-  ['question-shaped block only in the opening message', `<article><code>${block}</code></article><div contenteditable="true"></div>`, false],
+  // #1568: a question-shaped block that only exists inside the opening turn is never asked.
+  ['question-shaped block only in the opening turn', `${feed(row('human', 0, `<code>${block}</code>`))}<div contenteditable="true"></div>`, false],
 ]
 
 const script = readFileSync(join(here, 'content.js'), 'utf8')
@@ -138,7 +143,7 @@ for (const [name, body, expectFound] of cases) {
       { label: 'Abandon the plan', stop: true },
     ],
   })
-  const dom = new JSDOM(`<!doctype html><html><body><main><article>intro</article><article><code>${esc(shaped)}</code></article><div contenteditable="true"></div></main></body></html>`, {
+  const dom = new JSDOM(`<!doctype html><html><body><main>${feed(row('human', 0, 'intro'), row('assistant', 1, `<code>${esc(shaped)}</code>`))}<div contenteditable="true"></div></main></body></html>`, {
     url: 'https://claude.ai/code/session_01TEST',
     runScripts: 'outside-only',
   })
@@ -154,6 +159,61 @@ for (const [name, body, expectFound] of cases) {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'}  multi/default/stop reach the daemon as posted  (got=${JSON.stringify(got)})`)
   dom.window.close()
+}
+
+// ---------------------------------------------------------------------------
+// The mirror (#1225): one entry per conversation turn, keyed by the page's own position, with the
+// kind mapped to a role and markers left out. The opening turn is the run's prompt, and the only
+// turn long enough to be cut — from its end, never the conversation's.
+
+function mirrorOf(body) {
+  const dom = new JSDOM(`<!doctype html><html><body><main>${body}</main></body></html>`, {
+    url: 'https://claude.ai/code/session_01TEST',
+    runScripts: 'outside-only',
+  })
+  dom.window.eval(script)
+  const panel = [...dom.window.document.documentElement.children].filter(el => el.tagName === 'DIV').map(el => el.textContent).join(' ')
+  const got = dom.window.__tfBridgeTranscript
+  dom.window.close()
+  return { got, panel }
+}
+
+{
+  const prompt = 'prompt '.repeat(2000) // 14000 characters: only the opening turn is ever this long
+  const { got } = mirrorOf(
+    feed(
+      row('human', 0, `<p>${prompt}</p>`),
+      row('marker', 1, 'Initialized session'),
+      row('assistant', 2, '<p>Looking at the repo.</p>\n<p>  \uE001 Copy  </p>'),
+      row('human', 3, 'do the next one'),
+      row('assistant', 4, 'On it'),
+    ) + '<div contenteditable="true"></div>',
+  )
+  const want = [
+    { seq: 0, role: 'user', text: prompt.trim().slice(0, 8000) },
+    { seq: 2, role: 'agent', text: 'Looking at the repo.\nCopy' },
+    { seq: 3, role: 'user', text: 'do the next one' },
+    { seq: 4, role: 'agent', text: 'On it' },
+  ]
+  const ok = JSON.stringify(got) === JSON.stringify(want)
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  mirror is one entry per turn, roles mapped, markers skipped, prompt head-capped  (turns=${got?.length}, seqs=${got?.map(e => e.seq).join(',')}, roles=${got?.map(e => e.role).join(',')})`)
+}
+
+{
+  // A virtual list keeps only the tail rendered: positions come from the page, not from DOM order.
+  const { got } = mirrorOf(feed(row('human', 7, 'later question'), row('assistant', 8, 'later answer')) + '<div contenteditable="true"></div>')
+  const ok = JSON.stringify(got?.map(e => [e.seq, e.role])) === JSON.stringify([[7, 'user'], [8, 'agent']])
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  mirror keeps the page's positions when only the tail is rendered  (got=${JSON.stringify(got?.map(e => e.seq))})`)
+}
+
+{
+  // A layout the mirror does not know is named, never mirrored as whatever text is on screen.
+  const { got, panel } = mirrorOf('<div>Home Code Artifacts</div><p>some conversation text</p><div contenteditable="true"></div>')
+  const ok = Array.isArray(got) && got.length === 0 && /no transcript rows found/.test(panel)
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  no turn rows means nothing mirrored and the panel says so  (entries=${got?.length}, named=${/no transcript rows found/.test(panel)})`)
 }
 
 // ---------------------------------------------------------------------------

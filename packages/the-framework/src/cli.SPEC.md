@@ -166,15 +166,11 @@ For the `actions` target, the repository's owner and name come from its GitHub o
 
 For the `web` target nothing is resolved: the wrapped CLI holds the account the cloud session runs under. The agent announces the hand-off and, when the repository has no GitHub remote, that a bundle of it will be uploaded instead. It also states plainly that the cloud session clones the remote at its current branch, so local commits that were never pushed are not in it.
 
-The `web` target also decides there and then whether the cloud session may stop to ask: the Claude web bridge preference is read once, at the hand-off, and passed to the agent, which frames the session either as one whose questions reach the dashboard or as one that must decide its own. Either way the user is told which of the two they are getting, in the same announcement.
-
 The framework launches Chrome itself for a browser-enabled agent rather than letting the driver's browser tooling launch its own, because that is what lets the preview attach to the same page. It does so only for a local agent: the browser tools are wired on this machine, so a remote agent could never reach them, and launching Chrome would leak a headless browser per agent. A browser asked for on a remote target, or on a machine with no Chrome, is reported as having no effect rather than failing the agent. Whether the system prompt may claim the agent has a browser is narrower still than the setting: it must be a local, real, Claude Code agent.
 
 The preview stream of that Chrome is opened alongside it and is stopped with the agent, so no headless browser outlives it.
 
 #### Rationale
-
-The bridge preference is read at the hand-off rather than consulted later because a cloud session's instructions are fixed the moment it is created: nothing can revise them afterwards, so turning the bridge on or off later cannot reach a session already handed off.
 
 An abort that happens after the agent meta already says "running" but before the normal ending machinery is in place must close itself out by hand — say why, record the failure, release the handles — or the agent is recorded as running forever and the dashboard shows work that never moves. Persistence is best-effort even there: a store that cannot write its own failure must still let the process exit.
 

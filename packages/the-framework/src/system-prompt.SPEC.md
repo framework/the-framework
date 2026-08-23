@@ -21,7 +21,7 @@ Composes an agent's system channel — the built-in system prompt, the repo-cont
 - **Composition is additive and ordered** - context first, then the format specs, the built-in prompt, and the user's `SYSTEM.md`; a repo can keep the built-in prompt *and* add its own, replace it, or leave both off.
 - **Vanilla drops everything framework-authored except the emit protocols** - the built-in prompt, the context docs, and the format specs all go together; the user's own dirs and `SYSTEM.md` survive, and the emit protocols stay because they are the contract the dashboard's gates run on, not prompt content.
 - **Transparent drops the whole channel** - no prompt, no docs, no protocols: the agent runs byte-identical to the raw wrapped CLI. It overrides every other option.
-- **Per-agent capability sections** - an agent with a real browser attached is told so; a hands-off agent is told to land its own work, and told to decide alone only when nothing can answer its gates; the signal protocol is always the last thing in the channel.
+- **Per-agent capability sections** - an agent with a real browser attached is told so; a hands-off agent is told to land its own work; the signal protocol is always the last thing in the channel.
 
 ## Business logic
 
@@ -71,19 +71,16 @@ The dashboard's gates, the session name, and ready for merge must work even when
 
 The emit protocols are appended unconditionally (transparent aside): they are the emit contract the turn-boundary parsing depends on, not prompt content, so a vanilla agent still gets them — the drift that once dropped them from vanilla builds is exactly what the single assembly point exists to prevent. Nothing is ever appended after them, which is what lets the dashboard show the complete channel up front.
 
-Three further protocols are conditional on the agent, not on the prompt:
+Two further protocols are conditional on the agent, not on the prompt:
 
 - The **browser protocol** — the agent has a real browser wired; use it rather than fetching pages blind — rides ahead of the emit protocols.
-- The **decide-alone protocol** rides immediately after the await protocol it amends: the gates just taught have nobody attached to answer them, so an ambiguous prompt takes its most plausible reading and says so. It is added only for an agent explicitly marked as having no answerer.
-- The **hands-off protocol** — nothing here sees this session's workspace, so commit the work and open a pull request for it before ending — rides after that, and is added for every hands-off agent.
+- The **hands-off protocol** — nothing here sees this session's workspace, so commit the work and open a pull request for it before ending — rides after the await protocol, and is added for every hands-off agent.
 
-All three survive vanilla, none survives transparent, and the signal protocol is always last.
+Both survive vanilla, none survives transparent, and the signal protocol is always last. A hands-off agent's gates are the same as any agent's: the channel says nothing about whether its questions can be answered.
 
 #### Rationale
 
-Whether an agent can be answered is decided by the caller and passed in, rather than inferred from the agent being hands-off, because a hands-off agent whose Claude web bridge is on *can* be answered: it parks, the bridge carries the question to the dashboard, and the answer is typed back. Keeping the two switches apart is what lets a bridged cloud session ask its questions while still being told to land its own work.
-
-The decide-alone protocol keeps the emit contract intact for the parser (the gates are taught, then declared unanswerable) rather than deleting the gate teaching, so the same parsing works on every agent. Without the browser section, the tools are wired but never mentioned, and the agent reaches for blind fetching while the browser preview sits unused.
+Without the browser section, the tools are wired but never mentioned, and the agent reaches for blind fetching while the browser preview sits unused.
 
 ## Before modifying/creating SPEC.md files
 

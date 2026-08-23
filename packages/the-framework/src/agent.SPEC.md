@@ -15,7 +15,7 @@ The user gives The Framework a task. From there the agent runs unattended: it wo
 - **The agent queue is worked after the opening exchange settles** - a build then consumes the confirmed backlog one gated entry per turn until it is empty.
 - **Live chat comes last** - a build takes the user's own messages once its backlog is worked; a one-prompt agent takes them straight after its opening exchange.
 - **A hands-off agent is its opening prompt and nothing else** - the work leaves this machine, so every later phase is dropped, the agent is told to land its own work, and it says so before ending.
-- **A hands-off agent decides alone only when nothing can answer it** - with the Claude web bridge on, its framing leaves the gates in place, because the bridge carries its question to the dashboard and types the answer back.
+- **A hands-off agent keeps a local agent's gates** - its framing adds only the land-everything rule; whether a question it stops on reaches the user is the Claude web bridge's business, not the framing's.
 - **The agent always ends with a verdict** - success, stopped, or failed with the reason, and the coding agent's session is always closed.
 
 ## Glossary

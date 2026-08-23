@@ -2,7 +2,7 @@ The extension half of the Claude web bridge: a Chrome extension that carries the
 
 It exists because an agent with run target `web` is hands-off: the daemon hands the whole task to a cloud session on claude.ai and the agent ends at the hand-off. When that session later parks on a gate, nothing streams back — the question is stranded on a claude.ai page nobody may be looking at. The daemon cannot reach claude.ai itself, but the user's own browser is already signed in there, so the extension turns that browser into the bridge's far end, with the daemon's `/_bridge/*` endpoints as the near end.
 
-The bridge being on is also what makes such a session ask at all: a hand-off is told to decide alone whenever the bridge is off, since a question it stopped on could reach nobody, and is told its gates work when the bridge is on. Which of the two it is is settled once, when the task is handed off.
+A cloud session asks the same way a local agent does — its gates are never framed away. The bridge is what carries the question home; with the bridge off, the question simply waits in the session on claude.ai until the user finds it there.
 
 Four parts: the content script (the page half — reads claude.ai, types answers), the service worker (the daemon half — holds the token, makes every daemon call, manages tabs), the options page (setup and connection proof), and an offline check harness that proves the reading and typing against synthetic pages without a browser.
 

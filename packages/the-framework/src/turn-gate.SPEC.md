@@ -14,7 +14,7 @@ The turn-boundary protocol: what an agent may tell The Framework in the final me
 
 ## Business logic — TL;DR
 
-- **Protocol text on top of the system prompt** - five snippets that pin *how* to emit each signal and what this particular agent may do with them; three of them are only told to the agents they apply to.
+- **Protocol text on top of the system prompt** - four snippets that pin *how* to emit each signal and what this particular agent may do with them; two of them are only told to the agents they apply to.
 - **One question shape for every gate** - a single `await-choices` block with N options covers approvals, plan reviews, multi-select and anything else; there are no gate kinds.
 - **A bad block never breaks the agent** - gate parsing is deliberately forgiving, and anything unreadable is simply not a gate.
 - **A pick that stops instead of resuming** - the agent can mark options whose meaning is "I will take it from here"; picking one ends the agent rather than resuming it, and tells a cloud session that cannot be ended from here that the user is taking over.
@@ -33,19 +33,16 @@ The user gets an agent that reliably parks its questions and reports its state, 
 
 #### Business logic
 
-Five protocol snippets are available for the system prompt. The **await protocol** pins how to emit a question the agent stopped on. The **signal protocol** pins how to emit the session name, ready for merge, errors, views, and a pull request. Both describe only the emission mechanics — *when* to use each one is the system prompt's business, not theirs.
+Four protocol snippets are available for the system prompt. The **await protocol** pins how to emit a question the agent stopped on. The **signal protocol** pins how to emit the session name, ready for merge, errors, views, and a pull request. Both describe only the emission mechanics — *when* to use each one is the system prompt's business, not theirs.
 
-Three more are conditional on the agent rather than on the prompt:
+Two more are conditional on the agent rather than on the prompt:
 
 - The **hands-off protocol** is told to every hands-off agent: nothing on this machine sees its workspace or follows it to the end, so it has to land its own work — commit it on its branch and open a pull request for it, and write an analysis, plan or decision into committed files rather than leaving it in the conversation. Ending without a pull request is allowed only when the task genuinely needed no repository change, and then it has to say so.
-- The **decide-alone protocol** is told to a hands-off agent whose questions nobody can answer — one running with the Claude web bridge off. It amends the await protocol just taught: do not emit the block and do not stop, take the most plausible reading, say in one line which assumption was made, and carry the work to the end. The non-blocking signals are untouched. With the bridge on it is left out entirely, because then the question does reach the user.
 - The **browser protocol** is told only to an agent that has a browser: that it has one, and that anything it needs to see or act on goes through the browser rather than plain web fetching.
 
 #### Rationale
 
-Landing the work and deciding alone used to be one block told to every hands-off agent. They are different rules: a hands-off agent always has to land its own work, but it only has to decide alone when nothing can answer it. Told together, a cloud session was instructed to decide alone even with the bridge carrying its questions home — which is what made choices appear not to work on cloud sessions at all.
-
-The decide-alone wording is framed as what is available in this session rather than as a rule, so that it disappears cleanly the moment gates become answerable there.
+The hands-off protocol says nothing about the agent's gates: a hands-off agent asks exactly the way a local agent does, and whether the question reaches the user is the Claude web bridge's business. There used to be a further instruction telling an unanswerable hands-off agent to decide alone, and framing a cloud session that way is what made choices appear not to work on cloud sessions at all.
 
 ### One question shape for every gate
 

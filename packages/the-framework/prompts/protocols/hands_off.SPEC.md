@@ -30,7 +30,7 @@ Ending without a pull request is allowed only when the task genuinely required n
 
 #### Rationale
 
-This is the whole of what a hands-off agent is told about being detached. Whether it may also stop and ask the user a question is a separate matter, decided per agent by whether the Claude web bridge is on, and carried by its own protocol.
+This is the whole of what a hands-off agent is told about being detached. Its gates are the same as any agent's: whether a question it stops on reaches the user is the Claude web bridge's business, not this prompt's.
 
 ## Before modifying/creating SPEC.md files
 

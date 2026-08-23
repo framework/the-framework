@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { realpath } from 'node:fs/promises'
 import { nodeGitRunner, type GitRunner } from '../project.js'
 import { FRAMEWORK_DIR, BRANCHES_DIR, isSafeAgentId } from './agent-store.js'
 import { worktreeDirName } from '../branch-names.js'
@@ -208,6 +209,36 @@ export async function removeWorktree(repo: string, path: string, agent: GitRunne
  */
 export async function deleteBranch(repo: string, branch: string, agent: GitRunner = nodeGitRunner()): Promise<void> {
   await agent(['branch', '-D', branch], repo).catch(() => undefined)
+}
+
+/**
+ * Whether `path` is the root of a git worktree — the main checkout's or a linked one (#1654).
+ *
+ * Git answers for any directory *inside* a repository, so a `branches/<run>` directory that is
+ * no longer a worktree (a checkout removed by hand, a marker written after teardown) makes every
+ * git command run in it act on the enclosing repo: the user's own checkout, on the user's own
+ * branch. The one question that tells the two apart is whether git's top level is this very
+ * directory. False on any failure, and the caller leaves the directory alone.
+ */
+export async function isWorktreeRoot(path: string, agent: GitRunner = nodeGitRunner()): Promise<boolean> {
+  try {
+    const top = (await agent(['rev-parse', '--show-toplevel'], path)).trim()
+    if (!top) return false
+    // Both sides resolved: macOS's tmpdir sits behind the /var -> /private/var link, and git
+    // reports the resolved path.
+    return (await realpath(top)) === (await realpath(path))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The branch checked out at `path` when `path` is a worktree root (#1654), else `undefined` —
+ * the read every consumer of a `branches/<run>` directory wants, so none of them can take the
+ * enclosing repo's branch for the run's.
+ */
+export async function worktreeBranch(path: string, agent: GitRunner = nodeGitRunner()): Promise<string | undefined> {
+  return (await isWorktreeRoot(path, agent)) ? currentBranch(path, agent) : undefined
 }
 
 /**

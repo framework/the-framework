@@ -1,7 +1,7 @@
 import { basename, join } from 'node:path'
 import { nodeGitRunner, type GitRunner } from './project.js'
 import { excludeFromGit } from './git-exclude.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, worktreeDirEntries, currentBranch, type WorktreeDirEntry } from './store/index.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, worktreeDirEntries, worktreeBranch, type WorktreeDirEntry } from './store/index.js'
 import { isWorktreeDirName } from './branch-names.js'
 
 // The branches view (#1580): every checkout under `.the-framework/branches/` is a directory named
@@ -50,7 +50,7 @@ export interface BranchLinksDeps {
   fs?: LinksFs
   /** The checkouts on disk (default {@link worktreeDirEntries}). */
   worktrees?: (cwd: string) => Promise<WorktreeDirEntry[]>
-  /** The branch a worktree is on (default {@link currentBranch}). */
+  /** The branch a worktree is on, or none when the path is not a worktree root (default {@link worktreeBranch}). */
   branchOf?: (path: string) => Promise<string | undefined>
   /** Hide a repo-root entry from git (default {@link excludeFromGit} over `git`). */
   exclude?: (repo: string, rule: string) => Promise<void>
@@ -69,7 +69,9 @@ export async function reconcileBranchLinks(cwd: string, deps: BranchLinksDeps = 
   const git = deps.git ?? nodeGitRunner()
   const fs = deps.fs ?? nodeLinksFs()
   const worktrees = deps.worktrees ?? worktreeDirEntries
-  const branchOf = deps.branchOf ?? ((path: string) => currentBranch(path, git))
+  // A `branches/` directory that is not a worktree root reads as no branch (#1654): otherwise
+  // it reads as the enclosing repo's, and a link named after the user's own branch appears.
+  const branchOf = deps.branchOf ?? ((path: string) => worktreeBranch(path, git))
   const exclude = deps.exclude ?? ((repo: string, rule: string) => excludeFromGit(repo, rule, undefined, git))
 
   const linksDir = join(cwd, FRAMEWORK_DIR, BRANCHES_DIR)

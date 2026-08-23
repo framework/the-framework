@@ -284,6 +284,33 @@ test("a leftover checkout on a branch the framework did not mint keeps that bran
   }
 })
 
+test("a branches/ directory that is not a git worktree is refused before any git runs in it (#1654)", async () => {
+  // Found on the rig: a checkout removed by hand, then a failed-start marker written into the
+  // path. Git, asked in that directory, answers for the enclosing repo — so the ordinary rule
+  // would commit the user's main checkout, push the user's main, and judge it for deletion.
+  const { repo, path: worktree } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    // Turn the run's checkout into residue: gone as a worktree, its directory holding only the
+    // framework's bookkeeping. And leave the user's own checkout dirty, which is what must survive.
+    await git(['worktree', 'remove', '--force', worktree], repo)
+    await mkdir(join(worktree, '.the-framework'), { recursive: true })
+    await writeFile(join(worktree, '.the-framework', 'agent.json'), JSON.stringify({ status: 'failed', id: RUN_ID }))
+    await writeFile(join(repo, 'index.html'), '<h1>half-typed</h1>\n')
+    const before = (await git(['rev-parse', 'HEAD'], repo)).trim()
+
+    const result = await removeProjectWorktree(repo, RUN_ID)
+    assert.equal(result.ok, false)
+    assert.match(result.ok === false ? result.error : '', /not a git worktree; left alone/)
+    assert.equal((await git(['rev-parse', 'HEAD'], repo)).trim(), before, "nothing was committed on the user's checkout")
+    assert.match(await git(['status', '--porcelain'], repo), /index\.html/, "the user's edit is still uncommitted")
+    assert.equal((await git(['ls-remote', '--heads', 'origin'], repo)).trim(), '', 'and nothing was pushed')
+    assert.equal((await stat(worktree)).isDirectory(), true, 'the directory is left where it is')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
 test('a worktree whose work cannot be committed is refused, not force-removed (#982)', async () => {
   const { repo, path } = await repoWithDirtyWorktree()
   try {

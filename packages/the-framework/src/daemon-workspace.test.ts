@@ -396,6 +396,19 @@ test('a child that wrote its own lifecycle is left alone by the failed-start mar
   }
 })
 
+test('the failed-start marker is not written where the checkout is gone (#1654)', async () => {
+  // A marker written into a missing path creates a `branches/` directory that is not a worktree,
+  // and every git command later run in it acts on the enclosing repo instead.
+  const base = await realpath(await mkdtemp(join(tmpdir(), 'framework-bootfail-gone-')))
+  try {
+    const gone = join(base, 'removed-checkout')
+    assert.equal(await markFailedStart(gone, 'run1', 'build a thing', 'its process was killed by SIGTERM'), false)
+    assert.equal(await stat(gone).then(() => true, () => false), false, 'no directory is created')
+  } finally {
+    await rm(base, RETRIED_RM)
+  }
+})
+
 test('isTransientAgentFailure names transport deaths, not work failures (#1281)', () => {
   assert.equal(
     isTransientAgentFailure('[framework] claude-code exited (1): API Error: Connection closed mid-response. The response above may be incomplete.'),

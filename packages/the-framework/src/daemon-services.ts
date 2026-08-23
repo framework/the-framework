@@ -1,3 +1,4 @@
+import { hostname } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { listProjects, projectId, readPreferences, readSecrets, type Preferences } from './registry.js'
 import { resolveDiscordCredentials, type DiscordCredentials } from './discord-credentials.js'
@@ -13,7 +14,7 @@ import { startAutoPm, AUTO_PM_JOBS, DEFAULT_AUTO_PM_INTERVAL_MS, quotaHeadroom, 
 import type { ActiveAgentSlot } from './daemon-runtime.js'
 import { startDaemonTick, DAEMON_TICK_MS } from './daemon-tick.js'
 import { ciFixPrompt, startCiWatch } from './ci-watch.js'
-import { releaseStalePinnedBranch } from './stale-branch.js'
+import { acquireRoutineLock, releaseDeadRoutineLocks, releaseRoutineLock } from './routine-locks.js'
 import { maintenanceDue, readMaintenanceState, mergeMaintenanceState } from './maintenance.js'
 import { FLAT_TODO_FILE, TICKETS_DIR } from './tickets.js'
 import { acquireTicketLocks, releaseTicketLock } from './ticket-locks.js'
@@ -218,8 +219,21 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // rebooted daily would otherwise sweep every morning and never reach its interval.
     maintenanceDue: async project => maintenanceDue(await readMaintenanceState(project.path), Date.now()),
     recordMaintenance: async project => mergeMaintenanceState(project.path, { sweptAt: new Date().toISOString() }),
-    // A pinned routine branch left behind by a closed PR blocks every later firing (#1293).
-    releasePinned: (project, branch) => releaseStalePinnedBranch(project.path, branch),
+    // The routine lock (#1659): a pushed `routines/<name>.lock.md`, minted before the triage
+    // starts and dropped by this daemon when its run ends. On boot, the locks a previous daemon
+    // on this machine left go too, unless a run of this machine's started since is still going.
+    lockRoutine: (project, name) => acquireRoutineLock(project.path, name, { log }),
+    releaseRoutine: async (project, name) => {
+      const ok = await releaseRoutineLock(project.path, name, { log })
+      if (ok) log(`[framework] auto PM: released the ${name} lock — its run ended`)
+      else log(`[framework] auto PM: the release of the ${name} lock could not be committed; it will be retried`)
+      return ok
+    },
+    releaseDeadLocks: async project => {
+      const running = (await listAgents(project.path).catch(() => [])).filter(a => a.status === 'running' && a.host === hostname())
+      const released = await releaseDeadRoutineLocks(project.path, since => running.some(a => a.startedAt >= since), { log })
+      for (const name of released) log(`[framework] auto PM: released the ${name} lock a previous daemon left behind`)
+    },
     // The tickets a [Plan tickets] fan-out may claim (#1327/#1420): unplanned and not claimed
     // by a `.lock.md` — most important first. No stale-lock sweep runs here: #1420
     // removed the timer, so a lock stands until the agent's PR deletes it or a human releases

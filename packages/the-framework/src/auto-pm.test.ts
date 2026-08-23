@@ -1476,115 +1476,202 @@ test('a drain-only sweep works the queue and never borrows the tick for the rota
   assert.equal(empty.report().outcomes[0]?.message, 'the queue is empty, so there is nothing to drain')
 })
 
-test('a pinned job has its stale branch released before it fires (#1293)', async () => {
-  const order: string[] = []
-  const { loop } = harness({
-    jobs: [{ name: 'triage-quick', prompt: 'p', pinnedBranch: 'the-framework/triage-quick' }],
-    releasePinned: async (_project, branch) => {
-      order.push(`release:${branch}`)
-    },
-    start: async (_project, job) => {
-      order.push(`start:${job.name}`)
-      return 'run-1'
-    },
-  })
-  await loop.tick()
-  loop.stop()
-  assert.deepEqual(order, ['release:the-framework/triage-quick', 'start:triage-quick'])
-})
+// #1659: the routine lock. A triage rewrites the shared queue and may take hours, so the sweep
+// takes `routines/<name>.lock.md` on the data branch before the start — the daemon decides, and
+// no agent is spent finding out — and gives it back when the run ends, whatever the ending.
 
-test('an unpinned job never asks for a release, and a failing release does not stop the start (#1293)', async () => {
-  const releases: string[] = []
-  const unpinned = harness({
-    releasePinned: async (_project, branch) => {
-      releases.push(branch)
-    },
-  })
-  await unpinned.loop.tick()
-  unpinned.loop.stop()
-  assert.deepEqual(releases, [])
-  assert.deepEqual(unpinned.ran, ['first'])
-
-  // A release that could not happen leaves the routine exactly as jammed as it was; the job's own
-  // abort guard decides, exactly as before the seam existed.
-  const failing = harness({
-    jobs: [{ name: 'triage-quick', prompt: 'p', pinnedBranch: 'the-framework/triage-quick' }],
-    releasePinned: async () => {
-      throw new Error('gh is down')
-    },
-  })
-  await failing.loop.tick()
-  failing.loop.stop()
-  assert.deepEqual(failing.ran, ['triage-quick'])
-})
-
-// #1643: Run now on a pinned routine reaches the same release-then-start the sweep does. It used
-// to be a plain start outside the sweep, so a leftover copy of the branch — which the sweep
-// releases before firing — made the agent abort as "triage already pending" on every click.
-
-const PINNED_JOB: AutoPmJob = {
+const LOCKED_JOB: AutoPmJob = {
   name: 'triage-quick',
   prompt: 'Triage.',
   label: 'Triage quick wins',
-  pinnedBranch: 'the-framework/triage-quick',
+  lock: 'triage-quick',
 }
 
-test('a sweep narrowed to a pinned job releases its branch, then starts exactly one agent (#1643)', async () => {
+/** A lock that behaves like the real one: taken once, standing every later taker down until released. */
+function fakeLock(order: string[] = []) {
+  let held = false
+  const lockRoutine: AutoPmDeps['lockRoutine'] = async (_project, lock) => {
+    order.push(`lock:${lock}`)
+    if (held) return { ok: false, reason: `${lock} is already running on laptop (since T0)` }
+    held = true
+    return { ok: true }
+  }
+  const releaseRoutine: AutoPmDeps['releaseRoutine'] = async (_project, lock) => {
+    order.push(`release:${lock}`)
+    held = false
+    return true
+  }
+  return { order, lockRoutine, releaseRoutine, isHeld: () => held }
+}
+
+test('a locked job takes its lock before it starts, and releases it when the run ends (#1659)', async () => {
+  const lock = fakeLock()
+  let settled = false
+  const { loop } = harness({
+    jobs: [LOCKED_JOB],
+    cooldownMs: 0,
+    lockRoutine: lock.lockRoutine,
+    releaseRoutine: lock.releaseRoutine,
+    start: async (_project, job) => {
+      lock.order.push(`start:${job.name}`)
+      return 'run-1'
+    },
+    promote: async () => ({ settled, promoted: false }),
+  })
+  await loop.tick()
+  assert.deepEqual(lock.order, ['lock:triage-quick', 'start:triage-quick'])
+  // Still running: the lock stands, and the next sweep stands down on it rather than starting another.
+  await loop.tick()
+  assert.deepEqual(lock.order, ['lock:triage-quick', 'start:triage-quick', 'lock:triage-quick'])
+  assert.equal(loop.report().outcomes[0]?.message, 'triage-quick is already running on laptop (since T0)')
+  settled = true
+  await loop.tick()
+  loop.stop()
+  // Released on the ending itself — no `no-commits` condition, no PR: a triage never opens one —
+  // and the same sweep may take it again.
+  assert.deepEqual(lock.order.slice(3), ['release:triage-quick', 'lock:triage-quick', 'start:triage-quick'])
+})
+
+test('a held lock stands the job down naming its holder, with no agent started (#1659)', async () => {
+  const { loop, ran } = harness({
+    jobs: [LOCKED_JOB],
+    cooldownMs: 0,
+    lockRoutine: async () => ({ ok: false, reason: 'triage-quick is already running on other-machine (since 2026-08-23T10:00:00.000Z)' }),
+  })
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(ran, [])
+  assert.equal(loop.report().outcomes[0]?.started, false)
+  assert.equal(loop.report().outcomes[0]?.message, 'triage-quick is already running on other-machine (since 2026-08-23T10:00:00.000Z)')
+})
+
+test('a refused start gives the lock back, and a failed release is retried next sweep (#1659)', async () => {
+  const releases: string[] = []
+  const refused = harness({
+    jobs: [LOCKED_JOB],
+    cooldownMs: 0,
+    lockRoutine: async () => ({ ok: true }),
+    releaseRoutine: async (_project, lock) => {
+      releases.push(lock)
+      return true
+    },
+    start: async () => undefined,
+  })
+  await refused.loop.tick()
+  refused.loop.stop()
+  assert.deepEqual(releases, ['triage-quick'], 'no run will ever release a lock taken for a start that never happened')
+
+  let ok = false
+  const lock = fakeLock()
+  const flaky = harness({
+    jobs: [LOCKED_JOB],
+    cooldownMs: 0,
+    lockRoutine: lock.lockRoutine,
+    releaseRoutine: async (project, name) => (ok ? lock.releaseRoutine!(project, name) : false),
+    promote: async () => ({ settled: true, promoted: false }),
+  })
+  await flaky.loop.tick()
+  await flaky.loop.tick()
+  assert.deepEqual(flaky.ran, ['triage-quick'], 'the lock still stands while its release has not landed')
+  assert.ok(lock.isHeld())
+  ok = true
+  await flaky.loop.tick()
+  flaky.loop.stop()
+  assert.deepEqual(flaky.ran, ['triage-quick', 'triage-quick'], 'the retried release lands, and the routine may run again')
+})
+
+test('an unlocked job never asks for a lock, and a loop wired without the seam starts unguarded (#1659)', async () => {
+  const locks: string[] = []
+  const unlocked = harness({
+    lockRoutine: async (_project, lock) => {
+      locks.push(lock)
+      return { ok: true }
+    },
+  })
+  await unlocked.loop.tick()
+  unlocked.loop.stop()
+  assert.deepEqual(locks, [])
+  assert.deepEqual(unlocked.ran, ['first'])
+
+  const unwired = harness({ jobs: [LOCKED_JOB] })
+  await unwired.loop.tick()
+  unwired.loop.stop()
+  assert.deepEqual(unwired.ran, ['triage-quick'])
+})
+
+test("a previous daemon's dead locks are released on the project's first sweep only (#1659)", async () => {
+  const boots: string[] = []
+  const { loop } = harness({
+    releaseDeadLocks: async project => {
+      boots.push(project.id)
+    },
+  })
+  await loop.tick()
+  await loop.tick()
+  loop.stop()
+  assert.deepEqual(boots, ['p1'])
+})
+
+// #1643: Run now on a locked routine reaches the same lock-then-start the sweep does. It used to
+// be a plain start outside the sweep, which ran unguarded.
+
+test('a sweep narrowed to a locked job takes its lock, then starts exactly one agent (#1643/#1659)', async () => {
   const order: string[] = []
   const { loop } = harness({
     // The rotation is on another job's turn, so a tick that ignored the narrowing would start
-    // that one instead — the release-then-start below is the click's doing, not the cycle's.
-    jobs: [{ name: 'update', prompt: 'Update.' }, PINNED_JOB],
+    // that one instead — the lock-then-start below is the click's doing, not the cycle's.
+    jobs: [{ name: 'update', prompt: 'Update.' }, LOCKED_JOB],
     cooldownMs: 0,
     // Room for three, so a single start is the routine's own shape and not the cap's doing.
     concurrency: async () => 3,
-    releasePinned: async (_project, branch) => {
-      order.push(`release:${branch}`)
+    lockRoutine: async (_project, lock) => {
+      order.push(`lock:${lock}`)
+      return { ok: true }
     },
     start: async (_project, job) => {
       order.push(`start:${job.name}`)
       return `run-${order.length}`
     },
   })
-  await loop.tick({ onDemand: true, only: { pinned: 'the-framework/triage-quick' }, projectId: 'p1' })
+  await loop.tick({ onDemand: true, only: { lock: 'triage-quick' }, projectId: 'p1' })
   loop.stop()
-  assert.deepEqual(order, ['release:the-framework/triage-quick', 'start:triage-quick'])
+  assert.deepEqual(order, ['lock:triage-quick', 'start:triage-quick'])
 })
 
-test('a switched-off pinned routine stands the click down, and so does every other gate (#1643)', async () => {
-  const off = harness({ jobs: [PINNED_JOB], cooldownMs: 0, optedOut: async () => ['triage-quick'] })
-  await off.loop.tick({ onDemand: true, only: { pinned: 'the-framework/triage-quick' }, projectId: 'p1' })
+test('a switched-off locked routine stands the click down, and so does every other gate (#1643)', async () => {
+  const off = harness({ jobs: [LOCKED_JOB], cooldownMs: 0, optedOut: async () => ['triage-quick'] })
+  await off.loop.tick({ onDemand: true, only: { lock: 'triage-quick' }, projectId: 'p1' })
   off.loop.stop()
   assert.deepEqual(off.ran, [], 'an unticked box is not overridden by the click')
   assert.equal(off.loop.report().outcomes[0]?.message, 'Triage quick wins is switched off')
 
-  // A branch nothing pins is said as such, not as a setting the user could go and undo.
-  const unknown = harness({ jobs: [PINNED_JOB], cooldownMs: 0 })
-  await unknown.loop.tick({ onDemand: true, only: { pinned: 'the-framework/nobody' }, projectId: 'p1' })
+  // A lock nothing holds is said as such, not as a setting the user could go and undo.
+  const unknown = harness({ jobs: [LOCKED_JOB], cooldownMs: 0 })
+  await unknown.loop.tick({ onDemand: true, only: { lock: 'nobody' }, projectId: 'p1' })
   unknown.loop.stop()
   assert.deepEqual(unknown.ran, [])
-  assert.equal(unknown.loop.report().outcomes[0]?.message, 'no routine is pinned to the-framework/nobody')
+  assert.equal(unknown.loop.report().outcomes[0]?.message, 'no routine holds the nobody lock')
 
   // The click skips the master switch and the cooldown, not the cap (#1204/#1642).
-  const capped = harness({ jobs: [PINNED_JOB], cooldownMs: 0, activeAgents: () => ['run-live (pid 111)'] })
-  await capped.loop.tick({ onDemand: true, only: { pinned: 'the-framework/triage-quick' }, projectId: 'p1' })
+  const capped = harness({ jobs: [LOCKED_JOB], cooldownMs: 0, activeAgents: () => ['run-live (pid 111)'] })
+  await capped.loop.tick({ onDemand: true, only: { lock: 'triage-quick' }, projectId: 'p1' })
   capped.loop.stop()
   assert.deepEqual(capped.ran, [], 'a live agent at the cap holds the click like it holds the sweep')
 })
 
-test('a sweep narrowed to a pinned job never falls through to the drain or another rotation job (#1643)', async () => {
+test('a sweep narrowed to a locked job never falls through to the drain or another rotation job (#1643)', async () => {
   // The queue is full, so the queue-picked mode would drain; the rotation is on another job's
-  // turn, so the index would fire that one. The click named the pinned routine and gets it alone
+  // turn, so the index would fire that one. The click named the locked routine and gets it alone
   // — and the scheduled tick after it still gets the rotation job it was owed.
   const other: AutoPmJob = { name: 'update', prompt: 'Update.' }
   let entries = ['work one']
   const { loop, ran } = harness({
-    jobs: [other, PINNED_JOB],
+    jobs: [other, LOCKED_JOB],
     cooldownMs: 0,
     queue: async () => entries,
     drainJob: { name: 'drain', prompt: 'Work the queue.', drains: true },
   })
-  await loop.tick({ onDemand: true, only: { pinned: 'the-framework/triage-quick' }, projectId: 'p1' })
+  await loop.tick({ onDemand: true, only: { lock: 'triage-quick' }, projectId: 'p1' })
   assert.deepEqual(ran, ['triage-quick'], 'neither the full queue nor the rotation index took the click')
   entries = []
   await loop.tick()
@@ -1602,15 +1689,12 @@ test('only the drain job lands its own PRs (#1216)', () => {
   }
 })
 
-test('the triage jobs declare exactly the branch their prompts pin (#1293)', () => {
-  const pinned = AUTO_PM_JOBS.filter(job => job.pinnedBranch !== undefined)
-  assert.deepEqual(pinned.map(job => job.name), ['triage-quick', 'triage-consensual'])
-  for (const job of pinned) {
-    // The release targets the branch the prompt's abort guard tests, so the two must not drift.
-    assert.equal(job.pinnedBranch, `tf-${job.name}`)
-    assert.ok(
-      job.prompt.includes(`Always set <SESSION_NAME> to ${job.name}`),
-      `${job.name} must pin the session name its release targets`,
-    )
+test('the triage jobs hold a lock named after them, and their prompts no longer abort on a branch (#1659)', () => {
+  const locked = AUTO_PM_JOBS.filter(job => job.lock !== undefined)
+  assert.deepEqual(locked.map(job => job.name), ['triage-quick', 'triage-consensual'])
+  for (const job of locked) {
+    assert.equal(job.lock, job.name)
+    // The daemon decides; the prompt's "branch already exists → abort" spent an agent to find out.
+    assert.ok(!job.prompt.includes('already exists'), `${job.name} must not carry the branch abort`)
   }
 })

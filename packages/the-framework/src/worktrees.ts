@@ -191,11 +191,10 @@ export async function removeProjectWorktree(
       // A run that committed nothing (#1650) — a triage that wrote only to the data branch, a run
       // stopped before its first commit — leaves a branch whose tip is a commit the remote already
       // has. The rule is satisfied before any push: what the checkout holds *is* on the remote.
-      // Pushing anyway is what put an empty `tf-triage-quick` on origin, and keeping the branch
-      // is what jammed the next triage on it ("branch already exists — triage pending"), on any
-      // repo where the stale-branch release (#1293) could not prove it dead: no PR ever carried
-      // the name, so the branch looked like an agent still working toward its handoff. The branch
-      // goes with the checkout. It is not the last copy of anything, by construction. Only a
+      // Pushing anyway is what put an empty `tf-triage-quick` on origin, back when the triage
+      // prompt pinned that name and aborted on finding it (#1293, retired by the routine lock,
+      // #1659). The branch goes with the checkout. It is not the last copy of anything, by
+      // construction. Only a
       // branch the framework minted, though: a leftover checkout can sit on the user's own branch
       // (one was found on `main`), and deleting that is not this code's call even when it holds
       // nothing — git's refusal to delete a checked-out branch must never be the guard.

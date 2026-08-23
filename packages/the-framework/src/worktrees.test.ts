@@ -205,8 +205,8 @@ test('a run branch holding nothing the remote lacks goes with its checkout, unpu
   // A triage that wrote only to the data branch, or a run stopped before its first commit: the
   // branch tip is the commit it started from, which origin already has. Pushing it is what put an
   // empty `tf-triage-quick` on origin; keeping it is what made the next triage stand down behind
-  // a branch that "already exists" — on any repo where no PR ever carried the name, so the
-  // stale-branch release could not prove it dead.
+  // a branch that "already exists", back when the prompt aborted on the name (#1293, retired by
+  // the routine lock, #1659).
   const { repo, path, branch } = await repoWithDirtyWorktree()
   const git = nodeGitRunner()
   try {

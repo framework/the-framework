@@ -3,4 +3,3 @@
 2. Add tickets to TODO_AGENTS.md
 
 Always set <SESSION_NAME> to triage-consensual
-- If branch tf-<SESSION_NAME> already exists, abort and tell user that the branch already exists and that triage is already pending.

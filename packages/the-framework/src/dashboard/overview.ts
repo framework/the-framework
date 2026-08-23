@@ -3,6 +3,8 @@ import type { ProjectSummary } from './projects.js'
 import { collectQueue, type ProjectQueue } from './queue.js'
 import { readTickets, type WorkspaceTicket } from './tickets.js'
 import { TICKETS_DIR } from '../tickets.js'
+import { cloudRunState } from '../cloud-run-state.js'
+import { bridgeQuestions } from './bridge-store.js'
 
 // The first-sidebar Overview (#437, part of #314): a cross-project glance at what the agent
 // is working on right now, the size of the backlog, and the recently active projects. It
@@ -28,6 +30,12 @@ export interface ActiveAgent {
   sessionName?: string
   /** Whether the agent signalled `setReadyForMerge()` (#326): drives the building/ready dot. */
   readyForMerge?: boolean
+  /**
+   * A web run at work on its cloud side (#1668): in its session, or parked on a question the
+   * bridge reported. Its local half is over, so it is not a live agent — it is listed because the
+   * cloud side is the agent, and "no agents working" over a waiting cloud session was a lie.
+   */
+  cloud?: 'in-cloud' | 'waiting'
 }
 
 /** One recently active project, most-recent first. */
@@ -255,6 +263,11 @@ export async function buildHotTickets(projects: ProjectSummary[], deps: HotTicke
 export interface OverviewDeps {
   liveAgents?: (cwd: string) => Promise<LiveAgent[]>
   queue?: (projects: ProjectSummary[]) => Promise<ProjectQueue[]>
+  /** Every run of a project, archived included (default {@link readAllAgents}): where the web runs are. */
+  agents?: (cwd: string) => Promise<AgentMeta[]>
+  /** Whether the bridge holds a question for that cloud session (default: the daemon's bridge store). */
+  waiting?: (sessionId: string) => boolean
+  now?: () => number
 }
 
 /**
@@ -266,23 +279,39 @@ export interface OverviewDeps {
 export async function buildOverview(projects: ProjectSummary[], deps: OverviewDeps = {}): Promise<Overview> {
   const liveAgents = deps.liveAgents ?? readLiveMetas
   const queue = deps.queue ?? (p => collectQueue(p))
+  const agents = deps.agents ?? readAllAgents
+  const waiting = deps.waiting ?? (sessionId => bridgeQuestions().get(sessionId) !== undefined)
+  const now = (deps.now ?? Date.now)()
 
   const active: ActiveAgent[] = []
+  // One entry per web run across projects: two checkouts of one repository share their archive,
+  // so the same run is in both projects' lists; the first project to list it keeps it.
+  const cloudSeen = new Set<string>()
+  const entry = (project: ProjectSummary, meta: AgentMeta, cwd: string): ActiveAgent => ({
+    projectId: project.id,
+    projectName: project.name,
+    agentId: meta.id,
+    cwd,
+    status: meta.status,
+    ...(meta.intent ? { intent: meta.intent } : {}),
+    ...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {}),
+    ...(meta.sessionName ? { sessionName: meta.sessionName } : {}),
+    ...(meta.readyForMerge ? { readyForMerge: true } : {}),
+  })
   for (const project of projects) {
     // Every live agent of the project (#738), not just the one that used to sit at its path.
     for (const meta of await liveAgents(project.path).catch(() => [])) {
       if (meta.status !== 'running') continue
-      active.push({
-        projectId: project.id,
-        projectName: project.name,
-        agentId: meta.id,
-        cwd: meta.cwd,
-        status: meta.status,
-        ...(meta.intent ? { intent: meta.intent } : {}),
-        ...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {}),
-        ...(meta.sessionName ? { sessionName: meta.sessionName } : {}),
-        ...(meta.readyForMerge ? { readyForMerge: true } : {}),
-      })
+      active.push(entry(project, meta, meta.cwd))
+    }
+    // The web runs whose cloud side is still at work (#1668): their local half is over and their
+    // checkout may be gone, so they are read from the archive and keyed to the project's own path.
+    for (const meta of await agents(project.path).catch((): AgentMeta[] => [])) {
+      if (meta.target !== 'web' || cloudSeen.has(meta.id)) continue
+      const state = cloudRunState({ ...meta, cloudWaiting: meta.sessionId !== undefined && waiting(meta.sessionId) }, now)
+      if (state !== 'in-cloud' && state !== 'waiting') continue
+      cloudSeen.add(meta.id)
+      active.push({ ...entry(project, meta, project.path), cloud: state })
     }
   }
   active.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))

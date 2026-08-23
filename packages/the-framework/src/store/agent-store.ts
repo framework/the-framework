@@ -201,6 +201,12 @@ export interface AgentMeta {
    */
   settledAt?: string
   /**
+   * The browser bridge holds a question this run's cloud session is parked on (#1668). Not stored:
+   * the daemon annotates a web run's record on the way to the dashboard, the way a relayed run's
+   * label is, because the bridge store is in memory and the archive on disk knows nothing of it.
+   */
+  cloudWaiting?: boolean
+  /**
    * The loopback port the agent's browser preview is listening on (#813), or absent when the agent
    * has no browser. What lets the daemon proxy the pane: the port is allocated per agent and the
    * dashboard is a different process, so meta is the only place it can learn it.

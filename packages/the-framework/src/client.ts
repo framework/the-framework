@@ -81,3 +81,5 @@ export {
 export { isLoopbackHost } from './loopback-host.js'
 // A bridged question as the gate panel renders it (#1554): pure, so the client projects it itself.
 export { bridgeChoiceRequest } from './dashboard/bridge-question.js'
+// What a web run's cloud side is doing, from its record (#1668): pure, so every surface derives the same word.
+export { cloudRunState, cloudRunActive, CLOUD_SESSION_WINDOW_MS, type CloudRunState } from './cloud-run-state.js'

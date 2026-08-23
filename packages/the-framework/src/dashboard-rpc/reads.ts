@@ -85,11 +85,21 @@ export async function onAgents(projectId: string): Promise<AgentMeta[]> {
   // no longer costs anything — nothing here depends on this staying above one.
   const remote = contextRemote()?.list(projectId) ?? []
   const cwd = await resolveProjectPath(projectId)
-  const local = cwd ? await readAllAgents(cwd) : []
+  const local = cwd ? (await readAllAgents(cwd)).map(markCloudWaiting) : []
   if (remote.length === 0) return local
   // A relayed agent (#1067) lives only in the daemon's memory, not on disk; surface it in the list so
   // a reload re-opens it instead of losing it. Remote wins an id tie (it is the live authority).
   return [...remote, ...local.filter(agent => !remote.some(r => r.id === agent.id))]
+}
+
+/**
+ * A web run whose cloud session the bridge reports as parked on a question is marked waiting
+ * (#1668), so its row says so instead of "in cloud" — the archive on disk cannot know, only the
+ * daemon's bridge store does. Every other run passes through untouched.
+ */
+export function markCloudWaiting(agent: AgentMeta): AgentMeta {
+  if (agent.target !== 'web' || !agent.sessionId || !bridgeQuestions().get(agent.sessionId)) return agent
+  return { ...agent, cloudWaiting: true }
 }
 
 /**

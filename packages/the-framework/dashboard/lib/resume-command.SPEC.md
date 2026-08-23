@@ -1,5 +1,9 @@
 Builds the shell one-liner that reopens an agent's driver session in a terminal, so a conversation can be continued outside the dashboard.
 
+## Business logic — TL;DR
+
+- **Picking a session back up outside the dashboard** - the command recreates the directory the agent ran in and resumes the session there; with no directory recorded the session id alone is handed over.
+
 ## Business logic
 
 ### Picking a session back up outside the dashboard

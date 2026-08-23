@@ -562,9 +562,9 @@ function AgentHistoryRow({
   // machine, not the session (#1264): the cloud side keeps working and opens its own PR. Saying
   // "done" under ten working cloud agents is the lie the demo would put on camera — and "in cloud"
   // over a run whose PR merged two days ago is the opposite lie (#1668), so the word comes from
-  // what is known of the session: waiting, in cloud, its PR, merged, or finally done.
+  // what is known of the session: waiting, in cloud, merged, or finally done.
   const inCloud = cloudState === 'in-cloud'
-  const cloudWord = cloudState === 'merged' ? 'merged' : cloudState === 'pr' ? 'pr open' : undefined
+  const cloudWord = cloudState === 'merged' ? 'merged' : undefined
   // "In cloud" outranks "publishing…": a web agent's local half is over either way, and the cloud
   // side owns its own push/PR, so the cloud word is the truer one for that row.
   const publishingNow = publishing && !cloud

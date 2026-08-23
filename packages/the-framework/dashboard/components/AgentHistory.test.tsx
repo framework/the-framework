@@ -329,7 +329,7 @@ describe('cloud sessions on the rail (#1263/#1264)', () => {
     expect(screen.queryByText('in cloud')).toBeNull()
   })
 
-  test('adopted cloud work reads as its PR, then merged; an old run with nothing adopted is done (#1668)', () => {
+  test('adopted cloud work reads done (its PR badge says the rest) or merged; an old run with nothing adopted is done (#1668)', () => {
     const fresh = new Date().toISOString()
     const old = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
     renderRail(
@@ -344,9 +344,8 @@ describe('cloud sessions on the rail (#1263/#1264)', () => {
         onSelect={() => {}}
       />,
     )
-    expect(screen.getByText('pr open')).toBeTruthy()
     expect(screen.getByText('merged')).toBeTruthy()
-    expect(screen.getByText('done')).toBeTruthy()
+    expect(screen.getAllByText('done')).toHaveLength(2)
     expect(screen.queryByText('in cloud')).toBeNull()
   })
 

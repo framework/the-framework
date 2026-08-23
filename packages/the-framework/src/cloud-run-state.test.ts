@@ -27,12 +27,14 @@ test('a question the bridge holds makes the run waiting, over everything else (#
   assert.equal(cloudRunState(web({ cloudWaiting: true, startedAt: new Date(NOW - 3 * CLOUD_SESSION_WINDOW_MS).toISOString() }), NOW), 'waiting')
 })
 
-test('adopted work says what a local run would: its PR, then merged (#1668)', () => {
-  assert.equal(cloudRunState(web({ pr: { number: 7, url: 'u' } }), NOW), 'pr')
+test('adopted work says what a local run would: done with its PR, or merged (#1668)', () => {
+  // The PR's own state is not on the record (both 1622 and 1608 read "open" while closed), so the
+  // word is done and the PR badge carries the live state.
+  assert.equal(cloudRunState(web({ pr: { number: 7, url: 'u' } }), NOW), 'done')
   assert.equal(cloudRunState(web({ pr: { number: 7, url: 'u' }, mergeOutcome: 'merged' }), NOW), 'merged')
   // Merged outranks age: a merged run never reads as done-by-timeout.
   assert.equal(cloudRunState(web({ pr: { number: 7, url: 'u' }, mergeOutcome: 'merged', startedAt: new Date(NOW - 3 * CLOUD_SESSION_WINDOW_MS).toISOString() }), NOW), 'merged')
-  assert.equal(cloudRunState(web({ pr: { number: 7, url: 'u' }, mergeOutcome: 'withheld' }), NOW), 'pr')
+  assert.equal(cloudRunState(web({ pr: { number: 7, url: 'u' }, mergeOutcome: 'withheld' }), NOW), 'done')
 })
 
 test('only a web run whose local half is over has a cloud state; every other run keeps its status', () => {
@@ -46,5 +48,5 @@ test('only a web run whose local half is over has a cloud state; every other run
 test('in cloud and waiting count as an agent at work; the settled states do not', () => {
   assert.equal(cloudRunActive('in-cloud'), true)
   assert.equal(cloudRunActive('waiting'), true)
-  for (const state of ['pr', 'merged', 'done', undefined] as const) assert.equal(cloudRunActive(state), false)
+  for (const state of ['merged', 'done', undefined] as const) assert.equal(cloudRunActive(state), false)
 })

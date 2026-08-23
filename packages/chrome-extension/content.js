@@ -38,17 +38,37 @@ let bridgeStatus = 'not sent yet'
 
 function reportToDaemon(parsed) {
   const sessionId = sessionIdFromUrl()
-  if (!sessionId || typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return
+  if (!sessionId) return
+  // The block's own shape (#1554): `multi`, and per option `default` and `stop`, travel with
+  // the labels so the dashboard renders the gate as a local one and a stopping pick is typed
+  // back as a hand-over rather than a continuation.
   const question = {
     sessionId,
     title: String(parsed.title ?? '').slice(0, 500),
     options: (parsed.options ?? [])
-      .map(o => (typeof o === 'string' ? { label: o } : { label: String(o?.label ?? ''), ...(o?.detail ? { detail: String(o.detail).slice(0, 500) } : {}) }))
+      .map(o =>
+        typeof o === 'string'
+          ? { label: o }
+          : {
+              label: String(o?.label ?? ''),
+              ...(o?.detail ? { detail: String(o.detail).slice(0, 500) } : {}),
+              ...(o?.default === true ? { default: true } : {}),
+              ...(o?.stop === true ? { stop: true } : {}),
+            },
+      )
       .filter(o => o.label)
       .slice(0, 20),
     ...(parsed.recommended ? { recommended: String(parsed.recommended) } : {}),
+    ...(parsed.multi === true ? { multi: true } : {}),
   }
   if (!question.title || !question.options.length) return
+  // Offline (check.mjs, no extension runtime): expose what would have been posted, so the
+  // harness can pin the shape the daemon receives, not just the panel's summary of it.
+  if (typeof chrome === 'undefined') {
+    window.__tfBridgeQuestion = question
+    return
+  }
+  if (!chrome.runtime?.sendMessage) return
   try {
     chrome.runtime.sendMessage({ type: 'tf-question', question }, reply => {
       // Silence here was the first thing to go wrong live: the worker answered "no token set"

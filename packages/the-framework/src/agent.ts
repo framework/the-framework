@@ -41,6 +41,12 @@ export interface RunAgentOptions {
    * see {@link isHandsOff}.
    */
   location?: AgentLocation
+  /**
+   * The browser bridge (#1237) is on, so a gate a hand-off session parks on reaches the dashboard
+   * and its answer is typed back (#1554). Only meaningful with a hand-off {@link location}: it is
+   * what decides whether that session is told to decide alone (bridge off) or may ask (bridge on).
+   */
+  bridge?: boolean
   /** The wrapped coding agent. */
   driver: Driver
   /** Absolute workspace path the agent works in. */
@@ -147,12 +153,16 @@ export async function runAgent(opts: RunAgentOptions): Promise<RunAgentResult> {
   // A hand-off location (#1225): the prompt leaves this machine and the reply never comes back, so
   // the opening turn is the entire session and every phase after it is dropped rather than fed.
   const handsOff = isHandsOff(opts.location)
+  // A hand-off nobody can answer decides alone (#1234); with the bridge on its gates are real
+  // (#1554): the extension carries the question here and types the answer back.
+  const unattended = handsOff && !opts.bridge
   // The built-in #326 system prompt + any user SYSTEM.md frame the session (#301).
   const tf: TfContext = { prompt: opts.prompt }
   const system = composeAgentSystem({
     vanilla: opts.vanilla,
     browser: opts.browser,
     handsOff,
+    unattended,
     transparent: opts.transparent,
     user: opts.systemPrompt,
     tf,

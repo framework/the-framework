@@ -854,18 +854,27 @@ test('a hand-off run ends at the hand-off: no review passes, no backlog gate (#1
   }
 })
 
-test('a hand-off run is told the await gates are unavailable, a local one is not (#1234)', async () => {
+test('a hand-off run is told to land everything, and to decide alone only when no bridge can answer it (#1234/#1554)', async () => {
   // Our own prompt says "ambiguous prompt: showChoices + AWAIT". A cloud session that obeys it
-  // parks forever on a question nobody attached can answer. The hands-off block amends the
-  // await protocol for exactly these agents, and only these.
-  const systemOf = async (driver: Driver, location: AgentLocation): Promise<string> => {
+  // with nothing attached parks forever on a question nobody can answer, so without the bridge
+  // it is told to decide alone. With the browser bridge on, the extension carries that question
+  // to the dashboard and types the answer back, so the gates stay exactly as a local agent has
+  // them. Either way the hand-off commits and opens its own PR, which a local run never needs.
+  const systemOf = async (driver: Driver, location: AgentLocation, bridge?: boolean): Promise<string> => {
     const events: FrameworkEvent[] = []
-    await runAgent({ prompt: FAKE_INTENT, driver, location, cwd: '/tmp/ws', onEvent: e => events.push(e) })
+    await runAgent({ prompt: FAKE_INTENT, driver, location, ...(bridge ? { bridge } : {}), cwd: '/tmp/ws', onEvent: e => events.push(e) })
     const prompt = events.find(e => e.kind === 'system-prompt')
     return prompt?.kind === 'system-prompt' ? prompt.text : ''
   }
-  assert.ok((await systemOf(handsOffDriver().driver, 'web')).includes('This session runs detached'))
-  assert.ok(!(await systemOf(new FakeDriver(), 'local')).includes('This session runs detached'))
+  const alone = await systemOf(handsOffDriver().driver, 'web')
+  assert.ok(alone.includes('This session runs detached — land everything'))
+  assert.ok(alone.includes('decide alone'))
+  const bridged = await systemOf(handsOffDriver().driver, 'web', true)
+  assert.ok(bridged.includes('This session runs detached — land everything'))
+  assert.ok(!bridged.includes('decide alone'))
+  const local = await systemOf(new FakeDriver(), 'local')
+  assert.ok(!local.includes('This session runs detached'))
+  assert.ok(!local.includes('decide alone'))
 })
 
 test('a hand-off run does not stay open for messages (#1225)', async () => {

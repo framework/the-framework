@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Check, Cloud, ExternalLink, Loader2, MessageCircleQuestion, TriangleAlert } from 'lucide-react'
+import { Check, Cloud, ExternalLink, Loader2, TriangleAlert } from 'lucide-react'
 import type { BridgeAnswer, BridgeEvent, BridgeQuestion, FrameworkEvent } from '../../src/index.js'
+import { bridgeChoiceRequest } from '../../src/client.js'
 import { onBridgeQuestion, onBridgeEvents, onBridgeAnswer } from '../rpc/reads.js'
 import { sendBridgeAnswer, sendBridgeAnswerCancel } from '../rpc/control.js'
 import { cloudSession } from '../lib/live-state.js'
+import { ChoicePanel } from './ChoicePanel.js'
 import { CopyButton } from './ui/copy-button.js'
 
 /** How often to ask the daemon whether the bridge reported a question. */
@@ -17,9 +19,14 @@ const POLL_MS = 4000
 export function CloudAgentNotice({
   target,
   events,
+  projectId,
+  agentId,
 }: {
   target?: 'local' | 'actions' | 'remote' | 'web' | undefined
   events: readonly FrameworkEvent[]
+  /** The run this notice belongs to: what the gate panel is keyed on. */
+  projectId: string
+  agentId: string
 }) {
   const session = target === 'web' ? cloudSession(events) : undefined
   const question = useBridgeQuestion(session?.id)
@@ -31,7 +38,7 @@ export function CloudAgentNotice({
         <Cloud className="h-3.5 w-3.5 shrink-0" aria-hidden />
         <span className="min-w-0 flex-1">
           {session
-            ? 'Running as a Claude Code cloud session. It asks its questions and opens its own pull request over there, not here.'
+            ? 'Running as a Claude Code cloud session. It opens its own pull request over there; a question it parks on shows here once the bridge sees it.'
             : 'Starting a Claude Code cloud session…'}
         </span>
         {session && (
@@ -53,7 +60,14 @@ export function CloudAgentNotice({
         )}
       </div>
       {question && session && (!answer || answer.state === 'failed') && (
-        <ParkedQuestion question={question} url={session.url} sessionId={session.id} failure={answer?.state === 'failed' ? answer : undefined} />
+        <ParkedQuestion
+          question={question}
+          url={session.url}
+          sessionId={session.id}
+          projectId={projectId}
+          agentId={agentId}
+          failure={answer?.state === 'failed' ? answer : undefined}
+        />
       )}
       {answer && session && answer.state !== 'failed' && <AnswerState answer={answer} url={session.url} sessionId={session.id} />}
     </div>
@@ -61,82 +75,52 @@ export function CloudAgentNotice({
 }
 
 /**
- * The question the session is parked on, once the browser bridge has reported one (#1237).
- *
- * Answering is a two-step pick-then-send, unlike the one-click gates of a local agent: the send
- * has the extension type into the user's own claude.ai session, so the pick is confirmed
- * explicitly, and while it waits for delivery it can still be withdrawn. The link out stays as
- * the manual path for whoever prefers to answer over there.
+ * How a pick reaches a Claude web session (#1237/#1554): queued on the daemon for the extension,
+ * which types the continuation into the session's composer. Shaped for `ChoicePanel.send`, so the
+ * bridged gate is the same panel a local gate gets; the RPC's `{ok:false}` is thrown so the
+ * panel's action hook shows the reason. The option ids are the labels (see `bridgeChoiceRequest`).
+ */
+export function bridgeSend(sessionId: string): (pick: string | string[]) => Promise<void> {
+  return async pick => {
+    const result = await sendBridgeAnswer(sessionId, Array.isArray(pick) ? pick : [pick])
+    if (!result.ok) throw new Error(result.error ?? 'could not queue the answer')
+  }
+}
+
+/**
+ * The question the session is parked on, once the browser bridge has reported one (#1237),
+ * rendered as the gate it is (#1554): the same panel a local agent's question gets, posting
+ * through the bridge instead of the control log. The link out stays as the manual path for
+ * whoever prefers to answer over there.
  */
 function ParkedQuestion({
   question,
   url,
   sessionId,
+  projectId,
+  agentId,
   failure,
 }: {
   question: BridgeQuestion
   url: string
   sessionId: string
+  projectId: string
+  agentId: string
   failure?: BridgeAnswer | undefined
 }) {
-  const [picked, setPicked] = useState<string | undefined>(undefined)
-  const [error, setError] = useState<string | undefined>(undefined)
-  const send = () => {
-    if (!picked) return
-    void sendBridgeAnswer(sessionId, picked)
-      .then(result => {
-        if (!result.ok) setError(result.error ?? 'could not queue the answer')
-      })
-      .catch(() => setError('could not reach the daemon'))
-  }
   return (
-    <div className="flex gap-2 border-t border-border px-4 py-2.5 text-xs">
-      <MessageCircleQuestion className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-      <div className="min-w-0 flex-1">
-        <p className="font-medium text-foreground">{question.title}</p>
-        <div className="mt-1.5 flex flex-col items-start gap-1">
-          {question.options.map(option => (
-            <button
-              key={option.label}
-              type="button"
-              onClick={() => setPicked(option.label)}
-              aria-pressed={picked === option.label}
-              className={`rounded border px-2 py-1 text-left transition-colors ${
-                picked === option.label
-                  ? 'border-primary bg-primary/10 text-foreground'
-                  : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
-              }`}
-            >
-              {option.label}
-              {option.label === question.recommended && (
-                <span className="ml-1.5 text-[10px] uppercase tracking-wide text-primary">recommended</span>
-              )}
-              {option.detail && <span className="ml-1.5 opacity-70">{option.detail}</span>}
-            </button>
-          ))}
-        </div>
-        {failure && (
-          <p className="mt-1.5 flex items-center gap-1 text-destructive">
-            <TriangleAlert className="h-3 w-3 shrink-0" aria-hidden />
-            Sending “{failure.label}” failed{failure.note ? `: ${failure.note}` : ''}. Pick again, or answer in the session.
-          </p>
-        )}
-        {error && <p className="mt-1.5 text-destructive">{error}</p>}
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={send}
-            disabled={!picked}
-            className="rounded bg-primary px-2.5 py-1 font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {picked ? `Send “${picked}”` : 'Pick an answer'}
-          </button>
-          <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-            Answer it in the session
-            <ExternalLink className="h-3 w-3" aria-hidden />
-          </a>
-        </div>
-      </div>
+    <div className="border-t border-border">
+      {failure && (
+        <p className="flex items-center gap-1 px-4 pt-2.5 text-xs text-destructive">
+          <TriangleAlert className="h-3 w-3 shrink-0" aria-hidden />
+          Sending “{failure.labels.join(', ')}” failed{failure.note ? `: ${failure.note}` : ''}. Pick again, or answer in the session.
+        </p>
+      )}
+      <ChoicePanel projectId={projectId} agentId={agentId} choice={bridgeChoiceRequest(question)} countdown={false} inline send={bridgeSend(sessionId)} />
+      <a href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 px-4 pb-2.5 text-xs text-primary hover:underline">
+        Answer it in the session
+        <ExternalLink className="h-3 w-3" aria-hidden />
+      </a>
     </div>
   )
 }
@@ -153,7 +137,7 @@ function AnswerState({ answer, url, sessionId }: { answer: BridgeAnswer; url: st
         <>
           <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" aria-hidden />
           <span className="min-w-0 flex-1">
-            Sending “{answer.label}” through your Claude web tab… It goes out the next time the extension checks in.
+            Sending “{answer.labels.join(', ')}” through your Claude web tab… It goes out the next time the extension checks in.
           </span>
           <button
             type="button"
@@ -167,7 +151,7 @@ function AnswerState({ answer, url, sessionId }: { answer: BridgeAnswer; url: st
         <>
           <Check className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
           <span className="min-w-0 flex-1">
-            Answered “{answer.label}”. The session continues over there and its transcript above follows along.
+            Answered “{answer.labels.join(', ')}”. The session continues over there and its transcript above follows along.
           </span>
           <a href={url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-primary hover:underline">
             Open the session

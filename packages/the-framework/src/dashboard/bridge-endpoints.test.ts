@@ -67,6 +67,34 @@ test('a valid question is recorded and stamped by the daemon, not the caller (#1
   }
 })
 
+test('the block\'s multi, default and stop travel whole; unknown keys and false flags do not (#1554)', async () => {
+  const s = await serve({ token: TOKEN, record: () => {}, now: () => new Date('2026-08-23T10:00:00.000Z') })
+  try {
+    const res = await post(s.url, {
+      ...QUESTION,
+      recommended: undefined,
+      multi: true,
+      options: [
+        { label: 'Lint', default: true, extra: 'dropped' },
+        { label: 'Tests', detail: 'slow', default: false },
+        { label: 'Abandon', stop: true },
+      ],
+    })
+    assert.equal(res.status, 204)
+    assert.deepEqual(s.got, [
+      {
+        sessionId: QUESTION.sessionId,
+        title: QUESTION.title,
+        options: [{ label: 'Lint', default: true }, { label: 'Tests', detail: 'slow' }, { label: 'Abandon', stop: true }],
+        multi: true,
+        receivedAt: '2026-08-23T10:00:00.000Z',
+      },
+    ])
+  } finally {
+    await s.close()
+  }
+})
+
 test('the bridge is off unless a token was wired, and then everything 404s (#1237)', async () => {
   const s = await serve(undefined)
   try {
@@ -104,6 +132,11 @@ test('the payload is validated field by field, with a reason (#1237)', async () 
       ['too many options', { ...QUESTION, options: Array.from({ length: 21 }, () => ({ label: 'x' })) }, /at most/],
       // A recommendation naming no option would render a default the user cannot see.
       ['a recommendation matching nothing', { ...QUESTION, recommended: 'something else' }, /recommended/],
+      // Labels double as the pick's ids (#1554), so two alike could not be told apart.
+      ['two options with one label', { ...QUESTION, options: [{ label: 'Same' }, { label: 'Same' }] }, /distinct/],
+      ['a multi flag that is not a boolean', { ...QUESTION, multi: 'yes' }, /multi/],
+      ['a default that is not a boolean', { ...QUESTION, options: [{ label: 'x', default: 'yes' }] }, /default/],
+      ['a stop that is not a boolean', { ...QUESTION, options: [{ label: 'x', stop: 1 }] }, /stop/],
     ]
     for (const [name, body, reason] of cases) {
       const res = await post(s.url, body)
@@ -165,7 +198,7 @@ test('the queued answer is served to the extension, and its ack travels back (#1
   const s = await serve({
     token: TOKEN,
     record: () => {},
-    answer: sessionId => (sessionId === QUESTION.sessionId ? { id: 'ans-1', label: 'Work on the next TODO' } : undefined),
+    answer: sessionId => (sessionId === QUESTION.sessionId ? { id: 'ans-1', text: 'The user chose: Work on the next TODO.' } : undefined),
     answered: (sessionId, id, ok, note) => void acks.push({ sessionId, id, ok, note }),
   })
   try {
@@ -173,7 +206,7 @@ test('the queued answer is served to the extension, and its ack travels back (#1
       headers: { authorization: `Bearer ${TOKEN}` },
     })
     assert.equal(hit.status, 200)
-    assert.deepEqual(await hit.json(), { answer: { id: 'ans-1', label: 'Work on the next TODO' } })
+    assert.deepEqual(await hit.json(), { answer: { id: 'ans-1', text: 'The user chose: Work on the next TODO.' } })
 
     const miss = await fetch(`${s.url}${BRIDGE_PREFIX}/answer?sessionId=session_01Unknown`, {
       headers: { authorization: `Bearer ${TOKEN}` },
@@ -206,7 +239,7 @@ test('the queued answer is served to the extension, and its ack travels back (#1
 })
 
 test('the answer routes demand the bearer token like every other one (#1237)', async () => {
-  const s = await serve({ token: TOKEN, record: () => {}, answer: () => ({ id: 'x', label: 'y' }), answered: () => {} })
+  const s = await serve({ token: TOKEN, record: () => {}, answer: () => ({ id: 'x', text: 'y' }), answered: () => {} })
   try {
     const read = await fetch(`${s.url}${BRIDGE_PREFIX}/answer?sessionId=${QUESTION.sessionId}`)
     assert.equal(read.status, 401)

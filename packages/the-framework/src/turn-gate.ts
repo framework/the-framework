@@ -1,5 +1,5 @@
 import type { FrameworkEvent } from './events.js'
-import { PROTOCOLS_BROWSER, PROTOCOLS_AWAIT, PROTOCOLS_HANDS_OFF, PROTOCOLS_SIGNAL } from './prompts.generated.js'
+import { PROTOCOLS_BROWSER, PROTOCOLS_AWAIT, PROTOCOLS_HANDS_OFF, PROTOCOLS_SIGNAL, PROTOCOLS_UNATTENDED } from './prompts.generated.js'
 import type { ChoicesOption } from './await-gate.js'
 import type { MultiSelectOption } from './await-gate.js'
 
@@ -16,13 +16,20 @@ import type { MultiSelectOption } from './await-gate.js'
 export const AWAIT_PROTOCOL = PROTOCOLS_AWAIT
 
 /**
- * Told to a hands-off agent only (#1234): the await gates {@link AWAIT_PROTOCOL} just taught are
- * not available in this session, so an ambiguous prompt takes its most plausible reading instead
- * of parking forever on a question nobody attached can answer. Worded as availability rather
- * than as a rule, so it deletes itself cleanly once choices become a per-session capability.
- * The text lives in `prompts/protocols/hands_off.md`.
+ * Told to a hands-off agent only (#1225): the session leaves this machine and nothing here sees
+ * its workspace, so whatever it produces has to be committed and put in a pull request before it
+ * ends. The text lives in `prompts/protocols/hands_off.md`.
  */
 export const HANDS_OFF_PROTOCOL = PROTOCOLS_HANDS_OFF
+
+/**
+ * Told to a hands-off agent nothing can answer (#1234): the await gates {@link AWAIT_PROTOCOL}
+ * just taught have nobody attached to take them, so an ambiguous prompt takes its most plausible
+ * reading instead of parking forever. Left out once the browser bridge (#1237) is on, because
+ * then a gate the cloud session parks on reaches the dashboard and is answered from it (#1554).
+ * The text lives in `prompts/protocols/unattended.md`.
+ */
+export const UNATTENDED_PROTOCOL = PROTOCOLS_UNATTENDED
 
 /**
  * Told to the agent only when the agent has a browser (#824): that it has one, and that anything
@@ -107,6 +114,16 @@ export const MAX_AWAIT_ROUNDS = 5
  */
 export function continuationPrompt(question: string, answer: string): string {
   return `You paused to ask: "${question}". The user chose: ${answer}. Continue with that decision.`
+}
+
+/**
+ * What a session that cannot simply be ended is told when the user picks a `stop` option (#358,
+ * #1554). A local session is never re-prompted with a stopping answer — it just ends — but a
+ * cloud session lives on claude.ai where nothing of ours can end it, so the bridge types this
+ * instead: the decision, and that the user is taking over from here.
+ */
+export function takeoverPrompt(question: string, answer: string): string {
+  return `You paused to ask: "${question}". The user chose: ${answer}. Stop here: the user is taking over and will come back with fresh instructions.`
 }
 
 /**

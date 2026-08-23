@@ -220,7 +220,7 @@ export function AgentView({
       <ActionsRunNotice target={target} events={shown} live={live} />
       {/* A run handed to Claude Code on the web (#610): the work is happening in a cloud session
           this machine cannot stream, so point at where it is rather than show an empty feed. */}
-      <CloudAgentNotice target={target} events={shown} />
+      <CloudAgentNotice target={target} events={shown} projectId={projectId} agentId={agentId ?? ''} />
       {/* A run relayed to a connected device (#1067): its diff, handoff, and push/PR now relay to the
           device (slice 2), so this notice only flags that the browser preview stays local-only for now. */}
       <RemoteAgentNotice device={remoteLabel} />

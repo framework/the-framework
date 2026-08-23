@@ -25,6 +25,7 @@ export function ChoicePanel({
   countdown = true,
   inline = false,
   onAnswered,
+  send,
 }: {
   projectId: string
   /** Which run the pick resolves (#749); absent falls back to the project's control log. */
@@ -47,6 +48,13 @@ export function ChoicePanel({
    * there the `choice-resolved` event unmounts the panel and that is the whole story.
    */
   onAnswered?: ((pick: string | string[]) => void) | undefined
+  /**
+   * Where the pick goes. Default: the agent's control log via `sendChoice`. A gate carried in by
+   * the browser bridge (#1554) hands one that queues the pick for the extension instead — the
+   * panel is the same either way, which is the point: a cloud session's question is answered
+   * exactly like a local one.
+   */
+  send?: ((pick: string | string[], by: 'user' | 'autopilot') => Promise<unknown>) | undefined
 }) {
   const { busy, error, run } = useAction()
   // Posted and accepted by the daemon; the panel stays parked (buttons off, status shown)
@@ -66,7 +74,8 @@ export function ChoicePanel({
   const parked = busy || sent
 
   const post = (pick: string | string[], by: 'user' | 'autopilot' = 'user') => {
-    void run(() => sendChoice(projectId, choice.id, pick, by, agentId ?? undefined), 'Could not send your choice — try again.').then(
+    const deliver = send ?? ((p: string | string[], b: 'user' | 'autopilot') => sendChoice(projectId, choice.id, p, b, agentId ?? undefined))
+    void run(() => deliver(pick, by), 'Could not send your choice — try again.').then(
       result => {
         if (result !== undefined) {
           setSent(true)

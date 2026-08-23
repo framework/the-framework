@@ -15,19 +15,54 @@ const question = (title = 'Pick one'): BridgeQuestion => ({
 
 test('an answer can only be a label the parked question offered (#1237)', () => {
   const store = new BridgeQuestions()
-  assert.equal(store.queueAnswer(SESSION, 'Alpha'), 'that session has no parked question')
+  assert.equal(store.queueAnswer(SESSION, ['Alpha']), 'that session has no parked question')
   store.record(question())
-  assert.equal(store.queueAnswer(SESSION, 'rm -rf /'), 'that label is not one of the question options')
-  const queued = store.queueAnswer(SESSION, 'Alpha')
+  assert.equal(store.queueAnswer(SESSION, ['rm -rf /']), 'every label must be one of the question options')
+  assert.equal(store.queueAnswer(SESSION, ['Alpha', 'rm -rf /']), 'every label must be one of the question options')
+  // A single-select takes exactly one: none and several are both refused.
+  assert.equal(store.queueAnswer(SESSION, []), 'pick exactly one option')
+  assert.equal(store.queueAnswer(SESSION, ['Alpha', 'Beta']), 'pick exactly one option')
+  const queued = store.queueAnswer(SESSION, ['Alpha'])
   assert.ok(typeof queued === 'object')
   assert.equal(queued.state, 'queued')
-  assert.equal(store.pendingAnswer(SESSION)?.label, 'Alpha')
+  assert.deepEqual(store.pendingAnswer(SESSION)?.labels, ['Alpha'])
+})
+
+test('what gets typed is the continuation a local gate re-prompts with (#1554)', () => {
+  const store = new BridgeQuestions()
+  store.record(question())
+  const queued = store.queueAnswer(SESSION, ['Alpha'])
+  assert.ok(typeof queued === 'object')
+  assert.equal(queued.text, 'You paused to ask: "Pick one". The user chose: Alpha. Continue with that decision.')
+})
+
+test('a multi-select takes a subset of labels, none included, joined as a local gate words it (#1554)', () => {
+  const store = new BridgeQuestions()
+  store.record({ ...question('Which checks?'), multi: true, options: [{ label: 'Lint', default: true }, { label: 'Tests' }, { label: 'Docs' }] })
+  const two = store.queueAnswer(SESSION, ['Lint', 'Tests'])
+  assert.ok(typeof two === 'object')
+  assert.equal(two.text, 'You paused to ask: "Which checks?". The user chose: Lint, Tests. Continue with that decision.')
+  const none = store.queueAnswer(SESSION, [])
+  assert.ok(typeof none === 'object')
+  assert.equal(none.text, 'You paused to ask: "Which checks?". The user chose: (none). Continue with that decision.')
+  assert.equal(store.queueAnswer(SESSION, ['Lint', 'Lint']), 'every label must be one of the question options')
+})
+
+test('a stop option hands the session over instead of continuing it (#358/#1554)', () => {
+  const store = new BridgeQuestions()
+  store.record({ ...question('Ship this?'), options: [{ label: 'Approve' }, { label: 'Decline', stop: true }], recommended: 'Approve' })
+  const declined = store.queueAnswer(SESSION, ['Decline'])
+  assert.ok(typeof declined === 'object')
+  assert.equal(declined.text, 'You paused to ask: "Ship this?". The user chose: Decline. Stop here: the user is taking over and will come back with fresh instructions.')
+  const approved = store.queueAnswer(SESSION, ['Approve'])
+  assert.ok(typeof approved === 'object')
+  assert.match(approved.text, /Continue with that decision\.$/)
 })
 
 test('a delivered answer resolves the question, and its re-report is ignored (#1237)', () => {
   const store = new BridgeQuestions()
   store.record(question())
-  const queued = store.queueAnswer(SESSION, 'Beta')
+  const queued = store.queueAnswer(SESSION, ['Beta'])
   assert.ok(typeof queued === 'object')
   store.resolveAnswer(SESSION, queued.id, true)
   assert.equal(store.get(SESSION), undefined)
@@ -46,26 +81,26 @@ test('a delivered answer resolves the question, and its re-report is ignored (#1
 test('a failed delivery keeps the question so the user can retry (#1237)', () => {
   const store = new BridgeQuestions()
   store.record(question())
-  const queued = store.queueAnswer(SESSION, 'Beta')
+  const queued = store.queueAnswer(SESSION, ['Beta'])
   assert.ok(typeof queued === 'object')
   store.resolveAnswer(SESSION, queued.id, false, 'no composer on the page')
   assert.equal(store.get(SESSION)?.title, 'Pick one')
   assert.equal(store.answer(SESSION)?.state, 'failed')
   assert.equal(store.answer(SESSION)?.note, 'no composer on the page')
   // Retrying replaces the failed attempt.
-  const retried = store.queueAnswer(SESSION, 'Alpha')
+  const retried = store.queueAnswer(SESSION, ['Alpha'])
   assert.ok(typeof retried === 'object')
-  assert.equal(store.pendingAnswer(SESSION)?.label, 'Alpha')
+  assert.deepEqual(store.pendingAnswer(SESSION)?.labels, ['Alpha'])
 })
 
 test('a queued answer can be withdrawn, a resolved one cannot (#1237)', () => {
   const store = new BridgeQuestions()
   store.record(question())
-  const queued = store.queueAnswer(SESSION, 'Beta')
+  const queued = store.queueAnswer(SESSION, ['Beta'])
   assert.ok(typeof queued === 'object')
   assert.equal(store.cancelAnswer(SESSION), true)
   assert.equal(store.answer(SESSION), undefined)
-  const again = store.queueAnswer(SESSION, 'Beta')
+  const again = store.queueAnswer(SESSION, ['Beta'])
   assert.ok(typeof again === 'object')
   store.resolveAnswer(SESSION, again.id, true)
   assert.equal(store.cancelAnswer(SESSION), false)
@@ -75,9 +110,9 @@ test('a queued answer can be withdrawn, a resolved one cannot (#1237)', () => {
 test('a stale ack cannot resolve a newer answer (#1237)', () => {
   const store = new BridgeQuestions()
   store.record(question())
-  const first = store.queueAnswer(SESSION, 'Alpha')
+  const first = store.queueAnswer(SESSION, ['Alpha'])
   assert.ok(typeof first === 'object')
-  const second = store.queueAnswer(SESSION, 'Beta')
+  const second = store.queueAnswer(SESSION, ['Beta'])
   assert.ok(typeof second === 'object')
   store.resolveAnswer(SESSION, first.id, true)
   assert.equal(store.answer(SESSION)?.state, 'queued')
@@ -87,7 +122,7 @@ test('a stale ack cannot resolve a newer answer (#1237)', () => {
 test('an undelivered pick dies with the question it answered (#1237)', () => {
   const store = new BridgeQuestions()
   store.record(question())
-  const queued = store.queueAnswer(SESSION, 'Beta')
+  const queued = store.queueAnswer(SESSION, ['Beta'])
   assert.ok(typeof queued === 'object')
   // The session moved on before the extension collected the pick: typing the old answer into
   // the new question would be answering a question nobody asked.

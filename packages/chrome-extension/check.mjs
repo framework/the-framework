@@ -125,6 +125,38 @@ for (const [name, body, expectFound] of cases) {
 }
 
 // ---------------------------------------------------------------------------
+// The block's shape reaches the daemon whole (#1554): `multi`, and per option `default` and
+// `stop`, are what let the dashboard render the gate as a local one and type a stopping pick
+// back as a hand-over. Labels/details still travel; unknown keys do not.
+{
+  const shaped = JSON.stringify({
+    title: 'Which checks should run?',
+    multi: true,
+    options: [
+      { label: 'Lint', default: true, extra: 'dropped' },
+      { label: 'Tests', detail: 'slow', default: false },
+      { label: 'Abandon the plan', stop: true },
+    ],
+  })
+  const dom = new JSDOM(`<!doctype html><html><body><main><article>intro</article><article><code>${esc(shaped)}</code></article><div contenteditable="true"></div></main></body></html>`, {
+    url: 'https://claude.ai/code/session_01TEST',
+    runScripts: 'outside-only',
+  })
+  dom.window.eval(script)
+  const got = dom.window.__tfBridgeQuestion
+  const want = {
+    sessionId: 'session_01TEST',
+    title: 'Which checks should run?',
+    options: [{ label: 'Lint', default: true }, { label: 'Tests', detail: 'slow' }, { label: 'Abandon the plan', stop: true }],
+    multi: true,
+  }
+  const ok = JSON.stringify(got) === JSON.stringify(want)
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  multi/default/stop reach the daemon as posted  (got=${JSON.stringify(got)})`)
+  dom.window.close()
+}
+
+// ---------------------------------------------------------------------------
 // The write half (#1237): the dashboard's pick being typed into the composer and submitted.
 // jsdom has no execCommand, so these exercise the fallback fill; what they prove is the flow
 // around it: the composer is filled, a labelled send button is preferred, Enter is the

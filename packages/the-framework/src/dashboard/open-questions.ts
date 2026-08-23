@@ -1,5 +1,7 @@
-import { readEventLog, readLiveMetas, type LiveAgent } from '../store/index.js'
+import { readAllAgents, readEventLog, readLiveMetas, type AgentMeta, type LiveAgent } from '../store/index.js'
 import type { ChoiceRequest, FrameworkEvent } from '../events.js'
+import { bridgeChoiceRequest, type BridgeQuestion } from './bridge-question.js'
+import { bridgeQuestions } from './bridge-store.js'
 import type { ProjectSummary } from './projects.js'
 
 // Every session's open question, in one place (#1455 item 4).
@@ -24,6 +26,12 @@ export interface OpenQuestion {
   /** When the agent last spoke, ISO: what the longest-waiting-first order sorts on. */
   updatedAt?: string
   choice: ChoiceRequest
+  /**
+   * Asked by a Claude web session and carried here by the browser bridge (#1237/#1554): the pick
+   * goes back through `sendBridgeAnswer` on this session, not the agent's control log. The option
+   * ids of {@link choice} are the labels, which is what the extension types.
+   */
+  bridge?: { sessionId: string; url: string }
 }
 
 /** Injectable seams so {@link buildOpenQuestions} is unit-testable off disk. */
@@ -32,6 +40,23 @@ export interface OpenQuestionsDeps {
   liveAgents?: (cwd: string) => Promise<LiveAgent[]>
   /** An agent checkout's event log (default {@link readEventLog}). */
   events?: (cwd: string) => Promise<FrameworkEvent[]>
+  /**
+   * The questions the browser bridge holds, minus those with an answer already on its way
+   * (default: the daemon's bridge store).
+   */
+  bridged?: () => BridgeQuestion[]
+  /**
+   * Every agent of a project, archived included (default {@link readAllAgents}): a web agent is
+   * `done` at its hand-off (#1231) and its checkout may be long gone, so the live reader alone
+   * would never find the run a bridged question belongs to.
+   */
+  agents?: (cwd: string) => Promise<AgentMeta[]>
+}
+
+/** The bridge store's questions still waiting for a pick. */
+function unansweredBridgeQuestions(): BridgeQuestion[] {
+  const store = bridgeQuestions()
+  return store.list().filter(question => !store.pendingAnswer(question.sessionId))
 }
 
 /**
@@ -68,22 +93,40 @@ export async function buildOpenQuestions(
 ): Promise<OpenQuestion[]> {
   const liveAgents = deps.liveAgents ?? readLiveMetas
   const events = deps.events ?? readEventLog
+  const agents = deps.agents ?? readAllAgents
+  const bridged = (deps.bridged ?? unansweredBridgeQuestions)()
   const items: OpenQuestion[] = []
+  const card = (project: ProjectSummary, meta: AgentMeta, choice: ChoiceRequest, rest: Pick<OpenQuestion, 'bridge' | 'updatedAt'>): OpenQuestion => ({
+    projectId: project.id,
+    projectName: project.name,
+    agentId: meta.id,
+    ...(meta.sessionName ? { sessionName: meta.sessionName } : {}),
+    ...(meta.intent ? { intent: meta.intent } : {}),
+    choice,
+    ...rest,
+  })
   for (const project of projects) {
     for (const meta of await liveAgents(project.path).catch((): LiveAgent[] => [])) {
       if (meta.status !== 'running' || !meta.pendingChoice) continue
       // The agent's own checkout, not the project root: a daemon-spawned agent logs in its worktree.
       const choice = openChoiceRequest(await events(meta.cwd).catch((): FrameworkEvent[] => []), meta.pendingChoice.id)
       if (!choice) continue
-      items.push({
-        projectId: project.id,
-        projectName: project.name,
-        agentId: meta.id,
-        ...(meta.sessionName ? { sessionName: meta.sessionName } : {}),
-        ...(meta.intent ? { intent: meta.intent } : {}),
-        ...(meta.updatedAt ? { updatedAt: meta.updatedAt } : {}),
-        choice,
-      })
+      items.push(card(project, meta, choice, meta.updatedAt ? { updatedAt: meta.updatedAt } : {}))
+    }
+    // A web agent's question lives in the bridge store, not its log (#1554): join it on the cloud
+    // session id its meta carries. The archive is read only while there is something to join.
+    if (!bridged.length) continue
+    for (const meta of await agents(project.path).catch((): AgentMeta[] => [])) {
+      if (meta.target !== 'web' || !meta.sessionId) continue
+      const question = bridged.find(q => q.sessionId === meta.sessionId)
+      if (!question) continue
+      items.push(
+        card(project, meta, bridgeChoiceRequest(question), {
+          // Parked since the bridge saw it, which is the wait that matters here — not the hand-off.
+          updatedAt: question.receivedAt,
+          bridge: { sessionId: question.sessionId, url: `https://claude.ai/code/${question.sessionId}` },
+        }),
+      )
     }
   }
   return items.sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? ''))

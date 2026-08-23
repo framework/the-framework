@@ -111,7 +111,7 @@ async function deliverAnswers(sessionIds) {
     } catch {
       continue
     }
-    if (!answer?.id || typeof answer.label !== 'string' || deliveredAnswers.has(answer.id)) continue
+    if (!answer?.id || typeof answer.text !== 'string' || deliveredAnswers.has(answer.id)) continue
 
     const tabs = await chrome.tabs.query({ url: 'https://claude.ai/code/*' })
     const tab = tabs.find(t => (/\/code\/(session_[A-Za-z0-9]+)/.exec(t.url ?? '') ?? [])[1] === sessionId)
@@ -121,7 +121,7 @@ async function deliverAnswers(sessionIds) {
     deliveredAnswers.add(answer.id)
     let outcome
     try {
-      outcome = await chrome.tabs.sendMessage(tab.id, { type: 'tf-deliver-answer', text: answer.label })
+      outcome = await chrome.tabs.sendMessage(tab.id, { type: 'tf-deliver-answer', text: answer.text })
     } catch (err) {
       // A tab that cannot hear us is either discarded or carrying a content script orphaned by
       // an extension reload. If it is our own pinned tab, a reload revives it; someone else's
@@ -130,7 +130,7 @@ async function deliverAnswers(sessionIds) {
         await chrome.tabs.reload(tab.id).catch(() => {})
         await new Promise(resolve => setTimeout(resolve, 5000))
         try {
-          outcome = await chrome.tabs.sendMessage(tab.id, { type: 'tf-deliver-answer', text: answer.label })
+          outcome = await chrome.tabs.sendMessage(tab.id, { type: 'tf-deliver-answer', text: answer.text })
         } catch (err2) {
           outcome = { ok: false, note: `tab did not answer after a reload: ${String(err2?.message ?? err2)}` }
         }

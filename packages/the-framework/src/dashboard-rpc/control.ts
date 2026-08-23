@@ -95,14 +95,15 @@ export async function sendChoice(
  *
  * Not a control-log write like {@link sendChoice}: a cloud agent has no live local session to
  * steer, so the pick goes to the bridge store, where the browser extension collects it, types
- * it into the session's composer and submits. Only a label of the currently parked question is
- * accepted, so this can never put arbitrary text in front of another product's agent. Local
- * only, no relay: the bridge lives on the daemon the extension talks to.
+ * it into the session's composer and submits. Only labels of the currently parked question are
+ * accepted — one, or a multi-select's subset — and the daemon composes the text typed from them,
+ * so this can never put arbitrary text in front of another product's agent. Local only, no
+ * relay: the bridge lives on the daemon the extension talks to.
  */
-export async function sendBridgeAnswer(sessionId: string, label: string): Promise<{ ok: boolean; error?: string }> {
+export async function sendBridgeAnswer(sessionId: string, labels: string[]): Promise<{ ok: boolean; error?: string }> {
   if (typeof sessionId !== 'string' || !/^session_[A-Za-z0-9]{1,128}$/.test(sessionId)) return { ok: false, error: 'unknown session' }
-  if (typeof label !== 'string' || !label.trim()) return { ok: false, error: 'an answer label is required' }
-  const queued = bridgeQuestions().queueAnswer(sessionId, label)
+  if (!Array.isArray(labels) || !labels.every(label => typeof label === 'string' && label.trim())) return { ok: false, error: 'answer labels are required' }
+  const queued = bridgeQuestions().queueAnswer(sessionId, labels)
   return typeof queued === 'string' ? { ok: false, error: queued } : { ok: true }
 }
 

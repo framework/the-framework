@@ -32,8 +32,9 @@ import type { Driver, DriverEvent, DriverPromptOptions, DriverSession, DriverSta
  * Actions targets, and that is not a shortcut in this implementation but a property of
  * the surface: a cloud session exposes **no read-back API** of any kind — no status, no
  * transcript, no output endpoint, only the session URL. So the turn resolves once the
- * session is created, and following the work happens on claude.ai, or by pulling it back
- * with `claude --teleport <id>`.
+ * session is created, and following the work happens on claude.ai, through the browser
+ * bridge's mirror and gate relay (#1237/#1554), or by pulling it back with
+ * `claude --teleport <id>`.
  *
  * For the same reason there is no `readCode`: the workspace lives in a cloud VM this
  * machine never sees.

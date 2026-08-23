@@ -23,6 +23,8 @@ import { repoHasRemote, worktreePath } from './store/index.js'
 export interface RemovedWorktree {
   /** The agent id, which is also the worktree's directory name. */
   agentId: string
+  /** The run branch that went with it, when it held nothing the remote lacks (#1650). */
+  branchDeleted?: string
 }
 
 /** A worktree the sweep tried to reclaim and could not, and why. */
@@ -85,7 +87,7 @@ export async function removeMergedWorktrees(cwd: string, deps: MergedSweepDeps =
   }
   for (const row of rows) {
     const outcome = await withAgentLock(worktreePath(cwd, row.agentId), () => remove(cwd, row.agentId))
-    if (outcome.ok) result.removed.push({ agentId: row.agentId })
+    if (outcome.ok) result.removed.push({ agentId: row.agentId, ...(outcome.branchDeleted ? { branchDeleted: outcome.branchDeleted } : {}) })
     else result.failed.push({ agentId: row.agentId, error: outcome.error })
   }
   return result
@@ -142,7 +144,9 @@ export function startMergedWorktreeSweep(opts: MergedSweepOptions): MergedWorktr
       for (const item of removed) {
         announced.delete(item.agentId)
         opts.log(
-          `[framework] removed the worktree for session ${item.agentId}: its branch is on the remote. The branch and the session are kept.`,
+          item.branchDeleted
+            ? `[framework] removed the worktree for session ${item.agentId} and its branch ${item.branchDeleted}: the branch held nothing the remote lacks. The session is kept.`
+            : `[framework] removed the worktree for session ${item.agentId}: its branch is on the remote. The branch and the session are kept.`,
         )
       }
       for (const item of failed) {

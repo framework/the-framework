@@ -106,7 +106,7 @@ test('the sweep says what it removed and what it kept, per project (#1036)', asy
   const lines: string[] = []
   const results: Record<string, MergedSweepResult> = {
     '/a': { removed: [{ agentId: 'r1' }], failed: [] },
-    '/b': { removed: [{ agentId: 'r2' }], failed: [{ agentId: 'r3', error: 'not on the remote' }] },
+    '/b': { removed: [{ agentId: 'r2', branchDeleted: 'tf-triage-quick' }], failed: [{ agentId: 'r3', error: 'not on the remote' }] },
   }
   const sweep = startMergedWorktreeSweep({
     projects: async () => [{ path: '/a' }, { path: '/b' }],
@@ -117,7 +117,7 @@ test('the sweep says what it removed and what it kept, per project (#1036)', asy
   sweep.stop()
   assert.match(lines[0] ?? '', /removed the worktree for session r1: its branch is on the remote/)
   assert.match(lines[0] ?? '', /The branch and the session are kept/, 'a checkout vanishing silently reads as a bug')
-  assert.match(lines[1] ?? '', /removed the worktree for session r2/)
+  assert.match(lines[1] ?? '', /removed the worktree for session r2 and its branch tf-triage-quick: the branch held nothing/, 'a branch going says so (#1650)')
   assert.match(lines[2] ?? '', /kept the worktree for session r3: not on the remote/)
 })
 

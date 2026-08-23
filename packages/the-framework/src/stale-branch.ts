@@ -15,6 +15,11 @@ import { ghPrsForBranch, type LinkedPr } from './dashboard/gh.js'
 // history proves the work is over: some PR existed and none is open. Deleting is safe exactly
 // then, because the closed PR itself preserves the diff on GitHub — the branch is a leftover
 // name, not the last copy of anything a human still needs.
+//
+// The other leftover — a pinned branch with no commits and no PR, which a triage that only writes
+// the queue makes every time — never reaches this: its checkout's removal deletes it (#1650),
+// because its tip is a commit the remote already has. What arrives here `unproven` is genuinely
+// unprovable: commits of its own and no PR yet.
 
 /** What became of one pinned branch: gone already, genuinely busy, unprovable, or released. */
 export type StaleBranchOutcome = 'absent' | 'pending' | 'unproven' | 'released'

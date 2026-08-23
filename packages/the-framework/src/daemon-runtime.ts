@@ -597,6 +597,8 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
         // never depends on the caller having one.
         const outcome = await removeProjectWorktree(projectCwd, agentId ?? agentIdFromWorktreeDir(basename(worktree)))
         if (!outcome.ok) console.log(`[framework] keeping worktree ${worktree}: ${outcome.error}`)
+        else if (outcome.branchDeleted)
+          console.log(`[framework] removed worktree ${worktree} and its branch ${outcome.branchDeleted}: the branch held nothing the remote lacks`)
       } catch {
         // A worktree we could not retire is a worktree left on disk, which is the safe direction.
       }

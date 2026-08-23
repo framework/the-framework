@@ -45,6 +45,7 @@ export {
   branchPushed,
   repoHasRemote,
   removeWorktree,
+  deleteBranch,
   pruneWorktrees,
   worktreePath,
   agentBranchName,

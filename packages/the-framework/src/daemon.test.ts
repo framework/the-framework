@@ -371,7 +371,27 @@ fs.appendFileSync(${JSON.stringify(join(cwd, 'started.log'))}, agentId + '\\n')
     // accumulated per failed session until a human noticed.
     const failedId = await runWith('failed', 2)
     assert.equal(await archived(failedId), true, "a failed run's history is copied too")
-    assert.equal(await worktreeGone(failedId), true, 'and its checkout goes too, since the remote has its branch')
+    assert.equal(await worktreeGone(failedId), true, 'and its checkout goes too')
+    // This run committed nothing, and its tip — the init commit — is already on origin under the
+    // first run's branch. So nothing is pushed and the branch goes with the checkout (#1650): the
+    // branch's absence is the last thing teardown does, so it is what the test waits on before
+    // pulling the repo out from under the daemon.
+    for (let i = 0; i < 600; i++) {
+      const gone = await git(['show-ref', '--verify', '--quiet', `refs/heads/tf-agent-${failedId}`], cwd).then(
+        () => false,
+        () => true,
+      )
+      if (gone) break
+      await new Promise(r => setTimeout(r, 20))
+    }
+    await assert.rejects(
+      () => git(['show-ref', '--verify', '--quiet', `refs/heads/tf-agent-${failedId}`], cwd),
+      'a run that committed nothing leaves no branch behind',
+    )
+    await assert.rejects(
+      () => git(['rev-parse', '--verify', `refs/remotes/origin/tf-agent-${failedId}`], cwd),
+      'and nothing of it was pushed',
+    )
 
     ac.abort()
     await done

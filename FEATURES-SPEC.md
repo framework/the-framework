@@ -129,6 +129,7 @@ happens while nobody is at the keyboard.
 - CI watch: merge a PR once its checks pass
 - CI watch: one fix agent per red head commit, max two attempts
 - Reclaim the checkout of an agent whose work is on the remote — never by publishing what a `handoff: local` agent refused to
+- An agent that committed nothing leaves no branch behind: its empty branch goes with its checkout, never pushed, so a pinned routine is not stood down by its own last run
 - Release a pinned routine branch left behind by a closed PR — before the schedule fires the routine, and before its "Run now" does
 - The agent drains its own TODO backlog, one entry per turn
 

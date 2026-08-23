@@ -72,7 +72,10 @@ export async function addWorktree(
  * no `-b`. Continuing an agent puts it back on the branch its work is already on, rather than
  * branching again from HEAD and stranding what it did last time.
  *
- * Rejects on git failure, like {@link addWorktree}: a continued agent needs its checkout.
+ * A branch that is gone is recreated from HEAD (#1650): the only branch the framework deletes is
+ * one that held nothing past a commit the remote already had, so HEAD is where its work was.
+ * Anything else git refuses — the branch checked out elsewhere, say — still rejects, like
+ * {@link addWorktree}: a continued agent needs its checkout.
  */
 export async function attachWorktree(
   repo: string,
@@ -81,7 +84,18 @@ export async function attachWorktree(
 ): Promise<AddedWorktree> {
   if (!isSafeAgentId(opts.agentId)) throw new Error(`unsafe run id: ${opts.agentId}`)
   const path = worktreePath(repo, opts.agentId)
-  await agent(['worktree', 'add', path, opts.branch], repo)
+  try {
+    await agent(['worktree', 'add', path, opts.branch], repo)
+  } catch (err) {
+    // `worktree add <path> <name>` also resolves a remote-only `origin/<name>`, so the existence
+    // check comes after the attempt, not before it.
+    const exists = await agent(['show-ref', '--verify', '--quiet', `refs/heads/${opts.branch}`], repo).then(
+      () => true,
+      () => false,
+    )
+    if (exists) throw err
+    await agent(['worktree', 'add', '-b', opts.branch, path], repo)
+  }
   return { path, branch: opts.branch }
 }
 
@@ -184,6 +198,16 @@ export async function removeWorktree(repo: string, path: string, agent: GitRunne
   } catch {
     // Already removed, or never registered: nothing to do.
   }
+}
+
+/**
+ * Delete a branch that holds nothing (#1650). `-D`, because "merged" in git's eyes is the wrong
+ * test: the caller proved the tip is a commit the remote already has, which is the stronger fact.
+ * Forgiving: the checkout is already gone by the time this runs, and a branch that would not
+ * delete is a leftover name, not lost work.
+ */
+export async function deleteBranch(repo: string, branch: string, agent: GitRunner = nodeGitRunner()): Promise<void> {
+  await agent(['branch', '-D', branch], repo).catch(() => undefined)
 }
 
 /**

@@ -60,6 +60,16 @@ export function agentIdFromWorktreeDir(name: string): string {
 }
 
 /**
+ * Whether a branch is one the framework minted for a run (#1650): the run-id spelling, a
+ * session-named `tf-<name>`, or the legacy slashed form — and never the data branch, which
+ * shares the prefix. The only branches the framework may delete on its own.
+ */
+export function isRunBranch(name: string): boolean {
+  if (name === DATA_BRANCH) return false
+  return name.startsWith(AGENT_BRANCH_PREFIX) || name.startsWith(LEGACY_AGENT_BRANCH_PREFIX)
+}
+
+/**
  * Whether a name under `branches/` is a framework checkout directory. The same directory also
  * holds the rename links (#1589) and possibly a user's own entries, and only names the framework
  * mints — the run branch spelling — are checkouts.

@@ -1,8 +1,9 @@
 import type { AgentMeta } from '../store/index.js'
 import type { BridgeSession } from './bridge-endpoints.js'
+import { CLOUD_SESSION_WINDOW_MS } from '../cloud-run-state.js'
 
-/** How far back a cloud agent is still worth having a tab open for. */
-export const BRIDGE_SESSION_WINDOW_MS = 12 * 60 * 60 * 1000
+/** How far back a cloud agent is still worth having a tab open for: the session window, shared with its cloud state (#1668). */
+export const BRIDGE_SESSION_WINDOW_MS = CLOUD_SESSION_WINDOW_MS
 
 /**
  * At most this many tabs. The extension opens one per session, and a browser that quietly

@@ -294,7 +294,7 @@ describe('cloud sessions on the rail (#1263/#1264)', () => {
     renderRail(
       <AgentHistory
         projectId="p1"
-        agents={[agent({ status: 'done', target: 'web', driver: 'claude-web' })]}
+        agents={[agent({ status: 'done', target: 'web', driver: 'claude-web', startedAt: new Date().toISOString() })]}
         selectedAgentId={null}
         onSelect={() => {}}
       />,
@@ -313,6 +313,39 @@ describe('cloud sessions on the rail (#1263/#1264)', () => {
       />,
     )
     expect(screen.getByText('stopped')).toBeTruthy()
+    expect(screen.queryByText('in cloud')).toBeNull()
+  })
+
+  test('a web run parked on a question the bridge reported reads as waiting (#1668)', () => {
+    renderRail(
+      <AgentHistory
+        projectId="p1"
+        agents={[agent({ status: 'done', target: 'web', driver: 'claude-web', startedAt: new Date().toISOString(), cloudWaiting: true })]}
+        selectedAgentId={null}
+        onSelect={() => {}}
+      />,
+    )
+    expect(screen.getByText('waiting')).toBeTruthy()
+    expect(screen.queryByText('in cloud')).toBeNull()
+  })
+
+  test('adopted cloud work reads done (its PR badge says the rest) or merged; an old run with nothing adopted is done (#1668)', () => {
+    const fresh = new Date().toISOString()
+    const old = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+    renderRail(
+      <AgentHistory
+        projectId="p1"
+        agents={[
+          agent({ id: 'pr', status: 'done', target: 'web', driver: 'claude-web', startedAt: fresh, pr: { number: 1, url: 'u' } }),
+          agent({ id: 'merged', status: 'done', target: 'web', driver: 'claude-web', startedAt: old, pr: { number: 2, url: 'u' }, mergeOutcome: 'merged' }),
+          agent({ id: 'stale', status: 'done', target: 'web', driver: 'claude-web', startedAt: old }),
+        ]}
+        selectedAgentId={null}
+        onSelect={() => {}}
+      />,
+    )
+    expect(screen.getByText('merged')).toBeTruthy()
+    expect(screen.getAllByText('done')).toHaveLength(2)
     expect(screen.queryByText('in cloud')).toBeNull()
   })
 

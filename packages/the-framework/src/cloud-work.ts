@@ -26,6 +26,7 @@ import { errorMessage } from './error-message.js'
 // did nothing) or more than one (ancestry alone cannot say which) is simply retried next pass,
 // and a run older than the window stops being asked about at all.
 
+
 /** How long after its start a run is still asked about: safely past any cloud session's life. */
 export const CLOUD_ADOPTION_WINDOW_MS = 48 * 60 * 60 * 1000
 

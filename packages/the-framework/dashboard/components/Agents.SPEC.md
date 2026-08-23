@@ -2,7 +2,7 @@ The Overview's Agents card: every agent working right now, across all projects, 
 
 ## Business logic — TL;DR
 
-- **Only what is working now** - the card lists agents currently working; finished agents are not repeated here because the sidebar already lists them.
+- **Only what is working now** - the card lists agents currently working, a cloud session's agent included while the session works or waits; finished agents are not repeated here because the sidebar already lists them.
 - **A row opens the agent itself** - clicking a row goes to that agent in its project, never merely to the project's launcher.
 - **Each row names the agent the way the sidebar does** - its intent, else its session name, else its scope, else its project.
 
@@ -16,7 +16,7 @@ The user wants one place that answers "what is being worked on right now?" witho
 
 #### Business logic
 
-The card pools the currently working agents from every project. While the list is still being fetched it says so; when nothing is working it says no agents are working right now. Finished agents are deliberately absent — the sidebar's agent list already holds them, so a second copy here would say nothing new.
+The card pools the currently working agents from every project. An agent whose cloud session is still at work is among them, its row saying "in cloud" or "waiting" since no local process backs it. While the list is still being fetched it says so; when nothing is working it says no agents are working right now. Finished agents are deliberately absent — the sidebar's agent list already holds them, so a second copy here would say nothing new.
 
 ### A row opens the agent itself
 

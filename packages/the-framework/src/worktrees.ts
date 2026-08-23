@@ -8,6 +8,7 @@ import {
   branchPushed,
   commitPendingWork,
   worktreeClean,
+  isWorktreeRoot,
   currentBranch,
   removeWorktree,
   deleteBranch,
@@ -145,6 +146,13 @@ export async function removeProjectWorktree(
   }
   const path = worktreePath(cwd, agentId)
   try {
+    // Before any git runs in it (#1654): a directory under `branches/` that git does not know as
+    // a worktree root makes every command below act on the enclosing repo — the user's checkout,
+    // the user's branch. Nothing is committed, pushed or deleted through it; it is reported and
+    // left where it is.
+    if (!(await isWorktreeRoot(path))) {
+      return { ok: false, error: `session ${agentId}'s directory is not a git worktree; left alone` }
+    }
     const branch = await currentBranch(path)
     if (!branch) return { ok: false, error: `session ${agentId} is on no branch; its worktree was kept` }
     // The armed handoff decides before anything commits or pushes: a session armed to publish

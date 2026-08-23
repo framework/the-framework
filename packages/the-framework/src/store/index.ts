@@ -46,6 +46,8 @@ export {
   repoHasRemote,
   removeWorktree,
   deleteBranch,
+  isWorktreeRoot,
+  worktreeBranch,
   pruneWorktrees,
   worktreePath,
   agentBranchName,

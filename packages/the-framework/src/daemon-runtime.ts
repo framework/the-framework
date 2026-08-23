@@ -16,7 +16,7 @@ import {
   listAgents,
   findAgent,
   archivedAgentPaths,
-  currentBranch,
+  worktreeBranch,
   readLiveMetas,
   readLiveMeta,
   removeWorktree,
@@ -150,6 +150,14 @@ function exitDetail(code: number | null, signal: NodeJS.Signals | null): string 
 export async function markFailedStart(cwd: string, agentId: string, intent: string, detail: string): Promise<boolean> {
   const metaPath = join(cwd, FRAMEWORK_DIR, META_FILE)
   if (await stat(metaPath).then(() => true, () => false)) return false
+  // Only into a checkout that exists (#1654). A marker written where the worktree is gone — removed
+  // by hand while the child was still alive, or never created — makes a directory under
+  // `branches/` that is not a worktree, and every later git command run in it acts on the
+  // enclosing repo. The daemon's log line below is the record instead.
+  if (!(await stat(cwd).then(s => s.isDirectory(), () => false))) {
+    console.log(`[framework] run ${agentId} failed to start: ${detail}; its checkout is gone, so no marker is written`)
+    return false
+  }
   const now = new Date().toISOString()
   const meta: AgentMeta = {
     status: 'failed',
@@ -572,8 +580,10 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     withAgentLock(worktree, async () => {
       try {
         // Where the work ended up, recorded before the checkout can go (#799). The branch outlives
-        // the worktree and is the only handle the dashboard has left on a finished session.
-        const branch = await currentBranch(worktree)
+        // the worktree and is the only handle the dashboard has left on a finished session. Read
+        // only from a worktree root (#1654): a directory that is no longer one would answer with
+        // the enclosing repo's branch, and the archive would record the user's `main` as the run's.
+        const branch = await worktreeBranch(worktree)
         // Filed under the identity this repo commits as, onto the data branch (#1179/#1582)
         // through its write funnel: the archive is committed and pushed the moment it lands —
         // durable without a human, and never a commit on main.

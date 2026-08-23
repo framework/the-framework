@@ -1,8 +1,11 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { nodeGitRunner } from './project.js'
 import { reconcileBranchLinks, startBranchLinksPass, type LinksFs } from './branch-links.js'
-import { FRAMEWORK_DIR, BRANCHES_DIR, type WorktreeDirEntry } from './store/index.js'
+import { FRAMEWORK_DIR, BRANCHES_DIR, addWorktree, worktreePath, type WorktreeDirEntry } from './store/index.js'
 
 const CWD = '/repo'
 const LINKS = join(CWD, FRAMEWORK_DIR, BRANCHES_DIR)
@@ -79,6 +82,31 @@ test('the repo-root branches shortcut is created once, relative, hidden from git
   await reconcileBranchLinks(CWD, { fs: taken.fs, worktrees: async () => [], exclude })
   assert.equal(taken.links.has(ROOT_LINK), false, 'an occupied path is left alone')
   assert.deepEqual(excluded, [], "a user's own entry is never hidden from their git status")
+})
+
+test('a branches/ directory that is not a worktree gets no link, against real git (#1654)', async () => {
+  // Default seams on purpose: the bug was in the default branch read. Git asked in a residue
+  // directory answers with the enclosing repo's branch, which left a `main -> tf-agent-…` link
+  // beside the checkouts on the rig.
+  const git = nodeGitRunner()
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-links-')))
+  try {
+    await git(['init', '-b', 'main'], repo)
+    await git(['config', 'user.email', 't@t'], repo)
+    await git(['config', 'user.name', 't'], repo)
+    await writeFile(join(repo, 'README.md'), '# t\n')
+    await git(['add', '-A'], repo)
+    await git(['commit', '-m', 'init'], repo)
+    const { path } = await addWorktree(repo, { agentId: 'r1', branch: 'tf-agent-r1' }, git)
+    await git(['checkout', '-q', '-b', 'tf-real-name'], path)
+    await mkdir(join(worktreePath(repo, 'r2'), FRAMEWORK_DIR), { recursive: true })
+
+    await reconcileBranchLinks(repo)
+    const names = (await readdir(join(repo, FRAMEWORK_DIR, BRANCHES_DIR))).sort()
+    assert.deepEqual(names, ['tf-agent-r1', 'tf-agent-r2', 'tf-real-name'], 'the real rename is linked; no `main` link for the residue')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
 })
 
 test('the pass covers every registered project and a stopped pass does nothing', async () => {

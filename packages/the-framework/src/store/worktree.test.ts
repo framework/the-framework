@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
 import { join } from 'node:path'
-import { mkdtemp, rm, writeFile, stat, realpath } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile, stat, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import type { GitRunner } from '../project.js'
 import { nodeGitRunner } from '../project.js'
@@ -9,6 +9,8 @@ import {
   addWorktree,
   attachWorktree,
   deleteBranch,
+  isWorktreeRoot,
+  worktreeBranch,
   commitPendingWork,
   listWorktrees,
   parseWorktreeList,
@@ -162,6 +164,36 @@ test('attachWorktree recreates a branch that is gone from HEAD, and still refuse
     // A branch that exists but is checked out by the main checkout is git's refusal, not ours.
     const head = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], repo)).trim()
     await assert.rejects(() => attachWorktree(repo, { agentId: 'run2', branch: head }, git))
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('isWorktreeRoot is true for the main checkout and a linked worktree, false inside them and for a plain directory (#1654)', async () => {
+  const git = nodeGitRunner()
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-worktree-')))
+  try {
+    await git(['init'], repo)
+    await git(['config', 'user.email', 't@t'], repo)
+    await git(['config', 'user.name', 't'], repo)
+    await writeFile(join(repo, 'README.md'), '# t\n')
+    await git(['add', '-A'], repo)
+    await git(['commit', '-m', 'init'], repo)
+    const { path } = await addWorktree(repo, { agentId: 'run1', branch: 'tf-agent-run1' }, git)
+    // The hazard: a `branches/` directory that is not a worktree. Git still answers in it — with
+    // the enclosing repo's toplevel and branch.
+    const residue = worktreePath(repo, 'run2')
+    await mkdir(join(residue, FRAMEWORK_DIR), { recursive: true })
+
+    assert.equal(await isWorktreeRoot(repo, git), true)
+    assert.equal(await isWorktreeRoot(path, git), true)
+    assert.equal(await isWorktreeRoot(join(repo, FRAMEWORK_DIR), git), false, 'a subdirectory of a checkout is not its root')
+    assert.equal(await isWorktreeRoot(residue, git), false, 'and neither is a residue directory')
+    assert.equal(await isWorktreeRoot(join(tmpdir()), git), false, 'nor a directory outside any repo')
+
+    assert.equal(await currentBranch(residue, git), (await currentBranch(repo, git)), 'a plain read in the residue answers with the enclosing repo\'s branch — the bug')
+    assert.equal(await worktreeBranch(residue, git), undefined, 'the guarded read answers with nothing')
+    assert.equal(await worktreeBranch(path, git), 'tf-agent-run1')
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

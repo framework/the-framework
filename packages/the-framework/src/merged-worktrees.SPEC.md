@@ -2,8 +2,8 @@ The worktree sweep: reclaims a finished agent's checkout once its work is safely
 
 ## Business logic — TL;DR
 
-- **Only what is on the remote may go** - a checkout is reclaimed when, and only when, its branch is on the remote. Every deletion is therefore recoverable, because the remote holds a copy.
-- **The checkout goes, the work stays** - the branch, the agent's record and its replayable event log all survive; only the working copy on disk is reclaimed, and it can be recreated from the branch at any time.
+- **Only what is on the remote may go** - a checkout is reclaimed when, and only when, everything it holds is already on the remote. Every deletion is therefore recoverable, because the remote holds a copy.
+- **The checkout goes, the work stays** - the agent's record and its replayable event log survive, and so does its branch unless the removal proved that branch holds nothing anyone else is missing; only the working copy on disk is reclaimed, and it can be recreated from the branch at any time.
 - **The same decision as the Remove button** - the sweep reuses exactly the removal the user's own Remove button performs: commit what is pending, push the branch, remove only once the remote has it. The automatic path and the manual one cannot disagree.
 - **Never touches a checkout that is still someone's** - a live agent's checkout is left alone, and so is one the daemon is still responsible for, including an agent between finishing and being archived.
 - **A project with no remote keeps everything** - with nowhere to push, nothing is reclaimable; each retained checkout is still accounted for.
@@ -19,7 +19,7 @@ The user's machine should not fill up with the checkouts of agents that finished
 
 #### Business logic
 
-Every retained checkout in every registered project is offered up for reclamation on each pass. A checkout is removed when its work reaches the remote: pending work is committed, the branch is pushed, and only then is the working copy removed. A checkout whose work cannot reach the remote is kept, and the reason is reported — most often a branch that could not be pushed.
+Every retained checkout in every registered project is offered up for reclamation on each pass. A checkout is removed when its work reaches the remote: pending work is committed, the branch is pushed, and only then is the working copy removed — or, when the removal can prove the checkout holds nothing the remote lacks, with no push at all and with that branch deleted alongside it. A checkout whose work cannot reach the remote is kept, and the reason is reported — most often a branch that could not be pushed.
 
 Failing to reclaim is never final: a push that failed while the machine was offline, unauthenticated, or behind the remote simply succeeds on a later pass, which is exactly what the recurring sweep is for.
 
@@ -59,7 +59,7 @@ A checkout vanishing from under someone with no explanation reads as a bug, even
 
 #### Business logic
 
-Each removal is announced, naming the agent and stating that its branch is on the remote and that the branch and the agent's record are kept. Each retention is announced once per reason: the same reason is not repeated on later passes, a *changed* reason is announced again because it means the situation changed (a remote was added; pushes now fail on authentication), a removal forgets the checkout entirely so a checkout reappearing under the same identity is accounted for afresh, and restarting the daemon starts the accounting over — which is the start-up statement the retained checkouts deserve.
+Each removal is announced, naming the agent. When the checkout's branch is on the remote, the line says so and states that the branch and the agent's record are kept. When branches went with the checkout — one holding nothing the remote lacks, the `tf-agent-<agent id>` branch the checkout was created on and the agent walked away from, or both — the line names every branch that went, says that nothing on them is missing elsewhere, and states that the agent's record is kept regardless. Each retention is announced once per reason: the same reason is not repeated on later passes, a *changed* reason is announced again because it means the situation changed (a remote was added; pushes now fail on authentication), a removal forgets the checkout entirely so a checkout reappearing under the same identity is accounted for afresh, and restarting the daemon starts the accounting over — which is the start-up statement the retained checkouts deserve.
 
 The sweep has no clock of its own; the daemon's shared tick drives it, including once at start-up, since the case it exists for is a machine that was switched off while the work could not be pushed. Two overlapping passes join the pass already running rather than one being dropped, so waiting for a sweep always means the sweep really finished.
 

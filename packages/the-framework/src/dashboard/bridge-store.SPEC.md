@@ -2,7 +2,7 @@ Holds everything the Claude web bridge carries: the question each cloud session 
 
 ## User story
 
-- A cloud session parks on a question. The dashboard shows it next to the questions local agents are parked on, the user picks an option, and the extension types that option back into claude.ai — with the dashboard showing whether the delivery worked.
+- A cloud session parks on a question. The dashboard shows it next to the questions local agents are parked on, the user picks an option, and the extension types the answer back into claude.ai — with the dashboard showing whether the delivery worked.
 - The user follows a cloud session's conversation from the dashboard rather than from claude.ai.
 - When the bridge is not working, the user needs to see whether anything is reaching the daemon at all, and which extension version it claims to be.
 
@@ -12,7 +12,8 @@ Holds everything the Claude web bridge carries: the question each cloud session 
 - **The same question, re-reported, stays the same question** - reports are compared by the text shown, not by when they arrived.
 - **An answered question does not come back** - the delivered answer is remembered so the still-visible block on the page cannot resurface as parked.
 - **A new question discards the old answer** - an undelivered pick for a question the session has moved past is never typed into it.
-- **Only an option the session itself offered can be queued** - the bridge can never put arbitrary text into a claude.ai composer.
+- **Only options the session itself offered can be queued** - exactly one, or any subset when the question takes several answers; the bridge can never put arbitrary text into a claude.ai composer.
+- **What gets typed is the wording a local gate resumes with** - the daemon composes the sentence from the picked labels; a pick the agent marked as stopping types a take-over line instead, since nothing here can end a cloud session.
 - **A queued answer can be withdrawn, until it is delivered** - once the extension has delivered it, it is too late.
 - **A delivery report is matched by answer identity** - a stale report from a tab that died mid-delivery cannot resolve a newer answer.
 - **The transcript is kept by position** - repeat reports of the same message overwrite rather than accumulate, and a bounded number of entries is kept per cloud session.
@@ -21,7 +22,7 @@ Holds everything the Claude web bridge carries: the question each cloud session 
 
 ## Glossary
 
-- **question fingerprint** - what makes two reports the same question: the title, the options and the recommendation — deliberately not the moment the report arrived.
+- **question fingerprint** - what makes two reports the same question: the title, the options, the recommendation, and whether several answers may be picked — deliberately not the moment the report arrived.
 
 ## Business logic
 
@@ -47,11 +48,13 @@ Not persisting is deliberate: a question is only answerable while the session th
 
 #### User story
 
-The user picks one of the options in the dashboard, and the extension types it back into the claude.ai composer.
+The user picks one of the options in the dashboard, and the extension types the answer back into the claude.ai composer.
 
 #### Business logic
 
-An answer can only be queued for a cloud session that has a question parked, and only with a label that question actually offers — anything else is refused with the reason. Queuing gives the answer its own identity and marks it as waiting for delivery.
+An answer can only be queued for a cloud session that has a question parked, and only with labels that question actually offers: exactly one of them for an ordinary question, or any subset — the empty one included — when the question takes several answers at once. A label the question does not offer, or the same label twice, is refused with the reason. Queuing gives the answer its own identity and marks it as waiting for delivery.
+
+Queuing also composes what will actually be typed, out of the labels just validated. The wording is the one a local agent is resumed with — what it paused to ask, what the user chose, and to continue with that decision — with the picked labels joined together as the choice, and a placeholder standing in when a multi-select was answered with nothing. When any picked option is one the agent marked as stopping, the take-over wording is composed instead: the same question and answer, and that the user is taking over and will come back with fresh instructions. A local agent is simply ended on such a pick, but nothing here can end a cloud session, so it is told.
 
 A waiting answer can be withdrawn; one the extension has already delivered cannot.
 
@@ -61,7 +64,9 @@ The dashboard reads the answer in whatever state it is in, so it can show queued
 
 #### Rationale
 
-Restricting the queued answer to a label the question itself offered is what bounds the whole feature: the only text this can ever put in a claude.ai composer is text that session offered.
+Restricting the queued answer to labels the question itself offered is what bounds the whole feature: the only text this can ever put in a claude.ai composer is a sentence The Framework wrote around options that session offered. Nothing the user types reaches the composer.
+
+Using the same wording a local gate resumes with means a cloud session hears its answer exactly as a local agent does, rather than through a phrasing invented for the bridge.
 
 ### The transcript
 

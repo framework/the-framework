@@ -8,6 +8,7 @@ The user comes back to the dashboard after being away. Several agents across sev
 
 - **Everything at once, longest-waiting first** - all pending gates are shown together in one scrolling view, in the order the daemon returns them (longest-waiting first), never paginated.
 - **Answer without leaving** - each card carries the gate's own choice controls, so the pick is made here; each card also links into the agent that asked, which may belong to another project.
+- **A cloud session's question is pooled with the rest** - a question carried in by the Claude web bridge appears as an ordinary card, and answering it sends the pick out through the bridge rather than to a control channel that agent never reads.
 - **An answered question stays put** - answering collapses the card to a single line naming what was picked, and it stays there even after the daemon stops reporting the gate. Clicking the line re-expands the answer.
 - **Autopilot is off here** - a gate's automatic-acceptance countdown does not run in this hub.
 - **Nothing waiting, nothing shown** - the section disappears entirely rather than showing an empty "Waiting on you".
@@ -26,6 +27,8 @@ See `## User story`.
 The hub polls the daemon every five seconds for all live agents' pending gates and renders one card per gate. The heading reads "Waiting on you" followed by the count of still-unanswered questions. Each open card is topped by the agent's identity — its session name, or failing that the first line of what it was asked to do, or failing that its agent id — together with the project it belongs to, and a link into that agent.
 
 The cards scroll within their own area rather than growing the page, and there is no pagination: the point of the hub is that a full sweep of what is waiting is visible in one place.
+
+Which agent asked does not change the card. A question a Claude Code cloud session parked on, carried here by the Claude web bridge, is one of these cards like any other — the daemon has already matched it to the agent that handed the task over, so it is labelled by that agent and links into it. Answering it is the same click; only the delivery differs, going out through the bridge to be typed back into that session rather than to a control channel a cloud session never reads.
 
 ### An answered question does not vanish
 

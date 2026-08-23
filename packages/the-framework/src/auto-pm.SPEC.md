@@ -9,6 +9,7 @@ Auto PM: the policy that decides whether the daemon may spend leftover quota on 
 ## Glossary
 
 - **ended dry** - work Auto PM already gave an agent that finished without producing anything to hand off. It is not handed out again for the rest of the daemon's lifetime.
+- **routine lock** - a routine's lock file on the data branch, naming the machine that is running that routine and since when, so no two machines run it at once. A routine declares whether it holds one.
 
 ## Business logic — TL;DR
 
@@ -18,6 +19,7 @@ Auto PM: the policy that decides whether the daemon may spend leftover quota on 
 - **Never more agents than the cap** - a per-project concurrency setting, plus a cooldown so a project is left alone for a while after an unattended start.
 - **Fan-out on disjoint work only** - draining and planning can run several agents at once, each pinned to one entry or one ticket; every other routine rewrites the shared queue document and stays one at a time.
 - **Claims are files, not memory** - a ticket a batch is about to work gets a pushed `.lock.md` claim before its agent starts, so another machine's daemon does not book the same ticket.
+- **One triage at a time, on any machine** - a routine that rewrites the shared queue takes a routine lock before its agent starts, and the lock lifts when the run ends.
 - **Land finished work before judging** - a finished agent's queue writes are promoted into the checkout first, so the emptiness check is not made against a stale queue.
 - **Dead claims are freed, and their work is not re-offered** - an agent that ended without commits will never open the pull request that lifts its claim, so the sweep lifts it, and remembers not to hand that work out again.
 - **Run now is asking, so it outranks the switch** - a click runs with the preference off and skips the cooldown, but never past the concurrency cap, a switched-off routine, or the quota boundary.
@@ -76,7 +78,7 @@ While the queue is empty, each tick fires the next routine in a fixed cycle, tra
 
 The rotation advances only when a start actually took, so a routine the daemon refused is retried rather than skipped. Draining never advances it (a queue worked off over many ticks must not race the rotation forward), and neither does a routine a person named with Run now.
 
-Both triage routines pin a fixed session name and abort if that branch already exists, so a rotation coming round while the previous triage is still in flight is a no-op instead of a duplicate. Before firing such a routine the sweep releases a leftover copy of that branch whose pull request has since closed or merged — without that, one stale branch would jam the routine forever.
+Both triage routines hold a routine lock while they run, so a rotation coming round while the previous triage is still in flight stands that routine down instead of triaging the same tickets twice. The rotation still advances past it, which is what is wanted: the next idle tick tries the next routine rather than retrying one that is already running.
 
 The gated triage preset is deliberately outside the rotation: it ends at a gate, and firing it with nobody at the keyboard would park an agent against a question no one will answer.
 
@@ -143,6 +145,24 @@ Claiming is per ticket, not per batch: a ticket lost to a race costs the batch o
 
 If a start is refused, or the daemon is stopped mid-batch, the claims minted for the items that never started are released immediately — no agent exists that could ever settle them.
 
+### Locking a routine that must not run twice
+
+#### User story
+
+The user wants triage fired on a schedule without two triages ever overlapping — on this machine, or on another machine sharing the same repo — and without an agent being spent to discover that it is the second one.
+
+#### Business logic
+
+A routine declares whether it holds a routine lock; the two triage routines do, each under its own name. The lock is taken before the agent is started and never by the agent itself. A lock already held stands that routine down with a sentence naming the machine holding it and since when, and nothing is started — this is a stand-down rather than a refusal of the sweep, so it is reported like any other.
+
+The lock lifts when the run ends, whatever the ending: the routines that hold one write to the data branch and open no pull request that could carry the release. A release that could not land is retried on the next couple of sweeps, bounded so a run whose release keeps failing cannot be tracked forever — past the bound the lock stands until it expires. A lock taken for a start the daemon then refused is given back at once, since no run will ever release it. On a project's first sweep, the locks a previous daemon on this machine left behind whose runs are gone are released too — nothing else would free them before their expiry.
+
+A routine that declares no lock never takes one, and a daemon wired without the routine-lock machinery runs every routine unguarded.
+
+#### Rationale
+
+The guard used to live in the triage prompts themselves — a fixed branch name the agent checked and aborted on. Once a triage stopped committing anything, that branch never reached the remote and so guarded nothing across machines, and locally every refusal was discovered by an agent that had already been started and paid for. The guard belongs to the daemon, before the start, on the branch every machine shares.
+
 ### Landing finished work before deciding
 
 #### User story
@@ -185,9 +205,9 @@ A click can narrow the sweep to the work of exactly one routine, and a narrowed 
 
 - Draining: if the queue is empty, it says so rather than falling through to a rotation routine.
 - Planning: reaches the same claim-then-start path the rotation takes, so the concurrency setting applies to the click as well.
-- A routine pinned to a branch (the triages): one agent, but routed through the sweep so the stale copy of its branch is released first — the one preparation that a plain start skipped, and the one that made every such click die on the previous agent's leftover branch.
+- A routine that holds a routine lock (the triages): one agent, but routed through the sweep so the lock is taken before the start — a plain start would run the routine unlocked.
 
-A click naming a routine is never turned into a drain however full the queue is, and it never advances the rotation. A click naming a routine that is switched off stands down saying so, and one naming a branch no routine pins at all is told apart from that — the first is a setting the user can undo, the second means the dashboard is older than the daemon. A click may name one project, in which case only that project is visited; otherwise every project is.
+A click asks for a locked routine by the lock it holds rather than by its name, so renaming a routine cannot change the path its click takes. A click naming a routine is never turned into a drain however full the queue is, and it never advances the rotation. A click for a routine that is switched off stands down saying so, and one naming a lock no routine holds at all is told apart from that — the first is a setting the user can undo, the second means the dashboard is older than the daemon. A click may name one project, in which case only that project is visited; otherwise every project is.
 
 ### Switched-off routines
 

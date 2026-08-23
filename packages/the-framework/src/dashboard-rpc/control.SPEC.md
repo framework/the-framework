@@ -12,7 +12,7 @@ The user watches an agent work in the dashboard and steers it: sends it a furthe
 - **Finishing steps publish what the agent left** - Push and Open PR first commit whatever the agent left uncommitted in its checkout, then push; the pull request's title and body come from what the agent already recorded, and the opened pull request is written back onto the agent's archive.
 - **Merge means two different things by agent state** - a running agent is told to merge at its natural end with the user's authorization recorded; a finished agent's open pull request is merged straight away.
 - **Removing a checkout never loses work, and never surprises a running agent** - the work is committed and pushed before the worktree goes, a still-running agent is refused, and anything serving that checkout is stopped first.
-- **Publishing a cloud session's answer goes through the bridge** - a `web`-target agent has no local session to steer, so the user's pick is queued for the browser extension to type into claude.ai, and only a label of the question actually parked on is accepted.
+- **Publishing a cloud session's answer goes through the bridge** - a `web`-target agent has no local session to steer, so the user's pick is queued for the browser extension to type into claude.ai; only labels of the question actually parked on are accepted, and the daemon composes what gets typed from them.
 - **Queueing a ticket writes the queue directly** - the entry lands in the agent queue's matching priority section and links back to the ticket it came from.
 
 ## Business logic
@@ -97,7 +97,7 @@ A `web`-target agent's cloud session parks on a question. The Claude web bridge 
 
 #### Business logic
 
-The pick is queued in the bridge for the extension to collect, not written to a control channel, because a cloud session has no local session to steer. Only a well-formed cloud session id is accepted, an empty answer is refused, and only a label belonging to the question that session is currently parked on may be queued — so this can never put arbitrary text in front of another product's agent. A queued answer can be withdrawn until the extension has delivered it, after which withdrawing does nothing. This action is never relayed: the bridge lives on the daemon the extension talks to.
+The pick is queued in the bridge for the extension to collect, not written to a control channel, because a cloud session has no local session to steer. Only a well-formed cloud session id is accepted, and the pick must be labels of the question that session is currently parked on — one of them, or a multi-select's subset. Nothing else is accepted: an answer that is not a list of non-empty labels is refused outright, and the text the extension eventually types is composed by the daemon from the labels it validated, so this can never put arbitrary text in front of another product's agent. A queued answer can be withdrawn until the extension has delivered it, after which withdrawing does nothing. This action is never relayed: the bridge lives on the daemon the extension talks to.
 
 ### Queueing a ticket writes the queue directly
 

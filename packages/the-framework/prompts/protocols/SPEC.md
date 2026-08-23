@@ -1,4 +1,4 @@
-The protocols appended to every agent's system channel: how an agent signals to The Framework. They pin the exact shape of an awaited choice, of the session name and the ready-for-merge signal, and they tell an agent what this particular agent can do — whether it has a browser, and whether it can stop to ask at all.
+The protocols appended to every agent's system channel: how an agent signals to The Framework. They pin the exact shape of an awaited choice, of the session name and the ready-for-merge signal, and they tell an agent what this particular agent can do — whether it has a browser, and whether it has to land its own work.
 
 ## User story
 
@@ -15,8 +15,8 @@ The protocols appended to every agent's system channel: how an agent signals to 
 - **Awaiting** - one block shape for every question an agent stops to ask, including handing a stuck browser to a human, plus a non-blocking way to show a document.
 - **Signalling** - the non-blocking blocks: the session name, ready for merge, the pull request to open, and an error only the user can fix.
 - **Browser** - added only when this agent has a real browser, telling it so and when to prefer the browser over plain page fetching.
-- **Hands-off** - added only when this agent runs somewhere nothing local can steer, replacing the gates with "decide alone" and requiring everything to land as a pull request.
-- **Order is fixed** - the browser section comes first, then awaiting, then hands-off amending it, and signalling stays last.
+- **Hands-off** - added to every agent handed somewhere nothing local can steer, requiring it to land everything as a pull request.
+- **Order is fixed** - the browser section comes first, then awaiting, then hands-off, and signalling stays last.
 
 ## Business logic
 
@@ -41,7 +41,9 @@ See `## User story`.
 - **Awaiting** — how an agent parks at a gate: one block ending the turn, in one shape for an approval, a multi-select, a plan sign-off or handing a stuck browser to a human, carrying which option is safe to take when nobody answers and which option ends the agent instead of resuming it. It also covers pushing a document to the dashboard without stopping.
 - **Signalling** — the blocks an agent emits mid-turn without stopping: the session name it chose, the ready-for-merge declaration, the title and description of the pull request The Framework then opens for it, and errors only the user can fix.
 - **Browser** — added only to an agent that has a real browser: that it has one, that the browser is for what it must see or act on while plain fetching remains better for reading, and that it should stay within one page so the user can watch.
-- **Hands-off** — added only to an agent handed somewhere nothing local can steer: the gates just taught are unavailable, so it takes the most plausible reading and says which assumption it made, and it must land its work as a pull request because the conversation reaches nobody.
+- **Hands-off** — added to every agent handed somewhere nothing local can steer: no machine here sees its workspace, so it must commit its work and open a pull request for it, and write any analysis, plan or decision into committed files, because the conversation reaches nobody.
+
+An agent's gates are the same everywhere: a hands-off agent asks exactly the way a local one does, and the Claude web bridge is what carries a cloud session's question to the user.
 
 ### Order is fixed
 
@@ -51,7 +53,7 @@ The dashboard shows the user the exact system channel an agent will receive, and
 
 #### Business logic
 
-The browser section goes ahead of the rest; the await protocol follows; the hands-off protocol comes immediately after it, because it amends what that protocol just taught — the gates are described and then declared unavailable, which keeps the shape intact for The Framework's parser while telling the agent not to reach for it. The signal protocol is always last in the channel.
+The browser section goes ahead of the rest; the await protocol follows; the hands-off protocol comes after it, and the signal protocol is always last in the channel.
 
 ## Before modifying/creating SPEC.md files
 

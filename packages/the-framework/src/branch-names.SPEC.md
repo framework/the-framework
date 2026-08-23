@@ -2,6 +2,8 @@ The naming rules for everything The Framework mints in git, kept in one place so
 
 The same rules answer the filesystem questions around `.the-framework/branches/`: an agent's worktree directory carries its birth branch's name, so the flat listing reads as branch names; the agent id is recoverable from a directory name (a name without the minted prefix is a legacy layout's bare agent id, returned as-is so old checkouts stay addressable); and only names in the minted `tf-agent-` spelling count as framework checkouts, since the same directory also holds the rename links and possibly a user's own entries.
 
+They also answer which branches The Framework may ever delete on its own: those it minted for an agent — the `tf-agent-<agent id>` spelling, a session-named `tf-<session name>`, or the retired slashed form — and never the data branch, which shares the prefix but is not an agent's. A branch of the user's own is out of scope by name alone, so no cleanup can reach it however empty it looks.
+
 The retired `the-framework/` prefix is never minted anymore, but branches under it still exist on remotes and in archives, so classifiers and sweeps keep recognizing that spelling until those die out. It is never used to create anything.
 
 ## Before modifying/creating SPEC.md files

@@ -11,10 +11,14 @@ Finding the parked question, across every shape the block has been seen in:
 - When the page marks its messages, everything inside the opening message is the rendered prompt: decoys there are ignored while a real question in a later message still wins, and a question-shaped block that exists only inside the opening message is never reported.
 - Every one of those cases also checks that the composer was located and that the panel shows the question's actual title.
 
-Typing the dashboard's pick back into the session:
+What is reported to the daemon:
+
+- The question reaches the daemon in the shape the session asked it: whether several answers may be picked at once, which options start ticked, and which option ends the session, alongside the labels and their detail text — while keys the daemon does not know are dropped rather than forwarded.
+
+Typing the dashboard's answer back into the session:
 
 - The composer is filled and the page's send button is clicked.
-- With no send button on the page, the pick is submitted with an Enter keypress instead.
+- With no send button on the page, the answer is submitted with an Enter keypress instead.
 - A page with no composer is refused with that as the stated reason, rather than the text being typed somewhere else.
 
 The panel: it folds down to a compact "TF" tab, dropping its rows and its full title, and unfolds with the question's details intact.

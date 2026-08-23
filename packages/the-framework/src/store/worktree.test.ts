@@ -7,6 +7,8 @@ import type { GitRunner } from '../project.js'
 import { nodeGitRunner } from '../project.js'
 import {
   addWorktree,
+  attachWorktree,
+  deleteBranch,
   commitPendingWork,
   listWorktrees,
   parseWorktreeList,
@@ -133,6 +135,33 @@ test('add/list/remove round-trips against a real git repo', async () => {
     assert.equal((await listWorktrees(repo, git)).some(w => w.path === path), false, 'removed worktree is no longer listed')
 
     await assert.doesNotReject(() => pruneWorktrees(repo, git))
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('attachWorktree recreates a branch that is gone from HEAD, and still refuses one git will not attach (#1650)', async () => {
+  // The only branch the framework deletes held nothing past a commit the remote already had, so
+  // continuing that agent on a fresh branch from HEAD puts it exactly where it was.
+  const git = nodeGitRunner()
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'framework-worktree-')))
+  try {
+    await git(['init'], repo)
+    await git(['config', 'user.email', 't@t'], repo)
+    await git(['config', 'user.name', 't'], repo)
+    await writeFile(join(repo, 'README.md'), '# t\n')
+    await git(['add', '-A'], repo)
+    await git(['commit', '-m', 'init'], repo)
+
+    const { path } = await attachWorktree(repo, { agentId: 'run1', branch: 'tf-agent-run1' }, git)
+    assert.equal(await currentBranch(path, git), 'tf-agent-run1', 'the missing branch was created and checked out')
+    await removeWorktree(repo, path, git)
+    await deleteBranch(repo, 'tf-agent-run1', git)
+    await assert.rejects(() => git(['show-ref', '--verify', 'refs/heads/tf-agent-run1'], repo), 'deleteBranch removed it')
+
+    // A branch that exists but is checked out by the main checkout is git's refusal, not ours.
+    const head = (await git(['rev-parse', '--abbrev-ref', 'HEAD'], repo)).trim()
+    await assert.rejects(() => attachWorktree(repo, { agentId: 'run2', branch: head }, git))
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

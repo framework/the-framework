@@ -201,6 +201,51 @@ test('a web run whose checkout holds more than the hand-off carried falls back t
   }
 })
 
+test('a run branch holding nothing the remote lacks goes with its checkout, unpushed (#1650)', async () => {
+  // A triage that wrote only to the data branch, or a run stopped before its first commit: the
+  // branch tip is the commit it started from, which origin already has. Pushing it is what put an
+  // empty `tf-triage-quick` on origin; keeping it is what made the next triage stand down behind
+  // a branch that "already exists" — on any repo where no PR ever carried the name, so the
+  // stale-branch release could not prove it dead.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await git(['checkout', '--', '.'], path)
+    await mkdir(join(repo, '.git', 'info'), { recursive: true })
+    await writeFile(join(repo, '.git', 'info', 'exclude'), '.the-framework/\n')
+    const now = new Date().toISOString()
+    await mkdir(join(path, '.the-framework'), { recursive: true })
+    await writeFile(join(path, '.the-framework', 'agent.json'), JSON.stringify({ status: 'done', id: RUN_ID, startedAt: now, updatedAt: now }))
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
+    await assert.rejects(() => stat(path), 'the checkout is gone')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/remotes/origin/${branch}`], repo), 'nothing reached origin')
+    await assert.rejects(() => git(['rev-parse', '--verify', `refs/heads/${branch}`], repo), 'and the branch went with the checkout')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
+test('a clean checkout whose commit the remote does not have yet is pushed and keeps its branch (#1650)', async () => {
+  // The carve-out is for a branch that provably holds nothing. A commit origin has never seen is
+  // exactly what the ordinary rule exists to protect, clean tree or not.
+  const { repo, path, branch } = await repoWithDirtyWorktree()
+  const git = nodeGitRunner()
+  try {
+    await git(['push', '-q', 'origin', 'HEAD:main'], repo)
+    await git(['config', 'user.email', 't@t'], path)
+    await git(['config', 'user.name', 't'], path)
+    await git(['add', '-A'], path)
+    await git(['commit', '-q', '-m', 'work'], path)
+    assert.deepEqual(await removeProjectWorktree(repo, RUN_ID), { ok: true })
+    await assert.rejects(() => stat(path), 'the checkout is gone')
+    assert.match(await git(['show', `refs/remotes/origin/${branch}:index.html`], repo), /Welcome!/, 'the commit reached origin')
+    assert.match(await git(['show', `${branch}:index.html`], repo), /Welcome!/, 'and the branch stays')
+  } finally {
+    await rm(repo, { recursive: true, force: true })
+  }
+})
+
 test('a worktree whose work cannot be committed is refused, not force-removed (#982)', async () => {
   const { repo, path } = await repoWithDirtyWorktree()
   try {

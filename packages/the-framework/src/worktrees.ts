@@ -10,6 +10,7 @@ import {
   worktreeClean,
   currentBranch,
   removeWorktree,
+  deleteBranch,
   pruneWorktrees,
   worktreePath,
   worktreeSize,
@@ -155,6 +156,8 @@ export async function removeProjectWorktree(
         error: `session ${agentId}'s record could not be read (${errorMessage(err)}); its worktree was kept`,
       }
     }
+    // Whether the run's branch goes with the checkout (#1650): only when it provably holds nothing.
+    let emptyBranch = false
     if (meta?.target === 'web' && meta.cloudAnchor && (await webCheckoutCovered(path, branch, meta.cloudAnchor))) {
       // A web run's checkout never holds the work (#1601): the hand-off pushed everything the
       // cloud session clones at, and the work itself lands on the session's own remote branch.
@@ -164,6 +167,16 @@ export async function removeProjectWorktree(
       // recorded anchor). Anything short of that proof — no anchor recorded, the anchor's object
       // gone, a tree or tip that moved — falls through to the ordinary rule below, which is never
       // worse than what every web run got before.
+    } else if (await branchHoldsNothing(cwd, path, branch)) {
+      // A run that committed nothing (#1650) — a triage that wrote only to the data branch, a run
+      // stopped before its first commit — leaves a branch whose tip is a commit the remote already
+      // has. The rule is satisfied before any push: what the checkout holds *is* on the remote.
+      // Pushing anyway is what put an empty `tf-triage-quick` on origin, and keeping the branch
+      // is what jammed the next triage on it ("branch already exists — triage pending"), on any
+      // repo where the stale-branch release (#1293) could not prove it dead: no PR ever carried
+      // the name, so the branch looked like an agent still working toward its handoff. The branch
+      // goes with the checkout. It is not the last copy of anything, by construction.
+      emptyBranch = true
     } else if (meta?.handoff && !meta.handoff.push) {
       // A publish-nothing session's checkout goes only once everything it holds is already on
       // the remote by someone's explicit act: a clean tree on a pushed tip — then removing it
@@ -199,6 +212,8 @@ export async function removeProjectWorktree(
     await opts.beforeRemove?.(agentId)
     await removeWorktree(cwd, path)
     await pruneWorktrees(cwd)
+    // After the checkout: git refuses to delete a branch a worktree still has checked out.
+    if (emptyBranch) await deleteBranch(cwd, branch)
     return { ok: true }
   } catch (err) {
     return { ok: false, error: errorMessage(err) }
@@ -215,6 +230,21 @@ async function webCheckoutCovered(path: string, branch: string, anchor: string):
   const git = nodeGitRunner()
   return git(['merge-base', '--is-ancestor', branch, anchor], path).then(
     () => true,
+    () => false,
+  )
+}
+
+/**
+ * Whether a run's branch holds nothing the remote lacks (#1650): the tree is clean and the tip is
+ * reachable from some remote-tracking branch — a commit `origin` already has, so nothing on the
+ * branch is unique to it. Read from the local remote-tracking refs, which are only ever behind the
+ * remote: a tip they do not cover yet answers false, and the caller falls back to the push.
+ */
+async function branchHoldsNothing(cwd: string, path: string, branch: string): Promise<boolean> {
+  if (!(await worktreeClean(path))) return false
+  const git = nodeGitRunner()
+  return git(['branch', '--remotes', '--contains', `refs/heads/${branch}`], cwd).then(
+    out => out.trim() !== '',
     () => false,
   )
 }

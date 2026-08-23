@@ -1,4 +1,4 @@
-The `/go-to-dashboard` page: where the website's "Dashboard" link lands, explaining that the dashboard runs locally and handing the visitor the terminal commands to run, install, or one-time-try The Framework.
+The `/go-to-dashboard` page: the destination for anyone asking to be taken to the dashboard, explaining that the dashboard runs locally and handing the visitor the terminal commands to run, install, or one-time-try The Framework.
 
 ## Before modifying/creating SPEC.md files
 

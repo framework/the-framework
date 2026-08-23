@@ -186,18 +186,15 @@ test('both triage presets carry the one queue-only rule, and carry it whole (#16
   }
 })
 
-test('each triage preset pins its own session name and aborts on a taken branch (#891/#892)', () => {
-  // The collision guard is what makes these safe to fire on a schedule: a triage already in
-  // flight owns the branch, so the next firing must abort and say so rather than triage twice.
+test('each triage preset pins its own session name, and none carries a branch abort (#891/#892/#1659)', () => {
+  // The collision guard that makes these safe to fire on a schedule is the routine lock on the
+  // data branch (#1659), taken by the daemon before the start — not a branch the agent checks.
   for (const preset of [presets.triageQuick, presets.triageConsensual]) {
     const out = preset.render()
     assert.match(out, new RegExp(`Always set <SESSION_NAME> to ${preset.name}`))
-    // The guard is the invariant, not its phrasing — the two templates word the sentence
-    // slightly differently, and pinning one wording is how this assertion went stale.
-    assert.match(out, /If branch tf-<SESSION_NAME> already exists, abort and tell user/)
+    assert.doesNotMatch(out, /already exists/)
   }
-  // Distinct session names, or the two would collide with each other rather than with their own
-  // in-flight run.
+  // Distinct session names, so their locks are distinct too.
   assert.notEqual(presets.triageQuick.name, presets.triageConsensual.name)
 })
 

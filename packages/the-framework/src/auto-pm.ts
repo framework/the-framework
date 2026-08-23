@@ -3,7 +3,6 @@ import type { AutoHandoffSkip } from './events.js'
 import { presets } from './preset-catalog.js'
 import { DEFAULT_AUTO_PM_CONCURRENCY } from './preference-defaults.js'
 import { TICKETS_DIR, ticketFromQueueEntry } from './tickets.js'
-import { AGENT_BRANCH_PREFIX } from './branch-names.js'
 
 /**
  * Auto PM (#685): spend leftover subscription quota on product management instead of
@@ -200,13 +199,13 @@ export interface AutoPmJob {
    */
   entry?: string
   /**
-   * The branch this job's prompt pins via its constant session name, when it does (#1293). The
-   * triage prompts abort when `the-framework/<SESSION_NAME>` already exists, so a leftover branch
-   * whose PR was closed or merged jams the routine forever. Declared as data on the job, like
-   * {@link AutoPmJob.drains}, so the sweep can release the stale name before firing without
-   * matching on {@link AutoPmJob.name} at the call site.
+   * The routine lock this job holds while it runs (#1659), as `routines/<lock>.lock.md` on the
+   * data branch: the triage routines rewrite the shared queue and may take hours, so no two may
+   * run at once, on any machine. The sweep mints it before the start and releases it when the
+   * run ends. Declared as data on the job, like {@link AutoPmJob.drains}, so the sweep never
+   * matches on {@link AutoPmJob.name} at the call site.
    */
-  pinnedBranch?: string
+  lock?: string
   /**
    * Merge this job's PR once its agent opens it (#1216). Set on the drain job: what it implements
    * has already been triaged as consensual, quick-win work a human could have vetoed on the
@@ -367,14 +366,14 @@ export const AUTO_PM_JOBS: readonly AutoPmJob[] = [
     prompt: presets.triageQuick.render(),
     label: presets.triageQuick.label,
     tooltip: presets.triageQuick.tooltip,
-    pinnedBranch: `${AGENT_BRANCH_PREFIX}${presets.triageQuick.name}`,
+    lock: presets.triageQuick.name,
   },
   {
     name: presets.triageConsensual.name,
     prompt: presets.triageConsensual.render(),
     label: presets.triageConsensual.label,
     tooltip: presets.triageConsensual.tooltip,
-    pinnedBranch: `${AGENT_BRANCH_PREFIX}${presets.triageConsensual.name}`,
+    lock: presets.triageConsensual.name,
   },
   {
     name: presets.planTickets.name,
@@ -532,12 +531,24 @@ export interface AutoPmDeps {
   /** Start the PM agent. Resolves the agent's id, or undefined when the daemon refused. */
   start(project: AutoPmProject, job: AutoPmJob): Promise<string | undefined>
   /**
-   * Release a {@link AutoPmJob.pinnedBranch} its closed PR left behind (#1293), called right
-   * before such a job fires. Injected because the release reads `gh` and mutates git, and this
-   * module is pure policy. Omitted (or throwing) means the branch stays and the job's own abort
-   * guard decides, exactly as before the seam existed.
+   * Take a job's {@link AutoPmJob.lock} before its run starts (#1659): `routines/<lock>.lock.md`
+   * on the data branch, pushed, so every machine sharing it sees the routine as taken. `ok: false`
+   * stands the job down with the reason — the lock's holder, or a write that could not land.
+   * Omitted, the job starts unguarded.
    */
-  releasePinned?(project: AutoPmProject, branch: string): Promise<unknown>
+  lockRoutine?(project: AutoPmProject, lock: string): Promise<{ ok: true } | { ok: false; reason: string }>
+  /**
+   * Drop this daemon's {@link AutoPmJob.lock} once its run has ended, whatever the ending
+   * (#1659): a triage never opens the PR that would lift a ticket claim. `false` when the release
+   * could not land, so the loop holds the agent and retries next sweep.
+   */
+  releaseRoutine?(project: AutoPmProject, lock: string): Promise<boolean>
+  /**
+   * Drop the locks a previous daemon on this machine left behind whose runs are gone (#1659).
+   * Asked once per project, on the project's first sweep: this loop holds nothing in memory for
+   * them, so nothing else would ever release them before the expiry.
+   */
+  releaseDeadLocks?(project: AutoPmProject): Promise<unknown>
   /**
    * Settle a finished agent's queue entry (#852/#1582): the daemon retires the entry it pinned to
    * the run once the run's ending says the work was published. Called before the sweep decides
@@ -661,10 +672,9 @@ export interface AutoPmLoop {
    *   Its Run now used to be a plain single start, so the concurrency setting was the one thing
    *   that click ignored; narrowing here reaches the same claim-then-start path the rotation
    *   takes, locks included.
-   * - `{ pinned }` — the rotation job pinned to that branch ({@link AutoPmJob.pinnedBranch}), for
-   *   a triage's Run now (#1643). One agent, like the rotation's own firing, but through the
-   *   sweep so the stale copy of its branch is released before the start — the one preparation a
-   *   plain start skipped, and the one that made every click die on the previous run's leftover.
+   * - `{ lock }` — the rotation job holding that lock ({@link AutoPmJob.lock}), for a triage's Run
+   *   now (#1643/#1659). One agent, like the rotation's own firing, but through the sweep so the
+   *   lock is taken before the start — a plain start would run unguarded.
    *
    * `projectId` scopes the sweep to one project, which is what a Run now fired from a card with a
    * project picked means. Absent, every project the daemon watches is visited, which is what the
@@ -679,16 +689,15 @@ export interface AutoPmLoop {
 /**
  * Which routine's work a narrowed sweep is for (#1204/#1643). `'drain'` and `'plan'` are the
  * fan-out kinds: a drain takes one entry *off* the queue and a pinned plan agent writes one
- * ticket's own sibling files, so several agents do disjoint work. `{ pinned }` names a rotation
- * job by the branch it pins ({@link AutoPmJob.pinnedBranch}): one agent is all it can use, but its
- * prompt aborts when that branch already exists, and the release that clears a stale copy is the
- * sweep's (#1293) — a Run now that started it outside the sweep died on the leftover (#1643).
- * Keyed on the branch rather than the job's name for the same no-name-matching reason the job
- * carries the property at all: the card sends whatever the job it renders declares, so no string
- * anywhere has to agree with a name. A rotation job that neither fans out nor pins a branch has
- * nothing to narrow to — a plain start is exactly what it is.
+ * ticket's own sibling files, so several agents do disjoint work. `{ lock }` names a rotation
+ * job by the lock it holds ({@link AutoPmJob.lock}): one agent is all it can use, and the lock
+ * that guards it is the sweep's to take (#1659) — a Run now that started it outside the sweep
+ * would run unguarded. Keyed on the lock rather than the job's name for the same
+ * no-name-matching reason the job carries the property at all: the card sends whatever the job
+ * it renders declares. A rotation job that neither fans out nor holds a lock has nothing to
+ * narrow to — a plain start is exactly what it is.
  */
-export type AutoPmOnly = 'drain' | 'plan' | { pinned: string }
+export type AutoPmOnly = 'drain' | 'plan' | { lock: string }
 
 /**
  * Start the auto-PM sweep (#685): every {@link DEFAULT_AUTO_PM_INTERVAL_MS}, ask
@@ -714,7 +723,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   // The claim rides along (#1583) so a run that settles with nothing to hand off gets the lock
   // minted for it released rather than stranded; `waits` counts the sweeps spent holding a
   // finished run whose epilogue has not reported yet, so the hold is bounded.
-  type PendingAgent = { agentId: string; entry?: string; ticket?: string; claim?: PlanAssignment; waits?: number }
+  type PendingAgent = { agentId: string; entry?: string; ticket?: string; claim?: PlanAssignment; lock?: string; waits?: number }
   const pending = new Map<string, PendingAgent[]>()
   // Work this loop already spawned an agent for that ended with nothing to hand off (#1583): the
   // drain's entry, or the plan agent's ticket. Releasing such a claim re-opens the work, and a
@@ -726,6 +735,8 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
   // Where each project is in the job cycle. Per project, not global: two repos idle at once
   // should each work through the rotation, not take alternate halves of it.
   const nextJob = new Map<string, number>()
+  // Projects this loop has swept at least once, for the one-time boot release above.
+  const swept = new Set<string>()
   let sweeping = false
   let stopped = false
 
@@ -766,6 +777,12 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         Math.floor((await deps.concurrency?.().catch(() => undefined)) ?? DEFAULT_AUTO_PM_CONCURRENCY),
       )
       for (const project of projects) {
+        // A previous daemon's routine locks go on this project's first sweep (#1659): their runs
+        // are not in `pending`, so nothing below would ever release them.
+        if (!swept.has(project.id)) {
+          swept.add(project.id)
+          await deps.releaseDeadLocks?.(project).catch(() => undefined)
+        }
         // Land anything a previous agent produced before judging whether the queue is empty:
         // its entries are still on that agent's branch, and the checkout cannot see them.
         const outstanding = pending.get(project.id) ?? []
@@ -805,6 +822,12 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
                 stillPending.push({ ...agent, waits: (agent.waits ?? 0) + 1 })
                 continue
               }
+            }
+            // A routine's lock lifts with its run, whatever the ending (#1659): no PR of the
+            // agent's is ever going to. Retried next sweep when the release could not land.
+            if (agent.lock && deps.releaseRoutine && !(await deps.releaseRoutine(project, agent.lock).catch(() => false))) {
+              if ((agent.waits ?? 0) < 2) stillPending.push({ ...agent, waits: (agent.waits ?? 0) + 1 })
+              continue
             }
           }
           if (stillPending.length) pending.set(project.id, stillPending)
@@ -867,23 +890,22 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           note(project, false, 'the planning routine is switched off')
           continue
         }
-        // The pinned routine this click asked for (#1643), by the branch it declares rather than
-        // its name, and read off the enabled rotation for the same reason the plan click is. A
-        // branch no enabled job pins is told apart: the routine the catalog shows is switched
-        // off, which is a setting the user can undo, or nothing pins that branch at all, which
-        // is a dashboard older than its daemon.
-        const pinnedBranch = typeof opts?.only === 'object' ? opts.only.pinned : undefined
-        const pinnedJob =
-          pinnedBranch === undefined ? undefined : rotation.find(item => item.pinnedBranch === pinnedBranch)
-        if (pinnedBranch !== undefined && !pinnedJob) {
-          const off = deps.jobs.find(item => item.pinnedBranch === pinnedBranch)
-          const reason = off ? `${off.label ?? off.name} is switched off` : `no routine is pinned to ${pinnedBranch}`
+        // The locked routine this click asked for (#1643/#1659), by the lock it declares rather
+        // than its name, and read off the enabled rotation for the same reason the plan click is.
+        // A lock no enabled job holds is told apart: the routine the catalog shows is switched
+        // off, which is a setting the user can undo, or nothing holds that lock at all, which is
+        // a dashboard older than its daemon.
+        const lock = typeof opts?.only === 'object' ? opts.only.lock : undefined
+        const lockedJob = lock === undefined ? undefined : rotation.find(item => item.lock === lock)
+        if (lock !== undefined && !lockedJob) {
+          const off = deps.jobs.find(item => item.lock === lock)
+          const reason = off ? `${off.label ?? off.name} is switched off` : `no routine holds the ${lock} lock`
           deps.log(`[framework] auto PM: standing down for ${project.path} — ${reason}`)
           note(project, false, reason)
           continue
         }
         // The one routine the click named, when it named one: it takes the tick outright below.
-        const named = planJob ?? pinnedJob
+        const named = planJob ?? lockedJob
         /**
          * What this tick does, which is the queue-picked mode (#855) unless the draining routine
          * is switched off — then the rotation gets the tick instead of the sweep standing down.
@@ -1048,18 +1070,29 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
         // that overlapped the spawns would otherwise see too few live agents and top up past the cap.
         lastStart.set(project.id, now())
         const started: AutoPmJob[] = []
+        let standDown: string | undefined
         for (const item of batch) {
           // Re-checked per spawn, for the reason (#983) above: a stop mid-batch must not spawn the rest.
           if (stopped) break
+          // A locked routine is taken before its run starts (#1659): an alive lock — another
+          // machine's triage, or this one's still going — stands the job down here, with no
+          // agent started to find out. Said as its own reason, since nothing was refused.
+          if (item.lock && deps.lockRoutine) {
+            const taken = await deps.lockRoutine(project, item.lock).catch((): { ok: false; reason: string } => ({ ok: false, reason: 'the routine lock could not be taken' }))
+            if (!taken.ok) {
+              deps.log(`[framework] auto PM: standing down for ${project.path} — ${taken.reason}`)
+              standDown = taken.reason
+              break
+            }
+          }
           deps.log(`[framework] auto PM: ${doing(item)} in ${project.path}`)
-          // A pinned-name job aborts itself when its branch already exists (#1293); a branch
-          // whose PR closed is not a pending triage, so it is released before the start.
-          if (item.pinnedBranch) await deps.releasePinned?.(project, item.pinnedBranch).catch(() => undefined)
           const agentId = await deps.start(project, item).catch(() => undefined)
           if (!agentId) {
             // The batch ends at the first refusal: whatever refused this start is not going to take
             // the next one a moment later, and a refused job must be retried rather than skipped.
             deps.log(`[framework] auto PM: could not start a run in ${project.path}`)
+            // The lock just taken for it goes back: no run will ever release it.
+            if (item.lock) await deps.releaseRoutine?.(project, item.lock).catch(() => false)
             break
           }
           started.push(item)
@@ -1071,6 +1104,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
               ...(item.entry !== undefined ? { entry: item.entry } : {}),
               ...(item.ticket !== undefined ? { ticket: item.ticket } : {}),
               ...(item.claim !== undefined ? { claim: item.claim } : {}),
+              ...(item.lock !== undefined ? { lock: item.lock } : {}),
             },
           ])
         }
@@ -1110,7 +1144,7 @@ export function startAutoPm(deps: AutoPmDeps): AutoPmLoop {
           // Nothing took, so the cooldown armed above is given back: a batch that started nothing
           // spent nothing, and holding it would strand the project for a whole cooldown.
           lastStart.delete(project.id)
-          note(project, false, 'the daemon could not start a run')
+          note(project, false, standDown ?? 'the daemon could not start a run')
         }
       }
     } finally {

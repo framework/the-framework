@@ -53,14 +53,13 @@ const NO_PROJECTS: ProjectSummary[] = []
 /**
  * The sweep a routine's Run now asks for, when it is a sweep rather than a plain start — or
  * nothing, for the routine a plain start serves exactly. Decided by what the job declares about
- * itself (it drains, fans out, or pins a branch), never by its name, so a renamed routine keeps
+ * itself (it drains, fans out, or holds a lock), never by its name, so a renamed routine keeps
  * its path.
  *
  * The two that fan out (#1204) go because only the sweep can: it claims the work before each
  * agent starts — a queue entry for a drain, a ticket lock for planning — and a plain start could
- * only ever be one agent. A routine pinned to a branch (#1643) goes for the sweep's other
- * preparation: it releases a stale copy of that branch before the start, and without it the
- * agent read the leftover as a triage already pending and aborted, on every click.
+ * only ever be one agent. A routine that holds a lock (#1643/#1659) goes for the same claim: the
+ * sweep takes `routines/<name>.lock.md` before the start, and a plain start would run unguarded.
  *
  * The drain visits every project, which is what its tooltip says and why it sends no id. The
  * rest are the picked project's own work, so they carry one.
@@ -68,7 +67,7 @@ const NO_PROJECTS: ProjectSummary[] = []
 function narrowedSweep(job: AutoPmJob, projectId: string): { only: AutoPmOnly; projectId?: string } | undefined {
   if (job.drains) return { only: 'drain' }
   if (job.fansOut) return { only: 'plan', projectId }
-  if (job.pinnedBranch !== undefined) return { only: { pinned: job.pinnedBranch }, projectId }
+  if (job.lock !== undefined) return { only: { lock: job.lock }, projectId }
   return undefined
 }
 

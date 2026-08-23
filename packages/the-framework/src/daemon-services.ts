@@ -10,6 +10,7 @@ import { startKeyedWatcher, type KeyedWatcher } from './dashboard/keyed-watcher.
 import { buildInterventions, interventionKey, postInterventionsDiscord } from './dashboard/interventions.js'
 import { buildActivity, activityKey, postActivityDiscord } from './dashboard/activity.js'
 import { startAutoPm, AUTO_PM_JOBS, DEFAULT_AUTO_PM_INTERVAL_MS, quotaHeadroom, type AutoPmReport, type AutoPmOnly } from './auto-pm.js'
+import type { ActiveAgentSlot } from './daemon-runtime.js'
 import { startDaemonTick, DAEMON_TICK_MS } from './daemon-tick.js'
 import { ciFixPrompt, startCiWatch } from './ci-watch.js'
 import { releaseStalePinnedBranch } from './stale-branch.js'
@@ -102,8 +103,8 @@ export interface BackgroundServiceDeps {
   quota: QuotaSource
   /** Start an agent in a project. */
   startAgent: (prompt: string, options: StartAgentOptions, projectId: string) => Promise<StartAgentResult>
-  /** How many agents are live on a project, so a background job can tell idle from busy. */
-  activeAgentCount: (projectId: string) => number
+  /** The slots held on a project (#1646), so a background job can tell idle from busy, and say by what. */
+  activeAgentSlots: (projectId: string) => readonly ActiveAgentSlot[]
   /**
    * The agents this daemon is still responsible for, whose checkouts the worktree sweep must leave
    * alone. See {@link MergedSweepOptions.busy}.
@@ -153,6 +154,16 @@ export async function resolveProjectAgentOptions(id: string, env: NodeJS.Process
   return agentOptionsFromPreferences({ ...global, ...preferencesFromFileConfig(file) })
 }
 
+/**
+ * A held slot as the sweep's lines say it (#1646): the run's id with its pid, so the reader can
+ * go from a stand-down straight to `ps` and to the run's own page. The worktree-less fallback
+ * agent has no id of its own and is named by where it runs.
+ */
+export function describeSlot(slot: ActiveAgentSlot): string {
+  const who = slot.agentId ?? 'a run in the project checkout'
+  return slot.state === 'starting' ? `${who} (starting)` : `${who} (pid ${slot.pid})`
+}
+
 export function startBackgroundServices(deps: BackgroundServiceDeps): BackgroundServices {
   const { env, log } = deps
   const projects = () => listSummaries(env)
@@ -192,7 +203,9 @@ export function startBackgroundServices(deps: BackgroundServiceDeps): Background
     // The queue's open entries rather than a bare emptiness bit: a batch of concurrent drains is
     // pinned one entry each (#1204), so the sweep needs the entries the decision was made on.
     queue: async project => (await findTodoBacklog(project.path))?.entries ?? [],
-    activeAgents: project => deps.activeAgentCount(project.id),
+    // One label per held slot (#1646): the run's id and its pid, so the sweep's stand-down and
+    // fan-out lines name what they were measured against instead of a bare number.
+    activeAgents: project => deps.activeAgentSlots(project.id).map(describeSlot),
     // How many agents the routine may keep going per project (#1204). Global like the opt-outs;
     // the sweep applies the default when it is unset.
     concurrency: async () => (await prefs()).autoPmConcurrency,

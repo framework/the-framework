@@ -122,7 +122,7 @@ happens while nobody is at the keyboard.
 - Auto PM: drain the confirmed queue, refill it when empty
 - The routine rotation — update tickets from GitHub, triage quick wins, triage consensual work, plan tickets — plus a calendar-paced maintenance sweep
 - Each routine individually switchable off
-- Every stand-down reported with its reason ("it is a setting, not a bug")
+- Every stand-down reported with its reason ("it is a setting, not a bug"); a stand-down at the concurrency cap, or a fan-out that came out short, names the runs holding the slots
 - Concurrency cap: how many unattended agents per project
 - Fan-out planning: several agents, one ticket each
 - Cross-machine ticket claims so two agents never double-work; a claim whose agent ended with nothing to hand off is freed by the daemon

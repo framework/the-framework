@@ -332,6 +332,17 @@ export async function waitOutFinishedLeg(
   await slots.retiring.get(key)?.catch(() => {})
 }
 
+/**
+ * One slot the daemon holds on a project (#1646): a run whose process is alive, or one still
+ * mid-spawn. `agentId` is absent for the one-at-a-time fallback agent that got no worktree.
+ */
+export interface ActiveAgentSlot {
+  agentId?: string
+  /** The live process, for a `live` slot. Re-checked against the OS at read time. */
+  pid?: number
+  state: 'live' | 'starting'
+}
+
 /** Inputs to {@link createProjectRuntime}. */
 export interface ProjectRuntimeOptions {
   /** The daemon's home workspace; a run/preview with no project id targets it. */
@@ -362,8 +373,14 @@ export interface ProjectRuntime {
   /** The device side of the relay (#1067 slice 2): run one whitelisted read/steer/handoff RPC against
    *  this daemon's own home checkout, for a daemon that relayed an agent here. */
   onRelayRpc: (fn: string, args: unknown[]) => Promise<unknown>
-  /** Live agents on a project (#685), so a background job can tell an idle project from a busy one. */
-  activeAgentCount: (targetProjectId: string) => number
+  /**
+   * The slots held on a project (#685/#1646), one per live run or run mid-spawn, so a background
+   * job can tell an idle project from a busy one — and say *what* is holding it. The slots rather
+   * than a count, because a count that came out one too high (#1646) could not be questioned:
+   * the Agents panel reads each run's own status, while this reads the daemon's process table,
+   * and a process that outlives its finished run shows only here.
+   */
+  activeAgentSlots: (targetProjectId: string) => ActiveAgentSlot[]
   /**
    * The agent ids this daemon is still responsible for: spawning, running, or mid-retirement.
    *
@@ -374,10 +391,11 @@ export interface ProjectRuntime {
    */
   busyAgentIds: () => ReadonlySet<string>
   /**
-   * Stop the agents this daemon spawned. Returns how many were stopped. Called on shutdown, before
+   * Stop the agents this daemon spawned. Returns the ids of the runs it stopped (#1646), so the
+   * shutdown line can name a process that outlived its finished run. Called on shutdown, before
    * the previews go.
    */
-  stopAgents: (graceMs?: number) => Promise<number>
+  stopAgents: (graceMs?: number) => Promise<string[]>
   /** Stop every live preview so their dev servers do not outlive the daemon (#475). */
   dispose: () => Promise<void>
 }
@@ -832,18 +850,25 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
   }
 
   /**
-   * How many agents are live on a project (#685). Agent keys are `<projectKey>::<agentId>`, or the
+   * The slots held on a project (#685/#1646). Agent keys are `<projectKey>::<agentId>`, or the
    * bare project key for an agent that got no worktree, so both spellings count. The pid is
    * re-checked rather than trusted: `settle` clears the entry on exit, but an agent whose exit
-   * event never arrived would otherwise keep a project looking busy forever.
+   * event never arrived would otherwise keep a project looking busy forever. A key mid-spawn
+   * counts too; it cannot outlive the spawn, which clears it in a `finally`.
    */
-  const activeAgentCount = (targetProjectId: string): number => {
-    let live = 0
+  const activeAgentSlots = (targetProjectId: string): ActiveAgentSlot[] => {
+    const slots: ActiveAgentSlot[] = []
     for (const [key, pid] of activeAgents) {
-      if (!keyBelongsTo(key, targetProjectId)) continue
-      if (isPidAlive(pid)) live++
+      if (!keyBelongsTo(key, targetProjectId) || !isPidAlive(pid)) continue
+      const { agentId } = parseScopedKey(key)
+      slots.push({ ...(agentId ? { agentId } : {}), pid, state: 'live' })
     }
-    return live + [...starting].filter(key => keyBelongsTo(key, targetProjectId)).length
+    for (const key of starting) {
+      if (!keyBelongsTo(key, targetProjectId)) continue
+      const { agentId } = parseScopedKey(key)
+      slots.push({ ...(agentId ? { agentId } : {}), state: 'starting' })
+    }
+    return slots
   }
 
   /** See {@link ProjectRuntime.busyAgentIds}: every slot the daemon has not finished with. */
@@ -873,11 +898,15 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
    * Resolving means the daemon has let go of the repo, not merely that the processes are dead —
    * see {@link waitOutSlots}. The archive commit that runs right behind this depends on it.
    */
-  const stopAgents = async (graceMs = 5000): Promise<number> => {
+  const stopAgents = async (graceMs = 5000): Promise<string[]> => {
     closing = true
     const stopping = [...activeAgents.entries()]
-    let stopped = 0
-    for (const [, pid] of stopping) if (await terminate(pid, graceMs)) stopped++
+    // Named, not counted (#1646): a process still here at shutdown is either a run the user knows
+    // about or one that outlived its finished run, and only its id tells the two apart.
+    const stopped: string[] = []
+    for (const [key, pid] of stopping) {
+      if (await terminate(pid, graceMs)) stopped.push(parseScopedKey(key).agentId ?? `pid ${pid}`)
+    }
     // Each slot is left for its own `settle` to clear, so the wait can tell a teardown that has
     // yet to start from one that has already finished.
     await waitOutSlots(stopping.map(([key]) => key), { activeAgents: activeAgents, retiring }, graceMs)
@@ -918,7 +947,7 @@ export function createProjectRuntime({ cwd, env, binPath, retryDelayMs, driverPr
     tailRelayEvents,
     remoteAgents,
     onRelayRpc,
-    activeAgentCount,
+    activeAgentSlots,
     busyAgentIds,
     stopAgents,
     dispose,

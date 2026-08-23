@@ -127,7 +127,13 @@ test('two sessions run concurrently, each in its own worktree (#736)', async () 
     assert.equal(wtA?.own, true)
     assert.equal(wtB?.own, true)
     assert.notEqual(wtA?.path, wtB?.path)
-    assert.equal(world.runtime.activeAgentCount(project.id), 2)
+    // Both slots name their run and its process (#1646): the count is derived, the names are what
+    // the sweep says when it stands down against them.
+    const slots = world.runtime.activeAgentSlots(project.id)
+    assert.deepEqual(slots.map(slot => [slot.agentId, slot.state, typeof slot.pid]).sort(), [
+      [runA, 'live', 'number'],
+      [runB, 'live', 'number'],
+    ].sort())
 
     // Answering each question lets each session finish independently.
     for (const [agentId, gate] of [
@@ -143,7 +149,7 @@ test('two sessions run concurrently, each in its own worktree (#736)', async () 
     // Eventually, not instantly: the meta flips to done a beat before the daemon reaps the
     // child's exit, and until the reap the pid still answers as alive.
     await waitFor(
-      () => (world.runtime.activeAgentCount(project.id) === 0 ? true : undefined),
+      () => (world.runtime.activeAgentSlots(project.id).length === 0 ? true : undefined),
       'the daemon to reap both finished runs',
     )
   } finally {

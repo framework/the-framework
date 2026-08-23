@@ -30,7 +30,7 @@ The user opens a `web` agent and sees no streamed output.
 
 #### Business logic
 
-The `web` run target is a hand-off, not a streamed agent: the work runs on Anthropic's infrastructure, makes its own worktree and opens its own pull request, and there is no way for this machine to follow it. So instead of an empty event log that looks stalled, the agent's page states that it runs as a Claude Code cloud session and that the session asks its questions and opens its pull request over there, not here. Before the cloud session exists, it says one is starting.
+The `web` run target is a hand-off, not a streamed agent: the work runs on Anthropic's infrastructure, makes its own worktree and opens its own pull request, and there is no way for this machine to follow it. So instead of an empty event log that looks stalled, the agent's page states that it runs as a Claude Code cloud session, that the session opens its pull request over there, and that a question it parks on shows up here once the bridge sees it. Before the cloud session exists, it says one is starting.
 
 For every other run target, none of this is shown at all.
 

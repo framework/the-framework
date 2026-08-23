@@ -54,7 +54,7 @@ test('CONTEXT_DOCS is the repo-context fragment (#683): business knowledge plus 
   // dependency of the repo it works on, which is what left both specs unopenable (#1163).
   for (const doc of CONTEXT_DOCS) assert.ok(!doc.comment.includes('node_modules/'), `${doc.path} points into node_modules`)
 })
-import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL, UNATTENDED_PROTOCOL } from './turn-gate.js'
+import { AWAIT_PROTOCOL, BROWSER_PROTOCOL, HANDS_OFF_PROTOCOL, SIGNAL_PROTOCOL } from './turn-gate.js'
 
 test('loadUserSystemPrompt reads and trims SYSTEM.md', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'system-prompt-'))
@@ -264,38 +264,25 @@ test('the browser section survives --vanilla but not transparent (#824)', () => 
   assert.equal(composeAgentSystem({ transparent: true, browser: true }), '')
 })
 
-test('composeAgentSystem stays quiet about hands-off unless the run is one (#1234)', () => {
-  // A local agent's gates work; telling it they do not would auto-answer questions a human is
-  // sitting right there to take. And it lands its work through the framework, not on its own.
+test('composeAgentSystem stays quiet about hands-off unless the run is one (#1225)', () => {
+  // A local agent lands its work through the framework, not on its own.
   assert.ok(!composeAgentSystem().includes(HANDS_OFF_PROTOCOL))
-  assert.ok(!composeAgentSystem().includes(UNATTENDED_PROTOCOL))
 })
 
-test('a hands-off run is told to land everything; one nobody can answer is also told to decide alone (#1234/#1554)', () => {
-  // The two halves of what used to be one block. Every hand-off commits and opens its PR, because
-  // nothing here sees its workspace. Only a hand-off with no bridge is told its gates are
-  // unanswerable: with the bridge on, a cloud session that parks on a question reaches the
-  // dashboard, so it is left the same await protocol a local agent gets.
-  const attended = composeAgentSystem({ handsOff: true })
-  assert.ok(attended.includes(HANDS_OFF_PROTOCOL))
-  assert.ok(!attended.includes(UNATTENDED_PROTOCOL))
-  const alone = composeAgentSystem({ handsOff: true, unattended: true })
-  assert.ok(alone.includes(HANDS_OFF_PROTOCOL))
-  assert.ok(alone.includes(UNATTENDED_PROTOCOL))
-  // The decide-alone block rides right after the await protocol it amends, the land-everything
-  // rule after that, and the signal protocol stays last (#547).
-  assert.ok(alone.indexOf(UNATTENDED_PROTOCOL) > alone.indexOf(AWAIT_PROTOCOL))
-  assert.ok(alone.indexOf(HANDS_OFF_PROTOCOL) > alone.indexOf(UNATTENDED_PROTOCOL))
-  assert.ok(alone.endsWith(SIGNAL_PROTOCOL), 'the signal protocol is still last (#547)')
+test('a hands-off run is told to land everything, after the await protocol it keeps (#1225/#1554)', () => {
+  // Nothing here sees the session's workspace, so it commits and opens its own PR. Its gates are
+  // the same as a local agent's: it parks, and the answer reaches it through the browser bridge
+  // or on claude.ai itself — there is no decide-alone mode. The signal protocol stays last (#547).
+  const system = composeAgentSystem({ handsOff: true })
+  assert.ok(system.includes(HANDS_OFF_PROTOCOL))
+  assert.ok(system.indexOf(HANDS_OFF_PROTOCOL) > system.indexOf(AWAIT_PROTOCOL))
+  assert.ok(!system.includes('decide alone'))
+  assert.ok(system.endsWith(SIGNAL_PROTOCOL), 'the signal protocol is still last (#547)')
 })
 
-test('the hands-off blocks survive --vanilla but not transparent (#1234)', () => {
-  // Availability is a property of the session, not of the built-in prompt: --vanilla still
-  // teaches the gates, so it still has to say they cannot be answered here.
-  const vanilla = composeAgentSystem({ vanilla: true, handsOff: true, unattended: true })
-  assert.ok(vanilla.includes(HANDS_OFF_PROTOCOL))
-  assert.ok(vanilla.includes(UNATTENDED_PROTOCOL))
-  assert.equal(composeAgentSystem({ transparent: true, handsOff: true, unattended: true }), '')
+test('the hands-off block survives --vanilla but not transparent (#1225)', () => {
+  assert.ok(composeAgentSystem({ vanilla: true, handsOff: true }).includes(HANDS_OFF_PROTOCOL))
+  assert.equal(composeAgentSystem({ transparent: true, handsOff: true }), '')
 })
 
 test('composeAgentSystem keeps the emit protocols even with the built-in prompt off (#500/#501)', () => {

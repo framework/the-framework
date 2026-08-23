@@ -12,8 +12,8 @@ same "You paused to ask … The user chose …" a local agent is re-prompted wit
 tells the session the user is taking over), and a queued answer can be withdrawn until the
 extension collects it.
 
-With the bridge on, a cloud session started by The Framework is allowed to park on a question at
-all (#1554); with it off, the session is told to decide alone, since nothing could answer it.
+A cloud session started by The Framework asks its questions like a local agent does (#1554); with
+the bridge off it simply waits on claude.ai for an answer typed there.
 
 ## Set it up
 

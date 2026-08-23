@@ -1,5 +1,0 @@
-Covers the one-liner rows (meta and its order, the claim marker with inline holder, topic and claim clicks filtering without navigating, the GitHub link not hijacking the row), the start and plan columns sending their exact exported prompts with the right attended/unattended split, the one GitHub update offered empty and filled with its verbatim preset text, last-caught-up stamp and refusals saying why, and the filtered-empty vs genuinely-empty distinction.
-
-## Before modifying/creating SPEC.md files
-
-You must always read and respect https://raw.githubusercontent.com/brillout/sdd/refs/heads/main/sdd.md

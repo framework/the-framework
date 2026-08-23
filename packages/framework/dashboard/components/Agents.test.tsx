@@ -68,3 +68,11 @@ describe('Agents (#1139)', () => {
     expect(screen.getByText('oauth-work')).toBeTruthy()
   })
 })
+
+describe('Agents (#1648)', () => {
+  test('a run another machine started says whose it is; this daemon\'s own does not', () => {
+    render(<Agents working={[active('theirs', { host: 'rom-thinkpad-x280' }), active('mine')]} loading={false} onSelectAgent={vi.fn()} />)
+    expect(screen.getByText('from rom-thinkpad-x280')).toBeTruthy()
+    expect(screen.getAllByText(/^from /)).toHaveLength(1)
+  })
+})

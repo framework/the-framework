@@ -278,3 +278,37 @@ test('buildOverview lists a web run whose cloud side is still at work, and says 
     ],
   )
 })
+
+test('buildRecentAgents lists a run once when two checkouts share its archive (#1648)', async () => {
+  const shared = [agent('r2', '2026-07-13T12:00:00Z'), agent('r1', '2026-07-13T09:00:00Z')]
+  const recent = await buildRecentAgents([project('alpha', '/a'), project('alpha-clone', '/a2')], {
+    agents: async () => shared,
+  })
+  assert.deepEqual(
+    recent.map(r => ({ project: r.projectName, id: r.agent.id })),
+    [
+      { project: 'alpha', id: 'r2' },
+      { project: 'alpha', id: 'r1' },
+    ],
+  )
+})
+
+test('buildOverview names the machine that started a run when it is not this one (#1648)', async () => {
+  const at = '2026-07-13T12:00:00Z'
+  const run = (id: string, host?: string): AgentMeta =>
+    ({ version: 1, status: 'running', id, startedAt: at, updatedAt: at, intent: id, cwd: `/wt/${id}`, ...(host ? { host } : {}) }) as AgentMeta
+  const overview = await buildOverview([project('a', '/a')], {
+    liveAgents: async () => [run('mine', 'this-mac'), run('theirs', 'rom-thinkpad-x280'), run('unknown')] as never,
+    agents: async () => [],
+    queue: async () => [],
+    host: 'this-mac',
+  })
+  assert.deepEqual(
+    overview.active.map(r => ({ id: r.agentId, host: r.host })),
+    [
+      { id: 'mine', host: undefined },
+      { id: 'theirs', host: 'rom-thinkpad-x280' },
+      { id: 'unknown', host: undefined },
+    ],
+  )
+})

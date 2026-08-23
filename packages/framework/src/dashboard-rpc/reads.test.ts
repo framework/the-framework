@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { onProjectFiles, onProjectFileStatus, onAgentWorktree, markCloudWaiting } from './reads.js'
+import { onProjectFiles, onProjectFileStatus, onAgentWorktree, markCloudWaiting, markOtherHost } from './reads.js'
 import { bridgeQuestions, resetBridgeQuestions } from '../dashboard/bridge-store.js'
 import type { AgentMeta } from '../store/index.js'
 import { provideTestContext } from './test-context.js'
@@ -37,4 +37,12 @@ test('a web run whose session the bridge holds a question for is handed to the d
   assert.equal(markCloudWaiting(web('session_01Other')).cloudWaiting, undefined)
   assert.equal(markCloudWaiting({ ...web('session_01Park'), target: 'local' }).cloudWaiting, undefined)
   resetBridgeQuestions()
+})
+
+test('a run another machine\'s daemon started is handed to the dashboard as from another host (#1648)', () => {
+  const run = (host?: string): AgentMeta => ({ status: 'done', id: 'r', startedAt: '', updatedAt: '', ...(host ? { host } : {}) }) as AgentMeta
+  assert.equal(markOtherHost(run('rom-thinkpad-x280'), 'suleiman-mbp').otherHost, true)
+  assert.equal(markOtherHost(run('suleiman-mbp'), 'suleiman-mbp').otherHost, undefined)
+  // A record from before the host field was written says nothing about where it ran.
+  assert.equal(markOtherHost(run(), 'suleiman-mbp').otherHost, undefined)
 })

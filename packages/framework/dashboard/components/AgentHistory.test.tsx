@@ -172,6 +172,16 @@ describe('AgentHistory rows', () => {
     expect(screen.getByLabelText('Runs on my-laptop')).toBeTruthy()
   })
 
+  test('a run another machine started says whose it is; this daemon\'s own does not (#1067, #1648)', () => {
+    const rows = [
+      { projectId: 'p', projectName: 'gemstack', agent: agent({ id: 'theirs', host: 'rom-thinkpad-x280', otherHost: true }) },
+      { projectId: 'p', projectName: 'gemstack', agent: agent({ id: 'mine', host: 'this-mac' }) },
+    ]
+    renderRail(<AgentHistory projectId={null} agents={[]} recentAgents={rows} selectedAgentId={null} onSelect={() => {}} />)
+    expect(screen.getByLabelText('Started on rom-thinkpad-x280')).toBeTruthy()
+    expect(screen.queryByLabelText('Started on this-mac')).toBeNull()
+  })
+
   test('a local run has no device glyph (#1067)', () => {
     renderRail(<AgentHistory projectId="p1" agents={[agent()]} selectedAgentId={null} onSelect={() => {}} />)
     expect(screen.queryByLabelText(/Runs on/)).toBeNull()

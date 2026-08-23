@@ -207,6 +207,13 @@ export interface AgentMeta {
    */
   cloudWaiting?: boolean
   /**
+   * The run was started by another machine's daemon (#1648): its {@link host} is not this one.
+   * Not stored either — annotated on the way to the dashboard like {@link cloudWaiting}, since
+   * the shared data branch shows every machine's runs here and only this daemon knows which host
+   * it is.
+   */
+  otherHost?: boolean
+  /**
    * The loopback port the agent's browser preview is listening on (#813), or absent when the agent
    * has no browser. What lets the daemon proxy the pane: the port is allocated per agent and the
    * dashboard is a different process, so meta is the only place it can learn it.

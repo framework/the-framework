@@ -25,6 +25,7 @@ import { bridgeQuestions } from '../dashboard/bridge-store.js'
 import type { BridgeEvent, BridgeHello, BridgeQuestion } from '../dashboard/bridge-endpoints.js'
 import type { BridgeAnswer, BridgeContact, BridgeVersion } from '../dashboard/bridge-store.js'
 import { readDaemonToken, readPreferences, type Preferences } from '../registry.js'
+import { hostname } from 'node:os'
 
 // The read model behind the dashboard (#405): the agent history, an agent's replay, and the
 // surfaced PLAN/TODO docs — each keyed by project id and backed by
@@ -85,7 +86,7 @@ export async function onAgents(projectId: string): Promise<AgentMeta[]> {
   // no longer costs anything — nothing here depends on this staying above one.
   const remote = contextRemote()?.list(projectId) ?? []
   const cwd = await resolveProjectPath(projectId)
-  const local = cwd ? (await readAllAgents(cwd)).map(markCloudWaiting) : []
+  const local = cwd ? (await readAllAgents(cwd)).map(forDashboard) : []
   if (remote.length === 0) return local
   // A relayed agent (#1067) lives only in the daemon's memory, not on disk; surface it in the list so
   // a reload re-opens it instead of losing it. Remote wins an id tie (it is the live authority).
@@ -100,6 +101,22 @@ export async function onAgents(projectId: string): Promise<AgentMeta[]> {
 export function markCloudWaiting(agent: AgentMeta): AgentMeta {
   if (agent.target !== 'web' || !agent.sessionId || !bridgeQuestions().get(agent.sessionId)) return agent
   return { ...agent, cloudWaiting: true }
+}
+
+/**
+ * A run another machine's daemon started is marked as from another host (#1648): the data branch
+ * is shared precisely so other machines' runs show up here, and a row that looked exactly like
+ * one of this daemon's own sent the user reading the archive by hand to learn whose it was. A run
+ * with no recorded host predates the field and passes through untouched.
+ */
+export function markOtherHost(agent: AgentMeta, thisHost: string = hostname()): AgentMeta {
+  if (agent.host === undefined || agent.host === thisHost) return agent
+  return { ...agent, otherHost: true }
+}
+
+/** Every annotation a run's record gets on its way to the dashboard: what the daemon knows and the disk cannot. */
+export function forDashboard(agent: AgentMeta): AgentMeta {
+  return markOtherHost(markCloudWaiting(agent))
 }
 
 /**
@@ -215,7 +232,8 @@ export async function onOverview(): Promise<Overview> {
 
 /** Recent sessions pooled across every project (#shared-shell), newest first, for the home rail. */
 export async function onRecentAgents(): Promise<RecentAgent[]> {
-  return withProjects(projects => buildRecentAgents(projects))
+  const recent = await withProjects(projects => buildRecentAgents(projects))
+  return recent.map(row => ({ ...row, agent: forDashboard(row.agent) }))
 }
 
 /** Hot tickets across every project (#1112): being worked on, likely next, and queued. */

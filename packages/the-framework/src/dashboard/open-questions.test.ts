@@ -156,6 +156,18 @@ test('a web agent\'s question arrives from the bridge and is answerable by label
   ])
 })
 
+test('two checkouts of one repository yield one card for a bridged question, not two (#1554)', async () => {
+  // They share a tf-data archive, so the same web run is in both projects' agent lists.
+  const agents = async () => [{ status: 'done' as const, id: 'run-web', startedAt: '', updatedAt: '', target: 'web' as const, sessionId: 'session_01Web' }]
+  const questions = await buildOpenQuestions([PROJECTS[0]!, { id: 'p2', path: '/two', name: 'two', activated: true }], {
+    liveAgents: async () => [],
+    events: async () => [],
+    bridged: () => [{ sessionId: 'session_01Web', title: 'Where?', options: [{ label: 'Here' }], receivedAt: '' }],
+    agents,
+  })
+  assert.deepEqual(questions.map(q => q.projectId), ['p1'])
+})
+
 test('a bridged question whose run is unknown here, or already has an answer on its way, is not offered (#1554)', async () => {
   let archiveReads = 0
   const orphan = await buildOpenQuestions(PROJECTS, {

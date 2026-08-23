@@ -94,7 +94,10 @@ export async function buildOpenQuestions(
   const liveAgents = deps.liveAgents ?? readLiveMetas
   const events = deps.events ?? readEventLog
   const agents = deps.agents ?? readAllAgents
+  // One card per bridged question, whichever project claims it first: two checkouts of the same
+  // repository share their `tf-data` archive, so the web run behind a question shows up under each.
   const bridged = (deps.bridged ?? unansweredBridgeQuestions)()
+  const claimed = new Set<string>()
   const items: OpenQuestion[] = []
   const card = (project: ProjectSummary, meta: AgentMeta, choice: ChoiceRequest, rest: Pick<OpenQuestion, 'bridge' | 'updatedAt'>): OpenQuestion => ({
     projectId: project.id,
@@ -118,8 +121,9 @@ export async function buildOpenQuestions(
     if (!bridged.length) continue
     for (const meta of await agents(project.path).catch((): AgentMeta[] => [])) {
       if (meta.target !== 'web' || !meta.sessionId) continue
-      const question = bridged.find(q => q.sessionId === meta.sessionId)
+      const question = bridged.find(q => q.sessionId === meta.sessionId && !claimed.has(q.sessionId))
       if (!question) continue
+      claimed.add(question.sessionId)
       items.push(
         card(project, meta, bridgeChoiceRequest(question), {
           // Parked since the bridge saw it, which is the wait that matters here — not the hand-off.
